@@ -379,14 +379,20 @@ describe('changelog email signup connected flow (component + API + mail sink)', 
     const correctedRow = store.rows.find(
       row => row.email === 'artist@example.com'
     );
+    if (!correctedRow) {
+      throw new Error(
+        'The corrected email must have a persisted subscriber row'
+      );
+    }
     correctedRow.tokenExpiresAt = new Date(
       (correctedRow.tokenExpiresAt as Date).getTime() - 61_000
     );
-    fireEvent.click(
-      within(correctedPanel).getByRole('button', {
-        name: 'Resend Confirmation',
-      })
-    );
+    const correctedResend = within(correctedPanel).getByRole('button', {
+      name: 'Resend Confirmation',
+    });
+    // The corrected submission consumed its token; wait for the fresh one.
+    await waitFor(() => expect(correctedResend).not.toBeDisabled());
+    fireEvent.click(correctedResend);
 
     await waitFor(() => {
       expect(
