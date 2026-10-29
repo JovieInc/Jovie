@@ -526,6 +526,12 @@ jobs:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
         run: |
           set -euo pipefail
+          # The job checks out the landed production SHA; a build from before
+          # JOV-9822 has no key script and no /start spec, so skip cleanly.
+          if [ ! -f scripts/synthetic-passage-key.mjs ]; then
+            echo "::notice::Landed build predates the canary passage key; /start certification is skipped for it."
+            exit 0
+          fi
           doppler run --project jovie-web --config prd \
             --only-secrets=CRON_SECRET --no-fallback -- \
             env -u DOPPLER_TOKEN node scripts/synthetic-passage-key.mjs
@@ -545,6 +551,8 @@ jobs:
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
           test -n "$PRODUCTION_BASE_URL"
+          specs=(tests/e2e/smoke-prod-auth.spec.ts)
+          [ -f tests/e2e/prod-cert-start-chat.spec.ts ] && specs+=(tests/e2e/prod-cert-start-chat.spec.ts)
           doppler run --project jovie-web --config prd \
             --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
             --no-fallback -- env -u DOPPLER_TOKEN \
@@ -554,7 +562,7 @@ jobs:
               EXPECTED_VERCEL_ENVIRONMENT=production \
               PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$RUNNER_TEMP/playwright-dynamic-cookie-values" \
                 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-                  pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts tests/e2e/prod-cert-start-chat.spec.ts --project=chromium --reporter=line
+                  pnpm exec playwright test "${specs[@]}" --project=chromium --reporter=line
           echo "auth_smoke_status=passed" >> "$GITHUB_OUTPUT"
         env:
           EXPECTED_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
