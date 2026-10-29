@@ -41,6 +41,30 @@ IDLE_LOG_MAX_BYTES = 512 * 1024
 NO_PUSH_S = 3600
 MERGE_GROUP_START_P50_MIN = 5.0
 MERGE_GROUP_MIN_RUNS = 3
+# Per-pool merge-gate wait (2026-10-29): after #23586 moved the gate jobs to the gem pool its
+# created->started wait was p50 120 s / p95 451 s while hosted jobs in the same groups waited
+# p50 3 s / p95 33 s. Alarm when the self-hosted pool is the slower one, or hosted is saturated.
+POOL_MIN_JOBS = 5
+POOL_SLOWER_MARGIN_S = 30.0
+HOSTED_SATURATED_P50_S = 120.0
+SELF_HOSTED_LABELS = frozenset({"self-hosted", "jovie-fixed"})
+
+
+def runner_pool(labels) -> str:
+    """'self-hosted' when a job asked for the gem pool, else 'hosted'."""
+    return "self-hosted" if any(str(l).lower() in SELF_HOSTED_LABELS for l in labels or []) else "hosted"
+
+
+def pool_waits(waits_by_pool: dict) -> dict:
+    """p50/p95/n of created->started seconds per runner pool."""
+    out = {}
+    for pool, waits in sorted(waits_by_pool.items()):
+        if not waits:
+            continue
+        ordered = sorted(waits)
+        p95 = ordered[max(0, min(len(ordered) - 1, -(-95 * len(ordered) // 100) - 1))]
+        out[pool] = {"n": len(ordered), "p50S": round(statistics.median(ordered), 1), "p95S": round(p95, 1)}
+    return out
 LEASE_HELD_MIN = 45.0
 IDLE_DOMINANT_FRACTION = 0.5
 IDLE_DOMINANT_MIN_EXITS = 6
@@ -165,7 +189,7 @@ def sample_release_flow(state: Path, now: float, run=None, repo: str = REPO) -> 
         groups = _gh_json(run, f"repos/{repo}/actions/runs?event=merge_group&per_page=30&created=%3E%3D{since}")
         # run_started_at equals created_at for merge_group runs; the real wait is a job's
         # created_at -> started_at (runner assignment), sampled over the latest runs.
-        waits, sampled = [], 0
+        waits, sampled, by_pool = [], 0, {}
         for row in sorted(groups.get("workflow_runs") or [], key=lambda r: str(r.get("created_at")), reverse=True):
             if sampled >= MERGE_GROUP_SAMPLE_RUNS:
                 break
@@ -176,6 +200,7 @@ def sample_release_flow(state: Path, now: float, run=None, repo: str = REPO) -> 
                 created, started = _iso_epoch(job.get("created_at")), _iso_epoch(job.get("started_at"))
                 if created is not None and started is not None and started >= created:
                     waits.append((started - created) / 60)
+                    by_pool.setdefault(runner_pool(job.get("labels")), []).append(started - created)
         held = _gh_json(run, f"repos/{repo}/actions/workflows/{CONTROLLER_WORKFLOW}/runs?status=in_progress&per_page=10")
         leases = [(now - started) / 60 for row in held.get("workflow_runs") or []
                   if (started := _iso_epoch(row.get("run_started_at"))) is not None]
@@ -193,6 +218,7 @@ def sample_release_flow(state: Path, now: float, run=None, repo: str = REPO) -> 
                   "mergeGroupRuns": sampled, "mergeGroupJobs": len(waits),
                   "mergeGroupStartP50Min": round(statistics.median(waits), 2) if waits else None,
                   "mergeGroupStartMaxMin": round(max(waits), 2) if waits else None,
+                  "mergeGroupStartByPool": pool_waits(by_pool),
                   "leaseHeldMin": round(max(leases), 1) if leases else 0.0, "leaseRunIds": runs[:3],
                   "queuedRuns": queued_total, "queuedOldestMin": oldest_min}
         tmp = path.with_suffix(".tmp")
@@ -470,6 +496,18 @@ def judge(obs: dict) -> dict[str, str]:
             f"stage merge-group created->started: p50 {flow['mergeGroupStartP50Min']} min (max "
             f"{flow.get('mergeGroupStartMaxMin')}) over {flow.get('mergeGroupJobs')} jobs in the latest {flow['mergeGroupRuns']} merge_group runs; "
             "runner capacity or Actions queueing; check runner-heartbeat and runner-health-monitor")
+    pools = flow.get("mergeGroupStartByPool") or {}
+    hosted, fixed = pools.get("hosted") or {}, pools.get("self-hosted") or {}
+    if (hosted.get("n") or 0) >= POOL_MIN_JOBS and (fixed.get("n") or 0) >= POOL_MIN_JOBS \
+            and fixed["p50S"] > hosted["p50S"] + POOL_SLOWER_MARGIN_S:
+        alerts["throughput-merge-gate-pool"] = (
+            f"stage merge-group created->started: self-hosted p50 {fixed['p50S']}s / p95 {fixed['p95S']}s vs hosted "
+            f"p50 {hosted['p50S']}s / p95 {hosted['p95S']}s; route merge-gate jobs to hosted: "
+            "gh variable delete MERGE_GATE_POOL -R JovieInc/Jovie")
+    elif (hosted.get("n") or 0) >= POOL_MIN_JOBS and not fixed and hosted["p50S"] > HOSTED_SATURATED_P50_S:
+        alerts["throughput-merge-gate-pool"] = (
+            f"stage merge-group created->started: hosted p50 {hosted['p50S']}s / p95 {hosted['p95S']}s (saturated); "
+            "consider the gem pool: gh variable set MERGE_GATE_POOL --body fixed -R JovieInc/Jovie")
     if (flow.get("leaseHeldMin") or 0) > LEASE_HELD_MIN:
         alerts["throughput-prod-lease-held"] = (
             f"stage deploy: a Production Controller run has held the production lease {flow['leaseHeldMin']} min "
