@@ -180,7 +180,11 @@ async function cmdJudge(opts) {
   const reportPath = join(outDir, 'report.html');
   writeFileSync(
     reportPath,
-    renderReport({ receipt, penRefs, title: `Dogfood judge: ${surface.title}` })
+    renderReport({
+      receipt,
+      penRefs,
+      title: `${surface.title.split(':')[0]} Judge Run`,
+    })
   );
   process.stdout.write(
     `${JSON.stringify({ timings, nothingWrong: receipt.signoff.nothingWrong, signed: Boolean(receipt.signature), verdict: receipt.verdict, costUsd: receipt.costUsd, steps: receipt.steps.length, findings: events.length, blockers: events.filter(e => e.severity === 'blocker').length, receipt: receiptPath, report: reportPath, remediation: join(outDir, 'remediation.jsonl') }, null, 2)}\n`
