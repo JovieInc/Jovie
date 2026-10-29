@@ -1,6 +1,6 @@
 {
-  "version": "66d1070a3f9c",
-  "toolsListHash": "4137a7fe333b43d1adaf5fdd14d3cfbd80092e4db74b89392773e7fb70064a16",
+  "version": "b2aeb0d50f62",
+  "toolsListHash": "5d4c361dd8af47313af5a5f273b1bdea84b68e21e5099741df8d0f5cd90d5f94",
   "listingHash": "7883dee8a0ce9226462c05def64fcd2cae40c2fce1eab660e996c1b12b7363b6",
   "regenerate": "pnpm --filter @jovie/web agent-distribution:generate",
   "files": [
@@ -18,9 +18,9 @@
     "tools-list.snapshot.json"
   ],
   "versions": {
-    "muse": "067fb220a903",
-    "grok": "c58d6b87a6df",
-    "chatgpt": "597a6b37b4ef",
-    "claude": "4f27f87d6278"
+    "muse": "95c2f8460164",
+    "grok": "67ebd6d4eb40",
+    "chatgpt": "ceccd7c4f84f",
+    "claude": "9ee886e0a97c"
   }
 }

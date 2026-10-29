@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "jovie-agent",
-  "version": "597a6b37b4ef",
+  "version": "ceccd7c4f84f",
   "description": "Find an artist and draft their Jovie page and release smart link. Nothing is published.",
   "author": {
     "name": "Jovie",
@@ -25,9 +25,9 @@
         "developerName": "Jovie",
         "category": "Entertainment",
         "capabilities": [
-          "artist.search_or_import",
-          "workspace.create_draft",
-          "release.prepare_launch"
+          "Find artist",
+          "Create artist draft",
+          "Prepare release launch"
         ],
         "websiteURL": "https://jov.ie",
         "supportURL": "https://jov.ie/support",
@@ -117,8 +117,8 @@
     }
   },
   "_generated": {
-    "version": "597a6b37b4ef",
-    "toolsListHash": "4137a7fe333b43d1adaf5fdd14d3cfbd80092e4db74b89392773e7fb70064a16",
+    "version": "ceccd7c4f84f",
+    "toolsListHash": "5d4c361dd8af47313af5a5f273b1bdea84b68e21e5099741df8d0f5cd90d5f94",
     "listingHash": "7883dee8a0ce9226462c05def64fcd2cae40c2fce1eab660e996c1b12b7363b6",
     "regenerate": "pnpm --filter @jovie/web agent-distribution:generate"
   }

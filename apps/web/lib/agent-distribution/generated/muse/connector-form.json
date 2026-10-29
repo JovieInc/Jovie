@@ -1,7 +1,7 @@
 {
   "_generated": {
-    "version": "067fb220a903",
-    "toolsListHash": "4137a7fe333b43d1adaf5fdd14d3cfbd80092e4db74b89392773e7fb70064a16",
+    "version": "95c2f8460164",
+    "toolsListHash": "5d4c361dd8af47313af5a5f273b1bdea84b68e21e5099741df8d0f5cd90d5f94",
     "listingHash": "7883dee8a0ce9226462c05def64fcd2cae40c2fce1eab660e996c1b12b7363b6",
     "regenerate": "pnpm --filter @jovie/web agent-distribution:generate"
   },
@@ -35,9 +35,10 @@
   "tools": [
     {
       "name": "artist.search_or_import",
-      "title": null,
+      "title": "Find artist",
       "description": "Resolve a public Spotify/Apple artist identity or return ranked name candidates. Select an exact ID before drafting. Returns a private, seven-day draft_token; retain it for workspace.create_draft. Creates no account and does not publish.",
       "annotations": {
+        "title": "Find artist",
         "readOnlyHint": true,
         "destructiveHint": false,
         "openWorldHint": true
@@ -45,9 +46,10 @@
     },
     {
       "name": "workspace.create_draft",
-      "title": null,
+      "title": "Create artist draft",
       "description": "Create or resume an unpublished visibility draft using the exact artist_id and draft_token from artist.search_or_import. Retrying the same token resumes the same draft; a token for another artist is rejected. Never claims ownership, publishes or purchases.",
       "annotations": {
+        "title": "Create artist draft",
         "readOnlyHint": false,
         "destructiveHint": false,
         "idempotentHint": true,
@@ -56,9 +58,10 @@
     },
     {
       "name": "release.prepare_launch",
-      "title": null,
+      "title": "Prepare release launch",
       "description": "Resolve public release facts and create or resume an unpublished artist, release-page, and smart-link draft. Requires the draft capability. Returns only unresolved questions and never claims, publishes, or purchases.",
       "annotations": {
+        "title": "Prepare release launch",
         "readOnlyHint": false,
         "destructiveHint": false,
         "idempotentHint": true,

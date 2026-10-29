@@ -1,8 +1,9 @@
 {
-  "toolsListHash": "4137a7fe333b43d1adaf5fdd14d3cfbd80092e4db74b89392773e7fb70064a16",
+  "toolsListHash": "5d4c361dd8af47313af5a5f273b1bdea84b68e21e5099741df8d0f5cd90d5f94",
   "tools": [
     {
       "name": "artist.search_or_import",
+      "title": "Find artist",
       "description": "Resolve a public Spotify/Apple artist identity or return ranked name candidates. Select an exact ID before drafting. Returns a private, seven-day draft_token; retain it for workspace.create_draft. Creates no account and does not publish.",
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -175,6 +176,7 @@
         "additionalProperties": false
       },
       "annotations": {
+        "title": "Find artist",
         "readOnlyHint": true,
         "destructiveHint": false,
         "openWorldHint": true
@@ -182,6 +184,7 @@
     },
     {
       "name": "workspace.create_draft",
+      "title": "Create artist draft",
       "description": "Create or resume an unpublished visibility draft using the exact artist_id and draft_token from artist.search_or_import. Retrying the same token resumes the same draft; a token for another artist is rejected. Never claims ownership, publishes or purchases.",
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -205,6 +208,7 @@
         "additionalProperties": false
       },
       "annotations": {
+        "title": "Create artist draft",
         "readOnlyHint": false,
         "destructiveHint": false,
         "idempotentHint": true,
@@ -213,6 +217,7 @@
     },
     {
       "name": "release.prepare_launch",
+      "title": "Prepare release launch",
       "description": "Resolve public release facts and create or resume an unpublished artist, release-page, and smart-link draft. Requires the draft capability. Returns only unresolved questions and never claims, publishes, or purchases.",
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -294,6 +299,7 @@
         "additionalProperties": false
       },
       "annotations": {
+        "title": "Prepare release launch",
         "readOnlyHint": false,
         "destructiveHint": false,
         "idempotentHint": true,
