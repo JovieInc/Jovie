@@ -270,8 +270,13 @@ describe('UserButton billing actions', () => {
         firstName: null,
         lastName: null,
         username: null,
-        primaryEmailAddress: { emailAddress: 'john.doe+tag@example.com' },
-        emailAddresses: [{ emailAddress: 'john.doe+tag@example.com' }],
+        primaryEmailAddress: {
+          id: 'email_only',
+          emailAddress: 'john.doe+tag@example.com',
+        },
+        emailAddresses: [
+          { id: 'email_only', emailAddress: 'john.doe+tag@example.com' },
+        ],
       },
     });
     mockUseBillingStatusQuery.mockReturnValue({
