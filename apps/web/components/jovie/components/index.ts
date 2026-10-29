@@ -24,7 +24,6 @@ export { ErrorDisplay } from './ErrorDisplay';
 export { FeatureIntroCard, FeatureIntroHost } from './FeatureIntroCard';
 export { FeedbackForm } from './FeedbackForm';
 export { ImagePreviewStrip } from './ImagePreviewStrip';
-export { OvieEditorialBriefing } from './OvieEditorialBriefing';
 export { ScrollToBottom } from './ScrollToBottom';
 export {
   activeEntityFor,

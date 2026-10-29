@@ -119,14 +119,17 @@ export function bodyContainsOnboardingSessionBoundary(body: string): boolean {
  * let a broken error page pass) and never an indefinite spinner.
  *
  * Sourced from the real contract:
- *  - `onboarding-handler.ts` stream `onError` copy
- *  - `OnboardingChat.getOnboardingErrorMessage` ("still connecting")
+ *  - `onboarding-handler.ts` stream `onError` copy (`STREAM_ERROR_LINE`)
+ *  - `getOnboardingErrorMessage` rewritten bodies
  *  - the handler's `temporarily unavailable` error bodies
  */
 export const ONBOARDING_TURN_FALLBACK_MESSAGES = [
   'Jovie hit a temporary issue while processing your message',
   'Jovie is still connecting. Try again in a moment.',
   'Onboarding chat is temporarily unavailable',
+  'Chat is temporarily unavailable. Try again in a moment.',
+  'Jovie could not send your message. Try again.',
+  'Lost the thread mid-sentence. Say that again and we pick it up.',
 ] as const;
 
 /**

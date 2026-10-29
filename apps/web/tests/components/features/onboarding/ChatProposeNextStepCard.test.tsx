@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChatProposeNextStepCard } from '@/components/features/onboarding/ChatProposeNextStepCard';
@@ -6,7 +6,7 @@ import type { OnboardingProfileBuilderState } from '@/components/features/onboar
 import { OnboardingProfileReviewContext } from '@/components/features/onboarding/OnboardingProfileReviewContext';
 
 const { authState, trackMock } = vi.hoisted(() => ({
-  authState: { isSignedIn: false },
+  authState: { isSignedIn: false, providerPending: false },
   trackMock: vi.fn(),
 }));
 
@@ -28,7 +28,13 @@ vi.mock('@/features/auth', () => ({
       data-return-to={fallbackRedirectUrl}
       data-one-tap-suppressed={suppressOneTap}
     >
-      signup
+      <button
+        type='button'
+        data-auth-provider-slot='google'
+        disabled={authState.providerPending}
+      >
+        Continue with Google
+      </button>
     </div>
   ),
 }));
@@ -121,6 +127,7 @@ const preview: OnboardingProfileBuilderState = {
 describe('profile review before authentication', () => {
   beforeEach(() => {
     authState.isSignedIn = false;
+    authState.providerPending = false;
   });
 
   function reviewCard(state = preview, onEditDetails = vi.fn()) {
@@ -144,6 +151,9 @@ describe('profile review before authentication', () => {
     await userEvent.click(
       screen.getByRole('button', { name: /keep this profile/i })
     );
+    expect(
+      screen.getByRole('button', { name: /continue with google/i })
+    ).toHaveFocus();
     expect(screen.getByTestId('waitlist-signup')).toHaveAttribute(
       'data-return-to',
       '/start?handle=fixtureartist'
@@ -159,6 +169,9 @@ describe('profile review before authentication', () => {
       screen.getByRole('button', { name: /back to preview/i })
     );
     expect(screen.queryByTestId('waitlist-signup')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /keep this profile/i })
+    ).toHaveFocus();
   });
 
   it('requires a new keep action after the artist or handle changes', async () => {
@@ -171,6 +184,45 @@ describe('profile review before authentication', () => {
     expect(
       screen.getByRole('button', { name: /keep this profile/i })
     ).toBeEnabled();
+  });
+
+  it('waits for the real provider to become ready, and cancels pending focus on Back', async () => {
+    authState.providerPending = true;
+    const { rerender } = render(reviewCard());
+    await userEvent.click(
+      screen.getByRole('button', { name: /keep this profile/i })
+    );
+    expect(
+      screen.getByRole('button', { name: /continue with google/i })
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: /continue with google/i })
+    ).not.toHaveFocus();
+    authState.providerPending = false;
+    rerender(reviewCard());
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: /continue with google/i })
+      ).toHaveFocus()
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: /back to preview/i })
+    );
+    authState.providerPending = true;
+    await userEvent.click(
+      screen.getByRole('button', { name: /keep this profile/i })
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: /back to preview/i })
+    );
+    authState.providerPending = false;
+    rerender(reviewCard());
+    expect(
+      screen.queryByRole('button', { name: /continue with google/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /keep this profile/i })
+    ).toHaveFocus();
   });
 
   it('edits the existing conversation and never invents a preview when source state is missing', async () => {

@@ -44,6 +44,19 @@ export function getFocusableElements(container: HTMLElement): HTMLElement[] {
   ).filter(element => !element.hasAttribute('inert'));
 }
 
+/**
+ * Non-modal companion surfaces (e.g. the desktop "Open On Phone" QR card that
+ * pay mode opens beside the pay drawer) opt out of background isolation with
+ * `data-modal-companion`. Without it the card stays visible but inert, so its
+ * close control can be neither clicked nor reached by assistive tech.
+ */
+function isModalCompanion(element: Element): boolean {
+  return (
+    element instanceof HTMLElement &&
+    element.closest('[data-modal-companion]') !== null
+  );
+}
+
 function getModalBackgroundElements(modal: HTMLElement): HTMLElement[] {
   const background: HTMLElement[] = [];
   let current: HTMLElement | null = modal;
@@ -53,7 +66,8 @@ function getModalBackgroundElements(modal: HTMLElement): HTMLElement[] {
       if (
         sibling !== current &&
         sibling instanceof HTMLElement &&
-        sibling.dataset.modalBackdrop === undefined
+        sibling.dataset.modalBackdrop === undefined &&
+        sibling.dataset.modalCompanion === undefined
       ) {
         background.push(sibling);
       }
@@ -229,6 +243,7 @@ export function useModalFocusBoundary(
       ) {
         return;
       }
+      if (target instanceof Element && isModalCompanion(target)) return;
       const containing = getContainingModal(target);
       if (containing && containing !== modal) return;
       focusInto();

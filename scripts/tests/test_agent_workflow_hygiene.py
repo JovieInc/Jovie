@@ -503,7 +503,7 @@ def test_merge_gated_secret_scans_use_clean_hosted_runners() -> None:
     """Secret scanners need a fresh, authoritative Git object store."""
     for job_name in ("gitleaks", "trufflehog"):
         block = _job_block("security.yml", job_name)
-        assert "runs-on: ubuntu-latest" in block, job_name
+        assert _HOSTED_RUNS_ON.search(block), job_name
         assert "runs-on: ${{ vars.CI_FAST_RUNNER }}" not in block, job_name
 
 
@@ -554,7 +554,7 @@ def test_gh_fleet_controllers_use_hosted_cli_contract() -> None:
     """Controller jobs invoking gh must not depend on heterogeneous runners."""
     for workflow, job_name in FLEET_CONTROLLER_JOBS:
         block = _job_block(workflow, job_name)
-        assert "runs-on: ubuntu-latest" in block, (workflow, job_name)
+        assert _HOSTED_RUNS_ON.search(block), (workflow, job_name)
         assert "run: gh --version" in block, (workflow, job_name)
 
 
@@ -568,7 +568,7 @@ def test_conflict_handler_uses_shared_non_cancelling_canary_queue() -> None:
         encoding="utf-8"
     )
 
-    assert "runs-on: ubuntu-latest" in block
+    assert _HOSTED_RUNS_ON.search(block)
     assert "runs-on: ${{ vars.CI_FAST_RUNNER }}" not in block
     assert "github.event.workflow_run.event == 'pull_request'" in block
     assert "github.event.workflow_run.conclusion != 'cancelled'" in block
@@ -669,7 +669,7 @@ def test_conflict_paths_preserve_native_queue_and_use_only_non_force_delivery() 
     assert "gh pr update-branch" not in fleet
     assert "JOV-INV-021" in workflow
     assert "fx ask" in workflow
-    assert "FX_MODEL: openai/gpt-5.6-sol" in workflow
+    assert "FX_MODEL: zai/glm-5.3" in workflow
     assert workflow.count("actions/create-github-app-token@") >= 2
     assert (
         workflow.count(
@@ -730,7 +730,7 @@ def test_standalone_health_monitors_have_independent_bounded_schedules() -> None
     assert not (WORKFLOWS / "main-ci-health-monitor.yml").exists()
 
     for workflow, job_name in (("runner-health-monitor.yml", "monitor"),):
-        assert "runs-on: ubuntu-latest" in _job_block(workflow, job_name)
+        assert _HOSTED_RUNS_ON.search(_job_block(workflow, job_name))
 
 
 def test_agent_tick_stays_deleted() -> None:
@@ -1303,7 +1303,7 @@ def test_model_and_advisory_jobs_never_consume_fixed_ci_runners() -> None:
     """Long or advisory work cannot starve deterministic merge capacity."""
     for workflow, job_name in MODEL_OR_ADVISORY_JOBS:
         block = _job_block(workflow, job_name)
-        assert "runs-on: ubuntu-latest" in block, (workflow, job_name)
+        assert _HOSTED_RUNS_ON.search(block), (workflow, job_name)
         assert "CI_FAST_RUNNER" not in block, (workflow, job_name)
         assert "CI_UNIT_RUNNER" not in block, (workflow, job_name)
 
@@ -1312,7 +1312,7 @@ def test_deep_evidence_jobs_use_hosted_capacity() -> None:
     """Deep evidence must not consume the five fixed merge-throughput runners."""
     for workflow, job_name in HOSTED_DEEP_EVIDENCE_JOBS:
         block = _job_block(workflow, job_name)
-        assert "runs-on: ubuntu-latest" in block, (workflow, job_name)
+        assert _HOSTED_RUNS_ON.search(block), (workflow, job_name)
         assert "CI_FAST_RUNNER" not in block, (workflow, job_name)
         assert "CI_UNIT_RUNNER" not in block, (workflow, job_name)
 
@@ -1321,7 +1321,7 @@ def test_post_merge_fanout_never_consumes_fixed_ci_capacity() -> None:
     """Every merged PR fans these jobs out, so they must stay off fixed runners."""
     for workflow, job_name in HOSTED_POST_MERGE_JOBS:
         block = _job_block(workflow, job_name)
-        assert "runs-on: ubuntu-latest" in block, (workflow, job_name)
+        assert _HOSTED_RUNS_ON.search(block), (workflow, job_name)
         assert "CI_FAST_RUNNER" not in block, (workflow, job_name)
         assert "CI_UNIT_RUNNER" not in block, (workflow, job_name)
 
@@ -1330,7 +1330,7 @@ def test_api_only_pr_controllers_never_consume_fixed_ci_capacity() -> None:
     """Queue and check API work must leave fixed runners to deterministic tests."""
     for workflow, job_name in HOSTED_API_ONLY_PR_CONTROLLERS:
         block = _job_block(workflow, job_name)
-        assert "runs-on: ubuntu-latest" in block, (workflow, job_name)
+        assert _HOSTED_RUNS_ON.search(block), (workflow, job_name)
         assert "CI_FAST_RUNNER" not in block, (workflow, job_name)
         assert "CI_UNIT_RUNNER" not in block, (workflow, job_name)
 
@@ -1387,7 +1387,7 @@ def test_background_controllers_never_consume_fixed_ci_capacity() -> None:
     """Schedules, API controllers, and dormant lanes cannot steal unit slots."""
     for workflow, job_name in HOSTED_BACKGROUND_CONTROLLER_JOBS:
         block = _job_block(workflow, job_name)
-        assert "runs-on: ubuntu-latest" in block, (workflow, job_name)
+        assert _HOSTED_RUNS_ON.search(block), (workflow, job_name)
         assert "CI_FAST_RUNNER" not in block, (workflow, job_name)
         assert "CI_UNIT_RUNNER" not in block, (workflow, job_name)
 
@@ -1608,3 +1608,5 @@ def test_retired_intake_and_landing_workflows_stay_deleted() -> None:
         "stuck-draft-autoclose.yml",
     ):
         assert not (WORKFLOWS / name).exists(), name
+
+_HOSTED_RUNS_ON = re.compile(r"runs-on: ubuntu-(?:latest|24\.04)")

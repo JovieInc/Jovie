@@ -5,12 +5,18 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
+import { APP_ROUTES } from '@/constants/routes';
 import { agentCheckoutCorrelation } from '@/lib/acquisition/agent-checkout-correlation';
+import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
 import {
   FIRST_TOUCH_COOKIE,
   openFirstTouchEnvelope,
 } from '@/lib/acquisition/first-touch-envelope';
 import { getCachedAuth } from '@/lib/auth/cached';
+import {
+  CLAIM_FLOW_COOKIE,
+  claimStateHref,
+} from '@/lib/claim/artist-offer-claim';
 import { publicEnv } from '@/lib/env-public';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
@@ -275,10 +281,17 @@ export async function POST(request: NextRequest) {
     const baseUrl = publicEnv.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const idempotencyBucket = Math.floor(Date.now() / (5 * 60 * 1000));
 
+    // Self-serve claim (/claim/start) returns to the billing success state,
+    // which confirms payment and entitlement, and to /claim on cancel.
+    const isClaimFlow =
+      checkoutSource === 'onboarding' &&
+      request.cookies.get(CLAIM_FLOW_COOKIE)?.value === '1';
+
+    const sourceKey = isClaimFlow ? 'claim' : (checkoutSource ?? 'default');
     const correlationPart = checkoutCorrelationIdempotencyPart(correlation);
     const idempotencyKey = correlationPart
-      ? `checkout:${userId}:${priceId}:${checkoutSource ?? 'default'}:${correlationPart}:${idempotencyBucket}`
-      : `checkout:${userId}:${priceId}:${checkoutSource ?? 'default'}:${idempotencyBucket}`;
+      ? `checkout:${userId}:${priceId}:${sourceKey}:${correlationPart}:${idempotencyBucket}`
+      : `checkout:${userId}:${priceId}:${sourceKey}:${idempotencyBucket}`;
 
     const planIdSuffix = selectedPlan
       ? `&plan_id=${encodeURIComponent(selectedPlan)}`
@@ -286,7 +299,10 @@ export async function POST(request: NextRequest) {
 
     let successUrl: string;
     let cancelUrl: string;
-    if (checkoutSource === 'onboarding') {
+    if (isClaimFlow) {
+      successUrl = `${baseUrl}${APP_ROUTES.BILLING_SUCCESS}?session_id={CHECKOUT_SESSION_ID}${planIdSuffix}`;
+      cancelUrl = `${baseUrl}${claimStateHref('checkout_canceled')}`;
+    } else if (checkoutSource === 'onboarding') {
       successUrl = `${baseUrl}${onboardingReturnTo}&upgrade=success&session_id={CHECKOUT_SESSION_ID}${planIdSuffix}`;
       cancelUrl = `${baseUrl}${onboardingReturnTo}&upgrade=cancel`;
     } else if (checkoutSource === 'youtube_thumbnails') {
@@ -333,6 +349,7 @@ export async function POST(request: NextRequest) {
       undefined,
       { eventIdentity: `checkout:${session.id}` }
     );
+    await recordArtistOfferStage(correlation.acquisitionId, 'checkout');
 
     return NextResponse.json(
       { sessionId: session.id, url: session.url },

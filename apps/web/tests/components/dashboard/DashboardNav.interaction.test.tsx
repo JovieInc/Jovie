@@ -34,7 +34,6 @@ describe('DashboardNav interactions', () => {
   it('exposes an icon and label for each canonical navigation item', () => {
     renderDashboardNav({
       renderFn: render,
-      appFlags: { PROFILES_WORKSPACE: true },
     });
 
     for (const label of PRIMARY_LABELS) {
@@ -120,7 +119,7 @@ describe('DashboardNav interactions', () => {
   it('routes Identity through root navigation without a duplicate avatar button', () => {
     renderDashboardNav({
       renderFn: render,
-      appFlags: { PROFILES_WORKSPACE: true },
+
       overrides: {
         selectedProfile: {
           id: 'profile_123',
@@ -238,7 +237,7 @@ describe('DashboardNav interactions', () => {
     vi.useFakeTimers();
     renderDashboardNav({
       renderFn: render,
-      appFlags: { PROFILES_WORKSPACE: true },
+
       overrides: {
         selectedProfile: {
           id: 'profile_123',
@@ -288,7 +287,6 @@ describe('DashboardNav interactions', () => {
     mockUsePathname.mockReturnValue('/demo/showcase/settings');
     renderDashboardNav({
       renderFn: render,
-      appFlags: { PROFILES_WORKSPACE: true },
     });
 
     const identityLink = screen.getByRole('link', { name: 'Identity' });

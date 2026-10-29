@@ -63,41 +63,34 @@ describe('DashboardNav route warming', () => {
     resetDashboardNavTestMocks();
   });
 
-  it.each([false, true])(
-    'leaves home attention to the brand row and retains destinations with INBOX_HOME=%s',
-    inboxHome => {
-      const label = 'Inbox';
-      const destinations = () =>
-        screen.getAllByRole('link').map(link => ({
-          label: link.getAttribute('aria-label') ?? link.textContent?.trim(),
-          href: link.getAttribute('href'),
-        }));
-      const baseline = renderDashboardNav({
-        renderFn: render,
-        appFlags: { INBOX_HOME: inboxHome },
-      });
-      const attention = document.querySelector('[data-inbox-attention]');
-      expect(attention).toHaveAccessibleName(label);
-      expect(attention).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
-      const retained = destinations();
-      const attentionIndex = screen
-        .getAllByRole('link')
-        .findIndex(link => link === attention);
-      retained.splice(attentionIndex, 1);
-      expect(retained.length).toBeGreaterThan(0);
-      baseline.unmount();
-      renderDashboardNav({
-        renderFn: render,
-        headerOwnsInbox: true,
-        appFlags: { INBOX_HOME: inboxHome },
-      });
-      expect(document.querySelector('[data-inbox-attention]')).toBeNull();
-      expect(destinations()).toEqual(retained);
-      expect(
-        document.querySelector('[data-sidebar-search-divider]')
-      ).toBeNull();
-    }
-  );
+  it('leaves home attention to the brand row and retains destinations', () => {
+    const label = 'Inbox';
+    const destinations = () =>
+      screen.getAllByRole('link').map(link => ({
+        label: link.getAttribute('aria-label') ?? link.textContent?.trim(),
+        href: link.getAttribute('href'),
+      }));
+    const baseline = renderDashboardNav({
+      renderFn: render,
+    });
+    const attention = document.querySelector('[data-inbox-attention]');
+    expect(attention).toHaveAccessibleName(label);
+    expect(attention).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
+    const retained = destinations();
+    const attentionIndex = screen
+      .getAllByRole('link')
+      .findIndex(link => link === attention);
+    retained.splice(attentionIndex, 1);
+    expect(retained.length).toBeGreaterThan(0);
+    baseline.unmount();
+    renderDashboardNav({
+      renderFn: render,
+      headerOwnsInbox: true,
+    });
+    expect(document.querySelector('[data-inbox-attention]')).toBeNull();
+    expect(destinations()).toEqual(retained);
+    expect(document.querySelector('[data-sidebar-search-divider]')).toBeNull();
+  });
 
   it('keeps the divider when a search surface precedes navigation actions', () => {
     renderDashboardNav({
@@ -110,22 +103,21 @@ describe('DashboardNav route warming', () => {
     ).toBeInTheDocument();
   });
 
-  it('fully prefetches every canonical dynamic customer route', () => {
+  it('does not full-prefetch customer routes on mount', () => {
     renderDashboardNav({
       renderFn: render,
-      appFlags: { PROFILES_WORKSPACE: true },
     });
 
     for (const label of ['New Chat', 'Identity', 'Work', 'Audience']) {
       expect(screen.getByRole('link', { name: label })).toHaveAttribute(
         'data-prefetch',
-        'true'
+        'false'
       );
     }
     const homeLinks = screen.getAllByRole('link', { name: 'Inbox' });
     expect(homeLinks).toHaveLength(2);
     for (const link of homeLinks) {
-      expect(link).toHaveAttribute('data-prefetch', 'true');
+      expect(link).toHaveAttribute('data-prefetch', 'false');
     }
     for (const label of ['Library', 'Links', 'Contacts', 'Calendar', 'Tasks']) {
       expect(
@@ -290,10 +282,9 @@ describe('DashboardNav route warming', () => {
     expect(link.querySelector('[data-inbox-runtime-update]')).toBeNull();
   });
 
-  it('labels the header bell Inbox only when INBOX_HOME is on', () => {
+  it('labels the header bell Inbox without a rollout override', () => {
     const view = renderDashboardNav({
       renderFn: render,
-      appFlags: { INBOX_HOME: true },
     });
     expect(
       view.container.querySelector('[data-navigation-item-id="inbox"]')
@@ -311,6 +302,17 @@ describe('DashboardNav route warming', () => {
     const newChatAction = screen.getByRole('link', { name: 'New Chat' });
     expect(newChatAction).toBeInTheDocument();
     expect(newChatAction).toHaveAttribute('aria-label', 'New Chat');
+    expect(newChatAction.className).toContain('focus-visible:ring-inset');
+    expect(newChatAction.closest('nav')?.className).not.toContain(
+      'transform-gpu'
+    );
+    expect(newChatAction.closest('nav')?.className).toContain('overflow-clip');
+    expect(newChatAction.closest('nav')?.className).toContain(
+      'overflow-anchor-none'
+    );
+    expect(
+      newChatAction.closest('[data-sidebar-search-slot]')?.className
+    ).toContain('lg:overflow-hidden');
 
     const nav = container.querySelector('nav');
     expect(nav).not.toBeNull();

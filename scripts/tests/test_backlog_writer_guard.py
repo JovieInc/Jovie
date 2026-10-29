@@ -126,14 +126,17 @@ class SessionTest(unittest.TestCase):
         self.assertEqual(events[-1], "unlock")
 
     def test_exact_proof_and_minimum_write_window_boundaries(self):
-        code, rows, _ = self.run_session(seen=NOW - 38)
+        # Wall-clock proof boundaries only: freeze monotonic too, or >3s of CI
+        # load between fence start and the check shrinks the 22s window.
+        frozen = lambda: 1000.0  # noqa: E731
+        code, rows, _ = self.run_session(seen=NOW - 38, monotonic=frozen)
         self.assertEqual(code, 0)
         self.assertEqual(rows[1]["expiresAt"], NOW + guard.MIN_WRITE_WINDOW_S)
         for age, reason in [(38.000001, "native-proof-write-window-too-short"),
                             (60, "native-proof-write-window-too-short"),
                             (60.000001, "native-proof-expired")]:
             with self.subTest(age=age):
-                code, rows, _ = self.run_session(seen=NOW - age)
+                code, rows, _ = self.run_session(seen=NOW - age, monotonic=frozen)
                 self.assertEqual(code, 2)
                 self.assertEqual(rows[-1]["reason"], reason)
                 self.assertNotIn("locked", [row["phase"] for row in rows])
@@ -660,6 +663,71 @@ class ControlTest(unittest.TestCase):
             self.assertEqual(guard.main(), 2)
             self.assertEqual(send.call_args.args[0]["reason"], "writer-guard-not-installed")
             run.assert_not_called()
+
+
+class DefaultPreparationProtocolTest(unittest.TestCase):
+    def test_default_prepare_borrows_actual_control_pipe_and_original_start_without_reading_frames(self):
+        read, write = os.pipe()
+        try:
+            flags = fcntl.fcntl(read, fcntl.F_GETFL)
+            payload = b'{"op":"lock"}\n{"op":"check"}\n'
+            os.write(write, payload)
+            prepared = SimpleNamespace(observation={"allowed": False, "authorizesTransition": False,
+                                                    "authorizesDispatch": False})
+            messages = []
+            with patch.object(guard.sys, "stdin", SimpleNamespace(fileno=lambda: read)), \
+                 patch.object(guard.backlog_admission, "prepare_backlog_guard", return_value=prepared) as prepare:
+                self.assertEqual(guard.run_guard("JOV-6641", VERSION, send=messages.append,
+                                                monotonic=lambda: 123.0), 2)
+                prepare.assert_called_once_with("JOV-6641", VERSION, preparation_started=123.0, parent_control_fd=read)
+            self.assertEqual(os.read(read, len(payload)), payload)
+            self.assertEqual(fcntl.fcntl(read, fcntl.F_GETFL), flags)
+            self.assertFalse(messages[0]["authorizesDispatch"])
+            self.assertFalse(messages[0]["authorizesTransition"])
+        finally: os.close(read); os.close(write)
+
+    def test_closed_or_write_only_control_is_held_before_default_preparation(self):
+        read, write = os.pipe(); os.close(read)
+        try:
+            for fd in (read, write):
+                messages = []
+                with self.subTest(fd=fd), patch.object(guard.sys, "stdin", SimpleNamespace(fileno=lambda: fd)), \
+                     patch.object(guard.backlog_admission, "prepare_backlog_guard") as prepare:
+                    self.assertEqual(guard.run_guard("JOV-6641", VERSION, send=messages.append), 2)
+                    prepare.assert_not_called()
+                    self.assertEqual(messages[-1]["phase"], "held")
+                    self.assertFalse(messages[-1]["authorizesDispatch"])
+        finally: os.close(write)
+
+    def test_injected_prepare_retains_two_argument_contract_and_never_reads_stdin(self):
+        calls, messages = [], []
+        def prepare(identifier, version):
+            calls.append((identifier, version))
+            return SimpleNamespace(observation={"allowed": False})
+        with patch.object(guard.sys, "stdin", SimpleNamespace(fileno=lambda: (_ for _ in ()).throw(AssertionError("stdin")))):
+            self.assertEqual(guard.run_guard("JOV-6641", VERSION, prepare=prepare, send=messages.append), 2)
+        self.assertEqual(calls, [("JOV-6641", VERSION)])
+
+    def test_duplex_fifo_cannot_hide_parent_eof_and_is_held_before_prepare(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fifo = Path(tmp) / "duplex"; os.mkfifo(fifo)
+            fd = os.open(fifo, os.O_RDWR | os.O_NONBLOCK)
+            try:
+                flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+                messages = []
+                with patch.object(guard.sys, "stdin", SimpleNamespace(fileno=lambda: fd)), \
+                     patch.object(guard.backlog_admission, "prepare_backlog_guard") as prepare:
+                    self.assertEqual(guard.run_guard("JOV-6641", VERSION, send=messages.append), 2)
+                    prepare.assert_not_called()
+                self.assertEqual(messages[-1]["reason"], "parent-control-not-read-pipe")
+                self.assertEqual(fcntl.fcntl(fd, fcntl.F_GETFL), flags)
+            finally: os.close(fd)
+
+    def test_ordinary_collector_has_no_inferred_control_or_supplied_deadline(self):
+        expected = {"allowed": False, "authorizesDispatch": False}
+        with patch.object(guard.backlog_admission, "prepare_backlog_guard", return_value=SimpleNamespace(observation=expected)) as prepare:
+            self.assertEqual(guard.backlog_admission.collect_backlog_admission("JOV-6641", VERSION), expected)
+            prepare.assert_called_once_with("JOV-6641", VERSION, home=None, module_path=None)
 
 
 if __name__ == "__main__":

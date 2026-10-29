@@ -54,7 +54,7 @@ function assertPublishWorkflowContract(source: string): void {
   );
   expect(source).toMatch(/node-version-file: .nvmrc/);
   expect(source).toContain('registry-url: https://registry.npmjs.org');
-  expect(source).toMatch(/node --version.*v24\.21\.0/s);
+  expect(source).toMatch(/node --version.*v24\.22\.1/s);
   expect(source).toContain('pnpm install --frozen-lockfile');
   expect(source).toContain('pnpm --filter @jovie/cli run test:coverage');
   expect(source).toContain('pnpm --filter @jovie/cli run typecheck');
@@ -127,7 +127,7 @@ function assertPublishWorkflowContract(source: string): void {
   // JOV-7714: publish only bytes that passed the black-box chaos matrix.
   expect(source).toContain('needs: [chaos-tarball, chaos-matrix]');
   expect(source).toContain('os: [ubuntu-latest, macos-latest, windows-latest]');
-  expect(source).toMatch(/node: \[[^\]]*'24\.21\.0'[^\]]*'26'\]/);
+  expect(source).toMatch(/node: \[[^\]]*'24\.22\.1'[^\]]*'26'\]/);
   expect(source).toContain('fail-fast: false');
   // macOS cells try an idle self-hosted Mac first, hosted otherwise.
   expect(source).toContain('uses: ./.github/workflows/cli-chaos.yml');
@@ -650,4 +650,18 @@ describe('independent manual CLI release cadence', () => {
       expect(result.versionOutput).toBe('');
     }
   );
+});
+
+describe('push-triggered publication', () => {
+  // On push, `inputs.publish_mcp_only` renders as '' and `test "" = false`
+  // failed every push publish since 2026-10-13 (JOV-7919).
+  it('renders PUBLISH_MCP_ONLY as a literal boolean for push events', () => {
+    const lines = workflow.match(/PUBLISH_MCP_ONLY: .*/g) ?? [];
+    expect(lines.length).toBeGreaterThan(0);
+    for (const line of lines) {
+      expect(line).toBe(
+        'PUBLISH_MCP_ONLY: ${{ inputs.publish_mcp_only == true }}'
+      );
+    }
+  });
 });

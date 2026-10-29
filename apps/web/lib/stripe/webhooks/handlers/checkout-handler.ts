@@ -15,6 +15,8 @@
 
 import type Stripe from 'stripe';
 
+import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
+import { markClaimVerificationsPaid } from '@/lib/claim/claim-verification.server';
 import { enqueuePaidWelcomeAfterEntitlement } from '@/lib/email/paid-welcome';
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
 import { attributeLeadPaidConversionByAppUserId } from '@/lib/leads/funnel-events';
@@ -174,6 +176,34 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
       } catch (error) {
         await captureCriticalError(
           'Lead paid conversion outcome receipt failed',
+          error,
+          {
+            route: '/api/stripe/webhooks',
+            event: 'checkout.session.completed',
+            subscriptionId: subscription.id,
+            userId,
+          }
+        );
+        throw error;
+      }
+
+      const { acquisitionId } = extractCheckoutCorrelation(session.metadata);
+
+      // Funnel measurement only; never fails or retries the webhook.
+      await recordArtistOfferStage(acquisitionId, 'paid', stripeEventTimestamp);
+
+      // Claim integrity: a paid high-reach claim moves from awaiting_payment
+      // to pending_verification. Payment never links the artist identity; an
+      // operator verifies first. Retries are no-ops once transitioned.
+      try {
+        await markClaimVerificationsPaid({
+          appUserId: result.appUserId,
+          paidAt: stripeEventTimestamp,
+          acquisitionId,
+        });
+      } catch (error) {
+        await captureCriticalError(
+          'Claim verification payment transition failed',
           error,
           {
             route: '/api/stripe/webhooks',

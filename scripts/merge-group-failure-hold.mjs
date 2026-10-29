@@ -3,7 +3,12 @@
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { runGh } from '../packages/api-client/gh.ts';
 import { isTransientAdmissionFailureMessage } from './lib/merge-group-admission.mjs';
+import {
+  attributeAgainstAheadRun,
+  CI_FAST_REMAINING_JOB,
+} from './lib/merge-group-ahead-attribution.mjs';
 import {
   DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS,
   MERGE_GROUP_FAILURE_CONCLUSIONS,
@@ -17,6 +22,30 @@ export const ADMISSION_RECOVERY_CONTEXT = 'jovie-queue-admission-recovery/v1';
 export const ADMISSION_RECOVERY_SCHEMA =
   'jovie-merge-group-admission-recovery/v1';
 export const CI_WORKFLOW_ID = 178737329;
+// PR Size Guard owns the merge-group "Require combined-head workflows to
+// load" step. A ci.yml GitHub cannot load runs zero jobs and reports no
+// merge_group check (2026-10-20, #21826), so that required context is the
+// only merge-group evidence of the failure.
+export const PR_SIZE_GUARD_WORKFLOW_ID = 299199506;
+export const WORKFLOW_LOAD_STEP = 'Require combined-head workflows to load';
+// CI never reports on a group whose ci.yml does not load, so the queue would
+// wait for the ruleset's response timeout. Reporting the required context
+// failed on the exact synthetic head ejects the group now.
+export const WORKFLOW_LOAD_EJECT_CONTEXT = 'PR Ready';
+const MERGE_GROUP_FAILURE_WORKFLOWS = new Map([
+  [CI_WORKFLOW_ID, '.github/workflows/ci.yml'],
+  [PR_SIZE_GUARD_WORKFLOW_ID, '.github/workflows/pr-size-guard.yml'],
+]);
+
+/** Only the workflow-load step makes a PR Size Guard failure a source hold. */
+export function isHeldWorkflowFailure(run, failedSteps = []) {
+  if (run?.workflow_id === CI_WORKFLOW_ID) return true;
+  return (
+    run?.workflow_id === PR_SIZE_GUARD_WORKFLOW_ID &&
+    Array.isArray(failedSteps) &&
+    failedSteps.includes(WORKFLOW_LOAD_STEP)
+  );
+}
 export const FAILURE_CLASSES = Object.freeze([
   'deterministic-source',
   'retryable-product',
@@ -54,6 +83,27 @@ const ADMISSION_FAILURE_SUMMARIES = new Set([
 ]);
 const RETRY_DESCRIPTION =
   /^(spent|released):run=([1-9][0-9]*);try=([1-9][0-9]*)$/;
+// The base-branch fetch await step (ci.yml `&base-fetch-await`) emits exactly
+// this annotation when the detached background fetch never reports an exit
+// status. Only that timeout is infrastructure; any other fetch failure says
+// something we cannot attribute and stays unclassified.
+export const FETCH_STEP = 'Fetch base-branch history';
+export const FETCH_TIMEOUT_TITLE = 'Base-branch fetch';
+export const FETCH_TIMEOUT_MESSAGE =
+  'background fetch did not finish within 540s';
+// Aggregate steps that only report a lane job's failure, never originate one.
+const FETCH_TIMEOUT_CASCADE_STEPS = new Set([
+  'Require every ci-fast lane group to pass',
+  'Join exact lane results',
+  'Evaluate combined-head checks',
+]);
+const LANE_AGGREGATE_STEP = 'Require every ci-fast lane group to pass';
+const LANE_AGGREGATE_TITLE = 'ci-fast failed closed';
+// "ci-fast (structural web)" reports itself as `structural-web`.
+const laneOfJob = name =>
+  String(name ?? '')
+    .replace(/^ci-fast \((.*)\)$/, '$1')
+    .replace(/ /g, '-');
 const INFRASTRUCTURE_STEP =
   /^(?:Set up job|Initialize containers|Prepare all required actions|Complete job|Post |Checkout|Set up |Restore |Upload |Download )/i;
 
@@ -183,13 +233,111 @@ function instructionErrorsFromLog(log) {
   return errors.includes(RUNNER_EXIT_FAILURE) ? errors : null;
 }
 
-/** @param {{ conclusion?: string, failedSteps?: string[], annotationText?: string, changedFiles?: string[], admissionText?: string }} [input] */
+function hasOnlyFetchTimeoutErrors(text) {
+  const errors = String(text ?? '')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean);
+  let timeoutFound = false;
+  for (const error of errors) {
+    if (error === RUNNER_EXIT_FAILURE) continue;
+    if (error !== FETCH_TIMEOUT_MESSAGE) return false;
+    timeoutFound = true;
+  }
+  return timeoutFound;
+}
+
+/**
+ * Failure annotations of every failed fetch-step job, only when each job
+ * belongs to this exact run and attempt and carries nothing but the fetch
+ * timeout. Anything else (other run/attempt, other message, unreadable
+ * annotations) returns '' and leaves the failure unclassified.
+ * @param {{ id?: number, run_attempt?: number }} run
+ * @param {object[]} jobs
+ * @param {(job: object) => object[]} readAnnotations
+ */
+export function fetchTimeoutEvidence(run, jobs, readAnnotations) {
+  const failedJobs = (Array.isArray(jobs) ? jobs : []).filter(
+    job =>
+      Array.isArray(job?.steps) &&
+      job.steps.some(
+        step => step?.name === FETCH_STEP && step?.conclusion === 'failure'
+      )
+  );
+  if (failedJobs.length === 0) return '';
+  const messages = [];
+  for (const job of failedJobs) {
+    if (job.run_id !== run?.id || job.run_attempt !== run?.run_attempt)
+      return '';
+    let notes;
+    try {
+      notes = readAnnotations(job);
+    } catch {
+      return '';
+    }
+    if (!Array.isArray(notes)) return '';
+    const failures = notes.filter(note => note?.annotation_level === 'failure');
+    if (
+      failures.some(
+        note =>
+          typeof note.message !== 'string' ||
+          (note.message !== RUNNER_EXIT_FAILURE &&
+            (note.message !== FETCH_TIMEOUT_MESSAGE ||
+              note.title !== FETCH_TIMEOUT_TITLE))
+      ) ||
+      !failures.some(note => note.message === FETCH_TIMEOUT_MESSAGE)
+    )
+      return '';
+    messages.push(...failures.map(note => note.message));
+  }
+  // The aggregate job names every failed lane. A failed lane other than the
+  // one whose job hit the fetch timeout is not proven infrastructure.
+  const fetchLanes = new Set(failedJobs.map(job => laneOfJob(job.name)));
+  const aggregateJobs = jobs.filter(
+    job =>
+      Array.isArray(job?.steps) &&
+      job.steps.some(
+        step =>
+          step?.name === LANE_AGGREGATE_STEP && step?.conclusion === 'failure'
+      )
+  );
+  for (const job of aggregateJobs) {
+    if (job.run_id !== run?.id || job.run_attempt !== run?.run_attempt)
+      return '';
+    let notes;
+    try {
+      notes = readAnnotations(job);
+    } catch {
+      return '';
+    }
+    if (!Array.isArray(notes)) return '';
+    const closed = notes.filter(
+      note =>
+        note?.annotation_level === 'failure' &&
+        note.title === LANE_AGGREGATE_TITLE
+    );
+    if (closed.length !== 1) return '';
+    const lanes = String(closed[0].message ?? '').split(' ');
+    const failedLanes = [];
+    for (const lane of lanes) {
+      const match = /^([a-z][a-z-]*)=([a-z_]+)$/.exec(lane);
+      if (!match) return '';
+      if (match[2] !== 'success') failedLanes.push(match[1]);
+    }
+    if (failedLanes.length === 0 || !failedLanes.every(l => fetchLanes.has(l)))
+      return '';
+  }
+  return messages.join('\n');
+}
+
+/** @param {{ conclusion?: string, failedSteps?: string[], annotationText?: string, changedFiles?: string[], admissionText?: string, fetchTimeoutText?: string }} [input] */
 export function classifyMergeGroupFailure({
   conclusion,
   failedSteps = [],
   annotationText = '',
   changedFiles,
   admissionText = '',
+  fetchTimeoutText = '',
 } = {}) {
   if (!MERGE_GROUP_FAILURE_CONCLUSIONS.has(conclusion)) {
     fail(`unsupported terminal conclusion ${JSON.stringify(conclusion)}`);
@@ -198,6 +346,8 @@ export function classifyMergeGroupFailure({
     ? [...new Set(failedSteps.filter(step => typeof step === 'string'))]
     : [];
   if (conclusion === 'failure' || conclusion === 'action_required') {
+    // The group's own diff made a workflow unloadable; only the source fixes it.
+    if (steps.includes(WORKFLOW_LOAD_STEP)) return 'deterministic-source';
     if (
       steps.some(step => DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS.has(step)) ||
       // ci-fast namespace, coverage and structural failures require source repair.
@@ -230,6 +380,20 @@ export function classifyMergeGroupFailure({
       return changedFiles.some(file => AGENT_CONTEXT_BUDGET_FILES.has(file))
         ? 'deterministic-source'
         : 'base-branch';
+    }
+    // Reached only after every deterministic and product step above declined,
+    // so any stronger failure in the same run has already won.
+    if (
+      steps.includes(FETCH_STEP) &&
+      steps.every(
+        step =>
+          step === FETCH_STEP ||
+          FETCH_TIMEOUT_CASCADE_STEPS.has(step) ||
+          INFRASTRUCTURE_STEP.test(step)
+      ) &&
+      hasOnlyFetchTimeoutErrors(fetchTimeoutText)
+    ) {
+      return 'transient-infrastructure';
     }
     if (
       steps.length > 0 &&
@@ -266,7 +430,16 @@ export function parseTrustedFailureStatus(status, repository) {
   const creator = statusCreator(status);
   if (
     creator.type !== 'Bot' ||
-    !['jovie-bot', 'jovie-bot[bot]'].includes(creator.login)
+    ![
+      'jovie-bot[bot]',
+      'jovie-ci-lane[bot]',
+      'jovie-symphony-lane[bot]',
+      'jovie-agents-lane[bot]',
+      'jovie-bot',
+      'jovie-ci-lane',
+      'jovie-symphony-lane',
+      'jovie-agents-lane',
+    ].includes(creator.login)
   ) {
     return null;
   }
@@ -293,7 +466,16 @@ export function parseTrustedRetryStatus(status, repository) {
   const creator = statusCreator(status);
   if (
     creator.type !== 'Bot' ||
-    !['jovie-bot', 'jovie-bot[bot]'].includes(creator.login)
+    ![
+      'jovie-bot[bot]',
+      'jovie-ci-lane[bot]',
+      'jovie-symphony-lane[bot]',
+      'jovie-agents-lane[bot]',
+      'jovie-bot',
+      'jovie-ci-lane',
+      'jovie-symphony-lane',
+      'jovie-agents-lane',
+    ].includes(creator.login)
   ) {
     return null;
   }
@@ -360,7 +542,16 @@ function parseTrustedAdmissionRecoveryStatus(status, repository) {
   const creator = statusCreator(status);
   if (
     creator.type !== 'Bot' ||
-    !['jovie-bot', 'jovie-bot[bot]'].includes(creator.login)
+    ![
+      'jovie-bot[bot]',
+      'jovie-ci-lane[bot]',
+      'jovie-symphony-lane[bot]',
+      'jovie-agents-lane[bot]',
+      'jovie-bot',
+      'jovie-ci-lane',
+      'jovie-symphony-lane',
+      'jovie-agents-lane',
+    ].includes(creator.login)
   )
     return null;
   const match =
@@ -761,10 +952,10 @@ function validateRun(run, repository) {
   const front = parseMergeQueueBranch(run?.head_branch);
   if (!front) fail('run is not an exact main merge-queue ref');
   if (
-    run.workflow_id !== CI_WORKFLOW_ID ||
+    !MERGE_GROUP_FAILURE_WORKFLOWS.has(run.workflow_id) ||
     run.event !== 'merge_group' ||
     run.status !== 'completed' ||
-    run.path !== '.github/workflows/ci.yml' ||
+    run.path !== MERGE_GROUP_FAILURE_WORKFLOWS.get(run.workflow_id) ||
     run.repository?.full_name !== repository ||
     run.head_repository?.full_name !== repository ||
     !MERGE_GROUP_FAILURE_CONCLUSIONS.has(run.conclusion) ||
@@ -804,13 +995,22 @@ export function supersededByLiveEntry(pr, sourceHeadSha, groupHeadSha) {
 // that #21384, ahead of it, broke, while the ahead group was still running.
 // GitHub removes the failing ahead entry and rebuilds this one, so the hold
 // waits. An unreadable base keeps the hold (`baseOnMain` defaults true).
-/** @typedef {{ baseOnMain?: boolean, aheadConclusion?: string | null }} AheadGroup */
+// Exception: when the ahead run COMPLETED and its own results prove every
+// signal failing here passed (or was not selected) on this base, the failure
+// is this group's own (2026-10-21: a lanes flake ahead hid #22331's guard
+// failure for several cycles). See lib/merge-group-ahead-attribution.mjs.
+/** @typedef {{ baseOnMain?: boolean, aheadConclusion?: string | null, aheadRunId?: number | null, signatureAttribution?: { attributable: boolean, reason: string } }} AheadGroup */
 /** @param {AheadGroup} [group] */
 export function aheadEntryUnproven({
   baseOnMain = true,
   aheadConclusion,
+  signatureAttribution,
 } = {}) {
-  return baseOnMain === false && aheadConclusion !== 'success';
+  return (
+    baseOnMain === false &&
+    aheadConclusion !== 'success' &&
+    signatureAttribution?.attributable !== true
+  );
 }
 
 // Persist the exact-source failure before removing native merge intent. A new
@@ -818,8 +1018,8 @@ export function aheadEntryUnproven({
 // Dequeue denial is non-fatal: this token cannot call dequeuePullRequest, and
 // GitHub already removes the PR when the merge_group run fails.
 /**
- * @param {{ repository: string, run: object, timeline: object[], failedSteps?: string[], statuses?: object[], annotationText?: string, changedFiles?: string[], mainSha?: string, admissionText?: string, aheadGroup?: AheadGroup }} input
- * @param {{ writeStatus: Function, readPullRequest: Function, dequeuePullRequest: Function, disableAutoMerge: Function }} io
+ * @param {{ repository: string, run: object, timeline: object[], failedSteps?: string[], statuses?: object[], annotationText?: string, changedFiles?: string[], mainSha?: string, admissionText?: string, fetchTimeoutText?: string, aheadGroup?: AheadGroup }} input
+ * @param {{ writeStatus: Function, readPullRequest: Function, dequeuePullRequest: Function, disableAutoMerge: Function, recordDequeue?: Function }} io
  */
 export async function applyMergeGroupFailure(
   {
@@ -832,9 +1032,16 @@ export async function applyMergeGroupFailure(
     changedFiles,
     mainSha,
     admissionText = '',
+    fetchTimeoutText = '',
     aheadGroup,
   },
-  { writeStatus, readPullRequest, dequeuePullRequest, disableAutoMerge }
+  {
+    writeStatus,
+    readPullRequest,
+    dequeuePullRequest,
+    disableAutoMerge,
+    recordDequeue,
+  }
 ) {
   const front = validateRun(run, repository);
   const sourceHeadSha = sourceHeadForRun(timeline, run.created_at);
@@ -844,6 +1051,7 @@ export async function applyMergeGroupFailure(
     annotationText,
     changedFiles,
     admissionText,
+    fetchTimeoutText,
   });
   const groupHeadSha = String(run.head_sha).toLowerCase();
   // Quota or gateway trouble spends no source-failure retry and removes no merge
@@ -923,7 +1131,10 @@ export async function applyMergeGroupFailure(
       autoMergeDisabled: false,
     };
   }
-  if (aheadEntryUnproven(aheadGroup)) {
+  if (
+    !failedSteps?.includes?.(WORKFLOW_LOAD_STEP) &&
+    aheadEntryUnproven(aheadGroup)
+  ) {
     return {
       schema: FAILURE_HOLD_SCHEMA,
       repository,
@@ -932,6 +1143,9 @@ export async function applyMergeGroupFailure(
       mergeGroupHeadSha: groupHeadSha,
       mergeGroupBaseSha: front.baseSha,
       aheadConclusion: aheadGroup.aheadConclusion ?? null,
+      ...(aheadGroup.signatureAttribution
+        ? { aheadAttribution: aheadGroup.signatureAttribution }
+        : {}),
       workflowRunId: run.id,
       workflowRunAttempt: run.run_attempt,
       classification,
@@ -966,6 +1180,18 @@ export async function applyMergeGroupFailure(
     });
   }
 
+  let groupEjected = false;
+  if (failedSteps?.includes?.(WORKFLOW_LOAD_STEP)) {
+    await writeStatus({
+      sha: groupHeadSha,
+      context: WORKFLOW_LOAD_EJECT_CONTEXT,
+      description: `Workflows in this group cannot load; held ${sourceHeadSha.slice(0, 12)}`,
+      state: 'failure',
+      targetUrl: run.html_url,
+    });
+    groupEjected = true;
+  }
+
   current = await readPullRequest(front.prNumber);
   let dequeued = false;
   let autoMergeDisabled = false;
@@ -977,9 +1203,31 @@ export async function applyMergeGroupFailure(
     current = await readPullRequest(front.prNumber);
     if (currentMatches() && current.isInMergeQueue && current.mergeQueueEntry) {
       try {
-        await dequeuePullRequest(current.id);
-        dequeued = true;
-        dequeueOutcome = 'dequeued';
+        // The durable exact-head failure status above is authoritative even if
+        // this advisory comment fails. Record intent before the removal so a
+        // crash cannot turn a completed action into an unrecorded one.
+        try {
+          await recordDequeue?.({
+            number: front.prNumber,
+            head: sourceHeadSha,
+            code: 'poison',
+            reason: `merge-group failure hold: run ${run.id} failed for head ${sourceHeadSha.slice(0, 12)}`,
+          });
+        } catch (error) {
+          console.error(
+            `::warning::merge-group-failure-hold could not record the dequeue reason: ${errorText(error).slice(0, 200)}`
+          );
+        }
+        current = await readPullRequest(front.prNumber);
+        if (
+          currentMatches() &&
+          current.isInMergeQueue &&
+          current.mergeQueueEntry
+        ) {
+          await dequeuePullRequest(current.id);
+          dequeued = true;
+          dequeueOutcome = 'dequeued';
+        }
       } catch (error) {
         const denial = classifyDequeueDenial(error);
         if (!denial) throw error;
@@ -1046,9 +1294,13 @@ export async function applyMergeGroupFailure(
         ? current.headRefOid.toLowerCase()
         : null,
     exactHeadStillCurrent: currentMatches(),
+    ...(aheadGroup?.signatureAttribution
+      ? { aheadAttribution: aheadGroup.signatureAttribution }
+      : {}),
     dequeued,
     dequeueOutcome,
     autoMergeDisabled,
+    ...(groupEjected ? { groupEjected } : {}),
   };
 }
 
@@ -1058,6 +1310,35 @@ function gh(args) {
     maxBuffer: 64 * 1024 * 1024,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
+}
+
+export async function recordDequeueReason(
+  { repository, number, code, reason, head },
+  { run = runGh, now = () => new Date().toISOString() } = {}
+) {
+  const record = {
+    code,
+    reason,
+    actor: 'merge-group-failure-hold',
+    at: now(),
+    head,
+    outcome: 'requested',
+  };
+  const result = await run(
+    [
+      'api',
+      '-X',
+      'POST',
+      `repos/${repository}/issues/${number}/comments`,
+      '-f',
+      `body=Dequeue requested (${code}): ${reason}\n<!-- queue-dequeue ${JSON.stringify(record)} -->`,
+    ],
+    { priority: 'repair' }
+  );
+  if (result.code !== 0)
+    throw new Error(
+      result.stderr || `reason recording failed (${result.code})`
+    );
 }
 
 function ghJson(args) {
@@ -1231,6 +1512,65 @@ function instructionContractEvidence(repository, run, jobs, baseSha) {
   }
 }
 
+// The current log is only consumed for a failing `ci-fast (remaining)` job.
+// The ahead log is also read when that job SUCCEEDED (JOV-8760): an ahead run
+// that failed in another job still proves, through its successful structural
+// timings table, that this group's failing commands passed on the base —
+// skipping the successful log left every such group waiting unattributed.
+function ciFastRemainingLog(
+  repository,
+  jobs,
+  { includeSuccessful = false } = {}
+) {
+  const job = jobs.find(item => item?.name === CI_FAST_REMAINING_JOB);
+  const accepted = includeSuccessful ? ['failure', 'success'] : ['failure'];
+  if (
+    !job ||
+    !accepted.includes(job.conclusion) ||
+    !Number.isSafeInteger(job.id)
+  )
+    return null;
+  return gh(['api', `repos/${repository}/actions/jobs/${job.id}/logs`]);
+}
+
+// Only a completed, failed ahead run can prove this group's own failure; any
+// read error keeps today's wait (no attribution).
+/** @returns {AheadGroup} */
+function withAheadAttribution(repository, jobs, aheadGroup) {
+  if (
+    aheadGroup?.baseOnMain !== false ||
+    aheadGroup.aheadConclusion !== 'failure' ||
+    !Number.isSafeInteger(aheadGroup.aheadRunId)
+  ) {
+    return aheadGroup;
+  }
+  try {
+    const aheadJobs = restPages(
+      `repos/${repository}/actions/runs/${aheadGroup.aheadRunId}/jobs?filter=latest`
+    );
+    return {
+      ...aheadGroup,
+      signatureAttribution: attributeAgainstAheadRun({
+        currentJobs: jobs,
+        aheadJobs,
+        aheadConclusion: aheadGroup.aheadConclusion,
+        currentCiFastLog: ciFastRemainingLog(repository, jobs),
+        aheadCiFastLog: ciFastRemainingLog(repository, aheadJobs, {
+          includeSuccessful: true,
+        }),
+      }),
+    };
+  } catch {
+    return {
+      ...aheadGroup,
+      signatureAttribution: {
+        attributable: false,
+        reason: 'evidence-read-failed',
+      },
+    };
+  }
+}
+
 // Is the group's base on main, and how did the CI run of the group ahead end?
 // Any unreadable answer returns {} (attributable), the pre-existing behavior.
 /** @returns {AheadGroup} */
@@ -1256,7 +1596,11 @@ function readAheadGroup(repository, baseSha) {
     const ahead = runs
       .filter(item => item?.workflow_id === CI_WORKFLOW_ID)
       .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
-    return { baseOnMain: false, aheadConclusion: ahead?.conclusion ?? null };
+    return {
+      baseOnMain: false,
+      aheadConclusion: ahead?.conclusion ?? null,
+      aheadRunId: Number.isSafeInteger(ahead?.id) ? ahead.id : null,
+    };
   } catch {
     return {};
   }
@@ -1294,6 +1638,13 @@ async function main(argv) {
           .map(step => step.name)
       : []
   );
+  if (!isHeldWorkflowFailure(run, failedSteps)) {
+    // Other PR Size Guard failures keep their existing handling: no hold.
+    process.stdout.write(
+      `${JSON.stringify({ skipped: true, reason: 'not-a-held-workflow-failure', workflowRunId: run.id })}\n`
+    );
+    return;
+  }
   const evidence = instructionContractEvidence(
     repository,
     run,
@@ -1303,12 +1654,24 @@ async function main(argv) {
   const admissionText = failedSteps.includes(ADMISSION_STEP)
     ? admissionEvidence(repository, jobs)
     : '';
+  const fetchTimeoutText = failedSteps.includes(FETCH_STEP)
+    ? fetchTimeoutEvidence(run, jobs, job => {
+        const checkRunId = String(job.check_run_url ?? '').match(
+          /\/check-runs\/([1-9][0-9]*)$/
+        )?.[1];
+        if (!checkRunId) throw new Error('check-run identity unavailable');
+        return restPages(
+          `repos/${repository}/check-runs/${checkRunId}/annotations`
+        );
+      })
+    : '';
   const preview = classifyMergeGroupFailure({
     conclusion: run.conclusion,
     failedSteps,
     annotationText: evidence.annotationText,
     changedFiles: evidence.changedFiles,
     admissionText,
+    fetchTimeoutText,
   });
   const mainSha =
     preview === 'base-branch'
@@ -1331,7 +1694,12 @@ async function main(argv) {
       changedFiles: evidence.changedFiles,
       mainSha,
       admissionText,
-      aheadGroup: readAheadGroup(repository, front.baseSha),
+      fetchTimeoutText,
+      aheadGroup: withAheadAttribution(
+        repository,
+        jobs,
+        readAheadGroup(repository, front.baseSha)
+      ),
     },
     {
       writeStatus: async receipt =>
@@ -1358,6 +1726,7 @@ async function main(argv) {
           'mutation($id:ID!){disablePullRequestAutoMerge(input:{pullRequestId:$id}){clientMutationId}}',
           { id }
         ),
+      recordDequeue: data => recordDequeueReason({ repository, ...data }),
     }
   );
   const serialized = JSON.stringify(result);

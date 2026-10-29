@@ -84,6 +84,7 @@ vi.mock('@/components/features/onboarding/OnboardingSessionBoundary', () => ({
 
 vi.mock('@/lib/onboarding/session', () => ({
   getOrMintOnboardingSessionId: getOrMintOnboardingSessionIdMock,
+  getCurrentOnboardingSessionId: vi.fn().mockResolvedValue(null),
 }));
 
 // The /start page resolves canonical access state server-side via
@@ -99,6 +100,19 @@ vi.mock('@/lib/waitlist/settings', () => ({
 }));
 
 describe('/start page', () => {
+  it('returns an active account to its workspace when resume has no claim context', async () => {
+    resolveUserStateMock.mockResolvedValue({
+      state: CanonicalUserState.ACTIVE,
+      dbUserId: 'user-1',
+      profileId: 'owned-profile',
+    });
+    const { default: StartPage } = await import('@/app/(dynamic)/start/page');
+
+    await expect(
+      StartPage({ searchParams: Promise.resolve({ resume: '1' }) })
+    ).rejects.toThrow('NEXT_REDIRECT:/app');
+  });
+
   beforeEach(() => {
     resolveStartEntryProfileMock.mockReset().mockResolvedValue(null);
     getExactProfileAccessMock.mockReset().mockResolvedValue({ ok: false });

@@ -106,6 +106,39 @@ describe('revenue spine contract', () => {
     }
   });
 
+  it('classifies direct and wrapped idle transaction termination by SQLSTATE', () => {
+    const timeout = Object.assign(
+      new Error('terminating connection due to idle-in-transaction timeout'),
+      { code: '25P03' }
+    );
+    for (const error of [
+      timeout,
+      new Error('Failed query: SELECT set_config with private values', {
+        cause: timeout,
+      }),
+    ]) {
+      expect(
+        buildRevenueSpineFailure({
+          stage: 'rls_setup',
+          severity: 'blocked',
+          error,
+        })
+      ).toMatchObject({
+        failure_code: 'timeout',
+        fingerprint: 'revenue-spine:v1:rls_setup:timeout',
+        severity: 'blocked',
+        event_count: 1,
+      });
+    }
+    expect(
+      buildRevenueSpineFailure({
+        stage: 'rls_setup',
+        severity: 'blocked',
+        error: new Error(timeout.message),
+      }).failure_code
+    ).toBe('unexpected_error');
+  });
+
   it('rejects runtime values outside the closed contract', () => {
     expect(() =>
       buildRevenueSpineFailure({
@@ -137,6 +170,36 @@ describe('revenue spine delivery', () => {
     await Sentry.close(500);
     Sentry.getCurrentScope().setClient(undefined);
     Sentry.getIsolationScope().setUser(null);
+  });
+
+  it('delivers every blocked idle timeout under its known RLS fingerprint', async () => {
+    const error = new Error('Failed query: private SQL and parameters', {
+      cause: Object.assign(new Error('private database details'), {
+        code: '25P03',
+      }),
+    });
+    for (let occurrence = 0; occurrence < 2; occurrence++) {
+      captureRevenueSpineFailure({
+        stage: 'rls_setup',
+        severity: 'blocked',
+        userId: USER_A,
+        error,
+      });
+    }
+    await Sentry.flush(500);
+
+    expect(events).toHaveLength(2);
+    for (const event of events) {
+      expect(event).toMatchObject({
+        logentry: { message: 'revenue-spine:v1:rls_setup:timeout' },
+        fingerprint: ['revenue-spine:v1:rls_setup:timeout'],
+        level: 'error',
+        tags: { failure_code: 'timeout', impact_severity: 'blocked' },
+        contexts: { revenue_spine: { event_count: 1 } },
+      });
+      expect(event.exception).toBeUndefined();
+      expect(JSON.stringify(event)).not.toContain('private');
+    }
   });
 
   it('preserves every occurrence while counting affected users separately', async () => {

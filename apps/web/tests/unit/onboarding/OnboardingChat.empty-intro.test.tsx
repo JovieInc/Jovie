@@ -117,7 +117,19 @@ vi.mock('@/components/jovie/components', () => ({
       {children}
     </div>
   ),
-  ChatInput: () => <div data-testid='chat-input' />,
+  ChatInput: ({
+    pickerPlacement,
+    placeholder,
+  }: {
+    readonly pickerPlacement?: 'flow' | 'overlay';
+    readonly placeholder?: string;
+  }) => (
+    <textarea
+      data-testid='chat-input'
+      data-picker-placement={pickerPlacement}
+      placeholder={placeholder}
+    />
+  ),
   ChatMessage: ({
     parts,
   }: {
@@ -157,6 +169,107 @@ describe('OnboardingChat empty intro', () => {
     expect(
       screen.queryByTestId('onboarding-profile-review')
     ).not.toBeInTheDocument();
+  });
+
+  it('submits the chosen handle directly from its explicit action without a composer relay', async () => {
+    render(
+      <OnboardingChat
+        entryProfile={{ status: 'available', handle: 'direct-entry' }}
+        turnstileToken='token'
+        turnstileStatus='verified'
+      />
+    );
+    const action = await screen.findByRole('button', {
+      name: 'Continue with @direct-entry',
+    });
+    await act(async () => {});
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+    fireEvent.click(action);
+    expect(chatMocks.sendMessage).toHaveBeenCalledExactlyOnceWith({
+      text: 'I want to claim jov.ie/direct-entry.',
+    });
+  });
+
+  it('sends a confirmed prebuilt identity through the existing server-validated artist-selection path', async () => {
+    render(
+      <OnboardingChat
+        entryProfile={{
+          status: 'claimable',
+          handle: 'known-artist',
+          displayName: 'Known Artist',
+          avatarUrl: null,
+          spotifyId: 'known-spotify-id',
+          spotifyUrl: 'https://open.spotify.com/artist/known-spotify-id',
+          genres: [],
+          socialLinks: [],
+          linkPlatforms: [],
+          linkCount: 0,
+        }}
+        turnstileToken='token'
+        turnstileStatus='verified'
+      />
+    );
+    const action = await screen.findByRole('button', {
+      name: 'Yes, that is me',
+    });
+    await act(async () => {});
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+    fireEvent.click(action);
+    expect(chatMocks.sendMessage).toHaveBeenCalledExactlyOnceWith({
+      text: 'I want to claim jov.ie/known-artist.',
+      metadata: { spotifyArtistId: 'known-spotify-id' },
+    });
+  });
+
+  it('restores the confirmed handle over stale proposals without reopening composer intent', () => {
+    const onProfileBuilderChange = vi.fn();
+    const initialMessages: UIMessage[] = [
+      {
+        id: 'confirmation',
+        role: 'assistant',
+        parts: [
+          {
+            type: 'dynamic-tool',
+            toolName: 'checkHandle',
+            toolCallId: 'confirmation',
+            state: 'output-available',
+            input: { handle: 'confirmedartist' },
+            output: { action: 'handle_confirmed', handle: 'confirmedartist' },
+          },
+        ],
+      },
+      {
+        id: 'stale-proposal',
+        role: 'assistant',
+        parts: [
+          {
+            type: 'dynamic-tool',
+            toolName: 'checkHandle',
+            toolCallId: 'stale-proposal',
+            state: 'output-available',
+            input: { handle: 'staleartist' },
+            output: { action: 'check_handle', handle: 'staleartist' },
+          },
+        ],
+      },
+    ];
+    render(
+      <OnboardingChat
+        conversationId='saved-conversation'
+        initialMessages={initialMessages}
+        turnstileToken='token'
+        turnstileStatus='verified'
+        onProfileBuilderChange={onProfileBuilderChange}
+      />
+    );
+    expect(screen.getByTestId('chat-input')).toHaveAttribute(
+      'placeholder',
+      'Reply to Jovie…'
+    );
+    expect(onProfileBuilderChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ handle: 'confirmedartist' })
+    );
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
   });
 
   it('renders persisted progress without auto-submitting a starter or re-triggering claim activity', async () => {
@@ -215,6 +328,9 @@ describe('OnboardingChat empty intro', () => {
     );
 
     expect(screen.getByTestId('onboarding-empty-intro')).toBeTruthy();
+    expect(
+      screen.getByTestId('chat-empty-state-composer-region')
+    ).not.toHaveAttribute('data-align-above');
     expect(screen.getByTestId('onboarding-start-ambient-mark')).toBeTruthy();
     expect(screen.getByText(ONBOARDING_ENTRY_TITLE)).toBeTruthy();
     expect(screen.queryByTestId('onboarding-sign-in-skip')).toBeNull();
@@ -237,6 +353,9 @@ describe('OnboardingChat empty intro', () => {
     expect(
       screen.getByRole('heading', { name: 'Your first message' })
     ).toBeTruthy();
+    expect(
+      screen.getByTestId('chat-empty-state-composer-region')
+    ).toHaveAttribute('data-align-above', 'top');
     expect(screen.queryByText('Your message is on its way.')).toBeNull();
     expect(screen.queryByTestId('onboarding-start-ambient-mark')).toBeNull();
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
@@ -296,54 +415,16 @@ describe('OnboardingChat empty intro', () => {
     expect(chatMocks.sendMessage).not.toHaveBeenCalled();
   });
 
-  it('submits the chosen handle directly from its explicit action without a composer relay', async () => {
+  it('holds no banner space when no starter banner ever painted', () => {
     render(
       <OnboardingChat
-        entryProfile={{ status: 'available', handle: 'direct-entry' }}
-        turnstileToken='token'
-        turnstileStatus='verified'
+        starterHandoff={{ kind: 'prompt', prompt: 'Claim my page' }}
+        turnstileToken={null}
+        turnstileHasSiteKey={false}
+        turnstilePanel={<span hidden />}
       />
     );
-    const action = await screen.findByRole('button', {
-      name: 'Continue with @direct-entry',
-    });
-    await act(async () => {});
-    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
-    fireEvent.click(action);
-    expect(chatMocks.sendMessage).toHaveBeenCalledExactlyOnceWith({
-      text: 'I want to claim jov.ie/direct-entry.',
-    });
-  });
-
-  it('sends a confirmed prebuilt identity through the existing server-validated artist-selection path', async () => {
-    render(
-      <OnboardingChat
-        entryProfile={{
-          status: 'claimable',
-          handle: 'known-artist',
-          displayName: 'Known Artist',
-          avatarUrl: null,
-          spotifyId: 'known-spotify-id',
-          spotifyUrl: 'https://open.spotify.com/artist/known-spotify-id',
-          genres: [],
-          socialLinks: [],
-          linkPlatforms: [],
-          linkCount: 0,
-        }}
-        turnstileToken='token'
-        turnstileStatus='verified'
-      />
-    );
-    const action = await screen.findByRole('button', {
-      name: 'Yes, that is me',
-    });
-    await act(async () => {});
-    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
-    fireEvent.click(action);
-    expect(chatMocks.sendMessage).toHaveBeenCalledExactlyOnceWith({
-      text: 'I want to claim jov.ie/known-artist.',
-      metadata: { spotifyArtistId: 'known-spotify-id' },
-    });
+    expect(screen.queryByTestId('onboarding-starter-banner-space')).toBeNull();
   });
 
   it('keeps a handle entry on its value screen and never auto-sends the claim draft (JOV-7753)', async () => {
@@ -360,6 +441,32 @@ describe('OnboardingChat empty intro', () => {
     });
     expect(screen.queryByTestId('onboarding-start-ambient-mark')).toBeNull();
     expect(screen.queryByText(ONBOARDING_ENTRY_TITLE)).toBeNull();
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('shows a taken handle instead of the starter prompt and never sends it (JOV-9624)', async () => {
+    render(
+      <OnboardingChat
+        starterHandoff={{ kind: 'prompt', prompt: 'I want my own jov.ie.' }}
+        entryProfile={{
+          status: 'claimed',
+          handle: 'tim',
+          displayName: 'Tim White',
+          avatarUrl: null,
+        }}
+        turnstileToken='token'
+        turnstileStatus='verified'
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('This page is taken')).toBeTruthy();
+    });
+    expect(screen.getByText(/already claimed/)).toBeTruthy();
+    expect(
+      screen.queryByRole('heading', { name: 'Your first message' })
+    ).toBeNull();
+    expect(screen.queryByDisplayValue('I want my own jov.ie.')).toBeNull();
     expect(chatMocks.sendMessage).not.toHaveBeenCalled();
   });
 
@@ -405,6 +512,32 @@ describe('OnboardingChat empty intro', () => {
       ).toBe(headerOverlay === true);
     }
   );
+
+  it('overlays the slash picker on a blank start and flows it under a paused message', async () => {
+    render(
+      <OnboardingChat turnstileToken='token' turnstileStatus='verified' />
+    );
+
+    expect(screen.getByTestId('chat-input')).toHaveAttribute(
+      'data-picker-placement',
+      'overlay'
+    );
+
+    chatMocks.errorMetadata = {};
+    act(() => {
+      chatMocks.onError?.(new Error('Network interrupted'));
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('onboarding-message-recovery')
+      ).toHaveTextContent('Message paused');
+    });
+    expect(screen.getByTestId('chat-input')).toHaveAttribute(
+      'data-picker-placement',
+      'flow'
+    );
+  });
 
   it('surfaces a turnstile recovery row instead of swallowing the error (JOV-7294)', async () => {
     chatMocks.errorMetadata = { errorCode: 'TURNSTILE_REQUIRED' };

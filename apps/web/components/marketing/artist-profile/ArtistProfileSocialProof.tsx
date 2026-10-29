@@ -23,7 +23,7 @@ const PROFILE_STATES = [
     label: 'Before The Drop',
     action: 'Release Alerts',
     image: getMarketingExportImage('tim-white-profile-subscribe-mobile'),
-    alt: 'Tim White artist profile inviting fans to get release updates.',
+    alt: 'Tim White artist profile inviting listeners to get release updates.',
   },
   {
     id: 'tour',

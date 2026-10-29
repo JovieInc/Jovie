@@ -17,6 +17,7 @@ import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { resolveUserState } from '@/lib/auth/gate';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL } from '@/lib/cache/tags';
+import { isProofBlockingPublication } from '@/lib/claim/claim-verification';
 import { isMissingConnectorSchemaError } from '@/lib/connectors/schema-errors';
 import type { DbOrTransaction } from '@/lib/db';
 import { DB_CONFIG, isRetryableError } from '@/lib/db/client/retry';
@@ -184,7 +185,6 @@ interface SocialLinkExistenceQueryOptions {
   context: string;
   operation: string;
   profileId: string;
-  queryLabel: string;
   userId: string;
 }
 
@@ -340,20 +340,20 @@ async function buildBioLinkActivation(
 }
 
 async function fetchSocialLinkExistence(
-  tx: DbOrTransaction,
-  {
-    context,
-    operation,
-    profileId,
-    queryLabel,
-    userId,
-  }: SocialLinkExistenceQueryOptions
+  clerkUserId: string,
+  { context, operation, profileId, userId }: SocialLinkExistenceQueryOptions
 ): Promise<{ hasLinks: boolean; hasMusicLinks: boolean }> {
-  return dashboardQuery(
+  // Bound retry admission, including cleanup, without replaying sibling reads.
+  const retryDeadline = performance.now() + QUERY_TIMEOUTS.dashboard;
+  return executeWithRetry(
     () =>
-      tx
-        .select({
-          hasLinks: drizzleSql<boolean>`
+      withDbSessionTx(
+        async tx => {
+          // Await PostgreSQL cancellation before rollback/release or recovery.
+          await setStatementTimeout(tx, QUERY_TIMEOUTS.dashboard);
+          return tx
+            .select({
+              hasLinks: drizzleSql<boolean>`
             exists (
               select 1
               from ${socialLinks}
@@ -364,7 +364,7 @@ async function fetchSocialLinkExistence(
               )}
             )
           `,
-          hasMusicLinks: drizzleSql<boolean>`
+              hasMusicLinks: drizzleSql<boolean>`
             exists (
               select 1
               from ${socialLinks}
@@ -379,14 +379,24 @@ async function fetchSocialLinkExistence(
               )}
             )
           `,
-        })
-        .from(users)
-        .where(eq(users.id, userId))
-        .limit(1),
-    queryLabel
+            })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
+        },
+        { clerkUserId }
+      ),
+    {
+      maxRetries: 1,
+      baseDelayMs: 0,
+      isRetryable: error =>
+        isIdleTransactionTermination(error) &&
+        performance.now() < retryDeadline,
+    }
   )
     .then(result => mapSocialLinkExistence(result?.[0]))
     .catch((error: unknown) => {
+      // Cleanup has finished before tolerated failures become fallback data.
       const migrationResult = handleMigrationErrors(error, {
         userId,
         operation,
@@ -481,7 +491,10 @@ function buildProfileCompletion(
     completion.hasName &&
     completion.hasAvatar &&
     hasText(selectedProfile.username) &&
-    hasMusicPresence;
+    hasMusicPresence &&
+    // A private page waiting for ownership proof is set up, not public.
+    (selectedProfile.isPublic !== false ||
+      isProofBlockingPublication(selectedProfile.settings));
 
   return {
     percentage: completion.percentage,
@@ -988,17 +1001,12 @@ async function fetchDashboardCoreWithSession(
     // Supplementary reads stay sequential — parallel dispatch would just
     // queue on the pool while starting all timeout timers simultaneously —
     // but each is isolated in its own transaction (see the docstring above).
-    const linkCounts = await withDbSessionTx(
-      async tx =>
-        fetchSocialLinkExistence(tx, {
-          context: 'dashboard_data_settled',
-          operation: 'social_links_existence',
-          profileId: selected.id,
-          queryLabel: 'Social links existence query',
-          userId,
-        }),
-      { clerkUserId }
-    );
+    const linkCounts = await fetchSocialLinkExistence(clerkUserId, {
+      context: 'dashboard_data_settled',
+      operation: 'social_links_existence',
+      profileId: selected.id,
+      userId,
+    });
 
     const avatarQuality = await fetchAvatarQualityWithSession(
       clerkUserId,

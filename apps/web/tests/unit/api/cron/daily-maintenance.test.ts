@@ -395,7 +395,7 @@ describe('GET /api/cron/daily-maintenance', () => {
     expect(response.status).toBe(207);
     expect(data.results.waitlistAdmission.success).toBe(false);
     expect(data.results.waitlistAdmission.error).toContain(
-      '2 waitlist_pending user(s) had no waitlist entry'
+      '2 pending/approved waitlist entry(s) were missing'
     );
     expect(data.results.waitlistAdmission.error).toContain(
       '1 external user(s) pending longer than 3 days'

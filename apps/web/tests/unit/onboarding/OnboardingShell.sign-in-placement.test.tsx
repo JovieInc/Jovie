@@ -123,6 +123,15 @@ describe('onboarding sign-in placement', () => {
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
   });
 
+  it('keeps the blank-entry headline at the quiet Linear scale (glm/auth-focal-polish)', () => {
+    render(<OnboardingChatEmptyIntro mode='blank' />);
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading).toHaveClass('text-lg');
+    expect(heading).toHaveClass('font-medium');
+    expect(heading.className).not.toContain('text-2xl');
+    expect(heading.className).not.toContain('font-semibold');
+  });
+
   it.each(['prompt_handoff', 'spotify_handoff'] as const)(
     'keeps the %s intro free of verification theater (JOV-3379)',
     mode => {

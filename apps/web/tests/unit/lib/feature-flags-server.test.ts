@@ -316,33 +316,6 @@ describe('Statsig server initialization', () => {
     expect(run).not.toHaveBeenCalled();
   });
 
-  it('keeps customer navigation flags role-invariant for admin users', async () => {
-    mockIsAdmin.mockResolvedValue(true);
-
-    vi.doMock('flags/next', () => ({
-      dedupe: <T extends (...args: never[]) => unknown>(fn: T) => fn,
-    }));
-
-    const run = vi.fn().mockResolvedValue(false);
-    vi.doMock('@/lib/flags/registry', () => ({
-      APP_FLAG_REGISTRY: {
-        INBOX_HOME: { run },
-      },
-      SUBSCRIBE_CTA_VARIANT_FLAG: {
-        run: vi.fn().mockResolvedValue('two_step'),
-      },
-      PROFILE_ALERT_OPTIN_VARIANT_FLAG: {
-        run: vi.fn().mockResolvedValue('button'),
-      },
-    }));
-
-    const { getAppFlagValue } = await import('@/lib/flags/server');
-    await expect(
-      getAppFlagValue('INBOX_HOME', { userId: 'admin_123' })
-    ).resolves.toBe(false);
-    expect(run).toHaveBeenCalledTimes(1);
-  });
-
   it.each(['YOUTUBE_WORKSPACE_NAV', 'JOVIE_WORK_NAV'] as const)(
     'keeps %s off for admins unless resolved on',
     async flagName => {

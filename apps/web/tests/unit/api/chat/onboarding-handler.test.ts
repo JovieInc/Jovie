@@ -45,6 +45,10 @@ function expectOnlyDraftPersisted() {
   );
 }
 
+vi.mock('@/lib/waitlist/golden-path-admission.server', () => ({
+  readGoldenPathTurnContext: async () => ({ verdict: null, holdReason: null }),
+}));
+
 vi.mock('server-only', () => ({}));
 
 vi.mock('@/lib/profile/spotify-profile-identity', () => ({
@@ -174,11 +178,18 @@ function installDefaultDbMocks() {
 function stubRuntimeEnv({
   nodeEnv = 'development',
   vercelEnv,
+  gatewayKey = 'test-gateway-key',
 }: {
   readonly nodeEnv?: string;
   readonly vercelEnv?: string;
+  readonly gatewayKey?: string;
 } = {}) {
   vi.stubEnv('NODE_ENV', nodeEnv);
+  vi.stubEnv('AI_GATEWAY_API_KEY', gatewayKey);
+  vi.stubEnv('VERCEL', '');
+  // These cases pin the LLM dispatch plumbing; the system-1 engine has its own
+  // describe block below (JOV-9627).
+  vi.stubEnv('ONBOARDING_SYSTEM1_ENGINE', 'off');
   if (vercelEnv) {
     vi.stubEnv('VERCEL_ENV', vercelEnv);
   } else {
@@ -582,6 +593,28 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     expect(result?.headers.get('x-onboarding-fallback')).toMatch(/^greet:/);
     expect(await result?.text()).toContain("I'm Jovie");
     // The LLM must NOT have been called when the gate is closed.
+    expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+  });
+
+  it('serves the scripted fallback when the AI gateway is not configured', async () => {
+    vi.resetModules();
+    stubRuntimeEnv({ gatewayKey: '' });
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const req = makeRequest({
+      mode: 'onboarding',
+      messages: [userMessage('hi, I want in')],
+    });
+    const result = await tryHandleAnonymousOnboardingChat(
+      req,
+      'req-no-gateway'
+    );
+
+    expect(result?.status).toBe(200);
+    expect(result?.headers.get('x-fallback-reason')).toBe('llm_error');
+    expect(result?.headers.get('x-onboarding-fallback')).toMatch(/^greet:/);
+    expect(await result?.text()).toContain("I'm Jovie");
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
   });
 
@@ -2199,6 +2232,67 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       await expect(
         tools.confirmSpotifyArtist.execute({}, {} as never)
       ).resolves.toMatchObject({ action: 'spotify_artist_unconfirmed' });
+    });
+  });
+  describe('system-1 reply engine (JOV-9627)', () => {
+    async function send(text: string) {
+      vi.resetModules();
+      stubRuntimeEnv();
+      vi.stubEnv('ONBOARDING_SYSTEM1_ENGINE', '');
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      return tryHandleAnonymousOnboardingChat(
+        makeRequest({ mode: 'onboarding', messages: [userMessage(text)] }),
+        'req-s1'
+      );
+    }
+
+    it('answers an artist name from the script without calling the model', async () => {
+      const response = await send('Tame Impala');
+      expect(response?.status).toBe(200);
+      expect(response?.headers.get('x-onboarding-engine')).toBe('system1');
+      expect(response?.headers.get('x-fallback-reason')).toBe('system1');
+      expect(response?.headers.get('server-timing')).toMatch(/^reply;dur=\d+$/);
+      expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+    });
+
+    it('answers a pricing question from the answer set', async () => {
+      const response = await send('how much does it cost?');
+      expect(response?.headers.get('x-onboarding-fallback')).toMatch(
+        /^faq_price:/
+      );
+      expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+    });
+
+    it('keeps the kill switch: off sends the turn to the model', async () => {
+      vi.resetModules();
+      stubRuntimeEnv();
+      hoisted.executeChatTurnMock.mockResolvedValue({
+        streamResult: {
+          toUIMessageStreamResponse: ({
+            headers,
+          }: {
+            headers: Record<string, string>;
+          }) => new Response('ok', { status: 200, headers }),
+        },
+        selectedModel: 'm',
+        systemPrompt: 's',
+        toolNames: [],
+        modelMessages: [],
+      });
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      const response = await tryHandleAnonymousOnboardingChat(
+        makeRequest({
+          mode: 'onboarding',
+          messages: [userMessage('Tame Impala')],
+        }),
+        'req-s2'
+      );
+      expect(response?.headers.get('x-onboarding-engine')).toBeNull();
+      expect(hoisted.executeChatTurnMock).toHaveBeenCalledTimes(1);
     });
   });
 });

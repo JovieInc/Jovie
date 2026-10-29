@@ -1,6 +1,5 @@
 import { type Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
-import { Suspense } from 'react';
 import { loadPublicReleaseCredits } from '@/app/[username]/[slug]/_lib/data';
 import { isScreenCertSmartLinkProfileRequest } from '@/app/[username]/[slug]/_lib/screen-cert-fixture';
 
@@ -9,6 +8,7 @@ import { isScreenCertSmartLinkProfileRequest } from '@/app/[username]/[slug]/_li
 // API (cookies(), headers()) in this RSC tree.
 
 import { AskJovieWidget } from '@/components/features/ask-jovie/AskJovieWidget';
+import { AliasCollisionRecovery } from '@/components/features/profile/AliasCollisionRecovery';
 import type { ProfileMode } from '@/components/features/profile/contracts';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import { UnfazedProfileClient } from '@/components/features/profile/UnfazedProfileClient';
@@ -82,7 +82,6 @@ import {
 } from '@/lib/validation/username-core';
 import type { PublicContact } from '@/types/contacts';
 import { convertCreatorProfileToArtist } from '@/types/db';
-import { ProfileLoading } from './_components/ProfileLoading';
 import { PublicClaimBanner } from './_components/PublicClaimBanner';
 import { PublicProfileErrorState } from './_components/PublicProfileErrorState';
 import { getProfileStaticParams } from './_lib/profile-static-params';
@@ -470,6 +469,7 @@ async function ArtistPageContent({
 
   return (
     <>
+      <AliasCollisionRecovery username={username} />
       {/* JSON-LD Structured Data for SEO — single @graph for all schemas */}
       <script type='application/ld+json'>
         {safeJsonLdStringify(structuredData)}
@@ -601,25 +601,25 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
 
   await enforceCanonicalPublicProfileUsername(username);
 
-  // Resolve a missing/private profile before the page-level Suspense boundary
-  // can stream its loading shell. This preserves the segment's profile-specific
-  // not-found UI and a real HTTP 404 instead of streaming that UI with HTTP 200.
-  // Only this identity lookup is pre-stream: tour, release, merch, and entity
-  // reads remain inside ArtistPageContent, so valid profiles still use the
-  // existing loading fallback while those independent reads settle.
+  // Resolve a missing/private profile before rendering so the segment keeps its
+  // profile-specific not-found UI and a real HTTP 404.
+  //
+  // There is deliberately no Suspense boundary and no loading fallback here.
+  // The page is ISR, so the cached HTML is complete either way; a boundary only
+  // buried the real content (artwork, name) in a hidden segment that React
+  // reveals from a throttled inline script, which made the claim-link LCP swing
+  // between 1.7s and 6.0s on the throttled-mobile entry gate (budget 4000ms).
   const profileResult = await getProfileAndLinks(username);
   if (profileResult.status === 'not_found') {
     notFound();
   }
 
   return (
-    <Suspense fallback={<ProfileLoading />}>
-      <ArtistPageContent
-        initialMode={initialMode}
-        username={username}
-        profileResult={profileResult}
-      />
-    </Suspense>
+    <ArtistPageContent
+      initialMode={initialMode}
+      username={username}
+      profileResult={profileResult}
+    />
   );
 }
 

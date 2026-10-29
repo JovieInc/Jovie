@@ -638,6 +638,8 @@ interface OnboardingMessageRegionProps {
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly profileBuilderState: OnboardingProfileBuilderState;
   readonly shouldDockComposer: boolean;
+  /** Starter handoff paints the thread slot at the top, where the first message lands. */
+  readonly pinThreadToTop: boolean;
   readonly entryMode: OnboardingEntryMode;
   readonly entryProfile: StartEntryProfile | null;
   readonly onTryAnotherName: () => void;
@@ -664,6 +666,7 @@ function OnboardingMessageRegion({
   onSelectArtist,
   profileBuilderState,
   shouldDockComposer,
+  pinThreadToTop,
 }: OnboardingMessageRegionProps) {
   if (shouldDockComposer) {
     return (
@@ -689,7 +692,13 @@ function OnboardingMessageRegion({
     return (
       <ChatEmptyStateComposerRegion
         above={
-          <div className='flex min-h-full items-center justify-center'>
+          <div
+            className={
+              pinThreadToTop
+                ? 'flex flex-col'
+                : 'flex min-h-full items-center justify-center'
+            }
+          >
             <OnboardingChatEmptyIntro
               mode={entryMode}
               entryProfile={entryProfile}
@@ -699,6 +708,7 @@ function OnboardingMessageRegion({
             />
           </div>
         }
+        alignAbove={pinThreadToTop ? 'top' : undefined}
         hideWelcomeHeader
       >
         <div
@@ -762,11 +772,17 @@ export function OnboardingChat({
   interactionDisabled = false,
   onBusyChange,
 }: OnboardingChatProps) {
-  const initialStarterPrompt = starterHandoff?.prompt ?? '';
+  // A taken handle wins over a starter prompt: show the taken state, not a
+  // prefilled claim message for a name that is already someone else's.
+  const takenHandleEntry = entryProfile?.status === 'claimed';
+  const initialStarterPrompt = takenHandleEntry
+    ? ''
+    : (starterHandoff?.prompt ?? '');
   const hasInitialStarterPrompt = initialStarterPrompt.length > 0;
   const initialDraft = hasInitialStarterPrompt ? initialStarterPrompt : '';
   const [input, setInput] = useState(initialDraft);
   const [entryMode, setEntryMode] = useState<OnboardingEntryMode>(() => {
+    if (takenHandleEntry) return 'handle_entry';
     if (starterHandoff?.kind === 'spotify_artist') return 'spotify_handoff';
     if (starterHandoff) return 'prompt_handoff';
     if (intentId) return 'restoring_intent';
@@ -798,6 +814,8 @@ export function OnboardingChat({
   const wasAwaitingTurnstileRetryRef = useRef(false);
   const wasSecurityCheckRecoveryRef = useRef(false);
   const pendingVerifiedSubmitRef = useRef(false);
+  const starterBannerWrapRef = useRef<HTMLDivElement>(null);
+  const [heldBannerHeight, setHeldBannerHeight] = useState(0);
   const [localAutomationBypass, setLocalAutomationBypass] = useState<
     boolean | null
   >(null);
@@ -1161,18 +1179,34 @@ export function OnboardingChat({
     (isAwaitingFirstToken ||
       shouldReserveStarterVerification ||
       verificationRequested);
+  const sizeStarterInstruction =
+    shouldReserveStarterVerification &&
+    turnstileHasSiteKey &&
+    (turnstileStatus === 'loading' || turnstileStatus === 'interactive');
   const flowStatus = shouldShowTurnstileBanner ? (
     <OnboardingFlowStatus
       shouldShowTurnstileBanner={shouldShowTurnstileBanner}
       turnstilePanel={turnstilePanel}
-      sizeStarterInstruction={
-        shouldReserveStarterVerification &&
-        turnstileHasSiteKey &&
-        (turnstileStatus === 'loading' || turnstileStatus === 'interactive')
-      }
+      sizeStarterInstruction={sizeStarterInstruction}
     />
   ) : null;
-
+  const starterBannerMounted =
+    Boolean(flowStatus) && chatError?.errorCode !== 'TURNSTILE_REQUIRED';
+  useLayoutEffect(() => {
+    const element = starterBannerWrapRef.current;
+    if (!element) return;
+    // Measured before paint and on every size change while mounted, so the
+    // spacer always matches the banner it replaces.
+    const measure = () => {
+      const height = element.offsetHeight;
+      if (height > 0) setHeldBannerHeight(height);
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [starterBannerMounted]);
   const userTurnCount = messages.filter(
     message => message.role === 'user'
   ).length;
@@ -1180,6 +1214,19 @@ export function OnboardingChat({
   const shouldDockComposer =
     chatError !== null || userTurnCount > 1 || selectedArtist !== null;
   const isSecurityCheckRecovery = chatError?.errorCode === 'TURNSTILE_REQUIRED';
+  // Withdrawing the starter banner (token usable, automation bypass, first
+  // send) used to collapse the bottom-anchored composer box ~24px after first
+  // paint. The banner height is measured while it is mounted (ghost line,
+  // sized provider mount or guidance: whichever it contains), and an inert
+  // spacer of that height holds the space for as long as the centered
+  // composer stays put (the starter auto-sends, so messages exist before the
+  // composer docks), instead of releasing it when the first message appears.
+  const holdsStarterBannerSpace =
+    !flowStatus &&
+    heldBannerHeight > 0 &&
+    hasInitialStarterPrompt &&
+    !shouldDockComposer &&
+    !isSecurityCheckRecovery;
   useEffect(() => {
     if (shouldDockComposer) return;
     const scrollContainer = scrollContainerRef.current;
@@ -1191,6 +1238,12 @@ export function OnboardingChat({
     scrollContainer.scrollTop = 0;
   }, [displayMessages.length, scrollContainerRef, shouldDockComposer, status]);
 
+  // Card drafts and user confirmation taps are provisional. A persisted tool
+  // confirmation keeps later questions from inheriting the old handle prompt.
+  const hasConfirmedHandle = hasToolOutputAction(
+    messages,
+    WIDGET_COMPLETION_ACTIONS.HANDLE_CONFIRMED
+  );
   const onboardingChatInputProps = {
     value: input,
     onChange: handleInputChange,
@@ -1200,7 +1253,7 @@ export function OnboardingChat({
     isStreaming,
     onStop: stop,
     placeholder: getOnboardingComposerPlaceholder(
-      handleDraft,
+      hasConfirmedHandle ? null : handleDraft,
       hasConversationStarted
     ),
     dictationEnabled: false,
@@ -1214,7 +1267,17 @@ export function OnboardingChat({
   const sendLocalError = chatError;
   const onboardingComposerSurface = (
     <div className='mx-auto w-full max-w-[45rem]'>
-      {isSecurityCheckRecovery ? null : flowStatus}
+      {isSecurityCheckRecovery || !flowStatus ? null : (
+        <div ref={starterBannerWrapRef}>{flowStatus}</div>
+      )}
+      {holdsStarterBannerSpace ? (
+        <div
+          aria-hidden='true'
+          className='pointer-events-none'
+          data-testid='onboarding-starter-banner-space'
+          style={{ height: heldBannerHeight }}
+        />
+      ) : null}
       {isSecurityCheckRecovery ? (
         <OnboardingSecurityCheckRecovery
           status={turnstileStatus}
@@ -1233,7 +1296,11 @@ export function OnboardingChat({
           isSubmitted={isSubmitted}
         />
       ) : null}
-      <ChatInput ref={composerInputRef} {...onboardingChatInputProps} />
+      <ChatInput
+        ref={composerInputRef}
+        {...onboardingChatInputProps}
+        pickerPlacement={sendLocalError ? 'flow' : 'overlay'}
+      />
     </div>
   );
 
@@ -1260,9 +1327,11 @@ export function OnboardingChat({
           ref={shouldDockComposer ? totalSizeRef : undefined}
           className={cn(
             'mx-auto flex min-h-full w-full flex-col',
-            hasConversationStarted || shouldDockComposer
-              ? 'max-w-[44rem]'
-              : 'max-w-[52rem]',
+            // The empty frame is 52rem. Keep that width when the first
+            // message commits. Narrowing to 44rem here moves a 576px-tall
+            // column by 64px with no input, which Chromium 1280×720 scores
+            // as 0.1503125. The docked composer is the later width change.
+            shouldDockComposer ? 'max-w-[44rem]' : 'max-w-[52rem]',
             !shouldDockComposer && 'h-full justify-center'
           )}
         >
@@ -1294,6 +1363,7 @@ export function OnboardingChat({
             onSelectArtist={handleArtistSelect}
             profileBuilderState={profileBuilderState}
             shouldDockComposer={shouldDockComposer}
+            pinThreadToTop={hasInitialStarterPrompt}
           />
         </div>
       </div>

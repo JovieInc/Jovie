@@ -47,7 +47,7 @@ function exactCanaryPlan() {
   const item = {
     number: 42,
     action: 'escalate_conflict_fx',
-    model: 'openai/gpt-5.6-sol',
+    model: 'zai/glm-5.3',
     pr: { number: 42, ...identity },
   };
   const fx = {
@@ -1833,7 +1833,7 @@ else process.exit(2);
           LIVE_GUARD_ELIGIBLE: 'false',
           LIVE_GUARD_OUTCOME: 'fx_suppressed_live_boundary',
           LIVE_GUARD_DETAIL: 'live hold was added before model spend',
-          FX_MODEL: 'openai/gpt-5.6-sol',
+          FX_MODEL: 'zai/glm-5.3',
           SOURCE_HEAD: HEAD,
         },
       });
@@ -1858,7 +1858,7 @@ else process.exit(2);
       'FX_AI_GATEWAY_API_KEY: ${{ secrets.FX_AI_GATEWAY_API_KEY }}'
     );
     expect(WORKFLOW).not.toContain('secrets.AI_GATEWAY_API_KEY');
-    expect(WORKFLOW).toContain('FX_MODEL: openai/gpt-5.6-sol');
+    expect(WORKFLOW).toContain('FX_MODEL: zai/glm-5.3');
     expect(WORKFLOW).toContain(
       'elif [[ "$observed_model" != "$FX_MODEL" ]]; then'
     );

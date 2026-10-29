@@ -56,6 +56,40 @@ export function ChatProposeNextStepCard({
   const reviewKey = artist && handle ? `${artist.id}:${handle}` : null;
   const [keptProfile, setKeptProfile] = useState<string | null>(null);
   const showingAuth = reviewKey !== null && keptProfile === reviewKey;
+  const saveAuthRef = useRef<HTMLDivElement>(null);
+  const keepProfileRef = useRef<HTMLButtonElement>(null);
+  const returnToPreviewRef = useRef(false);
+
+  useEffect(() => {
+    if (showingAuth && canRenderAuthUi) {
+      const form = saveAuthRef.current;
+      if (!form) return;
+      const focusReadyProvider = () => {
+        const google = form.querySelector<HTMLButtonElement>(
+          '[data-auth-provider-slot="google"]:not(:disabled)'
+        );
+        if (!google) return false;
+        google.focus();
+        return true;
+      };
+      // AuthShell initially renders disabled slots, then enables them after
+      // hydration. Reveal the real ready control, not an arbitrary timer.
+      if (focusReadyProvider()) return;
+      const observer = new MutationObserver(() => {
+        if (focusReadyProvider()) observer.disconnect();
+      });
+      observer.observe(form, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        attributeFilter: ['disabled'],
+      });
+      return () => observer.disconnect();
+    } else if (returnToPreviewRef.current) {
+      returnToPreviewRef.current = false;
+      keepProfileRef.current?.focus();
+    }
+  }, [canRenderAuthUi, showingAuth]);
   const resumePath = handle
     ? `${APP_ROUTES.START}?${new URLSearchParams({ handle })}`
     : `${APP_ROUTES.START}?resume=1`;
@@ -193,7 +227,11 @@ export function ChatProposeNextStepCard({
         </p>
       )}
       {showingAuth && canRenderAuthUi ? (
-        <div className='space-y-3' data-testid='onboarding-save-auth'>
+        <div
+          ref={saveAuthRef}
+          className='space-y-3'
+          data-testid='onboarding-save-auth'
+        >
           <p className='text-app text-primary-token'>
             Continue with Google or another sign-in method to keep this profile.
           </p>
@@ -205,13 +243,20 @@ export function ChatProposeNextStepCard({
             claimHandle={handle ?? undefined}
             suppressOneTap
           />
-          <Button variant='ghost' onClick={() => setKeptProfile(null)}>
+          <Button
+            variant='ghost'
+            onClick={() => {
+              returnToPreviewRef.current = true;
+              setKeptProfile(null);
+            }}
+          >
             Back To Preview
           </Button>
         </div>
       ) : (
         <div className='flex flex-wrap gap-2'>
           <Button
+            ref={keepProfileRef}
             disabled={!reviewKey || !canRenderAuthUi}
             onClick={() => setKeptProfile(reviewKey)}
           >

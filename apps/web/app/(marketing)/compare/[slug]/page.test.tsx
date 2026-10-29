@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { getComparison, getComparisonSlugs } from '@/content/comparisons';
+import { applyRootTitleTemplate } from '@/lib/seo/document-title';
 
 const mocks = vi.hoisted(() => ({
   notFound: vi.fn(() => {
@@ -45,7 +46,7 @@ describe('ComparePage', () => {
       const metadata = await generateMetadata({
         params: Promise.resolve({ slug }),
       });
-      expect(metadata.title).toBe(data.title);
+      expect(applyRootTitleTemplate(metadata.title)).toBe(data.title);
       expect(metadata.alternates?.canonical).toBe(
         `https://jov.ie/compare/${slug}`
       );

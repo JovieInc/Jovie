@@ -184,6 +184,25 @@ class OutboxTest(Base):
         self.assertEqual(ls.status(self.state)["outbox"]["depth"], 0)
         self.assertEqual(ls.claim_status(self.state, "id-1"), "active")
 
+    def test_one_flush_drains_far_more_than_ten_entries_until_the_wall_budget_ends(self):
+        # Gem 2026-10-25: 504 pending writes, arrivals 80-175 per 30 min, 10 delivered per tick.
+        ls.claim(self.state, "id-1", "JOV-1", "codex")
+        for index in range(25):
+            ls.enqueue(self.state, "comment", "id-1", body=f"note {index}")
+        linear = FakeLinear([{"commentCreate": {"success": True}}] * 25)
+        report = ls.flush(self.state, linear, lambda n: True, (Limited,))
+        self.assertEqual((report["outcome"], len(report["delivered"])), ("drained", 25))
+        for index in range(3):
+            ls.enqueue(self.state, "comment", "id-1", body=f"later {index}")
+        held = ls.flush(self.state, FakeLinear([]), lambda n: True, (Limited,), budget_s=-1)
+        self.assertEqual((held["outcome"], held["delivered"]), ("partial", []))
+        self.assertEqual(ls.status(self.state)["outbox"]["depth"], 3)
+
+    def test_outbox_alert_fires_at_an_hour(self):
+        view = {"outbox": {"depth": 400, "oldestAgeS": 3700, "dead": 0}}
+        self.assertIn("linear-outbox-stale", ls.alerts(view))
+        self.assertNotIn("linear-outbox-stale", ls.alerts({"outbox": {"depth": 9, "oldestAgeS": 600, "dead": 0}}))
+
     def test_budget_rate_limit_and_errors_keep_the_entry_without_failing_work(self):
         ls.claim(self.state, "id-1", "JOV-1", "codex")
         ls.enqueue(self.state, "move", "id-1", target="In Progress")
@@ -255,6 +274,35 @@ class StartedOwnershipTest(Base):
     def claim_at(self, n, claimed_at):
         with mock.patch.object(ls.time, "time", return_value=claimed_at):
             self.assertTrue(ls.claim(self.state, f"id-{n}", f"JOV-{n}", "codex"))
+
+    def lyb_claim(self, n, claimed_at):
+        with mock.patch.object(ls.time, "time", return_value=claimed_at):
+            self.assertTrue(ls.claim(self.state, f"lyb-{n}", f"LYB-{n}", "codex"))
+
+    def binding_lock(self, ident):
+        path = self.state / "bindings" / "LYB" / f"issue.{ident}.lock"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return open(path, "a+")
+
+    def test_dead_binding_claim_is_released_but_a_held_one_is_not(self):
+        """LYB-180 sat `active` 238 h: reconcile only looked at the Jovie run lease."""
+        import fcntl
+        self.lyb_claim(1, self.NOW - 3600)
+        self.lyb_claim(2, self.NOW - 3600)
+        self.binding_lock("LYB-1").close()  # taken and dropped: the run is over
+        live = self.binding_lock("LYB-2")
+        fcntl.flock(live, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        try:
+            report = self.reconcile()
+        finally:
+            live.close()
+        self.assertEqual(report["claimsReleased"], ["LYB-1"])
+        self.assertEqual(ls._claims(self.state)["lyb-2"]["status"], "active")
+
+    def test_binding_claim_without_any_lock_waits_out_the_legacy_window(self):
+        self.lyb_claim(3, self.NOW - 3600)
+        self.assertEqual(self.reconcile()["claimsReleased"], [])
+        self.assertEqual(self.reconcile(at=ownership.LEGACY_RUN_GRACE_S)["claimsReleased"], ["LYB-3"])
 
     def test_owner_process_dies_then_the_issue_returns_to_the_pool(self):
         self.started(1)
@@ -344,3 +392,56 @@ class StartedOwnershipTest(Base):
         self.assertEqual((len(self.moves()), report["unresolved"]), (2, {"move-budget": 1}))
         again = self.reconcile(at=ownership.GRACE_S + 3, max_moves=2)  # idempotent: pending moves count
         self.assertEqual((len(self.moves()), again["started"], len(again["moved"])), (3, 1, 1))
+
+
+class MergedEvidenceTest(Base):
+    """Gem 2026-10-20: 40 Merging/Validating issues looked ownerless because their merged PRs
+    live in summer-config, Ops or LogYourBody, not Jovie main."""
+    NOW = StartedOwnershipTest.NOW
+    git, started, reconcile = StartedOwnershipTest.git, StartedOwnershipTest.started, StartedOwnershipTest.reconcile
+
+    def search(self, table, calls):
+        def run(ident):
+            calls.append(ident)
+            return table.get(ident, [])
+        return run
+
+    def comments(self):
+        return [e["body"] for e in ls._read(ls._outbox_path(self.state), ls.OUTBOX).get("entries", [])
+                if e["op"] == "comment"]
+
+    def test_an_org_merged_pr_that_claims_the_issue_makes_the_lifecycle_its_owner(self):
+        self.started(8304, "Validating")
+        self.started(8305, "Merging")
+        calls, table = [], {
+            "JOV-8304": [{"repository": "JovieInc/summer-config", "number": 209, "title": "fix(summer): x",
+                          "body": "Refs JOV-8304.\n"}],
+            "JOV-8305": [{"repository": "JovieInc/Jovie", "number": 1, "title": "docs: mentions JOV-8305 in passing",
+                          "body": "see JOV-8305"}]}
+        report = self.reconcile(search=self.search(table, calls))
+        self.assertEqual(report["owners"], {"lifecycle": 2})  # title token counts
+        self.assertEqual(sorted(calls), ["JOV-8304", "JOV-8305"])
+        self.assertEqual(len(self.comments()), 2)
+        again = self.reconcile(search=self.search(table, calls), at=ownership.GRACE_S + 1)
+        self.assertEqual((again["owners"], len(calls), len(self.comments())), ({"lifecycle": 2}, 2, 2))
+
+    def test_an_incidental_mention_is_not_evidence_and_searches_are_budgeted(self):
+        for n in range(30, 38):
+            self.started(n, "Validating")
+        calls = []
+        table = {f"JOV-{n}": [{"repository": "JovieInc/Jovie", "number": n, "title": "chore: unrelated",
+                                "body": f"context JOV-{n} (not a reference line)"}] for n in range(30, 38)}
+        report = self.reconcile(search=self.search(table, calls))
+        self.assertEqual(len(calls), ownership.SEARCHES_PER_TICK)
+        self.assertEqual(report["ownerless"], 8)
+        self.reconcile(search=self.search(table, calls), at=60)
+        self.assertEqual(len(calls), 8, "a miss is cached for a day; the rest finish next tick")
+        unreadable = self.reconcile(search=lambda ident: None, at=ownership.GRACE_S + 1)
+        self.assertEqual(unreadable["unresolved"], {"post-merge-without-merged-evidence": 8})
+
+    def test_a_refs_line_listing_several_issues_claims_each_of_them(self):
+        body = "Summary.\n\nRefs JOV-7703; JOV-6022; JOV-7514; JOV-7198.\n"  # Jovie#21232
+        for ident in ("JOV-7703", "JOV-6022", "JOV-7198"):
+            self.assertTrue(ownership.pr_names_issue({"title": "docs(fleet): x", "body": body}, ident))
+        partial = "This is a bounded first repair under JOV-8333; the rest stays open."  # summer-config#211
+        self.assertFalse(ownership.pr_names_issue({"title": "fix(summer): y", "body": partial}, "JOV-8333"))

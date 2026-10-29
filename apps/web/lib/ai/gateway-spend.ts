@@ -7,6 +7,7 @@ import {
   type GatewaySpendReportRow,
 } from '@ai-sdk/gateway';
 import { eq } from 'drizzle-orm';
+import { markCostsRefreshed } from '@/lib/admin/costs';
 import { formatUsd } from '@/lib/admin/format';
 import { isGatewayBannedModel } from '@/lib/constants/ai-models';
 import { db } from '@/lib/db';
@@ -188,6 +189,7 @@ export async function recordDailyGatewaySpend(
       updatedAt: now,
     })
     .where(eq(adminCosts.label, AI_GATEWAY_COST_LABEL));
+  await markCostsRefreshed(now);
 
   if (spend.alerts.length > 0) {
     await captureError(

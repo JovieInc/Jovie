@@ -55,6 +55,9 @@ import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
 const DISCOVERY_POLL_INTERVAL_MS = 1200;
+const DISCOVERY_FETCH_TIMEOUT_MS = 10_000;
+const DISCOVERY_TIMEOUT_MESSAGE =
+  'Loading your releases is taking longer than expected. We will keep trying, or tap Refresh.';
 const DISCOVERY_AUTO_ADVANCE_MS = 800;
 
 type StepId =
@@ -489,26 +492,47 @@ async function fetchDiscoverySnapshot(
   profileId: string,
   signal?: AbortSignal
 ): Promise<DiscoverySnapshot> {
-  const response = await fetch(
-    `/api/onboarding/discovery?profileId=${encodeURIComponent(profileId)}`,
-    {
-      signal,
+  // A hung request must turn into a visible, retryable error, not an endless
+  // disabled Continue. The timeout is a separate controller so a caller abort
+  // (unmount, newer poll) stays silent while a timeout surfaces.
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, DISCOVERY_FETCH_TIMEOUT_MS);
+  const forwardAbort = () => controller.abort();
+  if (signal?.aborted) controller.abort();
+  signal?.addEventListener('abort', forwardAbort, { once: true });
+
+  try {
+    const response = await fetch(
+      `/api/onboarding/discovery?profileId=${encodeURIComponent(profileId)}`,
+      { signal: controller.signal }
+    );
+
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      throw new Error(body?.error ?? 'Failed to load onboarding discovery.');
     }
-  );
 
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as {
-      error?: string;
-    } | null;
-    throw new Error(body?.error ?? 'Failed to load onboarding discovery.');
+    const payload = (await response.json()) as DiscoveryResponse;
+    if (!payload.success) {
+      throw new Error('Failed to load onboarding discovery.');
+    }
+
+    return payload.snapshot;
+  } catch (error) {
+    if (timedOut && !signal?.aborted) {
+      throw new Error(DISCOVERY_TIMEOUT_MESSAGE);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', forwardAbort);
   }
-
-  const payload = (await response.json()) as DiscoveryResponse;
-  if (!payload.success) {
-    throw new Error('Failed to load onboarding discovery.');
-  }
-
-  return payload.snapshot;
 }
 
 function StepFrame({ actions, children, prompt, title }: StepFrameProps) {
@@ -739,6 +763,9 @@ export function OnboardingV2Form({
   const [discoverySnapshot, setDiscoverySnapshot] =
     useState<DiscoverySnapshot | null>(null);
   const [discoveryError, setDiscoveryError] = useState<string | null>(null);
+  const [verificationNotice, setVerificationNotice] = useState<string | null>(
+    null
+  );
   const [isDiscoveryLoading, setIsDiscoveryLoading] = useState(false);
   const [isArtistConnectPending, setIsArtistConnectPending] = useState(false);
   const [lateArrivals, setLateArrivals] = useState<LateArrival[]>([]);
@@ -750,6 +777,7 @@ export function OnboardingV2Form({
   const selectedArtistRef = useRef<SelectedArtist | null>(selectedArtist);
   const currentStepRef = useRef<StepId>(currentStep);
   const discoverySnapshotRef = useRef<DiscoverySnapshot | null>(null);
+  const discoveryInFlightRef = useRef(false);
   const discoveryRequestSeqRef = useRef(0);
   const lateArrivalIdsRef = useRef<Set<string>>(new Set());
   const didResolveInitialResumeRef = useRef(false);
@@ -880,6 +908,7 @@ export function OnboardingV2Form({
 
       const requestSeq = discoveryRequestSeqRef.current + 1;
       discoveryRequestSeqRef.current = requestSeq;
+      discoveryInFlightRef.current = true;
       setIsDiscoveryLoading(true);
 
       try {
@@ -923,6 +952,9 @@ export function OnboardingV2Form({
 
         setDiscoveryError(getDiscoveryErrorMessage(error));
       } finally {
+        if (requestSeq === discoveryRequestSeqRef.current) {
+          discoveryInFlightRef.current = false;
+        }
         if (!signal?.aborted && requestSeq === discoveryRequestSeqRef.current) {
           setIsDiscoveryLoading(false);
         }
@@ -968,6 +1000,9 @@ export function OnboardingV2Form({
     refreshDiscovery(controller.signal);
 
     const intervalId = globalThis.setInterval(() => {
+      // Single flight: a newer poll supersedes an older request, so polling
+      // over a hung request would discard its timeout error forever.
+      if (discoveryInFlightRef.current) return;
       refreshDiscovery(controller.signal);
     }, DISCOVERY_POLL_INTERVAL_MS);
 
@@ -1087,6 +1122,7 @@ export function OnboardingV2Form({
       setCurrentStep('artist-confirm');
       setIsArtistConnectPending(true);
       setDiscoveryError(null);
+      setVerificationNotice(null);
 
       try {
         const connectResult = await connectOnboardingSpotifyArtist({
@@ -1096,6 +1132,14 @@ export function OnboardingV2Form({
           spotifyArtistId: artist.id,
           spotifyArtistUrl: artist.url,
         });
+
+        if (connectResult.verificationPending) {
+          // High-reach artist: not linked until ownership is verified. The
+          // user keeps going (plan + profile work); no enrichment runs.
+          setIsArtistConnectPending(false);
+          setVerificationNotice(connectResult.message);
+          return;
+        }
 
         if (!connectResult.success) {
           throw new Error(
@@ -1706,12 +1750,17 @@ export function OnboardingV2Form({
           isConnecting ||
           isEnriching ||
           isDiscoveryLoading;
+        const isVerificationPending = Boolean(verificationNotice) && !hasError;
         const artistConfirmTitle = hasError
           ? 'Import ran into an issue'
-          : 'Spotify connected';
+          : isVerificationPending
+            ? 'Verification in progress'
+            : 'Spotify connected';
         const artistConfirmPrompt = hasError
           ? 'You can try connecting again or skip ahead.'
-          : "We'll import your discography in the background. You can keep going.";
+          : isVerificationPending
+            ? (verificationNotice ?? '')
+            : "We'll import your discography in the background. You can keep going.";
         const chooseArtistLabel = hasError
           ? 'Try again'
           : 'Choose a different artist';
@@ -1992,6 +2041,11 @@ export function OnboardingV2Form({
               </>
             }
           >
+            {discoveryError ? (
+              <InfoBox presentation='inline' variant='error'>
+                {discoveryError}
+              </InfoBox>
+            ) : null}
             {discoverySnapshot?.releases.length ? (
               discoverySnapshot.releases.map(release => (
                 <FlatPanel key={release.id}>

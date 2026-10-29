@@ -10,7 +10,7 @@
  *   5. Enforcement commands exist in package.json. Absence from
  *      ci-fast-lanes.mjs is WARN-only (weekly + local; not a merge gate).
  *   6. code-style.md custom-rule count matches eslint.config.js.
- *   7. DESIGN_COMPLETE.md carries a superseded banner.
+ *   7. DESIGN_COMPLETE.md is retired, or carries a superseded banner.
  *   8. Design-agent invariants project from canon/invariants.jsonl only.
  *   9. Shared-UI visual arbitrary values are shrink-only (JOV-5437).
  *  10. Shadcn/Typeset outcome inventory is fail-closed (JOV-5438).
@@ -466,8 +466,13 @@ export function runDesignGovernanceAudit(
   }
 
   try {
-    const doc = readRepoFile(DESIGN_COMPLETE_PATH);
-    if (/superseded/i.test(doc)) {
+    if (!existsSync(path.join(repoRoot, DESIGN_COMPLETE_PATH))) {
+      report(
+        'design-complete-banner',
+        'PASS',
+        `${DESIGN_COMPLETE_PATH} is retired (git history preserves it)`
+      );
+    } else if (/superseded/i.test(readRepoFile(DESIGN_COMPLETE_PATH))) {
       report(
         'design-complete-banner',
         'PASS',

@@ -5,6 +5,27 @@ import { isDeepStrictEqual } from 'node:util';
 
 export const PRODUCT_LANES = ['ios', 'mac', 'web'];
 
+/**
+ * Rules whose only Mac-lane effect is the node checks (`@jovie/desktop`
+ * typecheck and test). A change selected for Mac solely by these runs the Mac
+ * lane on ubuntu; anything else keeps macOS for swift and the MenuMonitor artifact.
+ */
+export const MAC_NODE_ONLY_RULES = Object.freeze(
+  new Set(['mac-desktop-node-input'])
+);
+
+/**
+ * @param {{ classifications?: readonly Record<string, any>[] }} receipt
+ * @returns {boolean} true when the Mac lane needs a macOS runner
+ */
+export function macNativeRequired(receipt) {
+  return (receipt.classifications ?? []).some(
+    item =>
+      (item.affectedProducts ?? []).includes('mac') &&
+      !MAC_NODE_ONLY_RULES.has(item.rule ?? '')
+  );
+}
+
 const GATE_RECEIPTS = {
   ios: {
     tests:
@@ -14,9 +35,8 @@ const GATE_RECEIPTS = {
   },
   mac: {
     tests:
-      'swift build --package-path apps/macos/MenuMonitor -c release && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test && pnpm --filter @jovie/desktop run package:staging',
-    artifact:
-      'desktop-staging-<merge-group-head-sha> with MenuMonitor release binary',
+      'swift build --package-path apps/macos/MenuMonitor -c release && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test',
+    artifact: 'MenuMonitor release binary',
     releaseWorkflow: '.github/workflows/desktop-release.yml',
   },
   web: {
@@ -144,7 +164,7 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
   ],
   [
     // Files outside apps/desktop that `@jovie/desktop` test and
-    // package:staging read: prepare-icons runs apps/web's brand generator
+    // Desktop tests read apps/web's brand generator
     // (which reads the iOS AppIcon set), system-b-tokens.test reads the web
     // CSS, url-disposition.test reads the route manifest, and the dogfood
     // inventory must resolve its web sources. A guard test derives the
@@ -155,10 +175,23 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     /^apps\/ios\/Jovie\/Resources\/Assets\.xcassets\/AppIcon\.appiconset\/Contents\.json$/,
   ],
   [
+    // Brand-generator inputs the desktop app is built from. They stay on the
+    // macOS lane with swift and the desktop checks. Node-only web reads are
+    // mac-desktop-node-input and do not take a macOS runner.
     'mac-consumed-web-input',
     'web',
     ['mac', 'web'],
-    /^(?:packages\/ui\/brand\/(geometry\.gen|jovie-o-geometry)\.ts$|apps\/web\/(scripts\/generate-brand-assets\.ts|lib\/brand\/tokens\.ts|lib\/design\/generated\/design-tokens\.ts|styles\/(design-system|system-b-app)\.css|data\/marketing\/routeManifest\.ts|constants\/routes\.ts|app\/desktop-auth\/DesktopAuthClient\.tsx|components\/organisms\/(DesktopTitlebar|CmdKPalette|CommandPalette|user-button\/UserButton)\.tsx|components\/features\/(workspace-lock\/WorkspaceLockScreen\.tsx|dashboard\/dashboard-nav\/config\.ts))$)/,
+    /^(?:packages\/ui\/brand\/(geometry\.gen|jovie-o-geometry)\.ts$|apps\/web\/(scripts\/generate-brand-assets\.ts|lib\/brand\/tokens\.ts|lib\/design\/generated\/design-tokens\.ts)$)/,
+  ],
+  [
+    // Web files only read by `@jovie/desktop` node tests (dogfood inventory,
+    // url-disposition, system-b-tokens). They need the Mac lane's node checks,
+    // not Swift or electron-builder, so they do not require a macOS runner
+    // (MAC_NODE_ONLY_RULES). Hosted macOS is one small org-wide pool.
+    'mac-desktop-node-input',
+    'web',
+    ['mac', 'web'],
+    /^apps\/web\/(?:styles\/(design-system|system-b-app)\.css|data\/marketing\/routeManifest\.ts|constants\/routes\.ts|app\/desktop-auth\/DesktopAuthClient\.tsx|components\/organisms\/(DesktopTitlebar|CmdKPalette|CommandPalette|user-button\/UserButton)\.tsx|components\/features\/(workspace-lock\/WorkspaceLockScreen\.tsx|dashboard\/dashboard-nav\/config\.ts))$/,
   ],
   [
     'ios-product',
@@ -181,6 +214,22 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     // knowledge-ingest now lives in observability-ingest. First-parent ranges
     // still name the old prefix on the add and delete commits.
     /^(apps\/(web|ovie|extension)\/|packages\/(action-contracts|audio-contracts|brand|extension-contracts|jovie-cli|ui)\/|workers\/(observability-ingest|canary-otp|knowledge-ingest)\/|app\/|content\/|lib\/|trigger\/|creator_profiles\/|vercel\.json$|\.vercelignore$|skills\/jovie\/(SKILL\.md|README\.md|LICENSE)$|\.github\/workflows\/(production-release|production-marker-recovery|postdeploy-probes|canary-health-gate)\.yml$)/,
+  ],
+  [
+    // @jovie/api-client: the shared third-party API client used by scripts,
+    // lanes (via scripts/apiclient) and CI shell steps. No product app imports
+    // it yet; move it to shared-contract when one does.
+    'operations-api-client',
+    'operations-tooling',
+    [],
+    /^packages\/api-client\//,
+  ],
+  [
+    // @jovie/research: agent research router + decision log (CLI/MCP only).
+    'operations-research',
+    'operations-tooling',
+    [],
+    /^packages\/research\//,
   ],
   [
     'operations-tooling',
@@ -1091,6 +1140,7 @@ export function runProductLaneClassifier(
     const outputs = [
       `run_web=${selected.has('web')}`,
       `run_macos=${selected.has('mac')}`,
+      `run_macos_native=${selected.has('mac') && macNativeRequired(receipt)}`,
       `run_ios=${selected.has('ios')}`,
       `run_operations=${selected.has('operations')}`,
       `run_cross_product=${selected.has('cross-product')}`,

@@ -27,18 +27,22 @@ export function SidebarInboxLink({
     <Tooltip label={accessibleLabel} side='bottom'>
       <Link
         href={APP_ROUTES.DASHBOARD}
+        prefetch={false}
         aria-label={accessibleLabel}
         data-inbox-attention={
           pending ? 'available' : (availability?.state ?? 'unknown')
         }
         className='focus-ring-themed relative inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-item-foreground hover:bg-sidebar-accent focus-visible:bg-sidebar-accent'
       >
-        <Bell className='size-3.5' aria-hidden='true' />
+        <Bell
+          className='size-(--app-shell-sidebar-icon-size)'
+          aria-hidden='true'
+        />
         {pending || hasRuntimeUpdate ? (
           <span
             data-runtime-update={hasRuntimeUpdate || undefined}
             aria-hidden='true'
-            className='absolute right-1 top-1 size-1.5 rounded-full bg-accent'
+            className='absolute bottom-1 right-1 size-1.5 rounded-full bg-accent'
           />
         ) : null}
       </Link>

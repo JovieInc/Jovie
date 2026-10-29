@@ -69,10 +69,11 @@ class ExecutionAttemptTest(unittest.TestCase):
             with lock:
                 if rows: return None
                 event = "event-1"; rows.append({**row, "_remote": {"prevStatusId": head, "eventId": event, "statusId": 1}}); return event
-        real = attempt._github_rows, attempt._github_append
-        attempt._github_rows, attempt._github_append = fake_rows, fake_append
+        real = attempt._github_rows, attempt._github_append, attempt._read_ref
+        attempt._github_rows, attempt._github_append, attempt._read_ref = fake_rows, fake_append, lambda *_: None
         recovery = patch.object(attempt, "_recover_append", return_value=None); recovery.start(); self.addCleanup(recovery.stop)
-        self.addCleanup(lambda: (setattr(attempt, "_github_rows", real[0]), setattr(attempt, "_github_append", real[1])))
+        self.addCleanup(lambda: (setattr(attempt, "_github_rows", real[0]), setattr(attempt, "_github_append", real[1]),
+                                 setattr(attempt, "_read_ref", real[2])))
         coordination = {"kind": "github-status", "repository": "JovieInc/Jovie", "sha": "a" * 40}
         with ThreadPoolExecutor(2) as pool:
             results = list(pool.map(lambda host: self.claim(path=Path(self.tmp.name) / f"host-{host}.jsonl", coordination=coordination), "ab"))
@@ -90,6 +91,25 @@ class ExecutionAttemptTest(unittest.TestCase):
             self.assertIsNone(seen["env"], "the lanes' gh shim supplies the token")
         finally:
             attempt.subprocess.run = real[0]; attempt.os.environ.clear(); attempt.os.environ.update(real[1])
+    def test_a_slow_paginated_read_gets_one_retry_and_writes_never_replay(self):
+        # 2026-10-21: 14 claims/24h failed on a 30 s status-history read before any work.
+        calls = []
+        def fake_run(args, **kwargs):
+            calls.append((args[3], kwargs.get("timeout")))
+            if len(calls) == 1 or args[3] == "POST":
+                raise subprocess.TimeoutExpired(args, kwargs.get("timeout"))
+            return subprocess.CompletedProcess(args, 0, "[[]]", "")
+        real = attempt.subprocess.run
+        attempt.subprocess.run = fake_run
+        try:
+            self.assertEqual(attempt._gh({}, "GET", "repos/x/y/statuses"), [[]])
+            self.assertEqual(calls, [("GET", attempt.GET_TIMEOUT_S), ("GET", attempt.GET_TIMEOUT_S)])
+            calls.clear()
+            with self.assertRaises(subprocess.TimeoutExpired):
+                attempt._gh({}, "POST", "repos/x/y/statuses/s", {"state": "pending"})
+            self.assertEqual(calls, [("POST", 30)], "a write is never replayed")
+        finally:
+            attempt.subprocess.run = real
     def test_crash_restart_and_redelivery_stay_terminal(self):
         first = self.claim()
         self.assertEqual(self.claim(now=101)["reason"], "duplicate_active")
@@ -656,58 +676,65 @@ if error: sys.stderr.write("fixture response lost after remote commit"); sys.exi
 print(json.dumps(result))
 ''')
         shim.chmod(0o755)
-        self.enabled = self.root / "enabled-execution-attempt.py"
-        self.enabled.write_text(MODULE.read_text().replace("IMMUTABLE_WRITER_ENABLED = False", "IMMUTABLE_WRITER_ENABLED = True"))
+        # The checked-in writer is enabled (JOV-8293); this copy is an un-updated
+        # host that still emits the legacy wire format, for rollout safety.
+        self.legacy = self.root / "legacy-execution-attempt.py"
+        self.legacy.write_text(MODULE.read_text().replace("IMMUTABLE_WRITER_ENABLED = True", "IMMUTABLE_WRITER_ENABLED = False"))
         self.coord = {"kind": "github-status", "repository": "Fixture/Repo", "sha": "a" * 40}
         self.ident = attempt.identity("fixture", {"pr": 1}, {"head": "a" * 40})
         self.env = {**attempt.os.environ, "PATH": f"{self.root}:/usr/bin:/bin", "PYTHONPATH": str(MODULE.parent),
                     "LANES_STATE": str(self.root / "state"), "FIXTURE_GITHUB_STATE": str(self.remote)}
         self.env.pop(attempt.lifecycle.FD_ENV, None)
-    def cli(self, command, *, enabled=False, **fields):
+    # One CLI transition verifies several immutable objects through real
+    # tracked helpers (13 calls for claim, 22 for an ambiguous boundary), so a
+    # loaded runner pays one interpreter start per helper call. That cost is
+    # wall-clock, not a hang: the fixed 30 s bound timed out on merge groups
+    # (2026-10-24 queue ejections) and, through the staged release self-test,
+    # refused the release and ejected UpdateTest with it (JOV-8483). The guard
+    # below only bounds a hung CLI; the assertions are unchanged.
+    CLI_HANG_GUARD_S = 120
+
+    def cli(self, command, *, legacy=False, **fields):
         request = {"command": command, "path": str(self.root / "ledger.jsonl"), "ident": self.ident,
                    "coordination": self.coord, **fields}
-        # One CLI transition verifies several immutable objects through real
-        # tracked helpers (13 calls for claim, 22 for an ambiguous boundary).
-        # Bound the whole fixture without imposing a 10s budget on all helpers.
-        result = subprocess.run([sys.executable, str(self.enabled if enabled else MODULE)], input=json.dumps(request),
-                                capture_output=True, text=True, env=self.env, timeout=30)
+        result = subprocess.run([sys.executable, str(self.legacy if legacy else MODULE)], input=json.dumps(request),
+                                capture_output=True, text=True, env=self.env, timeout=self.CLI_HANG_GUARD_S)
         return result.returncode, json.loads(result.stdout)
-    def claim(self, *, enabled=False):
-        return self.cli("claim", enabled=enabled, owner=owner(), policy=policy(), trigger={"triggerId": "same"}, now=100)
-    def test_default_cli_and_caller_or_env_assertions_cannot_activate_new_writer(self):
-        self.coord.update(immutableWriterEnabled=True, reservationProtocol=attempt.RESERVATION_SCHEMA)
-        self.env.update(IMMUTABLE_WRITER_ENABLED="1", LANES_IMMUTABLE_WRITER_ENABLED="1")
+    def claim(self, *, legacy=False):
+        return self.cli("claim", legacy=legacy, owner=owner(), policy=policy(), trigger={"triggerId": "same"}, now=100)
+    def test_default_cli_and_caller_or_env_assertions_cannot_deactivate_new_writer(self):
+        self.coord.update(immutableWriterEnabled=False, reservationProtocol="other")
+        self.env.update(IMMUTABLE_WRITER_ENABLED="0", LANES_IMMUTABLE_WRITER_ENABLED="0")
         code, start = self.claim()
         self.assertEqual(code, 0); self.assertTrue(start["admitted"])
         code, row = self.cli("boundary", fence=start["fencingToken"], reservation={"spend": 1}, now=101, boundary_id="dispatch")
         self.assertEqual(code, 0); self.assertTrue(row["admitted"])
         state = json.loads(self.remote.read_text())
-        self.assertEqual(state["tags"], {})
-        self.assertTrue(all(ref["object"] == {"type": "commit", "sha": self.coord["sha"]} for ref in state["refs"].values()))
-        rows, head = attempt._status_rows(state["statuses"], self.ident, strict=True)
+        self.assertTrue(state["tags"], "the checked-in writer emits candidate-linked receipts")
+        self.assertTrue(all(ref["object"]["type"] == "tag" for ref in state["refs"].values()))
+        rows = [attempt._unpack(s["target_url"].split("#jovie-execution=", 1)[1]) for s in state["statuses"]]
         self.assertEqual([r["event"] for r in rows], ["attempt_started", "boundary_admitted"])
-        self.assertIsInstance(head, int)
-        self.assertTrue(all(set(r["_remote"]) == {"prevStatusId", "eventId", "statusId"} for r in rows))
-    def test_enabled_cli_unknown_committed_boundary_stays_terminal_across_real_processes(self):
-        code, start = self.claim(enabled=True)
+        self.assertTrue(all("reservationSha" in r["_remote"] for r in rows))
+    def test_default_cli_unknown_committed_boundary_stays_terminal_across_real_processes(self):
+        code, start = self.claim()
         self.assertEqual(code, 0); self.assertTrue(start["admitted"])
         state = json.loads(self.remote.read_text()); state["unknownOnce"] = True; self.remote.write_text(json.dumps(state))
         fields = {"fence": start["fencingToken"], "reservation": {"spend": 1}, "now": 101, "boundary_id": "dispatch"}
-        code, result = self.cli("boundary", enabled=True, **fields)
+        code, result = self.cli("boundary", **fields)
         self.assertEqual(code, 2); self.assertIn("execution-coordinator-http", result["error"])
         for now in (102, 103, 104):
-            code, result = self.cli("boundary", enabled=True, **{**fields, "now": now})
+            code, result = self.cli("boundary", **{**fields, "now": now})
             self.assertEqual(code, 2); self.assertEqual(result["error"], "stale-fencing-token")
-        code, result = self.claim(enabled=True)
+        code, result = self.claim()
         self.assertEqual(code, 0); self.assertEqual(result["reason"], "generation_terminal")
         state = json.loads(self.remote.read_text())
         rows = [attempt._unpack(s["target_url"].split("#jovie-execution=", 1)[1]) for s in state["statuses"]]
         self.assertEqual([r["event"] for r in rows], ["attempt_started", "boundary_admitted", "attempt_finished"])
         self.assertEqual((attempt._usage(rows, 104)["spend"], rows[-1]["terminalState"]), (1, "failed_unknown"))
-    def test_disabled_writer_reads_new_receipts_but_cannot_resume_or_extend_them(self):
-        code, start = self.claim(enabled=True)
+    def test_unupdated_writer_reads_new_receipts_but_cannot_resume_or_extend_them(self):
+        code, start = self.claim()
         self.assertEqual(code, 0)
-        code, result = self.claim()
+        code, result = self.claim(legacy=True)
         self.assertEqual(code, 2); self.assertEqual(result["error"], "execution-coordinator-writer-not-activated")
         self.assertEqual(len(json.loads(self.remote.read_text())["statuses"]), 1)
 
@@ -813,7 +840,9 @@ class CompletedFailureReconciliationTest(unittest.TestCase):
         self.assertTrue(self.path.read_bytes().startswith(prefix))
         self.assertEqual(before, ((self.state / "fix-attempts.json").read_bytes(), (self.state / "runs/ledger.jsonl").read_bytes()))
         self.assertEqual(attempt.claim(self.path, self.identities[0], owner(), policy(), {}, now=self.now, coordination=self.coord)["reason"], "generation_terminal")
-    def test_default_writer_keeps_legacy_reconciliation_and_numeric_history(self):
+    def test_unupdated_writer_keeps_legacy_reconciliation_and_numeric_history(self):
+        # An un-updated host still emits the legacy wire format; its numeric
+        # chains remain readable and reconcilable, never candidate-linked.
         with patch.object(attempt, "IMMUTABLE_WRITER_ENABLED", False):
             self.assertTrue(self.reconcile()["reconciled"])
             self.assertTrue(self.reconcile()["alreadyReconciled"])
@@ -1296,5 +1325,28 @@ class ExecutionAttemptCliLifecycleTest(unittest.TestCase):
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         finally:
             os.close(fd)
+
+
+
+class TornTailTest(unittest.TestCase):
+    def test_torn_final_line_is_dropped_and_next_append_is_clean(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "attempts.jsonl"
+            good = {"schema": attempt.SCHEMA, "identityDigest": "a"}
+            path.write_text(json.dumps(good) + "\n" + '{"schema": "jovie-execution-attempt/v1", "iden')
+            self.assertEqual(attempt._rows(path), [good])
+            attempt._file_locked(path, lambda rows: (None, [{**good, "identityDigest": "b"}]))
+            self.assertEqual([r["identityDigest"] for r in attempt._rows(path)], ["a", "b"])
+            self.assertEqual(len(path.read_text().splitlines()), 2)
+
+    def test_interior_corruption_still_raises(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "attempts.jsonl"
+            path.write_text('{"bad\n{"schema": "x"}\n')
+            with self.assertRaises(json.JSONDecodeError):
+                attempt._rows(path)
+
 
 if __name__ == "__main__": unittest.main()

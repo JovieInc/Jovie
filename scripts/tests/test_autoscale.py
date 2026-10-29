@@ -375,10 +375,13 @@ class AutoscaleTest(unittest.TestCase):
         def budget(name, slots):
             recorded["slots"] = slots; result = lane.new_issue_budget(name, slots, []); recorded["cap"], recorded["terminalCap"] = result["cap"], result["terminalCap"]; return {"allowed": False, "reason": "provider-disabled", "used": 0, "cap": None, "terminal": 0, "terminalCap": None}
         with tempfile.TemporaryDirectory() as tmp, env(SYMPHONY_AUTOSCALE="apply"):
-            root = Path(tmp); (root / "linear.env").write_text("LINEAR_API_KEY=test\n"); host = lane.Host(state=root / "state", repo=root, linear_env=root / "linear.env")
+            root = Path(tmp); (root / "linear-app.env").write_text("LINEAR_CLIENT_ID=cid\nLINEAR_CLIENT_SECRET=sec\n"); host = lane.Host(state=root / "state", repo=root, linear_env=root / "linear-app.env")
+            app = patch.object(lane.linear_app_token, "default_path", return_value=root / "linear-app.env"); app.start(); self.addCleanup(app.stop)
+            inventory_at = time.time()
             with patch.object(lane.autoscale, "effective_slots", return_value=9), \
                     patch.object(lane.autoscale, "intake_slots", return_value=9), \
                     patch.object(lane.disk_guard, "check", return_value={"admitted": True, "freePct": 40}), \
+                    patch.object(lane, "_SUMMARY", {"at": inventory_at, "sourceAt": inventory_at, "readable": True, "prs": []}), \
                     patch.object(lane, "lane_prs", return_value=[]), patch.object(lane, "fix_candidates", return_value=[]), \
                     patch.object(lane.pr_events, "queued_prs", return_value=[]), patch.object(lane.pr_events, "claim_event_pr", return_value=None), \
                     patch.object(lane, "claim_red_pr", return_value=None), patch.object(lane, "provider_may_run", return_value=False), \
@@ -402,11 +405,66 @@ class AutoscaleTest(unittest.TestCase):
                               feed["autoscale"]["lanes"]["devin"]["base"], len(feed["autoscale"]["history"])), ("apply", 6, 4, 10))
         spec = importlib.util.spec_from_file_location("hud_fixture", ROOT / "scripts/tests/test_hud.py"); fixture = importlib.util.module_from_spec(spec); spec.loader.exec_module(fixture)
         def text(value):
-            return "\n".join(fixture.plain(line) for line in fixture.hud.render(value, 160, 45))
+            # Use the widest two-column geometry so the optional autoscale mode fits
+            # beside the effective/base slot counts in the WORKERS panel heading.
+            frame = fixture.hud.render(value, 199, 45)
+            # Scaling arrows belong to the worker summary; the footer also has scroll arrows.
+            return next(cell for cell in fixture.cells(frame) if cell.startswith(" WORKERS "))
         self.assertIn("1 running / 3 (devin 1/2 · codex 0/1)", text(fixture.model())); self.assertNotIn("auto:", text(fixture.model())); shown = fixture.model(); shown["local"].update(autoscaleMode="apply", baseSlots={"devin": 2, "codex": 2}, slots={"devin": 3, "codex": 1}); rendered = text(shown); self.assertIn("devin 1/3↑2", rendered); self.assertIn("codex 0/1↓2", rendered); self.assertIn("auto:apply", rendered); level = fixture.model()
         level["local"].update(autoscaleMode="observe", baseSlots={"devin": 2, "codex": 1}); rendered = text(level); self.assertIn("1 running / 3 (devin 1/2 · codex 0/1)", rendered); self.assertIn("auto:observe", rendered); self.assertNotIn("↑", rendered)
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp); (root / "meminfo").write_text("MemTotal: 100 kB\nMemAvailable: 2048 kB\n"); (root / "pressure").mkdir(); (root / "pressure" / "cpu").write_text("some avg10=1.50 avg60=1.00\n"); (root / "pressure" / "memory").write_text("full avg10=0.25\n"); (root / "pressure" / "io").write_text("full avg10=2.00\n"); probed = A.sample_host(root); self.assertEqual((probed["memAvailableBytes"], probed["psi"]["cpuSomeAvg10"], probed["psi"]["memoryFullAvg10"]), (2048 * 1024, 1.5, 0.25))
             self.assertIsNone(A.sample_host(root / "missing")["psi"]); self.assertIsNone(A.sample_host(root / "missing")["memAvailableBytes"])
+    def test_remote_lane_ignores_gem_host_pressure_but_local_lane_does_not(self):
+        # Hyperagent runs off gem: gem disk, memory, load and PSI are not its limits; provider limits still are.
+        hot = sample(load1=30.0, memAvailableBytes=1 * GIB, psi={"cpuSomeAvg10": 90.0, "memoryFullAvg10": 50.0, "ioFullAvg10": 90.0})
+        seen = obs(eligiblePoolByProvider={"devin": 8, "codex": 6, "hyperagent": 20}, maintenanceQueueByProvider={"devin": 0, "codex": 0, "hyperagent": 0},
+                   newIssueBudgetByProvider={"devin": {"reason": "within-budget"}, "codex": {"reason": "within-budget"}, "hyperagent": {"reason": "within-budget"}},
+                   runningByProvider={"devin": 4, "codex": 3, "hyperagent": 10}, disk={"admitted": False, "freePct": 2})
+        bases = {"codex": 3, "hyperagent": 10}
+        state = decide(None, seen, hot, bases, cfg(remote=["hyperagent"]), NOW)
+        self.assertGreaterEqual(self.lane(state, "hyperagent")["effective"], 10); self.assertNotIn("host-pressure", self.lane(state, "hyperagent")["blockers"])
+        self.assertIn("host-pressure", self.lane(state, "codex")["blockers"]); self.assertLess(self.lane(state, "codex")["effective"], 3)
+        local = decide(None, seen, hot, bases, cfg(), NOW)
+        self.assertLess(self.lane(local, "hyperagent")["effective"], 10)
+        rate = decide(None, obs(rateBankAt={"hyperagent": NOW - 10}, eligiblePoolByProvider={"hyperagent": 20}, newIssueBudgetByProvider={"hyperagent": {"reason": "within-budget"}}, maintenanceQueueByProvider={"hyperagent": 0}, runningByProvider={"hyperagent": 10}), hot, {"hyperagent": 10}, cfg(remote=["hyperagent"]), NOW)
+        self.assertEqual(self.lane(rate, "hyperagent")["effective"], 5)
+class MarginalYieldAndAdmissionTest(unittest.TestCase):
+    lane = staticmethod(lambda state, name: state["lanes"][name])
+
+    def test_low_marginal_yield_blocks_growth_and_gives_a_seat_back(self):
+        prev = {"mode": "apply", "lanes": {"codex": {"base": 3, "effective": 4, "target": 4}}, "host": {"lastChangeAt": NOW - 3600}}
+        seen = obs(runningByProvider={"codex": 4}, eligiblePoolByProvider={"codex": 50}, maintenanceQueueByProvider={"codex": 20},
+                   yieldByProvider={"codex": {"attempts": 20, "converted": 1}})
+        state = decide(prev, seen, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW)
+        self.assertEqual((self.lane(state, "codex")["effective"], self.lane(state, "codex")["lastReason"]), (3, "low-yield"))
+        healthy = decide(prev, {**seen, "yieldByProvider": {"codex": {"attempts": 20, "converted": 9}}}, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW)
+        self.assertGreater(self.lane(healthy, "codex")["effective"], 4)
+        few = decide(prev, {**seen, "yieldByProvider": {"codex": {"attempts": 3, "converted": 0}}}, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW)
+        self.assertGreaterEqual(self.lane(few, "codex")["effective"], 4, "too few attempts is no evidence")
+
+    def test_intake_gates_stop_new_issues_but_not_remediation_seats(self):
+        base = obs(runningByProvider={"codex": 3}, eligiblePoolByProvider={"codex": 50}, maintenanceQueueByProvider={"codex": 20})
+        for extra, token in (({"openPRCount": 315, "wipMax": 80}, "wip-cap"),
+                             ({"mergeThroughput": {"queueDepth": 9, "queueWaitP50Minutes": 45, "mergedPerHour": 9, "openedPerHour": 5, "ejectionRate": 0.0}}, "ci-queue-wait"),
+                             ({"quotaDeferredHeads": 2}, "github-quota-deferred")):
+            state = decide(None, {**base, **extra}, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW)
+            row = self.lane(state, "codex")
+            self.assertIn(token, row["intakeBlockers"])
+            self.assertEqual(row["intakeEffective"], 0)
+            self.assertGreaterEqual(row["effective"], 3, "remediation seats keep running")
+        under = decide(None, {**base, "openPRCount": 40, "wipMax": 80}, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW)
+        self.assertEqual(self.lane(under, "codex")["intakeBlockers"], [])
+
+    def test_flow_metrics_and_swarm_claims(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "swarm-claims.json").write_text(json.dumps({"claims": [{"pr": 1, "at": NOW - 60}, {"pr": 2, "at": NOW - 99999}]}))
+            self.assertEqual(A.swarm_claims(Path(tmp), NOW), 1)
+        merged = [{"createdAt": "2026-10-28T00:00:00Z", "mergedAt": "2026-10-28T01:00:00Z"}] * 4
+        m = A.flow_metrics({"merged24h": merged, "mergedWindow": {"complete": True}, "openPRCount": 120, "eligiblePoolByProvider": {"codex": 40}},
+                           {"codex": {"attempts": 10, "converted": 6}}, 3, 80, NOW)
+        self.assertEqual((m["mergedPerDay"], m["convertedPerAttempt"], m["cycleMinutesP50"], m["burnDownEtaDays"], m["swarmClaims"]), (4, 0.6, 60.0, 10.0, 3))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -10,9 +10,11 @@ import { resolveUserState } from '@/lib/auth/gate';
 import { getExactProfileAccess } from '@/lib/auth/profile-access';
 import { db } from '@/lib/db';
 import { captureWarning } from '@/lib/error-tracking';
+import { getCurrentOnboardingSessionId } from '@/lib/onboarding/session';
 import { resolveStartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
 import { readStartEntryHandle } from '@/lib/onboarding/start-entry-profile';
 import { resolveStartEntryProfile } from '@/lib/onboarding/start-entry-profile.server';
+import { documentTitle } from '@/lib/seo/document-title';
 import { resolveSyntheticPassage } from '@/lib/synthetic/passage.server';
 
 /**
@@ -34,7 +36,7 @@ import { resolveSyntheticPassage } from '@/lib/synthetic/passage.server';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Start with Jovie',
+  title: documentTitle('Start with Jovie'),
   // JOV-7794: no unmeasured speed claim, no single-ICP wording.
   description: 'Claim your name and start your Jovie profile.',
   robots: { index: false, follow: false },
@@ -81,11 +83,10 @@ export default async function StartPage(
     resolveStartEntryProfile(params),
   ]);
   const startRedirect = getStartRouteRedirect(authResult.state, {
+    // resume=1 also appears on the ordinary Sign in link. A completed account
+    // needs a concrete claim or handoff to stay outside its workspace.
     hasEntryIntent: Boolean(
-      readStartEntryHandle(params) ||
-        starterHandoff ||
-        intentId ||
-        params.resume === '1'
+      readStartEntryHandle(params) || starterHandoff || intentId
     ),
   });
   if (startRedirect) {
@@ -116,6 +117,10 @@ export default async function StartPage(
 
   const isSignedIn = authResult.state !== CanonicalUserState.UNAUTHENTICATED;
   const turnstileTestMode = await resolveSyntheticTurnstileTestMode(isSignedIn);
+  // No account and no onboarding cookie: there is nothing to restore, so the
+  // client does not need to fetch an empty snapshot before showing the chat.
+  const freshAnonymous =
+    !isSignedIn && (await getCurrentOnboardingSessionId()) === null;
 
   return (
     <OnboardingSessionBoundary
@@ -127,6 +132,16 @@ export default async function StartPage(
       entryProfile={entryProfile}
       accountClaimHandle={accountClaimHandle ?? undefined}
       accountIdentityId={authResult.clerkUserId ?? undefined}
+      initialSnapshot={
+        freshAnonymous
+          ? {
+              identityId: null,
+              conversationId: null,
+              owned: false,
+              messages: [],
+            }
+          : undefined
+      }
     />
   );
 }

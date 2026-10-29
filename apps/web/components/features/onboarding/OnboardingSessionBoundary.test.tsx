@@ -156,6 +156,12 @@ describe('onboarding identity boundary', () => {
     render(<OnboardingSessionBoundary sessionLabel='pending' />);
     expect(mocks.fetch).not.toHaveBeenCalled();
     expect(mocks.shell).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole('heading', {
+        level: 1,
+        name: 'Restoring your conversation…',
+      })
+    ).toBeVisible();
   });
   it('keeps an actual empty anonymous entry available for a new homepage handoff', async () => {
     mocks.auth.userId = null;
@@ -245,5 +251,58 @@ describe('onboarding identity boundary', () => {
     expect(mocks.shell).not.toHaveBeenCalled();
     fireEvent.click(retry);
     await screen.findByText('Saved artist progress');
+  });
+  describe('server-seeded first visit', () => {
+    const seed = {
+      identityId: null,
+      conversationId: null,
+      owned: false,
+      messages: [] as UIMessage[],
+    };
+
+    it('paints the chat before auth loads and without fetching an empty snapshot', () => {
+      mocks.auth.isLoaded = false;
+      mocks.auth.isSignedIn = false;
+      mocks.auth.userId = null;
+      render(
+        <OnboardingSessionBoundary
+          sessionLabel='pending'
+          initialSnapshot={seed}
+        />
+      );
+      expect(mocks.shell).toHaveBeenCalled();
+      expect(screen.queryByText('Restoring your conversation…')).toBeNull();
+      expect(mocks.fetch).not.toHaveBeenCalled();
+    });
+
+    it('keeps the starter handoff for the seeded first visit', () => {
+      mocks.auth.isLoaded = true;
+      mocks.auth.isSignedIn = false;
+      mocks.auth.userId = null;
+      render(
+        <OnboardingSessionBoundary
+          sessionLabel='pending'
+          starterHandoff={{ kind: 'prompt', prompt: 'Hello from home' }}
+          initialSnapshot={seed}
+        />
+      );
+      expect(screen.getByTestId('handoff')).toHaveTextContent(
+        'Hello from home'
+      );
+      expect(mocks.fetch).not.toHaveBeenCalled();
+    });
+
+    it('discards the seed and restores from the server when the client is signed in', async () => {
+      mocks.auth.isLoaded = true;
+      mocks.auth.userId = 'account-a';
+      render(
+        <OnboardingSessionBoundary
+          sessionLabel='pending'
+          initialSnapshot={seed}
+        />
+      );
+      await screen.findByText('Saved artist progress');
+      expect(mocks.fetch).toHaveBeenCalledTimes(1);
+    });
   });
 });

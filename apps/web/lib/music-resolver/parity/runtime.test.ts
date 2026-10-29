@@ -10,8 +10,8 @@ describe('nodeMatchesNvmrc', () => {
       resolve(dirname(fileURLToPath(import.meta.url)), '../../../../../.nvmrc'),
       'utf8'
     );
-    expect(required.trim()).toBe('24.21.0');
+    expect(required.trim()).toBe('24.22.1');
     expect(nodeMatchesNvmrc('v22.23.2', required)).toBe(false);
-    expect(nodeMatchesNvmrc('24.21.0', required)).toBe(true);
+    expect(nodeMatchesNvmrc('24.22.1', required)).toBe(true);
   });
 });

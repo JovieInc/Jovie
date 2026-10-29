@@ -74,7 +74,7 @@ describe('RevivalQueuePanel', () => {
     );
     expect(
       screen.getByRole('heading', { name: 'Connect Your YouTube Channel' })
-    ).toHaveClass('text-2xl', 'text-primary-token');
+    ).toHaveClass('text-sm', 'text-primary-token');
     expect(screen.getByText('Disconnected intelligence')).toBeInTheDocument();
   });
 

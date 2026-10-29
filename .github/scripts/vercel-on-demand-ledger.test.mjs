@@ -218,6 +218,7 @@ describe('vercel on-demand hard cap', () => {
       charges = '',
       project = pinned,
       failCharges = false,
+      failDeployments = false,
       ignorePatch = false,
     }) => {
       const calls = [];
@@ -241,10 +242,13 @@ describe('vercel on-demand hard cap', () => {
         }
         if (u.pathname.startsWith('/v2/teams/'))
           return ok({ billing: { period } });
-        if (u.pathname === '/v6/deployments')
-          return ok({ deployments, pagination: {} });
+        if (u.pathname === '/v6/deployments') {
+          return failDeployments
+            ? { ok: false, status: 503 }
+            : ok({ deployments, pagination: {} });
+        }
         if (u.pathname === '/v1/billing/charges') {
-          return failCharges ? { ok: false, status: 503 } : ok(charges);
+          return failCharges ? { ok: false, status: 404 } : ok(charges);
         }
         throw new Error(`unexpected ${u.pathname}`);
       };
@@ -307,7 +311,11 @@ describe('vercel on-demand hard cap', () => {
         false
       );
 
-      const blind = api({ deployments: [], project: on, failCharges: true });
+      const blind = api({
+        deployments: [],
+        project: on,
+        failDeployments: true,
+      });
       const unknown = await runLedger({
         token: 't',
         teamId: 'team_x',
@@ -325,6 +333,40 @@ describe('vercel on-demand hard cap', () => {
         renderLedger(unknown, policy),
         /Spend unknown: Vercel API 503/
       );
+    });
+
+    it('keeps the per-build estimate when the CI token cannot read billed charges (404, staging run 39495526899)', async () => {
+      const v = api({
+        deployments: builds(20, Date.parse(policy.enabledAt), DAY / 4),
+        failCharges: true,
+      });
+      const result = await runLedger({
+        token: 't',
+        teamId: 'team_x',
+        policy,
+        fetchImpl: v.fetchImpl,
+        now,
+      });
+      assert.equal(result.decision.reason, 'within-cap');
+      assert.equal(result.ledger.billedAvailable, false);
+      assert.match(result.chargesError, /Vercel API 404/);
+      assert.equal(v.state().resourceConfig.elasticConcurrencyEnabled, true);
+      const report = renderLedger(result, policy);
+      assert.match(report, /billed unavailable/);
+      assert.match(report, /using the per-build estimate/);
+      // The estimate alone still enforces the cutoff.
+      const over = api({
+        deployments: builds(600, Date.parse(policy.enabledAt), (4 * DAY) / 600),
+        failCharges: true,
+      });
+      const cut = await runLedger({
+        token: 't',
+        teamId: 'team_x',
+        policy,
+        fetchImpl: over.fetchImpl,
+        now,
+      });
+      assert.equal(cut.decision.reason, 'cutoff-actual');
     });
 
     it('never fails the release: a write that does not read back is reported, not thrown', async () => {

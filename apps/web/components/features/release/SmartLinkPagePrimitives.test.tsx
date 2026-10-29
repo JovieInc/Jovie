@@ -10,6 +10,7 @@ import {
 } from '@/lib/a11y-gates/contrast-engine';
 import { contrastRatio } from '@/lib/utils/color';
 import {
+  buildSmartLinkReportHref,
   SmartLinkArtworkCard,
   SmartLinkPoweredByFooter,
 } from './SmartLinkPagePrimitives';
@@ -42,6 +43,15 @@ describe('SmartLinkArtworkCard', () => {
 });
 
 describe('SmartLinkPoweredByFooter', () => {
+  it('tracks the Powered by Jovie link with the via-jovie-footer loop id', () => {
+    render(<SmartLinkPoweredByFooter />);
+    const href = screen
+      .getByRole('link', { name: /Powered by/i })
+      .getAttribute('href');
+    expect(href).toContain('utm_campaign=via-jovie-footer');
+    expect(href).toContain('utm_source=via_jovie');
+  });
+
   it('keeps every dark footer link above AA on the real base tokens', () => {
     render(<SmartLinkPoweredByFooter />);
     const webRoot = resolve(import.meta.dirname, '../../..');
@@ -89,12 +99,21 @@ describe('SmartLinkPoweredByFooter', () => {
     expect(link).toHaveAttribute('href', '/report?type=smart_link');
     expect(screen.getByRole('link', { name: /Powered by/i })).toHaveAttribute(
       'href',
-      '/'
+      '/?utm_source=via_jovie&utm_medium=footer&utm_campaign=via-jovie-footer'
     );
 
-    rerender(
-      <SmartLinkPoweredByFooter reportHref='/report?type=smart_link&target=abc' />
+    rerender(<SmartLinkPoweredByFooter reportTarget='/tim/never-say-a-word' />);
+    expect(link).toHaveAttribute(
+      'href',
+      '/report?type=smart_link&target=%2Ftim%2Fnever-say-a-word'
     );
-    expect(link).toHaveAttribute('href', '/report?type=smart_link&target=abc');
+  });
+
+  it('builds an unambiguous report target and ignores blank targets', () => {
+    expect(buildSmartLinkReportHref('/tim/never-say-a-word')).toBe(
+      '/report?type=smart_link&target=%2Ftim%2Fnever-say-a-word'
+    );
+    expect(buildSmartLinkReportHref('  ')).toBe('/report?type=smart_link');
+    expect(buildSmartLinkReportHref(null)).toBe('/report?type=smart_link');
   });
 });

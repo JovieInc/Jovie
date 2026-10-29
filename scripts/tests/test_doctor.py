@@ -8,10 +8,12 @@ from __future__ import annotations
 import importlib.util
 import hashlib
 import json
+from datetime import datetime, timezone
 import os
 import subprocess
 import sys
 import tempfile
+import types
 import time
 import unittest
 from pathlib import Path
@@ -117,6 +119,22 @@ class FactoryStayUpWatchdogTest(unittest.TestCase):
             self.assertEqual(result["status"], "observing")
             self.assertEqual(result["reasons"], ["factory-tick-in-progress"])
             recovery.assert_not_called()
+
+    def assess_tick(self, age_s, heartbeat):
+        obs = factory_observation(tickEpoch=300, tickAgeSeconds=700, runningWorkers=0,
+                                  service={"active": True, "ageSeconds": age_s, "manager": "systemd"},
+                                  heartbeatAgeSeconds=heartbeat)
+        return factory_watchdog.assess(obs)["reasons"]
+
+    def test_a_long_tick_that_keeps_working_is_not_restarted_but_a_silent_one_is(self):
+        # 2026-10-26: a 30-minute dispatch tick was restarted at the 22-minute grace on every cycle and never
+        # reached its doctor pass; the feed, the HUD and the dead-man went stale for over an hour.
+        beyond_grace = factory_watchdog.ACTIVE_TICK_GRACE_S + 600
+        self.assertEqual(self.assess_tick(beyond_grace, 20), ["factory-tick-in-progress"])
+        self.assertEqual(self.assess_tick(beyond_grace, None), ["factory-down"])
+        self.assertEqual(self.assess_tick(beyond_grace, factory_watchdog.HEARTBEAT_ALIVE_S + 60), ["factory-down"])
+        self.assertEqual(self.assess_tick(factory_watchdog.TICK_HARD_CAP_S + 60, 5), ["factory-down"],
+                         "a tick that never finishes is bounded even while it beats")
 
     def test_stale_factory_recovers_only_after_a_new_writing_observation(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -277,9 +295,132 @@ class FactoryStayUpWatchdogTest(unittest.TestCase):
             self.assertEqual(len(alerts), 1)
 
 
+def realistic_feed():
+    """Shaped like the 2026-10-25 live feed that hit 410,142 bytes: 737 overlap pairs (217 KB), 312
+    remediation fingerprints with long ask text (72 KB), 40 conditions (54 KB), per-PR attribution rows."""
+    pairs = [{"actionTaken": "flag", "files": [f"apps/web/components/area{n % 40}/File{n % 97}.tsx", "apps/web/data/shared.ts",
+                                              "apps/web/tests/unit/area/contract.test.ts", f"apps/web/lib/mod{n}.ts"],
+              "first": f"pr:#{22000 + n}", "firstPr": 22000 + n, "later": f"pr:#{23000 - n}", "laterPr": 23000 - n,
+              "observedAt": "2026-10-25T13:55:52.575644+00:00", "policyAction": "flag", "queueOwned": n % 3 == 0,
+              "regenerateFiles": []} for n in range(737)]
+    fingerprints = {f"remediation-fingerprint-{n}": {
+        "state": ("done", "exhausted", "claimed", "human")[n % 4], "issue": f"JOV-{7000 + n}", "cls": "fixable-by-agent",
+        "lane": None, "ask": "needs-human `ccf5eaaa-8705-49f0-b264-ec3558d678b7`: exhausted the lane ladder. " * 3,
+        "recurrence": ["2026-10-24T01:02:03Z"] * 6} for n in range(312)}
+    conditions = {f"condition-{n}": {"schema": "jovie.control-plane-liveness-condition/v1",
+                                    "idempotencyKey": "k" * 64, "condition": "c" * 900} for n in range(40)}
+    rows = [{"repository": "JovieInc/Jovie", "prNumber": n, "title": "fix(area): a typical pull request title (JOV-1)",
+             "headSha": "a" * 40, "mergeCommitSha": "b" * 40, "origin": {"method": "autonomous", "provider": "codex",
+                                                                        "evidence": ["x" * 60] * 4}} for n in range(560)]
+    return {"schema": "symphony-lanes-status/v1", "at": "2026-10-25T15:00:00Z", "host": "gem", "release": "r1",
+            "fileOverlap": {"mode": "flag", "pairs": pairs, "metrics": {"overlap_flags": 18810}},
+            "remediation": {"byFingerprint": fingerprints, "surfaced": [{"pr": n} for n in range(131)]},
+            "conditions": conditions,
+            "shippingAttribution": {"schema": "s", "projects": [{"channel": "Jovie", "mergeCount": 118,
+                                                                 "pullRequests": rows,
+                                                                 "missingOriginReceiptPullRequests": ["u" * 45] * 100}]},
+            "alerts": {"a": "x" * 200}}
+
+
+class PublicFeedSizeTest(unittest.TestCase):
+    def test_realistic_feed_stays_under_seventy_percent_of_the_cap_and_keeps_operational_identity(self):
+        feed = realistic_feed()
+        full = json.dumps(feed, indent=1)
+        self.assertGreater(len(full.encode()), doctor.PUBLIC_FEED_MAX_BYTES * 2, "fixture must reproduce the overflow")
+        out = doctor.public_status_projection(feed, full)
+        public = json.loads(out)
+        self.assertEqual(public["schema"], "symphony-lanes-status/v1")
+        self.assertLess(len(out.encode()), doctor.PUBLIC_FEED_MAX_BYTES * doctor.PUBLIC_FEED_WARN_RATIO)
+        overlap = public["fileOverlap"]
+        self.assertNotIn("pairs", overlap)
+        self.assertEqual(overlap["pairsSummary"]["count"], 737)
+        self.assertLessEqual(len(overlap["pairsSummary"]["topHotspots"]), doctor.PUBLIC_OVERLAP_TOP)
+        self.assertEqual(overlap["pairsSummary"]["topHotspots"][0]["file"], "apps/web/data/shared.ts")
+        self.assertEqual(overlap["pairsSummary"]["pairsRef"]["jsonPointer"], "/fileOverlap/pairs")
+        rows = public["remediation"]["byFingerprint"]
+        self.assertEqual(len(rows), 312)
+        self.assertEqual(set(rows["remediation-fingerprint-2"]), set(doctor.PUBLIC_REMEDIATION_FIELDS))
+        self.assertEqual(public["remediation"]["byFingerprintRef"]["recordCount"], 312)
+        self.assertEqual(len(public["remediation"]["surfaced"]), 131)  # ownership arrays stay whole
+        # Nothing is lost: the complete evidence is what the details file carries, byte for byte.
+        self.assertEqual(len(json.loads(full)["fileOverlap"]["pairs"]), 737)
+        self.assertEqual(public["publicProjection"]["fullEvidence"]["bytes"], len(full.encode()))
+
+    def test_conditions_keep_active_and_recent_resolutions_compactly_and_count_the_rest(self):
+        # Gem 2026-10-25: 33 of 52 receipts were resolved, kept forever, each with ~1.5 KB of review bindings.
+        now = 1_800_000_000.0
+        stamp = lambda age: datetime.fromtimestamp(now - age, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        review = {"outcome": "approved-template", "bindings": {"messageSha256": "f" * 64, "extra": "x" * 1200}}
+        def event(state, resolved_age=None, evidence="e" * 900):
+            row = {"schema": "s", "idempotencyKey": "gem:k:1", "condition": "k", "generation": 1, "state": state,
+                   "severity": "degraded", "owner": "doctor", "firstObservedAt": "2026-10-25T00:00:00Z",
+                   "source": {"producer": "p", "status": "degraded", "observedAt": "t", "freshnessSeconds": 0},
+                   "evidence": evidence, "writingReview": review, "writingDecision": {"d": "x" * 500},
+                   "summerEscalation": {"transport": "linear", "outcome": "requested"}}
+            if resolved_age is not None:
+                row["resolvedAt"] = stamp(resolved_age)
+            return row
+        public = {"conditions": {"live": event("active"), "fresh": event("resolved", 3600),
+                                 "old": event("resolved", 7 * 3600), "undated": event("resolved")}}
+        before = len(json.dumps(public))
+        doctor._compact_conditions(public, now)
+        self.assertEqual(sorted(public["conditions"]), ["fresh", "live"])
+        live = public["conditions"]["live"]
+        self.assertNotIn("writingReview", live)
+        self.assertNotIn("writingDecision", live)
+        self.assertEqual(live["evidence"], "e" * 900, "operational evidence is never trimmed")
+        self.assertEqual(live["summerEscalation"]["outcome"], "requested")
+        self.assertEqual(live["source"]["status"], "degraded")
+        summary = public["conditionsSummary"]
+        self.assertEqual((summary["total"], summary["resolvedOmitted"], summary["byState"]),
+                         (4, 2, {"active": 1, "resolved": 3}))
+        self.assertEqual(summary["ref"]["jsonPointer"], "/conditions")
+        self.assertLess(len(json.dumps(public)), before / 2)
+
+    def test_growth_rate_projects_time_to_cap_and_alerts_under_six_hours(self):
+        cap, now = 262144, 1_000_000.0
+        flat = doctor.feed_growth([[now - 3600, 100000], [now - 1800, 100000]], now, 100000)
+        self.assertEqual((flat["growthBytesPerHour"], flat["secondsToCap"]), (0, None))
+        self.assertIsNone(doctor.feed_growth([[now - 60, 1]], now, 2)["secondsToCap"], "too little history")
+        rising = doctor.feed_growth([[now - 3600, 145000], [now - 1800, 160000]], now, 175000)
+        self.assertEqual(rising["growthBytesPerHour"], 30000)
+        self.assertEqual(rising["secondsToCap"], round((cap - 175000) / (30000 / 3600)))
+        self.assertLess(rising["secondsToCap"], doctor.FEED_GROWTH_ALERT_S)
+        sizes = {"bytes": 175000, "maxBytes": cap, "ratio": 0.668, **rising}
+        alert = doctor.judge(obs(publicFeed=sizes))["public-feed-growth"]
+        self.assertIn("30000 bytes/h", alert)
+        slow = doctor.feed_growth([[now - 3600, 100000], [now - 1800, 100500]], now, 101000)
+        self.assertNotIn("public-feed-growth", doctor.judge(obs(publicFeed={"bytes": 101000, "maxBytes": cap, "ratio": 0.4, **slow})))
+        # The level alert wins when both apply; one alert, not two.
+        both = doctor.judge(obs(publicFeed={**sizes, "bytes": 190000, "ratio": 0.725}))
+        self.assertIn("public-feed-near-limit", both)
+        self.assertNotIn("public-feed-growth", both)
+
+    def test_section_sizes_are_measured_and_the_doctor_alerts_before_the_cap(self):
+        out = doctor.public_status_projection(realistic_feed(), json.dumps(realistic_feed(), indent=1))
+        sizes = doctor.feed_section_sizes(out)
+        self.assertEqual(sizes["bytes"], len(out.encode()))
+        self.assertLess(sizes["ratio"], doctor.PUBLIC_FEED_WARN_RATIO)
+        self.assertEqual(next(iter(sizes["sections"])), "conditions")
+        self.assertNotIn("public-feed-near-limit", doctor.judge(obs(publicFeed=sizes)))
+        near = {**sizes, "bytes": 190000, "ratio": 0.725}
+        alert = doctor.judge(obs(publicFeed=near))["public-feed-near-limit"]
+        self.assertIn("72%", alert)
+        self.assertIn("conditions", alert)
+        self.assertNotIn("public-feed-near-limit", doctor.judge(obs(publicFeed={})))
+
+
 class JudgeTest(unittest.TestCase):
     def test_healthy_host_raises_nothing(self):
         self.assertEqual(doctor.judge(obs()), {})
+
+    def test_install_lag_alerts_only_past_the_measured_threshold(self):
+        late = doctor.judge(obs(installLag={"behindS": doctor.INSTALL_LAG_ALERT_S + 60, "behindCommit": "dcfb270acb83",
+                                            "error": "AdmissionHeld: gate-admission-busy"}))
+        self.assertIn("gate-admission-busy", late["install-lag"])
+        self.assertIn("dcfb270a", late["install-lag"])
+        for lag in ({"behindS": 600}, {"behindS": 0}, {"behindS": None}, {}):
+            self.assertNotIn("install-lag", doctor.judge(obs(installLag=lag)))
 
     def test_failed_event_delivery_is_actionable_and_acknowledgement_clears_it(self):
         failed = obs(tick={'remediationEvents': {'deliveryFailed': 1, 'deliveryExhausted': 0, 'deliveryNextAt': 100}})
@@ -324,8 +465,20 @@ class JudgeTest(unittest.TestCase):
 
     def test_escalation_alert_names_the_pr_and_class(self):
         alerts = doctor.judge(obs(escalation={"surfaced": [{"pr": 7, "cls": "needs-human-decision"}]}))
-        self.assertIn("#7 needs-human-decision", alerts["escalation-needs-human"])
+        self.assertIn("#7 needs-human-decision", alerts["escalation-surfaced"])
+        self.assertIn("repair-owner", alerts["escalation-surfaced"])  # never Tim by default
         self.assertEqual(doctor.judge(obs(escalation={"surfaced": []})), {})
+
+    def test_escalation_alert_drops_surfaced_prs_that_are_no_longer_open(self):
+        # Gem 2026-10-20: the alert still listed 12 PRs that had merged or closed by 10-13.
+        surfaced = {"surfaced": [{"pr": 20117, "cls": "needs-human-decision"}, {"pr": 21776, "cls": "needs-rebase"}]}
+        sweep = {"counts": {"open": 2}, "dispositions": [{"pr": 21776}, {"pr": 21725}]}
+        alerts = doctor.judge(obs(escalation=surfaced, reconcile=sweep))
+        self.assertIn("#21776", alerts["escalation-surfaced"])
+        self.assertNotIn("#20117", alerts["escalation-surfaced"])
+        self.assertEqual(doctor.judge(obs(escalation={"surfaced": surfaced["surfaced"][:1]}, reconcile=sweep)), {})
+        incomplete = {"counts": {"open": 5}, "dispositions": [{"pr": 21776}]}  # unknown keeps everything
+        self.assertIn("#20117", doctor.judge(obs(escalation=surfaced, reconcile=incomplete))["escalation-surfaced"])
 
     def test_each_rule_names_its_cause(self):
         alerts = doctor.judge(obs(
@@ -349,11 +502,69 @@ class JudgeTest(unittest.TestCase):
         self.assertIn("40 PR repairs", alerts["repairs-without-work"])
         self.assertIn("target-state-unavailable 23", alerts["repairs-without-work"])
 
+    def test_refunded_no_work_repairs_are_counted_as_requeues_not_spend(self):
+        # Gem 2026-10-23: refunded infra stops never consumed an attempt, so the alert
+        # must say so instead of claiming the budget was burned.
+        alerts = doctor.judge(obs(noWorkRepairs24h={"target-state-unavailable": 10},
+                                  refundedNoWorkRepairs24h=7))
+        alert = alerts["repairs-without-work"]
+        self.assertIn("3 spent a fix attempt", alert)
+        self.assertIn("7 were refunded and requeued with backoff", alert)
+
+    def test_an_unclean_previous_tick_is_a_visible_alert_with_its_recovery(self):
+        alerts = doctor.judge(obs(tick={"at": "x", "error": None,
+                                        "uncleanPreviousRun": {"pid": 4242, "startedAt": 1.0},
+                                        "uncleanRecovery": {"refundedFixAttempts": ["6"]}}))
+        self.assertIn("lanes-tick-unclean", alerts)
+        self.assertIn("pid 4242", alerts["lanes-tick-unclean"])
+        self.assertIn("1 stranded fix-attempt charge", alerts["lanes-tick-unclean"])
+
+    def test_exhausted_only_delivery_failure_is_still_a_visible_alert(self):
+        # Terminal exhausted rows never retry: they must alert on their own, without a
+        # failed count, or a terminal failure would go silent.
+        alerts = doctor.judge(obs(tick={"remediationEvents": {"deliveryFailed": 0,
+                                                              "deliveryExhausted": 2,
+                                                              "deliveryNextAt": None}}))
+        self.assertIn("remediation-delivery", alerts)
+        self.assertIn("exhausted=2", alerts["remediation-delivery"])
+
     def test_disk_tiers_page_summer_only_below_critical(self):
         self.assertEqual(set(doctor.judge(obs(diskFreePct=7.0))), {"disk-low"})
         alerts = doctor.judge(obs(diskFreePct=4.9))
         self.assertEqual(set(alerts), {"disk-critical"})
         self.assertIn("Summer", alerts["disk-critical"])
+
+    def test_disk_hold_below_growth_floor_alarms_after_thirty_minutes_naming_consumers(self):
+        # 2026-10-25: 13.2% free held codex at 1 seat for hours with no alarm (floor is 15%).
+        top = [{"path": "/home/x/codex-worktrees", "gib": 210.5}]
+        held = obs(diskFreePct=13.2, diskTop=top)
+        self.assertNotIn("disk-capacity-held", doctor.judge(held))
+        self.assertNotIn("disk-capacity-held", doctor.judge(
+            held, {"diskHeldSince": held["now"] - doctor.DISK_HELD_S + 1}))
+        alerts = doctor.judge(held, {"diskHeldSince": held["now"] - doctor.DISK_HELD_S})
+        self.assertIn("/home/x/codex-worktrees 210.5 GiB", alerts["disk-capacity-held"])
+        self.assertNotIn("disk-capacity-held", doctor.judge(
+            obs(diskFreePct=16.0), {"diskHeldSince": held["now"] - 9999}))
+
+    def test_top_disk_consumers_runs_du_with_a_budget_and_ranks_the_largest(self):
+        import tempfile
+        sizes = {}
+
+        def fake_du(cmd, **kwargs):
+            if cmd[2] not in sizes:
+                raise OSError("du unavailable")
+            return type("R", (), {"stdout": f"{sizes[cmd[2]]}\t{cmd[2]}\n"})()
+        with tempfile.TemporaryDirectory() as tmp:
+            home, state = Path(tmp) / "home", Path(tmp) / "state"
+            for name in ("codex-worktrees", ".cache", "grok-wt"):
+                (home / name).mkdir(parents=True)
+            (state / "runs").mkdir(parents=True)
+            sizes.update({str(home / "codex-worktrees"): 3 * 1048576, str(home / ".cache"): 1048576,
+                          str(state / "runs"): 2 * 1048576})  # grok-wt: du raises, so it is skipped
+            with mock.patch.dict(os.environ, {"HOME": str(home)}):
+                top = doctor.top_disk_consumers(state, budget_s=30, run=fake_du)
+        self.assertEqual([(Path(row["path"]).name, row["gib"]) for row in top],
+                         [("codex-worktrees", 3.0), ("runs", 2.0), (".cache", 1.0)])
 
     def test_pool_empty_needs_thirty_sustained_minutes(self):
         self.assertEqual(doctor.judge(obs(pool=0, busy=0), {"poolEmptySince": 1_000_000.0}), {})
@@ -432,6 +643,12 @@ class JudgeTest(unittest.TestCase):
         self.assertIn("provider-down:devin", alerts)
         self.assertNotIn("provider-idle:devin", alerts)
 
+    def test_a_missing_linear_app_credential_fails_closed_with_its_own_condition(self):
+        alerts = doctor.judge(obs(linearAppCredential=False))
+        self.assertIn("no personal-key fallback", alerts["linear-app-credential-missing"])
+        for present in (True, None):  # installed, or a fixture/self-test with no host file
+            self.assertNotIn("linear-app-credential-missing", doctor.judge(obs(linearAppCredential=present)))
+
     def test_started_issues_without_a_live_owner_escalate_after_the_grace(self):
         quiet = doctor.judge(obs(ownership={"started": 536, "ownerless": 3, "overGrace": 0}))
         self.assertNotIn("started-without-owner", quiet)  # inside the grace period
@@ -439,6 +656,151 @@ class JudgeTest(unittest.TestCase):
                                            "oldestOwnerlessS": 7200,
                                            "unresolved": {"post-merge-without-merged-evidence": 40}}))
         self.assertIn("40 started JOV issues", loud["started-without-owner"])
+
+    def test_team_templated_receipts_use_the_newest_team_file_and_ignore_sidecars(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            state = home / ".local/state/jovie-lanes"
+            (state / "refill").mkdir(parents=True)
+            (state / "decompose").mkdir()
+            now = time.time()
+            (state / "refill" / "JOV.json").write_text("{}")
+            (state / "refill" / "LYB.json").write_text("{}")
+            old = state / "refill" / "LYB.json"
+            os.utime(old, (now - 7200, now - 7200))
+            (state / "refill" / "JOV-rank.json").write_text("{}")  # sidecar, not a team receipt
+            stale_only = state / "decompose" / "LYB.json"
+            stale_only.write_text("{}")
+            os.utime(stale_only, (now - 7200, now - 7200))
+            (state / "decompose" / "seen.json").write_text("{}")  # lowercase: not a team
+            fresh_sidecar = state / "decompose" / "spawn-LYB.json"
+            fresh_sidecar.write_text("{}")
+            row = lambda name, minutes: {"id": f"gem:{name}", "status": "live", "host": "gem", "maxStalenessMinutes": minutes,
+                                         "receipt": {"kind": "host-local",
+                                                     "location": f"gem:~/.local/state/jovie-lanes/{name}/<TEAM>.json"}}
+            watch = doctor.automation_watch([row("refill", 15), row("decompose", 60)], "gem", now, home=home)
+            self.assertNotIn("gem:refill", watch["silent"], "JOV.json is fresh")
+            self.assertEqual(watch["silent"]["gem:decompose"]["ageS"] // 60, 120, "only a stale team receipt counts")
+            (state / "refill" / "JOV.json").unlink()
+            os.utime(state / "refill" / "JOV-rank.json", (now, now))
+            gone = doctor.automation_watch([row("refill", 15)], "gem", now, home=home)
+            self.assertIn("gem:refill", gone["silent"], "a sidecar cannot vouch for a team receipt")
+            for path in (state / "refill").iterdir():
+                path.unlink()
+            missing = doctor.automation_watch([row("refill", 15)], "gem", now, home=home)
+            self.assertIsNone(missing["silent"]["gem:refill"]["ageS"])
+
+    def test_registered_host_local_automations_raise_automation_silent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            state = home / ".local/state/jovie-lanes"
+            state.mkdir(parents=True)
+            (state / "fresh.json").write_text("{}")
+            stale = state / "stale.json"
+            stale.write_text("{}")
+            now = time.time()
+            os.utime(stale, (now - 3600, now - 3600))
+            rows = [{"schema": "jovie-automation-registry/v1"},
+                    {"id": "gem:fresh", "status": "live", "host": "gem", "maxStalenessMinutes": 15,
+                     "receipt": {"kind": "host-local", "location": "gem:~/.local/state/jovie-lanes/fresh.json"}},
+                    {"id": "gem:stale", "status": "live", "host": "gem", "maxStalenessMinutes": 30,
+                     "receipt": {"kind": "host-local", "location": "gem:~/.local/state/jovie-lanes/stale.json"}},
+                    {"id": "gem:missing", "status": "live", "host": "gem", "maxStalenessMinutes": 10,
+                     "receipt": {"kind": "host-local", "location": "gem:~/.local/state/jovie-lanes/watchdog.log"}},
+                    {"id": "gem:retired", "status": "retired", "host": "gem",
+                     "receipt": {"kind": "host-local", "location": "gem:~/nowhere"}},
+                    {"id": "mac:x", "status": "live", "host": "tims-macbook-pro", "maxStalenessMinutes": 1,
+                     "receipt": {"kind": "host-local", "location": "tims-macbook-pro:~/nowhere"}}]
+            watch = doctor.automation_watch([row for row in rows if row.get("id")], "gem", now, home=home)
+            self.assertEqual(sorted(watch["silent"]), ["gem:missing", "gem:stale"])
+            alerts = doctor.judge(obs(automation=watch, now=now))
+            self.assertIn("60 min old", alerts["automation-silent:gem:stale"])
+            self.assertIn("missing", alerts["automation-silent:gem:missing"])
+            self.assertEqual(doctor.automation_watch(None, "gem", now), {"known": False, "silent": {}})
+            self.assertIn("automation-registry-unreadable",
+                          doctor.judge(obs(automation={"known": False, "silent": {}}, now=now)))
+            self.assertNotIn("automation-registry-unreadable",
+                             doctor.judge(obs(automation={"known": False, "silent": {}, "skipped": True}, now=now)))
+            self.assertNotIn("automation-registry-unreadable", doctor.judge(obs(now=now)))
+
+    def test_outcome_lane_stall_is_alerted_only_when_owed_receipts_age_out(self):
+        now = 1_800_000_000.0
+        old = doctor.epoch_iso(now - 30 * 3600)
+        fresh = doctor.epoch_iso(now - 3600)
+        capped = {"queued": 7, "status": "budget-exhausted", "at": now - 600, "oldestOwedAt": old,
+                  "spentToday": 30, "perDay": 30}
+        alert = doctor.judge(obs(outcomeQueue=capped, now=now))["outcome-lane-stalled"]
+        self.assertIn("7 Validating", alert)
+        self.assertIn("30/30", alert)
+        silent = {**capped, "status": "drained", "at": now - 3 * 3600}
+        self.assertIn("outcome-lane-stalled", doctor.judge(obs(outcomeQueue=silent, now=now)))
+        self.assertNotIn("outcome-lane-stalled", doctor.judge(obs(outcomeQueue={**capped, "oldestOwedAt": fresh}, now=now)))
+        self.assertNotIn("outcome-lane-stalled", doctor.judge(obs(outcomeQueue={**capped, "status": "drained"}, now=now)))
+        self.assertNotIn("outcome-lane-stalled", doctor.judge(obs(outcomeQueue={**capped, "queued": 0}, now=now)))
+        self.assertNotIn("outcome-lane-stalled", doctor.judge(obs(now=now)))
+
+    def test_outcome_queue_status_feeds_the_doctor_alert(self):
+        import outcome_lane
+        with tempfile.TemporaryDirectory() as raw:
+            state = Path(raw)
+            queue = [({"identifier": "JOV-1"}, {"at": "2026-10-23T00:00:00Z"}),
+                     ({"identifier": "JOV-2"}, {"at": "2026-10-22T00:00:00Z"})]
+            outcome_lane.write_queue(state, "budget-exhausted", queue, 1_792_800_000.0, 30)
+            row = json.loads((state / "outcome-queue.json").read_text())
+            self.assertEqual((row["queued"], row["oldestOwedAt"], row["status"]),
+                             (2, "2026-10-22T00:00:00Z", "budget-exhausted"))
+            alerts = doctor.judge(obs(outcomeQueue=row, now=1_792_800_000.0 + 60))
+            self.assertIn("outcome-lane-stalled", alerts)
+
+    def test_the_watched_registry_is_the_one_merged_on_main(self):
+        # The doctor must read the path the registry actually ships at (#22354: canon/).
+        repo = Path(__file__).resolve().parents[2]
+        if not (repo / "canon").is_dir():
+            self.skipTest("staged lanes release trees carry no canon/")
+        self.assertTrue((repo / doctor.AUTOMATION_REGISTRY).is_file(), doctor.AUTOMATION_REGISTRY)
+        rows = doctor.automation_registry(repo, run=lambda *_a, **_k: doctor.subprocess.CompletedProcess(
+            [], 0, (repo / doctor.AUTOMATION_REGISTRY).read_text(), ""))
+        self.assertTrue(rows and any(row["id"] == "gem:lanes-watchdog" for row in rows))
+
+    def test_the_hosted_liveness_check_and_the_doctor_watch_each_other(self):
+        now = doctor.datetime(2026, 10, 20, 22, 0, tzinfo=doctor.timezone.utc).timestamp()
+        recent = {"installed": True, "lastRunAt": "2026-10-20T21:30:00Z"}
+        old = {"installed": True, "lastRunAt": "2026-10-20T20:30:00Z"}
+        self.assertNotIn("automation-liveness-silent", doctor.judge(obs(automationLiveness=recent, now=now)))
+        self.assertIn("90 min ago", doctor.judge(obs(automationLiveness=old, now=now))["automation-liveness-silent"])
+        self.assertIn("never", doctor.judge(obs(automationLiveness={"installed": True, "lastRunAt": None},
+                                                now=now))["automation-liveness-silent"])
+        for unknown in ({"installed": False}, {"installed": None}):  # not merged yet, or unreadable
+            self.assertNotIn("automation-liveness-silent", doctor.judge(obs(automationLiveness=unknown, now=now)))
+
+    def test_liveness_read_distinguishes_missing_workflow_from_unreadable(self):
+        def fake(code, stdout="", stderr=""):
+            return types.SimpleNamespace(REPO_SLUG="JovieInc/Jovie", shared=lambda key, ttl, fetch: fetch(),
+                                         sh=lambda *a, **k: types.SimpleNamespace(returncode=code, stdout=stdout, stderr=stderr))
+        self.assertEqual(doctor.automation_liveness(fake(0, '["2026-10-20T21:30:00Z"]'), 0),
+                         {"installed": True, "lastRunAt": "2026-10-20T21:30:00Z"})
+        self.assertEqual(doctor.automation_liveness(fake(1, stderr="gh: Not Found (HTTP 404)"), 0), {"installed": False})
+        self.assertEqual(doctor.automation_liveness(fake(1, stderr="timeout"), 0), {"installed": None})
+
+    def test_liveness_counts_only_successful_main_runs(self):
+        # Most runs are job-skipped (every 5th Production Continuity Guard run does work).
+        calls = []
+        lane = types.SimpleNamespace(REPO_SLUG="JovieInc/Jovie", shared=lambda key, ttl, fetch: fetch(),
+                                     sh=lambda args, **k: calls.append(args) or types.SimpleNamespace(
+                                         returncode=0, stdout='[""]', stderr=""))
+        self.assertEqual(doctor.automation_liveness(lane, 0), {"installed": True, "lastRunAt": None})
+        self.assertIn("status=success", calls[0][2])
+        self.assertIn("branch=main", calls[0][2])
+        # Installed but never succeeded reads as silent, not alive.
+        now = doctor.datetime(2026, 10, 20, 22, 0, tzinfo=doctor.timezone.utc).timestamp()
+        self.assertIn("automation-liveness-silent", doctor.judge(obs(
+            automationLiveness={"installed": True, "lastRunAt": None}, now=now)))
+
+    def test_a_failed_status_gist_publish_raises_status_feed_stale(self):
+        failed = doctor.judge(obs(), {"statusFeedError": "RuntimeError: status-gist-publish-unconfirmed"})
+        self.assertIn("status-gist-publish-unconfirmed", failed["status-feed-stale"])
+        self.assertNotIn("status-feed-stale", doctor.judge(obs(), {"statusFeed": "https://gist.github.com/x"}))
+        self.assertNotIn("status-feed-stale", doctor.judge(obs(), None))
 
     def test_linear_and_codex_failures_are_their_own_alerts(self):
         self.assertIn("linear-down", doctor.judge(obs(linearError="HTTPError: 429", pool=None)))
@@ -777,6 +1139,97 @@ class ReconcileTest(unittest.TestCase):
         verify.assert_called_once_with(reviewed, "disk-low", "4% free", condition, "gem", tracker.title("disk-low"))
         self.assertEqual(state["conditions"]["disk-low"]["writingReview"], reviewed["review"])
         self.assertEqual(state["conditions"]["disk-low"]["writingDecision"], "approved-template")
+
+    def test_an_incident_opens_even_when_the_label_cannot_be_created_or_found(self):
+        issues, forbidden = [], []
+
+        class ForbiddenLabels:
+            def gql(self, query, variables):
+                if "title:{eq:$t}" in query:
+                    return {"issues": {"nodes": []}}
+                if "teams(filter" in query:
+                    return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{"id": "triage", "name": "Triage"}]},
+                                                  "labels": {"nodes": [{"id": "symphony", "name": "symphony"}]}}]}}
+                if "issueLabels(" in query:
+                    return {"issueLabels": {"nodes": []}}
+                if "issueLabelCreate" in query:
+                    forbidden.append(variables)
+                    raise RuntimeError("linear: request rejected (403 FORBIDDEN)")
+                if "issueCreate" in query:
+                    issues.append(variables["i"])
+                    return {"issueCreate": {"issue": {"id": "iss-9", "identifier": "JOV-9"}}}
+                raise AssertionError(query)
+
+        self.assertEqual(doctor.Tracker(ForbiddenLabels(), "gem").open("production-deploy:lyb", "LYB deploys failing"), "iss-9")
+        self.assertEqual(len(forbidden), 1)
+        self.assertEqual(issues[0]["labelIds"], ["symphony"], "the incident keeps its symphony label and loses only the remediation one")
+
+    def test_a_failed_open_is_never_silent_and_keeps_when_it_started(self):
+        # 2026-10-25: production-deploy:lyb sat for ~50 min with no issue; Tracker.open swallowed the error.
+        class Down:
+            def gql(self, query, variables):
+                if "title:{eq:$t}" in query:
+                    return {"issues": {"nodes": []}}
+                if "teams(filter" in query:
+                    return {"teams": {"nodes": [{"id": "t", "states": {"nodes": [{"id": "tr", "name": "Triage"}]},
+                                                  "labels": {"nodes": []}}]}}
+                if "issueLabels(" in query or "issueLabelCreate" in query:
+                    return {"issueLabels": {"nodes": []}}
+                raise RuntimeError("linear: 500")
+
+        tracker = doctor.Tracker(Down(), "gem")
+        self.assertIsNone(tracker.open("production-deploy:lyb", "x"))
+        self.assertTrue(tracker.last_error.startswith("create-failed:RuntimeError"))
+        first = doctor.reconcile({"production-deploy:lyb": "x"}, {}, tracker, 1000.0)
+        entry = first["issues"]["production-deploy:lyb"]
+        self.assertEqual((entry["id"], entry["since"]), (None, 1000.0))
+        self.assertIn("create-failed", entry["reason"])
+        second = doctor.reconcile({"production-deploy:lyb": "x"}, first, tracker, 1300.0)
+        self.assertEqual(second["issues"]["production-deploy:lyb"]["since"], 1000.0, "since survives retries")
+
+    def test_invariant_flags_only_alerts_without_an_issue_older_than_fifteen_minutes(self):
+        issues = {"a": {"id": "i1", "closedAt": None},
+                  "b": {"id": None, "closedAt": None, "reason": "create-failed:RuntimeError: 500", "since": 1000.0},
+                  "c": {"id": None, "closedAt": None, "since": 1000.0},
+                  "d": {"id": None, "closedAt": None, "reason": "r", "since": 1500.0}}
+        alerts = {"a": "", "b": "", "c": "", "d": "", "e": ""}
+        gaps = doctor.alert_issue_gaps(alerts, issues, 1000.0 + doctor.ALERT_ISSUE_GRACE_S + 1)
+        self.assertEqual(gaps, {"b": "create-failed:RuntimeError: 500", "c": "untracked"})
+        self.assertEqual(doctor.alert_issue_gaps(alerts, issues, 1000.0 + doctor.ALERT_ISSUE_GRACE_S - 1), {})
+        previous = {"issues": issues}
+        with mock.patch("time.time", return_value=1000.0 + doctor.ALERT_ISSUE_GRACE_S + 1):
+            raised = doctor.judge(obs(tick={"error": "boom"}), previous)
+        self.assertNotIn("alert-issue-missing", raised, "only alerts present this tick count")
+
+    def test_judge_raises_alert_issue_missing_for_a_standing_alert_without_an_issue(self):
+        previous = {"issues": {"tick-error": {"id": None, "closedAt": None, "reason": "create-failed:RuntimeError: 500", "since": 100.0}}}
+        with mock.patch("time.time", return_value=100.0 + doctor.ALERT_ISSUE_GRACE_S + 5):
+            alerts = doctor.judge(obs(tick={"error": "boom"}), previous)
+        self.assertIn("tick-error", alerts)
+        self.assertIn("tick-error (create-failed:RuntimeError: 500)", alerts["alert-issue-missing"])
+
+    def test_an_existing_label_beyond_the_first_fifty_is_found_by_name_and_not_recreated(self):
+        created, issues = [], []
+
+        class ManyLabels:
+            def gql(self, query, variables):
+                if "title:{eq:$t}" in query:
+                    return {"issues": {"nodes": []}}
+                if "teams(filter" in query:
+                    return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{"id": "triage", "name": "Triage"}]},
+                                                  "labels": {"nodes": []}}]}}
+                if "issueLabels(" in query:
+                    return {"issueLabels": {"nodes": [{"id": "old-label", "name": variables["n"]}]}}
+                if "issueLabelCreate" in query:
+                    created.append(variables)
+                    return {}
+                if "issueCreate" in query:
+                    issues.append(variables["i"])
+                    return {"issueCreate": {"issue": {"id": "iss-8", "identifier": "JOV-8"}}}
+                raise AssertionError(query)
+
+        self.assertEqual(doctor.Tracker(ManyLabels(), "gem").open("production-deploy:lyb", "x"), "iss-8")
+        self.assertEqual((created, issues[0]["labelIds"]), ([], ["old-label"]))
 
     def test_alert_label_is_created_on_open_reopen_and_close(self):
         created = []
@@ -1677,7 +2130,12 @@ class _GistApiFake:
             self.after_write()
             if method == "POST" and self.ambiguous_create:
                 return SimpleNamespace(returncode=0, stdout="", stderr="")
-        files = {name: {"content": content, "truncated": False} for name, content in self.files.items()}
+        files = {name: {"content": content, "truncated": False, "size": len(content.encode("utf-8"))}
+                 for name, content in self.files.items()}
+        if method == "GET" and self.readback_mode == "stage-truncated":
+            files["stage-events.ndjson"].update(content=files["stage-events.ndjson"]["content"][:10], truncated=True)
+        if method == "GET" and self.readback_mode == "stage-short":
+            files["stage-events.ndjson"].update(content="", truncated=True, size=5)
         if method == "GET" and self.readback_mode == "changed":
             files["lanes-status-details.json"]["content"] += "\n"
         if method == "GET" and self.readback_mode == "truncated":
@@ -1688,6 +2146,223 @@ class _GistApiFake:
 
 
 class PublishTest(unittest.TestCase):
+    def raw_readback_fixture(self, names=("lanes-status.json", "lanes-status-details.json")):
+        """Synthetic immutable Gist snapshots and bounded curl transfers, with no network."""
+        fixture = SimpleNamespace(gets=0, raw_calls=[], revision="d" * 40, mutation=None,
+                                  response=lambda name, content: content, code="200", exit_code=0,
+                                  raw_error=None, url=lambda name, url: url, size=lambda size: size,
+                                  curl_version="curl 8.4.0 synthetic", version_exit=0)
+        def run(args, **kwargs):
+            if args[0] == "curl":
+                if "--version" in args:
+                    return SimpleNamespace(returncode=fixture.version_exit, stdout=fixture.curl_version)
+                url = args[args.index("--url") + 1]
+                name = url.rsplit("/", 1)[1]
+                fixture.raw_calls.append((list(args), kwargs))
+                if fixture.raw_error:
+                    raise fixture.raw_error
+                content = self.api.files[name].encode("utf-8")
+                Path(args[args.index("--output") + 1]).write_bytes(fixture.response(name, content))
+                if fixture.mutation:
+                    fixture.mutation()
+                return SimpleNamespace(returncode=fixture.exit_code, stdout=fixture.code)
+            result = self.api(args, **kwargs)
+            if "--method" in args and args[args.index("--method") + 1] == "GET":
+                fixture.gets += 1
+                stored = json.loads(result.stdout)
+                stored.update(owner={"login": "fixture-owner"}, history=[{"version": fixture.revision}])
+                for name in names:
+                    row = stored["files"][name]
+                    raw = f"https://gist.githubusercontent.com/fixture-owner/abc123/raw/{fixture.revision}/{name}"
+                    row.update(content=row["content"][:7], truncated=True,
+                               raw_url=fixture.url(name, raw), size=fixture.size(row["size"]))
+                result.stdout = json.dumps(stored)
+            return result
+        patch = mock.patch.object(doctor.lifecycle, "run", run)
+        patch.start()
+        self.addCleanup(patch.stop)
+        env = mock.patch.dict(os.environ, {"LANES_STATE": str(self.state)})
+        env.start()
+        self.addCleanup(env.stop)
+        return fixture
+
+    def test_truncated_status_and_details_verify_exact_immutable_raw_bytes(self):
+        fixture = self.raw_readback_fixture()
+        feed = self.feed(0)
+        feed["conditions"]["source-unknown"]["evidence"] = "界" * 100_000
+        self.assertEqual(doctor.publish_status(self.host, self.lane, feed), "https://gist.example/abc123")
+        self.assertEqual((fixture.gets, len(fixture.raw_calls)), (2, 2))
+        receipt = json.loads(self.record.read_text())
+        for name, key in (("lanes-status.json", "publicFeedSha256"),
+                          ("lanes-status-details.json", "fullEvidenceSha256")):
+            self.assertEqual(receipt[key], hashlib.sha256(self.api.files[name].encode()).hexdigest())
+        self.assertLessEqual(len(self.api.files["lanes-status.json"].encode()), doctor.PUBLIC_FEED_MAX_BYTES)
+        self.assertEqual(json.loads(self.api.files["lanes-status-details.json"]), feed)
+        for args, options in fixture.raw_calls:
+            name = args[-1].rsplit("/", 1)[1]
+            self.assertEqual(args[:2], ["curl", "--disable"])
+            self.assertEqual(args[args.index("--proto") + 1], "=https")
+            self.assertEqual(args[args.index("--max-redirs") + 1], "0")
+            self.assertEqual(int(args[args.index("--max-filesize") + 1]), len(self.api.files[name].encode()))
+            self.assertEqual(float(args[args.index("--max-time") + 1]), options["timeout"])
+            self.assertTrue(0 < options["timeout"] <= 60)
+            self.assertNotIn("--location", args)
+            self.assertNotIn("--insecure", args)
+            self.assertNotIn("--header", args)
+
+    def test_truncated_raw_readback_refuses_untrusted_origins_and_file_identities(self):
+        fixture = self.raw_readback_fixture(("lanes-status-details.json",))
+        original = self.record.read_bytes()
+        urls = [
+            "http://gist.githubusercontent.com/fixture-owner/abc123/raw/" + "d" * 40 + "/lanes-status-details.json",
+            "https://gist.githubusercontent.com.evil.invalid/fixture-owner/abc123/raw/" + "d" * 40 + "/lanes-status-details.json",
+            "https://fixture-user@gist.githubusercontent.com/fixture-owner/abc123/raw/" + "d" * 40 + "/lanes-status-details.json",
+            "https://127.0.0.1/fixture-owner/abc123/raw/" + "d" * 40 + "/lanes-status-details.json",
+        ]
+        for replace in (lambda u: u.replace("fixture-owner", "wrong-owner"),
+                        lambda u: u.replace("abc123", "def456"),
+                        lambda u: u.replace("d" * 40, "HEAD"),
+                        lambda u: u.replace("/lanes-status-details.json", "/lanes-status.json"),
+                        lambda u: u + "?redirect=other", lambda u: u + "#fragment",
+                        lambda u: u.replace("/raw/", "/raw/../raw/"),
+                        lambda u: u.replace(".com/", ".com:443/")):
+            urls.append(replace("https://gist.githubusercontent.com/fixture-owner/abc123/raw/" +
+                                "d" * 40 + "/lanes-status-details.json"))
+        for url in urls:
+            with self.subTest(url=url):
+                fixture.url = lambda name, raw, url=url: url
+                with self.assertRaisesRegex(RuntimeError, "status-gist-readback-unconfirmed"):
+                    doctor.publish_status(self.host, self.lane, self.feed(0))
+                self.assertEqual(self.record.read_bytes(), original)
+        self.assertEqual(fixture.raw_calls, [], "reject before any raw network operation")
+
+    def test_truncated_raw_readback_refuses_wrong_bytes_lengths_and_http_results(self):
+        fixture = self.raw_readback_fixture(("lanes-status-details.json",))
+        original = self.record.read_bytes()
+        for response, code, exit_code in (
+                (lambda n, b: b[:-1], "200", 0),
+                (lambda n, b: b + b"x", "200", 0),
+                (lambda n, b: b"x" + b[1:], "200", 0),
+                (lambda n, b: b, "206", 0),
+                (lambda n, b: b, "302", 0),
+                (lambda n, b: b, "404", 0),
+                (lambda n, b: b, "200", 63)):
+            with self.subTest(code=code, exit_code=exit_code, response=response):
+                fixture.response, fixture.code, fixture.exit_code = response, code, exit_code
+                with self.assertRaisesRegex(RuntimeError, "status-gist-readback-unconfirmed"):
+                    doctor.publish_status(self.host, self.lane, self.feed(0))
+                self.assertEqual(self.record.read_bytes(), original)
+
+    def test_truncated_raw_readback_requires_exact_api_byte_size_before_fetching(self):
+        fixture = self.raw_readback_fixture(("lanes-status-details.json",))
+        for size in (None, True, 0, "123", 123.0, -1):
+            with self.subTest(size=size):
+                fixture.size = lambda _, size=size: size
+                with self.assertRaisesRegex(RuntimeError, "status-gist-readback-unconfirmed"):
+                    doctor.publish_status(self.host, self.lane, self.feed(0))
+        self.assertEqual(fixture.raw_calls, [])
+        self.assertNotIn("verifiedAt", json.loads(self.record.read_text()))
+
+    def test_truncated_raw_readback_requires_a_curl_with_streaming_size_limits(self):
+        fixture = self.raw_readback_fixture(("lanes-status-details.json",))
+        original = self.record.read_bytes()
+        for version, exit_code in (("curl 8.3.0 synthetic", 0), ("curl 7.88.1 synthetic", 0),
+                                   ("unknown", 0), ("curl 8.4.0 synthetic", 1)):
+            with self.subTest(version=version, exit_code=exit_code):
+                fixture.curl_version, fixture.version_exit = version, exit_code
+                with self.assertRaisesRegex(RuntimeError, "status-gist-readback-unconfirmed"):
+                    doctor.publish_status(self.host, self.lane, self.feed(0))
+                self.assertEqual(self.record.read_bytes(), original)
+        self.assertEqual(fixture.raw_calls, [], "an unsupported curl must never download raw content")
+
+    def test_truncated_raw_readback_accounts_for_http_failures_in_the_shared_client(self):
+        fixture = self.raw_readback_fixture(("lanes-status-details.json",))
+        fixture.code = "429"
+        with self.assertRaisesRegex(RuntimeError, "status-gist-readback-unconfirmed"):
+            doctor.publish_status(self.host, self.lane, self.feed(0))
+        ledger = json.loads((self.state / "api-ledger/github.json").read_text())
+        credential = ledger["credentials"]["anonymous-gist-raw"]
+        self.assertEqual(credential["breaker"]["state"], "open")
+        usage = next(iter(credential["usage"].values()))["report"]
+        self.assertEqual((usage["attempts"], usage["errors"], usage["rateLimited"]), (1, 1, 1))
+        self.assertNotIn("verifiedAt", json.loads(self.record.read_text()))
+
+    def test_truncated_raw_readback_preserves_previous_receipt_on_timeout(self):
+        fixture = self.raw_readback_fixture(("lanes-status-details.json",))
+        previous = {"url": "https://gist.example/abc123", "id": "abc123", "verifiedAt": "previous",
+                    "fullEvidenceSha256": "previous-full", "publicFeedSha256": "previous-public"}
+        self.record.write_text(json.dumps(previous))
+        for error in (subprocess.TimeoutExpired("synthetic-curl", 0.1), OSError("synthetic TLS refusal")):
+            with self.subTest(error=type(error).__name__):
+                fixture.raw_error = error
+                with self.assertRaisesRegex(RuntimeError, "status-gist-readback-unconfirmed"):
+                    doctor.publish_status(self.host, self.lane, self.feed(0))
+                self.assertEqual(json.loads(self.record.read_text()), previous)
+
+    def test_truncated_raw_readback_uses_remaining_overall_deadline(self):
+        fixture = self.raw_readback_fixture(("lanes-status-details.json",))
+        clock = [100.0]
+        after_write = self.api.after_write
+        self.api.after_write = lambda: (after_write(), clock.__setitem__(0, 159.0))
+        with mock.patch.object(doctor.time, "monotonic", side_effect=lambda: clock[0]):
+            doctor.publish_status(self.host, self.lane, self.feed(0))
+        self.assertEqual(fixture.raw_calls[0][1]["timeout"], 1)
+        fixture.raw_calls.clear()
+        self.api.after_write = lambda: clock.__setitem__(0, clock[0] + 59)
+        fixture.mutation = lambda: clock.__setitem__(0, clock[0] + 2)
+        with mock.patch.object(doctor.time, "monotonic", side_effect=lambda: clock[0]):
+            with self.assertRaisesRegex(RuntimeError, "status-gist-readback-unconfirmed"):
+                doctor.publish_status(self.host, self.lane, self.feed(0))
+
+    def test_truncated_raw_readback_cannot_certify_a_concurrent_gist_generation(self):
+        fixture = self.raw_readback_fixture(("lanes-status-details.json",))
+        fixture.mutation = lambda: setattr(fixture, "revision", "e" * 40)
+        original = self.record.read_bytes()
+        with self.assertRaisesRegex(RuntimeError, "status-gist-readback-unconfirmed"):
+            doctor.publish_status(self.host, self.lane, self.feed(0))
+        self.assertEqual(fixture.gets, 2)
+        self.assertEqual(self.record.read_bytes(), original)
+
+    def test_truncated_raw_readback_cannot_overwrite_a_concurrent_local_generation(self):
+        fixture = self.raw_readback_fixture(("lanes-status-details.json",))
+        for filename in ("status-gist.json", "lanes-status.json", "lanes-status-publish.json"):
+            with self.subTest(filename=filename):
+                original = self.record.read_bytes()
+                fixture.mutation = lambda filename=filename: (self.state / filename).write_text("concurrent")
+                with self.assertRaisesRegex(RuntimeError, "status-gist-readback-unconfirmed"):
+                    doctor.publish_status(self.host, self.lane, self.feed(0))
+                self.assertEqual((self.state / filename).read_text(), "concurrent")
+                if filename == "status-gist.json":
+                    self.record.write_bytes(original)
+                self.assertNotIn("verifiedAt", json.loads(self.record.read_text()))
+
+    def test_truncated_raw_readback_serializes_publishers_through_the_final_receipt(self):
+        fixture = self.raw_readback_fixture(("lanes-status-details.json",))
+        def concurrent_publish():
+            writes = self.api.write_count
+            with self.assertRaisesRegex(RuntimeError, "status-gist-publish-in-progress"):
+                doctor.publish_status(self.host, self.lane, {"at": "other-generation"})
+            self.assertEqual(self.api.write_count, writes)
+        fixture.mutation = concurrent_publish
+        doctor.publish_status(self.host, self.lane, self.feed(0))
+        self.assertEqual(json.loads(self.api.files["lanes-status-details.json"]), self.feed(0))
+        self.assertIn("verifiedAt", json.loads(self.record.read_text()))
+        fixture.mutation = None
+        doctor.publish_status(self.host, self.lane, self.feed(0))  # lock released after success
+
+    def test_truncated_raw_readback_rechecks_generation_after_building_the_receipt(self):
+        self.raw_readback_fixture(("lanes-status-details.json",))
+        calls = [0]
+        def timestamp():
+            calls[0] += 1
+            if calls[0] == 2:
+                self.record.write_text("concurrent-final-receipt")
+            return "synthetic-at"
+        with mock.patch.object(doctor, "now_iso", side_effect=timestamp):
+            with self.assertRaisesRegex(RuntimeError, "status-gist-readback-unconfirmed"):
+                doctor.publish_status(self.host, self.lane, self.feed(0))
+        self.assertEqual(self.record.read_text(), "concurrent-final-receipt")
+
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
@@ -1722,6 +2397,96 @@ class PublishTest(unittest.TestCase):
                                                 "diagnostic": "x" * 1024} for i in range(row_count)]}],
             },
         }
+
+    def ledger(self, rows):
+        (self.state / "runs").mkdir(exist_ok=True)
+        (self.state / "runs" / "ledger.jsonl").write_text("".join(json.dumps(row) + "\n" for row in rows) + "not json\n")
+
+    def test_stage_events_publish_with_the_status_feed_and_only_when_they_change(self):
+        now = time.time()
+        iso = lambda delta: doctor.datetime.fromtimestamp(now - delta, doctor.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        self.ledger([
+            {"runId": "r1", "issue": "JOV-5", "provider": "codex", "startedAt": iso(3600), "endedAt": iso(600),
+             "verdict": "landing", "pr": 22315},
+            {"runId": "r2", "issue": "JOV-6", "provider": "grok", "startedAt": iso(900), "endedAt": iso(300),
+             "verdict": "provider-error"},
+            {"runId": "r3", "kind": "fix-red", "pr": 22301, "headBefore": "0123456789abcdef", "provider": "codex",
+             "startedAt": iso(500), "endedAt": iso(100), "verdict": "fix-no-change"},
+            {"runId": "old", "issue": "JOV-1", "provider": "codex", "startedAt": iso(40 * 86400), "endedAt": iso(29 * 86400)},
+            {"runId": "lyb", "binding": "LYB", "issue": "LYB-1", "provider": "codex", "startedAt": iso(60), "endedAt": iso(30)},
+            {"runId": "adopt", "kind": "adopt", "pr": 1, "provider": "codex", "startedAt": iso(60), "endedAt": iso(30)}])
+        doctor.publish_status(self.host, self.lane, self.feed(1))
+        rows = [json.loads(line) for line in self.api.files["stage-events.ndjson"].splitlines()]
+        self.assertEqual([(r["entityType"], r["entityId"], r["stage"], r["actor"], r["outcome"], r["sourceReceipt"]) for r in rows], [
+            ("shipping", "JovieInc/Jovie#22315", "worker-start", "codex", "advanced", "lanes-ledger:r1"),
+            ("shipping", "JOV-6", "worker-start", "grok", "failed", "lanes-ledger:r2"),
+            ("remediation", "JovieInc/Jovie#22301@0123456789ab", "repair-start", "codex", "failed", "lanes-ledger:r3"),
+            ("shipping", "JovieInc/Jovie#1", "gate-seat", "codex", "abandoned", "lanes-ledger:adopt")])
+        self.assertTrue(all(r["schema"] == "jovie-stage-event/v1" and r["enteredAt"] < r["exitedAt"] for r in rows))
+        writes = self.api.write_count
+        doctor.publish_status(self.host, self.lane, self.feed(1))
+        packet = json.loads((self.state / "lanes-status-publish.json").read_text())
+        self.assertNotIn("stage-events.ndjson", packet["files"], "unchanged rows are not re-uploaded")
+        self.assertEqual(self.api.write_count, writes + 1)
+
+    def test_gate_seat_wait_and_gate_run_are_tracked_stages(self):
+        events = doctor.stage_events.events
+        row = {"runId": "g1", "kind": "adopt", "pr": 22385, "provider": "grok", "gateWaitS": 120,
+               "startedAt": "2026-10-21T06:33:26Z", "endedAt": "2026-10-21T07:04:02Z", "verdict": "landing"}
+        seat, gate = events(row)
+        self.assertEqual((seat["stage"], seat["enteredAt"], seat["exitedAt"], seat["outcome"]),
+                         ("gate-seat", "2026-10-21T06:33:26Z", "2026-10-21T06:35:26Z", "advanced"))
+        self.assertEqual((gate["stage"], gate["enteredAt"], gate["exitedAt"], gate["outcome"], gate["entityId"]),
+                         ("gate", "2026-10-21T06:35:26Z", "2026-10-21T07:04:02Z", "advanced", "JovieInc/Jovie#22385"))
+        self.assertEqual(events({**row, "verdict": "held"})[1]["outcome"], "failed")
+        self.assertEqual(events({**row, "verdict": "gate-deferred"})[1]["outcome"], "abandoned")
+        [deferred] = events({**row, "gateWaitS": None, "verdict": "gate-deferred"})
+        self.assertEqual((deferred["stage"], deferred["exitedAt"], deferred["outcome"]),
+                         ("gate-seat", "2026-10-21T07:04:02Z", "abandoned"))
+        self.assertEqual(events({**row, "gateWaitS": 99999}), [events({**row, "gateWaitS": None})[0]])
+        self.assertEqual(events({**row, "pr": None}), [])
+
+    def test_a_held_sweep_snapshot_raises_an_alert_per_checkout(self):
+        alerts = doctor.judge(obs(sweepSecretHeld=[{"name": "94af-Jovie", "path": "/w/Jovie",
+                                                     "reason": "secret-finding:trufflehog"}]))
+        self.assertIn("secret-finding:trufflehog", alerts["sweep-snapshot-secret:94af-Jovie"])
+        self.assertFalse([key for key in doctor.judge(obs()) if key.startswith("sweep-snapshot-secret:")])
+
+    def test_outcome_verification_is_the_outcome_receipt_stage(self):
+        events = doctor.stage_events.events
+        row = {"runId": "o1", "kind": "outcome-verify", "provider": "codex", "issue": "JOV-7771",
+               "startedAt": "2026-10-21T11:27:54Z", "endedAt": "2026-10-21T12:00:00Z",
+               "verdict": "recorded", "decision": "pass"}
+        [event] = events(row)
+        self.assertEqual((event["entityId"], event["stage"], event["outcome"]),
+                         ("JOV-7771", "outcome-receipt", "advanced"))
+        self.assertEqual(events({**row, "decision": "fail"})[0]["outcome"], "failed")
+        self.assertEqual(events({**row, "verdict": "verifier-failed"})[0]["outcome"], "abandoned")
+        self.assertEqual(events({**row, "issue": "LYB-1"}), [])
+
+    def test_a_truncated_stage_file_is_read_back_by_its_size(self):
+        now = time.time()
+        iso = lambda delta: doctor.datetime.fromtimestamp(now - delta, doctor.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        self.ledger([{"runId": "r1", "issue": "JOV-5", "provider": "codex", "startedAt": iso(60), "endedAt": iso(30)}])
+        self.api.readback_mode = "stage-truncated"
+        self.assertEqual(doctor.publish_status(self.host, self.lane, self.feed(1)), "https://gist.example/abc123")
+        self.ledger([{"runId": "r2", "issue": "JOV-7", "provider": "codex", "startedAt": iso(60), "endedAt": iso(30)}])
+        self.api.readback_mode = "stage-short"
+        with self.assertRaisesRegex(RuntimeError, "status-gist-readback-unconfirmed"):
+            doctor.publish_status(self.host, self.lane, self.feed(1))
+
+    def test_the_stage_file_is_capped_newest_first(self):
+        now = time.time()
+        rows = [{"runId": f"r{i}", "issue": "JOV-5", "provider": "codex",
+                 "startedAt": doctor.datetime.fromtimestamp(now - 3600 + i, doctor.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                 "endedAt": doctor.datetime.fromtimestamp(now - 1800 + i, doctor.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+                for i in range(50)]
+        self.ledger(rows)
+        with mock.patch.object(doctor.stage_events, "MAX_BYTES", 1000):
+            text = doctor.stage_events.ndjson(self.state / "runs" / "ledger.jsonl", now)
+        self.assertLessEqual(len(text.encode()), 1000)
+        self.assertIn("lanes-ledger:r49", text)
+        self.assertNotIn("lanes-ledger:r0\"", text)
 
     def test_only_the_primary_host_publishes(self):
         saved = doctor.PRIMARY_FLAG
@@ -1918,6 +2683,45 @@ class DeliveryTest(unittest.TestCase):
         self.assertEqual(receipt["terminalOutcome"], "merge-proven")
         self.assertEqual(receipt["recoveryEvidence"]["lastDeliveredMerge"]["runId"], "gem-codex-repair")
 
+    def test_positive_exact_head_observation_can_resolve_without_population_certainty(self):
+        first = self.observation()
+        events, alerts = self.evaluate(first, {"deliveryDemandSince": 990000})
+        prior = {"alerts": alerts, "conditions": events, "deliveryDemandSince": 990000}
+        now = first["now"] + 60
+        row = {**self.merge(mergedAt=doctor.epoch_iso(now - 1)), "title": "repair",
+               "headRefName": "fix/work", "baseRefName": "main",
+               "createdAt": doctor.epoch_iso(980000), "updatedAt": doctor.epoch_iso(now - 1)}
+        evidence = doctor.merge_evidence.collect("JovieInc/Jovie", now - 86400, now,
+            fetch_page=lambda lo, hi: {"issueCount": 1, "nodes": [row]})
+        observed = self.observation(now=now, _allReceipts=[self.coding()], merged24h=evidence["prs"],
+            mergedWindow={k: v for k, v in evidence.items() if k != "prs"},
+            mergedAttributionError="merged-pr-evidence:" + doctor.merge_evidence.SEARCH_COVERAGE_REASON)
+        resolved, _ = self.evaluate(observed, prior)
+        self.assertFalse(observed["delivery"]["mergeEvidenceComplete"])
+        self.assertEqual(observed["delivery"]["state"], "unknown")
+        self.assertEqual(resolved["delivery-stalled"]["terminalOutcome"], "merge-proven")
+        self.assertEqual(resolved["delivery-stalled"]["recoveryEvidence"]["lastDeliveredMerge"]["headSha"], self.HEAD)
+        self.assertIsNone(observed["delivery"]["deployedVerification"])
+        # No missing event or unrelated/stale/malformed observation authorizes recovery.
+        for mutation in ("wrong-head", "wrong-repository", "stale", "unfinished", "missing-witness", "contradictory-witness"):
+            candidate = json.loads(json.dumps(observed))
+            if mutation == "wrong-head":
+                candidate["merged24h"][0]["headRefOid"] = "d" * 40
+            elif mutation == "wrong-repository":
+                candidate["mergedWindow"]["source"]["repository"] = "JovieInc/LogYourBody"
+            elif mutation == "stale":
+                candidate["now"] += 4000
+            elif mutation == "unfinished":
+                candidate["mergedWindow"]["providerEnumerationComplete"] = False
+            elif mutation == "contradictory-witness":
+                candidate["mergedWindow"]["enumeratedSlices"][0].update(providerCount=0, returnedCount=0)
+            else:
+                candidate["mergedWindow"]["enumeratedSlices"] = []
+            with self.subTest(mutation=mutation):
+                carried, _ = self.evaluate(candidate, prior)
+                self.assertEqual(carried["delivery-stalled"]["state"], "active")
+                self.assertIsNone(candidate["delivery"]["lastDeliveredMerge"])
+
     def test_unknown_drain_cannot_resolve_an_alarm(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = Path(tmp)
@@ -2002,6 +2806,26 @@ class DeliveryTest(unittest.TestCase):
 
 
 class RunTest(unittest.TestCase):
+    def test_factory_adapter_and_intake_failures_do_not_abort_doctor(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            (state / "factory-signals").mkdir()
+            (state / "factory-signals/pending.json").write_text(json.dumps({
+                "schema": "jovie-factory-signal/v1", "fingerprint": "pending", "title": "Repair",
+                "problem": "Evidence", "acceptance": ["Reproduce and repair"], "metric": {"name": "failures", "target": 0}}))
+            class Down:
+                def gql(self, query, variables):
+                    raise RuntimeError("fixture Linear down")
+            tracker = FakeTracker()
+            tracker.linear = Down()
+            with mock.patch.dict(os.environ, {"LANES_SELFTEST": "1"}), \
+                    mock.patch.object(doctor, "observe", return_value=obs()), \
+                    mock.patch.object(doctor.factory_signals, "sentinel_signals", side_effect=ValueError("bad adapter")):
+                result = doctor.run(SimpleNamespace(state=state), SimpleNamespace(HOST="test"), None, tracker)
+            self.assertIn("fixture Linear down", result["factoryIntake"]["error"])
+            self.assertEqual(json.loads((state / "doctor.json").read_text())["factoryIntake"], result["factoryIntake"])
+            self.assertTrue((state / "factory-signals/pending.json").exists())
+
     def test_legacy_admission_alarm_survives_unknown_inventory_and_restart(self):
         for timer in (None, 998000):
             with self.subTest(timer=timer), tempfile.TemporaryDirectory() as tmp:
@@ -2095,6 +2919,229 @@ class DoctorLockTest(unittest.TestCase):
         self.assertTrue(opened[0].closed)
 
 
+class SearchPopulationCoverageTest(unittest.TestCase):
+    """Search can omit a known merge even when issueCount equals returned rows."""
+    START = doctor.merge_evidence._epoch("2026-10-26T14:30:00Z")
+    END = doctor.merge_evidence._epoch("2026-10-27T00:23:00Z")
+
+    def row(self, number=23424):
+        return {"number": number, "title": "observed merge", "headRefName": "fix/example",
+                "baseRefName": "main", "createdAt": "2026-10-25T00:00:00Z",
+                "updatedAt": "2026-10-27T00:20:32Z", "mergedAt": "2026-10-27T00:20:32Z",
+                "headRefOid": "a" * 40, "mergeCommit": {"oid": "b" * 40}}
+
+    def evidence(self, rows):
+        return doctor.merge_evidence.collect("JovieInc/Jovie", self.START, self.END,
+            fetch_page=lambda lo, hi: {"issueCount": len(rows), "nodes": rows})
+
+    def test_sparse_origin_emitter_does_not_import_the_merge_reader(self):
+        # Existing automation checkouts copy only these two files. Reporting's
+        # optional merge reader must not expand the origin emitter dependency set.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for relative in ("scripts/shipping_origin.py", "scripts/lanes/shipping_attribution.py"):
+                target = root / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes((ROOT / relative).read_bytes())
+            result = subprocess.run([sys.executable, "scripts/shipping_origin.py", "--help"],
+                cwd=root, text=True, capture_output=True, timeout=10,
+                env={**os.environ, "PYTHONPATH": ""})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("emit-automation", result.stdout)
+
+    def test_observe_preserves_events_while_propagating_unknown_population(self):
+        evidence = self.evidence([self.row()])
+        lane = SimpleNamespace(REPO_SLUG="JovieInc/Jovie", HOST="test",
+            Linear=mock.Mock(side_effect=OSError("offline")), load_github_env=lambda: None,
+            graphql_budget=lambda: (4000,), provider_throughput=throughput_stub)
+        with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.dict(os.environ, {"LANES_SELFTEST": ""}), \
+                mock.patch.object(doctor, "host_capacity", return_value={}), \
+                mock.patch.object(doctor, "qualified_pool", side_effect=OSError("offline")), \
+                mock.patch.object(doctor.merge_evidence, "collect_shared", return_value=evidence) as collect, \
+                mock.patch.object(doctor.shipping_attribution, "PROJECTS", [{"repository": lane.REPO_SLUG}]), \
+                mock.patch.object(doctor, "sample_merge_throughput", return_value=(None, "unavailable")), \
+                mock.patch.object(doctor, "sample_quota_deferred_heads", return_value=(None, "unavailable")), \
+                mock.patch.object(doctor, "sample_quota_drain", return_value=(None, "unavailable")), \
+                mock.patch.object(doctor, "open_pr_numbers", return_value=None), \
+                mock.patch.object(doctor, "automation_observation", return_value={}), \
+                mock.patch.object(doctor.fleet_ledger, "record_ready"), \
+                mock.patch.object(doctor.deploy_health, "sample", return_value=(None, None)), \
+                mock.patch.object(doctor.throughput_sentinel, "observe", return_value={}):
+            host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "absent")
+            observed = doctor.observe(host, lane, SimpleNamespace(status=lambda: {}), now=self.END)
+        collect.assert_called_once()
+        self.assertEqual(observed["merged24h"], [self.row()])
+        self.assertEqual(observed["mergedAttributionError"], "merged-pr-evidence:" + evidence["reason"])
+        self.assertFalse(observed["mergedWindow"]["complete"])
+        self.assertIsNone(observed["mergedWindow"]["populationCount"])
+        self.assertEqual(observed["_mergeEvidenceByRepository"][lane.REPO_SLUG], evidence)
+
+    def test_known_22413_omission_cannot_certify_a_population(self):
+        # Exact GET: #22413 merged at 23:21:28, SHA 828288651b830f7514aaeee4f7fa4622acf63e14.
+        # Search omitted it with a matching count and no pagination remaining.
+        direct_merged_at = doctor.merge_evidence._epoch("2026-10-26T23:21:28Z")
+        self.assertTrue(self.START <= direct_merged_at < self.END)
+        evidence = self.evidence([self.row()])
+        self.assertFalse(evidence["complete"])
+        self.assertTrue(evidence["providerEnumerationComplete"])
+        self.assertEqual(evidence["populationCoverage"], "unknown")
+        self.assertIsNone(evidence["populationCount"])
+        self.assertEqual(evidence["observedCount"], 1)
+        self.assertEqual([r["number"] for r in evidence["prs"]], [23424])
+        with self.assertRaises(doctor.merge_evidence.IncompleteMergeEvidence):
+            doctor.merge_evidence.require_complete(evidence)
+
+    def test_empty_search_is_zero_observations_not_zero_population(self):
+        evidence = self.evidence([])
+        self.assertFalse(evidence["complete"])
+        self.assertTrue(evidence["providerEnumerationComplete"])
+        self.assertEqual(evidence["observedCount"], 0)
+        self.assertIsNone(evidence["populationCount"])
+
+    def test_legacy_complete_cache_does_not_resurrect_the_false_claim(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "merge-window.json"
+            legacy = {"complete": True, "reason": None, "prs": [self.row()],
+                      "window": {"since": self.START, "until": self.END}}
+            cache.write_text(json.dumps({"repository": "JovieInc/Jovie", "evidence": legacy}))
+            fetch = mock.Mock(return_value=self.evidence([self.row()]))
+            result = doctor.merge_evidence.collect_shared("JovieInc/Jovie", self.START,
+                self.END + 10, cache, collect_fn=fetch)
+            fetch.assert_called_once()
+            self.assertFalse(result["complete"])
+
+    def test_attribution_keeps_observed_events_without_an_exact_denominator(self):
+        evidence = self.evidence([self.row()])
+        report = doctor.shipping_attribution.project_report(
+            {"channel": "Jovie", "repository": "JovieInc/Jovie", "instrumented": True},
+            evidence, {"complete": True, "rows": []}, self.END)
+        self.assertFalse(report["denominatorComplete"])
+        self.assertIsNone(report["mergeCount"])
+        self.assertIsNone(report["coverage"])
+        self.assertEqual(report["observedMergeCount"], 1)
+        self.assertEqual([r["prNumber"] for r in report["pullRequests"]], [23424])
+
+    def test_invalid_cached_rows_or_slice_witnesses_are_not_reused(self):
+        for mutation in ("outside-window", "duplicate", "bad-time", "slice-gap", "slice-count"):
+            stale = self.evidence([self.row()])
+            if mutation == "outside-window":
+                stale["prs"][0]["mergedAt"] = "2026-10-26T14:29:59Z"
+            elif mutation == "duplicate":
+                stale["prs"].append(dict(stale["prs"][0])); stale["observedCount"] = 2
+            elif mutation == "bad-time":
+                stale["prs"][0]["mergedAt"] = "not-a-time"
+            elif mutation == "slice-gap":
+                stale["enumeratedSlices"][0]["sinceInclusive"] += 1
+            else:
+                stale["enumeratedSlices"][0]["providerCount"] += 1
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as tmp:
+                cache = Path(tmp) / "merge-window.json"
+                cache.write_text(json.dumps({"repository": "JovieInc/Jovie", "evidence": stale}))
+                fetch = mock.Mock(return_value=self.evidence([]))
+                result = doctor.merge_evidence.collect_shared("JovieInc/Jovie", self.START,
+                    self.END + 10, cache, collect_fn=fetch)
+                fetch.assert_called_once()
+                self.assertFalse(result["complete"])
+
+    def test_observed_events_survive_a_later_page_failure_without_a_total(self):
+        calls = []
+        def fetch(lo, hi):
+            calls.append((lo, hi))
+            if len(calls) == 1:
+                return {"issueCount": 101, "nodes": []}
+            if len(calls) == 2:
+                return {"issueCount": 1, "nodes": [self.row()]}
+            raise OSError("offline")
+        result = doctor.merge_evidence.collect("JovieInc/Jovie", self.START, self.END, fetch_page=fetch)
+        self.assertFalse(result["complete"])
+        self.assertFalse(result["providerEnumerationComplete"])
+        self.assertEqual(result["reason"], "fetch_failed")
+        self.assertEqual(result["observedCount"], 1)
+        self.assertEqual(result["prs"], [self.row()])
+        self.assertIsNone(result["populationCount"])
+
+    def test_retained_events_cannot_exceed_their_slice_witness(self):
+        evidence = self.evidence([self.row()])
+        # The overall returned count can still match: a different slice must not
+        # lend its witness count to the slice containing the retained event.
+        split = int(self.START + 3600)
+        evidence["enumeratedSlices"] = [
+            {"sinceInclusive": int(self.START), "untilInclusive": split, "providerCount": 1, "returnedCount": 1},
+            {"sinceInclusive": split + 1, "untilInclusive": int(self.END), "providerCount": 0, "returnedCount": 0}]
+        self.assertFalse(doctor.merge_evidence.search_observations(evidence, "JovieInc/Jovie"))
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "merge-window.json"
+            cache.write_text(json.dumps({"repository": "JovieInc/Jovie", "evidence": evidence}))
+            fetch = mock.Mock(return_value=self.evidence([]))
+            doctor.merge_evidence.collect_shared("JovieInc/Jovie", self.START, self.END + 1,
+                                                 cache, collect_fn=fetch)
+            fetch.assert_called_once()
+
+    def test_rows_outside_the_returned_search_slice_are_rejected(self):
+        result = doctor.merge_evidence.collect("JovieInc/Jovie", self.START, self.START + 10,
+            fetch_page=lambda lo, hi: {"issueCount": 1, "nodes": [self.row()]})
+        self.assertFalse(result["providerEnumerationComplete"])
+        self.assertEqual(result["reason"], "malformed_pr")
+        self.assertEqual(result["observedCount"], 0)
+
+    def test_real_shared_reader_reuses_honest_coverage_without_extra_requests(self):
+        response = SimpleNamespace(returncode=0, stdout=json.dumps({"data": {
+            "search": {"issueCount": 1, "nodes": [self.row()]}}}))
+        with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.object(doctor.merge_evidence.subprocess, "run", return_value=response) as run:
+            cache = Path(tmp) / "merge-window.json"
+            first = doctor.merge_evidence.collect_shared("JovieInc/Jovie", self.START, self.END, cache)
+            second = doctor.merge_evidence.collect_shared("JovieInc/Jovie", self.START + 1,
+                                                          self.END + 60, cache)
+            self.assertEqual(run.call_count, 1, "unknown population does not disable the existing five-minute cache")
+            self.assertFalse(second["complete"])
+            self.assertEqual(second["source"], first["source"])
+            self.assertEqual(second["window"]["until"], self.END, "cache read cannot renew source time")
+            doctor.merge_evidence.collect_shared("JovieInc/Jovie", self.START,
+                self.END + doctor.merge_evidence.SHARED_TTL_S, cache)
+            self.assertEqual(run.call_count, 2, "expiry triggers one bounded refresh, not a new retry loop")
+            for call in run.call_args_list:
+                self.assertEqual(call.args[0][:3], ["gh", "api", "graphql"])
+                self.assertGreater(call.kwargs["timeout"], 0)
+                self.assertLessEqual(call.kwargs["timeout"], 60)
+
+    def test_fractional_adjacent_windows_filter_exactly_without_double_counting(self):
+        rows = [{**self.row(n), "createdAt": doctor.epoch_iso(90),
+                 "mergedAt": doctor.epoch_iso(n), "updatedAt": doctor.epoch_iso(n)}
+                for n in range(100, 105)]
+        def fetch(lo, hi):
+            hits = [r for r in rows if lo <= doctor.merge_evidence._epoch(r["mergedAt"]) <= hi]
+            return {"issueCount": len(hits), "nodes": hits}
+        first = doctor.merge_evidence.collect("JovieInc/Jovie", 100.5, 102.5, fetch_page=fetch)
+        second = doctor.merge_evidence.collect("JovieInc/Jovie", 102.5, 104.0, fetch_page=fetch)
+        self.assertEqual([r["number"] for r in first["prs"]], [101, 102])
+        self.assertEqual([r["number"] for r in second["prs"]], [103])
+        self.assertEqual(first["window"], {"since": 100.5, "until": 102.5})
+        self.assertTrue(first["providerEnumerationComplete"])
+        self.assertFalse(first["complete"])
+        self.assertIsNone(second["populationCount"])
+
+    def test_status_feed_preserves_zero_observations_as_unknown_totals(self):
+        evidence = self.evidence([])
+        observed = obs(mergedAttributionError="merged-pr-evidence:" + evidence["reason"],
+            mergedWindow={k: v for k, v in evidence.items() if k != "prs"},
+            _mergeEvidenceByRepository={"JovieInc/Jovie": evidence},
+            _ledgerEvidence={"complete": True, "rows": []})
+        lane = SimpleNamespace(HOST="gem", provider_throughput=lambda *a, **k: {
+            "providers": {"codex": {"landedOutput": 0, "issueToMergeSecondsP50": 0}},
+            "landedByAttribution": {}, "landedByOrigin": {}})
+        with tempfile.TemporaryDirectory() as tmp:
+            feed = doctor.status_feed(SimpleNamespace(state=Path(tmp)), lane, observed, {}, {})
+        self.assertEqual(feed["mergedWindow"]["observedCount"], 0)
+        self.assertIsNone(feed["mergedWindow"]["populationCount"])
+        self.assertIsNone(feed["throughput"]["providers"]["codex"]["landedOutput"])
+        project = feed["shippingAttribution"]["projects"][0]
+        self.assertEqual(project["observedMergeCount"], 0)
+        self.assertIsNone(project["mergeCount"])
+        self.assertFalse(project["denominatorComplete"])
+
+
 class MergeWindowTest(unittest.TestCase):
     NOW = 1_800_000_000
 
@@ -2118,16 +3165,18 @@ class MergeWindowTest(unittest.TestCase):
     def test_more_than_100_and_exact_half_open_boundaries(self):
         rows = [self.row(i + 1, i) for i in range(206)]
         result = self.collect(self.pages(rows))
-        self.assertTrue(result["complete"])
+        self.assertTrue(result["providerEnumerationComplete"])
+        self.assertFalse(result["complete"])
         self.assertGreater(result["pages"], 1, "a window over one page is split, never paged by cursor")
         self.assertEqual([r["number"] for r in result["prs"]], list(range(2, 202)))
 
-    def test_lagging_updated_order_no_longer_makes_the_window_unknown(self):
+    def test_lagging_updated_order_does_not_lose_search_observations(self):
         # 2026-10-13: the connection listed #21435 (22:41Z) ahead of #21430 (23:19Z).
         late = self.row(2, 5)
         late["updatedAt"] = doctor.epoch_iso(self.NOW - 1)
         result = self.collect(self.pages([self.row(1, 3), late, self.row(3, 1)]))
-        self.assertTrue(result["complete"])
+        self.assertTrue(result["providerEnumerationComplete"])
+        self.assertFalse(result["complete"])
         self.assertEqual([r["number"] for r in result["prs"]], [1, 2, 3])
 
     def test_old_merge_updated_recently_does_not_count(self):
@@ -2159,7 +3208,7 @@ class MergeWindowTest(unittest.TestCase):
     def test_page_limit(self):
         source = self.pages([self.row(i + 1, i + 1) for i in range(102)])
         self.assertEqual(self.collect(source, max_pages=1)["reason"], "max_pages_reached")
-        self.assertTrue(self.collect(source)["complete"])
+        self.assertTrue(self.collect(source)["providerEnumerationComplete"])
 
     def test_read_failure_deadline_and_invalid_options(self):
         with mock.patch.object(doctor.merge_evidence.subprocess, "run", side_effect=OSError("offline")):
@@ -2181,7 +3230,8 @@ class MergeWindowTest(unittest.TestCase):
             return SimpleNamespace(returncode=0, stdout=json.dumps({"data": {"search": page}}))
         with mock.patch.object(doctor.merge_evidence.subprocess, "run", side_effect=run):
             result = doctor.merge_evidence.collect("JovieInc/Jovie", self.NOW - 200, self.NOW)
-        self.assertTrue(result["complete"])
+        self.assertTrue(result["providerEnumerationComplete"])
+        self.assertFalse(result["complete"])
         self.assertEqual(len(result["prs"]), 120)
         self.assertEqual(result["pages"], len(calls))
         self.assertGreater(len(calls), 1)
@@ -2222,11 +3272,9 @@ class MergeWindowTest(unittest.TestCase):
         bad["updatedAt"] = doctor.epoch_iso(self.NOW - 2)
         self.assertEqual(self.collect(self.pages([bad]))["reason"], "malformed_pr")
 
-    def test_shared_reader_reuses_one_complete_read_within_ttl(self):
+    def test_shared_reader_reuses_provider_enumeration_without_claiming_population(self):
         rows = [self.row(1, 50), self.row(2, 150)]
-        collect = mock.Mock(return_value={"schema": "jovie-merge-window/v1", "complete": True, "reason": None,
-                                          "window": {"since": self.NOW - 200, "until": self.NOW},
-                                          "pages": 1, "scans": 2, "prs": rows})
+        collect = mock.Mock(return_value=self.collect(self.pages(rows)))
         shared = doctor.merge_evidence.collect_shared
         with tempfile.TemporaryDirectory() as tmp:
             cache = Path(tmp) / "merge-window.json"
@@ -2237,7 +3285,10 @@ class MergeWindowTest(unittest.TestCase):
             # The reused read keeps its own `until` and only the rows inside the new `since`.
             self.assertEqual(later["window"], {"since": self.NOW - 100, "until": self.NOW})
             self.assertEqual([r["number"] for r in later["prs"]], [1])
-            self.assertTrue(later["complete"])
+            self.assertFalse(later["complete"])
+            self.assertTrue(later["providerEnumerationComplete"])
+            self.assertEqual(later["observedCount"], 1)
+            self.assertIsNone(later["populationCount"])
             shared("JovieInc/Jovie", self.NOW - 200, self.NOW + 300, cache, collect_fn=collect)
             self.assertEqual(collect.call_count, 2)
             shared("JovieInc/Other", self.NOW - 200, self.NOW + 300, cache, collect_fn=collect)
@@ -2486,3 +3537,133 @@ class ProviderPayloadCensusTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RedDispatchAlertTest(unittest.TestCase):
+    """JOV-8931: a relayed red check with no lane claim inside the grace window alerts."""
+
+    NOW = 1_000_000_000.0
+
+    def write_ledger(self, state, rows):
+        ledger = state / "runs/red-dispatch.jsonl"
+        ledger.parent.mkdir(parents=True, exist_ok=True)
+        with ledger.open("a") as handle:
+            for row in rows:
+                handle.write(json.dumps(row) + "\n")
+
+    def dispatched_row(self, *, pr=22868, sha="a" * 40, red_epoch=None):
+        return {"schema": "jovie-lane-red-dispatch/v1", "status": "dispatched", "pr": pr,
+                "sha": sha, "runId": 987654, "runAttempt": 2,
+                "redAt": "2026-10-23T18:27:30Z", "redAtEpoch": red_epoch,
+                "dispatchedAt": "2026-10-23T18:28:00Z", "claimAt": None,
+                "provider": "codex", "reason": None}
+
+    def test_summary_flags_dispatch_rows_past_the_grace_window(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.write_ledger(state, [
+                self.dispatched_row(red_epoch=self.NOW - 60),
+                self.dispatched_row(pr=1, sha="b" * 40, red_epoch=self.NOW - 300),
+            ])
+            summary = doctor.red_dispatch_summary(state, self.NOW)
+            self.assertEqual(summary["graceS"], 180)
+            self.assertEqual([row["pr"] for row in summary["unclaimed"]], [1])
+            self.assertEqual(summary["unclaimed"][0]["ageS"], 300)
+
+    def test_summary_clears_once_a_claim_row_lands(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.write_ledger(state, [
+                self.dispatched_row(pr=1, sha="b" * 40, red_epoch=self.NOW - 300),
+                {"status": "claimed", "pr": 1, "sha": "b" * 40, "claimAt": "2026-10-23T18:30:00Z"},
+            ])
+            self.assertEqual(doctor.red_dispatch_summary(state, self.NOW)["unclaimed"], [])
+
+    def test_summary_tolerates_missing_or_corrupt_ledger(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.assertEqual(doctor.red_dispatch_summary(state, self.NOW),
+                             {"graceS": 180, "unclaimed": []})
+            (state / "runs").mkdir(parents=True)
+            (state / "runs/red-dispatch.jsonl").write_text("not json\n")
+            self.assertEqual(doctor.red_dispatch_summary(state, self.NOW)["unclaimed"], [])
+
+    def test_judge_raises_the_alert_with_a_stable_key_per_pr(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.write_ledger(state, [self.dispatched_row(pr=1, sha="b" * 40, red_epoch=self.NOW - 300)])
+            obs = {"now": self.NOW, "redDispatch": doctor.red_dispatch_summary(state, self.NOW)}
+            alerts = doctor.judge(obs)
+            self.assertIn("red-dispatch-unclaimed:1", alerts)
+            self.assertIn("unclaimed 300s after red_at", alerts["red-dispatch-unclaimed:1"])
+
+    def test_judge_stays_quiet_inside_the_grace_window(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.write_ledger(state, [self.dispatched_row(red_epoch=self.NOW - 60)])
+            obs = {"now": self.NOW, "redDispatch": doctor.red_dispatch_summary(state, self.NOW)}
+            self.assertFalse(doctor.judge(obs))
+
+
+class QuotaDeferredHeadsTests(unittest.TestCase):
+    def test_alert_names_the_heads_and_is_silent_at_zero(self):
+        deferred = {"value": 2, "heads": [{"number": 7, "ageMinutes": 90}, {"number": 8, "ageMinutes": 70}]}
+        alert = doctor.judge(obs(quotaDeferredHeads=deferred))["quota-deferred-heads"]
+        self.assertIn("2 open PR heads", alert)
+        self.assertIn("#7 90m", alert)
+        self.assertNotIn("quota-deferred-heads", doctor.judge(obs(quotaDeferredHeads={"value": 0, "heads": []})))
+        self.assertNotIn("quota-deferred-heads", doctor.judge(obs()))
+
+    def test_sampler_parses_exit_one_caches_and_keeps_a_stale_read_on_failure(self):
+        import tempfile
+        from types import SimpleNamespace
+        out = json.dumps({"metric": "quota_deferred_heads_older_than_1h", "value": 1,
+                          "heads": [{"number": 9, "ageMinutes": 80}]})
+        calls = []
+        def run(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=1, stdout=out, stderr="")
+        with tempfile.TemporaryDirectory() as tmp:
+            signal, error = doctor.sample_quota_deferred_heads(Path(tmp), 1000.0, run)
+            self.assertEqual((signal["value"], error), (1, None))
+            again, _ = doctor.sample_quota_deferred_heads(Path(tmp), 1100.0, run)
+            self.assertEqual(len(calls), 1, "a fresh cache is not re-read")
+            self.assertEqual(again["value"], 1)
+            broken = lambda *a, **k: SimpleNamespace(returncode=2, stdout="", stderr="boom")
+            stale, error = doctor.sample_quota_deferred_heads(Path(tmp), 5000.0, broken)
+            self.assertEqual(stale["value"], 1)
+            self.assertIn("boom", error)
+
+
+class QuotaDrainTests(unittest.TestCase):
+    ALERT = {"bucket": "github-token", "remaining": 3000, "ratePerMinute": 200,
+             "emptyAt": "2026-10-26T01:00:00.000Z", "resetAt": "2026-10-26T01:35:00.000Z", "minutesEarly": 35}
+
+    def test_alert_names_the_bucket_and_is_silent_without_a_projection(self):
+        alert = doctor.judge(obs(quotaDrain={"alerts": [self.ALERT]}))["quota-drain"]
+        self.assertIn("github-token has 3000 left at ~200/min", alert)
+        self.assertIn("35 min before its reset", alert)
+        self.assertNotIn("quota-drain", doctor.judge(obs(quotaDrain={"alerts": []})))
+        self.assertNotIn("quota-drain", doctor.judge(obs()))
+
+    def test_sampler_parses_exit_three_caches_and_keeps_a_stale_read_on_failure(self):
+        import tempfile
+        from types import SimpleNamespace
+        report = {"schema": "jovie-actions-quota-drain/v1", "generatedAt": "x", "alerts": [self.ALERT]}
+        out = "::notice::ignored\n".replace("::notice::ignored\n", "") + json.dumps(report) + "\n::warning title=x::y\n"
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=3, stdout=out, stderr="")
+        with tempfile.TemporaryDirectory() as tmp:
+            signal, error = doctor.sample_quota_drain(Path(tmp), 1000.0, run)
+            self.assertEqual((len(signal["alerts"]), error), (1, None))
+            self.assertEqual(calls[0][2:], ["drain", "--json", "--hours", "1"])
+            again, _ = doctor.sample_quota_drain(Path(tmp), 1100.0, run)
+            self.assertEqual(len(calls), 1, "a fresh cache is not re-read")
+            self.assertEqual(again["alerts"][0]["bucket"], "github-token")
+            broken = lambda *a, **k: SimpleNamespace(returncode=2, stdout="", stderr="boom")
+            stale, error = doctor.sample_quota_drain(Path(tmp), 5000.0, broken)
+            self.assertEqual(len(stale["alerts"]), 1)
+            self.assertIn("boom", error)

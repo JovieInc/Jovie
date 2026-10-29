@@ -174,6 +174,7 @@ export interface PublicArtistSource {
   appleMusicUrl: string | null;
   youtubeUrl: string | null;
   isPublic: boolean | null;
+  settings?: unknown;
 }
 
 export interface PublicReleaseSource {
@@ -246,18 +247,23 @@ function subscribeUrlFor(username: string): string {
 }
 
 export function toPublicArtistProfile(
-  row: PublicArtistSource
+  row: PublicArtistSource,
+  options: { requireSearchability?: boolean } = {}
 ): PublicArtistProfile | null {
   if (row.isPublic !== true) return null;
   // QA and reserved handles stay out. Do not pass requirePublication: a public
   // artist whose display name matches their handle is a normal profile, not a
   // placeholder, and must remain findable.
   if (
-    !isPublicProfileDiscoveryEligible({
-      handle: row.username,
-      displayName: row.displayName,
-      isPublic: true,
-    })
+    !isPublicProfileDiscoveryEligible(
+      {
+        handle: row.username,
+        displayName: row.displayName,
+        isPublic: true,
+        settings: row.settings,
+      },
+      options
+    )
   ) {
     return null;
   }
@@ -298,7 +304,9 @@ export function rankPublicArtists(
   };
   return rows
     .flatMap(row => {
-      const profile = toPublicArtistProfile(row);
+      const profile = toPublicArtistProfile(row, {
+        requireSearchability: true,
+      });
       return profile ? [profile] : [];
     })
     .toSorted(

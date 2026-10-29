@@ -20,31 +20,41 @@ import {
  */
 export async function invalidateProfileCache(
   usernameNormalized: string | null | undefined,
-  oldUsernameNormalized?: string | null
+  oldUsernameNormalized?: string | null,
+  options: { privacyChanged?: boolean } = {}
 ): Promise<void> {
+  const cacheLife = options.privacyChanged ? { expire: 0 } : 'max';
   // Invalidate dashboard data cache
-  revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
-  revalidateTag(CACHE_TAGS.PUBLIC_PROFILE, 'max');
-  revalidateTag(CACHE_TAGS.SITEMAP_CATALOG, 'max');
-  revalidateTag(CACHE_TAGS.FEATURED_CREATORS, 'max');
-  revalidateTag(CACHE_TAGS.ARTISTS_DIRECTORY, 'max');
+  revalidateTag(CACHE_TAGS.DASHBOARD_DATA, cacheLife);
+  revalidateTag(CACHE_TAGS.PUBLIC_PROFILE, cacheLife);
+  revalidateTag(CACHE_TAGS.SITEMAP_CATALOG, cacheLife);
+  revalidateTag(CACHE_TAGS.FEATURED_CREATORS, cacheLife);
+  revalidateTag(CACHE_TAGS.ARTISTS_DIRECTORY, cacheLife);
   revalidatePath(APP_ROUTES.ARTISTS);
+  if (options.privacyChanged) {
+    revalidatePath('/sitemap.xml');
+    revalidatePath('/api/featured-creators');
+  }
 
   // Invalidate the public profile page for the current username
   if (usernameNormalized) {
     revalidatePath(`/${usernameNormalized}`);
+    if (options.privacyChanged)
+      revalidatePath(`/${usernameNormalized}`, 'layout');
     // Invalidate Redis edge cache
     await invalidateProfileEdgeCache(usernameNormalized);
   }
 
   if (usernameNormalized) {
-    revalidateTag(createProfileTag(usernameNormalized), 'max');
+    revalidateTag(createProfileTag(usernameNormalized), cacheLife);
   }
 
   // If username changed, also invalidate the old path
   if (oldUsernameNormalized && oldUsernameNormalized !== usernameNormalized) {
-    revalidateTag(createProfileTag(oldUsernameNormalized), 'max');
+    revalidateTag(createProfileTag(oldUsernameNormalized), cacheLife);
     revalidatePath(`/${oldUsernameNormalized}`);
+    if (options.privacyChanged)
+      revalidatePath(`/${oldUsernameNormalized}`, 'layout');
     // Invalidate Redis edge cache for old username
     await invalidateProfileEdgeCache(oldUsernameNormalized);
   }

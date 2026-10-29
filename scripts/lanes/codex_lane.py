@@ -71,15 +71,21 @@ def subscription_pool_mode() -> bool:
 
 
 def subscription_profiles() -> dict:
-    """Explicit, identity-bound two-account configuration; never discover credentials."""
+    """Explicit, identity-bound multi-account configuration; never discover credentials.
+
+    Tim 2026-10-24: no arbitrary caps. The pool was fixed at exactly two accounts with one seat on the
+    second, so a third paid subscription could not be added. An account is bound to its home AND its
+    verified email hash. A seat count is a host-side bound (a seat is one local codex exec on this
+    machine, so it cannot exceed the CPU count); the provider limit is the account's usage window,
+    which the capacity ledger measures per account."""
     if not subscription_pool_mode():
         return {}
     try:
         profiles = json.loads(os.environ.get("CODEX_LANE_SUBSCRIPTION_PROFILES", ""))
     except (ValueError, TypeError):
         raise ValueError("subscription profiles malformed") from None
-    if not isinstance(profiles, dict) or len(profiles) != 2 or CURRENT_LOGIN not in profiles:
-        raise ValueError("subscription pool requires current-login and one additional profile")
+    if not isinstance(profiles, dict) or len(profiles) < 2 or CURRENT_LOGIN not in profiles:
+        raise ValueError("subscription pool requires current-login and at least one additional profile")
     primary_limit = os.cpu_count()
     if type(primary_limit) is not int or primary_limit <= 0:
         raise ValueError("subscription compute capacity unavailable")
@@ -96,7 +102,7 @@ def subscription_profiles() -> dict:
         home = str(Path(home).resolve())
         if not Path(home).is_dir():
             raise ValueError("subscription home unavailable")
-        if type(slots) is not int or not 1 <= slots <= (primary_limit if name == CURRENT_LOGIN else 1):
+        if type(slots) is not int or not 1 <= slots <= primary_limit:
             raise ValueError("subscription slot limit invalid")
         if not isinstance(identity, str) or not re.fullmatch(r"[0-9a-f]{64}", identity):
             raise ValueError("subscription identity binding invalid")
@@ -668,9 +674,27 @@ CURRENT_METADATA_CALLS = [("account/read", {"refreshToken": False}),
                           ("model/list", {"limit": 100, "includeHidden": False})]
 
 
-def current_subscription_snapshot(name: str, *, lease_handle=None) -> dict:
-    account, rates, models = app_server_calls(name, CURRENT_METADATA_CALLS, lease_handle=lease_handle)
-    return {"account": account, "rateLimits": rates, "models": models}
+# Gem 2026-10-23: the 15s app-server budget timed out under host load (load ~14),
+# leaving the hourly identity proof to lapse. Give the read-only metadata session
+# a longer budget and retry transient timeouts with backoff; a final failure still
+# keeps the previous observation (never certifies new capacity).
+CURRENT_METADATA_TIMEOUT_S = float(os.environ.get("CODEX_METADATA_TIMEOUT_S", "45"))
+CURRENT_METADATA_ATTEMPTS = 3
+CURRENT_METADATA_BACKOFF_S = (2.0, 6.0)
+
+
+def current_subscription_snapshot(name: str, *, lease_handle=None, sleep=time.sleep) -> dict:
+    for attempt in range(CURRENT_METADATA_ATTEMPTS):
+        try:
+            account, rates, models = app_server_calls(name, CURRENT_METADATA_CALLS,
+                                                      timeout=CURRENT_METADATA_TIMEOUT_S,
+                                                      lease_handle=lease_handle)
+            return {"account": account, "rateLimits": rates, "models": models}
+        except TimeoutError:
+            if attempt + 1 >= CURRENT_METADATA_ATTEMPTS:
+                raise
+            sleep(CURRENT_METADATA_BACKOFF_S[min(attempt, len(CURRENT_METADATA_BACKOFF_S) - 1)])
+    raise TimeoutError("unreachable")
 
 
 def reconcile_current_subscription(now, if_due, fetch, name=CURRENT_LOGIN) -> dict:
@@ -1010,12 +1034,30 @@ def reverify_auth_bank(state: dict, now: float) -> dict:
     return read_state()
 
 
-def pick(state: dict, now: float, names: list[str] | None = None):
-    """Least-recently-used available account that nobody else has leased right now."""
+def pace_deltas(now: float) -> dict:
+    """{account: used-minus-elapsed points} from the capacity registry's live overlay; {} when unread."""
+    try:
+        import capacity_registry
+        return capacity_registry.live_deltas(capacity_registry.load(), STATE.parent, "openai-codex", now)
+    except Exception:
+        return {}
+
+
+def pick(state: dict, now: float, names: list[str] | None = None, deltas: dict | None = None):
+    """Available account that nobody else has leased right now: accounts behind their weekly pace
+    first, ahead-of-pace accounts last (they will run dry before reset), least-recently-used within
+    each group. Without a fresh live reading every account is level and this is plain LRU."""
     state = reverify_auth_bank(state, now)
     names = accounts() if names is None else names
+    deltas = pace_deltas(now) if deltas is None else deltas
+    band = 10.0
+
+    def group(n: str) -> int:
+        d = deltas.get(n)
+        return 0 if d is None else (-1 if d < -band else 1 if d > band else 0)
+
     order = sorted((n for n in names if available(n, state, now)),
-                   key=lambda n: float(state.get(n, {}).get("lastUsed") or 0))
+                   key=lambda n: (group(n), float(state.get(n, {}).get("lastUsed") or 0)))
     for name in order:
         handle = lease(name)
         if handle is not None:
@@ -1032,7 +1074,11 @@ def run(args) -> int:
     if subscription_pool_mode():
         reconcile()
     last = Path(args.cwd or ".") / ".codex-last-message.txt"
-    base = [cli(), "exec", "--ignore-user-config", "--skip-git-repo-check", "--ephemeral",
+    # Lane runs need no connectors: the curated Stripe plugin MCP answered AuthRequired on every
+    # run and a lane fix-red run failed on it. Disable the plugin/apps surfaces instead of
+    # giving them credentials.
+    base = [cli(), "exec", "--ignore-user-config", "--disable", "plugins", "--disable", "remote_plugin",
+            "--disable", "apps", "--skip-git-repo-check", "--ephemeral",
             "--dangerously-bypass-approvals-and-sandbox", "--color", "never", "-o", str(last)]
     if current_login_mode():
         base.remove("--dangerously-bypass-approvals-and-sandbox")

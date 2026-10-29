@@ -6,6 +6,7 @@ import {
 } from '@/components/atoms/ArtworkFrame';
 import { Icon } from '@/components/atoms/Icon';
 import { APP_ROUTES } from '@/constants/routes';
+import { viaJovieHref } from '@/lib/growth/loop-links';
 import { cn } from '@/lib/utils';
 
 interface SmartLinkAmbientGlowProps {
@@ -100,14 +101,26 @@ export function SmartLinkArtistName({
 const FOOTER_LINK_CLASSES =
   'inline-flex items-center text-2xs uppercase tracking-widest text-neutral-700 hover:text-neutral-950 dark:text-muted-foreground dark:hover:text-foreground/90';
 
+/**
+ * Abuse-report entry point for a smart link. The target must identify the
+ * exact page being reported: a bare slug is ambiguous across artists, so
+ * callers pass the public path (`/{handle}/{slug}`).
+ */
+export function buildSmartLinkReportHref(reportTarget?: string | null): string {
+  const base = `${APP_ROUTES.REPORT}?type=smart_link`;
+  const target = reportTarget?.trim();
+  return target ? `${base}&target=${encodeURIComponent(target)}` : base;
+}
+
 export function SmartLinkPoweredByFooter({
-  reportHref = `${APP_ROUTES.REPORT}?type=smart_link`,
-}: Readonly<{ reportHref?: string }>) {
+  reportTarget,
+}: Readonly<{ reportTarget?: string | null }>) {
+  const reportHref = buildSmartLinkReportHref(reportTarget);
   return (
     <footer className='shrink-0 pb-5 pt-3 text-center'>
       <div className='inline-flex items-center gap-2'>
         <Link
-          href='/'
+          href={viaJovieHref('footer')}
           className={`smart-link-powered-by gap-1 ${FOOTER_LINK_CLASSES}`}
         >
           <span>Powered by</span>

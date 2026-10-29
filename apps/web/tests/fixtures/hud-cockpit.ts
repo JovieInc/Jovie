@@ -51,6 +51,7 @@ export const cockpitShipping = {
     inFlight: { value: 1 },
     merges: { last7Days: { value: 12 }, prior7Days: { value: 10 } },
     production: { behindMain: { value: 3 } },
+    lanes: { deployHealth: null },
   },
   ciGreen: { value: true },
 } as unknown as ShippingStateView;

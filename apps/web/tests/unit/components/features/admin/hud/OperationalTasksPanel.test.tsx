@@ -209,9 +209,35 @@ describe('OperationalTasksPanelView', () => {
 
     expect(screen.getByText('Sync Failed')).toBeInTheDocument();
     expect(
-      screen.getByText('Task cache unavailable. Retrying automatically.')
+      screen.getByText(
+        'Task cache unavailable. Active tasks are unknown. Retrying automatically.'
+      )
     ).toBeInTheDocument();
     expect(screen.queryByText('JOV-5544')).not.toBeInTheDocument();
+  });
+
+  it('never renders the empty state on a stale cache', () => {
+    render(
+      <OperationalTasksPanelView
+        feed={feed({ syncState: 'stale', tasks: [], deltas: [] })}
+      />
+    );
+
+    expect(screen.getByText('Stale Cache')).toBeInTheDocument();
+    expect(
+      screen.queryByText('No active operational tasks.')
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/Active tasks are unknown/)).toBeInTheDocument();
+  });
+
+  it('renders the empty state only on a fresh cache', () => {
+    render(
+      <OperationalTasksPanelView feed={feed({ tasks: [], deltas: [] })} />
+    );
+
+    expect(
+      screen.getByText('No active operational tasks.')
+    ).toBeInTheDocument();
   });
 
   describe('inspect and canonical recovery', () => {
