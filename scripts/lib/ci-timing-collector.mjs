@@ -87,6 +87,54 @@ function normalizeStart(run, job) {
 }
 
 /**
+ * Seconds from job created_at (queued for a runner) to started_at.
+ * @param {{ created_at?: string | null, started_at?: string | null }} job
+ */
+export function queueWaitSeconds(job) {
+  const created = job.created_at ? ms(job.created_at) : null;
+  const started = job.started_at ? ms(job.started_at) : null;
+  if (created === null || started === null) return null;
+  return Math.max(0, (started - created) / 1000);
+}
+
+const SELF_HOSTED_LABELS = new Set(['self-hosted', 'jovie-fixed']);
+
+/**
+ * Runner pool a job asked for: 'self-hosted' (gem jovie-fixed pool) or
+ * 'hosted' (GitHub-hosted). Same rule as throughput_sentinel.runner_pool.
+ * @param {string[] | undefined} labels
+ */
+export function runnerPool(labels) {
+  return (labels ?? []).some(label =>
+    SELF_HOSTED_LABELS.has(String(label).toLowerCase())
+  )
+    ? 'self-hosted'
+    : 'hosted';
+}
+
+/**
+ * Queue-wait p50/p95 (seconds) per runner pool over job_attempt rows.
+ * @param {Array<{ row_type?: string, runner_pool?: string, queue_wait_s?: number | null }>} rows
+ */
+export function poolQueueWait(rows) {
+  /** @type {Record<string, number[]>} */
+  const byPool = {};
+  for (const row of rows) {
+    if (row.row_type !== 'job_attempt' || typeof row.queue_wait_s !== 'number')
+      continue;
+    (byPool[row.runner_pool ?? 'hosted'] ??= []).push(row.queue_wait_s);
+  }
+  return Object.fromEntries(
+    Object.entries(byPool).map(([pool, waits]) => {
+      const sorted = [...waits].sort((a, b) => a - b);
+      const at = p =>
+        sorted[Math.min(sorted.length - 1, Math.ceil(p * sorted.length) - 1)];
+      return [pool, { n: sorted.length, p50S: at(0.5), p95S: at(0.95) }];
+    })
+  );
+}
+
+/**
  * @param {{ run: any, job: any, collectedAt: string, prNumber?: number | null }} args
  */
 export function jobAttemptRow({ run, job, collectedAt, prNumber }) {
@@ -114,6 +162,8 @@ export function jobAttemptRow({ run, job, collectedAt, prNumber }) {
     completed_at: job.completed_at ?? null,
     conclusion: job.conclusion ?? null,
     runner_name: job.runner_name ?? null,
+    runner_pool: runnerPool(job.labels),
+    queue_wait_s: queueWaitSeconds(job),
     collected_at: collectedAt,
   };
 }

@@ -77,6 +77,7 @@ import {
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
+import { fixChatHref, fixForRow } from '@/lib/presence-loop/adapter';
 import type { SourceIdentity } from '@/lib/profile-surfaces/presence-identity';
 import {
   getPresenceEntityName,
@@ -1601,6 +1602,12 @@ function ProfilesWorkspaceContent({
           }
           router.push(connection.url);
         },
+        onFix: fixForRow(row, 'personal')
+          ? connection => {
+              const fix = fixForRow(connection, 'personal');
+              if (fix) router.push(fixChatHref(fix));
+            }
+          : undefined,
         onPrimaryAction: connection => {
           const action = getConnectionPrimaryAction(connection);
           if (action === 'review' && connection.rowType === 'surface') {

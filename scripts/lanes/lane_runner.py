@@ -177,7 +177,7 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", # Shared client layer (budgeted 
                   "scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
                   "scripts/lib/merge-group-ahead-attribution.mjs",
                   "scripts/lib/merge-group-admission.mjs",
-                  "scripts/lib/source-admission-policy.mjs", "scripts/pr-fleet-rules.mjs",
+                  "scripts/lib/source-admission-policy.mjs", "scripts/pr-fleet-rules.mjs", "scripts/lib/wins-ledger.mjs",
                   "scripts/lib/merge-group-member-policy.mjs",
                   "scripts/lib/product-lane-classifier.mjs",
                   "scripts/lib/pr-size-guard-policy.mjs", "scripts/lib/repo-hygiene-limits.mjs",

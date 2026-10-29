@@ -3075,6 +3075,39 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         self.assertEqual(events.repair_evidence_body(self.PR, updated,
                                                    customer_decision={"releaseWorthy": False}), updated)
 
+    def test_explicit_locking_pr_repairs_missing_provenance_and_passes_fleet(self):
+        body = events.red_before_green_block(self.PR)
+        updated = events.repair_evidence_body(self.PR, body, locking_pr=23295,
+                                              customer_decision={"releaseWorthy": False})
+        checked = subprocess.run(
+            ["node", "--input-type=module", "-e", r"""
+                import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+                import { readFileSync } from 'node:fs';
+                const body = readFileSync(0, 'utf8');
+                const check = body => evaluateFleetRules({
+                    pr: { title: 'fix: repair secret metadata evidence', body },
+                    files: [{ filename: 'ops/registry/secrets-lint-baseline.json', status: 'added' }],
+                }).errors;
+                process.stdout.write(JSON.stringify({ repaired: check(body),
+                    missing: check(body.replace(/## Locked areas[\s\S]*/, '')) }));
+            """], cwd=ROOT, input=updated, text=True, capture_output=True, check=True,
+        )
+        result = json.loads(checked.stdout)
+        self.assertEqual(result["repaired"], [])
+        self.assertTrue(any(error.startswith("locked-areas:") for error in result["missing"]))
+        self.assertEqual(events.repair_evidence_body(self.PR, updated, locking_pr=23295), updated)
+        self.assertEqual(updated.count("customer-changelog/v1"), 1)
+
+    def test_locking_reference_is_explicit_validated_and_never_overwrites_authority(self):
+        body = events.red_before_green_block(self.PR)
+        self.assertNotIn("## Locked areas", events.repair_evidence_body(self.PR, body))
+        for reference in ("GBrain: security/secrets-audit", "Locking PR: #123", "GBrain: <slug>"):
+            original = body + "\n## Locked areas\n" + reference + "\n"
+            self.assertEqual(events.repair_evidence_body(self.PR, original, locking_pr=23295), original)
+        for invalid in (0, -1, True, "23295"):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                events.repair_evidence_body(self.PR, body, locking_pr=invalid)
+
     def test_public_decision_round_trips_without_comment_injection(self):
         decision = {"releaseWorthy": True, "text": "Choose a link --> continue"}
         updated = events.repair_evidence_body(self.PR, "Summary", customer_decision=decision)
@@ -3110,6 +3143,18 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         self.assertEqual(len(written), 1)
         self.assertTrue(events.red_section_complete(written[0]))
         self.assertIn('<!-- customer-changelog/v1 {"releaseWorthy":false} -->', written[0])
+
+    def test_ensure_writes_explicit_locking_provenance_without_a_red_run(self):
+        written = []
+
+        def shell(args):
+            if args[:2] == ["pr", "view"]:
+                return SimpleNamespace(returncode=0, stdout="Summary")
+            written.append(Path(args[args.index("--body-file") + 1]).read_text())
+            return SimpleNamespace(returncode=0, stdout="")
+
+        self.assertTrue(events.ensure_red_before_green({"number": 23295}, sh=shell, locking_pr=23295))
+        self.assertEqual(written, ["Summary\n\n## Locked areas\n\nLocking PR: #23295\n"])
 
     def test_ensure_edits_only_an_incomplete_body(self):
         for body, edits in (("## Summary\nx", 1), (events.red_before_green_block(self.PR), 0)):
