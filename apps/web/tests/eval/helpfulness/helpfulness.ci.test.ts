@@ -28,9 +28,7 @@ describe('helpfulness case set', () => {
     expect(HELPFULNESS_EVAL_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}\.\d+$/);
     const ids = HELPFULNESS_CASES.map(c => c.id);
     expect(new Set(ids).size).toBe(ids.length);
-    const { MAX_CASES_PER_RUN, selectCases } = await import(
-      '../../../scripts/jovie-helpfulness-eval'
-    );
+    const { MAX_CASES_PER_RUN, selectCases } = await import('./run');
     expect(ids.length).toBeLessThanOrEqual(MAX_CASES_PER_RUN);
     expect(selectCases({ subset: 'ci', cases: [] }).length).toBeGreaterThan(4);
   });
@@ -126,9 +124,7 @@ describe('judge contract', () => {
 
 describe('spend guards', () => {
   it('refuses AI Gateway credentials unless explicitly allowed', async () => {
-    const { assertNoGatewaySpend } = await import(
-      '../../../scripts/jovie-helpfulness-eval'
-    );
+    const { assertNoGatewaySpend } = await import('./run');
     expect(() =>
       assertNoGatewaySpend(
         { AI_GATEWAY_API_KEY: 'k' } as NodeJS.ProcessEnv,

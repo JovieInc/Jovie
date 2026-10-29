@@ -38,18 +38,15 @@ import {
   ASSISTANT_REPLY_FALLBACK,
   gateAssistantReply,
 } from '@/lib/chat/voice-lint';
-import {
-  HELPFULNESS_CASES,
-  type HelpfulnessCase,
-} from '../tests/eval/helpfulness/cases';
-import { buildEvalToolSpecs } from '../tests/eval/helpfulness/eval-tools';
-import { buildFixture } from '../tests/eval/helpfulness/fixtures';
+import { HELPFULNESS_CASES, type HelpfulnessCase } from './cases';
+import { buildEvalToolSpecs } from './eval-tools';
+import { buildFixture } from './fixtures';
 import {
   HELPFULNESS_METRIC_SLUG,
   type HelpfulnessRunRow,
   parseHistory,
   renderMetricPage,
-} from '../tests/eval/helpfulness/publish';
+} from './publish';
 import {
   buildJudgePrompt,
   type CaseResult,
@@ -61,8 +58,8 @@ import {
   runHardChecks,
   scoreCase,
   summarize,
-} from '../tests/eval/helpfulness/scoring';
-import { HELPFULNESS_EVAL_VERSION } from '../tests/eval/helpfulness/spec';
+} from './scoring';
+import { HELPFULNESS_EVAL_VERSION } from './spec';
 import {
   type WaiMessage,
   WORKERS_AI_CHEAP_JUDGE,
@@ -70,7 +67,7 @@ import {
   WORKERS_AI_SUBJECT_MODEL,
   type WorkersAiConfig,
   workersAiChat,
-} from '../tests/eval/helpfulness/workers-ai';
+} from './workers-ai';
 
 /** Hard cap on cases per run so a loop can never fan out unbounded spend. */
 export const MAX_CASES_PER_RUN = 30;
@@ -380,7 +377,12 @@ async function calibrate(chat: Chat, judges: readonly string[]): Promise<void> {
           today: now.toISOString().slice(0, 10),
           reply: example.reply,
         })
-      ).catch(() => null);
+      ).catch(error => {
+        process.stderr.write(
+          `calibrate ${model} ${example.id}: ${String(error).slice(0, 300)}\n`
+        );
+        return null;
+      });
       const want = judgeScore(example.reference);
       const got = verdict ? judgeScore(verdict.scores) : null;
       return { id: example.id, want, got };
@@ -550,7 +552,7 @@ async function main(): Promise<void> {
   }
 }
 
-if (process.argv[1]?.endsWith('jovie-helpfulness-eval.ts')) {
+if (process.argv[1]?.endsWith('helpfulness/run.ts')) {
   main().catch(error => {
     process.stderr.write(`${String(error)}\n`);
     process.exit(1);

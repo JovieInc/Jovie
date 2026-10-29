@@ -76,7 +76,7 @@ export function renderMetricPage(
 
   return `# Jovie helpfulness (tracked metric)
 
-Owner: Summer. Source: \`apps/web/scripts/jovie-helpfulness-eval.ts\` in JovieInc/Jovie (synthetic artists, Workers AI only).
+Owner: Summer. Source: \`apps/web/tests/eval/helpfulness/run.ts\` in JovieInc/Jovie (synthetic artists, Workers AI only).
 Target: score >= 85 and pass rate >= 85% on the current eval version. Compare runs only within one version and judge.
 
 ## Latest
