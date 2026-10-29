@@ -10,17 +10,6 @@ interface ArtistNotificationsHeroProps {
   readonly hero: ArtistNotificationsLandingCopy['hero'];
 }
 
-const CARD_POSITIONS: Record<
-  ArtistNotificationsLandingCopy['hero']['floatingCards'][number]['kind'],
-  string
-> = {
-  capture: 'system-b-artist-notifications-card-capture',
-  subscribe: 'system-b-artist-notifications-card-subscribe',
-  email: 'system-b-artist-notifications-card-email',
-  click: 'system-b-artist-notifications-card-click',
-  outcome: 'system-b-artist-notifications-card-outcome',
-};
-
 export function ArtistNotificationsHero({
   hero,
 }: Readonly<ArtistNotificationsHeroProps>) {
@@ -97,7 +86,7 @@ export function ArtistNotificationsHero({
             {hero.floatingCards.map(card => (
               <div
                 key={card.id}
-                className={`system-b-artist-notifications-card-position ${CARD_POSITIONS[card.kind]}`}
+                className='system-b-artist-notifications-card-position'
               >
                 <ArtistNotificationFloatingCardView card={card} />
               </div>

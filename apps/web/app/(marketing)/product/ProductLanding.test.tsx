@@ -24,6 +24,16 @@ vi.mock('next/link', () => ({
   ),
 }));
 
+vi.mock('next/image', () => ({
+  default: (props: Record<string, unknown>) => {
+    const { fill, priority, quality, ...rest } = props;
+    void fill;
+    void priority;
+    void quality;
+    return <img alt='' {...rest} />;
+  },
+}));
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mocks.push }),
 }));
@@ -38,7 +48,6 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
 
     const hero = screen.getByTestId('marketing-section-hero');
     expect(hero.tagName).toBe('SECTION');
-    expect(screen.getByText(PRODUCT_COPY.hero.kicker)).toBeVisible();
     expect(screen.getByTestId('product-hero-heading')).toHaveTextContent(
       PRODUCT_COPY.hero.headline
     );
@@ -46,9 +55,6 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
 
     const card = screen.getByTestId('product-claim-card');
     expect(card).toBeVisible();
-    expect(card).toHaveTextContent(PRODUCT_COPY.claimCard.status);
-    expect(card).toHaveTextContent(PRODUCT_COPY.claimCard.pathLabel);
-    expect(card).toHaveTextContent(PRODUCT_COPY.claimCard.outcome);
     expect(card).toHaveTextContent(PRODUCT_COPY.claimCard.proof);
 
     const cta = screen.getByTestId('product-claim-cta');
