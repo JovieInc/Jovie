@@ -26,6 +26,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
+from atomic_state import atomic_write_text  # noqa: E402
 import model_families as MF  # noqa: E402
 
 INTERVAL_S = 24 * 3600
@@ -124,11 +125,11 @@ def open_pr(repo: Path, evidence: dict, now: float, run=subprocess.run, gh=None)
         remote = _git(["ls-remote", "--heads", "origin", branch], repo, run)
         if branch in remote.stdout:
             return {"status": "pr-exists", "branch": branch}
-        (wt / "ops/registry/capacity.json").write_text(result["capacityText"])
-        (wt / "scripts/backlog-orchestrator/config/model-registry.json").write_text(result["modelsText"])
+        atomic_write_text(wt / "ops/registry/capacity.json", result["capacityText"])
+        atomic_write_text(wt / "scripts/backlog-orchestrator/config/model-registry.json", result["modelsText"])
         log = wt / CHANGELOG
         log.parent.mkdir(parents=True, exist_ok=True)
-        log.write_text((log.read_text() if log.exists() else "") + changelog_lines(result["moves"], result["events"], stamp))
+        atomic_write_text(log, (log.read_text() if log.exists() else "") + changelog_lines(result["moves"], result["events"], stamp))
         import subprocess as _sp  # noqa: PLC0415
         for cmd in (["node", "scripts/capacity-registry.mjs", "canon", "--write"],):
             _sp.run(cmd, cwd=str(wt), capture_output=True, text=True, timeout=120)

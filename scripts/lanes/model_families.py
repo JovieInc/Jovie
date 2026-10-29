@@ -28,6 +28,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
+sys.path.insert(0, str(HERE))
+from atomic_state import atomic_write_text  # noqa: E402
 CAPACITY_PATH = ROOT / "ops/registry/capacity.json"
 MODEL_REGISTRY_PATH = ROOT / "scripts/backlog-orchestrator/config/model-registry.json"
 PROVIDERS_PATH = ROOT / "packages/api-client/providers.json"
@@ -342,8 +344,8 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"source": "gateway", "failed": type(error).__name__}), file=sys.stderr)
     result = sync(capacity_text, models_text, collect(gateway, read_codex(Path(args.codex_cache))), now)
     if args.write and result["changed"]:
-        CAPACITY_PATH.write_text(result["capacityText"])
-        MODEL_REGISTRY_PATH.write_text(result["modelsText"])
+        atomic_write_text(CAPACITY_PATH, result["capacityText"])
+        atomic_write_text(MODEL_REGISTRY_PATH, result["modelsText"])
     print(json.dumps({k: result[k] for k in ("events", "moves", "alarms", "changed")}, indent=2))
     return 0
 
