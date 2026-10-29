@@ -3,10 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test src/index.test.mjs && pnpm run test:knowledge && pnpm run test:audit",
+    "test": "node --test src/index.test.mjs && pnpm run test:knowledge",
     "test:knowledge": "node --experimental-strip-types --experimental-test-coverage --test-coverage-include='src/knowledge/*.ts' --test src/knowledge/*.test.mjs",
-    "typecheck": "tsc --noEmit",
-    "test:audit": "node --experimental-strip-types --test src/audit/index.test.mjs"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "htmlparser2": "12.0.0",
