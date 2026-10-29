@@ -1,39 +1,12 @@
 import 'server-only';
-import type { MarketingHeaderChromeNav } from '@/components/site/MarketingHeader';
-import type {
-  MarketingFooterColumn,
-  MarketingFooterLink,
-} from '@/data/marketingNavigation';
-import { SITE_CHROME_KIND, type SiteChrome } from './site-chrome';
+import {
+  type ResolvedSiteChrome,
+  SITE_CHROME_KIND,
+  toResolvedSiteChrome,
+} from './site-chrome';
 import { getLiveContent } from './store.server';
 
-/** Serializable chrome props for the shared public shell. */
-export interface ResolvedSiteChrome {
-  readonly nav: MarketingHeaderChromeNav;
-  readonly footerColumns: readonly MarketingFooterColumn[];
-  readonly legalLinks: readonly MarketingFooterLink[];
-}
-
-export function toResolvedSiteChrome(chrome: SiteChrome): ResolvedSiteChrome {
-  return {
-    nav: {
-      primary: chrome.nav.primary.map(({ href, label }) => ({ href, label })),
-      customers: chrome.nav.customers.map(({ href, label }) => ({
-        href,
-        label,
-      })),
-    },
-    legalLinks: chrome.footer.legal.map(({ href, label }) => ({ href, label })),
-    footerColumns: chrome.footer.columns.map(column => ({
-      title: column.title,
-      links: column.links.map(({ href, label }) => ({
-        href,
-        label,
-        external: /^https?:\/\//i.test(href) || undefined,
-      })),
-    })),
-  };
-}
+export { type ResolvedSiteChrome, toResolvedSiteChrome };
 
 /**
  * The published site chrome (header nav + footer), or the code default.

@@ -1,6 +1,11 @@
 import { lintCopy } from '@jovie/copy';
 import { z } from 'zod';
+import type { MarketingHeaderChromeNav } from '@/components/site/MarketingHeader';
 import { isNavigationEligiblePath } from '@/data/marketing/featureAvailability';
+import type {
+  MarketingFooterColumn,
+  MarketingFooterLink,
+} from '@/data/marketingNavigation';
 import type { ContentKindDefinition } from './kind';
 
 /**
@@ -332,3 +337,31 @@ export const SITE_CHROME_KIND: ContentKindDefinition<SiteChrome> = {
   // revalidate the layout tree rather than naming routes.
   livePaths: () => ['/'],
 };
+
+/** Serializable chrome props for the shared public shell. */
+export interface ResolvedSiteChrome {
+  readonly nav: MarketingHeaderChromeNav;
+  readonly footerColumns: readonly MarketingFooterColumn[];
+  readonly legalLinks: readonly MarketingFooterLink[];
+}
+
+export function toResolvedSiteChrome(chrome: SiteChrome): ResolvedSiteChrome {
+  return {
+    nav: {
+      primary: chrome.nav.primary.map(({ href, label }) => ({ href, label })),
+      customers: chrome.nav.customers.map(({ href, label }) => ({
+        href,
+        label,
+      })),
+    },
+    legalLinks: chrome.footer.legal.map(({ href, label }) => ({ href, label })),
+    footerColumns: chrome.footer.columns.map(column => ({
+      title: column.title,
+      links: column.links.map(({ href, label }) => ({
+        href,
+        label,
+        external: /^https?:\/\//i.test(href) || undefined,
+      })),
+    })),
+  };
+}

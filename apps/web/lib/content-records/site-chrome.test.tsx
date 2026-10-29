@@ -109,4 +109,15 @@ describe('site-chrome content kind', () => {
     const kind = getContentKind('site-chrome')!;
     expect(kind.smoke?.(clone(), 'main')).toEqual([]);
   });
+
+  it('render smoke test reports a missing legal link', () => {
+    const kind = getContentKind('site-chrome')!;
+    const chrome = clone();
+    chrome.footer.legal = chrome.footer.legal.filter(
+      link => link.href !== '/legal/terms'
+    );
+    expect(kind.smoke?.(chrome, 'main')).toContain(
+      'footer.legal: /legal/terms missing'
+    );
+  });
 });
