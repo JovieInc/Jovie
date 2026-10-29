@@ -1737,10 +1737,16 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
+      - name: Generate existing release-writer token
+        id: stale-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
       - name: Check unpublished release-worthy changes
         id: stale
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.stale-token.outputs.token }}
         run: node scripts/changelog-staleness.mjs
       - name: File or resolve staleness remediation
         env:
