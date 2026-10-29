@@ -2257,6 +2257,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/content-records/stage-events/route.ts",
+      "kind": "handler",
+      "route": "/api/content-records/stage-events",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/create-tip-intent/route.ts",
       "kind": "handler",
       "route": "/api/create-tip-intent",
