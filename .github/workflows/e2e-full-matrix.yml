@@ -1,11 +1,12 @@
 name: E2E Full Browser Matrix
 
 on:
-  push:
-    branches: [main]
-    # Every main push must enter the concurrency group below. A path-filtered
-    # push cannot supersede an older matrix, leaving the external stale-run
-    # sweep to kill its runners and misreport the cancellation as a failure.
+  # Daily via the Gem lanes clock (repository_dispatch clock_e2e_full_matrix;
+  # JOV-INV-042 freezes GitHub crons). Running the 8-shard matrix on every
+  # main push spent ~110k runner-minutes a month and no run passed in 30 days;
+  # one daily run on main HEAD keeps the evidence and the remediation intake.
+  repository_dispatch:
+    types: [clock_e2e_full_matrix]
   workflow_dispatch:
     inputs:
       test_filter:
@@ -18,12 +19,11 @@ permissions:
   contents: read
 
 concurrency:
-  # Every main push joins this group so an external sweep cannot kill a
-  # non-member mid-test. cancel-in-progress stays false so the active run
-  # finishes and reports failure or success. GitHub still cancels the
-  # previously pending run when a newer push queues, leaving one successor.
-  # No clock trigger: execution follows changed evidence, and a cron would
-  # fail the frozen clock gate.
+  # Every run joins this group so an external sweep cannot kill a non-member
+  # mid-test. cancel-in-progress stays false so the active run finishes and
+  # reports failure or success; a clock or manual run arriving meanwhile waits
+  # as the single pending successor. No GitHub cron (frozen clock gate): the
+  # Gem lanes clock dispatches it daily.
   group: e2e-full-matrix-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: false
 
@@ -31,7 +31,7 @@ jobs:
   build-web:
     name: Build standalone E2E server
     # A filtered manual diagnostic retains the existing managed dev server.
-    if: ${{ github.event_name == 'push' || github.event.inputs.test_filter == '' }}
+    if: ${{ github.event_name == 'repository_dispatch' || github.event.inputs.test_filter == '' }}
     environment: Preview – jovie
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -110,7 +110,7 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Create ephemeral Neon database branch
-        if: ${{ matrix.shard == 1 || github.event_name == 'push' || github.event.inputs.test_filter == '' }}
+        if: ${{ matrix.shard == 1 || github.event_name == 'repository_dispatch' || github.event.inputs.test_filter == '' }}
         id: neon-branch
         uses: ./.github/actions/neon-create-branch-with-retry
         with:
@@ -121,7 +121,7 @@ jobs:
           expires_in_hours: '3'
 
       - name: Run database migrations
-        if: ${{ matrix.shard == 1 || github.event_name == 'push' || github.event.inputs.test_filter == '' }}
+        if: ${{ matrix.shard == 1 || github.event_name == 'repository_dispatch' || github.event.inputs.test_filter == '' }}
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
@@ -131,20 +131,20 @@ jobs:
 
 
       - name: Download standalone E2E server
-        if: ${{ github.event_name == 'push' || github.event.inputs.test_filter == '' }}
+        if: ${{ github.event_name == 'repository_dispatch' || github.event.inputs.test_filter == '' }}
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: e2e-web-server-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}
 
       - name: Extract standalone E2E server
-        if: ${{ github.event_name == 'push' || github.event.inputs.test_filter == '' }}
+        if: ${{ github.event_name == 'repository_dispatch' || github.event.inputs.test_filter == '' }}
         run: |
           tar -xzf "$RUNNER_TEMP/e2e-web-server.tgz" -C apps/web
           test -f apps/web/.next/standalone/apps/web/server.js
 
       - name: Seed full-matrix QA data
-        if: ${{ github.event_name == 'push' || github.event.inputs.test_filter == '' }}
+        if: ${{ github.event_name == 'repository_dispatch' || github.event.inputs.test_filter == '' }}
         run: |
           cd apps/web
           pnpm run seed:test-data
@@ -156,7 +156,7 @@ jobs:
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
 
       - name: Start standalone E2E server
-        if: ${{ github.event_name == 'push' || github.event.inputs.test_filter == '' }}
+        if: ${{ github.event_name == 'repository_dispatch' || github.event.inputs.test_filter == '' }}
         run: |
           cd apps/web
           rm -rf .next/standalone/apps/web/.next/static .next/standalone/apps/web/public
@@ -236,7 +236,7 @@ jobs:
           URL_ENCRYPTION_KEY: e2e-full-matrix-url-encryption-key
 
       - name: Seed authenticated release fixtures
-        if: ${{ github.event_name == 'push' || github.event.inputs.test_filter == '' }}
+        if: ${{ github.event_name == 'repository_dispatch' || github.event.inputs.test_filter == '' }}
         run: pnpm --filter=@jovie/web run seed:test-data --ready-creator-releases-only
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
@@ -261,7 +261,7 @@ jobs:
         run: pnpm --filter=@jovie/web exec playwright install chromium ${{ matrix.browser }} --with-deps
 
       - name: Run E2E tests (${{ matrix.browser }})
-        if: ${{ matrix.shard == 1 || github.event_name == 'push' || github.event.inputs.test_filter == '' }}
+        if: ${{ matrix.shard == 1 || github.event_name == 'repository_dispatch' || github.event.inputs.test_filter == '' }}
         id: e2e-matrix
         run: |
           set -o pipefail
@@ -280,8 +280,8 @@ jobs:
             node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --ignore-snapshots --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/4 --grep-invert "@red|candidate-bound Better Auth OAuth runtime|Authenticated prod chat turn" --reporter=line 2>&1 | tee "$log"
           fi
         env:
-          BASE_URL: ${{ (github.event_name == 'push' || github.event.inputs.test_filter == '') && 'http://127.0.0.1:3100' || '' }}
-          E2E_SKIP_WEB_SERVER: ${{ (github.event_name == 'push' || github.event.inputs.test_filter == '') && '1' || '0' }}
+          BASE_URL: ${{ (github.event_name == 'repository_dispatch' || github.event.inputs.test_filter == '') && 'http://127.0.0.1:3100' || '' }}
+          E2E_SKIP_WEB_SERVER: ${{ (github.event_name == 'repository_dispatch' || github.event.inputs.test_filter == '') && '1' || '0' }}
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
           PROFILE_CTA_TEST_FILTER: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter || '' }}
           PROFILE_CTA_NEON_BRANCH_ID: ${{ steps.neon-branch.outputs.branch_id }}
@@ -358,7 +358,7 @@ jobs:
   notify:
     name: Notify Results
     needs: [build-web, e2e-full-matrix]
-    if: ${{ always() && github.event_name == 'push' }}
+    if: ${{ always() && github.event_name == 'repository_dispatch' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

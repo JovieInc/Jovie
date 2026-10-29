@@ -79,6 +79,16 @@ CLOCKS = (
     # applies unless client_payload.apply is false; the bot token cannot send workflow_dispatch.
     Clock("staleBranchSweep", "stale-branch-sweep.yml", "clock_stale_branch_sweep", 7 * 86400,
           "stale-branch-sweep-clock.json", github_cron=False),
+    # Daily deep evidence on main HEAD (waste audit 2026-10-29): these ran on every main
+    # push and were mostly cancelled or always red. One run a day is the same evidence.
+    Clock("nightlyTests", "nightly-tests.yml", "clock_nightly_tests", 86400,
+          "nightly-tests-clock.json", github_cron=False),
+    Clock("e2eFullMatrix", "e2e-full-matrix.yml", "clock_e2e_full_matrix", 86400,
+          "e2e-full-matrix-clock.json", github_cron=False),
+    Clock("visualA11y", "visual-a11y.yml", "clock_visual_a11y", 86400,
+          "visual-a11y-clock.json", github_cron=False),
+    Clock("testCoverageAudit", "test-coverage-audit.yml", "clock_test_coverage_audit", 86400,
+          "test-coverage-audit-clock.json", github_cron=False),
     # Dependabot advisories reach no workflow event; the loop files/closes Linear work and
     # fails its ratchet step when an advisory ages past its SLA. Clock is its only backstop.
     Clock("securityAdvisory", "security-advisory-loop.yml", "clock_security_advisory_loop", 4 * 3600,

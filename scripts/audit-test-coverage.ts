@@ -763,7 +763,7 @@ ${mutationSection}
 
 ## Update Cadence
 
-Nightly cron at \`0 6 * * *\` UTC via \`.github/workflows/test-coverage-audit.yml\`. On-demand via \`pnpm tsx scripts/audit-test-coverage.ts\`.
+Daily via the Gem lanes clock (repository_dispatch \`clock_test_coverage_audit\`) in \`.github/workflows/test-coverage-audit.yml\`. On-demand via \`pnpm tsx scripts/audit-test-coverage.ts\`.
 `;
 }
 

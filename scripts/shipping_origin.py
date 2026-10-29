@@ -34,7 +34,7 @@ WORKFLOWS = {
     "sentry-autofix.yml": {"repository_dispatch"},
     "shipping-origin.yml": {"workflow_dispatch"},
     "shipping-slo.yml": {"schedule", "workflow_dispatch"},
-    "test-coverage-audit.yml": {"push", "schedule", "workflow_dispatch"},
+    "test-coverage-audit.yml": {"repository_dispatch", "push", "schedule", "workflow_dispatch"},
 }
 
 

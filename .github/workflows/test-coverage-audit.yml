@@ -4,8 +4,8 @@
 # revisit-trigger: Remove the report publication hop if the canonical coverage baseline becomes artifact-backed and no longer requires committed report files.
 # Test Coverage Audit
 #
-# PURPOSE: Regenerate docs/TEST_COVERAGE_HEATMAP.md when source, tests, or the
-# hand-curated docs/TEST_RISK_REGISTER.md changes.
+# PURPOSE: Regenerate docs/TEST_COVERAGE_HEATMAP.md daily from main HEAD
+# (source, tests and the hand-curated docs/TEST_RISK_REGISTER.md).
 #
 # Output: opens a draft report PR when values change and uploads resulting
 # unit coverage to Codecov. Normal CI and the native queue govern publication.
@@ -20,20 +20,12 @@
 name: Test Coverage Audit
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'apps/web/**'
-      - '!apps/web/reports/test-coverage-snapshot.json'
-      - 'packages/**'
-      - 'docs/TEST_RISK_REGISTER.md'
-      - 'scripts/audit-test-coverage.ts'
-      - 'scripts/lib/publish-coverage-report.mjs'
-      - 'sonar-project.properties'
-      - '.github/workflows/sonarcloud.yml'
-      - '.github/workflows/test-coverage-audit.yml'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
+  # Daily via the Gem lanes clock (repository_dispatch clock_test_coverage_audit;
+  # JOV-INV-042 freezes GitHub crons). Regenerating the heatmap on every
+  # apps/web push ran ~1,500 times and ~17k runner-minutes a month; exact-head
+  # coverage gates PRs separately, so the report only needs daily freshness.
+  repository_dispatch:
+    types: [clock_test_coverage_audit]
   workflow_dispatch:
     inputs:
       commit:
@@ -44,7 +36,7 @@ on:
 permissions: {}
 
 concurrency:
-  # GitHub replaces an older pending member when a newer main push arrives.
+  # GitHub replaces an older pending member when a newer run arrives.
   # cancel-in-progress: false protects the active coverage producer.
   group: test-coverage-audit
   cancel-in-progress: false
@@ -93,7 +85,7 @@ jobs:
       # Mint after the long coverage run so the installation token is fresh.
       # App-authored pushes trigger normal PR checks; GITHUB_TOKEN pushes do not.
       - name: Generate report publication token
-        if: ${{ github.event_name == 'push' || inputs.commit }}
+        if: ${{ github.event_name == 'repository_dispatch' || inputs.commit }}
         id: report-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
@@ -103,7 +95,7 @@ jobs:
           permission-pull-requests: write
 
       - name: Open coverage report PR
-        if: ${{ github.event_name == 'push' || inputs.commit }}
+        if: ${{ github.event_name == 'repository_dispatch' || inputs.commit }}
         env:
           GH_TOKEN: ${{ steps.report-token.outputs.token }}
         run: |
