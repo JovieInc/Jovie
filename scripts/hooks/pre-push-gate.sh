@@ -78,6 +78,8 @@ run_publication() {
     return 1
   fi
   git diff --check "${publication_base}..HEAD"
+  # Reuse the changed-file Biome guard so formatter failures never reach CI.
+  bash scripts/hooks/biome-pre-push.sh
   bash scripts/security/scan-secrets.sh publication origin/main
   node scripts/lib/policy-gate-liveness.mjs
   node --test scripts/hooks/pre-push-gate.test.mjs
