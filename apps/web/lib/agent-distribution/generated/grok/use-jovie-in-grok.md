@@ -1,14 +1,17 @@
-<!-- generated: version b17c4168cfb4, tools/list 4137a7fe333b43d1adaf5fdd14d3cfbd80092e4db74b89392773e7fb70064a16 -->
-# Use Jovie in Grok
+<!-- generated: version c58d6b87a6df, tools/list 4137a7fe333b43d1adaf5fdd14d3cfbd80092e4db74b89392773e7fb70064a16 -->
+
+# Jovie in Grok
 
 Find an artist and draft their Jovie page and release smart link. Nothing is published.
 
 ## Add the connector
 
-1. Open [grok.com/connectors](https://grok.com/connectors).
-2. Choose **New Connector**, then **Custom**.
-3. Enter the server URL: `https://jov.ie/api/mcp`
+1. Open grok.com/connectors.
+2. Choose New Connector, then Custom.
+3. Enter the server URL shown below.
 4. Save. No sign-in or API key is needed.
+
+Server URL: `https://jov.ie/api/mcp`
 
 ## Try it
 
@@ -24,9 +27,9 @@ Find an artist and draft their Jovie page and release smart link. Nothing is pub
 - `workspace.create_draft`: Create or resume an unpublished visibility draft using the exact artist_id and draft_token from artist.search_or_import. Retrying the same token resumes the same draft; a token for another artist is rejected. Never claims ownership, publishes or purchases.
 - `release.prepare_launch`: Resolve public release facts and create or resume an unpublished artist, release-page, and smart-link draft. Requires the draft capability. Returns only unresolved questions and never claims, publishes, or purchases.
 
-## Use it from the xAI API
+## Jovie in the xAI API
 
-Add this to the `tools` array of a Responses API request (see `xai-remote-mcp.json`):
+Add this entry to the tools array of a Responses API request. The same entry is in xai-remote-mcp.json.
 
 ```json
 {

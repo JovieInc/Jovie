@@ -1,6 +1,15 @@
 import { lintCopy } from '@jovie/copy';
 import { canonicalJson, hashTools, sha256 } from './hash';
 import type { Listing } from './listing';
+import {
+  bullets,
+  code,
+  comment,
+  fence,
+  heading,
+  numbered,
+  page,
+} from './markdown';
 
 export interface DistributionTool {
   readonly name: string;
@@ -156,7 +165,7 @@ export function buildDistribution(
       connectionType: 'Existing MCP',
       url: listing.mcpUrl,
       docsUrl: listing.docsUrl,
-      accessRequirements: 'None. No account or API key is needed to connect.',
+      accessRequirements: listing.accessRequirements,
       authentication: 'none',
     },
     tools: toolSummary,
@@ -167,40 +176,30 @@ export function buildDistribution(
     server_url: listing.mcpUrl,
     server_label: listing.serverLabel,
   };
-  const grokMd = `<!-- generated: version ${version('grok')}, tools/list ${toolsListHash} -->
-# Use Jovie in Grok
-
-${listing.oneLiner}
-
-## Add the connector
-
-1. Open [grok.com/connectors](https://grok.com/connectors).
-2. Choose **New Connector**, then **Custom**.
-3. Enter the server URL: \`${listing.mcpUrl}\`
-4. Save. No sign-in or API key is needed.
-
-## Try it
-
-${listing.examplePrompts.map(p => `- ${p}`).join('\n')}
-
-## Tools
-
-${tools.map(t => `- \`${t.name}\`: ${t.description}`).join('\n')}
-
-## Use it from the xAI API
-
-Add this to the \`tools\` array of a Responses API request (see \`xai-remote-mcp.json\`):
-
-\`\`\`json
-${JSON.stringify(grokServer, null, 2)}
-\`\`\`
-
-## Privacy and support
-
-- Privacy: ${listing.privacyUrl}
-- Terms: ${listing.termsUrl}
-- Support: ${listing.supportUrl}
-`;
+  const g = listing.grokPage;
+  const grokMd = page([
+    comment(
+      `generated: version ${version('grok')}, tools/list ${toolsListHash}`
+    ),
+    heading(1, g.title),
+    listing.oneLiner,
+    heading(2, g.addHeading),
+    numbered(g.steps),
+    [g.urlLabel, code(listing.mcpUrl)].join(': '),
+    heading(2, g.tryHeading),
+    bullets(listing.examplePrompts),
+    heading(2, g.toolsHeading),
+    bullets(tools.map(t => [code(t.name), t.description].join(': '))),
+    heading(2, g.apiHeading),
+    g.apiIntro,
+    fence('json', JSON.stringify(grokServer, null, 2)),
+    heading(2, g.supportHeading),
+    bullets([
+      [g.privacyLabel, listing.privacyUrl].join(': '),
+      [g.termsLabel, listing.termsUrl].join(': '),
+      [g.supportLabel, listing.supportUrl].join(': '),
+    ]),
+  ]);
 
   const chatgptRoot = 'chatgpt/jovie-agent';
   const toTest = (t: (typeof listing.positiveTests)[number]) => ({
@@ -253,11 +252,13 @@ ${JSON.stringify(grokServer, null, 2)}
             })),
           },
           commerce: false,
-          commerce_description:
-            'This plugin does not sell products or process payments. Tools only create unpublished drafts.',
+          commerce_description: listing.commerceDescription,
         },
         publication: {
-          release_notes: `Agent drafts: ${tools.map(t => t.name).join(', ')}.`,
+          release_notes: [
+            listing.releaseNotesLead,
+            tools.map(t => t.name).join(', '),
+          ].join(' '),
         },
       },
     },

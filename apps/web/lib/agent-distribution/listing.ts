@@ -94,6 +94,30 @@ export const LISTING = {
         'Does not reuse the token across artists. Runs a new search for the other artist, since a token for another artist is rejected.',
     },
   ],
+  grokPage: {
+    title: 'Jovie in Grok',
+    addHeading: 'Add the connector',
+    steps: [
+      'Open grok.com/connectors.',
+      'Choose New Connector, then Custom.',
+      'Enter the server URL shown below.',
+      'Save. No sign-in or API key is needed.',
+    ],
+    urlLabel: 'Server URL',
+    tryHeading: 'Try it',
+    toolsHeading: 'Tools',
+    apiHeading: 'Jovie in the xAI API',
+    apiIntro:
+      'Add this entry to the tools array of a Responses API request. The same entry is in xai-remote-mcp.json.',
+    supportHeading: 'Privacy and support',
+    privacyLabel: 'Privacy',
+    termsLabel: 'Terms',
+    supportLabel: 'Support',
+  },
+  commerceDescription:
+    'This plugin does not sell products or process payments. Tools only create unpublished drafts.',
+  accessRequirements: 'None. No account or API key is needed to connect.',
+  releaseNotesLead: 'Agent drafts:',
   categories: ['Entertainment', 'Productivity', 'Marketing'],
   useCases: [
     'Find an artist on Spotify or Apple Music and start an unpublished Jovie draft.',

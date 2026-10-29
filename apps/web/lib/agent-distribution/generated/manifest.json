@@ -1,7 +1,7 @@
 {
-  "version": "57bcf535a848",
+  "version": "66d1070a3f9c",
   "toolsListHash": "4137a7fe333b43d1adaf5fdd14d3cfbd80092e4db74b89392773e7fb70064a16",
-  "listingHash": "04a101da6aa5898fa4e1b5c99f5f3a29655f5e1c36d5f0ab902331345b2fe9c2",
+  "listingHash": "7883dee8a0ce9226462c05def64fcd2cae40c2fce1eab660e996c1b12b7363b6",
   "regenerate": "pnpm --filter @jovie/web agent-distribution:generate",
   "files": [
     "chatgpt/jovie-agent/assets/icon-dark.svg",
@@ -18,9 +18,9 @@
     "tools-list.snapshot.json"
   ],
   "versions": {
-    "muse": "4c4617c37ec9",
-    "grok": "b17c4168cfb4",
-    "chatgpt": "fd488bbac365",
-    "claude": "a302825843ff"
+    "muse": "067fb220a903",
+    "grok": "c58d6b87a6df",
+    "chatgpt": "597a6b37b4ef",
+    "claude": "4f27f87d6278"
   }
 }
