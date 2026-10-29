@@ -1,0 +1,16 @@
+{
+  "_generated": {
+    "version": "2c49b752dee5",
+    "toolsListHash": "4137a7fe333b43d1adaf5fdd14d3cfbd80092e4db74b89392773e7fb70064a16",
+    "listingHash": "04a101da6aa5898fa4e1b5c99f5f3a29655f5e1c36d5f0ab902331345b2fe9c2",
+    "regenerate": "pnpm --filter @jovie/web agent-distribution:generate"
+  },
+  "ready": false,
+  "blockers": [
+    "tool artist.search_or_import: no title in the registry (Claude and ChatGPT reviews expect one)",
+    "tool workspace.create_draft: no title in the registry (Claude and ChatGPT reviews expect one)",
+    "tool release.prepare_launch: no title in the registry (Claude and ChatGPT reviews expect one)",
+    "docsUrl points at /support: add a public docs page for the agent MCP before submission",
+    "icons: 512 and 1024 reuse the brand app icon; 48 and 64 PNGs still need to be exported (binary assets are blocked by repo-hygiene outside allowlisted paths)"
+  ]
+}
