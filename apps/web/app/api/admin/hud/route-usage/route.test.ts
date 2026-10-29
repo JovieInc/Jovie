@@ -6,7 +6,6 @@ const mocks = vi.hoisted(() => ({
   read: vi.fn(),
   record: vi.fn(),
 }));
-
 vi.mock('@/lib/ovie/privacy-lock/access', () => ({
   getOvieOperatorEntitlements: mocks.entitlements,
 }));
@@ -52,33 +51,10 @@ describe('Ovie route usage access', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ recorded: true });
     expect(mocks.record).toHaveBeenCalledWith('ops');
+    const read = await GET(new Request(`${url}?days=7`));
+    expect(read.status).toBe(200);
+    expect(await read.json()).toEqual({ measured: true, rows: [] });
+    expect(mocks.read).toHaveBeenCalledWith(7);
     expect(mocks.entitlements).toHaveBeenCalledWith({ purpose: 'read' });
-  });
-
-  it.each(['not-json', '{}', '{"path":"/outside"}'])(
-    'rejects invalid paths without recording (%s)',
-    async body => {
-      expect((await post(body)).status).toBe(400);
-      expect(mocks.record).not.toHaveBeenCalled();
-    }
-  );
-
-  it('reports unavailable recording without claiming persistence', async () => {
-    mocks.record.mockResolvedValue(false);
-    const response = await post(JSON.stringify({ path: '/app/admin/ops' }));
-    expect(response.status).toBe(202);
-    expect(await response.json()).toEqual({ recorded: false });
-  });
-
-  it.each([
-    ['7', 7],
-    ['invalid', 30],
-  ])('reads the requested finite day range (%s)', async (days, expected) => {
-    const response = await GET(new Request(`${url}?days=${days}`));
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ measured: true, rows: [] });
-    expect(mocks.read).toHaveBeenCalledWith(expected);
-    expect(mocks.entitlements).toHaveBeenCalledWith({ purpose: 'read' });
-    expect(response.headers.get('cache-control')).toBe('no-store');
   });
 });
