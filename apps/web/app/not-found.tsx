@@ -4,12 +4,13 @@ import { Container } from '@/components/site/Container';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
 import { NotFoundPageContent } from '@/components/site/NotFoundPageContent';
-import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
+import { getSiteChrome } from '@/lib/content-records/site-chrome.server';
 
-export default function NotFound() {
+export default async function NotFound() {
+  const chrome = await getSiteChrome();
   return (
     <div className='system-b-root-not-found-page system-b-marketing dark min-h-screen'>
-      <MarketingHeader logoSize='xs' variant='minimal' />
+      <MarketingHeader chromeNav={chrome.nav} logoSize='xs' variant='minimal' />
 
       <main
         id='main-content'
@@ -24,7 +25,8 @@ export default function NotFound() {
       </main>
 
       <MarketingFooter
-        genericCreatorNav={isCodeFlagEnabled('MARKETING_GENERIC_CREATOR_NAV')}
+        columns={chrome.footerColumns}
+        legalLinks={chrome.legalLinks}
       />
     </div>
   );
