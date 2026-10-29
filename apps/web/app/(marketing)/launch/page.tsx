@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import {
   MarketingContainer,
@@ -28,6 +29,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 import { AiDemo } from '@/features/home/AiDemo';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
+import { HOMEPAGE_PROFILE_PREVIEW_CATALOG } from '@/features/home/homepage-profile-preview-fixture';
 import { ProfileMockup } from '@/features/home/ProfileMockup';
 import { TIM_WHITE_PROFILE } from '@/features/home/tim-white';
 import {
@@ -194,44 +196,38 @@ const PROFILE_FEATURES = [
   { label: '1.4', title: 'Custom domains' },
 ] as const;
 
-const RELEASES = [
-  {
-    title: 'The Sound',
-    type: 'Single',
-    date: 'Mar 2018',
-    badge: 'Smart Link',
-    tone: 'live',
-    active: true,
-  },
-  {
-    title: 'Fading Light',
-    type: 'EP',
-    date: 'Nov 2019',
-    badge: 'Smart Link',
-    tone: 'blue',
-    active: false,
-  },
-  {
-    title: 'Where It Goes',
-    type: 'Single',
-    date: 'Jun 2020',
-    badge: 'Pro',
-    tone: 'green',
-    active: false,
-  },
-  {
-    title: 'Signals',
-    type: 'Album',
-    date: 'Feb 2022',
-    badge: 'Pro',
-    tone: 'purple',
-    active: false,
-  },
-] as const;
+const MONTH_YEAR = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+const LONG_DATE = new Intl.DateTimeFormat('en-US', {
+  month: 'long',
+  day: 'numeric',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+
+/** The same catalog the profile card shows, newest first, dated from now. */
+const RELEASE_BADGES = ['Smart Link', 'Smart Link', 'Pro'] as const;
+const RELEASES = HOMEPAGE_PROFILE_PREVIEW_CATALOG.map((release, index) => ({
+  title: release.title,
+  type: release.releaseType,
+  artworkUrl: release.artworkUrl,
+  date: MONTH_YEAR.format(new Date(release.releaseDate)),
+  badge: RELEASE_BADGES[index] ?? 'Pro',
+  active: index === 0,
+}));
+const LEAD_RELEASE = HOMEPAGE_PROFILE_PREVIEW_CATALOG[0];
+const LEAD_RELEASE_SLUG = LEAD_RELEASE.title.toLowerCase().replaceAll(' ', '-');
 
 const RELEASE_FIELDS = [
-  { label: 'Smart Link', value: 'jov.ie/tim/the-sound', isLink: true },
-  { label: 'Tracklist', value: '1. The Sound', isLink: false },
+  {
+    label: 'Smart Link',
+    value: `jov.ie/tim/${LEAD_RELEASE_SLUG}`,
+    isLink: true,
+  },
+  { label: 'Tracklist', value: `1. ${LEAD_RELEASE.title}`, isLink: false },
   {
     label: 'Matched Platforms',
     value: 'Spotify, Apple Music, YouTube Music, Tidal, Amazon Music, Deezer',
@@ -319,7 +315,7 @@ const AUDIENCE_ROWS = [
     intent: 'High',
     status: 'Returning',
     source: 'Instagram',
-    action: 'Played Signals',
+    action: `Played ${LEAD_RELEASE.title}`,
   },
   {
     visitor: 'jordan_beats',
@@ -624,10 +620,12 @@ export default function LaunchPage() {
                         className='system-b-launch-release-row'
                         data-active={release.active}
                       >
-                        <span
-                          className='system-b-launch-art'
-                          data-tone={release.tone}
-                          aria-hidden='true'
+                        <Image
+                          src={release.artworkUrl}
+                          alt=''
+                          width={40}
+                          height={40}
+                          className='system-b-launch-art object-cover'
                         />
                         <div>
                           <strong>{release.title}</strong>
@@ -646,8 +644,11 @@ export default function LaunchPage() {
                       <span>Links</span>
                       <span>Details</span>
                     </div>
-                    <h3 className='text-balance'>The Sound</h3>
-                    <p>Single / March 22, 2018</p>
+                    <h3 className='text-balance'>{LEAD_RELEASE.title}</h3>
+                    <p>
+                      {LEAD_RELEASE.releaseType} /{' '}
+                      {LONG_DATE.format(new Date(LEAD_RELEASE.releaseDate))}
+                    </p>
                     {RELEASE_FIELDS.map(field => (
                       <div key={field.label} className='system-b-launch-field'>
                         <span>{field.label}</span>
