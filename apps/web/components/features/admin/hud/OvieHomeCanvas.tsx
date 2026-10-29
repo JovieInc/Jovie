@@ -295,6 +295,30 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       answer={answerPanel}
       inFlightOverride={inFlightOverride}
       copy={OVIE_HOME_COPY}
+      sectionSummaries={{
+        asks:
+          asksStatus === 'loading'
+            ? 'Loading decisions…'
+            : asksStatus === 'error'
+              ? OVIE_HOME_COPY.asksError
+              : (asksNotice ??
+                `${asks.filter(ask => !answers[ask.id] || answers[ask.id]?.state === 'failed').length} open decisions`),
+        inFlight: inFlightOverride
+          ? 'Generated shipping update'
+          : loopStatus === 'loading'
+            ? 'Loading shipping…'
+            : loopStatus === 'error'
+              ? OVIE_HOME_COPY.inFlightError
+              : `${home?.rows.length ?? 0} items in flight`,
+        done:
+          loopStatus === 'loading'
+            ? 'Loading completed work…'
+            : loopStatus === 'error'
+              ? OVIE_HOME_COPY.inFlightError
+              : home?.mergesToday != null
+                ? `${home.mergesToday} ${home.mergesToday === 1 ? 'merge' : 'merges'} today`
+                : 'Completed work is not measured',
+      }}
       stages={OVIE_SHIP_STAGES}
       constraint={constraint}
       pulse={home?.pulse ?? []}

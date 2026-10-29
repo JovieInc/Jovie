@@ -112,11 +112,20 @@ function renderCanvas(chat?: HomeCanvasState) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return render(
+  const result = render(
     <QueryClientProvider client={client}>
       <OvieHomeCanvas chat={chat} />
     </QueryClientProvider>
   );
+  for (const title of [
+    'Shipping Pulse',
+    'Blocked On You',
+    'In Flight',
+    'Done Today',
+  ]) {
+    fireEvent.click(screen.getByText(new RegExp(`^${title} ·`)));
+  }
+  return result;
 }
 
 function opsCard(kind: 'shipping' | 'revenue', title: string) {
@@ -599,6 +608,11 @@ describe('OvieHomeCanvas', () => {
     renderCanvas(chat);
     await screen.findByText('Vercel on-demand concurrency');
 
+    expect(
+      screen.getByRole('button', {
+        name: 'In Flight · Generated shipping update',
+      })
+    ).toHaveAttribute('aria-expanded', 'true');
     const answer = screen.getByTestId('home-loop-answer');
     expect(answer).toHaveTextContent('Shipping?');
     expect(answer).toHaveTextContent('2 of 2');

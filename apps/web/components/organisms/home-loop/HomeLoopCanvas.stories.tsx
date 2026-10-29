@@ -1,7 +1,7 @@
 import '@/app/globals.css';
 import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { fn } from 'storybook/test';
+import { expect, fn, userEvent, within } from 'storybook/test';
 import {
   HOME_LOOP_FIXTURE_ASKS,
   HOME_LOOP_FIXTURE_BUSY_ASKS,
@@ -141,5 +141,30 @@ export const FullScreenBusy: Story = {
     stripCoverage: '14 of 31 stages measured',
     asksMoreHref: '/app/ov/inbox',
     inFlightMoreHref: '/app/ov/shipping',
+  },
+};
+
+export const EditorialOverview: Story = {
+  args: {
+    sectionSummaries: {
+      asks: 'Two open decisions',
+      inFlight: 'Six items in flight',
+      done: 'Twelve merges today',
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getAllByRole('button', { expanded: false })
+    ).toHaveLength(4);
+    await userEvent.click(canvas.getByRole('button', { name: /In Flight ·/ }));
+    await expect(canvas.getAllByTestId('home-loop-kanban-card')).toHaveLength(
+      6
+    );
+    await expect(
+      canvas.queryByTestId('home-loop-asks-section')
+    ).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByRole('button', { name: /Done Today ·/ }));
+    await expect(canvas.getByTestId('home-loop-done')).toBeVisible();
   },
 };
