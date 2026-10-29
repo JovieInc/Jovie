@@ -272,7 +272,7 @@ describe('CommandPalette', () => {
 
   it('opens on Cmd+K in the main plane and focuses the breadcrumb input', async () => {
     render(withDashboard(<CommandPalette />));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
     const input = await screen.findByLabelText('Command Palette Search');
     expect(input).toBeInTheDocument();
@@ -325,7 +325,7 @@ describe('CommandPalette', () => {
 
   it('continues to open on Ctrl+K independently of sidebar Search', async () => {
     render(withDashboard(<CommandPalette />));
-    fireEvent.keyDown(globalThis, { key: 'k', ctrlKey: true });
+    fireEvent.keyDown(globalThis.window, { key: 'k', ctrlKey: true });
     await screen.findByTestId('cmdk-main-plane');
     expect(screen.getByLabelText('Command Palette Search')).toHaveFocus();
   });
@@ -484,7 +484,7 @@ describe('CommandPalette', () => {
 
   it('lists recent chats with safe fallback titles', async () => {
     render(withDashboard(<CommandPalette />));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
     expect(screen.getByText('Recent Chats')).toBeInTheDocument();
     expect(screen.getByText('Q1 release plan')).toBeInTheDocument();
@@ -497,7 +497,7 @@ describe('CommandPalette', () => {
   it('prioritizes the current chat and still finds chats outside the default five', async () => {
     pathnameMock.mockReturnValue('/app/chat/thread-d');
     const { container } = render(withDashboard(<CommandPalette />));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
 
     const recentSection = container.querySelector(
@@ -518,7 +518,7 @@ describe('CommandPalette', () => {
   it('shows the admin workspace action and its shortcut', async () => {
     pathnameMock.mockReturnValue('/app');
     render(withDashboard(<CommandPalette />, true));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
 
     const action = screen
@@ -532,7 +532,7 @@ describe('CommandPalette', () => {
     pushMock.mockClear();
     pathnameMock.mockReturnValue('/app');
     render(withDashboard(<CommandPalette />, true));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
 
     const action = screen
@@ -548,7 +548,7 @@ describe('CommandPalette', () => {
     pushMock.mockClear();
     pathnameMock.mockReturnValue('/app/ov/ops');
     render(withDashboard(<CommandPalette />, true));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
 
     const action = screen
@@ -564,7 +564,7 @@ describe('CommandPalette', () => {
     pushMock.mockClear();
     pathnameMock.mockReturnValue('/app/ov/shipping');
     render(withDashboard(<CommandPalette />, true));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
 
     const options = screen.getAllByRole('option');
@@ -590,7 +590,7 @@ describe('CommandPalette', () => {
     try {
       pathnameMock.mockReturnValue('/app/ov');
       const ov = render(withDashboard(<CommandPalette />, true));
-      fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+      fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
       await screen.findByTestId('cmdk-main-plane');
       expect(screen.queryByText(/could not load/i)).not.toBeInTheDocument();
       ov.unmount();
@@ -598,7 +598,7 @@ describe('CommandPalette', () => {
       // The same failure still surfaces for customers.
       pathnameMock.mockReturnValue('/app');
       render(withDashboard(<CommandPalette />, true));
-      fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+      fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
       await screen.findByTestId('cmdk-main-plane');
       expect(screen.getByText(/could not load/i)).toBeInTheDocument();
     } finally {
@@ -611,7 +611,7 @@ describe('CommandPalette', () => {
     pushMock.mockClear();
     pathnameMock.mockReturnValue('/app/ov');
     render(withDashboard(<CommandPalette />, true));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
 
     const linear = screen
@@ -629,7 +629,7 @@ describe('CommandPalette', () => {
 
   it('does not leak the workspace action to non-admins', async () => {
     render(withDashboard(<CommandPalette />));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
 
     expect(screen.queryByText('Switch to OV')).not.toBeInTheDocument();
@@ -639,7 +639,7 @@ describe('CommandPalette', () => {
   it('routes a recent-chat commit to the chat route', async () => {
     pushMock.mockClear();
     render(withDashboard(<CommandPalette />));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
     const threadRow = screen
       .getAllByRole('option')
@@ -689,7 +689,7 @@ describe('CommandPalette', () => {
         </>
       )
     );
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
     await screen.findByLabelText('Command Palette Search');
     pushMock.mockClear();
     const sidebar = screen.getByRole('button', { name: 'Sidebar action' });
@@ -716,7 +716,7 @@ describe('CommandPalette', () => {
     );
     const origin = screen.getByRole('button', { name: 'Return target' });
     origin.focus();
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    fireEvent.keyDown(globalThis.window, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
     expect(screen.getByLabelText('Command Palette Search')).toHaveFocus();
     fireEvent.keyDown(screen.getByLabelText('Command Palette Search'), {
