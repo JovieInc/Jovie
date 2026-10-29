@@ -297,6 +297,8 @@
     "design:shared-ui-visual-arbitrary:update": "node scripts/shared-ui-visual-arbitrary-audit.mjs --update-baseline",
     "design:no-dead-ends:check": "tsx packages/copy/dead-ends.ts check",
     "design:no-dead-ends:update": "tsx packages/copy/dead-ends.ts update",
+    "design:shell-ia:check": "node scripts/invariants/shell-ia.mjs",
+    "design:shell-ia:update": "node scripts/invariants/shell-ia.mjs --update",
     "design:overlay-layers:check": "node scripts/invariants/overlay-layer-contract.mjs",
     "design:overlay-layers:update": "node scripts/invariants/overlay-layer-contract.mjs --update-baseline",
     "quality:gaps": "node scripts/quality-gap-finder.mjs",
