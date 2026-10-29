@@ -67,6 +67,7 @@ function AudienceWorkspaceTabs({
         <RouteSegmentControl
           value={activeTab}
           aria-label='Audience Workspace'
+          surface='ghost'
           className='max-w-72'
           options={getAudienceWorkspaceNavigation(
             buildAudienceWorkspaceHref(searchParams)

@@ -17,6 +17,7 @@ import { NavigationDestinationReady } from '@/components/features/dashboard/Navi
 import { JovieWorkFeed } from '@/components/features/dashboard/organisms/jovie-work-feed/JovieWorkFeed';
 import { ErrorBanner } from '@/components/features/feedback/ErrorBanner';
 import { PageShell } from '@/components/organisms/PageShell';
+import { PageToolbarTabButton } from '@/components/organisms/table/molecules/PageToolbar';
 import { useRuntimeUpdate } from '@/components/shell/RuntimeUpdateProvider';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -500,24 +501,21 @@ export function OpportunityInboxPageClient({
             role='toolbar'
             aria-label='Inbox View'
           >
-            <Button
-              size='sm'
-              variant={inboxView === 'needs' ? 'secondary' : 'ghost'}
-              aria-pressed={inboxView === 'needs'}
+            <PageToolbarTabButton
+              label='Needs You'
+              active={inboxView === 'needs'}
               onClick={() => selectInboxView('needs')}
-            >
-              Needs You
-            </Button>
-            <Button
-              size='sm'
-              variant={inboxView === 'done' ? 'secondary' : 'ghost'}
-              aria-pressed={inboxView === 'done'}
+            />
+            <PageToolbarTabButton
+              label='Done For You'
+              active={inboxView === 'done'}
               onClick={() => selectInboxView('done')}
-            >
-              Done For You
-            </Button>
+            />
           </div>
-          <div className='mb-4' data-testid='opportunity-inbox-notes'>
+          <div
+            className='mb-4 flex flex-col items-center'
+            data-testid='opportunity-inbox-notes'
+          >
             {notes.length === 0 ? (
               <Button
                 ref={notesButtonRef}
@@ -532,6 +530,7 @@ export function OpportunityInboxPageClient({
             ) : null}
             <div
               id='opportunity-inbox-notes-panel'
+              className='w-full'
               hidden={!notesOpen && !notes}
             >
               <label

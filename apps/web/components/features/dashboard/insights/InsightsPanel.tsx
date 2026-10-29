@@ -76,15 +76,14 @@ function InsightsPanelContent({
     return (
       <div className='space-y-3' aria-hidden='true'>
         {['high', 'medium', 'low'].map(key => (
-          <ContentSurfaceCard
-            key={key}
-            className='flex items-start gap-3 p-4 sm:p-5'
-          >
-            <div className='h-8 w-8 rounded-lg skeleton motion-reduce:animate-none' />
-            <div className='min-w-0 flex-1 space-y-2'>
-              <div className='h-4 w-40 rounded-sm skeleton motion-reduce:animate-none' />
-              <div className='h-3 w-full rounded-sm skeleton motion-reduce:animate-none' />
-              <div className='h-3 w-4/5 rounded-sm skeleton motion-reduce:animate-none' />
+          <ContentSurfaceCard key={key}>
+            <div className='flex items-start gap-3 p-4 sm:p-5'>
+              <div className='h-8 w-8 rounded-lg skeleton motion-reduce:animate-none' />
+              <div className='min-w-0 flex-1 space-y-2'>
+                <div className='h-4 w-40 rounded-sm skeleton motion-reduce:animate-none' />
+                <div className='h-3 w-full rounded-sm skeleton motion-reduce:animate-none' />
+                <div className='h-3 w-4/5 rounded-sm skeleton motion-reduce:animate-none' />
+              </div>
             </div>
           </ContentSurfaceCard>
         ))}
@@ -189,7 +188,17 @@ export function InsightsPanelView({
 
   const toolbar = (
     <PageToolbar
-      start={null}
+      data-testid='insights-toolbar'
+      start={
+        <AppSegmentControl
+          value={selectedCategory}
+          onValueChange={onCategoryChange}
+          options={CATEGORY_FILTERS}
+          aria-label='Filter Insights By Category'
+          surface='ghost'
+          layout='hug'
+        />
+      }
       end={
         <PageToolbarActionButton
           ariaLabel={isGenerating ? 'Generating insights' : 'Generate insights'}
@@ -215,16 +224,6 @@ export function InsightsPanelView({
     <PageShell toolbar={toolbar} data-testid={testId}>
       <div className='min-h-0 flex-1 overflow-y-auto overflow-x-hidden'>
         <div className='flex min-h-full flex-col gap-4'>
-          <AppSegmentControl
-            value={selectedCategory}
-            onValueChange={onCategoryChange}
-            options={CATEGORY_FILTERS}
-            aria-label='Filter Insights By Category'
-            surface='ghost'
-            layout='hug'
-            listClassName='flex-wrap gap-1.5'
-          />
-
           <InsightsPanelContent
             isLoading={isLoading}
             error={error}
