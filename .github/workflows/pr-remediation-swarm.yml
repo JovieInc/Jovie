@@ -5,18 +5,18 @@
 name: PR Remediation Swarm
 
 # Tim 2026-10-28: many cheap remediators, each owning one PR, on free
-# GitHub-hosted runners. Event-driven: a failed required workflow wakes exactly
-# its PR (when SWARM_ENABLED=on); workflow_dispatch fans out over every
-# lane-fix-red PR. All API traffic uses the Jovie Bot App installation token so
+# GitHub-hosted runners. workflow_dispatch fans out over every lane-fix-red PR
+# (plus lane-fix-conflict PRs for sync-main only). The per-PR event wake is NOT
+# a workflow_run here: ci-workflow-topology allows one remediation dispatch per
+# producer and Lane Fix Relay is it. The event path lands by extending that
+# relay (repository_dispatch to this workflow) once the merged-after-fix rate
+# is proven; the dispatch path stays the manual and backstop entry. All API traffic uses the Jovie Bot App installation token so
 # the repo's Actions GITHUB_TOKEN quota is not touched; the selector backs off
 # below 20% remaining quota. Fan-out is SWARM_MAX_PARALLEL (default 20).
 # The lanes claim comment ("lane claim kind=fix") is the shared lease: the
 # swarm skips live claims and posts its own, so the Codex ladder skips the PR.
 
 on:
-  workflow_run:
-    workflows: [Source Validation, CI]
-    types: [completed]
   workflow_dispatch:
     inputs:
       prs:
@@ -36,13 +36,6 @@ env:
 jobs:
   select:
     name: Select red PRs
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (vars.SWARM_ENABLED == 'on' &&
-       github.event.workflow_run.conclusion == 'failure' &&
-       github.event.workflow_run.event == 'pull_request' &&
-       github.event.workflow_run.pull_requests[0].number != null &&
-       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -68,8 +61,8 @@ jobs:
         id: pick
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
-          PR: ${{ github.event_name == 'workflow_dispatch' && inputs.prs || github.event.workflow_run.pull_requests[0].number }}
-          LIMIT: ${{ github.event_name == 'workflow_dispatch' && inputs.limit || '1' }}
+          PR: ${{ inputs.prs }}
+          LIMIT: ${{ inputs.limit }}
           DAILY_CAP: ${{ vars.SWARM_DAILY_USD_CAP || '5' }}
           ATTEMPT_CAP: ${{ vars.SWARM_ATTEMPT_USD_CAP || '0.10' }}
           LEDGER_ISSUE: ${{ vars.SWARM_LEDGER_ISSUE }}
