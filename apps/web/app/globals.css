@@ -2108,6 +2108,10 @@ body {
      focus ring so it follows the field's radius. Keyed to a focus-visible text
      control (same as :focus-within while typing) so clicking an inner button
      does not light the whole field. The inner control paints no ring of its own. */
+  /* sm keeps the shell search field's 10px inline inset (8px + 2px), on-grid. */
+  .composite-field[data-size="sm"] {
+    padding-inline: calc(var(--space-2) + var(--space-0-5, 2px));
+  }
   .composite-field[data-surface="page"] {
     border: 1px solid transparent;
     background: var(--color-bg-page);

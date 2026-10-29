@@ -86,12 +86,36 @@ export function collect() {
   return result;
 }
 
+/** Pure ratchet math: returns the list of problems (empty = pass). */
+export function compareToBaseline(counts, baseline) {
+  const problems = [];
+  for (const [file, count] of Object.entries(counts)) {
+    if (count > (baseline[file] ?? 0)) {
+      problems.push(
+        `${file}: ${count} input(s) drop their own focus treatment outside CompositeField (baseline ${baseline[file] ?? 0}). Wrap the field in <CompositeField> from @jovie/ui/atoms/composite-field.`
+      );
+    }
+  }
+  for (const [file, count] of Object.entries(baseline)) {
+    if ((counts[file] ?? 0) < count) {
+      problems.push(
+        `${file}: debt shrank (${counts[file] ?? 0} < ${count}); run node scripts/lint-composite-field.mjs --update and commit the baseline.`
+      );
+    }
+  }
+  return problems;
+}
+
+export function countsOf(current) {
+  return Object.fromEntries(
+    Object.entries(current).map(([f, o]) => [f, o.length])
+  );
+}
+
 function main() {
   const args = new Set(process.argv.slice(2));
   const current = collect();
-  const counts = Object.fromEntries(
-    Object.entries(current).map(([f, o]) => [f, o.length])
-  );
+  const counts = countsOf(current);
   if (args.has('--list')) {
     for (const [file, found] of Object.entries(current)) {
       for (const o of found) console.log(`${file}:${o.line}  ${o.snippet}`);
@@ -108,21 +132,7 @@ function main() {
     return;
   }
   const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')).files;
-  const problems = [];
-  for (const [file, count] of Object.entries(counts)) {
-    if (count > (baseline[file] ?? 0)) {
-      problems.push(
-        `${file}: ${count} input(s) drop their own focus treatment outside CompositeField (baseline ${baseline[file] ?? 0}). Wrap the field in <CompositeField> from @jovie/ui/atoms/composite-field.`
-      );
-    }
-  }
-  for (const [file, count] of Object.entries(baseline)) {
-    if ((counts[file] ?? 0) < count) {
-      problems.push(
-        `${file}: debt shrank (${counts[file] ?? 0} < ${count}); run node scripts/lint-composite-field.mjs --update and commit the baseline.`
-      );
-    }
-  }
+  const problems = compareToBaseline(counts, baseline);
   if (problems.length) {
     console.error(problems.join('\n'));
     process.exit(1);

@@ -30,7 +30,7 @@ const shapeClasses = {
 } satisfies Record<CompositeFieldShape, string>;
 
 const sizeClasses = {
-  sm: 'h-app-control-sm gap-1.5 px-2.5',
+  sm: 'h-app-control-sm gap-1.5',
   md: 'min-h-12 gap-2 py-2 pr-2 pl-4',
 } satisfies Record<CompositeFieldSize, string>;
 
