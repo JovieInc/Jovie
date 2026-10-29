@@ -45,7 +45,7 @@ import {
 
 const ROOT = resolve(import.meta.dirname, '..');
 export const BASELINE_PATH = 'docs/metrics/waste-baseline.json';
-export const LATEST_PATH = 'docs/metrics/waste-latest.json';
+export const LATEST_PATH = 'docs/metrics/waste-latest.gen.json';
 const TMP_CONFIG = '.knip.waste-sweep.json';
 
 function arg(name, fallback = null) {

@@ -2,7 +2,7 @@
  * Repository waste inventory and ratchet (jovie-waste-sweep/v1).
  *
  * One measurement feeds three consumers:
- *   - docs/metrics/waste-latest.json, which the lanes status feed embeds for
+ *   - docs/metrics/waste-latest.gen.json, which the lanes status feed embeds for
  *     Summer (scripts/lanes/doctor.py `waste` block);
  *   - the dead-code ratchet in Source Validation, which fails a PR that adds
  *     unused files, exports or dependencies (lock_down, ratchet-core);

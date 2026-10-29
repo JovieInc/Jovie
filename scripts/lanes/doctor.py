@@ -1888,10 +1888,10 @@ WASTE_KEYS = ("schema", "measuredAt", "sha", "score", "knip")
 
 
 def fetch_waste(host, lane) -> dict | None:
-    """Waste score for Summer (docs/metrics/waste-latest.json, written weekly by
+    """Waste score for Summer (docs/metrics/waste-latest.gen.json, written weekly by
     .github/workflows/waste-sweep.yml): score, dead-code counts, always-loaded
     agent-context bytes and CI minutes. Candidates stay in the committed file."""
-    snapshot = fetch_committed_metric(host, lane, "waste.json", "docs/metrics/waste-latest.json")
+    snapshot = fetch_committed_metric(host, lane, "waste.json", "docs/metrics/waste-latest.gen.json")
     if not isinstance(snapshot, dict):
         return None
     ci = snapshot.get("ci") or {}

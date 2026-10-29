@@ -8,7 +8,7 @@ name: Waste Sweep
 # Events: a landed change to knip config, manifests or agent context re-measures
 # cheaply (no CI sampling). The Gem lanes clock fires repository_dispatch
 # clock_waste_sweep weekly for the full sweep with CI history (JOV-INV-042
-# freezes GitHub crons). Publishes docs/metrics/waste-latest.json through a bot
+# freezes GitHub crons). Publishes docs/metrics/waste-latest.gen.json through a bot
 # PR; the lanes status feed embeds it for Summer (scripts/lanes/doctor.py `waste`).
 
 on:
@@ -85,7 +85,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
           git switch -c "$BRANCH"
-          git add docs/metrics/waste-latest.json docs/metrics/waste-baseline.json
+          git add docs/metrics/waste-latest.gen.json docs/metrics/waste-baseline.json
           if git diff --staged --quiet; then
             echo "Snapshot unchanged."
             exit 0
@@ -96,10 +96,10 @@ jobs:
           node packages/api-client/cli.ts gh --priority report -- pr create --repo "${{ github.repository }}" --base main --head "$BRANCH" \
             --title "chore(metrics): refresh waste sweep snapshot" \
             --label compounding \
-            --body "Refreshes docs/metrics/waste-latest.json (and lowers any improved dead-code baseline) from ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}." \
+            --body "Refreshes docs/metrics/waste-latest.gen.json (and lowers any improved dead-code baseline) from ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}." \
             || node packages/api-client/cli.ts gh --priority report -- pr create --repo "${{ github.repository }}" --base main --head "$BRANCH" \
               --title "chore(metrics): refresh waste sweep snapshot" \
-              --body "Refreshes docs/metrics/waste-latest.json from ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}."
+              --body "Refreshes docs/metrics/waste-latest.gen.json from ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}."
 
       - name: File top deletion candidates
         if: ${{ env.SAMPLE_CI == 'true' }}
