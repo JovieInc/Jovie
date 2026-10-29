@@ -73,7 +73,7 @@ sentence-case labels, `@jovie/copy` lint, no duplicate destinations, every
 internal href navigable under feature availability and off the dead-end list
 (`CHROME_BLOCKED_PATHS`: Jovie Card, demo, compare, alternatives, ISRC, UTM,
 CLI, engineering, AI), only approved https social hosts, 3 to 4 columns with 8
-to 16 links, and a render smoke test through the real footer renderer. Layout
+to 16 links, and a resolution smoke test through the shell's resolver. Layout
 and the legal row stay in code.
 
 ## The 4-step procedure
