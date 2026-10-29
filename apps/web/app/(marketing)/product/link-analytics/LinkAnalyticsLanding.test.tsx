@@ -25,7 +25,10 @@ vi.mock('next/image', () => ({
 }));
 
 import { LINK_ANALYTICS_COPY } from '@/data/linkAnalyticsCopy';
-import { buildLinkAnalyticsFixture } from '@/lib/marketing/linkAnalyticsFixture';
+import {
+  buildLinkAnalyticsFixture,
+  LINK_ANALYTICS_SSR_NOW,
+} from '@/lib/marketing/linkAnalyticsFixture';
 import { formatShortDateUTC } from '@/lib/utils/date-formatting';
 import { LinkAnalyticsLanding } from './LinkAnalyticsLanding';
 
@@ -70,7 +73,9 @@ describe('LinkAnalyticsLanding', () => {
     const html = renderToString(<LinkAnalyticsLanding />);
 
     expect(html).toContain(
-      formatShortDateUTC(buildLinkAnalyticsFixture().lastClickAt ?? '')
+      formatShortDateUTC(
+        buildLinkAnalyticsFixture(LINK_ANALYTICS_SSR_NOW).lastClickAt ?? ''
+      )
     );
     expect(html).not.toMatch(/(?:just now)|(?:\d+\s?(?:m|h|d|w|mo|y)\s?ago)/u);
   });
