@@ -1392,8 +1392,11 @@ describe('coverage-via repair', () => {
       true,
     ],
     [
-      'a skipped render',
-      test.replace("it('renders'", "it.skip('renders'"),
+      'an uncalled render helper',
+      test.replace(
+        "it('renders', () => render(<RepairPanel />));",
+        'function unused() { render(<RepairPanel />); }'
+      ),
       true,
     ],
   ])('leaves %s unresolved', (_label, testSource, includeTest) => {
