@@ -70,7 +70,7 @@ export interface AdminNavRegistryItem {
 
 /**
  * Five daily destinations (Tim's jobs: what matters, what is blocked on me,
- * what is shipping, is the fleet healthy, what does capacity cost). Business
+ * what is shipping, is the fleet healthy, what does capacity cost). Company
  * and Tools hold everything else. See fleet/ovie-ia.md.
  */
 export const ADMIN_PRIMARY_WORKSPACE_IDS = [
@@ -92,13 +92,11 @@ export const ADMIN_BUSINESS_IDS = [
 ] as const satisfies readonly AdminWorkspaceId[];
 
 export const ADMIN_SETTINGS_TOOL_IDS = [
-  'product',
   'ops',
   'certifications',
   'platform_connections',
   'playlists',
   'presence',
-  'activity',
   'share_studio',
   'capacity',
 ] as const satisfies readonly AdminWorkspaceId[];
@@ -254,7 +252,7 @@ function orderedIds(): readonly AdminWorkspaceId[] {
   ];
 }
 
-/** Registry order is the sidebar order: primary, Business, Tools. */
+/** Registry order is the sidebar order: primary, Company, Tools. */
 export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = orderedIds()
   .map(id => {
     const item = ADMIN_NAV_ITEMS.find(entry => entry.id === id);
@@ -265,6 +263,28 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = orderedIds()
     (a, b) =>
       SECTION_ORDER.indexOf(a.section) - SECTION_ORDER.indexOf(b.section)
   );
+
+export interface AdminWorkspaceTab {
+  readonly label: string;
+  readonly href: string;
+}
+
+/**
+ * Views behind one sidebar row. Product and Timeline are Shipping views, and
+ * Agents (the skill and system map) is a Fleet view; they keep their routes so
+ * deep links and drilldowns stay valid, but have no sidebar row of their own.
+ */
+export const ADMIN_WORKSPACE_TABS = {
+  shipping: [
+    { label: 'Pipeline', href: APP_ROUTES.ADMIN_SHIPPING },
+    { label: 'Customer Reality', href: APP_ROUTES.ADMIN_PRODUCT },
+    { label: 'Timeline', href: APP_ROUTES.ADMIN_ACTIVITY },
+  ],
+  operations: [
+    { label: 'Health', href: APP_ROUTES.ADMIN_OPERATIONS },
+    { label: 'Agents', href: APP_ROUTES.ADMIN_SYSTEM },
+  ],
+} as const satisfies Record<string, readonly AdminWorkspaceTab[]>;
 
 export const ADMIN_PEOPLE_VIEW_LABELS: Record<AdminPeopleView, string> = {
   contacts: 'Customers',

@@ -16,7 +16,7 @@ import { connectorWriteReceipts } from '@/lib/db/schema/connector-write-receipts
 import { dspBioSyncRequests } from '@/lib/db/schema/dsp-bio-sync';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
+import { GatewayEmailProvider } from '@/lib/notifications/providers/gateway';
 import { createBioSubmissionAdapter } from './adapter';
 
 export interface BioSyncRequest {
@@ -98,7 +98,7 @@ export async function createDspBioWriteService(
   const adapter = createBioSubmissionAdapter({
     providerId,
     load,
-    send: message => new ResendEmailProvider().sendEmail(message),
+    send: message => new GatewayEmailProvider().sendEmail(message),
   });
   return {
     destination,

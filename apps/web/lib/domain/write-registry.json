@@ -31,7 +31,8 @@
         "upsertRelease",
         "upsertTrack",
         "upsertRecording",
-        "upsertReleaseTrack"
+        "upsertReleaseTrack",
+        "purgeOrphanRecordings"
       ],
       "tables": ["discogReleases", "discogTracks", "discogRecordings"]
     },
@@ -137,6 +138,13 @@
       "module": "apps/web/lib/chat/submit-feedback.ts",
       "exports": ["submitChatFeedback"],
       "tables": []
+    },
+    {
+      "id": "agent.draft-claim",
+      "entity": "agent draft claim",
+      "module": "apps/web/lib/agent-acquisition/draft-claim.server.ts",
+      "exports": ["claimAgentDraft"],
+      "tables": ["creatorProfiles"]
     },
     {
       "id": "agent.draft",

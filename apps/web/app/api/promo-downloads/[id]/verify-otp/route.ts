@@ -215,6 +215,11 @@ export async function POST(
             id: dedupKey,
             dedupKey,
             category: 'transactional',
+            emailRoute: {
+              stream: 'transactional',
+              purpose: 'promo-download-delivery',
+              consent: 'auth-request',
+            },
             subject: getPromoDownloadThankYouSubject(templateData),
             text: getPromoDownloadThankYouText(templateData),
             html: getPromoDownloadThankYouHtml(templateData),

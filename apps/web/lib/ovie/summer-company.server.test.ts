@@ -83,11 +83,7 @@ describe('getSummerRevenue', () => {
     });
   });
 
-  it('passes an internal-customer classifier to the Stripe metrics read', async () => {
-    hoisted.dbResults.push([
-      { stripeCustomerId: 'cus_internal' },
-      { stripeCustomerId: null },
-    ]);
+  it('reads Stripe metrics through the shared internal-customer default', async () => {
     hoisted.stripeMetrics.mockResolvedValue({
       mrrUsd: 0,
       activeSubscribers: 0,
@@ -97,17 +93,9 @@ describe('getSummerRevenue', () => {
       isAvailable: true,
     });
     await getSummerRevenue(NOW);
-    const { isInternalCustomer } = hoisted.stripeMetrics.mock.calls[0][0];
-    expect(isInternalCustomer({ id: 'cus_internal', email: null })).toBe(true);
-    expect(isInternalCustomer({ id: 'cus_ext', email: 'tim@jov.ie' })).toBe(
-      true
-    );
-    expect(
-      isInternalCustomer({ id: 'cus_ext2', email: 'e2e-1@example.com' })
-    ).toBe(true);
-    expect(
-      isInternalCustomer({ id: 'cus_real', email: 'artist@band.com' })
-    ).toBe(false);
+    // No private classifier: the default in stripe-metrics applies the email
+    // rules and the account_class lookup for every surface alike.
+    expect(hoisted.stripeMetrics).toHaveBeenCalledWith();
   });
 
   it.each([

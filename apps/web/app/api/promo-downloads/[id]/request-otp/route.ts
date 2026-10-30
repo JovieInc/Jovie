@@ -163,6 +163,11 @@ export async function POST(
         id: dedupKey,
         dedupKey,
         category: 'transactional',
+        emailRoute: {
+          stream: 'transactional',
+          purpose: 'promo-download-otp',
+          consent: 'auth-request',
+        },
         subject: getPromoDownloadOtpSubject({
           title: download.title,
           artistName,

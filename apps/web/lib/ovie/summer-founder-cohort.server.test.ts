@@ -22,13 +22,23 @@ describe('Summer founder account diagnosis', () => {
   });
 
   it('exposes stored activation evidence without inferring token eligibility or a claim attempt', async () => {
-    read.mockResolvedValue({
-      timeRange: '30d',
-      definitionVersion: 'founder-funnel.v2',
-      total: 1,
-      errors: [],
-      rows: [{ id: 'u1', displayName: null, enteredAt: null }],
-    });
+    read.mockImplementation(async (_stage: string, range: string) =>
+      range === 'all'
+        ? {
+            timeRange: 'all',
+            definitionVersion: 'founder-funnel.v2',
+            total: 12,
+            errors: [],
+            rows: [],
+          }
+        : {
+            timeRange: '30d',
+            definitionVersion: 'founder-funnel.v2',
+            total: 1,
+            errors: [],
+            rows: [{ id: 'u1', displayName: null, enteredAt: null }],
+          }
+    );
     activation.mockResolvedValue([
       {
         id: 'u1',
@@ -44,6 +54,8 @@ describe('Summer founder account diagnosis', () => {
     const result = await getSummerFounderAccounts(50);
     expect(activation).toHaveBeenCalledExactlyOnceWith(['u1']);
     expect(result).toMatchObject({
+      total: 1,
+      allTimeTotal: 12,
       rows: [
         {
           activation: {
@@ -79,10 +91,12 @@ describe('Summer founder account diagnosis', () => {
       ],
     });
     const result = await getSummerFounderAccounts(1);
-    expect(read).toHaveBeenCalledExactlyOnceWith('accounts_created', '30d', 1);
+    expect(read).toHaveBeenCalledWith('accounts_created', '30d', 1);
+    expect(read).toHaveBeenCalledWith('accounts_created', 'all', 1);
     expect(result).toEqual({
       metricScope: 'customer_only',
       total: 4,
+      allTimeTotal: 4,
       timeRange: '30d',
       definitionVersion: 'founder-funnel.v2',
       purpose: 'activation_diagnosis',

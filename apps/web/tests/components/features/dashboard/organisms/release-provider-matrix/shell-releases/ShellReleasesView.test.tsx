@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   act,
@@ -375,10 +377,7 @@ function RightPanelProbe() {
 function HeaderActionsProbe() {
   const state = useOptionalHeaderActions();
   return (
-    <div
-      data-testid='header-actions-probe'
-      data-search-total={state?.headerSearchAdapter?.totalCount}
-    >
+    <div data-testid='header-actions-probe'>
       <HeaderSearchSurfaceFromContext />
       {state?.headerActions}
     </div>
@@ -746,18 +745,30 @@ describe('ShellReleasesView', () => {
     });
   });
 
-  it('registers release filtering behind the shared global search trigger', async () => {
+  it('keeps the global search trigger inside the header actions probe', async () => {
     renderShell([
       fakeRelease({ id: '1', title: 'Alpha' }),
       fakeRelease({ id: '2', title: 'Beta' }),
     ]);
     const probe = await screen.findByTestId('header-actions-probe');
     expect(probe).toBeInTheDocument();
-    expect(probe).toHaveAttribute('data-search-total', '2');
     const searchTrigger = await screen.findByRole('button', {
       name: 'Search Jovie',
     });
     expect(searchTrigger).toHaveAttribute('data-app-search-trigger', 'true');
+  });
+
+  it('does not register a retired header search adapter (JOV-8792)', () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../../../../../components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).not.toContain('useRegisterHeaderSearch');
+    expect(source).not.toContain('headerSearchAdapter');
   });
 
   it('does not open a second route-filter popup from the shell trigger', async () => {

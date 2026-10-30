@@ -19,7 +19,6 @@ import {
   hasGreenSourceHold,
   isProtectedGreenSourcePr,
   selectMissedCohort,
-  TIM_HOLD_LABELS,
 } from '../auto-ready-green-drafts.mjs';
 import {
   filterList,
@@ -165,20 +164,16 @@ describe('green-source draft classifier', () => {
     });
   });
 
-  it.each([
-    'hold',
-    'gated',
-    'incident',
-    'security',
-    'queue-deferred',
-    ...TIM_HOLD_LABELS,
-  ])('refuses Tim/machine hold label %s', label => {
-    expect(classifyGreenSourceDraft(draft({ labels: [label] }))).toEqual({
-      eligible: false,
-      reason: 'held',
-    });
-    expect(hasGreenSourceHold([label])).toBe(true);
-  });
+  it.each(['hold', 'gated', 'incident', 'security', 'queue-deferred'])(
+    'refuses machine hold label %s',
+    label => {
+      expect(classifyGreenSourceDraft(draft({ labels: [label] }))).toEqual({
+        eligible: false,
+        reason: 'held',
+      });
+      expect(hasGreenSourceHold([label])).toBe(true);
+    }
+  );
 
   it.each(['human-review-required', 'needs-human', 'no-auto', 'taste'])(
     'ignores the legacy %s label',
@@ -290,12 +285,7 @@ describe('green-source draft classifier', () => {
       eligible: false,
       reason: 'parked-draft',
     });
-    for (const name of [
-      'hold',
-      'queue-deferred',
-      'do-not-merge',
-      'queue-poison',
-    ]) {
+    for (const name of ['hold', 'queue-deferred', 'queue-poison']) {
       expect(GREEN_SOURCE_HOLD_LABELS).toContain(name);
       expect(
         classifyGreenSourceDraft(draft({ labels: [{ name }] }))
@@ -303,10 +293,10 @@ describe('green-source draft classifier', () => {
     }
   });
 
-  it('emits a hold regex that matches Tim-hold and machine holds only', () => {
+  it('emits a hold regex that matches machine holds only', () => {
     const re = new RegExp(greenSourceHoldRegex());
     expect(re.test('hold')).toBe(true);
-    expect(re.test('tim-hold')).toBe(true);
+    expect(re.test('tim-hold')).toBe(false);
     expect(re.test('needs-human')).toBe(false);
   });
 });
