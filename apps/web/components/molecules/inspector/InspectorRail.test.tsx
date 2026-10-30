@@ -137,7 +137,7 @@ describe('InspectorShell', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('moves selection with arrow keys and does not use pill chrome', () => {
+  it('moves selection with arrow keys and uses the canonical pill chrome', () => {
     const onTabChange = vi.fn();
     render(
       <>
@@ -167,7 +167,7 @@ describe('InspectorShell', () => {
     fireEvent.keyDown(tablist, { key: 'End' });
     expect(onTabChange).toHaveBeenCalledWith('rights');
 
-    expect(tablist.className).not.toContain('rounded-full');
+    expect(tablist.className).toContain('rounded-full');
   });
 
   it('renders standardized empty and loading states', () => {
