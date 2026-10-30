@@ -10,6 +10,14 @@ export function laneHeavyDenied(what, env = process.env) {
     : null;
 }
 
+/**
+ * `exit` is `(code?: number) => void`. Defaulting the parameter to
+ * `process.exit` infers a `never` return, and checkJs then rejects a callback
+ * that records the status instead of stopping the process.
+ * @param {string} what
+ * @param {NodeJS.ProcessEnv} [env]
+ * @param {(code?: number) => void} [exit]
+ */
 export function denyLaneHeavy(what, env = process.env, exit = process.exit) {
   const message = laneHeavyDenied(what, env);
   if (message) {

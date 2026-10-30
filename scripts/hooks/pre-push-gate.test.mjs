@@ -80,12 +80,16 @@ test('publication remains policy gated without running affected tests', () => {
   assert.doesNotMatch(publication, /typecheck|coverage|biome check \./);
 });
 
-for (const [linkedWorktree, ci] of [
+// A bare [[boolean, string], ...] list infers both slots as string | boolean.
+// spawnSync env values must be strings, so checkJs rejects `CI: ci`.
+/** @type {Array<[boolean, string]>} */
+const childGitCases = [
   [false, ''],
   [true, ''],
   [false, '1'],
   [true, '1'],
-]) {
+];
+for (const [linkedWorktree, ci] of childGitCases) {
   test(`child Git fixtures cannot mutate the ${linkedWorktree ? 'linked worktree' : 'main repository'} that invoked the hook (CI=${ci || 'unset'})`, () => {
     const root = mkdtempSync(path.join(os.tmpdir(), 'pre-push-git-env-'));
     const env = { ...process.env };
