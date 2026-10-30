@@ -229,7 +229,7 @@ import {
   persistLibrarySavedView,
   readPersistedLibrarySavedView,
 } from './library-saved-views';
-import { PostReleasePanel } from './PostReleasePanel';
+import { PostReleasePanel, RightsholdersList } from './PostReleasePanel';
 import {
   YouTubeMerchRelationshipEditor,
   YouTubeOptimizationPanel,
@@ -2384,9 +2384,7 @@ function AssetDrawer({
       finding.status !== 'dismissed'
   );
   const hasPostReleaseActivity =
-    inspectorBundle.downloads.length > 0 ||
-    inspectorBundle.findings.length > 0 ||
-    inspectorBundle.rightsholders.length > 0;
+    inspectorBundle.downloads.length > 0 || inspectorBundle.findings.length > 0;
   const showDestinationsSection =
     current !== null &&
     !isMerch &&
@@ -2496,7 +2494,7 @@ function AssetDrawer({
             {activeTab === 'overview' ? (
               <>
                 {!isMerch ? (
-                  <InspectorSection title='Actions'>
+                  <InspectorSection title='Actions' className='py-3 first:pt-0'>
                     <WorkInspectorActions
                       asset={current}
                       launches={workLaunches}
@@ -2740,6 +2738,12 @@ function AssetDrawer({
                       />
                     ) : null}
                   </dl>
+                  {!isMerch ? (
+                    <RightsholdersList
+                      asset={current}
+                      bundle={inspectorBundle}
+                    />
+                  ) : null}
                 </InspectorSection>
 
                 {showDestinationsSection ? (

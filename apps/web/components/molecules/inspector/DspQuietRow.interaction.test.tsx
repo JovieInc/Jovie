@@ -33,7 +33,7 @@ describe('Destinations row invariant (JOV-8955)', () => {
         'group',
         'flex',
         'min-h-8',
-        'px-2',
+        'px-0',
         'items-center'
       );
       expect(within(row).getByText(providers[index].label)).toHaveClass(

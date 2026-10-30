@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils';
 
 /** Canonical pill segmented-control tab styling (re-exported by DrawerTabs; also used by InspectorTabs). */
 export const TAB_BAR_RAIL_CLASSNAME =
-  'flex min-w-0 items-center gap-0.5 rounded-full border border-(--app-shell-border)/70 bg-(--surface-0)/70 p-0.5';
+  'flex min-w-0 items-center gap-0.5 rounded-full border border-(--app-shell-border)/70 bg-surface-0 p-0.5';
 
 export const TAB_BAR_DRAWER_TRIGGER_CLASSNAME =
   'inline-flex h-7 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border-0 bg-transparent px-3 text-2xs font-caption tracking-tight text-tertiary-token shadow-none transition-colors duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/35';
