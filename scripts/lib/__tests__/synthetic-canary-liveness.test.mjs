@@ -247,7 +247,11 @@ describe('synthetic canary dead-man', () => {
       ).toMatchObject({ ok: true, reason: expect.stringContaining('pending') });
       expect(
         await check(githubFor([pending, run({ created_at: iso(421) })], jobs))
-      ).toMatchObject({ ok: false });
+      ).toMatchObject({
+        ok: false,
+        // A run in flight recovers the stale slot; never re-dispatch on top.
+        missedSlot: false,
+      });
       expect(await check(githubFor([pending], jobs))).toMatchObject({
         ok: false,
       });
@@ -427,7 +431,7 @@ describe('missed-slot dispatch fallback', () => {
     }
   });
 
-  it('never dispatches while the gate is off, or on a failed canary', async () => {
+  it('never dispatches while the gate is off, on a failed canary, or with a run in flight', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const off = githubFor(staleRun());
     await main({ github: off, env: { GITHUB_REPOSITORY: repo }, now: NOW });
@@ -446,6 +450,21 @@ describe('missed-slot dispatch fallback', () => {
     expect(failed.rest.mock.calls.every(([method]) => method === 'GET')).toBe(
       true
     );
+    // The fallback's own aftermath: its dispatched run is still queued above
+    // the stale scheduled run — the alarm holds, the re-kick does not repeat.
+    const inFlight = run({ id: 112, status: 'queued', conclusion: null });
+    const aftermath = githubFor(
+      [inFlight, run({ id: 113, created_at: iso(421) })],
+      { 112: [], 113: [] }
+    );
+    await main({
+      github: aftermath,
+      env: { GITHUB_REPOSITORY: repo, SYNTHETIC_CANARY_DISPATCH: '1' },
+      now: NOW,
+    });
+    expect(
+      aftermath.rest.mock.calls.every(([method]) => method === 'GET')
+    ).toBe(true);
   });
 
   it('keeps the dead-man red when the dispatch is rejected or errors', async () => {
