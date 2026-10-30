@@ -298,7 +298,10 @@ export function anonymousChecks({
  * Fold browser steps into checks. A steps file is a list of
  * { surface, id, status, startedAt, endedAt, summary } written by the
  * post-deploy Playwright run; `authStatus` covers the case where the run was
- * skipped (no credentials) or never produced steps.
+ * skipped (no credentials) or never produced steps. A `capabilities` step
+ * (JOV-9854) declares which checks the SERVED build's smoke implements, so a
+ * missing check on an older production build reads as deploy skew, not as a
+ * silent smoke skip.
  */
 export function stepChecks(
   steps,
@@ -309,6 +312,7 @@ export function stepChecks(
   const observationsBySurface = {};
   const telemetryBySurface = {};
   const screenshotBySurface = {};
+  const capabilitiesBySurface = {};
   for (const step of steps ?? []) {
     if (step.kind === 'observation') {
       (observationsBySurface[step.surface] ??= []).push({
@@ -334,6 +338,18 @@ export function stepChecks(
       };
       continue;
     }
+    if (step.kind === 'capabilities') {
+      if (
+        typeof step.surface === 'string' &&
+        Array.isArray(step.ids) &&
+        step.ids.every(id => typeof id === 'string')
+      ) {
+        capabilitiesBySurface[step.surface] = new Set(step.ids);
+      }
+      continue;
+    }
+    // A malformed non-check step must never become a check with a missing id.
+    if (typeof step.id !== 'string' || step.id.length === 0) continue;
     // A Playwright retry re-records the same check. The latest attempt is
     // the verdict, so one failed attempt followed by a pass is one passed
     // check, not a failed surface (JOV-9822).
@@ -356,12 +372,20 @@ export function stepChecks(
     observationsBySurface,
     telemetryBySurface,
     screenshotBySurface,
+    capabilitiesBySurface,
     authStatus,
     now,
   };
 }
 
-/** The browser-owned checks every surface is expected to carry. */
+/**
+ * The browser-owned checks every surface is expected to carry. A missing one
+ * is `blocked`, never silently passed (JOV-9854): when the served build's
+ * smoke declared its capabilities and the expected check is not among them,
+ * the blocked summary attributes the deploy skew instead of implying the
+ * smoke skipped it — the status is blocked either way, so the receipt never
+ * certifies a surface that was not fully exercised.
+ */
 export const EXPECTED_BROWSER_CHECKS = Object.freeze({
   'signup-signin': ['returning-user-email-otp', 'new-user-email-otp'],
   claim: [
@@ -379,9 +403,22 @@ export const EXPECTED_BROWSER_CHECKS = Object.freeze({
   checkout: ['checkout-entry-renders'],
 });
 
-export function missingBrowserChecks({ surface, present, authStatus, now }) {
+export function missingBrowserChecks({
+  surface,
+  present,
+  authStatus,
+  now,
+  capabilities = null,
+  producerSourceSha = null,
+}) {
   const expected = EXPECTED_BROWSER_CHECKS[surface] ?? [];
   const at = now();
+  const declared =
+    capabilities instanceof Set
+      ? capabilities
+      : capabilities
+        ? new Set(capabilities)
+        : null;
   return expected
     .filter(id => !present.some(c => c.id === id))
     .map(id => ({
@@ -390,9 +427,15 @@ export function missingBrowserChecks({ surface, present, authStatus, now }) {
       startedAt: at,
       endedAt: at,
       summary:
-        authStatus === 'not-configured'
-          ? 'sanctioned production identity (E2E_PROD_USER_EMAIL + DATABASE_URL in Doppler jovie-web/prd) is not configured for this run'
-          : `browser step did not run (auth smoke ${authStatus || 'unknown'})`,
+        declared && !declared.has(id)
+          ? `served build predates browser check ${id} (its auth smoke does not implement it${
+              producerSourceSha
+                ? `; producer checkout ${producerSourceSha.slice(0, 8)}`
+                : ''
+            }); certifies once production is promoted past it`
+          : authStatus === 'not-configured'
+            ? 'sanctioned production identity (E2E_PROD_USER_EMAIL + DATABASE_URL in Doppler jovie-web/prd) is not configured for this run'
+            : `browser step did not run (auth smoke ${authStatus || 'unknown'})`,
     }));
 }
 
@@ -420,6 +463,7 @@ export async function runProductionCertification({
   expectedSha = null,
   profileHandle = 'tim',
   env = {},
+  producerSourceSha = null,
 } = {}) {
   const served = await readServedBuild(origin, fetchImpl);
   const stepState = stepChecks(steps, authStatus, now);
@@ -451,7 +495,14 @@ export async function runProductionCertification({
       const present = stepState.bySurface[surface] ?? [];
       checks.push(...present);
       checks.push(
-        ...missingBrowserChecks({ surface, present, authStatus, now })
+        ...missingBrowserChecks({
+          surface,
+          present,
+          authStatus,
+          now,
+          capabilities: stepState.capabilitiesBySurface[surface] ?? null,
+          producerSourceSha,
+        })
       );
     }
     receipts.push(

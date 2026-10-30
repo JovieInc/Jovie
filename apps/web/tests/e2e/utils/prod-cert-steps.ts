@@ -153,6 +153,30 @@ export function createSurfaceTelemetry(page: Page): SurfaceTelemetryCollector {
 }
 
 /**
+ * Declare the browser checks each spec wraps, per surface (JOV-9854). The
+ * producer folds this into receipt building so a missing check on a served
+ * build that predates the check is attributed to deploy skew instead of
+ * reading as a silent smoke skip. The check is blocked either way; this only
+ * makes the blocked reason truthful. Best-effort: never fails a test.
+ */
+export function recordCertCapabilities(
+  capabilities: Readonly<Record<string, readonly string[]>>
+): void {
+  const file = process.env.PROD_CERT_STEPS_FILE;
+  if (!file) return;
+  try {
+    for (const [surface, ids] of Object.entries(capabilities)) {
+      appendFileSync(
+        file,
+        `${JSON.stringify({ kind: 'capabilities' as const, surface, ids: [...ids] })}\n`
+      );
+    }
+  } catch {
+    // Evidence is best-effort; the test result is authoritative.
+  }
+}
+
+/**
  * A measured quality-contract observation (canon/quality-contracts.jsonl),
  * recorded from the authenticated browser run. Folded into the surface receipt.
  */

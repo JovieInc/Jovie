@@ -127,6 +127,40 @@ Run: ${runUrl ?? 'n/a'}`,
   });
 }
 
+/**
+ * Load the browser-steps JSON produced by the auth-smoke Playwright run.
+ * A missing or empty file is legitimate (the smoke run was skipped or
+ * produced no steps) and yields []; a file that EXISTS but is unreadable is
+ * a producer failure — throwing (JOV-9854) instead of silently certifying
+ * every browser surface as blocked with zero steps on disk.
+ * @param {string | undefined} path
+ * @returns {any[]}
+ */
+export function loadCertSteps(path) {
+  if (!path) return [];
+  let raw;
+  try {
+    raw = readFileSync(path, 'utf8');
+  } catch {
+    return [];
+  }
+  if (!raw.trim()) return [];
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(
+      `cert steps file ${path} exists but is not valid JSON (${error instanceof Error ? error.message : String(error)}); refusing to certify with silently-dropped browser evidence`
+    );
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error(
+      `cert steps file ${path} must contain a JSON array of steps`
+    );
+  }
+  return parsed;
+}
+
 async function postReceipts(receipts, origin) {
   const secret = process.env.CRON_SECRET;
   if (!secret) throw new Error('CRON_SECRET is not set; cannot post receipts');
@@ -162,14 +196,7 @@ async function main() {
   const runUrl = process.env.GITHUB_RUN_ID
     ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
     : null;
-  let steps = [];
-  if (values.steps) {
-    try {
-      steps = JSON.parse(readFileSync(values.steps, 'utf8'));
-    } catch {
-      steps = [];
-    }
-  }
+  const steps = loadCertSteps(values.steps);
   const { served, receipts } = await runProductionCertification({
     origin: values.origin,
     steps,
@@ -177,6 +204,10 @@ async function main() {
     expectedSha: process.env.EXPECTED_COMMIT_SHA || null,
     profileHandle: process.env.PROD_CERT_PROFILE_HANDLE || 'tim',
     runUrl,
+    producerSourceSha:
+      process.env.GITHUB_SHA && /^[0-9a-f]{40}$/u.test(process.env.GITHUB_SHA)
+        ? process.env.GITHUB_SHA
+        : null,
   });
   writeFileSync(
     values.out,
