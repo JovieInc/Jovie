@@ -3194,6 +3194,7 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
                 self.assertEqual(len(written), 1)
                 self.assertIn("## Summary\nKeep this.", written[0])
                 self.assertIn("## Blast radius\nWhat could break: repair evidence.", written[0])
+                self.assertIn(win_section, written[0])
                 bodies.extend([body, written[0]])
         # Exercise the actual consumer, rather than trusting the Python mirror.
         checked = subprocess.run(["node", "--input-type=module", "-e", """
