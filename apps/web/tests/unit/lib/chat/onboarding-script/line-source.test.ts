@@ -128,3 +128,28 @@ describe('loadScriptBank', () => {
     expect(line.stepId).toBe('waitlist');
   });
 });
+
+describe('pickFromBank segment gate (JOV-9679)', () => {
+  it('never serves a music-scoped line to a comedian', async () => {
+    resetScriptBankCache();
+    mockActiveRows([]);
+    const bank = await loadScriptBank();
+    for (let i = 0; i < 40; i++) {
+      for (const step of ['faq_what', 'clarify'] as const) {
+        const picked = pickFromBank(bank, step, `session-${i}`, 'comedian');
+        expect(picked.segments).toBe('neutral');
+      }
+    }
+  });
+
+  it('keeps legacy lines when no segment is resolved', async () => {
+    resetScriptBankCache();
+    mockActiveRows([]);
+    const bank = await loadScriptBank();
+    const keys = new Set<string>();
+    for (let i = 0; i < 60; i++) {
+      keys.add(pickFromBank(bank, 'faq_what', `s-${i}`).key);
+    }
+    expect(keys.has('faq_what:v1')).toBe(true);
+  });
+});
