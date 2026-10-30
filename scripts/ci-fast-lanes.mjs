@@ -960,6 +960,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/pr-unacquired-runner-rerun.test.mjs',
   'scripts/dequeue-held-reason.test.mjs',
   'scripts/lib/__tests__/self-hosted-jobs.test.mjs',
+  'scripts/release-lag-check.test.mjs',
   'scripts/production-controller-read-token.test.mjs',
   'scripts/lib/__tests__/lane-fix-relay-wakes.test.mjs',
   'scripts/lib/__tests__/fleet-rules-evidence-concurrency.test.mjs',
