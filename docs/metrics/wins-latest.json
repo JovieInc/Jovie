@@ -1,14 +1,14 @@
 {
   "schema": "jovie.wins-metrics/v1",
-  "at": "2026-10-30T12:38:30.391Z",
-  "winsTotal": 22,
+  "at": "2026-10-30T15:31:26.368Z",
+  "winsTotal": 23,
   "winsVerified": 1,
-  "winsClaimed": 9,
+  "winsClaimed": 10,
   "winsUnverified": 3,
   "winsNotReproduced": 1,
   "winsPendingMerge": 4,
   "winsPendingMeasure": 4,
-  "winsLast7d": 22,
+  "winsLast7d": 23,
   "clusters": [
     {
       "theme": "release-reliability",
@@ -18,7 +18,7 @@
     },
     {
       "theme": "merge-throughput",
-      "total": 12,
+      "total": 13,
       "verified": 0,
       "ready": false
     },
@@ -140,6 +140,10 @@
     },
     {
       "id": "win-2026-10-30-nightly-evidence-coverage-publishers-survive-large",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-30-remove-the-three-mutually-dependent-shared",
       "status": "claimed"
     }
   ]
