@@ -25,6 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { fetch-depth: 1 }
       - uses: ./.github/actions/setup-node-pnpm
-      - uses: JovieInc/ci/actions/slop-guard@c68f7c3ac9c1376a7da82a4c1c86e098b1e2cf57 # JovieInc/ci#12
+      - uses: JovieInc/ci/actions/slop-guard@f5d93ff14246fa49d6b2515c3ca3ec8f3d9dcf0d # JovieInc/ci#12
         with:
           config: config/slop-guard/config.json
+          auto-shrink: 'true'

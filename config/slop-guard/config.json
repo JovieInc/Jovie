@@ -9,12 +9,16 @@
   "knipCommand": ["pnpm", "exec", "knip"],
   "knipArgs": ["--include", "files,exports,types"],
   "jscpd": {
-    "paths": [
-      "apps/web/app",
-      "apps/web/components",
-      "apps/web/lib",
-      "packages",
-      "workers"
+    "paths": ["apps", "packages", "workers", "scripts"],
+    "ignore": [
+      "**/node_modules/**",
+      "**/.next/**",
+      "**/*.test.*",
+      "**/*.spec.*",
+      "**/tests/**",
+      "**/__tests__/**",
+      "**/drizzle/**",
+      "**/storybook-static/**"
     ]
   },
   "knipIgnoreCategories": [
