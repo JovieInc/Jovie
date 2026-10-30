@@ -122,6 +122,30 @@ test('typecheck targets are the affected packages only', () => {
   ]);
 });
 
+test('web source changes typecheck test consumers without a changed test file', () => {
+  assert.deepEqual(
+    typecheckTargets(
+      [file('apps/web/lib/leads/route-lead.ts')],
+      process.cwd()
+    ).sort(),
+    ['pkg:@jovie/ovie', 'web', 'web-tests']
+  );
+  assert.deepEqual(
+    typecheckTargets(
+      [file('apps/web/tests/lib/leads/route-lead.test.ts')],
+      process.cwd()
+    ),
+    ['web-tests']
+  );
+  assert.deepEqual(
+    typecheckTargets(
+      [file('apps/web/lib/leads/route-lead.ts', 'removed')],
+      process.cwd()
+    ),
+    []
+  );
+});
+
 test('arguments parse and unknown flags fail', () => {
   assert.equal(parseArgs(['--no-coverage', '--base', 'dev']).coverage, false);
   assert.throws(() => parseArgs(['--nope']));

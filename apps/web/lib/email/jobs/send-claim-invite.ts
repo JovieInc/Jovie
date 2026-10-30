@@ -178,23 +178,6 @@ export async function processSendClaimInviteJob(
     };
   }
 
-  // Always generate a fresh token pair per email send.
-  // The raw token is never stored at rest — only the hash is persisted in the DB.
-  const {
-    token: claimToken,
-    tokenHash,
-    expiresAt,
-  } = await generateClaimTokenPair();
-
-  await tx
-    .update(creatorProfiles)
-    .set({
-      claimToken: tokenHash,
-      claimTokenExpiresAt: expiresAt,
-      updatedAt: new Date(),
-    })
-    .where(eq(creatorProfiles.id, profile.id));
-
   // Check if the email is suppressed (user unsubscribed or bounced)
   const suppressionCheck = await isEmailSuppressed(invite.email);
   if (suppressionCheck.suppressed) {
@@ -220,6 +203,25 @@ export async function processSendClaimInviteJob(
       detail: `Email suppressed: ${suppressionCheck.reason}`,
     };
   }
+
+  // Rotate only once the send is certain to proceed: a suppressed recipient
+  // must not invalidate a link we already delivered.
+  // Always generate a fresh token pair per email send.
+  // The raw token is never stored at rest — only the hash is persisted in the DB.
+  const {
+    token: claimToken,
+    tokenHash,
+    expiresAt,
+  } = await generateClaimTokenPair();
+
+  await tx
+    .update(creatorProfiles)
+    .set({
+      claimToken: tokenHash,
+      claimTokenExpiresAt: expiresAt,
+      updatedAt: new Date(),
+    })
+    .where(eq(creatorProfiles.id, profile.id));
 
   // Mark as sending
   await tx
