@@ -1,8 +1,21 @@
 {
-  "version": "b2aeb0d50f62",
-  "toolsListHash": "5d4c361dd8af47313af5a5f273b1bdea84b68e21e5099741df8d0f5cd90d5f94",
-  "listingHash": "7883dee8a0ce9226462c05def64fcd2cae40c2fce1eab660e996c1b12b7363b6",
+  "version": "7b8a447d221b",
+  "toolsListHash": "87e4a522b0ed1415e0ca53e123958ef35b15b35f4eeff2fe72cc35d3cafe32f6",
+  "listingHash": "a7665b2f5a09882b4a03e68179c82c6e3651a971c63ad7dfb88cc10b9d213c6f",
   "regenerate": "pnpm --filter @jovie/web agent-distribution:generate",
+  "icons": {
+    "markPath": "packages/brand/svg/jovie-mark-white.svg",
+    "markSha256": "54fe10796b4650cd8b85b7a34b505dd7b9bee7a0e7af8b154089bb17cd83d0c0",
+    "backgroundToken": "surface.canvas",
+    "background": "#030406",
+    "composedSha256": "0c1fd401149808c8f5b555f5c28f9367b5afef2e5985ea8d025f203a0d2f76e6",
+    "sizes": [
+      48,
+      64,
+      512,
+      1024
+    ]
+  },
   "files": [
     "chatgpt/jovie-agent/assets/icon-dark.svg",
     "chatgpt/jovie-agent/assets/icon.svg",
@@ -18,9 +31,9 @@
     "tools-list.snapshot.json"
   ],
   "versions": {
-    "muse": "95c2f8460164",
-    "grok": "67ebd6d4eb40",
-    "chatgpt": "ceccd7c4f84f",
-    "claude": "9ee886e0a97c"
+    "muse": "83f329c3072b",
+    "grok": "f762d704e4a8",
+    "chatgpt": "47fc97177060",
+    "claude": "d58fc3f8ec3b"
   }
 }

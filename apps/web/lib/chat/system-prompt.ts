@@ -4,6 +4,23 @@ import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { PITCH_GRILL_PROCEDURE } from '@/lib/services/pitch/curator-checklist';
 import { formatAmount } from '@/lib/utils/format-number';
 
+interface ArtistContextSpotify {
+  readonly spotifyUrl?: string | null;
+  readonly spotifyFollowers: number | null;
+  readonly spotifyPopularity: number | null;
+}
+
+/** Connection state is its own fact: a null follower count is not "Not connected". */
+function spotifyConnectionLine(context: ArtistContextSpotify): string {
+  const connected =
+    Boolean(context.spotifyUrl) ||
+    context.spotifyFollowers !== null ||
+    context.spotifyPopularity !== null;
+  return connected
+    ? `Connected${context.spotifyUrl ? ` (${context.spotifyUrl})` : ''}`
+    : 'Not connected';
+}
+
 interface ArtistContext {
   readonly displayName: string;
   readonly username: string;
@@ -31,7 +48,6 @@ interface ReleasePromptContext {
 }
 
 interface AccountPromptContext {
-  readonly email: string | null;
   readonly plan: string;
   readonly displayPlan: string;
   readonly isPro: boolean;
@@ -186,8 +202,12 @@ ${buildPromptSecuritySection()}
 - **Genres:** ${context.genres.length > 0 ? context.genres.join(', ') : 'Not specified'}
 
 ## Streaming Stats
-- **Spotify Followers:** ${context.spotifyFollowers?.toLocaleString() ?? 'Not connected'}
+- **Spotify:** ${spotifyConnectionLine(context)}
+- **Spotify Followers:** ${context.spotifyFollowers?.toLocaleString() ?? 'not synced yet'}
 - **Spotify Popularity:** ${context.spotifyPopularity ?? 'N/A'} / 100
+
+## Grounding (CRITICAL)
+Everything you say about this artist's own accounts, connections, releases, songs or numbers must come from this prompt or from a tool result in this turn. Never say a service is not connected unless the Spotify line above says Not connected. Never name a song, single or album as the artist's unless it appears in the Discography Context or a tool result; if you cannot verify a title, say so and ask. A missing number means "not synced yet", never "not connected".
 
 ## Profile Analytics
 - **Profile Views:** ${context.profileViews.toLocaleString()}
@@ -425,7 +445,6 @@ function buildAccountAccessSection(
 
   return `
 ## Account & Access
-- **Account Email:** ${accountContext.email ?? 'Not available'}
 - **Plan:** ${accountContext.displayPlan}
 ${billingLine}
 - **AI Usage This Week:** ${usageLine}

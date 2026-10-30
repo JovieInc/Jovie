@@ -19,7 +19,9 @@ class ClassifyTest(unittest.TestCase):
             "HttpError: API rate limit exceeded for installation": ("platform-infra", "rerun"),
             "upstream returned HTTP 500 before the job started": ("platform-infra", "rerun"),
             "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane": ("ci-fast-wiring", "wire-ci-fast"),
+            "This PR conflicts with main in: scripts/preflight-changed.mjs . Resolve the conflict (lane-fix-conflict).": ("narrowed-preflight", "merge-narrowed-preflight"),
             "AssertionError: off-grid 10px/14px spacing steps (*-2.5, *-3.5) grew: 591 > baseline 590.": ("spacing-scale", "snap-spacing"),
+            "Error: apps/web/app/(marketing)/pricing/page.tsx: source changed; renew certification evidence": ("census-certification", "sync-main"),
             "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "agent"),
             "red-before-green: include Failing command:": ("pr-body", "agent"),
             "AssertionError: expected 1": ("other", "agent"),
@@ -41,6 +43,17 @@ class ClassifyTest(unittest.TestCase):
         self.assertEqual((behind["cls"], behind["action"]), ("stale-branch", "sync-main"))
         still = classes.classify(pr("A", merge="BEHIND"), {"A": "API rate limit exceeded"})
         self.assertEqual(still["action"], "rerun", "a deterministic log outranks the stale-branch default")
+
+    def test_stale_census_certification_syncs_main_while_checks_block_the_branch(self):
+        log = (
+            "run 900 attempt 1 failed on GitHub primary-rate-limit: re-ran failed jobs; not repair work\n"
+            "HttpError: API rate limit exceeded for installation\n"
+            "Error: apps/web/app/(marketing)/pricing/page.tsx: source changed; renew certification evidence\n"
+        )
+        blocked = classes.classify(pr("Source Validation", merge="BLOCKED"), {"Source Validation": log})
+        self.assertEqual((blocked["cls"], blocked["action"]), ("census-certification", "sync-main"))
+        behind = classes.classify(pr("Source Validation", merge="BEHIND"), {"Source Validation": log})
+        self.assertEqual((behind["cls"], behind["action"]), ("census-certification", "sync-main"))
 
     def test_missing_changelog_metadata_stamps_and_a_quota_mask_stamps_only_a_bare_body(self):
         missing = "Error: Customer outcome decision missing or invalid (missing-metadata)."
@@ -74,6 +87,64 @@ class ClassifyTest(unittest.TestCase):
         c = classes.classify(pr("T"), {"T": "TypeError: x is not a function"})
         self.assertEqual(a["key"], b["key"])
         self.assertNotEqual(a["key"], c["key"])
+
+
+class NarrowedPreflightMergeTest(unittest.TestCase):
+    OURS = (
+        "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts "
+        "tests/unit/analytics-metrics-layer-guard.test.ts "
+        "tests/unit/marketing/locked-pen-chrome-contract.test.ts "
+        "tests/unit/design-system/mac-header-two-lines-v1.test.ts "
+        "tests/unit/marketing/marketing-headline-line-clamp-guard.test.ts"
+    )
+    THEIRS = (
+        "node scripts/design-system-source-ratchet.mjs && "
+        "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts "
+        "tests/unit/analytics-metrics-layer-guard.test.ts "
+        "tests/unit/marketing/locked-pen-chrome-contract.test.ts"
+    )
+    OURS_NOTE = "metrics-layer, locked chrome and heading contracts; full design-system suite runs with --thorough"
+    THEIRS_NOTE = "source identity, metrics-layer and locked chrome; full suite with --thorough"
+
+    def test_unions_prefixes_paths_and_known_note_phrases(self):
+        command = classes.merge_narrowed_guard_command(self.OURS, self.THEIRS)
+        self.assertEqual(command, (
+            "node scripts/design-system-source-ratchet.mjs && "
+            "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts "
+            "tests/unit/analytics-metrics-layer-guard.test.ts "
+            "tests/unit/marketing/locked-pen-chrome-contract.test.ts "
+            "tests/unit/design-system/mac-header-two-lines-v1.test.ts "
+            "tests/unit/marketing/marketing-headline-line-clamp-guard.test.ts"
+        ))
+        note = classes.merge_narrowed_guard_note(self.OURS_NOTE, self.THEIRS_NOTE)
+        self.assertEqual(
+            note,
+            "source identity, metrics-layer, locked chrome and heading contracts; full suite with --thorough",
+        )
+
+    def test_conflict_text_resolves_and_unknown_hunks_fail_closed(self):
+        text = (
+            "export const NARROWED = {\n"
+            "  'merge-group-unit-guards': {\n"
+            "    command:\n"
+            "<<<<<<< HEAD\n"
+            f"      '{self.OURS}',\n"
+            f"    note: '{self.OURS_NOTE}',\n"
+            "=======\n"
+            f"      '{self.THEIRS}',\n"
+            f"    note: '{self.THEIRS_NOTE}',\n"
+            ">>>>>>> origin/main\n"
+            "  },\n"
+            "};\n"
+        )
+        resolved = classes.resolve_preflight_narrowed_text(text)
+        self.assertIn("node scripts/design-system-source-ratchet.mjs &&", resolved)
+        self.assertIn("marketing-headline-line-clamp-guard.test.ts", resolved)
+        self.assertNotIn("<<<<<<<", resolved)
+        self.assertIsNone(classes.resolve_preflight_narrowed_text(text.replace("heading contracts", "mystery phrase")))
+        other = text.replace("note:", "title:", 1)
+        self.assertIsNone(classes.resolve_preflight_narrowed_text(other))
+        self.assertIsNone(classes.merge_narrowed_guard_command(self.OURS, self.THEIRS.replace("vitest run", "vitest watch")))
 
 
 class SpacingSnapTest(unittest.TestCase):

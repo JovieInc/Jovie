@@ -7,6 +7,7 @@ import {
   gte,
   inArray,
   lte,
+  or,
 } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { verifyCronRequest } from '@/lib/cron/auth';
@@ -31,12 +32,22 @@ export const maxDuration = 60;
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const SCHEDULING_LOOKBACK_MS = 15 * 60 * 1000;
 const SCHEDULING_LOOKAHEAD_MS = 15 * 60 * 1000;
+/**
+ * JOV-9779: Spotify does not expose a release before it is live, so the
+ * catalog import discovers a release after its release date (stored at
+ * midnight UTC). Matching only on release date within +/-15 minutes missed
+ * every release imported later than that. A release first discovered in this
+ * window is also scheduled when its release date is recent; older dates are
+ * back-catalog or reissues and never become new-release announcements.
+ */
+const NEWLY_DISCOVERED_MAX_RELEASE_AGE_MS = 72 * 60 * 60 * 1000;
 
 /**
  * Cron job to schedule release day notifications around the current window.
  *
  * This job:
- * 1. Finds releases that just dropped or will drop in the next 15 minutes
+ * 1. Finds releases that just dropped or will drop in the next 15 minutes,
+ *    plus recent releases the catalog import discovered in the last 15 minutes
  * 2. For each subscriber with releaseDay preference enabled
  * 3. Creates a fanReleaseNotifications entry scheduled for release time
  *
@@ -236,9 +247,19 @@ export async function scheduleReleaseNotifications(): Promise<{
     })
     .from(discogReleases)
     .where(
-      and(
-        gte(discogReleases.releaseDate, windowStart),
-        lte(discogReleases.releaseDate, windowEnd)
+      or(
+        and(
+          gte(discogReleases.releaseDate, windowStart),
+          lte(discogReleases.releaseDate, windowEnd)
+        ),
+        and(
+          gte(discogReleases.createdAt, windowStart),
+          gte(
+            discogReleases.releaseDate,
+            new Date(now.getTime() - NEWLY_DISCOVERED_MAX_RELEASE_AGE_MS)
+          ),
+          lte(discogReleases.releaseDate, windowEnd)
+        )
       )
     );
 

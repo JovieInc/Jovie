@@ -1010,7 +1010,7 @@ describe('ProfileCompactTemplate', () => {
 
     const branding = await screen.findByTestId('profile-jovie-branding');
     expect(
-      within(branding).getByRole('link', { name: /Jovie home/i })
+      within(branding).getByRole('link', { name: /Made with Jovie/i })
     ).toHaveAttribute(
       'href',
       `/?utm_source=profile&utm_artist=${mockArtist.handle}`

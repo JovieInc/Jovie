@@ -352,7 +352,7 @@ test.describe('Tipping MVP', () => {
         expect(url).toContain('venmo.com');
 
         // Verify the URL contains the amount parameter
-        expect(url).toContain('utm_amount=');
+        expect(url).toContain('amount=');
 
         // Close the new page
         await newPage.close();

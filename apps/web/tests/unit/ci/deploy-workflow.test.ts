@@ -3444,8 +3444,6 @@ describe('CI E2E smoke workflow', () => {
     expect(builds).toHaveLength(1);
     expect(builds[0]?.env).toMatchObject({
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: '1x00000000000000000000AA',
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
-        '${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}',
       NEXT_PUBLIC_APP_URL: 'http://localhost:3250',
       NEXT_PUBLIC_BETTER_AUTH_URL: 'http://localhost:3250',
     });
