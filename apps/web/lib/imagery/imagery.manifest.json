@@ -34,5 +34,60 @@
       }
     }
   },
-  "stages": {}
+  "stages": {
+    "profile-depth": {
+      "specHash": "97768389beeb16ab557623601d63fb8d8160a575c8c31bef314e2983d6d2eaef",
+      "verdicts": {
+        "desktop": {
+          "pass": true,
+          "findings": [
+            "clef advisory: clef rule all_caps_text over threshold, waived: the real release cover art in the profile capture is lettered in caps",
+            "clef advisory: clef rule art_tampered over threshold, waived: the real release cover art in the profile capture is not altered by the stage",
+            "cold advisory: The profile picture is too small and low resolution, making it hard to recognize the person."
+          ],
+          "judge": "geometry+clef+dogfood",
+          "model": "clef,@cf/mistralai/mistral-small-3.1-24b-instruct",
+          "at": "2026-10-30T01:14:04.712Z",
+          "imageHash": "a13018d0b58130ac0aeb812174bf4018f09d9e73dcc562275acf560daa9d4b1e"
+        },
+        "mobile": {
+          "pass": true,
+          "findings": [
+            "clef advisory: clef rule all_caps_text over threshold, waived: the real release cover art in the profile capture is lettered in caps",
+            "clef advisory: clef rule art_tampered over threshold, waived: the real release cover art in the profile capture is not altered by the stage",
+            "cold advisory: The profile picture of Tim White is blurry and low resolution."
+          ],
+          "judge": "geometry+clef+dogfood",
+          "model": "clef,@cf/mistralai/mistral-small-3.1-24b-instruct",
+          "at": "2026-10-30T01:14:13.020Z",
+          "imageHash": "49b8e8f7bd6ff7e30ec3d28fe3cfe4fa194e46b57310aa60eb625103114a2e71"
+        }
+      }
+    },
+    "setup-flow": {
+      "specHash": "02957f59e1a5105348402f7b0c02676e119ac678b600ce488fbebe7e15967af4",
+      "verdicts": {
+        "desktop": {
+          "pass": true,
+          "findings": [
+            "cold advisory: The 'Skip For Now' link is not styled consistently with the rest of the UI, making it look less prominent and potentially confusing for users."
+          ],
+          "judge": "geometry+clef+dogfood",
+          "model": "clef,@cf/mistralai/mistral-small-3.1-24b-instruct",
+          "at": "2026-10-30T01:14:25.745Z",
+          "imageHash": "0898c266fd6cfcec10a8975915a03926d4956fed2038cf48ae2958272317c3a1"
+        },
+        "mobile": {
+          "pass": true,
+          "findings": [
+            "cold advisory: The text 'Skip For Now' is not consistently styled with the rest of the text, making it look out of place."
+          ],
+          "judge": "geometry+clef+dogfood",
+          "model": "clef,@cf/mistralai/mistral-small-3.1-24b-instruct",
+          "at": "2026-10-30T01:14:35.351Z",
+          "imageHash": "b3306f8302e62ae0d12a8020391c69231c44dd349a345bc18494ed52029145a0"
+        }
+      }
+    }
+  }
 }

@@ -32,7 +32,7 @@ export interface StageRect extends StagePoint {
   readonly h: number;
 }
 
-/** 1 = hairline lift, 3 = furthest from the plate. Tonal black only. */
+/** 1 = hairline lift, 3 = deepest. Tonal black only. */
 export type StageShadowTier = 1 | 2 | 3;
 
 export interface StageLayerPlacement {
@@ -66,6 +66,18 @@ export interface StageLight {
   readonly spread: number;
 }
 
+/**
+ * A Clef rule that fires on the real product capture inside a layer, not on
+ * the art direction (for example all-caps cover art). Recorded in the
+ * verdict as waived with its reason; part of the spec hash, so changing one
+ * re-verifies the stage.
+ */
+export interface StageWaiver {
+  readonly judge: 'clef';
+  readonly rule: string;
+  readonly reason: string;
+}
+
 export interface ImageryStageSpec {
   readonly id: string;
   readonly title: string;
@@ -82,6 +94,7 @@ export interface ImageryStageSpec {
   readonly safeArea: StageRect;
   /** Marketing routes that show this stage. */
   readonly placements: readonly string[];
+  readonly waivers?: readonly StageWaiver[];
 }
 
 export const IMAGERY_STAGES = [
@@ -110,6 +123,20 @@ export const IMAGERY_STAGES = [
     light: { origin: { x: 1.1, y: -0.1 }, accent: 'ion', spread: 0.6 },
     safeArea: { x: 0.04, y: 0.3, w: 0.3, h: 0.4 },
     placements: ['/'],
+    waivers: [
+      {
+        judge: 'clef',
+        rule: 'all_caps_text',
+        reason:
+          'the real release cover art in the profile capture is lettered in caps',
+      },
+      {
+        judge: 'clef',
+        rule: 'art_tampered',
+        reason:
+          'the real release cover art in the profile capture is not altered by the stage',
+      },
+    ],
   },
   {
     id: 'setup-flow',

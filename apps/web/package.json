@@ -150,6 +150,8 @@
     "screenshots:capture": "playwright test --config=playwright.config.screenshots.ts",
     "shots:render": "tsx scripts/product-shots/render.ts",
     "imagery:plate": "tsx scripts/imagery/plate.ts",
+    "imagery:verify": "tsx scripts/imagery/verify.ts",
+    "imagery:regen": "tsx scripts/imagery/regen.ts",
     "docs-guide-shots": "playwright test --config=playwright.config.docs-guides.ts",
     "screenshots:seed": "tsx tests/product-screenshots/seed.ts",
     "visual-qa:capture": "playwright test tests/visual-qa/capture.spec.ts --config=playwright.config.visual-qa.ts",
