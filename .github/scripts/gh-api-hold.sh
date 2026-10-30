@@ -59,16 +59,48 @@ run_gh() {
   set -e
 }
 
+# Transient GitHub gateway failures (5xx, 408, network timeouts) can be
+# retried with a bounded backoff when the caller opts in through
+# GH_API_RETRY_ATTEMPTS (total attempts including the first). The default of
+# 1 keeps the long-standing single-attempt behavior: callers that already
+# loop around this script (desktop-release.yml, release-lineage-gate.sh)
+# keep their own attempt budgets and call counts. Auth, permission,
+# not-found and other non-transient 4xx responses are never retried here,
+# and rate-limit responses fall through to the hold below, unchanged.
+retry_attempts="${GH_API_RETRY_ATTEMPTS:-1}"
+case "$retry_attempts" in
+  *[!0-9]* | '') retry_attempts=1 ;;
+esac
+retry_base="${GH_API_RETRY_SECONDS:-2}"
+case "$retry_base" in
+  *[!0-9]* | '') retry_base=2 ;;
+esac
+
+attempt=1
 run_gh "$@"
+while [ "$status" -ne 0 ]; do
+  message="$(cat "$err" "$out" 2>/dev/null || true)"
+  if printf '%s\n' "$message" | grep -qiE 'API rate limit (already )?exceeded|x-ratelimit-remaining:[[:space:]]*0|secondary rate limit|HTTP 429'; then
+    break
+  fi
+  if [ "$attempt" -ge "$retry_attempts" ] ||
+    ! printf '%s\n' "$message" | grep -Eqi 'HTTP (408|5[0-9][0-9])|timed? out|timeout|error connecting|connection reset'; then
+    cat "$err" >&2
+    exit "$status"
+  fi
+  attempt=$((attempt + 1))
+  retry_wait="$retry_base"
+  if [ "$retry_wait" -gt 30 ]; then
+    retry_wait=30
+  fi
+  echo "::warning::gh api attempt $attempt of $retry_attempts hit a transient failure; retrying in ${retry_wait}s." >&2
+  sleep "$retry_wait"
+  run_gh "$@"
+done
+
 if [ "$status" -eq 0 ]; then
   cat "$out"
   exit 0
-fi
-
-message="$(cat "$err" "$out" 2>/dev/null || true)"
-if ! printf '%s\n' "$message" | grep -qiE 'API rate limit (already )?exceeded|x-ratelimit-remaining:[[:space:]]*0|secondary rate limit|HTTP 429'; then
-  cat "$err" >&2
-  exit "$status"
 fi
 
 # GET /rate_limit does not spend the bucket it reports, including while that
