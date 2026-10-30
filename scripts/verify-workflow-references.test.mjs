@@ -96,6 +96,50 @@ jobs:
   assert.deepEqual(validateWorkflowReferences(root), []);
 });
 
+test('validates quoted workspace selectors and exclusions against real package names', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'workflow-filters-'));
+  temporaryRoots.push(root);
+  fs.mkdirSync(path.join(root, '.github', 'workflows'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'apps', 'web'), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, 'apps', 'web', 'package.json'),
+    JSON.stringify({ name: '@actual/web' })
+  );
+  const workflow = path.join(root, '.github', 'workflows', 'filters.yml');
+  for (const filter of [
+    '@actual/web',
+    "'@actual/web'",
+    '"@actual/web"',
+    '!@actual/web',
+    "'!@actual/web'",
+    '"!@actual/web"',
+  ]) {
+    fs.writeFileSync(
+      workflow,
+      `jobs:\n  check:\n    steps:\n      - run: pnpm turbo test:fast --affected --filter=${filter}\n`
+    );
+    assert.deepEqual(validateWorkflowReferences(root), [], filter);
+  }
+  for (const filter of [
+    '@missing/web',
+    "'@missing/web'",
+    '!@missing/web',
+    "'!@missing/web'",
+    '"!@missing/web"',
+    "'!@actual/web",
+    '!!@actual/web',
+    "'!'",
+  ]) {
+    fs.writeFileSync(
+      workflow,
+      `jobs:\n  check:\n    steps:\n      - run: pnpm turbo test:fast --affected --filter ${filter}\n`
+    );
+    const errors = validateWorkflowReferences(root);
+    assert.equal(errors.length, 1, filter);
+    assert.match(errors[0], /pnpm workspace filter does not resolve/);
+  }
+});
+
 test('rejects gh --jq combined with --arg (JOV-7698, #20164)', () => {
   const broken = [
     '      - run: |',
