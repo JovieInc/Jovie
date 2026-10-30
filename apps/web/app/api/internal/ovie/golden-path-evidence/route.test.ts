@@ -120,7 +120,7 @@ describe('POST /api/internal/ovie/golden-path-evidence', () => {
         }),
       ],
     });
-    expect(response.status()).toBe(200);
+    expect(response.status).toBe(200);
     expect(recordMock).toHaveBeenCalledTimes(1);
     const stored = recordMock.mock.calls[0][0].receipts[0];
     expect(stored.consoleErrorCount).toBe(0);
@@ -129,20 +129,17 @@ describe('POST /api/internal/ovie/golden-path-evidence', () => {
   });
 
   it('rejects a malformed screenshot payload (JOV-9625)', async () => {
-    expect(
-      (
-        await post({
-          receipts: [
-            receipt({
-              screenshot: {
-                format: 'png',
-                dataUrl: 'data:image/png;base64,frame',
-              },
-            }),
-          ],
-        })
-      ).status
-    ).toBe(400);
+    const response = await post({
+      receipts: [
+        receipt({
+          screenshot: {
+            format: 'png',
+            dataUrl: 'data:image/png;base64,frame',
+          },
+        }),
+      ],
+    });
+    expect(response.status).toBe(400);
     expect(recordMock).not.toHaveBeenCalled();
   });
 });
