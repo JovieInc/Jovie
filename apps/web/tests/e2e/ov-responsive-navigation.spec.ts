@@ -1,442 +1,442 @@
-import { expect, type Locator, type Page, test } from "@playwright/test";
-import { ADMIN_NAV_REGISTRY } from "@/constants/admin-navigation";
-import { APP_ROUTES } from "@/constants/routes";
+import { expect, type Locator, type Page, test } from '@playwright/test';
+import { ADMIN_NAV_REGISTRY } from '@/constants/admin-navigation';
+import { APP_ROUTES } from '@/constants/routes';
 import {
-	NAVIGATION_STYLE_PROBE_SELECTOR,
-	normalizeNavigationContract,
-	type RawNavigationContract,
-} from "./utils/ov-navigation-contract";
+  NAVIGATION_STYLE_PROBE_SELECTOR,
+  normalizeNavigationContract,
+  type RawNavigationContract,
+} from './utils/ov-navigation-contract';
 
 const VIEWPORTS = [
-	{ label: "mobile-375", width: 375, height: 812 },
-	{ label: "tablet-768", width: 768, height: 1024 },
-	{ label: "desktop-1440", width: 1440, height: 900 },
+  { label: 'mobile-375', width: 375, height: 812 },
+  { label: 'tablet-768', width: 768, height: 1024 },
+  { label: 'desktop-1440', width: 1440, height: 900 },
 ] as const;
 
 async function enterPersona(
-	page: Page,
-	persona: "admin" | "creator-ready",
-	redirect: string,
+  page: Page,
+  persona: 'admin' | 'creator-ready',
+  redirect: string
 ): Promise<void> {
-	const provisionResponse = await page.request.post(
-		"/api/dev/test-auth/session",
-		{ data: { persona } },
-	);
-	expect(provisionResponse.ok()).toBe(true);
-	await page.goto(
-		`/api/dev/test-auth/enter?persona=${persona}&redirect=${encodeURIComponent(redirect)}`,
-		{ waitUntil: "domcontentloaded" },
-	);
-	await expect(page.locator("#main-content")).toBeVisible({ timeout: 60_000 });
+  const provisionResponse = await page.request.post(
+    '/api/dev/test-auth/session',
+    { data: { persona } }
+  );
+  expect(provisionResponse.ok()).toBe(true);
+  await page.goto(
+    `/api/dev/test-auth/enter?persona=${persona}&redirect=${encodeURIComponent(redirect)}`,
+    { waitUntil: 'domcontentloaded' }
+  );
+  await expect(page.locator('#main-content')).toBeVisible({ timeout: 60_000 });
 }
 
 /** Company and Tools stay collapsed until the viewer opens them (Tim 2026-10-21). */
 async function expandOperatorTools(navigation: Locator) {
-	for (const name of ["Company", "Tools"]) {
-		const group = navigation.getByRole("button", { name, exact: true });
-		if ((await group.count()) === 0) continue;
-		if ((await group.getAttribute("aria-expanded")) !== "true") {
-			await group.click();
-		}
-	}
+  for (const name of ['Company', 'Tools']) {
+    const group = navigation.getByRole('button', { name, exact: true });
+    if ((await group.count()) === 0) continue;
+    if ((await group.getAttribute('aria-expanded')) !== 'true') {
+      await group.click();
+    }
+  }
 }
 
 async function visibleHrefSet(navigation: Locator) {
-	return navigation.locator("a[href]").evaluateAll((links) =>
-		links
-			.filter((link) => {
-				const style = globalThis.getComputedStyle(link);
-				return style.display !== "none" && style.visibility !== "hidden";
-			})
-			.map((link) => link.getAttribute("href"))
-			.filter((href): href is string => href !== null)
-			.sort(),
-	);
+  return navigation.locator('a[href]').evaluateAll(links =>
+    links
+      .filter(link => {
+        const style = globalThis.getComputedStyle(link);
+        return style.display !== 'none' && style.visibility !== 'hidden';
+      })
+      .map(link => link.getAttribute('href'))
+      .filter((href): href is string => href !== null)
+      .sort()
+  );
 }
 
 async function customerNavigationContract(
-	navigation: Locator,
-	mobile: boolean,
+  navigation: Locator,
+  mobile: boolean
 ) {
-	const rawContract = await navigation.evaluate(
-		(
-			element,
-			{
-				isMobile,
-				styleProbeSelector,
-			}: { isMobile: boolean; styleProbeSelector: string },
-		): RawNavigationContract => {
-			const roots = isMobile
-				? [element]
-				: Array.from(element.querySelectorAll("[data-nav-section]"));
-			const nodes = roots.flatMap((root, rootIndex) =>
-				[root, ...Array.from(root.querySelectorAll("*"))].map(
-					(node, nodeIndex) => ({
-						rootIndex,
-						nodeIndex,
-						tag: node.tagName.toLowerCase(),
-						role: node.getAttribute("role"),
-						text:
-							Array.from(node.childNodes)
-								.filter((child) => child.nodeType === Node.TEXT_NODE)
-								.map((child) => child.textContent ?? "")
-								.join(" ") || null,
-						href: node.getAttribute("href"),
-						type: node.getAttribute("type"),
-						classes: Array.from(node.classList),
-						aria: Object.fromEntries(
-							Array.from(node.attributes)
-								.filter((attribute) => attribute.name.startsWith("aria-"))
-								.map((attribute) => {
-									// React useId values differ across sessions. Keep the
-									// control relationship, not the generated id string.
-									if (
-										attribute.name === "aria-controls" ||
-										attribute.name === "aria-owns"
-									) {
-										const target = node.ownerDocument.getElementById(
-											attribute.value,
-										);
-										if (!target) return [attribute.name, "missing-target"];
-										const label =
-											target.getAttribute("aria-label") ??
-											target.getAttribute("role") ??
-											target.tagName.toLowerCase();
-										return [attribute.name, `controls:${label}`];
-									}
-									return [attribute.name, attribute.value];
-								}),
-						),
-					}),
-				),
-			);
-			const styleInvariants = roots.flatMap((root, rootIndex) =>
-				[
-					root,
-					...Array.from(
-						root.querySelectorAll<HTMLAnchorElement | HTMLButtonElement>(
-							styleProbeSelector,
-						),
-					),
-				].map((node) => {
-					const nodeIndex = [
-						root,
-						...Array.from(root.querySelectorAll("*")),
-					].indexOf(node);
-					const style = globalThis.getComputedStyle(node);
-					return {
-						rootIndex,
-						nodeIndex,
-						styles: {
-							display: style.display,
-							visibility: style.visibility,
-							opacity: style.opacity,
-							"pointer-events": style.pointerEvents,
-							"background-color": style.backgroundColor,
-							"border-top-width": style.borderTopWidth,
-							"border-top-style": style.borderTopStyle,
-							"box-shadow": style.boxShadow,
-							"mix-blend-mode": style.mixBlendMode,
-							"backdrop-filter": style.backdropFilter,
-						},
-					};
-				}),
-			);
-			// The accessibility pass follows the same roots as the nodes pass:
-			// scanning the whole landmark leaks the per-user recent-chat rows
-			// (chat links and thread action buttons render inside the nav but
-			// outside every [data-nav-section]), which can never be role-invariant.
-			const accessibility = roots
-				.flatMap((root) => Array.from(root.querySelectorAll("a[href], button")))
-				.map((interactive) => ({
-					role: interactive.tagName.toLowerCase(),
-					name:
-						interactive.getAttribute("aria-label") ??
-						interactive.textContent?.trim() ??
-						null,
-					href: interactive.getAttribute("href"),
-					current: interactive.getAttribute("aria-current"),
-				}));
+  const rawContract = await navigation.evaluate(
+    (
+      element,
+      {
+        isMobile,
+        styleProbeSelector,
+      }: { isMobile: boolean; styleProbeSelector: string }
+    ): RawNavigationContract => {
+      const roots = isMobile
+        ? [element]
+        : Array.from(element.querySelectorAll('[data-nav-section]'));
+      const nodes = roots.flatMap((root, rootIndex) =>
+        [root, ...Array.from(root.querySelectorAll('*'))].map(
+          (node, nodeIndex) => ({
+            rootIndex,
+            nodeIndex,
+            tag: node.tagName.toLowerCase(),
+            role: node.getAttribute('role'),
+            text:
+              Array.from(node.childNodes)
+                .filter(child => child.nodeType === Node.TEXT_NODE)
+                .map(child => child.textContent ?? '')
+                .join(' ') || null,
+            href: node.getAttribute('href'),
+            type: node.getAttribute('type'),
+            classes: Array.from(node.classList),
+            aria: Object.fromEntries(
+              Array.from(node.attributes)
+                .filter(attribute => attribute.name.startsWith('aria-'))
+                .map(attribute => {
+                  // React useId values differ across sessions. Keep the
+                  // control relationship, not the generated id string.
+                  if (
+                    attribute.name === 'aria-controls' ||
+                    attribute.name === 'aria-owns'
+                  ) {
+                    const target = node.ownerDocument.getElementById(
+                      attribute.value
+                    );
+                    if (!target) return [attribute.name, 'missing-target'];
+                    const label =
+                      target.getAttribute('aria-label') ??
+                      target.getAttribute('role') ??
+                      target.tagName.toLowerCase();
+                    return [attribute.name, `controls:${label}`];
+                  }
+                  return [attribute.name, attribute.value];
+                })
+            ),
+          })
+        )
+      );
+      const styleInvariants = roots.flatMap((root, rootIndex) =>
+        [
+          root,
+          ...Array.from(
+            root.querySelectorAll<HTMLAnchorElement | HTMLButtonElement>(
+              styleProbeSelector
+            )
+          ),
+        ].map(node => {
+          const nodeIndex = [
+            root,
+            ...Array.from(root.querySelectorAll('*')),
+          ].indexOf(node);
+          const style = globalThis.getComputedStyle(node);
+          return {
+            rootIndex,
+            nodeIndex,
+            styles: {
+              display: style.display,
+              visibility: style.visibility,
+              opacity: style.opacity,
+              'pointer-events': style.pointerEvents,
+              'background-color': style.backgroundColor,
+              'border-top-width': style.borderTopWidth,
+              'border-top-style': style.borderTopStyle,
+              'box-shadow': style.boxShadow,
+              'mix-blend-mode': style.mixBlendMode,
+              'backdrop-filter': style.backdropFilter,
+            },
+          };
+        })
+      );
+      // The accessibility pass follows the same roots as the nodes pass:
+      // scanning the whole landmark leaks the per-user recent-chat rows
+      // (chat links and thread action buttons render inside the nav but
+      // outside every [data-nav-section]), which can never be role-invariant.
+      const accessibility = roots
+        .flatMap(root => Array.from(root.querySelectorAll('a[href], button')))
+        .map(interactive => ({
+          role: interactive.tagName.toLowerCase(),
+          name:
+            interactive.getAttribute('aria-label') ??
+            interactive.textContent?.trim() ??
+            null,
+          href: interactive.getAttribute('href'),
+          current: interactive.getAttribute('aria-current'),
+        }));
 
-			return { nodes, styleInvariants, accessibility };
-		},
-		{
-			isMobile: mobile,
-			styleProbeSelector: NAVIGATION_STYLE_PROBE_SELECTOR,
-		},
-	);
+      return { nodes, styleInvariants, accessibility };
+    },
+    {
+      isMobile: mobile,
+      styleProbeSelector: NAVIGATION_STYLE_PROBE_SELECTOR,
+    }
+  );
 
-	return normalizeNavigationContract(rawContract);
+  return normalizeNavigationContract(rawContract);
 }
 
-test.describe("OV responsive navigation exclusivity", () => {
-	test.use({ storageState: { cookies: [], origins: [] } });
-	test.skip(
-		process.env.E2E_USE_TEST_AUTH_BYPASS !== "1",
-		"dev-auth bypass not enabled — set E2E_USE_TEST_AUTH_BYPASS=1",
-	);
+test.describe('OV responsive navigation exclusivity', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+  test.skip(
+    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
+    'dev-auth bypass not enabled — set E2E_USE_TEST_AUTH_BYPASS=1'
+  );
 
-	for (const entry of ["selector", "palette", "shortcut"] as const) {
-		test(`workspace round trip via ${entry} remounts the authorized navigation`, async ({
-			page,
-		}) => {
-			test.setTimeout(180_000);
-			await page.setViewportSize({ width: 1440, height: 900 });
-			await enterPersona(page, "admin", APP_ROUTES.DASHBOARD);
-			const customerNavigation = page.getByRole("navigation", {
-				name: "Dashboard Navigation",
-			});
-			const operatorNavigation = page.getByRole("navigation", {
-				name: "OV Navigation",
-			});
-			await expect(customerNavigation).toBeVisible();
-			const customerBefore = await customerNavigationContract(
-				customerNavigation,
-				false,
-			);
+  for (const entry of ['selector', 'palette', 'shortcut'] as const) {
+    test(`workspace round trip via ${entry} remounts the authorized navigation`, async ({
+      page,
+    }) => {
+      test.setTimeout(180_000);
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await enterPersona(page, 'admin', APP_ROUTES.DASHBOARD);
+      const customerNavigation = page.getByRole('navigation', {
+        name: 'Dashboard Navigation',
+      });
+      const operatorNavigation = page.getByRole('navigation', {
+        name: 'OV Navigation',
+      });
+      await expect(customerNavigation).toBeVisible();
+      const customerBefore = await customerNavigationContract(
+        customerNavigation,
+        false
+      );
 
-			for (const destination of [
-				{ label: "OV", href: APP_ROUTES.OV },
-				{ label: "Jovie", href: APP_ROUTES.DASHBOARD },
-			]) {
-				// An RSC fetch or changed URL alone does not prove the old server
-				// layout was discarded. Require a new main-frame document request.
-				const documentRequest = page.waitForRequest(
-					(request) =>
-						request.isNavigationRequest() &&
-						request.frame() === page.mainFrame() &&
-						new URL(request.url()).pathname === destination.href,
-				);
-				await Promise.all([
-					documentRequest,
-					(async () => {
-						if (entry === "selector") {
-							await page
-								.getByRole("button", { name: "Switch Workspace" })
-								.click();
-							await page
-								.getByRole("menuitem", {
-									name: destination.label,
-									exact: true,
-								})
-								.click();
-						} else if (entry === "palette") {
-							await page.keyboard.press("Control+k");
-							await page
-								.getByRole("option")
-								.filter({
-									hasText: `Switch to ${destination.label}`,
-								})
-								.click();
-						} else {
-							// The shortcut intentionally ignores focused text inputs.
-							await page
-								.getByRole("button", { name: "Switch Workspace" })
-								.focus();
-							await page.keyboard.press("Alt+Shift+KeyW");
-						}
-					})(),
-				]);
-				await expect(page).toHaveURL(new RegExp(`${destination.href}/?$`));
-				await expect(
-					page.getByRole("button", { name: "Switch Workspace" }),
-				).toHaveText(destination.label);
-				if (destination.label === "OV") {
-					await expect(operatorNavigation).toBeVisible();
-					await expect(customerNavigation).toHaveCount(0);
-					await expandOperatorTools(operatorNavigation);
-					expect(new Set(await visibleHrefSet(operatorNavigation))).toEqual(
-						new Set(ADMIN_NAV_REGISTRY.map((item) => item.href)),
-					);
-				} else {
-					await expect(customerNavigation).toBeVisible();
-					await expect(operatorNavigation).toHaveCount(0);
-					const customerAfter = await customerNavigationContract(
-						customerNavigation,
-						false,
-					);
-					// Compare the canonical navigation, not async recent-chat controls
-					// that may still be loading after a document navigation.
-					expect(customerAfter.nodes).toEqual(customerBefore.nodes);
-					expect(customerAfter.styleInvariants).toEqual(
-						customerBefore.styleInvariants,
-					);
-					await expect(
-						customerNavigation.locator('[data-navigation-item-id="home"]'),
-					).toHaveAttribute("aria-current", "page");
-				}
-			}
-		});
-	}
+      for (const destination of [
+        { label: 'OV', href: APP_ROUTES.OV },
+        { label: 'Jovie', href: APP_ROUTES.DASHBOARD },
+      ]) {
+        // An RSC fetch or changed URL alone does not prove the old server
+        // layout was discarded. Require a new main-frame document request.
+        const documentRequest = page.waitForRequest(
+          request =>
+            request.isNavigationRequest() &&
+            request.frame() === page.mainFrame() &&
+            new URL(request.url()).pathname === destination.href
+        );
+        await Promise.all([
+          documentRequest,
+          (async () => {
+            if (entry === 'selector') {
+              await page
+                .getByRole('button', { name: 'Switch Workspace' })
+                .click();
+              await page
+                .getByRole('menuitem', {
+                  name: destination.label,
+                  exact: true,
+                })
+                .click();
+            } else if (entry === 'palette') {
+              await page.keyboard.press('Control+k');
+              await page
+                .getByRole('option')
+                .filter({
+                  hasText: `Switch to ${destination.label}`,
+                })
+                .click();
+            } else {
+              // The shortcut intentionally ignores focused text inputs.
+              await page
+                .getByRole('button', { name: 'Switch Workspace' })
+                .focus();
+              await page.keyboard.press('Alt+Shift+KeyW');
+            }
+          })(),
+        ]);
+        await expect(page).toHaveURL(new RegExp(`${destination.href}/?$`));
+        await expect(
+          page.getByRole('button', { name: 'Switch Workspace' })
+        ).toHaveText(destination.label);
+        if (destination.label === 'OV') {
+          await expect(operatorNavigation).toBeVisible();
+          await expect(customerNavigation).toHaveCount(0);
+          await expandOperatorTools(operatorNavigation);
+          expect(new Set(await visibleHrefSet(operatorNavigation))).toEqual(
+            new Set(ADMIN_NAV_REGISTRY.map(item => item.href))
+          );
+        } else {
+          await expect(customerNavigation).toBeVisible();
+          await expect(operatorNavigation).toHaveCount(0);
+          const customerAfter = await customerNavigationContract(
+            customerNavigation,
+            false
+          );
+          // Compare the canonical navigation, not async recent-chat controls
+          // that may still be loading after a document navigation.
+          expect(customerAfter.nodes).toEqual(customerBefore.nodes);
+          expect(customerAfter.styleInvariants).toEqual(
+            customerBefore.styleInvariants
+          );
+          await expect(
+            customerNavigation.locator('[data-navigation-item-id="home"]')
+          ).toHaveAttribute('aria-current', 'page');
+        }
+      }
+    });
+  }
 
-	for (const viewport of VIEWPORTS) {
-		test(`${viewport.label}: OV exposes only canonical operator navigation with stable keyboard and touch geometry`, async ({
-			page,
-		}) => {
-			test.setTimeout(180_000);
-			await page.setViewportSize(viewport);
-			await enterPersona(page, "admin", APP_ROUTES.OV);
-			// /app/ov is Ovie Home (founder decision 2026-10-20).
-			await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.OV}/?$`));
+  for (const viewport of VIEWPORTS) {
+    test(`${viewport.label}: OV exposes only canonical operator navigation with stable keyboard and touch geometry`, async ({
+      page,
+    }) => {
+      test.setTimeout(180_000);
+      await page.setViewportSize(viewport);
+      await enterPersona(page, 'admin', APP_ROUTES.OV);
+      // /app/ov is Ovie Home (founder decision 2026-10-20).
+      await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.OV}/?$`));
 
-			const mobileNavigation = page.getByRole("navigation", {
-				name: "OV Mobile Navigation",
-			});
-			const desktopNavigation = page.getByRole("navigation", {
-				name: "OV Navigation",
-			});
+      const mobileNavigation = page.getByRole('navigation', {
+        name: 'OV Mobile Navigation',
+      });
+      const desktopNavigation = page.getByRole('navigation', {
+        name: 'OV Navigation',
+      });
 
-			if (viewport.width < 1024) {
-				await expect(mobileNavigation).toBeVisible();
-				await expect(desktopNavigation).not.toBeVisible();
-				await expect(
-					page.getByRole("navigation", { name: "Dashboard Tabs" }),
-				).toHaveCount(0);
+      if (viewport.width < 1024) {
+        await expect(mobileNavigation).toBeVisible();
+        await expect(desktopNavigation).not.toBeVisible();
+        await expect(
+          page.getByRole('navigation', { name: 'Dashboard Tabs' })
+        ).toHaveCount(0);
 
-				const bottomControls = mobileNavigation.locator(":is(a, button)");
-				await expect(bottomControls).toHaveCount(5);
-				const controlBoxes = await bottomControls.evaluateAll((controls) =>
-					controls.map((control) => {
-						const box = control.getBoundingClientRect();
-						return {
-							left: box.left,
-							right: box.right,
-							width: box.width,
-							height: box.height,
-						};
-					}),
-				);
-				expect(controlBoxes.every((box) => box.width >= 44)).toBe(true);
-				expect(controlBoxes.every((box) => box.height >= 44)).toBe(true);
-				expect(
-					Math.min(...controlBoxes.map((box) => box.left)),
-				).toBeGreaterThanOrEqual(0);
-				expect(
-					Math.max(...controlBoxes.map((box) => box.right)),
-				).toBeLessThanOrEqual(viewport.width);
+        const bottomControls = mobileNavigation.locator(':is(a, button)');
+        await expect(bottomControls).toHaveCount(5);
+        const controlBoxes = await bottomControls.evaluateAll(controls =>
+          controls.map(control => {
+            const box = control.getBoundingClientRect();
+            return {
+              left: box.left,
+              right: box.right,
+              width: box.width,
+              height: box.height,
+            };
+          })
+        );
+        expect(controlBoxes.every(box => box.width >= 44)).toBe(true);
+        expect(controlBoxes.every(box => box.height >= 44)).toBe(true);
+        expect(
+          Math.min(...controlBoxes.map(box => box.left))
+        ).toBeGreaterThanOrEqual(0);
+        expect(
+          Math.max(...controlBoxes.map(box => box.right))
+        ).toBeLessThanOrEqual(viewport.width);
 
-				const mainBefore = await page.locator("#main-content").boundingBox();
-				const more = page.getByRole("button", { name: "More options" });
-				await more.focus();
-				await page.keyboard.press("Enter");
+        const mainBefore = await page.locator('#main-content').boundingBox();
+        const more = page.getByRole('button', { name: 'More options' });
+        await more.focus();
+        await page.keyboard.press('Enter');
 
-				const expanded = page.getByRole("navigation", {
-					name: "OV Navigation Menu",
-				});
-				await expect(expanded).toBeVisible();
-				await expect(expanded.getByRole("link").first()).toBeFocused();
-				for (const item of ADMIN_NAV_REGISTRY) {
-					await expect(
-						expanded.getByRole("link", { name: item.label }),
-					).toHaveAttribute("href", item.href);
-				}
+        const expanded = page.getByRole('navigation', {
+          name: 'OV Navigation Menu',
+        });
+        await expect(expanded).toBeVisible();
+        await expect(expanded.getByRole('link').first()).toBeFocused();
+        for (const item of ADMIN_NAV_REGISTRY) {
+          await expect(
+            expanded.getByRole('link', { name: item.label })
+          ).toHaveAttribute('href', item.href);
+        }
 
-				const operatorHrefs = new Set(
-					ADMIN_NAV_REGISTRY.map((item) => item.href),
-				);
-				const renderedHrefs = await visibleHrefSet(expanded);
-				expect(new Set(renderedHrefs)).toEqual(operatorHrefs);
+        const operatorHrefs = new Set(
+          ADMIN_NAV_REGISTRY.map(item => item.href)
+        );
+        const renderedHrefs = await visibleHrefSet(expanded);
+        expect(new Set(renderedHrefs)).toEqual(operatorHrefs);
 
-				const mainAfterOpen = await page.locator("#main-content").boundingBox();
-				expect(mainAfterOpen).toEqual(mainBefore);
+        const mainAfterOpen = await page.locator('#main-content').boundingBox();
+        expect(mainAfterOpen).toEqual(mainBefore);
 
-				await page.keyboard.press("Escape");
-				await expect(expanded).toHaveCount(0);
-				await expect(more).toBeFocused();
-				expect(await page.locator("#main-content").boundingBox()).toEqual(
-					mainBefore,
-				);
-			} else {
-				await expect(desktopNavigation).toBeVisible();
-				await expect(mobileNavigation).not.toBeVisible();
-				await expect(
-					page.getByRole("navigation", { name: "Dashboard Navigation" }),
-				).toHaveCount(0);
+        await page.keyboard.press('Escape');
+        await expect(expanded).toHaveCount(0);
+        await expect(more).toBeFocused();
+        expect(await page.locator('#main-content').boundingBox()).toEqual(
+          mainBefore
+        );
+      } else {
+        await expect(desktopNavigation).toBeVisible();
+        await expect(mobileNavigation).not.toBeVisible();
+        await expect(
+          page.getByRole('navigation', { name: 'Dashboard Navigation' })
+        ).toHaveCount(0);
 
-				await expandOperatorTools(desktopNavigation);
-				const operatorLinks = desktopNavigation.getByRole("link");
-				await expect(operatorLinks).toHaveCount(ADMIN_NAV_REGISTRY.length);
-				for (const item of ADMIN_NAV_REGISTRY) {
-					await expect(
-						desktopNavigation.getByRole("link", { name: item.label }),
-					).toHaveAttribute("href", item.href);
-				}
-				expect(new Set(await visibleHrefSet(desktopNavigation))).toEqual(
-					new Set(ADMIN_NAV_REGISTRY.map((item) => item.href)),
-				);
-				// Desktop OV has no page-level Sign Out. The control is the Account
-				// menu item, sentence case, inside the identity group.
-				const account = page.getByRole("group", { name: "Account" });
-				await expect(account).toBeVisible();
-				await account.getByRole("button").click();
-				await expect(
-					page.getByRole("menuitem", { name: "Sign out" }),
-				).toBeVisible();
-			}
-		});
+        await expandOperatorTools(desktopNavigation);
+        const operatorLinks = desktopNavigation.getByRole('link');
+        await expect(operatorLinks).toHaveCount(ADMIN_NAV_REGISTRY.length);
+        for (const item of ADMIN_NAV_REGISTRY) {
+          await expect(
+            desktopNavigation.getByRole('link', { name: item.label })
+          ).toHaveAttribute('href', item.href);
+        }
+        expect(new Set(await visibleHrefSet(desktopNavigation))).toEqual(
+          new Set(ADMIN_NAV_REGISTRY.map(item => item.href))
+        );
+        // Desktop OV has no page-level Sign Out. The control is the Account
+        // menu item, sentence case, inside the identity group.
+        const account = page.getByRole('group', { name: 'Account' });
+        await expect(account).toBeVisible();
+        await account.getByRole('button').click();
+        await expect(
+          page.getByRole('menuitem', { name: 'Sign out' })
+        ).toBeVisible();
+      }
+    });
 
-		test(`${viewport.label}: Jovie navigation is role-invariant and non-admin OV access cannot leak operator links`, async ({
-			browser,
-			page,
-		}) => {
-			test.setTimeout(180_000);
-			await page.setViewportSize(viewport);
+    test(`${viewport.label}: Jovie navigation is role-invariant and non-admin OV access cannot leak operator links`, async ({
+      browser,
+      page,
+    }) => {
+      test.setTimeout(180_000);
+      await page.setViewportSize(viewport);
 
-			await enterPersona(page, "admin", APP_ROUTES.CHAT);
-			const customerNavigationName =
-				viewport.width < 1024 ? "Dashboard Tabs" : "Dashboard Navigation";
-			const adminCustomerNavigation = page.getByRole("navigation", {
-				name: customerNavigationName,
-			});
-			await expect(adminCustomerNavigation).toBeVisible();
-			const adminCustomerContract = await customerNavigationContract(
-				adminCustomerNavigation,
-				viewport.width < 1024,
-			);
-			await expect(
-				page.getByRole("navigation", { name: "OV Mobile Navigation" }),
-			).toHaveCount(0);
-			await expect(
-				page.getByRole("navigation", { name: "OV Navigation" }),
-			).toHaveCount(0);
+      await enterPersona(page, 'admin', APP_ROUTES.CHAT);
+      const customerNavigationName =
+        viewport.width < 1024 ? 'Dashboard Tabs' : 'Dashboard Navigation';
+      const adminCustomerNavigation = page.getByRole('navigation', {
+        name: customerNavigationName,
+      });
+      await expect(adminCustomerNavigation).toBeVisible();
+      const adminCustomerContract = await customerNavigationContract(
+        adminCustomerNavigation,
+        viewport.width < 1024
+      );
+      await expect(
+        page.getByRole('navigation', { name: 'OV Mobile Navigation' })
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole('navigation', { name: 'OV Navigation' })
+      ).toHaveCount(0);
 
-			const creatorContext = await browser.newContext({
-				baseURL: process.env.BASE_URL ?? "http://localhost:3100",
-				viewport,
-			});
-			const creatorPage = await creatorContext.newPage();
+      const creatorContext = await browser.newContext({
+        baseURL: process.env.BASE_URL ?? 'http://localhost:3100',
+        viewport,
+      });
+      const creatorPage = await creatorContext.newPage();
 
-			try {
-				const creatorProvisionResponse = await creatorPage.request.post(
-					"/api/dev/test-auth/session",
-					{ data: { persona: "creator-ready" } },
-				);
-				expect(creatorProvisionResponse.ok()).toBe(true);
-				await enterPersona(creatorPage, "creator-ready", APP_ROUTES.CHAT);
-				const creatorCustomerNavigation = creatorPage.getByRole("navigation", {
-					name: customerNavigationName,
-				});
-				await expect(creatorCustomerNavigation).toBeVisible();
-				expect(
-					await customerNavigationContract(
-						creatorCustomerNavigation,
-						viewport.width < 1024,
-					),
-				).toEqual(adminCustomerContract);
+      try {
+        const creatorProvisionResponse = await creatorPage.request.post(
+          '/api/dev/test-auth/session',
+          { data: { persona: 'creator-ready' } }
+        );
+        expect(creatorProvisionResponse.ok()).toBe(true);
+        await enterPersona(creatorPage, 'creator-ready', APP_ROUTES.CHAT);
+        const creatorCustomerNavigation = creatorPage.getByRole('navigation', {
+          name: customerNavigationName,
+        });
+        await expect(creatorCustomerNavigation).toBeVisible();
+        expect(
+          await customerNavigationContract(
+            creatorCustomerNavigation,
+            viewport.width < 1024
+          )
+        ).toEqual(adminCustomerContract);
 
-				await enterPersona(creatorPage, "creator-ready", APP_ROUTES.OV);
-				await expect(creatorPage).toHaveURL(/\/app\/?$/);
-				await expect(
-					creatorPage.getByRole("navigation", {
-						name: "OV Mobile Navigation",
-					}),
-				).toHaveCount(0);
-				await expect(
-					creatorPage.getByRole("navigation", { name: "OV Navigation" }),
-				).toHaveCount(0);
-			} finally {
-				await creatorContext.close();
-			}
-		});
-	}
+        await enterPersona(creatorPage, 'creator-ready', APP_ROUTES.OV);
+        await expect(creatorPage).toHaveURL(/\/app\/?$/);
+        await expect(
+          creatorPage.getByRole('navigation', {
+            name: 'OV Mobile Navigation',
+          })
+        ).toHaveCount(0);
+        await expect(
+          creatorPage.getByRole('navigation', { name: 'OV Navigation' })
+        ).toHaveCount(0);
+      } finally {
+        await creatorContext.close();
+      }
+    });
+  }
 });

@@ -1,172 +1,172 @@
 // @coverage-via apps/web/tests/unit/profile/profile-compact-template.test.tsx
-"use client";
+'use client';
 
 import {
-	type CSSProperties,
-	type ReactNode,
-	useCallback,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-} from "react";
-import type { SmartLinkCreditGroup } from "@/app/[username]/[slug]/_lib/data";
-import { AnonCookieBootstrap } from "@/components/features/profile/AnonCookieBootstrap";
+  type CSSProperties,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import type { SmartLinkCreditGroup } from '@/app/[username]/[slug]/_lib/data';
+import { AnonCookieBootstrap } from '@/components/features/profile/AnonCookieBootstrap';
 import {
-	ProfileNotificationsContext,
-	useProfileShell,
-} from "@/components/organisms/profile-shell";
-import { BASE_URL, COUNTRY_CODE_COOKIE } from "@/constants/app";
-import { APP_ROUTES } from "@/constants/routes";
+  ProfileNotificationsContext,
+  useProfileShell,
+} from '@/components/organisms/profile-shell';
+import { BASE_URL, COUNTRY_CODE_COOKIE } from '@/constants/app';
+import { APP_ROUTES } from '@/constants/routes';
 import type {
-	ProfileMode,
-	ProfileSurfacePresentation,
-} from "@/features/profile/contracts";
-import type { DrawerView } from "@/features/profile/ProfileUnifiedDrawer";
+  ProfileMode,
+  ProfileSurfacePresentation,
+} from '@/features/profile/contracts';
+import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
 import {
-	getPublicProfileHistoryExitDelta,
-	readPublicProfileHistoryDepth,
-	resolvePublicProfileBackAction,
-	withPublicProfileHistoryDepth,
-} from "@/features/profile/profile-surface-state";
+  getPublicProfileHistoryExitDelta,
+  readPublicProfileHistoryDepth,
+  resolvePublicProfileBackAction,
+  withPublicProfileHistoryDepth,
+} from '@/features/profile/profile-surface-state';
 import {
-	getProfileMode,
-	getProfileModeHref,
-} from "@/features/profile/registry";
-import type { PublicRelease } from "@/features/profile/releases/types";
-import { ReleaseCreditsDrawer } from "@/features/release/ReleaseCreditsDrawer";
-import { useIsAuthenticated } from "@/hooks/useIsAuthenticated";
-import { sortDSPsByGeoPopularity } from "@/lib/dsp";
-import type { ProfileAlertOptInVariant } from "@/lib/flags/contracts";
+  getProfileMode,
+  getProfileModeHref,
+} from '@/features/profile/registry';
+import type { PublicRelease } from '@/features/profile/releases/types';
+import { ReleaseCreditsDrawer } from '@/features/release/ReleaseCreditsDrawer';
+import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
+import { sortDSPsByGeoPopularity } from '@/lib/dsp';
+import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import {
-	DEFAULT_PROFILE_PAC_ASSIGNMENT,
-	type ProfilePacAssignment,
-} from "@/lib/flags/profile-pac";
-import { useNotifications } from "@/lib/hooks/useNotifications";
-import type { PublicMerchCard } from "@/lib/merch/types";
-import { PROFILE_DESKTOP_SURFACE_ENABLED } from "@/lib/profile/desktop-surface-flag";
-import type { EntityMentionSegment } from "@/lib/profile/entity-mentions";
-import type { ConfirmedFeaturedPlaylistFallback } from "@/lib/profile/featured-playlist-fallback";
+  DEFAULT_PROFILE_PAC_ASSIGNMENT,
+  type ProfilePacAssignment,
+} from '@/lib/flags/profile-pac';
+import { useNotifications } from '@/lib/hooks/useNotifications';
+import type { PublicMerchCard } from '@/lib/merch/types';
+import { PROFILE_DESKTOP_SURFACE_ENABLED } from '@/lib/profile/desktop-surface-flag';
+import type { EntityMentionSegment } from '@/lib/profile/entity-mentions';
+import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import {
-	buildProfileAccentCssVars,
-	readProfileAccentTheme,
-} from "@/lib/profile/profile-theme";
-import { getPermittedPublicProfileNavigation } from "@/lib/profile/route-config";
-import { getCanonicalProfileDSPs } from "@/lib/profile-dsps";
+  buildProfileAccentCssVars,
+  readProfileAccentTheme,
+} from '@/lib/profile/profile-theme';
+import { getPermittedPublicProfileNavigation } from '@/lib/profile/route-config';
+import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import {
-	useUnsubscribeNotificationsMutation,
-	useUpdateContentPreferencesMutation,
-} from "@/lib/queries/useNotificationStatusQuery";
-import type { TourDateViewModel } from "@/lib/tour-dates/types";
-import type { AvatarSize } from "@/lib/utils/avatar-sizes";
-import { isDefaultAvatarUrl } from "@/lib/utils/dsp-images";
-import type { PublicContact } from "@/types/contacts";
-import type { Artist, LegacySocialLink } from "@/types/db";
-import type { NotificationContentType } from "@/types/notifications";
-import type { PressPhoto } from "@/types/press-photos";
-import { ProfileCompactSurface } from "./ProfileCompactSurface";
-import { ProfileDesktopSurface } from "./ProfileDesktopSurface";
-import { PublicProfileLayoutShell } from "./PublicProfileLayoutShell";
+  useUnsubscribeNotificationsMutation,
+  useUpdateContentPreferencesMutation,
+} from '@/lib/queries/useNotificationStatusQuery';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
+import type { AvatarSize } from '@/lib/utils/avatar-sizes';
+import { isDefaultAvatarUrl } from '@/lib/utils/dsp-images';
+import type { PublicContact } from '@/types/contacts';
+import type { Artist, LegacySocialLink } from '@/types/db';
+import type { NotificationContentType } from '@/types/notifications';
+import type { PressPhoto } from '@/types/press-photos';
+import { ProfileCompactSurface } from './ProfileCompactSurface';
+import { ProfileDesktopSurface } from './ProfileDesktopSurface';
+import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
 
 interface ProfileCompactTemplateProps {
-	readonly mode: ProfileMode;
-	readonly artist: Artist;
-	readonly socialLinks: LegacySocialLink[];
-	readonly contacts: PublicContact[];
-	readonly showPayButton?: boolean;
-	readonly latestRelease?: {
-		readonly title: string;
-		readonly slug: string;
-		readonly artworkUrl: string | null;
-		readonly releaseDate: Date | string | null;
-		readonly revealDate?: Date | string | null;
-		readonly releaseType: string;
-	} | null;
-	readonly profileSettings?: {
-		readonly showOldReleases?: boolean;
-	} | null;
-	readonly featuredPlaylistFallback?: ConfirmedFeaturedPlaylistFallback | null;
-	readonly profileBanner?: ReactNode;
-	readonly allowFanCapture?: boolean;
-	readonly enableDynamicEngagement?: boolean;
-	readonly subscribeTwoStep?: boolean;
-	readonly alertOptInVariant?: ProfileAlertOptInVariant;
-	readonly profilePacAssignment?: ProfilePacAssignment;
-	readonly genres?: string[] | null;
-	readonly pressPhotos?: PressPhoto[];
-	readonly allowPhotoDownloads?: boolean;
-	/** Selected-credits segments for the About destination (JOV-6199). */
-	readonly creditSegments?: readonly EntityMentionSegment[];
-	readonly photoDownloadSizes?: AvatarSize[];
-	readonly tourDates?: TourDateViewModel[];
-	readonly visitTrackingToken?: string;
-	readonly showSubscriptionConfirmedBanner?: boolean;
-	readonly viewerCountryCode?: string | null;
-	readonly releases?: readonly PublicRelease[];
-	readonly catalogLoadFailed?: boolean;
-	readonly merchCards?: readonly PublicMerchCard[];
-	readonly hideJovieBranding?: boolean;
-	readonly hideMoreMenu?: boolean;
-	readonly visualVariant?: "default";
-	/** Desktop spare-space claim footer (JOV-3544). */
-	readonly showClaimFooter?: boolean;
-	readonly claimFooterHref?: string | null;
-	readonly claimFooterLabel?: string;
-	readonly proofClaim?: boolean;
-	/** Credits for the profile's latest release. Opens the shared credits drawer. */
-	readonly releaseCredits?: readonly SmartLinkCreditGroup[];
-	/** True when this template is embedded in another page (marketing/demo
-	 *  preview) rather than serving as the outer profile document. Forwarded
-	 *  to the layout shell so the global viewport scroll lock skips embedded
-	 *  previews (JOV-4932). */
-	readonly embeddedPreview?: boolean;
+  readonly mode: ProfileMode;
+  readonly artist: Artist;
+  readonly socialLinks: LegacySocialLink[];
+  readonly contacts: PublicContact[];
+  readonly showPayButton?: boolean;
+  readonly latestRelease?: {
+    readonly title: string;
+    readonly slug: string;
+    readonly artworkUrl: string | null;
+    readonly releaseDate: Date | string | null;
+    readonly revealDate?: Date | string | null;
+    readonly releaseType: string;
+  } | null;
+  readonly profileSettings?: {
+    readonly showOldReleases?: boolean;
+  } | null;
+  readonly featuredPlaylistFallback?: ConfirmedFeaturedPlaylistFallback | null;
+  readonly profileBanner?: ReactNode;
+  readonly allowFanCapture?: boolean;
+  readonly enableDynamicEngagement?: boolean;
+  readonly subscribeTwoStep?: boolean;
+  readonly alertOptInVariant?: ProfileAlertOptInVariant;
+  readonly profilePacAssignment?: ProfilePacAssignment;
+  readonly genres?: string[] | null;
+  readonly pressPhotos?: PressPhoto[];
+  readonly allowPhotoDownloads?: boolean;
+  /** Selected-credits segments for the About destination (JOV-6199). */
+  readonly creditSegments?: readonly EntityMentionSegment[];
+  readonly photoDownloadSizes?: AvatarSize[];
+  readonly tourDates?: TourDateViewModel[];
+  readonly visitTrackingToken?: string;
+  readonly showSubscriptionConfirmedBanner?: boolean;
+  readonly viewerCountryCode?: string | null;
+  readonly releases?: readonly PublicRelease[];
+  readonly catalogLoadFailed?: boolean;
+  readonly merchCards?: readonly PublicMerchCard[];
+  readonly hideJovieBranding?: boolean;
+  readonly hideMoreMenu?: boolean;
+  readonly visualVariant?: 'default';
+  /** Desktop spare-space claim footer (JOV-3544). */
+  readonly showClaimFooter?: boolean;
+  readonly claimFooterHref?: string | null;
+  readonly claimFooterLabel?: string;
+  readonly proofClaim?: boolean;
+  /** Credits for the profile's latest release. Opens the shared credits drawer. */
+  readonly releaseCredits?: readonly SmartLinkCreditGroup[];
+  /** True when this template is embedded in another page (marketing/demo
+   *  preview) rather than serving as the outer profile document. Forwarded
+   *  to the layout shell so the global viewport scroll lock skips embedded
+   *  previews (JOV-4932). */
+  readonly embeddedPreview?: boolean;
 }
 
 function resolveDrawerView(
-	mode: ProfileMode,
-	options: {
-		readonly hasContacts: boolean;
-		readonly hasTip: boolean;
-		readonly hasReleases: boolean;
-	},
-	layout: "compact" | "desktop",
+  mode: ProfileMode,
+  options: {
+    readonly hasContacts: boolean;
+    readonly hasTip: boolean;
+    readonly hasReleases: boolean;
+  },
+  layout: 'compact' | 'desktop'
 ): DrawerView | null {
-	if (layout === "desktop") {
-		switch (mode) {
-			case "contact":
-				return options.hasContacts ? mode : null;
-			case "pay":
-				return options.hasTip ? mode : null;
-			default:
-				return null;
-		}
-	}
+  if (layout === 'desktop') {
+    switch (mode) {
+      case 'contact':
+        return options.hasContacts ? mode : null;
+      case 'pay':
+        return options.hasTip ? mode : null;
+      default:
+        return null;
+    }
+  }
 
-	switch (mode) {
-		case "contact":
-			return options.hasContacts ? mode : null;
-		case "pay":
-			return options.hasTip ? mode : null;
-		case "about":
-		case "profile":
-		case "listen":
-		case "subscribe":
-		case "tour":
-		case "releases":
-		default:
-			return null;
-	}
+  switch (mode) {
+    case 'contact':
+      return options.hasContacts ? mode : null;
+    case 'pay':
+      return options.hasTip ? mode : null;
+    case 'about':
+    case 'profile':
+    case 'listen':
+    case 'subscribe':
+    case 'tour':
+    case 'releases':
+    default:
+      return null;
+  }
 }
 
 function unwrapNextImageUrl(url: string | null | undefined): string | null {
-	if (!url) return null;
-	try {
-		const parsed = new URL(url, "http://localhost");
-		if (parsed.pathname !== "/_next/image") return url;
-		return parsed.searchParams.get("url") ?? url;
-	} catch {
-		return url;
-	}
+  if (!url) return null;
+  try {
+    const parsed = new URL(url, 'http://localhost');
+    if (parsed.pathname !== '/_next/image') return url;
+    return parsed.searchParams.get('url') ?? url;
+  } catch {
+    return url;
+  }
 }
 
 const DRAWER_CLOSE_RESET_DELAY_MS = 200;
@@ -177,1071 +177,1071 @@ const DRAWER_CLOSE_RESET_DELAY_MS = 200;
  * and hydration without branching.
  */
 function readClientCookieValue(name: string): string | null {
-	if (globalThis.document === undefined) return null;
-	for (const entry of globalThis.document.cookie.split(";")) {
-		const [key, ...rest] = entry.trim().split("=");
-		if (key === name && rest.length > 0) {
-			try {
-				return decodeURIComponent(rest.join("="));
-			} catch {
-				return rest.join("=");
-			}
-		}
-	}
-	return null;
+  if (globalThis.document === undefined) return null;
+  for (const entry of globalThis.document.cookie.split(';')) {
+    const [key, ...rest] = entry.trim().split('=');
+    if (key === name && rest.length > 0) {
+      try {
+        return decodeURIComponent(rest.join('='));
+      } catch {
+        return rest.join('=');
+      }
+    }
+  }
+  return null;
 }
 
 function getInitialModeFromLocation(
-	fallbackMode: ProfileMode,
-	readWindowLocation = false,
+  fallbackMode: ProfileMode,
+  readWindowLocation = false
 ): ProfileMode {
-	if (!readWindowLocation || globalThis.window === undefined) {
-		return fallbackMode;
-	}
+  if (!readWindowLocation || globalThis.window === undefined) {
+    return fallbackMode;
+  }
 
-	const modeParam = new URLSearchParams(globalThis.location.search).get("mode");
-	return modeParam === null ? fallbackMode : getProfileMode(modeParam);
+  const modeParam = new URLSearchParams(globalThis.location.search).get('mode');
+  return modeParam === null ? fallbackMode : getProfileMode(modeParam);
 }
 
 function getInitialDrawerPresentation(): ProfileSurfacePresentation {
-	// Keep the first client render identical to the server render. The responsive
-	// presentation is synced in an effect immediately after hydration.
-	return "standalone";
+  // Keep the first client render identical to the server render. The responsive
+  // presentation is synced in an effect immediately after hydration.
+  return 'standalone';
 }
 
 function getInitialIsDesktopLayout(): boolean {
-	// Keep the first client render identical to the server render. The responsive
-	// layout is synced in an effect immediately after hydration.
-	return false;
+  // Keep the first client render identical to the server render. The responsive
+  // layout is synced in an effect immediately after hydration.
+  return false;
 }
 
 function getModeFromUrl(): ProfileMode {
-	if (globalThis.window === undefined) {
-		return "profile";
-	}
+  if (globalThis.window === undefined) {
+    return 'profile';
+  }
 
-	const modeParam = new URLSearchParams(globalThis.location.search).get("mode");
-	return modeParam === null ? "profile" : getProfileMode(modeParam);
+  const modeParam = new URLSearchParams(globalThis.location.search).get('mode');
+  return modeParam === null ? 'profile' : getProfileMode(modeParam);
 }
 
 function getModeFromDrawerView(view: DrawerView): ProfileMode | null {
-	switch (view) {
-		case "about":
-		case "subscribe":
-		case "contact":
-		case "listen":
-		case "pay":
-		case "tour":
-		case "releases":
-			return view;
-		default:
-			return null;
-	}
+  switch (view) {
+    case 'about':
+    case 'subscribe':
+    case 'contact':
+    case 'listen':
+    case 'pay':
+    case 'tour':
+    case 'releases':
+      return view;
+    default:
+      return null;
+  }
 }
 
 function resolveHistoryMode(params: {
-	readonly drawerOpen: boolean;
-	readonly drawerView: DrawerView;
-	readonly requestedMode: ProfileMode;
+  readonly drawerOpen: boolean;
+  readonly drawerView: DrawerView;
+  readonly requestedMode: ProfileMode;
 }): ProfileMode | null {
-	const { drawerOpen, drawerView, requestedMode } = params;
+  const { drawerOpen, drawerView, requestedMode } = params;
 
-	if (!drawerOpen || drawerView === "menu" || drawerView === "notifications") {
-		return requestedMode === "profile" ? null : requestedMode;
-	}
+  if (!drawerOpen || drawerView === 'menu' || drawerView === 'notifications') {
+    return requestedMode === 'profile' ? null : requestedMode;
+  }
 
-	return getModeFromDrawerView(drawerView) ?? requestedMode;
+  return getModeFromDrawerView(drawerView) ?? requestedMode;
 }
 
 export function ProfileCompactTemplate({
-	mode,
-	artist,
-	socialLinks,
-	contacts,
-	showPayButton = false,
-	latestRelease,
-	profileSettings,
-	featuredPlaylistFallback,
-	profileBanner,
-	allowFanCapture = true,
-	enableDynamicEngagement = false,
-	subscribeTwoStep = false,
-	alertOptInVariant = "button",
-	profilePacAssignment = DEFAULT_PROFILE_PAC_ASSIGNMENT,
-	genres,
-	pressPhotos = [],
-	allowPhotoDownloads = false,
-	creditSegments,
-	photoDownloadSizes = [],
-	tourDates = [],
-	visitTrackingToken,
-	showSubscriptionConfirmedBanner = false,
-	viewerCountryCode,
-	releases,
-	catalogLoadFailed = false,
-	merchCards = [],
-	hideJovieBranding = false,
-	hideMoreMenu = false,
-	visualVariant = "default",
-	showClaimFooter = false,
-	claimFooterHref = null,
-	claimFooterLabel,
-	proofClaim = false,
-	releaseCredits,
-	embeddedPreview = false,
+  mode,
+  artist,
+  socialLinks,
+  contacts,
+  showPayButton = false,
+  latestRelease,
+  profileSettings,
+  featuredPlaylistFallback,
+  profileBanner,
+  allowFanCapture = true,
+  enableDynamicEngagement = false,
+  subscribeTwoStep = false,
+  alertOptInVariant = 'button',
+  profilePacAssignment = DEFAULT_PROFILE_PAC_ASSIGNMENT,
+  genres,
+  pressPhotos = [],
+  allowPhotoDownloads = false,
+  creditSegments,
+  photoDownloadSizes = [],
+  tourDates = [],
+  visitTrackingToken,
+  showSubscriptionConfirmedBanner = false,
+  viewerCountryCode,
+  releases,
+  catalogLoadFailed = false,
+  merchCards = [],
+  hideJovieBranding = false,
+  hideMoreMenu = false,
+  visualVariant = 'default',
+  showClaimFooter = false,
+  claimFooterHref = null,
+  claimFooterLabel,
+  proofClaim = false,
+  releaseCredits,
+  embeddedPreview = false,
 }: ProfileCompactTemplateProps) {
-	const previousLocationModeRef = useRef<ProfileMode | undefined>(undefined);
-	const visibleReleaseCredits = (releaseCredits ?? []).filter(
-		(group) => group.entries.length > 0,
-	);
-	const [creditsOpen, setCreditsOpen] = useState(false);
-	const hasContacts = contacts.some((contact) => contact.channels.length > 0);
-	const hasTip =
-		showPayButton && socialLinks.some((link) => link.platform === "venmo");
-	const hasReleases = (releases?.length ?? 0) >= 2;
-	const publicProfileNavIds = getPermittedPublicProfileNavigation()
-		.map((destination) => destination.id)
-		.join(",");
-	const initialDrawerView = resolveDrawerView(
-		mode,
-		{ hasContacts, hasTip, hasReleases },
-		"compact",
-	);
-
-	// alertOptInVariant starts as the ISR-rendered default ('button').
-	// AnonCookieBootstrap resolves the per-user Statsig variant on mount and
-	// updates this state, so real visitors see their assigned experiment variant.
-	const [resolvedAlertOptInVariant, setResolvedAlertOptInVariant] =
-		useState<ProfileAlertOptInVariant>(alertOptInVariant);
-	const [resolvedProfilePacAssignment, setResolvedProfilePacAssignment] =
-		useState<ProfilePacAssignment>(profilePacAssignment);
-	// The ISR render cannot read the httpOnly jv_aid cookie, so per-user
-	// experiment assignments land via AnonCookieBootstrap after hydration.
-	// Until that resolution settles, variant-dependent fan-capture CTAs stay
-	// unmounted — the assigned control must never morph under a visitor's
-	// cursor (a click mid-flight would hit the wrong variant).
-	const [visitorAssignmentResolved, setVisitorAssignmentResolved] =
-		useState(false);
-	const markVisitorAssignmentResolved = useCallback(() => {
-		setVisitorAssignmentResolved(true);
-	}, []);
-
-	// The proxy stamps the edge-geo country into the readable jv_country
-	// cookie so ISR pages can geo-sort DSPs without a server headers() read.
-	// Read it post-mount (same pattern as `initialSource` below) so the first
-	// client render stays identical to the server render.
-	const [resolvedViewerCountryCode, setResolvedViewerCountryCode] = useState<
-		string | null
-	>(viewerCountryCode ?? null);
-	useEffect(() => {
-		if (viewerCountryCode != null) return;
-		const cookieValue = readClientCookieValue(COUNTRY_CODE_COOKIE);
-		if (cookieValue) {
-			setResolvedViewerCountryCode(cookieValue);
-		}
-	}, [viewerCountryCode]);
-	const [drawerOpen, setDrawerOpen] = useState(initialDrawerView !== null);
-	const [drawerView, setDrawerView] = useState<DrawerView>(
-		initialDrawerView ?? "menu",
-	);
-	const [drawerPresentation, setDrawerPresentation] =
-		useState<ProfileSurfacePresentation>(getInitialDrawerPresentation);
-	const [isDesktopLayout, setIsDesktopLayout] = useState(
-		getInitialIsDesktopLayout,
-	);
-	const [isHydrated, setIsHydrated] = useState(false);
-	const [desktopSurfaceReady, setDesktopSurfaceReady] = useState(false);
-	const [requestedMode, setRequestedMode] = useState<ProfileMode>(() =>
-		getInitialModeFromLocation(mode, false),
-	);
-	const revealNotificationsRef = useRef<(() => void) | null>(null);
-	const closeResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-	const drawerOpenRef = useRef(initialDrawerView !== null);
-	const drawerViewRef = useRef<DrawerView>(initialDrawerView ?? "menu");
-	const lastSyncedModeRef = useRef<ProfileMode | null>(null);
-	const lastPrimaryModeRef = useRef<ProfileMode>("profile");
-	const initialLocationModeAlignedRef = useRef(false);
-	const suppressNextHistorySyncRef = useRef(true);
-	const arrivalHistoryLengthRef = useRef<number | null>(null);
-	// The pathname this document mounted on. Render fixtures mount this
-	// template on their own pathname; user-initiated mode activation from
-	// there stays sanctioned.
-	const mountedPathnameRef = useRef<string | null>(null);
-	const profileHistoryDepthRef = useRef(0);
-	// The mode this document landed with. Filled in by the effect below, before
-	// the history effect, while the landing URL is still intact. Next's history
-	// updater can replace that entry with the bare profile path after child
-	// effects; restoring the mode must not push a second entry on top of the strip.
-	const landedHistoryModeRef = useRef<ProfileMode | null>(null);
-	// The URL/intent pair the history effect last observed. When a later run
-	// sees the URL move while the intent is unchanged, a client Link navigation
-	// (or Next's own entry updater) is mid-flight and requestedMode has not
-	// synced yet; writing the stale intent back would revert the navigation.
-	const lastHistorySyncRef = useRef<{
-		href: string;
-		mode: ProfileMode | null;
-	} | null>(null);
-
-	const clearCloseResetTimer = useCallback(() => {
-		if (closeResetTimerRef.current !== null) {
-			clearTimeout(closeResetTimerRef.current);
-			closeResetTimerRef.current = null;
-		}
-	}, []);
-
-	useEffect(() => {
-		drawerOpenRef.current = drawerOpen;
-	}, [drawerOpen]);
-
-	useEffect(() => {
-		arrivalHistoryLengthRef.current = globalThis.history.length;
-		mountedPathnameRef.current = globalThis.location.pathname;
-		profileHistoryDepthRef.current = readPublicProfileHistoryDepth(
-			globalThis.history.state,
-		);
-	}, []);
-
-	useEffect(() => clearCloseResetTimer, [clearCloseResetTimer]);
-
-	useEffect(() => {
-		const orientation = screen?.orientation as
-			| (ScreenOrientation & {
-					lock?: (orientation: string) => Promise<void>;
-					unlock?: () => void;
-			  })
-			| undefined;
-		if (!orientation?.lock) return;
-		orientation.lock("portrait").catch(() => {});
-		return () => {
-			orientation.unlock?.();
-		};
-	}, []);
-
-	useEffect(() => {
-		if (globalThis.window === undefined) {
-			return;
-		}
-
-		const embeddedQuery = globalThis.matchMedia("(min-width: 768px)");
-		const desktopQuery = globalThis.matchMedia("(min-width: 1180px)");
-		const syncPresentation = () => {
-			// With the desktop surface flagged off (the default), desktop widths
-			// keep the compact surface in its centered phone column, so drawers use
-			// the same embedded presentation as tablet widths.
-			const ownsDesktopLayout =
-				PROFILE_DESKTOP_SURFACE_ENABLED &&
-				desktopQuery.matches &&
-				!embeddedPreview;
-			setIsDesktopLayout(ownsDesktopLayout);
-			setDrawerPresentation(
-				ownsDesktopLayout
-					? "modal"
-					: embeddedQuery.matches
-						? "embedded"
-						: "standalone",
-			);
-		};
-
-		syncPresentation();
-		setIsHydrated(true);
-
-		if (
-			typeof embeddedQuery.addEventListener === "function" &&
-			typeof desktopQuery.addEventListener === "function"
-		) {
-			embeddedQuery.addEventListener("change", syncPresentation);
-			desktopQuery.addEventListener("change", syncPresentation);
-			return () => {
-				embeddedQuery.removeEventListener("change", syncPresentation);
-				desktopQuery.removeEventListener("change", syncPresentation);
-			};
-		}
-
-		embeddedQuery.addListener(syncPresentation);
-		desktopQuery.addListener(syncPresentation);
-		return () => {
-			embeddedQuery.removeListener(syncPresentation);
-			desktopQuery.removeListener(syncPresentation);
-		};
-	}, [embeddedPreview]);
-
-	const mergedDSPs = useMemo(
-		() =>
-			sortDSPsByGeoPopularity(
-				getCanonicalProfileDSPs(artist, socialLinks),
-				resolvedViewerCountryCode,
-			),
-		[artist, socialLinks, resolvedViewerCountryCode],
-	);
-
-	const heroImageUrl = useMemo(() => {
-		const imageUrl = unwrapNextImageUrl(
-			photoDownloadSizes.find((size) => size.key === "large")?.url ??
-				photoDownloadSizes.find((size) => size.key === "original")?.url ??
-				artist.image_url ??
-				null,
-		);
-		return isDefaultAvatarUrl(imageUrl) ? null : imageUrl;
-	}, [artist.image_url, photoDownloadSizes]);
-
-	// Track hero image load failure so the ambient background degrades to the
-	// gradient placeholder instead of rendering a blank or icon-filled container.
-	const [heroImageError, setHeroImageError] = useState(false);
-
-	// Reset on hero URL change (e.g. artist data refresh or profile switch)
-	useEffect(() => {
-		setHeroImageError(false);
-	}, [heroImageUrl]);
-
-	const profileAccentStyle = useMemo(
-		() =>
-			buildProfileAccentCssVars(
-				readProfileAccentTheme(artist.theme),
-			) as CSSProperties,
-		[artist.theme],
-	);
-
-	// Hydration-safe entry-query capture: reading location.search during the
-	// first client render (e.g. a window-guarded useMemo) makes the identity
-	// link href differ from the SSR'd markup whenever a source param is present
-	// (/testartist vs /testartist?source=qr — React hydration mismatch, and the
-	// attribute is never patched up). Render null (matching the server) and
-	// read the param post-mount; the re-render then stamps the source into the
-	// href and the history-sync effect. Tracking does not regress: the
-	// sourceOverride falls through to useProfileShell's own hydration-safe
-	// locationSource (useSyncExternalStore) while this is null.
-	const [initialSource, setInitialSource] = useState<string | null>(null);
-	const [initialClaimIntent, setInitialClaimIntent] = useState<boolean | null>(
-		null,
-	);
-	useEffect(() => {
-		const params = new URLSearchParams(globalThis.location.search);
-		setInitialSource(params.get("source"));
-		setInitialClaimIntent(params.get("claim") === "1");
-	}, []);
-
-	const { notificationsContextValue, notificationsController, locationMode } =
-		useProfileShell({
-			artist,
-			socialLinks,
-			viewerCountryCode: resolvedViewerCountryCode,
-			contacts,
-			visitTrackingToken,
-			modeOverride: requestedMode,
-			sourceOverride: initialSource,
-			smsEnabled: enableDynamicEngagement,
-		});
-
-	const isSubscribed = Boolean(
-		notificationsContextValue.subscribedChannels.email ||
-			notificationsContextValue.subscribedChannels.sms,
-	);
-	const subscriberEmail =
-		notificationsContextValue.subscriptionDetails?.email ?? "";
-	const subscriberPhone =
-		notificationsContextValue.subscriptionDetails?.sms ?? "";
-	const subscribedViaEmail = Boolean(
-		notificationsContextValue.subscribedChannels.email,
-	);
-
-	const serverPrefs = notificationsController.contentPreferences;
-	const [contentPrefs, setContentPrefs] = useState<
-		Record<NotificationContentType, boolean>
-	>({
-		newMusic: serverPrefs?.newMusic ?? true,
-		tourDates: serverPrefs?.tourDates ?? true,
-		merch: serverPrefs?.merch ?? true,
-		general: serverPrefs?.general ?? true,
-	});
-
-	useEffect(() => {
-		if (serverPrefs) {
-			setContentPrefs({
-				newMusic: serverPrefs.newMusic ?? true,
-				tourDates: serverPrefs.tourDates ?? true,
-				merch: serverPrefs.merch ?? true,
-				general: serverPrefs.general ?? true,
-			});
-		}
-	}, [serverPrefs]);
-
-	const prefsMutation = useUpdateContentPreferencesMutation();
-	const unsubMutation = useUnsubscribeNotificationsMutation();
-	const { success: showSuccess } = useNotifications();
-
-	const handleTogglePref = useCallback(
-		(key: NotificationContentType) => {
-			const prev = contentPrefs[key];
-			const next = !prev;
-			setContentPrefs((state) => ({ ...state, [key]: next }));
-			prefsMutation.mutate(
-				{
-					artistId: artist.id,
-					email: subscriberEmail || undefined,
-					phone: subscriberPhone || undefined,
-					preferences: { [key]: next },
-				},
-				{
-					onError: () => {
-						setContentPrefs((state) => ({ ...state, [key]: prev }));
-					},
-				},
-			);
-		},
-		[contentPrefs, artist.id, subscriberEmail, subscriberPhone, prefsMutation],
-	);
-
-	const handleUnsubscribe = useCallback(() => {
-		const channel = subscribedViaEmail ? "email" : "sms";
-		const identifier = subscribedViaEmail
-			? { email: subscriberEmail }
-			: { phone: subscriberPhone };
-		unsubMutation.mutate(
-			{
-				artistId: artist.id,
-				channel,
-				...identifier,
-			},
-			{
-				onSuccess: () => {
-					notificationsContextValue.setSubscribedChannels({});
-					notificationsContextValue.setSubscriptionDetails({});
-					notificationsContextValue.setState("idle");
-					setRequestedMode("profile");
-					showSuccess("Notifications turned off");
-				},
-			},
-		);
-	}, [
-		artist.id,
-		subscribedViaEmail,
-		subscriberEmail,
-		subscriberPhone,
-		unsubMutation,
-		notificationsContextValue,
-		showSuccess,
-	]);
-
-	const searchSuffix = useMemo(() => {
-		// Preserve the public claim-entry marker across profile navigation, never
-		// arbitrary incoming query fields (which may contain private tokens).
-		return [
-			initialSource ? `source=${encodeURIComponent(initialSource)}` : "",
-			initialClaimIntent ? "claim=1" : "",
-		]
-			.filter(Boolean)
-			.join("&");
-	}, [initialSource, initialClaimIntent]);
-
-	const resolveInitialView = useCallback(
-		(nextMode: ProfileMode) =>
-			resolveDrawerView(
-				nextMode,
-				{
-					hasContacts,
-					hasTip,
-					hasReleases,
-				},
-				isDesktopLayout ? "desktop" : "compact",
-			),
-		[hasContacts, hasReleases, hasTip, isDesktopLayout],
-	);
-
-	const syncRequestedModeFromLocation = useCallback(
-		(fallbackMode = mode) => {
-			const nextMode = getInitialModeFromLocation(fallbackMode, true);
-			// React may replay a state updater after the alignment effect commits.
-			// Keep history guards outside that replay using the committed mode.
-			if (lastSyncedModeRef.current !== nextMode) {
-				suppressNextHistorySyncRef.current = true;
-				initialLocationModeAlignedRef.current = false;
-			}
-			setRequestedMode(nextMode);
-		},
-		[mode],
-	);
-
-	useEffect(() => {
-		const previousMode = previousLocationModeRef.current;
-		previousLocationModeRef.current = locationMode;
-		// Reuse the shell's hydration-safe location store for client Link changes.
-		// Later query removal means Home even with a cached Contact server mode.
-		const locationChanged =
-			previousMode !== undefined && previousMode !== locationMode;
-		syncRequestedModeFromLocation(locationChanged ? "profile" : mode);
-	}, [locationMode, mode, syncRequestedModeFromLocation]);
-
-	useEffect(() => {
-		if (requestedMode === getModeFromUrl()) {
-			initialLocationModeAlignedRef.current = true;
-			globalThis.document?.documentElement.removeAttribute(
-				"data-profile-initial-mode",
-			);
-		}
-	}, [requestedMode]);
-
-	useEffect(() => {
-		if (
-			requestedMode === "profile" ||
-			requestedMode === "listen" ||
-			requestedMode === "tour" ||
-			requestedMode === "about" ||
-			requestedMode === "releases"
-		) {
-			lastPrimaryModeRef.current = requestedMode;
-		}
-	}, [requestedMode]);
-
-	useEffect(() => {
-		// Drawer open/close sync is keyed to the requested *mode* (stable visitor
-		// intent), not to data. `resolveInitialView` also depends on data-derived
-		// capabilities (hasContacts/hasTip/hasReleases), so a background refetch
-		// that transiently empties data re-runs this effect. Without the
-		// mode-change gate that churn would close an open drawer (and the
-		// resolving refetch would re-open it / yank the view back) — the
-		// intermittent open/close bug from JOV-4848. When only data changed, an
-		// already-open drawer must be left untouched; render-time fallbacks own
-		// missing data (same pattern as the JOV-2150 no-flicker fix).
-		const modeChanged = lastSyncedModeRef.current !== requestedMode;
-		lastSyncedModeRef.current = requestedMode;
-
-		const resolved = resolveInitialView(requestedMode);
-		if (resolved) {
-			if (!modeChanged && drawerOpenRef.current) {
-				return;
-			}
-			clearCloseResetTimer();
-			drawerViewRef.current = resolved;
-			setDrawerView(resolved);
-			drawerOpenRef.current = true;
-			setDrawerOpen(true);
-			return;
-		}
-
-		// A visitor can tap the root Menu as soon as the global hydration marker
-		// appears, before this component's initial profile-mode effect flushes.
-		// openDrawerMode records that intent synchronously in the ref; do not let
-		// the stale initial `profile` pass immediately close the menu again.
-		if (
-			requestedMode === "profile" &&
-			drawerOpenRef.current &&
-			drawerViewRef.current === "menu"
-		) {
-			return;
-		}
-
-		if (!modeChanged && drawerOpenRef.current) {
-			return;
-		}
-
-		drawerOpenRef.current = false;
-		setDrawerOpen(false);
-	}, [clearCloseResetTimer, requestedMode, resolveInitialView]);
-
-	useEffect(() => {
-		const handlePopState = () => {
-			profileHistoryDepthRef.current = readPublicProfileHistoryDepth(
-				globalThis.history.state,
-			);
-			syncRequestedModeFromLocation("profile");
-		};
-
-		globalThis.addEventListener("popstate", handlePopState);
-		return () => globalThis.removeEventListener("popstate", handlePopState);
-	}, [syncRequestedModeFromLocation]);
-
-	const browserHref =
-		globalThis.window === undefined
-			? ""
-			: `${globalThis.location.pathname}${globalThis.location.search}`;
-
-	useEffect(() => {
-		if (
-			landedHistoryModeRef.current !== null ||
-			globalThis.window === undefined
-		) {
-			return;
-		}
-		landedHistoryModeRef.current = getModeFromUrl();
-	}, []);
-
-	useEffect(() => {
-		// Record the URL/intent pair this run observes first — the guards below
-		// return early, and the in-flight-navigation check after them must still
-		// see what the last run saw, including on suppressed or unsettled runs.
-		const activeMode = resolveHistoryMode({
-			drawerOpen,
-			drawerView,
-			requestedMode,
-		});
-		const currentHref = `${globalThis.location.pathname}${globalThis.location.search}`;
-		const previousSync = lastHistorySyncRef.current;
-		lastHistorySyncRef.current = { href: currentHref, mode: activeMode };
-
-		if (!initialLocationModeAlignedRef.current) {
-			return;
-		}
-
-		if (suppressNextHistorySyncRef.current) {
-			suppressNextHistorySyncRef.current = false;
-			return;
-		}
-
-		// Wait for entry-query hydration before reconstructing a profile URL.
-		// Without this guard the effect fires on the first render cycle with
-		// searchSuffix = '' and pushes a source-less URL before the initialSource
-		// useEffect (which reads location.search post-mount) has a chance to run.
-		if (
-			initialClaimIntent === null ||
-			(initialSource === null &&
-				new URLSearchParams(globalThis.location.search).has("source"))
-		) {
-			return;
-		}
-
-		const isHistoryModeSettled =
-			requestedMode === "profile"
-				? activeMode === null
-				: activeMode === requestedMode;
-
-		if (!isHistoryModeSettled) {
-			return;
-		}
-
-		const href =
-			activeMode === null
-				? getProfileModeHref(artist.handle, "profile", searchSuffix)
-				: getProfileModeHref(artist.handle, activeMode, searchSuffix);
-		if (currentHref === href) {
-			return;
-		}
-
-		// Durable ownership: once the document's pathname has left both this
-		// profile's root path and the pathname this template mounted on, the
-		// URL belongs to a navigation away from the surface. The in-flight
-		// guard below only defers the first run after such a move; later
-		// mode/drawer settling would still write the profile URL back over the
-		// navigation target (the open-drawer claim funnel case). The profile's
-		// own root path and the mount pathname (render fixtures) stay ours.
-		if (
-			globalThis.location.pathname !== `/${artist.handle}` &&
-			globalThis.location.pathname !== mountedPathnameRef.current
-		) {
-			return;
-		}
-
-		const landedMode = landedHistoryModeRef.current;
-		// Next's own entry updater strips the landed ?mode=… entry back to the
-		// bare profile path at depth 0; restoring the landed mode must replace
-		// that stripped entry, not push a second one on top of it. Two things
-		// keep this restore from capturing a client Link navigation instead:
-		// the mode param is gone (a Link to another mode keeps a mode param) and
-		// no new history entry was pushed since arrival — the strip replaces the
-		// landed entry in place, while a Link to the bare path pushes one.
-		// Redirect landings (legacy alias deep links) can enter the document
-		// with a different session-history length than the mount-time arrival
-		// capture, so a length equality here would fail exactly there and turn
-		// the in-place strip correction into a duplicate profile-entry push
-		// (the alias back/forward regression: back lands on a /{handle} copy
-		// instead of the pre-profile page). The mode-param, landed-mode, depth,
-		// and in-flight-navigation guards already exclude every client Link
-		// navigation: a Link to another mode keeps its mode param, and a Link
-		// to the bare path flips activeMode away from the landed mode (or is
-		// held by the in-flight guard) before this effect can act.
-		const correctingStrippedLanding =
-			profileHistoryDepthRef.current === 0 &&
-			landedMode !== null &&
-			landedMode !== "profile" &&
-			activeMode === landedMode &&
-			new URLSearchParams(globalThis.location.search).get("mode") === null;
-		if (correctingStrippedLanding) {
-			globalThis.history.replaceState(
-				withPublicProfileHistoryDepth(globalThis.history.state, 0),
-				"",
-				href,
-			);
-			return;
-		}
-
-		// A client Link navigation to a different mode (or to the bare profile)
-		// updates the URL before requestedMode syncs through the shell's
-		// location store. browserHref wakes this effect with the stale intent;
-		// writing that intent back would revert the visitor's navigation (the
-		// contact drawer link regression). Wait for the location sync — the next
-		// run sees the updated requestedMode and reconciles without a push. The
-		// depth-0 strip correction above stays the only sanctioned external URL
-		// move.
-		if (
-			previousSync &&
-			previousSync.href !== currentHref &&
-			previousSync.mode === activeMode
-		) {
-			return;
-		}
-
-		const nextDepth = profileHistoryDepthRef.current + 1;
-		profileHistoryDepthRef.current = nextDepth;
-		globalThis.history.pushState(
-			withPublicProfileHistoryDepth(globalThis.history.state, nextDepth),
-			"",
-			href,
-		);
-	}, [
-		browserHref,
-		drawerOpen,
-		drawerView,
-		requestedMode,
-		artist.handle,
-		searchSuffix,
-		initialSource,
-		initialClaimIntent,
-	]);
-
-	const profileHref = useMemo(
-		() => getProfileModeHref(artist.handle, "profile", searchSuffix),
-		[artist.handle, searchSuffix],
-	);
-
-	const openDrawerMode = useCallback(
-		(nextView: DrawerView) => {
-			clearCloseResetTimer();
-			const nextMode = getModeFromDrawerView(nextView);
-			if (nextMode) {
-				setRequestedMode(nextMode);
-				return;
-			}
-
-			suppressNextHistorySyncRef.current = true;
-			drawerOpenRef.current = true;
-			drawerViewRef.current = nextView;
-			setDrawerView(nextView);
-			setDrawerOpen(true);
-		},
-		[clearCloseResetTimer],
-	);
-
-	const handleDrawerOpenChange = useCallback(
-		(nextOpen: boolean) => {
-			if (!nextOpen) {
-				clearCloseResetTimer();
-				drawerOpenRef.current = false;
-				setRequestedMode(
-					isDesktopLayout ? lastPrimaryModeRef.current : "profile",
-				);
-				setDrawerOpen(false);
-				closeResetTimerRef.current = setTimeout(() => {
-					closeResetTimerRef.current = null;
-					if (!drawerOpenRef.current) {
-						drawerViewRef.current = "menu";
-						setDrawerView("menu");
-					}
-				}, DRAWER_CLOSE_RESET_DELAY_MS);
-				return;
-			}
-
-			clearCloseResetTimer();
-			drawerOpenRef.current = true;
-			setDrawerOpen(true);
-		},
-		[clearCloseResetTimer, isDesktopLayout],
-	);
-
-	const handleDrawerViewChange = useCallback(
-		(nextView: DrawerView) => {
-			clearCloseResetTimer();
-			const nextMode = getModeFromDrawerView(nextView);
-			if (nextMode) {
-				setRequestedMode(nextMode);
-				return;
-			}
-
-			suppressNextHistorySyncRef.current = true;
-			drawerOpenRef.current = true;
-			drawerViewRef.current = nextView;
-			setDrawerView(nextView);
-			setDrawerOpen(true);
-		},
-		[clearCloseResetTimer],
-	);
-
-	const handlePlayClick = useCallback(() => {
-		if (mergedDSPs.length === 0) {
-			clearCloseResetTimer();
-			setRequestedMode("subscribe");
-			return;
-		}
-		clearCloseResetTimer();
-		setRequestedMode("listen");
-	}, [clearCloseResetTimer, mergedDSPs.length]);
-
-	const isSignedIn = useIsAuthenticated();
-	const handleBack = useCallback(() => {
-		const historyLength = globalThis.history.length;
-		const arrivalHistoryLength =
-			arrivalHistoryLengthRef.current ?? historyLength;
-		const internalHistoryDepth = profileHistoryDepthRef.current;
-		const action = resolvePublicProfileBackAction({
-			isProfileRoot: requestedMode === "profile",
-			historyLength,
-			referrer: document.referrer,
-			isSignedIn,
-			arrivalHistoryLength,
-			internalHistoryDepth,
-		});
-
-		if (action === "profile-root") {
-			setRequestedMode("profile");
-			return;
-		}
-
-		if (action === "history-back") {
-			globalThis.history.back();
-			return;
-		}
-
-		if (action === "history-exit") {
-			globalThis.history.go(
-				getPublicProfileHistoryExitDelta(internalHistoryDepth),
-			);
-			return;
-		}
-
-		if (action === "app-fallback") {
-			globalThis.location.assign(APP_ROUTES.DASHBOARD);
-		}
-	}, [isSignedIn, requestedMode]);
-
-	const handleDesktopSurfaceReady = useCallback(() => {
-		setDesktopSurfaceReady(true);
-	}, []);
-
-	const handleShare = useCallback(async () => {
-		const profileUrl = `${BASE_URL}/${artist.handle}`;
-		try {
-			if (typeof navigator.share === "function") {
-				await navigator.share({ title: artist.name, url: profileUrl });
-			} else {
-				await navigator.clipboard.writeText(profileUrl);
-			}
-		} catch {
-			try {
-				await navigator.clipboard.writeText(profileUrl);
-			} catch {
-				// Silent failure
-			}
-		}
-		setRequestedMode("profile");
-	}, [artist.handle, artist.name]);
-
-	// Only the desktop layout needs the shell-level sr-only h1: there the
-	// compact surface renders its heading as a <p> (renderSemanticHeading is
-	// false), so the shell h1 is the document's single h1. On mobile the
-	// compact surface ALWAYS renders exactly one h1 itself — the visible hero
-	// heading in home mode, or its own sr-only heading in non-home modes — so
-	// a shell h1 duplicates it (two h1s in the a11y tree in listen/tour/
-	// subscribe/releases modes, violating the one-h1 guardrail).
-	const shouldRenderTemplateHeading = isDesktopLayout;
-
-	return (
-		<ProfileNotificationsContext.Provider value={notificationsContextValue}>
-			{/* Resolves the per-user jv_aid variant client-side after ISR hydration.
+  const previousLocationModeRef = useRef<ProfileMode | undefined>(undefined);
+  const visibleReleaseCredits = (releaseCredits ?? []).filter(
+    group => group.entries.length > 0
+  );
+  const [creditsOpen, setCreditsOpen] = useState(false);
+  const hasContacts = contacts.some(contact => contact.channels.length > 0);
+  const hasTip =
+    showPayButton && socialLinks.some(link => link.platform === 'venmo');
+  const hasReleases = (releases?.length ?? 0) >= 2;
+  const publicProfileNavIds = getPermittedPublicProfileNavigation()
+    .map(destination => destination.id)
+    .join(',');
+  const initialDrawerView = resolveDrawerView(
+    mode,
+    { hasContacts, hasTip, hasReleases },
+    'compact'
+  );
+
+  // alertOptInVariant starts as the ISR-rendered default ('button').
+  // AnonCookieBootstrap resolves the per-user Statsig variant on mount and
+  // updates this state, so real visitors see their assigned experiment variant.
+  const [resolvedAlertOptInVariant, setResolvedAlertOptInVariant] =
+    useState<ProfileAlertOptInVariant>(alertOptInVariant);
+  const [resolvedProfilePacAssignment, setResolvedProfilePacAssignment] =
+    useState<ProfilePacAssignment>(profilePacAssignment);
+  // The ISR render cannot read the httpOnly jv_aid cookie, so per-user
+  // experiment assignments land via AnonCookieBootstrap after hydration.
+  // Until that resolution settles, variant-dependent fan-capture CTAs stay
+  // unmounted — the assigned control must never morph under a visitor's
+  // cursor (a click mid-flight would hit the wrong variant).
+  const [visitorAssignmentResolved, setVisitorAssignmentResolved] =
+    useState(false);
+  const markVisitorAssignmentResolved = useCallback(() => {
+    setVisitorAssignmentResolved(true);
+  }, []);
+
+  // The proxy stamps the edge-geo country into the readable jv_country
+  // cookie so ISR pages can geo-sort DSPs without a server headers() read.
+  // Read it post-mount (same pattern as `initialSource` below) so the first
+  // client render stays identical to the server render.
+  const [resolvedViewerCountryCode, setResolvedViewerCountryCode] = useState<
+    string | null
+  >(viewerCountryCode ?? null);
+  useEffect(() => {
+    if (viewerCountryCode != null) return;
+    const cookieValue = readClientCookieValue(COUNTRY_CODE_COOKIE);
+    if (cookieValue) {
+      setResolvedViewerCountryCode(cookieValue);
+    }
+  }, [viewerCountryCode]);
+  const [drawerOpen, setDrawerOpen] = useState(initialDrawerView !== null);
+  const [drawerView, setDrawerView] = useState<DrawerView>(
+    initialDrawerView ?? 'menu'
+  );
+  const [drawerPresentation, setDrawerPresentation] =
+    useState<ProfileSurfacePresentation>(getInitialDrawerPresentation);
+  const [isDesktopLayout, setIsDesktopLayout] = useState(
+    getInitialIsDesktopLayout
+  );
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [desktopSurfaceReady, setDesktopSurfaceReady] = useState(false);
+  const [requestedMode, setRequestedMode] = useState<ProfileMode>(() =>
+    getInitialModeFromLocation(mode, false)
+  );
+  const revealNotificationsRef = useRef<(() => void) | null>(null);
+  const closeResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const drawerOpenRef = useRef(initialDrawerView !== null);
+  const drawerViewRef = useRef<DrawerView>(initialDrawerView ?? 'menu');
+  const lastSyncedModeRef = useRef<ProfileMode | null>(null);
+  const lastPrimaryModeRef = useRef<ProfileMode>('profile');
+  const initialLocationModeAlignedRef = useRef(false);
+  const suppressNextHistorySyncRef = useRef(true);
+  const arrivalHistoryLengthRef = useRef<number | null>(null);
+  // The pathname this document mounted on. Render fixtures mount this
+  // template on their own pathname; user-initiated mode activation from
+  // there stays sanctioned.
+  const mountedPathnameRef = useRef<string | null>(null);
+  const profileHistoryDepthRef = useRef(0);
+  // The mode this document landed with. Filled in by the effect below, before
+  // the history effect, while the landing URL is still intact. Next's history
+  // updater can replace that entry with the bare profile path after child
+  // effects; restoring the mode must not push a second entry on top of the strip.
+  const landedHistoryModeRef = useRef<ProfileMode | null>(null);
+  // The URL/intent pair the history effect last observed. When a later run
+  // sees the URL move while the intent is unchanged, a client Link navigation
+  // (or Next's own entry updater) is mid-flight and requestedMode has not
+  // synced yet; writing the stale intent back would revert the navigation.
+  const lastHistorySyncRef = useRef<{
+    href: string;
+    mode: ProfileMode | null;
+  } | null>(null);
+
+  const clearCloseResetTimer = useCallback(() => {
+    if (closeResetTimerRef.current !== null) {
+      clearTimeout(closeResetTimerRef.current);
+      closeResetTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    drawerOpenRef.current = drawerOpen;
+  }, [drawerOpen]);
+
+  useEffect(() => {
+    arrivalHistoryLengthRef.current = globalThis.history.length;
+    mountedPathnameRef.current = globalThis.location.pathname;
+    profileHistoryDepthRef.current = readPublicProfileHistoryDepth(
+      globalThis.history.state
+    );
+  }, []);
+
+  useEffect(() => clearCloseResetTimer, [clearCloseResetTimer]);
+
+  useEffect(() => {
+    const orientation = screen?.orientation as
+      | (ScreenOrientation & {
+          lock?: (orientation: string) => Promise<void>;
+          unlock?: () => void;
+        })
+      | undefined;
+    if (!orientation?.lock) return;
+    orientation.lock('portrait').catch(() => {});
+    return () => {
+      orientation.unlock?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (globalThis.window === undefined) {
+      return;
+    }
+
+    const embeddedQuery = globalThis.matchMedia('(min-width: 768px)');
+    const desktopQuery = globalThis.matchMedia('(min-width: 1180px)');
+    const syncPresentation = () => {
+      // With the desktop surface flagged off (the default), desktop widths
+      // keep the compact surface in its centered phone column, so drawers use
+      // the same embedded presentation as tablet widths.
+      const ownsDesktopLayout =
+        PROFILE_DESKTOP_SURFACE_ENABLED &&
+        desktopQuery.matches &&
+        !embeddedPreview;
+      setIsDesktopLayout(ownsDesktopLayout);
+      setDrawerPresentation(
+        ownsDesktopLayout
+          ? 'modal'
+          : embeddedQuery.matches
+            ? 'embedded'
+            : 'standalone'
+      );
+    };
+
+    syncPresentation();
+    setIsHydrated(true);
+
+    if (
+      typeof embeddedQuery.addEventListener === 'function' &&
+      typeof desktopQuery.addEventListener === 'function'
+    ) {
+      embeddedQuery.addEventListener('change', syncPresentation);
+      desktopQuery.addEventListener('change', syncPresentation);
+      return () => {
+        embeddedQuery.removeEventListener('change', syncPresentation);
+        desktopQuery.removeEventListener('change', syncPresentation);
+      };
+    }
+
+    embeddedQuery.addListener(syncPresentation);
+    desktopQuery.addListener(syncPresentation);
+    return () => {
+      embeddedQuery.removeListener(syncPresentation);
+      desktopQuery.removeListener(syncPresentation);
+    };
+  }, [embeddedPreview]);
+
+  const mergedDSPs = useMemo(
+    () =>
+      sortDSPsByGeoPopularity(
+        getCanonicalProfileDSPs(artist, socialLinks),
+        resolvedViewerCountryCode
+      ),
+    [artist, socialLinks, resolvedViewerCountryCode]
+  );
+
+  const heroImageUrl = useMemo(() => {
+    const imageUrl = unwrapNextImageUrl(
+      photoDownloadSizes.find(size => size.key === 'large')?.url ??
+        photoDownloadSizes.find(size => size.key === 'original')?.url ??
+        artist.image_url ??
+        null
+    );
+    return isDefaultAvatarUrl(imageUrl) ? null : imageUrl;
+  }, [artist.image_url, photoDownloadSizes]);
+
+  // Track hero image load failure so the ambient background degrades to the
+  // gradient placeholder instead of rendering a blank or icon-filled container.
+  const [heroImageError, setHeroImageError] = useState(false);
+
+  // Reset on hero URL change (e.g. artist data refresh or profile switch)
+  useEffect(() => {
+    setHeroImageError(false);
+  }, [heroImageUrl]);
+
+  const profileAccentStyle = useMemo(
+    () =>
+      buildProfileAccentCssVars(
+        readProfileAccentTheme(artist.theme)
+      ) as CSSProperties,
+    [artist.theme]
+  );
+
+  // Hydration-safe entry-query capture: reading location.search during the
+  // first client render (e.g. a window-guarded useMemo) makes the identity
+  // link href differ from the SSR'd markup whenever a source param is present
+  // (/testartist vs /testartist?source=qr — React hydration mismatch, and the
+  // attribute is never patched up). Render null (matching the server) and
+  // read the param post-mount; the re-render then stamps the source into the
+  // href and the history-sync effect. Tracking does not regress: the
+  // sourceOverride falls through to useProfileShell's own hydration-safe
+  // locationSource (useSyncExternalStore) while this is null.
+  const [initialSource, setInitialSource] = useState<string | null>(null);
+  const [initialClaimIntent, setInitialClaimIntent] = useState<boolean | null>(
+    null
+  );
+  useEffect(() => {
+    const params = new URLSearchParams(globalThis.location.search);
+    setInitialSource(params.get('source'));
+    setInitialClaimIntent(params.get('claim') === '1');
+  }, []);
+
+  const { notificationsContextValue, notificationsController, locationMode } =
+    useProfileShell({
+      artist,
+      socialLinks,
+      viewerCountryCode: resolvedViewerCountryCode,
+      contacts,
+      visitTrackingToken,
+      modeOverride: requestedMode,
+      sourceOverride: initialSource,
+      smsEnabled: enableDynamicEngagement,
+    });
+
+  const isSubscribed = Boolean(
+    notificationsContextValue.subscribedChannels.email ||
+      notificationsContextValue.subscribedChannels.sms
+  );
+  const subscriberEmail =
+    notificationsContextValue.subscriptionDetails?.email ?? '';
+  const subscriberPhone =
+    notificationsContextValue.subscriptionDetails?.sms ?? '';
+  const subscribedViaEmail = Boolean(
+    notificationsContextValue.subscribedChannels.email
+  );
+
+  const serverPrefs = notificationsController.contentPreferences;
+  const [contentPrefs, setContentPrefs] = useState<
+    Record<NotificationContentType, boolean>
+  >({
+    newMusic: serverPrefs?.newMusic ?? true,
+    tourDates: serverPrefs?.tourDates ?? true,
+    merch: serverPrefs?.merch ?? true,
+    general: serverPrefs?.general ?? true,
+  });
+
+  useEffect(() => {
+    if (serverPrefs) {
+      setContentPrefs({
+        newMusic: serverPrefs.newMusic ?? true,
+        tourDates: serverPrefs.tourDates ?? true,
+        merch: serverPrefs.merch ?? true,
+        general: serverPrefs.general ?? true,
+      });
+    }
+  }, [serverPrefs]);
+
+  const prefsMutation = useUpdateContentPreferencesMutation();
+  const unsubMutation = useUnsubscribeNotificationsMutation();
+  const { success: showSuccess } = useNotifications();
+
+  const handleTogglePref = useCallback(
+    (key: NotificationContentType) => {
+      const prev = contentPrefs[key];
+      const next = !prev;
+      setContentPrefs(state => ({ ...state, [key]: next }));
+      prefsMutation.mutate(
+        {
+          artistId: artist.id,
+          email: subscriberEmail || undefined,
+          phone: subscriberPhone || undefined,
+          preferences: { [key]: next },
+        },
+        {
+          onError: () => {
+            setContentPrefs(state => ({ ...state, [key]: prev }));
+          },
+        }
+      );
+    },
+    [contentPrefs, artist.id, subscriberEmail, subscriberPhone, prefsMutation]
+  );
+
+  const handleUnsubscribe = useCallback(() => {
+    const channel = subscribedViaEmail ? 'email' : 'sms';
+    const identifier = subscribedViaEmail
+      ? { email: subscriberEmail }
+      : { phone: subscriberPhone };
+    unsubMutation.mutate(
+      {
+        artistId: artist.id,
+        channel,
+        ...identifier,
+      },
+      {
+        onSuccess: () => {
+          notificationsContextValue.setSubscribedChannels({});
+          notificationsContextValue.setSubscriptionDetails({});
+          notificationsContextValue.setState('idle');
+          setRequestedMode('profile');
+          showSuccess('Notifications turned off');
+        },
+      }
+    );
+  }, [
+    artist.id,
+    subscribedViaEmail,
+    subscriberEmail,
+    subscriberPhone,
+    unsubMutation,
+    notificationsContextValue,
+    showSuccess,
+  ]);
+
+  const searchSuffix = useMemo(() => {
+    // Preserve the public claim-entry marker across profile navigation, never
+    // arbitrary incoming query fields (which may contain private tokens).
+    return [
+      initialSource ? `source=${encodeURIComponent(initialSource)}` : '',
+      initialClaimIntent ? 'claim=1' : '',
+    ]
+      .filter(Boolean)
+      .join('&');
+  }, [initialSource, initialClaimIntent]);
+
+  const resolveInitialView = useCallback(
+    (nextMode: ProfileMode) =>
+      resolveDrawerView(
+        nextMode,
+        {
+          hasContacts,
+          hasTip,
+          hasReleases,
+        },
+        isDesktopLayout ? 'desktop' : 'compact'
+      ),
+    [hasContacts, hasReleases, hasTip, isDesktopLayout]
+  );
+
+  const syncRequestedModeFromLocation = useCallback(
+    (fallbackMode = mode) => {
+      const nextMode = getInitialModeFromLocation(fallbackMode, true);
+      // React may replay a state updater after the alignment effect commits.
+      // Keep history guards outside that replay using the committed mode.
+      if (lastSyncedModeRef.current !== nextMode) {
+        suppressNextHistorySyncRef.current = true;
+        initialLocationModeAlignedRef.current = false;
+      }
+      setRequestedMode(nextMode);
+    },
+    [mode]
+  );
+
+  useEffect(() => {
+    const previousMode = previousLocationModeRef.current;
+    previousLocationModeRef.current = locationMode;
+    // Reuse the shell's hydration-safe location store for client Link changes.
+    // Later query removal means Home even with a cached Contact server mode.
+    const locationChanged =
+      previousMode !== undefined && previousMode !== locationMode;
+    syncRequestedModeFromLocation(locationChanged ? 'profile' : mode);
+  }, [locationMode, mode, syncRequestedModeFromLocation]);
+
+  useEffect(() => {
+    if (requestedMode === getModeFromUrl()) {
+      initialLocationModeAlignedRef.current = true;
+      globalThis.document?.documentElement.removeAttribute(
+        'data-profile-initial-mode'
+      );
+    }
+  }, [requestedMode]);
+
+  useEffect(() => {
+    if (
+      requestedMode === 'profile' ||
+      requestedMode === 'listen' ||
+      requestedMode === 'tour' ||
+      requestedMode === 'about' ||
+      requestedMode === 'releases'
+    ) {
+      lastPrimaryModeRef.current = requestedMode;
+    }
+  }, [requestedMode]);
+
+  useEffect(() => {
+    // Drawer open/close sync is keyed to the requested *mode* (stable visitor
+    // intent), not to data. `resolveInitialView` also depends on data-derived
+    // capabilities (hasContacts/hasTip/hasReleases), so a background refetch
+    // that transiently empties data re-runs this effect. Without the
+    // mode-change gate that churn would close an open drawer (and the
+    // resolving refetch would re-open it / yank the view back) — the
+    // intermittent open/close bug from JOV-4848. When only data changed, an
+    // already-open drawer must be left untouched; render-time fallbacks own
+    // missing data (same pattern as the JOV-2150 no-flicker fix).
+    const modeChanged = lastSyncedModeRef.current !== requestedMode;
+    lastSyncedModeRef.current = requestedMode;
+
+    const resolved = resolveInitialView(requestedMode);
+    if (resolved) {
+      if (!modeChanged && drawerOpenRef.current) {
+        return;
+      }
+      clearCloseResetTimer();
+      drawerViewRef.current = resolved;
+      setDrawerView(resolved);
+      drawerOpenRef.current = true;
+      setDrawerOpen(true);
+      return;
+    }
+
+    // A visitor can tap the root Menu as soon as the global hydration marker
+    // appears, before this component's initial profile-mode effect flushes.
+    // openDrawerMode records that intent synchronously in the ref; do not let
+    // the stale initial `profile` pass immediately close the menu again.
+    if (
+      requestedMode === 'profile' &&
+      drawerOpenRef.current &&
+      drawerViewRef.current === 'menu'
+    ) {
+      return;
+    }
+
+    if (!modeChanged && drawerOpenRef.current) {
+      return;
+    }
+
+    drawerOpenRef.current = false;
+    setDrawerOpen(false);
+  }, [clearCloseResetTimer, requestedMode, resolveInitialView]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      profileHistoryDepthRef.current = readPublicProfileHistoryDepth(
+        globalThis.history.state
+      );
+      syncRequestedModeFromLocation('profile');
+    };
+
+    globalThis.addEventListener('popstate', handlePopState);
+    return () => globalThis.removeEventListener('popstate', handlePopState);
+  }, [syncRequestedModeFromLocation]);
+
+  const browserHref =
+    globalThis.window === undefined
+      ? ''
+      : `${globalThis.location.pathname}${globalThis.location.search}`;
+
+  useEffect(() => {
+    if (
+      landedHistoryModeRef.current !== null ||
+      globalThis.window === undefined
+    ) {
+      return;
+    }
+    landedHistoryModeRef.current = getModeFromUrl();
+  }, []);
+
+  useEffect(() => {
+    // Record the URL/intent pair this run observes first — the guards below
+    // return early, and the in-flight-navigation check after them must still
+    // see what the last run saw, including on suppressed or unsettled runs.
+    const activeMode = resolveHistoryMode({
+      drawerOpen,
+      drawerView,
+      requestedMode,
+    });
+    const currentHref = `${globalThis.location.pathname}${globalThis.location.search}`;
+    const previousSync = lastHistorySyncRef.current;
+    lastHistorySyncRef.current = { href: currentHref, mode: activeMode };
+
+    if (!initialLocationModeAlignedRef.current) {
+      return;
+    }
+
+    if (suppressNextHistorySyncRef.current) {
+      suppressNextHistorySyncRef.current = false;
+      return;
+    }
+
+    // Wait for entry-query hydration before reconstructing a profile URL.
+    // Without this guard the effect fires on the first render cycle with
+    // searchSuffix = '' and pushes a source-less URL before the initialSource
+    // useEffect (which reads location.search post-mount) has a chance to run.
+    if (
+      initialClaimIntent === null ||
+      (initialSource === null &&
+        new URLSearchParams(globalThis.location.search).has('source'))
+    ) {
+      return;
+    }
+
+    const isHistoryModeSettled =
+      requestedMode === 'profile'
+        ? activeMode === null
+        : activeMode === requestedMode;
+
+    if (!isHistoryModeSettled) {
+      return;
+    }
+
+    const href =
+      activeMode === null
+        ? getProfileModeHref(artist.handle, 'profile', searchSuffix)
+        : getProfileModeHref(artist.handle, activeMode, searchSuffix);
+    if (currentHref === href) {
+      return;
+    }
+
+    // Durable ownership: once the document's pathname has left both this
+    // profile's root path and the pathname this template mounted on, the
+    // URL belongs to a navigation away from the surface. The in-flight
+    // guard below only defers the first run after such a move; later
+    // mode/drawer settling would still write the profile URL back over the
+    // navigation target (the open-drawer claim funnel case). The profile's
+    // own root path and the mount pathname (render fixtures) stay ours.
+    if (
+      globalThis.location.pathname !== `/${artist.handle}` &&
+      globalThis.location.pathname !== mountedPathnameRef.current
+    ) {
+      return;
+    }
+
+    const landedMode = landedHistoryModeRef.current;
+    // Next's own entry updater strips the landed ?mode=… entry back to the
+    // bare profile path at depth 0; restoring the landed mode must replace
+    // that stripped entry, not push a second one on top of it. Two things
+    // keep this restore from capturing a client Link navigation instead:
+    // the mode param is gone (a Link to another mode keeps a mode param) and
+    // no new history entry was pushed since arrival — the strip replaces the
+    // landed entry in place, while a Link to the bare path pushes one.
+    // Redirect landings (legacy alias deep links) can enter the document
+    // with a different session-history length than the mount-time arrival
+    // capture, so a length equality here would fail exactly there and turn
+    // the in-place strip correction into a duplicate profile-entry push
+    // (the alias back/forward regression: back lands on a /{handle} copy
+    // instead of the pre-profile page). The mode-param, landed-mode, depth,
+    // and in-flight-navigation guards already exclude every client Link
+    // navigation: a Link to another mode keeps its mode param, and a Link
+    // to the bare path flips activeMode away from the landed mode (or is
+    // held by the in-flight guard) before this effect can act.
+    const correctingStrippedLanding =
+      profileHistoryDepthRef.current === 0 &&
+      landedMode !== null &&
+      landedMode !== 'profile' &&
+      activeMode === landedMode &&
+      new URLSearchParams(globalThis.location.search).get('mode') === null;
+    if (correctingStrippedLanding) {
+      globalThis.history.replaceState(
+        withPublicProfileHistoryDepth(globalThis.history.state, 0),
+        '',
+        href
+      );
+      return;
+    }
+
+    // A client Link navigation to a different mode (or to the bare profile)
+    // updates the URL before requestedMode syncs through the shell's
+    // location store. browserHref wakes this effect with the stale intent;
+    // writing that intent back would revert the visitor's navigation (the
+    // contact drawer link regression). Wait for the location sync — the next
+    // run sees the updated requestedMode and reconciles without a push. The
+    // depth-0 strip correction above stays the only sanctioned external URL
+    // move.
+    if (
+      previousSync &&
+      previousSync.href !== currentHref &&
+      previousSync.mode === activeMode
+    ) {
+      return;
+    }
+
+    const nextDepth = profileHistoryDepthRef.current + 1;
+    profileHistoryDepthRef.current = nextDepth;
+    globalThis.history.pushState(
+      withPublicProfileHistoryDepth(globalThis.history.state, nextDepth),
+      '',
+      href
+    );
+  }, [
+    browserHref,
+    drawerOpen,
+    drawerView,
+    requestedMode,
+    artist.handle,
+    searchSuffix,
+    initialSource,
+    initialClaimIntent,
+  ]);
+
+  const profileHref = useMemo(
+    () => getProfileModeHref(artist.handle, 'profile', searchSuffix),
+    [artist.handle, searchSuffix]
+  );
+
+  const openDrawerMode = useCallback(
+    (nextView: DrawerView) => {
+      clearCloseResetTimer();
+      const nextMode = getModeFromDrawerView(nextView);
+      if (nextMode) {
+        setRequestedMode(nextMode);
+        return;
+      }
+
+      suppressNextHistorySyncRef.current = true;
+      drawerOpenRef.current = true;
+      drawerViewRef.current = nextView;
+      setDrawerView(nextView);
+      setDrawerOpen(true);
+    },
+    [clearCloseResetTimer]
+  );
+
+  const handleDrawerOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen) {
+        clearCloseResetTimer();
+        drawerOpenRef.current = false;
+        setRequestedMode(
+          isDesktopLayout ? lastPrimaryModeRef.current : 'profile'
+        );
+        setDrawerOpen(false);
+        closeResetTimerRef.current = setTimeout(() => {
+          closeResetTimerRef.current = null;
+          if (!drawerOpenRef.current) {
+            drawerViewRef.current = 'menu';
+            setDrawerView('menu');
+          }
+        }, DRAWER_CLOSE_RESET_DELAY_MS);
+        return;
+      }
+
+      clearCloseResetTimer();
+      drawerOpenRef.current = true;
+      setDrawerOpen(true);
+    },
+    [clearCloseResetTimer, isDesktopLayout]
+  );
+
+  const handleDrawerViewChange = useCallback(
+    (nextView: DrawerView) => {
+      clearCloseResetTimer();
+      const nextMode = getModeFromDrawerView(nextView);
+      if (nextMode) {
+        setRequestedMode(nextMode);
+        return;
+      }
+
+      suppressNextHistorySyncRef.current = true;
+      drawerOpenRef.current = true;
+      drawerViewRef.current = nextView;
+      setDrawerView(nextView);
+      setDrawerOpen(true);
+    },
+    [clearCloseResetTimer]
+  );
+
+  const handlePlayClick = useCallback(() => {
+    if (mergedDSPs.length === 0) {
+      clearCloseResetTimer();
+      setRequestedMode('subscribe');
+      return;
+    }
+    clearCloseResetTimer();
+    setRequestedMode('listen');
+  }, [clearCloseResetTimer, mergedDSPs.length]);
+
+  const isSignedIn = useIsAuthenticated();
+  const handleBack = useCallback(() => {
+    const historyLength = globalThis.history.length;
+    const arrivalHistoryLength =
+      arrivalHistoryLengthRef.current ?? historyLength;
+    const internalHistoryDepth = profileHistoryDepthRef.current;
+    const action = resolvePublicProfileBackAction({
+      isProfileRoot: requestedMode === 'profile',
+      historyLength,
+      referrer: document.referrer,
+      isSignedIn,
+      arrivalHistoryLength,
+      internalHistoryDepth,
+    });
+
+    if (action === 'profile-root') {
+      setRequestedMode('profile');
+      return;
+    }
+
+    if (action === 'history-back') {
+      globalThis.history.back();
+      return;
+    }
+
+    if (action === 'history-exit') {
+      globalThis.history.go(
+        getPublicProfileHistoryExitDelta(internalHistoryDepth)
+      );
+      return;
+    }
+
+    if (action === 'app-fallback') {
+      globalThis.location.assign(APP_ROUTES.DASHBOARD);
+    }
+  }, [isSignedIn, requestedMode]);
+
+  const handleDesktopSurfaceReady = useCallback(() => {
+    setDesktopSurfaceReady(true);
+  }, []);
+
+  const handleShare = useCallback(async () => {
+    const profileUrl = `${BASE_URL}/${artist.handle}`;
+    try {
+      if (typeof navigator.share === 'function') {
+        await navigator.share({ title: artist.name, url: profileUrl });
+      } else {
+        await navigator.clipboard.writeText(profileUrl);
+      }
+    } catch {
+      try {
+        await navigator.clipboard.writeText(profileUrl);
+      } catch {
+        // Silent failure
+      }
+    }
+    setRequestedMode('profile');
+  }, [artist.handle, artist.name]);
+
+  // Only the desktop layout needs the shell-level sr-only h1: there the
+  // compact surface renders its heading as a <p> (renderSemanticHeading is
+  // false), so the shell h1 is the document's single h1. On mobile the
+  // compact surface ALWAYS renders exactly one h1 itself — the visible hero
+  // heading in home mode, or its own sr-only heading in non-home modes — so
+  // a shell h1 duplicates it (two h1s in the a11y tree in listen/tour/
+  // subscribe/releases modes, violating the one-h1 guardrail).
+  const shouldRenderTemplateHeading = isDesktopLayout;
+
+  return (
+    <ProfileNotificationsContext.Provider value={notificationsContextValue}>
+      {/* Resolves the per-user jv_aid variant client-side after ISR hydration.
           Renders null; updates resolvedAlertOptInVariant state on mount. */}
-			<AnonCookieBootstrap
-				onVariantResolved={setResolvedAlertOptInVariant}
-				onProfilePacResolved={setResolvedProfilePacAssignment}
-				onResolved={markVisitorAssignmentResolved}
-			/>
-			<PublicProfileLayoutShell
-				artistName={artist.name}
-				heroImageUrl={heroImageUrl}
-				heroImageError={heroImageError}
-				onHeroImageLoadError={() => setHeroImageError(true)}
-				isDesktopLayout={isDesktopLayout}
-				desktopSurfaceReady={desktopSurfaceReady}
-				shouldRenderHeading={shouldRenderTemplateHeading}
-				profileAccentStyle={profileAccentStyle}
-				showClaimFooter={showClaimFooter}
-				claimFooterHref={claimFooterHref}
-				claimFooterLabel={claimFooterLabel}
-				proofClaim={proofClaim}
-				embedded={embeddedPreview}
-				previewExitHref={profileHref}
-				compactSurface={
-					<div
-						className="public-profile-compact-shell relative flex h-full min-w-0 w-full flex-col overflow-hidden bg-(--profile-content-bg) md:mx-auto md:rounded-(--profile-shell-card-radius) md:border md:border-(--profile-panel-border) md:shadow-(--profile-panel-shadow)"
-						data-testid="profile-compact-shell"
-						data-interactive-ready={isHydrated ? "true" : undefined}
-						data-alert-opt-in-variant={resolvedAlertOptInVariant}
-						data-visitor-assignment-resolved={
-							visitorAssignmentResolved ? "true" : undefined
-						}
-						data-public-profile-nav={publicProfileNavIds}
-					>
-						<ReleaseCreditsDrawer
-							open={creditsOpen && !isDesktopLayout}
-							onOpenChange={setCreditsOpen}
-							credits={visibleReleaseCredits}
-							presentation={drawerPresentation}
-						/>
-						{profileBanner && !isDesktopLayout ? (
-							<div
-								className="relative z-20 w-full shrink-0"
-								data-testid="profile-shell-banner"
-							>
-								{profileBanner}
-							</div>
-						) : null}
-						<div className="profile-compact-surface-slot relative min-h-0 flex-1">
-							<ProfileCompactSurface
-								proofClaimCta={
-									proofClaim && claimFooterHref
-										? {
-												href: claimFooterHref,
-												label: claimFooterLabel ?? "Claim yours",
-											}
-										: null
-								}
-								renderMode="interactive"
-								presentation={drawerPresentation}
-								onOpenReleaseCredits={
-									visibleReleaseCredits.length > 0
-										? () => setCreditsOpen(true)
-										: undefined
-								}
-								artist={artist}
-								socialLinks={socialLinks}
-								contacts={contacts}
-								showPayButton={showPayButton}
-								latestRelease={latestRelease}
-								profileSettings={profileSettings}
-								featuredPlaylistFallback={featuredPlaylistFallback}
-								enableDynamicEngagement={enableDynamicEngagement}
-								subscribeTwoStep={subscribeTwoStep}
-								alertOptInVariant={resolvedAlertOptInVariant}
-								profilePacAssignment={resolvedProfilePacAssignment}
-								genres={genres}
-								pressPhotos={pressPhotos}
-								allowPhotoDownloads={allowPhotoDownloads}
-								creditSegments={creditSegments}
-								photoDownloadSizes={photoDownloadSizes}
-								tourDates={tourDates}
-								showSubscriptionConfirmedBanner={
-									showSubscriptionConfirmedBanner
-								}
-								viewerCountryCode={resolvedViewerCountryCode}
-								visitorAssignmentResolved={visitorAssignmentResolved}
-								merchCards={merchCards}
-								hideJovieBranding={hideJovieBranding || embeddedPreview}
-								hideMoreMenu={hideMoreMenu}
-								allowFanCapture={allowFanCapture}
-								allowSignedInEscape={!embeddedPreview}
-								renderInteractiveOverlays
-								renderSemanticHeading={!isDesktopLayout}
-								drawerOpen={drawerOpen && isHydrated && !isDesktopLayout}
-								drawerView={drawerView}
-								activeMode={requestedMode}
-								onModeSelect={(nextMode) => {
-									clearCloseResetTimer();
-									setRequestedMode(nextMode);
-								}}
-								onDrawerOpenChange={handleDrawerOpenChange}
-								onDrawerViewChange={handleDrawerViewChange}
-								onBack={handleBack}
-								onOpenMenu={() => openDrawerMode("menu")}
-								onPlayClick={handlePlayClick}
-								onShare={handleShare}
-								profileHref={profileHref}
-								artistProfilesHref={APP_ROUTES.ARTIST_PROFILES}
-								isSubscribed={isSubscribed}
-								contentPrefs={contentPrefs}
-								onTogglePref={handleTogglePref}
-								onUnsubscribe={handleUnsubscribe}
-								isUnsubscribing={unsubMutation.isPending}
-								onManageNotifications={() => {
-									clearCloseResetTimer();
-									setRequestedMode("subscribe");
-								}}
-								onRegisterReveal={(fn) => {
-									revealNotificationsRef.current = fn;
-								}}
-								onRevealNotifications={() => {
-									revealNotificationsRef.current?.();
-								}}
-								releases={releases}
-								catalogLoadFailed={catalogLoadFailed}
-							/>
-						</div>
-					</div>
-				}
-				desktopBanner={
-					embeddedPreview || !PROFILE_DESKTOP_SURFACE_ENABLED
-						? null
-						: profileBanner
-				}
-				desktopSurface={
-					PROFILE_DESKTOP_SURFACE_ENABLED ? (
-						<div
-							className="relative flex min-h-0 w-full flex-1 flex-col"
-							data-sheet-container
-						>
-							<ProfileDesktopSurface
-								presentation="modal"
-								overlaysEnabled={isDesktopLayout}
-								onReady={handleDesktopSurfaceReady}
-								artist={artist}
-								socialLinks={socialLinks}
-								contacts={contacts}
-								showPayButton={showPayButton}
-								latestRelease={latestRelease}
-								profileSettings={profileSettings}
-								alertOptInVariant={resolvedAlertOptInVariant}
-								allowFanCapture={allowFanCapture}
-								genres={genres}
-								pressPhotos={pressPhotos}
-								allowPhotoDownloads={allowPhotoDownloads}
-								creditSegments={creditSegments}
-								photoDownloadSizes={photoDownloadSizes}
-								tourDates={tourDates}
-								viewerCountryCode={resolvedViewerCountryCode}
-								visitorAssignmentResolved={visitorAssignmentResolved}
-								releases={releases}
-								catalogLoadFailed={catalogLoadFailed}
-								drawerOpen={drawerOpen}
-								drawerView={drawerView}
-								activeMode={requestedMode}
-								onModeSelect={(nextMode) => {
-									clearCloseResetTimer();
-									setRequestedMode(nextMode);
-								}}
-								onAlertsModalClose={() => setRequestedMode("profile")}
-								hideJovieBranding={hideJovieBranding || embeddedPreview}
-								onDrawerOpenChange={handleDrawerOpenChange}
-								onDrawerViewChange={handleDrawerViewChange}
-								onOpenMenu={() => openDrawerMode("menu")}
-								onPlayClick={handlePlayClick}
-								onBack={handleBack}
-								profileHref={profileHref}
-								isSubscribed={isSubscribed}
-								contentPrefs={contentPrefs}
-								onTogglePref={handleTogglePref}
-								onUnsubscribe={handleUnsubscribe}
-								isUnsubscribing={unsubMutation.isPending}
-								onOpenReleaseCredits={
-									visibleReleaseCredits.length > 0
-										? () => setCreditsOpen(true)
-										: undefined
-								}
-							/>
-							<ReleaseCreditsDrawer
-								open={creditsOpen && isDesktopLayout}
-								onOpenChange={setCreditsOpen}
-								credits={visibleReleaseCredits}
-								presentation="modal"
-							/>
-						</div>
-					) : null
-				}
-			/>
-		</ProfileNotificationsContext.Provider>
-	);
+      <AnonCookieBootstrap
+        onVariantResolved={setResolvedAlertOptInVariant}
+        onProfilePacResolved={setResolvedProfilePacAssignment}
+        onResolved={markVisitorAssignmentResolved}
+      />
+      <PublicProfileLayoutShell
+        artistName={artist.name}
+        heroImageUrl={heroImageUrl}
+        heroImageError={heroImageError}
+        onHeroImageLoadError={() => setHeroImageError(true)}
+        isDesktopLayout={isDesktopLayout}
+        desktopSurfaceReady={desktopSurfaceReady}
+        shouldRenderHeading={shouldRenderTemplateHeading}
+        profileAccentStyle={profileAccentStyle}
+        showClaimFooter={showClaimFooter}
+        claimFooterHref={claimFooterHref}
+        claimFooterLabel={claimFooterLabel}
+        proofClaim={proofClaim}
+        embedded={embeddedPreview}
+        previewExitHref={profileHref}
+        compactSurface={
+          <div
+            className='public-profile-compact-shell relative flex h-full min-w-0 w-full flex-col overflow-hidden bg-(--profile-content-bg) md:mx-auto md:rounded-(--profile-shell-card-radius) md:border md:border-(--profile-panel-border) md:shadow-(--profile-panel-shadow)'
+            data-testid='profile-compact-shell'
+            data-interactive-ready={isHydrated ? 'true' : undefined}
+            data-alert-opt-in-variant={resolvedAlertOptInVariant}
+            data-visitor-assignment-resolved={
+              visitorAssignmentResolved ? 'true' : undefined
+            }
+            data-public-profile-nav={publicProfileNavIds}
+          >
+            <ReleaseCreditsDrawer
+              open={creditsOpen && !isDesktopLayout}
+              onOpenChange={setCreditsOpen}
+              credits={visibleReleaseCredits}
+              presentation={drawerPresentation}
+            />
+            {profileBanner && !isDesktopLayout ? (
+              <div
+                className='relative z-20 w-full shrink-0'
+                data-testid='profile-shell-banner'
+              >
+                {profileBanner}
+              </div>
+            ) : null}
+            <div className='profile-compact-surface-slot relative min-h-0 flex-1'>
+              <ProfileCompactSurface
+                proofClaimCta={
+                  proofClaim && claimFooterHref
+                    ? {
+                        href: claimFooterHref,
+                        label: claimFooterLabel ?? 'Claim yours',
+                      }
+                    : null
+                }
+                renderMode='interactive'
+                presentation={drawerPresentation}
+                onOpenReleaseCredits={
+                  visibleReleaseCredits.length > 0
+                    ? () => setCreditsOpen(true)
+                    : undefined
+                }
+                artist={artist}
+                socialLinks={socialLinks}
+                contacts={contacts}
+                showPayButton={showPayButton}
+                latestRelease={latestRelease}
+                profileSettings={profileSettings}
+                featuredPlaylistFallback={featuredPlaylistFallback}
+                enableDynamicEngagement={enableDynamicEngagement}
+                subscribeTwoStep={subscribeTwoStep}
+                alertOptInVariant={resolvedAlertOptInVariant}
+                profilePacAssignment={resolvedProfilePacAssignment}
+                genres={genres}
+                pressPhotos={pressPhotos}
+                allowPhotoDownloads={allowPhotoDownloads}
+                creditSegments={creditSegments}
+                photoDownloadSizes={photoDownloadSizes}
+                tourDates={tourDates}
+                showSubscriptionConfirmedBanner={
+                  showSubscriptionConfirmedBanner
+                }
+                viewerCountryCode={resolvedViewerCountryCode}
+                visitorAssignmentResolved={visitorAssignmentResolved}
+                merchCards={merchCards}
+                hideJovieBranding={hideJovieBranding || embeddedPreview}
+                hideMoreMenu={hideMoreMenu}
+                allowFanCapture={allowFanCapture}
+                allowSignedInEscape={!embeddedPreview}
+                renderInteractiveOverlays
+                renderSemanticHeading={!isDesktopLayout}
+                drawerOpen={drawerOpen && isHydrated && !isDesktopLayout}
+                drawerView={drawerView}
+                activeMode={requestedMode}
+                onModeSelect={nextMode => {
+                  clearCloseResetTimer();
+                  setRequestedMode(nextMode);
+                }}
+                onDrawerOpenChange={handleDrawerOpenChange}
+                onDrawerViewChange={handleDrawerViewChange}
+                onBack={handleBack}
+                onOpenMenu={() => openDrawerMode('menu')}
+                onPlayClick={handlePlayClick}
+                onShare={handleShare}
+                profileHref={profileHref}
+                artistProfilesHref={APP_ROUTES.ARTIST_PROFILES}
+                isSubscribed={isSubscribed}
+                contentPrefs={contentPrefs}
+                onTogglePref={handleTogglePref}
+                onUnsubscribe={handleUnsubscribe}
+                isUnsubscribing={unsubMutation.isPending}
+                onManageNotifications={() => {
+                  clearCloseResetTimer();
+                  setRequestedMode('subscribe');
+                }}
+                onRegisterReveal={fn => {
+                  revealNotificationsRef.current = fn;
+                }}
+                onRevealNotifications={() => {
+                  revealNotificationsRef.current?.();
+                }}
+                releases={releases}
+                catalogLoadFailed={catalogLoadFailed}
+              />
+            </div>
+          </div>
+        }
+        desktopBanner={
+          embeddedPreview || !PROFILE_DESKTOP_SURFACE_ENABLED
+            ? null
+            : profileBanner
+        }
+        desktopSurface={
+          PROFILE_DESKTOP_SURFACE_ENABLED ? (
+            <div
+              className='relative flex min-h-0 w-full flex-1 flex-col'
+              data-sheet-container
+            >
+              <ProfileDesktopSurface
+                presentation='modal'
+                overlaysEnabled={isDesktopLayout}
+                onReady={handleDesktopSurfaceReady}
+                artist={artist}
+                socialLinks={socialLinks}
+                contacts={contacts}
+                showPayButton={showPayButton}
+                latestRelease={latestRelease}
+                profileSettings={profileSettings}
+                alertOptInVariant={resolvedAlertOptInVariant}
+                allowFanCapture={allowFanCapture}
+                genres={genres}
+                pressPhotos={pressPhotos}
+                allowPhotoDownloads={allowPhotoDownloads}
+                creditSegments={creditSegments}
+                photoDownloadSizes={photoDownloadSizes}
+                tourDates={tourDates}
+                viewerCountryCode={resolvedViewerCountryCode}
+                visitorAssignmentResolved={visitorAssignmentResolved}
+                releases={releases}
+                catalogLoadFailed={catalogLoadFailed}
+                drawerOpen={drawerOpen}
+                drawerView={drawerView}
+                activeMode={requestedMode}
+                onModeSelect={nextMode => {
+                  clearCloseResetTimer();
+                  setRequestedMode(nextMode);
+                }}
+                onAlertsModalClose={() => setRequestedMode('profile')}
+                hideJovieBranding={hideJovieBranding || embeddedPreview}
+                onDrawerOpenChange={handleDrawerOpenChange}
+                onDrawerViewChange={handleDrawerViewChange}
+                onOpenMenu={() => openDrawerMode('menu')}
+                onPlayClick={handlePlayClick}
+                onBack={handleBack}
+                profileHref={profileHref}
+                isSubscribed={isSubscribed}
+                contentPrefs={contentPrefs}
+                onTogglePref={handleTogglePref}
+                onUnsubscribe={handleUnsubscribe}
+                isUnsubscribing={unsubMutation.isPending}
+                onOpenReleaseCredits={
+                  visibleReleaseCredits.length > 0
+                    ? () => setCreditsOpen(true)
+                    : undefined
+                }
+              />
+              <ReleaseCreditsDrawer
+                open={creditsOpen && isDesktopLayout}
+                onOpenChange={setCreditsOpen}
+                credits={visibleReleaseCredits}
+                presentation='modal'
+              />
+            </div>
+          ) : null
+        }
+      />
+    </ProfileNotificationsContext.Provider>
+  );
 }
