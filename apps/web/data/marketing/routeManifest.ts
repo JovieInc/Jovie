@@ -1330,11 +1330,6 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       ),
       approvedVariantBinding(
         'apps/web/components/organisms/AboutPageContent.tsx',
-        'feature-grid',
-        'two-column-text'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/marketing/FaqSection.tsx',
         'faq',
         'objection-handler'
       ),
@@ -1348,7 +1343,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     bindingEvidence: {
       status: 'verified',
       source:
-        'AboutPageContent mounts left-none, article-body, two-column-text, objection-handler, and the footer final-single-claim (2026-10-15)',
+        'AboutPageContent mounts left-none, article-body, objection-handler, and the footer final-single-claim; the plain-company page change (#23332) removed the feature grid (2026-10-30)',
     },
     status: 'active',
     specVersion: '1.0.0',

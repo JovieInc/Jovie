@@ -11,6 +11,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { runGh } from '../packages/api-client/gh.ts';
+import { formatBiomeJson } from './lib/format-biome-json.mjs';
 import {
   clusters,
   dueMeasurements,
@@ -61,7 +62,11 @@ export async function main(argv, io = console) {
     if (argv.includes('--write'))
       writeFileSync(
         'docs/metrics/wins-latest.json',
-        `${JSON.stringify({ schema: 'jovie.wins-metrics/v1', at: new Date().toISOString(), ...out }, null, 2)}\n`
+        formatBiomeJson({
+          schema: 'jovie.wins-metrics/v1',
+          at: new Date().toISOString(),
+          ...out,
+        })
       );
     io.log(JSON.stringify(out, null, argv.includes('--json') ? 0 : 2));
     return 0;
@@ -137,10 +142,7 @@ export async function main(argv, io = console) {
       note: 'Engineering metrics only. Dollar figures belong in the private ops store and are never written here.',
     };
     if (argv.includes('--write'))
-      writeFileSync(
-        'docs/metrics/wins-weekly.json',
-        `${JSON.stringify(out, null, 2)}\n`
-      );
+      writeFileSync('docs/metrics/wins-weekly.json', formatBiomeJson(out));
     io.log(JSON.stringify(out, null, 2));
     return 0;
   }
