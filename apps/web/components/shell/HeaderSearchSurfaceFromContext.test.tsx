@@ -24,10 +24,15 @@ describe('HeaderSearchSurfaceFromContext', () => {
   it('renders the calm chat-search treatment used by the canonical rail', () => {
     renderSurface(true);
 
-    const trigger = screen.getByRole('button', { name: 'Search Jovie' });
+    const trigger = screen.getByRole('button', {
+      name: 'Search chats in Jovie',
+    });
 
     expect(trigger).toHaveAttribute('data-app-search-trigger', 'true');
     expect(screen.getByText('Search chats')).toBeVisible();
+    // WCAG 2.5.3 Label in Name: the accessible name must contain the
+    // visible trigger text (axe label-content-name-mismatch).
+    expect(trigger.getAttribute('aria-label')).toContain('Search chats');
     expect(trigger.className).toContain('h-9');
     expect(trigger.className).toContain('rounded-full');
     expect(trigger.className).toContain('text-(length:--text-app)');

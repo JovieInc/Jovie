@@ -1,5 +1,5 @@
 import { serverFetch } from '@/lib/http/server-fetch';
-import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
+import { GatewayEmailProvider } from '@/lib/notifications/providers/gateway';
 import { logger } from '@/lib/utils/logger';
 import {
   validateSubmissionImageAsset,
@@ -25,7 +25,7 @@ import type {
 
 const XPERI_RECIPIENT = 'content.music@xperi.com';
 
-const emailProvider = new ResendEmailProvider();
+const emailProvider = new GatewayEmailProvider();
 
 function inferMimeTypeFromUrl(url: string): string {
   const normalized = url.toLowerCase();
@@ -236,6 +236,9 @@ async function sendPackage(
   );
 
   const result = await emailProvider.sendEmail({
+    stream: 'transactional',
+    purpose: 'xperi-allmusic-submission',
+    consent: 'artist-request',
     to: XPERI_RECIPIENT,
     subject: packageData.subject,
     text: packageData.text,

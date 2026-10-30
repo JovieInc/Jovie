@@ -1,8 +1,8 @@
-// Promotion gate for auth/billing journey evidence (extends JOV-5937;
+// Promotion gate for golden-path journey evidence (extends JOV-5937;
 // release-integrity repair 2, founder decision 2026-10-21).
 //
 // A candidate whose range artifact (`jovie.release-range-risk/v1`) affects
-// auth or billing, or is unknown, may be promoted only with successful, fresh,
+// a golden-path surface, or is unknown, may be promoted only with successful, fresh,
 // exact-candidate evidence for BOTH the auth and billing journeys, produced by
 // a run that actually executed them. Never counted: dispatch success, skipped
 // tests, mocked providers, expired quarantine exclusions, exit-0 placeholders,
@@ -34,9 +34,30 @@ const AUTOMATION_APPROVER =
 
 export function journeysRequired(range) {
   if (!range || range.schema !== 'jovie.release-range-risk/v1') return true;
-  if (range.unknown === true) return true;
-  const a = range.affects ?? {};
-  return a.auth === true || a.billing === true || a.unknown === true;
+  if (
+    !SHA.test(range.candidateSha ?? '') ||
+    !SHA.test(range.baseDeployedSha ?? '') ||
+    range.unknown !== false
+  )
+    return true;
+  const a = range.affects;
+  if (
+    !a ||
+    ['auth', 'billing', 'unknown'].some(key => typeof a[key] !== 'boolean')
+  )
+    return true;
+  // Every golden-path surface is a promotion input: sign-in, billing, the
+  // public profile and release pages, the proxy that routes them, and the
+  // database that holds the claim. Docs-, tests- and tooling-only ranges stay
+  // exempt because they grade as none of these.
+  return (
+    a.auth === true ||
+    a.billing === true ||
+    a.publicUi === true ||
+    a.proxy === true ||
+    a.database === true ||
+    a.unknown === true
+  );
 }
 
 function validateEvidence(ev, journey, range, nowMs, freshnessMs) {
@@ -59,10 +80,8 @@ function validateEvidence(ev, journey, range, nowMs, freshnessMs) {
   if (!ev.runId || !ev.runUrl) r.push('missing run id/url');
   const t = ev.tests ?? {};
   if (!Number.isInteger(t.total) || t.total < 1) r.push('no tests executed');
-  if (t.skipped > 0 || t.skipped === undefined)
-    r.push('journey has skipped tests');
-  if (t.failed > 0 || t.failed === undefined)
-    r.push('journey has failed tests');
+  if (t.skipped !== 0) r.push('journey has skipped tests');
+  if (t.failed !== 0) r.push('journey has failed tests');
   if (t.passed !== t.total) r.push('not every journey test passed');
   const providers = Array.isArray(ev.providers) ? ev.providers : [];
   if (providers.length === 0) r.push('no provider mode recorded');
@@ -175,11 +194,26 @@ export function evaluatePromotion({
       perJourney[journey] = ['no evidence'];
       continue;
     }
-    const results = candidates.map(e =>
+    // Only executed, exact-candidate observations can supersede an execution.
+    // Artifact download order is not chronology. A failed rerun must invalidate
+    // an earlier green; a later successful recovery can certify it again.
+    const executions = candidates.filter(
+      e => e.candidateSha === candidateSha && EXECUTING_SOURCES.has(e.source)
+    );
+    if (executions.some(e => !Number.isFinite(Date.parse(e.completedAt)))) {
+      perJourney[journey] = ['executed evidence has unknown completion time'];
+      continue;
+    }
+    const latest = Math.max(...executions.map(e => Date.parse(e.completedAt)));
+    const current = executions.length
+      ? executions.filter(e => Date.parse(e.completedAt) === latest)
+      : candidates;
+    const results = current.map(e =>
       validateEvidence(e, journey, range ?? {}, nowMs, window)
     );
-    const ok = results.find(x => x.length === 0);
-    perJourney[journey] = ok ? [] : results[0];
+    // Equal timestamps have no trustworthy ordering: every tied execution
+    // must agree. A green record cannot erase a contradictory failure.
+    perJourney[journey] = [...new Set(results.flat())];
   }
   const reasons = Object.entries(perJourney).flatMap(([j, rs]) =>
     rs.map(x => `${j}: ${x}`)
