@@ -80,7 +80,10 @@ export async function checkSyntheticCanary({ github, repo, now = Date.now() }) {
         throw new Error('invalid-run');
       if (age > MAX_SILENCE_MINUTES) {
         return result(false, 'No scheduled canary within 7 hours', run, {
-          missedSlot: true,
+          // A fresher candidate in flight (the fallback's own re-dispatch,
+          // still queued) means the slot is already being recovered —
+          // re-dispatching would queue a duplicate every check interval.
+          missedSlot: !pending,
         });
       }
       // Bind to this attempt: an older green attempt cannot hide a skipped rerun.
