@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { appendFileSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { load as loadYaml } from 'js-yaml';
@@ -49,6 +49,30 @@ function githubFor(runs, jobs = { 100: [job()] }) {
   };
 }
 const check = github => checkSyntheticCanary({ github, repo, now: NOW });
+
+// This lane's job logs are admin-gated, so a CI-only failure here is invisible
+// to the remote diagnoser. Echo suite progress and failures into the run's
+// step summary, which is publicly readable on the workflow run page.
+const stepSummary = process.env.GITHUB_STEP_SUMMARY;
+const trace = message => {
+  if (!stepSummary) return;
+  try {
+    appendFileSync(stepSummary, `synthetic-canary-liveness: ${message}\n`);
+  } catch {
+    // Diagnostics must never fail the suite.
+  }
+};
+trace('suite loaded');
+afterEach(context => {
+  const { result } = context.task;
+  if (result?.status === 'fail') {
+    trace(
+      `FAILED ${context.task.name}: ${String(
+        result.errors?.map(error => error.message).join(' || ') ?? ''
+      ).slice(0, 2000)}`
+    );
+  }
+});
 afterEach(() => vi.restoreAllMocks());
 
 describe('synthetic canary dead-man', () => {
