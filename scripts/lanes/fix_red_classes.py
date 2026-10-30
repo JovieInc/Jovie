@@ -75,8 +75,9 @@ CONSERVATIVE_UTILITY = re.compile(
 SNAP_STEP = {"2.5": "2", "3.5": "3"}
 SPACING_SCAN_PREFIXES = ("apps/web/app/", "apps/web/components/", "packages/ui/")
 NON_PRODUCT_SPACING = re.compile(r"\.(?:test|spec|stories)\.[tj]sx?$")
-# Source Validation's merge probe. Only this one file has a deterministic union:
-# both sides append to the same NARROWED vitest command. Any other path stays a model fix.
+# Source Validation's merge probe. The NARROWED vitest command has its own union.
+# Any conflict hunk whose only change is a shell && chain (node --test or vitest
+# paths, plus added prefixes) uses merge_and_chain. Any other hunk stays a model fix.
 NARROWED_PREFLIGHT = "scripts/preflight-changed.mjs"
 NARROWED_CONFLICT = re.compile(
     r"This PR conflicts with \S+ in: scripts/preflight-changed\.mjs\s*\. "
@@ -106,6 +107,9 @@ _NARROWED_HUNK = re.compile(
 _NARROWED_SIDE = re.compile(
     r"\A(?P<prefix>(?:[ \t]*command:\n)?)(?P<cindent>[ \t]*)'(?P<command>[^'\n]+)',\n"
     r"(?P<nindent>[ \t]*)note: '(?P<note>[^'\n]+)',\n?\Z")
+_AND_CHAIN_LINE = re.compile(
+    r"""^(?P<indent>[ \t]*)(?P<prefix>(?:"[^"\n]+"\s*:\s*)?)(?P<q>['"])(?P<command>[^'"\n]*&&[^'"\n]*)(?P=q)(?P<suffix>,?)\s*$""")
+_JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
 
 # (class, pattern, action). First match wins per check; order is most specific first.
 SIGNATURES = (
@@ -316,6 +320,184 @@ def _vitest_prefix_and_files(segment: str) -> tuple[str, list[str]] | None:
     if "vitest run" not in prefix:
         return None
     return prefix, files
+
+
+def _file_list_prefix_and_files(segment: str) -> tuple[str, list[str]] | None:
+    """A vitest invocation, or `node --test` plus test paths and nothing else."""
+    vitest = _vitest_prefix_and_files(segment)
+    if vitest:
+        return vitest
+    if not segment.startswith("node --test"):
+        return None
+    files = _NARROWED_TEST.findall(segment)
+    if not files:
+        return None
+    prefix = segment
+    for name in files:
+        prefix = re.sub(rf"(^|\s){re.escape(name)}(?=\s|$)", " ", prefix)
+    prefix = re.sub(r"\s+", " ", prefix).strip()
+    if prefix != "node --test":
+        return None
+    return prefix, files
+
+
+def _opaque_command_key(segment: str) -> tuple[str, ...]:
+    """Identity of one && segment. Flags-only commands key on the executable."""
+    tokens = segment.split()
+    if len(tokens) >= 2 and not tokens[1].startswith("-"):
+        return tokens[0], tokens[1]
+    return (tokens[0],)
+
+
+def merge_and_chain(ours: str, theirs: str) -> str | None:
+    """Union two shell `&&` chains. Base segments stay in base order, then
+    head-only segments. `node --test` and vitest paths union the same way.
+    The same script with different arguments, a changed runner, or quotes
+    returns None."""
+    ours_parts = _split_shell_and(str(ours or "").strip())
+    theirs_parts = _split_shell_and(str(theirs or "").strip())
+    if not ours_parts or not theirs_parts:
+        return None
+
+    def classify(parts: list[str]) -> tuple[list[tuple[str, list[str]]], list[str]] | None:
+        lists = []
+        opaque = []
+        seen: dict[tuple[str, ...], str] = {}
+        for part in parts:
+            parsed = _file_list_prefix_and_files(part)
+            if parsed:
+                lists.append(parsed)
+                continue
+            key = _opaque_command_key(part)
+            if seen.get(key, part) != part:
+                return None
+            seen[key] = part
+            opaque.append(part)
+        if len(lists) > 1:
+            return None
+        return lists, opaque
+
+    ours_split = classify(ours_parts)
+    theirs_split = classify(theirs_parts)
+    if not ours_split or not theirs_split:
+        return None
+    ours_lists, ours_opaque = ours_split
+    theirs_lists, theirs_opaque = theirs_split
+    if len(ours_lists) != len(theirs_lists):
+        return None
+    if ours_lists and ours_lists[0][0] != theirs_lists[0][0]:
+        return None
+    theirs_by = {_opaque_command_key(part): part for part in theirs_opaque}
+    ours_by = {_opaque_command_key(part): part for part in ours_opaque}
+    for key in set(theirs_by) & set(ours_by):
+        if theirs_by[key] != ours_by[key]:
+            return None
+    files: list[str] = []
+    merged_list = None
+    if theirs_lists:
+        for name in theirs_lists[0][1] + ours_lists[0][1]:
+            if name not in files:
+                files.append(name)
+        merged_list = f"{theirs_lists[0][0]} {' '.join(files)}"
+    result: list[str] = []
+    for segment in theirs_parts:
+        result.append(merged_list if _file_list_prefix_and_files(segment) else segment)
+    list_at = next((index for index, segment in enumerate(ours_parts) if _file_list_prefix_and_files(segment)), None)
+    for index, segment in enumerate(ours_parts):
+        if _file_list_prefix_and_files(segment) or segment in result:
+            continue
+        if merged_list and list_at is not None and index < list_at:
+            result.insert(result.index(merged_list), segment)
+        else:
+            result.append(segment)
+    return " && ".join(result)
+
+
+def _and_chain_commands(lines: list[str]) -> tuple[list[re.Match[str]], list[str]] | None:
+    found = []
+    other = []
+    for line in lines:
+        match = _AND_CHAIN_LINE.match(line)
+        if match:
+            found.append(match)
+        else:
+            other.append(line)
+    if len(found) != 1:
+        return None
+    return found, other
+
+
+def _json_key_conflicts(ours: list[str], theirs: list[str]) -> bool:
+    """Two different values for one JSON key are an edit, not an addition."""
+    theirs_by: dict[str, str] = {}
+    for line in theirs:
+        match = _JSON_KEY.match(line)
+        if match:
+            theirs_by[match.group(1)] = line
+    for line in ours:
+        match = _JSON_KEY.match(line)
+        if match and match.group(1) in theirs_by and theirs_by[match.group(1)] != line:
+            return True
+    return False
+
+
+def _resolve_and_chain_hunk(ours: str, theirs: str) -> str | None:
+    ours_parsed = _and_chain_commands(ours.splitlines())
+    theirs_parsed = _and_chain_commands(theirs.splitlines())
+    if not ours_parsed or not theirs_parsed:
+        return None
+    ours_command, ours_other = ours_parsed
+    theirs_command, theirs_other = theirs_parsed
+    ours_match, theirs_match = ours_command[0], theirs_command[0]
+    if ours_match.group("q") != theirs_match.group("q") \
+            or ours_match.group("indent") != theirs_match.group("indent") \
+            or ours_match.group("prefix") != theirs_match.group("prefix") \
+            or ours_match.group("suffix") != theirs_match.group("suffix"):
+        return None
+    if _json_key_conflicts(ours_other, theirs_other):
+        return None
+    merged = merge_and_chain(ours_match.group("command"), theirs_match.group("command"))
+    if merged is None:
+        return None
+    command_line = (
+        f"{theirs_match.group('indent')}{theirs_match.group('prefix')}"
+        f"{theirs_match.group('q')}{merged}{theirs_match.group('q')}{theirs_match.group('suffix')}")
+    lines = []
+    for line in theirs.splitlines():
+        match = _AND_CHAIN_LINE.match(line)
+        lines.append(command_line if match else line)
+    for line in ours_other:
+        if line not in lines:
+            lines.append(line)
+    ending = "\n" if ours.endswith("\n") or theirs.endswith("\n") else ""
+    return "\n".join(lines) + ending
+
+
+def resolve_and_chain_text(text: str) -> str | None:
+    """Replace conflict hunks that are only a shell `&&` chain, plus lines added
+    on one side. None when any hunk has another shape, so the caller aborts."""
+    if "<<<<<<<" not in str(text or ""):
+        return None
+    hunks = list(_NARROWED_HUNK.finditer(text))
+    if not hunks:
+        return None
+    cleared = _NARROWED_HUNK.sub("", text)
+    if "<<<<<<<" in cleared or ">>>>>>>" in cleared:
+        return None
+    pieces = []
+    last = 0
+    for hunk in hunks:
+        resolved = _resolve_and_chain_hunk(hunk.group("ours"), hunk.group("theirs"))
+        if resolved is None:
+            return None
+        pieces.append(text[last:hunk.start()])
+        pieces.append(resolved)
+        last = hunk.end()
+    pieces.append(text[last:])
+    resolved = "".join(pieces)
+    if "<<<<<<<" in resolved or ">>>>>>>" in resolved or resolved == text:
+        return None
+    return resolved
 
 
 def merge_narrowed_guard_command(ours: str, theirs: str) -> str | None:

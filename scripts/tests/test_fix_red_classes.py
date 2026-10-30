@@ -188,6 +188,63 @@ class AdditiveImportMergeTest(unittest.TestCase):
                 self.assertEqual(path.read_text(), source)
 
 
+class AndChainMergeTest(unittest.TestCase):
+    OURS = (
+        "node scripts/run-affected-tests.mjs --control && "
+        "node --test scripts/ci-workflow-topology.test.mjs scripts/workflow-runner-pin-check.test.mjs && "
+        "node scripts/ci-workflow-topology.mjs && pnpm ownership:check"
+    )
+    THEIRS = (
+        "node scripts/run-affected-tests.mjs --control && "
+        "node --test scripts/ci-workflow-topology.test.mjs && "
+        "node scripts/ci-workflow-topology.mjs && pnpm ownership:check && "
+        "node scripts/sources-of-truth.mjs && node scripts/invariants/duplicate-literals.mjs"
+    )
+    MERGED = (
+        "node scripts/run-affected-tests.mjs --control && "
+        "node --test scripts/ci-workflow-topology.test.mjs scripts/workflow-runner-pin-check.test.mjs && "
+        "node scripts/ci-workflow-topology.mjs && pnpm ownership:check && "
+        "node scripts/sources-of-truth.mjs && node scripts/invariants/duplicate-literals.mjs"
+    )
+
+    def test_unions_node_test_paths_and_trailing_commands(self):
+        self.assertEqual(classes.merge_and_chain(self.OURS, self.THEIRS), self.MERGED)
+        self.assertEqual(
+            classes.merge_and_chain(NarrowedPreflightMergeTest.OURS, NarrowedPreflightMergeTest.THEIRS),
+            classes.merge_narrowed_guard_command(NarrowedPreflightMergeTest.OURS, NarrowedPreflightMergeTest.THEIRS),
+        )
+
+    def test_rejects_a_changed_script_quotes_and_a_second_file_list(self):
+        self.assertIsNone(classes.merge_and_chain(self.OURS, self.THEIRS.replace("ownership:check", "ownership:check --strict")))
+        self.assertIsNone(classes.merge_and_chain(self.OURS + " && echo 'x'", self.THEIRS))
+        doubled = self.OURS.replace("node --test", "node --test scripts/other.test.mjs && node --test", 1)
+        self.assertIsNone(classes.merge_and_chain(doubled, self.THEIRS))
+
+    def test_conflict_text_keeps_added_json_keys_and_fails_closed(self):
+        text = (
+            "{\n"
+            "<<<<<<< HEAD\n"
+            f'    "ci:control:test": "{self.OURS}",\n'
+            "=======\n"
+            f'    "ci:control:test": "{self.THEIRS}",\n'
+            '    "fleet:check": "node scripts/fleet-registry.mjs check",\n'
+            ">>>>>>> origin/main\n"
+            "}\n"
+        )
+        resolved = classes.resolve_and_chain_text(text)
+        self.assertIn(self.MERGED, resolved)
+        self.assertIn('"fleet:check": "node scripts/fleet-registry.mjs check"', resolved)
+        self.assertNotIn("<<<<<<<", resolved)
+        edited = text.replace(
+            f'    "ci:control:test": "{self.OURS}",\n',
+            f'    "ci:control:test": "{self.OURS}",\n'
+            '    "fleet:check": "node scripts/fleet-registry.mjs other",\n',
+        )
+        self.assertIsNone(classes.resolve_and_chain_text(edited))
+        unknown = text.replace(f'    "ci:control:test": "{self.OURS}",\n', "    const drifted = true;\n")
+        self.assertIsNone(classes.resolve_and_chain_text(unknown))
+
+
 class SpacingSnapTest(unittest.TestCase):
     DIFF = """diff --git a/apps/web/components/Card.tsx b/apps/web/components/Card.tsx
 --- a/apps/web/components/Card.tsx
