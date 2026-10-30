@@ -1192,6 +1192,20 @@
     max-width: none;
     padding-inline: 0;
   }
+  /* The canvas starts at the top of the stage. Once #23662 made the shell
+     height follow content, frame-level vertical centering re-centered the
+     canvas between profile modes (the tab row moved ~158px between Events
+     and Home — the JOV-6571/6572 mode-history contract) and re-centered it
+     again when fan-capture content mounted after assignment resolution
+     (public-profile CLS). Optical vertical centering stays owned by the
+     Home grid inside the shell. The 32px start padding keeps the canvas
+     inside the visual-audit shell bounds (y >= 24 at 1280x900). */
+  .profile-viewport:not(.profile-viewport--embedded):not(
+    .profile-viewport--desktop-surface
+  ) .public-profile-layout-frame--compact {
+    align-items: flex-start;
+    padding-block-start: 32px;
+  }
 
   /* Drop the phone chrome: the page is the canvas. */
   .profile-viewport:not(.profile-viewport--embedded):not(
