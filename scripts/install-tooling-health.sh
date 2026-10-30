@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Install the Mac launchd job for scripts/tooling-health.mjs (every 5 min).
-# Re-run from a stable checkout after merge to repoint it. Secrets are sourced from ~/.hermes/.env at run time, never written here.
+# Re-run from a stable checkout after merge to repoint it. Host credentials are loaded at runtime.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 NODE="${NODE_BIN:-}"
