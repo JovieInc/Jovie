@@ -1,0 +1,107 @@
+/**
+ * ImageryStage layout (lib/imagery/stages.ts, docs/marketing/IMAGERY.md).
+ * Depth is placement, scale and tonal black shadow on DS tokens: no tilt, no
+ * glass, no glow, no raw colour. Rounded per MKT-D17. Dark first and matte.
+ */
+
+.imagery-stage {
+  position: relative;
+  margin: 0;
+  container-type: inline-size;
+  aspect-ratio: var(--stage-aspect, 16 / 9);
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-3xl);
+  background: var(--color-bg-base);
+}
+
+.imagery-stage__plate,
+.imagery-stage__plate img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.imagery-stage__layer {
+  position: absolute;
+  left: var(--layer-x);
+  top: var(--layer-y);
+  z-index: var(--layer-z, 1);
+  width: var(--layer-w);
+  transform: translate(-50%, -50%);
+}
+
+/* The shot's own frame stays; depth comes from the tier shadow below. */
+.imagery-stage__layer .product-shot {
+  box-shadow: none;
+}
+
+.imagery-stage__layer--shadow-1 {
+  filter: drop-shadow(0 1px 2px var(--color-bg-base));
+}
+
+.imagery-stage__layer--shadow-2 {
+  filter: drop-shadow(0 12px 24px var(--color-bg-base));
+}
+
+.imagery-stage__layer--shadow-3 {
+  filter: drop-shadow(0 24px 48px var(--color-bg-base));
+}
+
+/* Receding layers fall toward the plate's black, not toward blur or glow. */
+.imagery-stage__layer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-xl);
+  background: var(--color-bg-base);
+  opacity: var(--layer-recede, 0);
+  pointer-events: none;
+}
+
+/* Crop: show a region of the shot inside its own rounded, hairlined window. */
+.imagery-stage__crop {
+  position: relative;
+  aspect-ratio: var(--crop-aspect);
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+}
+
+.imagery-stage__crop .product-shot {
+  position: absolute;
+  left: var(--crop-left);
+  top: var(--crop-top);
+  width: var(--crop-scale);
+  border: 0;
+  border-radius: 0;
+}
+
+.imagery-stage__copy {
+  position: absolute;
+  left: var(--safe-x);
+  top: var(--safe-y);
+  width: var(--safe-w);
+  height: var(--safe-h);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+@media (max-width: 47.99rem) {
+  .imagery-stage {
+    aspect-ratio: var(--stage-aspect-mobile, 4 / 5);
+  }
+
+  .imagery-stage__layer {
+    display: var(--layer-mobile-display, block);
+    left: var(--layer-mobile-x, var(--layer-x));
+    top: var(--layer-mobile-y, var(--layer-y));
+    width: var(--layer-mobile-w, var(--layer-w));
+  }
+}
