@@ -265,7 +265,7 @@ export function PostReleasePanel({
               <div className='flex items-center gap-1'>
                 <h3
                   id='library-downloads-heading'
-                  className='text-xs font-semibold text-primary-token'
+                  className='text-xs font-medium text-secondary-token'
                 >
                   Downloads
                 </h3>
@@ -300,7 +300,7 @@ export function PostReleasePanel({
           <div className='flex items-center gap-1'>
             <h3
               id='library-rightsholders-heading'
-              className='text-xs font-semibold text-primary-token'
+              className='text-xs font-medium text-secondary-token'
             >
               Rightsholders
             </h3>
@@ -351,7 +351,7 @@ export function PostReleasePanel({
           <div className='flex items-center justify-between gap-3'>
             <h3
               id='library-presence-heading'
-              className='text-xs font-semibold text-primary-token'
+              className='text-xs font-medium text-secondary-token'
             >
               Presence
             </h3>
