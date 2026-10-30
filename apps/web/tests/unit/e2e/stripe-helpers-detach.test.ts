@@ -41,13 +41,13 @@ function makeFakeStripeClient(
         const pages = pagesByCustomer[params.customer] ?? [];
         return { data: pages.shift() ?? [], has_more: pages.length > 0 };
       },
-      detach: async (paymentMethod: { id: string }) => {
-        detached.push(paymentMethod.id);
+      detach: async (paymentMethodId: string) => {
+        detached.push(paymentMethodId);
         detachCalls.push({
           customerId: 'tracked-via-list',
-          paymentMethodId: paymentMethod.id,
+          paymentMethodId,
         });
-        return { id: paymentMethod.id, customer: 'cus_x', livemode: false };
+        return { id: paymentMethodId, customer: 'cus_x', livemode: false };
       },
     },
   };
