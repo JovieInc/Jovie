@@ -1,14 +1,14 @@
 {
   "schema": "jovie.wins-metrics/v1",
-  "at": "2026-10-30T20:52:32.989Z",
-  "winsTotal": 25,
+  "at": "2026-10-30T21:51:23.244Z",
+  "winsTotal": 26,
   "winsVerified": 1,
   "winsClaimed": 12,
   "winsUnverified": 3,
   "winsNotReproduced": 1,
   "winsPendingMerge": 4,
-  "winsPendingMeasure": 4,
-  "winsLast7d": 25,
+  "winsPendingMeasure": 5,
+  "winsLast7d": 26,
   "clusters": [
     {
       "theme": "release-reliability",
@@ -48,6 +48,12 @@
     },
     {
       "theme": "golden-path-reliability",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "cost",
       "total": 1,
       "verified": 0,
       "ready": false
@@ -153,6 +159,10 @@
     {
       "id": "win-2026-10-30-eliminate-the-false-failing-publication-transport",
       "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-30-every-model-call-emits-a-receipt",
+      "status": "pending-measure"
     }
   ]
 }
