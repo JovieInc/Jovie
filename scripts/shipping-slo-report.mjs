@@ -413,7 +413,7 @@ export function collectRaw({ workflows, days }) {
 export function buildReport(
   raw,
   baseline,
-  { now = Date.now(), stageManifest = null } = {}
+  { now = Date.now(), stageManifest = null, ciCapacity = null } = {}
 ) {
   const nowMs = typeof now === 'number' ? now : Date.parse(now);
   const weekMs = 7 * 86_400_000;
@@ -548,10 +548,15 @@ export function buildReport(
     gistSlo.stages = buildStageSummary(stageTimings);
   }
 
+  // Hosted-runner capacity (scripts/ci-capacity-slo.mjs): queue wait p50/p95
+  // and control-plane job-minutes/hour, with the p95 > 120s alarm flag.
+  if (ciCapacity) gistSlo.ciCapacity = ciCapacity;
+
   return {
     schemaVersion: 1,
     generatedAt: new Date(nowMs).toISOString(),
     windowDays: 7,
+    ciCapacity,
     metrics,
     blogPublishLatency,
     flat,
@@ -785,7 +790,18 @@ async function main() {
       days: Number(argValue(args, '--stage-days', '29')),
     });
 
-  const report = buildReport(raw, baseline, { stageManifest });
+  let ciCapacity = null;
+  try {
+    ciCapacity = JSON.parse(
+      readFileSync(
+        resolve(REPO_ROOT, 'docs/metrics/ci-capacity-latest.json'),
+        'utf8'
+      )
+    );
+  } catch {
+    // No capacity sample this run; the SLO report is unaffected.
+  }
+  const report = buildReport(raw, baseline, { stageManifest, ciCapacity });
 
   if (hasArg(args, '--ratchet')) {
     const { next, tightened } = ratchetBaseline(

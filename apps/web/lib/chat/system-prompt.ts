@@ -48,7 +48,6 @@ interface ReleasePromptContext {
 }
 
 interface AccountPromptContext {
-  readonly email: string | null;
   readonly plan: string;
   readonly displayPlan: string;
   readonly isPro: boolean;
@@ -446,7 +445,6 @@ function buildAccountAccessSection(
 
   return `
 ## Account & Access
-- **Account Email:** ${accountContext.email ?? 'Not available'}
 - **Plan:** ${accountContext.displayPlan}
 ${billingLine}
 - **AI Usage This Week:** ${usageLine}

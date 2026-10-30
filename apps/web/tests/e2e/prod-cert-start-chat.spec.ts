@@ -6,6 +6,10 @@ import {
   mintPassageToken,
   PASSAGE_TOKEN_HEADER,
 } from '@/lib/synthetic/passage-token';
+import {
+  type ProdcertArtistFixture,
+  selectUnclaimedCertArtist,
+} from '@/lib/synthetic/prodcert-artist-fixture';
 import { newProdcertUserEmail } from '@/lib/synthetic/prodcert-identities';
 import { fillControlledInputUntilEnabled } from '../helpers/auth';
 import { recordPlaywrightSensitiveValues } from '../helpers/vercel-preview';
@@ -26,9 +30,15 @@ import { certStep, certStepBlocked } from './utils/prod-cert-steps';
  *     release from the artist's real catalog before any pricing step
  *     (JOV-9758; the recovery email gate re-runs this check id).
  *
- * The artist is UNMARKED, the public test fixture the Golden Path lane uses.
- * No account, claim or profile is created; the anonymous session is tagged
- * synthetic (automation user agent + x-synthetic-monitoring).
+ * The fixture artist is verified unclaimed at run time (JOV-9928): the
+ * dogfood Golden Path journey claims its UNMARKED fixture in production, and
+ * the server answers any anonymous first touch on an artist whose Spotify id
+ * already has a creator_profiles row with ownership_conflict:v1. Each run
+ * probes creator_profiles read-only — the same predicate as
+ * hasSpotifyProfileIdentityConflict — and uses the first pool candidate with
+ * no bound row; if none is unclaimed the claim steps block with that exact
+ * reason. No account, claim or profile is created; the anonymous session is
+ * tagged synthetic (automation user agent + x-synthetic-monitoring).
  *
  * Also certifies smartlink/click-analytics-capture: one release-link click is
  * recorded by /api/track and read back from the database as `is_bot = true`
@@ -41,10 +51,36 @@ import { certStep, certStepBlocked } from './utils/prod-cert-steps';
 test.use({ storageState: { cookies: [], origins: [] } });
 
 const ORIGIN = process.env.PROD_CERT_START_ORIGIN ?? 'https://jov.ie';
-const TEST_ARTIST = {
-  name: 'UNMARKED',
-  url: 'https://open.spotify.com/artist/1ZlSI1juLMMN1HU8X7RViN',
-} as const;
+
+/**
+ * Candidate fixture artists, in pool order (JOV-9928). UNMARKED stays first
+ * for continuity; the rest are real, obscure Spotify artists with verified
+ * catalog releases that the dogfood Golden Path journey never claims. The
+ * run picks the first candidate whose Spotify id has no creator_profiles row
+ * in prod (see selectUnclaimedCertArtist).
+ */
+const PROD_CERT_ARTIST_POOL: readonly ProdcertArtistFixture[] = [
+  {
+    spotifyId: '1ZlSI1juLMMN1HU8X7RViN',
+    name: 'UNMARKED',
+    url: 'https://open.spotify.com/artist/1ZlSI1juLMMN1HU8X7RViN',
+  },
+  {
+    spotifyId: '0T4McYgGzOzXOWzLaukIjD',
+    name: 'Unmarked Pavement',
+    url: 'https://open.spotify.com/artist/0T4McYgGzOzXOWzLaukIjD',
+  },
+  {
+    spotifyId: '6knM2BGm18cXek6FXbWd0t',
+    name: 'Good Dropouts',
+    url: 'https://open.spotify.com/artist/6knM2BGm18cXek6FXbWd0t',
+  },
+  {
+    spotifyId: '6TWG4bY1qzp0lJuxxFtl6F',
+    name: 'Unmarked Cars',
+    url: 'https://open.spotify.com/artist/6TWG4bY1qzp0lJuxxFtl6F',
+  },
+];
 
 function runId(): string {
   return process.env.GITHUB_RUN_ID
@@ -80,6 +116,35 @@ test('anonymous /start reaches a real catalog preview on production', async ({
     certStepBlocked('claim', 'golden-path-preview-has-release', why);
     return;
   }
+
+  // JOV-9928: verify the fixture artist is unclaimed before use, read-only.
+  // The same predicate that emits ownership_conflict:v1 — any creator_profiles
+  // row bound to the artist's Spotify id — decides here, so the run either
+  // starts from a guaranteed-unclaimed artist or blocks the claim steps with
+  // the exact reason. The confirm_artist assertion below stays unchanged.
+  const databaseUrl = process.env.DATABASE_URL ?? '';
+  if (!databaseUrl) {
+    const why =
+      'DATABASE_URL is not provided to this run, so the fixture artist cannot be verified unclaimed';
+    certStepBlocked('claim', 'start-chat-first-reply', why);
+    certStepBlocked('claim', 'golden-path-preview-has-release', why);
+    return;
+  }
+  const probeSql = neon(databaseUrl);
+  const TEST_ARTIST = await selectUnclaimedCertArtist(
+    PROD_CERT_ARTIST_POOL,
+    async spotifyId => {
+      const rows =
+        await probeSql`SELECT 1 FROM creator_profiles WHERE spotify_id = ${spotifyId} LIMIT 1`;
+      return rows.length > 0;
+    }
+  ).catch((error: unknown) => {
+    const why = String((error as Error)?.message ?? error);
+    certStepBlocked('claim', 'start-chat-first-reply', why);
+    certStepBlocked('claim', 'golden-path-preview-has-release', why);
+    return null;
+  });
+  if (!TEST_ARTIST) return;
 
   const token = mintPassageToken(Buffer.from(passageKey, 'base64url'), {
     sub: newProdcertUserEmail(runId()),
