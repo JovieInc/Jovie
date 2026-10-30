@@ -107,4 +107,42 @@ describe('POST /api/internal/ovie/golden-path-evidence', () => {
     recordMock.mockRejectedValue(new ProdGoldenPathPersistenceError('bad'));
     expect((await post({ receipts: [receipt()] })).status).toBe(422);
   });
+  it('records a receipt carrying per-surface browser evidence (JOV-9625)', async () => {
+    const response = await post({
+      receipts: [
+        receipt({
+          consoleErrorCount: 0,
+          networkErrorCount: 2,
+          screenshot: {
+            format: 'jpeg',
+            dataUrl: 'data:image/jpeg;base64,frame',
+          },
+        }),
+      ],
+    });
+    expect(response.status()).toBe(200);
+    expect(recordMock).toHaveBeenCalledTimes(1);
+    const stored = recordMock.mock.calls[0][0].receipts[0];
+    expect(stored.consoleErrorCount).toBe(0);
+    expect(stored.networkErrorCount).toBe(2);
+    expect(stored.screenshot.dataUrl).toBe('data:image/jpeg;base64,frame');
+  });
+
+  it('rejects a malformed screenshot payload (JOV-9625)', async () => {
+    expect(
+      (
+        await post({
+          receipts: [
+            receipt({
+              screenshot: {
+                format: 'png',
+                dataUrl: 'data:image/png;base64,frame',
+              },
+            }),
+          ],
+        })
+      ).status
+    ).toBe(400);
+    expect(recordMock).not.toHaveBeenCalled();
+  });
 });

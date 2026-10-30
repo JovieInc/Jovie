@@ -25,7 +25,9 @@ import { logger } from '@/lib/utils/logger';
 export const runtime = 'nodejs';
 
 const ROUTE = '/api/internal/ovie/golden-path-evidence';
-const MAX_BODY_BYTES = 256 * 1024;
+// Eight per-surface receipts, each possibly carrying a JPEG evidence frame
+// (JOV-9625): 8 × ~250KB data-URL ceiling leaves headroom under ~4MB.
+const MAX_BODY_BYTES = 4 * 1024 * 1024;
 
 const text = z.string().min(1).max(2_000);
 const iso = z.string().datetime({ offset: true });
@@ -71,6 +73,17 @@ const receiptSchema = z
           .strict()
       )
       .max(40),
+    // Per-surface browser evidence (JOV-9625). Null/absent means the surface
+    // was not browser-exercised — recorded as absent, never as a clean zero.
+    consoleErrorCount: z.number().int().nonnegative().nullish(),
+    networkErrorCount: z.number().int().nonnegative().nullish(),
+    screenshot: z
+      .object({
+        format: z.literal('jpeg'),
+        dataUrl: z.string().startsWith('data:image/jpeg;base64,').max(400_000),
+      })
+      .strict()
+      .nullish(),
   })
   .strict();
 
