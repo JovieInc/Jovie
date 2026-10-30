@@ -9,5 +9,6 @@
   ],
   "duplicateFields": [
     "components/features/admin/feedback-table/AdminFeedbackTable.tsx::user"
-  ]
+  ],
+  "uppercaseLabels": []
 }
