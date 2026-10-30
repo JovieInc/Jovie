@@ -1,3 +1,7 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Summer
+# capability-gap: The ratchet engine, tamper-proof base comparison and baseline auto-shrink live in the shared JovieInc/ci composite action so every repo runs identical rules; this repo owns only its config and baseline.
+# removal-trigger: Collapse this hop when ci-fast-lanes can call a shared JovieInc/ci action directly instead of a standalone workflow.
 name: Slop Guard
 
 # Company anti-slop ratchets from JovieInc/ci (JOV-9975). Config config/slop-guard/config.json,
@@ -11,6 +15,8 @@ on:
 
 permissions:
   contents: read
+  issues: read
+  pull-requests: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
@@ -21,11 +27,24 @@ jobs:
     name: slop-guard
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    env:
+      HAS_BOT_KEY: ${{ secrets.JOVIE_BOT_PRIVATE_KEY != '' && secrets.JOVIE_BOT_APP_ID != '' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { fetch-depth: 1 }
       - uses: ./.github/actions/setup-node-pnpm
-      - uses: JovieInc/ci/actions/slop-guard@f5d93ff14246fa49d6b2515c3ca3ec8f3d9dcf0d # JovieInc/ci#12
+      # Optional: with the jovie-bot App key present, fixed debt lowers the baseline automatically.
+      # Without it (or on forks) auto-shrink is skipped and the guard stays warn-only for that part.
+      - name: Mint jovie-bot token
+        id: bot
+        if: env.HAS_BOT_KEY == 'true'
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ secrets.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+      - uses: JovieInc/ci/actions/slop-guard@603fc55898f8b5a79bc6c0dd32f48e6eed9b78ad # JovieInc/ci#12
         with:
           config: config/slop-guard/config.json
-          auto-shrink: 'true'
+          auto-shrink: ${{ steps.bot.outputs.token != '' }}
+          token: ${{ steps.bot.outputs.token || github.token }}
