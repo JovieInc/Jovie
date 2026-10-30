@@ -9,6 +9,12 @@ import { cn } from '@/lib/utils';
  * ShellAudioDock — the shell-level dock row that hosts the full audio player
  * below the rounded main panel (JOV-6680).
  *
+ * JOV-9028 (founder directive 2026-10-24, supersedes the shared-card plane
+ * intent): the dock is persistent shell chrome, so it lives on the shell's
+ * surface-0 plane — the same tone as the sidebar chrome — flat, with no
+ * card fill, radius, or shadow of its own. The rounded main panel ends
+ * cleanly above the dock; the dock never renders as a second elevated card.
+ *
  * Visibility is driven entirely by `audio-chrome-state`: when
  * `fullPlayerVisible` flips true the dock's height animates 0 → player height
  * and the main panel's bottom edge slides up in lockstep (the dock is an
@@ -53,10 +59,10 @@ export function ShellAudioDock({
       aria-hidden={!open}
       inert={!open || undefined}
       className={cn(
-        // Shell-elevation surface: same plane + radius tokens as the main
-        // panel so the panel's bottom corners round against the dock.
-        'shrink-0 overflow-hidden bg-(--app-shell-content-surface)',
-        'lg:rounded-(--app-shell-radius) lg:shadow-(--app-shell-shadow)',
+        // Surface-0 shell plane: the dock is flat chrome next to the sidebar
+        // footer, not an elevated card — the rounded main panel above owns
+        // the only card elevation on this column.
+        'shrink-0 overflow-hidden bg-surface-0',
         className
       )}
       style={{

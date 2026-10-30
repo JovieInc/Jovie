@@ -92,6 +92,19 @@
         "ref": "findJank rules input-reset:effect-resets-on-open-state and focus-loss:inline-component, plus the input-retention test requirement in the frontend-rules criterion",
         "status": "landed"
       }
+    },
+    {
+      "id": "DG-008",
+      "component": "apps/web/components/shell/ShellAudioDock.tsx",
+      "title": "Persistent audio player rendered as a separate elevated rounded card below the rounded main-content surface instead of flat shell chrome on the shell's surface-0 plane",
+      "class": "surface-nesting",
+      "foundBy": "human",
+      "foundAt": "2026-10-24T03:33:00Z",
+      "guard": {
+        "type": "lint-ast-rule",
+        "ref": "ShellAudioDock colocated elevation contract (JOV-9028): the dock renders bg-surface-0 with no card fill/radius/shadow classes, plus the rendered bounding-box guard in apps/web/tests/e2e/audio-dock-layout-stability.spec.ts (dock plane resolves to the surface-0 token; main panel ends cleanly above the player with no overlap/clipping across the player collapsed/expanded x sidebar open/closed state matrix)",
+        "status": "landed"
+      }
     }
   ]
 }

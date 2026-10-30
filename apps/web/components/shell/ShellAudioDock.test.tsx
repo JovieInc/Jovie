@@ -136,6 +136,29 @@ describe('ShellAudioDock', () => {
     expect(getDock()).toHaveAttribute('data-state', 'closed');
   });
 
+  it('lives on the shell surface-0 plane — flat chrome, not an elevated card (JOV-9028)', () => {
+    render(
+      <ShellAudioDock>
+        <div data-testid='player'>Player</div>
+      </ShellAudioDock>
+    );
+
+    publishSnapshot();
+
+    const dock = getDock();
+    // The persistent player is shell chrome on the shell's surface-0 plane
+    // (the same chrome plane as the sidebar footer), not a second card below
+    // the rounded main panel.
+    expect(dock).toHaveClass('bg-surface-0');
+    // Flat on the shell plane: no card fill, no card radius, no card shadow.
+    expect(dock).not.toHaveClass('bg-(--app-shell-content-surface)');
+    expect(dock).not.toHaveClass('lg:rounded-(--app-shell-radius)');
+    expect(dock).not.toHaveClass('lg:shadow-(--app-shell-shadow)');
+    // The dock keeps the shell gap above it so the main panel ends cleanly
+    // on the grid; the gap animates with the reveal (see the collapse test).
+    expect(dock.style.marginTop).toBe('var(--app-shell-gap)');
+  });
+
   it('resolves instantly under prefers-reduced-motion', () => {
     mockPrefersReducedMotion = true;
     render(

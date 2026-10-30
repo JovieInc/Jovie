@@ -29,10 +29,11 @@ from atomic_state import atomic_write_text
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, AGENT = (
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, FILL_BODY, AGENT = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "merge-narrowed-preflight", "agent")
-DETERMINISTIC = frozenset({RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED})
+    "merge-narrowed-preflight", "fill-pr-body", "agent")
+DETERMINISTIC = frozenset({
+    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, FILL_BODY})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -110,7 +111,7 @@ SIGNATURES = (
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
     ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
     ("atomic-write", ATOMIC_TEXT, AGENT),
-    ("pr-body", BODY_TEXT, AGENT),
+    ("pr-body", BODY_TEXT, FILL_BODY),
 )
 BEHIND_CLASS = "stale-branch"
 AGGREGATE = ("pr ready", "ci summary", "rollup")
