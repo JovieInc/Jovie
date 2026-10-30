@@ -7,7 +7,7 @@ import {
   PASSAGE_TOKEN_HEADER,
 } from '@/lib/synthetic/passage-token';
 import {
-  type ProdcertArtistFixture,
+  SHARED_E2E_ARTIST_POOL,
   selectUnclaimedCertArtist,
 } from '@/lib/synthetic/prodcert-artist-fixture';
 import { newProdcertUserEmail } from '@/lib/synthetic/prodcert-identities';
@@ -59,28 +59,7 @@ const ORIGIN = process.env.PROD_CERT_START_ORIGIN ?? 'https://jov.ie';
  * run picks the first candidate whose Spotify id has no creator_profiles row
  * in prod (see selectUnclaimedCertArtist).
  */
-const PROD_CERT_ARTIST_POOL: readonly ProdcertArtistFixture[] = [
-  {
-    spotifyId: '1ZlSI1juLMMN1HU8X7RViN',
-    name: 'UNMARKED',
-    url: 'https://open.spotify.com/artist/1ZlSI1juLMMN1HU8X7RViN',
-  },
-  {
-    spotifyId: '0T4McYgGzOzXOWzLaukIjD',
-    name: 'Unmarked Pavement',
-    url: 'https://open.spotify.com/artist/0T4McYgGzOzXOWzLaukIjD',
-  },
-  {
-    spotifyId: '6knM2BGm18cXek6FXbWd0t',
-    name: 'Good Dropouts',
-    url: 'https://open.spotify.com/artist/6knM2BGm18cXek6FXbWd0t',
-  },
-  {
-    spotifyId: '6TWG4bY1qzp0lJuxxFtl6F',
-    name: 'Unmarked Cars',
-    url: 'https://open.spotify.com/artist/6TWG4bY1qzp0lJuxxFtl6F',
-  },
-];
+const PROD_CERT_ARTIST_POOL = SHARED_E2E_ARTIST_POOL;
 
 function runId(): string {
   return process.env.GITHUB_RUN_ID
