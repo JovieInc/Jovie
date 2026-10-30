@@ -1,0 +1,59 @@
+name: Price change guard
+
+# An existing plan's live price cannot change without a scheduled-change record
+# that was merged at least 30 days earlier (customers get notice before a price
+# change; Terms promise, PR #23317). See apps/web/lib/billing/price-changes/.
+# Compares the live price table and registry at the PR base with the PR head.
+
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: price-change-guard-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    name: Price change guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Resolve base
+        id: base
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          MQ_BASE: ${{ github.event.merge_group.base_sha }}
+        run: echo "sha=${MQ_BASE:-$PR_BASE}" >> "$GITHUB_OUTPUT"
+
+      # The guard and its extractor come from the BASE, so a PR cannot weaken
+      # the check it is judged by. Changes to them are judged by the old guard.
+      - name: Use the base guard
+        env:
+          BASE: ${{ steps.base.outputs.sha }}
+        run: |
+          set -euo pipefail
+          for f in scripts/check-price-change-guard.ts \
+            apps/web/lib/billing/price-changes/guard.ts \
+            apps/web/lib/billing/price-changes/live-prices.ts \
+            apps/web/lib/billing/price-changes/rules.ts \
+            apps/web/lib/billing/price-changes/types.ts; do
+            if git cat-file -e "$BASE:$f" 2>/dev/null; then git checkout "$BASE" -- "$f"; fi
+          done
+
+      - name: Reject price edits without a merged scheduled-change record
+        env:
+          BASE: ${{ steps.base.outputs.sha }}
+        run: pnpm check:price-change-guard --base "$BASE"

@@ -1123,6 +1123,13 @@ export {
   type PreSaveToken,
   preSaveTokens,
 } from './pre-save';
+// Price-change notices (scheduled changes, per-subscriber notice ledger)
+export {
+  type PriceChangeNoticeRow,
+  priceChangeNotices,
+  type ScheduledPriceChangeRow,
+  scheduledPriceChanges,
+} from './price-changes';
 // Product Update Subscribers
 export {
   insertProductUpdateSubscriberSchema,

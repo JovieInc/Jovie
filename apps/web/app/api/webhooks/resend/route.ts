@@ -22,7 +22,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
-
+import { recordPriceChangeNoticeBounce } from '@/lib/billing/price-changes/bounce';
 import { db } from '@/lib/db';
 import { webhookEvents } from '@/lib/db/schema/suppression';
 import { stopEnrollmentsForEmail } from '@/lib/email/campaigns/enrollment';
@@ -314,6 +314,10 @@ async function processBounceOrComplaint(
 
   const reason = getSuppressionReason(type, bounceMessage);
   if (!reason) return;
+
+  // A bounced price-change notice was not delivered: it must stop counting as
+  // notified so the effect gate holds the switch. No-op for other mail.
+  await recordPriceChangeNoticeBounce(data.email_id, reason !== 'soft_bounce');
 
   // Calculate expiry for soft bounces (30 days)
   const expiresAt =

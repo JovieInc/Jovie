@@ -3425,6 +3425,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/summer-company/price-changes/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-company/price-changes",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/summer-company/revenue/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/revenue",

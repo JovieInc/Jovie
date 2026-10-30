@@ -9,6 +9,7 @@ const mockUpdate = vi.hoisted(() => vi.fn());
 const mockStopEnrollmentsForEmail = vi.hoisted(() => vi.fn());
 const mockGetCreatorByMessageId = vi.hoisted(() => vi.fn());
 const mockRecordBounce = vi.hoisted(() => vi.fn());
+const mockRecordPriceChangeNoticeBounce = vi.hoisted(() => vi.fn());
 const mockRecordComplaint = vi.hoisted(() => vi.fn());
 const mockRecordDelivery = vi.hoisted(() => vi.fn());
 const mockAddSuppression = vi.hoisted(() => vi.fn());
@@ -28,6 +29,10 @@ vi.mock('@/lib/env-server', () => ({
   env: {
     RESEND_WEBHOOK_SECRET: mockResendSecret,
   },
+}));
+
+vi.mock('@/lib/billing/price-changes/bounce', () => ({
+  recordPriceChangeNoticeBounce: mockRecordPriceChangeNoticeBounce,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -136,6 +141,7 @@ describe('POST /api/webhooks/resend', () => {
     vi.clearAllMocks();
     vi.resetModules();
     mockDatabase();
+    mockRecordPriceChangeNoticeBounce.mockReset().mockResolvedValue(false);
     mockGetCreatorByMessageId.mockResolvedValue(null);
     mockRecordBounce.mockResolvedValue({
       statusChanged: false,
@@ -294,6 +300,10 @@ describe('POST /api/webhooks/resend', () => {
 
     expect(response.status).toBe(200);
     expect(mockAddSuppression).toHaveBeenCalledTimes(2);
+    expect(mockRecordPriceChangeNoticeBounce).toHaveBeenCalledWith(
+      'email_bounce',
+      false
+    );
     expect(mockAddSuppression).toHaveBeenCalledWith(
       'fan@example.com',
       'soft_bounce',
@@ -412,6 +422,55 @@ describe('POST /api/webhooks/resend', () => {
         call => call[0] as Record<string, unknown>
       );
     }
+
+    it('records permanent notice bounces before acknowledging the event', async () => {
+      mockRecordPriceChangeNoticeBounce.mockResolvedValue(true);
+
+      const response = await post(bounceBody());
+
+      expect(response.status).toBe(200);
+      expect(mockRecordPriceChangeNoticeBounce).toHaveBeenCalledWith(
+        'email_bounce',
+        true
+      );
+      expect(mockAddSuppression).toHaveBeenCalled();
+    });
+
+    it('records complaints as permanent notice failures', async () => {
+      const body = JSON.parse(bounceBody());
+      body.type = 'email.complained';
+      body.data.complaint = { type: 'abuse' };
+
+      const response = await post(JSON.stringify(body));
+
+      expect(response.status).toBe(200);
+      expect(mockRecordPriceChangeNoticeBounce).toHaveBeenCalledWith(
+        'email_bounce',
+        true
+      );
+      expect(mockAddSuppression).toHaveBeenCalledWith(
+        'fan@example.com',
+        'spam_complaint',
+        'webhook',
+        expect.anything()
+      );
+    });
+
+    it('leaves a failed notice-ledger write unprocessed for provider retry', async () => {
+      const { updateChain } = mockDatabase();
+      mockRecordPriceChangeNoticeBounce.mockRejectedValue(
+        new Error('notice ledger unavailable')
+      );
+
+      const response = await post(bounceBody());
+
+      expect(response.status).toBe(500);
+      expect(
+        setCalls(updateChain).some(write => write.processed === true)
+      ).toBe(false);
+      expect(mockAddSuppression).not.toHaveBeenCalled();
+      expect(mockRecordBounce).not.toHaveBeenCalled();
+    });
 
     it('never acknowledges a bounce whose suppression write failed', async () => {
       const { updateChain } = mockDatabase();

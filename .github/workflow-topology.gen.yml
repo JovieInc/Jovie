@@ -754,6 +754,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:verify
     jobCount: 1
+  - name: Migration numbers
+    path: .github/workflows/migration-numbers.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - merge_group
+      - pull_request
+    terminalReceipt: job:numbers
+    jobCount: 1
   - name: Mutation Diff
     path: .github/workflows/mutation-diff.yml
     active: true
@@ -1045,6 +1057,18 @@ nodes:
     triggeringStateTransition:
       - pull_request
     terminalReceipt: job:capture
+    jobCount: 1
+  - name: Price change guard
+    path: .github/workflows/price-change-guard.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - merge_group
+      - pull_request
+    terminalReceipt: job:guard
     jobCount: 1
   - name: Private Data Guard
     path: .github/workflows/private-data-guard.yml
