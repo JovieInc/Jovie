@@ -73,7 +73,9 @@ describe('LibraryAssetSharePanel', () => {
     expect(
       screen.getByRole('menuitem', { name: 'Make public' })
     ).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Open' })).toBeInTheDocument();
+    // The header already opens the page; the link row carries no second Open.
+    expect(screen.queryByRole('menuitem', { name: 'Open' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Open link' })).toBeNull();
     expect(
       screen.getByRole('menuitem', { name: 'Revoke private link' })
     ).toBeInTheDocument();

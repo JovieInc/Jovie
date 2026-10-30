@@ -15,6 +15,7 @@ interface CopyableUrlRowProps {
   readonly testId?: string;
   readonly surface?: 'boxed' | 'flat';
   readonly actionsVisibility?: 'always' | 'hover';
+  readonly showOpen?: boolean;
 }
 
 export function CopyableUrlRow({
@@ -30,6 +31,7 @@ export function CopyableUrlRow({
   testId,
   surface = 'boxed',
   actionsVisibility = 'always',
+  showOpen = true,
 }: CopyableUrlRowProps) {
   return (
     <ShareableLinkRow
@@ -38,6 +40,7 @@ export function CopyableUrlRow({
       density={size === 'sm' ? 'compact' : size === 'md' ? 'rail' : 'table'}
       surface={surface}
       actionsVisibility={actionsVisibility}
+      showOpen={showOpen}
       onCopySuccess={onCopySuccess}
       onCopyError={onCopyError}
       copyButtonTitle={copyButtonTitle}

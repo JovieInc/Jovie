@@ -229,7 +229,7 @@ import {
   persistLibrarySavedView,
   readPersistedLibrarySavedView,
 } from './library-saved-views';
-import { PostReleasePanel } from './PostReleasePanel';
+import { PostReleasePanel, RightsholdersList } from './PostReleasePanel';
 import {
   YouTubeMerchRelationshipEditor,
   YouTubeOptimizationPanel,
@@ -2179,7 +2179,7 @@ function ApprovalStatusEditor({
           aria-label='Approval Status'
           data-testid={`library-approval-status-select-${asset.id}`}
           className={cn(
-            '-ml-1 inline-flex h-6 max-w-full items-center justify-start gap-1 truncate px-1 font-normal text-primary-token hover:bg-surface-1',
+            '-ml-1 inline-flex h-6 max-w-full items-center justify-start gap-1 truncate px-1 font-normal text-primary-token hover:bg-surface-1 disabled:opacity-100',
             LIBRARY_BUTTON_FOCUS_CLASS
           )}
         >
@@ -2384,9 +2384,7 @@ function AssetDrawer({
       finding.status !== 'dismissed'
   );
   const hasPostReleaseActivity =
-    inspectorBundle.downloads.length > 0 ||
-    inspectorBundle.findings.length > 0 ||
-    inspectorBundle.rightsholders.length > 0;
+    inspectorBundle.downloads.length > 0 || inspectorBundle.findings.length > 0;
   const showDestinationsSection =
     current !== null &&
     !isMerch &&
@@ -2451,7 +2449,7 @@ function AssetDrawer({
             title={current.title}
             subtitle={current.artist}
             meta={
-              <div className='flex h-6 min-w-0 items-center'>
+              <div className='-ml-1 flex h-6 min-w-0 items-center'>
                 <LibraryStatusGlyph
                   asset={current}
                   showLabel
@@ -2496,7 +2494,7 @@ function AssetDrawer({
             {activeTab === 'overview' ? (
               <>
                 {!isMerch ? (
-                  <InspectorSection title='Actions'>
+                  <InspectorSection title='Actions' className='py-3 first:pt-0'>
                     <WorkInspectorActions
                       asset={current}
                       launches={workLaunches}
@@ -2519,7 +2517,7 @@ function AssetDrawer({
 
                 {presentation ? (
                   <InspectorSection
-                    title='Public presentation'
+                    title='Public Presentation'
                     className='py-3 first:pt-0'
                     data-testid='work-inspector-presentation'
                   >
@@ -2736,10 +2734,16 @@ function AssetDrawer({
                     {!isMerch && current.source ? (
                       <MetadataRow
                         label='Source'
-                        value={`${capitalizeFirst(current.source.provider)} · ${current.source.canonicalId}`}
+                        value={capitalizeFirst(current.source.provider)}
                       />
                     ) : null}
                   </dl>
+                  {!isMerch ? (
+                    <RightsholdersList
+                      asset={current}
+                      bundle={inspectorBundle}
+                    />
+                  ) : null}
                 </InspectorSection>
 
                 {showDestinationsSection ? (

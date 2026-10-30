@@ -69,4 +69,18 @@ describe('Tab canon and single-field ratchet (shrink-only)', () => {
       'Fixed duplicates must be removed from tab-canon.baseline.json.'
     ).toEqual([]);
   });
+
+  it('keeps drawer content on one left edge: row primitives add no horizontal inset', () => {
+    // The drawer body owns the inset (px-3). Rows, link rows and destination
+    // rows must start at that same x, so headings, labels, URL and icons align.
+    const read = (rel: string) => readFileSync(join(WEB_ROOT, rel), 'utf8');
+    const property = read('components/molecules/drawer/DrawerPropertyRow.tsx');
+    expect(property).not.toMatch(/container: '[^']*\bpx-[1-9]/);
+    expect(read('components/molecules/inspector/DspQuietRow.tsx')).not.toMatch(
+      /'group flex[^']*\bpx-[1-9]/
+    );
+    expect(read('components/molecules/drawer/ShareableLinkRow.tsx')).toContain(
+      "surface === 'flat' && 'px-0'"
+    );
+  });
 });
