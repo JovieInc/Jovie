@@ -453,7 +453,7 @@ describe('LibrarySurface', () => {
     // Status renders as the shared glyph everywhere; the approval editor in
     // Details keeps its semantic accent helper.
     expect(source).toContain('LibraryStatusGlyph');
-    expect(source).toContain('libraryApprovalStatusClasses');
+    expect(source).toContain('libraryApprovalStatusDotClasses');
     expect(source).toContain('PageToolbarTabButton');
     expect(source).toContain("variant={active ? 'secondary' : 'tertiary'}");
     expect(source).toContain('system-b-library-card--selected');
@@ -499,9 +499,9 @@ describe('LibrarySurface', () => {
       ),
     ].map(match => match[0]);
 
-    // Status is a glyph on tiles, rows, table and inspector; only the
-    // approval editor in Details still renders as a word pill.
-    expect(statusPillClasses).toHaveLength(1);
+    // Status is a glyph on tiles, rows, table and inspector; the approval
+    // editor in Details is an inline menu, so no word pill remains.
+    expect(statusPillClasses).toHaveLength(0);
     for (const className of statusPillClasses ?? []) {
       expect(className).toContain('truncate');
       expect(className).toContain('rounded-full');
@@ -989,10 +989,10 @@ describe('LibrarySurface', () => {
     fireEvent.click(screen.getByTestId('library-release-row-release-1'));
 
     const drawer = within(screen.getByTestId('library-asset-drawer'));
-    // Hero shows the same glyph as the tile, with its words beside it.
+    // Hero shows lifecycle once; approval lives only in the Details editor.
     expect(
       drawer.getByTestId('library-status-glyph-release-1')
-    ).toHaveTextContent('Released · Not approved');
+    ).toHaveTextContent(/^Released$/);
     expect(
       drawer.queryByTestId('library-approval-status-release-1')
     ).not.toBeInTheDocument();
@@ -1431,11 +1431,17 @@ describe('LibrarySurface', () => {
     expect(
       drawer.getByRole('link', { name: 'View Public Page' })
     ).toHaveAttribute('href', '/tim/take-me-over');
-    expect(presentation.getByText('Released')).toBeInTheDocument();
+    expect(
+      drawer.getByTestId('library-status-glyph-release-1')
+    ).toHaveTextContent(/^Released$/);
+    expect(presentation.queryByText('Released')).not.toBeInTheDocument();
     expect(presentation.getByText('Not public')).toBeInTheDocument();
     expect(presentation.getByText('Hidden from profile')).toBeInTheDocument();
     expect(presentation.getByText('Listen')).toBeInTheDocument();
-    expect(presentation.getByText('Spotify')).toBeInTheDocument();
+    // Destinations render once, as their own section, not also as a row.
+    expect(presentation.queryByText('Destinations')).not.toBeInTheDocument();
+    expect(drawer.getAllByText('Destinations')).toHaveLength(1);
+    expect(drawer.getByText('Spotify')).toBeInTheDocument();
     expect(about.getByText('Single')).toBeInTheDocument();
     expect(
       about.getByText('Discography · catalog-release-1')
