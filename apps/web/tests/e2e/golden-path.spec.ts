@@ -3,6 +3,10 @@ import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { productionUpstashCredentials } from '@/lib/redis-store';
 import {
+  SHARED_E2E_ARTIST_POOL,
+  selectUnclaimedCertArtist,
+} from '@/lib/synthetic/prodcert-artist-fixture';
+import {
   ensureSignedInUser,
   fillControlledInputUntilEnabled,
   getAdminCredentials,
@@ -38,7 +42,9 @@ import {
  * The profile first-value proof and post-activation Stripe persistence proof
  * intentionally share one identity, claim, catalog, and production build.
  *
- * Test artist: "UNMARKED" (public catalog, no known Jovie owner)
+ * Test artist: selected at run time from SHARED_E2E_ARTIST_POOL (first one with
+ * no bound creator_profiles row) and released in teardown, so a stale binding
+ * from an earlier run can never turn the claim step into ownership_conflict:v1.
  */
 
 /* ------------------------------------------------------------------ */
@@ -49,11 +55,34 @@ const REQUIRED_ENV = {
   DATABASE_URL: process.env.DATABASE_URL,
 } as const;
 
-const TEST_SPOTIFY_ARTIST = {
-  id: '1ZlSI1juLMMN1HU8X7RViN',
-  name: 'UNMARKED',
-  url: 'https://open.spotify.com/artist/1ZlSI1juLMMN1HU8X7RViN',
-} as const;
+let TEST_SPOTIFY_ARTIST: { id: string; name: string; url: string } = {
+  id: '',
+  name: '',
+  url: '',
+};
+
+/** Only bindings owned by golden-path test accounts are ever released. */
+const GOLDEN_PATH_TEST_EMAIL_LIKE = 'gp-%+e2e@test.jovie.com';
+
+async function releaseGoldenPathTestBindings(sql: ReturnType<typeof neon>) {
+  await sql`
+    UPDATE creator_profiles
+    SET spotify_id = NULL, spotify_url = NULL, updated_at = NOW()
+    WHERE spotify_id IS NOT NULL
+      AND user_id IN (
+        SELECT id FROM users WHERE email LIKE ${GOLDEN_PATH_TEST_EMAIL_LIKE}
+      )
+  `;
+}
+
+async function selectGoldenPathArtist(sql: ReturnType<typeof neon>) {
+  await releaseGoldenPathTestBindings(sql);
+  return selectUnclaimedCertArtist(SHARED_E2E_ARTIST_POOL, async spotifyId => {
+    const rows =
+      await sql`SELECT 1 FROM creator_profiles WHERE spotify_id = ${spotifyId} LIMIT 1`;
+    return rows.length > 0;
+  }).then(a => ({ id: a.spotifyId, name: a.name, url: a.url }));
+}
 
 const IS_LOCAL_AUTH_BYPASS =
   process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ||
@@ -840,6 +869,13 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
   // Fresh browser — no inherited auth state
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  // Teardown: release the fixture binding this run created so the next run
+  // (or the prod-cert pool) starts from an unclaimed artist.
+  test.afterAll(async () => {
+    if (!process.env.DATABASE_URL) return;
+    await releaseGoldenPathTestBindings(neon(process.env.DATABASE_URL));
+  });
+
   test.beforeEach(() => {
     if (IS_LOCAL_AUTH_BYPASS) {
       if (IS_REQUIRED_GOLDEN_PATH) {
@@ -869,6 +905,10 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
     page,
     browser,
   }) => {
+    TEST_SPOTIFY_ARTIST = await selectGoldenPathArtist(
+      neon(process.env.DATABASE_URL!)
+    );
+
     test.setTimeout(900_000);
     const trackingFixture = await interceptGoldenPathTrackingCalls(page);
     // JOV-5489: keyframes for the recorded visual review (no-op unless enabled).
