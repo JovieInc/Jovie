@@ -1,14 +1,14 @@
 {
   "schema": "jovie.wins-metrics/v1",
-  "at": "2026-10-30T04:29:36.014Z",
-  "winsTotal": 18,
+  "at": "2026-10-30T05:09:04.990Z",
+  "winsTotal": 19,
   "winsVerified": 1,
-  "winsClaimed": 5,
+  "winsClaimed": 6,
   "winsUnverified": 3,
   "winsNotReproduced": 1,
   "winsPendingMerge": 4,
   "winsPendingMeasure": 4,
-  "winsLast7d": 18,
+  "winsLast7d": 19,
   "clusters": [
     {
       "theme": "release-reliability",
@@ -18,7 +18,7 @@
     },
     {
       "theme": "merge-throughput",
-      "total": 9,
+      "total": 10,
       "verified": 0,
       "ready": false
     },
@@ -125,6 +125,10 @@
     {
       "id": "win-2026-10-30-production-authorize-stops-reading-the-healed",
       "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-30-wins-ledger-bot-prs-pass-source",
+      "status": "claimed"
     }
   ]
 }
