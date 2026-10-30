@@ -1832,6 +1832,7 @@ describe('workflow failure streak (production controller alarm)', () => {
         'failure',
         'cancelled',
       ]),
+      token: 'test-token',
       nowMs,
     });
     expect(observed.reason).toContain('3-consecutive-failures');
@@ -1841,6 +1842,7 @@ describe('workflow failure streak (production controller alarm)', () => {
   it('stays healthy when a success interrupts the failures', async () => {
     const observed = await observeWorkflowFailureStreak(receipt, {
       fetchImpl: runsFetch(['failure', 'failure', 'success', 'failure']),
+      token: 'test-token',
       nowMs,
     });
     expect(observed.lastProofAt).toBe(new Date(nowMs).toISOString());
