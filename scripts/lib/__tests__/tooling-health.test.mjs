@@ -91,6 +91,7 @@ describe('tooling health', () => {
           },
         },
         console: { log() {} },
+        fetch: vi.fn(),
         homedir: () => '/home',
         join: (...parts) => parts.join('/'),
         mkdirSync() {},
@@ -130,6 +131,9 @@ describe('tooling health', () => {
       await tick();
       const attempts = failure === 'transport' ? 2 : 1;
       expect(resolve).toHaveBeenCalledTimes(attempts);
+      expect(resolve).toHaveBeenLastCalledWith(
+        expect.objectContaining({ fetchImpl: context.fetch })
+      );
       expect(
         JSON.parse(files.get('/state/latest.json')).tools.gbrain
       ).toMatchObject({

@@ -40,6 +40,11 @@ const readJson = path => {
     return null;
   }
 };
+/**
+ * @param {string} cmd
+ * @param {string[]} args
+ * @param {{ input?: string, timeout?: number }} [options]
+ */
 const run = (cmd, args, { input, timeout = 20000 } = {}) => {
   const t0 = Date.now();
   const r = spawnSync(cmd, args, {
@@ -190,6 +195,7 @@ for (const [tool, r] of Object.entries(results)) {
     runUrl: `file://${DIR}/latest.json`,
     detail: `${tool}: ${r.detail}. ${red} consecutive red probes. Owner and probe: canon/automation-registry.jsonl mac:tooling-health.`,
     apiKey,
+    fetchImpl: globalThis.fetch,
   };
   if (action === 'red') {
     if (apiKey)
