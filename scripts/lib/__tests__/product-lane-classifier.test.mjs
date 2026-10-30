@@ -112,6 +112,12 @@ describe('product lane classifier', () => {
     ).toThrow(ProductLaneClassificationError);
   });
 
+  it('routes the slop-guard baseline through operations, not a product lane', () => {
+    const receipt = classifyProductLanes(['config/slop-guard/baseline.json']);
+    expect(receipt.selectedLanes).toEqual(['operations']);
+    expect(receipt.classifications[0].rule).toBe('operations-tooling');
+  });
+
   it('classifies retired knowledge-ingest paths as web after the workspace move', () => {
     const receipt = classifyProductLanes([
       'workers/knowledge-ingest/README.md',
