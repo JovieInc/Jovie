@@ -63,6 +63,11 @@ jobs:
           set -euo pipefail
           node scripts/wins-ledger.mjs ingest --pr "$PR_NUMBER"
           node scripts/wins-ledger.mjs validate
+          # Derived timestamps must not turn a no-op ingest into another bot PR.
+          if git diff --quiet -- canon/wins/wins.jsonl; then
+            echo "No new ledger entry; retaining derived metrics."
+            exit 0
+          fi
           node scripts/wins-ledger.mjs summary --write > /dev/null
           node scripts/wins-ledger.mjs rollup --write > /dev/null
           node scripts/wins-ledger.mjs notify
