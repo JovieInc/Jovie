@@ -658,14 +658,24 @@ test.describe('Production Auth Smoke @production-smoke', () => {
           .request.get(`${expectedOrigin}/api/dashboard/profile`);
         expect(profileResponse.status()).toBe(200);
         const { profile } = (await profileResponse.json()) as {
-          profile?: { bio?: string | null; username?: unknown };
+          profile?: { id?: unknown; bio?: string | null; username?: unknown };
         };
+        // The save route requires the claimed profile's canonical UUID plus
+        // an updates envelope (apps/web/app/api/dashboard/profile/route.ts);
+        // a bare field payload is rejected with 400 before any write.
+        const profileId = typeof profile?.id === 'string' ? profile.id : '';
+        expect(
+          profileId,
+          'Profile edit save requires the claimed profile id'
+        ).toMatch(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+        );
         const originalBio = typeof profile?.bio === 'string' ? profile.bio : '';
         const marker = `prodcert edit-save-readback ${runTag()}`;
         const save = await page
           .context()
           .request.put(`${expectedOrigin}/api/dashboard/profile`, {
-            data: { bio: marker },
+            data: { profileId, updates: { bio: marker } },
           });
         expect(save.status(), 'Profile edit save failed').toBe(200);
         try {
@@ -687,7 +697,7 @@ test.describe('Production Auth Smoke @production-smoke', () => {
           const restore = await page
             .context()
             .request.put(`${expectedOrigin}/api/dashboard/profile`, {
-              data: { bio: originalBio },
+              data: { profileId, updates: { bio: originalBio } },
             });
           expect(restore.status(), 'Profile edit restore failed').toBe(200);
         }
