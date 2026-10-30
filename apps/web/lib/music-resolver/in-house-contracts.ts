@@ -107,6 +107,8 @@ export interface CatalogTrack {
   readonly provider: string;
   readonly title: string;
   readonly artist: string;
+  /** Individual credits when the provider returns a multi-artist array. */
+  readonly artists?: readonly string[];
   readonly url: string;
   readonly isrc: string | null;
   readonly upc: string | null;
@@ -118,6 +120,8 @@ export interface CatalogAlbum {
   readonly provider: string;
   readonly title: string;
   readonly artist: string;
+  /** Individual credits when the provider returns a multi-artist array. */
+  readonly artists?: readonly string[];
   readonly url: string;
   readonly upc: string | null;
   readonly provenance: string;
@@ -144,6 +148,15 @@ export interface InHouseSources {
     territory?: string
   ): Promise<readonly CatalogTrack[]>;
   albumByUpc(upc: string, territory?: string): Promise<CatalogAlbum | null>;
+  /**
+   * Every provider album whose own record carries this exact UPC. Optional so
+   * single-source test doubles still satisfy the contract; the resolver falls
+   * back to albumByUpc.
+   */
+  albumsByUpc?(
+    upc: string,
+    territory?: string
+  ): Promise<readonly CatalogAlbum[]>;
   albumByUrl(url: string, territory?: string): Promise<CatalogAlbum | null>;
   searchAlbums(
     artist: string,

@@ -9,6 +9,7 @@ import { users } from '@/lib/db/schema/auth';
 import { discogReleases, providerLinks } from '@/lib/db/schema/content';
 import { fanReleaseNotifications } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import type { ReleaseSourceType } from '@/lib/discography/queries';
 import { getReleaseDayNotificationEmail } from '@/lib/email/templates/release-day-notification';
 import { getBatchCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { captureError } from '@/lib/error-tracking';
@@ -93,7 +94,7 @@ type BatchRelease = {
   slug: string;
   artworkUrl: string | null;
   releaseDate: Date | null;
-  sourceType: string | null;
+  sourceType: ReleaseSourceType | null;
 };
 
 type BatchCreator = {
@@ -361,6 +362,11 @@ async function sendEmailNotification(
       headers: emailData.headers,
       channels: ['email'],
       category: 'marketing',
+      emailRoute: {
+        stream: 'transactional',
+        purpose: 'release-day',
+        consent: 'opt-in',
+      },
       senderContext,
     },
     { email: subscriber.email }

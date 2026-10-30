@@ -26,6 +26,7 @@ import {
   autoMergeWasNotArmed,
   classifyDequeueDenial,
   classifyMergeGroupFailure,
+  coveredByLaterEntry,
   enqueueWasRejected,
   FAILURE_HOLD_CONTEXT,
   FAILURE_RETRY_CONTEXT,
@@ -2208,6 +2209,57 @@ describe('terminal failure hold application', () => {
     expect(
       aheadEntryUnproven({ baseOnMain: false, aheadConclusion: null })
     ).toBe(true);
+  });
+
+  it('HEADGREEN: leaves an intermediate entry queued after a non-deterministic failure', async () => {
+    const queuedAt = (position, totalCount) => ({
+      id: 'PR_42',
+      state: 'OPEN',
+      headRefOid: SOURCE,
+      isInMergeQueue: true,
+      mergeQueueEntry: {
+        id: 'MQE_42',
+        position,
+        headCommit: { oid: GROUP },
+        mergeQueue: { entries: { totalCount } },
+      },
+      autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
+    });
+    expect(coveredByLaterEntry(queuedAt(2, 5), SOURCE, GROUP)).toBe(true);
+    // The last entry has nothing behind it; missing queue data fails closed.
+    expect(coveredByLaterEntry(queuedAt(5, 5), SOURCE, GROUP)).toBe(false);
+    expect(
+      coveredByLaterEntry(
+        {
+          ...queuedAt(2, 5),
+          mergeQueueEntry: { id: 'x', headCommit: { oid: GROUP } },
+        },
+        SOURCE,
+        GROUP
+      )
+    ).toBe(false);
+    const writeStatus = vi.fn();
+    const dequeuePullRequest = vi.fn();
+    const disableAutoMerge = vi.fn();
+    const result = await applyMergeGroupFailure(
+      { ...failureInput, failedSteps: ['Set up job'] },
+      {
+        writeStatus,
+        readPullRequest: vi.fn(async () => queuedAt(2, 5)),
+        dequeuePullRequest,
+        disableAutoMerge,
+      }
+    );
+    expect(result).toMatchObject({
+      coveredByLaterEntry: true,
+      skipped: true,
+      statusWritten: false,
+      dequeued: false,
+      autoMergeDisabled: false,
+    });
+    expect(writeStatus).not.toHaveBeenCalled();
+    expect(dequeuePullRequest).not.toHaveBeenCalled();
+    expect(disableAutoMerge).not.toHaveBeenCalled();
   });
 
   it('only treats a live queued exact source as superseded', () => {

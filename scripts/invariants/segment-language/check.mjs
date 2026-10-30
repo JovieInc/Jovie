@@ -7,7 +7,7 @@ import { ancestorJson, evaluateRatchet } from '../icp-language/ratchet.mjs';
 
 export const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 export const BASELINE_RELATIVE =
-  'scripts/invariants/segment-language/baseline.json';
+  'scripts/invariants/segment-language/baseline.gen.json';
 const EXT = /\.(?:ts|tsx)$/u;
 const SKIP =
   /\.(?:test|spec|stories)\.[cm]?[jt]sx?$|\/__tests__\/|\/__mocks__\//u;
@@ -125,7 +125,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     const { ids } = scanSegmentLanguage();
     writeFileSync(
       join(REPO_ROOT, BASELINE_RELATIVE),
-      `${JSON.stringify({ schema: 'jovie.segment-language-baseline/v1', count: ids.length, ids })}\n`
+      `${JSON.stringify({ schema: 'jovie.segment-language-baseline/v1', count: ids.length, ids }, null, 2)}\n`
     );
     process.stdout.write(
       `segment-language: wrote baseline count ${ids.length}\n`

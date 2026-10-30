@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { marketingFullscreenParameters } from '@/components/marketing/storybook/marketingStoryMeta';
+import { DEFAULT_SITE_CHROME } from '@/lib/content-records/site-chrome.defaults';
+import { toResolvedSiteChrome } from '@/lib/content-records/site-chrome.resolve';
 import { MarketingFooter } from './MarketingFooter';
 
 const meta = {
@@ -34,4 +36,21 @@ export const Expanded: Story = {
       <MarketingFooter variant='expanded' showCta={false} />
     </div>
   ),
+};
+
+/** The published `site-chrome/main` record: three columns and a legal row. */
+export const PublishedChrome: Story = {
+  render: () => {
+    const chrome = toResolvedSiteChrome(DEFAULT_SITE_CHROME);
+    return (
+      <div className='bg-base'>
+        <MarketingFooter
+          variant='expanded'
+          showCta={false}
+          columns={chrome.footerColumns}
+          legalLinks={chrome.legalLinks}
+        />
+      </div>
+    );
+  },
 };

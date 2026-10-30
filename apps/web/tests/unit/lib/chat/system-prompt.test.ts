@@ -41,8 +41,52 @@ describe('buildSystemPrompt', () => {
 
     expect(prompt).toContain('## Discography Context');
     expect(prompt).toContain('- **Total Releases:** 2');
-    expect(prompt).toContain('- Midnight Signal (single, 2025-06-01, 1 track)');
-    expect(prompt).toContain('- Color Theory (ep, 5 tracks)');
+    expect(prompt).toMatch(
+      /- Midnight Signal \(single, 1 track; released 2025-06-01, \d+ days ago\)/
+    );
+    expect(prompt).toContain('- Color Theory (ep, 5 tracks; date not set)');
+  });
+
+  it('keeps release timing and the explicit segment in the same prompt', () => {
+    const now = new Date('2026-10-28T15:00:00Z'); // a Wednesday
+    const prompt = buildSystemPrompt(
+      baseContext,
+      [
+        {
+          title: 'Night Swim',
+          releaseType: 'single',
+          releaseDate: '2026-10-30T00:00:00.000Z',
+          totalTracks: 1,
+        },
+        {
+          title: 'Neon Reef',
+          releaseType: 'single',
+          releaseDate: '2026-08-31T00:00:00.000Z',
+          totalTracks: 1,
+          spotifyPopularity: 38,
+        },
+      ],
+      {
+        aiCanUseTools: true,
+        aiWeeklyMessageLimit: 10,
+        now,
+        segment: 'athlete',
+      }
+    );
+
+    expect(prompt).toContain('- **Today:** 2026-10-28 (Wednesday)');
+    expect(prompt).toContain('The creator is a athlete.');
+    expect(prompt).toContain(
+      '- Night Swim (single, 1 track; UPCOMING, out Friday 2026-10-30, in 2 days)'
+    );
+    expect(prompt).toContain(
+      '- Neon Reef (single, 1 track; released 2026-08-31, 58 days ago, Spotify popularity 38/100)'
+    );
+    expect(prompt).toMatch(/Jovie profile .*\/testartist|Jovie profile .*\//);
+    expect(prompt).toContain('End with exactly one next step');
+    expect(prompt).not.toContain('Never volunteer unrequested suggestions');
+    const being = prompt.slice(prompt.indexOf('## Being Useful'));
+    expect(being.slice(0, being.indexOf('\n## ', 5))).not.toMatch(/[–—]/);
   });
 
   it('shows fallback line when no releases are available', () => {
@@ -99,7 +143,6 @@ describe('buildSystemPrompt', () => {
       aiCanUseTools: true,
       aiWeeklyMessageLimit: 70,
       accountContext: {
-        email: 'tim@jov.ie',
         plan: 'pro',
         displayPlan: 'Artist Presence',
         isPro: true,
@@ -130,7 +173,8 @@ describe('buildSystemPrompt', () => {
     });
 
     expect(prompt).toContain('## Account & Access');
-    expect(prompt).toContain('- **Account Email:** tim@jov.ie');
+    expect(prompt).not.toContain('tim@jov.ie');
+    expect(prompt).not.toContain('Account Email');
     expect(prompt).toContain('- **Plan:** Artist Presence');
     expect(prompt).toContain('- **Merch Creation:** Available');
     expect(prompt).toContain(
@@ -146,7 +190,6 @@ describe('buildSystemPrompt', () => {
       aiCanUseTools: false,
       aiWeeklyMessageLimit: 10,
       accountContext: {
-        email: 'tim@jov.ie',
         plan: 'free',
         displayPlan: 'Unverified',
         isPro: false,

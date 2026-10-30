@@ -7,15 +7,6 @@ import {
 
 const mockSendSlackMessage = vi.hoisted(() => vi.fn());
 const mockSendEmail = vi.hoisted(() => vi.fn());
-const mockFormatFounderSender = vi.hoisted(() =>
-  vi.fn(() => 'Tim White <tim@send.jov.ie>')
-);
-const mockGetSenderPolicy = vi.hoisted(() =>
-  vi.fn(() => ({
-    fromEmail: 'tim@send.jov.ie',
-    replyToEmail: 'tim@jov.ie',
-  }))
-);
 
 vi.mock('@/lib/notifications/providers/slack', () => ({
   sendSlackMessage: mockSendSlackMessage,
@@ -23,11 +14,6 @@ vi.mock('@/lib/notifications/providers/slack', () => ({
 
 vi.mock('@/lib/email/send', () => ({
   sendEmail: mockSendEmail,
-}));
-
-vi.mock('@/lib/notifications/sender-policy', () => ({
-  formatFounderSender: mockFormatFounderSender,
-  getSenderPolicy: mockGetSenderPolicy,
 }));
 
 describe('verification notifications', () => {
@@ -97,12 +83,12 @@ describe('verification notifications', () => {
 </body>
 </html>`;
 
-    expect(mockGetSenderPolicy).toHaveBeenCalledWith('founder');
-    expect(mockFormatFounderSender).toHaveBeenCalledWith();
+    // Founder stream: the gateway sets Tim's sender and reply-to from the registry.
     expect(mockSendEmail).toHaveBeenCalledWith({
+      stream: 'founder',
+      purpose: 'verification-decision',
+      consent: 'existing-relationship',
       to: 'pro@example.com',
-      from: 'Tim White <tim@send.jov.ie>',
-      replyTo: 'tim@jov.ie',
       subject: 'Quick update from Tim',
       text: expectedText,
       html: expectedHtml,

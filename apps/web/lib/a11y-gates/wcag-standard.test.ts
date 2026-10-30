@@ -39,10 +39,9 @@ describe('WCAG 2.2 AA axe standard', () => {
 
   it('keeps allowlisted disables and still enables target-size', () => {
     expect(disabledRuleIds('a11y-dashboard')).toEqual(['frame-tested']);
-    expect(disabledRuleIds('releases-dashboard')).toEqual([
-      'label-content-name-mismatch',
-      'nested-interactive',
-    ]);
+    // JOV-8781 shipped: the releases-dashboard entries are gone, so the
+    // surface scans with every WCAG 2.2 AA rule armed.
+    expect(disabledRuleIds('releases-dashboard')).toEqual([]);
     expect(disabledRuleIds('missing-surface')).toEqual([]);
     const options = wcag22AaAxeOptions(
       disabledRuleIds('storybook-overlay-collisions')
@@ -69,7 +68,7 @@ describe('WCAG 2.2 AA axe standard', () => {
   it('fails closed when the committed allowlist grows or goes stale', () => {
     const allowlist = loadAllowlist();
     expect(allowlist.maxEntries).toBe(allowlist.entries.length);
-    expect(allowlist.entries.length).toBe(4);
+    expect(allowlist.entries.length).toBe(2);
     let mainText: string | null = null;
     try {
       mainText = execFileSync(
