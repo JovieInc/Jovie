@@ -23,6 +23,9 @@ run-name: "${{ github.event_name == 'pull_request_target' && format('fleet-rules
 # skipped.
 on:
   pull_request_target:
+    # Base filter, not a job `if`: stacked PRs (non-main base) never reach PR Ready
+    # (wrong-base blocker), and ~235 all-skipped runs/day came from them.
+    branches: [main]
     types: [opened, edited, synchronize, labeled, unlabeled, reopened]
   # A verdict can land before Source Validation finishes (PR Ready then reads
   # "missing") or after it (PR Ready already red). Either way the failed jobs
@@ -70,13 +73,25 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             .nvmrc
+            .github/dependency-review-config.yml
             scripts/pr-fleet-rules.mjs
+            scripts/lib/wins-ledger.mjs
             packages/api-client
             .github/scripts/fleet-rules-verdict.sh
             .github/scripts/fleet-rules-rerun.sh
             .github/actions/prime-node-toolcache/action.yml
             .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
+      # Dependabot pull_request jobs cannot read Actions app credentials. Reuse
+      # this required trusted job and its exact-head PR Ready/rerun path for
+      # the identical blocking dependency review. Only main's config is read;
+      # the action compares PR dependencies through the API, never PR code.
+      - name: Review Dependabot dependencies
+        if: github.event.pull_request.user.login == 'dependabot[bot]'
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          repo-token: ${{ steps.fleet-token.outputs.token }}
+          config-file: ./.github/dependency-review-config.yml
       # No token input: setup-node keeps its default github.token, never the CI App token.
       - name: Prime Node toolcache (no GitHub API manifest call)
         if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}

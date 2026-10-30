@@ -28,6 +28,8 @@ trap 'rm -f "$out"' EXIT
 MAX_DEFERRED_RETRIES="${FLEET_DEFERRED_RETRIES:-3}"
 BACKOFF_STEP_S="${FLEET_DEFERRED_BACKOFF_STEP_S:-20}"
 BACKOFF_CAP_S="${FLEET_DEFERRED_BACKOFF_CAP_S:-80}"
+# Each attempt may also hold inside the script; keep the sum under the job timeout.
+export FLEET_RULES_QUOTA_HOLD_SECONDS="${FLEET_RULES_QUOTA_HOLD_SECONDS:-45}"
 retry=0
 set +e
 while :; do

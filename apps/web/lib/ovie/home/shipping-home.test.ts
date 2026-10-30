@@ -226,6 +226,7 @@ describe('buildPulse', () => {
     const pulse = buildPulse(delivery());
     expect(pulse.map(tile => tile.key)).toEqual([
       'prod',
+      'lyb-deploy',
       'merges-hour',
       'queue',
       'red-prs',
@@ -287,6 +288,71 @@ describe('buildPulse', () => {
     expect(byKey.lanes?.tone).toBe('neutral');
   });
 
+  it('shows LogYourBody production deploy health on Home, failing in bad tone', () => {
+    const base = measuredDelivery();
+    const withHealth = (
+      repo: Partial<{
+        status: 'ok' | 'failing' | 'unknown';
+        failedStreak: number;
+        behindMain: number | null;
+      }>
+    ) =>
+      Object.fromEntries(
+        buildPulse(
+          delivery({
+            ...base,
+            lanes: {
+              ...base.lanes,
+              deployHealth: {
+                observedAt: '2026-10-25T17:24:52.000Z',
+                healthy: false,
+                repos: [
+                  {
+                    repo: 'JovieInc/LogYourBody',
+                    status: 'ok',
+                    failedStreak: 0,
+                    behindMain: 0,
+                    oldestUnshippedAgeSeconds: null,
+                    lastSuccessAt: null,
+                    ...repo,
+                  },
+                ],
+              },
+            },
+          })
+        ).map(tile => [tile.key, tile])
+      );
+    expect(
+      withHealth({ status: 'failing', failedStreak: 21, behindMain: 87 })[
+        'lyb-deploy'
+      ]
+    ).toMatchObject({
+      label: 'LYB prod',
+      value: 'Failing, 87 behind',
+      tone: 'bad',
+      measured: true,
+    });
+    expect(withHealth({ behindMain: 4 })['lyb-deploy']).toMatchObject({
+      value: '4 behind',
+      tone: 'warn',
+    });
+    expect(withHealth({ behindMain: 0 })['lyb-deploy']).toMatchObject({
+      value: 'Current',
+      tone: 'good',
+    });
+    expect(withHealth({ status: 'unknown' })['lyb-deploy']).toMatchObject({
+      value: OVIE_NOT_MEASURED,
+      measured: false,
+      tone: 'neutral',
+    });
+    // No published block is Not measured, never healthy.
+    expect(
+      Object.fromEntries(buildPulse(base).map(tile => [tile.key, tile]))[
+        'lyb-deploy'
+      ]
+    ).toMatchObject({ value: OVIE_NOT_MEASURED, tone: 'neutral' });
+  });
+
   it('fills was from the last different observed value', () => {
     const first = buildPulse(measuredDelivery());
     let memory = rememberPulse({}, first);
@@ -342,8 +408,8 @@ describe('buildConstraint', () => {
       )
     ).toEqual({
       tone: 'bad',
-      text: '0 of 28 Todo issues eligible',
-      detailsHref: APP_ROUTES.ADMIN_PRODUCT,
+      text: 'Fleet degraded: 0 of 28 Todo issues eligible · 3 of 4 lanes running',
+      detailsHref: APP_ROUTES.ADMIN_OPERATIONS,
     });
   });
 
@@ -364,8 +430,8 @@ describe('buildConstraint', () => {
     );
     expect(constraint).toEqual({
       tone: 'bad',
-      text: 'Remediation alerts are not being acknowledged (45 failed delivery records)',
-      detailsHref: APP_ROUTES.ADMIN_PRODUCT,
+      text: 'Fleet degraded: Remediation alerts are not being acknowledged (45 failed delivery records) · 3 of 4 lanes running',
+      detailsHref: APP_ROUTES.ADMIN_OPERATIONS,
     });
   });
 
@@ -401,7 +467,11 @@ describe('buildConstraint', () => {
         [],
         'fresh'
       )
-    ).toEqual({ tone: 'warn', text: 'Lanes feed is stale' });
+    ).toEqual({
+      tone: 'bad',
+      text: 'Fleet not reporting: the lanes feed is stale · 3 of 4 lanes running',
+      detailsHref: APP_ROUTES.ADMIN_OPERATIONS,
+    });
     expect(buildConstraint(base, [], 'failed')).toEqual({
       tone: 'warn',
       text: 'Work items are not current',

@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { memo } from 'react';
 import { cn } from '@/lib/utils';
 import { SHELL_CAPTION_CLASSNAME } from './shell-caption';
@@ -50,17 +51,19 @@ const LyricListRow = memo(function LyricListRow({
   readonly disabled: boolean;
 }) {
   return (
-    <button
+    <Button
+      variant='ghost'
+      size='sm'
       type='button'
       onClick={() => onSeek?.(line.at)}
       disabled={disabled}
-      className='group/lyric w-full flex items-start gap-2 px-2 py-1.5 rounded-md text-xs text-secondary-token hover:bg-surface-1/40 hover:text-primary-token disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-colors duration-subtle ease-subtle text-left'
+      className='group/lyric w-full [&>span]:w-full [&>span]:items-start'
     >
       <span className='shrink-0 w-9 pt-0.5 text-3xs tabular-nums text-quaternary-token group-hover/lyric:text-tertiary-token transition-colors duration-subtle ease-subtle'>
         {formatLyricsTime(line.at)}
       </span>
-      <span className='flex-1 leading-snug'>{line.text}</span>
-    </button>
+      <span className='flex-1 text-left leading-snug'>{line.text}</span>
+    </Button>
   );
 });
 
@@ -96,16 +99,9 @@ export function LyricsList({
       <div className='flex items-center justify-between pb-2'>
         <p className={SHELL_CAPTION_CLASSNAME}>{title}</p>
         {onEdit && (
-          <button
-            type='button'
-            onClick={onEdit}
-            className={cn(
-              SHELL_CAPTION_CLASSNAME,
-              'hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) rounded transition-colors duration-subtle ease-subtle'
-            )}
-          >
+          <Button variant='ghost' size='sm' type='button' onClick={onEdit}>
             {editLabel}
-          </button>
+          </Button>
         )}
       </div>
       <ol className='flex flex-col -mx-2'>

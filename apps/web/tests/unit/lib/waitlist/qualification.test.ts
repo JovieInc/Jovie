@@ -12,6 +12,52 @@ const payload = {
 } satisfies WaitlistRequestPayload;
 
 describe('evaluateWaitlistQualification', () => {
+  it.each([
+    undefined,
+    { admit: false, reason: 'hold_golden_path_not_green' },
+    { admit: false, reason: 'hold_capacity_full' },
+    { admit: false, reason: 'hold_high_profile_needs_verification' },
+  ])(
+    'does not let interview fit or reserved capacity override readiness %j',
+    goldenPath => {
+      const result = evaluateWaitlistQualification({
+        email: 'artist@example.com',
+        payload,
+        config: {
+          mode: 'waitlist_enabled',
+          goldenPath,
+          interview: {
+            score: 100,
+            admit: true,
+            signals: ['spotify_artist_identity'],
+          },
+          autoAcceptReserved: true,
+        },
+      });
+      expect(result.status).toBe('waitlisted');
+      expect(result.details).toMatchObject({
+        goldenPathHold: goldenPath?.reason ?? 'hold_golden_path_not_green',
+      });
+    }
+  );
+
+  it('does not let a green golden path overrule exhausted reserved capacity', () => {
+    const result = evaluateWaitlistQualification({
+      email: 'artist@example.com',
+      payload,
+      config: {
+        mode: 'waitlist_enabled',
+        goldenPath: { admit: true, reason: 'admit_resolved_artist' },
+        autoAcceptReserved: false,
+        interview: { score: 100, admit: true, signals: [] },
+      },
+    });
+    expect(result).toMatchObject({
+      status: 'waitlisted',
+      reasonCode: 'waitlist_capacity_full',
+    });
+  });
+
   it('approves qualified users when signup is open', () => {
     expect(
       evaluateWaitlistQualification({
@@ -45,7 +91,11 @@ describe('evaluateWaitlistQualification', () => {
       evaluateWaitlistQualification({
         email: 'artist@example.com',
         payload,
-        config: { mode: 'waitlist_enabled', autoAcceptReserved: true },
+        config: {
+          mode: 'waitlist_enabled',
+          autoAcceptReserved: true,
+          goldenPath: { admit: true, reason: 'admit_resolved_artist' },
+        },
       })
     ).toMatchObject({
       qualified: true,
@@ -61,6 +111,7 @@ describe('evaluateWaitlistQualification', () => {
         payload,
         config: {
           mode: 'waitlist_enabled',
+          goldenPath: { admit: true, reason: 'admit_resolved_artist' },
           interview: {
             score: 75,
             admit: true,

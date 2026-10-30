@@ -540,6 +540,27 @@ describe('claimPrebuiltProfileForUser', () => {
     expect(mocks.insertMock).toHaveBeenCalledTimes(2);
   });
 
+  it('claims without publishing when publish is false (agent-draft handoff)', async () => {
+    const mocks = createTxMock([
+      [profileRow({ onboardingCompletedAt: null })],
+      [],
+    ]);
+
+    await claimPrebuiltProfileForUser(mocks.tx, {
+      ...baseParams,
+      source: 'agent_draft_handoff',
+      finalizeOnboarding: true,
+      publish: false,
+    });
+
+    const transfer = mocks.updateSetMock.mock.calls[1]?.[0];
+    expect(transfer).toMatchObject({ userId: 'user-1', isClaimed: true });
+    expect(transfer).not.toHaveProperty('isPublic');
+    expect(mocks.insertValuesMock.mock.calls[1]?.[0]).toMatchObject({
+      reason: 'agent_draft_handoff',
+    });
+  });
+
   it('does not mark onboarding complete or flip user status to active when finalizeOnboarding is false', async () => {
     const existingOnboardingCompletedAt = new Date('2025-01-01T00:00:00.000Z');
     const mocks = createTxMock([
@@ -836,6 +857,8 @@ describe('ensureOnboardingUserRow', () => {
       email: 'artist@example.com',
       userStatus: 'onboarding_incomplete',
       updatedAt: FIXED_NOW,
+      // @example.com is a reserved test domain, so the new row is stamped.
+      accountClass: 'internal',
     });
     expect(mocks.onConflictDoUpdateMock).toHaveBeenCalledWith({
       target: users.clerkId,

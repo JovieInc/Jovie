@@ -110,8 +110,8 @@ test.describe('Public profile CTA and identity evidence', () => {
       expect(response?.status()).toBe(200);
       await waitForHydration(page);
 
-      // 1440 only owns the wide surface when the build ships it; by default
-      // desktop keeps the mobile profile in a centered phone column.
+      // The flagged wide surface is distinct from the default CSS-only
+      // desktop composition; both keep the compact mobile layout below 1024px.
       const desktop =
         viewport.width === 1440 && PROFILE_DESKTOP_SURFACE_SHIPPED;
       const layout = page.getByTestId('public-profile-layout-shell');
@@ -186,9 +186,15 @@ test.describe('Public profile CTA and identity evidence', () => {
 
         expect(metrics).not.toBeNull();
         const metricsReceipt = JSON.stringify(metrics);
-        expect(metrics?.portraitSize, metricsReceipt).toBe(80);
+        const desktopComposition =
+          viewport.width >= 1024 && !PROFILE_DESKTOP_SURFACE_SHIPPED;
+        expect(metrics?.portraitSize, metricsReceipt).toBe(
+          desktopComposition ? 160 : 80
+        );
         expect(metrics?.nameTargetHeight).toBeGreaterThanOrEqual(44);
-        expect(metrics?.handleHeight).toBeLessThanOrEqual(20);
+        expect(metrics?.handleHeight).toBeLessThanOrEqual(
+          desktopComposition ? 24 : 20
+        );
         expect(metrics?.primaryTargetHeight).toBeGreaterThanOrEqual(44);
         expect(metrics?.renderedGap, metricsReceipt).toBeGreaterThanOrEqual(0);
         expect(metrics?.renderedGap, metricsReceipt).toBeLessThanOrEqual(4);

@@ -41,3 +41,17 @@ export const Default: Story = {
     turnstileToken: null,
   },
 };
+
+/** Taken handle with a starter prompt: the taken state wins, no prefilled claim (JOV-9624). */
+export const TakenHandleWithStarterPrompt: Story = {
+  args: {
+    turnstileToken: null,
+    starterHandoff: { kind: 'prompt', prompt: 'I want my own jov.ie.' },
+    entryProfile: {
+      status: 'claimed',
+      handle: 'tim',
+      displayName: 'Tim White',
+      avatarUrl: null,
+    },
+  },
+};
