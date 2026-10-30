@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/profile/inline-notifications-cta.test.tsx
 'use client';
 
 import { Bell, CheckCircle2 } from 'lucide-react';

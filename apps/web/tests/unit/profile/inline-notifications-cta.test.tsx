@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProfileNotificationsContextValue } from '@/components/organisms/profile-shell/types';
+import { ProfileInlineNotificationsCTA } from '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA';
 import type { Artist } from '@/types/db';
 
 const mockUseSubscriptionForm = vi.fn();
@@ -10,8 +11,6 @@ const mockUseUserSafe = vi.fn();
 const mockUpdateSubscriberBirthdayMutation = vi.fn();
 const mockUpdateSubscriberNameMutation = vi.fn();
 const mockUpdateContentPreferencesMutation = vi.fn();
-
-let ProfileInlineNotificationsCTA: typeof import('@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA').ProfileInlineNotificationsCTA;
 
 vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
@@ -146,12 +145,6 @@ function buildFormState(overrides: Record<string, unknown> = {}) {
 }
 
 describe('ProfileInlineNotificationsCTA flow', () => {
-  beforeAll(async () => {
-    ({ ProfileInlineNotificationsCTA } = await import(
-      '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
-    ));
-  }, 30_000);
-
   beforeEach(() => {
     vi.clearAllMocks();
     document.body.innerHTML = '';
