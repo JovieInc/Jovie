@@ -12,8 +12,9 @@ name: Spend Guard
 # forecast and anomaly layer the webhook cannot provide.
 
 on:
-  schedule:
-    - cron: '37 * * * *'
+  # Fired hourly by the Gem lanes clock (scripts/lanes/continuity_clock.py); no GitHub cron (JOV-INV-042).
+  repository_dispatch:
+    types: [clock_spend_guard]
   workflow_dispatch:
 
 permissions:
