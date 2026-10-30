@@ -1130,6 +1130,29 @@
     --cover-height: clamp(200px, 45%, 340px);
     height: min(740px, calc(100dvh - (var(--page-pad) * 2)));
   }
+
+  /* The shell height is floored/fixed at md+ (canvas min-height at 1024px+,
+     md card height below), so the compact surface must stretch to fill the
+     slot: bottom-anchored drawer sheets position against the surface root,
+     and a content-sized root stops 8px short of the shell bottom once the
+     floor exceeds the content height - failing the profile-drawers spec
+     'menu sheet spans the phone column' (2px tolerance, first red run
+     41005969193). Validated live: sheet/shell bottom delta 8px -> 0. */
+  .profile-viewport:not(.profile-viewport--embedded):not(
+    .profile-viewport--desktop-surface
+  ) .profile-compact-surface-slot {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .profile-compact-surface-slot
+    > div {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
 }
 
 @media (min-width: 1180px) {
