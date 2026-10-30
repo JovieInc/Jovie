@@ -43,6 +43,9 @@ export const ServerEnvSchema = z.object({
   NEXT_PUBLIC_BUILD_SHA: z.string().optional(),
   NEXT_PUBLIC_SENTRY_RELEASE: z.string().optional(),
   VERCEL_GIT_COMMIT_SHA: z.string().optional(),
+  // Present on every GitHub Actions step; lets standalone CI servers answer
+  // /api/health/build-info with the exact commit (JOV-1958 receipt).
+  GITHUB_SHA: z.string().optional(),
   VERCEL_DEPLOYMENT_ID: z.string().optional(),
   VERCEL_DEPLOYMENT_TIME: z.string().optional(),
   VERCEL_URL: z
@@ -545,6 +548,7 @@ export const ENV_KEYS = [
   'NEXT_PUBLIC_BUILD_SHA',
   'NEXT_PUBLIC_SENTRY_RELEASE',
   'VERCEL_GIT_COMMIT_SHA',
+  'GITHUB_SHA',
   'VERCEL_DEPLOYMENT_ID',
   'VERCEL_DEPLOYMENT_TIME',
   'VERCEL_URL',

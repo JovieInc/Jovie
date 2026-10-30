@@ -66,3 +66,31 @@ export async function selectUnclaimedCertArtist(
   }
   throw new ProdcertFixtureUnavailableError(taken);
 }
+
+/**
+ * The only artists e2e journeys may claim. Never hardcode one of these in a
+ * spec: select with `selectUnclaimedCertArtist` at run time and release the
+ * binding in teardown (guarded by e2e-shared-identity-fixture-guard.test.ts).
+ */
+export const SHARED_E2E_ARTIST_POOL: readonly ProdcertArtistFixture[] = [
+  {
+    spotifyId: '1ZlSI1juLMMN1HU8X7RViN',
+    name: 'UNMARKED',
+    url: 'https://open.spotify.com/artist/1ZlSI1juLMMN1HU8X7RViN',
+  },
+  {
+    spotifyId: '0T4McYgGzOzXOWzLaukIjD',
+    name: 'Unmarked Pavement',
+    url: 'https://open.spotify.com/artist/0T4McYgGzOzXOWzLaukIjD',
+  },
+  {
+    spotifyId: '6knM2BGm18cXek6FXbWd0t',
+    name: 'Good Dropouts',
+    url: 'https://open.spotify.com/artist/6knM2BGm18cXek6FXbWd0t',
+  },
+  {
+    spotifyId: '6TWG4bY1qzp0lJuxxFtl6F',
+    name: 'Unmarked Cars',
+    url: 'https://open.spotify.com/artist/6TWG4bY1qzp0lJuxxFtl6F',
+  },
+];

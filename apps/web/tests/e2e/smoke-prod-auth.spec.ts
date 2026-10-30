@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { createHash, randomBytes } from 'node:crypto';
 import {
   type APIRequestContext,
@@ -9,13 +10,23 @@ import {
 } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  mintPassageToken,
+  PASSAGE_TOKEN_HEADER,
+} from '@/lib/synthetic/passage-token';
+import { fillControlledInputUntilEnabled } from '../helpers/auth';
+import {
   assertExactNavigationUrl,
   isExactNavigationUrl,
   recordPlaywrightSensitiveValues,
   requireExactNavigationOrigin,
 } from '../helpers/vercel-preview';
 import { primeOriginBoundVercelBypass } from './utils/prime-vercel-bypass';
-import { certStep, recordCertObservation } from './utils/prod-cert-steps';
+import {
+  certStep,
+  certStepBlocked,
+  createSurfaceTelemetry,
+  recordCertObservation,
+} from './utils/prod-cert-steps';
 import { resolveProductionAuthCredentials } from './utils/production-auth-credentials';
 import {
   prepareProductionAuthEmailForm,
@@ -48,6 +59,13 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
  */
 
 test.use({ storageState: { cookies: [], origins: [] } });
+
+/** Run tag shared by the fresh-user address and the edit-readback marker. */
+function runTag(): string {
+  return process.env.GITHUB_RUN_ID
+    ? `${process.env.GITHUB_RUN_ID}${process.env.GITHUB_RUN_ATTEMPT ?? '1'}`
+    : `local${Date.now().toString(36)}`;
+}
 
 function hasProdAuthCredentials(): boolean {
   return resolveProductionAuthCredentials() !== null;
@@ -487,8 +505,12 @@ test.describe('Production Auth Smoke @production-smoke', () => {
   });
 
   test('sign-in works and dashboard loads', async ({ page }, testInfo) => {
+    test.setTimeout(240_000);
     const credentials = getProdCredentials();
     const expectedOrigin = exactOriginForTest(testInfo);
+    // JOV-9625 outcome receipt: per-surface console/network error counts and
+    // one JPEG evidence frame per surface this run exercises.
+    const telemetry = createSurfaceTelemetry(page);
 
     await page.goto(APP_ROUTES.SIGNIN, {
       waitUntil: 'domcontentloaded',
@@ -551,6 +573,9 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       }
     );
 
+    telemetry.record('signup-signin');
+    await telemetry.capture(page, 'signup-signin');
+
     const mainText = await certStep(
       'onboarding',
       'dashboard-first-value',
@@ -570,6 +595,9 @@ test.describe('Production Auth Smoke @production-smoke', () => {
     const lower = mainText.toLowerCase();
     expect(lower).not.toContain('application error');
     expect(lower).not.toContain('something went wrong');
+
+    telemetry.record('onboarding');
+    await telemetry.capture(page, 'onboarding');
 
     await verifyProductionIosOAuthTokenFlow(
       page.context().request,
@@ -616,6 +644,63 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       },
       () => `/${claimedUsername} renders publicly`
     );
+
+    // JOV-9625 outcome cert: the artist edit loop — edit the profile, save,
+    // read the change back on the public profile, restore. Exercises the real
+    // PUT /api/dashboard/profile save path and the public readback with the
+    // signed-in canary identity; the bio is restored so the run is idempotent.
+    await certStep(
+      'public-profile',
+      'profile-edit-save-readback',
+      async () => {
+        const profileResponse = await page
+          .context()
+          .request.get(`${expectedOrigin}/api/dashboard/profile`);
+        expect(profileResponse.status()).toBe(200);
+        const { profile } = (await profileResponse.json()) as {
+          profile?: { bio?: string | null; username?: unknown };
+        };
+        const originalBio = typeof profile?.bio === 'string' ? profile.bio : '';
+        const marker = `prodcert edit-save-readback ${runTag()}`;
+        const save = await page
+          .context()
+          .request.put(`${expectedOrigin}/api/dashboard/profile`, {
+            data: { bio: marker },
+          });
+        expect(save.status(), 'Profile edit save failed').toBe(200);
+        try {
+          const publicPage = await page
+            .context()
+            .request.get(`${expectedOrigin}/${claimedUsername}`);
+          expect(
+            publicPage.status(),
+            `Public profile /${claimedUsername} must render after the save`
+          ).toBe(200);
+          expect(
+            await publicPage.text(),
+            'Saved bio must read back on the public profile'
+          ).toContain(marker);
+          return marker;
+        } finally {
+          // Restore even on a failed readback so the canary profile is not
+          // left carrying the marker between runs.
+          const restore = await page
+            .context()
+            .request.put(`${expectedOrigin}/api/dashboard/profile`, {
+              data: { bio: originalBio },
+            });
+          expect(restore.status(), 'Profile edit restore failed').toBe(200);
+        }
+      },
+      () => 'profile edit saved, read back on the public profile, restored'
+    );
+    await page.goto(`${expectedOrigin}/${claimedUsername}`, {
+      waitUntil: 'domcontentloaded',
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+    });
+    await waitForHydration(page);
+    telemetry.record('public-profile');
+    await telemetry.capture(page, 'public-profile');
 
     const tabs = [
       {
@@ -697,8 +782,46 @@ test.describe('Production Auth Smoke @production-smoke', () => {
           timeout: SMOKE_TIMEOUTS.VISIBILITY,
         });
         await expect(composer).toBeEditable();
+
+        // JOV-9625 outcome cert: the two local toolbar contracts, measured on
+        // the composer's own attach toolbar — press feedback (button state
+        // flips) and the local selector opening (palette becomes visible).
+        const attach = page.getByRole('button', { name: 'Attachment options' });
+        await expect(attach).toBeVisible({
+          timeout: SMOKE_TIMEOUTS.VISIBILITY,
+        });
+        const pressStart = Date.now();
+        await attach.click();
+        await expect(attach).toHaveAttribute('aria-expanded', 'true', {
+          timeout: 5_000,
+        });
+        const feedbackMs = Date.now() - pressStart;
+        recordCertObservation({
+          surface: 'chat',
+          contractId: 'selection-press-navigation.feedback',
+          dimension: 'responsiveness',
+          value: feedbackMs,
+          unit: 'ms',
+        });
+        await expect(
+          page
+            .locator('[data-testid="shared-command-palette"], [role="listbox"]')
+            .first()
+        ).toBeVisible({ timeout: 5_000 });
+        const openMs = Date.now() - pressStart;
+        recordCertObservation({
+          surface: 'chat',
+          contractId: 'toolbar-context-menu.open',
+          dimension: 'responsiveness',
+          value: openMs,
+          unit: 'ms',
+        });
+        await page.keyboard.press('Escape');
+        await expect(attach).toHaveAttribute('aria-expanded', 'false', {
+          timeout: 5_000,
+        });
       },
-      () => 'chat composer visible and editable'
+      () => 'chat composer visible and editable; attach toolbar opened locally'
     );
 
     const probe = 'prodcert synthetic check: reply with the single word ok';
@@ -748,6 +871,22 @@ test.describe('Production Auth Smoke @production-smoke', () => {
           await composer.fill(probe);
           const sentAt = Date.now();
           await page.getByRole('button', { name: /send message/i }).click();
+          // conversation.active-state: the turn must enter an explicit
+          // active/streaming state (thinking indicator or streamed reply).
+          await expect(
+            page
+              .locator(
+                "[data-testid='chat-loading-indicator'], [data-testid='chat-message-reply']"
+              )
+              .first()
+          ).toBeVisible({ timeout: 30_000 });
+          recordCertObservation({
+            surface: 'chat',
+            contractId: 'conversation.active-state',
+            dimension: 'responsiveness',
+            value: Date.now() - sentAt,
+            unit: 'ms',
+          });
           await expect(page.getByText(probe).first()).toBeVisible({
             timeout: SMOKE_TIMEOUTS.VISIBILITY,
           });
@@ -789,6 +928,9 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       void chatStartedAt;
     }
 
+    telemetry.record('chat');
+    await telemetry.capture(page, 'chat');
+
     await certStep(
       'checkout',
       'checkout-entry-renders',
@@ -814,6 +956,8 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       },
       () => 'billing/checkout entry rendered; stopped before payment'
     );
+    telemetry.record('checkout');
+    await telemetry.capture(page, 'checkout');
 
     const performanceAuthStatePath =
       process.env.PERFORMANCE_AUTH_STATE_PATH?.trim();
@@ -825,6 +969,7 @@ test.describe('Production Auth Smoke @production-smoke', () => {
   // the tagged prodcert canary (+synthetic-, excluded from customer metrics);
   // it is a different identity from creator-ready, so the OTPs cannot race.
   test('new user signs up with an email code', async ({ page }, testInfo) => {
+    test.setTimeout(240_000);
     const expectedOrigin = exactOriginForTest(testInfo);
     const email = newProdcertUserEmail(
       process.env.GITHUB_RUN_ID
@@ -877,5 +1022,89 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       pathname =>
         `new synthetic user verified an email OTP and landed on ${pathname}`
     );
+
+    // JOV-9625 outcome cert: the fresh user reaches first value through the
+    // real onboarding chat — the first assistant reply on /start. The same
+    // canary passage token scheme as the anonymous claim run verifies
+    // Turnstile in test mode for this signed-in fresh user's first touch.
+    const passageKey = process.env.SYNTHETIC_PASSAGE_KEY ?? '';
+    const expectedCertSha = process.env.EXPECTED_COMMIT_SHA ?? '';
+    if (!passageKey || !/^[0-9a-f]{40}$/u.test(expectedCertSha)) {
+      certStepBlocked(
+        'onboarding',
+        'fresh-user-onboarding-first-value',
+        !passageKey
+          ? 'SYNTHETIC_PASSAGE_KEY is not provided to this run'
+          : 'EXPECTED_COMMIT_SHA is not provided to this run'
+      );
+      return;
+    }
+    const onboardingToken = mintPassageToken(
+      Buffer.from(passageKey, 'base64url'),
+      {
+        sub: email,
+        scp: 'onboarding_chat',
+        run: runTag().slice(0, 64),
+        ttlSeconds: 300,
+      }
+    );
+    recordPlaywrightSensitiveValues([onboardingToken]);
+    await page.route('**/*', async route => {
+      const request = route.request();
+      if (new URL(request.url()).origin !== expectedOrigin) {
+        await route.continue();
+        return;
+      }
+      await route.continue({
+        headers: {
+          ...request.headers(),
+          [PASSAGE_TOKEN_HEADER]: onboardingToken,
+          'x-synthetic-monitoring': 'prod-cert',
+        },
+      });
+    });
+
+    const telemetry = createSurfaceTelemetry(page);
+    await certStep(
+      'onboarding',
+      'fresh-user-onboarding-first-value',
+      async () => {
+        await page.goto(`${expectedOrigin}/start`, {
+          waitUntil: 'domcontentloaded',
+          timeout: SMOKE_TIMEOUTS.NAVIGATION,
+        });
+        assertExactNavigationUrl(page.url(), expectedOrigin, 'Onboarding chat');
+        const input = page.locator('[aria-label="Chat message input" i]');
+        const sendButton = page.getByRole('button', { name: 'Send message' });
+        await expect(input).toBeVisible({ timeout: 30_000 });
+        await fillControlledInputUntilEnabled(
+          input,
+          sendButton,
+          'Help me set up my artist profile'
+        );
+        const [response] = await Promise.all([
+          page.waitForResponse(
+            candidate =>
+              candidate.request().method() === 'POST' &&
+              new URL(candidate.url()).pathname === '/api/chat',
+            { timeout: 60_000 }
+          ),
+          sendButton.click(),
+        ]);
+        if (response.status() !== 200) {
+          const body = await response.text().catch(() => '');
+          throw new Error(
+            `/api/chat HTTP ${response.status()} ${body.slice(0, 160)}`
+          );
+        }
+        await expect(
+          page.locator("[data-testid='chat-message-reply']").first()
+        ).toBeVisible({ timeout: 60_000 });
+        return 'first assistant reply';
+      },
+      () => 'fresh user reached first value: onboarding chat first reply'
+    );
+    telemetry.record('onboarding');
+    await telemetry.capture(page, 'onboarding');
   });
 });
