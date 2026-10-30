@@ -980,12 +980,8 @@ jobs:
             echo "run_golden_path=false" >> "$GITHUB_OUTPUT"
           fi
 
-          # The golden-path model visual review costs AI Gateway spend; skip it when no UI file changed.
-          # Only a computed diff can skip it: full-run and fallback modes leave this unset (review runs).
-          VISUAL_REVIEW_UI_PATTERN='^(apps/web/(app|components|styles|public)/|apps/web/.*\.(css|scss|tsx)$|packages/ui/)'
-          if ! echo "$CHANGED_FILES" | grep -q -E "$VISUAL_REVIEW_UI_PATTERN"; then
-            echo "golden_path_no_ui_diff=true" >> "$GITHUB_OUTPUT"
-          fi
+          # No UI file changed: skip the paid golden-path model review (empty = review runs)
+          echo "$CHANGED_FILES" | grep -q -E '^(apps/web/(app|components|styles|public)/|apps/web/.*\.(css|scss|tsx)$|packages/ui/)' || echo "golden_path_no_ui_diff=true" >> "$GITHUB_OUTPUT"
 
           # Drizzle paths
           DRIZZLE_PATTERN='^(apps/web/drizzle/|apps/web/lib/db/|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts))'
