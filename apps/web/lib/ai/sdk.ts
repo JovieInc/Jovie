@@ -1,7 +1,11 @@
 import 'server-only';
 import { createGateway, gateway as defaultGateway } from '@ai-sdk/gateway';
 import * as ai from 'ai';
-
+import {
+  type AiUsageLike,
+  buildAiReceipt,
+  emitAiReceipt,
+} from '@/lib/ai/receipt';
 import {
   assertGatewayImageModelAllowed,
   assertGatewayModelAllowed,
@@ -113,8 +117,24 @@ function tagFirstArg<ARGS extends readonly [unknown, ...unknown[]]>(
   ] as unknown as ARGS;
 }
 
+function functionIdOf(options: unknown): string | undefined {
+  return (options as GatewayTaggableOptions | undefined)?.experimental_telemetry
+    ?.functionId;
+}
+
+/** Fire-and-forget receipt; never throws into the caller. */
+function recordReceipt(
+  functionId: string | undefined,
+  usage: PromiseLike<AiUsageLike> | AiUsageLike | undefined
+): void {
+  Promise.resolve(usage)
+    .then(u => emitAiReceipt(buildAiReceipt(functionId, u)))
+    .catch(() => undefined);
+}
+
 export const generateText: typeof ai.generateText = async (...args) => {
   const result = await getWrapped().generateText(...tagFirstArg(args));
+  recordReceipt(functionIdOf(args[0]), result.totalUsage);
   if (!isLeakGuardEnabled()) {
     return result;
   }
@@ -132,6 +152,7 @@ export const streamText: typeof ai.streamText = ((...args) => {
       ] as typeof args)
     : taggedArgs;
   const result = getWrapped().streamText(...guardedArgs);
+  recordReceipt(functionIdOf(args[0]), result.totalUsage);
 
   if (!isLeakGuardEnabled()) {
     return result;
