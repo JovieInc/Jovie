@@ -68,9 +68,9 @@ async function main() {
   const maxLagHours = Number(
     process.env.MAX_LAG_HOURS ?? DEFAULT_MAX_LAG_HOURS
   );
-  const info = await (
-    await fetch('https://jov.ie/api/health/build-info')
-  ).json();
+  const info = /** @type {{ commitSha?: string }} */ (
+    await (await fetch('https://jov.ie/api/health/build-info')).json()
+  );
   const run = (...a) => spawnSync('git', a, { encoding: 'utf8' });
   const mainSha = run('rev-parse', 'HEAD').stdout.trim();
   let firstUnshippedMs;
