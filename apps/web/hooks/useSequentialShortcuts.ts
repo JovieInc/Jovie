@@ -2,7 +2,10 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef } from 'react';
-import { KEYBOARD_SHORTCUTS } from '@/lib/keyboard-shortcuts';
+import {
+  KEYBOARD_SHORTCUTS,
+  type KeyboardShortcut,
+} from '@/lib/keyboard-shortcuts';
 import { isShellShortcutSuppressed } from '@/lib/utils/keyboard';
 
 /**
@@ -15,6 +18,11 @@ interface UseSequentialShortcutsConfig {
   sequenceTimeout?: number;
   /** Callback when shortcuts modal should open */
   onOpenShortcutsModal?: () => void;
+  /**
+   * Sequence catalog. Defaults to the customer catalog; Ovie passes its own so
+   * "G then D" can never open a customer route from the operator shell.
+   */
+  shortcuts?: readonly KeyboardShortcut[];
 }
 
 /**
@@ -31,6 +39,7 @@ export function useSequentialShortcuts({
   enabled = true,
   sequenceTimeout = 1500,
   onOpenShortcutsModal,
+  shortcuts = KEYBOARD_SHORTCUTS,
 }: UseSequentialShortcutsConfig = {}) {
   const router = useRouter();
   const sequenceStartRef = useRef<{
@@ -106,9 +115,7 @@ export function useSequentialShortcuts({
       }
 
       // Handle sequential shortcuts
-      const sequentialShortcuts = KEYBOARD_SHORTCUTS.filter(
-        s => s.isSequential
-      );
+      const sequentialShortcuts = shortcuts.filter(s => s.isSequential);
 
       // Check if this is the start of a sequence
       if (!sequenceStartRef.current) {
@@ -149,7 +156,14 @@ export function useSequentialShortcuts({
       // No match, clear sequence
       clearSequence();
     },
-    [enabled, onOpenShortcutsModal, clearSequence, sequenceTimeout, router]
+    [
+      enabled,
+      onOpenShortcutsModal,
+      clearSequence,
+      sequenceTimeout,
+      router,
+      shortcuts,
+    ]
   );
 
   useEffect(() => {

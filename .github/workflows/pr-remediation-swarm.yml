@@ -5,24 +5,33 @@
 name: PR Remediation Swarm
 
 # Tim 2026-10-28: many cheap remediators, each owning one PR, on free
-# GitHub-hosted runners. workflow_dispatch fans out over every lane-fix-red PR
-# (plus lane-fix-conflict PRs for sync-main only). The per-PR event wake is NOT
-# a workflow_run here: ci-workflow-topology allows one remediation dispatch per
-# producer and Lane Fix Relay is it. The event path lands by extending that
-# relay (repository_dispatch to this workflow) once the merged-after-fix rate
-# is proven; the dispatch path stays the manual and backstop entry. All API traffic uses the Jovie Bot App installation token so
-# the repo's Actions GITHUB_TOKEN quota is not touched; the selector backs off
-# below 20% remaining quota. Fan-out is SWARM_MAX_PARALLEL (default 20).
-# The lanes claim comment ("lane claim kind=fix") is the shared lease: the
-# swarm skips live claims and posts its own, so the Codex ladder skips the PR.
+# GitHub-hosted runners. A run with nothing to fix costs $0: the deterministic
+# gate (no failing check, CI still running, no concrete error, already handled
+# this head, sensitive paths, closed model budget) skips before any claim or
+# model call. Only a model-fixable class with a concrete error extract reaches
+# the model, with the extract plus the files it names (about 20k tokens).
+# Event-driven: repository_dispatch `swarm-remediate` {pr, sha} from Lane Fix
+# Relay (the one topology-approved remediation dispatcher; wired after #23537).
+# workflow_dispatch stays the manual path and the paced `behind` batch. All API
+# traffic uses the Jovie Bot App installation token so the repo's Actions
+# GITHUB_TOKEN quota is not touched. Fan-out is SWARM_MAX_PARALLEL (default 20).
+# The lanes claim comment ("lane claim kind=fix") is the shared lease.
 
 on:
+  # Event wake: Lane Fix Relay (the one topology-approved remediation dispatcher) sends
+  # `swarm-remediate` with {pr, sha} when a required check fails on a same-repo PR head.
+  repository_dispatch:
+    types: [swarm-remediate]
   workflow_dispatch:
     inputs:
       prs:
-        description: Comma-separated PR numbers (empty = every lane-fix-red PR, plus lane-fix-conflict PRs for sync-main only)
+        description: Comma-separated PR numbers (empty = every lane-fix-red PR, plus lane-fix-conflict PRs for sync-main, plus up to 10 clean BEHIND PRs for update-branch)
         required: false
         default: ''
+      modes:
+        description: 'Which PRs to select when prs is empty: all, or a comma list of red, conflict, behind'
+        required: false
+        default: all
       limit:
         description: Max PRs this run
         required: false
@@ -57,19 +66,24 @@ jobs:
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
           permission-pull-requests: read
           permission-issues: read
+      - name: Smoke the log path (gh version, one real job log, fails loudly if empty)
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: python3 scripts/swarm/pr_remediation_swarm.py smoke
       - name: Quota-aware selection
         id: pick
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
-          PR: ${{ inputs.prs }}
-          LIMIT: ${{ inputs.limit }}
+          PR: ${{ inputs.prs || github.event.client_payload.pr }}
+          LIMIT: ${{ inputs.limit || '1' }}
+          MODES: ${{ inputs.modes || 'red' }}
           DAILY_CAP: ${{ vars.SWARM_DAILY_USD_CAP || '5' }}
           ATTEMPT_CAP: ${{ vars.SWARM_ATTEMPT_USD_CAP || '0.10' }}
           LEDGER_ISSUE: ${{ vars.SWARM_LEDGER_ISSUE }}
           SWARM_API_KEY: ${{ secrets.SWARM_WORKERS_AI_TOKEN }}
           SWARM_BASE_URL: ${{ vars.SWARM_BASE_URL }}
           SWARM_CREDIT_PROBE: ${{ vars.SWARM_CREDIT_PROBE }}
-        run: python3 scripts/swarm/pr_remediation_swarm.py select --pr "$PR" --limit "$LIMIT" --daily-cap-usd "$DAILY_CAP" --attempt-cap-usd "$ATTEMPT_CAP" --ledger-issue "$LEDGER_ISSUE"
+        run: python3 scripts/swarm/pr_remediation_swarm.py select --pr "$PR" --limit "$LIMIT" --daily-cap-usd "$DAILY_CAP" --attempt-cap-usd "$ATTEMPT_CAP" --ledger-issue "$LEDGER_ISSUE" --modes "${MODES:-all}"
 
   remediate:
     name: Remediate #${{ matrix.pr }}
@@ -133,15 +147,24 @@ jobs:
         if: steps.prep.outputs.action == 'sync-main' || steps.prep.outputs.action == 'wire-ci-fast'
         run: python3 scripts/swarm/pr_remediation_swarm.py fix --plan "$PLAN" --cwd pr
       - name: Prime Node toolcache
-        if: steps.prep.outputs.action == 'agent'
+        if: steps.prep.outputs.action == 'agent' || steps.prep.outputs.action == 'regen'
         uses: ./.github/actions/prime-node-toolcache
         with:
           node-version-file: .nvmrc
       - name: Setup Node
-        if: steps.prep.outputs.action == 'agent'
+        if: steps.prep.outputs.action == 'agent' || steps.prep.outputs.action == 'regen'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
+      - name: Install dependencies for the allowlisted regeneration (no secrets in env)
+        if: steps.prep.outputs.action == 'regen'
+        working-directory: pr
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile --prefer-offline --ignore-scripts
+      - name: Regenerate with an allowlisted command (no model)
+        if: steps.prep.outputs.action == 'regen'
+        run: python3 scripts/swarm/pr_remediation_swarm.py regen --plan "$PLAN" --cwd pr
       - name: Stage provider key outside the checkout (no repo code runs here)
         if: steps.prep.outputs.action == 'agent'
         env:
@@ -155,7 +178,7 @@ jobs:
           SWARM_BASE_URL: ${{ vars.SWARM_BASE_URL }}
           SWARM_MODELS: ${{ vars.SWARM_MODELS || '@cf/zai-org/glm-5.3-flash' }}
           SWARM_ATTEMPT_USD_CAP: ${{ vars.SWARM_ATTEMPT_USD_CAP || '0.10' }}
-        run: python3 scripts/swarm/pr_remediation_swarm.py agent --plan "$PLAN" --cwd pr --log "$LOG" --meta "$META" --key-file "$RUNNER_TEMP/swarm-key" --max-steps 25 --timeout 600
+        run: python3 scripts/swarm/pr_remediation_swarm.py agent --plan "$PLAN" --cwd pr --log "$LOG" --meta "$META" --key-file "$RUNNER_TEMP/swarm-key" --max-steps 8 --timeout 600
       - name: Remove staged key
         if: always()
         run: rm -f "$RUNNER_TEMP/swarm-key"

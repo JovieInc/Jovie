@@ -13,16 +13,12 @@ describe('AppSearchField', () => {
     expect(
       screen.getByRole('searchbox', { name: 'Search library' })
     ).toBeVisible();
-    expect(container.firstElementChild).toHaveClass(
-      'focus-within:border-(--linear-border-focus)',
-      'focus-within:bg-surface-0',
-      'has-[:focus-visible]:ring-2',
-      'has-[:focus-visible]:ring-ring/14',
-      '[&_input]:focus-visible:ring-offset-0'
+    // The shared CompositeField owns the pill-shaped, keyboard-only ring.
+    expect(container.firstElementChild).toHaveAttribute(
+      'data-component',
+      'composite-field'
     );
-    expect(
-      screen.getByRole('searchbox', { name: 'Search library' }).className
-    ).not.toContain('ring-offset-0');
+    expect(container.firstElementChild).toHaveClass('composite-field');
     expect(container.firstElementChild?.className).not.toContain(
       'focus-within:ring-'
     );
