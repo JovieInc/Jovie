@@ -48,6 +48,19 @@ describe('pay landing System B source contract', () => {
     expect(source).not.toMatch(/homepage-section-stack mt-0/);
   });
 
+  it('shows the real pay sheet in the hero, not an empty field', () => {
+    render(<PayLanding />);
+
+    const hero = screen.getByTestId('pay-hero');
+    const shot = within(hero).getByTestId('pay-hero-product');
+    const image = within(shot).getByRole('img');
+    // Registry capture of the live profile pay state (Tim White, ?mode=pay).
+    expect(decodeURIComponent(image.getAttribute('src') ?? '')).toContain(
+      'tim-white-profile-pay-phone'
+    );
+    expect(image.getAttribute('alt')).toBeTruthy();
+  });
+
   it('keeps the final claim section to the handle form action path', () => {
     render(<PayLanding />);
 
@@ -95,6 +108,9 @@ describe('pay landing System B source contract', () => {
     expect(dock).toHaveAttribute('data-testid', 'marketing-section-hero');
     expect(dock).toHaveAttribute('data-marketing-variant', 'split-claim-card');
     expect(dock?.querySelector(':scope > .hero-glow')).not.toBeNull();
+    // Matte hero: no per-route photograph layer behind the copy (2026-10-29).
+    // The product shot (MarketingPhoneImage, #23613) is content, not backdrop.
+    expect(dock?.querySelector('[class*="hero-photo"]')).toBeNull();
   });
 
   it('gives the hero H1 enough measure to paint both Pen lines', () => {
@@ -122,6 +138,30 @@ describe('pay landing System B source contract', () => {
     expect(heading.className).toMatch(
       /\bxl:leading-(?:tight|snug|normal|relaxed|loose)\b/
     );
+  });
+});
+
+describe('bare icons and sr-only step labels', () => {
+  it('renders the steps as an ordered list with non-visible step counts', () => {
+    const { container } = render(<PayLanding />);
+
+    const list = container.querySelector('ol');
+    expect(list).not.toBeNull();
+    const counts = Array.from(list!.querySelectorAll('li > span.sr-only')).map(
+      node => node.textContent
+    );
+    expect(counts).toEqual(['Step 1', 'Step 2', 'Step 3']);
+  });
+
+  it('draws icons bare and hidden from assistive tech, with no tile wrapper', () => {
+    const { container } = render(<PayLanding />);
+
+    const icons = container.querySelectorAll('li svg, svg.h-5.w-5');
+    expect(icons.length).toBeGreaterThan(0);
+    for (const icon of Array.from(icons)) {
+      expect(icon).toHaveAttribute('aria-hidden', 'true');
+    }
+    expect(container.querySelector('.h-11.w-11')).toBeNull();
   });
 });
 

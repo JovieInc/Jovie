@@ -1,0 +1,232 @@
+{
+  "schema": "jovie-email-streams/v1",
+  "_comment": "The one registry of email sending streams (Tim 2026-10-29: protect sending and reputation). Every email goes through apps/web/lib/email/gateway and declares one stream below. Change a stream's provider, domain, sender, consent, headers, suppression, rate limit, approval or thresholds here only; the gateway, the CI guard (scripts/lib/external-api-guard.mjs, mail rules) and the deliverability loop all read this file. Decision: gbrain decisions/company/email-sending-streams-2026-10-29. Doc: docs/company/email-sending-streams.md.",
+  "updated": "2026-10-29",
+  "coreDomain": "jov.ie",
+  "mailingAddressEnv": "LEGAL_MAILING_ADDRESS",
+  "mailingAddressIssue": "JOV-9648",
+  "gateway": "apps/web/lib/email/gateway",
+  "providers": {
+    "resend": {
+      "status": "live",
+      "account": "transactional (send.jov.ie, notify.jov.ie)",
+      "hosts": ["api.resend.com"],
+      "sdk": "resend",
+      "streams": [
+        "transactional",
+        "lifecycle",
+        "founder",
+        "broadcast",
+        "inbox"
+      ],
+      "note": "Resend's acceptable-use policy forbids unsolicited mail, so cold never runs on this account."
+    },
+    "instantly": {
+      "status": "not-approved",
+      "hosts": ["api.instantly.ai"],
+      "streams": ["cold"],
+      "note": "Workspace unpaid (402); spend card pending Tim. pushLeadToInstantly throws until approved."
+    },
+    "smartlead": {
+      "status": "not-approved",
+      "hosts": ["server.smartlead.ai"],
+      "streams": ["cold"],
+      "note": "Alternative cold tool. Not wired."
+    }
+  },
+  "streams": {
+    "transactional": {
+      "status": "open",
+      "description": "Mail a person needs because of something they did: sign-in codes, receipts, dunning, verification, subscription confirmations, release emails to fans who opted in, partner submissions an artist requested.",
+      "provider": "resend",
+      "fromDomain": "send.jov.ie",
+      "fromDomainEnv": "EMAIL_STREAM_TRANSACTIONAL_DOMAIN",
+      "fromLocalPart": "notifications",
+      "fromLocalPartOverride": false,
+      "defaultFromName": "Jovie",
+      "fromNameOverride": true,
+      "replyTo": "tim@jov.ie",
+      "replyToOverride": true,
+      "consentBases": [
+        "auth-request",
+        "account-transaction",
+        "opt-in",
+        "artist-request"
+      ],
+      "requiredHeaders": [],
+      "requirePostalAddress": false,
+      "suppression": "delivery",
+      "rateLimit": {
+        "perHour": 5000
+      },
+      "approval": "none",
+      "pausable": false,
+      "thresholds": {
+        "bounceRate": 0.02,
+        "bounceRatePause": 0.04,
+        "complaintRate": 0.0008,
+        "complaintRatePause": 0.003
+      }
+    },
+    "lifecycle": {
+      "status": "open",
+      "description": "Onboarding and recovery mail to our own users about their account (stalled signup recovery).",
+      "provider": "resend",
+      "fromDomain": "send.jov.ie",
+      "fromDomainEnv": "EMAIL_STREAM_LIFECYCLE_DOMAIN",
+      "targetFromDomain": "notify.jov.ie",
+      "fromLocalPart": "tim",
+      "fromLocalPartOverride": false,
+      "defaultFromName": "Tim White",
+      "fromNameOverride": false,
+      "replyTo": "tim@jov.ie",
+      "replyToOverride": false,
+      "consentBases": ["account-relationship"],
+      "requiredHeaders": ["List-Unsubscribe", "List-Unsubscribe-Post"],
+      "requirePostalAddress": true,
+      "suppression": "all",
+      "rateLimit": {
+        "perHour": 100
+      },
+      "approval": "summer-card",
+      "pausable": true,
+      "thresholds": {
+        "bounceRate": 0.02,
+        "bounceRatePause": 0.04,
+        "complaintRate": 0.0008,
+        "complaintRatePause": 0.001
+      }
+    },
+    "founder": {
+      "status": "open",
+      "description": "1:1 plain mail from Tim to a person who already has a relationship with Jovie (verification decisions, personal follow-ups).",
+      "provider": "resend",
+      "fromDomain": "send.jov.ie",
+      "fromDomainEnv": "EMAIL_STREAM_FOUNDER_DOMAIN",
+      "targetFromDomain": "notify.jov.ie",
+      "fromLocalPart": "tim",
+      "fromLocalPartOverride": false,
+      "defaultFromName": "Tim White",
+      "fromNameOverride": false,
+      "replyTo": "tim@jov.ie",
+      "replyToOverride": false,
+      "consentBases": ["existing-relationship"],
+      "requiredHeaders": [],
+      "requirePostalAddress": false,
+      "suppression": "all",
+      "rateLimit": {
+        "perHour": 50
+      },
+      "approval": "none",
+      "pausable": true,
+      "thresholds": {
+        "bounceRate": 0.03,
+        "bounceRatePause": 0.04,
+        "complaintRate": 0.0008,
+        "complaintRatePause": 0.001
+      }
+    },
+    "broadcast": {
+      "status": "open",
+      "description": "One message to many opted-in people: newsletters, changelog, weekly recaps.",
+      "provider": "resend",
+      "fromDomain": "send.jov.ie",
+      "fromDomainEnv": "EMAIL_STREAM_BROADCAST_DOMAIN",
+      "targetFromDomain": "notify.jov.ie",
+      "fromLocalPart": "updates",
+      "fromLocalPartOverride": false,
+      "defaultFromName": "Jovie",
+      "fromNameOverride": false,
+      "replyTo": null,
+      "replyToOverride": false,
+      "consentBases": ["opt-in"],
+      "requiredHeaders": ["List-Unsubscribe", "List-Unsubscribe-Post"],
+      "requirePostalAddress": true,
+      "suppression": "all",
+      "rateLimit": {
+        "perHour": 2000
+      },
+      "approval": "summer-card",
+      "pausable": true,
+      "thresholds": {
+        "bounceRate": 0.02,
+        "bounceRatePause": 0.04,
+        "complaintRate": 0.0008,
+        "complaintRatePause": 0.001
+      }
+    },
+    "inbox": {
+      "status": "open",
+      "description": "Routing replies from an artist's Jovie inbox to the person who emailed it.",
+      "provider": "resend",
+      "fromDomain": "jovie.fm",
+      "fromDomainEnv": "EMAIL_STREAM_INBOX_DOMAIN",
+      "fromLocalPart": null,
+      "fromLocalPartOverride": true,
+      "defaultFromName": "Jovie",
+      "fromNameOverride": true,
+      "replyTo": null,
+      "replyToOverride": true,
+      "consentBases": ["inbound-reply"],
+      "requiredHeaders": [],
+      "requirePostalAddress": false,
+      "suppression": "delivery",
+      "rateLimit": {
+        "perHour": 200
+      },
+      "approval": "none",
+      "pausable": true,
+      "thresholds": {
+        "bounceRate": 0.03,
+        "bounceRatePause": 0.04,
+        "complaintRate": 0.0008,
+        "complaintRatePause": 0.003
+      }
+    },
+    "cold": {
+      "status": "closed",
+      "closedReason": "No cold-outbound path is approved. Tim must approve the domain (meetjovie.com), the provider and the spend cards first. Cold mail never uses jov.ie, any subdomain of it, or the Resend transactional account.",
+      "description": "Outreach to people who never opted in (prospects, claim invites, follow-ups).",
+      "provider": null,
+      "fromDomain": null,
+      "fromDomainEnv": "EMAIL_STREAM_COLD_DOMAIN",
+      "fromLocalPart": null,
+      "fromLocalPartOverride": false,
+      "defaultFromName": "Tim White",
+      "fromNameOverride": false,
+      "replyTo": null,
+      "replyToOverride": false,
+      "consentBases": ["legitimate-interest"],
+      "requiredHeaders": ["List-Unsubscribe", "List-Unsubscribe-Post"],
+      "requirePostalAddress": true,
+      "suppression": "all",
+      "rateLimit": {
+        "perHour": 0
+      },
+      "approval": "summer-card",
+      "pausable": true,
+      "thresholds": {
+        "bounceRate": 0.03,
+        "bounceRatePause": 0.05,
+        "complaintRate": 0.0008,
+        "complaintRatePause": 0.003
+      }
+    }
+  },
+  "deliverability": {
+    "windowDays": 7,
+    "minSample": 50,
+    "source": "Resend webhooks (/api/webhooks/resend) into notification_delivery_log, tagged with stream and senderDomain",
+    "limits": "Gmail and Yahoo bulk-sender rules: spam complaints under 0.1%, never 0.3%. Resend AUP: bounces under 4%.",
+    "forge": {
+      "status": "not-activated",
+      "summary": "Resend Forge moves sending onto Resend's shared pool, adds one DNS record and falls back to the current engine automatically. Eligibility needs Resend to treat us as an established good sender.",
+      "activation": "One-tap Ovie card to Tim with the DNS record, only when Resend reports us eligible AND every live stream is clean on real volume.",
+      "readyWhen": {
+        "minDeliveredPerStream": 500,
+        "maxBounceRate": 0.02,
+        "maxComplaintRate": 0.001
+      }
+    }
+  }
+}
