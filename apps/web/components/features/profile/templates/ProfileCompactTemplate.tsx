@@ -354,7 +354,7 @@ export function ProfileCompactTemplate({
   const [requestedMode, setRequestedMode] = useState<ProfileMode>(() =>
     getInitialModeFromLocation(mode, false)
   );
-  // Bounded post-mount wakes for the history effect below (see the effect).
+  // Strip detector wake for the history effect below (see the effect).
   const [historyWakeTick, setHistoryWakeTick] = useState(0);
   const revealNotificationsRef = useRef<(() => void) | null>(null);
   const closeResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -684,21 +684,36 @@ export function ProfileCompactTemplate({
 
   // Next's own entry updater can strip the landed ?mode=… entry back to the
   // bare profile path with a replaceState that never wakes React. When the
-  // strip lands after the history effect's last run (observed on the
-  // standalone E2E server, where hydration settles later than on Vercel), no
-  // dep changes, so the stripped-landing correction below never re-evaluates
-  // and the deep-link mode URL stays bare (profile-admission mode-history
-  // legs red). These bounded wakes force that effect to re-run a few times
-  // after mount; every guard inside it (depth-0, landed-mode match, arrival
-  // history length, the Link-navigation discriminator) is unchanged, so a
-  // wake without a strip is a no-op.
+  // strip lands after the history effect's last run, no dep changes, so the
+  // stripped-landing correction below never re-evaluates and the deep-link
+  // mode URL stays bare (profile-admission mode-history legs red). The first
+  // fix (#23867) used three fixed wake ticks (200/600/1400ms); verify run
+  // 41097577290 proved the strip lands LATER than that on the standalone E2E
+  // server. This detector instead polls the cheap ref/URL conditions every
+  // 250ms for 8s after mount and only then ticks the effect — zero re-renders
+  // on hosts where no strip happens (prod), and the correction still runs
+  // through the effect's full guard chain (landed-mode match, hydration
+  // readiness, the Link-navigation discriminator) before any replaceState.
   useEffect(() => {
-    const timers = [200, 600, 1400].map(delay =>
-      globalThis.setTimeout(() => setHistoryWakeTick(tick => tick + 1), delay)
-    );
-    return () => {
-      for (const timer of timers) globalThis.clearTimeout(timer);
-    };
+    const startedAt = Date.now();
+    const interval = globalThis.setInterval(() => {
+      if (Date.now() - startedAt > 8000) {
+        globalThis.clearInterval(interval);
+        return;
+      }
+      if (
+        landedHistoryModeRef.current !== null &&
+        landedHistoryModeRef.current !== 'profile' &&
+        globalThis.location.pathname === mountedPathnameRef.current &&
+        new URLSearchParams(globalThis.location.search).get('mode') === null &&
+        profileHistoryDepthRef.current === 0 &&
+        globalThis.history.length ===
+          (arrivalHistoryLengthRef.current ?? globalThis.history.length)
+      ) {
+        setHistoryWakeTick(tick => tick + 1);
+      }
+    }, 250);
+    return () => globalThis.clearInterval(interval);
   }, []);
 
   useEffect(() => {

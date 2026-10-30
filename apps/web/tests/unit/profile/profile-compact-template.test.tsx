@@ -1636,22 +1636,26 @@ describe('ProfileCompactTemplate', () => {
 
     const historyLengthAfterLanding = window.history.length;
     // Next's entry updater strips the landed ?mode=… entry with a bare
-    // replaceState — no React wake, no rerender (the standalone E2E server
-    // hits this ordering; the correction previously only ran on a wake).
+    // replaceState — no React wake, no rerender. On the standalone E2E
+    // server the strip lands LATE (post-hydration, ~seconds in): after the
+    // first fix's fixed 200/600/1400ms wake ticks had all fired, so the
+    // correction still never ran (verify run 41097577290). Delay the strip
+    // past that fixed window so only the 250ms strip detector can catch it.
+    await new Promise(resolve => setTimeout(resolve, 1800));
     act(() => {
       window.history.replaceState(window.history.state, '', '/test-artist');
     });
     pushStateSpy.mockClear();
 
-    // Deliberately NO view.rerender here: only the bounded post-mount wake
-    // ticks may correct the strip.
+    // Deliberately NO view.rerender here: only the strip detector's wake
+    // may correct the strip.
     await waitFor(
       () => {
         expect(`${window.location.pathname}${window.location.search}`).toBe(
           '/test-artist?mode=listen&source=qr'
         );
       },
-      { timeout: 3500 }
+      { timeout: 4500 }
     );
     expect(pushStateSpy).not.toHaveBeenCalled();
     expect(window.history.length).toBe(historyLengthAfterLanding);
