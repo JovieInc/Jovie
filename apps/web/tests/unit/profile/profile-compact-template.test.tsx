@@ -1597,6 +1597,68 @@ describe('ProfileCompactTemplate', () => {
     replaceStateSpy.mockRestore();
   });
 
+  it('restores a stripped deep-link landing even when the strip never wakes React', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([]);
+    mockUseProfileShell.mockImplementation(() => ({
+      locationMode: 'listen',
+      notificationsContextValue: {
+        subscribedChannels: {},
+        subscriptionDetails: {},
+        setSubscribedChannels: vi.fn(),
+        setSubscriptionDetails: vi.fn(),
+        setState: vi.fn(),
+      },
+      notificationsController: {
+        contentPreferences: null,
+      },
+    }));
+    window.history.replaceState(null, '', '/artist-profiles');
+    window.history.pushState(null, '', '/test-artist?mode=listen&source=qr');
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+
+    render(
+      <ProfileCompactTemplate
+        mode='listen'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          modeOverride: 'listen',
+          sourceOverride: 'qr',
+        })
+      );
+    });
+
+    const historyLengthAfterLanding = window.history.length;
+    // Next's entry updater strips the landed ?mode=… entry with a bare
+    // replaceState — no React wake, no rerender (the standalone E2E server
+    // hits this ordering; the correction previously only ran on a wake).
+    act(() => {
+      window.history.replaceState(window.history.state, '', '/test-artist');
+    });
+    pushStateSpy.mockClear();
+
+    // Deliberately NO view.rerender here: only the bounded post-mount wake
+    // ticks may correct the strip.
+    await waitFor(
+      () => {
+        expect(`${window.location.pathname}${window.location.search}`).toBe(
+          '/test-artist?mode=listen&source=qr'
+        );
+      },
+      { timeout: 3500 }
+    );
+    expect(pushStateSpy).not.toHaveBeenCalled();
+    expect(window.history.length).toBe(historyLengthAfterLanding);
+
+    pushStateSpy.mockRestore();
+  });
+
   it('does not revert a client Link navigation to a different mode', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([]);
     mockUseProfileShell.mockImplementation(() => ({
