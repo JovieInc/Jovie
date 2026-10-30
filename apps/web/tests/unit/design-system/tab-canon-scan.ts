@@ -78,3 +78,62 @@ export function findDuplicateFields(webRoot: string): string[] {
   }
   return Array.from(new Set(out)).sort();
 }
+
+/** Panel surfaces where labels must be Title Case, never ALL CAPS. */
+const PANEL_DIRS: readonly string[] = [
+  'components/molecules/drawer/',
+  'components/molecules/inspector/',
+  'components/molecules/tab-bar/',
+  'components/features/library/',
+  'components/features/library-asset-share/',
+  'components/shell/DrawerTabStrip',
+  'app/app/(shell)/library/',
+];
+const UPPERCASE_STYLE =
+  /(?<![\w-])uppercase(?![\w-])|text-transform\s*:\s*uppercase|textTransform\s*:\s*['"]uppercase['"]/;
+const LABEL_PROP = /\b(?:label|title|aria-label)=(?:'([^']+)'|"([^"]+)")/g;
+/** Acronyms and initialisms that are legitimately upper case. */
+const ACRONYMS: ReadonlySet<string> = new Set([
+  'UPC',
+  'ISRC',
+  'ISWC',
+  'URL',
+  'DSP',
+  'API',
+  'PDF',
+  'WAV',
+  'MP3',
+  'CSV',
+  'BPM',
+  'ID',
+  'EP',
+  'LP',
+  'QR',
+  'UGC',
+  'SMS',
+  'IPI',
+  'PRO',
+  'CAE',
+]);
+
+export function findUppercaseLabels(webRoot: string): string[] {
+  const out: string[] = [];
+  for (const file of runtimeFiles(webRoot)) {
+    const rel = relative(webRoot, file);
+    if (!PANEL_DIRS.some(dir => rel.startsWith(dir))) continue;
+    const source = readFileSync(file, 'utf8');
+    if (UPPERCASE_STYLE.test(source)) out.push(`${rel}::uppercase-style`);
+    for (const m of source.matchAll(LABEL_PROP)) {
+      const text = (m[1] ?? m[2] ?? '').trim();
+      const letters = text.replace(/[^A-Za-z]/g, '');
+      if (
+        letters.length >= 3 &&
+        text === text.toUpperCase() &&
+        !ACRONYMS.has(text)
+      ) {
+        out.push(`${rel}::${text}`);
+      }
+    }
+  }
+  return Array.from(new Set(out)).sort();
+}

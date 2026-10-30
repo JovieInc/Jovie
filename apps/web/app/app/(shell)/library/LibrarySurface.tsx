@@ -2179,17 +2179,10 @@ function ApprovalStatusEditor({
           aria-label='Approval Status'
           data-testid={`library-approval-status-select-${asset.id}`}
           className={cn(
-            'inline-flex h-6 max-w-full items-center gap-1.5 truncate rounded-md px-1 text-xs font-normal text-primary-token hover:bg-surface-1',
+            '-ml-1 inline-flex h-6 max-w-full items-center justify-start gap-1 truncate rounded-md px-1 text-xs font-normal text-primary-token hover:bg-surface-1',
             LIBRARY_BUTTON_FOCUS_CLASS
           )}
         >
-          <span
-            aria-hidden='true'
-            className={cn(
-              'h-2 w-2 shrink-0 rounded-full',
-              libraryApprovalStatusDotClasses(asset.approvalStatus)
-            )}
-          />
           <span>{formatLibraryApprovalStatus(asset.approvalStatus)}</span>
           <ChevronDown
             className='h-3 w-3 shrink-0 opacity-70'
