@@ -7,8 +7,12 @@
  * environment and never prints it. Feeds the capacity/spend loop.
  */
 import { pathToFileURL } from 'node:url';
+import { createApiClient } from '../packages/api-client/client.ts';
+import { providerSpec } from '../packages/api-client/contract.ts';
+import { hashCredential } from '../packages/api-client/store.ts';
 
-const BASE = 'https://ai-gateway.vercel.sh/v1/report';
+// The host comes from the api-client provider contract, never a literal.
+const BASE = `https://${providerSpec('ai-gateway').hosts[0]}/v1/report`;
 
 export function summarize(rows, days) {
   return rows
@@ -31,14 +35,24 @@ export function summarize(rows, days) {
     .sort((a, b) => b.costUsd - a.costUsd);
 }
 
-async function fetchRows(groupBy, days, apiKey, fetchImpl = fetch) {
+export async function fetchRows(groupBy, days, apiKey, fetchImpl = fetch) {
   const day = ms => new Date(Date.now() + ms).toISOString().slice(0, 10);
   const url = `${BASE}?start_date=${day(-days * 864e5)}&end_date=${day(864e5)}&group_by=${groupBy}`;
-  const res = await fetchImpl(url, {
-    headers: { authorization: `Bearer ${apiKey}` },
+  // Every provider call goes through the shared client layer (budget, retry, ledger).
+  const client = createApiClient({
+    provider: 'ai-gateway',
+    credential: hashCredential('ai-gateway', apiKey),
+    fetch: fetchImpl,
   });
-  if (!res.ok) throw new Error(`gateway report ${res.status}`);
-  return (await res.json()).results ?? [];
+  const res = await client.request({
+    url,
+    headers: { authorization: `Bearer ${apiKey}` },
+    priority: 'report',
+    maxAttempts: 2,
+  });
+  if (res.status < 200 || res.status >= 300)
+    throw new Error(`gateway report ${res.status}`);
+  return res.json().results ?? [];
 }
 
 export async function main(argv = process.argv.slice(2), env = process.env) {
