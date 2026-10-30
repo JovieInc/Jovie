@@ -66,4 +66,16 @@ describe('DspQuietRow', () => {
       'open.spotify.com/track/abc'
     );
   });
+
+  it('starts at the drawer content edge with no horizontal inset', () => {
+    render(
+      <DspQuietRow
+        label='Spotify'
+        icon={<span aria-hidden='true'>S</span>}
+        href='https://open.spotify.com/album/take-me-over'
+        testId='dsp-edge'
+      />
+    );
+    expect(screen.getByTestId('dsp-edge').className).toContain('px-0');
+  });
 });
