@@ -1139,9 +1139,8 @@
      'menu sheet spans the phone column' (2px tolerance, first red run
      41005969193). Validated live: sheet/shell bottom delta 8px -> 0. */
   .profile-viewport:not(.profile-viewport--embedded):not(
-      .profile-viewport--desktop-surface
-    )
-    .profile-compact-surface-slot {
+    .profile-viewport--desktop-surface
+  ) .profile-compact-surface-slot {
     display: flex;
     flex-direction: column;
   }
