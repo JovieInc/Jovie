@@ -371,6 +371,8 @@ ios.settings|ios|ios-settings|apps/ios/Jovie/Features/Settings/SettingsView.swif
 ios.library|ios|ios-library|apps/ios/Jovie/Features/Library/|compact
 ios.teleprompter|ios|ios-teleprompter|apps/ios/Jovie/Features/Teleprompter/|compact
 ios.inbox|ios|ios-inbox|apps/ios/Jovie/Features/Inbox/|compact
+ios.audience|ios|ios-audience|apps/ios/Jovie/Features/Audience/AudienceHighlightsView.swift|compact
+ios.calendar|ios|ios-calendar|apps/ios/Jovie/Features/Calendar/CalendarSurfaceView.swift|compact
 macos-electron.ovie-door|macos-electron|ovie|apps/desktop/src/ovie-door.ts|desktop|x|Product-surface implementation owned by Ovie
 macos-electron.auth-security|macos-electron|auth-security|apps/desktop/src/desktop-auth-security.ts|desktop|x|Auth/security lane is out of scope
 macos.menu-monitor|macos-electron|macos-menu-monitor|apps/macos/MenuMonitor/|desktop|x|MenuMonitor is out of scope

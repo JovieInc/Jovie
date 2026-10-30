@@ -21,6 +21,7 @@ class ClassifyTest(unittest.TestCase):
             "upstream returned HTTP 500 before the job started": ("platform-infra", "rerun"),
             "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane": ("ci-fast-wiring", "wire-ci-fast"),
             "domain-write-guard: apps/web/lib/leads/lead-claim-token.ts writes creatorProfiles directly 1x (allowed 0).": ("domain-write", "register-domain-writes"),
+            "missing registration for changed in-scope screen apps/ios/Jovie/Features/Calendar/CalendarSurfaceView.swift": ("screen-registration", "register-screens"),
             "This PR conflicts with main in: scripts/preflight-changed.mjs . Resolve the conflict (lane-fix-conflict).": ("narrowed-preflight", "merge-narrowed-preflight"),
             "AssertionError: off-grid 10px/14px spacing steps (*-2.5, *-3.5) grew: 591 > baseline 590.": ("spacing-scale", "snap-spacing"),
             "Error: apps/web/app/(marketing)/pricing/page.tsx: source changed; renew certification evidence": ("census-certification", "sync-main"),
@@ -337,6 +338,123 @@ class DomainWriteTest(unittest.TestCase):
             self.assertEqual(
                 classes.register_direct_domain_writes(root, social_log),
                 ["apps/web/lib/leads/lead-claim-token.ts"],
+            )
+
+
+class ScreenRegistrationTest(unittest.TestCase):
+    AUDIENCE = "apps/ios/Jovie/Features/Audience/AudienceHighlightsView.swift"
+    CALENDAR = "apps/ios/Jovie/Features/Calendar/CalendarSurfaceView.swift"
+    INBOX = "apps/ios/Jovie/Features/Inbox/InboxSurfaceView.swift"
+    DASHBOARD = "apps/ios/Jovie/Features/Dashboard/PublicProfileBrowserView.swift"
+    PLACEHOLDER = "apps/ios/Jovie/Features/Chat/MobileChatPlaceholderView.swift"
+    SHELL = "apps/ios/Jovie/Features/AppShell/AppShellView.swift"
+    WEB = "apps/web/app/(marketing)/pricing/page.tsx"
+    REGISTRY = (
+        "export const SCREEN_REGISTRY = Object.freeze(\n"
+        "  parseRegistry(\n"
+        "    `\n"
+        "ios.dashboard|ios|ios-dashboard|apps/ios/Jovie/Features/Dashboard/DashboardView.swift|compact\n"
+        "ios.inbox|ios|ios-inbox|apps/ios/Jovie/Features/Inbox/|compact\n"
+        "macos-electron.ovie-door|macos-electron|ovie|apps/desktop/src/ovie-door.ts|desktop|x|Owned by Ovie\n"
+        "ios.shell|ios|ios-shell|apps/ios/Jovie/Features/AppShell/|compact|x|iOS shell lane is out of scope\n"
+        "`.trim()\n"
+        "  )\n"
+        ");\n"
+    )
+
+    def tree(self, tmp, files, registry=None):
+        root = Path(tmp)
+        registry_path = root / "scripts/invariants/screen-certification.mjs"
+        registry_path.parent.mkdir(parents=True)
+        registry_path.write_text(registry or self.REGISTRY)
+        for rel in files:
+            path = root / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("import SwiftUI\n")
+        return root
+
+    def test_registration_beats_a_rate_limit_line_and_names_both_files(self):
+        log = (
+            "HttpError: API rate limit exceeded for installation\n"
+            f"missing registration for changed in-scope screen {self.AUDIENCE}\n"
+            f"missing registration for changed in-scope screen {self.CALENDAR}\n"
+            "FAIL — JOV-INV-018 screen-certification/v2\n"
+        )
+        got = classes.classify(pr("Source Validation"), {"Source Validation": log})
+        self.assertEqual((got["cls"], got["action"]), ("screen-registration", "register-screens"))
+        self.assertEqual(got["files"], [self.AUDIENCE, self.CALENDAR])
+        self.assertIn(classes.REGISTER_SCREENS, classes.DETERMINISTIC)
+
+    def test_registers_both_screens_once_after_the_last_gated_ios_row(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.tree(tmp, [self.AUDIENCE, self.CALENDAR, self.INBOX])
+            added = classes.register_unregistered_screens(root, [self.CALENDAR, self.AUDIENCE])
+            self.assertEqual(added, [self.AUDIENCE, self.CALENDAR])
+            text = (root / "scripts/invariants/screen-certification.mjs").read_text()
+            self.assertLess(text.index("ios.inbox|"), text.index("ios.audience|"))
+            self.assertLess(text.index("ios.audience|"), text.index("ios.calendar|"))
+            self.assertLess(text.index("ios.calendar|"), text.index("macos-electron.ovie-door|"))
+            self.assertIn(
+                "ios.audience|ios|ios-audience|" + self.AUDIENCE + "|compact", text)
+            self.assertEqual(classes.register_unregistered_screens(root, [self.AUDIENCE, self.CALENDAR]), [])
+
+    def test_unsafe_path_writes_nothing_even_beside_a_safe_screen(self):
+        cases = [
+            [self.PLACEHOLDER],
+            [self.WEB],
+            ["apps/ios/Jovie/Features/Calendar/MissingView.swift"],
+            [self.AUDIENCE, self.PLACEHOLDER],
+            [self.AUDIENCE, self.WEB],
+        ]
+        for files in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                present = [path for path in files if not path.endswith("MissingView.swift") and path != self.WEB]
+                root = self.tree(tmp, [*present, self.AUDIENCE])
+                if self.WEB in files:
+                    page = root / self.WEB
+                    page.parent.mkdir(parents=True, exist_ok=True)
+                    page.write_text("export default function Page() { return null }\n")
+                before = (root / "scripts/invariants/screen-certification.mjs").read_text()
+                self.assertEqual(classes.register_unregistered_screens(root, files), [], files)
+                self.assertEqual((root / "scripts/invariants/screen-certification.mjs").read_text(), before)
+
+    def test_directory_coverage_is_not_duplicated_and_a_sibling_screen_still_lands(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.tree(tmp, [self.INBOX, self.CALENDAR])
+            added = classes.register_unregistered_screens(root, [self.INBOX, self.CALENDAR])
+            self.assertEqual(added, [self.CALENDAR])
+            text = (root / "scripts/invariants/screen-certification.mjs").read_text()
+            self.assertEqual(text.count("ios.inbox|"), 1)
+            self.assertNotIn(self.INBOX, text)
+            self.assertIn("ios.calendar|ios|ios-calendar|" + self.CALENDAR + "|compact", text)
+
+    def test_excluded_coverage_and_an_excluded_id_write_nothing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.tree(tmp, [self.SHELL])
+            before = (root / "scripts/invariants/screen-certification.mjs").read_text()
+            self.assertEqual(classes.register_unregistered_screens(root, [self.SHELL]), [])
+            self.assertEqual((root / "scripts/invariants/screen-certification.mjs").read_text(), before)
+        collision = self.REGISTRY.replace(
+            "ios.inbox|",
+            "ios.calendar|ios|ios-shell|apps/ios/Jovie/Features/Other/|compact|x|kept out\nios.inbox|",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.tree(tmp, [self.CALENDAR, self.AUDIENCE], collision)
+            before = (root / "scripts/invariants/screen-certification.mjs").read_text()
+            self.assertEqual(classes.register_unregistered_screens(root, [self.CALENDAR, self.AUDIENCE]), [])
+            self.assertEqual((root / "scripts/invariants/screen-certification.mjs").read_text(), before)
+
+    def test_an_existing_gated_row_gains_the_source_in_place(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.tree(tmp, [self.DASHBOARD])
+            added = classes.register_unregistered_screens(root, [self.DASHBOARD])
+            self.assertEqual(added, [self.DASHBOARD])
+            text = (root / "scripts/invariants/screen-certification.mjs").read_text()
+            self.assertEqual(text.count("ios.dashboard|"), 1)
+            self.assertIn(
+                "ios.dashboard|ios|ios-dashboard|apps/ios/Jovie/Features/Dashboard/DashboardView.swift,"
+                + self.DASHBOARD + "|compact",
+                text,
             )
 
 
