@@ -12,9 +12,13 @@ import {
   PRICING_COMPARISON,
 } from '@/lib/entitlements/registry';
 
+// Public rows: certified capabilities only (product-truth publication=public,
+// proofAuthorized). Pro rows are entitlement-gated, so they are real differences.
 const PUBLIC_PRICING_FEATURE_NAMES = new Set([
   'Public Jovie profile page',
-  'Contact / subscriber capture',
+  'Fan email capture',
+  'Release notifications (email to fans)',
+  'Pre-release & countdown pages',
 ]);
 
 const PUBLIC_PRICING_COMPARISON = PRICING_COMPARISON.map(category => ({

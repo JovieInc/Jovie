@@ -40,6 +40,8 @@ import {
 } from './OnboardingTurnstile';
 import { useOnboardingClaim } from './useOnboardingClaim';
 
+const SIGN_IN_LABEL = 'Sign in';
+
 /**
  * App-shell frame for the anonymous onboarding chat.
  *
@@ -252,7 +254,7 @@ export function OnboardingShell({
         sidebar={null}
         flushContent
         containerClassName='[color-scheme:dark]'
-        contentClassName='overflow-hidden!'
+        contentClassName='overflow-clip!'
         main={
           <div className='flex min-h-0 min-w-0 flex-1'>
             <div
@@ -293,9 +295,12 @@ export function OnboardingShell({
                       asChild
                       variant='compact'
                       touchTarget
+                      reserveLabel={SIGN_IN_LABEL}
                       className='shrink-0 whitespace-nowrap'
                     >
-                      <NextLink href={APP_ROUTES.SIGNIN}>Sign in</NextLink>
+                      <NextLink href={APP_ROUTES.SIGNIN}>
+                        {SIGN_IN_LABEL}
+                      </NextLink>
                     </JovieLink>
                   ) : null}
                 </OnboardingIdentityConflict>

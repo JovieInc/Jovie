@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ComponentPropsWithoutRef, forwardRef } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -72,6 +72,24 @@ function fakeRelease(
 }
 
 describe('ShellReleaseRow audio affordance', () => {
+  it('renders multi-artist credits through the canonical conjunction formatter', () => {
+    render(
+      <ShellReleaseRow
+        release={fakeRelease({
+          id: 'r-credits',
+          title: 'Neon Hearts',
+          artistNames: ['Vigel', 'Tim White'],
+        })}
+        isSelected={false}
+        onSelect={vi.fn()}
+      />
+    );
+
+    // ds-cert:credit-format: the release row never joins artist names
+    // locally — "Vigel and Tim White", matching the release drawer.
+    expect(screen.getByText('Vigel and Tim White')).toBeInTheDocument();
+  });
+
   it('opens the smart link without prefetching or selecting the row', async () => {
     const onSelect = vi.fn();
     render(
@@ -364,6 +382,62 @@ describe('ShellReleaseRow audio affordance', () => {
       expect.objectContaining({ hasLyrics: false })
     );
   });
+});
+
+describe('ShellReleaseRow DSP interaction', () => {
+  it.each(['pointer', 'Enter', 'Space'] as const)(
+    'keeps %s activation on the DSP trigger separate from row selection',
+    async activation => {
+      const user = userEvent.setup();
+      const onSelect = vi.fn();
+      render(
+        <ul>
+          <ShellReleaseRow
+            release={fakeRelease({
+              id: 'r-dsp',
+              title: 'Distribution Details',
+            })}
+            isSelected={false}
+            onSelect={onSelect}
+          />
+        </ul>
+      );
+
+      const trigger = screen.getByRole('button', {
+        name: /^View DSP Distribution Details/i,
+      });
+      const row = screen.getByRole('listitem', {
+        name: 'Distribution Details',
+      });
+      const key = activation === 'Enter' ? '{Enter}' : ' ';
+
+      if (activation === 'pointer') {
+        await user.click(trigger);
+      } else {
+        act(() => trigger.focus());
+        await user.keyboard(key);
+      }
+
+      const details = screen.getByRole('dialog', {
+        name: 'DSP Distribution Details',
+      });
+      expect(details).toHaveFocus();
+      expect(onSelect).not.toHaveBeenCalled();
+
+      await user.click(screen.getByText('Spotify'));
+      act(() => details.focus());
+      await user.keyboard('{Enter} ');
+      expect(onSelect).not.toHaveBeenCalled();
+
+      if (activation === 'pointer') {
+        await user.click(row);
+      } else {
+        act(() => row.focus());
+        await user.keyboard(key);
+      }
+      expect(onSelect).toHaveBeenCalledTimes(1);
+    }
+  );
 });
 
 describe('ShellReleaseRow enrichment', () => {
