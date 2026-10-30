@@ -1201,9 +1201,8 @@
      Home grid inside the shell. The 32px start padding keeps the canvas
      inside the visual-audit shell bounds (y >= 24 at 1280x900). */
   .profile-viewport:not(.profile-viewport--embedded):not(
-      .profile-viewport--desktop-surface
-    )
-    .public-profile-layout-frame--compact {
+    .profile-viewport--desktop-surface
+  ) .public-profile-layout-frame--compact {
     align-items: flex-start;
     padding-block-start: 32px;
   }
