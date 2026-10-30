@@ -293,6 +293,25 @@ describe('OnboardingShell status', () => {
     expect(signIn.className).not.toMatch(/(?:^|\s)h-11(?:\s|$)/);
   });
 
+  it('keeps the real sign-in link named and reachable before its label child arrives', () => {
+    render(<OnboardingShell sessionLabel='pending' />);
+
+    const signIn = screen.getByRole('link', { name: 'Sign in' });
+    const destination = signIn.getAttribute('href');
+    const labelNodes = Array.from(signIn.childNodes);
+    signIn.replaceChildren();
+
+    expect(screen.getByRole('link', { name: 'Sign in' })).toBe(signIn);
+    expect(signIn).toHaveAttribute('href', destination);
+    signIn.focus();
+    expect(signIn).toHaveFocus();
+
+    signIn.append(...labelNodes);
+    expect(signIn).toHaveTextContent('Sign in');
+    expect(screen.getByRole('link', { name: 'Sign in' })).toBe(signIn);
+    expect(signIn).toHaveFocus();
+  });
+
   it('reports a failed chat start without verification jargon or error codes', () => {
     render(<OnboardingShell sessionLabel='pending' />);
 
