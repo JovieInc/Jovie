@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { UIMessage } from 'ai';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -209,6 +210,33 @@ describe('OnboardingProfileRail', () => {
     expect(
       screen.getByTestId('onboarding-profile-rail-inline')
     ).toBeInTheDocument();
+  });
+
+  it('lets keyboard users enter the side preview scroll region', async () => {
+    const user = userEvent.setup();
+    render(<OnboardingProfileRail placement='side' state={CONFIRMED_STATE} />);
+
+    await user.tab();
+
+    expect(
+      screen.getByRole('complementary', { name: 'Profile Preview' })
+    ).toHaveFocus();
+  });
+
+  it('does not add a container tab stop to the inline preview', async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <OnboardingProfileRail placement='inline' state={CONFIRMED_STATE} />
+        <button type='button'>Continue conversation</button>
+      </>
+    );
+
+    await user.tab();
+
+    expect(
+      screen.getByRole('button', { name: 'Continue conversation' })
+    ).toHaveFocus();
   });
 });
 
