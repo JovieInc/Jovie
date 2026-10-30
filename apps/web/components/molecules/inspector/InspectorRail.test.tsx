@@ -120,7 +120,7 @@ describe('InspectorShell', () => {
     const selected = screen.getByRole('tab', { name: 'Details' });
     expect(selected).toHaveAttribute('aria-selected', 'true');
     expect(selected.className).toContain('rounded-full');
-    expect(selected.className).toContain('bg-(--surface-2)');
+    expect(selected.className).toContain('bg-surface-3');
     expect(selected.className).not.toContain('border-b-2');
 
     expect(screen.getByRole('tab', { name: 'Assets' })).toHaveAttribute(
