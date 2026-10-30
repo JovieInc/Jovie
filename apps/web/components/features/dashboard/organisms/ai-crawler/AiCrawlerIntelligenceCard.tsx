@@ -155,8 +155,11 @@ export function AiCrawlerIntelligenceCard({
         className
       )}
       data-testid='ai-crawler-intelligence-card'
-      aria-label='View AI Crawler Read Details'
     >
+      {/* No aria-label: it shadowed the visible card text (WCAG 2.5.3
+          label-in-name). The sr-only prefix plus the visible content forms
+          the accessible name. */}
+      <span className='sr-only'>View AI crawler read details</span>
       {rowContent}
       <ChevronRight
         className='h-4 w-4 shrink-0 text-tertiary-token'

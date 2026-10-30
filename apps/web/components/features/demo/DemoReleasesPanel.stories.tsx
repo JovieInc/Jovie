@@ -5,6 +5,13 @@ import { DEMO_RELEASES } from './demo-fixtures';
 const meta = {
   title: 'Features/Demo/DemoReleasesPanel',
   component: DemoReleasesPanel,
+  decorators: [
+    Story => (
+      <div className='h-96 w-80'>
+        <Story />
+      </div>
+    ),
+  ],
   parameters: {
     layout: 'centered',
     jovie: {

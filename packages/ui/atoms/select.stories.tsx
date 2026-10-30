@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
 import {
   Select,
   SelectContent,
@@ -47,10 +48,15 @@ export const Disabled: Story = {
 
 export const EdgeCollision: Story = {
   parameters: { layout: 'fullscreen' },
-  render: () => (
+  render: () => <EdgeCollisionDemo />,
+};
+
+function EdgeCollisionDemo() {
+  const [open, setOpen] = useState(true);
+  return (
     <div className='flex min-h-64 items-start justify-end p-2'>
-      <Select defaultOpen defaultValue='north-america'>
-        <SelectTrigger className='w-48' aria-label='Coverage'>
+      <Select open={open} onOpenChange={setOpen} defaultValue='north-america'>
+        <SelectTrigger inert={open} className='w-48' aria-label='Coverage'>
           <SelectValue placeholder='Pick coverage' />
         </SelectTrigger>
         <SelectContent align='end'>
@@ -61,5 +67,5 @@ export const EdgeCollision: Story = {
         </SelectContent>
       </Select>
     </div>
-  ),
-};
+  );
+}

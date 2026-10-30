@@ -35,6 +35,9 @@ describe('ChatStyleLinkItem', () => {
       />
     );
 
+    const handle = screen.getByRole('button', { name: 'Drag To Reorder' });
+    expect(handle.closest('div[role="button"]')).toBeNull();
+    expect(handle.querySelector('button, a, input')).toBeNull();
     const deleteAction = screen.getByLabelText('Delete Spotify');
     expect(deleteAction.className).toContain('bg-error');
     expect(deleteAction.className).not.toMatch(/\bred-\d/);

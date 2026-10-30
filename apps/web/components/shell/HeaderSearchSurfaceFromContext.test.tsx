@@ -24,7 +24,9 @@ describe('HeaderSearchSurfaceFromContext', () => {
   it('renders the calm chat-search treatment used by the canonical rail', () => {
     renderSurface(true);
 
-    const trigger = screen.getByRole('button', { name: 'Search Jovie' });
+    const trigger = screen.getByRole('button', {
+      name: /^(?:Search(?: chats)? ⌘K — )?Search Jovie$/,
+    });
 
     expect(trigger).toHaveAttribute('data-app-search-trigger', 'true');
     expect(screen.getByText('Search chats')).toBeVisible();
@@ -38,7 +40,11 @@ describe('HeaderSearchSurfaceFromContext', () => {
 
     expect(screen.getByText('Search')).toBeVisible();
     expect(screen.queryByText('Search chats')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Search Jovie' })).toHaveClass(
+    expect(
+      screen.getByRole('button', {
+        name: /^(?:Search(?: chats)? ⌘K — )?Search Jovie$/,
+      })
+    ).toHaveClass(
       'h-(--app-shell-sidebar-row-height)',
       'px-(--app-shell-sidebar-inset)',
       'gap-x-(--app-shell-sidebar-icon-gap)',
@@ -57,7 +63,11 @@ describe('HeaderSearchSurfaceFromContext', () => {
       </HeaderActionsProvider>
     );
     await userEvent.tab();
-    expect(screen.getByRole('button', { name: 'Search Jovie' })).toHaveFocus();
+    expect(
+      screen.getByRole('button', {
+        name: /^(?:Search(?: chats)? ⌘K — )?Search Jovie$/,
+      })
+    ).toHaveFocus();
     await userEvent.keyboard('{Enter}');
     expect(screen.getByRole('status')).toHaveTextContent('Open');
     await userEvent.keyboard('{Enter}');

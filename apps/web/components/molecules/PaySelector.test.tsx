@@ -26,6 +26,15 @@ describe('PaySelector', () => {
     expect(onContinue).toHaveBeenCalledWith(20);
   });
 
+  it('keeps the custom-amount toggle wired to the heading it controls', () => {
+    render(<PaySelector amounts={[5, 10, 20]} onContinue={vi.fn()} />);
+
+    const toggle = screen.getByRole('button', { name: /custom amount/i });
+    expect(toggle).toHaveAttribute('aria-controls', 'pay-selector-heading');
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(document.getElementById('pay-selector-heading')).not.toBeNull();
+  });
+
   it('normalizes a custom amount to the USD contract precision', () => {
     const onContinue = vi.fn();
     render(

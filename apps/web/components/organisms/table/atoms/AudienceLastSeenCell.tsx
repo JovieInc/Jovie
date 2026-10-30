@@ -4,7 +4,6 @@ import React from 'react';
 import { AudienceRowActionsMenu } from '@/features/dashboard/AudienceRowActionsMenu';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/audience';
-import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 import type { AudienceMember } from '@/types';
 
 export interface AudienceLastSeenCellProps {
@@ -33,16 +32,16 @@ export const AudienceLastSeenCell = React.memo(function AudienceLastSeenCell({
       )}
     >
       <span className='line-clamp-1'>{formatTimeAgo(lastSeenAt)}</span>
+      {/* Pure reveal wrapper: no handlers, so the row's own click handling
+          applies exactly as in AudienceCreatedAtCell; the actions menu inside
+          owns its interaction semantics. No aria-hidden: the menu stays
+          focusable, and aria-hidden on a focusable container is an axe
+          aria-hidden-focus violation. */}
       <div
         className={cn(
           'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
           isMenuOpen && 'opacity-100 pointer-events-auto'
         )}
-        onClick={event => event.stopPropagation()}
-        onKeyDown={event =>
-          handleActivationKeyDown(event, e => e.stopPropagation())
-        }
-        aria-hidden='true'
       >
         <AudienceRowActionsMenu
           row={row}

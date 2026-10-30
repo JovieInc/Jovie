@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { SummerOpsCard } from '@/lib/ovie/ops-card';
 import { ChatOpsDataCard } from './ChatOpsDataCard';
@@ -40,6 +40,8 @@ describe('ChatOpsDataCard', () => {
     expect(facts).toHaveTextContent('Not measured');
     const chart = screen.getByTestId('chat-ops-data-card-chart');
     expect(chart).toHaveTextContent('Live counts');
+    const series = within(chart).getByRole('list', { name: /Live counts/ });
+    expect(within(series).getAllByRole('listitem')).toHaveLength(2);
     expect(chart).toHaveTextContent('Queued');
     expect(chart).toHaveTextContent('Running');
   });

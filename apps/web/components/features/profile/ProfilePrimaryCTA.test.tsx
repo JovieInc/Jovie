@@ -69,7 +69,7 @@ describe('ProfilePrimaryCTA', () => {
     );
 
     const listenCta = screen.getByRole('link', {
-      name: 'Open Listen page with music links',
+      name: 'Listen now — Open Listen page with music links',
     });
     expect(listenCta).toHaveAttribute('href', '/timwhite/listen');
     expect(listenCta).toHaveClass(

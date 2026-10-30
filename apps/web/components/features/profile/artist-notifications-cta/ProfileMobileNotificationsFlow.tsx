@@ -302,7 +302,7 @@ function LabeledInput({
 }>) {
   return (
     <label className='block space-y-2'>
-      <span className='text-app font-medium tracking-tight text-white/42'>
+      <span className='text-app font-medium tracking-tight text-white/60'>
         {label}
       </span>
       <input
@@ -781,7 +781,7 @@ export function ProfileMobileNotificationsFlow({
           <div className='space-y-6'>
             <div className='space-y-3'>
               <p
-                className='text-app font-semibold tracking-tight text-white/42'
+                className='text-app font-semibold tracking-tight text-white/60'
                 data-testid='profile-mobile-notifications-sent-from'
               >
                 Sent from Jovie
@@ -822,7 +822,7 @@ export function ProfileMobileNotificationsFlow({
               <>
                 <div className='h-px bg-white/8' />
                 <div className='space-y-3'>
-                  <p className='text-app font-semibold tracking-tight text-white/42'>
+                  <p className='text-app font-semibold tracking-tight text-white/60'>
                     Optional
                   </p>
 
@@ -835,7 +835,7 @@ export function ProfileMobileNotificationsFlow({
                         <p className='text-mid font-medium tracking-[-0.015em] text-white/88'>
                           Share My Email With {artistName}
                         </p>
-                        <p className='text-xs leading-4 text-white/42'>
+                        <p className='text-xs leading-4 text-white/60'>
                           They can see it, email you directly, and use it in
                           their own tools, including ads. Off unless you turn it
                           on. You can turn it off anytime.
