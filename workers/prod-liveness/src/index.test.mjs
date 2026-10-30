@@ -81,3 +81,53 @@ test('run pages every configured channel at once and reports undelivered pages',
   );
   assert.equal(none.channels, 0);
 });
+
+test('emails once per incident (down and recovery, not re-pages) and pages Summer with a signature', async () => {
+  const store = new Map();
+  const STATE = {
+    get: async k => store.get(k) ?? null,
+    put: async (k, v) => {
+      store.set(k, v);
+    },
+  };
+  const calls = [];
+  let up = false;
+  const f = async (u, init) => {
+    if (init?.method === 'POST') {
+      calls.push([u, init]);
+      return new Response('{}', { status: 200 });
+    }
+    return up
+      ? new Response('', { status: 200 })
+      : new Response('', {
+          status: 503,
+          headers: { 'x-vercel-error': 'DEPLOYMENT_PAUSED' },
+        });
+  };
+  const env = {
+    STATE,
+    TARGETS: 'https://jov.ie/',
+    FAILURES_TO_PAGE: '1',
+    SUMMER_PAGE_URL: 'https://summer.example/summer/v1/events/liveness',
+    SUMMER_LIVENESS_SECRET: 's',
+    RESEND_API_KEY: 'k',
+    EMAIL_TO: 'tim@jov.ie',
+  };
+  await run(env, 1_000, f);
+  const emails = () => calls.filter(c => c[0].includes('resend.com'));
+  assert.equal(emails().length, 1);
+  const summer = calls.find(c => c[0].includes('summer.example'));
+  assert.match(summer[1].headers['x-liveness-signature'], /^[0-9a-f]{64}$/);
+  assert.equal(JSON.parse(summer[1].body).incident, '1000');
+  await run(env, 40 * 60_000, f); // re-page: Summer again, no new email
+  assert.equal(emails().length, 1);
+  up = true;
+  await run(env, 41 * 60_000, f);
+  assert.equal(emails().length, 2);
+  assert.equal(
+    JSON.parse(
+      calls.filter(c => c[0].includes('summer.example')).at(-1)[1].body
+    ).incident,
+    '1000'
+  );
+});
