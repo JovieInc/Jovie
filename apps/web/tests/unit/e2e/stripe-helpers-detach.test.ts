@@ -1,5 +1,8 @@
 import type Stripe from 'stripe';
 import { describe, expect, it } from 'vitest';
+// Regression coverage for the JOV-8805 fix (#23853): the dogfood personas'
+// Stripe customers persist across runs while the database does not, so the
+// detox helper must drain every attached payment method each run.
 import { detachCustomerPaymentMethods } from '@/tests/e2e/helpers/stripe-helpers';
 
 /**
