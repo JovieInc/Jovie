@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Lead } from '@/lib/db/schema/leads';
 
 vi.mock('server-only', () => ({}));
 
@@ -80,6 +81,7 @@ import { routeLead } from '@/lib/leads/route-lead';
 
 const baseLead = {
   id: 'lead-1',
+  creatorProfileId: null,
   contactEmail: 'artist@gmail.com',
   bio: 'I make music',
   hasInstagram: true,
@@ -103,7 +105,7 @@ const freshTokenPair = {
   rotated: true,
 };
 
-function setupLead(overrides: Record<string, unknown> = {}) {
+function setupLead(overrides: Partial<Lead> = {}) {
   const lead = { ...baseLead, ...overrides };
 
   // Reset select chain — where() is called for both lead fetch and settings fetch
