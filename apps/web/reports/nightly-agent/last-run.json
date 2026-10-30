@@ -1,45 +1,45 @@
 {
-  "generatedAt": "2026-10-20T02:01:54.269Z",
+  "generatedAt": "2026-10-30T04:21:56.332Z",
   "repo": "jovie",
   "pass": true,
-  "workflowRunUrl": "https://github.com/JovieInc/Jovie/actions/runs/39354766579",
+  "workflowRunUrl": "https://github.com/JovieInc/Jovie/actions/runs/41000446233",
   "reportDocPath": "docs/NIGHTLY_TESTING_AGENT_REPORT.md",
   "suites": [
     {
       "lane": "unit",
-      "total": 9074,
-      "passed": 9059,
+      "total": 10070,
+      "passed": 10044,
+      "failed": 0,
+      "flaky": 0,
+      "skipped": 26,
+      "durationMs": 227081
+    },
+    {
+      "lane": "unit",
+      "total": 9978,
+      "passed": 9963,
       "failed": 0,
       "flaky": 0,
       "skipped": 15,
-      "durationMs": 211900
+      "durationMs": 199833
     },
     {
       "lane": "unit",
-      "total": 8280,
-      "passed": 8276,
+      "total": 10276,
+      "passed": 10273,
       "failed": 0,
       "flaky": 0,
-      "skipped": 4,
-      "durationMs": 104247
+      "skipped": 3,
+      "durationMs": 218602
     },
     {
       "lane": "unit",
-      "total": 9262,
-      "passed": 9251,
+      "total": 12156,
+      "passed": 12142,
       "failed": 0,
       "flaky": 0,
-      "skipped": 11,
-      "durationMs": 152814
-    },
-    {
-      "lane": "unit",
-      "total": 11023,
-      "passed": 10995,
-      "failed": 0,
-      "flaky": 0,
-      "skipped": 28,
-      "durationMs": 237462
+      "skipped": 14,
+      "durationMs": 147234
     }
   ],
   "failureCount": 0,
