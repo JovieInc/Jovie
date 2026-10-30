@@ -76,6 +76,9 @@ vi.mock('@/lib/ingestion/flows/full-extraction-flow', () => ({
     ],
   }),
 }));
+vi.mock('@/lib/leads/build-lead-catalog.server', () => ({
+  buildLeadProfileCatalog: async () => ({ status: 'skipped' }),
+}));
 vi.mock('@/lib/ingestion/flows/avatar-hosting', () => ({
   resolveHostedAvatarUrl: async () => 'https://blob.test/avatar.avif',
 }));
@@ -189,7 +192,11 @@ describe('outbound claim link, composed', () => {
       { params: Promise.resolve({ token: stored.claimToken as string }) }
     );
     const location = response.headers.get('location') ?? '';
-    expect(location).toContain(`/${profile.usernameNormalized}?claim=1`);
+    // The lead-built page is private until claimed, so the link starts the
+    // claim directly instead of previewing a page nobody may see.
+    expect(profile.isPublic).toBe(false);
+    expect(location).toContain(`/${profile.usernameNormalized}/claim?token=`);
+    expect(location).toContain('next=auth');
 
     // Interrupted auth: the signed cookie is all that survives; resume with it.
     const cookie = response.cookies.get(PENDING_CLAIM_COOKIE)?.value ?? '';
@@ -218,6 +225,28 @@ describe('outbound claim link, composed', () => {
       })
     );
     expect(claimed.profileId).toBe(profile.id);
+
+    // Claiming is the release: the page goes public with its owner.
+    const [afterClaim] = await db()
+      .select({ isPublic: creatorProfiles.isPublic })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, profile.id));
+    expect(afterClaim.isPublic).toBe(true);
+  });
+
+  it('a held lead-built profile cannot be published around the hold', async () => {
+    const lead = await insertLead('heldartist');
+    const result = await approveLead({ ...lead, linktreeHandle: 'heldartist' });
+    const profileId = result.ingestion?.profileId as string;
+    await db()
+      .update(creatorProfiles)
+      .set({ isPublic: true })
+      .where(eq(creatorProfiles.id, profileId));
+    const [row] = await db()
+      .select({ isPublic: creatorProfiles.isPublic })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, profileId));
+    expect(row.isPublic).toBe(false);
   });
 
   it('re-routing after the profile token changed re-syncs the profile to the lead token', async () => {
