@@ -86,20 +86,24 @@ export function SmartLinkArtistName({
   className,
 }: Readonly<SmartLinkArtistNameProps>) {
   const sharedClassName = cn('text-muted-foreground mt-1', className);
+  const linkClassName = cn(
+    sharedClassName,
+    'relative before:absolute before:inset-x-0 before:top-1/2 before:h-11 before:-translate-y-1/2'
+  );
 
   if (!handle) {
     return <p className={sharedClassName}>{name}</p>;
   }
 
   return (
-    <Link href={`/${handle}`} className={sharedClassName}>
+    <Link href={`/${handle}`} className={linkClassName}>
       {name}
     </Link>
   );
 }
 
 const FOOTER_LINK_CLASSES =
-  'inline-flex items-center text-2xs uppercase tracking-widest text-neutral-700 hover:text-neutral-950 dark:text-muted-foreground dark:hover:text-foreground/90';
+  'relative inline-flex items-center text-2xs uppercase tracking-widest text-neutral-700 before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-full before:min-w-11 before:-translate-x-1/2 before:-translate-y-1/2 hover:text-neutral-950 dark:text-muted-foreground dark:hover:text-foreground/90';
 
 /**
  * Abuse-report entry point for a smart link. The target must identify the
@@ -126,8 +130,11 @@ export function SmartLinkPoweredByFooter({
           <span>Powered by</span>
           <span className='font-semibold'>Jovie</span>
         </Link>
+        <span aria-hidden='true' className='text-2xs text-muted-foreground'>
+          ·
+        </span>
         <Link href={reportHref} className={FOOTER_LINK_CLASSES}>
-          <span aria-hidden='true'>{'· '}</span>Report
+          Report
         </Link>
       </div>
     </footer>
