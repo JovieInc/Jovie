@@ -1,14 +1,14 @@
 {
   "schema": "jovie.wins-metrics/v1",
-  "at": "2026-10-30T20:52:32.989Z",
-  "winsTotal": 25,
+  "at": "2026-10-30T22:37:43.671Z",
+  "winsTotal": 26,
   "winsVerified": 1,
-  "winsClaimed": 12,
+  "winsClaimed": 13,
   "winsUnverified": 3,
   "winsNotReproduced": 1,
   "winsPendingMerge": 4,
   "winsPendingMeasure": 4,
-  "winsLast7d": 25,
+  "winsLast7d": 26,
   "clusters": [
     {
       "theme": "release-reliability",
@@ -18,7 +18,7 @@
     },
     {
       "theme": "merge-throughput",
-      "total": 15,
+      "total": 16,
       "verified": 0,
       "ready": false
     },
@@ -152,6 +152,10 @@
     },
     {
       "id": "win-2026-10-30-eliminate-the-false-failing-publication-transport",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-30-coherent-grouped-codeql-releases-pass-the",
       "status": "claimed"
     }
   ]
