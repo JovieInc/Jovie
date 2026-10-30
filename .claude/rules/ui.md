@@ -344,6 +344,7 @@ absent.
 - Dedicated audience routes may use that language. The allowlist is `scripts/invariants/icp-language/config.json`.
 - The headline “Be found. Be understood.” is locked.
 - `scripts/invariants/icp-language/check.mjs` is a blocking PR Ready check. Existing hits are a shrink-only baseline. See MKT-D16 in `docs/marketing/DESIGN_INVARIANTS.md`.
+- In-app surfaces follow the same idea per creator type (JOV-9679): segment-specific advice, features and notifications live in the tagged registry `apps/web/lib/creator/segment-registry.ts`, and `scripts/invariants/segment-language/check.mjs` ratchets untagged music words in in-app string literals (shrink-only). Unknown segment gets neutral language.
 
 ### Quiet Surfaces: Hard Bans (founder, 2026-10-28)
 

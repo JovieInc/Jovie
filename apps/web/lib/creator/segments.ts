@@ -201,11 +201,24 @@ export function inferSegment(signals: SegmentSignals): SegmentInference {
     .filter(([segment, value]) => segment !== 'other' && value > 0)
     .sort((a, b) => b[1] - a[1]);
   const top = ranked[0];
-  if (!top) return NEUTRAL_RESULT;
+  // Music artists are the primary launch ICP. An `artist` creator_type with
+  // nothing pointing elsewhere is a musician, never neutral.
+  const artistDefault: SegmentInference = {
+    segment: 'musician',
+    confidence: SEGMENT_CONFIDENCE_THRESHOLD,
+    candidate: 'musician',
+    source: 'inferred',
+  };
+  if (!top) {
+    return signals.creatorType === 'artist' ? artistDefault : NEUTRAL_RESULT;
+  }
   const [segment, confidence] = top;
   const runnerUp = ranked[1];
   const margin = runnerUp ? confidence - runnerUp[1] : confidence;
   if (confidence < SEGMENT_CONFIDENCE_THRESHOLD || margin < 0.15) {
+    if (signals.creatorType === 'artist' && segment === 'musician') {
+      return artistDefault;
+    }
     return { ...NEUTRAL_RESULT, confidence, candidate: segment };
   }
   return { segment, confidence, candidate: segment, source: 'inferred' };
@@ -217,4 +230,28 @@ export function explicitSegmentFromSettings(
 ): Segment | null {
   const value = settings?.segment;
   return isSegment(value) ? value : null;
+}
+
+/** Profile fields the segment is derived from. */
+export interface SegmentProfileLike {
+  creatorType?: CreatorType | null;
+  settings?: Record<string, unknown> | null;
+  bio?: string | null;
+  spotifyId?: string | null;
+  spotifyUrl?: string | null;
+}
+
+/** Resolve the segment for a profile row. Shared by the chat page and API. */
+export function resolveProfileSegment(
+  profile: SegmentProfileLike,
+  extra: Pick<SegmentSignals, 'platforms' | 'hasMusicCatalog'> = {}
+): ResolvedSegment {
+  return inferSegment({
+    creatorType: profile.creatorType,
+    explicit: explicitSegmentFromSettings(profile.settings),
+    bio: profile.bio,
+    platforms: extra.platforms,
+    hasMusicCatalog:
+      extra.hasMusicCatalog ?? Boolean(profile.spotifyId || profile.spotifyUrl),
+  }).segment;
 }

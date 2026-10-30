@@ -2365,6 +2365,17 @@ describe('source-read guard selection', () => {
     expect(guard.command).not.toContain('--register');
   });
 
+  it('selects segment-language for shared parsing and ratchet changes', () => {
+    for (const path of [
+      'scripts/invariants/icp-language/match.mjs',
+      'scripts/invariants/icp-language/ratchet.mjs',
+    ]) {
+      for (const event of ['pull_request', 'merge_group', 'push']) {
+        expect(selected(event, [path])).toContain('segment-language');
+      }
+    }
+  });
+
   it('fails closed onto guards for manual, local, and unreadable diffs', () => {
     const all = SOURCE_GUARDS.map(guard => guard.id);
     // Manual dispatch runs web Unit Tests and structural, which carry the rest.
@@ -2378,6 +2389,7 @@ describe('source-read guard selection', () => {
       'synthetic-canary-liveness',
       'playbook-authoring',
       'icp-language',
+      'segment-language',
       'anti-slop',
       'external-api-guard',
       'domain-write-guard',
@@ -2396,6 +2408,7 @@ describe('source-read guard selection', () => {
       'synthetic-canary-liveness',
       'playbook-authoring',
       'icp-language',
+      'segment-language',
       'anti-slop',
       'external-api-guard',
       'domain-write-guard',
@@ -2432,15 +2445,16 @@ describe('source-read guard selection', () => {
         ).toContain("from 'node:test'");
         continue;
       }
-      if (guard.id === 'icp-language') {
+      if (['icp-language', 'segment-language'].includes(guard.id)) {
+        expect(guard.prOnly).toBe(false);
         expect(guard.command).toContain(
-          'node scripts/invariants/icp-language/check.mjs'
+          `node scripts/invariants/${guard.id}/check.mjs`
         );
         expect(
           readFileSync(
             join(
               REPO_ROOT,
-              'scripts/invariants/icp-language/icp-language.test.mjs'
+              `scripts/invariants/${guard.id}/${guard.id}.test.mjs`
             ),
             'utf8'
           )

@@ -100,6 +100,7 @@ export function JovieChat({
   homeCanvas,
   homeCanvasMode = 'empty-state',
   ambientOwnedByShell = false,
+  segment,
 }: JovieChatProps) {
   // TanStack Virtual returns fresh rows from a stable `virtualizer` object. React
   // Compiler caches reads keyed on that object; compiled, ChatThreadMessages froze
@@ -593,7 +594,11 @@ export function JovieChat({
       setEmptyNextStep({
         action: insightsUnavailable
           ? null
-          : resolveChatEmptyStateInsight(insightsSummary?.insights ?? []),
+          : resolveChatEmptyStateInsight(
+              insightsSummary?.insights ?? [],
+              Date.now(),
+              segment
+            ),
       });
     }
   }, [
@@ -604,6 +609,7 @@ export function JovieChat({
     insightsEnabled,
     insightsSummary,
     emptyNextStep,
+    segment,
   ]);
   useEffect(() => {
     if (!showEmptyGreeting || emptyNextStep) return;
@@ -618,7 +624,7 @@ export function JovieChat({
     insight => insight.id === selectedEmptyAction?.insightId
   );
   const activeEmptyAction = currentEmptyInsight
-    ? resolveChatEmptyStateInsight([currentEmptyInsight])
+    ? resolveChatEmptyStateInsight([currentEmptyInsight], Date.now(), segment)
     : null;
   const usableEmptyAction =
     activeEmptyAction?.prompt === selectedEmptyAction?.prompt

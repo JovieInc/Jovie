@@ -47,7 +47,7 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('- Color Theory (ep, 5 tracks; date not set)');
   });
 
-  it('marks upcoming vs released releases against today (helpfulness eval)', () => {
+  it('keeps release timing and the explicit segment in the same prompt', () => {
     const now = new Date('2026-10-28T15:00:00Z'); // a Wednesday
     const prompt = buildSystemPrompt(
       baseContext,
@@ -66,10 +66,16 @@ describe('buildSystemPrompt', () => {
           spotifyPopularity: 38,
         },
       ],
-      { aiCanUseTools: true, aiWeeklyMessageLimit: 10, now }
+      {
+        aiCanUseTools: true,
+        aiWeeklyMessageLimit: 10,
+        now,
+        segment: 'athlete',
+      }
     );
 
     expect(prompt).toContain('- **Today:** 2026-10-28 (Wednesday)');
+    expect(prompt).toContain('The creator is a athlete.');
     expect(prompt).toContain(
       '- Night Swim (single, 1 track; UPCOMING, out Friday 2026-10-30, in 2 days)'
     );

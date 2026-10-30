@@ -28,8 +28,12 @@ import {
   or,
 } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-
 import { getCachedAuth } from '@/lib/auth/cached';
+import {
+  explicitSegmentFromSettings,
+  inferSegment,
+  type ResolvedSegment,
+} from '@/lib/creator/segments';
 import { db } from '@/lib/db';
 import { chatConversations } from '@/lib/db/schema/chat';
 import { discogReleases } from '@/lib/db/schema/content';
@@ -74,6 +78,8 @@ export interface ProfileSuggestion {
 }
 
 export interface SuggestionsStarterContext {
+  /** Resolved creator segment (JOV-9679) for gating starter chips. */
+  segment: ResolvedSegment;
   latestReleaseTitle: string | null;
   pendingArtistMatches: number;
   pendingLinkSuggestions: number;
@@ -125,6 +131,7 @@ export async function GET(request: Request) {
         avatarLockedByUser: creatorProfiles.avatarLockedByUser,
         onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
         settings: creatorProfiles.settings,
+        creatorType: creatorProfiles.creatorType,
         username: creatorProfiles.username,
         displayName: creatorProfiles.displayName,
         spotifyUrl: creatorProfiles.spotifyUrl,
@@ -345,6 +352,11 @@ export async function GET(request: Request) {
     const conversationCountValue = conversationCountResult[0]?.value ?? 0;
 
     const starterContext: SuggestionsStarterContext = {
+      segment: inferSegment({
+        creatorType: profile.creatorType,
+        explicit: explicitSegmentFromSettings(profile.settings),
+        hasMusicCatalog: latestRelease.length > 0 || dspMatches.length > 0,
+      }).segment,
       latestReleaseTitle: latestRelease[0]?.title ?? null,
       pendingArtistMatches: dspMatches.length,
       pendingLinkSuggestions: socialSuggestions.length,

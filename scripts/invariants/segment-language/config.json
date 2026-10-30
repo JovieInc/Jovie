@@ -1,0 +1,29 @@
+{
+  "schema": "jovie.segment-language/v1",
+  "rule": "Tim White, 2026-10-28 (JOV-9679). Jovie never gives one creator type another type's advice, features or vocabulary. In-app string literals that use music-segment words must come from the tagged segment registry (apps/web/lib/creator/segment-registry.ts) or be in the shrink-only baseline.",
+  "roots": [
+    "apps/web/components/jovie",
+    "apps/web/components/features/dashboard",
+    "apps/web/app/app",
+    "apps/web/lib/chat",
+    "apps/web/lib/notifications",
+    "apps/web/lib/insights"
+  ],
+  "exemptPrefixes": ["apps/web/lib/creator/", "apps/web/lib/chat/voice-lint"],
+  "terms": [
+    "artist",
+    "musician",
+    "music",
+    "song",
+    "album",
+    "playlist",
+    "record label",
+    "release",
+    "spotify",
+    "dsp",
+    "streaming",
+    "dj",
+    "producer",
+    "label"
+  ]
+}

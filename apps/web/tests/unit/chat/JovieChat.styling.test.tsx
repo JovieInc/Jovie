@@ -704,54 +704,68 @@ describe('JovieChat styling regressions', () => {
     ).toBe(region);
   });
 
-  it('preserves the welcome and offers one action without promoting Insight prose to a win (JOV-7150)', () => {
-    mockChatState.hasMessages = false;
-    mockChatState.isLoading = false;
-    mockChatState.isSubmitting = false;
-    mockChatState.status = 'ready';
-    mockChatState.messages = [];
-    mockInsightsSummary.data = {
-      insights: [
-        {
-          id: 'release-insight',
-          status: 'active',
-          title: 'Streams are up 12% this week',
-          insightType: 'release_momentum',
-          category: 'content',
-          priority: 'high',
-          description: '',
-          actionSuggestion: 'Streams are up 320% today.',
-          confidence: '0.90',
-          createdAt: new Date().toISOString(),
-          periodStart: new Date().toISOString(),
-          periodEnd: new Date().toISOString(),
-          expiresAt: new Date(Date.now() + 60_000).toISOString(),
-        },
-      ],
-    };
+  it.each(['musician', 'athlete'] as const)(
+    'preserves the welcome and offers an action for the %s segment without promoting Insight prose to a win',
+    segment => {
+      mockChatState.hasMessages = false;
+      mockChatState.isLoading = false;
+      mockChatState.isSubmitting = false;
+      mockChatState.status = 'ready';
+      mockChatState.messages = [];
+      mockInsightsSummary.data = {
+        insights: [
+          {
+            id: 'release-insight',
+            status: 'active',
+            title: 'Streams are up 12% this week',
+            insightType: 'release_momentum',
+            category: 'content',
+            priority: 'high',
+            description: '',
+            actionSuggestion: 'Streams are up 320% today.',
+            confidence: '0.90',
+            createdAt: new Date().toISOString(),
+            periodStart: new Date().toISOString(),
+            periodEnd: new Date().toISOString(),
+            expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          },
+        ],
+      };
 
-    const { container } = renderWithQueryClient(
-      <JovieChat profileId='profile-1' displayName='Tim White' />
-    );
+      const { container } = renderWithQueryClient(
+        <JovieChat
+          profileId='profile-1'
+          displayName='Tim White'
+          segment={segment}
+        />
+      );
 
-    const insight = container.querySelector(
-      '[data-testid="chat-empty-state-greeting-text"]'
-    );
-    expect(insight?.textContent).toMatch(
-      /^Good (morning|afternoon|evening), Tim\.$/
-    );
-    expect(container.textContent).toContain('Draft a release update');
-    expect(container.textContent).not.toMatch(/12%|320%/);
-    expect(
-      container.querySelectorAll('[data-testid="chat-empty-state-next-step"]')
-    ).toHaveLength(1);
-    expect(
-      container.querySelector('[data-insight-id="release-insight"]')
-    ).toBeTruthy();
-    expect(
-      container.querySelector('[data-testid="chat-empty-state-insight"]')
-    ).toBeNull();
-  });
+      const insight = container.querySelector(
+        '[data-testid="chat-empty-state-greeting-text"]'
+      );
+      expect(insight?.textContent).toMatch(
+        /^Good (morning|afternoon|evening), Tim\.$/
+      );
+      expect(container.textContent).toContain(
+        segment === 'musician'
+          ? 'Draft a release update'
+          : 'Review Your Profile'
+      );
+      if (segment === 'athlete') {
+        expect(container.textContent).not.toContain('Draft a release update');
+      }
+      expect(container.textContent).not.toMatch(/12%|320%/);
+      expect(
+        container.querySelectorAll('[data-testid="chat-empty-state-next-step"]')
+      ).toHaveLength(1);
+      expect(
+        container.querySelector('[data-insight-id="release-insight"]') !== null
+      ).toBe(segment === 'musician');
+      expect(
+        container.querySelector('[data-testid="chat-empty-state-insight"]')
+      ).toBeNull();
+    }
+  );
 
   it('renders a supplied Home canvas as the empty-state affordance', () => {
     mockChatState.hasMessages = false;

@@ -329,6 +329,17 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
+    // Tim 2026-10-28 (JOV-9679): never give one creator type another type's
+    // advice, features or vocabulary. Segment words in in-app copy come from
+    // the tagged registry; the recorded violation set only shrinks.
+    id: 'segment-language',
+    command:
+      'node scripts/invariants/segment-language/check.mjs && node --test --test-isolation=none scripts/invariants/segment-language/segment-language.test.mjs',
+    inputs:
+      /^(?:apps\/web\/(?:components\/(?:jovie|features\/dashboard)\/|app\/app\/|lib\/(?:chat|notifications|insights|creator)\/)|scripts\/invariants\/(?:segment-language\/|icp-language\/(?:match|ratchet)\.mjs$)|scripts\/ci-fast-lanes\.mjs$)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     // Anti-slop registry (docs/design-system/anti-slop-rules.json): schema,
     // evidence and wiring of every enforced rule, and prose copies of the
     // anti-slop list that drifted from the registry (Tim, 2026-10-26).
