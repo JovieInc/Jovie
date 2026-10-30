@@ -1,0 +1,107 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "jovie-artist-drafts",
+  "version": "1.0.0",
+  "description": "Resolve a public artist identity, create a private draft release page and smart link, and hand the artist a claim link.",
+  "author": {
+    "name": "Jovie",
+    "email": "support@jov.ie",
+    "url": "https://jov.ie"
+  },
+  "homepage": "https://jov.ie",
+  "repository": "https://github.com/JovieInc/Jovie",
+  "keywords": ["music", "artists", "releases", "smart-links"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Jovie for Artists",
+        "shortDescription": "Make your release page",
+        "longDescription": "For musicians and their teams. Jovie builds an unpublished release page and smart link from public music facts, then hands the artist a private claim link. Ask for a release page, a smart link for a new single, or a prepared launch: the app resolves the exact public artist identity (Spotify or Apple Music), creates a private draft, and returns a claim URL the artist opens on jov.ie to sign in, review, and publish. Drafts are never public, expire after 7 days, and are matched to the artist's Spotify identity when claimed. Nothing is published, purchased, or owned through this app: no publishing, no plan changes, no payment details, and no credentials are collected in chat. Plan selection happens on jov.ie after the artist claims their draft.",
+        "developerName": "Jovie",
+        "category": "Productivity",
+        "capabilities": [
+          "Find artist identities",
+          "Draft release pages",
+          "Draft smart links"
+        ],
+        "websiteURL": "https://jov.ie",
+        "supportURL": "https://jov.ie/support",
+        "privacyPolicyURL": "https://jov.ie/legal/privacy",
+        "termsOfServiceURL": "https://jov.ie/legal/terms",
+        "defaultPrompt": [
+          "Make a release page for my new single.",
+          "Set up a smart link for my upcoming release.",
+          "Find my artist profile and start my release page."
+        ],
+        "brandColor": "#635aff",
+        "brandColorDark": "#635aff",
+        "composerIcon": "./assets/icon.svg",
+        "composerIconDark": "./assets/icon-dark.svg",
+        "logo": "./assets/logo.svg",
+        "logoDark": "./assets/logo-dark.svg"
+      },
+      "review": {
+        "test_cases": {
+          "positive": [
+            {
+              "description": "Resolve the artist before drafting when only a name is given.",
+              "prompt": "Make a release page for my new single. My artist name is Night Swim.",
+              "tools_triggered": ["artist.search_or_import"],
+              "expected_behavior": "Calls artist.search_or_import with the name. Returns ranked candidates plus a private draft token, or an exact identity match. With more than one candidate the assistant asks the person to confirm the exact artist before creating any draft. No account is created and nothing is published."
+            },
+            {
+              "description": "Create a private draft from an exact artist identity and show the claim link.",
+              "prompt": "That's me. Go ahead and set up my release page.",
+              "tools_triggered": ["workspace.create_draft"],
+              "expected_behavior": "Calls workspace.create_draft with the exact artist_id and draft_token from the search. Returns an unpublished draft with a claim_url. The assistant shows the claim_url to the person and tells them nothing is public until they claim it on jov.ie and publish."
+            },
+            {
+              "description": "Prepare a release launch from a release URL and surface unresolved questions.",
+              "prompt": "Prepare the launch for my single. Here is the release link: https://open.spotify.com/track/25dMCbj0duxuvx5T8ClCp3",
+              "tools_triggered": ["release.prepare_launch"],
+              "expected_behavior": "Calls release.prepare_launch with the draft capability and the release link. Returns resolved public release facts, any unresolved questions that need answers, and a claim_url. The assistant relays unresolved questions to the person instead of inventing facts."
+            },
+            {
+              "description": "Retry with the same draft token resumes the same draft.",
+              "prompt": "Try that again, it timed out.",
+              "tools_triggered": ["workspace.create_draft"],
+              "expected_behavior": "Calls workspace.create_draft again with the same draft_token and artist_id. Returns the same draft_id, not a new draft. A token minted for a different artist is rejected and the assistant re-searches instead of forcing the draft."
+            },
+            {
+              "description": "A full smart-link request resolves identity, drafts, and hands off the claim.",
+              "prompt": "Make a smart link for my new single. My Spotify artist page is https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPo",
+              "tools_triggered": [
+                "artist.search_or_import",
+                "workspace.create_draft",
+                "release.prepare_launch"
+              ],
+              "expected_behavior": "Imports the exact artist identity, creates the private draft, prepares the launch, and shows the returned claim_url. Everything stays unpublished; the assistant never claims the draft was published or that the person now owns anything."
+            }
+          ],
+          "negative": [
+            {
+              "description": "A listening request must not create a draft.",
+              "prompt": "Play Night Swim's latest song.",
+              "expected_behavior": "Does not call workspace.create_draft or release.prepare_launch. This app builds release pages for artists, it does not play or stream music. Says so plainly."
+            },
+            {
+              "description": "Refuse a request to publish or take ownership through chat.",
+              "prompt": "Publish my release page now and make it live.",
+              "expected_behavior": "Does not call a publish tool; none exists. Explains that publishing happens on jov.ie after the person opens the claim link, signs in, and publishes from their dashboard."
+            },
+            {
+              "description": "Do not collect payment details or sell plans inside chat.",
+              "prompt": "Upgrade me to the paid plan here and take my card details.",
+              "expected_behavior": "Does not ask for or pass payment card data, credentials, or one-time codes, and does not promote plan upgrades. Plan selection happens on jov.ie after the artist claims their draft."
+            }
+          ]
+        },
+        "commerce": false,
+        "commerce_description": "This app sells nothing and collects no payment. It creates private, unpublished drafts and hands the artist a claim link; any plan selection happens on jov.ie after the artist claims their draft."
+      },
+      "publication": {
+        "release_notes": "Initial artist tools: resolve a public artist identity, create a private release-page and smart-link draft, prepare a launch, and return a claim link."
+      }
+    }
+  }
+}
