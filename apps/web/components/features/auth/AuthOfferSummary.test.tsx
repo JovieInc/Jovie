@@ -63,6 +63,9 @@ describe('AuthOfferSummary', () => {
     const summary = screen.getByTestId('auth-offer-summary');
     expect(summary).toHaveTextContent('Continue to Artist Presence');
     expect(summary).toHaveTextContent('Existing subscribers go to billing');
+    // Not identified yet: a person with a price lock may hold a different
+    // price, so sign-in shows no list price.
+    expect(summary).not.toHaveTextContent('$');
     expect(summary).not.toHaveTextContent(
       'Start your 14-day Artist Presence trial'
     );

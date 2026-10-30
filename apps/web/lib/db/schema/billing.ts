@@ -2,10 +2,12 @@ import { sql as drizzleSql } from 'drizzle-orm';
 import {
   check,
   index,
+  integer,
   jsonb,
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
@@ -80,6 +82,45 @@ export const billingAuditLog = pgTable(
   })
 );
 
+/**
+ * Price lock (Tim, 2026-10-29): the price a person signed up at, recorded once
+ * and honored on every surface and in checkout. One lock per user, written at
+ * provisioning (signup), at waitlist join, or on first need. Amounts and
+ * Stripe price ids are snapshots, so a later list-price change or a retired
+ * price cannot change what this person pays. Rows are only ever updated to
+ * record a reconcile verdict.
+ */
+export const priceLocks = pgTable(
+  'price_locks',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    plan: text('plan').notNull(),
+    priceVersionId: text('price_version_id').notNull(),
+    currency: text('currency').notNull().default('usd'),
+    monthlyAmountCents: integer('monthly_amount_cents'),
+    yearlyAmountCents: integer('yearly_amount_cents'),
+    stripePriceIdMonthly: text('stripe_price_id_monthly'),
+    stripePriceIdYearly: text('stripe_price_id_yearly'),
+    // signup | waitlist | checkout | first_view | backfill_subscription
+    source: text('source').notNull(),
+    lockedAt: timestamp('locked_at').defaultNow().notNull(),
+    reconcileStatus: text('reconcile_status'),
+    reconciledAt: timestamp('reconciled_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    amountsPositive: check(
+      'price_locks_amounts_check',
+      drizzleSql`(${table.monthlyAmountCents} IS NOT NULL OR ${table.yearlyAmountCents} IS NOT NULL) AND (${table.monthlyAmountCents} IS NULL OR ${table.monthlyAmountCents} > 0) AND (${table.yearlyAmountCents} IS NULL OR ${table.yearlyAmountCents} > 0)`
+    ),
+    userUnique: uniqueIndex('price_locks_user_id_unique').on(table.userId),
+    versionIdx: index('price_locks_price_version_idx').on(table.priceVersionId),
+  })
+);
+
 // Schema validations
 export const insertStripeWebhookEventSchema =
   createInsertSchema(stripeWebhookEvents);
@@ -92,6 +133,9 @@ export const selectBillingAuditLogSchema = createSelectSchema(billingAuditLog);
 // Types
 export type StripeWebhookEvent = typeof stripeWebhookEvents.$inferSelect;
 export type NewStripeWebhookEvent = typeof stripeWebhookEvents.$inferInsert;
+
+export type PriceLockRow = typeof priceLocks.$inferSelect;
+export type NewPriceLockRow = typeof priceLocks.$inferInsert;
 
 export type BillingAuditLog = typeof billingAuditLog.$inferSelect;
 export type NewBillingAuditLog = typeof billingAuditLog.$inferInsert;

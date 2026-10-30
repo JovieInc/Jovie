@@ -1,13 +1,16 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/features/waitlist/WaitlistOutcomeView.test.tsx
+
 import { Button } from '@jovie/ui';
 import { ArrowRight, CheckCircle2, Clock3, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
+import { PriceLockNote } from '@/components/organisms/billing/PriceLockNote';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
-import { PLAN_PRICES } from '@/lib/config/plan-prices';
-import { useCheckoutMutation } from '@/lib/queries';
+import { lockedMonthlyLabel } from '@/lib/billing/price-lock-view';
+import { useCheckoutMutation, usePriceLockQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import type { WaitlistAccessOutcome } from '@/lib/waitlist/access-request';
 
@@ -176,6 +179,9 @@ export const WAITLIST_START_PRO_TEST_ID = 'waitlist-start-pro-checkout';
  */
 function StartProCheckoutButton({ priceId }: { readonly priceId: string }) {
   const checkout = useCheckoutMutation();
+  // The person's own (locked) price; no price shown until it has loaded.
+  const priceLock = usePriceLockQuery();
+  const lockedPrice = lockedMonthlyLabel(priceLock.data ?? null);
 
   return (
     <div className='flex flex-col gap-2'>
@@ -202,8 +208,14 @@ function StartProCheckoutButton({ priceId }: { readonly priceId: string }) {
       >
         {checkout.isPending
           ? 'Opening Checkout...'
-          : `Start Pro ($${PLAN_PRICES.pro.monthly})`}
+          : lockedPrice
+            ? `Start Pro (${lockedPrice})`
+            : 'Start Pro'}
       </Button>
+      <PriceLockNote
+        lock={priceLock.data}
+        className='text-xs leading-5 text-white/62'
+      />
       {checkout.isError ? (
         <p className='text-sm text-error' role='alert'>
           {"Checkout didn't open. Try again in a moment."}

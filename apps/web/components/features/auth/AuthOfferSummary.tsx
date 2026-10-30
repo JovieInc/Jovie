@@ -46,9 +46,17 @@ function getOfferHeading(
   return 'Claim your free profile';
 }
 
-function getOfferPriceLine(plan: PublicOfferPlan, interval: BillingInterval) {
+function getOfferPriceLine(
+  mode: AuthOfferSummaryMode,
+  plan: PublicOfferPlan,
+  interval: BillingInterval
+) {
   if (plan === 'free') return '$0';
   if (!isSelfServiceOffer(plan, interval)) return getPlanCtaLabel(plan);
+  // price-lock-allow: pre-auth sign-up recap. A new signup is locked to
+  // exactly this list price. Sign-in shows no price: the person is not
+  // identified yet and may hold a different locked price.
+  if (mode === 'sign-in') return null;
   return `${formatUsdAmount(PLAN_PRICES.pro.monthly)}/mo`;
 }
 
@@ -88,6 +96,7 @@ export function AuthOfferSummary({
     readAuthOfferIntervalFromParams(searchParams) ??
     storedOffer?.interval ??
     'month';
+  const priceLine = getOfferPriceLine(mode, publicPlan, interval);
   const note =
     mode === 'sign-in' && publicPlan !== 'free'
       ? 'Existing subscribers go to billing — not a new trial.'
@@ -104,9 +113,11 @@ export function AuthOfferSummary({
       <p className='text-lg font-medium leading-tight tracking-tight text-primary-token'>
         {getOfferHeading(mode, publicPlan)}
       </p>
-      <p className='mt-1 text-app leading-5 text-secondary-token'>
-        {getOfferPriceLine(publicPlan, interval)}
-      </p>
+      {priceLine ? (
+        <p className='mt-1 text-app leading-5 text-secondary-token'>
+          {priceLine}
+        </p>
+      ) : null}
       <p className='mt-2 text-xs leading-5 text-tertiary-token'>{note}</p>
     </aside>
   );

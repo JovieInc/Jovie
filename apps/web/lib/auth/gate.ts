@@ -6,6 +6,7 @@ import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
 import { cache } from 'react';
 import { getRequestSession } from '@/lib/auth/request-session';
+import { ensurePriceLockForUserSafely } from '@/lib/billing/price-lock.server';
 import { isProofBlockingPublication } from '@/lib/claim/claim-verification';
 import { db } from '@/lib/db';
 import {
@@ -296,7 +297,11 @@ async function upsertUser(
       })
       .returning({ id: users.id });
 
-    if (createdUser?.id) return createdUser.id;
+    if (createdUser?.id) {
+      // Price lock: the price they sign up at is recorded now (idempotent).
+      await ensurePriceLockForUserSafely(createdUser.id, 'signup');
+      return createdUser.id;
+    }
   } catch (insertError) {
     const adoptedId = await tryAdoptExistingUser(
       insertError,

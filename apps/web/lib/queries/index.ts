@@ -465,6 +465,7 @@ export {
   usePressPhotosQuery,
   usePressPhotoUploadMutation,
 } from './usePressPhotoMutation';
+export { fetchPriceLock, usePriceLockQuery } from './usePriceLockQuery';
 export {
   type PricingOption,
   type PricingOptionsResponse,

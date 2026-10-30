@@ -14,6 +14,7 @@
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { runPriceLockReconcile } from '@/lib/billing/price-lock-reconcile.server';
 import {
   BATCH_SIZE,
   fetchUserBatch,
@@ -101,6 +102,7 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
     await reconcileUsersWithSubscriptions(stats, errors);
     await reconcileProUsersWithoutSubscription(stats, errors);
     await checkStaleCustomers(stats);
+    await reconcilePriceLocksSafely(errors);
 
     const duration = Date.now() - startTime;
     result = {
@@ -149,6 +151,30 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
       errorCount: errors.length,
       webhookReplay,
       failure,
+    });
+  }
+}
+
+/**
+ * Price lock reconcile (Tim, 2026-10-29): Stripe subscriptions against the
+ * prices people locked, alarming Summer on mismatch. Isolated so a failure
+ * here never masks the rest of the daily billing reconciliation.
+ */
+async function reconcilePriceLocksSafely(errors: string[]): Promise<void> {
+  try {
+    const result = await runPriceLockReconcile({
+      listSubscriptions: () =>
+        stripe.subscriptions.list({ status: 'all', limit: 100 }),
+    });
+    logger.info('[billing-reconciliation] Price lock reconcile', {
+      checked: result.summary.checked,
+      counts: result.summary.counts,
+      backfilled: result.backfill.created,
+    });
+  } catch (error) {
+    errors.push('Price lock reconcile failed');
+    await captureCriticalError('Price lock reconcile failed', error, {
+      job: 'price-lock-reconcile',
     });
   }
 }

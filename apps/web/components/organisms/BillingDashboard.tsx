@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/BillingDashboard.test.tsx
+
 import { QueryClientContext, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle } from 'lucide-react';
 import {
@@ -27,6 +29,7 @@ import { BillingHistorySection } from './billing/BillingHistorySection';
 import { BillingLoadingSkeleton } from './billing/BillingLoadingSkeleton';
 import { CurrentPlanCard } from './billing/CurrentPlanCard';
 import { PlanComparisonSection } from './billing/PlanComparisonSection';
+import { PriceLockNote } from './billing/PriceLockNote';
 
 const BillingDashboardContent = memo(function BillingDashboardContent() {
   const { error: notifyError, success: notifySuccess } = useNotifications();
@@ -132,6 +135,8 @@ const BillingDashboardContent = memo(function BillingDashboardContent() {
       )}
 
       <BillingHeader plan={currentPlan} />
+
+      <PriceLockNote lock={pricingQuery.data?.priceLock} />
 
       {billingInfo && (
         <CurrentPlanCard

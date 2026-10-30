@@ -4,6 +4,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/queries', () => ({
+  usePriceLockQuery: () => ({ data: null }),
   useCheckoutMutation: () => ({
     mutate: vi.fn(),
     isPending: false,

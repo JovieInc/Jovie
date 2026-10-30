@@ -79,7 +79,6 @@ import { UserButton } from '@/components/organisms/user-button/UserButton';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe, useUserSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
-import { FALLBACK_VERIFIED_PRICE_LABEL } from '@/lib/billing/verified-upgrade';
 import {
   useBillingStatusQuery,
   useChatUsageQuery,
@@ -111,7 +110,9 @@ const mockUsePathname = vi.mocked(usePathname);
 const mockUseDesktopUpdateContext = vi.mocked(useDesktopUpdateContext);
 
 const originalLocation = window.location;
-const UPGRADE_CTA = `Get Verified — ${FALLBACK_VERIFIED_PRICE_LABEL}`;
+// No list-price fallback: the CTA carries no price until the person's own
+// (possibly locked) price has loaded.
+const UPGRADE_CTA = 'Get Verified';
 
 describe('UserButton billing actions', () => {
   let fetchMock: Mock;

@@ -3,6 +3,7 @@ import 'server-only';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { readCachedAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
+import { ensurePriceLockForUserSafely } from '@/lib/billing/price-lock.server';
 import {
   buildProductionWaitlistCanaryMarker,
   hasProductionWaitlistCanaryNamespace,
@@ -767,6 +768,12 @@ export async function submitWaitlistAccessRequest(
     notifySlackWaitlist(input.fullName, normalizedEmail).catch(error => {
       logger.warn('[waitlist] Slack notification failed', error);
     });
+  }
+
+  // Price lock: joining the waitlist locks the price they are shown (a no-op
+  // when sign-up already locked it). Never fails the join.
+  if (input.appUserId && !suppressCanaryCommunications) {
+    await ensurePriceLockForUserSafely(input.appUserId, 'waitlist');
   }
 
   if (!suppressCanaryCommunications) {

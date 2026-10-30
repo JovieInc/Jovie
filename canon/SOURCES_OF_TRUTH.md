@@ -11,6 +11,7 @@ Machine-readable map: [`sources-of-truth.json`](./sources-of-truth.json). Rule f
 | Models and prices per access path | file | `ops/registry/capacity.json` | `canon/CAPACITY.md`<br>`scripts/backlog-orchestrator/config/model-registry.json`<br>`canon/virtual-models.json`<br>`apps/web/lib/constants/ai-models.ts` | provider model lists (checked by the model-registry-sync worker, not here) |
 | Plans, prices, offers | file | `apps/web/lib/config/plan-prices.ts` | `apps/web/lib/billing/offer-truth.ts`<br>`apps/web/lib/config/pricing.ts`<br>`apps/web/data/marketingPricingPlans.ts`<br>`apps/web/lib/entitlements/registry.ts`<br>`apps/web/app/api/stripe/pricing-options/route.ts`<br>`apps/docs/app/docs/plans-pricing/page.mdx`<br>`apps/web/content/legal/terms.md` | Stripe prices |
 | Stripe price ids | external | Stripe (mirror: `apps/web/lib/stripe/price-ids.ts`) | `apps/web/lib/stripe/price-contract.ts`<br>`apps/web/lib/stripe/price-id-mapping.ts`<br>`apps/web/scripts/check-stripe-price-ids.mjs` | Stripe prices |
+| A person's price (price lock) | file | `apps/web/lib/billing/price-versions.ts` | `apps/web/lib/billing/price-lock-checkout.ts`<br>`apps/web/lib/billing/price-lock-view.ts`<br>`apps/web/lib/billing/price-lock.server.ts`<br>`apps/web/app/api/billing/price-lock/route.ts`<br>`apps/web/lib/queries/usePricingOptionsQuery.ts` | Stripe subscriptions (daily price lock reconcile) |
 | Entitlements and plan limits | file | `apps/web/lib/entitlements/registry.ts` | `apps/web/lib/entitlements/server.ts`<br>`apps/web/lib/rate-limit/config.ts`<br>`apps/web/data/marketingPricingPlans.ts` | - |
 | Feature flags | file | `apps/web/lib/flags/registry.ts` | `apps/web/lib/flags/code-flags.ts`<br>`apps/web/lib/db/schema/feature-flags.ts` | - |
 | Rate limits and API budgets | file | `apps/web/lib/rate-limit/config.ts` (moves to #23531) | `apps/web/lib/auth/rate-limit-rules.ts`<br>`packages/api-client/providers.json` | - |
@@ -33,6 +34,7 @@ Machine-readable map: [`sources-of-truth.json`](./sources-of-truth.json). Rule f
 - **Models and prices per access path.** Model ids, access paths (subscription, gateway, API) and per-path price. The model-registry-sync worker (branch opus/model-registry-sync) adds scripts/model-id-guard.mjs and its ratchet; this map does not duplicate that guard.
 - **Plans, prices, offers.** ARTIST_VISIBILITY_OFFER and PLAN_PRICES. Stripe is the live authority for what is charged.
 - **Stripe price ids.** Stripe holds the price objects; price-ids.ts is the only reader of price env vars.
+- **A person's price (price lock).** Price versions name each list price; the price_locks table holds the snapshot each person signed up at. A person's price is resolveLockedPrice(lock), never the list price.
 - **Entitlements and plan limits.** Plan features and numeric limits per plan; server gates, usePlanGate, pricing page and rate limits derive from it.
 - **Feature flags.** Flag keys and defaults. Runtime overrides live in the feature-flags table and Statsig.
 - **Rate limits and API budgets.** Web request limits today. PR #23531 adds the outbound API rate-limit registry and headroom file; when it lands, point this owner at it.

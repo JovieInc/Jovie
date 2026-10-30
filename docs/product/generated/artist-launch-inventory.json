@@ -1921,6 +1921,14 @@
       "classification": "A"
     },
     {
+      "source": "apps/web/app/api/billing/price-lock/route.ts",
+      "kind": "handler",
+      "route": "/api/billing/price-lock",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/billing/status/route.ts",
       "kind": "handler",
       "route": "/api/billing/status",
