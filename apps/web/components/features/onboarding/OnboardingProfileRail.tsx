@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import { useEffect, useRef } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ProfileIdentityHeader } from '@/features/profile/ProfileIdentityHeader';
 import { ProfilePreviewBento } from '@/features/profile/ProfilePreviewBento';
@@ -341,6 +342,31 @@ export function OnboardingProfileRail({
 }) {
   const artist = resolvePreviewArtist(state);
   const isInline = placement === 'inline';
+  const railRef = useRef<HTMLElement>(null);
+
+  // JOV-8844 keyboard reachability, component-owned (JOV-7973): the side rail
+  // is a focusable scroll region, so Home/End must scroll it themselves rather
+  // than relying on the browser's default keyboard scrolling, which the live
+  // chat's focus/keyboard layers can shadow mid-journey — the golden-path
+  // reachability check intermittently found the rail still resting at its
+  // bottom edge after Home, clipping the preview badge at the scrollport top.
+  // Attached imperatively: this is scroll-region behavior, not element
+  // interactivity, so it stays out of the JSX a11y handler surface.
+  const hasArtist = artist !== null;
+  useEffect(() => {
+    const rail = railRef.current;
+    if (isInline || !rail) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Home' && event.key !== 'End') return;
+      event.preventDefault();
+      rail.scrollTo({
+        top: event.key === 'Home' ? 0 : rail.scrollHeight - rail.clientHeight,
+        behavior: 'auto',
+      });
+    };
+    rail.addEventListener('keydown', onKeyDown);
+    return () => rail.removeEventListener('keydown', onKeyDown);
+  }, [isInline, hasArtist]);
 
   if (!artist) return null;
 
@@ -369,6 +395,7 @@ export function OnboardingProfileRail({
 
   return (
     <aside
+      ref={railRef}
       aria-label='Profile Preview'
       tabIndex={isInline ? undefined : 0}
       className={cn(

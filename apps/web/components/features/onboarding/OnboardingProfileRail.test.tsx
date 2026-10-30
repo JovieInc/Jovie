@@ -252,3 +252,66 @@ describe('resolvePreviewArtist', () => {
     ).toEqual({ id: 'handle-djnova', name: 'djnova', url: '' });
   });
 });
+
+// JOV-7973: the side rail is a focusable scroll region, so it must own its
+// Home/End keyboard scrolling (JOV-8844 reachability) instead of relying on
+// the browser default, which the live chat's focus/keyboard layers can shadow
+// mid-journey — leaving the rail at its bottom edge with the preview badge
+// clipped at the scrollport top (golden-path toBeInViewport ratio 0.8125).
+describe('OnboardingProfileRail keyboard scrolling (JOV-7973)', () => {
+  it('scrolls itself to the top edge on Home', async () => {
+    const user = userEvent.setup();
+    render(<OnboardingProfileRail placement='side' state={CONFIRMED_STATE} />);
+    const rail = screen.getByTestId('onboarding-profile-rail');
+    const scrollTo = vi.fn();
+    Object.defineProperty(rail, 'scrollTo', {
+      configurable: true,
+      value: scrollTo,
+    });
+
+    await user.type(rail, '{Home}');
+    expect(scrollTo).toHaveBeenLastCalledWith({
+      top: 0,
+      behavior: 'auto',
+    });
+  });
+
+  it('scrolls itself to the bottom edge on End', async () => {
+    const user = userEvent.setup();
+    render(<OnboardingProfileRail placement='side' state={CONFIRMED_STATE} />);
+    const rail = screen.getByTestId('onboarding-profile-rail');
+    const scrollTo = vi.fn();
+    Object.defineProperty(rail, 'scrollTo', {
+      configurable: true,
+      value: scrollTo,
+    });
+    Object.defineProperty(rail, 'scrollHeight', {
+      configurable: true,
+      value: 754,
+    });
+    Object.defineProperty(rail, 'clientHeight', {
+      configurable: true,
+      value: 720,
+    });
+
+    await user.type(rail, '{End}');
+    expect(scrollTo).toHaveBeenLastCalledWith({
+      top: 34,
+      behavior: 'auto',
+    });
+  });
+
+  it('lets every other key scroll natively (no preventDefault)', async () => {
+    const user = userEvent.setup();
+    render(<OnboardingProfileRail placement='side' state={CONFIRMED_STATE} />);
+    const rail = screen.getByTestId('onboarding-profile-rail');
+    const scrollTo = vi.fn();
+    Object.defineProperty(rail, 'scrollTo', {
+      configurable: true,
+      value: scrollTo,
+    });
+
+    await user.type(rail, '{ArrowDown}');
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+});
