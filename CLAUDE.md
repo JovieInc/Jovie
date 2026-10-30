@@ -49,7 +49,7 @@ The Mac staging app is retired; use early-access opt-in in the regular app.
 
 Read the relevant rule before editing its area. Do not preload docs, skills,
 provider guides, or search results. Start with `rg`; read bounded sections and
-expand only for concrete uncertainty. One canonical copy per instruction.
+expand only for uncertainty. One canonical copy per instruction.
 Context guidance: [agent context](docs/agent-context/README.md).
 
 | Task | Read |
