@@ -197,6 +197,14 @@ export const LANES_SELFTEST_CHANGED_TESTS_SCRIPT = [
 
 export const SOURCE_GUARDS = Object.freeze([
   Object.freeze({
+    id: 'native-design-system',
+    command:
+      'node apps/ios/scripts/native-design-system.mjs && node --test --experimental-test-coverage --test-coverage-include=apps/ios/scripts/native-design-system.mjs --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=95 apps/ios/scripts/native-design-system.test.mjs && node scripts/invariants/native-spacing-scale.mjs',
+    inputs:
+      /^(?:apps\/ios\/|apps\/web\/design\/ziawi-color-sot\.json$|apps\/web\/styles\/design-system\.css$|scripts\/invariants\/native-spacing-scale)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     id: 'artist-launch-contract',
     command:
       'node scripts/artist-launch-contract.mjs --check && node --test --test-isolation=none scripts/artist-launch-contract.test.mjs',
@@ -2480,6 +2488,9 @@ function runIosFast() {
     'Gemfile',
     'Gemfile.lock',
     'scripts/ios-best-practices-lint.sh',
+    'apps/web/design/ziawi-color-sot.json',
+    'apps/web/styles/design-system.css',
+    'scripts/invariants/native-spacing-scale*',
     '.github/workflows/ios-ci.yml',
     '.github/workflows/ios-testflight.yml',
   ]);
@@ -2490,7 +2501,9 @@ function runIosFast() {
       skipped: true,
     };
   }
-  return shell('pnpm run ios:lint && pnpm run ios:app-store:test');
+  return shell(
+    'node apps/ios/scripts/native-design-system.mjs && pnpm run ios:lint && pnpm run ios:app-store:test'
+  );
 }
 
 function runProfileAdmission() {
