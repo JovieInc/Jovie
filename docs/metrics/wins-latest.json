@@ -1,14 +1,14 @@
 {
   "schema": "jovie.wins-metrics/v1",
-  "at": "2026-10-29T19:36:09.030Z",
-  "winsTotal": 12,
+  "at": "2026-10-30T02:35:21.582Z",
+  "winsTotal": 13,
   "winsVerified": 1,
   "winsClaimed": 4,
   "winsUnverified": 3,
   "winsNotReproduced": 1,
   "winsPendingMerge": 3,
-  "winsPendingMeasure": 0,
-  "winsLast7d": 12,
+  "winsPendingMeasure": 1,
+  "winsLast7d": 13,
   "clusters": [
     {
       "theme": "release-reliability",
@@ -30,6 +30,12 @@
     },
     {
       "theme": "source-of-truth",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "golden-path-reliability",
       "total": 1,
       "verified": 0,
       "ready": false
@@ -83,6 +89,10 @@
     {
       "id": "win-2026-10-29-remote-preflight",
       "status": "unverified"
+    },
+    {
+      "id": "win-2026-10-30-self-cleaning-golden-path-fixture-eliminates",
+      "status": "pending-measure"
     }
   ]
 }
