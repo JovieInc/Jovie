@@ -29,7 +29,12 @@ import {
   downloadChatAttachments,
   validateChatMessageParts,
 } from '@/lib/chat/attachment-policy';
+import { copyFloorRepairTransform } from '@/lib/chat/copy-floor-repair';
 import { buildReferencedEntitiesBlock } from '@/lib/chat/entity-hydration';
+import {
+  buildGroundingFacts,
+  wrapStreamResultWithGroundingGuard,
+} from '@/lib/chat/grounding-guard';
 import { resolveImportBioRestrictedTools } from '@/lib/chat/import-bio-turn-guard';
 import { retrieveKnowledgeContext } from '@/lib/chat/knowledge/retrieval';
 import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
@@ -221,6 +226,8 @@ export interface ExecuteChatTurnInput {
    */
   artistContext: ArtistContext | null;
   releases: ReleaseContext[];
+  /** Recording titles for the grounding guard; null/undefined = unknown (title rule skipped). */
+  catalogTrackTitles?: readonly string[] | null;
   /** Internal creator-profile UUID. Null when anonymous (`mode='onboarding'`). */
   resolvedProfileId: string | null;
   resolvedConversationId: string | null;
@@ -337,6 +344,7 @@ export async function executeChatTurn(
     uiMessages,
     artistContext,
     releases,
+    catalogTrackTitles,
     resolvedConversationId,
     userId,
     userPlan,
@@ -649,7 +657,12 @@ export async function executeChatTurn(
     // JOV-3525: pace raw model deltas into a steady word-level reveal so the
     // client render cadence is smooth; pairs with useChat
     // experimental_throttle in useJovieChat.
-    experimental_transform: smoothStream({ delayInMs: 15, chunking: 'word' }),
+    // Copy floor first (canon/VOICE.md): rewrite dashes in flight so the
+    // streamed reply and the persisted reply are the same clean text.
+    experimental_transform: [
+      copyFloorRepairTransform(),
+      smoothStream({ delayInMs: 15, chunking: 'word' }),
+    ],
     experimental_telemetry: buildAiTelemetry({
       functionId: 'jovie-chat',
       identity: {
@@ -821,9 +834,29 @@ export async function executeChatTurn(
     },
   });
 
-  const streamResult = blockedForDisclosure
+  const leakGuarded = blockedForDisclosure
     ? rawStreamResult
     : wrapStreamResultWithLeakGuard(rawStreamResult);
+  // Post-generation grounding check: claims about the artist's own data must
+  // match the facts the server loaded this turn (JOV grounding guard).
+  const streamResult =
+    blockedForDisclosure || mode !== 'app' || !artistContext
+      ? leakGuarded
+      : wrapStreamResultWithGroundingGuard(
+          leakGuarded,
+          buildGroundingFacts(artistContext, releases, catalogTrackTitles),
+          violation => {
+            telemetry?.setTags?.({
+              chat_grounding_violation: violation.kind,
+            });
+            telemetry?.addBreadcrumb?.({
+              category: 'ai-chat',
+              message: 'chat_grounding_violation',
+              level: 'warning',
+              data: { requestId, kind: violation.kind, mode },
+            });
+          }
+        );
 
   return {
     ...(writingPilot

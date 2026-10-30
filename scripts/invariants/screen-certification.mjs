@@ -64,6 +64,7 @@ export const SCREEN_MARKETING_ROUTES = Object.freeze({
   'web.marketing-support': '/support',
   'web.marketing-integrations': '/integrations',
   'web.developers': '/developers',
+  'web.developers-agents': '/developers/agents',
   'web.api-versioning-policy': '/api-versioning',
   'web.cli-landing': '/cli',
   // JOV-7110: web.engineering-publication used to cover both engineering
@@ -228,11 +229,12 @@ function parseRegistry(raw) {
 export const SCREEN_REGISTRY = Object.freeze(
   parseRegistry(
     `
-web.homepage|web|marketing-home|apps/web/app/(home)/page.tsx,apps/web/app/(home)/layout.tsx|desktop,mobile
+web.homepage|web|marketing-home|apps/web/app/(home)/page.tsx,apps/web/app/(home)/layout.tsx,apps/web/app/content-preview/|desktop,mobile
 web.root-document|web|root-document-shell|apps/web/app/layout.tsx|desktop,mobile
 web.artists|web|marketing-artists|apps/web/app/artists/page.tsx|desktop,mobile
 web.waitlist|web|marketing-waitlist|apps/web/app/waitlist/page.tsx,apps/web/app/waitlist/layout.tsx,apps/web/app/waitlist/error.tsx|desktop,mobile
 web.developers|web|developer-documentation|apps/web/app/(marketing)/developers/page.tsx|desktop,mobile
+web.developers-agents|web|developer-agent-docs|apps/web/app/(marketing)/developers/agents/page.tsx|desktop,mobile
 web.api-versioning-policy|web|api-versioning-policy|apps/web/app/(marketing)/api-versioning/page.tsx|desktop,mobile
 web.cli-landing|web|cli-landing|apps/web/app/(marketing)/cli/page.tsx|desktop,mobile
 web.engineering-publication|web|engineering-publication|apps/web/app/(marketing)/engineering/page.tsx,apps/web/app/(marketing)/engineering/[slug]/page.tsx|desktop,mobile
@@ -279,7 +281,7 @@ web.legal-privacy|web|legal-privacy|apps/web/app/(dynamic)/legal/privacy/|deskto
 web.legal-terms|web|legal-terms|apps/web/app/(dynamic)/legal/terms/|desktop,mobile
 web.legal-cookies|web|legal-cookies|apps/web/app/(dynamic)/legal/cookies/|desktop,mobile
 web.legal-dmca|web|legal-dmca|apps/web/app/(dynamic)/legal/dmca/|desktop,mobile
-web.playlists-index|web|public-playlists|apps/web/app/(dynamic)/playlists/page.tsx|desktop,mobile
+web.playlists-index|web|public-playlists|apps/web/app/(dynamic)/playlists/page.tsx,apps/web/app/(dynamic)/playlists/layout.tsx|desktop,mobile
 web.brand|web|marketing-brand|apps/web/app/brand/page.tsx,apps/web/app/brand/layout.tsx|desktop,mobile
 web.marketing-renders|web|marketing-renders|apps/web/app/(marketing)/renders/|desktop,mobile
 web.profile-admission|web|profile-admission|apps/web/app/(profile-admission)/renders/profile-admission/page.tsx|desktop,mobile
@@ -357,7 +359,7 @@ web.billing-success|web|billing-success|apps/web/app/billing/success/page.tsx|de
 web.billing-youtube-thumbnails|web|billing-youtube-thumbnails|apps/web/app/billing/youtube-thumbnails/page.tsx|desktop,mobile
 web.billing-youtube-thumbnails-success|web|billing-youtube-thumbnails-success|apps/web/app/billing/youtube-thumbnails/success/page.tsx|desktop,mobile
 web.billing-shell|web|billing-shell|apps/web/app/billing/layout.tsx|desktop,mobile
-web.claim|web|artist-claim-checkout|apps/web/app/claim/page.tsx,apps/web/app/claim/ClaimArtistSearch.tsx|desktop,mobile
+web.claim|web|artist-claim-checkout|apps/web/app/claim/page.tsx,apps/web/app/claim/ClaimArtistSearch.tsx,apps/web/app/claim/agent/[draftId]/page.tsx,apps/web/app/claim/agent/[draftId]/AgentClaimScreen.tsx|desktop,mobile
 web.account-shell|web|account-shell|apps/web/app/account/layout.tsx|desktop,mobile
 web.account-creation-recovery|web|account-creation-recovery|apps/web/app/error/user-creation-failed/page.tsx,apps/web/app/error/user-creation-failed/loading.tsx|desktop,mobile
 web.root-error-boundary|web|screen.errors.root|apps/web/app/error.tsx,apps/web/app/global-error.tsx|desktop,mobile

@@ -19,6 +19,7 @@ import {
   VERCEL_PROJECTS,
   VERCEL_TEAM_ID,
 } from './lib/remediation-sweep.mjs';
+import { runDriftChecks } from './lib/source-drift.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -326,6 +327,21 @@ export async function loadCredentialsPlans({
   return { plans: report.plans, warnings };
 }
 
+/** Source-of-truth drift against live Stripe, DNS and production (stage record to DRIFT_RUN_RECEIPT). */
+export async function loadDriftPlans({
+  env = process.env,
+  run = runDriftChecks,
+} = {}) {
+  const report = await run({
+    root: new URL('..', import.meta.url).pathname,
+    env,
+    gh,
+  });
+  if (env.DRIFT_RUN_RECEIPT)
+    writeFileSync(env.DRIFT_RUN_RECEIPT, `${JSON.stringify(report.run)}\n`);
+  return { plans: report.plans, warnings: report.warnings };
+}
+
 function warn(message) {
   console.error(message);
   if (process.env.GITHUB_ACTIONS === 'true')
@@ -347,6 +363,7 @@ async function main() {
     loadDeployments: () => loadVercelDeployments({ token: token?.token }),
     loadDomains: () => loadDomainRecords(),
     loadCredentials: () => loadCredentialsPlans(),
+    loadDrift: () => loadDriftPlans(),
     vercelTokenPresent: Boolean(token),
     upsert: upsertLinearIssueByTitleFingerprint,
     apiKey: process.env.LINEAR_API_KEY,

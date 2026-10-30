@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { type ReactNode, useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -293,6 +295,25 @@ describe('OnboardingShell status', () => {
     expect(signIn.className).not.toMatch(/(?:^|\s)h-11(?:\s|$)/);
   });
 
+  it('keeps the real sign-in link named and reachable before its label child arrives', () => {
+    render(<OnboardingShell sessionLabel='pending' />);
+
+    const signIn = screen.getByRole('link', { name: 'Sign in' });
+    const destination = signIn.getAttribute('href');
+    const labelNodes = Array.from(signIn.childNodes);
+    signIn.replaceChildren();
+
+    expect(screen.getByRole('link', { name: 'Sign in' })).toBe(signIn);
+    expect(signIn).toHaveAttribute('href', destination);
+    signIn.focus();
+    expect(signIn).toHaveFocus();
+
+    signIn.append(...labelNodes);
+    expect(signIn).toHaveTextContent('Sign in');
+    expect(screen.getByRole('link', { name: 'Sign in' })).toBe(signIn);
+    expect(signIn).toHaveFocus();
+  });
+
   it('reports a failed chat start without verification jargon or error codes', () => {
     render(<OnboardingShell sessionLabel='pending' />);
 
@@ -444,5 +465,25 @@ describe('buildEntryProfileBuilderState (JOV-7753)', () => {
         .artist
     ).toBeNull();
     expect(buildEntryProfileBuilderState(null).artist).toBeNull();
+  });
+});
+
+// JOV-7973: the /start shell pane must clip without owning a programmatically
+// scrollable box. overflow:hidden stays scrollable, so a journey scrollIntoView
+// can leave the whole route (profile rail included) shifted under the clip —
+// the golden-path preview badge then reads a stable viewport ratio 0.8125 that
+// keyboard End/Home on the rail can never undo.
+describe('OnboardingShell route pane (JOV-7973)', () => {
+  it('clips the shell content pane instead of owning a scroll box', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/onboarding/OnboardingShell.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).toContain("contentClassName='overflow-clip!'");
+    expect(source).not.toContain("contentClassName='overflow-hidden!'");
   });
 });
