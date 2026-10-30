@@ -9460,6 +9460,13 @@ class ManagedMeshArchiveTest(unittest.TestCase):
         if os.environ.get("LANES_SELFTEST") != "1":
             return  # Real archive verification runs inside every updater self-test.
         runtime = ROOT / "scripts/lanes/.mesh-runtime"
+        if not (runtime / "manifest.json").exists():
+            # Not inside an updater self-test either: prove_staging compiles the mesh
+            # runtime into the staged tree before this suite runs, so the archive here
+            # is always fresh and verifiable there. The LANES_SELFTEST=1 guard without
+            # the compile (the lanes-selftest-changed-tests source guard runs changed
+            # lanes tests against the plain checkout) has no archive to verify.
+            return
         proof = json.loads((runtime / "manifest.json").read_text())
         self.assertEqual(proof["schema"], "jovie.mesh-managed-runtime/v1")
         self.assertTrue(proof["isolatedImportPassed"])
