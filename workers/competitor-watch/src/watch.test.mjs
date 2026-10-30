@@ -85,6 +85,7 @@ test('sources config is well formed', () => {
     assert.ok(!ids.has(s.id), `duplicate ${s.id}`);
     ids.add(s.id);
     assert.ok(['feed', 'html-links', 'page-watch'].includes(s.kind));
+    assert.ok(['company', 'person'].includes(s.type));
     assert.match(s.url, /^https:\/\//);
     if (s.kind === 'html-links') assert.ok(s.hrefPattern);
   }

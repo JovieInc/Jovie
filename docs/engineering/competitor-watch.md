@@ -15,6 +15,14 @@ Measurement: every item carries `published_at`, `first_seen_at`, `triaged_at`, `
 
 Known limits: the 8B triage model over-scores generic AI news, so the router requires a concrete flag (`adoptable_now` or `cost_saving`) except for a 5. xAI's `x.ai/news` and Replit's blog return 403 to Workers egress; xAI is covered through `docs.x.ai` release notes, Replit is disabled in `sources.json` until polled from another host.
 
+## People and deferred sources
+
+`sources.json` entries have `type: company | person`. People are followed through their own blogs, newsletters, personal-site feeds and GitHub release feeds (Boris Cherny's blog and Claude Code releases, Lauren Tan's site and noodle releases, Simon Willison, Karpathy, Geoffrey Litt, Peter Steinberger, Latent Space, Cursor's changelog and blog, OpenAI Developers blog and Codex releases). To add someone, append an entry.
+
+Deferred, listed under `deferred` in `sources.json` with a revisit trigger:
+- **X/Twitter**: no free, compliant RSS and the API is paid; we do not scrape. Revisit if a free or official feed appears, or if MRR justifies the API cost.
+- **YouTube and podcasts**: per-channel YouTube RSS is free (`youtube.com/feeds/videos.xml?channel_id=...`); add once channel ids are confirmed.
+
 ## Fast-adopt path
 
 An item routed to `adopt` is a small PR, not a promise. It extends existing machinery; nothing new is built.
