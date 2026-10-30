@@ -168,14 +168,12 @@ describe('TabBar distribution', () => {
     const inactiveTab = screen.getByRole('tab', { name: 'Activity' });
 
     expect(activeTab).toHaveClass(
-      'rounded-md',
-      'border-subtle',
-      'bg-surface-0',
+      'rounded-full',
+      'bg-(--surface-2)',
       'shadow-none'
     );
     expect(activeTab.className).not.toContain('ring-(--color-accent)');
     expect(inactiveTab).toHaveClass(
-      'border-transparent',
       'focus-visible:ring-2',
       'focus-visible:ring-focus/35'
     );
