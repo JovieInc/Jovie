@@ -4,9 +4,9 @@
     "profile-hero-desktop": {
       "width": 1640,
       "height": 1172,
-      "sourceHash": "e6fac0aaa5431462bf511f399ac533364651b5cb36c8fb479aab30a4429a622f",
-      "specHash": "431d2bbda1f7a334f405179ebdc85d1f63359bf2683879cf776aa248037d998c",
-      "renderedAt": "2026-10-29T19:20:52.679Z",
+      "sourceHash": "ef8ce274bff1307caa27efe589f7d6127edc5799890ccf74486f336a5d21ed75",
+      "specHash": "4678825cd69b894ed73b87947ac9cbfcfa9668059752d8d8e9bd02f31cc09746",
+      "renderedAt": "2026-10-30T00:52:32.782Z",
       "sources": [
         "apps/web/components/features/demo/DemoTimWhiteProfileSurface.tsx",
         "apps/web/components/features/profile/templates/ProfileCompactTemplate.tsx",
@@ -16,14 +16,24 @@
       "bytes": {
         "avif": 26784,
         "webp": 41214
-      }
+      },
+      "frame": "bare",
+      "fullScreen": false,
+      "displayWidth": 820,
+      "capture": {
+        "cssWidth": 912,
+        "cssHeight": 652,
+        "viewportWidth": 1440,
+        "viewportHeight": 900
+      },
+      "minTextPx": 14
     },
     "setup-claim-handle": {
       "width": 696,
       "height": 372,
-      "sourceHash": "b476b23c99368aeb6e2ecd82041a84d353e24012183dc076ddd3fdc51c721a37",
-      "specHash": "8e8165321af2f58428e0d98ae5f458702ea14d0331883630a01c31630c875ffd",
-      "renderedAt": "2026-10-29T19:42:52.724Z",
+      "sourceHash": "85ce1ede5bc4eefd660c29f6e95d36b59900150842447d052771d82be6c26be5",
+      "specHash": "e8d656c91aa186f42b33c809e2e5bec6c8db231a114829cec83355939eeea9c8",
+      "renderedAt": "2026-10-30T00:51:37.794Z",
       "sources": [
         "apps/web/components/features/dashboard/organisms/onboarding/OnboardingHandleStep.tsx",
         "apps/web/components/features/dashboard/organisms/onboarding-v2/shared/types.ts",
@@ -33,14 +43,24 @@
       "bytes": {
         "avif": 8086,
         "webp": 11838
-      }
+      },
+      "frame": "bare",
+      "fullScreen": false,
+      "displayWidth": 358,
+      "capture": {
+        "cssWidth": 348,
+        "cssHeight": 186,
+        "viewportWidth": 390,
+        "viewportHeight": 844
+      },
+      "minTextPx": 14
     },
     "setup-connect-music": {
       "width": 972,
       "height": 530,
-      "sourceHash": "a35c3cf4e9bcf1c7787421e6eec8a688ab77df0b3672970e1fe9498e9ec1079f",
-      "specHash": "cc187de12e7d6b300efb2e132d4520b657a8c2f8ae04e359d7589c5978325b90",
-      "renderedAt": "2026-10-29T19:36:43.647Z",
+      "sourceHash": "63dd206c65655023bfb4795c2a91a615ba942dca555ab8276c860905cd0452a8",
+      "specHash": "9e1513b8b12b2a3378251869fbb8692cae560ca07ecdd7a5b47f0e86770ba422",
+      "renderedAt": "2026-10-30T00:51:50.479Z",
       "sources": [
         "apps/web/components/features/dashboard/organisms/onboarding/OnboardingDspStep.tsx",
         "apps/web/components/features/dashboard/organisms/onboarding-v2/shared/types.ts",
@@ -50,24 +70,46 @@
       "bytes": {
         "avif": 12755,
         "webp": 18120
-      }
+      },
+      "frame": "bare",
+      "fullScreen": false,
+      "displayWidth": 560,
+      "capture": {
+        "cssWidth": 486,
+        "cssHeight": 265,
+        "viewportWidth": 1440,
+        "viewportHeight": 900
+      },
+      "minTextPx": 14
     },
     "setup-share-profile": {
-      "width": 764,
-      "height": 666,
-      "sourceHash": "96c85efffe68e56ff8b35ad934ba091d47be3cf6313064caf6e50e6df81ee090",
-      "specHash": "b5e7b8c2e7283ac396ec5dfc619fad20ad240bb90a4f1c4cd23a2ef7f9d8b881",
-      "renderedAt": "2026-10-29T19:20:16.153Z",
+      "width": 652,
+      "height": 1420,
+      "sourceHash": "818add9ebcee29938294ede2babcd974e11f8e6382a2ac937f262dd38c70e4db",
+      "specHash": "541a90c5e296b3550179fb287498e63cb862529b37ccd61bdb36327214982ff1",
+      "renderedAt": "2026-10-30T00:52:01.555Z",
       "sources": [
+        "apps/web/components/marketing/device/DeviceScreen.css",
         "apps/web/components/features/demo/DemoTimWhiteProfileSurface.tsx",
         "apps/web/components/features/profile/ProfileUnifiedDrawer.tsx",
+        "apps/web/components/features/profile/ProfileDrawerShell.tsx",
         "apps/web/components/features/share/PublicShareMenu.tsx",
         "apps/web/components/features/home/homepage-profile-preview-fixture.ts"
       ],
       "bytes": {
-        "avif": 5418,
-        "webp": 10070
-      }
+        "avif": 14028,
+        "webp": 23088
+      },
+      "frame": "phone",
+      "fullScreen": true,
+      "displayWidth": 326,
+      "capture": {
+        "cssWidth": 326,
+        "cssHeight": 710,
+        "viewportWidth": 1440,
+        "viewportHeight": 1100
+      },
+      "minTextPx": 12
     }
   }
 }

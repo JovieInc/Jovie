@@ -8,6 +8,7 @@ import { SOURCE_GUARDS } from '../../ci-fast-lanes.mjs';
 import { REPO_ROOT } from './paths.mjs';
 import {
   checkFreshness,
+  checkGeometry,
   rawImageryIds,
   SHOT_MANIFEST,
   SHOT_MAX_BYTES,
@@ -22,7 +23,11 @@ function write(root, rel, content) {
   writeFileSync(file, content);
 }
 
-function fixture({ source = 'export const Step = 1;\n', bytes = 10 } = {}) {
+function fixture({
+  source = 'export const Step = 1;\n',
+  bytes = 10,
+  shot = {},
+} = {}) {
   const root = mkdtempSync(join(tmpdir(), 'product-shots-'));
   write(root, SOURCE, 'export const Step = 1;\n');
   const sourceHash = hashShotSources(root, [SOURCE]);
@@ -41,6 +46,17 @@ function fixture({ source = 'export const Step = 1;\n', bytes = 10 } = {}) {
           renderedAt: '2026-10-29T00:00:00.000Z',
           sources: [SOURCE],
           bytes: { avif: bytes, webp: bytes },
+          frame: 'bare',
+          fullScreen: false,
+          displayWidth: 400,
+          capture: {
+            cssWidth: 440,
+            cssHeight: 220,
+            viewportWidth: 1440,
+            viewportHeight: 900,
+          },
+          minTextPx: 14,
+          ...shot,
         },
       },
     })
@@ -73,6 +89,51 @@ describe('product-shot freshness', () => {
   it('treats CRLF and LF checkouts as the same source', () => {
     const root = fixture({ source: 'export const Step = 1;\r\n' });
     assert.deepEqual(checkFreshness(root), []);
+  });
+});
+
+describe('product-shot geometry and readability (deliberate red)', () => {
+  it('passes a tight crop with readable text', () => {
+    assert.deepEqual(checkGeometry(fixture()), []);
+  });
+
+  it('fails a phone shot whose aspect is not the screen aspect', () => {
+    const root = fixture({
+      shot: {
+        frame: 'phone',
+        fullScreen: true,
+        width: 700,
+        height: 700,
+        displayWidth: 320,
+        capture: {
+          cssWidth: 320,
+          cssHeight: 320,
+          viewportWidth: 390,
+          viewportHeight: 844,
+        },
+      },
+    });
+    assert.match(checkGeometry(root).join('\n'), /screen aspect/);
+  });
+
+  it('fails text that is 8px effective on the page', () => {
+    const root = fixture({ shot: { minTextPx: 14 * (8 / 14) * (440 / 400) } });
+    assert.match(checkGeometry(root).join('\n'), /minimum 11px/);
+  });
+
+  it('fails a crop of the whole viewport that is not declared fullScreen', () => {
+    const root = fixture({
+      shot: {
+        displayWidth: 1300,
+        capture: {
+          cssWidth: 1300,
+          cssHeight: 800,
+          viewportWidth: 1440,
+          viewportHeight: 900,
+        },
+      },
+    });
+    assert.match(checkGeometry(root).join('\n'), /crop covers/);
   });
 });
 

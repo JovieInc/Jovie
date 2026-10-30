@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { ProductShotSpec } from '../../lib/screenshots/product-shots';
 import {
+  checkShotGeometry,
   expandVariants,
   isShotStale,
   oversizedFormats,
@@ -51,6 +52,16 @@ function entryFor(root: string, shot: ProductShotSpec): ShotManifestEntry {
     renderedAt: '2026-10-29T00:00:00.000Z',
     sources: shot.sources,
     bytes: { avif: 1, webp: 1 },
+    frame: shot.frame,
+    fullScreen: false,
+    displayWidth: shot.displayWidth,
+    capture: {
+      cssWidth: 400,
+      cssHeight: 200,
+      viewportWidth: 1440,
+      viewportHeight: 900,
+    },
+    minTextPx: 14,
   };
 }
 
@@ -218,5 +229,105 @@ describe('oversizedFormats', () => {
     ).toEqual([
       `a.avif is ${PRODUCT_SHOT_MAX_BYTES + 1} bytes (> ${PRODUCT_SHOT_MAX_BYTES}); tighten the crop`,
     ]);
+  });
+});
+
+describe('checkShotGeometry (hard imagery rules)', () => {
+  const screen = 1206 / 2622;
+  // A phone screen shot: exact aspect, text 12px at scale 1, full screen.
+  const phone = {
+    frame: 'phone',
+    fullScreen: true,
+    displayWidth: 320,
+    width: 640,
+    height: Math.round(640 / screen),
+    minTextPx: 12,
+    capture: {
+      cssWidth: 320,
+      cssHeight: 696,
+      viewportWidth: 390,
+      viewportHeight: 844,
+    },
+  };
+  const bare = {
+    frame: 'bare',
+    fullScreen: false,
+    displayWidth: 400,
+    width: 800,
+    height: 400,
+    minTextPx: 14,
+    capture: {
+      cssWidth: 440,
+      cssHeight: 220,
+      viewportWidth: 1440,
+      viewportHeight: 900,
+    },
+  };
+
+  it('passes a device screen that fills its frame and a tight crop', () => {
+    expect(checkShotGeometry('phone', phone)).toEqual([]);
+    expect(checkShotGeometry('bare', bare)).toEqual([]);
+  });
+
+  it('fails a device shot whose aspect is not the frame screen (deliberate red)', () => {
+    const letterboxed = { ...phone, width: 640, height: 640 };
+    expect(checkShotGeometry('wrong-aspect', letterboxed).join()).toMatch(
+      /screen aspect/
+    );
+    const withinTolerance = { ...phone, height: phone.height + 5 };
+    expect(checkShotGeometry('ok', withinTolerance)).toEqual([]);
+  });
+
+  it('fails text under 11px effective (deliberate red: 8px)', () => {
+    // 14px text shrunk 400 -> 230 css px = 8px on the page.
+    const tiny = {
+      ...bare,
+      displayWidth: 250,
+      capture: { ...bare.capture, cssWidth: 440 },
+      minTextPx: 14,
+    };
+    expect(
+      checkShotGeometry('tiny-text', { ...tiny, minTextPx: 14 * 0.57 }).join()
+    ).toMatch(/minimum 11px/);
+    expect(
+      checkShotGeometry('tiny-text', { ...phone, minTextPx: 8 }).join()
+    ).toMatch(/8\.0px/);
+  });
+
+  it('allows shots with no text', () => {
+    expect(checkShotGeometry('art', { ...bare, minTextPx: null })).toEqual([]);
+  });
+
+  it('fails a crop of most of the viewport unless fullScreen is declared', () => {
+    const wide = {
+      ...bare,
+      capture: {
+        cssWidth: 1300,
+        cssHeight: 800,
+        viewportWidth: 1440,
+        viewportHeight: 900,
+      },
+      displayWidth: 1300,
+    };
+    expect(checkShotGeometry('wide', wide).join()).toMatch(/covers 80%/);
+    expect(
+      checkShotGeometry('wide', { ...wide, fullScreen: true }).join()
+    ).toMatch(/only for device frames/);
+  });
+
+  it('fails a non-device shot shrunk below 0.6x of its capture', () => {
+    const shrunk = { ...bare, displayWidth: 200, minTextPx: 30 };
+    expect(checkShotGeometry('shrunk', shrunk).join()).toMatch(/shrunk/);
+  });
+
+  it('fails a manifest entry that lacks the recorded facts', () => {
+    expect(
+      checkShotGeometry('old', {
+        frame: 'bare',
+        width: 1,
+        height: 1,
+        displayWidth: 1,
+      }).join()
+    ).toMatch(/re-render/);
   });
 });

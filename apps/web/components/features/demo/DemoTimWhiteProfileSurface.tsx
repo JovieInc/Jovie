@@ -41,6 +41,7 @@ import {
   readProfileAccentTheme,
 } from '@/lib/profile/profile-theme';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
+import { cn } from '@/lib/utils';
 import { DemoClientProviders } from './DemoClientProviders';
 
 const DEMO_PRESS_PHOTOS = [
@@ -652,7 +653,8 @@ function SingleStatePhonePreview({
 
 function DrawerPhonePreview({
   stateId,
-}: Readonly<{ stateId: 'more-menu' | 'share' }>) {
+  compact = false,
+}: Readonly<{ stateId: 'more-menu' | 'share'; compact?: boolean }>) {
   const state = HOMEPAGE_PROFILE_SHOWCASE_STATES[stateId];
   const profileAccentStyle = buildProfileAccentCssVars(
     readProfileAccentTheme(HOMEPAGE_PROFILE_PREVIEW_ARTIST.theme)
@@ -666,8 +668,16 @@ function DrawerPhonePreview({
         subtitle='Use the state query param to pin one Tim White profile state for screenshots or focused review.'
       >
         <div className='flex items-center justify-center'>
-          <HomePhoneFrame className='homepage-showcase-phone-frame [--homepage-phone-frame-width:24rem]'>
+          <HomePhoneFrame
+            className={cn(
+              'homepage-showcase-phone-frame',
+              compact
+                ? '[--homepage-phone-frame-width:20.5rem]'
+                : '[--homepage-phone-frame-width:24rem]'
+            )}
+          >
             <div
+              data-testid='drawer-phone-screen'
               className='homepage-showcase-surface relative h-full w-full bg-black/96'
               style={profileAccentStyle}
             >
@@ -815,7 +825,12 @@ export function DemoTimWhiteProfileSurface() {
 
   if (showcaseState) {
     if (showcaseState === 'more-menu' || showcaseState === 'share') {
-      return <DrawerPhonePreview stateId={showcaseState} />;
+      return (
+        <DrawerPhonePreview
+          stateId={showcaseState}
+          compact={searchParams.get('frame') === 'compact'}
+        />
+      );
     }
 
     return (

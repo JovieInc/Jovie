@@ -64,6 +64,24 @@
   border-radius: var(--radius-lg);
 }
 
+/* Phone: a bezel-free device screen (device policy in
+   components/marketing/device/deviceBezels.ts). The image is exactly the
+   screen, so it fills it: the aspect comes from product-shot-rules.mjs via
+   --product-shot-screen-ratio, never letterboxed or shrunk. */
+.product-shot--phone picture {
+  container-type: inline-size;
+}
+
+.product-shot--phone.product-shot--staged {
+  padding: var(--space-4);
+}
+
+.product-shot--phone .product-shot__image {
+  aspect-ratio: var(--product-shot-screen-ratio);
+  border-radius: min(var(--radius-3xl), 8cqi);
+  object-fit: fill;
+}
+
 /* Narrow screens serve the mobile variant when the shot has one; reserve its
    aspect ratio so the art swap cannot shift layout. */
 @media (max-width: 47.99rem) {
