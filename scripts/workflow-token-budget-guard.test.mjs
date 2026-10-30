@@ -1,5 +1,11 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -173,4 +179,54 @@ test('main bootstraps, passes, then fails when a workflow adds an unbudgeted sit
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('stack repair jobs prime pinned Node before invoking the API client', () => {
+  for (const [file, jobs] of Object.entries({
+    'auto-merge-base-guard.yml': ['guard'],
+    'unstack-merged-parent.yml': ['plan', 'unstack'],
+  })) {
+    const source = readFileSync(
+      new URL(`../.github/workflows/${file}`, import.meta.url),
+      'utf8'
+    );
+    assert.equal(countFile(source)['setup-node-manifest'], 0, file);
+    if (file === 'auto-merge-base-guard.yml')
+      assert.equal(declaredBudget(source)?.calls, 0);
+    for (const job of jobs) {
+      const body = source.split(`  ${job}:\n`)[1].split(/\n  [\w-]+:\n/)[0];
+      const prime = body.indexOf(
+        'uses: ./.github/actions/prime-node-toolcache'
+      );
+      const setup = body.indexOf('uses: actions/setup-node@');
+      const run = body.indexOf('run:');
+      assert.ok(prime >= 0 && setup > prime && run > setup, `${file}: ${job}`);
+      assert.match(body.slice(setup, run), /node-version-file: .nvmrc/);
+    }
+  }
+});
+
+test('unstack planner declares its bounded REST page including client retries', () => {
+  const source = readFileSync(
+    new URL('../.github/workflows/unstack-merged-parent.yml', import.meta.url),
+    'utf8'
+  );
+  const providers = JSON.parse(
+    readFileSync(
+      new URL('../packages/api-client/providers.json', import.meta.url),
+      'utf8'
+    )
+  );
+  assert.equal(declaredBudget(source)?.calls, providers.defaults.maxAttempts);
+  const plan = source.split('  plan:\n')[1].split('  unstack:\n')[0];
+  assert.match(plan, /api "repos\/\$REPO\/pulls" --method GET/);
+  assert.match(
+    plan,
+    /-f state=open -f base="\$MERGED_HEAD_REF" -F per_page=50/
+  );
+  assert.doesNotMatch(plan, /--paginate|pr list/);
+  assert.match(
+    plan,
+    /github.event.action == 'closed' &&\s+github.event.pull_request.merged == true &&\s+github.event.pull_request.base.ref == 'main'/
+  );
 });

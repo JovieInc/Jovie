@@ -49,6 +49,10 @@ export function HeaderSearchSurfaceFromContext({
     };
   }, [closeCommandPalette, isCommandPaletteOpen]);
 
+  // WCAG 2.5.3 Label in Name: the accessible name must contain the visible
+  // text. The calm rail shows 'Search chats' (#22743), so its programmatic
+  // name carries that text; compact and default keep the branded name
+  // ('Search' is contained in 'Search Jovie').
   const trigger = (
     <button
       type='button'
@@ -64,7 +68,7 @@ export function HeaderSearchSurfaceFromContext({
             ),
         className
       )}
-      aria-label='Search Jovie'
+      aria-label={calm ? 'Search chats in Jovie' : 'Search Jovie'}
     >
       <Icon
         name='Search'

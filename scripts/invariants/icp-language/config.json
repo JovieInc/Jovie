@@ -21,7 +21,6 @@
     {"path": "apps/web/data/artistNotificationsCopy.ts", "reason": "Copy rendered by the artist-notifications route"},
     {"path": "apps/web/data/youtubeThumbnailsCopy.ts", "reason": "Copy rendered by the YouTube-thumbnails route"},
     {"path": "apps/web/app/investor-portal/", "reason": "Dedicated investor audience portal"},
-    {"path": "apps/web/content/investors/", "reason": "Investor-portal documents"},
     {"path": "apps/web/data/investorAnswerReuseCopy.ts", "reason": "Investor-audience answers"}
   ],
   "editorialOutOfScope": [

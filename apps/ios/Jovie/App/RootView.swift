@@ -298,10 +298,9 @@ private struct AppContentView: View {
     }
     .task(id: "\(appState.route)-\(appState.launchMode)-\(appState.activeUserID ?? "")-\(workspaceMode.rawValue)") {
       guard appState.route == .ready else { return }
-      // Live What’s New is the changelog sheet above. The versioned sheet is
-      // the UITest fixture so chat-first cases can name what to tap.
+      // UI fixtures exercise the same changelog sheet as live presentation.
       if appState.launchMode == .uiTestingWhatsNew {
-        showWhatsNew = true
+        changelogWhatsNew = WhatsNewUITestFixture.unseen()
       }
       await reloadHomeData(for: appState.activeUserID)
     }
@@ -850,6 +849,44 @@ struct WhatsNewFeedClient: Sendable {
   }
 }
 
+/// Deterministic content for the actual production sheet; never fetched or persisted as live data.
+enum WhatsNewUITestFixture {
+  static func unseen(arguments: [String] = ProcessInfo.processInfo.arguments) -> WhatsNewUnseen? {
+    guard
+      let postURL = URL(string: "https://jov.ie/changelog/ui-fixture-current"),
+      let indexURL = URL(string: "https://jov.ie/changelog")
+    else { return nil }
+    let multiple = arguments.contains("-ui-testing-whats-new-multiple")
+    let long = arguments.contains("-ui-testing-whats-new-long")
+    let emptyDogfood = arguments.contains("-ui-testing-whats-new-no-dogfood")
+    let items = WhatsNewCatalog.items(for: "1.0")
+    let newest = WhatsNewFeedEntry(
+      id: "ui-fixture-current",
+      title: long ? items.map(\.title).joined(separator: ". ") : items[0].title,
+      date: "2026-10-19",
+      summary: long ? items.map(\.testHint).joined(separator: " ") : items[0].testHint,
+      url: postURL,
+      highlights: [],
+      dogfood: emptyDogfood ? [] : Array(items.prefix(3).map(\.testHint))
+    )
+    let older = WhatsNewFeedEntry(
+      id: "ui-fixture-seen", title: items[1].title, date: "2026-10-18",
+      summary: items[1].testHint, url: newest.url, highlights: [], dogfood: []
+    )
+    let middle = WhatsNewFeedEntry(
+      id: "ui-fixture-middle", title: items[2].title, date: "2026-10-19",
+      summary: items[2].testHint, url: newest.url, highlights: [], dogfood: []
+    )
+    let feed = WhatsNewFeed(
+      version: WhatsNewFeed.contractVersion,
+      changelogUrl: indexURL,
+      entries: multiple ? [newest, middle, older] : [newest]
+    )
+    // A fixture cannot exercise the network. Resolve through the production policy.
+    return WhatsNewFeedPolicy.resolve(feed: feed, lastSeenID: multiple ? older.id : nil)
+  }
+}
+
 struct JovieChangelogWhatsNewView: View {
   let unseen: WhatsNewUnseen
   @Environment(\.dismiss) private var dismiss
@@ -865,26 +902,26 @@ struct JovieChangelogWhatsNewView: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: JovieSpacing.large) {
-      HStack(alignment: .top) {
-        VStack(alignment: .leading, spacing: JovieSpacing.xSmall) {
-          Text(eyebrow)
-            .font(JovieFont.body(size: 14))
-            .foregroundStyle(JovieColor.textTertiary)
-          Text(unseen.entry.title)
-            .font(JovieFont.display(size: 24))
-            .foregroundStyle(JovieColor.textPrimary)
-            .fixedSize(horizontal: false, vertical: true)
-            .accessibilityAddTraits(.isHeader)
-        }
-        Spacer(minLength: JovieSpacing.medium)
-        Image(systemName: "sparkles")
-          .font(.title2)
-          .foregroundStyle(JovieColor.accent)
-          .accessibilityHidden(true)
-      }
-
       ScrollView {
         VStack(alignment: .leading, spacing: JovieSpacing.medium) {
+          HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: JovieSpacing.xSmall) {
+              Text(eyebrow)
+                .font(JovieFont.body(size: 14))
+                .foregroundStyle(JovieColor.textTertiary)
+              Text(unseen.entry.title)
+                .font(JovieFont.display(size: 24))
+                .foregroundStyle(JovieColor.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+            }
+            Spacer(minLength: JovieSpacing.medium)
+            Image(systemName: "sparkles")
+              .font(.title2)
+              .foregroundStyle(JovieColor.textTertiary)
+              .accessibilityHidden(true)
+          }
+
           Text(unseen.entry.summary)
             .font(JovieFont.body(size: 16))
             .foregroundStyle(JovieColor.textSecondary)
@@ -904,8 +941,9 @@ struct JovieChangelogWhatsNewView: View {
                     .foregroundStyle(JovieColor.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                 } icon: {
-                  Image(systemName: "checkmark.circle")
-                    .foregroundStyle(JovieColor.accent)
+                  Image(systemName: "circle.fill")
+                    .font(.system(size: 5))
+                    .foregroundStyle(JovieColor.textTertiary)
                     .accessibilityHidden(true)
                 }
                 .accessibilityIdentifier("whats-new-dogfood-\(index)")
@@ -937,6 +975,7 @@ struct JovieChangelogWhatsNewView: View {
     .presentationDetents([.medium, .large])
     .presentationDragIndicator(.visible)
     .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("whats-new-production-sheet")
   }
 }
 

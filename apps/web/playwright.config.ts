@@ -226,8 +226,8 @@ export default defineConfig({
             PUBLIC_NOAUTH_SMOKE: process.env.PUBLIC_NOAUTH_SMOKE || '0',
             ...(useTestAuthBypass
               ? {
-                  NEXT_PUBLIC_CLERK_MOCK: '1',
-                  NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
+                  NEXT_PUBLIC_AUTH_MOCK: '1',
+                  NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1',
                 }
               : {}),
             NODE_OPTIONS:

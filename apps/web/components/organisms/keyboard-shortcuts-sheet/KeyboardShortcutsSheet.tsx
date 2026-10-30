@@ -21,6 +21,7 @@ import {
   type ShortcutCategory,
   shortcutsForHelpSheet,
 } from '@/lib/keyboard-shortcuts';
+import { OPERATOR_SEQUENCE_SHORTCUTS } from '@/lib/ovie/operator-commands';
 
 /**
  * Render individual shortcut keys with proper styling
@@ -113,13 +114,16 @@ export function KeyboardShortcutsSheet() {
   const isOvieWorkspace = getCurrentAppShellWorkspace(pathname).id === 'ov';
   const [searchQuery, setSearchQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-  const catalogShortcuts = useMemo(
-    () =>
-      shortcutsForHelpSheet({ canUseFounderDoor }).filter(
-        shortcut => isOvieWorkspace || shortcut.id !== 'lock-workspace'
-      ),
-    [canUseFounderDoor, isOvieWorkspace]
-  );
+  const catalogShortcuts = useMemo(() => {
+    const shared = shortcutsForHelpSheet({ canUseFounderDoor }).filter(
+      shortcut =>
+        (isOvieWorkspace || shortcut.id !== 'lock-workspace') &&
+        (!isOvieWorkspace || !shortcut.isSequential)
+    );
+    return isOvieWorkspace
+      ? [...shared, ...OPERATOR_SEQUENCE_SHORTCUTS]
+      : shared;
+  }, [canUseFounderDoor, isOvieWorkspace]);
 
   // Filter shortcuts based on search query
   const filteredShortcuts = useMemo(() => {

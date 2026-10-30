@@ -98,10 +98,10 @@ export default defineConfig({
             NEXT_PUBLIC_E2E_MODE: '1',
             // Disable Clerk proxy for screenshots — Clerk JS loads from its own
             // CDN instead of proxying through localhost (which requires HTTPS).
-            NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
+            NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1',
           },
           url: managedWebServerUrl.origin,
-          // Default to fresh server so NEXT_PUBLIC_CLERK_PROXY_DISABLED is always
+          // Default to fresh server so NEXT_PUBLIC_AUTH_PROXY_DISABLED is always
           // applied. A pre-running server won't have this flag, causing silent
           // Clerk JS loading failures. Opt in with REUSE_EXISTING_SERVER=1.
           reuseExistingServer: process.env.REUSE_EXISTING_SERVER === '1',

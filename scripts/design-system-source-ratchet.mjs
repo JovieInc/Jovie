@@ -25,6 +25,12 @@ import {
 } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { evaluateBaseDesignRatchet } from './design-system-base-ratchet.mjs';
+
+export {
+  RAW_HEX_PATTERN,
+  RAW_PALETTE_PATTERN,
+} from './design-system-base-ratchet.mjs';
 
 const THIS_DIR = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = join(THIS_DIR, '..');
@@ -63,26 +69,10 @@ const LINEAR_SKIP_DIRS = new Set([
 ]);
 const LINEAR_TEST_FILE = /\.(?:test|spec)\.[tj]sx?$/;
 
-// Raw color literals and raw Tailwind palette families bypass semantic tokens.
-// bg/text/border-white|black are owned by @jovie/no-hardcoded-theme-colors;
-// these two close the remaining gap (hex literals in TS/TSX, red-500 etc.).
-// Only .ts/.tsx under app/components/lib are scanned: styles/ and packages/ui
-// legitimately define the token values.
-export const RAW_HEX_PATTERN = /#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?\b/g;
-export const RAW_PALETTE_PATTERN =
-  /\b(?:bg|text|border|ring|fill|stroke|from|to|via|outline|divide|decoration|shadow|accent|caret)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}\b/g;
-const RAW_COLOR_SCAN_PREFIXES = Object.freeze([
-  'apps/web/app/',
-  'apps/web/components/',
-  'apps/web/lib/',
-]);
-
 export const IDENTITY_RULES = Object.freeze({
   arbitraryValue: 'arbitrary-value',
   arbitraryProperty: 'arbitrary-property',
   linearNamespace: 'linear-namespace',
-  rawHex: 'raw-hex-color',
-  rawPalette: 'raw-palette-class',
 });
 
 /** Widened identity roots. Count helpers above stay narrower on purpose. */
@@ -246,18 +236,6 @@ export function collectDesignSystemIdentities(options = {}) {
     }
     for (const value of collectMatches(source, LINEAR_NAMESPACE_PATTERN)) {
       identities.push(identityKey(rel, IDENTITY_RULES.linearNamespace, value));
-    }
-    if (
-      /\.tsx?$/.test(rel) &&
-      !/\.(?:test|spec|stories)\.[tj]sx?$/.test(rel) &&
-      RAW_COLOR_SCAN_PREFIXES.some(prefix => rel.startsWith(prefix))
-    ) {
-      for (const value of collectMatches(source, RAW_HEX_PATTERN)) {
-        identities.push(identityKey(rel, IDENTITY_RULES.rawHex, value));
-      }
-      for (const value of collectMatches(source, RAW_PALETTE_PATTERN)) {
-        identities.push(identityKey(rel, IDENTITY_RULES.rawPalette, value));
-      }
     }
   }
   return uniqueSorted(identities);
@@ -433,14 +411,20 @@ function main() {
   }
 
   const result = evaluateDesignSystemSourceRatchet();
+  const baseResult = evaluateBaseDesignRatchet();
   const summary = `${result.metrics[0].count} identities (${result.metrics[0].newCount} new / baseline ${result.metrics[0].baseline})`;
-  if (!result.ok) {
+  if (!result.ok || !baseResult.ok) {
     console.error(`[design-system-source-ratchet] FAIL — ${summary}`);
     for (const issue of result.issues) console.error(issue);
+    for (const identity of baseResult.newIdentities)
+      console.error(`new design identity: ${identity}`);
     process.exitCode = 1;
     return;
   }
   console.log(`[design-system-source-ratchet] PASS — ${summary}`);
+  console.log(
+    `[design-system-base-ratchet] PASS — ${baseResult.identities.length} identities (0 new / base ${baseResult.base})`
+  );
 }
 
 if (
