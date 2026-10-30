@@ -51,4 +51,17 @@ describe('ShareableLinkRow', () => {
     );
     expect(screen.getByTestId('row')).toHaveClass('h-8');
   });
+
+  it('flat surface adds no horizontal inset and uses body text size', () => {
+    render(
+      <ShareableLinkRow
+        url='https://jov.ie/tim'
+        density='compact'
+        surface='flat'
+        testId='row'
+      />
+    );
+    expect(screen.getByTestId('row')).toHaveClass('px-0');
+    expect(screen.getByText('jov.ie/tim')).toHaveClass('text-xs');
+  });
 });
