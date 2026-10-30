@@ -336,7 +336,7 @@ export const SOURCE_GUARDS = Object.freeze([
     command:
       'node scripts/invariants/segment-language/check.mjs && node --test --test-isolation=none scripts/invariants/segment-language/segment-language.test.mjs',
     inputs:
-      /^(?:apps\/web\/(?:components\/(?:jovie|features\/dashboard)\/|app\/app\/|lib\/(?:chat|notifications|insights|creator)\/)|scripts\/invariants\/segment-language\/|scripts\/ci-fast-lanes\.mjs$)/u,
+      /^(?:apps\/web\/(?:components\/(?:jovie|features\/dashboard)\/|app\/app\/|lib\/(?:chat|notifications|insights|creator)\/)|scripts\/invariants\/(?:segment-language\/|icp-language\/(?:match|ratchet)\.mjs$)|scripts\/ci-fast-lanes\.mjs$)/u,
     prOnly: false,
   }),
   Object.freeze({

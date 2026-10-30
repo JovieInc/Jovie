@@ -30,6 +30,20 @@ test('ignores identifiers, comments, imports and single words', () => {
   assert.equal(violationsInSource(source, 'x.ts', config).size, 0);
 });
 
+test('flags multiline template copy while ignoring commented templates', () => {
+  const source = [
+    '/* const ignored = `',
+    'Spotify for artists',
+    '`; */',
+    'const tip = `',
+    'Release your single on Friday',
+    '`;',
+  ].join('\n');
+  const found = violationsInSource(source, 'x.ts', config);
+  assert.equal(found.size, 1);
+  assert.ok([...found.keys()][0].startsWith('release:'));
+});
+
 test('deliberate red: a new untagged segment string fails the ratchet', () => {
   const scanned = scanSegmentLanguage();
   const recorded = readBaseline();

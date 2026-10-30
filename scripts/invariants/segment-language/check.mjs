@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { extractCopyTexts } from '../icp-language/match.mjs';
 import { ancestorJson, evaluateRatchet } from '../icp-language/ratchet.mjs';
 
 export const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -38,17 +39,23 @@ const sha = text => createHash('sha1').update(text).digest('hex').slice(0, 10);
 export function violationsInSource(source, path, config) {
   const re = termRegex(config.terms);
   const ids = new Map();
+  const texts = [];
   for (const line of source.split('\n')) {
     const trimmed = line.trim();
     if (/^(?:\/\/|\*|\/\*|import\s)/u.test(trimmed)) continue;
     for (const match of line.matchAll(LITERAL)) {
-      const text = match[2];
-      if (!PROSE.test(text)) continue;
-      const hit = re.exec(text);
-      if (!hit) continue;
-      const term = hit[0].toLowerCase().replace(/\s+/gu, ' ');
-      ids.set(`${term}:${path}:${sha(text)}`, text.slice(0, 80));
+      texts.push(match[2]);
     }
+  }
+  // Reuse the ICP extractor for complete multiline literals; its JSX pieces
+  // have already been flattened to one line and do not expand this scan.
+  texts.push(...extractCopyTexts(source).filter(text => text.includes('\n')));
+  for (const text of texts) {
+    if (!PROSE.test(text)) continue;
+    const hit = re.exec(text);
+    if (!hit) continue;
+    const term = hit[0].toLowerCase().replace(/\s+/gu, ' ');
+    ids.set(`${term}:${path}:${sha(text)}`, text.slice(0, 80));
   }
   return ids;
 }

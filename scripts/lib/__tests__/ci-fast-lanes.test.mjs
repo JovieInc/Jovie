@@ -2365,6 +2365,17 @@ describe('source-read guard selection', () => {
     expect(guard.command).not.toContain('--register');
   });
 
+  it('selects segment-language for shared parsing and ratchet changes', () => {
+    for (const path of [
+      'scripts/invariants/icp-language/match.mjs',
+      'scripts/invariants/icp-language/ratchet.mjs',
+    ]) {
+      for (const event of ['pull_request', 'merge_group', 'push']) {
+        expect(selected(event, [path])).toContain('segment-language');
+      }
+    }
+  });
+
   it('fails closed onto guards for manual, local, and unreadable diffs', () => {
     const all = SOURCE_GUARDS.map(guard => guard.id);
     // Manual dispatch runs web Unit Tests and structural, which carry the rest.
