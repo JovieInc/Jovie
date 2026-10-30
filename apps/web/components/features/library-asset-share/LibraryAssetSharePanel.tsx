@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
-import { CopyLinkInput } from '@/components/features/dashboard/atoms/CopyLinkInput';
 import { toast } from '@/components/feedback';
+import { CopyableUrlRow } from '@/components/molecules/CopyableUrlRow';
 import {
   OverflowMenu,
   type OverflowMenuItem,
@@ -206,11 +206,12 @@ export function LibraryAssetSharePanel({
       className='flex items-center gap-1.5'
       data-testid={`library-asset-share-${asset.id}`}
     >
-      <CopyLinkInput
+      <CopyableUrlRow
         url={shareUrl || ' '}
         displayValue={displayUrl}
         size='sm'
-        stopPropagation
+        surface='flat'
+        valueClassName='font-sans'
         testId={`library-asset-share-url-${asset.id}`}
         className={cn(
           'min-w-0 flex-1',

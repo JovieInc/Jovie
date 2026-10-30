@@ -1,0 +1,13 @@
+{
+  "tabOffenders": [
+    "app/app/(shell)/library/LibraryPageClient.tsx",
+    "app/app/(shell)/library/LibrarySurface.tsx",
+    "components/features/admin/hud/HudDrilldownSearch.tsx",
+    "components/marketing/artist-profile/ArtistProfileModeSwitcher.tsx",
+    "components/organisms/WorkspaceTabsSurface.tsx",
+    "components/shell/PerformanceCard.tsx"
+  ],
+  "duplicateFields": [
+    "components/features/admin/feedback-table/AdminFeedbackTable.tsx::user"
+  ]
+}
