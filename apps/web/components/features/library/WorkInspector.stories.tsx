@@ -137,6 +137,8 @@ function WorkInspectorProof({
             <LibrarySurface
               assets={assets}
               postReleaseBundle={postReleaseBundle}
+              profileId='profile-story'
+              artistHandle='tim'
             />
           )}
         </main>
