@@ -6751,6 +6751,30 @@ def renumber_migrations_fix(host: Host, pr: dict, route: dict, worktree: Path, l
     return types.SimpleNamespace(returncode=0)
 
 
+def register_domain_writes_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """The no-model fix for an allowed-0 domain write: register the exporting module, lower the
+    ratchet, commit and push. Returns a finished-agent stand-in, or None when the edit does not apply."""
+    probe = sh(["node", "scripts/domain-write-guard.mjs"], cwd=worktree, log=log, timeout=300)
+    added = fix_red_classes.register_direct_domain_writes(
+        worktree, f"{probe.stdout or ''}\n{probe.stderr or ''}")
+    if not added:
+        return None
+    if sh(["node", "scripts/domain-write-guard.mjs", "--write"], cwd=worktree, log=log, timeout=300).returncode:
+        return None
+    if sh(["node", "scripts/domain-write-guard.mjs"], cwd=worktree, log=log, timeout=300).returncode:
+        return None
+    message = "fix(domain): register " + ", ".join(Path(name).name for name in added)[:72]
+    steps = [["git", "add", "--", "apps/web/lib/domain/write-registry.json",
+              "scripts/lib/domain-write-guard.ratchet.gen.json"],
+             ["git", "commit", "-q", "-m", message],
+             ["git", "push", "-q", "origin", f"HEAD:{pr['headRefName']}"]]
+    for step in steps:
+        if sh(step, cwd=worktree, log=log, timeout=900).returncode:
+            return None
+    receipt.update(resolution="registered-domain-writes", registeredModules=added)
+    return types.SimpleNamespace(returncode=0)
+
+
 def wire_ci_fast_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
     """The no-model fix for an unwired script test: list it in ci-fast-lanes.mjs, commit, push. Returns a
     finished-agent stand-in, or None when the edit does not apply (the model then gets the head)."""
@@ -7825,7 +7849,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 fixer = {fix_red_classes.WIRE_CI_FAST: wire_ci_fast_fix,
                          fix_red_classes.RENUMBER: renumber_migrations_fix,
                          fix_red_classes.SNAP_SPACING: snap_spacing_fix,
-                         fix_red_classes.MERGE_NARROWED: merge_narrowed_preflight_fix}.get((route or {}).get("action"))
+                         fix_red_classes.MERGE_NARROWED: merge_narrowed_preflight_fix,
+                         fix_red_classes.REGISTER_DOMAIN: register_domain_writes_fix}.get((route or {}).get("action"))
                 agent = fixer(host, pr, route, worktree, log, receipt) if fixer else None
                 agent = agent or run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree),
