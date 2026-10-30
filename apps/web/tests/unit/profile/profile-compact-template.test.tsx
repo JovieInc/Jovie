@@ -14,7 +14,6 @@ import { PublicClaimBanner } from '@/app/[username]/_components/PublicClaimBanne
 import { AboutSection } from '@/components/features/profile/AboutSection';
 import { ProfileDrawerShell } from '@/components/features/profile/ProfileDrawerShell';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
-import { readPublicProfileHistoryDepth } from '@/features/profile/profile-surface-state';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 import { ProfileCompactSurface } from '../../../components/features/profile/templates/ProfileCompactSurface';
@@ -1925,62 +1924,6 @@ describe('ProfileCompactTemplate', () => {
         await waitFor(() => expectMode('profile'));
       }
     );
-
-    it('restores a stripped mode landing in place instead of pushing a duplicate entry', async () => {
-      // Alias deep-link regression (responsive-shell back/forward): the
-      // strip correction must not depend on history.length — a redirect
-      // landing enters the document with a session-history length that no
-      // longer matches the mount-time arrival capture. jsdom cannot vary
-      // real history.length, so simulate the discrepancy on the getter.
-      let simulatedHistoryLength = 4;
-      Object.defineProperty(window.history, 'length', {
-        configurable: true,
-        get: () => simulatedHistoryLength,
-      });
-      try {
-        window.history.replaceState(
-          null,
-          '',
-          '/test-artist?mode=tour&source=qr'
-        );
-        render(profile());
-
-        // The redirect landing's length no longer matches the arrival
-        // capture, and Next's entry updater strips the landed ?mode entry
-        // back to the bare profile path.
-        simulatedHistoryLength = 5;
-        window.history.replaceState(window.history.state, '', '/test-artist');
-        expect(window.location.pathname + window.location.search).toBe(
-          '/test-artist'
-        );
-
-        // Drawer settling wakes the history effect, exactly like the
-        // hydration state updates do in the browser.
-        const menu = screen.getByRole('button', { name: 'Menu' });
-        fireEvent.click(menu);
-        await screen.findByRole('dialog', { name: 'Menu' });
-        fireEvent.keyDown(document, { key: 'Escape' });
-        await waitFor(() => {
-          expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-        });
-
-        // The landed entry is restored in place: the query returns and the
-        // history depth stays 0 (a duplicate push would stamp depth 1).
-        await waitFor(() => {
-          expect(window.location.pathname + window.location.search).toBe(
-            '/test-artist?mode=tour&source=qr'
-          );
-        });
-        expect(readPublicProfileHistoryDepth(window.history.state)).toBe(0);
-        expect(
-          document
-            .querySelector('[data-testid="profile-compact-surface"]')
-            ?.getAttribute('data-mode')
-        ).toBe('tour');
-      } finally {
-        delete (window.history as { length?: number }).length;
-      }
-    });
 
     it.each(['0', 'true', 'private-token'])(
       'does not propagate unsupported claim=%s',

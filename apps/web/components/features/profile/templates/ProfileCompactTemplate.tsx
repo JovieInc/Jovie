@@ -838,22 +838,14 @@ export function ProfileCompactTemplate({
     // the mode param is gone (a Link to another mode keeps a mode param) and
     // no new history entry was pushed since arrival — the strip replaces the
     // landed entry in place, while a Link to the bare path pushes one.
-    // Redirect landings (legacy alias deep links) can enter the document
-    // with a different session-history length than the mount-time arrival
-    // capture, so a length equality here would fail exactly there and turn
-    // the in-place strip correction into a duplicate profile-entry push
-    // (the alias back/forward regression: back lands on a /{handle} copy
-    // instead of the pre-profile page). The mode-param, landed-mode, depth,
-    // and in-flight-navigation guards already exclude every client Link
-    // navigation: a Link to another mode keeps its mode param, and a Link
-    // to the bare path flips activeMode away from the landed mode (or is
-    // held by the in-flight guard) before this effect can act.
     const correctingStrippedLanding =
       profileHistoryDepthRef.current === 0 &&
       landedMode !== null &&
       landedMode !== 'profile' &&
       activeMode === landedMode &&
-      new URLSearchParams(globalThis.location.search).get('mode') === null;
+      new URLSearchParams(globalThis.location.search).get('mode') === null &&
+      globalThis.history.length ===
+        (arrivalHistoryLengthRef.current ?? globalThis.history.length);
     if (correctingStrippedLanding) {
       globalThis.history.replaceState(
         withPublicProfileHistoryDepth(globalThis.history.state, 0),
