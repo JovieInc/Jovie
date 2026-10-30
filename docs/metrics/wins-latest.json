@@ -1,14 +1,14 @@
 {
   "schema": "jovie.wins-metrics/v1",
-  "at": "2026-10-30T05:25:55.887Z",
-  "winsTotal": 19,
+  "at": "2026-10-30T06:21:33.607Z",
+  "winsTotal": 20,
   "winsVerified": 1,
-  "winsClaimed": 6,
+  "winsClaimed": 7,
   "winsUnverified": 3,
   "winsNotReproduced": 1,
   "winsPendingMerge": 4,
   "winsPendingMeasure": 4,
-  "winsLast7d": 19,
+  "winsLast7d": 20,
   "clusters": [
     {
       "theme": "release-reliability",
@@ -18,7 +18,7 @@
     },
     {
       "theme": "merge-throughput",
-      "total": 10,
+      "total": 11,
       "verified": 0,
       "ready": false
     },
@@ -128,6 +128,10 @@
     },
     {
       "id": "win-2026-10-30-wins-ledger-bot-prs-pass-source",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-30-remove-the-stale-shared-ui-inventory",
       "status": "claimed"
     }
   ]
