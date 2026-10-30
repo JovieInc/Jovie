@@ -24,12 +24,16 @@ for (const path of PREVIEW_PATHS) {
       timeout: 120_000,
     });
     expect(response?.status(), `${path} must remain unpublished`).toBe(404);
-    const body = (await page.locator('body').innerText())
-      .replace(/\s+/g, ' ')
-      .trim();
-    expect(body, `${path} did not render its not-found state`).toMatch(
-      /not found|could not be found|can't find that page/i
-    );
+    // The standalone build can finish the not-found document after
+    // domcontentloaded (marketing-route-health settles 750ms before the same
+    // check), so poll for the painted text instead of reading innerText once.
+    await expect
+      .poll(
+        async () =>
+          (await page.locator('body').innerText()).replace(/\s+/g, ' ').trim(),
+        { timeout: 20_000 }
+      )
+      .toMatch(/not found|could not be found|can't find that page/i);
     await expect(page.locator('main').first()).toBeVisible();
   });
 }

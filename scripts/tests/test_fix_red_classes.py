@@ -1,3 +1,4 @@
+import json
 import sys
 import tempfile
 import unittest
@@ -19,6 +20,7 @@ class ClassifyTest(unittest.TestCase):
             "HttpError: API rate limit exceeded for installation": ("platform-infra", "rerun"),
             "upstream returned HTTP 500 before the job started": ("platform-infra", "rerun"),
             "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane": ("ci-fast-wiring", "wire-ci-fast"),
+            "domain-write-guard: apps/web/lib/leads/lead-claim-token.ts writes creatorProfiles directly 1x (allowed 0).": ("domain-write", "register-domain-writes"),
             "This PR conflicts with main in: scripts/preflight-changed.mjs . Resolve the conflict (lane-fix-conflict).": ("narrowed-preflight", "merge-narrowed-preflight"),
             "AssertionError: off-grid 10px/14px spacing steps (*-2.5, *-3.5) grew: 591 > baseline 590.": ("spacing-scale", "snap-spacing"),
             "Error: apps/web/app/(marketing)/pricing/page.tsx: source changed; renew certification evidence": ("census-certification", "sync-main"),
@@ -241,6 +243,119 @@ class WireTest(unittest.TestCase):
             root = self.tree(tmp)
             self.assertEqual(classes.wire_ci_fast(root, ["scripts/gone.test.mjs", "../x.test.mjs", "apps/web/a.test.ts"]), [])
             self.assertEqual((root / "scripts/ci-fast-lanes.mjs").read_text(), self.LIST)
+
+
+class DomainWriteTest(unittest.TestCase):
+    LOG = (
+        "domain-write-guard: apps/web/lib/leads/lead-claim-token.ts writes creatorProfiles directly 1x (allowed 0). "
+        "Route it through a registered domain function.\n"
+        "HttpError: API rate limit exceeded for installation\n"
+        "domain-write-guard: lower ratchet: apps/web/lib/leads/route-lead.ts creatorProfiles 1 -> 0\n"
+    )
+    REGISTRY = """{
+  "schema": "jovie-domain-write-registry/v1",
+  "sideEffects": {
+    "socialLinks": ["invalidateSocialLinksCache"]
+  },
+  "coreTables": {
+    "creatorProfiles": "creator_profiles",
+    "socialLinks": "social_links",
+    "users": "users"
+  },
+  "domains": [
+    {
+      "id": "claim.finalize",
+      "entity": "claim",
+      "module": "apps/web/lib/claim/finalize.ts",
+      "exports": ["claimPrebuiltProfileForUser"],
+      "tables": ["creatorProfiles"]
+    }
+  ],
+  "agentTools": {
+    "chat:submitFeedback": {"kind": "domain", "domain": "feedback.submit"}
+  }
+}
+"""
+    SOURCE = (
+        "export function deriveLeadClaimToken(id: string): string {\n"
+        "  return id;\n"
+        "}\n\n"
+        "export async function persistLeadClaimToken(): Promise<void> {\n"
+        "  await db.update(creatorProfiles).set({ claimToken: hash });\n"
+        "}\n"
+    )
+
+    def test_allowed_zero_beats_a_rate_limit_line_and_names_the_file(self):
+        got = classes.classify(pr("Source Validation"), {"Source Validation": self.LOG})
+        self.assertEqual((got["cls"], got["action"]), ("domain-write", "register-domain-writes"))
+        self.assertEqual(got["files"], ["apps/web/lib/leads/lead-claim-token.ts"])
+
+    def test_a_positive_cap_is_not_this_class(self):
+        log = "domain-write-guard: apps/web/lib/leads/route-lead.ts writes creatorProfiles directly 1x (allowed 1)."
+        got = classes.classify(pr("Source Validation"), {"Source Validation": log})
+        self.assertNotEqual(got["action"], "register-domain-writes")
+
+    def tree(self, tmp, source=None):
+        root = Path(tmp)
+        module = root / "apps/web/lib/leads/lead-claim-token.ts"
+        module.parent.mkdir(parents=True)
+        module.write_text(self.SOURCE if source is None else source)
+        registry = root / "apps/web/lib/domain/write-registry.json"
+        registry.parent.mkdir(parents=True)
+        registry.write_text(self.REGISTRY)
+        return root
+
+    def test_registers_the_export_that_writes_and_is_idempotent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.tree(tmp)
+            added = classes.register_direct_domain_writes(root, self.LOG)
+            self.assertEqual(added, ["apps/web/lib/leads/lead-claim-token.ts"])
+            text = (root / "apps/web/lib/domain/write-registry.json").read_text()
+            parsed = json.loads(text)
+            row = next(item for item in parsed["domains"] if item["module"].endswith("lead-claim-token.ts"))
+            self.assertEqual(row["id"], "leads.lead-claim-token")
+            self.assertEqual(row["entity"], "lead claim token")
+            self.assertEqual(row["exports"], ["persistLeadClaimToken"])
+            self.assertEqual(row["tables"], ["creatorProfiles"])
+            self.assertIn('"agentTools"', text)
+            self.assertEqual(classes.register_direct_domain_writes(root, self.LOG), [])
+
+    def test_private_helper_extra_table_and_missing_side_effect_stay_unregistered(self):
+        private = (
+            "function writeProfile(): void {\n"
+            "  db.update(creatorProfiles).set({ claimToken: hash });\n"
+            "}\n"
+            "export async function persistLeadClaimToken(): Promise<void> {\n"
+            "  writeProfile();\n"
+            "}\n"
+        )
+        extra = self.SOURCE + "\nexport function dropUser(): void {\n  db.delete(users);\n}\n"
+        social = (
+            "export async function persistLeadClaimToken(): Promise<void> {\n"
+            "  db.update(socialLinks).set({ url });\n"
+            "}\n"
+        )
+        social_log = (
+            "domain-write-guard: apps/web/lib/leads/lead-claim-token.ts writes socialLinks directly 1x (allowed 0).\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.tree(tmp, private)
+            self.assertEqual(classes.register_direct_domain_writes(root, self.LOG), [])
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.tree(tmp, extra)
+            self.assertEqual(classes.register_direct_domain_writes(root, self.LOG), [])
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.tree(tmp, social)
+            self.assertEqual(classes.register_direct_domain_writes(root, social_log), [])
+            social_ok = social.replace(
+                "db.update(socialLinks)",
+                "invalidateSocialLinksCache();\n  db.update(socialLinks)",
+            )
+            (root / "apps/web/lib/leads/lead-claim-token.ts").write_text(social_ok)
+            self.assertEqual(
+                classes.register_direct_domain_writes(root, social_log),
+                ["apps/web/lib/leads/lead-claim-token.ts"],
+            )
 
 
 class MeasureTest(unittest.TestCase):

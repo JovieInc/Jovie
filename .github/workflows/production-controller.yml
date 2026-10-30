@@ -217,6 +217,20 @@ jobs:
 
           echo "is_current=true" >> "$GITHUB_OUTPUT"
           record_receipt "proceed" "exact SHA is current" "$EXPECTED_SHA" 0 "authorize exact CI evidence"
+      - name: Summarize the release decision
+        if: ${{ always() }}
+        env:
+          DECISION: ${{ steps.coalesce.outputs.decision }}
+          IS_CURRENT: ${{ steps.coalesce.outputs.is_current }}
+          REPLACEMENT: ${{ steps.coalesce.outputs.replacement_sha }}
+          EXPECTED_SHA: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}
+        run: |
+          if [ "$IS_CURRENT" = true ]; then
+            echo "### Release attempted: $EXPECTED_SHA is current, proceeding to authorize and release" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### No release attempted: superseded (decision=$DECISION, replacement=$REPLACEMENT)" >> "$GITHUB_STEP_SUMMARY"
+            echo "A green run here means nothing shipped. Production advances only when a run's Production Release job succeeds." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   fleet-promotion:
     name: Authorize fleet deployment state

@@ -29,10 +29,11 @@ from atomic_state import atomic_write_text
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, AGENT = (
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, AGENT = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "merge-narrowed-preflight", "agent")
-DETERMINISTIC = frozenset({RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED})
+    "merge-narrowed-preflight", "register-domain-writes", "agent")
+DETERMINISTIC = frozenset({
+    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -85,6 +86,15 @@ NARROWED_PREFLIGHT = "scripts/preflight-changed.mjs"
 NARROWED_CONFLICT = re.compile(
     r"This PR conflicts with \S+ in: scripts/preflight-changed\.mjs\s*\. "
     r"Resolve the conflict \(lane-fix-conflict\)")
+# An allowed-0 direct write is a new path, not grandfathered debt. Register that
+# module. A positive cap and "lower ratchet" lines stay with the model.
+DOMAIN_WRITE = re.compile(
+    r"domain-write-guard: (?P<path>apps/web/(?:app|lib|components)/[\w./-]+\.(?:ts|tsx)) "
+    r"writes (?P<table>[A-Za-z_][A-Za-z0-9_]*) directly \d+x \(allowed 0\)")
+_DOMAIN_REGISTRY = "apps/web/lib/domain/write-registry.json"
+_EXPORT_START = re.compile(
+    r"(?m)^export\s+(?:async\s+)?(?:function|const)\s+([A-Za-z_][A-Za-z0-9_]*)\b")
+_DOMAINS_END = re.compile(r'\n    \}\n  \],\n  "agentTools":')
 _NARROWED_NOTE_PHRASES = (
     "source identity",
     "metrics-layer",
@@ -106,6 +116,9 @@ _NARROWED_SIDE = re.compile(
 SIGNATURES = (
     ("component-test-evidence", COMPONENT_TEST_TEXT, AGENT),
     ("narrowed-preflight", NARROWED_CONFLICT, MERGE_NARROWED),
+    # Before platform-infra: a Source Validation log can carry passing-test
+    # rate-limit lines beside the guard error that actually failed the job.
+    ("domain-write", DOMAIN_WRITE, REGISTER_DOMAIN),
     ("changelog-metadata", CHANGELOG_MISSING, STAMP_CHANGELOG),
     # Before platform-infra: the ratchet message includes a count such as 591,
     # and `\b5\d\d\b` would otherwise treat that count as an HTTP 5xx.
@@ -190,6 +203,8 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
             found = UNWIRED.search(logs.get(name) or "")
             files.extend(item.strip() for item in (found.group(1).split(",") if found else []) if item.strip())
         files = sorted(set(files))
+    elif cls == "domain-write":
+        files = sorted(_domain_write_hits("\n".join(logs.get(name) or "" for name in names)))
     return {"schema": SCHEMA, "cls": cls, "key": fingerprint_key(cls, names, signature), "action": action,
             "checks": names, "signature": signature, "files": files}
 
@@ -446,6 +461,172 @@ def resolve_preflight_narrowed_text(text: str) -> str | None:
     if "<<<<<<<" in resolved or ">>>>>>>" in resolved:
         return None
     return resolved
+
+
+def _domain_write_hits(log: str) -> dict[str, list[str]]:
+    """Allowed-0 guard lines, in file order. A positive cap is not a hit."""
+    hits: dict[str, list[str]] = {}
+    for match in DOMAIN_WRITE.finditer(str(log or "")):
+        tables = hits.setdefault(match.group("path"), [])
+        if match.group("table") not in tables:
+            tables.append(match.group("table"))
+    return hits
+
+
+def _writes_table(text: str, table: str, sql: object) -> bool:
+    if re.search(rf"\.(?:insert|update|delete)\(\s*(?:schema\.)?{re.escape(table)}\s*\)", text):
+        return True
+    if isinstance(sql, str) and "_" in sql and re.search(
+            rf"\b(?:insert\s+into|update|delete\s+from)\s+\"?(?:public\.)?\"?{re.escape(sql)}\b", text, re.I):
+        return True
+    return False
+
+
+def _core_tables_written(text: str, core: dict) -> set[str]:
+    return {table for table, sql in core.items() if isinstance(table, str) and _writes_table(text, table, sql)}
+
+
+def _export_spans(source: str) -> list[tuple[str, str]]:
+    found = list(_EXPORT_START.finditer(source))
+    spans = []
+    for index, match in enumerate(found):
+        end = found[index + 1].start() if index + 1 < len(found) else len(source)
+        spans.append((match.group(1), source[match.start():end]))
+    return spans
+
+
+def _domain_id(path: str) -> str | None:
+    rel = path
+    for prefix in ("apps/web/lib/", "apps/web/app/", "apps/web/components/"):
+        if rel.startswith(prefix):
+            rel = rel[len(prefix):]
+            break
+    else:
+        return None
+    rel = re.sub(r"\.(?:tsx|ts)$", "", rel)
+    parts = []
+    for part in rel.split("/"):
+        if re.fullmatch(r"\([^)]*\)", part):
+            continue
+        part = part.replace("_", "-").lower()
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", part):
+            return None
+        parts.append(part)
+    ident = ".".join(parts)
+    if not ident or not re.fullmatch(r"[a-z0-9]+(?:[.-][a-z0-9]+)*", ident):
+        return None
+    return ident
+
+
+def _domain_block(entry: dict) -> str:
+    exports = entry["exports"]
+    if len(exports) == 1:
+        exports_txt = json.dumps(exports)
+    else:
+        lines = ",\n".join(f"        {json.dumps(name)}" for name in exports)
+        exports_txt = f"[\n{lines}\n      ]"
+    return (
+        "    {\n"
+        f"      \"id\": {json.dumps(entry['id'])},\n"
+        f"      \"entity\": {json.dumps(entry['entity'])},\n"
+        f"      \"module\": {json.dumps(entry['module'])},\n"
+        f"      \"exports\": {exports_txt},\n"
+        f"      \"tables\": {json.dumps(entry['tables'])}\n"
+        "    }"
+    )
+
+
+def _domain_entry(root: Path, path: str, tables: list[str], core: dict, side: dict) -> dict | None:
+    """One registry domain for a file whose every core write is an allowed-0 export. None when a model must decide."""
+    if not re.fullmatch(r"apps/web/(?:app|lib|components)/[\w./-]+\.(?:ts|tsx)", path):
+        return None
+    if ".." in Path(path).parts or re.search(r"\.(?:test|spec|stories)\.", path):
+        return None
+    source_path = Path(root) / path
+    if not source_path.is_file():
+        return None
+    try:
+        source = source_path.read_text(errors="replace")
+    except OSError:
+        return None
+    reported = list(dict.fromkeys(tables))
+    if not reported or any(table not in core for table in reported):
+        return None
+    if _core_tables_written(source, core) != set(reported):
+        return None
+    for table in reported:
+        needed = side.get(table)
+        if isinstance(needed, list) and needed and not any(isinstance(name, str) and name in source for name in needed):
+            return None
+    exports = []
+    covered: set[str] = set()
+    for name, span in _export_spans(source):
+        written = [table for table in reported if _writes_table(span, table, core.get(table))]
+        if not written:
+            continue
+        exports.append(name)
+        covered.update(written)
+    if not exports or covered != set(reported):
+        return None
+    ident = _domain_id(path)
+    if not ident:
+        return None
+    stem = re.sub(r"\.(?:tsx|ts)$", "", Path(path).name).replace("-", " ").replace("_", " ")
+    return {"id": ident, "entity": stem, "module": path, "exports": exports, "tables": reported}
+
+
+def register_direct_domain_writes(root: Path, log: str) -> list[str]:
+    """Append a domain for each allowed-0 writer the guard names. Returns modules added.
+
+    Skips a path that is already registered, missing, written outside an export, missing a
+    required side effect, or writing a core table the log did not report. Grandfathered
+    (allowed > 0) files are never registered. The registry is inserted in place so the
+    rest of the file is not reformatted.
+    """
+    hits = _domain_write_hits(log)
+    if not hits:
+        return []
+    registry_path = Path(root) / _DOMAIN_REGISTRY
+    try:
+        text = registry_path.read_text()
+        registry = json.loads(text)
+    except (OSError, json.JSONDecodeError):
+        return []
+    domains = registry.get("domains")
+    core = registry.get("coreTables")
+    if not isinstance(domains, list) or not isinstance(core, dict):
+        return []
+    modules = {row.get("module") for row in domains if isinstance(row, dict)}
+    ids = {row.get("id") for row in domains if isinstance(row, dict)}
+    side = registry.get("sideEffects") if isinstance(registry.get("sideEffects"), dict) else {}
+    blocks = []
+    added = []
+    for path in sorted(hits):
+        if path in modules:
+            continue
+        entry = _domain_entry(Path(root), path, hits[path], core, side)
+        if entry is None or entry["id"] in ids:
+            continue
+        ids.add(entry["id"])
+        modules.add(path)
+        blocks.append(_domain_block(entry))
+        added.append(path)
+    if not blocks:
+        return []
+    match = _DOMAINS_END.search(text)
+    if not match:
+        return []
+    updated = (text[:match.start()] + "\n    },\n" + ",\n".join(blocks)
+               + '\n  ],\n  "agentTools":' + text[match.end():])
+    try:
+        parsed = json.loads(updated)
+    except json.JSONDecodeError:
+        return []
+    registered = {row.get("module") for row in parsed.get("domains") or [] if isinstance(row, dict)}
+    if not set(added) <= registered:
+        return []
+    atomic_write_text(registry_path, updated if updated.endswith("\n") else updated + "\n")
+    return added
 
 
 def wire_ci_fast(root: Path, files: list[str]) -> list[str]:
