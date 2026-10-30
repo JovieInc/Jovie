@@ -1,14 +1,14 @@
 {
   "schema": "jovie.wins-metrics/v1",
-  "at": "2026-10-30T20:52:32.989Z",
-  "winsTotal": 25,
+  "at": "2026-10-30T21:45:28.051Z",
+  "winsTotal": 26,
   "winsVerified": 1,
   "winsClaimed": 12,
   "winsUnverified": 3,
   "winsNotReproduced": 1,
   "winsPendingMerge": 4,
-  "winsPendingMeasure": 4,
-  "winsLast7d": 25,
+  "winsPendingMeasure": 5,
+  "winsLast7d": 26,
   "clusters": [
     {
       "theme": "release-reliability",
@@ -18,7 +18,7 @@
     },
     {
       "theme": "merge-throughput",
-      "total": 15,
+      "total": 16,
       "verified": 0,
       "ready": false
     },
@@ -153,6 +153,10 @@
     {
       "id": "win-2026-10-30-eliminate-the-false-failing-publication-transport",
       "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-30-every-resource-that-can-stop-shipping",
+      "status": "pending-measure"
     }
   ]
 }
