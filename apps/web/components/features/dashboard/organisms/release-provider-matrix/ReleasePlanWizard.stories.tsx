@@ -36,7 +36,11 @@ export const GateLoading: Story = {
   },
 };
 
-export const UpgradeRequired: Story = {
+/**
+ * No self-serve plan grants release plans, so the gate explains that and
+ * offers no upgrade (no dead ends, JOV-INV-046).
+ */
+export const NotIncludedInPlan: Story = {
   args: {
     canGenerateReleasePlans: false,
   },

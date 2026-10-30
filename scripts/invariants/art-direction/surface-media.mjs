@@ -5,10 +5,10 @@
  * perf budget.
  *
  * Scopes live in docs/design-system/motion-effects.json. The homepage hero is
- * the approved scope (Tim, 2026-10-22). It ships without a feature flag. The
- * ambient field and the matte motion pair are the other scopes: each keeps a
- * static fallback and declines WebGL under reduced motion. Every other hit
- * stays on the shrink-only baseline. There is no flag to leave off.
+ * the approved scope (Tim, 2026-10-22); its static CSS poster is the default
+ * and WebGL runs only when apps/web/data/marketing/animatedBackgroundBudget.ts
+ * enables it. The hero shell zoom is the other scope (CSS transforms, no GL).
+ * Every other hit stays on the shrink-only baseline.
  *
  * Per effect this checks: reduced-motion marker (group, plus each file the
  * registry names), fallback marker, offscreen pause and frame cap on GL files,
@@ -26,11 +26,6 @@ export const SURFACE_BASELINE =
   'scripts/invariants/art-direction/surface-media.baseline.json';
 export const MOTION_EFFECTS = 'docs/design-system/motion-effects.json';
 export const HERO_SCOPE_PREFIX = 'apps/web/components/homepage/hero-light/';
-export const AMBIENT_SCOPE_ID = 'marketing-ambient-field';
-export const AMBIENT_SCOPE_FILES = Object.freeze([
-  'apps/web/components/marketing/motion/MarketingAmbientField.tsx',
-  'apps/web/components/marketing/motion/ambient-field-gl.ts',
-]);
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const ROOTS = [
@@ -51,8 +46,7 @@ const SKIP_FILE = /\.(?:test|spec|stories)\.[cm]?[jt]sx?$/;
 const SOURCE_FILE = /\.(?:css|ts|tsx|js|jsx)$/;
 const MEDIA =
   /<canvas\b|<video\b|getContext\(\s*['"]webgl|WebGL2RenderingContext|webgl2/i;
-const FALLBACK =
-  /poster|shouldRunAmbientField|renderer\s*!==\s*['"]webgl['"]|mountCanvas\s*\?/;
+const FALLBACK = /poster|renderer\s*!==\s*['"]webgl['"]|mountCanvas\s*\?/;
 
 export function mediaKind(source) {
   if (!MEDIA.test(source)) return null;
