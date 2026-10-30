@@ -4,7 +4,7 @@ paths: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"]
 
 # Anti-slop ratchets
 
-CI runs `JovieInc/ci/actions/slop-guard` (`config/slop-guard/config.json`, shrink-only `baseline.json`). Fix the offender; never add to the baseline.
+CI (`ci-slop-guard`, required through PR Ready) runs `JovieInc/ci/actions/slop-guard`; policy lives in JovieInc/ci, this repo owns only the shrink-only `config/slop-guard/baseline.json`. Fix the offender; never add to the baseline.
 
 - Size: no new source file over 500 lines (tests 1000); a baselined file may not grow.
 - Pass-through: no file that only re-exports or forwards to one call; real boundaries carry `// boundary: <reason>`.

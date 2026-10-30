@@ -2,7 +2,7 @@
   {
     "file": ".claude/rules/anti-slop.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "4e118deca55146ca3b994986070a3bc5ff5efa2b56b6d5c967b1064bef7b3bde"
+    "bodySha256": "17ed298ea129cb191c56f2d3ff1ebccf036817325b44c1c524230fb0b511a844"
   },
   {
     "file": ".claude/rules/auth.md",
