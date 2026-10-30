@@ -3167,11 +3167,16 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         cases = [("<cmd>", run_url), ("not applicable", run_url),
                  ("...", run_url), ("node --test", "https://example.com/red"),
                  ("node --test", run_url + "/job/456")]
+        # The CI-scoped fixture already satisfies Win policy; this test repairs only red evidence.
+        win = ("\n## Win\n\n- Claim: Repair synthetic red-evidence fixtures\n"
+               "- Area: ci\n- Theme: merge-throughput\n"
+               "- Metric: invalid fixture cases | count | lower | 5 | 0 | synthetic test cases | python -m unittest scripts.tests.test_pr_events\n"
+               f"- Verify: {run_url}\n")
         bodies = []
         for command, url in cases:
             body = (f"## Summary\nKeep this.\n\n## Red-before-green\n"
                     f"- Failing command: `{command}`\n- Failing run (before fix): {url}\n"
-                    "\n## Blast radius\nWhat could break: repair evidence.\nProof: regression tests.\n")
+                    "\n## Blast radius\nWhat could break: repair evidence.\nProof: regression tests.\n" + win)
             written = []
             def edit(args):
                 written.append(Path(args[-1]).read_text())
@@ -3182,6 +3187,7 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
                 self.assertEqual(len(written), 1)
                 self.assertIn("## Summary\nKeep this.", written[0])
                 self.assertIn("## Blast radius\nWhat could break: repair evidence.", written[0])
+                self.assertIn(win, written[0])
                 bodies.extend([body, written[0]])
         # Exercise the actual consumer, rather than trusting the Python mirror.
         checked = subprocess.run(["node", "--input-type=module", "-e", """
