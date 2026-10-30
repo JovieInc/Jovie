@@ -354,6 +354,8 @@ export function ProfileCompactTemplate({
   const [requestedMode, setRequestedMode] = useState<ProfileMode>(() =>
     getInitialModeFromLocation(mode, false)
   );
+  // Bounded post-mount wakes for the history effect below (see the effect).
+  const [historyWakeTick, setHistoryWakeTick] = useState(0);
   const revealNotificationsRef = useRef<(() => void) | null>(null);
   const closeResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const drawerOpenRef = useRef(initialDrawerView !== null);
@@ -680,6 +682,25 @@ export function ProfileCompactTemplate({
     }
   }, [requestedMode]);
 
+  // Next's own entry updater can strip the landed ?mode=… entry back to the
+  // bare profile path with a replaceState that never wakes React. When the
+  // strip lands after the history effect's last run (observed on the
+  // standalone E2E server, where hydration settles later than on Vercel), no
+  // dep changes, so the stripped-landing correction below never re-evaluates
+  // and the deep-link mode URL stays bare (profile-admission mode-history
+  // legs red). These bounded wakes force that effect to re-run a few times
+  // after mount; every guard inside it (depth-0, landed-mode match, arrival
+  // history length, the Link-navigation discriminator) is unchanged, so a
+  // wake without a strip is a no-op.
+  useEffect(() => {
+    const timers = [200, 600, 1400].map(delay =>
+      globalThis.setTimeout(() => setHistoryWakeTick(tick => tick + 1), delay)
+    );
+    return () => {
+      for (const timer of timers) globalThis.clearTimeout(timer);
+    };
+  }, []);
+
   useEffect(() => {
     if (
       requestedMode === 'profile' ||
@@ -887,6 +908,7 @@ export function ProfileCompactTemplate({
     searchSuffix,
     initialSource,
     initialClaimIntent,
+    historyWakeTick,
   ]);
 
   const profileHref = useMemo(
