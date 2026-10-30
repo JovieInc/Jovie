@@ -404,6 +404,115 @@ def merge_narrowed_guard_note(ours: str, theirs: str) -> str | None:
     return head
 
 
+SCOPED_RULE_ROUTER = "CLAUDE.md"
+# Match scripts/agent-context/check.mjs budgets and docs/doc-freshness-registry.json agentsMap.
+ROUTER_BYTE_BUDGET = 6000
+ROUTER_MAX_LINES = 120
+_TABLE_ROW = re.compile(r"^\| [^|\n]+ \| [^|\n]+ \|$")
+_CONFLICT_HUNK = re.compile(
+    r"^<<<<<<<[^\n]*\n(?P<ours>.*?)^=======\n(?P<theirs>.*?)^>>>>>>>[^\n]*(?:\n|\Z)",
+    re.M | re.S)
+_ROUTER_REVIEW_KEY = '\n    "CLAUDE.md": {'
+
+
+def _table_rows(side: str) -> list[str] | None:
+    text = str(side or "")
+    if text.endswith("\n"):
+        text = text[:-1]
+    lines = text.split("\n") if text else []
+    if not lines or any(_TABLE_ROW.fullmatch(line) is None for line in lines):
+        return None
+    keys = [line.split("|", 2)[1].strip() for line in lines]
+    if len(keys) != len(set(keys)):
+        return None
+    return lines
+
+
+def merge_scoped_rule_rows(ours: str, theirs: str) -> str | None:
+    """Union added router rows. Main order first, then head-only rows. A changed cell fails closed."""
+    head, base = _table_rows(ours), _table_rows(theirs)
+    if head is None or base is None:
+        return None
+    base_by = {line.split("|", 2)[1].strip(): line for line in base}
+    merged = list(base)
+    for line in head:
+        key = line.split("|", 2)[1].strip()
+        current = base_by.get(key)
+        if current is None:
+            merged.append(line)
+        elif current != line:
+            return None
+    return "\n".join(merged) + "\n"
+
+
+def resolve_scoped_rule_router_text(text: str) -> str | None:
+    """Replace conflict hunks that are only added scoped-rule table rows. None on any other hunk."""
+    if "<<<<<<<" not in str(text or ""):
+        return None
+    hunks = list(_CONFLICT_HUNK.finditer(text))
+    if not hunks:
+        return None
+    cleared = _CONFLICT_HUNK.sub("", text)
+    if "<<<<<<<" in cleared or ">>>>>>>" in cleared:
+        return None
+    pieces = []
+    last = 0
+    for hunk in hunks:
+        rows = merge_scoped_rule_rows(hunk.group("ours"), hunk.group("theirs"))
+        if rows is None:
+            return None
+        pieces.append(text[last:hunk.start()])
+        pieces.append(rows)
+        last = hunk.end()
+    pieces.append(text[last:])
+    resolved = "".join(pieces)
+    if "<<<<<<<" in resolved or ">>>>>>>" in resolved:
+        return None
+    return resolved
+
+
+def router_within_budget(text: str) -> bool:
+    if not isinstance(text, str) or "<<<<<<<" in text or ">>>>>>>" in text:
+        return False
+    return len(text.encode()) <= ROUTER_BYTE_BUDGET and len(text.splitlines()) <= ROUTER_MAX_LINES
+
+
+def refresh_router_document_digest(registry_text: str, document_text: str) -> str | None:
+    """Replace only CLAUDE.md's documentSha256. Other review bytes stay as reviewed."""
+    try:
+        data = json.loads(registry_text)
+    except json.JSONDecodeError:
+        return None
+    reviews = data.get("documentReviews")
+    review = reviews.get(SCOPED_RULE_ROUTER) if isinstance(reviews, dict) else None
+    if not isinstance(review, dict):
+        return None
+    claim, old, sources = review.get("claim"), review.get("documentSha256"), review.get("sources")
+    if not isinstance(claim, str) or not claim.strip() or not isinstance(sources, list) or not sources:
+        return None
+    if not isinstance(old, str) or re.fullmatch(r"[0-9a-f]{64}", old) is None:
+        return None
+    start = registry_text.find(_ROUTER_REVIEW_KEY)
+    if start < 0:
+        return None
+    end = registry_text.find('\n    "', start + len(_ROUTER_REVIEW_KEY))
+    if end < 0:
+        end = len(registry_text)
+    needle = f'"documentSha256": "{old}"'
+    region = registry_text[start:end]
+    if region.count(needle) != 1:
+        return None
+    digest = hashlib.sha256(document_text.replace("\r\n", "\n").encode()).hexdigest()
+    updated = registry_text[:start] + region.replace(needle, f'"documentSha256": "{digest}"', 1) + registry_text[end:]
+    try:
+        checked = json.loads(updated)
+    except json.JSONDecodeError:
+        return None
+    if checked["documentReviews"][SCOPED_RULE_ROUTER]["documentSha256"] != digest:
+        return None
+    return updated
+
+
 def resolve_preflight_narrowed_text(text: str) -> str | None:
     """Replace conflict hunks that are only the NARROWED command and note. None when any
     hunk has another shape, so the caller aborts and leaves the merge to a model."""

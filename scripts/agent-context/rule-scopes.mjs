@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { extractFreshnessMarkers } from '../lib/doc-freshness.mjs';
 
 const MANIFEST = 'scripts/agent-context/rule-scopes.json';
 
@@ -59,13 +60,33 @@ export function runRuleScopes(root, args) {
       ? git(['show', `:${file}`])
       : readFileSync(resolve(root, file), 'utf8');
   const scopes = collectRuleScopes(files, read);
+  const map = read('CLAUDE.md');
+  const markers = extractFreshnessMarkers(map).filter(
+    marker => marker.id === 'scoped-rules-count'
+  );
+  assert.equal(
+    markers.length,
+    1,
+    'CLAUDE.md must have exactly one scoped-rule count marker'
+  );
+  const updatedMap = map.replace(
+    markers[0].fullMatch,
+    `<!-- doc-freshness:scoped-rules-count:${scopes.length} -->`
+  );
   if (args.includes('--write')) {
+    if (updatedMap !== map)
+      writeFileSync(resolve(root, 'CLAUDE.md'), updatedMap);
     writeFileSync(
       resolve(root, MANIFEST),
       `${JSON.stringify(scopes, null, 2)}\n`
     );
   } else {
     checkRuleScopes(scopes, JSON.parse(read(MANIFEST)));
+    assert.equal(
+      map,
+      updatedMap,
+      'Scoped-rule count is stale. Run node scripts/agent-context/rule-scopes.mjs --write and stage CLAUDE.md with the integrity record.'
+    );
   }
 }
 

@@ -1,3 +1,4 @@
+import hashlib
 import sys
 import tempfile
 import unittest
@@ -145,6 +146,43 @@ class NarrowedPreflightMergeTest(unittest.TestCase):
         other = text.replace("note:", "title:", 1)
         self.assertIsNone(classes.resolve_preflight_narrowed_text(other))
         self.assertIsNone(classes.merge_narrowed_guard_command(self.OURS, self.THEIRS.replace("vitest run", "vitest watch")))
+
+
+class ScopedRuleRouterMergeTest(unittest.TestCase):
+    HEAD = "| Research | [research](.claude/rules/research.md) |\n"
+    MAIN = "| New fact (price, limit, copy) | [owner first](.claude/rules/source-of-truth.md): `canon/sources-of-truth.json`; derive, never copy |\n"
+
+    def conflict(self, head, main):
+        return f"<<<<<<< HEAD\n{head}=======\n{main}>>>>>>> origin/main\n"
+
+    def test_unions_added_rows_and_rejects_other_hunks(self):
+        resolved = classes.resolve_scoped_rule_router_text(
+            "before\n" + self.conflict(self.HEAD, self.MAIN) + "after\n")
+        self.assertEqual(resolved, "before\n" + self.MAIN + self.HEAD + "after\n")
+        changed = self.HEAD.replace("research.md", "research-old.md")
+        self.assertIsNone(classes.resolve_scoped_rule_router_text(self.conflict(self.HEAD, changed)))
+        prose = self.conflict("Keep one canonical copy.\n", "One canonical copy per instruction.\n")
+        self.assertIsNone(classes.resolve_scoped_rule_router_text(prose))
+        self.assertIsNone(classes.resolve_scoped_rule_router_text("no conflict\n"))
+
+    def test_refreshes_only_the_router_digest(self):
+        document = f"# Router\n{self.MAIN}{self.HEAD}<!-- doc-freshness:scoped-rules-count:2 -->\n"
+        old = "0" * 64
+        registry = (
+            '{\n  "documentReviews": {\n    "CLAUDE.md": {\n'
+            '      "owner": "@itstimwhite",\n'
+            '      "claim": "The router stays a router.",\n'
+            f'      "documentSha256": "{old}",\n'
+            '      "sources": [{"path": "canon/OPERATING_SYSTEM.md", "sha256": "abc"}]\n'
+            '    }\n  }\n}\n'
+        )
+        updated = classes.refresh_router_document_digest(registry, document)
+        digest = hashlib.sha256(document.encode()).hexdigest()
+        self.assertIn(digest, updated)
+        self.assertNotIn(old, updated)
+        self.assertIn("The router stays a router.", updated)
+        self.assertTrue(classes.router_within_budget(document))
+        self.assertIsNone(classes.refresh_router_document_digest(registry.replace(old, "zz"), document))
 
 
 class SpacingSnapTest(unittest.TestCase):

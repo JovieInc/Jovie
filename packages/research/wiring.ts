@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { type CredentialEnv, createProviderClients } from './credentials.ts';
 import { createGbrainClient, type GbrainClient } from './gbrain.ts';
 import { clefJudge, jevJudge } from './judge.ts';
-import { loadResearch, saveResearch } from './persist.ts';
+import { loadResearch, researchSlug, saveResearch } from './persist.ts';
 import { createRouter, type SourceImpl } from './router.ts';
 import { priorDecisions, searchGbrain, searchRepo } from './sources-local.ts';
 import {
@@ -47,7 +47,10 @@ export interface Wiring {
 export function createDefaultWiring(
   options: { ctx?: CredentialEnv; state?: ResearchState } = {}
 ): Wiring {
-  const gbrain = createGbrainClient();
+  // Writes (pages, takes, decisions) chunk and embed server-side: 10-30s.
+  const gbrain = createGbrainClient({ timeoutMs: 90_000 });
+  // Tier 0 must stay fast: a busy shared daemon (seen at 15s) is skipped, not awaited.
+  const gbrainFast = createGbrainClient({ timeoutMs: 8_000 });
   const state = options.state ?? new ResearchState();
   const clients = createProviderClients({ ctx: options.ctx });
   const root = repoRoot();
@@ -83,7 +86,7 @@ export function createDefaultWiring(
   const sources: Record<string, SourceImpl> = {
     gbrain: {
       available: () => true,
-      run: async c => ({ hits: await searchGbrain(gbrain, c.query) }),
+      run: async c => ({ hits: await searchGbrain(gbrainFast, c.query) }),
     },
     repo: {
       available: () => true,
@@ -145,9 +148,10 @@ export function createDefaultWiring(
     state,
     sources,
     judges,
-    prior: q => priorDecisions(gbrain, q),
+    prior: q => priorDecisions(gbrainFast, q),
     loadPersisted: key => loadResearch(gbrain, key),
     persist: (result, caller) => saveResearch(gbrain, result, caller),
+    slugFor: researchSlug,
   });
   return { gbrain, state, router, judges };
 }
