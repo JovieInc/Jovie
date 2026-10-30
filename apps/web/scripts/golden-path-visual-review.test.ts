@@ -156,7 +156,11 @@ describe('golden path visual review', () => {
 
   it('reviewer A sends the image with the rubric and parses the verdict', async () => {
     let body:
-      | { model: string; messages: { content: { type: string }[] }[] }
+      | {
+          model: string;
+          messages: { content: { type: string }[] }[];
+          providerOptions?: { gateway?: Record<string, unknown> };
+        }
       | undefined;
     const result = await reviewWithModel({
       png: Buffer.from('png-bytes'),
