@@ -1,5 +1,9 @@
 import { neon } from '@neondatabase/serverless';
 import type { Page } from '@playwright/test';
+import {
+  SHARED_E2E_ARTIST_POOL,
+  selectUnclaimedCertArtist,
+} from '@/lib/synthetic/prodcert-artist-fixture';
 
 /**
  * Fixture artists for the $12 claim dogfood (never real artists).
@@ -267,4 +271,47 @@ export async function resetDogfoodBilling(email: string): Promise<void> {
         billing_version = billing_version + 1, updated_at = now()
     WHERE email = ${email}
   `;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Golden-path fixture artist lifecycle                                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Email pattern for golden-path test accounts; only their bindings are
+ * ever released by the self-cleaning teardown.
+ */
+export const GOLDEN_PATH_TEST_EMAIL_LIKE = 'gp-%+e2e@test.jovie.com';
+
+/**
+ * Release all creator_profiles spotify bindings owned by golden-path test
+ * accounts. Called in beforeAll (to clear stale runs) and afterAll (teardown).
+ * Keeps the fixture pool clean so subsequent runs never hit ownership_conflict:v1.
+ */
+export async function releaseGoldenPathTestBindings(
+  sql: ReturnType<typeof neon>
+): Promise<void> {
+  await sql`
+    UPDATE creator_profiles
+    SET spotify_id = NULL, spotify_url = NULL, updated_at = NOW()
+    WHERE spotify_id IS NOT NULL
+      AND user_id IN (
+        SELECT id FROM users WHERE email LIKE ${GOLDEN_PATH_TEST_EMAIL_LIKE}
+      )
+  `;
+}
+
+/**
+ * Release any stale golden-path bindings then select the first artist from
+ * SHARED_E2E_ARTIST_POOL whose Spotify id has no bound creator_profiles row.
+ */
+export async function selectGoldenPathArtist(
+  sql: ReturnType<typeof neon>
+): Promise<{ id: string; name: string; url: string }> {
+  await releaseGoldenPathTestBindings(sql);
+  return selectUnclaimedCertArtist(SHARED_E2E_ARTIST_POOL, async spotifyId => {
+    const rows =
+      await sql`SELECT 1 FROM creator_profiles WHERE spotify_id = ${spotifyId} LIMIT 1`;
+    return rows.length > 0;
+  }).then(a => ({ id: a.spotifyId, name: a.name, url: a.url }));
 }

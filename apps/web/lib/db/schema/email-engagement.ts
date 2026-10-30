@@ -34,7 +34,8 @@ export type TrackedEmailType =
   | 'follow_up_2'
   | 'follow_up_3'
   | 'release_notification'
-  | 'campaign';
+  | 'campaign'
+  | 'recovery';
 
 /**
  * Metadata for engagement events

@@ -65,7 +65,7 @@ export const M2_CLAIM_ENTRY_MARKER = 'claim-artist-search';
 export const M2_CLAIM_ENTRY_PRICE = `${M2_CLAIM_PRICE_DISPLAY}/mo`;
 
 export const M2_ACTIVATION_MARKERS = [
-  'Artist Visibility is starting',
+  'Artist Presence is active',
   'Checkout not confirmed',
   'Confirming checkout',
 ] as const;

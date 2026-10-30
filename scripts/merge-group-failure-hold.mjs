@@ -989,6 +989,29 @@ export function supersededByLiveEntry(pr, sourceHeadSha, groupHeadSha) {
   );
 }
 
+// HEADGREEN grouping (live ruleset 10512119, 2026-10-29): only the group head's
+// build gates the merge, so a failed build of an entry that still has entries
+// queued behind it, on the same live synthetic commit, did not eject it and a
+// later head can still land it. Holding it (durable failure status, dequeue,
+// auto-merge off) would turn a one-off intermediate flake into the ejection
+// HEADGREEN exists to avoid. The last queued entry has nothing behind it, so
+// its failure still holds, and so does a deterministic-source failure (a PR
+// that is itself broken must not wait to eject everyone behind it). Missing
+// queue data fails closed to the old behavior.
+export function coveredByLaterEntry(pr, sourceHeadSha, groupHeadSha) {
+  const entry = pr?.mergeQueueEntry;
+  const total = entry?.mergeQueue?.entries?.totalCount;
+  return (
+    pr?.state === 'OPEN' &&
+    String(pr?.headRefOid ?? '').toLowerCase() === sourceHeadSha &&
+    pr.isInMergeQueue === true &&
+    Number.isInteger(entry?.position) &&
+    Number.isInteger(total) &&
+    entry.position < total &&
+    liveEntryHeadSha(pr) === groupHeadSha
+  );
+}
+
 // A group's base is main or, behind other entries, the head of the group ahead
 // of it. Until that group's CI passes, a failure here can be the ahead entry's:
 // on 2026-10-12 #21393 was held as deterministic-source for a DESIGN.md check
@@ -1125,6 +1148,28 @@ export async function applyMergeGroupFailure(
       workflowRunAttempt: run.run_attempt,
       classification,
       superseded: true,
+      statusWritten: false,
+      dequeued: false,
+      dequeueOutcome: 'not-attempted',
+      autoMergeDisabled: false,
+    };
+  }
+  if (
+    !failedSteps?.includes?.(WORKFLOW_LOAD_STEP) &&
+    classification !== 'deterministic-source' &&
+    coveredByLaterEntry(current, sourceHeadSha, groupHeadSha)
+  ) {
+    return {
+      schema: FAILURE_HOLD_SCHEMA,
+      repository,
+      prNumber: front.prNumber,
+      sourceHeadSha,
+      mergeGroupHeadSha: groupHeadSha,
+      workflowRunId: run.id,
+      workflowRunAttempt: run.run_attempt,
+      classification,
+      skipped: true,
+      coveredByLaterEntry: true,
       statusWritten: false,
       dequeued: false,
       dequeueOutcome: 'not-attempted',
@@ -1374,7 +1419,7 @@ function graphql(query, variables) {
 }
 
 const TIMELINE_QUERY = `query($owner:String!,$name:String!,$number:Int!,$cursor:String){repository(owner:$owner,name:$name){pullRequest(number:$number){timelineItems(first:100,after:$cursor,itemTypes:[ADDED_TO_MERGE_QUEUE_EVENT,REMOVED_FROM_MERGE_QUEUE_EVENT,PULL_REQUEST_COMMIT,HEAD_REF_FORCE_PUSHED_EVENT]){nodes{__typename ... on AddedToMergeQueueEvent{createdAt} ... on RemovedFromMergeQueueEvent{createdAt reason beforeCommit{oid}} ... on PullRequestCommit{commit{oid}} ... on HeadRefForcePushedEvent{createdAt afterCommit{oid}}} pageInfo{hasNextPage endCursor}}}}}`;
-const PR_QUERY = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id state headRefOid isInMergeQueue mergeQueueEntry{id headCommit{oid}} autoMergeRequest{enabledAt}}}}`;
+const PR_QUERY = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id state headRefOid isInMergeQueue mergeQueueEntry{id position headCommit{oid} mergeQueue{entries{totalCount}}} autoMergeRequest{enabledAt}}}}`;
 
 function readTimeline(repository, prNumber) {
   const [owner, name] = repository.split('/');

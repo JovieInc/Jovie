@@ -3380,7 +3380,10 @@ describe('CI E2E smoke workflow', () => {
       'Protected Golden Path fixture is already owned; refusing to detach'
     );
     expect(goldenPathSpec).toContain('user_profile_claims upc');
-    expect(goldenPathSpec).toContain('sync-spotify-empty-state');
+    // JOV-9758/JOV-9771: onboarding imports the catalog; the journey never
+    // clicks a manual sync and must see real releases before any pricing.
+    expect(goldenPathSpec).not.toContain('sync-spotify-empty-state');
+    expect(goldenPathSpec).toContain('data-catalog-releases');
     expect(goldenPathSpec).toContain('FROM discog_releases r');
     expect(goldenPathSpec).toContain(
       'INNER JOIN creator_profiles cp ON cp.id = r.creator_profile_id'
@@ -3441,8 +3444,6 @@ describe('CI E2E smoke workflow', () => {
     expect(builds).toHaveLength(1);
     expect(builds[0]?.env).toMatchObject({
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: '1x00000000000000000000AA',
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
-        '${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}',
       NEXT_PUBLIC_APP_URL: 'http://localhost:3250',
       NEXT_PUBLIC_BETTER_AUTH_URL: 'http://localhost:3250',
     });

@@ -9,6 +9,12 @@ import {
 } from './fetch';
 import { queryKeys } from './keys';
 
+/** Prefer the server's explanation (e.g. 422 "must sign in first") over a generic message. */
+function serverErrorMessage(error: FetchError, fallback: string): string {
+  const message = error.parsedBody?.error;
+  return typeof message === 'string' && message.trim() ? message : fallback;
+}
+
 // Types
 export interface ApproveWaitlistInput {
   entryId: string;
@@ -78,7 +84,9 @@ async function approveWaitlistEntry(
     };
   } catch (error) {
     if (error instanceof FetchError) {
-      throw new Error('Failed to approve waitlist entry');
+      throw new Error(
+        serverErrorMessage(error, 'Failed to approve waitlist entry')
+      );
     }
     throw error;
   }
@@ -111,7 +119,9 @@ async function disapproveWaitlistEntry(
     };
   } catch (error) {
     if (error instanceof FetchError) {
-      throw new Error('Failed to disapprove waitlist entry');
+      throw new Error(
+        serverErrorMessage(error, 'Failed to disapprove waitlist entry')
+      );
     }
     throw error;
   }
@@ -147,7 +157,9 @@ async function updateWaitlistStatus(
     };
   } catch (error) {
     if (error instanceof FetchError) {
-      throw new Error('Failed to update waitlist status');
+      throw new Error(
+        serverErrorMessage(error, 'Failed to update waitlist status')
+      );
     }
     throw error;
   }
@@ -180,7 +192,9 @@ async function resendWaitlistInvite(
     };
   } catch (error) {
     if (error instanceof FetchError) {
-      throw new Error('Failed to resend waitlist invite');
+      throw new Error(
+        serverErrorMessage(error, 'Failed to resend waitlist invite')
+      );
     }
     throw error;
   }

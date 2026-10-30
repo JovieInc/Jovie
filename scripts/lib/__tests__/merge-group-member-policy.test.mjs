@@ -750,10 +750,10 @@ describe('merge-group hold labels (JOV-6843)', () => {
   });
 
   it('fails a member that carries any hold label, case-insensitively', () => {
-    expect(evaluateHoldMemberPolicy(heldPr(['ci', 'Do-Not-Merge']))).toEqual({
+    expect(evaluateHoldMemberPolicy(heldPr(['ci', 'Queue-Deferred']))).toEqual({
       passed: false,
       policy: 'hold',
-      reason: 'carries the Do-Not-Merge label',
+      reason: 'carries the Queue-Deferred label',
     });
     expect(evaluateHoldMemberPolicy(heldPr(['ci', 'big-pr']))).toBeNull();
     for (const label of HOLD_LABELS) {

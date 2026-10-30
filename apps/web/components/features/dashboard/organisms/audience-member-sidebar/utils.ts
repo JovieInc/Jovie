@@ -73,7 +73,9 @@ export function computeMemberTitle(
   if (!member || member.type === 'anonymous') {
     return 'Anonymous user';
   }
-  return member.displayName || member.email || member.phone || 'Fan';
+  return (
+    member.displayName || member.email || member.phone || 'Audience member'
+  );
 }
 
 /**
@@ -83,20 +85,20 @@ export function computeMemberSubtitle(
   member: { type: string; email?: string | null; phone?: string | null } | null
 ): string {
   if (!member || member.type === 'anonymous') {
-    return 'Anonymous fan';
+    return 'Anonymous visitor';
   }
 
   switch (member.type) {
     case 'email':
-      return member.email ?? 'Email fan';
+      return member.email ?? 'Email subscriber';
     case 'sms':
-      return member.phone ?? 'SMS fan';
+      return member.phone ?? 'SMS subscriber';
     case 'spotify':
       return 'Spotify connected';
     case 'customer':
       return 'Customer';
     default:
-      return 'Fan';
+      return 'Audience member';
   }
 }
 
