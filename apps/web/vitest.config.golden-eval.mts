@@ -33,6 +33,7 @@ export default defineConfig({
       NODE_ENV: 'test',
     },
     include: [
+      'tests/eval/agent-acquisition/**/*.ci.test.ts',
       'tests/eval/golden/**/*.ci.test.ts',
       'tests/eval/helpfulness/**/*.ci.test.ts',
     ],
