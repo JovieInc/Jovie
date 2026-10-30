@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fileSurfaceIssues } from '../../prod-cert.mjs';
+import { fileOverallIssue, fileSurfaceIssues } from '../../prod-cert.mjs';
 import {
   buildReceipt,
+  certificationVerdict,
+  EXPECTED_BROWSER_CHECKS,
   runCheck,
   runProductionCertification,
   SURFACE_IDS,
@@ -178,6 +180,39 @@ describe('runProductionCertification', () => {
   });
 });
 
+describe('quality observations', () => {
+  it('attaches measured contract observations from the browser run to the surface receipt', async () => {
+    const steps = [
+      {
+        kind: 'observation',
+        surface: 'chat',
+        contractId: 'conversation.message-echo',
+        dimension: 'responsiveness',
+        value: 31,
+        unit: 'ms',
+        sampleSize: 1,
+      },
+    ];
+    const { receipts } = await runProductionCertification({
+      fetchImpl: fakeFetch(),
+      steps,
+      authStatus: 'passed',
+    });
+    expect(receipts.find(r => r.surface === 'chat').observations).toEqual([
+      {
+        contractId: 'conversation.message-echo',
+        dimension: 'responsiveness',
+        value: 31,
+        unit: 'ms',
+        sampleSize: 1,
+      },
+    ]);
+    expect(receipts.find(r => r.surface === 'landing').observations).toEqual(
+      []
+    );
+  });
+});
+
 describe('fileSurfaceIssues', () => {
   it('upserts one fingerprinted issue per failed surface and closes passed ones', async () => {
     const upsert = vi.fn(async (/** @type {any} */ _issue) => ({ ok: true }));
@@ -196,5 +231,122 @@ describe('fileSurfaceIssues', () => {
     expect(close.mock.calls.map(c => c[0].fingerprint)).toEqual([
       'prod-cert-landing',
     ]);
+  });
+});
+
+describe('JOV-9822 retries, full green and the overall verdict', () => {
+  const step = (surface, id, status, endedAt) => ({
+    surface,
+    id,
+    status,
+    startedAt: endedAt,
+    endedAt,
+    summary: status,
+  });
+  const allPassedSteps = Object.entries(EXPECTED_BROWSER_CHECKS).flatMap(
+    ([surface, ids]) => ids.map(id => step(surface, id, 'passed', T))
+  );
+
+  it('keeps the latest attempt of a retried check, so a fail-then-pass passes', async () => {
+    const { receipts } = await runProductionCertification({
+      fetchImpl: fakeFetch(),
+      authStatus: 'passed',
+      steps: [
+        ...allPassedSteps.filter(s => s.id !== 'checkout-entry-renders'),
+        step('checkout', 'checkout-entry-renders', 'failed', T),
+        step(
+          'checkout',
+          'checkout-entry-renders',
+          'passed',
+          '2026-10-28T20:01:00.000Z'
+        ),
+      ],
+    });
+    const checkout = receipts.find(r => r.surface === 'checkout');
+    expect(checkout.status).toBe('passed');
+    expect(checkout.checks).toHaveLength(1);
+  });
+
+  it('a pass followed by a failed retry stays failed', async () => {
+    const { receipts } = await runProductionCertification({
+      fetchImpl: fakeFetch(),
+      authStatus: 'passed',
+      steps: [
+        ...allPassedSteps.filter(s => s.id !== 'first-reply'),
+        step('chat', 'first-reply', 'passed', T),
+        step('chat', 'first-reply', 'failed', '2026-10-28T20:01:00.000Z'),
+      ],
+    });
+    expect(receipts.find(r => r.surface === 'chat').status).toBe('failed');
+  });
+
+  it('certifies only when all eight surfaces pass on the served sha within 24h', async () => {
+    const { receipts } = await runProductionCertification({
+      fetchImpl: fakeFetch(),
+      authStatus: 'passed',
+      steps: allPassedSteps,
+    });
+    expect(receipts.every(r => r.status === 'passed')).toBe(true);
+    const now = Date.parse(receipts[0].endedAt);
+    expect(
+      certificationVerdict(receipts, { servedSha: SHA, nowMs: now })
+    ).toEqual({
+      certified: true,
+      servedSha: SHA,
+      notGreen: [],
+    });
+    const other = 'b'.repeat(40);
+    expect(
+      certificationVerdict(receipts, { servedSha: other, nowMs: now }).notGreen
+    ).toHaveLength(8);
+    expect(
+      certificationVerdict(receipts, {
+        servedSha: SHA,
+        nowMs: now + 25 * 60 * 60 * 1000,
+      }).certified
+    ).toBe(false);
+    expect(
+      certificationVerdict(receipts.slice(1), { servedSha: SHA, nowMs: now })
+        .notGreen
+    ).toEqual([{ surface: 'landing', why: 'no receipt' }]);
+  });
+
+  it('requires the /start preview and the smartlink capture from the browser run', async () => {
+    const { receipts } = await runProductionCertification({
+      fetchImpl: fakeFetch(),
+      authStatus: 'passed',
+      steps: allPassedSteps.filter(
+        s => s.id !== 'golden-path-preview-has-release'
+      ),
+    });
+    const claim = receipts.find(r => r.surface === 'claim');
+    expect(claim.status).toBe('blocked');
+    expect(claim.blocker).toContain('golden-path-preview-has-release');
+  });
+
+  it('opens one overall issue when not certified and closes it when certified', async () => {
+    const upsert = vi.fn().mockResolvedValue({ ok: true });
+    const close = vi.fn().mockResolvedValue({ ok: true });
+    await fileOverallIssue(
+      {
+        certified: false,
+        servedSha: SHA,
+        notGreen: [{ surface: 'chat', why: 'failed' }],
+      },
+      { deps: { upsert, close } }
+    );
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fingerprint: 'prod-cert-overall',
+        description: expect.stringContaining('`chat`: failed'),
+      })
+    );
+    await fileOverallIssue(
+      { certified: true, servedSha: SHA, notGreen: [] },
+      { deps: { upsert, close } }
+    );
+    expect(close).toHaveBeenCalledWith(
+      expect.objectContaining({ fingerprint: 'prod-cert-overall' })
+    );
   });
 });

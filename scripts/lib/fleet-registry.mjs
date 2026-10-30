@@ -11,6 +11,8 @@ export const ROUTE_KINDS = [
   'gem-lanes',
   'jovie-fleet-lease',
   'cursor-cli',
+  'slack',
+  'imessage',
   'none',
 ];
 export const TOS_VERDICTS = [

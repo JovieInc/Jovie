@@ -15,13 +15,17 @@ import {
   requireExactNavigationOrigin,
 } from '../helpers/vercel-preview';
 import { primeOriginBoundVercelBypass } from './utils/prime-vercel-bypass';
-import { certStep, certStepBlocked } from './utils/prod-cert-steps';
+import { certStep, recordCertObservation } from './utils/prod-cert-steps';
 import { resolveProductionAuthCredentials } from './utils/production-auth-credentials';
 import {
   prepareProductionAuthEmailForm,
+  waitForCheckoutEntryContent,
   waitForProductionDashboardContent,
 } from './utils/production-auth-interaction';
-import { waitForProductionAuthOtp } from './utils/production-auth-otp';
+import {
+  newProdcertUserEmail,
+  waitForProductionAuthOtp,
+} from './utils/production-auth-otp';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 /**
@@ -676,31 +680,114 @@ test.describe('Production Auth Smoke @production-smoke', () => {
     }
 
     // Chat: same session (a second OTP request would invalidate this one).
+    // The identity is the tagged canary (+clerk_test), so its thread is
+    // excluded from customer metrics; the thread is deleted at the end.
+    await page.goto(APP_ROUTES.CHAT, {
+      waitUntil: 'domcontentloaded',
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+    });
+    assertExactNavigationUrl(page.url(), expectedOrigin, 'Chat navigation');
+    await waitForHydration(page);
+    const composer = page.getByRole('textbox', { name: /chat message input/i });
     await certStep(
       'chat',
       'composer-ready',
       async () => {
-        await page.goto(APP_ROUTES.CHAT, {
-          waitUntil: 'domcontentloaded',
-          timeout: SMOKE_TIMEOUTS.NAVIGATION,
-        });
-        assertExactNavigationUrl(page.url(), expectedOrigin, 'Chat navigation');
-        await waitForHydration(page);
-        const composer = page
-          .locator('textarea, [role="textbox"], [contenteditable="true"]')
-          .first();
         await expect(composer).toBeVisible({
           timeout: SMOKE_TIMEOUTS.VISIBILITY,
         });
-        await expect(composer).toBeEnabled();
+        await expect(composer).toBeEditable();
       },
-      () => 'chat composer visible and enabled'
+      () => 'chat composer visible and editable'
     );
-    certStepBlocked(
-      'chat',
-      'first-reply',
-      'first assistant reply is not exercised yet: a prod send spends model credit and has no synthetic-tagged thread cleanup'
-    );
+
+    const probe = 'prodcert synthetic check: reply with the single word ok';
+    const chatStartedAt = Date.now();
+    let conversationId: string | null = null;
+    try {
+      await certStep(
+        'chat',
+        'first-reply',
+        async () => {
+          await composer.focus();
+          await page.evaluate(() => {
+            const el = document.activeElement;
+            const w = window as unknown as { __prodcertAck?: Promise<number> };
+            w.__prodcertAck = new Promise<number>(resolve => {
+              let startedAt = 0;
+              el?.addEventListener(
+                'keydown',
+                () => {
+                  startedAt = performance.now();
+                },
+                { once: true }
+              );
+              el?.addEventListener(
+                'input',
+                () =>
+                  requestAnimationFrame(() =>
+                    resolve(performance.now() - startedAt)
+                  ),
+                { once: true }
+              );
+            });
+          });
+          await page.keyboard.press('p');
+          const ackMs = await page.evaluate(
+            () =>
+              (window as unknown as { __prodcertAck: Promise<number> })
+                .__prodcertAck
+          );
+          recordCertObservation({
+            surface: 'chat',
+            contractId: 'local-input.acknowledgement',
+            dimension: 'responsiveness',
+            value: Math.round(ackMs),
+            unit: 'ms',
+          });
+          await composer.fill(probe);
+          const sentAt = Date.now();
+          await page.getByRole('button', { name: /send message/i }).click();
+          await expect(page.getByText(probe).first()).toBeVisible({
+            timeout: SMOKE_TIMEOUTS.VISIBILITY,
+          });
+          const echoMs = Date.now() - sentAt;
+          await expect(
+            page.getByTestId('chat-message-reply').first()
+          ).toBeVisible({ timeout: 60_000 });
+          const replyMs = Date.now() - sentAt;
+          recordCertObservation({
+            surface: 'chat',
+            contractId: 'conversation.message-echo',
+            dimension: 'responsiveness',
+            value: echoMs,
+            unit: 'ms',
+          });
+          recordCertObservation({
+            surface: 'chat',
+            contractId: 'conversation.first-useful-output',
+            dimension: 'responsiveness',
+            value: replyMs,
+            unit: 'ms',
+          });
+          const match = page.url().match(/[0-9a-f]{8}-[0-9a-f-]{27}/u);
+          conversationId = match ? match[0] : null;
+          return { echoMs, replyMs };
+        },
+        ({ echoMs, replyMs }) =>
+          `assistant replied; message echo ${echoMs}ms, first reply ${replyMs}ms`
+      );
+    } finally {
+      if (conversationId) {
+        await page
+          .context()
+          .request.delete(
+            `${expectedOrigin}/api/chat/conversations/${conversationId}`
+          )
+          .catch(() => undefined);
+      }
+      void chatStartedAt;
+    }
 
     await certStep(
       'checkout',
@@ -716,9 +803,10 @@ test.describe('Production Auth Smoke @production-smoke', () => {
           'Billing navigation'
         );
         await waitForHydration(page);
-        const billingText = (
-          await page.locator('main').first().innerText()
-        ).toLowerCase();
+        const billingText = await waitForCheckoutEntryContent(
+          page,
+          SMOKE_TIMEOUTS.VISIBILITY
+        );
         expect(billingText).not.toMatch(
           /application error|something went wrong/
         );
@@ -732,5 +820,62 @@ test.describe('Production Auth Smoke @production-smoke', () => {
     if (performanceAuthStatePath) {
       await page.context().storageState({ path: performanceAuthStatePath });
     }
+  });
+  // JOV-9625: a brand-new user signs up with a fresh email OTP. The address is
+  // the tagged prodcert canary (+synthetic-, excluded from customer metrics);
+  // it is a different identity from creator-ready, so the OTPs cannot race.
+  test('new user signs up with an email code', async ({ page }, testInfo) => {
+    const expectedOrigin = exactOriginForTest(testInfo);
+    const email = newProdcertUserEmail(
+      process.env.GITHUB_RUN_ID
+        ? `${process.env.GITHUB_RUN_ID}${process.env.GITHUB_RUN_ATTEMPT ?? '1'}`
+        : `local${Date.now().toString(36)}`
+    );
+    recordPlaywrightSensitiveValues([email]);
+
+    await certStep(
+      'signup-signin',
+      'new-user-email-otp',
+      async () => {
+        await page.goto(APP_ROUTES.SIGNIN, {
+          waitUntil: 'domcontentloaded',
+          timeout: SMOKE_TIMEOUTS.NAVIGATION,
+        });
+        assertExactNavigationUrl(
+          page.url(),
+          expectedOrigin,
+          'Signup navigation'
+        );
+        const { submitButton } = await prepareProductionAuthEmailForm(
+          page,
+          email
+        );
+        const requestedAtMs = Date.now();
+        await submitButton.click();
+        const codeInput = page
+          .locator(
+            'form[data-auth-email-code-step="code"] input[name="code"], form[data-auth-email-code-step="code"] input[autocomplete="one-time-code"], form[data-auth-email-code-step="code"] input[inputmode="numeric"], [data-testid="otp-autofill-input"]'
+          )
+          .first();
+        await expect(codeInput).toBeVisible({ timeout: 15_000 });
+        const code = await waitForProductionAuthOtp({
+          email,
+          startedAtMs: requestedAtMs,
+        });
+        await codeInput.fill(code);
+        await page.waitForURL(
+          url =>
+            url.origin === expectedOrigin &&
+            !url.pathname.startsWith(APP_ROUTES.SIGNIN),
+          { timeout: 30_000 }
+        );
+        assertExactNavigationUrl(page.url(), expectedOrigin, 'Signup landing');
+        const text = (await page.locator('body').innerText()).toLowerCase();
+        expect(text).not.toMatch(/application error|something went wrong/);
+        return new URL(page.url()).pathname;
+      },
+      pathname =>
+        `new synthetic user verified an email OTP and landed on ${pathname}`
+    );
   });
 });

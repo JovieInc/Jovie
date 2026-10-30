@@ -46,7 +46,7 @@ const artist = {
 describe('/artists page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.count.mockResolvedValue(1);
+    mocks.count.mockResolvedValue(12);
   });
 
   it('renders page 1 normally with the global count', async () => {
@@ -61,7 +61,7 @@ describe('/artists page', () => {
     expect(mocks.directoryProps).toHaveBeenCalledWith(
       expect.objectContaining({
         profiles: [artist],
-        total: 1,
+        total: 12,
         nextCursor: null,
       })
     );
@@ -99,20 +99,18 @@ describe('/artists page', () => {
     expect(mocks.redirect).not.toHaveBeenCalled();
   });
 
-  it('allows the empty state on the first page only', async () => {
-    mocks.count.mockResolvedValue(0);
+  it('redirects to /artist-profiles while the directory is below the publish gate', async () => {
+    mocks.count.mockResolvedValue(1);
     mocks.profiles.mockResolvedValue({
       status: 'ok',
-      profiles: [],
+      profiles: [artist],
       nextCursor: null,
     });
 
-    render(await ArtistsPage({ searchParams: Promise.resolve({}) }));
-
-    expect(mocks.directoryProps).toHaveBeenCalledWith(
-      expect.objectContaining({ profiles: [], total: 0 })
-    );
-    expect(mocks.redirect).not.toHaveBeenCalled();
+    await expect(
+      ArtistsPage({ searchParams: Promise.resolve({}) })
+    ).rejects.toThrow('NEXT_REDIRECT:/artist-profiles');
+    expect(mocks.directoryProps).not.toHaveBeenCalled();
   });
 
   it('renders the no-DB fallback instead of the directory when the catalog is unavailable (JOV-7125)', async () => {

@@ -1,7 +1,9 @@
 import 'server-only';
 
+import { matchArtistCredits, sameCatalogName, sameUpc } from './catalog-names';
 import {
   type ArtistCandidate,
+  type CatalogAlbum,
   type CatalogTrack,
   type InHouseEntityKind,
   type InHouseQuery,
@@ -12,6 +14,7 @@ import {
   type ResolvedDspLink,
 } from './in-house-contracts';
 
+export { normalizeCatalogName, sameCatalogName } from './catalog-names';
 export type {
   ArtistCandidate,
   CatalogAlbum,
@@ -37,20 +40,6 @@ export { PROVENANCE_CONFIDENCE } from './in-house-contracts';
  * link aggregator is not called: its terms restrict use to build a competing
  * aggregation service.
  */
-
-export function normalizeCatalogName(value: string): string {
-  const normalized = value.normalize('NFKC').toLowerCase();
-  if (!/[\p{L}\p{N}]/u.test(normalized)) return '';
-  return normalized
-    .replace(/&/g, ' and ')
-    .replace(/[^\p{L}\p{N}\p{M}]+/gu, ' ')
-    .trim();
-}
-
-export function sameCatalogName(left: string, right: string): boolean {
-  const normalized = normalizeCatalogName(left);
-  return normalized.length > 0 && normalized === normalizeCatalogName(right);
-}
 
 function territoryOf(query: { readonly territory?: string }): string {
   return query.territory ?? 'US';
@@ -129,6 +118,20 @@ function finish(
   };
 }
 
+function linkFromCatalog(item: {
+  readonly provider: string;
+  readonly url: string;
+  readonly provenance: string;
+  readonly confidence: number;
+}): ResolvedDspLink {
+  return {
+    provider: item.provider,
+    url: item.url,
+    provenance: item.provenance,
+    confidence: item.confidence,
+  };
+}
+
 function linksFromTracks(tracks: readonly CatalogTrack[]): ResolvedDspLink[] {
   return tracks.map(track => ({
     provider: track.provider,
@@ -203,60 +206,52 @@ async function resolveTrack(
     );
   }
   const hits = await sources.searchTracks(query.artist, query.title, territory);
-  const exact = hits.filter(
-    hit =>
-      sameCatalogName(hit.artist, query.artist) &&
-      sameCatalogName(hit.title, query.title)
+  const credited = hits.flatMap(hit => {
+    const match = matchArtistCredits(query.artist, hit.artist, hit.artists);
+    return match ? [{ hit, match }] : [];
+  });
+  const matched = credited.filter(({ hit }) =>
+    sameCatalogName(hit.title, query.title)
   );
-  if (exact.length === 0) {
-    const related = hits.filter(hit =>
-      sameCatalogName(hit.artist, query.artist)
-    );
-    if (related.length === 0) return empty('track', 'no_match', hits.length);
+  const subject = {
+    title: query.title,
+    artist: query.artist,
+    isrc: null,
+    upc: null,
+    mbid: null,
+  };
+  const candidatesOf = (items: readonly CatalogTrack[]) =>
+    items.map(hit => ({ title: hit.title, artist: hit.artist, url: hit.url }));
+  if (matched.length === 0) {
+    if (credited.length === 0) return empty('track', 'no_match', hits.length);
     return finish(
       'track',
       'ambiguous',
-      {
-        title: query.title,
-        artist: query.artist,
-        isrc: null,
-        upc: null,
-        mbid: null,
-      },
+      subject,
       [],
-      related.map(hit => ({
-        title: hit.title,
-        artist: hit.artist,
-        url: hit.url,
-      }))
+      candidatesOf(credited.map(item => item.hit))
     );
   }
+  const exact = matched.map(item => item.hit);
   const isrcs = new Set(
     exact.flatMap(hit => (hit.isrc ? [hit.isrc.toUpperCase()] : []))
   );
   if (isrcs.size > 1) {
-    return finish(
-      'track',
-      'ambiguous',
-      {
-        title: query.title,
-        artist: query.artist,
-        isrc: null,
-        upc: null,
-        mbid: null,
-      },
-      [],
-      exact.map(hit => ({
-        title: hit.title,
-        artist: hit.artist,
-        url: hit.url,
-      }))
-    );
+    return finish('track', 'ambiguous', subject, [], candidatesOf(exact));
   }
   const isrc = [...isrcs][0] ?? null;
   const links = isrc
     ? await fanOutIsrc(sources, isrc, territory, linksFromTracks(exact))
     : linksFromTracks(exact);
+  // A collaborator-only credit is weaker than a full credit match: it needs an
+  // ISRC that a second provider independently confirms.
+  const creditOnly = matched.every(item => item.match === 'credit');
+  if (
+    creditOnly &&
+    (!isrc || new Set(links.map(link => link.provider)).size < 2)
+  ) {
+    return finish('track', 'ambiguous', subject, [], candidatesOf(exact));
+  }
   return finish(
     'track',
     'resolved',
@@ -276,26 +271,27 @@ async function resolveAlbum(
   sources: InHouseSources
 ): Promise<InHouseResolution> {
   if ('upc' in query) {
-    const album = await sources.albumByUpc(query.upc, territoryOf(query));
-    if (!album) return empty('album', 'no_match');
+    const found = sources.albumsByUpc
+      ? await sources.albumsByUpc(query.upc, territoryOf(query))
+      : [await sources.albumByUpc(query.upc, territoryOf(query))];
+    // A source that reports a different UPC for the record never counts.
+    const albums = found.filter(
+      (album): album is CatalogAlbum =>
+        album !== null && (!album.upc || sameUpc(album.upc, query.upc))
+    );
+    const first = albums[0];
+    if (!first) return empty('album', 'no_match');
     return finish(
       'album',
       'resolved',
       {
-        title: album.title,
-        artist: album.artist,
+        title: first.title,
+        artist: first.artist,
         isrc: null,
-        upc: album.upc ?? query.upc,
+        upc: first.upc ?? query.upc,
         mbid: null,
       },
-      [
-        {
-          provider: album.provider,
-          url: album.url,
-          provenance: album.provenance,
-          confidence: album.confidence,
-        },
-      ]
+      albums.map(linkFromCatalog)
     );
   }
   if ('url' in query) {
@@ -326,54 +322,74 @@ async function resolveAlbum(
     query.title,
     territoryOf(query)
   );
-  const exact = hits.filter(
-    hit =>
-      sameCatalogName(hit.artist, query.artist) &&
-      sameCatalogName(hit.title, query.title)
+  const credited = hits.flatMap(hit => {
+    const match = matchArtistCredits(query.artist, hit.artist, hit.artists);
+    return match ? [{ hit, match }] : [];
+  });
+  const matched = credited.filter(({ hit }) =>
+    sameCatalogName(hit.title, query.title)
   );
-  if (exact.length === 0) {
-    const related = hits.filter(hit =>
-      sameCatalogName(hit.artist, query.artist)
-    );
-    if (related.length === 0) return empty('album', 'no_match', hits.length);
+  const subject = {
+    title: query.title,
+    artist: query.artist,
+    isrc: null,
+    upc: null,
+    mbid: null,
+  };
+  const candidatesOf = (items: readonly CatalogAlbum[]) =>
+    items.map(hit => ({ title: hit.title, artist: hit.artist, url: hit.url }));
+  if (matched.length === 0) {
+    if (credited.length === 0) return empty('album', 'no_match', hits.length);
     return finish(
       'album',
       'ambiguous',
-      {
-        title: query.title,
-        artist: query.artist,
-        isrc: null,
-        upc: null,
-        mbid: null,
-      },
+      subject,
       [],
-      related.map(hit => ({
-        title: hit.title,
-        artist: hit.artist,
-        url: hit.url,
-      }))
+      candidatesOf(credited.map(item => item.hit))
     );
   }
-  const upcs = new Set(exact.flatMap(hit => (hit.upc ? [hit.upc] : [])));
-  if (upcs.size > 1) {
-    return finish(
-      'album',
-      'ambiguous',
-      {
-        title: query.title,
-        artist: query.artist,
-        isrc: null,
-        upc: null,
-        mbid: null,
-      },
-      [],
-      exact.map(hit => ({
-        title: hit.title,
-        artist: hit.artist,
-        url: hit.url,
-      }))
-    );
+  const exact = matched.map(item => item.hit);
+  const upcs = new Set(
+    exact.flatMap(hit => (hit.upc ? [hit.upc.replace(/^0+/, '')] : []))
+  );
+  // Same-name artists with the same title surface as distinct releases:
+  // different UPCs, or several URLs on one provider with no UPC to join them.
+  const urlsByProvider = new Map<string, Set<string>>();
+  for (const hit of exact) {
+    const urls = urlsByProvider.get(hit.provider) ?? new Set<string>();
+    urls.add(hit.url);
+    urlsByProvider.set(hit.provider, urls);
   }
+  const duplicateOnProvider = [...urlsByProvider.values()].some(
+    urls => urls.size > 1
+  );
+  if (upcs.size > 1 || (duplicateOnProvider && upcs.size !== 1)) {
+    return finish('album', 'ambiguous', subject, [], candidatesOf(exact));
+  }
+  const knownUpc = exact.find(hit => hit.upc)?.upc ?? null;
+  // Identifier evidence: re-resolve by the shared UPC so a second provider
+  // independently confirms the same release before any new-source link ships.
+  const byUpc =
+    knownUpc && sources.albumsByUpc
+      ? (await sources.albumsByUpc(knownUpc, territoryOf(query))).filter(
+          album => !album.upc || sameUpc(album.upc, knownUpc)
+        )
+      : [];
+  const evidenced = [
+    ...byUpc,
+    ...exact.filter(hit => hit.upc && sameUpc(hit.upc, knownUpc)),
+  ];
+  const corroborated = new Set(evidenced.map(hit => hit.provider)).size >= 2;
+  const creditOnly = matched.every(item => item.match === 'credit');
+  if (creditOnly && !corroborated) {
+    return finish('album', 'ambiguous', subject, [], candidatesOf(exact));
+  }
+  // Spotify and Deezer name hits need that corroboration. Apple search rows
+  // predate it and keep the established exact-name path.
+  const links = [
+    ...(corroborated ? evidenced : []),
+    ...exact.filter(hit => hit.provider === 'apple_music' || !hit.upc),
+  ];
   return finish(
     'album',
     'resolved',
@@ -381,15 +397,10 @@ async function resolveAlbum(
       title: exact[0]?.title ?? query.title,
       artist: exact[0]?.artist ?? query.artist,
       isrc: null,
-      upc: [...upcs][0] ?? null,
+      upc: knownUpc,
       mbid: null,
     },
-    exact.map(hit => ({
-      provider: hit.provider,
-      url: hit.url,
-      provenance: hit.provenance,
-      confidence: hit.confidence,
-    }))
+    links.map(linkFromCatalog)
   );
 }
 

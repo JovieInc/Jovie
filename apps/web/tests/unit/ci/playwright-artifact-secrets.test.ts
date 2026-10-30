@@ -1349,10 +1349,7 @@ ${fixtureCheckout}
       Object.entries(generate?.env ?? {})
         .filter(([name]) => isCredentialBearingName(name))
         .map(([name, value]) => `${name}: ${value}`)
-    ).toEqual([
-      'DATABASE_URL: postgresql://localhost/noop',
-      'CLERK_SECRET_KEY: sk_test_mock',
-    ]);
+    ).toEqual(['DATABASE_URL: postgresql://localhost/noop']);
     const publishSteps = publish?.steps ?? [];
     const tokenIndex = publishSteps.findIndex(step =>
       /create-github-app-token@/.test(step.uses ?? '')

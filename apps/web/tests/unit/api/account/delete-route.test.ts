@@ -11,6 +11,12 @@ const mockInvalidateHandleCache = vi.hoisted(() => vi.fn());
 const mockInvalidateProfileCache = vi.hoisted(() => vi.fn());
 const mockDeleteBlobs = vi.hoisted(() => vi.fn());
 
+const mockDeleteAgentDrafts = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/agent-acquisition/draft-purge.server', () => ({
+  deleteAgentDraftsByIds: mockDeleteAgentDrafts,
+}));
+
 vi.mock('@vercel/blob', () => ({ del: mockDeleteBlobs }));
 
 vi.mock('@/lib/auth/cached', () => ({
@@ -106,6 +112,7 @@ vi.mock('@/lib/db/schema/profiles', () => ({
   creatorProfiles: {
     userId: 'creatorProfiles.userId',
     usernameNormalized: 'creatorProfiles.usernameNormalized',
+    settings: 'creatorProfiles.settings',
   },
 }));
 
@@ -133,6 +140,7 @@ vi.mock('drizzle-orm', () => ({
   and: vi.fn((...values) => values),
   eq: vi.fn((a, b) => ({ field: a, value: b })),
   inArray: vi.fn((field, values) => ({ field, values })),
+  sql: vi.fn(() => ({})),
 }));
 
 // ---- helpers ----
@@ -210,12 +218,15 @@ describe('POST /api/account/delete', () => {
   it('scopes RLS to existence check then delete transaction (JOV-3048)', async () => {
     selectResults.queue.push([{ id: 'user_1', deletedAt: null }]);
     selectResults.queue.push([]);
+    selectResults.queue.push([]); // agent draft ids
     selectResults.queue.push([{ usernameNormalized: 'testartist' }]);
 
     const { POST } = await import('@/app/api/account/delete/route');
     await POST(makeRequest({ confirmation: 'DELETE' }));
 
-    expect(mockWithDbSession).toHaveBeenCalledTimes(1);
+    // existence check + agent-draft id lookup (drafts are deleted outside RLS)
+    expect(mockWithDbSession).toHaveBeenCalledTimes(2);
+    expect(mockDeleteAgentDrafts).toHaveBeenCalledWith([]);
     expect(mockWithDbSessionTx).toHaveBeenCalledTimes(2);
     expect(mockWithDbSession.mock.invocationCallOrder[0]).toBeLessThan(
       mockWithDbSessionTx.mock.invocationCallOrder[0]
@@ -231,6 +242,7 @@ describe('POST /api/account/delete', () => {
   it('retries idempotently when account was partially deleted', async () => {
     selectResults.queue.push([{ id: 'user_1', deletedAt: new Date() }]);
     selectResults.queue.push([]);
+    selectResults.queue.push([]); // agent draft ids
     selectResults.queue.push([{ usernameNormalized: 'testartist' }]);
 
     const { POST } = await import('@/app/api/account/delete/route');
@@ -249,6 +261,7 @@ describe('POST /api/account/delete', () => {
     // Second select: retained founder-review media lookup.
     selectResults.queue.push([]);
     // Third select: find creator profiles for handle cache invalidation
+    selectResults.queue.push([]); // agent draft ids
     selectResults.queue.push([{ usernameNormalized: 'testartist' }]);
 
     const { POST } = await import('@/app/api/account/delete/route');
@@ -328,6 +341,7 @@ describe('POST /api/account/delete', () => {
         }),
       },
     ]);
+    selectResults.queue.push([]); // agent draft ids
     selectResults.queue.push([{ usernameNormalized: 'testartist' }]);
 
     const { POST } = await import('@/app/api/account/delete/route');

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { StepCard } from './StepCard';
 
 describe('StepCard', () => {
-  it('uses accent tokens on the icon circle and step label', () => {
+  it('renders a bare icon and a screen-reader-only step count', () => {
     const { container } = render(
       <StepCard
         stepNumber='01'
@@ -13,7 +13,10 @@ describe('StepCard', () => {
       />
     );
 
-    expect(container.querySelector('.bg-accent.text-on-accent')).not.toBeNull();
-    expect(screen.getByText('Step 01')).toHaveClass('text-accent');
+    // Hard ban: no bordered or filled container around the icon.
+    expect(container.querySelector('.bg-accent')).toBeNull();
+    expect(container.querySelector('.rounded-full')).toBeNull();
+    // "Step N" is semantics only, never visible text.
+    expect(screen.getByText('Step 01')).toHaveClass('sr-only');
   });
 });

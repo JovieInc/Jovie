@@ -182,6 +182,9 @@ export const ServerEnvSchema = z.object({
   // Stripe server-side configuration
   STRIPE_SECRET_KEY: z.string().optional(),
   REVENUECAT_LYB_SECRET_API_KEY: z.string().optional(),
+  // Fleet audit trail read side (workers/observability-ingest, jovie-fleet-audit worker).
+  FLEET_AUDIT_READ_TOKEN: z.string().optional(),
+  FLEET_AUDIT_URL: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_CONNECT_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_WEBHOOK_SECRET_TIPS: z.string().optional(),
@@ -470,6 +473,8 @@ export const ServerEnvSchema = z.object({
   // Production waitlist canary. The base address is shared with the OTP
   // runner; the read token authorizes only the redacted canary receipt route.
   E2E_PROD_SIGNUP_EMAIL_BASE: z.string().email().optional(),
+  // Kill switch for canary passage tokens on the /start bot check (JOV-9625).
+  SYNTHETIC_PASSAGE_TOKENS_DISABLED: z.enum(['0', '1']).optional(),
   PRODUCTION_WAITLIST_CANARY_READ_TOKEN: z.string().min(32).optional(),
   E2E_PROD_SIGNUP_PASSWORD: z.string().optional(),
   E2E_PROD_MAILBOX_PROVIDER: z
@@ -600,6 +605,7 @@ export const ENV_KEYS = [
   'TELEGRAM_WEBHOOK_SECRET',
   'STRIPE_SECRET_KEY',
   'REVENUECAT_LYB_SECRET_API_KEY',
+  'FLEET_AUDIT_READ_TOKEN',
   'STRIPE_WEBHOOK_SECRET',
   'STRIPE_CONNECT_WEBHOOK_SECRET',
   'STRIPE_WEBHOOK_SECRET_TIPS',
@@ -665,6 +671,7 @@ export const ENV_KEYS = [
   'E2E_REQUIRE_TURNSTILE_GATE',
   'ONBOARDING_SYSTEM1_ENGINE',
   'E2E_PROD_SIGNUP_EMAIL_BASE',
+  'SYNTHETIC_PASSAGE_TOKENS_DISABLED',
   'PRODUCTION_WAITLIST_CANARY_READ_TOKEN',
   'E2E_PROD_SIGNUP_PASSWORD',
   'E2E_PROD_MAILBOX_PROVIDER',

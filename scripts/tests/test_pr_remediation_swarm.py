@@ -189,6 +189,44 @@ class SwarmPolicyTest(unittest.TestCase):
             self.assertIn("usd-per-greened=$0.2500", text)
             self.assertIn("::warning title=swarm cost per greened PR", buf.getvalue())
 
+    def test_log_fetch_retries_with_allow_escape_sequences_when_gh_asks(self):
+        calls = []
+        def fake(args, **kw):
+            calls.append(list(args))
+            if "--allow-escape-sequences" in args:
+                return swarm._Result({"code": 0, "stdout": "\x1b[31mlog\x1b[0m", "stderr": ""})
+            return swarm._Result({"code": 1, "stdout": "", "stderr": "the response contains terminal escape sequences; pass --allow-escape-sequences to output it anyway"})
+        original = swarm.gh
+        swarm.gh = fake
+        try:
+            out = swarm.fetch_job_log(7)
+            self.assertEqual((out.returncode, len(calls)), (0, 2))
+            calls.clear()
+            swarm.gh = lambda args, **kw: (calls.append(args), swarm._Result({"code": 1, "stdout": "", "stderr": "gh: HTTP 404"}))[1]
+            self.assertEqual((swarm.fetch_job_log(7).returncode, len(calls)), (1, 1))  # no retry for other errors
+        finally:
+            swarm.gh = original
+
+    def test_smoke_fails_loudly_on_an_empty_log_and_passes_on_a_real_one(self):
+        import contextlib, io
+        saved = (swarm.gh_json, swarm.fetch_job_log, swarm.gh_version)
+        swarm.gh_version = lambda: "2.93.0"
+        def jsons(args, **kw):
+            return {"workflow_runs": [{"id": 1, "conclusion": "success"}]} if "/runs?" in args[1] else {"jobs": [{"id": 5, "name": "x", "conclusion": "success", "started_at": "t"}]}
+        swarm.gh_json = jsons
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                swarm.fetch_job_log = lambda j: swarm._Result({"code": 0, "stdout": "log", "stderr": ""})
+                self.assertEqual(swarm.cmd_smoke(None), 0)
+                swarm.fetch_job_log = lambda j: swarm._Result({"code": 1, "stdout": "", "stderr": "escape sequences"})
+                self.assertEqual(swarm.cmd_smoke(None), 1)
+                swarm.fetch_job_log = lambda j: swarm._Result({"code": 0, "stdout": "", "stderr": ""})
+                self.assertEqual(swarm.cmd_smoke(None), 1)  # rc 0 but empty is still a failure
+                swarm.gh_version = lambda: "2.10.0"
+                self.assertEqual(swarm.cmd_smoke(None), 1)  # below the supported minimum
+        finally:
+            swarm.gh_json, swarm.fetch_job_log, swarm.gh_version = saved
+
     def test_claim_format_matches_the_lanes_parser(self):
         body = f"🤖 lane claim kind=fix sha=abc host={swarm.HOST} at={swarm.iso()}"
         fields = dict(p.split("=", 1) for p in body.split()[3:] if "=" in p)

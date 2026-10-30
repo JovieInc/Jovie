@@ -106,7 +106,7 @@ export function useDashboardAudienceTable({
   );
 
   const copySelectedEmails = React.useCallback(async (): Promise<void> => {
-    // Only emails the fan shared with the artist; hidden emails never leave.
+    // Only emails the audience member shared with the artist; hidden emails never leave.
     const emails = selectedRows
       .map(row => getAudienceVisibleEmail(row))
       .filter(
