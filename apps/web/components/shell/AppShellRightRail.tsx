@@ -11,8 +11,8 @@ export interface AppShellRightRailProps {
   readonly className?: string;
 }
 
-/** Shared desktop inspector overlay, contained by the route's main surface.
- * It never owns a flex column or narrows the route. Mobile sheets retain the
+/** Shared desktop inspector column, allocated beside the main column.
+ * At lg and up it pushes the route aside using the shared rail motion. Mobile sheets retain the
  * RightDrawer viewport adapter; pointer and focus ownership stay with the drawer. */
 export function AppShellRightRail({
   children,
@@ -25,7 +25,7 @@ export function AppShellRightRail({
       data-rail-preview-region='right'
       aria-label='Context Panel'
       className={cn(
-        'pointer-events-none z-30 shell-inspector-overlay',
+        'pointer-events-none z-30 shell-inspector-allocation',
         SHELL_RAIL_ALLOCATION,
         className
       )}

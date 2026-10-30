@@ -27,29 +27,7 @@ vi.mock('@jovie/ui', async () => {
   const actual = await vi.importActual<Record<string, unknown>>('@jovie/ui');
   return {
     ...actual,
-    SegmentControl: ({
-      value,
-      onValueChange,
-      options,
-    }: {
-      value: string;
-      onValueChange: (value: string) => void;
-      options: Array<{ value: string; label: string }>;
-    }) => (
-      <div>
-        {options.map(option => (
-          <button
-            key={option.value}
-            type='button'
-            aria-selected={value === option.value}
-            role='tab'
-            onClick={() => onValueChange(option.value)}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-    ),
+
     // ContextMenu components are imported transitively by AlbumArtworkContextMenu
     // (which is mocked below, but the module still loads), so provide passthroughs.
     ContextMenu: ({ children }: { children?: React.ReactNode }) => (
@@ -258,35 +236,6 @@ vi.mock('@/components/molecules/drawer', () => ({
     <div>
       <span>{label}</span>
       {children}
-    </div>
-  ),
-  DrawerTabs: ({
-    value,
-    onValueChange,
-    options,
-    actions,
-    overflowMode,
-  }: {
-    value: string;
-    onValueChange: (value: string) => void;
-    options: Array<{ value: string; label: string }>;
-    actions?: React.ReactNode;
-    overflowMode?: 'wrap' | 'scroll';
-  }) => (
-    <div data-overflow-mode={overflowMode} data-testid='drawer-tabs'>
-      {options.map(option => (
-        <button
-          key={option.value}
-          data-testid={`drawer-tab-${option.value}`}
-          type='button'
-          aria-selected={value === option.value}
-          role='tab'
-          onClick={() => onValueChange(option.value)}
-        >
-          {option.label}
-        </button>
-      ))}
-      {actions}
     </div>
   ),
   DrawerSplitButton: ({
@@ -549,10 +498,22 @@ describe('ReleaseSidebar inspector cards', () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
     expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
-    expect(screen.getByTestId('drawer-tabs')).toBeInTheDocument();
+    expect(
+      screen.getByRole('tablist', { name: 'Release sidebar tabs' })
+    ).toBeInTheDocument();
     expect(screen.getByTestId('drawer-tab-overview')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-tab-dsps')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-tab-tasks')).toBeInTheDocument();
+    const tablist = screen.getByRole('tablist', {
+      name: 'Release sidebar tabs',
+    });
+    expect(tablist.parentElement).toHaveAttribute('data-size', 'sm');
+    expect(tablist.parentElement).toHaveAttribute('data-layout', 'fill');
+    expect(tablist.parentElement?.className).toContain('rounded-full');
+    expect(screen.getByRole('tabpanel', { name: 'Overview' })).toHaveAttribute(
+      'id',
+      'release-inspector-panel'
+    );
     expect(screen.getByTestId('release-properties-card')).toBeInTheDocument();
     expect(screen.getByTestId('metadata')).toHaveAttribute(
       'data-variant',
@@ -769,7 +730,7 @@ describe('ReleaseSidebar inspector cards', () => {
 
     await user.click(screen.getByTestId('context-menu-edit'));
 
-    expect(screen.getByTestId('drawer-tab-dsps')).toHaveAttribute(
+    expect(screen.getByRole('tab', { name: 'Links' })).toHaveAttribute(
       'aria-selected',
       'true'
     );
@@ -859,7 +820,9 @@ describe('ReleaseSidebar inspector cards', () => {
     expect(screen.getByTestId('drawer-card-action-bar')).toBeInTheDocument();
     expect(screen.getByTestId('analytics')).toBeInTheDocument();
     expect(screen.getByTestId('release-properties-card')).toBeInTheDocument();
-    expect(screen.getByTestId('drawer-tabs')).toBeInTheDocument();
+    expect(
+      screen.getByRole('tablist', { name: 'Release sidebar tabs' })
+    ).toBeInTheDocument();
     expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
     expect(screen.getByTestId('release-lyrics-card')).toBeInTheDocument();
     expect(screen.getAllByRole('tab')).toHaveLength(3);

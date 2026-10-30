@@ -271,10 +271,11 @@ test.describe('Releases dashboard', () => {
     await expect(sidebar.getByTestId('drawer-tab-dsps')).toBeVisible();
     await expect(sidebar.getByTestId('drawer-tab-tasks')).toBeVisible();
     await sidebar.getByTestId('drawer-tab-dsps').click();
-    await expect(sidebar.getByTestId('drawer-tab-dsps')).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
+    await expect(
+      sidebar
+        .getByRole('tab')
+        .filter({ has: sidebar.getByTestId('drawer-tab-dsps') })
+    ).toHaveAttribute('aria-selected', 'true');
 
     const copiedUrl = await getSidebarSmartLinkUrl(sidebar);
     const smartLinkHandle = extractSmartLinkHandle(copiedUrl);

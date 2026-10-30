@@ -141,6 +141,10 @@ export function InspectorShell<T extends string>({
           <div
             id={INSPECTOR_TAB_PANEL_ID}
             role='tabpanel'
+            aria-labelledby={
+              tabs.find(tab => tab.value === activeTab)?.id ??
+              `${INSPECTOR_TAB_PANEL_ID}-${activeTab}`
+            }
             data-testid='inspector-tab-panel'
             data-scroll-mode='internal'
             aria-busy={isLoading}

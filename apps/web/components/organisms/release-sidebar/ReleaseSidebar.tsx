@@ -19,9 +19,9 @@ import {
   DrawerSection,
   DrawerSplitButton,
   DrawerTabbedCard,
-  DrawerTabs,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
+import { InspectorTabs } from '@/components/molecules/inspector/InspectorTabs';
 import { convertToCommonDropdownItems } from '@/components/organisms/table';
 import { buildReleaseTasksRoute } from '@/constants/routes';
 import { buildReleaseActions } from '@/features/dashboard/organisms/releases/release-actions';
@@ -669,20 +669,25 @@ export function ReleaseSidebar({
             testId='release-tabbed-card'
             sectionKind='details'
             tabs={
-              <DrawerTabs
+              <InspectorTabs
                 value={activeTab}
                 onValueChange={value =>
                   setActiveTab(value as ReleaseSidebarTab)
                 }
                 options={releaseTabOptions}
                 ariaLabel='Release sidebar tabs'
-                overflowMode='scroll'
-                distribution='fill'
+                panelId='release-inspector-panel'
               />
             }
             controls={activeTab === 'dsps' ? platformCardActions : undefined}
           >
-            {renderTabContent()}
+            <div
+              id='release-inspector-panel'
+              role='tabpanel'
+              aria-labelledby={`release-inspector-panel-${activeTab}`}
+            >
+              {renderTabContent()}
+            </div>
           </DrawerTabbedCard>
         </div>
       )}

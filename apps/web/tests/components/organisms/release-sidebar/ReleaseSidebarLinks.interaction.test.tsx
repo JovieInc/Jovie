@@ -65,32 +65,7 @@ vi.mock('@jovie/ui', async () => {
     SimpleTooltip: ({ children }: { children: React.ReactNode }) => (
       <>{children}</>
     ),
-    SegmentControl: ({
-      value,
-      onValueChange,
-      options,
-    }: {
-      value: string;
-      onValueChange: (value: string) => void;
-      options: Array<{
-        value: string;
-        label: string;
-      }>;
-    }) => (
-      <div>
-        {options.map(option => (
-          <button
-            key={option.value}
-            type='button'
-            aria-selected={value === option.value}
-            role='tab'
-            onClick={() => onValueChange(option.value)}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-    ),
+
     // ContextMenu components (imported transitively by AlbumArtworkContextMenu)
     ContextMenu: ({ children }: { children?: React.ReactNode }) => (
       <>{children}</>
@@ -254,33 +229,6 @@ vi.mock('@/components/molecules/drawer', () => ({
       {actions}
       {children}
     </section>
-  ),
-  DrawerTabs: ({
-    value,
-    onValueChange,
-    options,
-    actions,
-  }: {
-    value: string;
-    onValueChange: (value: string) => void;
-    options: Array<{ value: string; label: string }>;
-    actions?: React.ReactNode;
-  }) => (
-    <div>
-      {options.map(option => (
-        <button
-          key={option.value}
-          data-testid={`drawer-tab-${option.value}`}
-          type='button'
-          aria-selected={value === option.value}
-          role='tab'
-          onClick={() => onValueChange(option.value)}
-        >
-          {option.label}
-        </button>
-      ))}
-      {actions}
-    </div>
   ),
   DrawerSplitButton: ({
     primaryAction,
