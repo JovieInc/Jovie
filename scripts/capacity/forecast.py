@@ -83,7 +83,13 @@ def c_inodes(spec: dict, now: float) -> dict | None:
 
 
 def c_gh_rate(spec: dict, now: float) -> dict | None:
-    raw = run(["gh", "api", "rate_limit", "--jq", f".resources.{spec.get('bucket', 'core')}"])
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    try:
+        from apiclient.gh import run_gh
+        result = run_gh(["api", "rate_limit", "--jq", f".resources.{spec.get('bucket', 'core')}"], priority="report")
+    except (ImportError, OSError):
+        return None
+    raw = result["stdout"] if result.get("code") == 0 else None
     try:
         row = json.loads(raw or "")
     except ValueError:
