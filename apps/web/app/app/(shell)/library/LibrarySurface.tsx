@@ -2179,7 +2179,7 @@ function ApprovalStatusEditor({
           aria-label='Approval Status'
           data-testid={`library-approval-status-select-${asset.id}`}
           className={cn(
-            '-ml-1 inline-flex h-6 max-w-full items-center justify-start gap-1 truncate rounded-md px-1 font-normal text-primary-token hover:bg-surface-1',
+            '-ml-1 inline-flex h-6 max-w-full items-center justify-start gap-1 truncate px-1 font-normal text-primary-token hover:bg-surface-1',
             LIBRARY_BUTTON_FOCUS_CLASS
           )}
         >
