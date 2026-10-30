@@ -51,6 +51,7 @@ import {
   selectLanes,
   selectNodeRuntimeContractCommands,
   structuralLocks,
+  typecheckEnvironment,
   validateLaneGroups,
 } from '../../ci-fast-lanes.mjs';
 import { buildControlTestCommands } from '../../run-affected-tests.mjs';
@@ -3345,14 +3346,33 @@ describe('CI diff selection on a divergent PR', () => {
         all: ['notes.md', 'pr-only.ts'],
         ts: ['pr-only.ts'],
       });
-      expect(select('merge_group', 'origin/main')).toEqual({
+      // Preserve exact two-tree removal coverage: the divergent head removes
+      // main-only.ts relative to main, but it is not part of the PR delta.
+      expect(select('push', 'origin/main')).toEqual({
         all: ['main-only.ts', 'notes.md', 'pr-only.ts'],
         ts: ['main-only.ts', 'pr-only.ts'],
+      });
+      expect(select('merge_group', 'origin/main')).toEqual({
+        all: ['notes.md', 'pr-only.ts'],
+        ts: ['pr-only.ts'],
       });
       expect(select('push')).toEqual({
         all: ['notes.md', 'pr-only.ts'],
         ts: ['pr-only.ts'],
       });
+      // A docs-only tail must still typecheck the preceding queue entry.
+      const precedingEntry = git('rev-parse', 'HEAD');
+      writeFileSync(join(repository, 'notes.md'), 'docs-only tail\n');
+      git('add', '.');
+      git('commit', '-m', 'docs-only tail');
+      expect(select('merge_group', precedingEntry).ts).toEqual(['pr-only.ts']);
+      expect(typecheckEnvironment(repository).TURBO_SCM_BASE).toBe(base);
+      expect(typecheckEnvironment(repository).TURBO_SCM_HEAD).toBe('HEAD');
+      // Other events retain their existing affected range.
+      vi.stubEnv('GITHUB_EVENT_NAME', 'pull_request');
+      expect(typecheckEnvironment(repository).TURBO_SCM_BASE).toBe(
+        precedingEntry
+      );
       git('update-ref', '-d', 'refs/remotes/origin/main');
       expect(select('pull_request', base)).toEqual({
         all: ['notes.md', 'pr-only.ts'],
