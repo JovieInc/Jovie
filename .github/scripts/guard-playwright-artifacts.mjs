@@ -889,6 +889,8 @@ const ANNOTATION_MAX_TITLE_LENGTH = 250;
 const ANNOTATION_MAX_ERROR_LINES = 4;
 const ANNOTATION_MAX_MESSAGE_LENGTH = 2000;
 const ANNOTATION_FAILURE_HEADER = /^\s*\d+\)\s+(.+)$/;
+const FAILURE_TAIL_LINE_COUNT = 30;
+const FAILURE_TAIL_MAX_LENGTH = 2800;
 
 function truncateAnnotation(value, maxLength) {
   if (value.length <= maxLength) return value;
@@ -997,6 +999,36 @@ export function collectPlaywrightFailureAnnotations(
   return { annotations, total: failures.length, omitted };
 }
 
+/**
+ * Bounded, redacted tail annotation for runs that exited non-zero without
+ * any parseable per-test failure block (JOV-8805): crashes before/around
+ * the reporter (config errors, browser launch failures, wrapper exits)
+ * otherwise leave only "Process completed with exit code 1" on an
+ * admin-gated job log that no remediation sandbox can read.
+ */
+export function formatPlaywrightFailureTailAnnotation(
+  output,
+  {
+    redact,
+    lineCount = FAILURE_TAIL_LINE_COUNT,
+    maxLength = FAILURE_TAIL_MAX_LENGTH,
+  } = {}
+) {
+  const tail = String(output ?? '')
+    .split('\n')
+    .filter(line => line.trim().length > 0)
+    .slice(-lineCount)
+    .join('\n')
+    .trim();
+  if (!tail) return null;
+  const safe = redact ?? (value => value);
+  const message = safe(truncateAnnotation(tail, maxLength)).replaceAll(
+    '\n',
+    '%0A'
+  );
+  return `::error title=E2E run failed without parseable test failures ::${message}`;
+}
+
 async function runProducer(command) {
   // Runs the wrapped Playwright command under the producer's artifact
   // policy. The captured child output is parsed into bounded, secret-redacted
@@ -1032,7 +1064,17 @@ async function runProducer(command) {
     });
     maskValues(dynamicValues);
     const scanEnvironment = withDynamicSecretValues(process.env, dynamicValues);
+    const { total: parsedFailures } = collectPlaywrightFailureAnnotations(
+      childResult.stdout,
+      { redact: text => redactSecretValues(text, scanEnvironment) }
+    );
     reportPlaywrightFailureAnnotations(childResult.stdout, scanEnvironment);
+    if (childStatus !== 0 && parsedFailures === 0) {
+      const tail = formatPlaywrightFailureTailAnnotation(childResult.stdout, {
+        redact: text => redactSecretValues(text, scanEnvironment),
+      });
+      if (tail) writeSync(process.stdout.fd, `${tail}\n`);
+    }
     const configured = configuredPaths();
     const producerOptions = options();
     // Producer stages omit images by default, even when a job permits image

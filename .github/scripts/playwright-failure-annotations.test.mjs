@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import {
   collectPlaywrightFailureAnnotations,
   formatPlaywrightFailureAnnotation,
+  formatPlaywrightFailureTailAnnotation,
   parsePlaywrightFailures,
 } from './guard-playwright-artifacts.mjs';
 
@@ -112,4 +113,37 @@ test('emits nothing for a green run', () => {
     { redact: value => value }
   );
   assert.equal(annotations.length, 0);
+});
+
+test('formats a bounded tail annotation when no failure block is parseable', () => {
+  const output = [
+    'Running 2 tests using 1 worker',
+    'Error: Playwright does not support chromium on ubuntu26.04-x64',
+  ].join('\n');
+  const annotation = formatPlaywrightFailureTailAnnotation(output);
+  assert.ok(annotation);
+  assert.ok(annotation.startsWith('::error title='));
+  assert.ok(annotation.includes('ubuntu26.04-x64'));
+  assert.ok(annotation.includes('%0A'));
+});
+
+test('tail annotation omits blank lines, caps length and redacts secrets', () => {
+  const output = [
+    '',
+    ...Array.from({ length: 60 }, (_, index) => `line ${index}`),
+    secret,
+  ].join('\n');
+  const annotation = formatPlaywrightFailureTailAnnotation(output, {
+    redact: text => text.split(secret).join('[redacted]'),
+  });
+  assert.ok(annotation);
+  assert.ok(!annotation.includes(secret));
+  assert.ok(annotation.length <= 3000);
+  assert.ok(annotation.includes('line 59'));
+  assert.ok(!annotation.includes('line 0'));
+});
+
+test('tail annotation returns null for empty output', () => {
+  assert.equal(formatPlaywrightFailureTailAnnotation(''), null);
+  assert.equal(formatPlaywrightFailureTailAnnotation(undefined), null);
 });
