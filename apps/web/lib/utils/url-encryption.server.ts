@@ -136,7 +136,7 @@ export function decryptUrl(encryptionResult: EncryptionResult): string {
     const salt = Buffer.from(encryptionResult.salt, 'hex');
     const key = crypto.scryptSync(keyMaterial, salt, 32, SCRYPT_WORK_FACTOR);
     const iv = Buffer.from(encryptionResult.iv, 'hex');
-    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv, { authTagLength: 16 });
 
     const authTag = Buffer.from(encryptionResult.authTag, 'hex');
     decipher.setAuthTag(authTag);
@@ -238,7 +238,7 @@ export function decryptUrlRawKey(data: RawKeyEncryptionResult): string {
 
     const key = getRawAesKey();
     const iv = Buffer.from(data.iv, 'hex');
-    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv, { authTagLength: 16 });
     decipher.setAuthTag(Buffer.from(data.authTag, 'hex'));
 
     const decryptedBuffer = Buffer.concat([
