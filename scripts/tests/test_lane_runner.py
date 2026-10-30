@@ -8183,10 +8183,12 @@ class FixRedTest(unittest.TestCase):
         real_sh = lane.sh
         real_gen = lane.resolve_generated_conflict
         real_narrow = lane.resolve_narrowed_preflight_conflict
+        real_chain = lane.resolve_and_chain_conflict
         real_add = lane.resolve_additive_list_conflict
         real_agent = lane.run_agent
         lane.resolve_generated_conflict = lambda *a, **k: False
         lane.resolve_narrowed_preflight_conflict = lambda *a, **k: False
+        lane.resolve_and_chain_conflict = lambda *a, **k: False
         lane.resolve_additive_list_conflict = lambda *a, **k: True
         lane.run_agent = lambda *a, **k: self.fail("quoted-list conflicts need no model")
 
@@ -8209,6 +8211,7 @@ class FixRedTest(unittest.TestCase):
                 lane.sh = real_sh
                 lane.resolve_generated_conflict = real_gen
                 lane.resolve_narrowed_preflight_conflict = real_narrow
+                lane.resolve_and_chain_conflict = real_chain
                 lane.resolve_additive_list_conflict = real_add
                 lane.run_agent = real_agent
         self.assertEqual((receipt["verdict"], receipt["resolution"]), ("fix-pushed", "additive-list-merged"))
@@ -13022,6 +13025,62 @@ class NoHumanHoldTest(unittest.TestCase):
         after = git("rev-parse", "HEAD").stdout.strip()
         remote = git("rev-parse", "origin/feature").stdout.strip()
         self.assertEqual(after, remote)
+        self.assertNotEqual(after, before)
+        self.assertEqual(git("merge-base", "--is-ancestor", before, after).returncode, 0)
+
+    def test_and_chain_conflict_unions_node_test_paths_and_fast_forwards(self):
+        root = Path(self.tmp.name)
+        origin = root / "origin.git"
+        work = root / "work"
+        work.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "main", str(work)], check=True)
+        subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True)
+        def git(*args, cwd=work):
+            return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True)
+        hooks = root / "hooks"
+        hooks.mkdir()
+        for key, value in (("user.name", "t"), ("user.email", "t@example.test"), ("commit.gpgsign", "false"),
+                           ("core.hooksPath", str(hooks))):
+            git("config", key, value)
+        git("remote", "add", "origin", str(origin))
+        path = work / "package.json"
+        base = (
+            '{\n  "scripts": {\n'
+            '    "ci:control:test": "node --test scripts/a.test.mjs && pnpm ownership:check",\n'
+            "  }\n}\n"
+        )
+        path.write_text(base)
+        git("add", "package.json")
+        git("commit", "-qm", "base")
+        git("branch", "feature")
+        git("push", "-q", "origin", "HEAD:refs/heads/main")
+        git("checkout", "-q", "feature")
+        path.write_text(base.replace(
+            "node --test scripts/a.test.mjs",
+            "node --test scripts/a.test.mjs scripts/b.test.mjs",
+        ))
+        git("commit", "-qam", "head adds a test path")
+        git("push", "-q", "origin", "HEAD:refs/heads/feature")
+        git("checkout", "-q", "main")
+        path.write_text(base.replace(
+            '    "ci:control:test": "node --test scripts/a.test.mjs && pnpm ownership:check",\n',
+            '    "ci:control:test": "node --test scripts/a.test.mjs && pnpm ownership:check && node scripts/sources-of-truth.mjs",\n'
+            '    "fleet:check": "node scripts/fleet-registry.mjs check",\n',
+        ))
+        git("commit", "-qam", "main adds a suffix and a script")
+        git("push", "-q", "origin", "HEAD:refs/heads/main")
+        git("checkout", "-q", "feature")
+        before = git("rev-parse", "HEAD").stdout.strip()
+        self.assertTrue(lane.resolve_and_chain_conflict(work, "feature", None))
+        text = path.read_text()
+        self.assertIn(
+            "node --test scripts/a.test.mjs scripts/b.test.mjs && pnpm ownership:check && node scripts/sources-of-truth.mjs",
+            text,
+        )
+        self.assertIn('"fleet:check"', text)
+        self.assertNotIn("<<<<<<<", text)
+        after = git("rev-parse", "HEAD").stdout.strip()
+        self.assertEqual(after, git("rev-parse", "origin/feature").stdout.strip())
         self.assertNotEqual(after, before)
         self.assertEqual(git("merge-base", "--is-ancestor", before, after).returncode, 0)
 
