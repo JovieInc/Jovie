@@ -718,7 +718,11 @@ async function processStoredSnapshot(
     }
   }
 
+<<<<<<< HEAD
   if (!selected.inEnvelope || !repairSelection) {
+=======
+  if (!selected.inEnvelope) {
+>>>>>>> origin/main
     const outcome = signFor(
       dependencies,
       {

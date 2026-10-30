@@ -1,4 +1,4 @@
-import { fireEvent, within } from '@testing-library/react';
+import { fireEvent, render, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TaskListRow } from '@/components/features/dashboard/tasks/TaskListRow';
 import { fastRender } from '@/tests/utils/fast-render';
@@ -202,5 +202,40 @@ describe('TaskListRow', () => {
       />
     );
     expect(within(human.container).queryByText('Jovie working')).toBeNull();
+  });
+
+  it('mutes the shared row frame for terminal tasks and keeps it full otherwise', () => {
+    const done = render(
+      <TaskListRow
+        task={{ ...mockTask, status: 'done' }}
+        artistName='Tim White'
+        onOpenRelease={vi.fn()}
+      />
+    );
+    expect(
+      within(done.container).getByTestId('task-list-row-task-1').className
+    ).toContain('opacity-75');
+
+    const cancelled = render(
+      <TaskListRow
+        task={{ ...mockTask, status: 'cancelled' }}
+        artistName='Tim White'
+        onOpenRelease={vi.fn()}
+      />
+    );
+    expect(
+      within(cancelled.container).getByTestId('task-list-row-task-1').className
+    ).toContain('opacity-60');
+
+    const live = render(
+      <TaskListRow
+        task={mockTask}
+        artistName='Tim White'
+        onOpenRelease={vi.fn()}
+      />
+    );
+    const liveRow = within(live.container).getByTestId('task-list-row-task-1');
+    expect(liveRow.className).not.toContain('opacity-75');
+    expect(liveRow.className).not.toContain('opacity-60');
   });
 });

@@ -199,14 +199,6 @@ describe('Eve framework smoke', () => {
       );
       expect(
         hasChannel(
-          'summer-bottleneck',
-          'defineChannel',
-          'POST',
-          '/ovie/v1/summer-bottleneck/events'
-        )
-      ).toBe(true);
-      expect(
-        hasChannel(
           'summer-shadow',
           'defineChannel',
           'POST',

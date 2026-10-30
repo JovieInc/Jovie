@@ -122,6 +122,7 @@ describe('eve identity instruction packs', () => {
     expect(eveIdentityForChannel('jovie-core-chat').pack.id).toBe('jovie');
     expect(eveIdentityForChannel('unknown-source').pack.id).toBe('jovie');
     expect(eveIdentityForChannel('ovie-summer-shadow').pack.id).toBe('summer');
+<<<<<<< HEAD
     expect(eveIdentityIdForChannel('photon')).toBe('ovie');
     expect(eveIdentityIdForChannel('imessage')).toBe('ovie');
     expect(eveIdentityForChannel('photon').pack.id).toBe('ovie');
@@ -135,6 +136,9 @@ describe('eve identity instruction packs', () => {
       .replace(/\/\/.*$/gm, '')
       .toLowerCase();
     expect(livePhoton).not.toMatch(/hermes|trigger\.dev|local-executor/);
+=======
+    expect(eveIdentityForChannel('photon').pack.id).toBe('ovie');
+>>>>>>> origin/main
     if (previous === undefined) {
       delete process.env.EVE_IDENTITY;
     } else {
