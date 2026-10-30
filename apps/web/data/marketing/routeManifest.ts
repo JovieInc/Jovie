@@ -1343,7 +1343,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     bindingEvidence: {
       status: 'verified',
       source:
-        'AboutPageContent mounts left-none, article-body, objection-handler, and the footer final-single-claim; the plain-company rewrite (#23332) removed the feature grid (2026-10-30)',
+        'AboutPageContent mounts left-none, article-body, objection-handler, and the footer final-single-claim; the plain-company page change (#23332) removed the feature grid (2026-10-30)',
     },
     status: 'active',
     specVersion: '1.0.0',
