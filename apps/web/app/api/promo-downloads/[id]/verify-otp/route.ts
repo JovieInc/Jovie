@@ -23,11 +23,18 @@ import {
 } from '@/lib/email/templates/promo-download-thank-you';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { emailOtpVerifyLimiter } from '@/lib/notifications/email-otp-limiters';
 import {
   upsertPromoAudienceMember,
   verifyEmailOtp,
 } from '@/lib/notifications/otp-service';
 import { sendNotification } from '@/lib/notifications/service';
+import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
+import {
+  createRateLimitHeaders,
+  generalLimiter,
+  getClientIP,
+} from '@/lib/rate-limit';
 import { decodeCityHeader } from '../_geo';
 
 export const runtime = 'nodejs';
@@ -51,6 +58,27 @@ export async function POST(
       return NextResponse.json(
         { error: 'Invalid verification code' },
         { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const clientIp = getClientIP(request);
+    const ipResult = await generalLimiter.limit(clientIp);
+    const limiterEmail = normalizeSubscriptionEmail(parsed.data.email);
+    const verifyResult = ipResult.success
+      ? await emailOtpVerifyLimiter.limit(
+          limiterEmail ? `${limiterEmail}:${clientIp}` : clientIp
+        )
+      : ipResult;
+    if (!verifyResult.success) {
+      return NextResponse.json(
+        { error: 'Too many verification attempts. Try again shortly.' },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            ...createRateLimitHeaders(verifyResult),
+          },
+        }
       );
     }
 
@@ -187,6 +215,11 @@ export async function POST(
             id: dedupKey,
             dedupKey,
             category: 'transactional',
+            emailRoute: {
+              stream: 'transactional',
+              purpose: 'promo-download-delivery',
+              consent: 'auth-request',
+            },
             subject: getPromoDownloadThankYouSubject(templateData),
             text: getPromoDownloadThankYouText(templateData),
             html: getPromoDownloadThankYouHtml(templateData),

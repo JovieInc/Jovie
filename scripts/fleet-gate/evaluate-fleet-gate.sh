@@ -291,6 +291,10 @@ emit_gate_signal() {
 }
 emit_gate_signal controller '.signals.controller'
 emit_gate_signal production '.signals.production'
+# The database probe is a required dependency whenever the risk lane is not
+# low; its unknown detail (transport vs stale vs malformed) is the first thing
+# a frozen promotion needs, so emit it separately from the aggregate.
+emit_gate_signal database '.signals.production.dependencies.database'
 emit_gate_signal main '.signals.main'
 emit_gate_signal integrity '.signals.integrity'
 emit_gate_signal queue '.signals.queue'

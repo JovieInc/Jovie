@@ -52,6 +52,13 @@ describe('code flags', () => {
     delete process.env.FEATURE_STRIPE_TEST_PRICE_CONFIGURED;
   });
 
+  it('ships value before paywall on with an env kill switch (JOV-9758)', () => {
+    expect(CODE_FLAGS.ONBOARDING_VALUE_BEFORE_PAYWALL).toBe(true);
+    process.env.FEATURE_ONBOARDING_VALUE_BEFORE_PAYWALL = 'false';
+    expect(isCodeFlagEnabled('ONBOARDING_VALUE_BEFORE_PAYWALL')).toBe(false);
+    delete process.env.FEATURE_ONBOARDING_VALUE_BEFORE_PAYWALL;
+  });
+
   it('keeps the auth offer summary off unless the env override is true', () => {
     expect(CODE_FLAGS.AUTH_OFFER_SUMMARY).toBe(false);
     expect(isCodeFlagEnabled('AUTH_OFFER_SUMMARY')).toBe(false);

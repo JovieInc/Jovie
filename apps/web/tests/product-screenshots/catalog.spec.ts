@@ -28,7 +28,7 @@ import {
   hideTransientUI,
   PUBLIC_EXPORT_DIR,
   prepareImagesForScreenshot,
-  SCREENSHOT_CLOCK_ISO,
+  resolveScreenshotClock,
   TIMEOUTS,
   waitForSettle,
 } from './helpers';
@@ -181,9 +181,7 @@ async function prepareScenario(
   }
 
   const viewport = SCREENSHOT_VIEWPORTS[scenario.viewport];
-  await page.clock.setFixedTime(
-    new Date(scenario.fixedNow ?? SCREENSHOT_CLOCK_ISO)
-  );
+  await page.clock.setFixedTime(resolveScreenshotClock(scenario.fixedNow));
   await page.emulateMedia({
     reducedMotion: scenario.reducedMotion ? 'reduce' : 'no-preference',
   });
