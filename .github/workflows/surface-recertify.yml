@@ -1,0 +1,174 @@
+name: Surface Recertify
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: A hosted App-token writer opens one bot PR that renews design-census certification evidence after a push to main changed certified source; it renders the page in a browser, uploads screenshots as a workflow artifact, and never merges, never touches code, and never enables auto-merge.
+# removal-trigger: Remove when certification evidence is produced by the PR that changes certified source, or PR #23631 (off-repo evidence ledger) lands with its credential.
+#
+# A push to main that changes the bytes of a canonical census row's source or
+# owners makes design-surface-census.test.mjs fail for every PR (2026-10-29: the
+# pricing row, after a footer comment change). This renews exactly the stale
+# rows: capture 1440 and 390 full-page evidence of the real route, validate it,
+# write the row's `sourceDigest` with the census module's own function, and open
+# one `compounding` PR. Screenshots stay in the workflow artifact; the repo keeps
+# their sha256 digests and the run URL. Rows that cannot be captured (dynamic
+# routes, several sources, a failed render) stay red on purpose: Main Health
+# pages Summer rather than recording evidence that does not exist.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - 'packages/**'
+      - 'design.tokens.json'
+      - 'scripts/design-surface-census.mjs'
+      - 'scripts/surface-recertify.mjs'
+      - 'scripts/lib/surface-recertify.mjs'
+      - '.github/workflows/surface-recertify.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: surface-recertify
+  cancel-in-progress: false
+
+jobs:
+  detect:
+    name: Find stale certified surfaces
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      stale: ${{ steps.list.outputs.stale }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - id: list
+        run: |
+          set -euo pipefail
+          node scripts/surface-recertify.mjs list | tee "$RUNNER_TEMP/stale.json"
+          count="$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).length)' "$RUNNER_TEMP/stale.json")"
+          echo "stale=$([ "$count" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+  recertify:
+    name: Capture evidence and open the renewal PR
+    needs: detect
+    if: needs.detect.outputs.stale == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Generate short-lived Jovie App token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          token: ${{ steps.app-token.outputs.token }}
+
+      - uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-playwright
+
+      # Same no-secret public-route mode the local certification runs use: no
+      # database, mocked auth keys. Evidence is for public marketing routes.
+      - name: Start the app
+        env:
+          DATABASE_URL: postgresql://localhost/noop
+          NEXT_DISABLE_TOOLBAR: '1'
+          E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_CLERK_USER_ID: user_test
+          PUBLIC_NOAUTH_SMOKE: '1'
+          NEXT_PUBLIC_E2E_MODE: '1'
+          NEXT_TELEMETRY_DISABLED: '1'
+          PORT: '3917'
+        run: |
+          nohup node apps/web/scripts/dev-fast.mjs > "$RUNNER_TEMP/dev.log" 2>&1 &
+          for i in $(seq 1 60); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 120 http://localhost:3917/ || true)"
+            [ "$code" = 200 ] && exit 0
+            sleep 5
+          done
+          tail -50 "$RUNNER_TEMP/dev.log"
+          exit 1
+
+      - name: Capture 1440 and 390 evidence for stale rows
+        run: node scripts/surface-recertify.mjs capture --base-url http://localhost:3917 --out "$RUNNER_TEMP/evidence"
+
+      - name: Upload screenshots (workflow artifact, 90 days)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: surface-recert-${{ github.run_id }}
+          path: ${{ runner.temp }}/evidence
+          retention-days: 90
+          if-no-files-found: warn
+
+      - name: Renew the census rows that have valid evidence
+        id: apply
+        run: |
+          set -euo pipefail
+          node scripts/surface-recertify.mjs apply \
+            --evidence "$RUNNER_TEMP/evidence" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --artifact "surface-recert-$GITHUB_RUN_ID" \
+            --sha "$GITHUB_SHA" | tee "$RUNNER_TEMP/apply.json"
+          pnpm exec biome format --write apps/web/data/designSystem/surfaceCensus.json
+          git diff --quiet -- apps/web/data/designSystem/surfaceCensus.json && echo "changed=false" >> "$GITHUB_OUTPUT" || echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update the renewal PR
+        if: steps.apply.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BRANCH: bot/surface-recertify
+        run: |
+          set -euo pipefail
+          git config user.name "jovie-bot[bot]"
+          git config user.email "jovie-bot[bot]@users.noreply.github.com"
+          renewed="$(node -p 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).renewed.join(", ")' "$RUNNER_TEMP/apply.json")"
+          git checkout -B "$BRANCH"
+          git add apps/web/data/designSystem/surfaceCensus.json
+          git commit -q -m "chore(design): renew certification evidence for ${renewed}" -m "Automatic recertification after ${GITHUB_SHA:0:9}; evidence in workflow artifact surface-recert-${GITHUB_RUN_ID}."
+          git push -q --force-with-lease origin "$BRANCH" || git push -q --force origin "$BRANCH"
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          cat > "$RUNNER_TEMP/body.md" <<BODY
+          ## Summary
+
+          no Linear issue — automatic recertification (compounding). A push to main (${GITHUB_SHA:0:9}) changed the source or owners of certified surface(s): ${renewed}. \`design-surface-census.test.mjs\` fails for every PR until their \`sourceDigest\` is renewed, so the Surface Recertify bot rendered each route (Next dev build of that commit, Chromium), captured 1440 and 390 full-page evidence, validated it (HTTP 200, no horizontal overflow, no page errors) and wrote the digest with the census module's own \`sourceDigest\`.
+
+          Evidence: screenshots are in workflow artifact \`surface-recert-${GITHUB_RUN_ID}\` of ${run_url} (kept 90 days). The repo keeps their sha256 digests in the census \`evidence.ref\`; no binary is added to the repo.
+
+          <!-- customer-changelog/v1 {"releaseWorthy":false} -->
+
+          ## Blast radius
+
+          - What could break: nothing at runtime. One data file, \`apps/web/data/designSystem/surfaceCensus.json\`, evidence record(s) only.
+          - Rows that could not be captured stay red on purpose (see run log); Main Health pages Summer for them.
+
+          ## Locked areas
+
+          n/a, no locked paths touched.
+
+          ## Cost Impact
+
+          One hosted job of about 10 minutes per push that changes certified source; no paid APIs.
+
+          🤖 Generated with [Claude Code](https://claude.com/claude-code)
+          BODY
+          if number="$(node packages/api-client/cli.ts gh --priority repair -- pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')" && [ -n "$number" ]; then
+            node packages/api-client/cli.ts gh --priority repair -- pr edit "$number" --body-file "$RUNNER_TEMP/body.md" --title "chore(design): renew certification evidence for ${renewed}"
+          else
+            node packages/api-client/cli.ts gh --priority repair -- pr create --base main --head "$BRANCH" --label compounding \
+              --title "chore(design): renew certification evidence for ${renewed}" --body-file "$RUNNER_TEMP/body.md"
+          fi

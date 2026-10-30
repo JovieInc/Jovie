@@ -1,0 +1,38 @@
+name: Main Health
+# Current-state certification checks on main after every push. PR gates only look
+# at what a PR touches, so a merge that changes certified source without renewing
+# its evidence turns main red for all later PRs (2026-10-29, pricing census).
+# Read-only. The Gem lanes doctor reads the latest completed run of this workflow
+# (scripts/lanes/main_health.py) and pages Summer the moment it fails, then clears
+# when a later run passes. A red run here means "main is broken now", not "a PR is".
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: main-health
+  cancel-in-progress: false
+
+jobs:
+  health:
+    name: Main health (census and certification)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Run main-health checks
+        run: node scripts/main-health.mjs --out "$RUNNER_TEMP/main-health.json"
