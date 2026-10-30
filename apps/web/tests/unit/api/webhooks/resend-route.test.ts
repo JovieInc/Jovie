@@ -255,7 +255,7 @@ describe('POST /api/webhooks/resend', () => {
     );
 
     it.each([-301, 301])(
-      'rejects a valid signature outside the clock window (%s seconds)',
+      'rejects a valid signature outside the clock tolerance (%s seconds)',
       async offset => {
         vi.mocked(Date.now).mockReturnValue(
           (Number(oracle.timestamp) + offset) * 1000
