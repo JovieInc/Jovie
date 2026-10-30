@@ -3,16 +3,16 @@ import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { productionUpstashCredentials } from '@/lib/redis-store';
 import {
-  SHARED_E2E_ARTIST_POOL,
-  selectUnclaimedCertArtist,
-} from '@/lib/synthetic/prodcert-artist-fixture';
-import {
   ensureSignedInUser,
   fillControlledInputUntilEnabled,
   getAdminCredentials,
   hasAdminCredentials,
   prepareBetterAuthEmailOtp,
 } from '../helpers/auth';
+import {
+  releaseGoldenPathTestBindings,
+  selectGoldenPathArtist,
+} from './helpers/claim-dogfood-fixtures';
 import { completeGoldenPathBillingJourney } from './helpers/golden-path-billing';
 import { openHomeWelcome } from './helpers/golden-path-home-welcome';
 import {
@@ -60,29 +60,6 @@ let TEST_SPOTIFY_ARTIST: { id: string; name: string; url: string } = {
   name: '',
   url: '',
 };
-
-/** Only bindings owned by golden-path test accounts are ever released. */
-const GOLDEN_PATH_TEST_EMAIL_LIKE = 'gp-%+e2e@test.jovie.com';
-
-async function releaseGoldenPathTestBindings(sql: ReturnType<typeof neon>) {
-  await sql`
-    UPDATE creator_profiles
-    SET spotify_id = NULL, spotify_url = NULL, updated_at = NOW()
-    WHERE spotify_id IS NOT NULL
-      AND user_id IN (
-        SELECT id FROM users WHERE email LIKE ${GOLDEN_PATH_TEST_EMAIL_LIKE}
-      )
-  `;
-}
-
-async function selectGoldenPathArtist(sql: ReturnType<typeof neon>) {
-  await releaseGoldenPathTestBindings(sql);
-  return selectUnclaimedCertArtist(SHARED_E2E_ARTIST_POOL, async spotifyId => {
-    const rows =
-      await sql`SELECT 1 FROM creator_profiles WHERE spotify_id = ${spotifyId} LIMIT 1`;
-    return rows.length > 0;
-  }).then(a => ({ id: a.spotifyId, name: a.name, url: a.url }));
-}
 
 const IS_LOCAL_AUTH_BYPASS =
   process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ||
