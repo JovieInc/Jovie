@@ -1,14 +1,14 @@
 {
   "schema": "jovie.wins-metrics/v1",
-  "at": "2026-10-30T19:36:32.021Z",
-  "winsTotal": 24,
+  "at": "2026-10-30T20:52:32.989Z",
+  "winsTotal": 25,
   "winsVerified": 1,
-  "winsClaimed": 11,
+  "winsClaimed": 12,
   "winsUnverified": 3,
   "winsNotReproduced": 1,
   "winsPendingMerge": 4,
   "winsPendingMeasure": 4,
-  "winsLast7d": 24,
+  "winsLast7d": 25,
   "clusters": [
     {
       "theme": "release-reliability",
@@ -18,7 +18,7 @@
     },
     {
       "theme": "merge-throughput",
-      "total": 14,
+      "total": 15,
       "verified": 0,
       "ready": false
     },
@@ -148,6 +148,10 @@
     },
     {
       "id": "win-2026-10-30-the-staging-production-bind-now-rides",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-30-eliminate-the-false-failing-publication-transport",
       "status": "claimed"
     }
   ]
