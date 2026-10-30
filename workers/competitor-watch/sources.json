@@ -1,0 +1,98 @@
+{
+  "schema": "jovie.competitor-watch-sources/v1",
+  "_comment": "Add a source by appending one entry. kind: feed (RSS/Atom, ETag polling), html-links (index page, hrefPattern picks item links), page-watch (changelog page with no feed; one item when its text changes). Only link, title, our own short summary and dates are stored, never article text.",
+  "sources": [
+    {
+      "id": "cloudflare-blog",
+      "name": "Cloudflare Blog",
+      "kind": "feed",
+      "url": "https://blog.cloudflare.com/rss/"
+    },
+    {
+      "id": "cloudflare-changelog",
+      "name": "Cloudflare Changelog",
+      "kind": "feed",
+      "url": "https://developers.cloudflare.com/changelog/rss/index.xml",
+      "idBy": "url+title"
+    },
+    {
+      "id": "vercel",
+      "name": "Vercel Blog and Changelog",
+      "kind": "feed",
+      "url": "https://vercel.com/atom"
+    },
+    {
+      "id": "openai-news",
+      "name": "OpenAI News",
+      "kind": "feed",
+      "url": "https://openai.com/news/rss.xml"
+    },
+    {
+      "id": "openai-changelog",
+      "name": "OpenAI Changelog",
+      "kind": "page-watch",
+      "url": "https://developers.openai.com/api/docs/changelog"
+    },
+    {
+      "id": "anthropic-news",
+      "name": "Anthropic News",
+      "kind": "html-links",
+      "url": "https://www.anthropic.com/news",
+      "hrefPattern": "^/news/[a-z0-9][a-z0-9-]+$",
+      "excludePattern": "^/news/(announcements|features|product|policy|research|company|customers|societal-impacts)$"
+    },
+    {
+      "id": "anthropic-release-notes",
+      "name": "Claude Release Notes",
+      "kind": "feed",
+      "url": "https://platform.claude.com/docs/en/release-notes/feed.xml",
+      "idBy": "url+title"
+    },
+    {
+      "id": "xai-release-notes",
+      "name": "xAI Release Notes",
+      "kind": "page-watch",
+      "url": "https://docs.x.ai/docs/release-notes",
+      "_note": "x.ai/news returns 403 to non-browser clients; docs.x.ai is reachable."
+    },
+    {
+      "id": "replit-blog",
+      "name": "Replit Blog",
+      "kind": "feed",
+      "url": "https://replit.com/blog/feed.xml",
+      "enabled": false,
+      "_note": "replit.com returns 403 to Cloudflare Workers egress even with a browser-like UA; poll from the Gem router script or an allowlisted path instead."
+    },
+    {
+      "id": "linear-changelog",
+      "name": "Linear Changelog",
+      "kind": "feed",
+      "url": "https://linear.app/rss/changelog.xml"
+    },
+    {
+      "id": "raycast-changelog",
+      "name": "Raycast Changelog",
+      "kind": "feed",
+      "url": "https://www.raycast.com/changelog/feed.xml"
+    }
+  ],
+  "context": {
+    "products": {
+      "jovie": "artist profiles, smart links, release pages, fan audience capture, tips/payments, chat assistant for artists",
+      "ovie": "internal operator workspace: tasks, agents, dashboards, news",
+      "lyb": "Last Year's Best, year-end music lists",
+      "chat": "AI chat and agents (AI SDK, Gateway, Workers AI)",
+      "search": "search and retrieval",
+      "design": "design system, UI components, motion, mobile web and iOS/macOS apps"
+    },
+    "openResearch": [
+      "ai-sdk and model gateway pricing",
+      "workers-ai cost savings",
+      "agent-first UI patterns",
+      "smart link and release page conversion",
+      "payments and checkout",
+      "auth and passkeys",
+      "image and video generation cost"
+    ]
+  }
+}
