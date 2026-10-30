@@ -1,0 +1,30 @@
+name: Slop Guard
+
+# Company anti-slop ratchets from JovieInc/ci (JOV-9975). Config config/slop-guard/config.json,
+# shrink-only baseline config/slop-guard/baseline.json. New offenders and growth fail; fixed
+# offenders fail until the baseline is lowered with --update.
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  slop-guard:
+    name: slop-guard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { fetch-depth: 1 }
+      - uses: ./.github/actions/setup-node-pnpm
+      - uses: JovieInc/ci/actions/slop-guard@c68f7c3ac9c1376a7da82a4c1c86e098b1e2cf57 # JovieInc/ci#12
+        with:
+          config: config/slop-guard/config.json
