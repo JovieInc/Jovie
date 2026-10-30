@@ -8,9 +8,11 @@ import {
   isNull,
   or,
 } from 'drizzle-orm';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { getSessionErrorResponse } from '@/app/api/chat/session-error-response';
 import { APP_ROUTES } from '@/constants/routes';
+import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
 import { getSessionContext, withDbSessionTx } from '@/lib/auth/session';
 import { ownedConversationCondition } from '@/lib/chat/conversation-access';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
@@ -24,9 +26,28 @@ import { seedOnboardingPresenceBuild } from '@/lib/onboarding/presence-build';
 import { getCurrentOnboardingSessionId } from '@/lib/onboarding/session';
 import { buildWelcomeMessage } from '@/lib/services/onboarding/welcome-message';
 import { ensureChatWorkRecord } from '@/lib/tasks/chat-work-record';
+import { ACQUISITION_COOKIE_NAME } from '@/lib/tracking/consent';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const MAX_INITIAL_REPLY_LENGTH = 2000;
+
+/**
+ * JOV-9957 (golden-path-delight/v1): this bootstrap IS the entry into the
+ * guided first use — the welcome conversation a buyer lands in after
+ * checkout, personalized from verified facts. Journey-keyed, recorded once;
+ * never throws and never blocks the bootstrap.
+ */
+async function recordFirstUseStartedStage(): Promise<void> {
+  try {
+    const cookieStore = await cookies();
+    await recordArtistOfferStage(
+      cookieStore.get(ACQUISITION_COOKIE_NAME)?.value,
+      'first-use-started'
+    );
+  } catch {
+    // Measurement only: a request without a cookie store records nothing.
+  }
+}
 
 function buildWelcomeChatRoute(conversationId: string): string {
   return `${APP_ROUTES.CHAT}/${conversationId}?panel=profile&from=onboarding`;
@@ -283,6 +304,11 @@ export async function POST(request: Request) {
       },
       { clerkUserId: user.clerkId ?? undefined }
     );
+
+    // JOV-9957: the journey just entered its first guided use. Durable,
+    // server-side, cookie-keyed — it must not depend on client beacon
+    // delivery (the failure class that left `upgrade-viewed` dark).
+    await recordFirstUseStartedStage();
 
     // JOV-4514: durable work record for the conversation. Covers the
     // newly-created, reused, and orphan-claimed paths above; idempotent.

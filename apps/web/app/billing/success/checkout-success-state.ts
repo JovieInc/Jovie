@@ -139,17 +139,23 @@ export function isArtistVisibilityPlan(plan: PaidPlanId): boolean {
   return plan === 'pro' || plan === 'trial';
 }
 
+/**
+ * JOV-9957 (Superhuman concierge pattern): a paid buyer with a profile lands
+ * straight in the paid feature's first guided task — the welcome-chat agent
+ * conversation (`from=onboarding` bootstraps it, personalized from verified
+ * facts) — never on a settings/workspace page. A buyer who paid before
+ * claiming still claims first.
+ */
+export const GUIDED_FIRST_USE_ROUTE = `${APP_ROUTES.CHAT}?from=onboarding`;
+
 export function getPaidSuccessPrimaryHref(input: {
   readonly plan: PaidPlanId;
   readonly isOnboardingUpgrade: boolean;
   /** Paid before claiming a link: claim or create it next. */
   readonly needsProfile?: boolean;
 }): string {
-  if (input.isOnboardingUpgrade) return APP_ROUTES.DASHBOARD;
   if (input.needsProfile) return APP_ROUTES.START;
-  return isArtistVisibilityPlan(input.plan)
-    ? APP_ROUTES.PRESENCE
-    : APP_ROUTES.CHAT;
+  return GUIDED_FIRST_USE_ROUTE;
 }
 
 export function getPaidSuccessPrimaryLabel(input: {
@@ -157,9 +163,8 @@ export function getPaidSuccessPrimaryLabel(input: {
   readonly isOnboardingUpgrade: boolean;
   readonly needsProfile?: boolean;
 }): string {
-  if (input.isOnboardingUpgrade) return 'Explore your dashboard';
   if (input.needsProfile) return 'Claim your link';
-  return isArtistVisibilityPlan(input.plan) ? 'Open Identity' : 'Go to chat';
+  return 'Start your first task';
 }
 
 export function shouldCelebratePaidSuccess(

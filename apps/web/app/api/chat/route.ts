@@ -45,6 +45,7 @@ import { and, count, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { tryHandleAnonymousOnboardingChat } from '@/app/api/chat/onboarding-handler';
+import { recordFirstUseComplete } from '@/lib/acquisition/artist-offer-funnel.server';
 import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
 import { isAiGatewayAvailable } from '@/lib/ai/gateway-availability';
 import {
@@ -229,8 +230,27 @@ import {
 } from '@/lib/services/pitch';
 import { isRetouchConfigured } from '@/lib/services/retouching/provider-gemini';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
+import { ACQUISITION_COOKIE_NAME } from '@/lib/tracking/consent';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
+
+/**
+ * JOV-9957: read the journey id from the raw Cookie header. The turn's
+ * `onFinish` runs after the stream has flushed, so it reads the header off
+ * the original request instead of the request-scoped cookie store.
+ */
+function acquisitionIdFromCookieHeader(
+  cookieHeader: string | null
+): string | null {
+  if (!cookieHeader) return null;
+  for (const part of cookieHeader.split(';')) {
+    const [name, ...value] = part.trim().split('=');
+    if (name === ACQUISITION_COOKIE_NAME) {
+      return value.join('=') || null;
+    }
+  }
+  return null;
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -3282,6 +3302,16 @@ export async function POST(req: Request) {
               }
             : {}),
         });
+
+        // JOV-9957 (golden-path-delight/v1): the journey's first completed
+        // agent turn closes out its first guided use. Server-side and
+        // journey-keyed (gated on first-use-started, recorded once); never
+        // blocks the turn.
+        if (!isAborted) {
+          await recordFirstUseComplete(
+            acquisitionIdFromCookieHeader(req.headers.get('cookie'))
+          ).catch(() => undefined);
+        }
 
         if (!isAborted && assistantText.trim().length > 0) {
           scheduleOnlineScoring({

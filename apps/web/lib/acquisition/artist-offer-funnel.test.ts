@@ -10,6 +10,7 @@ import {
   isRecordedArtistOfferStage,
   landingPathname,
   percentile,
+  RECORDED_ARTIST_OFFER_STAGES,
   stageForFunnelPath,
 } from './artist-offer-funnel';
 
@@ -243,6 +244,22 @@ describe('golden-path funnel', () => {
     ]) {
       expect(isRecordedArtistOfferStage(stage)).toBe(true);
     }
+  });
+
+  it('records the JOV-9957 first-use stages from producers only', () => {
+    expect(isRecordedArtistOfferStage('first-use-started')).toBe(true);
+    expect(isRecordedArtistOfferStage('first-use-complete')).toBe(true);
+    // They sit in the recorded registry's flow position, never at the end.
+    expect(RECORDED_ARTIST_OFFER_STAGES.indexOf('first-use-started')).toBe(
+      RECORDED_ARTIST_OFFER_STAGES.indexOf('upgrade-viewed') + 1
+    );
+    expect(RECORDED_ARTIST_OFFER_STAGES.indexOf('first-use-complete')).toBe(
+      RECORDED_ARTIST_OFFER_STAGES.indexOf('first-use-started') + 1
+    );
+    expect(RECORDED_ARTIST_OFFER_STAGES.at(-1)).toBe('admitted');
+    // Not part of the linear golden path: the metric reads them against paid.
+    expect(GOLDEN_PATH_STAGES).not.toContain('first-use-started');
+    expect(GOLDEN_PATH_STAGES).not.toContain('first-use-complete');
   });
 
   it('reports the claim-link cohort against its own denominator', () => {

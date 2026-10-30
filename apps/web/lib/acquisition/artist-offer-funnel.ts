@@ -54,6 +54,11 @@ export type ArtistOfferBranchStage =
  * preview that rendered at least one release from the artist's real catalog.
  * Non-music creators never reach it, so it is read as a branch off `start`
  * and never flags the weekly stalled-stage invariant.
+ * `first-use-started` / `first-use-complete` (JOV-9957,
+ * golden-path-delight/v1 `upgrade_to_first_use`) bracket the first guided
+ * use of the paid feature: the welcome-chat conversation a buyer lands in
+ * after checkout, and its first completed agent turn. Recorded, not linear —
+ * the metric reads them against `paid` on the same journey timeline.
  */
 export const GOLDEN_PATH_ENTRY_STAGE = 'claim-link-open' as const;
 
@@ -73,7 +78,9 @@ export type GoldenPathExtraStage =
   | 'start'
   | 'catalog-preview'
   | 'claimed'
-  | 'upgrade-viewed';
+  | 'upgrade-viewed'
+  | 'first-use-started'
+  | 'first-use-complete';
 
 /**
  * Waitlist stages (growth spine): `waitlist-join` is the intake submit,
@@ -104,6 +111,8 @@ export const RECORDED_ARTIST_OFFER_STAGES = [
   'catalog-preview',
   'claimed',
   'upgrade-viewed',
+  'first-use-started',
+  'first-use-complete',
   'waitlist-join',
   'admitted',
 ] as const satisfies readonly ArtistOfferAnyStage[];
