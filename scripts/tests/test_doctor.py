@@ -120,6 +120,25 @@ class FactoryStayUpWatchdogTest(unittest.TestCase):
             self.assertEqual(result["reasons"], ["factory-tick-in-progress"])
             recovery.assert_not_called()
 
+    def test_three_consecutive_admission_denied_ticks_alert_without_restart(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            streaks = []
+            for n in range(4):
+                tick = {"at": f"2026-10-30T00:0{n}:00Z", "admissionDenied": "disk-critical"}
+                streaks.append(factory_watchdog.admission_streak(state, tick))
+                factory_watchdog.admission_streak(state, tick)  # same tick observed twice counts once
+            self.assertEqual(streaks, [1, 2, 3, 4])
+            self.assertEqual(factory_watchdog.admission_streak(state, {"at": "2026-10-30T00:09:00Z"}), 0)
+        base = dict(tickEpoch=300, tickAgeSeconds=60, runningWorkers=0, admissionDenied="disk-critical",
+                    eligibleWork=4, openPullRequests=1, demandKnown=True, demand=5)
+        short = factory_watchdog.assess(factory_observation(admissionDeniedStreak=2, **base))
+        self.assertNotIn("admission-denied", short["reasons"])
+        self.assertNotIn("zero-worker", short["reasons"])
+        denied = factory_watchdog.assess(factory_observation(admissionDeniedStreak=3, **base))
+        self.assertIn("admission-denied", denied["reasons"])
+        self.assertTrue(denied["decisionRequired"])
+
     def assess_tick(self, age_s, heartbeat):
         obs = factory_observation(tickEpoch=300, tickAgeSeconds=700, runningWorkers=0,
                                   service={"active": True, "ageSeconds": age_s, "manager": "systemd"},
