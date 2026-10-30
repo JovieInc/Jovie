@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useEffect, useRef } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ProfileIdentityHeader } from '@/features/profile/ProfileIdentityHeader';
 import { ProfilePreviewBento } from '@/features/profile/ProfilePreviewBento';
@@ -342,6 +342,7 @@ export function OnboardingProfileRail({
 }) {
   const artist = resolvePreviewArtist(state);
   const isInline = placement === 'inline';
+  const railRef = useRef<HTMLElement>(null);
 
   // JOV-8844 keyboard reachability, component-owned (JOV-7973): the side rail
   // is a focusable scroll region, so Home/End must scroll it themselves rather
@@ -349,15 +350,23 @@ export function OnboardingProfileRail({
   // chat's focus/keyboard layers can shadow mid-journey — the golden-path
   // reachability check intermittently found the rail still resting at its
   // bottom edge after Home, clipping the preview badge at the scrollport top.
-  const handleRailKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
-    if (event.key !== 'Home' && event.key !== 'End') return;
-    const rail = event.currentTarget;
-    event.preventDefault();
-    rail.scrollTo({
-      top: event.key === 'Home' ? 0 : rail.scrollHeight - rail.clientHeight,
-      behavior: 'auto',
-    });
-  };
+  // Attached imperatively: this is scroll-region behavior, not element
+  // interactivity, so it stays out of the JSX a11y handler surface.
+  const hasArtist = artist !== null;
+  useEffect(() => {
+    const rail = railRef.current;
+    if (isInline || !rail) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Home' && event.key !== 'End') return;
+      event.preventDefault();
+      rail.scrollTo({
+        top: event.key === 'Home' ? 0 : rail.scrollHeight - rail.clientHeight,
+        behavior: 'auto',
+      });
+    };
+    rail.addEventListener('keydown', onKeyDown);
+    return () => rail.removeEventListener('keydown', onKeyDown);
+  }, [isInline, hasArtist]);
 
   if (!artist) return null;
 
@@ -385,11 +394,10 @@ export function OnboardingProfileRail({
   };
 
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: focusable scroll region owns its Home/End keyboard scrolling (JOV-8844 contract; see handleRailKeyDown)
     <aside
+      ref={railRef}
       aria-label='Profile Preview'
       tabIndex={isInline ? undefined : 0}
-      onKeyDown={isInline ? undefined : handleRailKeyDown}
       className={cn(
         'overflow-x-hidden bg-(--app-shell-content-surface) text-primary-token transition-[opacity,transform,width,border-color] duration-cinematic ease-out',
         isInline
