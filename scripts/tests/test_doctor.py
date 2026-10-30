@@ -1711,11 +1711,19 @@ class StatusFeedTest(unittest.TestCase):
                                      "load_github_env": staticmethod(lambda: None), "graphql_budget": staticmethod(lambda: None),
                                      "provider_throughput": staticmethod(throughput_stub), "HOST": "gem"})
             codex = type("Codex", (), {"status": staticmethod(lambda: {})})
+            # Restore, never unconditionally pop: inside a release self-test the marker was
+            # already set by selftest_env, popping it here leaves every later module
+            # in the same process un-hermetic (their LANES_SELFTEST guards then open —
+            # e.g. dispatch ran macos_pool's GitHub probe and broke test_autoscale).
+            previous_selftest = os.environ.get("LANES_SELFTEST")
             os.environ["LANES_SELFTEST"] = "1"  # no open-PR read from a unit test
             try:
                 observed = doctor.observe(host, lane, codex)
             finally:
-                os.environ.pop("LANES_SELFTEST", None)
+                if previous_selftest is None:
+                    os.environ.pop("LANES_SELFTEST", None)
+                else:
+                    os.environ["LANES_SELFTEST"] = previous_selftest
             (state / "slots").mkdir()
             feed = doctor.status_feed(host, lane, observed, {}, {})
         self.assertEqual(feed["held_by_reason"], {"gate-timeout": 1, "missing-test": 1})
@@ -1743,12 +1751,16 @@ class StatusFeedTest(unittest.TestCase):
                                      "load_github_env": staticmethod(lambda: None), "graphql_budget": staticmethod(lambda: None),
                                      "provider_throughput": staticmethod(throughput_stub), "HOST": "gem"})
             codex = type("Codex", (), {"status": staticmethod(lambda: {})})
+            previous_selftest = os.environ.get("LANES_SELFTEST")
             os.environ["LANES_SELFTEST"] = "1"  # no open-PR read from a unit test
             try:
                 observed = doctor.observe(host, lane, codex, now=now)
                 feed = doctor.status_feed(host, lane, observed, {}, {})
             finally:
-                os.environ.pop("LANES_SELFTEST", None)
+                if previous_selftest is None:
+                    os.environ.pop("LANES_SELFTEST", None)
+                else:
+                    os.environ["LANES_SELFTEST"] = previous_selftest
         self.assertEqual(observed["gateWaits24h"], 2)
         self.assertEqual(observed["noWorkRepairs24h"], {"preserved-head-superseded": 1, "worktree-unavailable": 1})
         self.assertEqual(observed["gateWaitMedianS24h"], 210)

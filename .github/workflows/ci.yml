@@ -3656,6 +3656,7 @@ jobs:
               node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
                 pnpm exec playwright test \
                   tests/e2e/storybook-agent-status.spec.ts \
+                  tests/e2e/storybook-chat-composer-streaming.spec.ts \
                   tests/e2e/storybook-destructive-button.spec.ts \
                   tests/e2e/storybook-download-visual.spec.ts \
                   tests/e2e/storybook-elevation.spec.ts \
@@ -3668,6 +3669,7 @@ jobs:
                   tests/e2e/storybook-overlay-collisions.spec.ts \
                   tests/e2e/storybook-spotify-connect.spec.ts \
                   tests/e2e/storybook-ovie-privacy-boundary.spec.ts \
+                  tests/e2e/storybook-onboarding-dsp-strip-clearance.spec.ts \
                   tests/e2e/storybook-onboarding-recovery.spec.ts \
                   tests/e2e/storybook-task-row-geometry.spec.ts \
                   tests/e2e/storybook-desktop-update-modal.spec.ts \
