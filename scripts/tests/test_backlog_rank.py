@@ -77,6 +77,8 @@ class GroomTests(unittest.TestCase):
         self.assertEqual(refill.missing_info(row(1, labels=(), description="short")),
                          ["description under 200 chars: state the problem and the scope",
                           "no acceptance criteria: add a checkable Definition of done"])
+        # agent-ready is retired as an admission requirement (2026-10-29): a complete row
+        # without the label has no missing info — readiness is computed, never labelled.
         self.assertEqual(refill.missing_info(row(2, labels=())), [])
         self.assertEqual(refill.missing_info(row(3, labels=("needs-tim",), description="short")), [])
         self.assertEqual(refill.missing_info(row(4)), [])

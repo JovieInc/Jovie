@@ -669,13 +669,20 @@ def test_staging_build_runs_in_job_and_materializes_trace_closure() -> None:
     assert "VERCEL_ENABLE_SOURCE_FALLBACK: 'false'" in deploy_step
 
 
-def test_staging_build_and_deploy_do_not_inject_retired_clerk_env() -> None:
+def test_staging_build_env_is_doppler_scoped_and_clerk_free() -> None:
+    """Clerk is retired from the build env (2026-10-29, #23527): turbo hashes NEXT_PUBLIC_*
+    into the build task, so per-job Clerk values split the cache key, and nothing in the app
+    reads them any more (no-clerk-build-env guard). Staging build secrets resolve through the
+    staging-scoped Doppler config, never production, and the prebuilt deploy stays fail-closed."""
     workflow = PRODUCTION_RELEASE_WORKFLOW.read_text()
+
     staging = workflow[
         workflow.index("  deploy-staging:") : workflow.index(
             "  canary-health-gate:"
         )
     ]
+    build_step = _staging_build_step(workflow)
+
     # Clerk is retired: neither the in-job build nor prebuilt deployment
     # should receive old credentials or aliases, including staging variants.
     assert not re.search(
@@ -683,6 +690,17 @@ def test_staging_build_and_deploy_do_not_inject_retired_clerk_env() -> None:
         r"CLERK_PUBLISHABLE_KEY(?:_STAGING)?)\b",
         staging,
     )
+    # The in-job staging build takes its secrets from the staging Doppler config
+    # with no fallback, so CLI-side env resolution cannot fall back to production.
+    assert "--project jovie-web --config stg" in build_step
+    assert "--no-fallback" in build_step
+
+    deploy_step = staging[
+        staging.index("- name: Deploy (staging preview, prebuilt)") :
+    ]
+    # Fail-closed: a source fallback would silently discard the in-job
+    # artifact and repeat the slow server build.
+    assert "VERCEL_ENABLE_SOURCE_FALLBACK: 'false'" in deploy_step
 
 
 def test_masked_deployment_url_is_encoded_across_job_boundary() -> None:

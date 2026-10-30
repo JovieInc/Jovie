@@ -2134,8 +2134,19 @@ class LinearRateLimitTest(unittest.TestCase):
                              "the tmp record alone still cools the credential")
 
     def test_doctor_observe_keeps_the_mirror_pool_during_a_cooldown(self):
+        # Restore the previous value, never an unconditional pop: inside a release
+        # self-test the marker was already set by selftest_env, and popping it here
+        # un-hermetics every later module in the same process (their LANES_SELFTEST
+        # guards open and the tick reaches GitHub/Linear).
+        previous_selftest = os.environ.get("LANES_SELFTEST")
         os.environ["LANES_SELFTEST"] = "1"
-        self.addCleanup(lambda: os.environ.pop("LANES_SELFTEST", None))
+
+        def restore_selftest():
+            if previous_selftest is None:
+                os.environ.pop("LANES_SELFTEST", None)
+            else:
+                os.environ["LANES_SELFTEST"] = previous_selftest
+        self.addCleanup(restore_selftest)
         with patch.object(lane.random, "random", return_value=0):
             lane.publish_linear_cooldown(self.client.key, self.headers(), now=time.time())
         host = lane.Host()
@@ -5404,11 +5415,19 @@ class DispatchTest(unittest.TestCase):
                     patch.object(lane.reason_lane, "tick", return_value={}), \
                     patch.object(lane.doctor, "run"), \
                     patch.object(lane.subprocess, "Popen") as spawn:
+                # The dispatch self-test guard must open only for this assertion; restore
+                # the marker after — inside a release self-test it was already set, and
+                # losing it would un-hermetic every later module in the same process.
+                previous_selftest = os.environ.get("LANES_SELFTEST")
                 os.environ.pop("LANES_SELFTEST", None)
-                host = lane.Host(state=Path(tmp), repo=Path(tmp))
-                self.assertEqual(lane.dispatch(host), 0)
-                self.assertEqual(spawn.call_count, 1)
-                tick = json.loads((Path(tmp) / "tick.json").read_text())
+                try:
+                    host = lane.Host(state=Path(tmp), repo=Path(tmp))
+                    self.assertEqual(lane.dispatch(host), 0)
+                    self.assertEqual(spawn.call_count, 1)
+                    tick = json.loads((Path(tmp) / "tick.json").read_text())
+                finally:
+                    if previous_selftest is not None:
+                        os.environ["LANES_SELFTEST"] = previous_selftest
                 if failure is None:
                     self.assertEqual(sync.call_args.args[:2], (host.state, client))
                     self.assertEqual(sync.call_args.args[4], ["JOV"])
@@ -9441,6 +9460,13 @@ class ManagedMeshArchiveTest(unittest.TestCase):
         if os.environ.get("LANES_SELFTEST") != "1":
             return  # Real archive verification runs inside every updater self-test.
         runtime = ROOT / "scripts/lanes/.mesh-runtime"
+        if not (runtime / "manifest.json").exists():
+            # Not inside an updater self-test either: prove_staging compiles the mesh
+            # runtime into the staged tree before this suite runs, so the archive here
+            # is always fresh and verifiable there. The LANES_SELFTEST=1 guard without
+            # the compile (the lanes-selftest-changed-tests source guard runs changed
+            # lanes tests against the plain checkout) has no archive to verify.
+            return
         proof = json.loads((runtime / "manifest.json").read_text())
         self.assertEqual(proof["schema"], "jovie.mesh-managed-runtime/v1")
         self.assertTrue(proof["isolatedImportPassed"])

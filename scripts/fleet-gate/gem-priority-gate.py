@@ -1250,12 +1250,22 @@ def observe_lease(guard_bin: str) -> dict[str, Any]:
     }
 
 
+DATABASE_PROBE_ATTEMPTS = 3
+
+
 def observe_database(production_url: str) -> dict[str, str]:
     """Observe public DB liveness on the configured production origin only.
 
     Deploy liveness deliberately omits private dependency diagnostics. Never
     infer database readiness from that aggregate response or carry diagnostics
     into a fleet receipt. Uncertain DB evidence remains unknown.
+
+    A transport blip (connection error, timeout, or an edge error page) is
+    not a database verdict, so transport-class failures get the same bounded
+    three-attempt retry as the other live observers. Authoritative verdicts
+    (a parseable liveness document in any state, a redirect, an unexpected
+    status) return immediately and are never retried. Pass conditions,
+    freshness bounds, and the unknown-blocks-visibly rule are unchanged.
     """
     def unknown(reason: str) -> dict[str, str]:
         return {"status": "unknown", "detail": f"database health probe: {reason}"}
@@ -1269,33 +1279,60 @@ def observe_database(production_url: str) -> dict[str, str]:
         # Validate the port before constructing the credential-free same-origin URL.
         origin.port
         url = urllib.parse.urlunsplit((origin.scheme, origin.netloc, "/api/health/db", "", ""))
+    except (OSError, ValueError, OverflowError):
+        return unknown("untrusted production origin")
+
+    last_transport_reason = ""
+    for attempt in range(DATABASE_PROBE_ATTEMPTS):
         try:
-            with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310 - configured origin
-                status, final_url = response.status, response.geturl()
-                value = json.loads(response.read().decode("utf-8"))
-        except urllib.error.HTTPError as error:
-            status, final_url = error.code, error.geturl()
-            value = json.loads(error.read().decode("utf-8"))
-        if final_url != url:
-            return unknown("redirected away from the configured database endpoint")
-        if not isinstance(value, dict) or not isinstance(value.get("healthy"), bool):
-            return unknown("malformed public liveness schema")
-        timestamp = value.get("timestamp")
-        if not isinstance(timestamp, str):
-            return unknown("missing observation timestamp")
-        observed_at = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-        if observed_at.tzinfo is None:
-            return unknown("timestamp has no timezone")
-        age = utc_now() - observed_at.astimezone(UTC)
-        if not timedelta(0) <= age <= timedelta(minutes=10):
-            return unknown("stale or future-dated observation")
-        if value["healthy"] is False and status in (200, 503):
-            return {"status": "red", "detail": "same-origin database health check failed"}
-        if value["healthy"] is True and status == 200:
-            return {"status": "green", "detail": "same-origin database health check passed"}
-        return unknown("unexpected HTTP status or contradictory liveness")
-    except (OSError, ValueError, OverflowError, urllib.error.URLError):
-        return unknown("transport or malformed response")
+            try:
+                with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310 - configured origin
+                    status, final_url = response.status, response.geturl()
+                    body = response.read().decode("utf-8")
+            except urllib.error.HTTPError as error:
+                status, final_url = error.code, error.geturl()
+                body = error.read().decode("utf-8", "replace")
+            try:
+                value = json.loads(body)
+            except ValueError:
+                # An HTML edge/error page is a transport-class blip, not a
+                # liveness verdict; retry it like any other blip.
+                last_transport_reason = f"attempt {attempt + 1}: edge returned a non-JSON body"
+                if attempt + 1 < DATABASE_PROBE_ATTEMPTS:
+                    time.sleep(attempt + 1)
+                continue
+        except (OSError, urllib.error.URLError) as error:
+            last_transport_reason = f"attempt {attempt + 1}: {error}"
+            if attempt + 1 < DATABASE_PROBE_ATTEMPTS:
+                time.sleep(attempt + 1)
+            continue
+        try:
+            if final_url != url:
+                return unknown("redirected away from the configured database endpoint")
+            if not isinstance(value, dict) or not isinstance(value.get("healthy"), bool):
+                return unknown("malformed public liveness schema")
+            timestamp = value.get("timestamp")
+            if not isinstance(timestamp, str):
+                return unknown("missing observation timestamp")
+            observed_at = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+            if observed_at.tzinfo is None:
+                return unknown("timestamp has no timezone")
+            age = utc_now() - observed_at.astimezone(UTC)
+            if not timedelta(0) <= age <= timedelta(minutes=10):
+                return unknown("stale or future-dated observation")
+            if value["healthy"] is False and status in (200, 503):
+                return {"status": "red", "detail": "same-origin database health check failed"}
+            if value["healthy"] is True and status == 200:
+                return {"status": "green", "detail": "same-origin database health check passed"}
+            return unknown("unexpected HTTP status or contradictory liveness")
+        except ValueError:
+            # A parseable response with unparseable evidence is authoritative
+            # brokenness, not a transport blip: return it, never retry it.
+            return unknown("transport or malformed response")
+    return unknown(
+        f"transport or malformed response after {DATABASE_PROBE_ATTEMPTS} "
+        f"attempts: {last_transport_reason or 'no response'}"
+    )
 
 
 def observe_production(url: str) -> dict[str, Any]:

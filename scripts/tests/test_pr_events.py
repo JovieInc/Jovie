@@ -3167,16 +3167,23 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         cases = [("<cmd>", run_url), ("not applicable", run_url),
                  ("...", run_url), ("node --test", "https://example.com/red"),
                  ("node --test", run_url + "/job/456")]
-        # The CI-scoped fixture already satisfies Win policy; this test repairs only red evidence.
-        win = ("\n## Win\n\n- Claim: Repair synthetic red-evidence fixtures\n"
-               "- Area: ci\n- Theme: merge-throughput\n"
-               "- Metric: invalid fixture cases | count | lower | 5 | 0 | synthetic test cases | python -m unittest scripts.tests.test_pr_events\n"
-               f"- Verify: {run_url}\n")
         bodies = []
+        # 'fix(ci): ...' is compounding/throughput work, so since the wins ledger (2026-10-29)
+        # fleet rules also demand a measured Win section — the pull-request template ships one.
+        # The bodies carry a valid measured Win so the only expected before-error is the
+        # red-before-green one and the repaired body evaluates clean end to end.
+        win_section = (
+            "\n## Win\n\n- Claim: repair-evidence edits stopped failing the fleet-rules consumer\n"
+            "- Area: ci\n- Theme: merge-throughput\n"
+            "- Metric: fleet-rules-rejects | count | lower | 3 | 0 | fleet-rules-evidence workflow log | "
+            "gh run list --workflow=fleet-rules-evidence.yml\n"
+            "- Verify: https://github.com/JovieInc/Jovie/actions/runs/123\n"
+        )
         for command, url in cases:
             body = (f"## Summary\nKeep this.\n\n## Red-before-green\n"
                     f"- Failing command: `{command}`\n- Failing run (before fix): {url}\n"
-                    "\n## Blast radius\nWhat could break: repair evidence.\nProof: regression tests.\n" + win)
+                    "\n## Blast radius\nWhat could break: repair evidence.\nProof: regression tests.\n"
+                    + win_section)
             written = []
             def edit(args):
                 written.append(Path(args[-1]).read_text())
@@ -3187,7 +3194,7 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
                 self.assertEqual(len(written), 1)
                 self.assertIn("## Summary\nKeep this.", written[0])
                 self.assertIn("## Blast radius\nWhat could break: repair evidence.", written[0])
-                self.assertIn(win, written[0])
+                self.assertIn(win_section, written[0])
                 bodies.extend([body, written[0]])
         # Exercise the actual consumer, rather than trusting the Python mirror.
         checked = subprocess.run(["node", "--input-type=module", "-e", """

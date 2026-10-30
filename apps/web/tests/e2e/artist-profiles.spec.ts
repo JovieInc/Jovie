@@ -107,11 +107,13 @@ test.describe('Artist Profiles Landing', () => {
         .getByTestId('artist-profile-section-hero')
         .getByText(ARTIST_PROFILE_COPY.hero.subhead, { exact: true })
     ).toBeVisible();
+    // Scope to the hero section: the marketing header renders an
+    // identically-labelled claim CTA pointed at /signup, so an unscoped
+    // role query resolves to the header link instead of the hero's
+    // /start claim.
     const claimLink = page
-      .getByRole('link', {
-        name: /claim your profile/i,
-      })
-      .first();
+      .getByTestId('artist-profile-section-hero')
+      .getByRole('link', { name: /claim your profile/i });
 
     await expect(
       page.getByRole('heading', {
@@ -182,9 +184,11 @@ test.describe('Artist Profiles Landing', () => {
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
+    // Same scoping as the desktop hero leg: the header's claim CTA shares
+    // the accessible name and points at /signup.
     const claimLink = page
-      .getByRole('link', { name: /claim your profile/i })
-      .first();
+      .getByTestId('artist-profile-section-hero')
+      .getByRole('link', { name: /claim your profile/i });
     await expect(claimLink).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
@@ -260,7 +264,7 @@ test.describe('Artist Profiles Landing', () => {
         label: 'Pre-save',
         headline: 'Collect release alerts before it lands.',
         screenshotAlt:
-          'Jovie artist profile inviting fans to get release updates.',
+          'Jovie profile inviting listeners to get release updates.',
       },
       {
         label: 'Out now',

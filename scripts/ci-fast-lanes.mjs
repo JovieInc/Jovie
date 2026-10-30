@@ -1073,6 +1073,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/delivery-control-receipts-workflow.test.mjs',
   'scripts/lib/__tests__/dependabot-update-policy.test.mjs',
   'scripts/lib/__tests__/design-surface-census.test.mjs',
+  'scripts/lib/__tests__/main-red-eject.test.mjs',
   'scripts/lib/__tests__/doc-freshness.test.mjs',
   'scripts/lib/__tests__/flaky-test-filing.test.mjs',
   'scripts/lib/__tests__/gbrain-pool-env.test.mjs',
@@ -1484,6 +1485,34 @@ function argv(command, args, opts = {}) {
   };
 }
 
+/**
+ * Lane selection for a merge group must cover every entry the head contains.
+ * merge_group.base_sha is the entry ahead, so HEADGREEN landed a red entry
+ * behind a docs-only green head (#23600, 2026-10-29). Prefer the merge base
+ * with live origin/main (fetched by the ci-fast job); fall back to the event base.
+ * @param {string} cwd
+ * @param {string} fallback
+ */
+export function mergeGroupDiffBase(cwd, fallback) {
+  const mergeBase = argv('git', ['merge-base', 'HEAD', 'origin/main'], { cwd });
+  const sha = mergeBase.output.trim();
+  return mergeBase.code === 0 && /^[0-9a-f]{40}$/.test(sha) ? sha : fallback;
+}
+
+/** Keep Turbo's affected graph as wide as merge-group lane selection. */
+export function typecheckEnvironment(cwd = REPO_ROOT) {
+  return process.env.GITHUB_EVENT_NAME === 'merge_group'
+    ? {
+        ...process.env,
+        TURBO_SCM_BASE: mergeGroupDiffBase(
+          cwd,
+          process.env.TURBO_SCM_BASE || 'HEAD^1'
+        ),
+        TURBO_SCM_HEAD: 'HEAD',
+      }
+    : process.env;
+}
+
 /** @param {readonly string[]} patterns */
 export function changedFiles(patterns = [], cwd = REPO_ROOT) {
   const event = process.env.GITHUB_EVENT_NAME || '';
@@ -1498,6 +1527,8 @@ export function changedFiles(patterns = [], cwd = REPO_ROOT) {
       probe.code === 0
         ? `origin/${base}`
         : process.env.TURBO_SCM_BASE || diffBase;
+  } else if (event === 'merge_group') {
+    diffBase = mergeGroupDiffBase(cwd, process.env.TURBO_SCM_BASE || diffBase);
   } else if (process.env.TURBO_SCM_BASE) {
     diffBase = process.env.TURBO_SCM_BASE;
   }
@@ -2140,7 +2171,10 @@ function runTypecheck() {
       };
     }
   }
-  return shellAsync('pnpm turbo typecheck --affected --force');
+  return shellAsync(
+    'pnpm turbo typecheck --affected --force',
+    typecheckEnvironment()
+  );
 }
 
 function runWebTestsTypecheck() {
@@ -2540,14 +2574,14 @@ function shellQuote(value) {
 }
 
 /** Async twin of shell() so structural commands can overlap. */
-function shellAsync(command) {
+function shellAsync(command, env = process.env) {
   return new Promise(resolveResult => {
     const stdout = [];
     const stderr = [];
     const child = spawn(command, {
       shell: true,
       cwd: REPO_ROOT,
-      env: process.env,
+      env,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     child.stdout.on('data', chunk => stdout.push(chunk));

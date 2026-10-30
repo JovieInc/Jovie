@@ -1194,6 +1194,8 @@ def test_product_screenshot_budget_covers_capture_and_publication() -> None:
         "E2E_USE_TEST_AUTH_BYPASS",
         "E2E_CLERK_USER_ID",
     ):
+        # Clerk build env is retired (2026-10-29, #23527): the capture job no longer
+        # sets NEXT_PUBLIC_CLERK_* / CLERK_SECRET_KEY, so there is nothing to unset.
         assert f"-u {capture_only_variable}" in publication
     assert "hold_screenshot_merge_queue()" in publication
     assert "production-controller.yml/runs?status=in_progress&per_page=100" in publication
