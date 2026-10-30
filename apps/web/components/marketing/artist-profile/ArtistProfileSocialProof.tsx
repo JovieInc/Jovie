@@ -15,6 +15,7 @@ interface ArtistProfileSocialProofProps {
 
 interface ArtistProfileReleaseCycleGalleryProps {
   readonly releaseCycle: ArtistProfileLandingCopy['releaseCycle'];
+  readonly id?: string;
 }
 
 const PROFILE_STATES = [
@@ -79,9 +80,11 @@ export function ArtistProfileSocialProof({
 
 export function ArtistProfileReleaseCycleGallery({
   releaseCycle,
+  id,
 }: Readonly<ArtistProfileReleaseCycleGalleryProps>) {
   return (
     <ArtistProfileSectionShell
+      id={id}
       sectionId='product-gallery'
       sectionVariant='release-rail'
       sectionOwner='apps/web/components/marketing/artist-profile/ArtistProfileSocialProof.tsx'

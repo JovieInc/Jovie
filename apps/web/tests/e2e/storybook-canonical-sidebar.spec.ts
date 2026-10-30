@@ -617,7 +617,7 @@ test('operator disclosures restore preferences without invisible keyboard stops'
     '/iframe.html?id=organisms-unifiedsidebar--operator&viewMode=story'
   );
   const nav = page.getByRole('navigation', { name: 'OV Navigation' });
-  const business = nav.getByRole('button', { name: 'Business', exact: true });
+  const business = nav.getByRole('button', { name: 'Company', exact: true });
   const tools = nav.getByRole('button', { name: 'Tools', exact: true });
   await expect(tools).toHaveAttribute('aria-expanded', 'true');
   await expect(business).toHaveAttribute('aria-expanded', 'true');

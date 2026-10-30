@@ -109,6 +109,17 @@ describe('SmartLinkPoweredByFooter', () => {
     );
   });
 
+  it('gives every footer link a 44px hit container and keeps the separator outside the Report link', () => {
+    render(<SmartLinkPoweredByFooter />);
+    for (const link of screen.getAllByRole('link')) {
+      expect(link.className).toContain('before:h-11');
+      expect(link.className).toContain('before:min-w-11');
+    }
+    expect(screen.getByRole('link', { name: 'Report' }).textContent).toBe(
+      'Report'
+    );
+  });
+
   it('builds an unambiguous report target and ignores blank targets', () => {
     expect(buildSmartLinkReportHref('/tim/never-say-a-word')).toBe(
       '/report?type=smart_link&target=%2Ftim%2Fnever-say-a-word'

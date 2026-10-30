@@ -25,6 +25,16 @@ describe('AboutPageContent', () => {
     expect(screen.getByText(ABOUT_DEFINITION)).toBeVisible();
   });
 
+  it('closes with one quiet claim link instead of a request-access band', () => {
+    render(<AboutPageContent />);
+    expect(screen.queryByText(/request access/i)).toBeNull();
+    const closing = screen.getByTestId('marketing-section-cta');
+    expect(closing.querySelectorAll('a')).toHaveLength(1);
+    expect(
+      screen.getByRole('link', { name: 'Claim your profile' })
+    ).toBeVisible();
+  });
+
   it('renders what, why, who, contact, then questions, in that order', () => {
     const { container } = render(<AboutPageContent />);
     const headings = Array.from(container.querySelectorAll('h2')).map(h =>

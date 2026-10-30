@@ -106,6 +106,10 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
       'apps/web/tests/unit/e2e/start-entry-essentials.test.ts',
     ],
   ],
+  [
+    'apps/web/tests/e2e/helpers/golden-path-tracking.ts',
+    ['apps/web/tests/unit/e2e/golden-path-tracking.test.ts'],
+  ],
 ]);
 // Any web source that uses TanStack Virtual must stay out of React Compiler
 // memoization (JOV-6702); the invariant has no import edge to such files.
@@ -3117,8 +3121,8 @@ export function buildSelectedTestCommands(
       [
         'NEXT_PUBLIC_APP_URL=http://localhost:3100',
         'NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3100',
-        'NEXT_PUBLIC_CLERK_MOCK=1',
-        'NEXT_PUBLIC_CLERK_PROXY_DISABLED=1',
+        'NEXT_PUBLIC_AUTH_MOCK=1',
+        'NEXT_PUBLIC_AUTH_PROXY_DISABLED=1',
         'NEXT_PUBLIC_E2E_MODE=1',
         'NEXT_IGNORE_ESLINT=1',
         'NEXT_IGNORE_TYPECHECK=1',

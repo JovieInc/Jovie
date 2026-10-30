@@ -73,7 +73,7 @@ export async function POST(request: Request) {
         capabilities: { tools: {} },
         serverInfo: { name: 'jovie-artist-drafts', version: '1.0.0' },
         instructions:
-          'Resolve an exact public creator profile, create an unpublished workspace, then prepare a release launch draft. Preserve acquisition fields. Keep draft_token private. Ownership, publishing and purchases require a separate verified human handoff; these tools grant none of those permissions.',
+          'Resolve an exact public creator profile, create an unpublished workspace, then prepare a release launch draft. Preserve acquisition fields. Keep draft_token private. Show the returned claim_url to the user: on Jovie they sign in, the artist is matched to its Spotify identity (well-known artists go through verification), and nothing is public until they publish. These tools grant no ownership or publishing.',
       });
     if (method === 'ping') return ok({});
     if (method === 'tools/list') return ok({ tools: AGENT_DRAFT_TOOLS });
@@ -85,7 +85,11 @@ export async function POST(request: Request) {
       !AGENT_DRAFT_TOOLS.some(tool => tool.name === call.data.name)
     )
       return rpcError(-32602, 'Unknown tool or invalid arguments', id, 200);
-    const writeBlocked = await guardAgentRequest(request, true);
+    const writeBlocked = await guardAgentRequest(
+      request,
+      true,
+      call.data.arguments
+    );
     if (writeBlocked) return writeBlocked;
     const result = await executeAgentDraftTool(
       call.data.name,
