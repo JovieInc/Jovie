@@ -502,6 +502,13 @@ const ADVANCED_TOOL_SCHEMAS = {
       stepId: z.string().optional(),
     }),
   },
+  surfaceLibraryOpportunities: {
+    description:
+      'Onboarding presence-build Library opportunities artifact. System-emitted tool event, not a model-invoked chat tool.',
+    inputSchema: z.object({
+      stepId: z.string().optional(),
+    }),
+  },
   assembleArtistProfile: {
     description:
       'Onboarding presence-build profile assembly artifact. System-emitted tool event, not a model-invoked chat tool.',
@@ -573,6 +580,7 @@ const ALWAYS_PAID_TOOL_NAMES = [
   'formatLyrics',
   'proposeVideoRecording',
   'researchArtistPresence',
+  'surfaceLibraryOpportunities',
   'assembleArtistProfile',
   'generateSmartLink',
   'draftWelcomePost',
@@ -806,6 +814,7 @@ const TOOL_RESULT_REQUIRED_KEYS: Record<string, readonly string[]> = {
   unpauseMerchCard: ['success', 'action', 'merchCardId'],
   writeWorldClassBio: ['success', 'action', 'bio', 'summary'],
   researchArtistPresence: ['action', 'stepId', 'title', 'summary'],
+  surfaceLibraryOpportunities: ['action', 'stepId', 'title', 'summary'],
   assembleArtistProfile: ['action', 'stepId', 'title', 'summary'],
   generateSmartLink: ['action', 'stepId', 'title', 'summary'],
   draftWelcomePost: ['action', 'stepId', 'title', 'summary'],
@@ -3624,12 +3633,8 @@ function buildEvalPromptAccountContext(
   const billingVerification = toPromptBillingVerification(
     vars.billingVerification
   );
-  const dailyLimit = planLimits.limits.aiDailyMessageLimit;
+  const weeklyLimit = planLimits.limits.aiWeeklyMessageLimit;
   const used = typeof vars.usageUsed === 'number' ? vars.usageUsed : 7;
-  const monthlyLimit =
-    typeof vars.monthlyLimit === 'number' ? vars.monthlyLimit : dailyLimit * 30;
-  const monthlyUsed =
-    typeof vars.monthlyUsed === 'number' ? vars.monthlyUsed : used * 4;
   const planMismatch =
     vars.planMismatch === 'legacy-founding'
       ? {
@@ -3653,14 +3658,10 @@ function buildEvalPromptAccountContext(
       billingVerification === 'unavailable'
         ? null
         : {
-            dailyLimit,
+            weeklyLimit,
             used,
-            remaining: Math.max(dailyLimit - used, 0),
+            remaining: Math.max(weeklyLimit - used, 0),
             resetAt: '2026-05-26T07:00:00.000Z',
-            monthlyLimit,
-            monthlyUsed,
-            monthlyRemaining: Math.max(monthlyLimit - monthlyUsed, 0),
-            monthlyResetAt: '2026-06-01T07:00:00.000Z',
           },
     entitlements: {
       aiCanUseTools:
@@ -3726,7 +3727,7 @@ function evaluateSystemPromptContract(prompt: string, vars: EvalVars) {
         : undefined;
   const systemPrompt = buildSystemPrompt(artistContext, releases, {
     aiCanUseTools,
-    aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
+    aiWeeklyMessageLimit: planLimits.limits.aiWeeklyMessageLimit,
     insightsEnabled: toBoolean(vars.insightsEnabled, plan !== 'free'),
     knowledgeContext,
     accountContext,
@@ -4385,6 +4386,7 @@ function defaultToolResult(toolName: string, input: unknown): unknown {
         summary: 'Pitch ready.',
       };
     case 'researchArtistPresence':
+    case 'surfaceLibraryOpportunities':
     case 'assembleArtistProfile':
     case 'generateSmartLink':
     case 'draftWelcomePost':
@@ -5024,6 +5026,7 @@ function sampleToolInput(toolName: string): Record<string, unknown> {
           'Hey everyone, Neon Reef is out now. Thank you so much for listening.',
       };
     case 'researchArtistPresence':
+    case 'surfaceLibraryOpportunities':
     case 'assembleArtistProfile':
     case 'generateSmartLink':
     case 'draftWelcomePost':
@@ -5839,7 +5842,7 @@ function evaluateSkillPromptContract(vars: EvalVars) {
   const chatPitchPrompt = buildSystemPrompt(
     buildTestArtistContext(),
     buildTestReleases(),
-    { aiCanUseTools: true, aiDailyMessageLimit: 20 }
+    { aiCanUseTools: true, aiWeeklyMessageLimit: 20 }
   );
   const incompleteChecklist = getPitchChecklistStatus({
     artistName: 'Luna Waves',
@@ -7618,7 +7621,7 @@ function evaluatePromptDisclosureContract(prompt: string, vars: EvalVars) {
   const planLimits = getEntitlements(plan);
   const systemPrompt = buildSystemPrompt(artistContext, [], {
     aiCanUseTools: planLimits.booleans.aiCanUseTools,
-    aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
+    aiWeeklyMessageLimit: planLimits.limits.aiWeeklyMessageLimit,
     insightsEnabled: plan !== 'free',
   });
 

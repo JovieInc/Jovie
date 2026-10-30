@@ -34,7 +34,7 @@ export function ReplacesSection() {
             <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tracking-tight text-tertiary-token border border-subtle'>
               Why switch
             </span>
-            <h2 className='marketing-h2-linear text-primary-token'>
+            <h2 className='marketing-h2-linear text-primary-token line-clamp-2'>
               One Tool Instead Of Three.
             </h2>
             <p className='max-w-lg marketing-lead-linear text-secondary-token'>

@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto';
 
 import { preAdmissionDecision } from './admission-policy.mjs';
+import {
+  admissionTargetPacket,
+  resolveAdmissionTarget,
+  sameAdmissionTarget,
+} from './ownership-inventory.mjs';
 
 export const ADMISSION_SCAN_SCHEMA = 'symphony-admission-scan/v1';
 
@@ -149,7 +154,7 @@ function evidenceFor(issue) {
       /<!-- admission-gate\/v1 -->|admission[- ]approved/i.test(commentText),
   };
   const admissionReceipt = comments.some(comment =>
-    comment.startsWith('<!-- symphony-admission:v1 ')
+    scopedSymphonyAdmissionReceipt(issue, comment)
   );
   return {
     labels,
@@ -162,6 +167,27 @@ function evidenceFor(issue) {
         comments.some(comment => ACTIVE_PULL_REQUEST.test(comment))
     ),
   };
+}
+
+function scopedSymphonyAdmissionReceipt(issue, comment) {
+  if (!comment.startsWith('<!-- symphony-admission:v1 ')) return false;
+  try {
+    const payload = JSON.parse(
+      comment.slice(
+        '<!-- symphony-admission:v1 '.length,
+        comment.endsWith(' -->') ? -' -->'.length : undefined
+      )
+    );
+    const target = admissionTargetPacket(payload);
+    const expected = resolveAdmissionTarget(issue);
+    return (
+      expected.decision === 'admit' &&
+      Boolean(target) &&
+      sameAdmissionTarget(target, expected.target)
+    );
+  } catch {
+    return false;
+  }
 }
 
 function historyFor(identifier, options) {

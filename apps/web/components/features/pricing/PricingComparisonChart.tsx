@@ -60,7 +60,7 @@ function MobileFeatureRow({
     <tr className='system-b-pricing-chart-row'>
       <th
         scope='row'
-        className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature'
+        className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature whitespace-nowrap'
       >
         {feature.name}
       </th>
@@ -86,7 +86,7 @@ function DesktopFeatureRow({
     <tr className='system-b-pricing-chart-row'>
       <th
         scope='row'
-        className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature'
+        className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature whitespace-nowrap'
       >
         {feature.name}
       </th>
@@ -204,15 +204,15 @@ export function PricingComparisonChart() {
           <caption className='sr-only'>Feature comparison by plan</caption>
           <thead>
             <tr className='system-b-pricing-chart-row'>
-              <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature-heading' />
-              <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--plan'>
+              <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature-heading whitespace-nowrap' />
+              <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--plan whitespace-nowrap'>
                 <div className='system-b-pricing-plan-name'>
                   {free.marketing.displayName}
                 </div>
                 <div className='system-b-pricing-plan-price'>$0</div>
               </th>
               <th
-                className='system-b-pricing-chart-cell system-b-pricing-chart-cell--plan'
+                className='system-b-pricing-chart-cell system-b-pricing-chart-cell--plan whitespace-nowrap'
                 data-selected='true'
               >
                 <div className='system-b-pricing-plan-name'>
@@ -233,7 +233,7 @@ export function PricingComparisonChart() {
                 </div>
               </th>
               {maxPlanEnabled ? (
-                <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--plan'>
+                <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--plan whitespace-nowrap'>
                   <div className='system-b-pricing-plan-label'>
                     <span className='system-b-pricing-plan-name'>
                       {max.marketing.displayName}
@@ -290,9 +290,9 @@ export function PricingComparisonChart() {
           </caption>
           <thead>
             <tr className='system-b-pricing-chart-row'>
-              <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature-heading' />
+              <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature-heading whitespace-nowrap' />
               <th
-                className='system-b-pricing-chart-cell system-b-pricing-chart-cell--plan'
+                className='system-b-pricing-chart-cell system-b-pricing-chart-cell--plan whitespace-nowrap'
                 data-selected={selectedPlan === 'pro' ? 'true' : undefined}
               >
                 <div className='system-b-pricing-plan-name'>

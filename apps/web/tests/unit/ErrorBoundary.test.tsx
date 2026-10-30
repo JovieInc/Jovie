@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import * as Sentry from '@sentry/nextjs';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,6 +17,8 @@ vi.mock('@/lib/sentry/init', () => ({
   isSentryInitialized: vi.fn(),
   getSentryMode: vi.fn().mockReturnValue('enabled'),
 }));
+
+const ROOT = process.cwd();
 
 describe('ErrorBoundary', () => {
   const mockReset = vi.fn();
@@ -408,6 +412,19 @@ describe('ErrorBoundary', () => {
       // Button uses CVA with Tailwind classes (variant='primary', size='sm')
       expect(tryAgainButton).toHaveAttribute('data-variant', 'primary');
       expect(tryAgainButton).toHaveClass('bg-btn-primary');
+    });
+
+    it('keeps the primary action shape stable for failure and deployment-skew states', () => {
+      const source = readFileSync(
+        join(ROOT, 'components/organisms/ErrorBoundary.tsx'),
+        'utf8'
+      );
+
+      expect(source).toContain('const primaryAction = isSkewError');
+      expect(source).toContain("label: 'Reload'");
+      expect(source).toContain('onClick: () => globalThis.location.reload()');
+      expect(source).toContain('label: RECOVERY_COPY.retryLabel');
+      expect(source).toContain('onClick: reset');
     });
   });
 });

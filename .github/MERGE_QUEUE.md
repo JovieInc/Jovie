@@ -163,11 +163,12 @@ It fails closed if an open PR is missing from that authoritative snapshot.
 `queue-deferred` is a mechanical hold placed at a draft's birth (Symphony) or
 under queue pressure (agent-pipeline). The label alone has no provenance, so
 every deferral posts a typed receipt — one upserted PR comment with the
-`<!-- bot-comment:queue-deferral -->` marker — recording the exact head, a
-typed reason (`symphony-birth-hold` or `queue-pressure`), its reason-bound
-source, and the deferral time. Only comments authored by the canonical Jovie
-bot or repository owner are authority. `scripts/lib/queue-deferral-receipt.mjs`
-is the canonical reader/writer; public comments cannot create release authority.
+`<!-- bot-comment:queue-deferral -->` marker — recording the repository, exact
+head, typed reason (`symphony-birth-hold` or `queue-pressure`), its
+reason-bound source, and the deferral time. Only comments authored by the
+canonical Jovie bot or repository owner are authority.
+`scripts/lib/queue-deferral-receipt.mjs` is the canonical reader/writer; public
+comments cannot create release authority.
 
 `queue-deferred-release.yml` runs after PR CI, successful production-controller
 completion, and the existing five-minute fleet-receipt refresh. That upstream
@@ -176,10 +177,10 @@ the repository is otherwise idle. It runs `scripts/release-queue-deferred.sh`:
 
 - **Report pass** — prints age and reason for every `queue-deferred` PR
   (not only agent-branch PRs) and raises a warning once a hold exceeds the
-  12-minute SLA. A missing or malformed receipt reports as
-  `untyped-ready-hold` and is released automatically when the live PR is
-  ready, mergeable, exact-head green, and a fresh GREEN fleet receipt
-  agrees. Human-policy labels (`needs:taste`, `net-new`, `outbound`,
+  12-minute SLA. A missing receipt reports as `untyped-ready-hold` and is
+  released automatically when the live PR is ready, mergeable, exact-head
+  green, and a fresh GREEN fleet receipt agrees. A malformed typed receipt
+  stays held. Human-policy labels (`needs:taste`, `net-new`, `outbound`,
   `needs-human`, …) report as `human-policy-hold:<label>` and stay held.
 - **Release pass** — only under a fresh (≤10-minute) `GREEN` fleet receipt
   with `promotionAdmission.allowed`, and only when the live PR is non-draft,

@@ -40,6 +40,7 @@ final class ChatRepository {
   /// unconditionally calls `refreshConversations()` in a `.task` on
   /// appear, so this can't be solved by the call site alone.
   private var isFixtureSeeded = false
+  private var sendTask: Task<Void, Never>?
 
   init(
     client: MobileChatClientProtocol,
@@ -59,6 +60,14 @@ final class ChatRepository {
 
   func bootstrap() async {
     await hydrateFromCache()
+    if workspace == .ovie {
+      if activeConversationID == nil { await refreshConversations() }
+      else { await openConversation(activeConversationID!) }
+    }
+  }
+
+  func cancelInFlightTurn() {
+    sendTask?.cancel()
   }
 
   func refreshConversations() async {
@@ -73,6 +82,9 @@ final class ChatRepository {
       isOffline = false
       lastErrorMessage = nil
       await persistCache()
+      if workspace == .ovie, activeConversationID == nil, let first = fetched.first {
+        await openConversation(first.id)
+      }
     } catch {
       await hydrateFromCache()
       applyFailure(error)
@@ -141,15 +153,21 @@ final class ChatRepository {
   func send(text: String) async {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty, !isSending else { return }
+    let task = Task { [weak self] in
+      _ = await self?.performSend(text: trimmed)
+    }
+    sendTask = task
+    await task.value
+  }
 
+  private func performSend(text: String) async {
     let clientTurnId = UUID().uuidString
     let clientMessageId = UUID().uuidString
-
     timeline.append(
       MobileChatTimelineItem(
         id: "user:\(clientTurnId)",
         role: .user,
-        content: trimmed,
+        content: text,
         status: .completed,
         clientTurnId: clientTurnId,
         requiresWebHandoff: false,
@@ -161,7 +179,7 @@ final class ChatRepository {
         id: "assistant:\(clientTurnId)",
         role: .assistant,
         content: "",
-        status: .sending,
+        status: .queued,
         clientTurnId: clientTurnId,
         requiresWebHandoff: false,
         handoffURL: nil
@@ -179,15 +197,16 @@ final class ChatRepository {
     }
 
     do {
-      // Apply NDJSON events as they arrive so tokens paint before the body
-      // finishes. Do not refetch list/detail here — those GETs can replace
-      // this timeline and mark a successful turn offline.
+      try Task.checkCancellation()
+      // Apply each NDJSON event as it arrives so tokens paint before the
+      // body finishes. Do not refetch list/detail here — those GETs can
+      // replace this timeline and mark a successful turn offline.
       _ = try await client.sendTurn(
         MobileChatTurnRequest(
           conversationId: activeConversationID,
           clientTurnId: clientTurnId,
           clientMessageId: clientMessageId,
-          text: trimmed,
+          text: text,
           source: "typed",
           chatMode: workspace.chatMode
         )
@@ -196,10 +215,23 @@ final class ChatRepository {
       }
       coalescer.flush()
 
+      if Task.isCancelled {
+        markAssistantCanceled(clientTurnId: clientTurnId)
+      } else if assistantStatus(clientTurnId: clientTurnId)?.isInFlight == true {
+        markAssistantFailed(
+          clientTurnId: clientTurnId,
+          message: "Summer did not confirm a terminal state for this turn."
+        )
+      }
       isOffline = false
-      if assistantStatus(clientTurnId: clientTurnId) != .failed {
+      if assistantStatus(clientTurnId: clientTurnId) != .failed,
+         assistantStatus(clientTurnId: clientTurnId) != .canceled
+      {
         lastErrorMessage = nil
       }
+      await persistCache()
+    } catch is CancellationError {
+      markAssistantCanceled(clientTurnId: clientTurnId)
       await persistCache()
     } catch {
       coalescer.flush()
@@ -303,6 +335,15 @@ final class ChatRepository {
       return
     }
 
+    if case MobileChatClientError.requestFailed(statusCode: 409) = error {
+      updateAssistant(clientTurnId: clientTurnId) { item in
+        var updated = item
+        if ![.completed, .failed, .canceled].contains(item.status) { updated.status = .retrying }
+        return updated
+      }
+      isOffline = false
+      return
+    }
     if assistantStatus(clientTurnId: clientTurnId) != .completed {
       markAssistantFailed(clientTurnId: clientTurnId, message: error.localizedDescription)
       isOffline = true
@@ -336,8 +377,9 @@ final class ChatRepository {
     func flushDelta(for turnID: String) {
       guard let text = pendingDeltas.removeValue(forKey: turnID), !text.isEmpty else { return }
       updateAssistant(clientTurnId: turnID) { item in
+        if item.status == .failed || item.status == .canceled { return item }
         var updated = item
-        updated.status = .streaming
+        if item.status != .completed { updated.status = .streaming }
         updated.content += text
         return updated
       }
@@ -345,24 +387,40 @@ final class ChatRepository {
 
     for event in events {
       switch event {
-      case let .turnReserved(conversationId, _, _):
+      case let .turnReserved(conversationId, turnId, _):
         activeConversationID = conversationId
         updateAssistant(clientTurnId: clientTurnId) { item in
           var updated = item
-          updated.status = .streaming
+          if item.status != .failed && item.status != .canceled && item.status != .completed {
+            updated.status = .queued
+          }
+          updated.turnId = turnId
+          return updated
+        }
+
+      case let .turnState(eventClientTurnId, state, eveWorkId):
+        updateAssistant(clientTurnId: eventClientTurnId) { item in
+          if item.status == .failed || item.status == .canceled || item.status == .completed {
+            return item
+          }
+          var updated = item
+          updated.status = Self.status(fromLifecycle: state) ?? item.status
+          if let eveWorkId { updated.eveWorkId = eveWorkId }
           return updated
         }
 
       case let .assistantDelta(eventClientTurnId, text):
         pendingDeltas[eventClientTurnId, default: ""] += text
 
-      case let .assistantCompleted(eventClientTurnId, conversationId, _, text):
+      case let .assistantCompleted(eventClientTurnId, conversationId, turnId, text):
         flushDelta(for: eventClientTurnId)
         activeConversationID = conversationId
         updateAssistant(clientTurnId: eventClientTurnId) { item in
+          if item.status == .failed || item.status == .canceled { return item }
           var updated = item
           updated.status = .completed
           updated.content = text
+          updated.turnId = turnId
           return updated
         }
 
@@ -370,6 +428,7 @@ final class ChatRepository {
         flushDelta(for: eventClientTurnId)
         activeConversationID = conversationId
         updateAssistant(clientTurnId: eventClientTurnId) { item in
+          if item.status == .failed || item.status == .canceled { return item }
           var updated = item
           updated.status = .completed
           updated.content = summary
@@ -380,7 +439,11 @@ final class ChatRepository {
 
       case let .error(_, message):
         flushDelta(for: clientTurnId)
-        markAssistantFailed(clientTurnId: clientTurnId, message: message)
+        if assistantStatus(clientTurnId: clientTurnId) != .completed {
+          markAssistantFailed(clientTurnId: clientTurnId, message: message)
+        } else {
+          lastErrorMessage = message
+        }
       }
     }
 
@@ -395,12 +458,35 @@ final class ChatRepository {
 
   private func markAssistantFailed(clientTurnId: String, message: String) {
     updateAssistant(clientTurnId: clientTurnId) { item in
+      if item.status == .completed { return item }
       var updated = item
       updated.status = .failed
       updated.content = message
       return updated
     }
     lastErrorMessage = message
+  }
+
+  private func markAssistantCanceled(clientTurnId: String) {
+    updateAssistant(clientTurnId: clientTurnId) { item in
+      if item.status == .completed || item.status == .failed { return item }
+      var updated = item
+      updated.status = .canceled
+      if updated.content.isEmpty { updated.content = "Summer turn was canceled before completion." }
+      return updated
+    }
+  }
+
+  private static func status(fromLifecycle state: String) -> MobileChatTimelineStatus? {
+    switch state {
+    case "queued": return .queued
+    case "running": return .running
+    case "retrying": return .retrying
+    case "failed": return .failed
+    case "canceled": return .canceled
+    case "completed": return .completed
+    default: return nil
+    }
   }
 
   private func updateAssistant(
@@ -418,9 +504,9 @@ final class ChatRepository {
   private func hydrateFromCache() async {
     guard let snapshot = await cache.load(for: userID, workspace: workspace) else { return }
     conversations = snapshot.conversations
-    if let activeConversationID,
-       let cachedMessages = snapshot.messagesByConversationID[activeConversationID]
-    {
+    let conversationID = activeConversationID ?? snapshot.activeConversationID ?? snapshot.conversations.first?.id
+    activeConversationID = conversationID
+    if let conversationID, let cachedMessages = snapshot.messagesByConversationID[conversationID] {
       timeline = cachedMessages.map(timelineItem(from:))
     }
   }
@@ -455,7 +541,8 @@ final class ChatRepository {
     let snapshot = CachedChatSnapshot(
       conversations: conversations,
       messagesByConversationID: messagesByConversationID,
-      cachedAt: Date()
+      cachedAt: Date(),
+      activeConversationID: activeConversationID
     )
     await cache.store(snapshot, for: userID, workspace: workspace)
   }
@@ -465,14 +552,23 @@ final class ChatRepository {
       ? webBaseURL.appending(path: "/app/chat/\(activeConversationID ?? "")")
       : nil
 
+    let status: MobileChatTimelineStatus = switch message.turnStatus {
+    case "reserved": .queued
+    case "running", "streaming": .running
+    case "canceled": .canceled
+    case "failed_tool_unavailable", "failed_model_error", "failed_timeout", "failed_network", "failed":
+      .failed
+    default: .completed
+    }
     return MobileChatTimelineItem(
       id: message.id,
       role: MobileChatTimelineRole(rawValue: message.role) ?? .assistant,
       content: message.content,
-      status: .completed,
+      status: status,
       clientTurnId: message.clientMessageId,
       requiresWebHandoff: message.requiresWebHandoff,
-      handoffURL: handoffURL
+      handoffURL: handoffURL,
+      turnId: message.turnId
     )
   }
 
@@ -491,8 +587,16 @@ final class ChatRepository {
       role: item.role.rawValue,
       content: item.content,
       clientMessageId: item.clientTurnId,
-      turnId: nil,
-      turnStatus: item.status == .failed ? "failed" : "completed",
+      turnId: item.turnId,
+      turnStatus: {
+        switch item.status {
+        case .failed: return "failed"
+        case .canceled: return "canceled"
+        case .queued: return "reserved"
+        case .running, .retrying, .streaming, .sending: return "streaming"
+        default: return "completed"
+        }
+      }(),
       createdAt: ISO8601DateFormatter().string(from: Date()),
       requiresWebHandoff: item.requiresWebHandoff
     )

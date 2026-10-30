@@ -1364,28 +1364,37 @@ jobs:
           else
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
-      - name: Install actionlint (structural)
-        if: steps.structural.outputs.skip != 'true'
-        uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
-      - name: Set up Python (structural regression tests)
-        if: steps.structural.outputs.skip != 'true'
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.12'
-      - name: Install pytest (structural regression tests)
-        if: steps.structural.outputs.skip != 'true'
-        run: python -m pip install --quiet --require-hashes -r .github/requirements/pytest.txt
-      - name: Setup Playwright (Chromium)
-        if: steps.structural.outputs.skip != 'true'
-        uses: ./.github/actions/setup-playwright
       - name: Run ci-fast lanes
         id: lanes
         env:
           CI_FAST_LANE_GROUP: remaining
           CI_PRODUCT_LANES: ${{ needs.ci-path-changes.outputs.selected_lanes }}
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
-          CI_FAST_SKIP_STRUCTURAL: ${{ steps.structural.outputs.skip }}
+          CI_FAST_SKIP_STRUCTURAL: 'true'
           CI_FAST_LANES_OUT: ${{ runner.temp }}/ci-fast-lanes.json
+        run: node scripts/ci-fast-lanes.mjs
+      - name: Install actionlint (structural)
+        if: ${{ success() && steps.structural.outputs.skip != 'true' }}
+        uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
+      - name: Set up Python (structural regression tests)
+        if: ${{ success() && steps.structural.outputs.skip != 'true' }}
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Install pytest (structural regression tests)
+        if: ${{ success() && steps.structural.outputs.skip != 'true' }}
+        run: python -m pip install --quiet --require-hashes -r .github/requirements/pytest.txt
+      - name: Setup Playwright (Chromium)
+        if: ${{ success() && steps.structural.outputs.skip != 'true' }}
+        uses: ./.github/actions/setup-playwright
+      - name: Run structural ci-fast lane
+        if: ${{ success() && steps.structural.outputs.skip != 'true' }}
+        env:
+          CI_FAST_LANE_GROUP: remaining
+          CI_PRODUCT_LANES: ${{ needs.ci-path-changes.outputs.selected_lanes }}
+          TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
+          CI_FAST_ONLY_STRUCTURAL: 'true'
+          CI_FAST_LANES_OUT: ${{ runner.temp }}/ci-fast-lanes-structural.json
         run: node scripts/ci-fast-lanes.mjs
       - name: Upload ci-fast lane results
         if: ${{ !cancelled() }}
@@ -1393,7 +1402,9 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ci-fast-lanes-remaining-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/ci-fast-lanes.json
+          path: |
+            ${{ runner.temp }}/ci-fast-lanes.json
+            ${{ runner.temp }}/ci-fast-lanes-structural.json
           retention-days: 7
           if-no-files-found: warn
 

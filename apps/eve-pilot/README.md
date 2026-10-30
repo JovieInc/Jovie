@@ -107,6 +107,30 @@ After the Eve host is public HTTPS:
 Point Photon's webhook at `https://<eve-host>/eve/v1/photon`. Then take
 Summer off Photon talk so iMessage is the Ovie door, not the factory.
 
+## Production promotion (isolated shadow project)
+
+`jovie-eve-shadow` is not Git-linked, so production promotion is a Vercel alias
+mutation, not a merge. Use the `Eve Pilot` workflow's `workflow_dispatch` job
+`promote-shadow-production` with the exact READY deployment ID and the exact
+40-hex commit it must carry:
+
+    gh workflow run eve-pilot.yml --ref main \
+      -f production_deployment_id=dpl_<id> \
+      -f expected_sha=<40-hex>
+
+The job fails closed: it promotes only the exact `dpl_` id in READY state,
+refuses a foreign `githubCommitSha`, re-points both
+`jovie-eve-shadow.vercel.app` and `jovie-eve-shadow-jovie.vercel.app`, polls
+until each alias serves that deployment, and requires an unsigned
+`POST /eve/v1/photon` to answer 400/401 from the app (not a Vercel SSO
+redirect). Preview protection is untouched; the team-scoped
+`jovie-eve-shadow-jovie.vercel.app` hostname stays SSO-protected. The signed
+Photon POST 200 plus an Eve agent reply remain a founder-only iMessage canary.
+
+First execution: JOV-5868 promoted `dpl_2wqTD2wC3uNknrka1S45wXyEsLop` (merge
+`58c68e78ddc2a613546213ebba6bf1b0da9eefbd`, #17045) in run
+[33805196475](https://github.com/JovieInc/Jovie/actions/runs/33805196475).
+
 ## Local verification
 
 Node 24 or later. Isolated from the monorepo Node 22 CI runner.

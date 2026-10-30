@@ -10,6 +10,7 @@ import {
 
 const NOW = Date.now();
 const HEAD = 'a'.repeat(40);
+const REPO = 'JovieInc/Jovie';
 
 function fleet(overrides = {}) {
   return {
@@ -76,6 +77,7 @@ describe('queue-deferred release admission', () => {
   it('round-trips only a fresh exact-head controller receipt', () => {
     const body = renderQueueDeferredReleaseComment({
       schema: QUEUE_DEFERRED_RELEASE_SCHEMA,
+      repository: REPO,
       pr: 15974,
       head: HEAD,
       releasedAt: new Date(NOW).toISOString(),
@@ -84,6 +86,7 @@ describe('queue-deferred release admission', () => {
     });
     expect(body).toContain(QUEUE_DEFERRED_RELEASE_MARKER);
     expect(extractQueueDeferredRelease(body, NOW)).toMatchObject({
+      repository: REPO,
       pr: 15974,
       head: HEAD,
       mode: 'deferred-release-only',
@@ -92,9 +95,26 @@ describe('queue-deferred release admission', () => {
       validateQueueDeferredRelease(
         {
           schema: QUEUE_DEFERRED_RELEASE_SCHEMA,
+          repository: REPO,
           pr: 15974,
           head: HEAD,
           releasedAt: new Date(NOW - 16 * 60_000).toISOString(),
+          mode: 'deferred-release-only',
+          reason: 'controller-observation-fallback',
+        },
+        NOW
+      ).ok
+    ).toBe(false);
+  });
+
+  it('fails closed for stale unscoped release receipts', () => {
+    expect(
+      validateQueueDeferredRelease(
+        {
+          schema: QUEUE_DEFERRED_RELEASE_SCHEMA,
+          pr: 15974,
+          head: HEAD,
+          releasedAt: new Date(NOW).toISOString(),
           mode: 'deferred-release-only',
           reason: 'controller-observation-fallback',
         },

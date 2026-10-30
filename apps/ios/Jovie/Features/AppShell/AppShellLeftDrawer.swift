@@ -6,7 +6,7 @@ enum AppShellDrawerProfilePolicy {
   static func profileSurfaceOpensDashboard() -> Bool { true }
 
   static func accountHeaderOpensEmbeddedPublicProfile(publicProfileURL: String?) -> Bool {
-    publicProfileURL?.isEmpty == false
+    PublicProfileURLPolicy(publicProfileURL: publicProfileURL ?? "") != nil
   }
 }
 

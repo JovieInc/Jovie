@@ -74,7 +74,7 @@ export function InstantMerchLanding() {
               <p className='homepage-section-eyebrow'>{copy.flow.eyebrow}</p>
               <h2
                 id='instant-merch-flow-heading'
-                className='mt-3 text-balance text-2xl font-semibold tracking-tight text-primary-token sm:text-3xl'
+                className='mt-3 text-balance text-2xl font-semibold tracking-tight text-primary-token sm:text-3xl line-clamp-2'
               >
                 {copy.flow.title}
               </h2>
@@ -113,7 +113,7 @@ export function InstantMerchLanding() {
               <p className='homepage-section-eyebrow'>{copy.details.eyebrow}</p>
               <h2
                 id='instant-merch-details-heading'
-                className='mt-3 text-balance text-2xl font-semibold tracking-tight text-primary-token sm:text-3xl'
+                className='mt-3 text-balance text-2xl font-semibold tracking-tight text-primary-token sm:text-3xl line-clamp-2'
               >
                 {copy.details.title}
               </h2>
@@ -130,7 +130,7 @@ export function InstantMerchLanding() {
           <MarketingContainer width='prose' className='text-center'>
             <h2
               id='instant-merch-cta-heading'
-              className='text-balance text-2xl font-semibold tracking-tight text-primary-token sm:text-3xl'
+              className='text-balance text-2xl font-semibold tracking-tight text-primary-token sm:text-3xl line-clamp-2'
             >
               {copy.cta.title}
             </h2>

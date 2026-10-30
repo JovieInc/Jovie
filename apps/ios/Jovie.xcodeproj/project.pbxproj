@@ -104,6 +104,7 @@
 		A13F86A7D4F0C7F83D2BB000 /* ScreenBrightnessManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FA81B967152B211E5988375 /* ScreenBrightnessManager.swift */; };
 		ADC14533827EFD888D1ED50F /* QRCodeRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000F426E1AB94DD5401C3341 /* QRCodeRenderer.swift */; };
 		B0B0995CD42EDBEAFBAABE04 /* JovieUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 611EE527D20DC6F6872CBF33 /* JovieUITests.swift */; };
+		A0C053710000000000000002 /* LibraryAccessibilityUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0C053710000000000000001 /* LibraryAccessibilityUITests.swift */; };
 		BD6A822847064E6F3E3E5228 /* QRCodeRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 448ADF9C21BB11784C6AD119 /* QRCodeRendererTests.swift */; };
 		BE57F23AE56E75A83692D03D /* VenueModeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DEB4AD6A6B0BBDE4A347E2D /* VenueModeView.swift */; };
 		C2C8C16A08954501FB61E562 /* APIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C8753F36E077F69D925EE26 /* APIClientTests.swift */; };
@@ -183,6 +184,7 @@
 		549B9163EF50F377CA1A4C5B /* JovieTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JovieTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5615484B29C6B6E26EE5E92B /* IntentNavigationStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IntentNavigationStoreTests.swift; sourceTree = "<group>"; };
 		611EE527D20DC6F6872CBF33 /* JovieUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieUITests.swift; sourceTree = "<group>"; };
+		A0C053710000000000000001 /* LibraryAccessibilityUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryAccessibilityUITests.swift; sourceTree = "<group>"; };
 		6FDEFEB6D7C1D0251FDA1E61 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		71290AE6A5F14D6941193B70 /* AppRouter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
 		71445144CE0970267C0508C6 /* AppState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
@@ -323,6 +325,7 @@
 			isa = PBXGroup;
 			children = (
 				611EE527D20DC6F6872CBF33 /* JovieUITests.swift */,
+				A0C053710000000000000001 /* LibraryAccessibilityUITests.swift */,
 			);
 			name = JovieUITests;
 			path = JovieUITests;
@@ -906,6 +909,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B0B0995CD42EDBEAFBAABE04 /* JovieUITests.swift in Sources */,
+				A0C053710000000000000002 /* LibraryAccessibilityUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

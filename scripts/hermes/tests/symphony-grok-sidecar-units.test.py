@@ -79,7 +79,11 @@ class UnitContractTests(unittest.TestCase):
     def test_timer_matches_live_schedule(self):
         text = TIMER.read_text(encoding="utf-8")
         self.assertEqual(ini_value(text, "OnBootSec"), "2m")
-        self.assertEqual(ini_value(text, "OnUnitActiveSec"), "20m")
+        # Canonical cadence is 5min-after-inactive, matching the fleet's host
+        # drop-in (Tim, 2026-09-03); the old 20m OnUnitActiveSec starved the
+        # active grok/kimi coding lane.
+        self.assertIsNone(ini_value(text, "OnUnitActiveSec"))
+        self.assertEqual(ini_value(text, "OnUnitInactiveSec"), "5min")
         self.assertEqual(ini_value(text, "Persistent"), "true")
         self.assertEqual(ini_value(text, "WantedBy"), "timers.target")
 

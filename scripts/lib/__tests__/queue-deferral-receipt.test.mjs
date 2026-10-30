@@ -16,9 +16,11 @@ import {
 
 const HEAD = 'a'.repeat(40);
 const OTHER_HEAD = 'b'.repeat(40);
+const REPO = 'JovieInc/Jovie';
 
 const VALID = Object.freeze({
   schema: QUEUE_DEFERRAL_SCHEMA,
+  repository: REPO,
   pr: 15808,
   head: HEAD,
   reason: 'symphony-birth-hold',
@@ -50,6 +52,8 @@ describe('validateReceipt', () => {
     ['non-object', 42],
     ['array', [VALID]],
     ['wrong schema', { ...VALID, schema: 'jovie-fleet-gate/v1' }],
+    ['missing repository', { ...VALID, repository: undefined }],
+    ['malformed repository', { ...VALID, repository: 'Jovie' }],
     ['non-integer pr', { ...VALID, pr: '15808' }],
     ['non-hex head', { ...VALID, head: 'xyz' }],
     ['short head', { ...VALID, head: 'a'.repeat(39) }],
@@ -68,6 +72,7 @@ describe('validateReceipt', () => {
 describe('renderReceiptComment + extractReceiptFromComment', () => {
   it('round-trips a receipt through the comment body', () => {
     const body = renderReceiptComment({
+      repository: REPO,
       pr: 15808,
       head: HEAD,
       reason: 'symphony-birth-hold',
@@ -85,6 +90,7 @@ describe('renderReceiptComment + extractReceiptFromComment', () => {
 
   it('renders the note into the receipt JSON', () => {
     const body = renderReceiptComment({
+      repository: REPO,
       pr: 900,
       head: OTHER_HEAD,
       reason: 'queue-pressure',
@@ -94,6 +100,7 @@ describe('renderReceiptComment + extractReceiptFromComment', () => {
     });
     expect(extractReceiptFromComment(body)).toEqual({
       schema: QUEUE_DEFERRAL_SCHEMA,
+      repository: REPO,
       pr: 900,
       head: OTHER_HEAD,
       reason: 'queue-pressure',
@@ -103,9 +110,30 @@ describe('renderReceiptComment + extractReceiptFromComment', () => {
     });
   });
 
+  it('returns an invalid typed sentinel for stale unscoped deferral receipts', () => {
+    const body = `${QUEUE_DEFERRAL_MARKER}\n\`\`\`json\n${JSON.stringify({
+      ...VALID,
+      repository: undefined,
+    })}\n\`\`\``;
+    const receipt = extractReceiptFromComment(body);
+    expect(receipt).toMatchObject({
+      schema: QUEUE_DEFERRAL_SCHEMA,
+      invalid: true,
+      pr: VALID.pr,
+      head: VALID.head,
+    });
+    expect(receipt.errors).toContain('repository must be owner/name');
+  });
+
   it('rejects invalid render inputs instead of emitting a bad receipt', () => {
     expect(() =>
-      renderReceiptComment({ pr: 1, head: 'nope', reason: 'x', source: 'y' })
+      renderReceiptComment({
+        repository: REPO,
+        pr: 1,
+        head: 'nope',
+        reason: 'x',
+        source: 'y',
+      })
     ).toThrow(/invalid deferral receipt/);
   });
 
@@ -224,15 +252,15 @@ describe('classifyQueueDeferredHold', () => {
     });
   });
 
-  it('releases a structurally invalid receipt as untyped rather than a manual trap', () => {
+  it('holds a structurally invalid typed receipt instead of treating it as untyped', () => {
     expect(
       classifyQueueDeferredHold({
-        receipt: { reason: 'symphony-birth-hold' },
+        receipt: { ...VALID, repository: undefined },
         labels: ['queue-deferred'],
       })
     ).toEqual({
-      releasable: true,
-      detail: 'untyped-ready-hold',
+      releasable: false,
+      detail: 'untyped-hold-manual-release-required',
     });
   });
 

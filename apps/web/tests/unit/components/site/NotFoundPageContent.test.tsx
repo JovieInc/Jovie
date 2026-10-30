@@ -90,6 +90,7 @@ describe('NotFoundPageContent', () => {
     expect(source).not.toMatch(hardcodedHashColorPattern);
     expect(source).not.toMatch(rawVisualUtilityPattern);
     expect(source).toContain('`${prefix}-actions`');
+    expect(source).toContain('line-clamp-2');
     expect(source).toContain('`${prefix}-action-secondary`');
     expect(source).not.toContain('style={{');
   });

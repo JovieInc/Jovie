@@ -35,6 +35,9 @@ describe('JOV-5465 duration/ease/shadow/blur retire', () => {
     );
     expect(source).toContain('var(--shadow-card-elevated)');
     expect(source).toContain('duration-(--duration-normal)');
+    expect(source).toContain(
+      'marketing-h2-linear text-primary-token line-clamp-2'
+    );
     expect(source).not.toMatch(/--linear-(?:shadow-|duration-)/);
   });
 

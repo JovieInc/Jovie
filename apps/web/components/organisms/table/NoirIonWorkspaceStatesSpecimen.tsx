@@ -51,7 +51,9 @@ export function NoirIonWorkspaceStatesSpecimen() {
       >
         <thead className='sr-only'>
           <tr>
-            <th scope='col'>Workspace state</th>
+            <th className='whitespace-nowrap' scope='col'>
+              Workspace state
+            </th>
           </tr>
         </thead>
         <tbody>

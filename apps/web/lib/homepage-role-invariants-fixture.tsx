@@ -22,7 +22,7 @@ export const HOMEPAGE_ARTIST_STORY_REGRESSION_FIXTURE_RED_STYLE = {
  */
 export const HOMEPAGE_ARTIST_STORY_REGRESSION_PAGE_SOURCE = `
 function HomepageHero() {
-  return <MarketingPosterHero />;
+  return <HomepageEditorialHero />;
 }
 
 function HomepageFaq() {
@@ -32,6 +32,7 @@ function HomepageFaq() {
 function HomepageUnlockedSections() {
   return (
     <>
+      <HomepageCertifiedSections previews={CERTIFIED_PREVIEWS} />
       <HomepageMeetJovie />
       <HomepageArtistProfiles cards={ARTIST_OUTCOME_CARDS} />
       <MarketingShippedSitesShowcase testId='homepage-shipped-sites-showcase' />
@@ -50,7 +51,7 @@ function HomepageStoryStack() {
   return (
     <div data-testid='homepage-story-stack'>
       <HomepageUnlockedSections />
-      <HomepageV2FinalCta />
+      <HomepageClose />
     </div>
   );
 }

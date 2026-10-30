@@ -153,10 +153,25 @@ struct TalkOverlayView: View {
     phase == .reviewing ? "Recover" : phase == .unavailable ? "Unavailable" : "Talk"
   }
 
+  /// Capture stopped early (interruption, route loss, recognizer finished or
+  /// failed) with nothing usable — the primary action becomes Retry.
+  private var isPausedWithoutTranscript: Bool {
+    // `!isPrimaryBusy` keeps this false during finish()'s settle window,
+    // where isRecording is already false but the send is in flight.
+    phase == .recording && !isPrimaryBusy
+      && !voiceCaptureService.isRecording && !voiceCaptureService.canFinish
+  }
+
+  /// start() threw (permissions, recognizer, audio session). Offer Retry
+  /// instead of parking the user on a disabled "Starting…".
+  private var isStartFailed: Bool {
+    phase == .starting && localError != nil && !voiceCaptureService.isRecording
+  }
+
   private var statusText: String {
     switch phase {
     case .starting: "Starting…"
-    case .recording: listeningCue
+    case .recording: voiceCaptureService.isRecording ? listeningCue : "Paused"
     case .reviewing: "Review recovered transcript"
     case .submitting: "Sending…"
     case .unavailable: unavailableMessage ?? EyesFreeCaptureGate.unavailableMessage
@@ -167,16 +182,20 @@ struct TalkOverlayView: View {
     if phase == .reviewing { return "Use Draft" }
     if phase == .submitting { return "Sending" }
     if phase == .unavailable { return "Retry" }
+    if isPausedWithoutTranscript || isStartFailed { return "Retry" }
     if phase == .recording, autoSubmit { return "Send" }
     return "Done"
   }
 
   private var canPrimary: Bool {
     switch phase {
-    case .starting, .submitting, .unavailable:
+    case .starting:
+      isStartFailed
+    case .submitting, .unavailable:
       false
     case .recording:
-      VoiceMemoActionDraft.isReady(voiceCaptureService.transcriptPreview)
+      isPausedWithoutTranscript
+        || VoiceMemoActionDraft.isReady(voiceCaptureService.transcriptPreview)
     case .reviewing:
       VoiceMemoActionDraft.isReady(reviewDraft)
     }
@@ -289,9 +308,20 @@ struct TalkOverlayView: View {
     defer { isPrimaryBusy = false }
 
     switch phase {
-    case .starting, .unavailable, .submitting:
+    case .starting:
+      guard isStartFailed else { return }
+      localError = nil
+      await startIfNeeded()
+    case .unavailable, .submitting:
       return
     case .recording:
+      if isPausedWithoutTranscript {
+        voiceCaptureService.cancel()
+        localError = nil
+        phase = .starting
+        await startIfNeeded()
+        return
+      }
       if autoSubmit {
         await finishAndSubmit()
       } else {

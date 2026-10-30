@@ -121,6 +121,45 @@ describe('GET /api/hud/shipping-state', () => {
     expect(mockPublish).toHaveBeenCalledTimes(1);
   });
 
+  it('serves per-source freshness read-only, never coercing stale or unknown to healthy', async () => {
+    mockAuthorizeHud.mockResolvedValue({ ok: true, mode: 'admin' });
+    mockReadCached.mockReturnValue({
+      schema: 'ovie.shipping-state.v1',
+      state: 'stale',
+      publishing: true,
+      latencyMs: 12,
+      sources: {
+        'fleet-receipt': {
+          sourceId: 'fleet-receipt',
+          state: 'stale',
+          observedAt: '2026-09-03T00:00:00.000Z',
+          freshnessDeadline: '2026-09-03T00:10:00.000Z',
+        },
+        'symphony-runtime': {
+          sourceId: 'symphony-runtime',
+          state: 'unknown',
+          observedAt: null,
+          freshnessDeadline: null,
+        },
+      },
+    });
+    const { GET } = await import('@/app/api/hud/shipping-state/route');
+    const response = await GET(
+      new NextRequest('http://localhost/api/hud/shipping-state')
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    const body = await response.json();
+    expect(body.sources['fleet-receipt'].state).toBe('stale');
+    expect(body.sources['fleet-receipt'].freshnessDeadline).toBe(
+      '2026-09-03T00:10:00.000Z'
+    );
+    expect(body.sources['symphony-runtime'].state).toBe('unknown');
+    expect(body.sources['symphony-runtime'].observedAt).toBeNull();
+    expect(mockReadCached).toHaveBeenCalledTimes(1);
+    expect(mockReadFile).not.toHaveBeenCalled();
+  });
+
   it('does not export actuation methods', async () => {
     const route = await import('@/app/api/hud/shipping-state/route');
     expect('POST' in route).toBe(false);

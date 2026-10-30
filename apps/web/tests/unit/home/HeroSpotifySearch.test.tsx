@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { HeroSpotifySearch } from '@/features/home/HeroSpotifySearch';
+import { HeroSpotifySearch } from '@/components/features/home/HeroSpotifySearch';
 import type { ArtistSearchState, SpotifyArtistResult } from '@/lib/queries';
 
 // jsdom doesn't implement scrollIntoView
@@ -10,8 +10,13 @@ Element.prototype.scrollIntoView = vi.fn();
 // --- Mocks ---
 
 const mockPush = vi.fn();
+const mockTrack = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
+}));
+vi.mock('@/lib/analytics', () => ({
+  track: (...args: unknown[]) => mockTrack(...args),
+  page: vi.fn(),
 }));
 
 const mockSearch = vi.fn();
@@ -112,11 +117,100 @@ describe('HeroSpotifySearch', () => {
       expect(getInput()).toHaveAttribute('role', 'combobox');
     });
 
+    it('namespaces result option ids per instance when rendered twice', async () => {
+      mockHookReturn.results = ARTISTS;
+      mockHookReturn.state = 'success';
+      // The homepage mounts this component in the hero and again in the
+      // closing section; option ids must never collide across instances.
+      render(
+        <>
+          <HeroSpotifySearch inputId='homepage-name-search' />
+          <HeroSpotifySearch inputId='homepage-close-name-search' />
+        </>
+      );
+      const [heroInput, closeInput] = screen.getAllByRole('combobox');
+      const user = userEvent.setup();
+      expect(heroInput).toHaveAttribute(
+        'aria-controls',
+        'homepage-name-search-results'
+      );
+      expect(closeInput).toHaveAttribute(
+        'aria-controls',
+        'homepage-close-name-search-results'
+      );
+      // Opening one instance closes the other (outside-pointer dismissal),
+      // so assert each namespaced id set in turn.
+      await user.type(heroInput, 'Taylor');
+      expect(
+        document.getElementById('homepage-name-search-results-result-0')
+      ).toBeInTheDocument();
+      await user.keyboard('{Escape}');
+      await user.type(closeInput, 'Taylor');
+      expect(
+        document.getElementById('homepage-close-name-search-results-result-0')
+      ).toBeInTheDocument();
+      expect(
+        document.getElementById('homepage-name-search-results-result-0')
+      ).not.toBeInTheDocument();
+    });
+
     it('renders search icon when idle', () => {
       renderComponent();
       // Lucide Search icon renders as an SVG inside the input container
       const container = screen.getByRole('combobox').closest('div');
       expect(container?.querySelector('svg')).toBeInTheDocument();
+    });
+
+    it('records the certified search-submit outcome without the query text', async () => {
+      mockHookReturn.results = ARTISTS;
+      mockHookReturn.state = 'success';
+      render(
+        <HeroSpotifySearch
+          appearance='editorial'
+          placeholder='Search your name'
+          submitLabel='Find me'
+          submitAnalytics={{
+            eventName: 'homepage_certified_search_submitted',
+            properties: {
+              variantIdentity:
+                'homepage-certified:control-how-the-world-sees-you:v1',
+              placement: 'hero',
+            },
+          }}
+        />
+      );
+      const user = userEvent.setup();
+      await user.type(getInput(), 'Taylor');
+      await user.click(screen.getByText('Taylor Swift'));
+
+      expect(mockTrack).toHaveBeenCalledWith(
+        'homepage_certified_search_submitted',
+        expect.objectContaining({
+          variantIdentity:
+            'homepage-certified:control-how-the-world-sees-you:v1',
+          placement: 'hero',
+          hasArtistName: true,
+        })
+      );
+      expect(JSON.stringify(mockTrack.mock.calls)).not.toContain('Taylor');
+    });
+
+    it('focuses the editorial input when its empty submit is clicked', async () => {
+      render(
+        <HeroSpotifySearch
+          appearance='editorial'
+          placeholder='Search your name'
+          submitLabel='Find me'
+        />
+      );
+      const user = userEvent.setup();
+      const input = getInput();
+      input.blur();
+
+      await user.click(screen.getByRole('button', { name: 'Find me' }));
+
+      expect(input).toHaveFocus();
+      expect(mockPush).not.toHaveBeenCalled();
     });
   });
 
@@ -190,7 +284,10 @@ describe('HeroSpotifySearch', () => {
       const input = getInput();
       await user.type(input, 'Taylor');
       await user.keyboard('{ArrowDown}');
-      expect(input).toHaveAttribute('aria-activedescendant', 'hero-result-0');
+      expect(input).toHaveAttribute(
+        'aria-activedescendant',
+        'hero-spotify-results-result-0'
+      );
     });
 
     it('ArrowUp wraps to last item', async () => {
@@ -200,7 +297,10 @@ describe('HeroSpotifySearch', () => {
       await user.type(input, 'Taylor');
       // activeIndex starts at -1. ArrowUp should wrap to last (pasteUrlIndex = 3)
       await user.keyboard('{ArrowUp}');
-      expect(input).toHaveAttribute('aria-activedescendant', 'hero-result-3');
+      expect(input).toHaveAttribute(
+        'aria-activedescendant',
+        'hero-spotify-results-result-3'
+      );
     });
 
     it('Enter selects active artist', async () => {
@@ -241,9 +341,15 @@ describe('HeroSpotifySearch', () => {
       await user.type(input, 'Taylor');
       expect(input).not.toHaveAttribute('aria-activedescendant');
       await user.keyboard('{ArrowDown}');
-      expect(input).toHaveAttribute('aria-activedescendant', 'hero-result-0');
+      expect(input).toHaveAttribute(
+        'aria-activedescendant',
+        'hero-spotify-results-result-0'
+      );
       await user.keyboard('{ArrowDown}');
-      expect(input).toHaveAttribute('aria-activedescendant', 'hero-result-1');
+      expect(input).toHaveAttribute(
+        'aria-activedescendant',
+        'hero-spotify-results-result-1'
+      );
     });
   });
 
@@ -351,7 +457,10 @@ describe('HeroSpotifySearch', () => {
       await user.type(input, 'Taylor');
       // Navigate down past all 3 artists to the paste URL option (index 3)
       await user.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}');
-      expect(input).toHaveAttribute('aria-activedescendant', 'hero-result-3');
+      expect(input).toHaveAttribute(
+        'aria-activedescendant',
+        'hero-spotify-results-result-3'
+      );
       await user.keyboard('{Enter}');
       expect(mockClear).toHaveBeenCalled();
     });
@@ -388,10 +497,16 @@ describe('HeroSpotifySearch', () => {
       expect(input).not.toHaveAttribute('aria-activedescendant');
       // ArrowDown selects first artist
       await user.keyboard('{ArrowDown}');
-      expect(input).toHaveAttribute('aria-activedescendant', 'hero-result-0');
+      expect(input).toHaveAttribute(
+        'aria-activedescendant',
+        'hero-spotify-results-result-0'
+      );
       // ArrowDown again selects second artist
       await user.keyboard('{ArrowDown}');
-      expect(input).toHaveAttribute('aria-activedescendant', 'hero-result-1');
+      expect(input).toHaveAttribute(
+        'aria-activedescendant',
+        'hero-spotify-results-result-1'
+      );
     });
 
     it('aria-controls references listbox id', async () => {

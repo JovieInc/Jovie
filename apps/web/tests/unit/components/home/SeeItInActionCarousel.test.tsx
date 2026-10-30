@@ -33,6 +33,19 @@ vi.mock('next/link', () => ({
 }));
 
 describe('SeeItInActionCarousel', () => {
+  it('renders bounded section copy for the showcase', () => {
+    render(<SeeItInActionCarousel />);
+
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'See It In Action' })
+    ).toHaveClass('marketing-h2-linear', 'line-clamp-2');
+    expect(
+      screen.getByText(
+        "Tim White's profile, releases, and smart links all powered by Jovie."
+      )
+    ).toHaveClass('marketing-lead-linear', 'text-secondary-token');
+  });
+
   it('renders the Tim White profile card', () => {
     render(<SeeItInActionCarousel />);
 

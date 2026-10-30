@@ -44,7 +44,7 @@ export default async function ChangelogPage() {
       {/* Header */}
       <MarketingHero variant='left'>
         <p className='text-sm font-medium text-tertiary-token'>Changelog</p>
-        <h1 className='mb-4 mt-6 max-w-xs text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl'>
+        <h1 className='system-b-marketing-route-title mb-4 mt-6 max-w-xs text-primary-token line-clamp-2'>
           What&apos;s New
         </h1>
         <p className='mb-4 max-w-xl text-lg leading-relaxed text-secondary-token'>

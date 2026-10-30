@@ -76,7 +76,7 @@ describe('authenticated chat prompt voice', () => {
         },
       },
       [],
-      { aiCanUseTools: true, aiDailyMessageLimit: 10 }
+      { aiCanUseTools: true, aiWeeklyMessageLimit: 10 }
     );
     expect(prompt).toContain('warm to musicians, ruthless to bad systems');
     expect(prompt).toContain('No emoji');

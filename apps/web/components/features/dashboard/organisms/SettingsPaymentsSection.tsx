@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/settings/SettingsPaymentsSection.test.tsx
 'use client';
 
 import { Button } from '@jovie/ui';
@@ -157,6 +158,18 @@ export function SettingsPaymentsSection() {
     }
   };
 
+  const renderConnectAction = (label: string) => (
+    <Button
+      onClick={handleConnect}
+      loading={isActionLoading || undefined}
+      variant='primary'
+      size='sm'
+      disabled={isPlatformProfileUnavailable || undefined}
+    >
+      {label}
+    </Button>
+  );
+
   if (isLoading) {
     return renderPanel(
       <SettingsActionRow
@@ -189,6 +202,7 @@ export function SettingsPaymentsSection() {
       <SettingsActionRow
         icon={<AlertTriangle className='h-4 w-4' aria-hidden />}
         title='Payout setup temporarily unavailable'
+        disabled
         description='Stripe payout onboarding is paused while jovie finishes platform setup. Your account is safe — try again later.'
         action={
           <Button variant='secondary' size='sm' disabled>
@@ -207,17 +221,7 @@ export function SettingsPaymentsSection() {
         icon={<CreditCard className='h-4 w-4' aria-hidden />}
         title='Stripe not connected'
         description='Connect stripe to receive fan payments directly through jovie. Stripe handles payment processing, payouts, and tax reporting.'
-        action={
-          <Button
-            onClick={handleConnect}
-            loading={isActionLoading || undefined}
-            variant='primary'
-            size='sm'
-            disabled={isPlatformProfileUnavailable || undefined}
-          >
-            Connect Stripe
-          </Button>
-        }
+        action={renderConnectAction('Connect Stripe')}
       />,
       error
         ? renderNotice(
@@ -241,15 +245,7 @@ export function SettingsPaymentsSection() {
         }
         action={
           <div className='flex flex-wrap items-center gap-2'>
-            <Button
-              onClick={handleConnect}
-              loading={isActionLoading || undefined}
-              variant='primary'
-              size='sm'
-              disabled={isPlatformProfileUnavailable || undefined}
-            >
-              Complete Setup
-            </Button>
+            {renderConnectAction('Complete Setup')}
             <Button
               onClick={handleDisconnect}
               loading={isActionLoading || undefined}

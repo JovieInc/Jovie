@@ -27,7 +27,12 @@ function runGuard(fixtureRoot: string) {
 }
 
 describe('storybook story quality guard', () => {
-  it('passes on the current product story library and provenance receipts', () => {
+  // The guard scans the full story library plus git provenance in one shot;
+  // under merge-queue machine load this exceeds the 12s default test budget
+  // (observed timing out a merge-group shard twice on 2026-09-03).
+  it('passes on the current product story library and provenance receipts', {
+    timeout: 60_000,
+  }, () => {
     const output = execFileSync(process.execPath, [guardPath], {
       cwd: repoRoot,
       encoding: 'utf8',

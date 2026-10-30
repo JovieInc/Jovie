@@ -25,7 +25,7 @@ describe('HomeV1Design', () => {
         level: 1,
         name: 'Release Work, Finally Organized.',
       })
-    ).toBeInTheDocument();
+    ).toHaveClass('line-clamp-2');
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
 
     const requestHeading = screen.getByRole('heading', {

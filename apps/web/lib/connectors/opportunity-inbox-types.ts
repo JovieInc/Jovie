@@ -43,6 +43,8 @@ export interface OpportunityInboxReportData {
 
 export interface OpportunityInboxCardViewModel {
   readonly id: string;
+  /** Persisted suggested_action kind, used for durable founder-review binding. */
+  readonly sourceKind?: string;
   readonly signalType: OpportunitySignalType;
   readonly typeLabel: string;
   readonly createdAt: string;
@@ -51,6 +53,12 @@ export interface OpportunityInboxCardViewModel {
   readonly primaryActionLabel: string;
   readonly status: OpportunityInboxCardStatus;
   readonly category: OpportunityInboxCardCategory;
+  /** Source-owned editorial visual. Never inferred from private source refs. */
+  readonly visual?: {
+    readonly url: string;
+    readonly alt: string;
+    readonly fit: 'contain';
+  };
   /** Server-computed score used to rank verified brand-deal decisions. */
   readonly brandDealRankingScore?: number;
   /** Present only when category === 'report'. */

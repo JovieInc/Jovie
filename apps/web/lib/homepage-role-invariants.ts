@@ -13,16 +13,15 @@ export const HOMEPAGE_SHIPPING_LAYERS = [
 
 export type HomepageShippingLayer = (typeof HOMEPAGE_SHIPPING_LAYERS)[number];
 
+// Certified nine-section homepage: hero (1), then sections 2-8 mounted as one
+// copy-driven component, then the close (9) that repeats the name search.
 export const HOMEPAGE_UNLOCKED_SECTION_MOUNTS = [
-  'HomepageMeetJovie',
-  'HomepageArtistProfiles',
-  'HomepageClosedLoop',
-  'HomepageFaq',
+  'HomepageCertifiedSections',
 ] as const;
 
 export const HOMEPAGE_STORY_STACK_MOUNTS = [
   'HomepageUnlockedSections',
-  'HomepageV2FinalCta',
+  'HomepageClose',
 ] as const;
 
 export const HOMEPAGE_ROOT_MOUNTS = [

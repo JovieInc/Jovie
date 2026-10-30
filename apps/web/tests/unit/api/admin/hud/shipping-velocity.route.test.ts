@@ -12,7 +12,7 @@ const hoisted = vi.hoisted(() => ({
   },
   getRedis: vi.fn(() => null),
   captureError: vi.fn(),
-  logger: { error: vi.fn() },
+  logger: { error: vi.fn(), warn: vi.fn() },
 }));
 
 vi.mock('@/lib/entitlements/server', () => ({
@@ -580,6 +580,141 @@ describe('GET /api/admin/hud/shipping-velocity', () => {
     expect(response.status).toBe(200);
     expect(fetchMock).toHaveBeenCalledTimes(101);
     expect((await response.json()).data).toHaveLength(365);
+  });
+
+  it('degrades to an unavailable observation without error reports when GitHub is rate limited', async () => {
+    hoisted.env.HUD_GITHUB_TOKEN = 'test-token';
+    hoisted.env.HUD_GITHUB_OWNER = 'JovieInc';
+    hoisted.env.HUD_GITHUB_REPO = 'jovie';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            errors: [
+              {
+                type: 'RATE_LIMITED',
+                message:
+                  'API rate limit already exceeded for user ID 35063371.',
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { 'x-ratelimit-reset': '1788100800' },
+          }
+        )
+      )
+    );
+
+    const { GET } = await import('@/app/api/admin/hud/shipping-velocity/route');
+    const response = await GET(
+      new Request('http://localhost/api/admin/hud/shipping-velocity?range=7d')
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: [],
+      range: '7d',
+      observation: 'unavailable',
+      errorMessage: expect.stringContaining('GitHub rate limit exceeded'),
+    });
+    expect(hoisted.captureError).not.toHaveBeenCalled();
+    expect(hoisted.logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('rate limit'),
+      expect.any(Error)
+    );
+  });
+
+  it('serves stale cache without error reports when refresh hits the GitHub rate limit', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-30T12:00:00.000Z'));
+    hoisted.env.HUD_GITHUB_TOKEN = 'test-token';
+    hoisted.env.HUD_GITHUB_OWNER = 'JovieInc';
+    hoisted.env.HUD_GITHUB_REPO = 'jovie';
+    const cachedAt = '2026-08-30T11:55:00.000Z';
+    hoisted.getRedis.mockReturnValue({
+      get: vi.fn().mockResolvedValue({
+        data: [
+          {
+            date: '2026-08-30',
+            merged: 3,
+            opened: 1,
+            closed: 0,
+            mergeP50Hours: 2,
+          },
+        ],
+        range: '7d',
+        cachedAt,
+        observation: 'fresh',
+      }),
+      set: vi.fn(),
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            errors: [
+              {
+                type: 'RATE_LIMITED',
+                message:
+                  'API rate limit already exceeded for user ID 35063371.',
+              },
+            ],
+          }),
+          { status: 200 }
+        )
+      )
+    );
+
+    const { GET } = await import('@/app/api/admin/hud/shipping-velocity/route');
+    const response = await GET(
+      new Request('http://localhost/api/admin/hud/shipping-velocity?range=7d')
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      cachedAt,
+      observation: 'stale',
+      errorMessage: expect.stringContaining('GitHub rate limit exceeded'),
+      data: [expect.objectContaining({ merged: 3 })],
+    });
+    expect(hoisted.captureError).not.toHaveBeenCalled();
+  });
+
+  it('still fails closed on non-rate-limit GitHub GraphQL errors', async () => {
+    hoisted.env.HUD_GITHUB_TOKEN = 'test-token';
+    hoisted.env.HUD_GITHUB_OWNER = 'JovieInc';
+    hoisted.env.HUD_GITHUB_REPO = 'jovie';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            errors: [{ message: 'Could not resolve to a Repository' }],
+          }),
+          { status: 200 }
+        )
+      )
+    );
+
+    const { GET } = await import('@/app/api/admin/hud/shipping-velocity/route');
+    const response = await GET(
+      new Request('http://localhost/api/admin/hud/shipping-velocity?range=7d')
+    );
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Failed to fetch shipping velocity data',
+    });
+    expect(hoisted.captureError).toHaveBeenCalledWith(
+      'HUD shipping velocity fetch failed',
+      expect.any(Error),
+      expect.objectContaining({
+        route: '/api/admin/hud/shipping-velocity',
+      })
+    );
   });
 
   it('returns 401 for signed-out users', async () => {

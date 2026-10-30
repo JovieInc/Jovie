@@ -545,6 +545,18 @@ async function loadInboxNavigationAvailability(
       );
       return UNKNOWN_INBOX_NAVIGATION_AVAILABILITY;
     }
+    // Expected transient timeouts on a fail-soft badge count are log-only too
+    // (JOV-5754): Neon cold-start PG statement timeouts, idle-in-transaction
+    // timeouts, and JS-level query timeouts are infrastructure conditions, not
+    // data bugs, and the read is designed to fail open. Drizzle names the
+    // failing statement in the wrapper message, so reporting them pages
+    // Sentry with the tour_dates count query title.
+    if (isQueryTimeoutError(error) || isPostgresTimeoutError(error)) {
+      logger.warn(
+        '[inbox-navigation] inbox count read timed out; degrading to unknown availability'
+      );
+      return UNKNOWN_INBOX_NAVIGATION_AVAILABILITY;
+    }
     Sentry.captureException(error, {
       level: 'warning',
       tags: { context: 'inbox_navigation_availability' },

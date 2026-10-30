@@ -83,17 +83,17 @@ describe('entitlement state transitions', () => {
 
     expect(free.plan).toBe('free');
     expect(free.isPro).toBe(false);
-    expect(free.aiDailyMessageLimit).toBe(10);
+    expect(free.aiWeeklyMessageLimit).toBe(15);
 
     expect(pro.plan).toBe('pro');
     expect(pro.isPro).toBe(true);
     expect(pro.hasAdvancedFeatures).toBe(false);
-    expect(pro.aiDailyMessageLimit).toBe(100);
+    expect(pro.aiWeeklyMessageLimit).toBe(70);
 
     expect(max.plan).toBe('max');
     expect(max.isPro).toBe(true);
     expect(max.hasAdvancedFeatures).toBe(true);
-    expect(max.aiDailyMessageLimit).toBe(500);
+    expect(max.aiWeeklyMessageLimit).toBe(250);
   });
 
   it('tracks downgrade to free when subscription is no longer active', async () => {

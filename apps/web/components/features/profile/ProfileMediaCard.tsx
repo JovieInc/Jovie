@@ -191,29 +191,29 @@ function CountdownGrid({
       aria-hidden={isPendingClientTime || undefined}
     >
       {countdown.label ? (
-        <p
+        <span
           className={cn(
-            'font-medium tracking-tight text-white/68',
+            'block font-medium tracking-tight text-white/68',
             compact ? 'text-3xs' : 'text-xs'
           )}
         >
           {countdown.label}
-        </p>
+        </span>
       ) : null}
       <div className={cn('grid grid-cols-4', compact ? 'gap-1.5' : 'gap-3.5')}>
         {cells.map(([label, value]) => (
           <div key={label} className='min-w-0'>
-            <p
+            <span
               className={cn(
-                'font-bold leading-none tracking-[-0.018em] text-(--color-text-tooltip) tabular-nums',
+                'block font-bold leading-none tracking-[-0.018em] text-(--color-text-tooltip) tabular-nums',
                 compact ? 'text-2xs' : 'text-3xl'
               )}
             >
               {value}
-            </p>
-            <p className='mt-1 text-3xs font-semibold uppercase tracking-[0.12em] text-white/52'>
+            </span>
+            <span className='mt-1 block text-3xs font-semibold uppercase tracking-[0.12em] text-white/52'>
               {label}
-            </p>
+            </span>
           </div>
         ))}
       </div>
@@ -442,9 +442,9 @@ export function ProfileMediaCard({
           data-testid={dataTestId ? `${dataTestId}-content` : undefined}
         >
           <div className={cn('space-y-1.5', compact && 'space-y-1')}>
-            <p
+            <span
               className={cn(
-                'font-bold uppercase text-white/72',
+                'block font-bold uppercase text-white/72',
                 accentClassName,
                 compact
                   ? 'text-3xs leading-none tracking-[0.14em]'
@@ -452,7 +452,7 @@ export function ProfileMediaCard({
               )}
             >
               {eyebrow}
-            </p>
+            </span>
             <h3
               className={cn(
                 'min-w-0 font-bold leading-[1.03] tracking-[-0.026em] text-(--color-text-tooltip) [overflow-wrap:anywhere]',
@@ -467,17 +467,17 @@ export function ProfileMediaCard({
               {title}
             </h3>
             {subtitle ? (
-              <p
+              <span
                 className={cn(
-                  'line-clamp-2 min-w-0 text-white/78 [overflow-wrap:anywhere]',
+                  'block line-clamp-2 min-w-0 text-white/78 [overflow-wrap:anywhere]',
                   compact ? 'text-3xs leading-tight' : 'text-app'
                 )}
               >
                 {subtitle}
-              </p>
+              </span>
             ) : null}
             {locationLabel ? (
-              <p
+              <span
                 className={cn(
                   'inline-flex max-w-full min-w-0 items-center gap-1.5 text-white/78 [overflow-wrap:anywhere]',
                   compact ? 'text-3xs' : 'text-xs'
@@ -490,20 +490,20 @@ export function ProfileMediaCard({
                   )}
                 />
                 <span className='min-w-0 truncate'>{locationLabel}</span>
-              </p>
+              </span>
             ) : null}
             {secondaryLocationLabel ? (
-              <p
+              <span
                 className={cn(
-                  'min-w-0 truncate text-white/62 [overflow-wrap:anywhere]',
+                  'block min-w-0 truncate text-white/62 [overflow-wrap:anywhere]',
                   compact ? 'text-3xs' : 'text-xs'
                 )}
               >
                 {secondaryLocationLabel}
-              </p>
+              </span>
             ) : null}
             {status ? (
-              <p
+              <span
                 className={cn(
                   'inline-flex min-w-0 items-center gap-2 font-semibold tracking-[-0.005em] text-(--color-text-tooltip) [overflow-wrap:anywhere]',
                   compact ? 'text-3xs' : 'text-app'
@@ -525,7 +525,7 @@ export function ProfileMediaCard({
                   aria-hidden='true'
                 />
                 <span className='min-w-0 truncate'>{status.label}</span>
-              </p>
+              </span>
             ) : null}
             {countdown ? (
               <CountdownGrid countdown={countdown} compact={compact} />

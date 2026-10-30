@@ -260,6 +260,9 @@ BOT REVIEWS
 - Staging URL: https://staging.jov.ie (Vercel preview alias)
 - Deploy controller: `.github/workflows/production-controller.yml` authorizes
   the exact successful `CI` attempt and holds the repo-wide production lease;
+  supersession is event-driven (exact main + merge-queue state), so a current
+  generation with an empty queue proceeds without a fixed delay and any
+  bounded wait derives from queue depth with an explicit benefit and deadline;
   `.github/workflows/production-release.yml` owns staging, canary, promotion,
   observational gates, and the sole rollback job.
 - Merge method: squash (merge queue)

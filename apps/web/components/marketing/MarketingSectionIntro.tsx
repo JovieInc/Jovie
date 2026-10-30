@@ -39,7 +39,7 @@ export function MarketingSectionIntro({
         <h2
           id={titleId}
           className={cn(
-            'marketing-h2-linear mt-5 text-primary-token',
+            'marketing-h2-linear mt-5 text-primary-token line-clamp-2',
             titleClassName
           )}
         >

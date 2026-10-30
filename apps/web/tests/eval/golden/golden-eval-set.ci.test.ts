@@ -86,7 +86,7 @@ describe('Golden eval-set CI gate', () => {
 
       const systemPrompt = buildSystemPrompt(artistContext, releases, {
         aiCanUseTools: true,
-        aiDailyMessageLimit: 50,
+        aiWeeklyMessageLimit: 50,
         knowledgeContext: knowledgeContext || undefined,
       });
 
@@ -164,7 +164,7 @@ describe('Golden eval-set CI gate: referenced-entity hydration', () => {
 
     return buildSystemPrompt(artistContext, releases, {
       aiCanUseTools: true,
-      aiDailyMessageLimit: 50,
+      aiWeeklyMessageLimit: 50,
       knowledgeContext: selectKnowledgeContext(userPrompt) || undefined,
       referencedEntities,
     });
@@ -249,7 +249,7 @@ describe('Golden eval-set CI gate: pinned-opportunity injection', () => {
 
     return buildSystemPrompt(artistContext, releases, {
       aiCanUseTools: true,
-      aiDailyMessageLimit: 50,
+      aiWeeklyMessageLimit: 50,
       knowledgeContext: selectKnowledgeContext(golden.userPrompt) || undefined,
       pinnedOpportunity: buildPinnedOpportunityBlock(PINNED_CARD),
     });

@@ -22,7 +22,7 @@ const BUTTON_VARIANT_CLASSES: Record<ButtonVariant, string> = {
   primary:
     'border border-btn-primary bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-btn-primary-hover hover:bg-btn-primary-hover',
   secondary:
-    'border border-subtle bg-btn-secondary text-btn-secondary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_1px_rgba(0,0,0,0.08)] hover:border-default hover:bg-(--color-btn-secondary-hover)',
+    'border-0 bg-btn-secondary text-btn-secondary-foreground shadow-none hover:bg-(--color-btn-secondary-hover)',
   tertiary:
     'border border-transparent bg-transparent text-secondary-token shadow-none hover:bg-interactive-hover hover:text-primary-token active:bg-interactive-active',
   ghost:
@@ -91,9 +91,9 @@ const buttonVariants = cva(
 
 const DESTRUCTIVE_CLASSES: Record<ButtonVariant, string> = {
   primary:
-    'border-error bg-error text-[var(--color-error-foreground)] hover:border-error/90 hover:bg-error/90',
+    'border-error bg-error text-error-foreground hover:border-error/90 hover:bg-error/90',
   secondary:
-    'border-error/30 bg-error-subtle text-error hover:border-error/45 hover:bg-error-subtle hover:text-error',
+    'border-0 bg-error-subtle text-error hover:bg-error-subtle hover:text-error',
   tertiary: 'text-error hover:bg-error-subtle hover:text-error',
   ghost: 'text-error hover:bg-error-subtle hover:text-error',
   link: 'text-error hover:text-error',
@@ -247,8 +247,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         normalizedVariant.destructive &&
           DESTRUCTIVE_CLASSES[normalizedVariant.variant],
         className,
-        hasPressFeedback &&
-          'active:scale-[var(--scale-press)] motion-reduce:active:scale-100',
+        hasPressFeedback && 'active:scale-press motion-reduce:active:scale-100',
         isDisabled && 'pointer-events-none'
       ),
       'aria-disabled': isDisabled ? true : ariaDisabled,

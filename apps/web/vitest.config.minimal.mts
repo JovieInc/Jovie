@@ -23,6 +23,8 @@ export default defineConfig({
       'tests/unit/lib/sentry/**/*.test.ts',
       'tests/unit/design-system/app-screen-canvas-source-guard.test.ts',
       'tests/unit/design-system/ui-ownership-registry.test.ts',
+      'tests/unit/design-system/app-screen-canvas-contract.test.ts',
+      'tests/unit/design-system/app-screen-canvas-manifest.test.ts',
     ],
     pool: 'forks',
     testTimeout: 10000,

@@ -12,6 +12,7 @@ export function InsightSection() {
       <Container size='homepage'>
         <div className='max-w-3xl mx-auto text-center'>
           <h2
+            className='line-clamp-2'
             style={{
               fontSize: 'var(--linear-h2-size)',
               fontWeight: 'var(--linear-font-weight-medium)',

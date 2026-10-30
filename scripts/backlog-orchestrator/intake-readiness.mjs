@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto';
 
 import { hasProtectedAdmissionLabel } from './admission-policy.mjs';
+import {
+  admissionTargetPacket,
+  resolveAdmissionTarget,
+  sameAdmissionTarget,
+} from './ownership-inventory.mjs';
 
 export const INTAKE_READINESS_SCHEMA = 'intake-readiness/v1';
 export const INTAKE_CONTROL_LOOP_SCHEMA = 'intake-control-loop/v1';
@@ -64,15 +69,37 @@ function isTimOwned(issue) {
 function hasActiveOwnership(issue, labels) {
   const comments = issue?.comments?.nodes || issue?.comments || [];
   const hasReceipt = comments.some(comment =>
-    String(
-      typeof comment === 'string' ? comment : comment?.body || ''
-    ).startsWith('<!-- symphony-admission:v1 ')
+    scopedSymphonyAdmissionReceipt(
+      issue,
+      String(typeof comment === 'string' ? comment : comment?.body || '')
+    )
   );
   return (
     labels.includes('symphony') ||
     hasReceipt ||
     ['In Progress', 'In Review'].includes(issue?.state?.name)
   );
+}
+
+function scopedSymphonyAdmissionReceipt(issue, comment) {
+  if (!comment.startsWith('<!-- symphony-admission:v1 ')) return false;
+  try {
+    const payload = JSON.parse(
+      comment.slice(
+        '<!-- symphony-admission:v1 '.length,
+        comment.endsWith(' -->') ? -' -->'.length : undefined
+      )
+    );
+    const target = admissionTargetPacket(payload);
+    const expected = resolveAdmissionTarget(issue);
+    return (
+      expected.decision === 'admit' &&
+      Boolean(target) &&
+      sameAdmissionTarget(target, expected.target)
+    );
+  } catch {
+    return false;
+  }
 }
 
 function disposition(issue, status, reason, extra = {}) {

@@ -22,7 +22,7 @@ export function BlogAuthorCard({
           verified={author.isVerified}
         />
         <div className='flex flex-col items-center sm:items-start'>
-          <h1 className='text-3xl sm:text-4xl font-semibold tracking-tight text-primary-token'>
+          <h1 className='text-3xl sm:text-4xl font-semibold tracking-tight text-primary-token line-clamp-2'>
             {author.name}
           </h1>
           {author.title && (

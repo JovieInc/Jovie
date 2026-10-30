@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest';
 
 const webRoot = path.resolve(__dirname, '../../..');
 const pagePath = 'app/(home)/page.tsx';
-const heroComponentPath = 'components/marketing/MarketingPosterHero.tsx';
+const heroComponentPath = 'components/homepage/HomepageEditorialHero.tsx';
+const searchComponentPath = 'components/features/home/HeroSpotifySearch.tsx';
 const cssPath = 'app/(home)/home.css';
 
 const forbiddenPageChromePatterns = [
@@ -23,14 +24,13 @@ const forbiddenHeroCssPatterns = [
   /#[0-9a-fA-F]{3,8}/,
   /rgba?\(/,
   /hsla?\(/,
-  /background(?:-image)?:[^;]*(?:linear-gradient|radial-gradient)/,
   /box-shadow:/,
   /(?:background|color|border(?:-[^:]+)?|text-decoration-color):[^;]*(?<!-)\b(?:white|black)\b/,
 ] as const;
 
 function extractMountedHeroCss(source: string): string {
-  const start = source.indexOf('HOMEPAGE POSTER HERO SYSTEM B START');
-  const end = source.indexOf('HOMEPAGE POSTER HERO SYSTEM B END', start);
+  const start = source.indexOf('HOMEPAGE EDITORIAL HERO START');
+  const end = source.indexOf('HOMEPAGE EDITORIAL HERO END', start);
 
   expect(start, 'mounted hero CSS block exists').toBeGreaterThanOrEqual(0);
   expect(end, 'mounted hero CSS block is bounded').toBeGreaterThan(start);
@@ -40,7 +40,7 @@ function extractMountedHeroCss(source: string): string {
 
 function extractMountedHeroPageSource(source: string): string {
   const heroStart = source.indexOf('function HomepageHero()');
-  const heroEnd = source.indexOf('function HomepageFaq()');
+  const heroEnd = source.indexOf('function HomepageUnlockedSections()');
 
   expect(heroStart, 'homepage hero source exists').toBeGreaterThanOrEqual(0);
   expect(heroEnd, 'homepage hero source is bounded').toBeGreaterThan(heroStart);
@@ -66,24 +66,42 @@ describe('mounted homepage hero System B source contract', () => {
       ).not.toMatch(pattern);
     }
 
-    // The shared marketing primitive owns the stable composition while each
-    // route retains its own copy, media, analytics, and visual treatment.
-    expect(pageSource).toContain('<MarketingPosterHero');
-    expect(pageSource).toContain('<MarketingElectricSeam');
-    expect(pageSource).toContain('homepage-trust-section');
+    // The homepage owns copy and backdrop; the hero primitive owns the
+    // composition; the existing name search is the only control.
+    expect(pageSource).toContain('<HomepageEditorialHero');
+    expect(pageSource).not.toContain('HomeTrustSection');
     expect(pageSource).not.toMatch(/statsRow|stats=\{/);
+    expect(pageSource).not.toContain('secondaryCta');
+    expect(heroComponentSource).toContain("appearance='editorial'");
+    expect(heroComponentSource).toContain(
+      "submitTestId='homepage-primary-cta'"
+    );
+    expect(heroComponentSource).not.toMatch(/<Button|<Link|href=/);
 
     for (const className of [
-      'homepage-poster-hero',
-      'homepage-poster-hero__copy',
-      'homepage-poster-hero__headline',
-      'homepage-poster-hero__subtitle',
-      'homepage-poster-hero__actions',
-      'homepage-poster-hero__seam',
-      'homepage-poster-hero__media',
+      'homepage-editorial-hero',
+      'homepage-editorial-hero__backdrop',
+      'homepage-editorial-hero__scrim',
+      'homepage-editorial-hero__copy',
+      'homepage-editorial-hero__headline',
+      'homepage-editorial-hero__support',
+      'homepage-editorial-hero__search',
     ]) {
       expect(heroComponentSource).toContain(className);
     }
+  });
+
+  it('keeps the editorial name-search pill on the shared Button atom', () => {
+    const searchSource = readFileSync(
+      path.join(webRoot, searchComponentPath),
+      'utf8'
+    );
+
+    expect(searchSource).toContain("from '@jovie/ui/atoms/button'");
+    expect(searchSource).toMatch(
+      /<Button[\s\S]*?size='marketing'[\s\S]*?variant='primary'[\s\S]*?className='homepage-name-search__submit/
+    );
+    expect(searchSource).toContain("appearance = 'default'");
   });
 
   it('keeps mounted hero shell CSS tokenized and stable', () => {
@@ -97,19 +115,19 @@ describe('mounted homepage hero System B source contract', () => {
 
     expect(css).toContain('var(--system-b-bg-page)');
     expect(css).toContain('var(--color-text-primary-token)');
-    expect(css).toContain('var(--color-text-tertiary-token)');
+    expect(css).toContain('var(--color-text-secondary-token)');
     expect(css).toContain('var(--homepage-grid-max)');
     expect(css).toContain('var(--homepage-grid-gutter)');
     expect(css).toContain('var(--space-');
     expect(css).toContain('var(--font-satoshi)');
+    expect(css).toContain('font-weight: var(--font-weight-bold);');
     expect(css).toContain(
       'letter-spacing: var(--ds-marketing-display-tracking);'
     );
-    expect(css).toContain('font-size: var(--ds-marketing-display-size);');
-    expect(css).toContain('line-height: var(--ds-marketing-display-leading);');
-    expect(css).toContain('font-size: var(--text-lg);');
-    expect(css).toContain('text-wrap: pretty;');
-    expect(css).toContain('mask-image: linear-gradient(');
-    expect(css).toContain('min-height: var(--space-6);');
+    expect(css).toContain('border-radius: var(--radius-pill);');
+    expect(css).toContain('min-height: 100svh;');
+    // Every scrim color is mixed from a token, never a raw value.
+    const tokenMixes = css.match(/color-mix\(\s*in oklab,\s*var\(--system-b-/g);
+    expect(tokenMixes?.length ?? 0).toBeGreaterThanOrEqual(4);
   });
 });

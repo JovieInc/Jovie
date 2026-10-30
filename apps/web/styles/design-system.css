@@ -76,6 +76,13 @@
   );
   --ds-marketing-title-leading: 1.08;
   --ds-marketing-title-tracking: 0;
+  /* Compact route title ("type 28/620", optical-grid-consistent-v1). Utility
+     routes (support, changelog, policy pages) use one fixed 28px/620 title
+     instead of the fluid display ramp; 28px sits on the 4px scale. */
+  --ds-marketing-route-title-size: 1.75rem;
+  --ds-marketing-route-title-weight: 620;
+  --ds-marketing-route-title-leading: 1.15;
+  --ds-marketing-route-title-tracking: -0.022em;
   --ds-marketing-lede-size: clamp(1.25rem, 1.6vw, 1.375rem);
   --ds-marketing-lede-leading: var(--leading-normal);
   --ds-marketing-lede-tracking: -0.015em;

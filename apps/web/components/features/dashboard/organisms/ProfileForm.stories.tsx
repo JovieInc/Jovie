@@ -37,7 +37,7 @@ const MockedProfileForm = (props: React.ComponentProps<typeof ProfileForm>) => {
 };
 
 const meta: Meta<typeof ProfileForm> = {
-  title: 'Dashboard/Organisms/ProfileForm',
+  title: 'Dashboard/Organisms/LegacyProfileForm',
   component: MockedProfileForm as typeof ProfileForm,
   parameters: {
     layout: 'centered',

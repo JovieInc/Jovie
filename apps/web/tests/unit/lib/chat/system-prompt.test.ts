@@ -54,7 +54,7 @@ describe('buildSystemPrompt', () => {
   it('includes the analytics tool guidance when insights are enabled', () => {
     const prompt = buildSystemPrompt(baseContext, [], {
       aiCanUseTools: true,
-      aiDailyMessageLimit: 10,
+      aiWeeklyMessageLimit: 10,
       insightsEnabled: true,
     });
 
@@ -67,7 +67,7 @@ describe('buildSystemPrompt', () => {
   it('instructs off-topic refusals to pivot into useful music-career actions', () => {
     const prompt = buildSystemPrompt(baseContext, [], {
       aiCanUseTools: true,
-      aiDailyMessageLimit: 10,
+      aiWeeklyMessageLimit: 10,
       insightsEnabled: true,
     });
 
@@ -81,7 +81,7 @@ describe('buildSystemPrompt', () => {
   it('does not instruct the model to call analytics tools when insights are disabled', () => {
     const prompt = buildSystemPrompt(baseContext, [], {
       aiCanUseTools: true,
-      aiDailyMessageLimit: 10,
+      aiWeeklyMessageLimit: 10,
       insightsEnabled: false,
     });
 
@@ -94,7 +94,7 @@ describe('buildSystemPrompt', () => {
   it('injects verified account context without exposing Stripe identifiers', () => {
     const prompt = buildSystemPrompt(baseContext, [], {
       aiCanUseTools: true,
-      aiDailyMessageLimit: 100,
+      aiWeeklyMessageLimit: 70,
       accountContext: {
         email: 'tim@jov.ie',
         plan: 'pro',
@@ -107,14 +107,10 @@ describe('buildSystemPrompt', () => {
           reason: 'is_pro_true_with_non_paid_plan',
         },
         usage: {
-          dailyLimit: 100,
+          weeklyLimit: 70,
           used: 7,
-          remaining: 93,
+          remaining: 63,
           resetAt: '2026-05-24T07:00:00.000Z',
-          monthlyLimit: 3100,
-          monthlyUsed: 7,
-          monthlyRemaining: 3093,
-          monthlyResetAt: '2026-06-01T00:00:00.000Z',
         },
         entitlements: {
           aiCanUseTools: true,
@@ -135,7 +131,7 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('- **Plan:** Pro');
     expect(prompt).toContain('- **Merch Creation:** Available');
     expect(prompt).toContain(
-      '- **AI Usage Today:** 7 used, 93 remaining of 100'
+      '- **AI Usage This Week:** 7 used, 63 remaining of 70'
     );
     expect(prompt).toContain('Billing row mismatch detected');
     expect(prompt).not.toContain('cus_');
@@ -145,7 +141,7 @@ describe('buildSystemPrompt', () => {
   it('does not show Free-plan limitations when billing verification is unavailable', () => {
     const prompt = buildSystemPrompt(baseContext, [], {
       aiCanUseTools: false,
-      aiDailyMessageLimit: 10,
+      aiWeeklyMessageLimit: 10,
       accountContext: {
         email: 'tim@jov.ie',
         plan: 'free',

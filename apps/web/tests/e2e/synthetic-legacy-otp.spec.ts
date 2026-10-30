@@ -27,8 +27,8 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 test.use({ storageState: { cookies: [], origins: [] } });
 
 const HOMEPAGE_PRIMARY_CTA_TEST_ID = 'homepage-primary-cta';
-const SIGNUP_PATH = '/signup';
 const START_PATH = '/start';
+const WAITLIST_PATH = '/waitlist';
 const TURNSTILE_CONFIG_ERROR = 'turnstile is not configured';
 
 async function installSyntheticRouteStubs(page: Page) {
@@ -219,7 +219,7 @@ test.describe('Synthetic Monitoring - Legacy OTP Signup (JOV-2446 cutover)', () 
 
       console.log('[Synthetic][legacy] Step 3: Sign up flow test');
       await primaryCta.click();
-      await expect(page).toHaveURL(new RegExp(SIGNUP_PATH), {
+      await expect(page).toHaveURL(new RegExp(WAITLIST_PATH), {
         timeout: 20000,
       });
       await assertNoFrontDoorConfigErrors(page);

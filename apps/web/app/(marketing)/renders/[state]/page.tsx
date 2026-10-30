@@ -26,7 +26,9 @@ export default async function MarketingRenderPage({
     return (
       <div className='flex min-h-screen items-center justify-center bg-black dark:bg-black text-white dark:text-white'>
         <div className='text-center'>
-          <h1 className='text-2xl font-semibold'>Unknown State:{stateId}</h1>
+          <h1 className='text-2xl font-semibold line-clamp-2'>
+            Unknown State:{stateId}
+          </h1>
           <p className='mt-4 text-white/60'>Available states:</p>
           <ul className='mt-2 space-y-1 text-sm text-white/40'>
             {VALID_STATES.map(s => (

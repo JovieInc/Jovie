@@ -3,7 +3,7 @@ import 'server-only';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { getAppFlagValue } from '@/lib/flags/server';
-import { aiChatDailyPlanAwareLimiter } from '@/lib/rate-limit/limiters';
+import { aiChatWeeklyPlanAwareLimiter } from '@/lib/rate-limit/limiters';
 import type {
   BillingPlanMismatch,
   BillingVerificationState,
@@ -12,14 +12,10 @@ import type {
 } from '@/types';
 
 export interface ChatUsageContext {
-  dailyLimit: number;
+  weeklyLimit: number;
   used: number;
   remaining: number;
   resetAt: string | null;
-  monthlyLimit: number;
-  monthlyUsed: number;
-  monthlyRemaining: number;
-  monthlyResetAt: string;
 }
 
 export interface ChatAccountContext {
@@ -62,21 +58,6 @@ function formatResetAt(resetTime: number | undefined): string | null {
   return new Date(resetTime).toISOString();
 }
 
-function resolveMonthlyUsageWindow(now = new Date()): {
-  daysInMonth: number;
-  resetAt: string;
-} {
-  const year = now.getUTCFullYear();
-  const month = now.getUTCMonth();
-  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-  const resetAt = new Date(Date.UTC(year, month + 1, 1, 0, 0, 0, 0));
-
-  return {
-    daysInMonth,
-    resetAt: resetAt.toISOString(),
-  };
-}
-
 function resolveDisplayPlan(
   plan: UserPlan,
   billingVerification: BillingVerificationState
@@ -91,27 +72,20 @@ function resolveDisplayPlan(
 function resolveUsage(
   userId: string,
   plan: UserPlan,
-  dailyLimit: number,
+  weeklyLimit: number,
   billingVerification: BillingVerificationState
 ): ChatUsageContext | null {
   if (billingVerification === 'unavailable') return null;
 
-  const status = aiChatDailyPlanAwareLimiter.getStatus(userId, plan);
-  const remaining = Math.max(0, Math.min(dailyLimit, status.remaining));
-  const used = Math.max(0, dailyLimit - remaining);
-  const monthlyWindow = resolveMonthlyUsageWindow();
-  const monthlyLimit = dailyLimit * monthlyWindow.daysInMonth;
-  const monthlyUsed = Math.min(used, monthlyLimit);
+  const status = aiChatWeeklyPlanAwareLimiter.getStatus(userId, plan);
+  const remaining = Math.max(0, Math.min(weeklyLimit, status.remaining));
+  const used = Math.max(0, weeklyLimit - remaining);
 
   return {
-    dailyLimit,
+    weeklyLimit,
     used,
     remaining,
     resetAt: formatResetAt(status.resetTime),
-    monthlyLimit,
-    monthlyUsed,
-    monthlyRemaining: Math.max(0, monthlyLimit - monthlyUsed),
-    monthlyResetAt: monthlyWindow.resetAt,
   };
 }
 
@@ -141,7 +115,7 @@ export async function resolveChatAccountContext(params: {
   const usage = resolveUsage(
     params.userId,
     entitlements.plan,
-    entitlements.aiDailyMessageLimit,
+    entitlements.aiWeeklyMessageLimit,
     billingVerification
   );
   const canAccessMerchCreation = Boolean(entitlements.canAccessMerchCreation);

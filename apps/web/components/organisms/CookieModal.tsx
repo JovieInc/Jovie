@@ -120,6 +120,29 @@ function CookieCategories({
   );
 }
 
+function CookiePreferencesSaveButton({
+  isSaving,
+  onSave,
+  className,
+}: Readonly<{
+  isSaving: boolean;
+  onSave: () => void;
+  className: string;
+}>) {
+  return (
+    <Button
+      type='button'
+      variant='primary'
+      size='sm'
+      onClick={onSave}
+      disabled={isSaving}
+      className={className}
+    >
+      Save Preferences
+    </Button>
+  );
+}
+
 export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
   const [settings, setSettings] = useState<Consent>(() => {
     if (globalThis.window === undefined) {
@@ -199,16 +222,11 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
             >
               Cancel
             </Button>
-            <Button
-              type='button'
-              variant='primary'
-              size='sm'
-              onClick={save}
-              disabled={isSaving}
+            <CookiePreferencesSaveButton
+              isSaving={isSaving}
+              onSave={save}
               className='min-h-12 flex-1'
-            >
-              Save Preferences
-            </Button>
+            />
           </SheetFooter>
           {saveError ? (
             <p
@@ -263,16 +281,11 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
         >
           Cancel
         </Button>
-        <Button
-          type='button'
-          variant='primary'
-          size='sm'
-          onClick={save}
-          disabled={isSaving}
+        <CookiePreferencesSaveButton
+          isSaving={isSaving}
+          onSave={save}
           className='min-h-12'
-        >
-          Save Preferences
-        </Button>
+        />
       </DialogActions>
     </Dialog>
   );

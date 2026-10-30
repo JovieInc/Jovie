@@ -873,7 +873,7 @@ function MonthNavigation({ cursor, onPrevious, onNext }: MonthNavigationProps) {
       >
         <ChevronLeft className='h-4 w-4' strokeWidth={2.25} />
       </Button>
-      <h2 className='system-b-calendar-month-label'>
+      <h2 className='system-b-calendar-month-label line-clamp-2'>
         {MONTH_NAMES[cursor.getMonth()]} {cursor.getFullYear()}
       </h2>
       <Button

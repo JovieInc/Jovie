@@ -4,8 +4,10 @@ import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  AUTH_BRANDING_RELATIVE_PATH,
   AUTH_DESKTOP_ONLY_CLASS,
   AUTH_EDITORIAL_CARD_TEST_ID,
+  AUTH_FORM_CONTAINER_RELATIVE_PATH,
   AUTH_LAYOUT_CSS_RELATIVE_PATH,
   AUTH_LAYOUT_VIEWPORTS,
   AUTH_SHELL_KIND,
@@ -16,9 +18,12 @@ import {
   editorialCardVisibleFromCss,
   inspectAuthDesktopOnlyCss,
   inspectAuthLayoutSourceIssues,
+  inspectAuthShellHelperSourceIssues,
 } from '@/lib/auth/auth-shell-layout-contract';
 import {
   ALWAYS_VISIBLE_AUTH_DESKTOP_ONLY_CSS,
+  SHELL_OWNING_BRANDING_SOURCE,
+  SHELL_OWNING_FORM_CONTAINER_SOURCE,
   SWAPPED_BREAKPOINT_AUTH_DESKTOP_ONLY_CSS,
   SWAPPED_GRID_BREAKPOINT_LAYOUT_SOURCE,
   UNWRAPPED_EDITORIAL_LAYOUT_SOURCE,
@@ -92,6 +97,8 @@ vi.mock('@/lib/desktop/electron-bridge', () => ({
 }));
 
 import { AuthModalShell } from '@/components/auth/AuthModalShell';
+import { AuthBranding } from '@/components/features/auth/AuthBranding';
+import { AuthFormContainer } from '@/components/features/auth/AuthFormContainer';
 import { AuthLayout } from '@/components/features/auth/AuthLayout';
 import { DesktopAuthRouteHandoff } from '../../../app/(auth)/DesktopAuthRouteHandoff';
 
@@ -129,6 +136,38 @@ describe('auth shell layout contract', () => {
     expect(inspectAuthLayoutSourceIssues(layoutSource)).toEqual([]);
     expect(layoutSource).toContain(AUTH_DESKTOP_ONLY_CLASS);
     expect(layoutSource).toContain("data-auth-editorial-card='desktop-only'");
+  });
+
+  it('keeps helper components from owning auth shell geometry or breakpoints', () => {
+    const formContainerRender = render(
+      <AuthFormContainer>Auth form body</AuthFormContainer>
+    );
+
+    expect(formContainerRender.container.firstChild).toHaveClass('w-full');
+    formContainerRender.unmount();
+
+    const brandingRender = render(
+      <AuthBranding
+        title='Built For Artists.'
+        description='Manage releases, links, and audience signals from one focused workspace.'
+      />
+    );
+
+    expect(screen.getByTestId(AUTH_EDITORIAL_CARD_TEST_ID)).toBeInTheDocument();
+    brandingRender.unmount();
+
+    expect(
+      inspectAuthShellHelperSourceIssues(
+        'form-container',
+        readWebSource(AUTH_FORM_CONTAINER_RELATIVE_PATH)
+      )
+    ).toEqual([]);
+    expect(
+      inspectAuthShellHelperSourceIssues(
+        'branding',
+        readWebSource(AUTH_BRANDING_RELATIVE_PATH)
+      )
+    ).toEqual([]);
   });
 
   it('binds each sign-in surface to its documented shell', () => {
@@ -314,9 +353,46 @@ describe('auth shell layout contract', () => {
     ).toEqual(['missing-desktop-only-class', 'editorial-unwrapped']);
   });
 
+  it('rejects helpers that re-own shell padding, form width, or branding breakpoints', () => {
+    expect(
+      inspectAuthShellHelperSourceIssues(
+        'form-container',
+        SHELL_OWNING_FORM_CONTAINER_SOURCE
+      )
+    ).toEqual([
+      'form-container-owns-shell-padding',
+      'form-container-owns-form-width',
+    ]);
+    expect(
+      inspectAuthShellHelperSourceIssues(
+        'branding',
+        SHELL_OWNING_BRANDING_SOURCE
+      )
+    ).toEqual([
+      'branding-owns-breakpoint',
+      'branding-owns-gradient-shell',
+      'branding-owns-decorative-orbs',
+      'branding-bypasses-auth-brand-panel',
+    ]);
+  });
+
+  it('keeps AuthLayout as the only production auth form width owner', () => {
+    const layoutSource = readWebSource(
+      'components/features/auth/AuthLayout.tsx'
+    );
+    const formContainerSource = readWebSource(
+      AUTH_FORM_CONTAINER_RELATIVE_PATH
+    );
+
+    expect(layoutSource).toContain('AUTH_FORM_MAX_WIDTH_CLASS');
+    expect(formContainerSource).not.toContain('AUTH_FORM_MAX_WIDTH_CLASS');
+  });
+
   it('keeps production auth shells off the deliberate-red fixtures', () => {
     const productionSources = [
       'components/features/auth/AuthLayout.tsx',
+      AUTH_FORM_CONTAINER_RELATIVE_PATH,
+      AUTH_BRANDING_RELATIVE_PATH,
       'components/auth/AuthModalShell.tsx',
       'app/(auth)/DesktopAuthRouteHandoff.tsx',
       'app/(auth)/signin/SignInPageClient.tsx',

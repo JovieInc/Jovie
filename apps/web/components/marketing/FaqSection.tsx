@@ -37,7 +37,7 @@ export function FaqSection({
     >
       <h2
         className={cn(
-          'faq-section__heading',
+          'faq-section__heading line-clamp-2',
           headingClassName ??
             'system-b-marketing-section-heading text-primary-token'
         )}

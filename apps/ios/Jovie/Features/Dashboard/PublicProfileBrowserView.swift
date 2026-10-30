@@ -10,16 +10,94 @@ struct PublicProfileBrowserDestination: Identifiable, Equatable {
 
 struct PublicProfileURLPolicy: Equatable {
   let allowedHost: String
+  let allowedProfileRoot: String
+
+  /// Canonical public-profile reserved roots from desktop `navigation.ts`
+  /// plus iOS `mobile-auth-return`. First-path-segment match only.
+  private static let reservedRootSegments: Set<String> = [
+    ".well-known",
+    "_next",
+    "__clerk",
+    "a",
+    "about",
+    "account",
+    "actions",
+    "admin",
+    "ai",
+    "alternatives",
+    "api",
+    "app",
+    "artist-notifications",
+    "artist-profile",
+    "artist-profiles",
+    "artist-selection",
+    "artists",
+    "auth",
+    "auth-return",
+    "billing",
+    "blog",
+    "brand",
+    "changelog",
+    "claim",
+    "clerk",
+    "compare",
+    "demo",
+    "demovideo",
+    "desktop-auth",
+    "docs",
+    "download",
+    "drop",
+    "favicon.ico",
+    "go",
+    "hud",
+    "hud-tv",
+    "investor-portal",
+    "investors",
+    "launch",
+    "legal",
+    "llms-full.txt",
+    "llms.txt",
+    "mobile-auth-return",
+    "new",
+    "og",
+    "onboarding",
+    "out",
+    "p",
+    "pay",
+    "pricing",
+    "r",
+    "renders",
+    "s",
+    "share",
+    "sign-in",
+    "sign-up",
+    "signin",
+    "signup",
+    "sso-callback",
+    "support",
+    "unavailable",
+    "waitlist",
+  ]
+
+  private static let allowedHosts: Set<String> = [
+    "jov.ie",
+    "staging.jov.ie",
+  ]
+
+  private static let usernamePattern = /^[A-Za-z][A-Za-z0-9._-]{1,28}[A-Za-z0-9]$/
+  private static let childSegmentPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$/
 
   init?(webBaseURL: URL) {
     guard webBaseURL.scheme?.lowercased() == "https",
           let host = webBaseURL.host?.lowercased(),
-          !host.isEmpty
+          Self.allowedHosts.contains(host),
+          let profileRoot = Self.validatedProfileRoot(for: webBaseURL)
     else {
       return nil
     }
 
     allowedHost = host
+    allowedProfileRoot = profileRoot
   }
 
   init?(publicProfileURL: String) {
@@ -39,7 +117,33 @@ struct PublicProfileURLPolicy: Equatable {
   }
 
   func allows(_ url: URL) -> Bool {
-    url.scheme?.lowercased() == "https" && url.host?.lowercased() == allowedHost
+    url.scheme?.lowercased() == "https"
+      && url.host?.lowercased() == allowedHost
+      && Self.validatedProfileRoot(for: url) == allowedProfileRoot
+  }
+
+  private static func validatedProfileRoot(for url: URL) -> String? {
+    guard let decodedPath = url.path.removingPercentEncoding,
+          !decodedPath.contains("\\"),
+          !decodedPath.contains("//")
+    else {
+      return nil
+    }
+
+    let segments = decodedPath.split(separator: "/", omittingEmptySubsequences: true)
+      .map(String.init)
+    guard let root = segments.first,
+          segments.count <= 4,
+          root.wholeMatch(of: usernamePattern) != nil,
+          !reservedRootSegments.contains(root.lowercased()),
+          segments.dropFirst().allSatisfy({
+            $0.wholeMatch(of: childSegmentPattern) != nil
+          })
+    else {
+      return nil
+    }
+
+    return root.lowercased()
   }
 }
 
@@ -108,7 +212,7 @@ final class PublicProfileBrowserModel: NSObject, ObservableObject, WKNavigationD
     self.policy = policy
 
     let configuration = WKWebViewConfiguration()
-    configuration.websiteDataStore = .default()
+    configuration.websiteDataStore = .nonPersistent()
     PublicProfileBrowserMediaPolicy.configure(configuration)
     webView = WKWebView(frame: .zero, configuration: configuration)
 
@@ -170,10 +274,24 @@ final class PublicProfileBrowserModel: NSObject, ObservableObject, WKNavigationD
   ) {
     guard let url = navigationAction.request.url else {
       decisionHandler(.cancel)
+      refuseNavigation(in: webView)
       return
     }
 
-    decisionHandler(policy.allows(url) ? .allow : .cancel)
+    // WKWebView uses about:blank while applying loadHTMLString / empty documents.
+    // That is not an origin escape and must not trip the public-profile error state.
+    if url.scheme?.lowercased() == "about" {
+      decisionHandler(.allow)
+      return
+    }
+
+    guard policy.allows(url) else {
+      decisionHandler(.cancel)
+      refuseNavigation(in: webView)
+      return
+    }
+
+    decisionHandler(.allow)
   }
 
   func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation?) {
@@ -205,6 +323,14 @@ final class PublicProfileBrowserModel: NSObject, ObservableObject, WKNavigationD
 
     isLoading = false
     errorMessage = "Couldn't load this profile."
+    updateNavigationState(webView)
+  }
+
+  private func refuseNavigation(in webView: WKWebView) {
+    isLoading = false
+    if webView.url == nil {
+      errorMessage = "Couldn't load this profile."
+    }
     updateNavigationState(webView)
   }
 
@@ -299,6 +425,7 @@ struct PublicProfileBrowserView: View {
       .buttonStyle(JovieIconButtonStyle())
       .disabled(!model.canGoBack)
       .accessibilityLabel("Back")
+      .accessibilityIdentifier("public-profile-browser-back")
 
       Button {
         model.goForward()
@@ -308,6 +435,7 @@ struct PublicProfileBrowserView: View {
       .buttonStyle(JovieIconButtonStyle())
       .disabled(!model.canGoForward)
       .accessibilityLabel("Forward")
+      .accessibilityIdentifier("public-profile-browser-forward")
 
       Button {
         model.reload()

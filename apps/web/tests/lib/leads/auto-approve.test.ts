@@ -92,6 +92,12 @@ function makeLead(overrides: Record<string, unknown> = {}) {
     hasRepresentation: false,
     spotifyFollowers: 1000,
     spotifyPopularity: 30,
+    displayName: 'Test Artist',
+    avatarUrl: 'https://cdn.example/test.jpg',
+    hasSpotifyLink: true,
+    contactEmail: 'test@example.com',
+    instagramHandle: null,
+    bio: 'Independent artist.',
     ...overrides,
   };
 }
@@ -206,6 +212,15 @@ describe('runAutoApprove', () => {
     // Should have called limit(2) since 5-3=2 remaining slots
     expect(mockDb._selectChain.limit).toHaveBeenCalledWith(2);
     expect(result.approved).toBe(2);
+  });
+
+  it('skips leads that fail machine certification', async () => {
+    mockDb._selectChain.limit.mockResolvedValue([
+      makeLead({ hasSpotifyLink: false, avatarUrl: null, contactEmail: null }),
+    ]);
+    const result = await runAutoApprove(makeSettings());
+    expect(result.approved).toBe(0);
+    expect(mockApproveLead).not.toHaveBeenCalled();
   });
 
   it('resets counter when past reset time', async () => {

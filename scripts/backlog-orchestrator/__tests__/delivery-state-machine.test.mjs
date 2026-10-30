@@ -15,6 +15,8 @@ import {
 } from '../delivery-state-machine.mjs';
 
 const HEAD = 'a'.repeat(40);
+const REPO = 'JovieInc/Jovie';
+const LYB_REPO = 'JovieInc/LogYourBody';
 
 describe('delivery state machine', () => {
   it('turns every machine-owned failure into one bounded repair route', () => {
@@ -141,6 +143,26 @@ describe('delivery state machine', () => {
     assert.equal(receipt.next.owner, 'gem');
   });
 
+  it('includes repository identity in delivery receipt keys', () => {
+    const jovie = buildDeliveryReceipt({
+      repository: REPO,
+      delivery_key: 'queue-eviction-42',
+      failure: 'queue-noop',
+      pr_number: 42,
+      head_sha: HEAD,
+    });
+    const logYourBody = buildDeliveryReceipt({
+      repository: LYB_REPO,
+      delivery_key: 'queue-eviction-42',
+      failure: 'queue-noop',
+      pr_number: 42,
+      head_sha: HEAD,
+    });
+    assert.equal(jovie.event.repository, REPO);
+    assert.equal(logYourBody.event.repository, LYB_REPO);
+    assert.notEqual(jovie.receiptKey, logYourBody.receiptKey);
+  });
+
   it('classifies a suppressed product PR queue failure dispatch as exact-head queue repair', () => {
     const receipt = buildDeliveryReceipt({
       action: 'delivery-control-failure',
@@ -224,6 +246,7 @@ describe('delivery state machine', () => {
     try {
       const action = {
         schema: 'jovie-stack-health-action/v1',
+        repository: REPO,
         taskKey: 'b'.repeat(64),
         deliveryKey: `closure-stack:${'b'.repeat(64)}`,
         action: 'split-or-retarget-draft-stack',
@@ -335,6 +358,8 @@ describe('delivery state machine', () => {
       );
       assert.deepEqual(task.evidence.prNumbers, [16510, 16511]);
       assert.deepEqual(task.evidence.memberHeads, action.memberHeads);
+      assert.equal(task.repository, REPO);
+      assert.equal(task.evidence.repository, REPO);
       assert.equal(task.evidence.rootHeadSha, HEAD);
       assert.equal(task.evidence.promotionPath[0].headSha, HEAD);
       const resolved = await persist([], '2026-08-29T01:00:00.000Z');

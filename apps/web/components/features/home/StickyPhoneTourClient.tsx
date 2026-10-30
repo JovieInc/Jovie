@@ -134,7 +134,7 @@ export function StickyPhoneTourClient({
                     {introBadge}
                   </span>
 
-                  <h2 className='marketing-h2-linear mt-5 text-primary-token'>
+                  <h2 className='marketing-h2-linear mt-5 text-primary-token line-clamp-2'>
                     {introTitle}
                   </h2>
 

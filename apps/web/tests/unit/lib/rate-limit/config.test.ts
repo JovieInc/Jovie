@@ -113,6 +113,10 @@ describe('Rate Limit Config', () => {
           'spotifySearch',
           'spotifyClaim',
           'aiChat',
+          'aiChatWeeklyFree',
+          'aiChatWeeklyTrial',
+          'aiChatWeeklyPro',
+          'aiChatWeeklyMax',
         ];
 
         for (const limiter of requiredLimiters) {
@@ -157,6 +161,29 @@ describe('Rate Limit Config', () => {
       it('should have strict Spotify claim limits', () => {
         expect(RATE_LIMITERS.spotifyClaim.limit).toBeLessThanOrEqual(10);
         expect(RATE_LIMITERS.spotifyClaim.window).toContain('h');
+      });
+
+      it('binds every plan-aware AI quota to an isolated seven-day window', () => {
+        expect(RATE_LIMITERS.aiChatWeeklyFree).toMatchObject({
+          limit: 15,
+          window: '7 d',
+          prefix: 'ai:chat:weekly:free',
+        });
+        expect(RATE_LIMITERS.aiChatWeeklyTrial).toMatchObject({
+          limit: 50,
+          window: '7 d',
+          prefix: 'ai:chat:weekly:trial',
+        });
+        expect(RATE_LIMITERS.aiChatWeeklyPro).toMatchObject({
+          limit: 70,
+          window: '7 d',
+          prefix: 'ai:chat:weekly:pro',
+        });
+        expect(RATE_LIMITERS.aiChatWeeklyMax).toMatchObject({
+          limit: 250,
+          window: '7 d',
+          prefix: 'ai:chat:weekly:max',
+        });
       });
 
       it('should throttle the public claim-token entry route per IP', () => {

@@ -355,24 +355,9 @@ export function ProfileDesktopSurface({
         onManageNotifications={() => onModeSelect('subscribe')}
       />
     );
-  } else if (primaryAction.href) {
-    primaryActionElement = (
-      <Button asChild variant='primary' size='marketing' className='gap-2 px-4'>
-        <a href={primaryAction.href}>
-          <PrimaryActionIcon className='h-4 w-4' />
-          {primaryAction.label}
-        </a>
-      </Button>
-    );
   } else {
-    primaryActionElement = (
-      <Button
-        type='button'
-        variant='primary'
-        size='marketing'
-        onClick={() => onModeSelect(primaryAction.mode)}
-        className='gap-2 px-4'
-      >
+    const primaryActionContent = (
+      <>
         <PrimaryActionIcon
           className={cn(
             'h-4 w-4',
@@ -380,6 +365,25 @@ export function ProfileDesktopSurface({
           )}
         />
         {primaryAction.label}
+      </>
+    );
+    primaryActionElement = (
+      <Button
+        {...(primaryAction.href
+          ? { asChild: true }
+          : {
+              type: 'button' as const,
+              onClick: () => onModeSelect(primaryAction.mode),
+            })}
+        variant='primary'
+        size='marketing'
+        className='gap-2 px-4'
+      >
+        {primaryAction.href ? (
+          <a href={primaryAction.href}>{primaryActionContent}</a>
+        ) : (
+          primaryActionContent
+        )}
       </Button>
     );
   }

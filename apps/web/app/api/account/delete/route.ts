@@ -1,4 +1,5 @@
-import { eq } from 'drizzle-orm';
+import { del } from '@vercel/blob';
+import { and, eq, inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
@@ -10,6 +11,12 @@ import { preSaveTokens } from '@/lib/db/schema/pre-save';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { emailSuppressions } from '@/lib/db/schema/suppression';
 import { captureError } from '@/lib/error-tracking';
+import {
+  FOUNDER_REVIEW_SOURCE,
+  FOUNDER_REVIEW_UPLOAD_LEASE_SOURCE,
+  StoredFounderReviewContextSchema,
+  StoredFounderReviewUploadLeaseSchema,
+} from '@/lib/founder-review/contract';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { invalidateHandleCache } from '@/lib/onboarding/handle-availability-cache';
@@ -24,6 +31,30 @@ interface DeleteAccountBody {
   confirmation: string;
 }
 
+function founderReviewBlobUrls(rows: ReadonlyArray<{ context: unknown }>) {
+  return Array.from(
+    new Set(
+      rows.flatMap(row => {
+        const review = StoredFounderReviewContextSchema.safeParse(row.context);
+        if (review.success && review.data.recording.media) {
+          return [review.data.recording.media.blobUrl];
+        }
+        const lease = StoredFounderReviewUploadLeaseSchema.safeParse(
+          row.context
+        );
+        return lease.success ? [lease.data.blob.url] : [];
+      })
+    )
+  );
+}
+
+async function deleteFounderReviewBlobs(
+  rows: ReadonlyArray<{ context: unknown }>
+) {
+  const urls = founderReviewBlobUrls(rows);
+  if (urls.length > 0) await del(urls);
+}
+
 /**
  * POST /api/account/delete
  *
@@ -33,8 +64,9 @@ interface DeleteAccountBody {
  * Requires confirmation text "DELETE" in the request body.
  *
  * Deletion is idempotent: a prior partial failure can be retried safely.
- * Dependent rows are removed first; `users.deletedAt` is written last as a
- * success-fence so a mid-chain error never leaves a banned limbo account.
+ * `users.deletedAt` is written first as an erasure fence so a pre-issued
+ * private-upload callback cannot create new retained data during deletion.
+ * The remaining steps are retry-safe when a partial failure follows the fence.
  *
  * RLS contract: existence checks run in `withDbSession` (read-only). The
  * destructive delete chain runs inside `withDbSessionTx` so `app.clerk_user_id`
@@ -82,18 +114,18 @@ export async function POST(request: Request) {
   }
 
   try {
-    const user = await withDbSession(
+    const lookup = await withDbSession(
       async sessionClerkUserId => {
         const [row] = await db
           .select({ id: users.id, deletedAt: users.deletedAt })
           .from(users)
           .where(eq(users.id, sessionClerkUserId))
           .limit(1);
-
-        return row;
+        return row ?? null;
       },
       { clerkUserId }
     );
+    const user = lookup;
 
     if (!user) {
       return NextResponse.json(
@@ -104,26 +136,9 @@ export async function POST(request: Request) {
 
     const now = new Date();
 
-    const profiles = await withDbSessionTx(
-      async tx => {
-        const profileRows = await tx
-          .select({ usernameNormalized: creatorProfiles.usernameNormalized })
-          .from(creatorProfiles)
-          .where(eq(creatorProfiles.userId, user.id));
-
-        // Delete dependent data first — users.deletedAt is the success-fence below
-        await tx
-          .delete(creatorProfiles)
-          .where(eq(creatorProfiles.userId, user.id));
-        await tx.delete(preSaveTokens).where(eq(preSaveTokens.userId, user.id));
-        await tx.delete(feedbackItems).where(eq(feedbackItems.userId, user.id));
-        await tx
-          .delete(emailSuppressions)
-          .where(eq(emailSuppressions.createdBy, user.id));
-
-        if (!user.deletedAt) {
-          // Soft-delete: anonymize all personal data and mark as deleted
-          // GDPR requires removal of all PII - we retain only structural fields
+    if (!user.deletedAt) {
+      await withDbSessionTx(
+        async tx => {
           await tx
             .update(users)
             .set({
@@ -137,12 +152,77 @@ export async function POST(request: Request) {
               updatedAt: now,
             })
             .where(eq(users.id, user.id));
-        }
+        },
+        { clerkUserId }
+      );
+    }
+
+    const founderReviewRows = await db
+      .select({ context: feedbackItems.context })
+      .from(feedbackItems)
+      .where(
+        and(
+          eq(feedbackItems.userId, user.id),
+          inArray(feedbackItems.source, [
+            FOUNDER_REVIEW_SOURCE,
+            FOUNDER_REVIEW_UPLOAD_LEASE_SOURCE,
+          ])
+        )
+      );
+
+    await deleteFounderReviewBlobs(founderReviewRows);
+
+    const profiles = await withDbSessionTx(
+      async tx => {
+        const profileRows = await tx
+          .select({ usernameNormalized: creatorProfiles.usernameNormalized })
+          .from(creatorProfiles)
+          .where(eq(creatorProfiles.userId, user.id));
+
+        // The account is already fenced; these retry-safe deletes remove data.
+        await tx
+          .delete(creatorProfiles)
+          .where(eq(creatorProfiles.userId, user.id));
+        await tx.delete(preSaveTokens).where(eq(preSaveTokens.userId, user.id));
+        await tx.delete(feedbackItems).where(eq(feedbackItems.userId, user.id));
+        await tx
+          .delete(emailSuppressions)
+          .where(eq(emailSuppressions.createdBy, user.id));
 
         return profileRows;
       },
       { clerkUserId }
     );
+
+    // Catch an upload whose token was issued before deletion and whose callback
+    // raced the first snapshot. The callback also rechecks the active-user
+    // fence after inserting, so uploads that land after this sweep self-delete.
+    const lateFounderReviewRows = await db
+      .select({ context: feedbackItems.context })
+      .from(feedbackItems)
+      .where(
+        and(
+          eq(feedbackItems.userId, user.id),
+          inArray(feedbackItems.source, [
+            FOUNDER_REVIEW_SOURCE,
+            FOUNDER_REVIEW_UPLOAD_LEASE_SOURCE,
+          ])
+        )
+      );
+    await deleteFounderReviewBlobs(lateFounderReviewRows);
+    if (lateFounderReviewRows.length > 0) {
+      await db
+        .delete(feedbackItems)
+        .where(
+          and(
+            eq(feedbackItems.userId, user.id),
+            inArray(feedbackItems.source, [
+              FOUNDER_REVIEW_SOURCE,
+              FOUNDER_REVIEW_UPLOAD_LEASE_SOURCE,
+            ])
+          )
+        );
+    }
 
     // Invalidate handle availability cache so deleted usernames become available
     for (const profile of profiles) {

@@ -228,7 +228,7 @@ const SECTION_RESOLUTIONS = {
     'MarketingHero',
     MARKETING_PEN_CONTRACT_IDS.section.hero,
     'data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.hero}',
-    3,
+    1,
     [
       {
         source: 'apps/web/components/marketing/MarketingPosterHero.tsx',

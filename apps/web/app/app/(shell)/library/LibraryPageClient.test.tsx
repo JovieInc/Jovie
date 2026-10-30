@@ -53,6 +53,10 @@ describe('LibraryPageClient stages', () => {
       'aria-selected',
       'true'
     );
+    expect(screen.getByTestId('library-stage-tabs')).toHaveAttribute(
+      'data-youtube-connected',
+      'false'
+    );
     expect(screen.queryByRole('tab', { name: 'Ideas & Scripts' })).toBeNull();
     expect(screen.queryByRole('tab', { name: 'Assets' })).toBeNull();
     fireEvent.click(screen.getByRole('tab', { name: 'Ideas' }));

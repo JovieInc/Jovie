@@ -54,6 +54,10 @@ export default function ErrorBoundary({
     ? 'The app was just updated. Reload to continue.'
     : message;
 
+  const primaryAction = isSkewError
+    ? { label: 'Reload', onClick: () => globalThis.location.reload() }
+    : { label: RECOVERY_COPY.retryLabel, onClick: reset };
+
   return (
     <div
       className='flex flex-1 flex-col items-center justify-center px-4 py-12 text-center'
@@ -75,19 +79,9 @@ export default function ErrorBoundary({
         </div>
 
         <div className='flex justify-center' data-recovery-actions=''>
-          {isSkewError ? (
-            <Button
-              variant='primary'
-              size='sm'
-              onClick={() => globalThis.location.reload()}
-            >
-              Reload
-            </Button>
-          ) : (
-            <Button variant='primary' size='sm' onClick={reset}>
-              {RECOVERY_COPY.retryLabel}
-            </Button>
-          )}
+          <Button variant='primary' size='sm' onClick={primaryAction.onClick}>
+            {primaryAction.label}
+          </Button>
         </div>
 
         {!isSkewError && (

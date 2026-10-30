@@ -40,13 +40,13 @@ export const CANONICAL_WEB_SURFACE_OWNERSHIP = {
       'apps/web/app/(home)/layout.tsx',
     ],
     requiredTokens: [
-      'MarketingPosterHero',
+      'HomepageEditorialHero',
       'PublicPageShell',
-      'HomepageV2FinalCta',
+      'HomepageClose',
     ],
     forbiddenTokens: ['HomePageNarrative'],
-    registryOwnerNeedle: 'MarketingPosterHero',
-    moleculeOwners: ['PublicPageShell', 'MarketingPosterHero'],
+    registryOwnerNeedle: 'HomepageEditorialHero',
+    moleculeOwners: ['PublicPageShell', 'HomepageEditorialHero'],
     familyToken: 'features/home',
   },
   'public-profile': {

@@ -327,16 +327,16 @@ describe('Button', () => {
 
     expect(
       screen.getByRole('button', { name: 'Default' }).className
-    ).not.toContain('active:scale-[var(--scale-press)]');
+    ).not.toContain('active:scale-press');
     expect(screen.getByRole('button', { name: 'Press' }).className).toContain(
-      'active:scale-[var(--scale-press)]'
+      'active:scale-press'
     );
     expect(screen.getByRole('button', { name: 'Press' }).className).toContain(
       'motion-reduce:active:scale-100'
     );
     expect(
       screen.getByRole('button', { name: 'Static' }).className
-    ).not.toContain('active:scale-[var(--scale-press)]');
+    ).not.toContain('active:scale-press');
     expect(screen.getByRole('button', { name: 'Press' })).toHaveAttribute(
       'data-press-feedback',
       'true'
@@ -362,12 +362,27 @@ describe('Button', () => {
     expect(btn.className).toContain('motion-reduce:transition-none');
   });
 
-  it('uses raised control styling for secondary buttons', () => {
+  it('keeps secondary buttons borderless at rest with tokenized hover', () => {
     render(<Button variant='secondary'>Press</Button>);
     const btn = screen.getByRole('button');
-    expect(btn.className).toContain('shadow-[');
-    expect(btn.className).toContain('hover:border-default');
+    expect(btn.className).toContain('border-0');
+    expect(btn.className).toContain('shadow-none');
+    expect(btn.className).not.toMatch(/hover:border-/);
     expect(btn.className).toContain('hover:bg-(--color-btn-secondary-hover)');
+  });
+
+  it('keeps destructive secondary buttons borderless', () => {
+    render(
+      <Button variant='secondary' destructive>
+        Delete
+      </Button>
+    );
+    const btn = screen.getByRole('button');
+    expect(btn.className).toContain('border-0');
+    expect(btn.className).not.toMatch(/(?:^|\s)border(?:\s|$)/);
+    expect(btn.className).not.toMatch(/border-error/);
+    expect(btn.className).not.toMatch(/hover:border-/);
+    expect(btn.className).toContain('bg-error-subtle');
   });
 
   it.each([
@@ -414,6 +429,13 @@ describe('Button', () => {
     render(<Button loading>Load</Button>);
     expect(screen.getByTestId('spinner')).toBeInTheDocument();
     expect(screen.getByRole('button')).toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('keeps the label mounted under an absolutely positioned spinner while loading', () => {
+    render(<Button loading>Load</Button>);
+    const spinnerShell = screen.getByTestId('spinner').parentElement;
+    expect(spinnerShell?.className).toContain('absolute inset-0');
+    expect(screen.getByText('Load')).toBeInTheDocument();
   });
 
   it('keeps loading and disabled accessibility state authoritative', () => {

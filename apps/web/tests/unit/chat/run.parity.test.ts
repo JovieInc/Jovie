@@ -78,12 +78,12 @@ const noReleases: ReleaseContext[] = [];
 
 const freePlanLimits = {
   booleans: { aiCanUseTools: false },
-  limits: { aiDailyMessageLimit: 20 },
+  limits: { aiWeeklyMessageLimit: 20 },
 } as unknown as Parameters<typeof executeChatTurn>[0]['planLimits'];
 
 const paidPlanLimits = {
   booleans: { aiCanUseTools: true },
-  limits: { aiDailyMessageLimit: 500 },
+  limits: { aiWeeklyMessageLimit: 500 },
 } as unknown as Parameters<typeof executeChatTurn>[0]['planLimits'];
 
 function userMessage(text: string, id = 'm1'): UIMessage {

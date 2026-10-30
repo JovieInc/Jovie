@@ -1,7 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
@@ -13,107 +12,35 @@ const taskExtensions = new Set(['.cjs', '.cts', '.js', '.mjs', '.mts', '.ts']);
 interface TriggerIntegrationState {
   configExists: boolean;
   dependencies: Record<string, string>;
-  taskSources: Array<{ path: string; source: string }>;
+  taskSources: string[];
 }
 
-function isDeployableTaskSource(source: string): boolean {
-  const sourceFile = ts.createSourceFile(
-    'trigger-task.ts',
-    source,
-    ts.ScriptTarget.Latest,
-    false,
-    ts.ScriptKind.TS
-  );
-  const importedConstructors = new Map<string, 'schedules' | 'task'>();
-
-  for (const statement of sourceFile.statements) {
-    if (
-      !ts.isImportDeclaration(statement) ||
-      !ts.isStringLiteral(statement.moduleSpecifier) ||
-      !/^@trigger\.dev\/sdk(?:\/v3)?$/.test(statement.moduleSpecifier.text)
-    ) {
-      continue;
-    }
-
-    const bindings = statement.importClause?.namedBindings;
-    if (!bindings || !ts.isNamedImports(bindings)) continue;
-
-    for (const element of bindings.elements) {
-      const importedName = element.propertyName?.text ?? element.name.text;
-      if (importedName === 'task' || importedName === 'schedules') {
-        importedConstructors.set(element.name.text, importedName);
-      }
-    }
-  }
-
-  return sourceFile.statements.some(statement => {
-    if (
-      !ts.isVariableStatement(statement) ||
-      !statement.modifiers?.some(
-        modifier => modifier.kind === ts.SyntaxKind.ExportKeyword
-      )
-    ) {
-      return false;
-    }
-
-    return statement.declarationList.declarations.some(declaration => {
-      const initializer = declaration.initializer;
-      if (!initializer || !ts.isCallExpression(initializer)) return false;
-
-      if (ts.isIdentifier(initializer.expression)) {
-        return importedConstructors.get(initializer.expression.text) === 'task';
-      }
-
-      return (
-        ts.isPropertyAccessExpression(initializer.expression) &&
-        ts.isIdentifier(initializer.expression.expression) &&
-        importedConstructors.get(initializer.expression.expression.text) ===
-          'schedules' &&
-        initializer.expression.name.text === 'task'
-      );
-    });
-  });
-}
-
-function integrationErrors(state: TriggerIntegrationState): string[] {
-  if (!state.configExists) return [];
-
+function retiredIntegrationErrors(state: TriggerIntegrationState): string[] {
   const errors: string[] = [];
-
-  if (!state.dependencies['@trigger.dev/sdk']) {
-    errors.push('trigger.config.ts requires @trigger.dev/sdk');
+  if (state.configExists) {
+    errors.push('Trigger.dev is retired: trigger.config.ts must be absent');
   }
-  if (!state.dependencies['trigger.dev']) {
-    errors.push('trigger.config.ts requires the trigger.dev CLI');
+  if (state.dependencies['@trigger.dev/sdk']) {
+    errors.push('Trigger.dev is retired: @trigger.dev/sdk must be absent');
   }
-  if (
-    !state.taskSources.some(taskSource =>
-      isDeployableTaskSource(taskSource.source)
-    )
-  ) {
-    errors.push(
-      'trigger.config.ts requires at least one Trigger.dev task source'
-    );
+  if (state.dependencies['trigger.dev']) {
+    errors.push('Trigger.dev is retired: trigger.dev CLI must be absent');
   }
-
+  if (state.taskSources.length > 0) {
+    errors.push('Trigger.dev is retired: trigger task sources must be absent');
+  }
   return errors;
 }
 
-function findTaskSources(
-  directory: string
-): Array<{ path: string; source: string }> {
+function findTaskSources(directory: string): string[] {
   if (!existsSync(directory)) return [];
-
   return readdirSync(directory, { recursive: true, withFileTypes: true })
     .filter(entry => entry.isFile() && taskExtensions.has(extname(entry.name)))
-    .map(entry => {
-      const path = join(entry.parentPath, entry.name);
-      return { path, source: readFileSync(path, 'utf8') };
-    });
+    .map(entry => join(entry.parentPath, entry.name));
 }
 
-describe('Trigger.dev integration contract', () => {
-  it('keeps the repository integration inactive until a complete implementation exists', () => {
+describe('retired Trigger.dev integration contract', () => {
+  it('keeps every Trigger.dev activation surface absent', () => {
     const manifest = JSON.parse(
       readFileSync(resolve(repoRoot, 'package.json'), 'utf8')
     ) as {
@@ -126,7 +53,7 @@ describe('Trigger.dev integration contract', () => {
     };
 
     expect(
-      integrationErrors({
+      retiredIntegrationErrors({
         configExists: existsSync(triggerConfigPath),
         dependencies,
         taskSources: findTaskSources(triggerSourceDir),
@@ -134,77 +61,39 @@ describe('Trigger.dev integration contract', () => {
     ).toEqual([]);
   });
 
-  it('fails closed when an active config has no SDK, CLI, or task source', () => {
+  it('fails closed if a config is restored', () => {
     expect(
-      integrationErrors({
+      retiredIntegrationErrors({
         configExists: true,
         dependencies: {},
         taskSources: [],
       })
-    ).toEqual([
-      'trigger.config.ts requires @trigger.dev/sdk',
-      'trigger.config.ts requires the trigger.dev CLI',
-      'trigger.config.ts requires at least one Trigger.dev task source',
-    ]);
+    ).toEqual(['Trigger.dev is retired: trigger.config.ts must be absent']);
   });
 
-  it('rejects helper-only source files as non-deployable', () => {
+  it('fails closed if packages are restored', () => {
     expect(
-      integrationErrors({
-        configExists: true,
+      retiredIntegrationErrors({
+        configExists: false,
         dependencies: {
           '@trigger.dev/sdk': 'latest',
           'trigger.dev': 'latest',
         },
-        taskSources: [
-          {
-            path: 'trigger/helper.ts',
-            source: 'export function helper() { return true; }',
-          },
-        ],
+        taskSources: [],
       })
     ).toEqual([
-      'trigger.config.ts requires at least one Trigger.dev task source',
+      'Trigger.dev is retired: @trigger.dev/sdk must be absent',
+      'Trigger.dev is retired: trigger.dev CLI must be absent',
     ]);
   });
 
-  it('rejects commented-out task code as non-deployable', () => {
+  it('fails closed if a task source is restored', () => {
     expect(
-      integrationErrors({
-        configExists: true,
-        dependencies: {
-          '@trigger.dev/sdk': 'latest',
-          'trigger.dev': 'latest',
-        },
-        taskSources: [
-          {
-            path: 'trigger/commented.ts',
-            source:
-              "// import { task } from '@trigger.dev/sdk/v3';\n// export const disabled = task({ id: 'disabled', run: async () => true });",
-          },
-        ],
+      retiredIntegrationErrors({
+        configExists: false,
+        dependencies: {},
+        taskSources: ['trigger/example.ts'],
       })
-    ).toEqual([
-      'trigger.config.ts requires at least one Trigger.dev task source',
-    ]);
-  });
-
-  it('requires all implementation pieces before activation', () => {
-    expect(
-      integrationErrors({
-        configExists: true,
-        dependencies: {
-          '@trigger.dev/sdk': 'latest',
-          'trigger.dev': 'latest',
-        },
-        taskSources: [
-          {
-            path: 'trigger/example.ts',
-            source:
-              "import { task } from '@trigger.dev/sdk/v3'; export const example = task({ id: 'example', run: async () => true });",
-          },
-        ],
-      })
-    ).toEqual([]);
+    ).toEqual(['Trigger.dev is retired: trigger task sources must be absent']);
   });
 });

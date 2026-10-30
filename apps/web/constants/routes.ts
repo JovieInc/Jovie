@@ -103,6 +103,7 @@ export const APP_ROUTES = {
   ADMIN_CAMPAIGNS: '/app/ov/campaigns',
   ADMIN_GROWTH_YC_METRICS: '/app/ov/growth/yc-metrics',
   ADMIN_INVESTORS: '/app/ov/investors',
+  ADMIN_INVESTOR_UPDATES: '/app/ov/investors/updates',
   ADMIN_INVESTORS_LINKS: '/app/ov/investors/links',
   ADMIN_INVESTORS_SETTINGS: '/app/ov/investors/settings',
   ADMIN_LEADS: '/app/ov/leads',

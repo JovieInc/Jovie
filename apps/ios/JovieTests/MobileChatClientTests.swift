@@ -296,7 +296,8 @@ struct MobileChatClientTests {
       requestRecorder.record(request)
 
       let ndjson = """
-      {"type":"turn.reserved","conversationId":"conv_1","turnId":"turn_1","clientTurnId":"client_turn_1"}
+      {"type":"turn.reserved","conversationId":"conv_1","turnId":"turn_1","clientTurnId":"client_turn_1","eveWorkId":"ini_eve_1"}
+      {"type":"turn.state","clientTurnId":"client_turn_1","state":"queued","eveWorkId":"ini_eve_1"}
       {"type":"assistant.delta","clientTurnId":"client_turn_1","text":"Hel"}
       {"type":"ignored.event","clientTurnId":"client_turn_1"}
       {"type":"assistant.completed","clientTurnId":"client_turn_1","conversationId":"conv_1","turnId":"turn_1","text":"Hello"}
@@ -319,6 +320,7 @@ struct MobileChatClientTests {
 
     #expect(events == [
       .turnReserved(conversationId: "conv_1", turnId: "turn_1", clientTurnId: "client_turn_1"),
+      .turnState(clientTurnId: "client_turn_1", state: "queued", eveWorkId: "ini_eve_1"),
       .assistantDelta(clientTurnId: "client_turn_1", text: "Hel"),
       .assistantCompleted(
         clientTurnId: "client_turn_1",

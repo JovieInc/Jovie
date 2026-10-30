@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/home/BentoFeatureGrid.test.tsx
 import { BellRing, CheckCircle2, Circle, Sparkles } from 'lucide-react';
 import { Container } from '@/components/site/Container';
 import { FlatlineCurve, MomentumCurve } from '@/features/home/MomentumCurves';
@@ -139,7 +140,7 @@ export function BentoFeatureGrid() {
         <div className='mx-auto max-w-linear-content'>
           <h2
             id='bento-heading'
-            className='marketing-h2-linear text-primary-token'
+            className='marketing-h2-linear text-primary-token line-clamp-2'
           >
             A Command Center For Your Career.
           </h2>

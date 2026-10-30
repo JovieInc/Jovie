@@ -43,6 +43,9 @@ describe('YoutubeThumbnailsLanding (JOV-5862 lock)', () => {
     expect(YOUTUBE_THUMBNAILS_OPTIMIZATION.liveApplySurface).toBe(
       'youtube_packaging_experiment'
     );
+    expect(YOUTUBE_THUMBNAILS_OPTIMIZATION.experimentId).toBe(
+      'youtube-closed-loop'
+    );
     expect(evaluateDirectThumbnailMutation().allowed).toBe(false);
   });
 });

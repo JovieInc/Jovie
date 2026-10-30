@@ -10,6 +10,10 @@ const exceptionMigration = join(
   process.cwd(),
   'drizzle/migrations/0097_regular_mister_sinister.sql'
 );
+const thumbnailPolicyMigration = join(
+  process.cwd(),
+  'drizzle/migrations/0099_youtube_thumbnail_versions_uuid_policy.sql'
+);
 const snapshot = join(
   process.cwd(),
   'drizzle/migrations/meta/0097_snapshot.json'
@@ -123,5 +127,19 @@ describe('library graph private migrations', () => {
     expect(sql).toContain('artist rule exceptions are immutable');
     expect(sql).toContain('artist_rule_exception_event');
     expect(sql).toContain("'exception_granted'::artist_rule_event_type");
+  });
+
+  it('compares youtube thumbnail version video ids as uuid on both sides', async () => {
+    const sql = await readFile(thumbnailPolicyMigration, 'utf8');
+    expect(sql).toContain(
+      'DROP POLICY IF EXISTS "youtube_thumbnail_versions_private_access" ON "youtube_thumbnail_versions"'
+    );
+    expect(sql).toContain(
+      'v.id::uuid = "youtube_thumbnail_versions"."video_id"::uuid'
+    );
+    expect(sql).not.toContain('WHERE v.id = video_id');
+    expect(sql).not.toContain(
+      'WHERE v.id = "youtube_thumbnail_versions"."video_id" AND'
+    );
   });
 });

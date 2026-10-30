@@ -99,24 +99,30 @@ describe('Sheet', () => {
       render(<TestSheet open={true} />);
       const content = screen.getByTestId('sheet-content');
       expect(content.className).toContain('right-0');
+      expect(content.className).toContain('w-104');
+      expect(content.className).toContain('max-w-sheet-viewport');
     });
 
     it('renders on left side', () => {
       render(<TestSheet open={true} side='left' />);
       const content = screen.getByTestId('sheet-content');
       expect(content.className).toContain('left-0');
+      expect(content.className).toContain('w-104');
+      expect(content.className).toContain('max-w-sheet-viewport');
     });
 
     it('renders on top side', () => {
       render(<TestSheet open={true} side='top' />);
       const content = screen.getByTestId('sheet-content');
       expect(content.className).toContain('top-0');
+      expect(content.className).toContain('max-h-sheet-viewport');
     });
 
     it('renders on bottom side', () => {
       render(<TestSheet open={true} side='bottom' />);
       const content = screen.getByTestId('sheet-content');
       expect(content.className).toContain('bottom-0');
+      expect(content.className).toContain('max-h-sheet-viewport');
     });
   });
 
@@ -289,7 +295,7 @@ describe('Sheet', () => {
       render(<TestSheet open={true} />);
       const content = screen.getByTestId('sheet-content');
       expect(content.className).toContain('fixed');
-      expect(content.className).toContain('z-[65]');
+      expect(content.className).toContain('z-sheet');
       expect(content.className).toContain('bg-surface-elevated');
       expect(content.className).toContain('border-default');
       expect(content.className).toContain('shadow-popover');

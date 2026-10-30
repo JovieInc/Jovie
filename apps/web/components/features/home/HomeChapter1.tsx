@@ -15,7 +15,10 @@ export function HomeChapter1() {
         <div className='mx-auto max-w-300'>
           <div className='homepage-chapter-layout'>
             <div className='homepage-chapter-copy'>
-              <h2 id='homepage-ch1-heading' className='homepage-chapter-title'>
+              <h2
+                id='homepage-ch1-heading'
+                className='homepage-chapter-title line-clamp-2'
+              >
                 {HOME_CHAPTER_1_CONTENT.title}
               </h2>
               <p className='homepage-chapter-body'>

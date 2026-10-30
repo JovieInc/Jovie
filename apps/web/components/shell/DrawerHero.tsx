@@ -275,7 +275,7 @@ export function DrawerHero({
             <h2
               title={title}
               className={cn(
-                'min-w-0 flex-1 font-semibold text-primary-token',
+                'min-w-0 flex-1 font-semibold text-primary-token line-clamp-2',
                 isRailDensity
                   ? 'text-sm leading-tight tracking-tight'
                   : 'text-base leading-tight',

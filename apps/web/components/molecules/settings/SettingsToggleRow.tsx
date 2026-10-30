@@ -5,6 +5,12 @@ import { Switch } from '@jovie/ui';
 import * as React from 'react';
 import { SettingsPlanGateLabel } from '@/components/atoms/SettingsPlanGateLabel';
 import { cn } from '@/lib/utils';
+import {
+  getSettingsRowDataState,
+  getSettingsRowDescriptionClassName,
+  getSettingsRowIconClassName,
+  getSettingsRowTitleClassName,
+} from './settings-row-state';
 
 interface SettingsToggleRowBaseProps {
   readonly id?: string;
@@ -44,6 +50,12 @@ export function SettingsToggleRow(props: Readonly<SettingsToggleRowProps>) {
   const baseId = id ?? `settings-toggle-${reactId}`;
   const titleId = `${baseId}-title`;
   const descriptionId = description ? `${baseId}-description` : undefined;
+  const isGated = props.gated === true;
+  const isDisabled = isGated ? false : (props.disabled ?? false);
+  const rowState = getSettingsRowDataState({
+    disabled: isDisabled,
+    gated: isGated,
+  });
 
   return (
     <div
@@ -51,10 +63,17 @@ export function SettingsToggleRow(props: Readonly<SettingsToggleRowProps>) {
         'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 py-1.5 sm:gap-x-6',
         className
       )}
+      data-state={rowState}
+      aria-disabled={isDisabled || undefined}
     >
       <div className='flex min-w-0 items-start gap-3'>
         {icon ? (
-          <div className='mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token'>
+          <div
+            className={getSettingsRowIconClassName({
+              state: rowState,
+              className: 'mt-0.5',
+            })}
+          >
             {icon}
           </div>
         ) : null}
@@ -62,19 +81,16 @@ export function SettingsToggleRow(props: Readonly<SettingsToggleRowProps>) {
         <div className='min-w-0'>
           <h3
             id={titleId}
-            className={`text-app font-[540] tracking-tighter ${
-              props.gated ? 'text-tertiary-token' : 'text-primary-token'
-            }`}
+            className={getSettingsRowTitleClassName({ state: rowState })}
           >
             {title}
           </h3>
           {description ? (
             <p
               id={descriptionId}
-              className={cn(
-                'mt-1 text-xs leading-4',
-                props.gated ? 'text-quaternary-token' : 'text-secondary-token'
-              )}
+              className={getSettingsRowDescriptionClassName({
+                state: rowState,
+              })}
             >
               {description}
             </p>

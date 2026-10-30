@@ -5,7 +5,7 @@ import { evaluatePrSizePolicy } from './pr-size-guard-policy.mjs';
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const GENERATED_PR_TRAILER_PATTERN = /\(#(\d+)\)$/;
 // Fail closed at the checked-in native queue's max_entries_to_merge ceiling.
-const MAX_GROUP_MEMBERS = 10;
+const MAX_GROUP_MEMBERS = 5;
 const SIZE_BYPASS_LABELS = new Set(['big-pr', 'codemod']);
 const COLLABORATOR_ASSOCIATIONS = new Set(['COLLABORATOR', 'MEMBER', 'OWNER']);
 const OPINIONATED_REVIEW_STATES = new Set([

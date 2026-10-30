@@ -187,6 +187,21 @@ test('ordinary iOS UI changes select the design gate without Ubuntu operations',
   );
 });
 
+test('the hosted design lane executes the semantic-canvas guard', () => {
+  const packageJson = readJson('package.json');
+  const designTests = packageJson.scripts['design:conformance:test'];
+
+  assert.match(designTests, /app-screen-canvas-source-guard\.test\.ts/);
+  assert.match(designTests, /app-screen-canvas-manifest\.test\.ts/);
+  assert.match(designTests, /--config vitest\.config\.mts/);
+  assert.doesNotMatch(designTests, /vitest\.config\.minimal\.mts/);
+  assert.ok(LANE_GROUPS.remaining.includes('design-conformance'));
+  assert.equal(
+    LANE_COMMANDS['design-conformance'],
+    'pnpm design:conformance:gate'
+  );
+});
+
 test('Ubuntu operation paths remain disjoint from design selection', () => {
   const selected = selectDesignConformanceChecks([
     'scripts/backlog-orchestrator/admitter.mjs',

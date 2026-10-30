@@ -96,7 +96,7 @@ export function HomeLiveProofSection({
           <div className='max-w-[34rem]'>
             <h2
               id='homepage-live-proof-heading'
-              className='marketing-h2-linear text-primary-token'
+              className='marketing-h2-linear text-primary-token line-clamp-2'
             >
               {/* ui-casing-allow: marketing display headline */}
               See it live.

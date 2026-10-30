@@ -34,6 +34,12 @@ const ARBITRARY_TOKEN =
   /(?:^|[\s"'`])((?:[!a-z][\w-]*:)*!?[a-z][\w-]*-\[[^\]]+\]|\[[a-z-]+:[^\]]+\])/g;
 const STATE_UTILITY = /^(?:group-|peer-)?(?:data|aria)-\[/;
 const HAS_CSS_VAR = /var\(--|--[a-z]/;
+const STATE_CSS_VAR_UTILITY = /^!?(?:opacity)-\[var\(--state-[a-z0-9-]+\)\]$/;
+const RADIX_CSS_VAR_UTILITY =
+  /^!?(?:origin-\[--radix-[^\]]+\]|(?:h|min-h|max-h|w|min-w|max-w|size)-\[var\(--radix-[a-z0-9-]+\)\])$/;
+const CSS_PROPERTY_UTILITY = /^\[-?[a-z][\w-]*:[^\]]+\]$/;
+const VISUAL_ARBITRARY_UTILITY =
+  /^!?(?:(?:h|min-h|max-h|w|min-w|max-w|size|basis|z|shadow|tracking|leading|bg|text|opacity|scale|rotate|blur|backdrop-blur)-\[|(?:rounded|border|outline|ring|translate|skew|inset|m|p|gap|space)(?:-[a-z]+)?-\[)/;
 const TRANSITION_UTILITY = /^transition-\[/;
 const EMPTY_CONTENT = /^content-\[(?:""|'')]$/;
 
@@ -62,16 +68,48 @@ function isPositiveCount(value) {
   return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }
 
-export function classifySharedUiArbitraryToken(token) {
+function getTailwindUtility(token) {
   const normalized = token.replace(/^!/, '');
-  const parts = normalized.split(':');
-  const utility = parts[parts.length - 1] ?? '';
+  let depth = 0;
+  let utilityStart = 0;
+
+  for (let index = 0; index < normalized.length; index += 1) {
+    const character = normalized[index];
+    if (character === '[') {
+      depth += 1;
+      continue;
+    }
+    if (character === ']') {
+      depth = Math.max(0, depth - 1);
+      continue;
+    }
+    if (character === ':' && depth === 0) {
+      utilityStart = index + 1;
+    }
+  }
+
+  return {
+    normalized,
+    utility: normalized.slice(utilityStart),
+  };
+}
+
+export function classifySharedUiArbitraryToken(token) {
+  const { normalized, utility } = getTailwindUtility(token);
 
   if (STATE_UTILITY.test(utility) && !/\]:/.test(utility)) {
     return KINDS.STATE;
   }
   if (TRANSITION_UTILITY.test(utility)) return KINDS.TRANSITION;
   if (EMPTY_CONTENT.test(utility)) return KINDS.CONTENT;
+  if (CSS_PROPERTY_UTILITY.test(utility)) return KINDS.CSS_PROPERTY;
+  if (
+    STATE_CSS_VAR_UTILITY.test(utility) ||
+    RADIX_CSS_VAR_UTILITY.test(utility)
+  ) {
+    return KINDS.CSS_VAR;
+  }
+  if (VISUAL_ARBITRARY_UTILITY.test(utility)) return KINDS.VISUAL;
   if (HAS_CSS_VAR.test(utility) || HAS_CSS_VAR.test(normalized)) {
     return KINDS.CSS_VAR;
   }

@@ -81,6 +81,13 @@ vi.mock('next/image', () => ({
       'data-testid': 'next-image',
       ...props,
     }),
+  getImageProps: ({ src }: { readonly src: string }) => ({
+    props: {
+      src,
+      srcSet: src,
+      sizes: '100vw',
+    },
+  }),
 }));
 
 vi.mock('@headlessui/react', () => ({

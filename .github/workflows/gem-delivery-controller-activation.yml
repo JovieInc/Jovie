@@ -107,9 +107,7 @@ jobs:
           for unit in \
             symphony-ui-pilot.service \
             symphony-reconciler.service \
-            symphony-grok-sidecar.service \
             symphony-reconciler.timer \
-            symphony-grok-sidecar.timer \
             symphony-burrito.service \
             symphony-burrito-update.service \
             symphony-burrito-update.timer; do

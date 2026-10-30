@@ -1,16 +1,26 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/auth/AuthBrandPanel.test.tsx
 import Image from 'next/image';
 import { ProductScreenshotFrame } from '@/components/marketing/ProductScreenshotFrame';
 import { cn } from '@/lib/utils';
 
 interface AuthBrandPanelProps {
   readonly className?: string;
+  readonly headline?: string;
+  readonly description?: string;
+  readonly showText?: boolean;
 }
 
 const AUTH_BRAND_FRAME = 'dashboard-releases-sidebar-desktop';
+const DEFAULT_AUTH_BRAND_HEADLINE = 'Built For Artists.';
 
-export function AuthBrandPanel({ className }: Readonly<AuthBrandPanelProps>) {
+export function AuthBrandPanel({
+  className,
+  headline = DEFAULT_AUTH_BRAND_HEADLINE,
+  description,
+  showText = true,
+}: Readonly<AuthBrandPanelProps>) {
   return (
     <div
       data-testid='auth-brand-panel'
@@ -26,12 +36,24 @@ export function AuthBrandPanel({ className }: Readonly<AuthBrandPanelProps>) {
         className
       )}
     >
-      <AuthBrandFrame />
+      <AuthBrandFrame
+        headline={headline}
+        description={description}
+        showText={showText}
+      />
     </div>
   );
 }
 
-function AuthBrandFrame() {
+function AuthBrandFrame({
+  headline,
+  description,
+  showText,
+}: Readonly<{
+  headline: string;
+  description?: string;
+  showText: boolean;
+}>) {
   return (
     <section
       aria-label='Product Preview'
@@ -67,11 +89,18 @@ function AuthBrandFrame() {
       {/* Spacer pushes the headline + bars to the bottom of the card. */}
       <div className='relative min-h-0 flex-1' />
 
-      <div className='relative z-10 px-8 pb-4 sm:px-10'>
-        <h2 className='text-balance text-[clamp(1.5rem,2.6vw,2rem)] font-bold leading-[1.05] tracking-[-0.025em] text-(--color-text-tooltip)'>
-          Built For Artists.
-        </h2>
-      </div>
+      {showText ? (
+        <div className='relative z-10 px-8 pb-4 sm:px-10'>
+          <h2 className='text-balance text-[clamp(1.5rem,2.6vw,2rem)] font-bold leading-[1.05] tracking-[-0.025em] text-(--color-text-tooltip)'>
+            {headline}
+          </h2>
+          {description ? (
+            <p className='mt-3 max-w-96 text-pretty text-app leading-6 text-(--color-text-tooltip)/70'>
+              {description}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }

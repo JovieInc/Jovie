@@ -39,7 +39,7 @@ export function HomeSpecChapter() {
         <div className='mx-auto max-w-300'>
           <h2
             id='homepage-spec-heading'
-            className='homepage-philosophy-heading'
+            className='homepage-philosophy-heading line-clamp-2'
           >
             {HOME_PHILOSOPHY_CONTENT.sectionTitle}
           </h2>

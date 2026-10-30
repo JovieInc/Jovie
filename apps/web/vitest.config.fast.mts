@@ -26,6 +26,25 @@ const isCI = process.env.CI === 'true';
 const isChangedRun = process.argv.includes('--changed');
 const isCoverageRun = process.argv.includes('--coverage');
 
+// Vitest 4: the junit reporter's per-reporter outputFile OVERRIDES the CLI
+// --outputFile flag, so sharded CI runs (the workflow passes a shard-specific
+// --outputFile) all wrote the same default name that the artifact-upload glob
+// never matched — failing shards uploaded no junit at all (repo #17071).
+// Derive the shard path from argv the same way --changed is detected;
+// VITEST_JUNIT_OUTPUT_FILE remains an explicit override for other lanes.
+const shardArgv = (() => {
+  const eq = process.argv.find(a => a.startsWith('--shard='));
+  if (eq) return eq.slice('--shard='.length);
+  const i = process.argv.indexOf('--shard');
+  const next = i !== -1 ? process.argv[i + 1] : undefined;
+  return next && !next.startsWith('--') ? next : null;
+})();
+const junitOutputFile =
+  process.env.VITEST_JUNIT_OUTPUT_FILE ??
+  (isCI && shardArgv
+    ? `test-report.${shardArgv.replace(/\//g, '-')}.junit.xml`
+    : 'test-report.junit.xml');
+
 // Changed-suite runs can fan out many short-lived workers on parity branches,
 // which increases startup churn and causes timeout cascades under aggregate load.
 // Keep this mode deterministic by running in a single long-lived fork with
@@ -162,11 +181,13 @@ export default defineConfig({
     },
 
     // Reduce reporter overhead - basic was removed in vitest 4, use default with summary:false
-    // JUnit reporter in CI for Codecov Test Analytics ingestion
+    // JUnit reporter in CI for Codecov Test Analytics ingestion.
+    // Per-reporter outputFile wins over CLI --outputFile in Vitest 4, so the
+    // shard path is derived above (--shard argv / VITEST_JUNIT_OUTPUT_FILE).
     reporters: isCI
       ? [
           ['default', { summary: false }],
-          ['junit', { outputFile: 'test-report.junit.xml' }],
+          ['junit', { outputFile: junitOutputFile }],
         ]
       : ['default'],
 

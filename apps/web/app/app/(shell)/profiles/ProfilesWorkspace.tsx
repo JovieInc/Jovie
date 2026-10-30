@@ -958,6 +958,7 @@ function SuggestedConnectionRow({
           className='w-full whitespace-nowrap sm:w-auto'
           onClick={() => onAction(suggestion, 'reject')}
         >
+          {/* ui-casing-allow: canonical sentence-case identity-rejection label, pinned by ProfilesWorkspace.test */}
           <CircleX className='h-3.5 w-3.5' aria-hidden /> Not me
         </Button>
       </div>
@@ -1079,7 +1080,10 @@ export function ProfilesWorkspace({
       fetchConnectionSuggestions(profileId ?? '', signal),
     enabled: Boolean(profileId),
   });
-  const connectionSuggestions = connectionSuggestionsQuery.data ?? [];
+  const connectionSuggestions = useMemo(
+    () => connectionSuggestionsQuery.data ?? [],
+    [connectionSuggestionsQuery.data]
+  );
   const suggestedGroups = useMemo(
     () => groupConnectionSuggestions(connectionSuggestions),
     [connectionSuggestions]

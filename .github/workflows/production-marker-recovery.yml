@@ -11,6 +11,10 @@ on:
   # workflow never redeploys, never mutates aliases, and never rolls back: it
   # re-proves the already-deployed generation and preserves the marker only
   # while canonical production still owns it.
+  # controller-hop-exception: jovie-controller-hop/v1
+  # accountable-writer: Shipping-Control
+  # necessary-trust-boundary: Expired-marker stub deletion runs only inside the bounded recovery job after exact promotion, Sentry-gate, and skipped-rollback evidence; it removes only expired same-name artifact stubs and never mutates release state.
+  # revisit-trigger: Revisit when the marker store gains atomic replace semantics so a re-proof upload cannot duplicate a marker name.
   workflow_run:
     workflows: [Production Controller]
     types: [completed]
@@ -142,14 +146,17 @@ jobs:
             exit 1
           fi
 
-          # Recovery never overwrites durable truth: no verified marker for
-          # this exact generation may already exist.
+          # Recovery never overwrites durable truth: no live verified marker
+          # for this exact generation may already exist. An expired marker
+          # holds no downloadable bytes and fails classification as
+          # expired_marker; counting it here would deadlock the generation,
+          # so only non-expired artifacts block recovery.
           for marker_name in \
             "production-generation-verified-$EXPECTED_SHA" \
             "production-generation-verified-recovery-$EXPECTED_SHA"; do
             existing="$(gh api \
               "repos/$REPO/actions/artifacts?name=$marker_name&per_page=100" \
-              --jq '.total_count')"
+              --jq '[.artifacts[] | select(.expired == false)] | length')"
             if [ "$existing" != "0" ]; then
               if [ "$REQUEST_MODE" = "workflow_run" ]; then
                 echo "fleet_refresh_required=true" >> "$GITHUB_OUTPUT"
@@ -292,17 +299,34 @@ jobs:
           echo "marker_upload_required=false" >> "$GITHUB_OUTPUT"
           # Re-read durable truth at the write boundary. The original
           # controller upload may become visible while the bounded probes run;
-          # never create a duplicate marker name in that race.
+          # never create a duplicate marker name in that race. Only live
+          # (non-expired) markers count as durable truth.
           for marker_name in \
             "production-generation-verified-$EXPECTED_SHA" \
             "production-generation-verified-recovery-$EXPECTED_SHA"; do
             existing="$(gh api \
               "repos/$REPO/actions/artifacts?name=$marker_name&per_page=100" \
-              --jq '.total_count')"
+              --jq '[.artifacts[] | select(.expired == false)] | length')"
             if [ "$existing" != "0" ]; then
               echo "::notice::Verified marker became durable during recovery; upload is neutral."
               exit 0
             fi
+          done
+          # The classifier refuses duplicate marker names, and expired
+          # artifacts remain listed until GitHub deletes them. Remove expired
+          # same-name stubs so the recovered marker is the only artifact of
+          # its name. Expired artifacts have no downloadable bytes, so this
+          # destroys no evidence.
+          for marker_name in \
+            "production-generation-verified-$EXPECTED_SHA" \
+            "production-generation-verified-recovery-$EXPECTED_SHA"; do
+            expired_ids="$(gh api \
+              "repos/$REPO/actions/artifacts?name=$marker_name&per_page=100" \
+              --jq '[.artifacts[] | select(.expired == true) | .id] | .[]')"
+            for artifact_id in $expired_ids; do
+              gh api -X DELETE "repos/$REPO/actions/artifacts/$artifact_id" >/dev/null
+              echo "::notice::Deleted expired marker artifact $artifact_id ($marker_name) before re-proof upload."
+            done
           done
           # Write-through: the payload is produced and uploaded only after
           # every recovery gate above proved exact evidence, and the payload

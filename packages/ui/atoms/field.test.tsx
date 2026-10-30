@@ -115,8 +115,30 @@ describe('Field', () => {
       const error = screen.getByText('Invalid email address');
       expect(error).toBeInTheDocument();
       expect(error).toHaveAttribute('role', 'alert');
-      expect(error).toHaveAttribute('aria-live', 'polite');
-      expect(error).toHaveAttribute('aria-atomic', 'true');
+      expect(error).not.toHaveAttribute('aria-live');
+      expect(error).not.toHaveAttribute('aria-atomic');
+    });
+
+    it('reserves the feedback slot before an error appears', () => {
+      const { container, rerender } = render(
+        <Field label='Email'>
+          <Input />
+        </Field>
+      );
+
+      const feedbackSlot = container.querySelector(
+        '[data-slot="field-feedback"]'
+      );
+      expect(feedbackSlot).toHaveClass('min-h-5');
+      expect(feedbackSlot).toBeEmptyDOMElement();
+
+      rerender(
+        <Field label='Email' error='Invalid email'>
+          <Input />
+        </Field>
+      );
+
+      expect(feedbackSlot).toContainElement(screen.getByRole('alert'));
     });
 
     it('sets aria-invalid on input when error is present', () => {
@@ -212,14 +234,16 @@ describe('Field', () => {
       );
     });
 
-    it('error message has aria-live for dynamic updates', () => {
+    it('uses the alert role without duplicate live-region attributes', () => {
       render(
         <Field error='Error message'>
           <Input />
         </Field>
       );
       const error = screen.getByText('Error message');
-      expect(error).toHaveAttribute('aria-live', 'polite');
+      expect(error).toHaveAttribute('role', 'alert');
+      expect(error).not.toHaveAttribute('aria-live');
+      expect(error).not.toHaveAttribute('aria-atomic');
     });
 
     it('combines description and error in aria-describedby', () => {

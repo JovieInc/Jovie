@@ -96,9 +96,14 @@ Source: `apps/web/app/api/cron/frequent/route.ts`
 | 2 | cleanupKeys | Every day | Deletes expired `dashboardIdempotencyKeys` |
 | 3 | billingReconciliation | Every day | Reconciles DB subscription status with Stripe; fixes mismatches |
 | 4 | cleanupSmsIntents | Every day | Marks expired SMS subscribe intents, hard-deletes rows >24h old (folded from standalone cron per JOV-1901) |
-|| 5 | aiCrawlerAnalytics | Every day | Syncs Cloudflare zone AI-crawl analytics into `ai_crawler_analytics_snapshots` per artist profile (skips when CF GraphQL not configured) |
-|| 6 | onboardingScriptAggregation | Every day | Onboarding deterministic-script self-improvement (JOV-3806): recomputes per-line conversion counters, mines lint-clean LLM candidates, promotes/retires variants |
-|| 7 | dataRetention | **Sundays only** | Heavy: purges old analytics, click events, audience members, pixel events, webhook events, audit logs, chat messages, ingestion jobs per retention policy |
+| 5 | waitlistAutoAccept | Every day | Auto-accepts bounded waitlist capacity when the admin setting enables it |
+| 6 | profileSearchMonitoring | Every day | Runs profile-search monitoring inside a bounded 90-second sub-budget |
+| 7 | discographyReEnrich | Every day | Sweeps a bounded batch of under-enriched discographies |
+| 8 | onboardingScriptAggregation | Every day | Recomputes onboarding conversion counters, mines lint-clean candidates, and promotes or retires variants |
+| 9 | aiCrawlerAnalytics | Every day | Syncs Cloudflare zone AI-crawl analytics into `ai_crawler_analytics_snapshots` per artist profile when configured |
+| 10 | releaseOutcomeReconciliation | Every day | Reconciles bounded release-workflow outcome snapshots and fails visibly on partial errors |
+| 11 | founderReviewUploadLeases | Every day | Deletes expired private founder-review uploads that never bound to a receipt; quarantines and reports cleanup failures |
+| 12 | dataRetention | **Sundays only** | Heavy: purges old analytics, click events, audience members, pixel events, webhook events, audit logs, chat messages, ingestion jobs per retention policy |
 
 > **Note:** `scheduleNotifications` was previously listed here but has been called directly from `/api/cron/frequent` for sub-hourly scheduling. It is NOT a daily-maintenance sub-job. See AUTOMATION_AUDIT.md for rationale.
 

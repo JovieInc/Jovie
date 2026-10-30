@@ -56,8 +56,9 @@ interface TooltipContentProps
   extends React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content> {
   /**
    * `compact` is reserved for an author-confirmed, single-line label. It keeps
-   * the tooltip on one line and applies the compact pill shape. `rich` is the
-   * default for any content that may wrap or contain structured children.
+   * the tooltip on one line. Both variants use the shared rounded-rectangle
+   * surface; `rich` is the default for content that may wrap or contain
+   * structured children.
    */
   readonly contentVariant?: 'compact' | 'rich';
   /**
@@ -73,7 +74,7 @@ interface TooltipContentProps
 
 /**
  * Tooltip content with tokenized surface styling.
- * z-[150] to sit above shell chrome, right rails, popovers, and drawers.
+ * z-tooltip to sit above shell chrome, right rails, popovers, and drawers.
  * Collision-safe by default: avoidCollisions + collisionPadding (8px) keep the
  * content fully inside the viewport for far-edge triggers (e.g. header rail
  * toggle at the far right) while flipping/shifting as needed.
@@ -106,15 +107,15 @@ const TooltipContent = React.forwardRef<
         collisionPadding={collisionPadding}
         data-testid={testId}
         className={cn(
-          // Every overlay shares the same tokenized surface. The content
-          // contract, not runtime line measurement, chooses the shape: a
-          // compact label is provably one line; all other content is a shared
-          // rounded rectangle that may wrap without clipping.
-          'z-[150] px-2 py-1 text-xs font-normal tracking-tight',
+          // Every overlay shares the same tokenized rounded rectangle. The
+          // content contract only controls wrapping; compact labels are
+          // provably one line while rich content may wrap without clipping.
+          'z-tooltip px-2 py-1 text-xs font-normal tracking-tight',
           TOOLTIP_SURFACE_BASE,
+          OVERLAY_CONTENT_RADIUS,
           contentVariant === 'compact'
-            ? 'rounded-full whitespace-nowrap'
-            : `${OVERLAY_CONTENT_RADIUS} max-w-56 break-words`,
+            ? 'whitespace-nowrap'
+            : 'max-w-56 break-words',
           // Pure opacity reveal (fade only) — subtract decorative zoom + slide-ins.
           // Matches parallel support work on shell Tooltip / Dsp for visual parity.
           // No layout shift; cursor-near friendly.

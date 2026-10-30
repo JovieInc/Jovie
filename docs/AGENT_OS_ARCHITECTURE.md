@@ -1,5 +1,7 @@
 # AgentOS Architecture
 
+> **Retirement notice (2026-09-02):** Hermes and Trigger.dev are retired Jovie tooling. The v1 design below is historical and is not an active deployment or fallback plan. See [`docs/operations/SUMMER_RUNTIME_RETIREMENT.md`](./operations/SUMMER_RUNTIME_RETIREMENT.md).
+
 > Issue: JOV-1922
 > Status: Accepted for v1 internal proof
 > Date: 2026-05-08

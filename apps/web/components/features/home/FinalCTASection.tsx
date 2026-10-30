@@ -28,7 +28,7 @@ export function FinalCTASection() {
         <div className='reveal-on-scroll relative mx-auto max-w-[36rem] text-center'>
           <h2
             data-testid='final-cta-headline'
-            className='marketing-h2-linear text-primary-token'
+            className='marketing-h2-linear text-primary-token line-clamp-2'
           >
             {/* ui-casing-allow: marketing sentence-style headline */}
             Claim your handle.

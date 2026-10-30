@@ -139,7 +139,7 @@ Profile is historical ledger drift, not a reason to change the current code.
 | --- | --- | --- | --- |
 | Atom | `JovieColor`, `JovieFont`, `JovieSpacing`, `JovieRadius`, `JovieMotion` | All native iOS product surfaces | Extend this token owner only after prior-art review; do not create feature-local colors, fonts, or spacing registries. `JovieTheme.swift:L4-L122`. |
 | Atom | `JoviePillButtonStyle` | Dashboard, auth, onboarding, audience, calendar, inbox, library, entity, Talk | Canonical full-width pill action in `JovieTheme.swift`. |
-| Atom | `JovieIconButtonStyle` | Shell gear, settings close, chat scroll-to-bottom | Canonical 44-point circular icon target in `JovieTheme.swift`. |
+| Atom | `JovieIconButtonStyle` | Shell gear, settings close, chat scroll-to-bottom, Library control hit frames | Canonical 44-point circular icon target in `JovieTheme.swift`. |
 | Atom | `JovieLogoMark` and QR plate modifier | Splash, auth, QR surfaces | Logo and QR plate are shared source owners; `JovieTheme.swift:L124-L180,L244-L256`. |
 | Atom | `EntityAccent` | Inline chat entity chips | Only for entity-kind parity; do not reuse as generic iOS accents; `JovieTheme.swift:L26-L53`. |
 | Atom | `JoviePressFeedbackButtonStyle` | AppShell tab bar, drawer rows, and Settings rows | Canonical owner for the opacity/scale/subtle recipe in `JovieTheme.swift`; Settings preserves `.7` through the style parameter, verified by `AppShellTabBarTests.swift`. |

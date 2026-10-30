@@ -4,8 +4,9 @@
 # Report mode is read-only; release mode removes the label from an
 # already-ready PR so native autoenrollment revalidates and owns queue admission.
 # Untyped holds (missing receipt) on a ready green PR are lifted — they are
-# not a permanent manual trap. Human-policy holds (taste, net-new, outbound)
-# stay held. Mutations are re-read and compensated.
+# not a permanent manual trap. Stale typed receipts missing repository scope
+# stay held. Human-policy holds (taste, net-new, outbound) stay held.
+# Mutations are re-read and compensated.
 #
 # Env:
 #   REPO                     target repo (default JovieInc/Jovie)
@@ -128,7 +129,9 @@ queue_pressure_allows_release() {  # queue_pressure_allows_release <candidate-pr
   echo "    ✓ queue pressure relieved (${ready_count} ready, threshold ${threshold})"
 }
 
-# Latest valid typed deferral receipt for a PR. Empty output = untyped hold.
+# Latest typed deferral receipt for a PR. Empty output = untyped hold.
+# A typed JSON receipt that fails schema validation is returned as an invalid
+# sentinel by the Node reader so stale unscoped receipts fail closed.
 deferral_receipt_for_pr() {  # deferral_receipt_for_pr <num>
   local raw body
   raw="$(gh_retry api "repos/${REPO}/issues/${1}/comments" --paginate --slurp \
@@ -314,8 +317,19 @@ if [[ "$RELEASE_MODE" == "release" || "$RELEASE_MODE" == "both" ]]; then
       snapshot_labels="$(jq -r '.L | join(",")' <<<"$pr")"
       receipt="$(deferral_receipt_for_pr "$n")"
       if [[ -n "$receipt" ]]; then
+        receipt_invalid="$(jq -r '.invalid // false' <<<"$receipt")"
+        receipt_repo="$(jq -r '.repository // ""' <<<"$receipt")"
+        if [[ "$receipt_invalid" == "true" ]]; then
+          echo "    ~ deferral receipt is invalid for repository-scoped queue release; leaving hold"
+        elif [[ "$receipt_repo" != "$REPO" ]]; then
+          echo "    ~ deferral-receipt-repository-mismatch (receipt=${receipt_repo:-missing}, live=${REPO}); leaving hold"
+          receipt='{"schema":"jovie-queue-deferral/v1","invalid":true,"errors":["repository mismatch"]}'
+          receipt_invalid="true"
+        fi
+      fi
+      if [[ -n "$receipt" ]]; then
         receipt_pr="$(jq -r '.pr' <<<"$receipt")"
-        if [[ "$receipt_pr" != "$n" ]]; then
+        if [[ "$receipt_invalid" != "true" && "$receipt_pr" != "$n" ]]; then
           echo "    ~ deferral-receipt-pr-mismatch (receipt=#${receipt_pr}, live=#${n}); treating as untyped ready hold"
           receipt=""
         fi
@@ -381,7 +395,7 @@ if [[ "$RELEASE_MODE" == "release" || "$RELEASE_MODE" == "both" ]]; then
       # enrollment authority.
       if [[ "$DRY_RUN" != "1" ]]; then
         release_receipt="$(node "$RELEASE_ADMISSION_LIB" render \
-          --pr "$n" --head "$expected_head" \
+          --repository "$REPO" --pr "$n" --head "$expected_head" \
           --mode "$release_admission_mode" \
           --reason "$reason" \
           --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" 2>/dev/null)" || {

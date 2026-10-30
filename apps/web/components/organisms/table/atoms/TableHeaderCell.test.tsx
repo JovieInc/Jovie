@@ -50,6 +50,11 @@ describe('TableHeaderCell', () => {
     expect(th.className).toMatch(/text-right/);
   });
 
+  it('keeps column heading cells bounded to one line', () => {
+    renderInTable(<TableHeaderCell>Title</TableHeaderCell>);
+    expect(screen.getByRole('columnheader')).toHaveClass('whitespace-nowrap');
+  });
+
   it('applies center alignment class', () => {
     renderInTable(<TableHeaderCell align='center'>Status</TableHeaderCell>);
     expect(screen.getByRole('columnheader').className).toMatch(/text-center/);

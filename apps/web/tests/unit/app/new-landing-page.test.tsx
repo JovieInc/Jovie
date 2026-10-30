@@ -23,7 +23,10 @@ vi.mock('@/components/marketing/homepage-v2/HomepageV2Route', () => ({
   HomepageV2Route: () => (
     <main data-testid='homepage-v2-route'>
       <h1>Make every release feel bigger.</h1>
-      <Link data-testid='homepage-v2-hero-primary-cta' href='/start'>
+      <Link
+        data-testid='homepage-v2-hero-primary-cta'
+        href='https://jov.ie/waitlist'
+      >
         Get started
       </Link>
       <Link href='/artist-profiles'>Explore artist profiles</Link>
@@ -72,6 +75,8 @@ describe('NewLandingPage', () => {
       '/pricing'
     );
     expect(screen.queryByRole('link', { name: 'Contact' })).toBeNull();
+    // Header utility CTA stays on the /start front door; the waitlist-first
+    // contract applies to owned hero/final CTAs, not the shared nav utilities.
     expect(screen.getByRole('link', { name: 'Find yourself' })).toHaveAttribute(
       'href',
       '/start'
@@ -87,7 +92,7 @@ describe('NewLandingPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByTestId('homepage-v2-hero-primary-cta')).toHaveAttribute(
       'href',
-      '/start'
+      'https://jov.ie/waitlist'
     );
     expect(
       screen.getByRole('link', { name: 'Explore artist profiles' })
