@@ -47,11 +47,11 @@ const baseDashboardData: DashboardData = {
         href: '/app/settings/profile',
       },
       {
-        id: 'email',
-        label: 'Add your account email',
+        id: 'handle',
+        label: 'Claim your handle',
         description:
-          'Email keeps your account recoverable and mission-critical.',
-        href: '/app/dashboard/earnings',
+          'Your jov.ie handle is how fans find and share your profile.',
+        href: '/app/settings/profile',
       },
     ],
     profileIsLive: false,
@@ -72,7 +72,7 @@ describe('ProfileCompletionCard', () => {
 
     expect(getByText('Your profile is not live yet')).toBeDefined();
     expect(getByText('Add a profile photo')).toBeDefined();
-    expect(getByText('Add your account email')).toBeDefined();
+    expect(getByText('Claim your handle')).toBeDefined();
   });
 
   it('does not crash when profileCompletion is missing', () => {

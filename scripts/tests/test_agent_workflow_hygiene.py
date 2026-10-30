@@ -1185,7 +1185,7 @@ def test_product_screenshot_budget_covers_capture_and_publication() -> None:
         "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
         "CLERK_SECRET_KEY",
         "NEXT_DISABLE_TOOLBAR",
-        "NEXT_PUBLIC_CLERK_PROXY_DISABLED",
+        "NEXT_PUBLIC_AUTH_PROXY_DISABLED",
         "E2E_USE_TEST_AUTH_BYPASS",
         "E2E_CLERK_USER_ID",
     ):

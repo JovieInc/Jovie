@@ -29,6 +29,11 @@ import {
 import { track } from '@/lib/analytics';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
+export interface MarketingHeaderChromeNav {
+  readonly primary: readonly MarketingNavLink[];
+  readonly customers: readonly MarketingNavLink[];
+}
+
 export type MarketingHeaderVariant = 'landing' | 'minimal' | 'homepage';
 export interface MarketingHeaderNavLink extends MarketingNavLink {
   readonly treatment?: 'wordmark' | 'leading';
@@ -93,6 +98,11 @@ export interface MarketingHeaderProps
     readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
     readonly logoVariant?: LogoVariant;
     readonly navLinks?: readonly MarketingHeaderNavLink[];
+    /**
+     * Published site-chrome nav (content record `site-chrome/main`). Replaces
+     * the code-default header links and Customers flyout when present.
+     */
+    readonly chromeNav?: MarketingHeaderChromeNav;
     readonly primaryCta?: MarketingHeaderCta;
     readonly showHomepageCenterNav?: boolean;
     readonly variant?: MarketingHeaderVariant;
@@ -108,7 +118,8 @@ function resolveNavConfig(
   hasSimpleNav: boolean,
   centerNavDisabled: boolean,
   simpleNavLinks: readonly MarketingHeaderNavLink[],
-  iconOnly: boolean
+  iconOnly: boolean,
+  chromeNav?: MarketingHeaderChromeNav
 ): ResolvedNavConfig {
   if (hasSimpleNav) {
     return {
@@ -120,6 +131,31 @@ function resolveNavConfig(
   if (centerNavDisabled) {
     return { flyoutMenus: undefined, mobileNavLinks: [], desktopNavLinks: [] };
   }
+  if (chromeNav) {
+    const primary = plainLinks(chromeNav.primary);
+    const desktop: readonly MarketingHeaderNavLink[] = [
+      ...(iconOnly
+        ? []
+        : [
+            {
+              href: APP_ROUTES.HOME,
+              label: 'Jovie',
+              treatment: 'wordmark' as const,
+            },
+          ]),
+      ...primary,
+    ];
+    return {
+      flyoutMenus: [
+        {
+          ...MARKETING_CUSTOMERS_FLYOUT,
+          links: plainLinks(chromeNav.customers),
+        },
+      ],
+      mobileNavLinks: primary,
+      desktopNavLinks: desktop,
+    };
+  }
   return {
     flyoutMenus: MARKETING_GLASS_FLYOUT_MENUS,
     mobileNavLinks: MARKETING_GLASS_MOBILE_LINKS,
@@ -129,11 +165,18 @@ function resolveNavConfig(
   };
 }
 
+function plainLinks(
+  links: readonly MarketingNavLink[]
+): readonly MarketingNavLink[] {
+  return links.map(({ href, label }) => ({ href, label }));
+}
+
 export function MarketingHeader({
   brand,
   logoSize = 'xs',
   logoVariant = 'word',
   navLinks,
+  chromeNav,
   primaryCta,
   showHomepageCenterNav = true,
   variant = 'landing',
@@ -145,7 +188,8 @@ export function MarketingHeader({
       CANONICAL_PUBLIC_SHELL_CONTEXT
     );
   }, []);
-  const resolvedNavLinks = navLinks ?? MARKETING_NAV_LINKS;
+  const resolvedNavLinks =
+    navLinks ?? chromeNav?.primary ?? MARKETING_NAV_LINKS;
   const isMinimal = variant === 'minimal';
   const isHomepage = variant === 'homepage';
   const isArtistProfiles =
@@ -189,7 +233,8 @@ export function MarketingHeader({
     hasSimpleNav,
     centerNavDisabled,
     resolvedNavLinks,
-    iconOnly
+    iconOnly,
+    chromeNav
   );
   const resolvedPrimaryCta =
     primaryCta ?? resolveMarketingHeaderPrimaryCta(pathname);
