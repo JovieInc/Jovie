@@ -129,9 +129,12 @@ test('n/a declines; malformed section errors; absent is silent', () => {
 function ingestWorkflow(mode) {
   const root = resolve(import.meta.dirname, '../../..');
   const dir = mkdtempSync(join(tmpdir(), 'wins-workflow-'));
-  const workflow = load(
-    readFileSync(join(root, '.github/workflows/wins-ledger.yml'), 'utf8')
-  );
+  const workflow =
+    /** @type {{ jobs: { ingest: { steps: { name: string, run?: string }[] } } }} */ (
+      load(
+        readFileSync(join(root, '.github/workflows/wins-ledger.yml'), 'utf8')
+      )
+    );
   const env = {
     PATH: `${dir}/bin:${process.env.PATH}`,
     NODE_OPTIONS: '--v8-pool-size=1',
