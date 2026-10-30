@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Jovie — Cursor Agent Rules (thin pointer)
 
-**Canonical instructions live in [`AGENTS.md`](../../AGENTS.md) (→ `CLAUDE.md`).**
+**Canonical instructions live in [`AGENTS.md`](../../AGENTS.md) (`CLAUDE.md` is a symlink to it).**
 Read it, then the scoped rule for your topic in `.claude/rules/*`.
 
 Corrections to guidance that previously lived in this file (it was severely

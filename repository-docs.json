@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repository": "JovieInc/Jovie",
-  "entrypoints": ["README.md", "CLAUDE.md", "docs/DOCUMENTATION.md"],
+  "entrypoints": ["README.md", "AGENTS.md", "docs/DOCUMENTATION.md"],
   "sources": [
     {
       "path": ".nvmrc",
