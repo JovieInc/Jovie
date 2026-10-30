@@ -1,3 +1,4 @@
+import { frameScreenAspect } from './product-shot-rules.mjs';
 import productShotManifest from './product-shots.manifest.json';
 import type { ScreenshotTheme, ScreenshotViewport } from './types';
 
@@ -33,6 +34,12 @@ export interface ProductShotSpec {
   readonly alt: string;
   readonly route: string;
   readonly viewport: ScreenshotViewport;
+  /**
+   * Capture viewport height override (CSS px) for a moment that sits below
+   * the registry viewport's fold in a fixed-height demo shell; the crop is
+   * clamped to the page, so a tall screen needs a tall page.
+   */
+  readonly viewportHeight?: number;
   readonly theme: ScreenshotTheme;
   readonly waitFor: string;
   /**
@@ -57,6 +64,11 @@ export interface ProductShotSpec {
   /** Clip the crop height in CSS px (keeps tall lists to one moment). */
   readonly maxHeight?: number;
   readonly frame: ProductShotFrame;
+  /**
+   * The shot is one whole device screen (frames with a defined screen only,
+   * see product-shot-rules.mjs). Exempts it from the crop-share rule.
+   */
+  readonly fullScreen?: boolean;
   /** Largest CSS width the shot renders at on a marketing page. */
   readonly displayWidth: number;
   /** Repo-relative files whose change makes this shot stale. */
@@ -144,16 +156,22 @@ export const PRODUCT_SHOTS = [
     id: 'setup-share-profile',
     title: 'Share your profile',
     alt: "The share sheet on Tim White's Jovie profile: Copy Link, Instagram Story, X, Threads and Email.",
-    route: '/demo/showcase/tim-white-profile?state=share',
+    route: '/demo/showcase/tim-white-profile?state=share&frame=compact',
     viewport: 'desktop',
     theme: 'dark',
     waitFor: '[data-testid="profile-menu-drawer"]',
-    crop: ['[data-testid="profile-menu-drawer"]'],
-    frame: 'bare',
-    displayWidth: 382,
+    // The whole phone screen (share sheet over the profile), not the sheet:
+    // it fills the phone frame exactly (rules in product-shot-rules.mjs).
+    crop: ['[data-testid="drawer-phone-screen"]'],
+    viewportHeight: 1100,
+    frame: 'phone',
+    fullScreen: true,
+    displayWidth: 326,
     sources: [
+      'apps/web/components/marketing/device/DeviceScreen.css',
       `${DEMO}/DemoTimWhiteProfileSurface.tsx`,
       `${PROFILE}/ProfileUnifiedDrawer.tsx`,
+      `${PROFILE}/ProfileDrawerShell.tsx`,
       'apps/web/components/features/share/PublicShareMenu.tsx',
       'apps/web/components/features/home/homepage-profile-preview-fixture.ts',
     ],
@@ -194,6 +212,16 @@ interface ProductShotManifestEntry {
   readonly renderedAt: string;
   readonly sources: readonly string[];
   readonly bytes: { readonly avif: number; readonly webp: number };
+  readonly frame: ProductShotFrame;
+  readonly fullScreen: boolean;
+  readonly displayWidth: number;
+  readonly capture: {
+    readonly cssWidth: number;
+    readonly cssHeight: number;
+    readonly viewportWidth: number;
+    readonly viewportHeight: number;
+  };
+  readonly minTextPx: number | null;
 }
 
 interface ProductShotManifest {
@@ -207,6 +235,8 @@ export interface ProductShotImage {
   readonly id: ProductShotId;
   readonly alt: string;
   readonly frame: ProductShotFrame;
+  /** width / height of the frame's screen; null for frames without one. */
+  readonly screenAspect: number | null;
   readonly avif: string;
   readonly webp: string;
   /** CSS px at `displayWidth`; intrinsic pixels are `PRODUCT_SHOT_DPR`x. */
@@ -244,6 +274,7 @@ export function getProductShot(id: ProductShotId): ProductShotImage {
     id,
     alt: spec.alt,
     frame: spec.frame,
+    screenAspect: frameScreenAspect(spec.frame),
     ...resolveRendered(id, entry),
     mobile: spec.mobile ? resolveMobile(id) : null,
   };

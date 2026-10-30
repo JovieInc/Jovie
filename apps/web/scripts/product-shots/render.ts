@@ -23,6 +23,7 @@ import {
 } from '../../lib/screenshots/product-shots';
 import { SCREENSHOT_VIEWPORTS } from '../../lib/screenshots/registry';
 import {
+  checkShotGeometry,
   expandVariants,
   oversizedFormats,
   type PageBox,
@@ -80,6 +81,64 @@ async function cropBox(page: Page, spec: ProductShotSpec) {
   return unionClip(boxes, pageSize, spec.padding ?? 0, spec.maxHeight);
 }
 
+function captureViewport(spec: ProductShotSpec) {
+  const base = SCREENSHOT_VIEWPORTS[spec.viewport];
+  return { ...base, height: spec.viewportHeight ?? base.height };
+}
+
+type Clip = ReturnType<typeof unionClip>;
+
+/**
+ * Smallest visible text font-size (computed CSS px) inside the crop. Skips
+ * aria-hidden and decorative subtrees, hidden elements, and text outside the
+ * clip. Null when the crop shows no text.
+ */
+async function measureMinTextPx(
+  page: Page,
+  clip: Clip
+): Promise<number | null> {
+  return page.evaluate(area => {
+    let min: number | null = null;
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT
+    );
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (!node.nodeValue?.trim()) continue;
+      const element = node.parentElement;
+      if (
+        !element ||
+        element.closest(
+          '[aria-hidden="true"],[role="presentation"],script,style,nextjs-portal,[data-sonner-toaster]'
+        )
+      )
+        continue;
+      const style = getComputedStyle(element);
+      if (
+        style.display === 'none' ||
+        style.visibility === 'hidden' ||
+        Number(style.opacity) === 0
+      )
+        continue;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const rect = range.getBoundingClientRect();
+      if (rect.width < 1 || rect.height < 1) continue;
+      const left = rect.left + scrollX;
+      const top = rect.top + scrollY;
+      const inside =
+        left < area.x + area.width &&
+        left + rect.width > area.x &&
+        top < area.y + area.height &&
+        top + rect.height > area.y;
+      if (!inside) continue;
+      const size = Number.parseFloat(style.fontSize);
+      if (Number.isFinite(size) && (min === null || size < min)) min = size;
+    }
+    return min;
+  }, clip);
+}
+
 async function renderShot(page: Page, baseUrl: string, spec: ProductShotSpec) {
   if (spec.fixedNow) await page.clock.setFixedTime(new Date(spec.fixedNow));
   await page.goto(new URL(spec.route, baseUrl).toString(), {
@@ -111,6 +170,8 @@ async function renderShot(page: Page, baseUrl: string, spec: ProductShotSpec) {
       ':focus,:focus-visible{outline:none!important;box-shadow:none!important;--tw-ring-shadow:0 0 #0000!important;--tw-ring-offset-shadow:0 0 #0000!important}',
   });
   const clip = await cropBox(page, spec);
+  const minTextPx = await measureMinTextPx(page, clip);
+  const viewport = captureViewport(spec);
   const png = await page.screenshot({
     clip,
     fullPage: true,
@@ -138,7 +199,7 @@ async function renderShot(page: Page, baseUrl: string, spec: ProductShotSpec) {
   };
   const oversized = oversizedFormats(spec.id, bytes);
   if (oversized.length > 0) throw new Error(oversized.join('; '));
-  return {
+  const entry = {
     width: info.width,
     height: info.height,
     sourceHash: hashShotSources(REPO_ROOT, spec.sources),
@@ -146,7 +207,20 @@ async function renderShot(page: Page, baseUrl: string, spec: ProductShotSpec) {
     renderedAt: new Date().toISOString(),
     sources: [...spec.sources],
     bytes,
+    frame: spec.frame,
+    fullScreen: spec.fullScreen ?? false,
+    displayWidth: spec.displayWidth,
+    capture: {
+      cssWidth: clip.width,
+      cssHeight: clip.height,
+      viewportWidth: viewport.width,
+      viewportHeight: viewport.height,
+    },
+    minTextPx,
   } satisfies ManifestEntry;
+  const violations = checkShotGeometry(spec.id, entry);
+  if (violations.length > 0) throw new Error(violations.join('; '));
+  return entry;
 }
 
 async function main() {
@@ -168,7 +242,7 @@ async function main() {
   try {
     for (const spec of shots.flatMap(expandVariants)) {
       const context = await browser.newContext({
-        viewport: SCREENSHOT_VIEWPORTS[spec.viewport],
+        viewport: captureViewport(spec),
         deviceScaleFactor: PRODUCT_SHOT_DPR,
         colorScheme: spec.theme === 'dark' ? 'dark' : 'light',
         reducedMotion: 'reduce',

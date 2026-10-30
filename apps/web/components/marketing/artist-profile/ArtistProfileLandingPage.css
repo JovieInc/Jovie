@@ -132,9 +132,11 @@
 }
 
 /* How it works: three registry shots (lib/screenshots/product-shots.ts),
-   each already cropped to its moment and staged in a matte card. Claim gets
-   the full row so the handle reads near 1:1; at 80rem and up Connect and
-   Share share the second row at equal heights (staged cards stretch). */
+   each already cropped to its moment and staged in a matte card. Below 80rem
+   they stack, each at its natural width. At 80rem and up Claim and Connect
+   stack in the left column and Share, a whole phone screen, spans both rows
+   in a column sized to the phone (326px + padding) so it is never shrunk;
+   staged cards stretch, so the column edges align at equal heights. */
 .ap-how-it-works__shots {
   display: grid;
   gap: var(--space-4);
@@ -149,15 +151,25 @@
   flex: 1;
 }
 
-/* Two columns only where Connect keeps about 0.7x scale; below that the
-   cards stack and each reads larger. */
 @media (min-width: 80rem) {
   .ap-how-it-works__shots {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr) calc(326px + 2 * var(--space-4));
+    grid-template-rows: auto 1fr;
   }
 
   .ap-how-it-works__shot--claim {
-    grid-column: 1 / -1;
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .ap-how-it-works__shot--connect {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .ap-how-it-works__shot--share {
+    grid-column: 2;
+    grid-row: 1 / span 2;
   }
 }
 

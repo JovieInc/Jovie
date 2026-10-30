@@ -1,5 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { OFFICIAL_IPHONE_BEZEL } from '@/components/marketing/device/deviceBezels';
+import {
+  FRAME_SCREENS,
+  frameScreenAspect,
+} from '@/lib/screenshots/product-shot-rules.mjs';
 import {
   getProductShot,
   PRODUCT_SHOT_DPR,
@@ -71,5 +76,21 @@ describe('ProductShot', () => {
   it('draws window chrome only for window-framed shots', () => {
     const { container } = render(<ProductShot id='setup-connect-music' />);
     expect(container.querySelector('.product-shot__bar')).toBeNull();
+  });
+
+  it('keeps the phone screen aspect equal to the official bezel opening', () => {
+    expect(FRAME_SCREENS.phone).toEqual({
+      width: OFFICIAL_IPHONE_BEZEL.screen.width,
+      height: OFFICIAL_IPHONE_BEZEL.screen.height,
+    });
+  });
+
+  it('sets the frame screen ratio from the one shared definition', () => {
+    const { container } = render(<ProductShot id='setup-share-profile' />);
+    const figure = container.querySelector('figure') as HTMLElement;
+    expect(figure.className).toContain('product-shot--phone');
+    expect(figure.style.getPropertyValue('--product-shot-screen-ratio')).toBe(
+      String(frameScreenAspect('phone'))
+    );
   });
 });

@@ -28,10 +28,13 @@ export function hashShotSpec(spec) {
     route: spec.route,
     viewport: spec.viewport,
     theme: spec.theme,
+    viewportHeight: spec.viewportHeight ?? null,
     crop: spec.crop,
     padding: spec.padding ?? 0,
     maxHeight: spec.maxHeight ?? null,
     displayWidth: spec.displayWidth,
+    frame: spec.frame,
+    fullScreen: spec.fullScreen ?? false,
     fixedNow: spec.fixedNow ?? null,
     mobile: spec.mobile ?? null,
   };

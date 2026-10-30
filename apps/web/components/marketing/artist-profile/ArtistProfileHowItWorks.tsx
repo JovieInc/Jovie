@@ -29,7 +29,7 @@ const SETUP_STAGES: readonly {
   {
     id: 'share',
     shot: 'setup-share-profile',
-    sizes: '(min-width: 1024px) 22rem, 92vw',
+    sizes: '(min-width: 640px) 326px, 92vw',
   },
 ];
 

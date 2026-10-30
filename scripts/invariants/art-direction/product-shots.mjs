@@ -7,7 +7,11 @@
  *    its source components. When a source changes after the render, the shot
  *    is stale: `pnpm --filter @jovie/web shots:render --stale` against a
  *    demo-mode server regenerates it. Missing or oversized files also fail.
- * 2. Source (shrink-only ratchet): marketing source may not reach product
+ * 2. Geometry and readability (blocking): the rules in
+ *    apps/web/lib/screenshots/product-shot-rules.mjs, read from the facts the
+ *    renderer recorded per shot (device shots match their frame's screen
+ *    aspect, effective text >= 11px, crops are moments not shrunk pages).
+ * 3. Source (shrink-only ratchet): marketing source may not reach product
  *    imagery around the registries: no `/product-screenshots/` or
  *    `/product-shots/` path literals and no `screenshot-catalog` imports.
  *    Existing hits live in product-shots.baseline.json and only shrink.
@@ -19,6 +23,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { checkShotGeometry } from '../../../apps/web/lib/screenshots/product-shot-rules.mjs';
 import { hashShotSources } from '../../../apps/web/scripts/product-shots/source-hash.mjs';
 import {
   MARKETING_SOURCE_ROOTS,
@@ -89,6 +94,16 @@ export function checkFreshness(repoRoot = REPO_ROOT) {
   return failures;
 }
 
+/** Geometry and readability failures for every manifest entry. */
+export function checkGeometry(repoRoot = REPO_ROOT) {
+  const manifestPath = join(repoRoot, SHOT_MANIFEST);
+  if (!existsSync(manifestPath)) return [];
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  return Object.entries(manifest.shots ?? {}).flatMap(([id, entry]) =>
+    checkShotGeometry(id, entry)
+  );
+}
+
 export function rawImageryIds(repoRoot = REPO_ROOT) {
   const ids = new Set();
   for (const file of walkFiles(repoRoot, MARKETING_SOURCE_ROOTS)) {
@@ -121,7 +136,11 @@ export function checkRawImagery(repoRoot = REPO_ROOT, recordedIds) {
 
 export function check(repoRoot = REPO_ROOT) {
   return {
-    failures: [...checkFreshness(repoRoot), ...checkRawImagery(repoRoot)],
+    failures: [
+      ...checkFreshness(repoRoot),
+      ...checkGeometry(repoRoot),
+      ...checkRawImagery(repoRoot),
+    ],
   };
 }
 

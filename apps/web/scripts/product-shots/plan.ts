@@ -13,6 +13,16 @@ import { hashShotSources, hashShotSpec } from './source-hash.mjs';
 /** Per-file ceiling. A shot above it is a crop that shows too much. */
 export const PRODUCT_SHOT_MAX_BYTES = 120 * 1024;
 
+export {
+  checkShotGeometry,
+  FRAME_SCREENS,
+  frameScreenAspect,
+  MAX_CROP_VIEWPORT_SHARE,
+  MIN_DISPLAY_SCALE,
+  MIN_EFFECTIVE_TEXT_PX,
+  SCREEN_ASPECT_TOLERANCE,
+} from '../../lib/screenshots/product-shot-rules.mjs';
+
 export interface RenderArgs {
   readonly baseUrl: string;
   readonly only: ReadonlySet<string> | null;
@@ -53,6 +63,16 @@ export interface ShotManifestEntry {
   readonly renderedAt: string;
   readonly sources: readonly string[];
   readonly bytes: { readonly avif: number; readonly webp: number };
+  readonly frame: ProductShotSpec['frame'];
+  readonly fullScreen: boolean;
+  readonly displayWidth: number;
+  readonly capture: {
+    readonly cssWidth: number;
+    readonly cssHeight: number;
+    readonly viewportWidth: number;
+    readonly viewportHeight: number;
+  };
+  readonly minTextPx: number | null;
 }
 
 /**

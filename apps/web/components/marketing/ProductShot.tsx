@@ -15,6 +15,11 @@ function shotStyle(shot: ProductShotImage): CSSProperties {
   const vars: Record<string, string> = {
     '--product-shot-max-width': `${shot.width}px`,
   };
+  if (shot.screenAspect !== null) {
+    // One source for the screen aspect: product-shot-rules.mjs, also read by
+    // the renderer and the CI invariant.
+    vars['--product-shot-screen-ratio'] = String(shot.screenAspect);
+  }
   if (shot.mobile) {
     vars['--product-shot-mobile-max-width'] = `${shot.mobile.width}px`;
     vars['--product-shot-mobile-ratio'] =

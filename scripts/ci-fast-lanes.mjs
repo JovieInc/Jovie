@@ -306,7 +306,7 @@ export const SOURCE_GUARDS = Object.freeze([
     command:
       'node scripts/invariants/art-direction/run.mjs && node --test scripts/invariants/art-direction/*.test.mjs',
     inputs:
-      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage)\/|apps\/web\/public\/assets\/generated\/|docs\/design-system\/taste-labels\/|apps\/web\/styles\/design-system\.css$|apps\/web\/data\/marketing\/imageColorPolicy\.ts$|design\.tokens\.json$|docs\/design-system\/motion-effects\.json$|scripts\/invariants\/art-direction\/|apps\/web\/lib\/screenshots\/product-shots|apps\/web\/public\/product-shots\/|apps\/web\/scripts\/product-shots\/|apps\/web\/components\/features\/(?:demo|profile|onboarding|share|dashboard\/organisms\/onboarding)\/|apps\/web\/components\/features\/home\/homepage-profile-preview-fixture\.ts$)/u,
+      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage)\/|apps\/web\/public\/assets\/generated\/|docs\/design-system\/taste-labels\/|apps\/web\/styles\/design-system\.css$|apps\/web\/data\/marketing\/imageColorPolicy\.ts$|design\.tokens\.json$|docs\/design-system\/motion-effects\.json$|scripts\/invariants\/art-direction\/|apps\/web\/lib\/screenshots\/product-shot|apps\/web\/public\/product-shots\/|apps\/web\/scripts\/product-shots\/|apps\/web\/components\/features\/(?:demo|profile|onboarding|share|dashboard\/organisms\/onboarding)\/|apps\/web\/components\/features\/home\/homepage-profile-preview-fixture\.ts$)/u,
     prOnly: true,
   }),
   Object.freeze({
