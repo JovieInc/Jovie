@@ -1,3 +1,5 @@
+import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -217,6 +219,21 @@ class WireTest(unittest.TestCase):
             self.assertIn("'scripts/n.test.mjs'", node)
             self.assertIn("'scripts/v.test.mjs'", vitest)
             self.assertEqual(classes.wire_ci_fast(root, ["scripts/n.test.mjs"]), [], "already listed")
+
+    def test_cli_wires_tests_without_a_model_and_is_idempotent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.tree(tmp)
+            command = [sys.executable, str(Path(classes.__file__).resolve()), "wire-ci-fast", "--root", str(root),
+                       "scripts/n.test.mjs", "scripts/v.test.mjs"]
+            first = subprocess.run(command, capture_output=True, text=True)
+            self.assertEqual(first.returncode, 0, first.stderr)
+            self.assertEqual(json.loads(first.stdout), {"added": ["scripts/n.test.mjs", "scripts/v.test.mjs"]})
+            node, vitest = (root / "scripts/ci-fast-lanes.mjs").read_text().split("SCRIPT_CONTRACT_VITEST_TESTS")
+            self.assertIn("'scripts/n.test.mjs'", node)
+            self.assertIn("'scripts/v.test.mjs'", vitest)
+            second = subprocess.run(command, capture_output=True, text=True)
+            self.assertEqual(second.returncode, 0, second.stderr)
+            self.assertEqual(json.loads(second.stdout), {"added": []})
 
     def test_missing_or_out_of_tree_files_are_left_to_the_model(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -11,6 +11,7 @@ machine instead of another run).
 Pure functions over parsed values; lane_runner owns every side effect (gh, git, state files).
 
     python3 fix_red_classes.py measure [--state DIR] [--days N]   # before/after numbers from the ledger
+    python3 fix_red_classes.py wire-ci-fast [--root DIR] FILE...  # repair the inventory without a model
 """
 from __future__ import annotations
 
@@ -570,11 +571,18 @@ def costs_from_metrics(state: Path) -> dict:
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("command", choices=["measure"])
-    parser.add_argument("--state", default=str(Path.home() / ".local/state/jovie-lanes"))
-    parser.add_argument("--days", type=int, default=5)
-    parser.add_argument("--now", type=float, default=None)
+    commands = parser.add_subparsers(dest="command", required=True)
+    metrics = commands.add_parser("measure", help="before/after numbers from the ledger")
+    metrics.add_argument("--state", default=str(Path.home() / ".local/state/jovie-lanes"))
+    metrics.add_argument("--days", type=int, default=5)
+    metrics.add_argument("--now", type=float, default=None)
+    wiring = commands.add_parser("wire-ci-fast", help="wire script tests into the maintained CI inventory")
+    wiring.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
+    wiring.add_argument("files", nargs="+")
     args = parser.parse_args(argv)
+    if args.command == "wire-ci-fast":
+        print(json.dumps({"added": wire_ci_fast(args.root, args.files)}))
+        return 0
     now = args.now or datetime.now(timezone.utc).timestamp()
     print(json.dumps(measure(read_ledger(Path(args.state)), now, args.days, costs_from_metrics(Path(args.state))), indent=1))
     return 0

@@ -80,8 +80,17 @@ test('publication remains policy gated without running affected tests', () => {
   assert.doesNotMatch(publication, /typecheck|coverage|biome check \./);
 });
 
-for (const linkedWorktree of [false, true]) {
-  test(`child Git fixtures cannot mutate the ${linkedWorktree ? 'linked worktree' : 'main repository'} that invoked the hook`, () => {
+// A bare [[boolean, string], ...] list infers both slots as string | boolean.
+// spawnSync env values must be strings, so checkJs rejects `CI: ci`.
+/** @type {Array<[boolean, string]>} */
+const childGitCases = [
+  [false, ''],
+  [true, ''],
+  [false, '1'],
+  [true, '1'],
+];
+for (const [linkedWorktree, ci] of childGitCases) {
+  test(`child Git fixtures cannot mutate the ${linkedWorktree ? 'linked worktree' : 'main repository'} that invoked the hook (CI=${ci || 'unset'})`, () => {
     const root = mkdtempSync(path.join(os.tmpdir(), 'pre-push-git-env-'));
     const env = { ...process.env };
     const localNames = spawnSync('git', ['rev-parse', '--local-env-vars'], {
@@ -125,6 +134,11 @@ for (const linkedWorktree of [false, true]) {
         path.join(hooksDir, 'resolve-repo-node.sh'),
         path.join(parentHooks, 'resolve-repo-node.sh')
       );
+      // Exercise the real hook dependency in both local and hosted-CI modes.
+      copyFileSync(
+        path.join(repoRoot, 'scripts/heavy-task.sh'),
+        path.join(parent, 'scripts/heavy-task.sh')
+      );
       copyFileSync(path.join(repoRoot, '.nvmrc'), path.join(parent, '.nvmrc'));
       const bin = path.join(root, 'bin');
       mkdirSync(bin);
@@ -164,6 +178,9 @@ git -C "$JOVIE_CHILD_FIXTURE" commit -m child-check
           encoding: 'utf8',
           env: {
             ...env,
+            CI: ci,
+            HEAVY_TASK_DISABLE: '0',
+            HEAVY_TASK_DIR: path.join(root, 'heavy-slots'),
             PATH: `${bin}:${env.PATH}`,
             GIT_DIR: gitDir,
             GIT_INDEX_FILE: path.join(gitDir, 'index'),

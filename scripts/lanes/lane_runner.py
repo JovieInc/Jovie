@@ -141,7 +141,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_migration_renumber.py",
+LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_heavy_task.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_migration_renumber.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -1314,7 +1314,10 @@ def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | 
         "  note the follow-up slices in the handoff.",
         "- In a shared registry or list (flags, commands, baselines), insert new entries in",
         "  their sorted position, never at the end, so concurrent PRs merge cleanly.",
-        "- Run the narrow relevant checks (biome on changed files, the related tests).",
+        "- Run only the narrow relevant checks (biome on changed files, the related tests). Never run `next build`,",
+        "  `turbo build`, Playwright or a full e2e/typecheck locally: CI runs them on hosted runners and this host",
+        "  is shared (load 43 on 16 cores on 2026-10-26). Wrap any heavy tsc/vitest/eslint run in",
+        "  `bash scripts/heavy-task.sh <command>`.",
         "- Commit with commitlint style (lowercase subject, header <= 100 chars). Never use",
         "  --no-verify or weaken a check.",
         f"- Push `{branch}` and open ONE draft PR against main whose title contains {issue.identifier}.",
@@ -11220,6 +11223,7 @@ def guarded_main(argv: list[str] | None = None) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    os.environ.setdefault("LANES_NO_LOCAL_BUILD", "1")  # every agent, gate and hook this process starts inherits it
     try:
         host = Host()
         arguments = sys.argv[1:] if argv is None else argv
