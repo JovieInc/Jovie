@@ -13,8 +13,8 @@ from it and never restates a number.
 
 A PR with a measurable before/after fills the `## Win` section of the PR template
 (one `Metric:` line per number). Fleet Rules rejects a malformed section. When the
-PR merges, `wins-ledger.yml` runs `node scripts/wins-ledger.mjs ingest --pr N` and
-opens a bot PR appending the record. `## Win` of `n/a` records nothing.
+PR merges, `wins-ledger.yml` runs `node scripts/wins-ledger.mjs ingest --pr N --store` and
+writes the record to the runtime store (`summer-company/wins-ledger/<id>.json`, create-only). No bot PR: data is not shipped as PRs (JovieInc/ci `canon/COMPANY.md`, "Data vs behaviour"). Without store credentials the Win stays in the merged PR body. `## Win` of `n/a` records nothing.
 
 ## Capture is automatic
 
