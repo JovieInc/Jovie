@@ -925,6 +925,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/evals/gtm-lead-copy.test.mjs',
   'scripts/evals/release-task-cluster.test.mjs',
   'scripts/evals/summer-ops-card-copy.test.mjs',
+  'scripts/dogfood-judge/judge-core.test.mjs',
   'scripts/funnel-judge/preview-gate.test.mjs',
   'scripts/funnel-judge/proof-gate.test.mjs',
   'scripts/funnel-judge/rubric.test.mjs',
