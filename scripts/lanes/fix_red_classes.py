@@ -75,8 +75,10 @@ CONSERVATIVE_UTILITY = re.compile(
 SNAP_STEP = {"2.5": "2", "3.5": "3"}
 SPACING_SCAN_PREFIXES = ("apps/web/app/", "apps/web/components/", "packages/ui/")
 NON_PRODUCT_SPACING = re.compile(r"\.(?:test|spec|stories)\.[tj]sx?$")
-# Source Validation's merge probe. Only this one file has a deterministic union:
-# both sides append to the same NARROWED vitest command. Any other path stays a model fix.
+# Source Validation's merge probe. Deterministic unions:
+# - NARROWED vitest command in scripts/preflight-changed.mjs
+# - quoted list entries (both sides only add 'path', lines)
+# Any other hunk stays a model fix.
 NARROWED_PREFLIGHT = "scripts/preflight-changed.mjs"
 NARROWED_CONFLICT = re.compile(
     r"This PR conflicts with \S+ in: scripts/preflight-changed\.mjs\s*\. "
@@ -106,6 +108,7 @@ _NARROWED_HUNK = re.compile(
 _NARROWED_SIDE = re.compile(
     r"\A(?P<prefix>(?:[ \t]*command:\n)?)(?P<cindent>[ \t]*)'(?P<command>[^'\n]+)',\n"
     r"(?P<nindent>[ \t]*)note: '(?P<note>[^'\n]+)',\n?\Z")
+_QUOTED_LIST_ENTRY = re.compile(r"^[ \t]*'[^'\n]+',[ \t]*$")
 
 # (class, pattern, action). First match wins per check; order is most specific first.
 SIGNATURES = (
@@ -447,6 +450,57 @@ def resolve_preflight_narrowed_text(text: str) -> str | None:
         pieces.append(
             f"{ours.group('prefix')}{ours.group('cindent')}'{command}',\n"
             f"{ours.group('nindent')}note: '{note}',\n")
+        last = hunk.end()
+    pieces.append(text[last:])
+    resolved = "".join(pieces)
+    if "<<<<<<<" in resolved or ">>>>>>>" in resolved:
+        return None
+    return resolved
+
+
+def merge_additive_quoted_entries(ours: str, theirs: str) -> str | None:
+    """Union two conflict sides that only add quoted list entries.
+
+    Main's order stays, then head-only lines. A blank side, a non-entry line, or a
+    repeated path with different text returns None."""
+
+    def rows(side: str) -> list[str] | None:
+        if not str(side or "").endswith("\n"):
+            return None
+        lines = side[:-1].split("\n")
+        if not lines or any(_QUOTED_LIST_ENTRY.fullmatch(line) is None for line in lines):
+            return None
+        return lines
+
+    ours_rows = rows(ours)
+    theirs_rows = rows(theirs)
+    if ours_rows is None or theirs_rows is None:
+        return None
+    seen: list[str] = []
+    for line in theirs_rows + ours_rows:
+        if line not in seen:
+            seen.append(line)
+    return "\n".join(seen) + "\n"
+
+
+def resolve_additive_quoted_list_text(text: str) -> str | None:
+    """Replace conflict hunks that are only quoted list entries. None when any hunk
+    has another shape, so the caller leaves that merge to a model."""
+    if "<<<<<<<" not in str(text or ""):
+        return None
+    hunks = list(_NARROWED_HUNK.finditer(text))
+    if not hunks:
+        return None
+    if "<<<<<<<" in _NARROWED_HUNK.sub("", text) or ">>>>>>>" in _NARROWED_HUNK.sub("", text):
+        return None
+    pieces = []
+    last = 0
+    for hunk in hunks:
+        merged = merge_additive_quoted_entries(hunk.group("ours"), hunk.group("theirs"))
+        if merged is None:
+            return None
+        pieces.append(text[last:hunk.start()])
+        pieces.append(merged)
         last = hunk.end()
     pieces.append(text[last:])
     resolved = "".join(pieces)

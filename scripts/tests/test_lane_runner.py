@@ -8179,6 +8179,40 @@ class FixRedTest(unittest.TestCase):
         self.assertEqual(pending, {"5": "h9"})
         self.assertFalse(any(c[:3] in (["gh", "pr", "ready"], ["gh", "pr", "merge"]) for c in calls))
 
+    def test_an_additive_list_conflict_skips_the_agent(self):
+        real_sh = lane.sh
+        real_gen = lane.resolve_generated_conflict
+        real_narrow = lane.resolve_narrowed_preflight_conflict
+        real_add = lane.resolve_additive_list_conflict
+        real_agent = lane.run_agent
+        lane.resolve_generated_conflict = lambda *a, **k: False
+        lane.resolve_narrowed_preflight_conflict = lambda *a, **k: False
+        lane.resolve_additive_list_conflict = lambda *a, **k: True
+        lane.run_agent = lambda *a, **k: self.fail("quoted-list conflicts need no model")
+
+        def fake(args, cwd=None, timeout=600, env=None, log=None):
+            if args[:2] == ["git", "rev-parse"]:
+                return SimpleNamespace(returncode=0, stdout="h9\n")
+            if args[:2] == ["git", "reflog"]:
+                return SimpleNamespace(returncode=0, stdout="h9\0commit: repair\n")
+            if args[:2] == ["git", "ls-remote"]:
+                return SimpleNamespace(returncode=0, stderr="", stdout="h9\trefs/heads/devin/jov-1\n")
+            return SimpleNamespace(returncode=0, stderr="", stdout="")
+
+        lane.sh = fake
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            try:
+                receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]},
+                                          {**self.pr(), "isDraft": False, "mergeStateStatus": "DIRTY"})
+            finally:
+                lane.sh = real_sh
+                lane.resolve_generated_conflict = real_gen
+                lane.resolve_narrowed_preflight_conflict = real_narrow
+                lane.resolve_additive_list_conflict = real_add
+                lane.run_agent = real_agent
+        self.assertEqual((receipt["verdict"], receipt["resolution"]), ("fix-pushed", "additive-list-merged"))
+
     def test_excerpt_keeps_failing_lines_and_prompt_forbids_new_prs(self):
         real = lane.sh
         lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout=(

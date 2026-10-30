@@ -6233,6 +6233,44 @@ def resolve_narrowed_preflight_conflict(worktree: Path, branch: str, log, *, gua
     return pushed
 
 
+def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
+    """Union quoted list entries when every conflict hunk with main is only those lines.
+
+    Main's order stays, then head-only lines. A prose hunk or any other shape aborts
+    and leaves the PR to the model. The push is a fast-forward of the PR branch."""
+    guard()
+    merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
+    if merged.returncode != 0:
+        conflicted = [path for path in (sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout or "").split() if path]
+        if not conflicted:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        resolved: dict[str, str] = {}
+        for path in conflicted:
+            target = worktree / path
+            try:
+                text = fix_red_classes.resolve_additive_quoted_list_text(target.read_text())
+            except OSError:
+                text = None
+            if text is None:
+                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+                return False
+            resolved[path] = text
+        try:
+            for path, text in resolved.items():
+                atomic_write_text(worktree / path, text)
+        except OSError:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        guard()
+        if sh(["git", "add", "--", *conflicted], cwd=worktree, log=log).returncode != 0 \
+                or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+    guard()
+    return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+
+
 def merge_narrowed_preflight_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
     """No-model fix when Source Validation reports only the narrowed preflight conflict."""
     del host, route
@@ -7814,6 +7852,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 verify_target(pr, stage, worktree=worktree if allow_local_push else None)
             resolved_generated = False
             resolved_narrowed = False
+            resolved_additive = False
             if pr.get("mergeStateStatus") == "DIRTY":
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 0, "mutations": 1}, coordination=coordination, boundary_id="repair-generated-conflict")
@@ -7822,11 +7861,17 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                     execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                                {"spend": 0, "mutations": 1}, coordination=coordination, boundary_id="repair-narrowed-preflight")
                     resolved_narrowed = resolve_narrowed_preflight_conflict(worktree, pr["headRefName"], log, guard=boundary)
+                if not resolved_generated and not resolved_narrowed:
+                    execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
+                                               {"spend": 0, "mutations": 1}, coordination=coordination, boundary_id="repair-additive-list")
+                    resolved_additive = resolve_additive_list_conflict(worktree, pr["headRefName"], log, guard=boundary)
             agent = None
             if resolved_generated:
                 receipt.update(resolution="generated-regenerated")
             elif resolved_narrowed:
                 receipt.update(resolution="narrowed-preflight-merged")
+            elif resolved_additive:
+                receipt.update(resolution="additive-list-merged")
             else:
                 boundary("before-install")
                 install_dependencies(host, worktree, log)
