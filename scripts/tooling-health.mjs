@@ -171,6 +171,7 @@ for (const [tool, r] of Object.entries(results)) {
   const action = alertAction({
     red,
     previousRed: previous[tool]?.consecutiveRed ?? 0,
+    pendingRecovery: previous[tool]?.recoveryPending === true,
   });
   tools[tool] = {
     ok: r.ok,
@@ -178,6 +179,8 @@ for (const [tool, r] of Object.entries(results)) {
     detail: r.detail,
     ms: r.ms,
     consecutiveRed: red,
+    recoveryPending:
+      previous[tool]?.recoveryPending === true || action === 'green',
     ...roll[tool],
   };
   const apiKey = process.env.LINEAR_API_KEY;
@@ -199,8 +202,9 @@ for (const [tool, r] of Object.entries(results)) {
       ]);
     }
   } else if (action === 'green' && apiKey) {
-    await resolveRemediationSignal(ctx);
-    tools[tool].alert = 'resolved';
+    const resolution = await resolveRemediationSignal(ctx);
+    tools[tool].recoveryPending = !resolution.ok;
+    tools[tool].alert = resolution.ok ? 'resolved' : 'recovery-pending';
   }
 }
 const red = Object.entries(tools)

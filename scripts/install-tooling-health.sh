@@ -3,7 +3,19 @@
 # Re-run from a stable checkout after merge to repoint it. Secrets are sourced from ~/.hermes/.env at run time, never written here.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-NODE="${NODE_BIN:-$HOME/.nvm/versions/node/v24.21.0/bin/node}"
+NODE="${NODE_BIN:-}"
+if [[ -z "$NODE" ]]; then
+  TOOLING_NODE_DIR="$(bash "$ROOT/scripts/hooks/resolve-repo-node.sh")"
+  if [[ -n "$TOOLING_NODE_DIR" ]]; then
+    NODE="$TOOLING_NODE_DIR/node"
+  else
+    NODE="$(command -v node)"
+  fi
+fi
+if [[ ! -x "$NODE" ]]; then
+  echo "tooling-health Node executable not found: $NODE" >&2
+  exit 1
+fi
 LABEL=co.jovie.tooling-health
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 mkdir -p "$HOME/.jovie/tooling-health"

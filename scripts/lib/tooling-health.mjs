@@ -61,9 +61,10 @@ export function consecutiveRed(history, tool) {
   return n;
 }
 
-export function alertAction({ red, previousRed }) {
+export function alertAction({ red, previousRed, pendingRecovery = false }) {
   if (red >= ALERT_AFTER_RED) return 'red';
-  if (red === 0 && previousRed >= ALERT_AFTER_RED) return 'green';
+  if (red === 0 && (previousRed >= ALERT_AFTER_RED || pendingRecovery))
+    return 'green';
   return 'none';
 }
 
