@@ -29,6 +29,7 @@
       "lib/eval/leak-guard.test.ts",
       "lib/eval/promote-trace.test.ts",
       "lib/eval/scorers/scorers.test.ts",
+      "tests/eval/agent-acquisition/over-trigger.ci.test.ts",
       "tests/eval/golden/golden-eval-set.ci.test.ts",
       "tests/eval/helpfulness/helpfulness.ci.test.ts",
       "tests/eval/helpfulness/runner.ci.test.ts",
