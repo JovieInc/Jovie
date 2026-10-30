@@ -1153,7 +1153,10 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
-  it('selects physical-pointer onboarding recovery through the guarded Storybook matrix', () => {
+  it.each([
+    'tests/e2e/storybook-onboarding-recovery.spec.ts',
+    'tests/e2e/storybook-onboarding-dsp-strip-clearance.spec.ts',
+  ])('selects %s through the guarded Storybook matrix', spec => {
     const surfaces = jobBlock(
       'ci-storybook-surfaces',
       'ci-cross-product-integration'
@@ -1167,9 +1170,8 @@ describe('ci-fast bounded parallel workflow', () => {
     ).not.toBeNull();
     const selected =
       invocation[1].match(/tests\/e2e\/storybook-[a-z0-9-]+\.spec\.ts/g) ?? [];
-    const recovery = 'tests/e2e/storybook-onboarding-recovery.spec.ts';
-    expect(selected.filter(path => path === recovery)).toHaveLength(1);
-    expect(existsSync(resolve(REPO_ROOT, 'apps/web', recovery))).toBe(true);
+    expect(selected.filter(path => path === spec)).toHaveLength(1);
+    expect(existsSync(resolve(REPO_ROOT, 'apps/web', spec))).toBe(true);
     expect(surfaces).toContain('guard-playwright-artifacts.mjs" --run --');
     expect(surfaces).toContain('--project=chromium --reporter=line');
     expect(surfaces).toContain('--workers=2');
