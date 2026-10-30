@@ -9,6 +9,7 @@ GITHUB_APP_ID = "2934433"          # jovie-bot
 GITHUB_INSTALLATION_ID = "112037986"
 BUDGET_BYTES_MONTH = "104857600"   # 100 MB
 RETENTION_DAYS = "90"
+WATCH_REPOS = "JovieInc/Jovie,JovieInc/gbrain"  # hourly workflow/ruleset correlation
 MESH_URL = "https://summer.jov.ie"
 
 [[d1_databases]]
@@ -22,7 +23,7 @@ binding = "ARCHIVE"
 bucket_name = "jovie-evidence"
 
 [triggers]
-# Hourly: budget check. 03:xx UTC pass also archives >90d rows to R2 (gzip NDJSON) and deletes them.
+# Hourly: budget check and workflow/ruleset correlation for WATCH_REPOS. 03:xx UTC pass also archives >90d rows to R2 (gzip NDJSON) and deletes them.
 crons = ["23 * * * *"]
 
 # Secret bindings (wrangler secret put -c wrangler.audit.toml):

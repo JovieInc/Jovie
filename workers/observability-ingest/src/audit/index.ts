@@ -5,6 +5,8 @@
  *   POST /v1/events        batches from the gh / git-push shim spool (scripts/fleet-audit)
  *   POST /v1/snapshot      GitHub-side state (workflow states, ruleset updated_at) from the hourly
  *                          correlator; changes are matched to shim events, unmatched ones alert Summer
+ *   POST /v1/token         token broker: own per-client credential (not the ingest HMAC), grant
+ *                          table, nonce + timestamp replay protection; see broker.ts
  *   POST /v1/github-audit  rows from a GitHub org audit-log export (UI export; no API on our plan)
  * Readers (Authorization: Bearer READ_TOKEN):
  *   GET  /v1/who?target=&since=&limit=   GET /v1/summary
@@ -13,6 +15,15 @@
  * rows older than RETENTION_DAYS are archived as gzip NDJSON to R2 and deleted. No log drains,
  * no paid ingestion.
  */
+import {
+  authenticateBrokerClient,
+  authorizeTokenRequest,
+  collectRepoState,
+  type Grant,
+  mintInstallationToken,
+  revokeInstallationToken,
+} from './broker.ts';
+
 export interface Env {
   readonly AUDIT_DB: D1Database;
   readonly ARCHIVE?: R2Bucket;
@@ -24,6 +35,13 @@ export interface Env {
   readonly MESH_SENDER_ID?: string;
   readonly MESH_SENDER_KIND?: string;
   readonly MESH_TOKEN?: string;
+  readonly GITHUB_APP_ID?: string;
+  readonly GITHUB_INSTALLATION_ID?: string;
+  readonly GITHUB_APP_PRIVATE_KEY?: string;
+  /** JSON {clientId: key}; per-client issuance keys, distinct from INGEST_HMAC_SECRET. */
+  readonly BROKER_CLIENT_KEYS?: string;
+  /** Comma-separated owner/repo list the hourly cron correlates (default JovieInc/Jovie). */
+  readonly WATCH_REPOS?: string;
 }
 
 export interface AuditEvent {
@@ -49,6 +67,8 @@ const MAX_BATCH = 500;
 const DEFAULT_BUDGET = 100 * 1024 * 1024;
 const MATCH_BEFORE_MS = 30 * 60_000;
 const MATCH_AFTER_MS = 10 * 60_000;
+const MAX_SNAPSHOT_ITEMS = 500;
+const COLLECTION_STALE_MS = 2 * 3_600_000;
 const FIELDS: Array<[keyof AuditEvent, number]> = [
   ['actor_agent', 80],
   ['session_id', 80],
@@ -194,14 +214,14 @@ export async function insertEvents(
   return { inserted, bytes };
 }
 
-export async function alertSummer(
+/** Mesh delivery of one alert body; true only on a 2xx from Summer. */
+async function deliverToSummer(
   env: Env,
-  text: string,
-  refs: string[] = []
-): Promise<boolean> {
+  body: string,
+  refs: string[]
+): Promise<{ ok: boolean; error?: string }> {
   if (!env.MESH_TOKEN || !env.MESH_SENDER_ID || !env.MESH_SENDER_KIND)
-    return false;
-  const body = text.slice(0, 1800);
+    return { ok: false, error: 'mesh_not_configured' };
   const digest = await crypto.subtle.digest(
     'SHA-256',
     new TextEncoder().encode(body)
@@ -230,10 +250,94 @@ export async function alertSummer(
         }),
       }
     );
-    return res.ok;
-  } catch {
-    return false;
+    return res.ok ? { ok: true } : { ok: false, error: `http_${res.status}` };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message.slice(0, 120) : 'fetch_failed',
+    };
   }
+}
+
+export const OUTBOX_MAX_ATTEMPTS = 12;
+
+/** Statement that enqueues an alert; batch it with the state change it reports (atomic). */
+export function outboxStatement(
+  env: Env,
+  text: string,
+  refs: string[],
+  nowIso: string
+): D1PreparedStatement {
+  return env.AUDIT_DB.prepare(
+    `INSERT INTO alert_outbox (id, created_at, body, refs, attempts, next_attempt_at)
+     VALUES (?1, ?2, ?3, ?4, 0, ?2)`
+  ).bind(
+    crypto.randomUUID(),
+    nowIso,
+    text.slice(0, 1800),
+    JSON.stringify(refs.slice(0, 8))
+  );
+}
+
+/**
+ * Deliver due alerts. A failure keeps the row with attempts+1, last_error and exponential backoff
+ * (1 min doubling, capped at 6 h); after OUTBOX_MAX_ATTEMPTS it stays undelivered and visible.
+ */
+export async function drainOutbox(
+  env: Env,
+  now: Date,
+  limit = 20
+): Promise<{ delivered: number; failed: number }> {
+  const nowIso = now.toISOString();
+  const { results } = await env.AUDIT_DB.prepare(
+    `SELECT id, body, refs, attempts FROM alert_outbox
+      WHERE delivered_at IS NULL AND attempts < ?1 AND next_attempt_at <= ?2
+      ORDER BY created_at LIMIT ?3`
+  )
+    .bind(OUTBOX_MAX_ATTEMPTS, nowIso, limit)
+    .all<{ id: string; body: string; refs: string; attempts: number }>();
+  let delivered = 0;
+  let failed = 0;
+  for (const row of results ?? []) {
+    const r = await deliverToSummer(
+      env,
+      row.body,
+      JSON.parse(row.refs || '[]')
+    );
+    if (r.ok) {
+      delivered++;
+      await env.AUDIT_DB.prepare(
+        'UPDATE alert_outbox SET delivered_at = ?2, attempts = attempts + 1 WHERE id = ?1'
+      )
+        .bind(row.id, nowIso)
+        .run();
+    } else {
+      failed++;
+      const backoff = Math.min(6 * 3_600_000, 60_000 * 2 ** row.attempts);
+      await env.AUDIT_DB.prepare(
+        'UPDATE alert_outbox SET attempts = attempts + 1, last_error = ?2, next_attempt_at = ?3 WHERE id = ?1'
+      )
+        .bind(
+          row.id,
+          r.error ?? 'failed',
+          new Date(now.getTime() + backoff).toISOString()
+        )
+        .run();
+    }
+  }
+  return { delivered, failed };
+}
+
+/** Enqueue then try to deliver now; a failed delivery is retried by the hourly cron. */
+export async function alertSummer(
+  env: Env,
+  text: string,
+  refs: string[] = []
+): Promise<boolean> {
+  const now = new Date();
+  await outboxStatement(env, text, refs, now.toISOString()).run();
+  const { delivered } = await drainOutbox(env, now);
+  return delivered > 0;
 }
 
 function describe(ev: AuditEvent): string {
@@ -287,29 +391,84 @@ function itemValue(it: SnapshotItem): string {
     : String(it.updated_at ?? '');
 }
 
-function candidateActions(it: SnapshotItem, value: string): string[] {
-  if (it.kind === 'workflow') {
-    return value === 'active'
-      ? ['workflow.enable', 'api.PUT']
-      : ['workflow.disable', 'api.PUT'];
-  }
-  return [
-    'ruleset.edit',
-    'graphql.updateRepositoryRuleset',
-    'graphql.createRepositoryRuleset',
-    'graphql.deleteRepositoryRuleset',
-  ];
+export type ChangeKind = 'changed' | 'added' | 'removed';
+
+const RULESET_ACTIONS = [
+  'ruleset.edit',
+  'graphql.updateRepositoryRuleset',
+  'graphql.createRepositoryRuleset',
+  'graphql.deleteRepositoryRuleset',
+];
+
+function candidateActions(
+  it: SnapshotItem,
+  value: string,
+  kind: ChangeKind
+): string[] {
+  if (it.kind === 'ruleset') return RULESET_ACTIONS;
+  if (kind !== 'changed')
+    return ['git.push', 'git.push_force', 'api.PUT', 'api.DELETE'];
+  return value === 'active'
+    ? ['workflow.enable', 'api.PUT']
+    : ['workflow.disable', 'api.PUT'];
 }
 
-export function matchesTarget(ev: AuditEvent, it: SnapshotItem): boolean {
-  const t = (ev.target ?? '').toLowerCase();
-  if (!t) return false;
+/**
+ * Unmatched changes alert Summer, except workflow files appearing or disappearing: those land
+ * through merged commits, which git history already attributes, so they are recorded as
+ * 'observed' rather than paged. Ruleset additions and removals always need a shim event.
+ */
+export function unmatchedStatus(
+  it: SnapshotItem,
+  kind: ChangeKind
+): 'unattributed' | 'observed' {
+  return it.kind === 'workflow' && kind !== 'changed'
+    ? 'observed'
+    : 'unattributed';
+}
+
+/** owner/name, lowercased, from "owner/name", a GitHub URL or an ssh remote; null if not exact. */
+export function normRepo(r: string | null | undefined): string | null {
+  if (!r) return null;
+  const m =
+    /^(?:https?:\/\/github\.com\/|git@github\.com:)?([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/i.exec(
+      r.trim()
+    );
+  return m ? m[1].toLowerCase() : null;
+}
+
+const API_PATH_RE =
+  /^\/?repos\/([\w.-]+\/[\w.-]+)\/(actions\/workflows|rulesets)\/([^/]+)(?:\/(?:enable|disable))?$/i;
+
+function exactKey(key: string, it: SnapshotItem): boolean {
+  const k = key.trim().toLowerCase();
   const keys = [String(it.id), it.name, it.path, it.path?.split('/').pop()]
-    .filter((k): k is string => Boolean(k))
-    .map(k => k.toLowerCase());
-  return keys.some(
-    k => t === k || t.includes(`/${k}/`) || t.endsWith(`/${k}`) || t.includes(k)
-  );
+    .filter((x): x is string => Boolean(x))
+    .map(x => x.toLowerCase());
+  return keys.includes(k);
+}
+
+/**
+ * Exact attribution only: the event must name the same repository (from its API path or its repo
+ * field, normalized) and the same object (id, name, workflow path or file name). No substrings, and
+ * an event without a resolvable repository never attributes.
+ */
+export function matchesTarget(
+  ev: AuditEvent,
+  it: SnapshotItem,
+  repo: string
+): boolean {
+  const want = normRepo(repo);
+  if (!want) return false;
+  const t = (ev.target ?? '').trim();
+  const m = API_PATH_RE.exec(t);
+  if (m) {
+    const pathKind = m[2].toLowerCase() === 'rulesets' ? 'ruleset' : 'workflow';
+    return (
+      m[1].toLowerCase() === want && pathKind === it.kind && exactKey(m[3], it)
+    );
+  }
+  return normRepo(ev.repo) === want && exactKey(t, it);
 }
 
 async function findMatch(
@@ -317,26 +476,22 @@ async function findMatch(
   repo: string,
   it: SnapshotItem,
   value: string,
-  changedAt: string
+  changedAt: string,
+  kind: ChangeKind = 'changed'
 ) {
   const at = Date.parse(changedAt);
   const lo = new Date(at - MATCH_BEFORE_MS).toISOString();
   const hi = new Date(at + MATCH_AFTER_MS).toISOString();
-  const actions = candidateActions(it, value);
+  const actions = candidateActions(it, value, kind);
+  // Only a mutation that succeeded explains a change: refused or failed attempts never attribute.
   const { results } = await env.AUDIT_DB.prepare(
-    `SELECT * FROM events WHERE ts BETWEEN ?1 AND ?2 AND action IN (${actions.map((_, i) => `?${i + 3}`).join(',')})
+    `SELECT * FROM events WHERE ts BETWEEN ?1 AND ?2 AND outcome = 'ok'
+       AND action IN (${actions.map((_, i) => `?${i + 3}`).join(',')})
      ORDER BY ts DESC LIMIT 50`
   )
     .bind(lo, hi, ...actions)
     .all<AuditEvent>();
-  const repoName = repo.split('/').pop()?.toLowerCase() ?? '';
-  return (results ?? []).find(
-    ev =>
-      matchesTarget(ev, it) &&
-      (!ev.repo ||
-        ev.repo.toLowerCase().includes(repoName) ||
-        ev.repo === 'origin')
-  );
+  return (results ?? []).find(ev => matchesTarget(ev, it, repo));
 }
 
 export async function applySnapshot(
@@ -352,33 +507,94 @@ export async function applySnapshot(
     status: string;
     matched_event_id: string | null;
   }> = [];
-  for (const it of items.slice(0, 500)) {
-    const key = `${repo}:${it.kind}:${it.id}`;
+  // Never diff a partial set: a truncated snapshot would read as mass removals.
+  if (items.length > MAX_SNAPSHOT_ITEMS)
+    throw new Error(
+      `snapshot for ${repo} has ${items.length} items (max ${MAX_SNAPSHOT_ITEMS})`
+    );
+  const prefix = `${repo}:`;
+  const { results: prevRows } = await env.AUDIT_DB.prepare(
+    'SELECT key, value FROM snapshots WHERE substr(key, 1, ?1) = ?2'
+  )
+    .bind(prefix.length, prefix)
+    .all<{ key: string; value: string }>();
+  const prevByKey = new Map((prevRows ?? []).map(r => [r.key, r.value]));
+  // Explicit baseline marker: a repo whose first snapshot was empty still has a baseline, so later
+  // additions are drift rather than silently becoming a new baseline.
+  const hasBaseline = Boolean(
+    await env.AUDIT_DB.prepare('SELECT 1 AS x FROM snapshots WHERE key = ?1')
+      .bind(`baseline:${repo}`)
+      .first()
+  );
+
+  const writes: D1PreparedStatement[] = [];
+  const diffs: Array<{
+    it: SnapshotItem;
+    kind: ChangeKind;
+    prev: string | null;
+    value: string;
+  }> = [];
+  const seen = new Set<string>();
+  for (const it of items) {
+    const key = `${prefix}${it.kind}:${it.id}`;
+    seen.add(key);
     const value = itemValue(it);
-    const prev = await env.AUDIT_DB.prepare(
-      'SELECT value FROM snapshots WHERE key = ?1'
-    )
-      .bind(key)
-      .first<{ value: string }>();
-    await env.AUDIT_DB.prepare(
-      `INSERT INTO snapshots (key, value, observed_at) VALUES (?1, ?2, ?3)
-       ON CONFLICT(key) DO UPDATE SET value = ?2, observed_at = ?3`
-    )
-      .bind(key, value, nowIso)
-      .run();
-    if (!prev || prev.value === value) continue; // first sighting is a baseline, not a change
-    const changedAt = it.updated_at ?? nowIso;
+    const prev = prevByKey.get(key);
+    if (prev !== value)
+      writes.push(
+        env.AUDIT_DB.prepare(
+          `INSERT INTO snapshots (key, value, observed_at) VALUES (?1, ?2, ?3)
+           ON CONFLICT(key) DO UPDATE SET value = ?2, observed_at = ?3`
+        ).bind(key, value, nowIso)
+      );
+    if (prev === undefined) {
+      if (hasBaseline) diffs.push({ it, kind: 'added', prev: null, value });
+    } else if (prev !== value) {
+      diffs.push({ it, kind: 'changed', prev, value });
+    }
+  }
+  for (const [key, prev] of prevByKey) {
+    if (seen.has(key)) continue;
+    const [, kindName, id] =
+      key.slice(prefix.length).match(/^(workflow|ruleset):(.+)$/) ?? [];
+    if (!kindName) continue;
+    writes.push(
+      env.AUDIT_DB.prepare('DELETE FROM snapshots WHERE key = ?1').bind(key)
+    );
+    diffs.push({
+      it: { kind: kindName as SnapshotItem['kind'], id },
+      kind: 'removed',
+      prev,
+      value: '',
+    });
+  }
+  if (!hasBaseline)
+    writes.push(
+      env.AUDIT_DB.prepare(
+        'INSERT INTO snapshots (key, value, observed_at) VALUES (?1, ?2, ?2) ON CONFLICT(key) DO NOTHING'
+      ).bind(`baseline:${repo}`, nowIso)
+    );
+
+  for (const { it, kind, prev, value } of diffs) {
+    const changedAt = (kind !== 'removed' && it.updated_at) || nowIso;
     const change =
-      it.kind === 'workflow' ? `${prev.value} -> ${value}` : `updated ${value}`;
+      kind === 'added'
+        ? `added (${value || 'present'})`
+        : kind === 'removed'
+          ? `removed (was ${prev})`
+          : it.kind === 'workflow'
+            ? `${prev} -> ${value}`
+            : `updated ${value}`;
     const target = it.name ?? String(it.id);
-    const match = await findMatch(env, repo, it, value, changedAt);
-    const status = match ? 'attributed' : 'unattributed';
-    await env.AUDIT_DB.prepare(
-      `INSERT INTO correlations (id, observed_at, changed_at, repo, target, change, github_actor, matched_event_id, status)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`
-    )
-      .bind(
-        crypto.randomUUID(),
+    const match = await findMatch(env, repo, it, value, changedAt, kind);
+    const status = match ? 'attributed' : unmatchedStatus(it, kind);
+    const correlationId = crypto.randomUUID();
+    writes.push(
+      env.AUDIT_DB.prepare(
+        `INSERT INTO correlations (id, observed_at, changed_at, repo, target, change, github_actor, matched_event_id, status)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`
+      ).bind(
+        correlationId,
         nowIso,
         changedAt,
         repo,
@@ -388,22 +604,29 @@ export async function applySnapshot(
         match?.id ?? null,
         status
       )
-      .run();
+    );
+    if (status === 'unattributed')
+      writes.push(
+        outboxStatement(
+          env,
+          `[fleet-audit] UNATTRIBUTED change: ${it.kind} "${target}" in ${repo} ${change} at ${changedAt}. ` +
+            'No shim event explains it: an agent bypassed the gh shim, a human clicked it, or a GitHub App ' +
+            'did it. Check the org audit log export and fix the gap.',
+          [correlationId],
+          nowIso
+        )
+      );
     out.push({
       target,
       change: `${it.kind} ${change}`,
       status,
       matched_event_id: match?.id ?? null,
     });
-    if (!match) {
-      await alertSummer(
-        env,
-        `[fleet-audit] UNATTRIBUTED change: ${it.kind} "${target}" in ${repo} ${change} at ${changedAt}. ` +
-          'No shim event explains it: an agent bypassed the gh shim, a human clicked it, or a GitHub App ' +
-          'did it. Check the org audit log export and fix the gap.'
-      );
-    }
   }
+  // One D1 batch = one transaction: snapshot state, correlations and their alerts land together or not at all.
+  if (writes.length) await env.AUDIT_DB.batch(writes);
+  if (out.some(o => o.status === 'unattributed'))
+    await drainOutbox(env, new Date(nowIso));
   return out;
 }
 
@@ -508,6 +731,11 @@ export async function retain(env: Env, now: Date) {
   await env.AUDIT_DB.prepare('DELETE FROM correlations WHERE observed_at < ?1')
     .bind(cutoff)
     .run();
+  await env.AUDIT_DB.prepare(
+    'DELETE FROM alert_outbox WHERE delivered_at IS NOT NULL AND delivered_at < ?1'
+  )
+    .bind(cutoff)
+    .run();
   return { archived: results.length, key };
 }
 
@@ -608,6 +836,12 @@ export async function summary(env: Env, now: Date) {
     unattributed: unattributed.results ?? [],
     counts: { events_24h: c24?.n ?? 0, events_7d: c7?.n ?? 0 },
     top_actors_24h: top.results ?? [],
+    alerts_pending:
+      (
+        await env.AUDIT_DB.prepare(
+          'SELECT COUNT(*) AS n FROM alert_outbox WHERE delivered_at IS NULL'
+        ).first<{ n: number }>()
+      )?.n ?? 0,
   };
 }
 
@@ -650,7 +884,12 @@ export async function handle(
       const last = await env.AUDIT_DB.prepare(
         "SELECT value FROM snapshots WHERE key = 'cron:last'"
       ).first<{ value: string }>();
-      return json({ ok: true, last_cron_at: last?.value ?? null });
+      // last_collection_ok_at is the registry receipt: it only advances on a successful collection.
+      return json({
+        ok: true,
+        last_cron_at: last?.value ?? null,
+        ...(await collectionHealth(env, now)),
+      });
     }
     if (!authorizedReader(request, env))
       return json({ error: 'unauthorized' }, 401);
@@ -677,6 +916,9 @@ export async function handle(
   }
   if (request.method !== 'POST')
     return json({ error: 'method not allowed' }, 405);
+
+  // Token issuance never accepts the ingest signature: it has its own per-client credential.
+  if (url.pathname === '/v1/token') return issueToken(request, env, now);
 
   const parsed = await readSigned(request, env);
   if (parsed instanceof Response) return parsed;
@@ -707,6 +949,11 @@ export async function handle(
     };
     if (!body?.repo || !Array.isArray(body.items))
       return json({ error: 'repo and items are required' }, 400);
+    if (body.items.length > MAX_SNAPSHOT_ITEMS)
+      return json(
+        { error: `at most ${MAX_SNAPSHOT_ITEMS} items per snapshot` },
+        400
+      );
     const changes = await applySnapshot(
       env,
       body.repo,
@@ -727,6 +974,236 @@ export async function handle(
   return json({ error: 'not found' }, 404);
 }
 
+const MAX_TOKEN_BODY = 4096;
+
+export async function issueToken(
+  request: Request,
+  env: Env,
+  now: Date
+): Promise<Response> {
+  if (
+    !env.GITHUB_APP_PRIVATE_KEY ||
+    !env.GITHUB_APP_ID ||
+    !env.GITHUB_INSTALLATION_ID ||
+    !env.BROKER_CLIENT_KEYS
+  )
+    return json({ error: 'broker_not_configured' }, 503);
+  const body = await request.text();
+  if (body.length > MAX_TOKEN_BODY)
+    return json({ error: 'payload too large' }, 413);
+  const auth = await authenticateBrokerClient({
+    headers: request.headers,
+    body,
+    clientKeysJson: env.BROKER_CLIENT_KEYS,
+    ingestSecret: env.INGEST_HMAC_SECRET,
+    nowSec: Math.floor(now.getTime() / 1000),
+  });
+  if ('error' in auth) return json({ error: auth.error }, auth.status);
+
+  const grant = await env.AUDIT_DB.prepare(
+    'SELECT client_id, agent_class, repos, scopes, active FROM broker_grants WHERE client_id = ?1'
+  )
+    .bind(auth.clientId)
+    .first<Grant>();
+  if (!grant || !grant.active)
+    return json({ error: 'no active grant for this client' }, 403);
+
+  // Replay protection: each (client, nonce) is accepted once inside the timestamp window.
+  const seen = await env.AUDIT_DB.prepare(
+    'INSERT OR IGNORE INTO broker_nonces (client_id, nonce, seen_at) VALUES (?1, ?2, ?3)'
+  )
+    .bind(auth.clientId, auth.nonce, now.toISOString())
+    .run();
+  if ((seen.meta?.changes ?? 0) === 0)
+    return json({ error: 'replayed request' }, 409);
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return json({ error: 'invalid json' }, 400);
+  }
+  const req = authorizeTokenRequest(parsed, grant);
+  if (typeof req === 'string') return json({ error: req }, 403);
+
+  let minted: Awaited<ReturnType<typeof mintInstallationToken>>;
+  try {
+    minted = await mintInstallationToken({
+      appId: env.GITHUB_APP_ID,
+      installationId: env.GITHUB_INSTALLATION_ID,
+      privateKey: env.GITHUB_APP_PRIVATE_KEY,
+      request: req,
+    });
+  } catch (err) {
+    return json(
+      { error: err instanceof Error ? err.message : 'mint failed' },
+      502
+    );
+  }
+  const nowIso = now.toISOString();
+  // Fail closed: a token whose issuance is not on the audit trail is revoked and never returned.
+  try {
+    const audited = await insertEvents(
+      env,
+      [
+        {
+          id: crypto.randomUUID(),
+          ts: nowIso,
+          actor_agent: req.agent,
+          session_id: req.session ?? null,
+          host: req.host ?? null,
+          repo: `JovieInc/${(req.repositories ?? []).join(',')}`,
+          target: `client:${auth.clientId} scope:${req.scope}`,
+          action: 'token.issue',
+          danger: req.scope === 'ci' ? 1 : 0,
+          reason: req.reason,
+          issue: req.issue ?? null,
+          outcome: 'ok',
+          before: null,
+          after: `expires ${minted.expires_at}`,
+          source: 'broker',
+        },
+      ],
+      nowIso
+    );
+    if (audited.inserted !== 1) throw new Error('issuance event not recorded');
+  } catch {
+    await revokeInstallationToken(minted.token);
+    return json({ error: 'audit_unavailable' }, 503);
+  }
+  return json({
+    ok: true,
+    token: minted.token,
+    expires_at: minted.expires_at,
+    permissions: minted.permissions,
+  });
+}
+
+/**
+ * Hourly: read workflow states and ruleset versions for each watched repo with a read-only
+ * jovie-bot token, then diff and attribute them (applySnapshot). Replaces a GitHub cron, which
+ * repository policy forbids. No-op until the App key is bound.
+ */
+export async function correlateWatchedRepos(
+  env: Env,
+  now: Date,
+  fetchImpl: typeof fetch = fetch
+) {
+  if (
+    !env.GITHUB_APP_PRIVATE_KEY ||
+    !env.GITHUB_APP_ID ||
+    !env.GITHUB_INSTALLATION_ID
+  )
+    return [];
+  const out: Array<{
+    repo: string;
+    items: number;
+    changes: number;
+    error?: string;
+  }> = [];
+  for (const repo of watchedRepos(env)) {
+    try {
+      const { token } = await mintInstallationToken({
+        appId: env.GITHUB_APP_ID,
+        installationId: env.GITHUB_INSTALLATION_ID,
+        privateKey: env.GITHUB_APP_PRIVATE_KEY,
+        request: {
+          agent: 'fleet-audit-cron',
+          scope: 'watch',
+          repositories: [repo.split('/')[1]],
+          reason: 'hourly correlation',
+        },
+        fetchImpl,
+      });
+      const items = await collectRepoState(repo, token, fetchImpl);
+      const changes = await applySnapshot(
+        env,
+        repo,
+        items,
+        now.toISOString(),
+        'cron'
+      );
+      out.push({ repo, items: items.length, changes: changes.length });
+      // Freshness advances only after a complete collection and diff succeeded.
+      await putMeta(env, `collect:${repo}:ok`, now.toISOString());
+      await env.AUDIT_DB.prepare('DELETE FROM snapshots WHERE key = ?1')
+        .bind(`collect:${repo}:error`)
+        .run();
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      out.push({ repo, items: 0, changes: 0, error });
+      const already = await env.AUDIT_DB.prepare(
+        'SELECT value FROM snapshots WHERE key = ?1'
+      )
+        .bind(`collect:${repo}:error`)
+        .first<{ value: string }>();
+      await putMeta(
+        env,
+        `collect:${repo}:error`,
+        `${now.toISOString()} ${error.slice(0, 200)}`
+      );
+      if (!already)
+        await alertSummer(
+          env,
+          `[fleet-audit] correlation FAILED for ${repo} at ${now.toISOString()}: ${error.slice(0, 300)}. ` +
+            'Drift detection for this repo is stale until a collection succeeds.'
+        );
+    }
+  }
+  return out;
+}
+
+async function putMeta(env: Env, key: string, value: string) {
+  await env.AUDIT_DB.prepare(
+    `INSERT INTO snapshots (key, value, observed_at) VALUES (?1, ?2, ?2)
+     ON CONFLICT(key) DO UPDATE SET value = ?2, observed_at = ?2`
+  )
+    .bind(key, value)
+    .run();
+}
+
+function watchedRepos(env: Env): string[] {
+  return (env.WATCH_REPOS ?? 'JovieInc/Jovie')
+    .split(',')
+    .map(r => r.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Collection freshness for the liveness receipt: the oldest last-successful collection across
+ * watched repos (null until every repo has succeeded once), plus any repo whose latest attempt failed.
+ */
+export async function collectionHealth(env: Env, now: Date) {
+  let oldest: string | null = null;
+  let missing = false;
+  const errors: Array<{ repo: string; error: string }> = [];
+  for (const repo of watchedRepos(env)) {
+    const ok = await env.AUDIT_DB.prepare(
+      'SELECT value FROM snapshots WHERE key = ?1'
+    )
+      .bind(`collect:${repo}:ok`)
+      .first<{ value: string }>();
+    const err = await env.AUDIT_DB.prepare(
+      'SELECT value FROM snapshots WHERE key = ?1'
+    )
+      .bind(`collect:${repo}:error`)
+      .first<{ value: string }>();
+    if (err) errors.push({ repo, error: err.value });
+    if (!ok) missing = true;
+    else if (!oldest || ok.value < oldest) oldest = ok.value;
+  }
+  const last = missing ? null : oldest;
+  const stale =
+    !last ||
+    errors.length > 0 ||
+    now.getTime() - Date.parse(last) > COLLECTION_STALE_MS;
+  return {
+    last_collection_ok_at: last,
+    collection_stale: stale,
+    collection_errors: errors,
+  };
+}
+
 export default {
   fetch(request: Request, env: Env): Promise<Response> {
     return handle(request, env);
@@ -739,6 +1216,11 @@ export default {
        ON CONFLICT(key) DO UPDATE SET value = ?1, observed_at = ?1`
     )
       .bind(now.toISOString())
+      .run();
+    await correlateWatchedRepos(env, now);
+    await drainOutbox(env, now);
+    await env.AUDIT_DB.prepare('DELETE FROM broker_nonces WHERE seen_at < ?1')
+      .bind(new Date(now.getTime() - 3_600_000).toISOString())
       .run();
     if (now.getUTCHours() === 3) await retain(env, now);
   },

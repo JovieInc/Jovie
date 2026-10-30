@@ -1,25 +1,38 @@
 import assert from 'node:assert/strict';
-import { createHmac } from 'node:crypto';
+import { createHmac, createVerify, generateKeyPairSync } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { test } from 'node:test';
 
+import {
+  appJwt,
+  authorizeTokenRequest,
+  collectRepoState,
+  SCOPE_PERMISSIONS,
+  signBrokerRequest,
+} from './broker.ts';
 import worker, {
+  alertSummer,
+  applySnapshot,
+  correlateWatchedRepos,
+  drainOutbox,
   handle,
   matchesTarget,
+  OUTBOX_MAX_ATTEMPTS,
   retain,
   sanitizeEvent,
 } from './index.ts';
 
-const MIGRATION = new URL(
-  '../../migrations/audit/0001_init.sql',
-  import.meta.url
-);
+const MIGRATIONS = [
+  '0001_init.sql',
+  '0002_broker_grants.sql',
+  '0003_alert_outbox.sql',
+].map(f => new URL(`../../migrations/audit/${f}`, import.meta.url));
 
 /** Minimal D1 stand-in over node:sqlite (same SQL dialect). */
 function d1() {
   const db = new DatabaseSync(':memory:');
-  db.exec(readFileSync(MIGRATION, 'utf8'));
+  for (const m of MIGRATIONS) db.exec(readFileSync(m, 'utf8'));
   const stmt = (sql, args = []) => ({
     bind: (...a) => stmt(sql, a),
     first: async () => db.prepare(sql).get(...args) ?? null,
@@ -31,7 +44,18 @@ function d1() {
   });
   return {
     prepare: sql => stmt(sql),
-    batch: async list => Promise.all(list.map(s => s.run())),
+    batch: async list => {
+      db.exec('BEGIN');
+      try {
+        const out = [];
+        for (const st of list) out.push(await st.run());
+        db.exec('COMMIT');
+        return out;
+      } catch (err) {
+        db.exec('ROLLBACK');
+        throw err;
+      }
+    },
     raw: db,
   };
 }
@@ -228,13 +252,24 @@ test('target matching uses id, name, or workflow file', () => {
           target: 'repos/JovieInc/Jovie/actions/workflows/368087390/disable',
         })
       ),
-      it
+      it,
+      'JovieInc/Jovie'
     )
   );
   assert.ok(
-    matchesTarget(sanitizeEvent(ev({ target: 'lane-fix-relay.yml' })), it)
+    matchesTarget(
+      sanitizeEvent(ev({ target: 'lane-fix-relay.yml' })),
+      it,
+      'JovieInc/Jovie'
+    )
   );
-  assert.ok(!matchesTarget(sanitizeEvent(ev({ target: 'ci.yml' })), it));
+  assert.ok(
+    !matchesTarget(
+      sanitizeEvent(ev({ target: 'ci.yml' })),
+      it,
+      'JovieInc/Jovie'
+    )
+  );
 });
 
 test('retention archives to R2 before deleting, and never deletes without an archive', async () => {
@@ -293,6 +328,834 @@ test('budget alarm fires once at 80%', async () => {
     const alarms = calls.filter(c => c.body.body.includes('budget alarm'));
     assert.equal(alarms.length, 1);
     assert.match(calls[0].url, /\/summer\/v1\/mesh\/inbox$/);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test('hourly cron correlation: mints a watch token, reads state, attributes a disable', async () => {
+  const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const e = env({
+    GITHUB_APP_ID: '2934433',
+    GITHUB_INSTALLATION_ID: '112037986',
+    GITHUB_APP_PRIVATE_KEY: privateKey.export({ type: 'pkcs8', format: 'pem' }),
+    WATCH_REPOS: 'JovieInc/Jovie',
+  });
+  let state = 'active';
+  const calls = [];
+  const fakeFetch = async (url, init = {}) => {
+    calls.push(`${init.method ?? 'GET'} ${new URL(url).pathname}`);
+    if (String(url).endsWith('/access_tokens')) {
+      assert.deepEqual(JSON.parse(init.body).permissions, {
+        actions: 'read',
+        metadata: 'read',
+      });
+      return new Response(
+        JSON.stringify({
+          token: 'ghs_x',
+          expires_at: '2026-10-29T02:00:00Z',
+          permissions: {},
+        })
+      );
+    }
+    if (String(url).includes('/actions/workflows'))
+      return new Response(
+        JSON.stringify({
+          total_count: 1,
+          workflows: [
+            {
+              id: 368087390,
+              name: 'Lane Fix Relay',
+              path: '.github/workflows/lane-fix-relay.yml',
+              state,
+              updated_at: '2026-10-29T00:23:50Z',
+            },
+          ],
+        })
+      );
+    return new Response('[]');
+  };
+  await handle(
+    signed('/v1/events', [ev()]),
+    e,
+    new Date('2026-10-29T00:24:00Z')
+  );
+  let out = await correlateWatchedRepos(
+    e,
+    new Date('2026-10-29T00:00:00Z'),
+    fakeFetch
+  );
+  assert.deepEqual(out, [{ repo: 'JovieInc/Jovie', items: 1, changes: 0 }]);
+  state = 'disabled_manually';
+  out = await correlateWatchedRepos(
+    e,
+    new Date('2026-10-29T01:00:00Z'),
+    fakeFetch
+  );
+  assert.equal(out[0].changes, 1);
+  const row = e.AUDIT_DB.raw
+    .prepare('SELECT status, matched_event_id FROM correlations')
+    .get();
+  assert.equal(row.status, 'attributed');
+  assert.ok(calls.includes('POST /app/installations/112037986/access_tokens'));
+});
+
+test('no App key: the cron correlation is a no-op', async () => {
+  assert.deepEqual(await correlateWatchedRepos(env(), new Date()), []);
+});
+
+// ---------------------------------------------------------------- review of #23742: broker security
+
+const GRANT = {
+  client_id: 'gem-lanes',
+  agent_class: 'lane:gem',
+  repos: 'Jovie',
+  scopes: 'fleet,ci',
+  active: 1,
+};
+
+function brokerEnv(extra = {}) {
+  const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const e = env({
+    GITHUB_APP_ID: '2934433',
+    GITHUB_INSTALLATION_ID: '112037986',
+    GITHUB_APP_PRIVATE_KEY: privateKey.export({ type: 'pkcs8', format: 'pem' }),
+    BROKER_CLIENT_KEYS: JSON.stringify({
+      'gem-lanes': 'k'.repeat(40),
+      'no-grant': 'n'.repeat(40),
+    }),
+    ...extra,
+  });
+  e.AUDIT_DB.raw
+    .prepare(
+      `INSERT INTO broker_grants (client_id, agent_class, repos, scopes, active, created_at)
+       VALUES (?, ?, ?, ?, ?, '2026-10-29T00:00:00Z')`
+    )
+    .run(
+      GRANT.client_id,
+      GRANT.agent_class,
+      GRANT.repos,
+      GRANT.scopes,
+      GRANT.active
+    );
+  return e;
+}
+
+async function brokerRequest(
+  body,
+  { client = 'gem-lanes', key = 'k'.repeat(40), ts, nonce } = {}
+) {
+  const text = JSON.stringify(body);
+  const t = String(ts ?? Math.floor(Date.parse('2026-10-29T12:00:00Z') / 1000));
+  const n = nonce ?? `nonce-${Math.random().toString(36).slice(2)}-xxxxxxxx`;
+  return new Request('https://jovie-fleet-audit.tim-fd8.workers.dev/v1/token', {
+    method: 'POST',
+    body: text,
+    headers: {
+      'x-fleet-broker-client': client,
+      'x-fleet-broker-timestamp': t,
+      'x-fleet-broker-nonce': n,
+      'x-fleet-broker-signature': await signBrokerRequest(key, t, n, text),
+    },
+  });
+}
+
+const NOW = new Date('2026-10-29T12:00:00Z');
+
+async function withMintStub(fn) {
+  const realFetch = globalThis.fetch;
+  const minted = [];
+  globalThis.fetch = async (url, init) => {
+    if (String(url).endsWith('/access_tokens')) {
+      minted.push(JSON.parse(init.body));
+      return new Response(
+        JSON.stringify({
+          token: 'ghs_test',
+          expires_at: '2026-10-29T13:00:00Z',
+          permissions: {},
+        })
+      );
+    }
+    return new Response('{}');
+  };
+  try {
+    return await fn(minted);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
+
+test('review 1: ci scope is actions:write only (cancel/rerun), nothing else writable', () => {
+  assert.deepEqual(SCOPE_PERMISSIONS.ci, {
+    actions: 'write',
+    metadata: 'read',
+  });
+  for (const [scope, perms] of Object.entries(SCOPE_PERMISSIONS))
+    assert.ok(
+      !('administration' in perms) &&
+        !('workflows' in perms) &&
+        !('secrets' in perms),
+      scope
+    );
+  assert.deepEqual(SCOPE_PERMISSIONS.watch, {
+    actions: 'read',
+    metadata: 'read',
+  });
+});
+
+test('review 2a: the ingest signature cannot mint a token', async () => {
+  await withMintStub(async minted => {
+    const res = await handle(
+      signed('/v1/token', { scope: 'fleet', reason: 'push the fix branch' }),
+      brokerEnv(),
+      NOW
+    );
+    assert.equal(res.status, 401);
+    assert.equal(minted.length, 0);
+  });
+});
+
+test('review 2b: a broker key equal to the ingest secret is refused', async () => {
+  const e = brokerEnv({ INGEST_HMAC_SECRET: 'k'.repeat(40) });
+  const res = await handle(
+    await brokerRequest({ scope: 'fleet', reason: 'push the fix branch' }),
+    e,
+    NOW
+  );
+  assert.equal(res.status, 503);
+});
+
+test('review 2c: identity comes from the grant; body cannot pick agent, scope or repos beyond it', async () => {
+  await withMintStub(async minted => {
+    const e = brokerEnv();
+    let res = await handle(
+      await brokerRequest({
+        agent: 'tim',
+        scope: 'fleet',
+        reason: 'push the fix branch',
+      }),
+      e,
+      NOW
+    );
+    assert.equal(res.status, 403);
+    res = await handle(
+      await brokerRequest({
+        scope: 'fleet',
+        reason: 'push the fix branch',
+        repositories: ['gbrain'],
+      }),
+      e,
+      NOW
+    );
+    assert.equal(res.status, 403);
+    res = await handle(
+      await brokerRequest(
+        { scope: 'fleet', reason: 'x' },
+        { client: 'no-grant', key: 'n'.repeat(40) }
+      ),
+      e,
+      NOW
+    );
+    assert.equal(res.status, 403);
+    res = await handle(
+      await brokerRequest({ scope: 'ci', reason: 'cancel stale relay runs' }),
+      e,
+      NOW
+    );
+    assert.equal(res.status, 403, 'ci without an issue');
+
+    res = await handle(
+      await brokerRequest({
+        scope: 'ci',
+        reason: 'cancel stale relay runs',
+        issue: 'JOV-1',
+        session: 's-9',
+      }),
+      e,
+      NOW
+    );
+    assert.equal(res.status, 200);
+    assert.deepEqual(minted.at(-1), {
+      repositories: ['Jovie'],
+      permissions: { actions: 'write', metadata: 'read' },
+    });
+    const row = e.AUDIT_DB.raw
+      .prepare(
+        "SELECT actor_agent, target, session_id, outcome FROM events WHERE action = 'token.issue'"
+      )
+      .get();
+    assert.deepEqual(
+      { ...row },
+      {
+        actor_agent: 'lane:gem',
+        target: 'client:gem-lanes scope:ci',
+        session_id: 's-9',
+        outcome: 'ok',
+      }
+    );
+  });
+});
+
+test('review 2d: replayed nonce and stale timestamp are rejected', async () => {
+  await withMintStub(async minted => {
+    const e = brokerEnv();
+    const nonce = 'fixed-nonce-0123456789';
+    const body = { scope: 'fleet', reason: 'push the fix branch' };
+    assert.equal(
+      (await handle(await brokerRequest(body, { nonce }), e, NOW)).status,
+      200
+    );
+    assert.equal(
+      (await handle(await brokerRequest(body, { nonce }), e, NOW)).status,
+      409
+    );
+    const stale = Math.floor(NOW.getTime() / 1000) - 301;
+    assert.equal(
+      (await handle(await brokerRequest(body, { ts: stale }), e, NOW)).status,
+      401
+    );
+    const tampered = await brokerRequest(body);
+    const forged = new Request(tampered.url, {
+      method: 'POST',
+      headers: tampered.headers,
+      body: JSON.stringify({
+        scope: 'ci',
+        reason: 'escalate quietly',
+        issue: 'JOV-1',
+      }),
+    });
+    assert.equal((await handle(forged, e, NOW)).status, 401);
+    assert.equal(minted.length, 1);
+  });
+});
+
+test('review 2e: grants can never hold watch or admin scopes', () => {
+  const e = env();
+  assert.throws(() =>
+    e.AUDIT_DB.raw
+      .prepare(
+        "INSERT INTO broker_grants VALUES ('x', 'y', 'Jovie', 'fleet,watch', 1, null, 'now')"
+      )
+      .run()
+  );
+});
+
+test('a valid broker request still needs the App key configured', async () => {
+  const res = await handle(
+    await brokerRequest({ scope: 'fleet', reason: 'push the fix branch' }),
+    env(),
+    NOW
+  );
+  assert.equal(res.status, 503);
+});
+
+test('app JWT is a verifiable RS256 token for jovie-bot', async () => {
+  const { privateKey, publicKey } = generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+  });
+  const jwt = await appJwt(
+    '2934433',
+    privateKey.export({ type: 'pkcs8', format: 'pem' }),
+    1_800_000_000
+  );
+  const [h, p, s] = jwt.split('.');
+  const v = createVerify('RSA-SHA256');
+  v.update(`${h}.${p}`);
+  assert.ok(v.verify(publicKey, Buffer.from(s, 'base64url')));
+  assert.equal(JSON.parse(Buffer.from(p, 'base64url')).iss, '2934433');
+});
+
+test('authorizeTokenRequest rejects the internal watch scope', () => {
+  assert.equal(
+    authorizeTokenRequest({ scope: 'watch', reason: 'yyyyyyyyy' }, GRANT),
+    'scope must be fleet or ci'
+  );
+});
+
+// ---------------------------------------------------------------- review 3: freshness
+
+function cronEnv() {
+  const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  return env({
+    GITHUB_APP_ID: '2934433',
+    GITHUB_INSTALLATION_ID: '112037986',
+    GITHUB_APP_PRIVATE_KEY: privateKey.export({ type: 'pkcs8', format: 'pem' }),
+    WATCH_REPOS: 'JovieInc/Jovie',
+    MESH_TOKEN: 't',
+    MESH_SENDER_ID: 's',
+    MESH_SENDER_KIND: 'claude',
+  });
+}
+
+function stateFetch(state) {
+  return async (url, init = {}) => {
+    const u = String(url);
+    if (u.endsWith('/access_tokens'))
+      return new Response(
+        JSON.stringify({
+          token: 'ghs_x',
+          expires_at: '2026-10-29T02:00:00Z',
+          permissions: {},
+        })
+      );
+    if (state.fail) return new Response('{}', { status: 502 });
+    if (u.includes('/actions/workflows'))
+      return new Response(
+        JSON.stringify({
+          total_count: state.workflows.length,
+          workflows: state.workflows,
+        })
+      );
+    if (/\/rulesets\/\d+$/.test(u))
+      return new Response(
+        JSON.stringify({ updated_at: '2026-10-29T00:00:00Z' })
+      );
+    if (u.includes('/rulesets'))
+      return new Response(JSON.stringify(state.rulesets ?? []));
+    return new Response('{}');
+  };
+}
+
+const wf = (id, name, st = 'active') => ({
+  id,
+  name,
+  path: `.github/workflows/${name}.yml`,
+  state: st,
+  updated_at: '2026-10-29T00:23:50Z',
+});
+
+test('review 3: freshness advances only on success; a failed collection is stale and alerts once', async () => {
+  const e = cronEnv();
+  const alerts = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (_u, init) => {
+    alerts.push(JSON.parse(init.body).body);
+    return new Response('{}');
+  };
+  try {
+    const state = { workflows: [wf(1, 'ci')] };
+    await correlateWatchedRepos(
+      e,
+      new Date('2026-10-29T01:00:00Z'),
+      stateFetch(state)
+    );
+    let h = await (
+      await handle(
+        new Request('https://x/healthz'),
+        e,
+        new Date('2026-10-29T01:05:00Z')
+      )
+    ).json();
+    assert.equal(h.last_collection_ok_at, '2026-10-29T01:00:00.000Z');
+    assert.equal(h.collection_stale, false);
+
+    state.fail = true;
+    await correlateWatchedRepos(
+      e,
+      new Date('2026-10-29T02:00:00Z'),
+      stateFetch(state)
+    );
+    await correlateWatchedRepos(
+      e,
+      new Date('2026-10-29T03:00:00Z'),
+      stateFetch(state)
+    );
+    h = await (
+      await handle(
+        new Request('https://x/healthz'),
+        e,
+        new Date('2026-10-29T03:05:00Z')
+      )
+    ).json();
+    assert.equal(
+      h.last_collection_ok_at,
+      '2026-10-29T01:00:00.000Z',
+      'did not advance on failure'
+    );
+    assert.equal(h.collection_stale, true);
+    assert.equal(h.collection_errors.length, 1);
+    assert.equal(
+      alerts.filter(a => a.includes('correlation FAILED')).length,
+      1,
+      'alerts once per outage'
+    );
+
+    state.fail = false;
+    await correlateWatchedRepos(
+      e,
+      new Date('2026-10-29T04:00:00Z'),
+      stateFetch(state)
+    );
+    h = await (
+      await handle(
+        new Request('https://x/healthz'),
+        e,
+        new Date('2026-10-29T04:05:00Z')
+      )
+    ).json();
+    assert.equal(h.collection_stale, false);
+    assert.deepEqual(h.collection_errors, []);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test('review 3b: an unreadable ruleset list fails the whole collection (no silent partial snapshot)', async () => {
+  await assert.rejects(
+    collectRepoState('JovieInc/Jovie', 't', async url =>
+      String(url).includes('rulesets')
+        ? new Response('{}', { status: 403 })
+        : new Response(JSON.stringify({ workflows: [] }))
+    )
+  );
+});
+
+test('review 3c: never configured means no freshness at all', async () => {
+  const h = await (
+    await handle(new Request('https://x/healthz'), env(), new Date())
+  ).json();
+  assert.equal(h.last_collection_ok_at, null);
+  assert.equal(h.collection_stale, true);
+});
+
+// ---------------------------------------------------------------- review 4: full-set drift
+
+test('review 4a: additions and removals are detected; ruleset removal without a shim event alerts', async () => {
+  const e = env();
+  const repo = 'JovieInc/Jovie';
+  const t0 = new Date('2026-10-29T00:00:00Z');
+  const rs = {
+    kind: 'ruleset',
+    id: 24952446,
+    name: 'main protection',
+    updated_at: '2026-10-01T00:00:00Z',
+  };
+  const w = (id, name) => ({
+    kind: 'workflow',
+    id,
+    name,
+    path: `.github/workflows/${name}.yml`,
+    state: 'active',
+  });
+  await handle(
+    signed('/v1/snapshot', { repo, items: [w(1, 'ci'), rs] }),
+    e,
+    t0
+  );
+  const res = await handle(
+    signed('/v1/snapshot', { repo, items: [w(1, 'ci'), w(2, 'new-flow')] }),
+    e,
+    new Date('2026-10-29T01:00:00Z')
+  );
+  const { changes } = await res.json();
+  const byTarget = Object.fromEntries(changes.map(c => [c.target, c]));
+  assert.match(byTarget['new-flow'].change, /added/);
+  assert.equal(
+    byTarget['new-flow'].status,
+    'observed',
+    'workflow files arrive by merged commits'
+  );
+  const removed = changes.find(c => /removed/.test(c.change));
+  assert.ok(removed, 'ruleset removal detected');
+  assert.equal(removed.status, 'unattributed');
+  const keys = e.AUDIT_DB.raw
+    .prepare('SELECT key FROM snapshots')
+    .all()
+    .map(r => r.key);
+  assert.ok(
+    !keys.some(k => k.includes('ruleset')),
+    'removed objects leave the snapshot'
+  );
+});
+
+test('review 4b: a failed or refused mutation never counts as attribution', async () => {
+  const e = env();
+  const repo = 'JovieInc/Jovie';
+  const t0 = new Date('2026-10-29T00:00:00Z');
+  await handle(signed('/v1/events', [ev({ outcome: 'exit:1' })]), e, t0);
+  const item = st => ({
+    kind: 'workflow',
+    id: 368087390,
+    name: 'Lane Fix Relay',
+    state: st,
+    updated_at: '2026-10-29T00:23:50Z',
+  });
+  await handle(
+    signed('/v1/snapshot', { repo, items: [item('active')] }),
+    e,
+    t0
+  );
+  const res = await handle(
+    signed('/v1/snapshot', { repo, items: [item('disabled_manually')] }),
+    e,
+    new Date('2026-10-29T01:00:00Z')
+  );
+  const [change] = (await res.json()).changes;
+  assert.equal(change.status, 'unattributed');
+  assert.equal(change.matched_event_id, null);
+});
+
+test('review 4c: oversized snapshots are rejected instead of truncated into false removals', async () => {
+  const items = Array.from({ length: 501 }, (_, i) => ({
+    kind: 'workflow',
+    id: i,
+    name: `w${i}`,
+    state: 'active',
+  }));
+  const res = await handle(
+    signed('/v1/snapshot', { repo: 'JovieInc/Jovie', items }),
+    env()
+  );
+  assert.equal(res.status, 400);
+});
+
+// ---------------------------------------------------------------- re-review of #23742 at d7532ce1f0
+
+test('re-review 1: attribution needs the exact normalized repo and exact object', () => {
+  const it = {
+    kind: 'workflow',
+    id: 368087390,
+    name: 'Lane Fix Relay',
+    path: '.github/workflows/lane-fix-relay.yml',
+  };
+  const m = over =>
+    matchesTarget(sanitizeEvent(ev(over)), it, 'JovieInc/Jovie');
+  assert.ok(m({}));
+  assert.ok(
+    m({ repo: 'https://github.com/JovieInc/Jovie.git' }),
+    'URL form normalizes'
+  );
+  assert.ok(!m({ repo: 'JovieInc/Jovie-old' }), 'no repo substring');
+  assert.ok(!m({ repo: null }), 'missing repo never attributes');
+  assert.ok(!m({ repo: 'origin' }), 'a git remote name is not a repository');
+  assert.ok(!m({ target: 'Lane Fix Relay (copy)' }), 'no target substring');
+  assert.ok(
+    !m({
+      target: 'repos/JovieInc/Other/actions/workflows/368087390/disable',
+      repo: null,
+    }),
+    'path repo must match'
+  );
+  assert.ok(
+    !m({ target: 'repos/JovieInc/Jovie/rulesets/368087390' }),
+    'path kind must match'
+  );
+  assert.ok(
+    m({
+      target: 'repos/JovieInc/Jovie/actions/workflows/368087390/disable',
+      repo: null,
+    }),
+    'path names the repo'
+  );
+});
+
+test('re-review 2a: snapshot state, correlations and alerts are one transaction', async () => {
+  const e = env();
+  const repo = 'JovieInc/Jovie';
+  const item = st => ({
+    kind: 'workflow',
+    id: 7,
+    name: 'Relay',
+    state: st,
+    updated_at: '2026-10-29T00:23:50Z',
+  });
+  await handle(
+    signed('/v1/snapshot', { repo, items: [item('active')] }),
+    e,
+    new Date('2026-10-29T00:00:00Z')
+  );
+  e.AUDIT_DB.raw.exec('DROP TABLE alert_outbox'); // the alert write will fail mid-batch
+  await assert.rejects(
+    applySnapshot(
+      e,
+      repo,
+      [item('disabled_manually')],
+      '2026-10-29T01:00:00.000Z',
+      'cron'
+    )
+  );
+  const snap = e.AUDIT_DB.raw
+    .prepare(`SELECT value FROM snapshots WHERE key = '${repo}:workflow:7'`)
+    .get();
+  assert.equal(
+    snap.value,
+    'active',
+    'state did not advance without its correlation and alert'
+  );
+  assert.equal(
+    e.AUDIT_DB.raw.prepare('SELECT COUNT(*) AS n FROM correlations').get().n,
+    0
+  );
+});
+
+test('re-review 2b: a failed alert delivery keeps bounded retry state and is retried', async () => {
+  const e = env({
+    MESH_TOKEN: 't',
+    MESH_SENDER_ID: 's',
+    MESH_SENDER_KIND: 'claude',
+  });
+  const realFetch = globalThis.fetch;
+  let up = false;
+  globalThis.fetch = async () => new Response('{}', { status: up ? 200 : 503 });
+  try {
+    assert.equal(await alertSummer(e, 'hello'), false);
+    let row = e.AUDIT_DB.raw
+      .prepare(
+        'SELECT attempts, delivered_at, last_error, next_attempt_at FROM alert_outbox'
+      )
+      .get();
+    assert.equal(row.attempts, 1);
+    assert.equal(row.delivered_at, null);
+    assert.equal(row.last_error, 'http_503');
+    assert.ok(
+      Date.parse(row.next_attempt_at) > Date.now(),
+      'backoff scheduled'
+    );
+    up = true;
+    assert.deepEqual(await drainOutbox(e, new Date(Date.now() + 3_600_000)), {
+      delivered: 1,
+      failed: 0,
+    });
+    row = e.AUDIT_DB.raw
+      .prepare('SELECT attempts, delivered_at FROM alert_outbox')
+      .get();
+    assert.ok(row.delivered_at);
+    up = false;
+    await alertSummer(e, 'never delivered');
+    for (let i = 0; i < 20; i++)
+      await drainOutbox(e, new Date(Date.now() + (i + 1) * 7 * 3_600_000));
+    const dead = e.AUDIT_DB.raw
+      .prepare(
+        "SELECT attempts FROM alert_outbox WHERE body = 'never delivered'"
+      )
+      .get();
+    assert.equal(dead.attempts, OUTBOX_MAX_ATTEMPTS, 'retries are bounded');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test('re-review 3a: incomplete pagination and malformed pages fail closed', async () => {
+  const row = i => ({
+    id: i,
+    name: `w${i}`,
+    path: `.github/workflows/w${i}.yml`,
+    state: 'active',
+  });
+  const pages =
+    (wf, rulesets = []) =>
+    async url => {
+      const u = new URL(String(url));
+      if (u.pathname.endsWith('/actions/workflows'))
+        return new Response(
+          JSON.stringify(wf(Number(u.searchParams.get('page'))))
+        );
+      if (/\/rulesets\/\d+$/.test(u.pathname))
+        return new Response(
+          JSON.stringify({ updated_at: '2026-10-01T00:00:00Z' })
+        );
+      return new Response(JSON.stringify(rulesets));
+    };
+  const full = await collectRepoState(
+    'JovieInc/Jovie',
+    't',
+    pages(p => ({
+      total_count: 150,
+      workflows: Array.from({ length: p === 1 ? 100 : 50 }, (_, i) =>
+        row((p - 1) * 100 + i)
+      ),
+    }))
+  );
+  assert.equal(full.length, 150);
+  await assert.rejects(
+    collectRepoState(
+      'JovieInc/Jovie',
+      't',
+      pages(p => ({
+        total_count: 150,
+        workflows: p === 1 ? Array.from({ length: 100 }, (_, i) => row(i)) : [],
+      }))
+    ),
+    /collected 100 of 150/
+  );
+  await assert.rejects(
+    collectRepoState(
+      'JovieInc/Jovie',
+      't',
+      pages(() => ({ workflows: [] }))
+    ),
+    /malformed workflows/
+  );
+  await assert.rejects(
+    collectRepoState(
+      'JovieInc/Jovie',
+      't',
+      pages(() => ({ total_count: 1, workflows: [{ id: 'x' }] }))
+    ),
+    /malformed workflow row/
+  );
+  await assert.rejects(
+    collectRepoState(
+      'JovieInc/Jovie',
+      't',
+      pages(() => ({ total_count: 0, workflows: [] }), { bad: true })
+    ),
+    /malformed rulesets/
+  );
+});
+
+test('re-review 3b: an empty first snapshot still sets a baseline, so later additions are drift', async () => {
+  const e = env();
+  const repo = 'JovieInc/gbrain';
+  let res = await handle(
+    signed('/v1/snapshot', { repo, items: [] }),
+    e,
+    new Date('2026-10-29T00:00:00Z')
+  );
+  assert.deepEqual((await res.json()).changes, []);
+  const rs = {
+    kind: 'ruleset',
+    id: 9,
+    name: 'new rule',
+    updated_at: '2026-10-29T00:30:00Z',
+  };
+  res = await handle(
+    signed('/v1/snapshot', { repo, items: [rs] }),
+    e,
+    new Date('2026-10-29T01:00:00Z')
+  );
+  const [change] = (await res.json()).changes;
+  assert.match(change.change, /added/);
+  assert.equal(change.status, 'unattributed');
+});
+
+test('re-review 4: if the issuance audit write fails, the token is revoked and never returned', async () => {
+  const e = brokerEnv();
+  e.AUDIT_DB.raw.exec('DROP TABLE events');
+  const realFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init = {}) => {
+    calls.push(`${init.method ?? 'GET'} ${new URL(String(url)).pathname}`);
+    if (String(url).endsWith('/access_tokens'))
+      return new Response(
+        JSON.stringify({
+          token: 'ghs_secret',
+          expires_at: '2026-10-29T13:00:00Z',
+          permissions: {},
+        })
+      );
+    return new Response(null, { status: 204 });
+  };
+  try {
+    const res = await handle(
+      await brokerRequest({ scope: 'fleet', reason: 'push the fix branch' }),
+      e,
+      NOW
+    );
+    assert.equal(res.status, 503);
+    const text = await res.text();
+    assert.ok(!text.includes('ghs_secret'));
+    assert.ok(calls.includes('DELETE /installation/token'));
   } finally {
     globalThis.fetch = realFetch;
   }
