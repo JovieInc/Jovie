@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
+  collectDiagnosticLines,
   collectPlaywrightFailureAnnotations,
+  formatDiagnosticLinesAnnotation,
   formatPlaywrightFailureAnnotation,
   formatPlaywrightFailureTailAnnotation,
   parsePlaywrightFailures,
@@ -146,4 +148,45 @@ test('tail annotation omits blank lines, caps length and redacts secrets', () =>
 test('tail annotation returns null for empty output', () => {
   assert.equal(formatPlaywrightFailureTailAnnotation(''), null);
   assert.equal(formatPlaywrightFailureTailAnnotation(undefined), null);
+});
+
+test('collects bounded diagnostic lines naming the surfaced failure', () => {
+  const output = [
+    '{"config":{"reporter":"json"},',
+    '      "message":"POST /api/stripe/checkout returned 500: {\\"error\\":\\"Failed to create checkout session: stripe test clock rolled back\\"}"',
+    '      "message":"POST /api/stripe/checkout returned 500: {\\"error\\":\\"Failed to create checkout session: stripe test clock rolled back\\"}"',
+    '[claim-dogfood] checkout session creation failed: Error: stripe test clock rolled back',
+  ].join('\n');
+  const hits = collectDiagnosticLines(output);
+  assert.equal(hits.length, 2);
+  assert.ok(hits[0].includes('returned 500:'));
+  assert.ok(hits[1].includes('[claim-dogfood]'));
+});
+
+test('caps diagnostic lines at the limit', () => {
+  const output = Array.from(
+    { length: 10 },
+    (_, index) => `line returned 500: ${index}`
+  ).join('\n');
+  assert.equal(collectDiagnosticLines(output).length, 4);
+});
+
+test('diagnostic annotation is one redacted ::error with the cause inline', () => {
+  const hits = [
+    'POST /api/stripe/checkout returned 500: {"error":"Failed to create checkout session: boom"}',
+    secret,
+  ];
+  const annotation = formatDiagnosticLinesAnnotation(hits, {
+    redact: text => text.split(secret).join('[redacted]'),
+  });
+  assert.ok(
+    annotation.startsWith('::error title=E2E checkout failure diagnostics ::')
+  );
+  assert.ok(annotation.includes('Failed to create checkout session: boom'));
+  assert.ok(!annotation.includes(secret));
+});
+
+test('diagnostic annotation returns null when nothing matched', () => {
+  assert.equal(formatDiagnosticLinesAnnotation([]), null);
+  assert.equal(collectDiagnosticLines('no matches here').length, 0);
 });
