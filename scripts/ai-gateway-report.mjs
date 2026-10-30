@@ -52,7 +52,7 @@ export async function fetchRows(groupBy, days, apiKey, fetchImpl = fetch) {
   });
   if (res.status < 200 || res.status >= 300)
     throw new Error(`gateway report ${res.status}`);
-  return res.json().results ?? [];
+  return /** @type {{ results?: object[] }} */ (res.json()).results ?? [];
 }
 
 export async function main(argv = process.argv.slice(2), env = process.env) {
