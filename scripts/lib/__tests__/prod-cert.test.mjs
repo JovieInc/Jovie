@@ -547,6 +547,37 @@ describe('JOV-9854 deploy-skew attribution', () => {
     ]);
   });
 
+  it('capabilities from two specs declaring the same surface are unioned', async () => {
+    // smoke-prod-auth and prod-cert-start-chat both declare `claim` from
+    // different Playwright workers; neither declaration may clobber the other.
+    // Under last-write-wins, claimed-profile-owned (first spec only) would
+    // lose its declaration and read "served build predates"; the union keeps
+    // every declared check on the implemented-but-absent ("did not run") path.
+    const { receipts } = await runProductionCertification({
+      fetchImpl: fakeFetch(),
+      authStatus: 'passed',
+      producerSourceSha: SHA,
+      steps: [
+        capabilities('claim', ['claimed-profile-owned']),
+        capabilities('claim', [
+          'start-chat-first-reply',
+          'golden-path-preview-has-release',
+        ]),
+      ],
+    });
+    const claim = receipts.find(r => r.surface === 'claim');
+    expect(claim.status).toBe('blocked');
+    for (const id of [
+      'claimed-profile-owned',
+      'start-chat-first-reply',
+      'golden-path-preview-has-release',
+    ]) {
+      expect(claim.checks.find(c => c.id === id).summary).toBe(
+        'browser step did not run (auth smoke passed)'
+      );
+    }
+  });
+
   it('loadCertSteps: missing/empty is zero steps, corrupt is a loud failure', async () => {
     const fs = await import('node:fs');
     const os = await import('node:os');

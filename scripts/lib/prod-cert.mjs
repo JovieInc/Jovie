@@ -344,7 +344,10 @@ export function stepChecks(
         Array.isArray(step.ids) &&
         step.ids.every(id => typeof id === 'string')
       ) {
-        capabilitiesBySurface[step.surface] = new Set(step.ids);
+        // Two specs can declare the same surface (claim) from different
+        // workers — union so neither declaration is lost to write order.
+        const declared = (capabilitiesBySurface[step.surface] ??= new Set());
+        for (const id of step.ids) declared.add(id);
       }
       continue;
     }
