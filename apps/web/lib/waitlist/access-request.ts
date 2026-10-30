@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { readCachedAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import {
   buildProductionWaitlistCanaryMarker,
@@ -78,8 +79,8 @@ export interface WaitlistAccessRequestInput {
   readonly source?: string;
   /**
    * Free-text answers from the qualifying onboarding interview. When
-   * provided, they are scored deterministically and can admit a gate-on
-   * signup (`qualified_interview_signal`).
+   * provided, they are scored deterministically; admission still requires
+   * the server-derived golden-path decision and an atomic capacity slot.
    */
   readonly interviewResponses?: InterviewResponses;
   /**
@@ -374,15 +375,15 @@ async function decideAccess(params: {
     },
   });
 
-  // A golden-path admit only becomes real once the existing daily auto-accept
+  // A gate-on admit only becomes real once the existing daily auto-accept
   // slot is reserved. Reserve after qualification says approved (so a held or
   // invalid request never consumes a slot) and refund it if approval fails.
   // Admission state only: nothing here emails or invites anyone.
-  let reservedGoldenPathSlot = false;
-  if (qualification.reasonCode === 'qualified_golden_path_resolved_artist') {
+  let reservedAdmissionSlot = false;
+  if (mode === 'waitlist_enabled' && qualification.status === 'approved') {
     const reservation = await tryReserveAutoAcceptSlot(params.tx);
     if (reservation.shouldAutoAccept) {
-      reservedGoldenPathSlot = true;
+      reservedAdmissionSlot = true;
     } else {
       qualification = evaluateWaitlistQualification({
         email: params.email,
@@ -427,7 +428,7 @@ async function decideAccess(params: {
     qualification.reasonCode
   );
   if (!approval) {
-    if (reservedGoldenPathSlot) await releaseAutoAcceptSlot(params.tx);
+    if (reservedAdmissionSlot) await releaseAutoAcceptSlot(params.tx);
     const failedQualification: QualificationDecision = {
       ...qualification,
       status: 'waitlisted',
@@ -561,66 +562,39 @@ export async function submitWaitlistAccessRequest(
   // 40001/40P01 conflicts. This block must be idempotent; the transaction
   // takes a per-email advisory lock as its first statement so retried
   // attempts re-serialize cleanly.
-  const result = await withSerializableRetry<InternalTransactionResult>(() =>
-    withSystemIngestionSession(
-      async tx => {
-        await lockWaitlistEmail(tx, normalizedEmail);
-
-        const existing = await findLatestEntryByEmail(tx, normalizedEmail);
-        const entryValues = buildEntryValues({
-          data: input.data,
-          email: normalizedEmail,
-          fullName: input.fullName,
-          source: input.source ?? 'waitlist_form',
-          admissionScore: input.admissionScore,
-        });
-
-        if (existing && !isUnqualifiedSignupEntry(existing)) {
-          return handleExistingEntryResubmission({
-            tx,
-            existing,
-            entryValues,
-            appUserId: input.appUserId,
-            emailRaw,
-            syntheticRunId: input.syntheticRunId,
-          });
+  const result = await withSerializableRetry<InternalTransactionResult>(
+    async () => {
+      // A route's positive decision cannot survive expiry or revocation during
+      // serialization backoff. Only downgrade here; held identities stay held.
+      let goldenPathAdmission = input.goldenPathAdmission;
+      if (goldenPathAdmission?.admit) {
+        const readiness = await readCachedAcquisitionEligibility().catch(
+          () => null
+        );
+        if (readiness?.eligible !== true || readiness.verdict !== 'ELIGIBLE') {
+          goldenPathAdmission = {
+            admit: false,
+            reason: 'hold_golden_path_not_green',
+          };
         }
+      }
+      return withSystemIngestionSession(
+        async tx => {
+          await lockWaitlistEmail(tx, normalizedEmail);
 
-        // A sign-up entry the chat has not qualified yet is this request's
-        // entry: qualify it now instead of treating it as a resubmission.
-        const [entry] = existing
-          ? await tx
-              .update(waitlistEntries)
-              .set({
-                ...entryValues,
-                status: 'chat_started',
-                statusReason: 'chat_started',
-              })
-              .where(eq(waitlistEntries.id, existing.id))
-              .returning({ id: waitlistEntries.id })
-          : await tx
-              .insert(waitlistEntries)
-              .values({
-                ...entryValues,
-                status: 'chat_started',
-                statusReason: 'chat_started',
-                createdAt: new Date(),
-              })
-              .onConflictDoNothing({
-                target: waitlistEntries.emailNormalized,
-                where: drizzleSql`${waitlistEntries.canonical} = true`,
-              })
-              .returning({ id: waitlistEntries.id });
+          const existing = await findLatestEntryByEmail(tx, normalizedEmail);
+          const entryValues = buildEntryValues({
+            data: input.data,
+            email: normalizedEmail,
+            fullName: input.fullName,
+            source: input.source ?? 'waitlist_form',
+            admissionScore: input.admissionScore,
+          });
 
-        if (!entry) {
-          const concurrentExisting = await findLatestEntryByEmail(
-            tx,
-            normalizedEmail
-          );
-          if (concurrentExisting) {
+          if (existing && !isUnqualifiedSignupEntry(existing)) {
             return handleExistingEntryResubmission({
               tx,
-              existing: concurrentExisting,
+              existing,
               entryValues,
               appUserId: input.appUserId,
               emailRaw,
@@ -628,73 +602,116 @@ export async function submitWaitlistAccessRequest(
             });
           }
 
-          throw new Error('Failed to create waitlist entry');
-        }
+          // A sign-up entry the chat has not qualified yet is this request's
+          // entry: qualify it now instead of treating it as a resubmission.
+          const [entry] = existing
+            ? await tx
+                .update(waitlistEntries)
+                .set({
+                  ...entryValues,
+                  status: 'chat_started',
+                  statusReason: 'chat_started',
+                })
+                .where(eq(waitlistEntries.id, existing.id))
+                .returning({ id: waitlistEntries.id })
+            : await tx
+                .insert(waitlistEntries)
+                .values({
+                  ...entryValues,
+                  status: 'chat_started',
+                  statusReason: 'chat_started',
+                  createdAt: new Date(),
+                })
+                .onConflictDoNothing({
+                  target: waitlistEntries.emailNormalized,
+                  where: drizzleSql`${waitlistEntries.canonical} = true`,
+                })
+                .returning({ id: waitlistEntries.id });
 
-        const decision = await decideAccess({
-          tx,
-          entryId: entry.id,
-          appUserId: input.appUserId,
-          emailRaw,
-          email: normalizedEmail,
-          data: input.data,
-          interviewResponses: input.interviewResponses,
-          goldenPathAdmission: input.goldenPathAdmission,
-          admissionScore: input.admissionScore,
-        });
+          if (!entry) {
+            const concurrentExisting = await findLatestEntryByEmail(
+              tx,
+              normalizedEmail
+            );
+            if (concurrentExisting) {
+              return handleExistingEntryResubmission({
+                tx,
+                existing: concurrentExisting,
+                entryValues,
+                appUserId: input.appUserId,
+                emailRaw,
+                syntheticRunId: input.syntheticRunId,
+              });
+            }
 
-        const nextStatus = decision.qualification.status;
-        const now = new Date();
-        await tx
-          .update(waitlistEntries)
-          .set({
-            status: nextStatus,
-            statusReason: decision.qualification.reasonCode,
-            qualificationResult: {
-              qualified: decision.qualification.qualified,
-              status: decision.qualification.status,
-              reasonCode: decision.qualification.reasonCode,
-              details: decision.qualification.details,
-            },
-            qualifiedAt: decision.qualification.qualified ? now : null,
-            waitlistedAt: nextStatus === 'waitlisted' ? now : null,
-            approvedAt: nextStatus === 'approved' ? now : undefined,
-            blockedAt: nextStatus === 'blocked' ? now : null,
-            updatedAt: now,
-          })
-          .where(eq(waitlistEntries.id, entry.id));
+            throw new Error('Failed to create waitlist entry');
+          }
 
-        await insertWaitlistAuditLog(tx, {
-          waitlistEntryId: entry.id,
-          fromStatus: 'chat_started',
-          toStatus: nextStatus,
-          actorUserId: input.appUserId,
-          actorType: 'user',
-          reason: decision.qualification.reasonCode,
-          metadata: {
-            ...decision.qualification.details,
-            ...(syntheticCanary ? { syntheticCanary } : {}),
-          },
-        });
-
-        if (nextStatus === 'waitlisted' && !suppressCanaryCommunications) {
-          await enqueueWaitlistEmailJob(tx, {
+          const decision = await decideAccess({
+            tx,
             entryId: entry.id,
-            type: 'waitlist_confirmation',
+            appUserId: input.appUserId,
+            emailRaw,
+            email: normalizedEmail,
+            data: input.data,
+            interviewResponses: input.interviewResponses,
+            goldenPathAdmission,
+            admissionScore: input.admissionScore,
           });
-        }
 
-        return {
-          entryId: entry.id,
-          status: nextStatus,
-          outcome: decision.outcome,
-          approval: decision.approval,
-          statusChange: decision.statusChange,
-          entryCreated: true,
-        };
-      },
-      { isolationLevel: 'serializable' }
-    )
+          const nextStatus = decision.qualification.status;
+          const now = new Date();
+          await tx
+            .update(waitlistEntries)
+            .set({
+              status: nextStatus,
+              statusReason: decision.qualification.reasonCode,
+              qualificationResult: {
+                qualified: decision.qualification.qualified,
+                status: decision.qualification.status,
+                reasonCode: decision.qualification.reasonCode,
+                details: decision.qualification.details,
+              },
+              qualifiedAt: decision.qualification.qualified ? now : null,
+              waitlistedAt: nextStatus === 'waitlisted' ? now : null,
+              approvedAt: nextStatus === 'approved' ? now : undefined,
+              blockedAt: nextStatus === 'blocked' ? now : null,
+              updatedAt: now,
+            })
+            .where(eq(waitlistEntries.id, entry.id));
+
+          await insertWaitlistAuditLog(tx, {
+            waitlistEntryId: entry.id,
+            fromStatus: 'chat_started',
+            toStatus: nextStatus,
+            actorUserId: input.appUserId,
+            actorType: 'user',
+            reason: decision.qualification.reasonCode,
+            metadata: {
+              ...decision.qualification.details,
+              ...(syntheticCanary ? { syntheticCanary } : {}),
+            },
+          });
+
+          if (nextStatus === 'waitlisted' && !suppressCanaryCommunications) {
+            await enqueueWaitlistEmailJob(tx, {
+              entryId: entry.id,
+              type: 'waitlist_confirmation',
+            });
+          }
+
+          return {
+            entryId: entry.id,
+            status: nextStatus,
+            outcome: decision.outcome,
+            approval: decision.approval,
+            statusChange: decision.statusChange,
+            entryCreated: true,
+          };
+        },
+        { isolationLevel: 'serializable' }
+      );
+    }
   );
 
   // True if the user's `userStatus` actually moved between previous and new

@@ -7,6 +7,10 @@ and routes through its Tracker like every other doctor alert; nothing here owns 
 Alarms (each names its stage and carries its evidence):
   throughput-no-push:<repo>:<lane>   demand > 0, seats configured, zero lane pushes for 60 min
   throughput-queue-no-merge          merge queue > 0, zero merges in the last 60 min
+  throughput-queue-unmergeable      an UNMERGEABLE queue entry the sweep could not dequeue (it dequeues, comments and
+                                     routes to lane-fix-conflict after 10 min; #23519 stalled the queue 3h)
+  throughput-claim-errors:<lane>     >= 20% of a lane's runs in 30 min died on claim-error (a broken claim ledger
+                                     killed ~560 fix-red runs from 2026-10-26 07:30Z and nothing alarmed)
   throughput-merge-group-start-slow  merge-group runs wait > 5 min (p50) for a runner
   throughput-prod-lease-held         a Production Controller run holds the lease > 45 min
   throughput-idle-dominant           one idle/hold reason is > 50% of the last hour's exits
@@ -37,6 +41,30 @@ IDLE_LOG_MAX_BYTES = 512 * 1024
 NO_PUSH_S = 3600
 MERGE_GROUP_START_P50_MIN = 5.0
 MERGE_GROUP_MIN_RUNS = 3
+# Per-pool merge-gate wait (2026-10-29): after #23586 moved the gate jobs to the gem pool its
+# created->started wait was p50 120 s / p95 451 s while hosted jobs in the same groups waited
+# p50 3 s / p95 33 s. Alarm when the self-hosted pool is the slower one, or hosted is saturated.
+POOL_MIN_JOBS = 5
+POOL_SLOWER_MARGIN_S = 30.0
+HOSTED_SATURATED_P50_S = 120.0
+SELF_HOSTED_LABELS = frozenset({"self-hosted", "jovie-fixed"})
+
+
+def runner_pool(labels) -> str:
+    """'self-hosted' when a job asked for the gem pool, else 'hosted'."""
+    return "self-hosted" if any(str(l).lower() in SELF_HOSTED_LABELS for l in labels or []) else "hosted"
+
+
+def pool_waits(waits_by_pool: dict) -> dict:
+    """p50/p95/n of created->started seconds per runner pool."""
+    out = {}
+    for pool, waits in sorted(waits_by_pool.items()):
+        if not waits:
+            continue
+        ordered = sorted(waits)
+        p95 = ordered[max(0, min(len(ordered) - 1, -(-95 * len(ordered) // 100) - 1))]
+        out[pool] = {"n": len(ordered), "p50S": round(statistics.median(ordered), 1), "p95S": round(p95, 1)}
+    return out
 LEASE_HELD_MIN = 45.0
 IDLE_DOMINANT_FRACTION = 0.5
 IDLE_DOMINANT_MIN_EXITS = 6
@@ -45,6 +73,7 @@ NO_DEMAND_REASONS = frozenset({"maintenance-only-idle", "no-demand", "pool-empty
 GROWTH_ALARM_FRACTION = 0.7
 RELEASE_FLOW_REFRESH_S = 300
 MERGE_GROUP_SAMPLE_RUNS = 3
+CLAIM_ERROR_WINDOW_S, CLAIM_ERROR_FRACTION, CLAIM_ERROR_MIN_RUNS = 1800, 0.2, 5
 PUSH_VERDICTS = frozenset({"pr-opened", "pushed", "fix-pushed", "landing", "verified-not-queued", "decomposed"})
 REPO = "JovieInc/Jovie"
 # Repos the lanes do not claim work in; their demand and merge signals come from GitHub alone.
@@ -100,6 +129,22 @@ def read_idle_exits(state: Path, now: float, window_s: float = 3600) -> list[dic
     return rows
 
 
+def claim_errors_by_lane(receipts: list[dict], now: float) -> dict[str, dict]:
+    """Per provider over the last 30 min: finished runs and how many died on a claim-error receipt."""
+    out: dict[str, dict] = {}
+    for row in receipts or []:
+        ended = _iso_epoch(row.get("endedAt"))
+        if ended is None or not 0 <= now - ended <= CLAIM_ERROR_WINDOW_S or not row.get("provider"):
+            continue
+        slot = out.setdefault(row["provider"], {"runs": 0, "claimErrors": 0, "sample": None})
+        slot["runs"] += 1
+        reason = next((r for r in row.get("reasons") or [] if isinstance(r, str) and r.startswith("claim-error:")), None)
+        if reason:
+            slot["claimErrors"] += 1
+            slot["sample"] = slot["sample"] or reason[:120]
+    return out
+
+
 def pushes_by_lane(receipts: list[dict], now: float) -> dict[str, int]:
     """Lane pushes in the last hour per `repository|provider`, from the run ledger."""
     counts: Counter = Counter()
@@ -144,7 +189,7 @@ def sample_release_flow(state: Path, now: float, run=None, repo: str = REPO) -> 
         groups = _gh_json(run, f"repos/{repo}/actions/runs?event=merge_group&per_page=30&created=%3E%3D{since}")
         # run_started_at equals created_at for merge_group runs; the real wait is a job's
         # created_at -> started_at (runner assignment), sampled over the latest runs.
-        waits, sampled = [], 0
+        waits, sampled, by_pool = [], 0, {}
         for row in sorted(groups.get("workflow_runs") or [], key=lambda r: str(r.get("created_at")), reverse=True):
             if sampled >= MERGE_GROUP_SAMPLE_RUNS:
                 break
@@ -155,15 +200,112 @@ def sample_release_flow(state: Path, now: float, run=None, repo: str = REPO) -> 
                 created, started = _iso_epoch(job.get("created_at")), _iso_epoch(job.get("started_at"))
                 if created is not None and started is not None and started >= created:
                     waits.append((started - created) / 60)
+                    by_pool.setdefault(runner_pool(job.get("labels")), []).append(started - created)
         held = _gh_json(run, f"repos/{repo}/actions/workflows/{CONTROLLER_WORKFLOW}/runs?status=in_progress&per_page=10")
         leases = [(now - started) / 60 for row in held.get("workflow_runs") or []
                   if (started := _iso_epoch(row.get("run_started_at"))) is not None]
         runs = [row.get("id") for row in held.get("workflow_runs") or []]
+        # Hosted-runner backlog: queued runs repo-wide and the oldest one's wait. 2026-10-28: 990 queued
+        # runs, oldest 18 min, 64 in progress, so a green head waited on runner concurrency, not on lanes.
+        queued = _gh_json(run, f"repos/{repo}/actions/runs?status=queued&per_page=1")
+        queued_total = queued.get("total_count") if isinstance(queued.get("total_count"), int) else None
+        oldest_min = None
+        if queued_total:
+            tail = _gh_json(run, f"repos/{repo}/actions/runs?status=queued&per_page=1&page={queued_total}")
+            created = _iso_epoch(((tail.get("workflow_runs") or [{}])[0]).get("created_at"))
+            oldest_min = round((now - created) / 60, 1) if created is not None else None
         signal = {"schema": "symphony-release-flow/v1", "observedAt": now,
                   "mergeGroupRuns": sampled, "mergeGroupJobs": len(waits),
                   "mergeGroupStartP50Min": round(statistics.median(waits), 2) if waits else None,
                   "mergeGroupStartMaxMin": round(max(waits), 2) if waits else None,
-                  "leaseHeldMin": round(max(leases), 1) if leases else 0.0, "leaseRunIds": runs[:3]}
+                  "mergeGroupStartByPool": pool_waits(by_pool),
+                  "leaseHeldMin": round(max(leases), 1) if leases else 0.0, "leaseRunIds": runs[:3],
+                  "queuedRuns": queued_total, "queuedOldestMin": oldest_min}
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(signal, sort_keys=True))
+        os.replace(tmp, path)
+        return signal, None
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        return (cached or None), f"{type(error).__name__}: {error}"[:200]
+
+
+QUEUE_TIMINGS_REFRESH_S, QUEUE_TIMINGS_PRS, QUEUE_TIMINGS_FILE = 900, 12, "queue-timings.json"
+REARM_CONTEXT = "jovie-queue-victim-rearm/v1"  # scripts/merge-group-victim-rearm.mjs
+
+
+def _pct(values: list, q: float):
+    values = sorted(values)
+    return round(values[min(len(values) - 1, int(len(values) * q))], 1) if values else None
+
+
+def sample_queue_timings(state: Path, now: float, run=None, repo: str = REPO) -> tuple[dict | None, str | None]:
+    """Merge-queue wait stages (schema symphony-queue-timings/v1), refreshed every 15 min:
+    merge-group CI duration p50/p95 and outcome mix over the latest 100 CI merge_group runs
+    (cancelled = a group reset by a failure, jump or dequeue), and enqueue->merge p50/p95 for the
+    latest merged PRs (last enqueue, and first enqueue which includes ejections and re-enqueues)."""
+    path = Path(state) / QUEUE_TIMINGS_FILE
+    try:
+        cached = json.loads(path.read_text())
+    except (OSError, ValueError):
+        cached = {}
+    if isinstance(cached.get("observedAt"), (int, float)) and 0 <= now - cached["observedAt"] < QUEUE_TIMINGS_REFRESH_S:
+        return cached, None
+    try:
+        runs = _gh_json(run, f"repos/{repo}/actions/workflows/ci.yml/runs?event=merge_group&per_page=100").get("workflow_runs") or []
+        done = [row for row in runs if row.get("status") == "completed" and _iso_epoch(row.get("created_at")) is not None
+                and _iso_epoch(row.get("updated_at")) is not None]
+        by = {kind: [(_iso_epoch(r["updated_at"]) - _iso_epoch(r["created_at"])) / 60 for r in done if r.get("conclusion") == kind]
+              for kind in ("success", "failure", "cancelled")}
+        merged = _gh_json(run, f"repos/{repo}/pulls?state=closed&sort=updated&direction=desc&per_page=40")
+        merged = [pr for pr in merged if pr.get("merged_at")][:QUEUE_TIMINGS_PRS]
+        last, first = [], []
+        dequeues = {"github": 0, "bot": 0, "human": 0}
+        requeue_lag, auto_lag, push_lag = [], [], []
+        receipts_cache: dict[str, list[float]] = {}
+        for pr in merged:
+            events = _gh_json(run, f"repos/{repo}/issues/{pr['number']}/timeline?per_page=100")
+            adds = [_iso_epoch(e.get("created_at")) for e in events if e.get("event") == "added_to_merge_queue"]
+            adds = [a for a in adds if a is not None]
+            # Silent dequeues: removals with no check named on the PR. github-merge-queue[bot] = GitHub ejected
+            # the entry after a merge-group failure/timeout; each is followed by a re-enqueue (lag measured).
+            removed = [(_iso_epoch(e.get("created_at")), str((e.get("actor") or {}).get("login") or ""))
+                       for e in events if e.get("event") == "removed_from_merge_queue"]
+            for at, actor in removed:
+                if at is None:
+                    continue
+                dequeues["github" if actor.startswith("github-merge-queue") else "bot" if actor.endswith("[bot]") else "human"] += 1
+                later = [a for a in adds if a > at]
+                if later:
+                    back = min(later)
+                    lag = (back - at) / 60
+                    requeue_lag.append(lag)
+                    # Auto = the victim-rearm job wrote a why= receipt on this head between the removal and the
+                    # re-add (the enqueue lands seconds before the receipt); anything else came from the enroll sweep.
+                    sha = str((pr.get("head") or {}).get("sha") or "")
+                    if sha and sha not in receipts_cache:
+                        rows = _gh_json(run, f"repos/{repo}/commits/{sha}/statuses?per_page=100")
+                        receipts_cache[sha] = [t for t in (_iso_epoch(r.get("created_at")) for r in rows
+                                               if r.get("context") == REARM_CONTEXT and ";why=" in str(r.get("description") or ""))
+                                               if t is not None]
+                    auto = any(at <= t <= back + 120 for t in receipts_cache.get(sha, []))
+                    (auto_lag if auto else push_lag).append(lag)
+            merged_at = _iso_epoch(pr.get("merged_at"))
+            if adds and merged_at is not None:
+                last.append((merged_at - max(adds)) / 60)
+                first.append((merged_at - min(adds)) / 60)
+        total = sum(len(v) for v in by.values())
+        signal = {"schema": "symphony-queue-timings/v1", "observedAt": now, "groupCi": {
+                      "runs": total, "successP50Min": _pct(by["success"], .5), "successP95Min": _pct(by["success"], .95),
+                      "cancelledShare": round(len(by["cancelled"]) / total, 3) if total else None,
+                      "failureShare": round(len(by["failure"]) / total, 3) if total else None},
+                  "enqueueToMerge": {"prs": len(last), "lastEnqueueP50Min": _pct(last, .5), "lastEnqueueP95Min": _pct(last, .95),
+                                     "firstEnqueueP50Min": _pct(first, .5), "firstEnqueueP95Min": _pct(first, .95),
+                                     "targets": {"p50Min": 30, "p95Min": 60}},
+                  "dequeues": {"prs": len(last), "silentGithub": dequeues["github"], "bot": dequeues["bot"], "human": dequeues["human"],
+                               "requeueLagP50Min": _pct(requeue_lag, .5), "requeueLagP95Min": _pct(requeue_lag, .95),
+                               "autoRequeues": len(auto_lag), "pushToMainRequeues": len(push_lag),
+                               "autoRequeueLagP50Min": _pct(auto_lag, .5), "autoRequeueLagP95Min": _pct(auto_lag, .95),
+                               "pushRequeueLagP50Min": _pct(push_lag, .5), "pushRequeueLagP95Min": _pct(push_lag, .95)}}
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(signal, sort_keys=True))
         os.replace(tmp, path)
@@ -264,7 +406,16 @@ def growth_bounds(state: Path, limits: dict) -> list[dict]:
 
 def observe(state: Path, now: float, receipts: list[dict], limits: dict, run=None,
             fetch_remote: bool = True) -> dict:
+    queue_unmergeable = None
+    if fetch_remote:
+        try:
+            import queue_unmergeable as _queue
+            queue_unmergeable = _queue.sweep(state, run or _budgeted_gh, now)
+        except Exception as error:  # noqa: BLE001  (a sweep failure must never stop the sentinel)
+            queue_unmergeable = {"seen": [], "dequeued": [], "errors": [f"{type(error).__name__}: {error}"[:160]]}
     flow, flow_error = (sample_release_flow(state, now, run) if fetch_remote else (None, None))
+    if fetch_remote:
+        sample_queue_timings(state, now, run)
     exits = read_idle_exits(state, now)
     repos, repo_errors = {}, {}
     for watched in (WATCHED_REPOS if fetch_remote else ()):
@@ -272,7 +423,14 @@ def observe(state: Path, now: float, receipts: list[dict], limits: dict, run=Non
         repos[watched] = flow_row
         if flow_err:
             repo_errors[watched] = flow_err
-    return {"pushes1h": pushes_by_lane(receipts, now),
+    breaker = None
+    if fetch_remote:
+        try:
+            import queue_breaker as _breaker
+            breaker = _breaker.sweep(state, run or _budgeted_gh, now)
+        except Exception as error:  # noqa: BLE001
+            breaker = {"tripped": [], "reblocked": [], "errors": [f"{type(error).__name__}: {error}"[:160]]}
+    return {"queueBreaker": breaker, "queueUnmergeable": queue_unmergeable, "pushes1h": pushes_by_lane(receipts, now), "claimErrors30m": claim_errors_by_lane(receipts, now),
             "idleExits1h": dict(Counter(row["reason"] for row in exits)),
             "idleExitsByProvider1h": {name: dict(Counter(r["reason"] for r in exits if r.get("provider") == name))
                                       for name in sorted({r.get("provider") for r in exits if r.get("provider")})},
@@ -305,6 +463,23 @@ def judge(obs: dict) -> dict[str, str]:
                     f"({row.get('running', 0)} running, oldest lease "
                     f"{round((row.get('oldestLeaseAge') or 0) / 60)} min) but zero {provider} pushes in the last 60 min; "
                     f"idle exits 1h: {_top(idle)}; held: {obs.get('heldByReason') or {}}")
+    # 1b. Claim errors: runs that die before any work because the claim ledger is unreadable.
+    for provider, row in sorted((sentinel.get("claimErrors30m") or {}).items()):
+        if row.get("runs", 0) >= CLAIM_ERROR_MIN_RUNS and row.get("claimErrors", 0) / row["runs"] > CLAIM_ERROR_FRACTION:
+            alerts[f"throughput-claim-errors:{provider}"] = (
+                f"stage claim ({provider}): {row['claimErrors']}/{row['runs']} runs in the last 30 min ended on claim-error "
+                f"({row.get('sample')}); check runs/execution-attempts.jsonl for a torn line and the execution coordinator")
+    # 1c. An UNMERGEABLE queue entry is dequeued and routed by queue_unmergeable; an alarm only when that fails.
+    stuck = sentinel.get("queueUnmergeable") or {}
+    if stuck.get("errors") and stuck.get("seen"):
+        alerts["throughput-queue-unmergeable"] = (
+            f"stage queued->merged: UNMERGEABLE merge-queue entries {[row['pr'] for row in stuck['seen']]} could not be "
+            f"auto-dequeued: {'; '.join(stuck['errors'])[:300]}")
+    tripped = sentinel.get("queueBreaker") or {}
+    if tripped.get("tripped"):
+        alerts["throughput-queue-breaker"] = (
+            f"stage queued->merged: PR(s) {tripped['tripped']} failed merge-group CI twice in 3h and were dequeued and held with "
+            "lane-fix-red; re-enqueue waits for a new head and a green PR-time check")
     # 2. Queue but no merges.
     merge = obs.get("mergeThroughput") or {}
     if isinstance(merge.get("observedAt"), (int, float)) and obs["now"] - merge["observedAt"] < 1800 \
@@ -321,6 +496,18 @@ def judge(obs: dict) -> dict[str, str]:
             f"stage merge-group created->started: p50 {flow['mergeGroupStartP50Min']} min (max "
             f"{flow.get('mergeGroupStartMaxMin')}) over {flow.get('mergeGroupJobs')} jobs in the latest {flow['mergeGroupRuns']} merge_group runs; "
             "runner capacity or Actions queueing; check runner-heartbeat and runner-health-monitor")
+    pools = flow.get("mergeGroupStartByPool") or {}
+    hosted, fixed = pools.get("hosted") or {}, pools.get("self-hosted") or {}
+    if (hosted.get("n") or 0) >= POOL_MIN_JOBS and (fixed.get("n") or 0) >= POOL_MIN_JOBS \
+            and fixed["p50S"] > hosted["p50S"] + POOL_SLOWER_MARGIN_S:
+        alerts["throughput-merge-gate-pool"] = (
+            f"stage merge-group created->started: self-hosted p50 {fixed['p50S']}s / p95 {fixed['p95S']}s vs hosted "
+            f"p50 {hosted['p50S']}s / p95 {hosted['p95S']}s; route merge-gate jobs to hosted by deleting repo variable MERGE_GATE_POOL"
+            "")
+    elif (hosted.get("n") or 0) >= POOL_MIN_JOBS and not fixed and hosted["p50S"] > HOSTED_SATURATED_P50_S:
+        alerts["throughput-merge-gate-pool"] = (
+            f"stage merge-group created->started: hosted p50 {hosted['p50S']}s / p95 {hosted['p95S']}s (saturated); "
+            "consider the gem pool: set repo variable MERGE_GATE_POOL=fixed")
     if (flow.get("leaseHeldMin") or 0) > LEASE_HELD_MIN:
         alerts["throughput-prod-lease-held"] = (
             f"stage deploy: a Production Controller run has held the production lease {flow['leaseHeldMin']} min "

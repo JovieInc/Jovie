@@ -111,7 +111,6 @@ export function AboutPageContent() {
 
       <MarketingFooterCta
         sectionVariant='final-single-claim'
-        title='Ready to build your Jovie profile?'
         ctaAnalyticsEvent='about_footer_cta_start'
         ctaAnalyticsSource='about_page_footer'
         prefetch={false}
