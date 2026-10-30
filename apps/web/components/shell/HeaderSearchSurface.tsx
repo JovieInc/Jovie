@@ -602,7 +602,9 @@ export function HeaderSearchSurface({
       >
         <Search className='h-3.5 w-3.5' aria-hidden='true' />
         <span className='hidden sm:inline'>Search</span>
-        <kbd className='hidden text-2xs text-tertiary-token sm:inline'>/</kbd>
+        <kbd className='hidden text-2xs text-tertiary-token sm:inline'>
+          <span aria-hidden='true'>/</span>
+        </kbd>
       </button>
     );
   }

@@ -81,7 +81,14 @@ export function HeaderSearchSurfaceFromContext({
           <span className='min-w-0 flex-1 truncate'>
             {calm ? 'Search chats' : 'Search'}
           </span>
-          <kbd className='shrink-0 text-2xs text-tertiary-token'>⌘K</kbd>
+          {/* Decorative shortcut glyph: the text is excluded from the a11y
+              tree (aria-hidden lives on the inner span because kbd itself is
+              focusable) so the trigger's visible text stays contained in its
+              accessible name (WCAG 2.5.3 Label in Name; axe
+              label-content-name-mismatch). */}
+          <kbd className='shrink-0 text-2xs text-tertiary-token'>
+            <span aria-hidden='true'>⌘K</span>
+          </kbd>
         </>
       )}
     </button>

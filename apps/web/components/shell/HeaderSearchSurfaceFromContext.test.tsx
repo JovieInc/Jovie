@@ -33,6 +33,15 @@ describe('HeaderSearchSurfaceFromContext', () => {
     // WCAG 2.5.3 Label in Name: the accessible name must contain the
     // visible trigger text (axe label-content-name-mismatch).
     expect(trigger.getAttribute('aria-label')).toContain('Search chats');
+    // The expanded non-calm trigger keeps the branded name; its visible text
+    // ('Search') is contained in it, and the decorative shortcut kbd is
+    // aria-hidden so it cannot break Label in Name (axe
+    // label-content-name-mismatch, releases-dashboard fixture states).
+    expect(
+      screen
+        .getByRole('button', { name: 'Search Jovie' })
+        .querySelector('kbd span')
+    ).toHaveAttribute('aria-hidden', 'true');
     expect(trigger.className).toContain('h-9');
     expect(trigger.className).toContain('rounded-full');
     expect(trigger.className).toContain('text-(length:--text-app)');
