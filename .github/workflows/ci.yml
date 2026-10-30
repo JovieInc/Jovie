@@ -7875,7 +7875,7 @@ jobs:
         with:
           app-id: ${{ secrets.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
-      - uses: JovieInc/ci/actions/slop-guard@SHA # JovieInc/ci#12
+      - uses: JovieInc/ci/actions/slop-guard@f20a14472554e2dd09c87ac26ff02fb9dbabd45e # JovieInc/ci#12
         with:
           auto-shrink: ${{ steps.bot.outputs.token != '' }}
           token: ${{ steps.bot.outputs.token || github.token }}
