@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
-  getProfileByUsername: vi.fn(),
+  getProfileWithUser: vi.fn(),
   getMerchMvpEnabled: vi.fn(),
   getReleasesForProfileLite: vi.fn(),
   getLiveMerchCardsForProfile: vi.fn(),
@@ -65,7 +65,7 @@ vi.mock('@/lib/flags/profile-variant', () => ({
 }));
 
 vi.mock('@/lib/services/profile', () => ({
-  getProfileByUsername: hoisted.getProfileByUsername,
+  getProfileWithUser: hoisted.getProfileWithUser,
 }));
 vi.mock('@/lib/discography/queries', () => ({
   getReleasesForProfileLite: hoisted.getReleasesForProfileLite,
@@ -116,14 +116,14 @@ describe('GET /api/v1/[username]', () => {
     );
     expect(res.headers.get('X-RateLimit-Remaining')).toBe('99');
     expect(await res.json()).toEqual({ error: 'Artist not found' });
-    expect(hoisted.getProfileByUsername).not.toHaveBeenCalled();
+    expect(hoisted.getProfileWithUser).not.toHaveBeenCalled();
     expect(hoisted.publicArtistApiLimiterLimit).toHaveBeenCalledWith(
       '203.0.113.10'
     );
   });
 
   it('keeps legitimate public profiles available', async () => {
-    hoisted.getProfileByUsername.mockResolvedValue({
+    hoisted.getProfileWithUser.mockResolvedValue({
       id: 'profile-1',
       username: 'realartist',
       displayName: 'Real Artist',
@@ -225,7 +225,7 @@ describe('GET /api/v1/[username]', () => {
   });
 
   it('does not expose a rounded audience count and derives a channel ID from the public URL', async () => {
-    hoisted.getProfileByUsername.mockResolvedValue({
+    hoisted.getProfileWithUser.mockResolvedValue({
       id: 'profile-1',
       username: 'realartist',
       displayName: 'Real Artist',
@@ -272,7 +272,7 @@ describe('GET /api/v1/[username]', () => {
   });
 
   it('falls back to stored Spotify followers without inventing an observation time', async () => {
-    hoisted.getProfileByUsername.mockResolvedValue({
+    hoisted.getProfileWithUser.mockResolvedValue({
       id: 'profile-1',
       username: 'realartist',
       displayName: 'Real Artist',
@@ -313,7 +313,7 @@ describe('GET /api/v1/[username]', () => {
   });
 
   it('uses persisted release slugs and live product IDs rather than collection destinations', async () => {
-    hoisted.getProfileByUsername.mockResolvedValue({
+    hoisted.getProfileWithUser.mockResolvedValue({
       id: 'profile-1',
       username: 'realartist',
       usernameNormalized: 'realartist',
@@ -406,7 +406,7 @@ describe('GET /api/v1/[username]', () => {
   });
 
   it('does not advertise product destinations when the public merch page is disabled', async () => {
-    hoisted.getProfileByUsername.mockResolvedValue({
+    hoisted.getProfileWithUser.mockResolvedValue({
       id: 'profile-1',
       username: 'realartist',
       displayName: 'Real Artist',
@@ -424,7 +424,7 @@ describe('GET /api/v1/[username]', () => {
   });
 
   it('hides a private profile the same way as a missing one', async () => {
-    hoisted.getProfileByUsername.mockResolvedValue({
+    hoisted.getProfileWithUser.mockResolvedValue({
       id: 'profile-1',
       username: 'realartist',
       displayName: 'Real Artist',
@@ -449,7 +449,7 @@ describe('GET /api/v1/[username]', () => {
   });
 
   it('returns typed 404 responses with the caller rate-limit fields', async () => {
-    hoisted.getProfileByUsername.mockResolvedValue(null);
+    hoisted.getProfileWithUser.mockResolvedValue(null);
 
     const { GET } = await import('./route');
     const res = await GET(new Request('https://jov.ie/api/v1/missing'), {
@@ -497,7 +497,7 @@ describe('GET /api/v1/[username]', () => {
       error: 'Too many requests',
       code: 'RATE_LIMITED',
     });
-    expect(hoisted.getProfileByUsername).not.toHaveBeenCalled();
+    expect(hoisted.getProfileWithUser).not.toHaveBeenCalled();
     expect(hoisted.getReleasesForProfileLite).not.toHaveBeenCalled();
   });
 
@@ -528,6 +528,6 @@ describe('GET /api/v1/[username]', () => {
       error: 'Public API temporarily unavailable',
       code: 'RATE_LIMIT_UNAVAILABLE',
     });
-    expect(hoisted.getProfileByUsername).not.toHaveBeenCalled();
+    expect(hoisted.getProfileWithUser).not.toHaveBeenCalled();
   });
 });

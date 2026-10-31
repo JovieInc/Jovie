@@ -14,6 +14,7 @@
     "dev:local:playwright": "NEXT_PUBLIC_E2E_MODE=1 NEXT_DISABLE_TOOLBAR=1 node scripts/dev-fast.mjs -- --webpack",
     "backfill:audience-action-owners": "NODE_OPTIONS=--conditions=react-server tsx scripts/backfill-audience-action-owners.ts",
     "backfill:credit-spotify-ids": "NODE_OPTIONS=--conditions=react-server tsx scripts/backfill-credit-spotify-ids.ts",
+    "cleanup:test-profiles": "NODE_OPTIONS=--conditions=react-server tsx scripts/cleanup-test-profiles.ts",
     "backfill:collaborator-profiles": "NODE_OPTIONS=--conditions=react-server tsx scripts/backfill-collaborator-profiles.ts",
     "agent-distribution:generate": "NODE_OPTIONS=--conditions=react-server tsx scripts/generate-agent-distribution.ts",
     "agent-distribution:check": "NODE_OPTIONS=--conditions=react-server tsx scripts/generate-agent-distribution.ts --check",
