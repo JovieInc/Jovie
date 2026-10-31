@@ -69,7 +69,7 @@ jobs:
       cancel-in-progress: false
     # Fleet controller: use the hosted image contract so `gh` is always
     # available. Some self-hosted fast runners intentionally lack it.
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNNER_CONTROL_PLANE || '"ubuntu-latest"') }}
     permissions:
       actions: read
       contents: read
@@ -130,7 +130,7 @@ jobs:
     concurrency:
       group: auto-ready-green-source-${{ github.event.inputs.pr_number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha || github.run_id }}
       cancel-in-progress: true
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNNER_CONTROL_PLANE || '"ubuntu-latest"') }}
     permissions:
       actions: read
       checks: read
