@@ -658,26 +658,58 @@ test.describe('Production Auth Smoke @production-smoke', () => {
           .request.get(`${expectedOrigin}/api/dashboard/profile`);
         expect(profileResponse.status()).toBe(200);
         const { profile } = (await profileResponse.json()) as {
-          profile?: { bio?: string | null; username?: unknown };
+          profile?: { id?: unknown; bio?: string | null; username?: unknown };
         };
+        // The save route requires the claimed profile's canonical UUID plus
+        // an updates envelope (apps/web/app/api/dashboard/profile/route.ts);
+        // a bare field payload is rejected with 400 before any write.
+        const profileId = typeof profile?.id === 'string' ? profile.id : '';
+        expect(
+          profileId,
+          'Profile edit save requires the claimed profile id'
+        ).toMatch(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+        );
         const originalBio = typeof profile?.bio === 'string' ? profile.bio : '';
         const marker = `prodcert edit-save-readback ${runTag()}`;
         const save = await page
           .context()
           .request.put(`${expectedOrigin}/api/dashboard/profile`, {
-            data: { bio: marker },
+            data: { profileId, updates: { bio: marker } },
           });
         expect(save.status(), 'Profile edit save failed').toBe(200);
         try {
-          const publicPage = await page
-            .context()
-            .request.get(`${expectedOrigin}/${claimedUsername}`);
+          // The save path invalidates the public profile's ISR + edge caches
+          // (lib/cache/profile.ts invalidateProfileCache fires revalidatePath,
+          // revalidateTag and the Redis edge purge), but that invalidation is
+          // eventually consistent across the CDN. A single immediate sample
+          // races the propagation window — the readback failed one attempt and
+          // passed the next in run 41155363486 ("Saved bio must read back",
+          // spec :692) and again in 41157880251. Poll the public render with a
+          // bounded window instead of sampling once — the same move
+          // waitForCheckoutEntryContent made for billing text after the
+          // 2026-10-29 05:06Z promotion failed on a single empty sample.
+          const readbackDeadlineMs = Date.now() + 30_000;
+          let publicText = '';
+          for (;;) {
+            const publicPage = await page
+              .context()
+              .request.get(`${expectedOrigin}/${claimedUsername}`);
+            expect(
+              publicPage.status(),
+              `Public profile /${claimedUsername} must render after the save`
+            ).toBe(200);
+            publicText = await publicPage.text();
+            if (
+              publicText.includes(marker) ||
+              Date.now() >= readbackDeadlineMs
+            ) {
+              break;
+            }
+            await page.waitForTimeout(1_000);
+          }
           expect(
-            publicPage.status(),
-            `Public profile /${claimedUsername} must render after the save`
-          ).toBe(200);
-          expect(
-            await publicPage.text(),
+            publicText,
             'Saved bio must read back on the public profile'
           ).toContain(marker);
           return marker;
@@ -687,7 +719,7 @@ test.describe('Production Auth Smoke @production-smoke', () => {
           const restore = await page
             .context()
             .request.put(`${expectedOrigin}/api/dashboard/profile`, {
-              data: { bio: originalBio },
+              data: { profileId, updates: { bio: originalBio } },
             });
           expect(restore.status(), 'Profile edit restore failed').toBe(200);
         }
@@ -1015,6 +1047,16 @@ test.describe('Production Auth Smoke @production-smoke', () => {
           { timeout: 30_000 }
         );
         assertExactNavigationUrl(page.url(), expectedOrigin, 'Signup landing');
+        // The post-signup redirect chain is still settling at this point: the
+        // OTP form lands the fresh user on /app, and the NEEDS_ONBOARDING
+        // state redirects to /start?fresh_signup=true. waitForURL unblocks at
+        // the first off-/signin commit, so the chain and the landing page's
+        // own load can still be in flight. Settle before this run navigates
+        // again — a goto issued mid-chain aborts the in-flight navigation
+        // (net::ERR_ABORTED, probes run 41152444713).
+        await page.waitForLoadState('domcontentloaded', {
+          timeout: SMOKE_TIMEOUTS.NAVIGATION,
+        });
         const text = (await page.locator('body').innerText()).toLowerCase();
         expect(text).not.toMatch(/application error|something went wrong/);
         return new URL(page.url()).pathname;
