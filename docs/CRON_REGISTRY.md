@@ -97,12 +97,11 @@ Source of truth: `apps/web/vercel.json`. The Vercel project's Root Directory is 
 | Cron Path | Schedule | Frequency |
 |-----------|----------|-----------|
 | `/api/cron/frequent` | `*/15 * * * *` | Every 15 minutes |
+| `/api/cron/queue-tick` | `*/5 * * * *` | Every 5 minutes: fail-safe drain for the interview, ingestion, workflow-run and merch queues (2026-10-31). Enqueue sites kick one queue at insert time via `kickQueue`; the per-queue cron routes below remain as the handlers. `process-workflow-runs`, `process-merch-fulfillment` and `voice-pipeline` (a no-op stub) are no longer scheduled directly. |
 | `/api/cron/daily-maintenance` | `0 0 * * *` | Daily at midnight UTC |
 | `/api/cron/generate-insights` | `0 5 * * *` | Daily at 05:00 UTC |
-| `/api/cron/process-ingestion-jobs` | `*/6 * * * *` | Every 6 minutes (JOV-2500: lets Neon 5min autosuspend reclaim compute) |
 | `/api/cron/process-merch-fulfillment` | `*/10 * * * *` | Every 10 minutes |
 | `/api/cron/purge-pixel-ips` | `0 3 * * *` | Daily at 03:00 UTC |
-| `/api/cron/summarize-interviews` | `*/5 * * * *` | Every 5 minutes |
 | `/api/cron/generate-playlist` | `0 6 * * *` | Daily at 06:00 UTC |
 | `/api/cron/process-pre-saves` | `0 2 * * *` | Daily at 02:00 UTC |
 | `/api/cron/monitor-metadata-submissions` | `0 * * * *` | Hourly |
@@ -173,10 +172,8 @@ These have their own Vercel schedule OR exist as callable endpoints (also invoke
 | Route | maxDuration | Description | Also called by |
 |-------|-------------|-------------|----------------|
 | `/api/cron/generate-insights` | 300s | AI insights for eligible Pro/Founding/Growth profiles with sufficient click data | — |
-| `/api/cron/process-ingestion-jobs` | 300s | Claims up to 5 pending ingestion jobs, processes 3 concurrently | `frequent` (fallback) |
 | `/api/cron/process-merch-fulfillment` | 300s | Submits queued paid merch orders to Printful and confirms them idempotently | — |
 | `/api/cron/purge-pixel-ips` | 60s | NULLs `client_ip` from pixel events >48h old (privacy); retains `ip_hash` | — |
-| `/api/cron/summarize-interviews` | 300s (default) | Haiku-powered interview summarization; queued jobs stall without this schedule | — |
 | `/api/cron/generate-playlist` | 300s (default) | Daily AI playlist generation for admin review | — |
 | `/api/cron/process-pre-saves` | 300s (default) | Processes pending Spotify pre-saves where release date has passed; up to 500/run | — |
 | `/api/cron/cleanup-sms-intents` | 60s | Marks expired SMS subscribe intents and hard-deletes rows >24h old (no longer scheduled directly — called via `daily-maintenance` sub-job; file kept as admin escape hatch) | `daily-maintenance` |
