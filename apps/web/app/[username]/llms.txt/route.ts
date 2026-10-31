@@ -97,8 +97,9 @@ function appendAudienceDestinations(
   }
 }
 
-// ISR: match the profile page's 1-hour revalidation window
-export const revalidate = 3600;
+// Match the profile page's fresh publication decision on every request.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 interface RouteParams {
   readonly params: Promise<{ readonly username: string }>;
@@ -284,7 +285,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
   return new NextResponse(lines.join('\n'), {
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
-      'Cache-Control': 'public, max-age=3600, s-maxage=3600',
+      'Cache-Control': 'no-store',
     },
   });
 }

@@ -10,10 +10,9 @@ import {
   RENDER_FIXTURE_METADATA,
 } from '@/lib/render-fixture-policy';
 
-// Query modes stay on the canonical page's one-hour ISR cadence. The tipping
-// seed is not in the featured/claimed prerender set, so the pay destination
-// has to be emitted here or the release runner fetches it across regions.
-export const revalidate = 3600;
+// Rewritten profile modes share the canonical page's fresh publication decision.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export function generateStaticParams() {
   return getProfileModeRenderStaticParams();

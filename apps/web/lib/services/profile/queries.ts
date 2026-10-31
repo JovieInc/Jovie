@@ -340,10 +340,11 @@ export async function getProfileContacts(
  * @param username - The username to look up
  * @param options - Query options
  * @returns Full profile with links and contacts, or null if not found
+ * @throws Storage failures/timeouts when throwOnError is enabled by an authoritative reader
  */
 export async function getProfileWithLinks(
   username: string,
-  options?: { skipCache?: boolean }
+  options?: { skipCache?: boolean; throwOnError?: boolean }
 ): Promise<ProfileWithLinks | null> {
   const normalizedUsername = username.toLowerCase();
   if (KNOWN_PROBE_USERNAMES.has(normalizedUsername)) {
@@ -395,6 +396,7 @@ export async function getProfileWithLinks(
       },
       'profile-service'
     );
+    if (options?.throwOnError) throw error;
     return null;
   }
 
