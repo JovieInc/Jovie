@@ -1,0 +1,61 @@
+name: Preflight Remote
+# Third pre-push backend (after local and Gem): scripts/preflight-remote.mjs --backend actions
+# dispatches this on the exact commit the hook is about to push. It runs the identical
+# `preflight:changed` gate and uploads {sha, tree, rc} as the evidence artifact the hook
+# verifies. Hosted minutes on this public repo are free and concurrency is high, so a
+# saturated Mac and a saturated Gem do not stall pushes.
+run-name: preflight ${{ inputs.sha }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Exact commit to gate (pushed to refs/preflight/<sha> first)
+        required: true
+        type: string
+      tree:
+        description: Expected tree of that commit (evidence binding)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preflight-remote-${{ inputs.sha }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    name: preflight:changed on exact sha
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Run the identical gate and write evidence
+        env:
+          WANT_SHA: ${{ inputs.sha }}
+          WANT_TREE: ${{ inputs.tree }}
+        run: |
+          set +e
+          git fetch --quiet --no-tags origin main:refs/remotes/origin/main
+          sha="$(git rev-parse HEAD)"; tree="$(git rev-parse 'HEAD^{tree}')"
+          if [ "$sha" != "$WANT_SHA" ] || [ "$tree" != "$WANT_TREE" ]; then
+            echo "checked out $sha/$tree, wanted $WANT_SHA/$WANT_TREE" >&2; rc=2
+          else
+            pnpm preflight:changed --fast; rc=$?
+          fi
+          mkdir -p evidence
+          printf '{"sha":"%s","tree":"%s","rc":%s,"host":"actions","at":"%s"}\n' "$sha" "$tree" "$rc" "$(date -u +%FT%TZ)" > evidence/evidence.json
+          exit "$rc"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: preflight-evidence
+          path: evidence/evidence.json
+          retention-days: 1

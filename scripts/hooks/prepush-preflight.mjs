@@ -13,7 +13,11 @@ import { spawn, spawnSync } from 'node:child_process';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { cpus, homedir, loadavg } from 'node:os';
 import path from 'node:path';
-import { chooseMode, isInfraTimeout } from '../lib/prepush-offload.mjs';
+import {
+  chooseBackend,
+  chooseMode,
+  isInfraTimeout,
+} from '../lib/prepush-offload.mjs';
 
 const env = process.env;
 const g = a => spawnSync('git', a, { encoding: 'utf8' }).stdout.trim();
@@ -35,62 +39,95 @@ function run(argv) {
 }
 
 const LOCAL = ['scripts/preflight-changed.mjs', '--hook', '--fast'];
-const REMOTE = ['scripts/preflight-remote.mjs', '--bundle', '--fast'];
+
+function gemLoad() {
+  const r = spawnSync(
+    'ssh',
+    [
+      '-o',
+      'BatchMode=yes',
+      '-o',
+      'ConnectTimeout=4',
+      'gem',
+      'cat /proc/loadavg; nproc',
+    ],
+    { encoding: 'utf8', timeout: 8000 }
+  );
+  if (r.status !== 0) return null;
+  const lines = r.stdout.trim().split('\n');
+  return {
+    load: Number.parseFloat(lines[0]),
+    cores: Number.parseInt(lines.at(-1), 10),
+  };
+}
+
+const ARGV = {
+  gem: ['scripts/preflight-remote.mjs', '--bundle', '--fast'],
+  actions: ['scripts/preflight-remote.mjs', '--backend', 'actions'],
+};
+const unavailable = code => code === 127 || code === 255;
 
 export async function main() {
   const t0 = Date.now();
   const load = loadavg()[0];
   const cores = cpus().length;
-  let mode = chooseMode({ load, cores, env });
-  let outcome;
-  let infra = null;
-  let code;
-  let lastRemote = null;
-  if (mode === 'remote') {
-    console.error(
-      `[pre-push] load ${load.toFixed(0)} > ${cores} cores x 1.5: running the identical gate on Gem (preflight:remote), evidence bound to HEAD sha + tree`
-    );
-    lastRemote = await run(REMOTE);
-    code = lastRemote.code;
-    if (code === 127 || code === 255) {
-      infra = 'gem-unreachable';
-      console.error(
-        '[pre-push] INFRA: Gem unreachable (not a code failure); running the gate locally instead'
-      );
-      mode = 'local-fallback';
+  const gem = chooseMode({ load, cores, env }) === 'local' ? null : gemLoad();
+  const first = chooseBackend({ load, cores, gem, env });
+  // Fallbacks only when a backend is unavailable (infra); the gate is never skipped.
+  const order = [
+    first,
+    ...['gem', 'actions', 'local'].filter(b => b !== first),
+  ];
+  let backend = first;
+  const infra = [];
+  let code = 1;
+  for (const b of order) {
+    backend = b;
+    if (b === 'local') {
+      const r = await run(LOCAL);
+      code = r.code;
+      if (code !== 0 && isInfraTimeout(r)) {
+        infra.push('local-timeout');
+        console.error(
+          `\n[pre-push] INFRA FAILURE, not a code verdict: a check timed out or was killed under host load ${loadavg()[0].toFixed(0)} on ${cores} cores. Re-running the identical gate remotely.`
+        );
+        for (const rb of ['gem', 'actions']) {
+          backend = rb;
+          const rr = await run(ARGV[rb]);
+          code = rr.code;
+          if (code === 0 || (!unavailable(code) && !isInfraTimeout(rr))) break;
+          infra.push(`${rb}-${unavailable(code) ? 'unavailable' : 'timeout'}`);
+        }
+      }
+      break;
     }
-  }
-  if (mode !== 'remote') {
-    const r = await run(LOCAL);
+    console.error(
+      `[pre-push] load ${load.toFixed(0)}/${cores} cores${gem ? `, gem ${gem.load.toFixed(0)}/${gem.cores}` : ''}: running the identical gate on ${b} (evidence bound to HEAD sha + tree)`
+    );
+    const r = await run(ARGV[b]);
     code = r.code;
-    if (code !== 0 && !infra && isInfraTimeout(r)) {
-      infra = 'local-timeout';
+    if (unavailable(code)) {
+      infra.push(`${b}-unavailable`);
       console.error(
-        `\n[pre-push] INFRA FAILURE, not a code verdict: a check timed out or was killed under host load ${loadavg()[0].toFixed(0)} on ${cores} cores. Re-running the identical gate on Gem.`
+        `[pre-push] INFRA: ${b} unavailable (not a code failure); trying the next backend`
       );
-      mode = 'remote-after-timeout';
-      lastRemote = await run(REMOTE);
-      code = lastRemote.code;
+      continue;
     }
+    if (code !== 0 && isInfraTimeout(r)) {
+      infra.push(`${b}-timeout`);
+      console.error(
+        `\n[pre-push] INFRA FAILURE, not a code verdict: a check timed out on ${b}. Retrying once.`
+      );
+      code = (await run(ARGV[b])).code;
+    }
+    break;
   }
-  if (
-    code !== 0 &&
-    mode.startsWith('remote') &&
-    lastRemote &&
-    isInfraTimeout(lastRemote)
-  ) {
-    infra = `${infra ?? 'remote'}+gem-timeout`;
-    console.error(
-      '\n[pre-push] INFRA FAILURE, not a code verdict: a check timed out on Gem under load. Retrying the identical gate on Gem once.'
-    );
-    ({ code } = await run(REMOTE));
-  }
-  outcome = code === 0 ? 'pass' : 'fail';
+  const outcome = code === 0 ? 'pass' : 'fail';
   if (code !== 0) {
     console.error(
-      infra && mode.startsWith('remote')
-        ? '[pre-push] RED on Gem: a real failure (reproduced off the loaded host). Fix and push again.'
-        : '[pre-push] RED: fix the items above and push again.'
+      backend === 'local'
+        ? '[pre-push] RED: fix the items above and push again.'
+        : `[pre-push] RED on ${backend}: a real failure. Fix and push again.`
     );
   }
   try {
@@ -104,9 +141,11 @@ export async function main() {
         at: new Date().toISOString(),
         sha: g(['rev-parse', 'HEAD']),
         tree: g(['rev-parse', 'HEAD^{tree}']),
-        mode,
+        backend,
+        mode: backend,
         load,
         cores,
+        gem,
         infra,
         outcome,
         wallMs: Date.now() - t0,

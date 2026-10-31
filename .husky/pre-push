@@ -11,6 +11,17 @@ export AUTOMATION_VERIFY_MAX_WORKERS="${AUTOMATION_VERIFY_MAX_WORKERS:-1}"
 # raise bounded shard concurrency after proving memory and timeout headroom.
 export AUTOMATION_VERIFY_SHARD_CONCURRENCY="${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-1}"
 
+# Scratch refs for the Actions preflight backend (scripts/lib/preflight-actions.mjs):
+# skip ONLY when the caller opted in AND every pushed ref is under refs/preflight/.
+# Any real branch/tag in the same push falls through to the full gate.
+if [ "${JOVIE_PREFLIGHT_SCRATCH_PUSH:-}" = "1" ]; then
+  scratch_only=1
+  while read -r _lref _lsha rref _rsha; do
+    case "$rref" in refs/preflight/*) ;; *) scratch_only=0 ;; esac
+  done
+  if [ "$scratch_only" = "1" ]; then exit 0; fi
+fi
+
 # NOTE: git holds the ssh receive-pack connection open across this hook.
 # GitHub kills it after ~10 idle minutes, and a long gate then surfaces as
 # `git push` dying with SIGPIPE (exit 141) right after the last check —

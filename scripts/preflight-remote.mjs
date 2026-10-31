@@ -43,6 +43,7 @@ export function parseRemoteArgs(argv, env = {}) {
       DEFAULT_SLOTS,
     push: true,
     bundle: false,
+    backend: 'gem',
     dryRun: false,
     repo: process.cwd(),
     bodyFile: undefined,
@@ -51,6 +52,7 @@ export function parseRemoteArgs(argv, env = {}) {
   for (let i = 0; i < argv.length; i += 1) {
     const f = argv[i];
     if (f === '--host') a.host = argv[++i];
+    else if (f === '--backend') a.backend = argv[++i];
     else if (f === '--no-push') a.push = false;
     // ship HEAD as a git bundle (no push, so no recursion into pre-push) and
     // require passing evidence bound to the exact sha + tree
@@ -171,6 +173,14 @@ export async function main({
   const bodyB64 = a.bodyFile
     ? readFileSync(a.bodyFile).toString('base64')
     : undefined;
+  if (a.backend === 'actions') {
+    const { runActions } = await import('./lib/preflight-actions.mjs');
+    return runActions({
+      repo: a.repo,
+      sha,
+      tree: git(a.repo, ['rev-parse', 'HEAD^{tree}']).out,
+    });
+  }
   const script = buildRemoteScript({
     slug: branchSlug(branch),
     branch,
