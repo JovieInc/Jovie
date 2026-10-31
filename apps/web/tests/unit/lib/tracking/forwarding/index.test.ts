@@ -98,8 +98,12 @@ vi.mock('@/lib/env-server', () => ({
   },
 }));
 
+import { readTrackingProfile } from '@/lib/tracking/eligibility.server';
 // Import after mocks are set up
-import { forwardEvent } from '@/lib/tracking/forwarding/index';
+import {
+  forwardEvent,
+  processPendingEvents,
+} from '@/lib/tracking/forwarding/index';
 
 function makePixelEvent(overrides: Partial<PixelEvent> = {}): PixelEvent {
   return {
@@ -125,6 +129,7 @@ function makePixelEvent(overrides: Partial<PixelEvent> = {}): PixelEvent {
 describe('forwardEvent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(readTrackingProfile).mockResolvedValue({ youngAudience: false });
     // Reset the mock chain for update
     mockUpdate.mockReturnValue({
       set: vi.fn().mockReturnValue({
@@ -255,6 +260,51 @@ describe('forwardEvent', () => {
 
     // Should only be called once for Jovie's pixel, not creator's
     expect(mockForwardToFacebook).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves privacy skips when another vendor exhausts its retry budget', async () => {
+    const event = makePixelEvent({ retryCount: 5 });
+    mockSelect.mockReturnValueOnce({
+      from: () => ({ where: () => ({ limit: async () => [event] }) }),
+    });
+    mockSelect.mockReturnValueOnce({
+      from: () => ({
+        innerJoin: () => ({ innerJoin: () => ({ where: async () => [] }) }),
+      }),
+    });
+    const set = vi
+      .fn()
+      .mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
+    mockUpdate.mockReturnValue({ set });
+    vi.mocked(readTrackingProfile)
+      .mockResolvedValue({ youngAudience: true })
+      .mockResolvedValueOnce({ youngAudience: false });
+    mockForwardToFacebook.mockResolvedValueOnce({
+      platform: 'facebook',
+      success: false,
+      error: 'offline',
+    });
+    expect(await processPendingEvents()).toEqual({
+      processed: 1,
+      successful: 0,
+      failed: 1,
+      dead_lettered: 1,
+    });
+    expect(set).toHaveBeenLastCalledWith({
+      forwardingStatus: expect.objectContaining({
+        jovie_facebook: expect.objectContaining({ status: 'dead_letter' }),
+        jovie_google: expect.objectContaining({
+          status: 'skipped',
+          error: 'tracking_ineligible',
+        }),
+        jovie_tiktok: expect.objectContaining({
+          status: 'skipped',
+          error: 'tracking_ineligible',
+        }),
+      }),
+    });
+    expect(mockForwardToGoogle).not.toHaveBeenCalled();
+    expect(mockForwardToTikTok).not.toHaveBeenCalled();
   });
 
   it('updates the database with forwarding status after forwarding', async () => {

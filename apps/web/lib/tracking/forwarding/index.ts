@@ -375,7 +375,11 @@ async function deadLetterEvent(
   const deadLetterStatus: PixelForwardingStatus = {};
   for (const result of results) {
     deadLetterStatus[result.platform] = {
-      status: result.success ? 'sent' : 'dead_letter',
+      status: result.skipped
+        ? 'skipped'
+        : result.success
+          ? 'sent'
+          : 'dead_letter',
       sentAt: new Date().toISOString(),
       ...(result.error && { error: result.error }),
     };
