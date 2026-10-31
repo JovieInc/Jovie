@@ -16,9 +16,6 @@ import { getCurrentOnboardingSessionId } from '@/lib/onboarding/session';
 import { getClientIP, trackingIpVisitsLimiter } from '@/lib/rate-limit';
 import { detectBot } from '@/lib/utils/bot-detection';
 
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
-
 const MAX_BODY_BYTES = 256;
 
 const bodySchema = z

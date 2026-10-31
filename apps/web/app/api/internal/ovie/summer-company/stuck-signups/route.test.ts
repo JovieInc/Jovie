@@ -34,7 +34,7 @@ it('rejects callers that are not Summer before reading anything', async () => {
   expect(mocks.list).not.toHaveBeenCalled();
 });
 
-it('returns stuck signups with replay links and clamps the window', async () => {
+it('returns stuck signups with replay links and clamps the lookback period', async () => {
   mocks.list.mockResolvedValue([
     { userId: 'u1', signedUpAt: 'x', profileClaimed: false, replays: [] },
   ]);

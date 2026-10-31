@@ -4,9 +4,6 @@ import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { verifySummerOidcRequest } from '@/lib/ovie/summer-oidc.server';
 
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
-
 const DEFAULT_DAYS = 30;
 const MAX_DAYS = 90;
 
