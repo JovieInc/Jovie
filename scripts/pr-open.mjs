@@ -174,12 +174,9 @@ function blastRadius(paths) {
 }
 
 /** @param {{
- *   title: string,
- *   files: Array<{ filename: string, status?: string, patch?: string, previous_filename?: string }>,
- *   labels?: string[],
- *   summary?: string, metric?: string, claim?: string, area?: string, theme?: string,
- *   perMerge?: boolean, failingCommand?: string, failingRun?: string,
- *   customerVisible?: string, prUrl?: string, number?: string | number, failingLog?: string,
+ *   title: string, files: Array<{ filename: string, status?: string, patch?: string, previous_filename?: string }>,
+ *   labels?: string[], summary?: string, metric?: string, claim?: string, area?: string, theme?: string,
+ *   perMerge?: boolean, failingCommand?: string, failingRun?: string, customerVisible?: string, prUrl?: string, number?: string | number, failingLog?: string,
  * }} input */
 export function draftBody({
   title,
@@ -542,9 +539,7 @@ export async function deriveEvidence(
   return evidence;
 }
 
-/** Force fresh edited payloads even when the requested final body is unchanged.
- * Confirm new run IDs; re-running an old run cannot satisfy this receipt.
- */
+/** REST edits emit fresh Actions events; gh pr edit's GraphQL writes did not. */
 export async function refreshBodyChecks(
   cwd,
   pr,
@@ -567,18 +562,15 @@ export async function refreshBodyChecks(
     ).workflow_runs;
   const before = new Set(runs().map(r => r.id));
   const dir = mkdtempSync(path.join(tmpdir(), 'pr-open-edit-'));
-  const file = path.join(dir, 'body.md');
+  const file = path.join(dir, 'body.json');
   const edit = text => {
-    writeFileSync(file, text);
+    writeFileSync(file, JSON.stringify({ body: text, title }));
     const result = github(cwd, [
-      'pr',
-      'edit',
-      String(pr.number),
-      '--repo',
-      REPOSITORY,
-      '--title',
-      title,
-      '--body-file',
+      'api',
+      '--method',
+      'PATCH',
+      `repos/${REPOSITORY}/pulls/${pr.number}`,
+      '--input',
       file,
     ]);
     if (result.status !== 0)
@@ -607,7 +599,7 @@ export async function refreshBodyChecks(
           log(`fresh ${name}: ${fresh.find(r => r.name === name).html_url}`);
         return;
       }
-      if (attempt < 4) await pause(1000 * (attempt + 1));
+      if (attempt < 4) await pause(5000 * (attempt + 1));
     }
     throw new Error(
       'update: body saved, but fresh PR Fleet Rules / Source Validation runs not confirmed; no stale rerun was requested'

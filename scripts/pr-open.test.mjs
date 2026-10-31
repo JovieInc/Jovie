@@ -258,12 +258,19 @@ test('refresh forces two edits and confirms new runs, never stale reruns', async
     output = [];
   let reads = 0;
   const github = (_cwd, args) => {
-    if (args[0] === 'api')
+    if (!args.includes('PATCH'))
       return ok({
         workflow_runs: reads++ < 2 ? freshRuns(pr, 1) : freshRuns(pr, 3),
       });
-    assert.deepEqual(args.slice(0, 3), ['pr', 'edit', '42']);
-    edits.push(readFileSync(args[args.indexOf('--body-file') + 1], 'utf8'));
+    assert.deepEqual(args.slice(0, 4), [
+      'api',
+      '--method',
+      'PATCH',
+      'repos/JovieInc/Jovie/pulls/42',
+    ]);
+    edits.push(
+      JSON.parse(readFileSync(args[args.indexOf('--input') + 1], 'utf8')).body
+    );
     return okText('');
   };
   await refreshBodyChecks('.', pr, 'final body', pr.title, {
@@ -278,7 +285,7 @@ test('refresh forces two edits and confirms new runs, never stale reruns', async
   await assert.rejects(
     refreshBodyChecks('.', pr, 'final body', pr.title, {
       github: (_cwd, args) =>
-        args[0] === 'api'
+        !args.includes('PATCH')
           ? ok({ workflow_runs: freshRuns(pr, 1) })
           : okText(''),
       pause: async () => {},
@@ -297,14 +304,16 @@ test('update N always drafts from PR N diff and title, even in another checkout'
     if (args.some(a => a.includes('/files?')))
       return ok([[file('apps/web/lib/target/own.test.ts', 'added')]]);
     if (args[0] === 'run') return ok([]);
+    if (args.includes('PATCH')) {
+      edits.push(
+        JSON.parse(readFileSync(args[args.indexOf('--input') + 1], 'utf8')).body
+      );
+      return okText('');
+    }
     if (args[0] === 'api')
       return ok({
         workflow_runs: runReads++ ? freshRuns(pr, 3) : freshRuns(pr, 1),
       });
-    if (args[0] === 'pr' && args[1] === 'edit') {
-      edits.push(readFileSync(args[args.indexOf('--body-file') + 1], 'utf8'));
-      return okText('');
-    }
     throw new Error(`unexpected ${args.join(' ')}`);
   };
   const code = await main(['update', '42'], x => out.push(x), {
@@ -346,7 +355,7 @@ test('update rejects swapped bodies and missing identity before any edit', async
       );
       assert.equal(result, 1);
       assert.match(out.join('\n'), /target:/);
-      assert.ok(!calls.some(args => args[1] === 'edit'));
+      assert.ok(!calls.some(args => args.includes('PATCH')));
     }
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -385,7 +394,7 @@ test('update refuses moving heads, incomplete diffs and failed target lookups', 
       }),
       1
     );
-    assert.ok(!calls.some(args => args[1] === 'edit'));
+    assert.ok(!calls.some(args => args.includes('PATCH')));
     assert.match(
       out.join('\n'),
       /changed during|incomplete PR diff|unable to read/
