@@ -382,6 +382,20 @@ class LoopTest(unittest.TestCase):
         self.assertFalse(pe.verify_signature("k", b"{}", "bad"))
         self.assertFalse(pe.verify_signature("k", b"{}", ""))
 
+    def test_sandbox_binds_the_shared_api_ledger_writable(self):
+        # The units run bwrap with a read-only root; the apiclient budget ledger lives under the
+        # shared jovie-lanes state (~/.local/state/jovie-lanes/api-ledger) and is written on every
+        # API call. Without the writable bind, os.mkdir('<provider>.lock.d') dies with EROFS
+        # [Errno 30] and every watcher unit fails. The bind must survive a fresh host too
+        # (install.sh creates the ledger dir before bwrap can reference it).
+        sh = (Path(__file__).parent / "install.sh").read_text()
+        sandbox = sh.split('sandbox="')[1].split('"')[0]
+        self.assertIn("--ro-bind / /", sandbox)
+        self.assertIn("--bind $ledger $ledger", sandbox)
+        ledger_line = next(line for line in sh.splitlines() if line.startswith("ledger="))
+        self.assertIn("jovie-lanes/api-ledger", ledger_line)
+        self.assertIn('mkdir -p "$ledger"', sh)
+
 
 if __name__ == "__main__":
     unittest.main()
