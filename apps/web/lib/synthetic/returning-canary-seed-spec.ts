@@ -49,6 +49,49 @@ export const CHAT_HEALTH_CANARY_SEED: CanarySeedIdentity = Object.freeze({
   artist: null,
 });
 
+/**
+ * Shape of the creator-profile row the chat-health canary is seeded with
+ * (everything `ensureCreatorProfileRecord` needs except `userId`).
+ */
+export interface ChatHealthCanaryProfileSeedInput {
+  readonly username: string;
+  readonly usernameNormalized: string;
+  readonly displayName: string;
+  readonly bio: string;
+  readonly isPublic: true;
+  readonly isVerified: boolean;
+  readonly isClaimed: boolean;
+  readonly ingestionStatus: 'idle';
+  readonly onboardingCompletedAt: Date;
+}
+
+/**
+ * Exact creator-profile values that bring the chat-health canary to a
+ * COMPLETE profile (JOV-10150). The shared chat shell redirects every chat
+ * route — including /app/chat — to /start while `isProfileComplete` is false,
+ * so the post-deploy chat cert can only run its composer contracts on the
+ * real chat surface if this input keeps satisfying the product's own
+ * completeness contract (username + usernameNormalized + displayName +
+ * isPublic + onboardingCompletedAt — see `lib/auth/profile-completeness`).
+ * Exported so the seed script and its unit test share one source of truth;
+ * the test fails if this input ever stops clearing the onboarding redirect.
+ */
+export function chatHealthCanaryProfileSeedInput(
+  now: Date
+): ChatHealthCanaryProfileSeedInput {
+  return {
+    username: CHAT_HEALTH_CANARY_SEED.handle,
+    usernameNormalized: CHAT_HEALTH_CANARY_SEED.handle,
+    displayName: CHAT_HEALTH_CANARY_SEED.displayName,
+    bio: CHAT_HEALTH_CANARY_SEED.bio,
+    isPublic: true,
+    isVerified: false,
+    isClaimed: true,
+    ingestionStatus: 'idle',
+    onboardingCompletedAt: now,
+  };
+}
+
 export const CANARY_SEED_IDENTITIES: readonly CanarySeedIdentity[] =
   Object.freeze([RETURNING_CANARY_SEED, CHAT_HEALTH_CANARY_SEED]);
 
