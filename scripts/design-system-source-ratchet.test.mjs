@@ -123,3 +123,23 @@ test('fails closed if the trusted base is missing', t => {
     /trusted design base/
   );
 });
+
+test('uses the target tip to reject regrowth on a stale feature branch', t => {
+  const { repoRoot, git, write } = fixture(t);
+  git('branch', 'feature');
+  write('apps/web/app/page.tsx', 'const color = "var(--color-bg)";');
+  git('add', '.');
+  git(
+    '-c',
+    'user.name=Test',
+    '-c',
+    'user.email=test@example.com',
+    'commit',
+    '--quiet',
+    '-m',
+    'landed shrink'
+  );
+  git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+  git('checkout', '--quiet', 'feature');
+  assert.equal(evaluateBaseDesignRatchet({ repoRoot }).ok, false);
+});

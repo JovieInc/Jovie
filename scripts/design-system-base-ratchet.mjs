@@ -44,9 +44,9 @@ function rawIdentities(file, source) {
   )
     return [];
   return [
-    ['raw-hex-color', RAW_HEX_PATTERN],
-    ['raw-palette-class', RAW_PALETTE_PATTERN],
-  ].flatMap(([rule, pattern]) =>
+    { rule: 'raw-hex-color', pattern: RAW_HEX_PATTERN },
+    { rule: 'raw-palette-class', pattern: RAW_PALETTE_PATTERN },
+  ].flatMap(({ rule, pattern }) =>
     [...source.matchAll(new RegExp(pattern.source, pattern.flags))].map(match =>
       identityKey(file, rule, match[0])
     )
@@ -103,7 +103,11 @@ export function evaluateBaseDesignRatchet(options = {}) {
   const repoRoot = options.repoRoot ?? REPO_ROOT;
   const baseRef =
     options.baseRef ?? `origin/${process.env.GITHUB_BASE_REF || 'main'}`;
-  const base = git(repoRoot, ['merge-base', 'HEAD', baseRef]).trim();
+  const base = git(repoRoot, [
+    'rev-parse',
+    '--verify',
+    `${baseRef}^{commit}`,
+  ]).trim();
   // Native grep supplies matching source lines with a NUL after the filename.
   // Both raw-color rules are line-local; no checkout or per-file process needed.
   const matches = git(
