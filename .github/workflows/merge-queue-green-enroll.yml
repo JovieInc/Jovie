@@ -211,6 +211,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             .nvmrc
+            package.json
             packages/api-client
             scripts/queue-drift-resolve.mjs
             .github/actions/prime-node-toolcache/action.yml
@@ -240,6 +241,17 @@ jobs:
           path: merged
           fetch-depth: 1
           persist-credentials: false
+
+      # Four guards parse TypeScript. Install only the compiler (trusted
+      # version from the default branch, no lifecycle scripts) outside the PR
+      # tree, then link it in; a failed install makes those guards fail open.
+      - name: Provide the TypeScript compiler to the guards
+        if: steps.resolve.outputs.run == 'true'
+        continue-on-error: true
+        run: |
+          version="$(node -p "require('./package.json').devDependencies.typescript")"
+          npm install --prefix "$RUNNER_TEMP/ts" --no-audit --no-fund --ignore-scripts "typescript@${version}"
+          ln -s "$RUNNER_TEMP/ts/node_modules" merged/node_modules
 
       - name: Run drift-prone guards against the test merge
         id: guards

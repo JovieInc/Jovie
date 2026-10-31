@@ -3,7 +3,7 @@
 // scripts/lib/queue-drift-guards.json against the current tree (CI points it at
 // a test merge of the PR with the latest main). Exit 0 = clean or nothing
 // decidable (fail open); exit 1 = at least one guard reports real drift.
-import { spawnSync } from 'node:child_process';
+import { spawn as spawnAsync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,6 +40,44 @@ function tail(text) {
     : trimmed;
 }
 
+function skipReason(guard, root) {
+  const missing = (guard.requires ?? []).filter(
+    path => !existsSync(resolve(root, path))
+  );
+  return missing.length > 0 ? `absent: ${missing.join(', ')}` : '';
+}
+
+function classify(guard, run) {
+  const output = `${run.stdout ?? ''}\n${run.stderr ?? ''}`;
+  if (run.error || run.status === null) {
+    return {
+      id: guard.id,
+      status: 'error',
+      detail: String(run.error?.code ?? run.signal ?? 'no exit status'),
+    };
+  }
+  if (run.status === 0) return { id: guard.id, status: 'pass', detail: '' };
+  if (ENVIRONMENT_ERROR.test(output)) {
+    return {
+      id: guard.id,
+      status: 'error',
+      detail: 'guard could not load its dependencies',
+    };
+  }
+  return {
+    id: guard.id,
+    status: 'fail',
+    detail: tail(run.stderr) || tail(run.stdout),
+    remediation: guard.remediation ?? '',
+  };
+}
+
+const guardEnv = () => ({
+  PATH: process.env.PATH,
+  HOME: process.env.HOME,
+  CI: 'true',
+});
+
 export function runGuards({
   guards,
   root = process.cwd(),
@@ -47,46 +85,57 @@ export function runGuards({
   timeoutMs = 60_000,
 }) {
   return guards.map(guard => {
-    const missing = (guard.requires ?? []).filter(
-      path => !existsSync(resolve(root, path))
-    );
-    if (missing.length > 0) {
-      return {
-        id: guard.id,
-        status: 'skipped',
-        detail: `absent: ${missing.join(', ')}`,
-      };
-    }
+    const skipped = skipReason(guard, root);
+    if (skipped) return { id: guard.id, status: 'skipped', detail: skipped };
     const [command, ...args] = guard.command;
     const run = spawn(command, args, {
       cwd: root,
       encoding: 'utf8',
       timeout: timeoutMs,
-      env: { PATH: process.env.PATH, HOME: process.env.HOME, CI: 'true' },
+      env: guardEnv(),
     });
-    const output = `${run.stdout ?? ''}\n${run.stderr ?? ''}`;
-    if (run.error || run.status === null) {
-      return {
-        id: guard.id,
-        status: 'error',
-        detail: String(run.error?.code ?? run.signal ?? 'no exit status'),
-      };
-    }
-    if (run.status === 0) return { id: guard.id, status: 'pass', detail: '' };
-    if (ENVIRONMENT_ERROR.test(output)) {
-      return {
-        id: guard.id,
-        status: 'error',
-        detail: 'guard could not load its dependencies',
-      };
-    }
-    return {
-      id: guard.id,
-      status: 'fail',
-      detail: tail(run.stderr) || tail(run.stdout),
-      remediation: guard.remediation ?? '',
-    };
+    return classify(guard, run);
   });
+}
+
+/** Same verdicts as runGuards, with every guard running at once (wall time = slowest guard). */
+export function runGuardsParallel({
+  guards,
+  root = process.cwd(),
+  timeoutMs = 60_000,
+}) {
+  return Promise.all(
+    guards.map(
+      guard =>
+        new Promise(resolvePromise => {
+          const skipped = skipReason(guard, root);
+          if (skipped) {
+            resolvePromise({
+              id: guard.id,
+              status: 'skipped',
+              detail: skipped,
+            });
+            return;
+          }
+          const [command, ...args] = guard.command;
+          const child = spawnAsync(command, args, {
+            cwd: root,
+            env: guardEnv(),
+            timeout: timeoutMs,
+          });
+          let stdout = '';
+          let stderr = '';
+          child.stdout.on('data', chunk => (stdout += chunk));
+          child.stderr.on('data', chunk => (stderr += chunk));
+          child.on('error', error =>
+            resolvePromise(classify(guard, { error }))
+          );
+          child.on('close', (status, signal) =>
+            resolvePromise(classify(guard, { status, signal, stdout, stderr }))
+          );
+        })
+    )
+  );
 }
 
 export function formatReport(results) {
@@ -101,7 +150,7 @@ export function formatReport(results) {
   ].join('\n');
 }
 
-function main(argv) {
+async function main(argv) {
   const flag = name => {
     const index = argv.indexOf(name);
     return index >= 0 ? argv[index + 1] : undefined;
@@ -109,7 +158,11 @@ function main(argv) {
   const manifest =
     flag('--manifest') ?? resolve(here, 'lib/queue-drift-guards.json');
   const out = flag('--out');
-  const results = runGuards({ guards: loadGuards(manifest) });
+  const started = Date.now();
+  const results = await runGuardsParallel({ guards: loadGuards(manifest) });
+  console.log(
+    `queue-drift: ${results.length} guards in ${((Date.now() - started) / 1000).toFixed(1)}s`
+  );
   for (const result of results) {
     console.log(
       `queue-drift: ${result.id} ${result.status}${result.detail && result.status !== 'fail' ? ` (${result.detail})` : ''}`
@@ -126,5 +179,5 @@ if (
   process.argv[1] &&
   resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
-  process.exit(main(process.argv.slice(2)));
+  process.exit(await main(process.argv.slice(2)));
 }

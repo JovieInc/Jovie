@@ -18,7 +18,9 @@ const MERGEABLE_ATTEMPTS = 3;
 async function ghJson(gh, path) {
   const result = await gh(['api', path], { priority: 'merge' });
   if (result.code !== 0)
-    throw new Error(`gh api ${path} failed (${result.code}): ${result.stderr}`);
+    throw new Error(
+      `GitHub API ${path} failed (${result.code}): ${result.stderr}`
+    );
   return JSON.parse(result.stdout);
 }
 

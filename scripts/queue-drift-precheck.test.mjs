@@ -1,5 +1,13 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,6 +17,7 @@ import {
   formatReport,
   loadGuards,
   runGuards,
+  runGuardsParallel,
 } from './queue-drift-precheck.mjs';
 import { resolveCandidate, verdict } from './queue-drift-resolve.mjs';
 
@@ -29,7 +38,10 @@ test('manifest lists the drift-prone guards and every entry is well formed', () 
   assert.ok(ids.includes('doc-freshness'));
   assert.ok(ids.includes('data-architecture-guard'));
   for (const entry of guards) {
-    assert.match(entry.command[1], /^scripts\/[\w.-]+\.mjs$/);
+    assert.match(
+      entry.command[1],
+      /^(scripts|apps\/web\/scripts)\/[\w./-]+\.mjs$/
+    );
     assert.deepEqual(entry.requires, [entry.command[1]]);
   }
 });
@@ -75,8 +87,8 @@ test('undecidable guards fail open: absent, timed out, or cannot load', () => {
   assert.equal(formatReport(results), '');
 });
 
-test('the real guards pass on this tree (no hand-maintained count to drift)', () => {
-  const results = runGuards({
+test('the real guards pass on this tree (no hand-maintained count to drift)', async () => {
+  const results = await runGuardsParallel({
     guards: loadGuards('scripts/lib/queue-drift-guards.json'),
   });
   assert.deepEqual(
@@ -255,4 +267,80 @@ test('CLAUDE.md carries no hand-maintained scoped-rules count', () => {
       marker.files.includes('CLAUDE.md')
     )
   );
+});
+
+// Baseline-class guard = a standalone script that compares a committed
+// baseline, ratchet, census, allowlist or digest with the tree. Those are the
+// guards that pass on main and fail once main moves under a queued PR, so each
+// must run in the precheck or say why it cannot.
+const BASELINE_CLASS =
+  /(baseline|ratchet|census|allowlist)[A-Za-z0-9_.-]*\.json|BASELINE_PATH|--(write|update)-baseline|sourceDigest/i;
+const SCAN_ROOTS = ['scripts', 'apps/web/scripts', '.github/scripts'];
+
+function scriptFiles(dir, out = []) {
+  for (const name of readdirSync(dir)) {
+    if (['node_modules', 'fixtures', '__tests__'].includes(name)) continue;
+    const path = join(dir, name);
+    if (statSync(path).isDirectory()) scriptFiles(path, out);
+    else if (/\.(mjs|js)$/.test(name) && !/\.test\./.test(name)) out.push(path);
+  }
+  return out;
+}
+
+function baselineClassScripts() {
+  return SCAN_ROOTS.flatMap(root => scriptFiles(root))
+    .filter(path => !path.startsWith('scripts/lib/'))
+    .filter(path => BASELINE_CLASS.test(readFileSync(path, 'utf8')))
+    .sort();
+}
+
+test('every baseline-class guard is in queue-drift-guards.json or exempt with a reason', () => {
+  const manifest = JSON.parse(read('scripts/lib/queue-drift-guards.json'));
+  const listed = new Set(
+    manifest.guards.flatMap(entry => entry.requires ?? [])
+  );
+  const exempt = new Map();
+  for (const group of manifest.exempt ?? []) {
+    assert.ok(group.reason?.trim(), 'every exempt group needs a reason');
+    for (const path of group.paths) exempt.set(path, group.reason);
+  }
+  const missing = baselineClassScripts().filter(
+    path => !listed.has(path) && !exempt.has(path)
+  );
+  assert.deepEqual(
+    missing,
+    [],
+    `Baseline-class scripts missing from scripts/lib/queue-drift-guards.json (add a guard, or an exempt entry with a reason):\n${missing.join('\n')}`
+  );
+  for (const path of listed) {
+    assert.ok(!exempt.has(path), `${path} is both a guard and exempt`);
+  }
+  for (const path of [...listed, ...exempt.keys()]) {
+    // A guard may be listed before it lands (see the manifest comment).
+    if (listed.has(path) && path === 'scripts/data-architecture-guard.mjs')
+      continue;
+    assert.ok(existsSync(path), `${path} is listed but does not exist`);
+  }
+});
+
+test('the parallel runner gives the same verdicts as the serial one', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'drift-par-'));
+  writeFileSync(join(root, 'ok.mjs'), 'process.exit(0)');
+  writeFileSync(
+    join(root, 'bad.mjs'),
+    'console.error("grew"); process.exit(1)'
+  );
+  writeFileSync(join(root, 'dep.mjs'), 'import "nope-missing-package-xyz"');
+  const guards = [
+    { id: 'ok', command: ['node', 'ok.mjs'], requires: ['ok.mjs'] },
+    { id: 'bad', command: ['node', 'bad.mjs'], remediation: 'fix it' },
+    { id: 'dep', command: ['node', 'dep.mjs'] },
+    { id: 'gone', command: ['node', 'gone.mjs'], requires: ['gone.mjs'] },
+  ];
+  const results = await runGuardsParallel({ guards, root });
+  assert.deepEqual(
+    results.map(r => r.status),
+    ['pass', 'fail', 'error', 'skipped']
+  );
+  assert.match(results[1].detail, /grew/);
 });
