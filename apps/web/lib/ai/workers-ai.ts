@@ -56,6 +56,9 @@ function getProvider(): WorkersAiProvider {
     name: 'workers-ai',
     baseURL: workersAiBaseUrl(),
     apiKey: env.WORKERS_AI_TOKEN?.trim(),
+    // Without this the SDK sends a bare json_object mode and the model ignores
+    // the schema's keys (measured: enum field came back under a different key).
+    supportsStructuredOutputs: true,
   });
   return cachedProvider;
 }
