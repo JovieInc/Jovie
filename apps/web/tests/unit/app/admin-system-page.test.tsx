@@ -55,7 +55,7 @@ describe('AdminSystemPage', () => {
     expect(mockRequireAccess).toHaveBeenCalledOnce();
     expect(screen.getByTestId('admin-system-page')).toHaveAttribute(
       'data-page-title',
-      'System Map'
+      'Agents'
     );
     expect(screen.getByTestId('admin-system-page')).toHaveAttribute(
       'data-active-tab',
@@ -66,7 +66,7 @@ describe('AdminSystemPage', () => {
       undefined
     );
     expect(
-      screen.queryByRole('heading', { name: 'System Map' })
+      screen.queryByRole('heading', { name: 'Agents' })
     ).not.toBeInTheDocument();
   });
 

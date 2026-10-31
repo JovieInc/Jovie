@@ -59,6 +59,8 @@ export const SYNTHETIC_PRINCIPAL_SCENARIOS = [
   'claim',
   'onboarding_chat',
   'checkout_test',
+  // JOV-9779: canary artist + canary inbox for the release-email canary.
+  'release_email',
 ] as const;
 export type SyntheticPrincipalScenario =
   (typeof SYNTHETIC_PRINCIPAL_SCENARIOS)[number];
@@ -102,6 +104,15 @@ export const SYNTHETIC_PRINCIPALS = [
     label: 'Production canary',
     producer: 'synthetic-monitoring',
     scenarios: ['auth', 'claim', 'onboarding_chat', 'checkout_test'],
+    status: 'active',
+  },
+  {
+    // `+synthetic-release-artist` owns the canary profile and
+    // `+synthetic-release-email` is the canary subscriber inbox.
+    actorId: 'release',
+    label: 'Release-email canary',
+    producer: 'release-email-canary',
+    scenarios: ['release_email'],
     status: 'active',
   },
 ] as const satisfies readonly SyntheticPrincipal[];

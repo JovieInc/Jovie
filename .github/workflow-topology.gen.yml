@@ -186,7 +186,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:main-release-ready
-    jobCount: 64
+    jobCount: 65
   - name: Claim Checkout Dogfood
     path: .github/workflows/claim-checkout-dogfood.yml
     active: true
@@ -713,7 +713,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:land
-    jobCount: 2
+    jobCount: 3
   - name: Marketing Certification Producer
     path: .github/workflows/marketing-certification-producer.yml
     active: true
@@ -1378,6 +1378,18 @@ nodes:
       - pull_request
     terminalReceipt: job:ready
     jobCount: 7
+  - name: Spend Guard
+    path: .github/workflows/spend-guard.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - repository_dispatch
+      - workflow_dispatch
+    terminalReceipt: job:guard
+    jobCount: 1
   - name: Staging Controller
     path: .github/workflows/staging-controller.yml
     active: true

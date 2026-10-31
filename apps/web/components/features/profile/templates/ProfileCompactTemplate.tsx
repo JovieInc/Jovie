@@ -57,6 +57,7 @@ import {
   useUnsubscribeNotificationsMutation,
   useUpdateContentPreferencesMutation,
 } from '@/lib/queries/useNotificationStatusQuery';
+import { recordRuntimeTrace } from '@/lib/testing/runtime-trace';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import { isDefaultAvatarUrl } from '@/lib/utils/dsp-images';
@@ -401,6 +402,12 @@ export function ProfileCompactTemplate({
     profileHistoryDepthRef.current = readPublicProfileHistoryDepth(
       globalThis.history.state
     );
+    recordRuntimeTrace('profile-history', 'arrival', {
+      pathname: globalThis.location.pathname,
+      search: globalThis.location.search,
+      historyLength: globalThis.history.length,
+      depth: profileHistoryDepthRef.current,
+    });
   }, []);
 
   useEffect(() => clearCloseResetTimer, [clearCloseResetTimer]);
@@ -658,6 +665,12 @@ export function ProfileCompactTemplate({
         suppressNextHistorySyncRef.current = true;
         initialLocationModeAlignedRef.current = false;
       }
+      recordRuntimeTrace('profile-history', 'requested-mode-sync', {
+        from: lastSyncedModeRef.current,
+        to: nextMode,
+        pathname: globalThis.location.pathname,
+        search: globalThis.location.search,
+      });
       setRequestedMode(nextMode);
     },
     [mode]
@@ -710,6 +723,11 @@ export function ProfileCompactTemplate({
         globalThis.history.length ===
           (arrivalHistoryLengthRef.current ?? globalThis.history.length)
       ) {
+        recordRuntimeTrace('profile-history', 'strip-detector-tick', {
+          pathname: globalThis.location.pathname,
+          search: globalThis.location.search,
+          historyLength: globalThis.history.length,
+        });
         setHistoryWakeTick(tick => tick + 1);
       }
     }, 250);
@@ -841,6 +859,12 @@ export function ProfileCompactTemplate({
         : activeMode === requestedMode;
 
     if (!isHistoryModeSettled) {
+      recordRuntimeTrace('profile-history', 'sync-skip', {
+        reason: 'not-settled',
+        requestedMode,
+        activeMode,
+        href: currentHref,
+      });
       return;
     }
 
@@ -863,6 +887,12 @@ export function ProfileCompactTemplate({
       globalThis.location.pathname !== `/${artist.handle}` &&
       globalThis.location.pathname !== mountedPathnameRef.current
     ) {
+      recordRuntimeTrace('profile-history', 'sync-skip', {
+        reason: 'ownership-left-profile',
+        pathname: globalThis.location.pathname,
+        mountedPathname: mountedPathnameRef.current,
+        href: currentHref,
+      });
       return;
     }
 
@@ -883,6 +913,10 @@ export function ProfileCompactTemplate({
       globalThis.history.length ===
         (arrivalHistoryLengthRef.current ?? globalThis.history.length);
     if (correctingStrippedLanding) {
+      recordRuntimeTrace('profile-history', 'strip-correction-replace', {
+        from: currentHref,
+        to: href,
+      });
       globalThis.history.replaceState(
         withPublicProfileHistoryDepth(globalThis.history.state, 0),
         '',
@@ -904,11 +938,23 @@ export function ProfileCompactTemplate({
       previousSync.href !== currentHref &&
       previousSync.mode === activeMode
     ) {
+      recordRuntimeTrace('profile-history', 'sync-skip', {
+        reason: 'link-navigation-discriminator',
+        previousHref: previousSync.href,
+        href: currentHref,
+        mode: activeMode,
+      });
       return;
     }
 
     const nextDepth = profileHistoryDepthRef.current + 1;
     profileHistoryDepthRef.current = nextDepth;
+    recordRuntimeTrace('profile-history', 'mode-push', {
+      from: currentHref,
+      to: href,
+      depth: nextDepth,
+      historyLength: globalThis.history.length,
+    });
     globalThis.history.pushState(
       withPublicProfileHistoryDepth(globalThis.history.state, nextDepth),
       '',

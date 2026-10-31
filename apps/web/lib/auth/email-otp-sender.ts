@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { captureError } from '@/lib/error-tracking';
+import { isSyntheticCanaryRecipient } from '@/lib/utils/email';
 import { isDeterministicTestOtpEmail } from './rate-limit-rules';
 
 /**
@@ -47,8 +48,13 @@ function logOutcome(
 }
 
 export async function sendEmailOtp(input: EmailOtpSendInput): Promise<void> {
-  if (isDeterministicTestOtpEmail(input.email)) {
-    // Deterministic E2E path: specs type 424242, nothing is sent.
+  if (
+    isDeterministicTestOtpEmail(input.email) ||
+    isSyntheticCanaryRecipient(input.email)
+  ) {
+    // Deterministic E2E path (specs type 424242) and prod-cert canaries (they
+    // read the code from the verification table): nothing is sent, so canaries
+    // never burn the transactional quota or bounce against jov.ie.
     logOutcome('skipped_test_email', input);
     return;
   }

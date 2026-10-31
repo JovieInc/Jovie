@@ -1,7 +1,7 @@
 {
   "schema": "jovie.spend-ledger/v1",
   "description": "Per-provider balance, burn, runway and caps. Metadata only. Snapshots are dated readings; the live check overlays fresh reads where a read path exists.",
-  "updatedAt": "2026-10-25T02:45:00Z",
+  "updatedAt": "2026-10-30T00:30:00Z",
   "thresholds": {
     "runwayAlertDays": 14,
     "capAlertPercents": [50, 80, 100],
@@ -10,6 +10,7 @@
   "providers": [
     {
       "id": "vercel-ai-gateway-credits",
+      "funding": { "source": "cash" },
       "label": "Vercel AI Gateway credit balance (team jovie)",
       "provider": "vercel",
       "owner": "tim",
@@ -34,6 +35,7 @@
     },
     {
       "id": "summer-gateway-monthly",
+      "funding": { "source": "cash" },
       "label": "Summer standing AI Gateway budget",
       "provider": "summer-config",
       "owner": "summer-config",
@@ -145,23 +147,30 @@
       "provider": "vercel",
       "owner": "tim",
       "kind": "capped-spend",
-      "cap": null,
+      "cap": {
+        "amountUsd": 100,
+        "period": "billing-cycle",
+        "enforcement": "provider-hard-pause",
+        "periodKey": "2026-10-15..2026-11-14",
+        "resetDate": "2026-11-14",
+        "onHit": "pauses production deployments of every project on the team (503 DEPLOYMENT_PAUSED); not an overage"
+      },
       "snapshot": {
-        "observedAt": "2026-10-20T19:00:00Z",
-        "spentUsd": 14.62,
-        "window": "2026-10-05..2026-10-19 billed usage excl. Pro seat",
-        "source": "GET /v1/billing/charges"
+        "observedAt": "2026-10-30T00:00:00Z",
+        "spentUsd": 20.11,
+        "window": "2026-10-15..2026-10-29 on-demand per Vercel",
+        "source": "coordinator readback of Vercel Spend Management; scripts/spend-guard.mjs estimates 21.17 with calibration 0.587"
       },
       "burnPerDayUsd": {
-        "value": 1.04,
-        "source": "billing-charges-14d-mean",
-        "observedAt": "2026-10-20T19:00:00Z"
+        "value": 3.24,
+        "source": "spend-guard trailing 7 complete days, usage excl. Pro seat",
+        "observedAt": "2026-10-30T00:00:00Z"
       },
       "readPath": {
-        "method": "GET https://api.vercel.com/v1/billing/charges?teamId=…",
+        "method": "node scripts/spend-guard.mjs (vercel usage, vercel budgets --format json)",
         "live": null
       },
-      "notes": "Spend Management cap amount and its 50/75/100% notifications live in the dashboard (docs/COST_MONITORING.md Layer 0); the cap value is not readable by API."
+      "notes": "Budget raised $20 -> $100 on 2026-10-29 (Tim-approved) with pause on. Webhook target: https://summer.jov.ie/summer/v1/events/vercel (Summer signal, 50/75/100). Hourly forecast and anomaly layer: .github/workflows/spend-guard.yml. Per-project ignored-build policy: ops/registry/vercel-projects.json."
     },
     {
       "id": "vercel-on-demand-builds",
@@ -435,6 +444,7 @@
     },
     {
       "id": "summer-trial-workers-ai",
+      "funding": { "source": "credits", "creditPoolId": "cloudflare-credits" },
       "label": "Summer provider trial: Workers AI sub-cap",
       "provider": "cloudflare",
       "owner": "summer-config",
@@ -454,6 +464,10 @@
     },
     {
       "id": "summer-trial-anthropic-api",
+      "funding": {
+        "source": "credits",
+        "creditPoolId": "anthropic-api-credit"
+      },
       "label": "Summer provider trial: Anthropic API sub-cap",
       "provider": "anthropic",
       "owner": "summer-config",

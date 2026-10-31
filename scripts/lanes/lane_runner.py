@@ -170,7 +170,9 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", # Shared client layer (budgeted 
                   "packages/api-client/gh.ts", "packages/api-client/client.ts",
                   "packages/api-client/cache.ts", "packages/api-client/contract.ts",
                   "packages/api-client/headers.ts", "packages/api-client/policy.ts",
-                  "packages/api-client/store.ts",
+                  "packages/api-client/store.ts", "packages/api-client/cli.ts",
+                  # Headroom file for Summer/Ovie (credentials_spend.py publishes it).
+                  "scripts/rate-limit-headroom.mjs", "scripts/lib/api-budget.mjs", "ops/registry/rate-limits.json",
                   "scripts/fleet-gate/gem-priority-gate.py", "scripts/fleet-gate/closure_health.py",
                   "scripts/fleet-gate/gem_gate_contract.py", "scripts/fleet-gate/summer_ci_audit.py",
                   "scripts/fleet-gate/symphony_proof_context.py", "scripts/fleet-gate/scoped_admission.py",
@@ -179,6 +181,7 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", # Shared client layer (budgeted 
                   "scripts/lib/merge-group-admission.mjs",
                   "scripts/lib/source-admission-policy.mjs", "scripts/pr-fleet-rules.mjs", "scripts/lib/wins-ledger.mjs",
                   "scripts/lib/merge-group-member-policy.mjs",
+                  "scripts/lib/pr-size-exclusions.mjs",
                   "scripts/lib/product-lane-classifier.mjs",
                   "scripts/lib/pr-size-guard-policy.mjs", "scripts/lib/repo-hygiene-limits.mjs",
                   "scripts/lib/pre-land-changelog.mjs", "scripts/version-fanout-guard.mjs",
@@ -1336,7 +1339,8 @@ def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | 
         "- You are unattended: nobody will answer a question. Never stop to ask; choose the",
         "  non-interactive path. Apart from `/autoplan`, do not run gstack or other skill",
         "  workflows (ship, review, qa, upgrade) and do not upgrade any tooling: commit with git",
-        "  and open the PR with `gh pr create --draft`.",
+        "  and open the PR with `pnpm pr:open open --draft` (drafts a gate-compliant body from the diff,",
+        "  runs the Fleet Rules and Source Validation body gates, refuses a failing PR; never raw `gh pr create`).",
         "- Remove any git worktrees you create when done (`git worktree remove`); the host",
         "  reclaims idle ones, but ENOSPC once took every lane down at once.",
         *sensitive_contract,
@@ -5125,6 +5129,100 @@ def partial_main_sync(host: Host, pr: dict) -> str | None:
     return target if result.returncode == 0 else None
 
 
+DETERMINISTIC_CONFLICT_PER_PASS = 4
+CONFLICT_PASS_MIN_INTERVAL_S = 120
+
+
+def conflict_files(host: Host, pr: dict) -> list[str] | None:
+    """Files a DIRTY head conflicts with main in (`git merge-tree`, no checkout); None when
+    unknown, [] when it merges cleanly."""
+    number, head = pr["number"], pr["headRefOid"]
+    main_ref, pr_ref = f"{SYNC_REF}main", f"{SYNC_REF}pr-{number}"
+    git = lambda *args, timeout=300: sh(["git", *args], cwd=host.repo, timeout=timeout)
+    if git("fetch", "-q", "--no-tags", "origin", f"+refs/heads/main:{main_ref}",
+           f"+refs/pull/{number}/head:{pr_ref}", timeout=600).returncode \
+            or (git("rev-parse", pr_ref).stdout or "").strip() != head:
+        return None
+    merged = git("merge-tree", "--write-tree", "--name-only", "--no-messages", head, main_ref)
+    if merged.returncode == 0:
+        return []
+    if merged.returncode != 1:
+        return None
+    return [line for line in (merged.stdout or "").splitlines()[1:] if line.strip()]
+
+
+def deterministic_conflict_pass(host: Host, prs: list[dict], now: float | None = None) -> list[int]:
+    """Model-free, attempt-free conflict repair for every DIRTY PR whose conflict is confined to
+    generated or append-only files (remediation.RESOLVABLE_CONFLICT_FILES): merge main, take
+    main's copy, run the generator, push (no force). It costs no seat and no fix attempt, so a
+    spent or escalated PR is not left DIRTY by the thing a script can do. Each (PR, head, main)
+    is tried once; every try is ledgered with the time the PR has been DIRTY-visible."""
+    now = time.time() if now is None else now
+    path = host.state / "deterministic-conflict.json"
+    visits = read_json(path)
+    acted = []
+    due = sorted((pr for pr in prs if pr.get("mergeStateStatus") == "DIRTY" and not pr.get("isDraft")
+                  and pr.get("isCrossRepository") is False and pr.get("isInMergeQueue") is not True
+                  and not ({label.lower() for label in pr_events.label_names(pr)} & pr_events.HOLD_LABELS)
+                  and not (pr.get("headRefName") or "").startswith("dependabot/")),
+                 key=lambda pr: (float((visits.get(str(pr["number"])) or {}).get("at") or 0), pr["number"]))
+    if not due:
+        return []
+    listed = sh(["git", "ls-remote", "origin", "refs/heads/main"], cwd=host.repo, timeout=60)
+    main = (listed.stdout or "").split()[0] if listed.returncode == 0 and (listed.stdout or "").split() else None
+    if not main:
+        return []
+    for pr in due:
+        if len(acted) >= DETERMINISTIC_CONFLICT_PER_PASS:
+            break
+        last = visits.get(str(pr["number"])) or {}
+        if (last.get("head") == pr["headRefOid"] and last.get("main") == main) \
+                or now - float(last.get("at") or 0) < CONFLICT_PASS_MIN_INTERVAL_S \
+                or claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
+            continue
+        files = conflict_files(host, pr)
+        outcome = "skipped"
+        if files is not None and files and set(files) <= remediation.RESOLVABLE_CONFLICT_FILES:
+            repair_lock = Locked(host.state / "locks" / f"repair-pr-{pr['number']}.lock", blocking=False)
+            if not repair_lock.held:
+                repair_lock.release()
+                continue
+            worktree = host.state / "worktrees" / f"detconflict-pr{pr['number']}"
+            outcome = "failed"
+            preserve, added = False, False
+            try:
+                fetched = sh(["git", "fetch", "-q", "origin", "main", pr["headRefName"]], cwd=host.repo, timeout=600)
+                added = fetched.returncode == 0 and sh(
+                    ["git", "worktree", "add", "-q", "--detach", str(worktree), f"origin/{pr['headRefName']}"],
+                    cwd=host.repo).returncode == 0
+                if added and sh(["git", "rev-parse", "HEAD"], cwd=worktree).stdout.strip() == pr["headRefOid"]:
+                    with open(os.devnull, "a") as log:
+                        guard = lambda: require_fix_target(pr, "deterministic-conflict", worktree=worktree, repair=True)
+                        outcome = "resolved" if resolve_generated_conflict(
+                            worktree, pr["headRefName"], log, guard=guard) else "failed"
+            except RepairStopped:
+                preserve, outcome = True, "target-changed"
+            finally:
+                if added and not preserve:
+                    sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+                repair_lock.release()
+            acted.append(pr["number"])
+        elif files is not None:
+            outcome = "not-deterministic" if files else "clean"
+        visit = {"at": now, "head": pr["headRefOid"], "main": main, "outcome": outcome, "files": (files or [])[:8]}
+        if outcome == "target-changed":
+            visit["worktree"] = str(worktree)
+        update_json(path, lambda rows, key=str(pr["number"]), visit=visit: rows.update({key: visit}))
+        if outcome in ("resolved", "failed"):
+            pr_events.ledger(host, {"schema": "jovie-lane-run/v1", "kind": "deterministic-conflict",
+                                    "origin": AUTONOMOUS_ORIGIN,
+                                    "attribution": {"category": "finalizer-only", "provider": "lane-event"},
+                                    "pr": pr["number"], "headBefore": pr["headRefOid"], "main": main,
+                                    "action": "generated-conflict", "verdict": outcome,
+                                    "files": files, "endedAt": now_iso()})
+    return acted
+
+
 RERUN_RUNS_LIMIT = 5
 
 
@@ -6107,6 +6205,9 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
                    "Other shell && chains are unioned by fix_red_classes.merge_and_chain",
                    "(base order, then head-only prefixes; node --test and vitest paths union).",
                    "Unknown hunks stay unresolved.",
+                   "A one-line comma-separated identifier list is unioned by",
+                   "fix_red_classes.merge_additive_identifier_list (main order, then head-only",
+                   "tokens). Unknown hunks stay unresolved.",
                    "Run the related checks after resolving.", ""]
     else:
         problem = []
@@ -6172,6 +6273,37 @@ def regenerate_merged_generated(worktree: Path, paths, log, *, guard=lambda: Non
     return sh(["git", "add", *generated], cwd=worktree, log=log).returncode == 0
 
 
+def union_merge_file(worktree: Path, path: str, log) -> bool:
+    """Resolve an append-only file by keeping both sides' lines (`git merge-file --union`)."""
+    stages = {}
+    for stage in (1, 2, 3):
+        shown = sh(["git", "show", f":{stage}:{path}"], cwd=worktree)
+        if stage != 1 and shown.returncode:
+            return False
+        stages[stage] = shown.stdout if shown.returncode == 0 else ""
+    with tempfile.TemporaryDirectory() as tmp:
+        names = {}
+        for stage, text in stages.items():
+            names[stage] = str(Path(tmp) / f"s{stage}")
+            atomic_write_text(Path(names[stage]), text)
+        merged = sh(["git", "merge-file", "--union", "-p", names[2], names[1], names[3]], cwd=worktree)
+    if merged.returncode < 0 or merged.returncode >= 128:
+        return False
+    try:
+        rows = [json.loads(line) for line in merged.stdout.splitlines() if line.strip()]
+        header = json.loads(next(iter(stages[3].splitlines()), "null"))
+        if not isinstance(header, dict) or not header.get("schema") or not rows or rows[0] != header:
+            return False
+        rows = rows[1:]
+        ids = [row["id"] for row in rows]
+        if any(not isinstance(key, str) for key in ids) or len(set(ids)) != len(ids):
+            return False
+    except (ValueError, TypeError, KeyError):
+        return False
+    atomic_write_text(worktree / path, merged.stdout)
+    return sh(["git", "add", path], cwd=worktree, log=log).returncode == 0
+
+
 def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
     """JOV-6837/JOV-7594: a PR that conflicts with main only in machine-derived files needs
     no model. Merge main, take its copy of each conflicted generated file, run each file's
@@ -6183,9 +6315,14 @@ def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda
     merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
     if merged.returncode != 0:
         conflicted = set(sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout.split())
-        if not conflicted or not conflicted <= remediation.GENERATED_RESOLVERS.keys():
+        if not conflicted or not conflicted <= remediation.RESOLVABLE_CONFLICT_FILES:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
+        for path in sorted(conflicted & remediation.UNION_MERGE_FILES):
+            if not union_merge_file(worktree, path, log):
+                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+                return False
+        conflicted -= remediation.UNION_MERGE_FILES
         changed = sh(["git", "diff", "--name-only", "HEAD"], cwd=worktree)
         if changed.returncode or not regenerate_merged_generated(
                 worktree, conflicted | set(changed.stdout.splitlines()), log, guard=guard):
@@ -6271,6 +6408,97 @@ def resolve_and_chain_conflict(worktree: Path, branch: str, log, *, guard=lambda
             return False
     guard()
     return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+
+
+def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
+    """Union quoted list entries when every conflict hunk with main is only those lines.
+
+    Main's order stays, then head-only lines. A prose hunk or any other shape aborts
+    and leaves the PR to the model. The push is a fast-forward of the PR branch."""
+    guard()
+    merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
+    if merged.returncode != 0:
+        conflicted = [path for path in (sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout or "").split() if path]
+        if not conflicted:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        resolved: dict[str, str] = {}
+        for path in conflicted:
+            target = worktree / path
+            try:
+                text = fix_red_classes.resolve_additive_quoted_list_text(target.read_text())
+            except OSError:
+                text = None
+            if text is None:
+                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+                return False
+            resolved[path] = text
+        try:
+            for path, text in resolved.items():
+                atomic_write_text(worktree / path, text)
+        except OSError:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        guard()
+        if sh(["git", "add", "--", *conflicted], cwd=worktree, log=log).returncode != 0 \
+                or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+    guard()
+    return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+
+
+def resolve_identifier_list_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
+    """Union one-line identifier lists when every conflict hunk with main is that shape.
+
+    Main's order stays, then head-only tokens. Prose or any other shape aborts and
+    leaves the PR to the model. The push is a fast-forward of the PR branch."""
+    guard()
+    merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
+    if merged.returncode != 0:
+        conflicted = [path for path in (sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout or "").split() if path]
+        if not conflicted:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        resolved: dict[str, str] = {}
+        for path in conflicted:
+            target = worktree / path
+            try:
+                text = fix_red_classes.resolve_additive_identifier_list_text(target.read_text())
+            except (OSError, UnicodeError):
+                text = None
+            if text is None:
+                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+                return False
+            resolved[path] = text
+        try:
+            for path, text in resolved.items():
+                atomic_write_text(worktree / path, text)
+        except OSError:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        guard()
+        if sh(["git", "add", "--", *conflicted], cwd=worktree, log=log).returncode != 0 \
+                or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+    guard()
+    return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+
+
+def conflict_resolvers():
+    """DIRTY conflict classes in try order. Each one charges one mutation.
+
+    The repair budget is this list plus the model dispatch, so adding a class
+    cannot exhaust the budget before that class runs or before an unknown hunk
+    reaches the model."""
+    return (
+        ("repair-generated-conflict", resolve_generated_conflict, "generated-regenerated"),
+        ("repair-narrowed-preflight", resolve_narrowed_preflight_conflict, "narrowed-preflight-merged"),
+        ("repair-and-chain", resolve_and_chain_conflict, "and-chain-merged"),
+        ("repair-additive-list", resolve_additive_list_conflict, "additive-list-merged"),
+        ("repair-identifier-list", resolve_identifier_list_conflict, "identifier-list-merged"),
+    )
 
 
 def merge_narrowed_preflight_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
@@ -6814,6 +7042,29 @@ def register_domain_writes_fix(host: Host, pr: dict, route: dict, worktree: Path
         if sh(step, cwd=worktree, log=log, timeout=900).returncode:
             return None
     receipt.update(resolution="registered-domain-writes", registeredModules=added)
+    return types.SimpleNamespace(returncode=0)
+
+
+def atomic_state_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """Repair reported writes, verify them and publish through the existing repair route."""
+    logs = failed_logs(host, pr)
+    changed = fix_red_classes.repair_atomic_state_writes(worktree, "\n".join(logs.values()))
+    if not changed:
+        return None
+    check = sh(["python3", "-m", "unittest", "scripts.tests.test_lanes_atomic_state"],
+               cwd=worktree, log=log, timeout=300)
+    if check.returncode:
+        return None
+    steps = [["pnpm", "preflight:changed"], ["git", "add", "--", *changed],
+             ["git", "commit", "-q", "-m", "fix(lanes): publish state through the atomic writer"]]
+    for step in steps:
+        if sh(step, cwd=worktree, log=log, timeout=900).returncode:
+            return None
+    require_fix_target(pr, "before-atomic-push", worktree=worktree, repair=True)
+    if sh(["git", "push", "-q", "origin", f"HEAD:{pr['headRefName']}"],
+          cwd=worktree, log=log, timeout=900).returncode:
+        return None
+    receipt.update(resolution="atomic-state-writes", atomicFiles=changed)
     return types.SimpleNamespace(returncode=0)
 
 
@@ -7777,7 +8028,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                                           {"owner": HOST, "runtime": "symphony-lanes", "provider": name,
                                            "model": spec.get("model"), "tool": "fix_red_pr", "accountPool": name},
                                           {"attempts": MAX_FIX_ATTEMPTS, "concurrency": 1, "wallSeconds": host.agent_timeout * MAX_FIX_ATTEMPTS,
-                                           "spend": MAX_FIX_ATTEMPTS, "mutations": MAX_FIX_ATTEMPTS * 2,
+                                           "spend": MAX_FIX_ATTEMPTS,
+                                           "mutations": max(MAX_FIX_ATTEMPTS * 2, len(conflict_resolvers()) + 1),
                                            "leaseSeconds": host.agent_timeout + 900, "version": "lanes-v1"},
                                           {"triggerId": run_id, "correlationId": f"pr-{pr['number']}",
                                            "causationId": pr["headRefOid"]}, coordination=coordination)
@@ -7852,28 +8104,17 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             def boundary(stage="repair-command", allow_local_push=False):
                 require_disk(host, stage)
                 verify_target(pr, stage, worktree=worktree if allow_local_push else None)
-            resolved_generated = False
-            resolved_narrowed = False
-            resolved_and_chain = False
+            resolved_name = None
             if pr.get("mergeStateStatus") == "DIRTY":
-                execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
-                                           {"spend": 0, "mutations": 1}, coordination=coordination, boundary_id="repair-generated-conflict")
-                resolved_generated = resolve_generated_conflict(worktree, pr["headRefName"], log, guard=boundary)
-                if not resolved_generated:
+                for boundary_id, resolver, resolution in conflict_resolvers():
                     execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
-                                               {"spend": 0, "mutations": 1}, coordination=coordination, boundary_id="repair-narrowed-preflight")
-                    resolved_narrowed = resolve_narrowed_preflight_conflict(worktree, pr["headRefName"], log, guard=boundary)
-                if not resolved_generated and not resolved_narrowed:
-                    execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
-                                               {"spend": 0, "mutations": 1}, coordination=coordination, boundary_id="repair-and-chain")
-                    resolved_and_chain = resolve_and_chain_conflict(worktree, pr["headRefName"], log, guard=boundary)
+                                               {"spend": 0, "mutations": 1}, coordination=coordination, boundary_id=boundary_id)
+                    if resolver(worktree, pr["headRefName"], log, guard=boundary):
+                        resolved_name = resolution
+                        break
             agent = None
-            if resolved_generated:
-                receipt.update(resolution="generated-regenerated")
-            elif resolved_narrowed:
-                receipt.update(resolution="narrowed-preflight-merged")
-            elif resolved_and_chain:
-                receipt.update(resolution="and-chain-merged")
+            if resolved_name:
+                receipt.update(resolution=resolved_name)
             else:
                 boundary("before-install")
                 install_dependencies(host, worktree, log)
@@ -7896,6 +8137,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 1, "mutations": 1}, coordination=coordination, boundary_id="repair-dispatch")
                 fixer = {fix_red_classes.WIRE_CI_FAST: wire_ci_fast_fix,
+                         fix_red_classes.ATOMIC_WRITE: atomic_state_fix,
                          fix_red_classes.RENUMBER: renumber_migrations_fix,
                          fix_red_classes.SNAP_SPACING: snap_spacing_fix,
                          fix_red_classes.MERGE_NARROWED: merge_narrowed_preflight_fix,
@@ -9470,6 +9712,10 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             revisit_terminal_prs(host, candidates)
         except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
             pass  # Retried next pass; it never blocks the claimed repair.
+        try:
+            deterministic_conflict_pass(host, candidates)
+        except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+            pass  # Same contract: a script-only rung never blocks the claimed repair.
     if routing_refresh_reason and red is None and adopt is None and issue is None:
         record_idle_exit(host, name, "routing-preflight-required:" + routing_refresh_reason)
         slot.release()

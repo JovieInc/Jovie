@@ -128,6 +128,23 @@ describe('POST /api/internal/ovie/golden-path-evidence', () => {
     expect(stored.screenshot.dataUrl).toBe('data:image/jpeg;base64,frame');
   });
 
+  it('records the admin inventory readback as receipt evidence (JOV-9625)', async () => {
+    const response = await post({
+      receipts: [
+        receipt({
+          adminInventoryReadback: {
+            status: 'blocked',
+            detail:
+              'GET /api/ovie/certifications returned HTTP 403 for browse-admin+clerk_test@jov.ie — the fixture is not an admin in production',
+          },
+        }),
+      ],
+    });
+    expect(response.status).toBe(200);
+    const stored = recordMock.mock.calls[0][0].receipts[0];
+    expect(stored.adminInventoryReadback.status).toBe('blocked');
+  });
+
   it('rejects a malformed screenshot payload (JOV-9625)', async () => {
     const response = await post({
       receipts: [

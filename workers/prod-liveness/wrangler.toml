@@ -1,0 +1,23 @@
+name = "jovie-prod-liveness"
+main = "src/index.ts"
+compatibility_date = "2026-10-15"
+workers_dev = true
+preview_urls = false
+
+[vars]
+TARGETS = "https://jov.ie/,https://summer.jov.ie/runtime/v1/health"
+FAILURES_TO_PAGE = "2"
+EMAIL_TO = "tim@jov.ie"
+SUMMER_PAGE_URL = "https://summer.jov.ie/summer/v1/events/liveness"
+
+[triggers]
+crons = ["* * * * *"]
+
+[[kv_namespaces]]
+binding = "STATE"
+id = "0282eb9b15e8474da733c8d97736c047"
+
+# Secret: PAGE_URLS, comma-separated HTTPS endpoints that receive the JSON page (Slack incoming
+# webhook, Summer ingress). Runs on Cloudflare so a Vercel pause cannot silence it.
+
+# Page channels (secrets: RESEND_API_KEY, SUMMER_LIVENESS_SECRET; optional PAGE_URLS).

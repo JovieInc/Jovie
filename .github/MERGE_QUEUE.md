@@ -167,6 +167,8 @@ budget in this file and the live ruleset together, watching hosted macOS pickup
 | 2026-10-21 | source synced to live (build 10, merge 10, timeout 20) | keep the daily verify green (JOV-8205) |
 | 2026-10-29 16:3x | live `grouping_strategy` ALLGREEN → HEADGREEN, `max_entries_to_build` 10 → 8, `max_entries_to_merge` stays 10, check timeout stays 30 (Tim-approved) | one-off failures in intermediate merge_group builds ejected green PRs; size-budget overflow and a self-hosted sparse-checkout fault jammed the queue |
 | 2026-10-29 | source synced to live (HEADGREEN, build 8, merge 10, timeout 30; the checked-in 20 had drifted from live 30); failure-hold, queue breaker and native-queue-eval made HEADGREEN-aware | keep the daily verify green; stop attributing intermediate failures to their entry |
+| 2026-10-31 08:48 | live `max_entries_to_build` 8 → 4; merge 10, HEADGREEN and timeout 30 unchanged (Tim-approved 2026-10-31) | hosted runner cap (about 60 concurrent jobs) was binding: 8 HEADGREEN groups of about 49 jobs each, 183 runs queued, head group 22 min wall for 10 min of CI; only the head group gates the merge (JOV-10096) |
+| 2026-10-31 | source synced to live (build 4); live was lowered first because a lock below live fails preflight, while live below lock is a supported brake | keep the daily verify green |
 
 ## Reconciliation and loop prevention
 
