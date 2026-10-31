@@ -221,9 +221,9 @@ describe('EntityChipPopover', () => {
     const card = await screen.findByTestId('entity-chip-popover-card');
     expect(card.tagName).toBe('DIV');
     expect(screen.queryByText('Unknown Track')).toBeNull();
-    expect(
-      screen.getByRole('heading', { name: 'Unavailable reference' })
-    ).toBeInTheDocument();
+    // JOV-9672: an unresolved entity shows the kind's generic name; the
+    // caller's historical label stays hidden by design.
+    expect(screen.getByRole('heading', { name: 'Track' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Open/i })).toBeNull();
   });
 });

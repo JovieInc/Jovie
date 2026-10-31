@@ -69,7 +69,10 @@ export function EntityChipPopover({
   // A caller cannot attach another object's metadata or capability to this id.
   const entity =
     candidate?.kind === kind && candidate.id === id ? candidate : undefined;
-  const label = entity?.label ?? 'Unavailable reference';
+  // JOV-INV-046 fallback treatment: when the scoped read-model has no entry,
+  // the chip falls back to the entity kind's generic name. The caller's
+  // historical label stays hidden by design.
+  const label = entity?.label ?? KIND_PREFIX[kind];
   const [open, setOpen] = useState(false);
   const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

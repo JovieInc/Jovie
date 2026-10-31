@@ -121,9 +121,17 @@ interface TranscriptEntityChipProps {
   readonly tone: EntityChipTone;
 }
 
-function TranscriptEntityChip({ kind, id, tone }: TranscriptEntityChipProps) {
+function TranscriptEntityChip({
+  kind,
+  id,
+  label: tokenLabel,
+  tone,
+}: TranscriptEntityChipProps) {
   const { ref: resolved } = useEntityResolution(kind, id);
-  const label = resolved?.label ?? 'Unavailable reference';
+  // JOV-INV-046 fallback treatment: the wire token's own label is real
+  // message content, so an unresolved lookup falls back to it instead of
+  // explaining the miss.
+  const label = resolved?.label ?? tokenLabel;
   return (
     <EntityChipPopover
       kind={kind}

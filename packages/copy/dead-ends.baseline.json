@@ -1,7 +1,7 @@
 {
   "schema": "jovie.dead-ends/v1",
   "invariant": "JOV-INV-046",
-  "totalFindings": 157,
+  "totalFindings": 146,
   "files": {
     "apps/desktop/src/build-identity.ts": {
       "copy:dead-end-not-available:development (build time unavailable)": 1
@@ -251,9 +251,6 @@
     "apps/web/components/features/release/SmartLinkAudioPreview.tsx": {
       "copy:dead-end-not-available:Preview unavailable": 1
     },
-    "apps/web/components/jovie/components/AssistantMessageText.tsx": {
-      "copy:dead-end-not-available:Unavailable reference": 1
-    },
     "apps/web/components/jovie/components/ChatComposerToolbar.tsx": {
       "copy:dead-end-not-available:Dictation unavailable · show how to dictate": 1,
       "copy:dead-end-not-available:Dictation unavailable": 1,
@@ -261,21 +258,6 @@
     },
     "apps/web/components/jovie/components/ChatInput.tsx": {
       "copy:dead-end-not-available:Dictation unavailable right now. You can keep typing.": 1
-    },
-    "apps/web/components/jovie/components/ChatMerchCard.tsx": {
-      "copy:dead-end-not-available:Preview unavailable": 1
-    },
-    "apps/web/components/jovie/components/ChatMerchDesignCarousel.tsx": {
-      "copy:dead-end-not-available:Preview unavailable": 1
-    },
-    "apps/web/components/jovie/components/ChatOpsDataCard.tsx": {
-      "copy:dead-end-not-available:Observation time unavailable": 1
-    },
-    "apps/web/components/jovie/components/EntityChipPopover.tsx": {
-      "copy:dead-end-not-available:Unavailable reference": 1
-    },
-    "apps/web/components/jovie/components/TokenizedText.tsx": {
-      "copy:dead-end-not-available:Unavailable reference": 1
     },
     "apps/web/components/jovie/hooks/useSpeechRecognition.ts": {
       "copy:dead-end-use-instead:Dictation isn’t available in the desktop app. Use macOS dictation: press the 🎤 key (or Fn": 1
@@ -330,9 +312,6 @@
     "apps/web/components/organisms/table/utils/useViewMode.ts": {
       "copy:dead-end-not-available:View mode \"${mode}\" is not available.": 1
     },
-    "apps/web/components/organisms/user-button/UsageMenuItem.tsx": {
-      "copy:dead-end-not-available:Usage details are unavailable right now.": 1
-    },
     "apps/web/components/organisms/user-button/UserButton.tsx": {
       "code:disabled-no-reason:<CommonDropdown disabled>": 1
     },
@@ -345,9 +324,6 @@
     "apps/web/components/shell/SidebarInboxLink.tsx": {
       "copy:dead-end-not-available:Inbox — Status Unavailable": 1
     },
-    "apps/web/components/shell/SidebarThreadsSection.tsx": {
-      "copy:dead-end-not-available:Conversations unavailable": 1
-    },
     "apps/web/components/shell/StatusBadge.tsx": {
       "copy:dead-end-coming-soon:Publicly announced — not yet live": 1
     },
@@ -356,11 +332,6 @@
     },
     "apps/web/hooks/useUserLocation.ts": {
       "copy:dead-end-not-available:Geolocation not supported": 1
-    },
-    "apps/web/lib/chat-usage/copy.ts": {
-      "copy:dead-end-not-available:Usage Unavailable": 1,
-      "copy:dead-end-not-available:Usage unavailable": 1,
-      "copy:dead-end-not-available:AI message usage is unavailable right now.": 1
     },
     "packages/ui/atoms/link.tsx": {
       "code:disabled-no-reason:<Comp disabled>": 1

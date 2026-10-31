@@ -488,7 +488,12 @@ export function SidebarThreadsSection({
             />
           </SidebarThreadStatusRow>
         ) : null}
-        {state === 'error' && !hasThreads ? (
+        {/*
+         * JOV-INV-046 retryable treatment: the error row renders only with a
+         * working retry control. Without onRetry the row hides itself instead
+         * of announcing an unavailable list.
+         */}
+        {state === 'error' && !hasThreads && onRetry ? (
           <div
             className={cn(
               getSidebarNavRowClassName({ tight }),
@@ -499,24 +504,24 @@ export function SidebarThreadsSection({
               className={SIDEBAR_ENTRY_ICON_SLOT_CLASS}
               aria-hidden='true'
             />
-            <span className='min-w-0 truncate'>Conversations unavailable</span>
-            {onRetry ? (
-              <Button
-                type='button'
-                variant='ghost'
-                size='icon'
-                onClick={onRetry}
-                aria-label='Retry Chats'
-                className='grid h-5 w-5 shrink-0 place-items-center rounded text-quaternary-token transition-[background-color] duration-subtle ease-subtle hover:bg-sidebar-accent/55 hover:text-primary-token'
-              >
-                <Icon
-                  name='RefreshCw'
-                  className={getSidebarNavIconClassName({ tight: true })}
-                  aria-hidden='true'
-                  strokeWidth={2.25}
-                />
-              </Button>
-            ) : null}
+            <span className='min-w-0 truncate'>
+              Conversations didn&apos;t load
+            </span>
+            <Button
+              type='button'
+              variant='ghost'
+              size='icon'
+              onClick={onRetry}
+              aria-label='Retry Chats'
+              className='grid h-5 w-5 shrink-0 place-items-center rounded text-quaternary-token transition-[background-color] duration-subtle ease-subtle hover:bg-sidebar-accent/55 hover:text-primary-token'
+            >
+              <Icon
+                name='RefreshCw'
+                className={getSidebarNavIconClassName({ tight: true })}
+                aria-hidden='true'
+                strokeWidth={2.25}
+              />
+            </Button>
           </div>
         ) : null}
         {visible.map((t, index) => {
