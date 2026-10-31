@@ -1359,20 +1359,43 @@ def api_gh(args, **_):
     return subprocess.CompletedProcess(args, done["code"], done["stdout"], done["stderr"])
 
 
-def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh) -> bool:
-    """Write the evidence block into the PR body when its section is missing or incomplete."""
-    block = red_before_green_block(pr, excerpt)
-    if not block or not isinstance(pr.get("number"), int):
+def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None) -> str:
+    """Complete repair evidence without overwriting an author's customer outcome decision.
+
+    A complete red section must not suppress other missing metadata. The caller
+    chooses internal vs customer-visible work; the repair loop never infers it.
+    Existing markers, including malformed ones, remain for the canonical guard.
+    """
+    if customer_decision is not None and (not isinstance(customer_decision, dict)
+            or type(customer_decision.get("releaseWorthy")) is not bool):
+        raise ValueError("customer_decision requires an explicit releaseWorthy boolean")
+    updated = body or ""
+    if not red_section_complete(updated):
+        block = red_before_green_block(pr, excerpt)
+        if block:
+            updated = with_red_section(updated, block)
+    if customer_decision is not None and "<!-- customer-changelog/v1" not in updated:
+        decision = json.dumps(customer_decision, separators=(",", ":"))
+        updated = updated.rstrip("\n") + f"\n\n<!-- customer-changelog/v1 {decision} -->\n"
+    return updated
+
+
+def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_decision: dict | None = None) -> bool:
+    """Write missing repair evidence, even when another evidence section is complete."""
+    if not isinstance(pr.get("number"), int):
         return False
     viewed = sh(["pr", "view", str(pr["number"]), "--repo", REPO, "--json", "body", "--jq", ".body"])
-    if viewed.returncode != 0 or red_section_complete(viewed.stdout or ""):
+    if viewed.returncode != 0:
         return False
-    updated = with_red_section(viewed.stdout or "", block)
+    body = viewed.stdout or ""
+    updated = repair_evidence_body(pr, body, excerpt, customer_decision=customer_decision)
+    if updated == body:
+        return False
     with tempfile.TemporaryDirectory(prefix="red-before-green-") as tmp:
         path = Path(tmp) / "body.md"
         from atomic_state import atomic_write_text
         atomic_write_text(path, updated)
-        if RED_BLOCK_MARKER not in path.read_text():
+        if path.read_text() != updated:
             return False
         return sh(["pr", "edit", str(pr["number"]), "--repo", REPO, "--body-file", str(path)]).returncode == 0
 

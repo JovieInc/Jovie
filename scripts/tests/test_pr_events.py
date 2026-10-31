@@ -3293,3 +3293,41 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
             shell = Shell({("pr", "view"): (0, body), ("pr", "edit"): (0, "")})
             events.ensure_red_before_green(self.PR, "FAIL x", shell)
             self.assertEqual(len(shell.made("pr", "edit")), edits)
+
+    def test_complete_red_evidence_still_gets_an_explicit_customer_decision(self):
+        body = events.red_before_green_block(self.PR, "FAIL x")
+        updated = events.repair_evidence_body(self.PR, body, customer_decision={"releaseWorthy": False})
+        self.assertIn(body, updated)
+        self.assertIn('<!-- customer-changelog/v1 {"releaseWorthy":false} -->', updated)
+        self.assertEqual(events.repair_evidence_body(self.PR, updated,
+                         customer_decision={"releaseWorthy": False}), updated)
+
+    def test_repair_preserves_existing_customer_decisions_including_invalid_ones(self):
+        for marker in ['<!-- customer-changelog/v1 {"releaseWorthy":true,"outcomeKey":"existing"} -->',
+                       '<!-- customer-changelog/v1 {broken} -->']:
+            body = events.red_before_green_block(self.PR) + "\n\n" + marker
+            self.assertEqual(events.repair_evidence_body(self.PR, body,
+                             customer_decision={"releaseWorthy": False}), body)
+
+    def test_repair_never_infers_a_customer_decision(self):
+        body = events.repair_evidence_body(self.PR, "Summary", "FAIL x")
+        self.assertTrue(events.red_section_complete(body))
+        self.assertNotIn("customer-changelog/v1", body)
+
+    def test_customer_decision_requires_an_explicit_boolean(self):
+        for decision in [{}, {"releaseWorthy": "false"}, {"releaseWorthy": 0}]:
+            with self.subTest(decision=decision), self.assertRaises(ValueError):
+                events.repair_evidence_body(self.PR, "Summary", customer_decision=decision)
+
+    def test_ensure_repairs_metadata_after_red_section_is_complete(self):
+        body = events.red_before_green_block(self.PR)
+        published = []
+        def edit(args):
+            published.append(Path(args[-1]).read_text())
+            return (0, "")
+        shell = Shell({("pr", "view"): (0, body), ("pr", "edit"): edit})
+        self.assertTrue(events.ensure_red_before_green(self.PR, "FAIL x", shell,
+                        customer_decision={"releaseWorthy": False}))
+        self.assertEqual(len(published), 1)
+        self.assertIn(body, published[0])
+        self.assertEqual(published[0].count("customer-changelog/v1"), 1)
