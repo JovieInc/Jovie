@@ -436,14 +436,23 @@ def find_duplicate(idea, registry):
 
 
 def gbrain_decisions(text, run=subprocess.run):
-    """Top recorded decisions for the idea; None means the lookup failed (the gate then fails closed)."""
+    """Top recorded decisions for the idea; None means the lookup failed (the gate then fails closed). Empty or
+    unparseable output is a failure, not "no decisions": `--expand false` once made the CLI print nothing, and
+    the gate passed known contradictions (2026-10-31)."""
     try:
         done = run(["gbrain", "query", text[:300], "--types", "decision", "--limit", "3", "--json"],
-                   capture_output=True, text=True, timeout=90)
-        rows = json.loads(done.stdout[done.stdout.find("["):] or "[]") if done.returncode == 0 else None
-    except (OSError, subprocess.SubprocessError, ValueError):
+                   capture_output=True, text=True, timeout=120)
+    except (OSError, subprocess.SubprocessError):
         return None
-    return [{"slug": r.get("slug"), "title": r.get("title"), "text": str(r.get("chunk_text") or "")[:1500]} for r in rows or []]
+    out = done.stdout or ""
+    start = out.find("[\n") if "[\n" in out else out.find("[{")
+    if done.returncode != 0 or start < 0:
+        return None if out.strip() != "[]" else []
+    try:
+        rows = json.loads(out[start:])
+    except ValueError:
+        return None
+    return [{"slug": r.get("slug"), "title": r.get("title"), "text": str(r.get("chunk_text") or "")[:1500]} for r in rows if isinstance(r, dict)]
 
 
 def decision_gate(idea, api_key, decisions=gbrain_decisions, poster=gateway_post):
@@ -836,16 +845,21 @@ def render_digest(day, routed, ideas, per_bookmark, cost, grok_calls, grok_cost,
     return "\n".join(lines) + "\n"
 
 
-def recheck_held(state_dir=DEFAULT_DIR, *, decisions=gbrain_decisions, poster=gateway_post):
-    """Re-run the decision gate on rows a gate outage held (reason `gate-unavailable: ...`)."""
+def recheck_held(state_dir=DEFAULT_DIR, *, decisions=gbrain_decisions, poster=gateway_post, workers=4):
+    """Re-run the decision gate on rows a gate outage held (reason `gate-unavailable: ...`). Gates run in parallel
+    outside the lock (each gbrain lookup takes ~20 s); results are applied under the lock in one save."""
+    held = [r for r in frontier.Registry(state_dir).machine.values()
+            if str(r.get("reason") or "").startswith(("gate-unavailable", "decision gate passed"))]
+    gate = lambda row: decision_gate({"title": row["name"], "claim": row.get("problem") or ""}, "", decisions, poster)  # noqa: E731
+    with cf.ThreadPoolExecutor(max_workers=workers) as pool:
+        verdicts = dict(zip([r["id"] for r in held], pool.map(gate, held)))
+    out = []
     with locked(state_dir):
         registry = frontier.Registry(state_dir)
-        out = []
-        for row in list(registry.machine.values()):
-            if not str(row.get("reason") or "").startswith("gate-unavailable"):
+        for pid, (ok, ref, _) in verdicts.items():
+            row = registry.machine.get(pid)
+            if not row:
                 continue
-            idea = {"title": row["name"], "claim": row.get("problem") or ""}
-            ok, ref, _ = decision_gate(idea, "", decisions, poster)
             if ok:
                 row.update(reason="decision gate passed; backfill verdict, not filed", updatedAt=frontier.now_iso())
             elif ref.startswith(("contradicts", "duplicates")):

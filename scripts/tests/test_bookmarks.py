@@ -89,6 +89,17 @@ class GateAndRoutingTests(unittest.TestCase):
         self.assertFalse(B.decision_gate(idea(), "k", lambda t: None, self.poster("compatible"))[0])
         self.assertIn("gate-unavailable", B.decision_gate(idea(), "k", found, self.poster("compatible", 402))[1])
 
+    def test_decision_lookup_treats_silent_or_garbled_output_as_failure(self):
+        class Done:
+            def __init__(self, out, code=0):
+                self.stdout, self.returncode = out, code
+        self.assertIsNone(B.gbrain_decisions("x", run=lambda *a, **k: Done("")))
+        self.assertIsNone(B.gbrain_decisions("x", run=lambda *a, **k: Done("[gbrain] notice only")))
+        self.assertIsNone(B.gbrain_decisions("x", run=lambda *a, **k: Done('[{"slug": 1', 0)))
+        self.assertEqual(B.gbrain_decisions("x", run=lambda *a, **k: Done("[]")), [])
+        rows = B.gbrain_decisions("x", run=lambda *a, **k: Done('[gbrain] routing notice\n[\n {"slug": "decisions/a", "title": "A", "chunk_text": "keep neon"}\n]'))
+        self.assertEqual(rows[0]["slug"], "decisions/a")
+
     def test_vet_routes_by_type_and_respects_caps(self):
         with tempfile.TemporaryDirectory() as d:
             reg = frontier.Registry(Path(d), canon=Path(d) / "none.jsonl")
