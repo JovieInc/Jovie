@@ -16,6 +16,14 @@ concurrency:
   group: source-validation-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
   cancel-in-progress: false
   queue: max
+env:
+  # Read-only Cloudflare R2 Turbo cache (infra/turbo-cache). The RO token cannot
+  # write, so PR code can read main's artifacts but never poison them. Fork PRs
+  # receive no secrets and stay local-only. setup-node-pnpm probes the Worker.
+  CF_TURBO_URL: ${{ secrets.CF_TURBO_CACHE_URL }}
+  CF_TURBO_ROLE: ro
+  CF_TURBO_TOKEN: ${{ secrets.CF_TURBO_CACHE_RO_TOKEN }}
+  CF_TURBO_SIGNATURE_KEY: ${{ secrets.CF_TURBO_SIGNATURE_KEY }}
 jobs:
   deterministic:
     name: Source Validation
@@ -753,7 +761,9 @@ jobs:
         run: pnpm turbo build --filter=@jovie/web
         env:
           TURBO_ENGINE_READ_ONLY: '1'
-          TURBO_CACHE: local:r
+          # Read-only: local:r plus the R2 remote when setup-node-pnpm selected
+          # it (the RO token cannot write either way).
+          TURBO_CACHE: ${{ env.TURBO_CACHE_READ || 'local:r' }}
           # Same public mock environment as the merge group's Build + Layout,
           # so both measure identical bundles without secrets.
           NEXT_PUBLIC_APP_URL: http://localhost:3230

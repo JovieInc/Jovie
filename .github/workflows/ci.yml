@@ -58,6 +58,18 @@ env:
   TURBO_TOKEN: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && secrets.TURBO_TOKEN || '' }}
   TURBO_TEAM: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && secrets.TURBO_TEAM || '' }}
   TURBO_CACHE: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && 'local:rw,remote:rw' || 'local:rw' }}
+  # Cloudflare R2 Turbo cache (infra/turbo-cache). Push, dispatch and
+  # merge_group (the exact tree main is about to be, after required PR checks)
+  # get the read-write token; pull_request gets a read-only token, so
+  # PR-controlled code can read artifacts but can never write or poison them.
+  # Every artifact is HMAC-signed (CF_TURBO_SIGNATURE_KEY); unsigned or
+  # wrongly-signed artifacts are rejected. No key means read-only everywhere. Fork PRs receive no secrets and stay local-only. The composite
+  # setup-node-pnpm action probes the Worker and falls back to the legacy
+  # Vercel cache above (push only) when it is unreachable.
+  CF_TURBO_URL: ${{ secrets.CF_TURBO_CACHE_URL }}
+  CF_TURBO_ROLE: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group') && 'rw' || 'ro' }}
+  CF_TURBO_TOKEN: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group') && secrets.CF_TURBO_CACHE_RW_TOKEN || secrets.CF_TURBO_CACHE_RO_TOKEN }}
+  CF_TURBO_SIGNATURE_KEY: ${{ secrets.CF_TURBO_SIGNATURE_KEY }}
   # JOV-2497: four-slot cross-PR pool caps Neon branch *creation* (one endpoint per branch).
   # Only jobs that call neon-create-branch-with-retry use the pool — artifact consumers
   # (Lighthouse/A11y/Mobile Overflow) reuse neon-db and must NOT share the pool or
