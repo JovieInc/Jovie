@@ -20,6 +20,12 @@ mkdir -p "$SHARE/scripts/capacity" "$SHARE/ops/registry" "$STATE" "$HOME/Library
 install -m 0755 "$HERE/forecast.py" "$SHARE/scripts/capacity/forecast.py"
 install -m 0644 "$HERE/../../ops/registry/capacity-resources.json" "$SHARE/ops/registry/capacity-resources.json"
 install -m 0644 "$HERE/../../ops/registry/spend.json" "$SHARE/ops/registry/spend.json"
+# The client layer (budgeted gh) the gh-rate and gh-env-secrets collectors import; without it they go BLIND.
+mkdir -p "$SHARE/scripts/apiclient" "$SHARE/packages/api-client"
+install -m 0644 "$HERE"/../apiclient/*.py "$SHARE/scripts/apiclient/"
+install -m 0644 "$HERE/../../packages/api-client/providers.json" "$SHARE/packages/api-client/providers.json"
+# Provenance, so drift between this install and main is visible in forecast.json.
+git -C "$HERE" rev-parse HEAD >"$SHARE/INSTALLED_FROM" 2>/dev/null || echo unknown >"$SHARE/INSTALLED_FROM"
 cat >"$PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
