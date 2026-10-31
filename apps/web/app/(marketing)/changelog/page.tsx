@@ -29,6 +29,7 @@ export const metadata: Metadata = {
     canonical: `${BASE_URL}${APP_ROUTES.CHANGELOG}`,
     types: {
       'application/atom+xml': `${BASE_URL}${APP_ROUTES.CHANGELOG}/feed.xml`,
+      'application/rss+xml': `${BASE_URL}${APP_ROUTES.CHANGELOG}/rss.xml`,
       'application/feed+json': `${BASE_URL}${APP_ROUTES.CHANGELOG}/feed.json`,
     },
   },
