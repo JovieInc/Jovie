@@ -4,6 +4,7 @@ import { OperatorRouteTabs } from '@/components/features/admin/layout/OperatorRo
 import { ADMIN_WORKSPACE_TABS } from '@/constants/admin-navigation';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
+import { ShippedByArea } from './ShippedByArea';
 import { ShippingMatrix } from './ShippingMatrix';
 import { ShippingStatistics } from './ShippingStatistics';
 
@@ -27,6 +28,7 @@ export default async function ShippingPage() {
       />
       <ShippingMatrix />
       <ShippingStatistics />
+      <ShippedByArea />
     </AdminPage>
   );
 }
