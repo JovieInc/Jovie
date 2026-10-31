@@ -65,6 +65,42 @@
   padding-bottom: var(--space-5);
 }
 
+/*
+ * /start claim chat transcript (Pen R6As7U · T68xUV). The onboarding thread
+ * reads at 16px body with dark surface-2 user bubbles; the app chat keeps its
+ * own ladder. Tokens are re-pointed here so ChatMessage stays one component.
+ */
+:where(.system-b-onboarding-chat) {
+  --system-b-chat-body-size: var(--text-base);
+  --system-b-chat-body-line-height: 1.5;
+  --system-b-chat-message-max-width: 75%;
+  --system-b-chat-user-bubble-bg: var(--color-bg-surface-2);
+  --system-b-chat-user-bubble-text: var(--color-text-primary-token);
+  --system-b-chat-user-bubble-border: transparent;
+  --system-b-chat-user-bubble-shadow: none;
+}
+
+/* Specificity (not :where) so this beats the shared pill/rectangle shapes. */
+.system-b-onboarding-chat .system-b-chat-user-bubble {
+  border-radius: calc(var(--radius-xl) + var(--space-0-5));
+  padding: var(--space-4) var(--space-5);
+}
+
+.system-b-onboarding-chat .system-b-chat-user-text {
+  line-height: 1.45;
+}
+
+:where(.system-b-onboarding-speaker-row) {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  color: var(--color-text-primary-token);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.4;
+}
+
 :where(.system-b-onboarding-empty-state) {
   border-bottom: 1px solid
     color-mix(in oklab, var(--system-b-app-frame-seam) 58%, transparent);
