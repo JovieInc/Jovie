@@ -1,8 +1,8 @@
-// Promotion gate for auth/billing journey evidence (extends JOV-5937;
+// Promotion gate for golden-path journey evidence (extends JOV-5937;
 // release-integrity repair 2, founder decision 2026-10-21).
 //
 // A candidate whose range artifact (`jovie.release-range-risk/v1`) affects
-// auth or billing, or is unknown, may be promoted only with successful, fresh,
+// a golden-path surface, or is unknown, may be promoted only with successful, fresh,
 // exact-candidate evidence for BOTH the auth and billing journeys, produced by
 // a run that actually executed them. Never counted: dispatch success, skipped
 // tests, mocked providers, expired quarantine exclusions, exit-0 placeholders,
@@ -46,7 +46,18 @@ export function journeysRequired(range) {
     ['auth', 'billing', 'unknown'].some(key => typeof a[key] !== 'boolean')
   )
     return true;
-  return a.auth === true || a.billing === true || a.unknown === true;
+  // Every golden-path surface is a promotion input: sign-in, billing, the
+  // public profile and release pages, the proxy that routes them, and the
+  // database that holds the claim. Docs-, tests- and tooling-only ranges stay
+  // exempt because they grade as none of these.
+  return (
+    a.auth === true ||
+    a.billing === true ||
+    a.publicUi === true ||
+    a.proxy === true ||
+    a.database === true ||
+    a.unknown === true
+  );
 }
 
 function validateEvidence(ev, journey, range, nowMs, freshnessMs) {

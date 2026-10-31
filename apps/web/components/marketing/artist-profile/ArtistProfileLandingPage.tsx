@@ -226,7 +226,10 @@ export function ArtistProfileLandingPage({
         <ArtistProfileHowItWorks howItWorks={copy.howItWorks} />
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.releaseCycle}>
-        <ArtistProfileReleaseCycleGallery releaseCycle={copy.releaseCycle} />
+        <ArtistProfileReleaseCycleGallery
+          releaseCycle={copy.releaseCycle}
+          id='bring-them-back-automatically'
+        />
       </div>
       {flags.FAQ ? (
         <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.faq}>

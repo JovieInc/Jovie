@@ -1,4 +1,13 @@
 import { execFileSync } from 'node:child_process';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   ATOM_MOLECULE_INVENTORY_RATCHET,
@@ -17,6 +26,7 @@ import {
   validateApprovedOutcomeAlignment,
   validateComparativeQualityBar,
   validateDimensionRequirements,
+  writeAtomMoleculeInventoryRatchet,
 } from '../../component-comparative-quality-bar.mjs';
 import { OUTCOME_INVENTORY } from '../../component-shadcn-outcome-inventory.mjs';
 
@@ -30,6 +40,75 @@ const redFor = baselineId =>
   COMPARATIVE_DELIBERATE_RED_FIXTURES.find(
     fixture => fixture.baselineId === baselineId
   );
+
+describe('inventory ratchet regeneration', () => {
+  it('unions merged component paths, preserves policy, and is idempotent', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'component-inventory-'));
+    try {
+      const registry = join(
+        repo,
+        'scripts/lib/component-comparative-quality-bar-registry.mjs'
+      );
+      mkdirSync(join(repo, 'scripts/lib'), { recursive: true });
+      mkdirSync(join(repo, 'apps/web/components/molecules'), {
+        recursive: true,
+      });
+      const prefix = '// approved policy\n';
+      const suffix = '\nexport const policy = "keep";\n';
+      writeFileSync(
+        registry,
+        `${prefix}export const ATOM_MOLECULE_INVENTORY_RATCHET = deepFreeze([]);${suffix}`
+      );
+      for (const name of ['CreditList', 'MainOne', 'MainTwo']) {
+        writeFileSync(
+          join(repo, `apps/web/components/molecules/${name}.tsx`),
+          `export function ${name}() { return <span>${name}</span>; }`
+        );
+      }
+      const proposed = writeAtomMoleculeInventoryRatchet(repo);
+      expect(
+        proposed.find(row => row.root === 'apps/web/components/**/molecules')
+          .total
+      ).toBe(3);
+      const written = readFileSync(registry, 'utf8');
+      expect(written.startsWith(prefix)).toBe(true);
+      expect(written.endsWith(suffix)).toBe(true);
+      expect(written).toContain(
+        proposed.find(row => row.root === 'apps/web/components/**/molecules')
+          .sourceSetSha256
+      );
+      writeAtomMoleculeInventoryRatchet(repo);
+      expect(readFileSync(registry, 'utf8')).toBe(written);
+    } finally {
+      rmSync(repo, { recursive: true });
+    }
+  });
+
+  it('refuses missing or ambiguous generated sections without writing', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'component-inventory-'));
+    try {
+      const registry = join(
+        repo,
+        'scripts/lib/component-comparative-quality-bar-registry.mjs'
+      );
+      mkdirSync(join(repo, 'scripts/lib'), { recursive: true });
+      for (const source of [
+        'export const policy = "keep";',
+        'export const ATOM_MOLECULE_INVENTORY_RATCHET = deepFreeze([]);\n'.repeat(
+          2
+        ),
+      ]) {
+        writeFileSync(registry, source);
+        expect(() => writeAtomMoleculeInventoryRatchet(repo)).toThrow(
+          'exactly one inventory ratchet'
+        );
+        expect(readFileSync(registry, 'utf8')).toBe(source);
+      }
+    } finally {
+      rmSync(repo, { recursive: true });
+    }
+  });
+});
 
 // The inventory walk and trusted-base git resolution are module-cached but
 // cost seconds on a cold filesystem; paying them inside one test pushes it

@@ -18,7 +18,7 @@ vi.mock('next/link', () => ({
   ),
 }));
 
-const NOW = new Date('2031-04-16T16:00:00.000Z');
+const NOW = new Date('2026-10-29T12:00:00.000Z');
 
 describe('PreSaveLanding', () => {
   beforeEach(() => {
@@ -58,8 +58,11 @@ describe('PreSaveLanding', () => {
     expect(
       within(countdown).getByText(PRE_SAVE_FIXTURE.releaseTitle)
     ).toBeVisible();
-    expect(within(countdown).getByText('1')).toBeVisible();
-    expect(within(countdown).getByText('YR')).toBeVisible();
+    // Demo release is three weeks out: days, never years.
+    expect(within(countdown).getByText('21')).toBeVisible();
+    expect(within(countdown).getByText('D')).toBeVisible();
+    expect(within(countdown).queryByText('YR')).toBeNull();
+    expect(within(countdown).queryByText('YRS')).toBeNull();
 
     const panel = screen.getByTestId('pre-save-panel');
     expect(panel).toHaveClass('marketing-rounded-frame', 'border');

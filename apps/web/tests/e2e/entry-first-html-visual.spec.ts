@@ -20,3 +20,19 @@ test('start renders its heading in the first HTML, not behind a loading boundary
   expect(html).not.toContain('data-testid="start-loading-skeleton"');
   expect(html).not.toMatch(/<template id="B:\d+"><\/template>/);
 });
+
+// JOV-9822: the canary passage check runs while /start renders. A forged
+// token must leave the first HTML exactly as an ordinary visit sees it.
+test('start keeps its first-HTML heading when a forged passage token is sent', async ({
+  request,
+}) => {
+  const response = await request.get('/start', {
+    headers: { 'x-jovie-synthetic-passage': 'jsp1.e30.forged' },
+  });
+  expect(response.ok()).toBe(true);
+  const html = await response.text();
+
+  expect(html).toContain('What are you working on?');
+  expect(html).not.toContain('data-testid="start-loading-skeleton"');
+  expect(html).not.toMatch(/<template id="B:\d+"><\/template>/);
+});
