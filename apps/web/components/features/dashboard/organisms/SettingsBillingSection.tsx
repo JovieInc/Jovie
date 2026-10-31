@@ -12,6 +12,7 @@ import { useState } from 'react';
 import { SettingsActionRow } from '@/components/molecules/settings/SettingsActionRow';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { APP_ROUTES } from '@/constants/routes';
+import { trialStatusLine } from '@/lib/billing/offer';
 import {
   getEffectivePlan,
   getPlanDisplayName,
@@ -82,10 +83,7 @@ function resolveSummaryDescription(ctx: {
   if (ctx.isPro)
     return 'Open Stripe to manage invoices, payment methods, and subscription details.';
   if (ctx.isTrial) {
-    const ends = formatTrialEnd(ctx.trialEndsAt);
-    return ends
-      ? `Your trial ends ${ends}. Compare plans to keep it after that.`
-      : 'Your trial is active. Compare plans to keep it after it ends.';
+    return trialStatusLine(formatTrialEnd(ctx.trialEndsAt));
   }
   if (ctx.canOpenPortal)
     return 'Open Stripe to review invoices, payment details, or reactivate your plan.';
