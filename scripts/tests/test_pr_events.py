@@ -3180,6 +3180,53 @@ console.log(JSON.stringify(JSON.parse(readFileSync(0, 'utf8')).map(body => evalu
 """], cwd=ROOT, input=json.dumps(bodies), text=True, capture_output=True, check=True)
         self.assertEqual(json.loads(checked.stdout), [[] for _ in cases])
 
+    def test_repair_preserves_fenced_red_logs_accepted_by_the_canonical_gate(self):
+        bodies = [
+            "## Red-before-green\n- Failing command: `node probe.mjs`\n\n"
+            "```text\n# launcher probe\nFAIL status null\n```\n",
+            "~~~markdown\n## Red-before-green\nExample only.\n~~~\n\n"
+            "## Red-before-green\n- Failing command: `node probe.mjs`\n\n"
+            "```text\n### heap diagnostic\nError: launcher timed out\n```\n",
+        ]
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+console.log(JSON.stringify(JSON.parse(readFileSync(0, 'utf8')).map(body =>
+  evaluateFleetRules({pr: {title: 'fix: preserve red logs', body}, files: []}).errors
+)));
+"""], cwd=ROOT, input=json.dumps(bodies), text=True, capture_output=True, check=True, timeout=15)
+        self.assertEqual(json.loads(checked.stdout), [[], []])
+        for body in bodies:
+            with self.subTest(body=body):
+                self.assertTrue(events.red_section_complete(body))
+                updated = events.repair_evidence_body(self.PR, body, "FAIL newer run",
+                                                      customer_decision={"releaseWorthy": False})
+                self.assertTrue(updated.startswith(body))
+                self.assertNotIn("FAIL newer run", updated)
+                self.assertEqual(updated.count("customer-changelog/v1"), 1)
+                self.assertEqual(events.repair_evidence_body(self.PR, updated), updated)
+
+    def test_replacement_ignores_fenced_headings_and_preserves_the_next_section(self):
+        example = "```markdown\n## Red-before-green\nExample only.\n```\n\n"
+        following = "## Blast radius\nKeep existing proof.\n"
+        body = (example + "## Red-before-green\n- Failing command: `<cmd>`\n\n"
+                "```text\n# diagnostic\nFAIL incomplete command\n```\n\n" + following)
+        block = events.red_before_green_block(self.PR, "FAIL real run")
+        updated = events.with_red_section(body, block)
+        self.assertTrue(updated.startswith(example + block))
+        self.assertTrue(updated.endswith(following))
+        self.assertNotIn("FAIL incomplete command", updated)
+        self.assertTrue(events.red_section_complete(updated))
+        self.assertTrue(events.with_red_section(example + following, block).startswith(example + following))
+
+    def test_replacement_ignores_comment_fences_without_deleting_following_proof(self):
+        following = "## Blast radius\nPreserve existing proof.\n\n## Review\nPreserve verdict.\n"
+        body = ("## Red-before-green\n- Failing command: <cmd>\n\n"
+                "<!-- reviewer scratch\n```text\n-->\n\n" + following)
+        updated = events.repair_evidence_body(self.PR, body, "FAIL real run")
+        self.assertTrue(events.red_section_complete(updated))
+        self.assertTrue(updated.endswith(following))
+
     def test_explicit_locking_pr_repairs_missing_provenance_and_passes_fleet(self):
         body = events.red_before_green_block(self.PR)
         updated = events.repair_evidence_body(self.PR, body, locking_pr=23295,
