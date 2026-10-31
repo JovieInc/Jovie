@@ -15,7 +15,6 @@ HYPERAGENT_MODEL (default fable-5.1), MESH_HUB.
 """
 import json
 import os
-import subprocess
 import sys
 import time
 import urllib.error
@@ -75,6 +74,38 @@ def prompt(task):
     )
 
 
+def run_thread(cli, task):
+    """create_thread, poll, and if the turn hits its model budget ask once for the deliverable."""
+    mapped_id, name = cli["resolve_agent"](MODEL, None, "research")
+    created = cli["mcp_call"]("create_thread", {"agentId": mapped_id, "message": prompt(task),
+                                                "namingHint": f"board {task['id']}"[:80]})
+    thread_id = created.get("threadId") or (created.get("thread") or {}).get("id")
+    url = cli["THREAD_URL"].format(thread_id=thread_id)
+    deadline, nudged, last_beat = time.time() + TIMEOUT, False, time.time()
+    while time.time() < deadline:
+        time.sleep(8)
+        if time.time() - last_beat > 240:
+            hub("POST", "/v1/board/update", {"id": task["id"], "note": f"hyperagent {url}", "leaseSec": 600})
+            last_beat = time.time()
+        thread = cli["mcp_call"]("get_thread", {"threadId": thread_id, "messageLimit": 50})
+        if thread.get("awaitingApproval"):
+            return None, f"Hyperagent thread awaits an approval: {url}", url, name
+        if thread.get("isRunning"):
+            continue
+        tail = (thread.get("messages") or [{}])[-1]
+        if tail.get("role") == "error" and "budget" in str(tail.get("content") or tail.get("text")) and not nudged:
+            nudged = True
+            cli["mcp_call"]("send_message", {"threadId": thread_id, "message": FINALIZE})
+            continue
+        text = cli["last_assistant_text"](thread)
+        return text, None, url, name
+    return None, f"Hyperagent thread timed out: {url}", url, name
+
+
+FINALIZE = ("Stop researching. Using only what you have already found, output the final deliverable now "
+            "in the requested format, with URLs, and mark anything you did not confirm as unverified.")
+
+
 def work(task):
     path, n = runs_today()
     if n >= RUNS_PER_DAY:
@@ -87,28 +118,18 @@ def work(task):
     path.write_text(str(n + 1))
     log("claimed", id=task["id"])
     t0 = time.time()
-    proc = subprocess.Popen(
-        [BIN, "execute", "--model", MODEL, "--role", "research", "--json", "--timeout", str(TIMEOUT), "-p", prompt(task)],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-    )
-    while proc.poll() is None:
-        time.sleep(30)
-        if time.time() - t0 > 240 and int(time.time() - t0) % 240 < 30:
-            hub("POST", "/v1/board/update", {"id": task["id"], "note": "hyperagent thread running", "leaseSec": 600})
-    out, err = proc.communicate()
-    result, status = None, "failed"
     try:
-        doc = json.loads(out.strip().splitlines()[-1])
-        if doc.get("ok") and doc.get("text"):
-            result = f"{doc['text'].strip()}\n\n(executor: Hyperagent {doc.get('agent_name')} / {MODEL}, thread {doc.get('thread_url')})"
-            status = "done"
-    except Exception:
-        pass
-    if result is None:
-        tail = (err or "").strip().splitlines()[-1:] or ["no output"]
-        result = f"hyperagent exit {proc.returncode}: {tail[0][:300]}"
+        import runpy
+        cli = runpy.run_path(BIN)
+        text, error, url, name = run_thread(cli, task)
+    except Exception as exc:  # transport, auth refresh, mapping
+        text, error, url, name = None, f"hyperagent bridge error: {str(exc)[:300]}", None, None
+    if text:
+        result, status = f"{text.strip()}\n\n(executor: Hyperagent {name} / {MODEL}, thread {url})", "done"
+    else:
+        result, status = error or f"Hyperagent produced no text: {url}", "failed"
     fin = hub("POST", "/v1/board/done", {"id": task["id"], "result": result[:7900], "status": status})
-    log("done", id=task["id"], status=status, secs=round(time.time() - t0), ok=fin.get("ok"))
+    log("done", id=task["id"], status=status, secs=round(time.time() - t0), ok=fin.get("ok"), thread=url)
 
 
 def main():
