@@ -19,7 +19,7 @@ waiting a median 25 days, Urgent work and Summer's portfolio picks never reached
 Every admission is logged with a timestamp; `measure` turns each into admitted -> claimed
 latency (p50/p95) when a lane claims it. All writes go through the lane outbox (readback,
 retry, never overwrites a remote decision). Only issues that pass the same readiness gate as
-the refill (`binding_refill.skip_reason`: agent-ready, acceptance criteria, no hold label,
+the refill (`binding_refill.skip_reason`: acceptance criteria, no hold label,
 no open blocker, no red line) are ever admitted.
 """
 from __future__ import annotations
@@ -303,7 +303,7 @@ def run(lane, host, team: str, client, now: float | None = None, floor: int = 0,
     """One priority-admission pass for `team`, written through the outbox."""
     now = time.time() if now is None else now
     state = Path(host.state)
-    receipt = {"at": now, "team": team, "admitted": [], "displaced": [], "demoted": []}
+    receipt = {"at": now, "team": team, "admitted": [], "displaced": [], "demoted": [], "admittedUnlabelled": []}
     try:
         receipt["rankIntake"] = ingest_inbox(state, now)
     except Exception as error:  # a malformed envelope never blocks admission
@@ -319,15 +319,15 @@ def run(lane, host, team: str, client, now: float | None = None, floor: int = 0,
     todo = linear_sync.todo(state, team)
     goal = binding_refill.target(state, floor)
     receipt.update(todo=len(todo), target=goal, ceiling=ceiling(goal))
+    outbox = linear_sync.Outboxed(state, client)
     candidates, skipped = admit_candidates(rows, ranks, excluded, lambda row: lane.issue_hits_red_line(binding_refill._issue(lane, row)),
                                            now, pending)
-    for row in list(candidates):  # a superseded claim means a remote owner decided; the outbox would drop the move
-        if linear_sync.claim_status(state, row["id"]) in ("superseded", "active"):
+    for row in list(candidates):  # a live local claim owns the issue; leave it
+        if linear_sync.claim_status(state, row["id"]) == "active":
             candidates.remove(row)
-            skipped[row["identifier"]] = "claim-" + str(linear_sync.claim_status(state, row["id"]))
+            skipped[row["identifier"]] = "claim-active"
     # Ranked and Urgent skips first: the reason a Summer pick did not run must survive the receipt cap.
     receipt["skipped"] = dict(sorted(skipped.items(), key=lambda kv: (kv[0] not in ranks, kv[0]))[:50])
-    outbox = linear_sync.Outboxed(state, client)
     live_todo = list(todo)
     admitted = []
     for row in candidates:  # the mirror may lag: confirm in Linear that the candidate is still Backlog (and Urgent or ranked)
@@ -352,14 +352,22 @@ def run(lane, host, team: str, client, now: float | None = None, floor: int = 0,
                                             f"unclaimed Todo ({backlog_rank.explain(displaced, now)}). It is re-promoted by rank when Todo has room.")
             live_todo = [r for r in live_todo if r["id"] != displaced["id"]]
             receipt["displaced"].append(displaced["identifier"])
+        # Urgent or Summer-ranked admission is a new decision: a stale superseded claim (an earlier lane
+        # run the remote state outran) must not turn every move into a silent no-op.
+        if linear_sync.clear_superseded(state, row["id"]):
+            receipt.setdefault("clearedSuperseded", []).append(row["identifier"])
         outbox.move(row["id"], "Todo")
+        labelled = binding_refill.READY_LABEL in {str(label).lower() for label in row.get("labels") or ()}
+        # "Label at admission" is read by Summer's quality check (labelled vs unlabelled revert/fail rate).
         outbox.comment(row["id"], f"Priority admission: promoted to Todo regardless of target ({why}; Todo was {len(todo)} of {goal}"
                                   + (f"; displaced {displaced['identifier']}" if displaced else "")
-                                  + f"). Claim order: Summer rank, then priority, then age.")
+                                  + f"). Claim order: Summer rank, then priority, then age. Label at admission: {'present' if labelled else 'none'}.")
         live_todo.append(row)
         receipt["admitted"].append(row["identifier"])
+        if not labelled:  # measured: admission no longer needs the retired agent-ready label
+            receipt["admittedUnlabelled"].append(row["identifier"])
         _log(state, "priority-admissions.jsonl", {"id": row["identifier"], "issueId": row["id"], "admittedAt": now,
-                                                  "urgent": row.get("priority") == 1, "ranked": row["identifier"] in ranks,
+                                                  "urgent": row.get("priority") == 1, "ranked": row["identifier"] in ranks, "labelled": labelled,
                                                   "backlogAgeS": round(now - (_epoch(row.get("createdAt")) or now)),
                                                   "displaced": displaced["identifier"] if displaced else None})
     excess = len(live_todo) - ceiling(goal)

@@ -290,3 +290,5 @@ apps/web/runtime-data/
 # Stryker mutation runs (scripts/mutation-diff.mjs)
 .stryker-tmp/
 **/reports/mutation/
+apps/web/.agent-distribution-out/
+scripts/copy-inventory/inventory.gen.json

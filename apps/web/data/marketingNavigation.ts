@@ -1,5 +1,7 @@
 import { APP_ROUTES } from '@/constants/routes';
 import { isNavigationEligiblePath } from '@/data/marketing/featureAvailability';
+import { DEFAULT_SITE_CHROME } from '@/lib/content-records/site-chrome.defaults';
+import { toResolvedSiteChrome } from '@/lib/content-records/site-chrome.resolve';
 
 export interface MarketingNavLink {
   readonly href: string;
@@ -22,11 +24,6 @@ export interface MarketingFooterColumn {
 export const MARKETING_DEVELOPER_LINK: MarketingFooterLink = {
   href: APP_ROUTES.DEVELOPERS,
   label: 'Developers',
-};
-
-export const MARKETING_CLI_LINK: MarketingFooterLink = {
-  href: APP_ROUTES.CLI,
-  label: 'CLI',
 };
 
 /**
@@ -114,125 +111,17 @@ export function getMarketingToolsFlyoutLinks(
   );
 }
 
-const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
-  {
-    title: 'Product',
-    links: [
-      { href: APP_ROUTES.PRODUCT, label: 'Product' },
-      { href: APP_ROUTES.PRODUCT_COMMAND_PALETTE, label: 'Command palette' },
-      {
-        href: APP_ROUTES.PRODUCT_RELEASE_SCHEDULING,
-        label: 'Release scheduling',
-      },
-      { href: APP_ROUTES.PRODUCT_DSP_LINKS, label: 'DSP Links' },
-      { href: APP_ROUTES.PRODUCT_UTM_LINKS, label: 'UTM Links' },
-      { href: APP_ROUTES.PRODUCT_ISRC, label: 'ISRC' },
-      { href: APP_ROUTES.PRODUCT_PRE_SAVE, label: 'Pre-save' },
-      { href: APP_ROUTES.PRODUCT_LINK_ANALYTICS, label: 'Link analytics' },
-      { href: APP_ROUTES.CARD, label: 'Jovie Card' },
-      { href: APP_ROUTES.PRICING, label: 'Pricing' },
-    ],
-  },
-  {
-    title: 'Music',
-    links: [
-      { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artist Profiles' },
-      { href: APP_ROUTES.SMART_LINKS, label: 'Music Smart Links' },
-      { href: APP_ROUTES.ARTIST_NOTIFICATIONS, label: 'Notifications' },
-      { href: APP_ROUTES.PAY, label: 'Pay' },
-      {
-        href: `${APP_ROUTES.ARTIST_PROFILES}#capture-every-fan`,
-        label: 'Audience capture',
-      },
-      {
-        href: `${APP_ROUTES.ARTIST_PROFILES}#bring-them-back-automatically`,
-        label: 'Audience reactivation',
-      },
-      { href: APP_ROUTES.DEMO_VIDEO, label: 'Product Demo' },
-      { href: APP_ROUTES.LAUNCH, label: 'Release System' },
-    ],
-  },
-  {
-    title: 'Company',
-    links: [
-      { href: APP_ROUTES.ARTISTS, label: 'Artist Directory' },
-      { href: APP_ROUTES.ABOUT, label: 'About' },
-      { href: APP_ROUTES.BLOG, label: 'Blog' },
-      { href: APP_ROUTES.CHANGELOG, label: 'Changelog' },
-    ],
-  },
-  {
-    title: 'Resources',
-    links: [
-      MARKETING_DEVELOPER_LINK,
-      MARKETING_CLI_LINK,
-      { href: APP_ROUTES.ENGINEERING, label: 'Engineering' },
-      { href: APP_ROUTES.AI, label: 'AI Operating System' },
-      { href: APP_ROUTES.SUPPORT, label: 'Support' },
-      { href: APP_ROUTES.COMPARE, label: 'Compare' },
-      { href: APP_ROUTES.ALTERNATIVES, label: 'Alternatives' },
-    ],
-  },
-  {
-    title: 'Connect',
-    links: [
-      {
-        href: 'https://instagram.com/meetjovie',
-        label: 'Instagram',
-        external: true,
-      },
-      { href: 'https://x.com/meetjovie', label: 'X', external: true },
-      { href: APP_ROUTES.SUPPORT, label: 'Contact' },
-    ],
-  },
-] as const;
-
+/**
+ * The code-default footer: projected from the site-chrome content record's
+ * seed (`lib/content-records/site-chrome.ts`). The live footer is the
+ * published record; this is what renders before one exists or if the store
+ * is unavailable. Edit the record, not this file.
+ */
 export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] =
-  RAW_MARKETING_FOOTER_COLUMNS.map(column => ({
-    ...column,
+  toResolvedSiteChrome(DEFAULT_SITE_CHROME).footerColumns.map(column => ({
+    title: column.title,
     links: eligibleLinks(column.links),
   }));
-
-/**
- * JOV-7580. The generic Customers column: Artists first, then the Music column
- * hrefs with audience wording. Kept literal so every label is validated.
- */
-const RAW_GENERIC_CREATOR_FOOTER_LINKS = [
-  { href: APP_ROUTES.SOLUTIONS_ARTISTS, label: 'Artists' },
-  { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artist Profiles' },
-  { href: APP_ROUTES.SMART_LINKS, label: 'Smart Links' },
-  { href: APP_ROUTES.ARTIST_NOTIFICATIONS, label: 'Notifications' },
-  { href: APP_ROUTES.PAY, label: 'Pay' },
-  {
-    href: `${APP_ROUTES.ARTIST_PROFILES}#capture-every-fan`,
-    label: 'Audience Capture',
-  },
-  {
-    href: `${APP_ROUTES.ARTIST_PROFILES}#bring-them-back-automatically`,
-    label: 'Audience Reactivation',
-  },
-  { href: APP_ROUTES.DEMO_VIDEO, label: 'Product Demo' },
-  { href: APP_ROUTES.LAUNCH, label: 'Release System' },
-] as const satisfies readonly MarketingFooterLink[];
-
-/**
- * JOV-7580. Flag off returns the current Music column. Flag on renames that
- * column to Customers, adds Artists, and uses audience wording. Href targets
- * stay the same.
- */
-export function getMarketingFooterColumns(
-  genericCreatorNav = false
-): readonly MarketingFooterColumn[] {
-  if (!genericCreatorNav) return MARKETING_FOOTER_COLUMNS;
-  return MARKETING_FOOTER_COLUMNS.map(column =>
-    column.title === 'Music'
-      ? {
-          title: 'Customers',
-          links: eligibleLinks(RAW_GENERIC_CREATOR_FOOTER_LINKS),
-        }
-      : column
-  );
-}
 
 /**
  * Commercial pages for the flagged site-footer refresh.

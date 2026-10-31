@@ -36,7 +36,7 @@ describe('JovieCardInterestCapture', () => {
   it('reuses signed-in email and persists stable feature/source/state attribution', async () => {
     render(<JovieCardInterestCapture />);
 
-    expect(screen.getByLabelText('Email Address')).toHaveValue(
+    expect(screen.getByLabelText('Email address')).toHaveValue(
       'founder@example.com'
     );
     fireEvent.submit(screen.getByTestId('changelog-subscribe-form'));
@@ -57,9 +57,9 @@ describe('JovieCardInterestCapture', () => {
       screen.getByRole('heading', { name: 'Check your email' })
     ).toBeVisible();
     expect(
-      screen.getAllByText(
+      screen.getByText(
         'Confirm your email to receive Jovie Card access updates.'
-      )[1]
+      )
     ).toBeVisible();
   });
 

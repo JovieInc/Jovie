@@ -83,6 +83,7 @@ import throughput_sentinel  # noqa: E402
 import taste_default  # noqa: E402
 import yc_corpus  # noqa: E402
 import credentials_spend  # noqa: E402
+import model_family_sync  # noqa: E402
 import capacity_live  # noqa: E402  (live quota reads for the capacity registry)
 import capacity_registry  # noqa: E402  (caps and policies come from ops/registry/capacity.json)
 import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
@@ -176,7 +177,7 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", # Shared client layer (budgeted 
                   "scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
                   "scripts/lib/merge-group-ahead-attribution.mjs",
                   "scripts/lib/merge-group-admission.mjs",
-                  "scripts/lib/source-admission-policy.mjs", "scripts/pr-fleet-rules.mjs",
+                  "scripts/lib/source-admission-policy.mjs", "scripts/pr-fleet-rules.mjs", "scripts/lib/wins-ledger.mjs",
                   "scripts/lib/merge-group-member-policy.mjs",
                   "scripts/lib/product-lane-classifier.mjs",
                   "scripts/lib/pr-size-guard-policy.mjs", "scripts/lib/repo-hygiene-limits.mjs",
@@ -6100,6 +6101,12 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
                    "Never hand-merge generated files: take main's generated copy, then run its canonical",
                    "generator (`pnpm ci:topology:write` for workflow topology or",
                    "`pnpm --filter @jovie/web drizzle:generate` for migration metadata).",
+                   "When the only conflict is scripts/preflight-changed.mjs in the NARROWED",
+                   "merge-group-unit-guards command, union && prefixes and vitest paths with",
+                   "fix_red_classes.merge_narrowed_guard_command. Unknown hunks stay unresolved.",
+                   "Other shell && chains are unioned by fix_red_classes.merge_and_chain",
+                   "(base order, then head-only prefixes; node --test and vitest paths union).",
+                   "Unknown hunks stay unresolved.",
                    "Run the related checks after resolving.", ""]
     else:
         problem = []
@@ -6133,6 +6140,11 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
         "  `## Premise check` (Assumption / Falsifying test / Result). A retry is not a falsifier.",
         "- For bug fixes and CI repairs, retain pre-fix red evidence in `## Red-before-green`:",
         "  Failing command plus a red-output snippet or Failing run (before fix) URL.",
+        "- Retain exactly one customer changelog decision in the PR body (docs/CHANGELOG_PUBLICATION.md).",
+        "  Explicitly choose internal metadata or a customer-visible outcome with availability and evidence;",
+        '  internal metadata is `<!-- customer-changelog/v1 {"releaseWorthy":false} -->`.',
+        "  Use pr_events.repair_evidence_body(pr, body, excerpt, customer_decision=decision) to complete",
+        "  missing repair metadata; preserve existing decisions, then run the canonical Fleet/changelog guards.",
         f"- Immediately before every install or push, use `gh api graphql` to read PR #{pr['number']} in {REPO_SLUG}:",
         "  request state, headRefOid and isInMergeQueue. The pr view JSON command does not expose queue ownership.",
         "  Continue only while OPEN with isInMergeQueue=false; otherwise stop and preserve local changes, without install or push.",
@@ -6142,6 +6154,22 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
         "- If the failure is unrelated to this PR (broken main, infra), change nothing and end with",
         "  `NOT-SHIPPABLE: <reason>`.",
     ])
+
+
+def regenerate_merged_generated(worktree: Path, paths, log, *, guard=lambda: None) -> bool:
+    """Restore main's generated copies, then regenerate from the merged source, including
+    outputs that Git merged cleanly. Also usable after an agent resolves source conflicts."""
+    generated = sorted(set(paths) & remediation.GENERATED_RESOLVERS.keys())
+    if not generated:
+        return True
+    if sh(["git", "checkout", "origin/main", "--", *generated], cwd=worktree, log=log).returncode:
+        return False
+    commands = dict.fromkeys(remediation.GENERATED_RESOLVERS[path] for path in generated)
+    for command in commands:
+        guard()
+        if sh(list(command), cwd=worktree, timeout=900, log=log).returncode:
+            return False
+    return sh(["git", "add", *generated], cwd=worktree, log=log).returncode == 0
 
 
 def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
@@ -6158,23 +6186,100 @@ def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda
         if not conflicted or not conflicted <= remediation.GENERATED_RESOLVERS.keys():
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
-        sh(["git", "checkout", "origin/main", "--", *sorted(conflicted)], cwd=worktree, log=log)
-        guard()
-        commands = []
-        for path in sorted(conflicted):
-            command = list(remediation.GENERATED_RESOLVERS[path])
-            if command not in commands:
-                commands.append(command)
-        for command in commands:
-            if sh(command, cwd=worktree, timeout=900, log=log).returncode != 0:
-                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-                return False
-        sh(["git", "add", *sorted(conflicted)], cwd=worktree, log=log)
+        changed = sh(["git", "diff", "--name-only", "HEAD"], cwd=worktree)
+        if changed.returncode or not regenerate_merged_generated(
+                worktree, conflicted | set(changed.stdout.splitlines()), log, guard=guard):
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
         if sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
     guard()
     return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+
+
+def resolve_narrowed_preflight_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
+    """Union a NARROWED preflight command when that file is the only conflict with main.
+
+    Both sides keep their shell prefixes and vitest paths. Any other conflict, or a hunk
+    the union cannot read, aborts and leaves the PR to the model. The push is a fast-forward
+    of the PR branch; this never rebases or force-pushes."""
+    guard()
+    merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
+    if merged.returncode != 0:
+        conflicted = [path for path in (sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout or "").split() if path]
+        target = worktree / fix_red_classes.NARROWED_PREFLIGHT
+        if conflicted != [fix_red_classes.NARROWED_PREFLIGHT]:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        try:
+            resolved = fix_red_classes.resolve_preflight_narrowed_text(target.read_text())
+        except OSError:
+            resolved = None
+        if resolved is None:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        try:
+            atomic_write_text(target, resolved)
+        except OSError:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        guard()
+        if sh(["git", "add", "--", fix_red_classes.NARROWED_PREFLIGHT], cwd=worktree, log=log).returncode != 0 \
+                or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+    guard()
+    pushed = sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+    return pushed
+
+
+def resolve_and_chain_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
+    """Union shell && chains when every conflict hunk with main is that shape.
+
+    Base order, then head-only prefixes. node --test and vitest paths follow the
+    same rule. A hunk the union cannot read aborts and leaves the PR to the model.
+    The push is a fast-forward of the PR branch; this never rebases or force-pushes."""
+    guard()
+    merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
+    if merged.returncode != 0:
+        conflicted = [path for path in (sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout or "").split() if path]
+        if not conflicted:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        resolved_texts: dict[Path, str] = {}
+        for rel in conflicted:
+            target = worktree / rel
+            try:
+                outcome = fix_red_classes.resolve_and_chain_text(target.read_text())
+            except (OSError, UnicodeError):
+                outcome = None
+            if outcome is None:
+                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+                return False
+            resolved_texts[target] = outcome
+        try:
+            for target, outcome in resolved_texts.items():
+                atomic_write_text(target, outcome)
+        except OSError:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        guard()
+        if sh(["git", "add", "--", *conflicted], cwd=worktree, log=log).returncode != 0 \
+                or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+    guard()
+    return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+
+
+def merge_narrowed_preflight_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """No-model fix when Source Validation reports only the narrowed preflight conflict."""
+    del host, route
+    if not resolve_narrowed_preflight_conflict(worktree, pr["headRefName"], log):
+        return None
+    receipt.update(resolution="narrowed-preflight-merged")
+    return types.SimpleNamespace(returncode=0)
 
 
 REPAIR_AUTHORITY_FIELDS = """number title body state mergedAt headRefName headRefOid url isDraft mergeStateStatus reviewDecision updatedAt
@@ -6688,6 +6793,30 @@ def renumber_migrations_fix(host: Host, pr: dict, route: dict, worktree: Path, l
     return types.SimpleNamespace(returncode=0)
 
 
+def register_domain_writes_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """The no-model fix for an allowed-0 domain write: register the exporting module, lower the
+    ratchet, commit and push. Returns a finished-agent stand-in, or None when the edit does not apply."""
+    probe = sh(["node", "scripts/domain-write-guard.mjs"], cwd=worktree, log=log, timeout=300)
+    added = fix_red_classes.register_direct_domain_writes(
+        worktree, f"{probe.stdout or ''}\n{probe.stderr or ''}")
+    if not added:
+        return None
+    if sh(["node", "scripts/domain-write-guard.mjs", "--write"], cwd=worktree, log=log, timeout=300).returncode:
+        return None
+    if sh(["node", "scripts/domain-write-guard.mjs"], cwd=worktree, log=log, timeout=300).returncode:
+        return None
+    message = "fix(domain): register " + ", ".join(Path(name).name for name in added)[:72]
+    steps = [["git", "add", "--", "apps/web/lib/domain/write-registry.json",
+              "scripts/lib/domain-write-guard.ratchet.gen.json"],
+             ["git", "commit", "-q", "-m", message],
+             ["git", "push", "-q", "origin", f"HEAD:{pr['headRefName']}"]]
+    for step in steps:
+        if sh(step, cwd=worktree, log=log, timeout=900).returncode:
+            return None
+    receipt.update(resolution="registered-domain-writes", registeredModules=added)
+    return types.SimpleNamespace(returncode=0)
+
+
 def wire_ci_fast_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
     """The no-model fix for an unwired script test: list it in ci-fast-lanes.mjs, commit, push. Returns a
     finished-agent stand-in, or None when the edit does not apply (the model then gets the head)."""
@@ -6751,10 +6880,33 @@ def route_fix_red(host: Host, pr: dict) -> dict | None:
         return None
 
 
+def stamp_changelog_decision(host: Host, pr: dict) -> bool:
+    """Write the internal customer-changelog note onto the PR body. False when the body cannot
+    take one or GitHub rejects the edit (the model then gets the head)."""
+    stamped = fix_red_classes.stamp_internal_changelog(pr.get("body"))
+    if stamped is None:
+        return False
+    runs = host.state / "runs"
+    runs.mkdir(parents=True, exist_ok=True)
+    path = runs / f"changelog-{int(pr['number'])}.md"
+    atomic_write_text(path, stamped)
+    edited = gh_call(["pr", "edit", str(int(pr["number"])), "--repo", REPO_SLUG, "--body-file", str(path)],
+                     priority="repair")
+    return edited.returncode == 0
+
+
 def deterministic_route_taken(host: Host, pr: dict, route: dict | None) -> str | None:
     """Run the no-model action for a routed class once per head; the reason on success (None: use the model)."""
-    if not route or route["action"] not in {fix_red_classes.RERUN, fix_red_classes.SYNC_MAIN}:
+    if not route or route["action"] not in {fix_red_classes.RERUN, fix_red_classes.SYNC_MAIN, fix_red_classes.STAMP_CHANGELOG}:
         return None
+    if route["action"] == fix_red_classes.STAMP_CHANGELOG:
+        # No body, or a note already present: do not spend the once-per-head claim. An invalid
+        # note is a different defect and still belongs to the model.
+        if fix_red_classes.stamp_internal_changelog(pr.get("body")) is None:
+            return None
+        if not claim_route(host, pr, route["action"]):
+            return None
+        return "infra-rerun:changelog-metadata" if stamp_changelog_decision(host, pr) else None
     # One rerun per head, shared with the platform-red gate above; one sync per head.
     if not (claim_infra_rerun(host, pr) if route["action"] == fix_red_classes.RERUN else claim_route(host, pr, route["action"])):
         return None
@@ -7701,13 +7853,27 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 require_disk(host, stage)
                 verify_target(pr, stage, worktree=worktree if allow_local_push else None)
             resolved_generated = False
+            resolved_narrowed = False
+            resolved_and_chain = False
             if pr.get("mergeStateStatus") == "DIRTY":
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 0, "mutations": 1}, coordination=coordination, boundary_id="repair-generated-conflict")
                 resolved_generated = resolve_generated_conflict(worktree, pr["headRefName"], log, guard=boundary)
+                if not resolved_generated:
+                    execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
+                                               {"spend": 0, "mutations": 1}, coordination=coordination, boundary_id="repair-narrowed-preflight")
+                    resolved_narrowed = resolve_narrowed_preflight_conflict(worktree, pr["headRefName"], log, guard=boundary)
+                if not resolved_generated and not resolved_narrowed:
+                    execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
+                                               {"spend": 0, "mutations": 1}, coordination=coordination, boundary_id="repair-and-chain")
+                    resolved_and_chain = resolve_and_chain_conflict(worktree, pr["headRefName"], log, guard=boundary)
             agent = None
             if resolved_generated:
                 receipt.update(resolution="generated-regenerated")
+            elif resolved_narrowed:
+                receipt.update(resolution="narrowed-preflight-merged")
+            elif resolved_and_chain:
+                receipt.update(resolution="and-chain-merged")
             else:
                 boundary("before-install")
                 install_dependencies(host, worktree, log)
@@ -7731,7 +7897,9 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                                            {"spend": 1, "mutations": 1}, coordination=coordination, boundary_id="repair-dispatch")
                 fixer = {fix_red_classes.WIRE_CI_FAST: wire_ci_fast_fix,
                          fix_red_classes.RENUMBER: renumber_migrations_fix,
-                         fix_red_classes.SNAP_SPACING: snap_spacing_fix}.get((route or {}).get("action"))
+                         fix_red_classes.SNAP_SPACING: snap_spacing_fix,
+                         fix_red_classes.MERGE_NARROWED: merge_narrowed_preflight_fix,
+                         fix_red_classes.REGISTER_DOMAIN: register_domain_writes_fix}.get((route or {}).get("action"))
                 agent = fixer(host, pr, route, worktree, log, receipt) if fixer else None
                 agent = agent or run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree),
@@ -9784,6 +9952,12 @@ def finish_dispatch(host: Host, tick: dict) -> int:
                                     {"status": "not-owner", "owner": owner})
     except Exception as error:  # registry freshness never takes dispatch down
         tick["credentialsSpend"] = {"status": "error", "error": type(error).__name__}
+    try:
+        # Daily model-family sync (model_family_sync.py): provider lists -> registry PR, stale alarm.
+        owner = os.environ.get("CREDENTIALS_SPEND_OWNER", "gem").split(".")[0]
+        tick["modelFamilySync"] = (model_family_sync.tick(host.state, host.repo) if HOST == owner else {"status": "not-owner"})
+    except Exception as error:  # registry freshness never takes dispatch down
+        tick["modelFamilySync"] = {"status": "error", "error": type(error).__name__}
     try:
         # Live quota reads (Codex ledger, Grok /usage) for the capacity registry; metadata only.
         tick["capacityLive"] = (capacity_live.tick(host.state) if HOST == os.environ.get("CREDENTIALS_SPEND_OWNER", "gem").split(".")[0]

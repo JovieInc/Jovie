@@ -1,8 +1,27 @@
 import { getProfileUrl } from '@/constants/domains';
 import { buildPromptSecuritySection } from '@/lib/chat/prompt-disclosure-guard';
+import { buildSegmentPromptSection } from '@/lib/creator/segment-registry';
+import { inferSegment, type ResolvedSegment } from '@/lib/creator/segments';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { PITCH_GRILL_PROCEDURE } from '@/lib/services/pitch/curator-checklist';
 import { formatAmount } from '@/lib/utils/format-number';
+
+interface ArtistContextSpotify {
+  readonly spotifyUrl?: string | null;
+  readonly spotifyFollowers: number | null;
+  readonly spotifyPopularity: number | null;
+}
+
+/** Connection state is its own fact: a null follower count is not "Not connected". */
+function spotifyConnectionLine(context: ArtistContextSpotify): string {
+  const connected =
+    Boolean(context.spotifyUrl) ||
+    context.spotifyFollowers !== null ||
+    context.spotifyPopularity !== null;
+  return connected
+    ? `Connected${context.spotifyUrl ? ` (${context.spotifyUrl})` : ''}`
+    : 'Not connected';
+}
 
 interface ArtistContext {
   readonly displayName: string;
@@ -31,7 +50,6 @@ interface ReleasePromptContext {
 }
 
 interface AccountPromptContext {
-  readonly email: string | null;
   readonly plan: string;
   readonly displayPlan: string;
   readonly isPro: boolean;
@@ -171,11 +189,23 @@ export function buildSystemPromptParts(
       readonly label: string;
       readonly planRequired: string;
     }[];
+    /**
+     * Resolved creator segment (JOV-9679). Omitted: inferred from the bio,
+     * releases and music links already in this context.
+     */
+    segment?: ResolvedSegment;
     /** Clock for release timing. Defaults to now; tests and evals pin it. */
     now?: Date;
   }
 ): SystemPromptParts {
   const now = options?.now ?? new Date();
+  const segment =
+    options?.segment ??
+    inferSegment({
+      bio: context.bio,
+      hasMusicCatalog: releases.length > 0 || context.hasMusicLinks,
+      platforms: context.hasMusicLinks ? ['spotify'] : [],
+    }).segment;
   const stable = `You are Jovie, an AI music career assistant. You help independent artists understand their data and make smart career decisions.
 ${buildPromptSecuritySection()}
 ## About This Artist
@@ -186,8 +216,12 @@ ${buildPromptSecuritySection()}
 - **Genres:** ${context.genres.length > 0 ? context.genres.join(', ') : 'Not specified'}
 
 ## Streaming Stats
-- **Spotify Followers:** ${context.spotifyFollowers?.toLocaleString() ?? 'Not connected'}
+- **Spotify:** ${spotifyConnectionLine(context)}
+- **Spotify Followers:** ${context.spotifyFollowers?.toLocaleString() ?? 'not synced yet'}
 - **Spotify Popularity:** ${context.spotifyPopularity ?? 'N/A'} / 100
+
+## Grounding (CRITICAL)
+Everything you say about this artist's own accounts, connections, releases, songs or numbers must come from this prompt or from a tool result in this turn. Never say a service is not connected unless the Spotify line above says Not connected. Never name a song, single or album as the artist's unless it appears in the Discography Context or a tool result; if you cannot verify a title, say so and ask. A missing number means "not synced yet", never "not connected".
 
 ## Profile Analytics
 - **Profile Views:** ${context.profileViews.toLocaleString()}
@@ -197,6 +231,8 @@ ${buildPromptSecuritySection()}
 ## Discography Context
 - **Total Releases:** ${releases.length}
 ${buildDiscographySection(releases, now)}
+
+${buildSegmentPromptSection(segment)}
 
 ## Tipping & Monetization
 - **Tip Link Clicks:** ${context.tippingStats.tipClicks}
@@ -425,7 +461,6 @@ function buildAccountAccessSection(
 
   return `
 ## Account & Access
-- **Account Email:** ${accountContext.email ?? 'Not available'}
 - **Plan:** ${accountContext.displayPlan}
 ${billingLine}
 - **AI Usage This Week:** ${usageLine}

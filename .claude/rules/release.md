@@ -349,7 +349,7 @@ pnpm version:check        # validate consistency
 
 **Implementation PRs must not add or edit `CHANGELOG.md`.** The file is
 release state, not branch state. Branch-local Unreleased notes collide in
-native ALLGREEN merge groups (GitHub's server merge ignores local
+native merge groups (ALLGREEN until 2026-10-29, HEADGREEN now; GitHub's server merge ignores local
 `merge=union`). A user-visible change earns exactly one What's New bullet only
 after land/runtime proof, written through the existing release/UI receipt path
 (`apps/web/components/jovie/feature-intro-catalog.ts` plus the post-land
