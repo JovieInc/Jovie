@@ -2,7 +2,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-
+import { runCli } from './cli.js';
 import type { FetchImplementation } from './client.js';
 import { runMesh } from './mesh.js';
 import {
@@ -558,5 +558,42 @@ describe('runMesh routing', () => {
       { env: { ...env, JOVIE_MESH_HUB: '0' }, fetchImpl: api.fetchImpl }
     );
     expect(legacy).not.toHaveProperty('transport');
+  });
+
+  it('parses --peek as a switch through the CLI and rejects it on other commands', async () => {
+    const api = server(url => {
+      if (url.pathname === '/v1/mailbox')
+        return {
+          status: 200,
+          body: { ok: true, messages: [hubMessage('grokbot:mesh-cli-0001')] },
+        };
+      return { status: 200, body: { ok: true, agents: [] } };
+    });
+    let out = '';
+    const code = await runCli(['mesh', 'read', '--peek', '--json'], {
+      stdout: {
+        write: (chunk: string) => {
+          out += chunk;
+        },
+      },
+      mesh: {
+        env: { ...env, JOVIE_MESH_LEGACY: '0' },
+        fetchImpl: api.fetchImpl,
+      },
+    });
+    expect(code).toBe(0);
+    expect(JSON.parse(out)).toMatchObject({ handled: 0 });
+    expect(api.calls.some(c => c.url.endsWith('/v1/ack'))).toBe(false);
+    let stray = '';
+    expect(
+      await runCli(['skill', '--peek', '--json'], {
+        stdout: {
+          write: (c: string) => {
+            stray += c;
+          },
+        },
+      })
+    ).toBe(2);
+    expect(stray).toContain('only supported by mesh');
   });
 });

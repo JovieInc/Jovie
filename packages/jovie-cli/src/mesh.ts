@@ -46,10 +46,10 @@ export const MESH_FLAG_NAMES = [
   'owner',
   'sender-id',
   'token-sha256',
-  'peek',
-  'install',
   'hours',
 ] as const;
+/** Value-less mesh switches; parsed as booleans and passed on as 'true'. */
+export const MESH_BOOLEAN_FLAG_NAMES = ['peek', 'install'] as const;
 const isRecipient = (to: string) => to === 'all' || MESH_KIND_PATTERN.test(to);
 const KEYCHAIN_SERVICE_PREFIX = 'jovie.mesh.';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
