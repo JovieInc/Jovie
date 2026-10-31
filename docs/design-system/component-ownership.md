@@ -16,8 +16,11 @@ a renderer-local copy of these families.
 - `header`: route header inside the content plane, never a second shell.
 - `main`: route content. `AppShellContentPanel` or `PageShell` owns the route
   scroll mode and content width.
-- `rightPanel`: contextual inspector rail. Desktop is in-flow and narrows the
-  content plane; mobile is a modal drawer with one active focus owner.
+- `rightPanel`: contextual inspector rail. Desktop renders as an overlay
+  above the content plane (`AppShellRightRail` never owns a flex column or
+  narrows the route; verify last-column visibility under the overlay rather
+  than assuming reserved table width); mobile is a modal drawer with one
+  active focus owner.
 - `audioPlayer` and `mobileBottomNav`: shell chrome slots that reserve space
   instead of obscuring route content.
 
