@@ -2,29 +2,18 @@
 
 import { EmptyState } from '@/components/molecules/EmptyState';
 import { APP_ROUTES } from '@/constants/routes';
-import type { OpportunityInboxEmptyActionCard } from '@/lib/connectors/opportunity-inbox-types';
-
-export interface OpportunityInboxEmptyStateProps {
-  readonly actionCards?: readonly OpportunityInboxEmptyActionCard[];
-}
 
 /**
- * Concise empty state (JOV-3931): one headline, one supporting line, one CTA.
- * Optional actionCards remain supported for legacy multi-card layouts.
+ * One calm centered line (JOV-8967): the empty Inbox never renders setup
+ * steps. Setup actions live on Home surfaces while incomplete; conversational
+ * entry stays in chat, so the only next step is Start A Chat.
  */
-export function OpportunityInboxEmptyState({
-  actionCards,
-}: OpportunityInboxEmptyStateProps) {
-  const primaryCard = actionCards?.[0];
-  const ctaHref = primaryCard?.href ?? APP_ROUTES.CHAT;
-  const ctaLabel = primaryCard?.actionLabel ?? 'Start A Chat';
-
+export function OpportunityInboxEmptyState() {
   return (
+    // ui-casing-allow: design-locked inbox copy
     <EmptyState
       heading='Your Inbox Is Clear'
-      description='Jovie is watching for the next opportunity.'
-      action={{ href: ctaHref, label: ctaLabel }}
-      presentation='workspace'
+      action={{ href: APP_ROUTES.CHAT, label: 'Start A Chat' }}
       testId='opportunity-inbox-empty-state'
     />
   );

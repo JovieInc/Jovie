@@ -669,9 +669,7 @@ export function OpportunityInboxPageClient({
             {!hasReviewableItems &&
             !runtimeUpdate?.available &&
             !inboxReadUnavailable ? (
-              <OpportunityInboxEmptyState
-                actionCards={inbox.emptyActionCards}
-              />
+              <OpportunityInboxEmptyState />
             ) : null}
 
             <OpportunityInboxConfirmedTourDates items={confirmedTourDates} />
