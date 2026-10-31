@@ -1,12 +1,15 @@
 {
   "schema": "jovie.capacity-resources/v1",
   "description": "Every resource that can stop shipping: metric, hard limit, what happens at the limit, and the lead time to fix. Read by scripts/capacity/forecast.py. Joins ops/registry/spend.json (spend collectors) and canon/automation-registry.jsonl (collector liveness). Metadata only, no secrets.",
-  "updatedAt": "2026-10-30T00:00:00Z",
+  "updatedAt": "2026-10-31T00:00:00Z",
   "cloudCollector": "gem",
   "hostAliases": {
     "gem": ["gem"],
     "mac": ["tims-macbook-pro", "tw-mac-001", "mac"],
-    "air": ["air", "office-air"]
+    "air": ["air", "office-air", "tims-air", "tims-macbook-air"],
+    "workstation": ["tw-workstation-001"],
+    "grok": ["grok"],
+    "muse": ["muse"]
   },
   "leadTimes": {
     "cleanup": "minutes",
@@ -965,6 +968,144 @@
           "deadlineHours": 72
         }
       }
+    },
+    {
+      "id": "gem-liveness",
+      "group": "host-liveness",
+      "host": "gem",
+      "label": "gem reachable (probe over ssh; 1 = unreachable)",
+      "unit": "count",
+      "collector": {
+        "type": "liveness"
+      },
+      "atLimit": {
+        "effect": "deny",
+        "note": "gem is dark: no disk or health data, its work stops silently"
+      },
+      "leadTimeHours": 1,
+      "mode": "level",
+      "warnFrac": 1,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [
+            {
+              "label": "Check power/network/tailscale on gem",
+              "cost": "none",
+              "lead": "minutes"
+            }
+          ],
+          "default": "Summer pings gem over the mesh and restarts its agent",
+          "deadlineHours": 2
+        }
+      }
+    },
+    {
+      "id": "mac-liveness",
+      "group": "host-liveness",
+      "host": "mac",
+      "label": "mac reachable (probe over ssh; 1 = unreachable)",
+      "unit": "count",
+      "collector": {
+        "type": "liveness"
+      },
+      "atLimit": {
+        "effect": "deny",
+        "note": "mac is dark: no disk or health data, its work stops silently"
+      },
+      "leadTimeHours": 1,
+      "mode": "level",
+      "warnFrac": 1,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [
+            {
+              "label": "Check power/network/tailscale on mac",
+              "cost": "none",
+              "lead": "minutes"
+            }
+          ],
+          "default": "Summer pings mac over the mesh and restarts its agent",
+          "deadlineHours": 2
+        }
+      }
+    },
+    {
+      "id": "air-liveness",
+      "group": "host-liveness",
+      "host": "air",
+      "label": "air reachable (probe over ssh; 1 = unreachable)",
+      "unit": "count",
+      "collector": {
+        "type": "liveness"
+      },
+      "atLimit": {
+        "effect": "deny",
+        "note": "air is dark: no disk or health data, its work stops silently"
+      },
+      "leadTimeHours": 1,
+      "mode": "level",
+      "warnFrac": 1,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [
+            {
+              "label": "Check power/network/tailscale on air",
+              "cost": "none",
+              "lead": "minutes"
+            }
+          ],
+          "default": "Summer pings air over the mesh and restarts its agent",
+          "deadlineHours": 2
+        }
+      }
     }
-  ]
+  ],
+  "fleet": [
+    {
+      "id": "gem",
+      "kind": "linux-host",
+      "ssh": "gem",
+      "required": true
+    },
+    {
+      "id": "mac",
+      "kind": "mac",
+      "ssh": "tims-macbook-pro",
+      "required": true
+    },
+    {
+      "id": "air",
+      "kind": "mac",
+      "ssh": "tims-macbook-air",
+      "required": true,
+      "note": "office HUD, Aeon mesh worker"
+    },
+    {
+      "id": "grok",
+      "kind": "vm",
+      "ssh": null,
+      "required": false,
+      "note": "not on tailnet 2026-10-31; set ssh when reachable and flip required"
+    },
+    {
+      "id": "muse",
+      "kind": "vm",
+      "ssh": null,
+      "required": false,
+      "note": "not on tailnet 2026-10-31; set ssh when reachable and flip required"
+    },
+    {
+      "id": "workstation",
+      "kind": "windows",
+      "ssh": null,
+      "required": false,
+      "note": "tw-workstation-001 offline 115d, retired"
+    }
+  ],
+  "containers": {
+    "requiredResources": ["docker-gem"]
+  }
 }
