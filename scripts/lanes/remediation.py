@@ -88,7 +88,7 @@ RED_CONCLUSIONS = FLAKY_CONCLUSIONS | {"FAILURE"}
 PENDING_STATUS = frozenset({"IN_PROGRESS", "QUEUED", "PENDING", "WAITING", "REQUESTED"})
 INFRA_TEXT = re.compile(
     r"runner has (?:been )?lost|The runner has received a shutdown|ETIMEDOUT|i/o timeout|"
-    r"\bOOM\b|out of memory|Killed process|ENOMEM|\b5\d\d\b",
+    r"\bOOM\b|out of memory|Killed process|ENOMEM|\b(?:HTTP(?:/\d(?:\.\d)?)?(?:[ \t]*Error)?[ \t:]+|(?:status|response)(?:[ _-]?code)?[ \t:=]+|requested URL returned error:[ \t]*)5\d\d\b",
     re.IGNORECASE,
 )
 STRATEGY_TEXT = re.compile(
