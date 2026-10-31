@@ -1219,12 +1219,25 @@ If timeout (20 min): "The deploy has been running for 20 minutes, which is longe
 
 Tell the user: "Deploy is done. Now I'm going to check the live site to make sure everything looks good — loading the page, checking for errors, and measuring performance."
 
+## Verify the outcome, not the action
+
+A check is green only when it proves the RIGHT thing happened. None of these is success on its own: HTTP 200, a page or element rendered, exit code 0, a non-empty reply, a screenshot taken, "no new console errors".
+
+1. **Oracle first.** Name the expected outcome before checking, then assert it: this artist's name and real releases on the profile, the word the probe asked for, the deployed SHA in build-info.
+2. **Failure surfaces fail.** Error copy, quota or limit walls, "temporarily unavailable" or paused, empty states, stuck spinners, placeholder or template text, and a 200 whose body is an error. Jovie catalog: \`scripts/lib/outcome-verifier.mjs\` (\`assertOutcome\`, \`detectFailureSurface\`).
+3. **Red before green.** Before trusting a new or changed check, show it fails on known-bad input (\`acceptedNegativeControls(check)\` returns \`[]\`, or a seeded-bug run goes red).
+4. **Strict fold.** Pass needs at least one check and every check passed. Skipped, blocked, unknown or nothing-ran is BLOCKED, never green. Never mark something healthy without a passing re-run.
+
+Report expected vs observed and the negative control you ran.
+
+Before loading anything, write down the route's expected content (the oracle): for example the profile's artist name and a real release, or the changed feature's visible result.
+
 Use the diff-scope classification from Step 5 to determine canary depth:
 
 | Diff Scope | Canary Depth |
 |------------|-------------|
 | SCOPE_DOCS only | Already skipped in Step 5 |
-| SCOPE_CONFIG only | Smoke: `$B goto` + verify 200 status |
+| SCOPE_CONFIG only | Smoke: `$B goto` + verify 200 status AND the expected content (a 200 error page fails) |
 | SCOPE_BACKEND only | Console errors + perf check |
 | SCOPE_FRONTEND (any) | Full: console + perf + screenshot |
 | Mixed scopes | Full canary |
@@ -1264,7 +1277,8 @@ Take an annotated screenshot as evidence.
 **Health assessment:**
 - Page loads successfully with 200 status → PASS
 - No critical console errors → PASS
-- Page has real content (not blank or error screen) → PASS
+- Page shows the expected content you named before the check (the oracle) → PASS
+- No failure surface in the page text: error copy, quota or limit wall, unavailable/paused, empty state, placeholder text, including a 200 whose body is an error → otherwise FAIL
 - Loads in under 10 seconds → PASS
 
 If all pass: Tell the user "Site is healthy. Page loaded in {X}s, no console errors, content looks good. Screenshot saved to {path}." Mark as HEALTHY, continue to Step 9.
@@ -1272,7 +1286,7 @@ If all pass: Tell the user "Site is healthy. Page loaded in {X}s, no console err
 If any fail: show the evidence (screenshot path, console errors, perf numbers). Use AskUserQuestion:
 - **Re-ground:** "I found some issues on the live site after the deploy. Here's what I see: {specific issues}. This might be temporary (caches clearing, CDN propagating) or it might be a real problem."
 - **RECOMMENDATION:** Choose based on severity — B for critical (site down), A for minor (console errors).
-- A) That's expected — the site is still warming up. Mark it as healthy.
+- A) Possibly warming up — re-run this canary in 2 minutes. Mark healthy only if the re-run passes every check; a second failure goes to B or C.
 - B) That's broken — revert the merge and roll back to the previous version
 - C) Let me investigate more — open the site and look at logs before deciding
 

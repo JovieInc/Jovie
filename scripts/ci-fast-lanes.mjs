@@ -261,6 +261,17 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
+    // Shared outcome-verifier contract (false-green class, JOV-9625): every
+    // known-bad sample and every failure string /api/chat emits must be
+    // rejected; coverage floors keep the verifier itself fully exercised.
+    id: 'outcome-verifier',
+    command:
+      'pnpm exec vitest --root scripts --config vitest.config.mts run --coverage --coverage.include=lib/outcome-verifier.mjs --coverage.reporter=text --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-outcome-verifier-coverage" --coverage.thresholds.lines=100 --coverage.thresholds.functions=100 --coverage.thresholds.branches=90 lib/__tests__/outcome-verifier.test.mjs lib/__tests__/skills-verify-outcome.test.mjs',
+    inputs:
+      /^(?:scripts\/lib\/(?:outcome-verifier\.mjs|__tests__\/(?:outcome-verifier|skills-verify-outcome)\.test\.mjs)|apps\/web\/app\/api\/chat\/(?:route|onboarding-handler)\.ts|apps\/web\/lib\/rate-limit\/limiters\.ts|\.agents\/skills\/gstack\/(?:canary|land-and-deploy|qa-only|ship|investigate)\/SKILL\.md(?:\.tmpl)?|\.claude\/skills\/qa(?:-swarm)?\/SKILL\.md|scripts\/ci-fast-lanes\.mjs)$/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     id: 'synthetic-canary-liveness',
     command:
       'pnpm exec vitest --root scripts --config vitest.config.mts run --coverage --coverage.include=synthetic-canary-liveness.mjs --coverage.reporter=text --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-synthetic-canary-coverage" --coverage.thresholds.lines=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=90 lib/__tests__/synthetic-canary-liveness.test.mjs',

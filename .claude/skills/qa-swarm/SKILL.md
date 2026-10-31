@@ -116,6 +116,13 @@ Finding shape:
 4. File fix findings as P0/P1; quarantine-only entries as `kind: flake`.
 5. Propose findings.
 
+## Zero findings is a claim, not a default
+
+"No findings" must list what was checked and the expected outcome observed for
+each flow (oracle, not just "page loaded"). Error, quota, empty or placeholder
+text in any captured surface, including a 200 error body, is a P0 finding
+(`detectFailureSurface` in `scripts/lib/outcome-verifier.mjs`).
+
 ## Verification
 
 ```bash
