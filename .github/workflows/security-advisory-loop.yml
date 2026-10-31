@@ -54,9 +54,8 @@ jobs:
 
       - name: Generate alerts-read App token
         id: app-token
-        # The installation may lack the permission (run 40924917151); the intake
-        # then runs blind, files one grant card and the ledger counts the breach.
-        continue-on-error: true
+        # Keep token failures blocking. The intake still records blindness and
+        # files the deduped repair card when this permission is unavailable.
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
@@ -64,6 +63,7 @@ jobs:
           permission-vulnerability-alerts: read
 
       - name: Sync advisories to Linear and close the fixed-and-deployed
+        if: ${{ !cancelled() }}
         env:
           GH_TOKEN: ${{ github.token }}
           ALERTS_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -71,6 +71,7 @@ jobs:
         run: node scripts/security-advisory-intake.mjs
 
       - name: Ratchet - no advisory ages past its SLA silently
+        if: ${{ !cancelled() }}
         env:
           GH_TOKEN: ${{ github.token }}
           ALERTS_TOKEN: ${{ steps.app-token.outputs.token }}

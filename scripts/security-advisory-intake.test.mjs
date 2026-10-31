@@ -25,7 +25,10 @@ import {
   SLA_HOURS,
   slaDueAt,
 } from './lib/security-advisory-policy.mjs';
-import { stageMetrics } from './security-advisory-intake.mjs';
+import {
+  recordBlindSource,
+  stageMetrics,
+} from './security-advisory-intake.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const NOW = new Date('2026-10-25T12:00:00Z');
@@ -41,6 +44,7 @@ function cliFixture(t) {
     `#!/usr/bin/env node
 const args = process.argv.slice(2);
 require('node:fs').appendFileSync(${JSON.stringify(called)}, JSON.stringify({args, token: process.env.GH_TOKEN}) + '\\n');
+if (process.env.FIXTURE_BLIND === '1') { console.error('HTTP 403'); process.exit(1); }
 const endpoint = args.find(a => a.startsWith('repos/'));
 let body = [];
 if (endpoint.includes('/deployments?')) body = [{id: 7, environment: 'Production', created_at: '2026-10-25T12:00:00Z'}];
@@ -57,17 +61,21 @@ console.log(args.includes('--include') ? 'HTTP/2.0 200 OK\\n\\n' + json : json);
     GH_TOKEN: 'fixture-default-credential',
     GITHUB_TOKEN: '',
     ALERTS_TOKEN: 'fixture-alerts-credential',
+    LINEAR_API_KEY: '',
     JOVIE_GITHUB_CREDENTIAL: '',
     JOVIE_API_STATE_DIR: dir,
     GITHUB_REPOSITORY: 'fixture/repo',
     RECEIPT_PATH: path.join(dir, 'receipt.json'),
   };
-  const run = (args = ['--check']) =>
-    spawnSync(
+  const run = (args = ['--check']) => {
+    const result = spawnSync(
       process.execPath,
       [path.join(ROOT, 'scripts/security-advisory-intake.mjs'), ...args],
       { env, encoding: 'utf8', timeout: 10_000 }
     );
+    assert.ifError(result.error);
+    return result;
+  };
   return { dir, called, env, run };
 }
 
@@ -98,7 +106,7 @@ test('CLI preserves alert pagination and separate deployment credentials', t => 
   const result = run(['--dry-run']);
   assert.equal(result.status, 0, result.stderr);
   const receipt = JSON.parse(readFileSync(env.RECEIPT_PATH, 'utf8'));
-  assert.equal(receipt.open, 0);
+  assert.equal(receipt.open, 0, result.stdout + result.stderr);
   assert.equal(receipt.stages.latestProductionDeployAt, '2026-10-25T12:00:00Z');
   const calls = readFileSync(called, 'utf8')
     .trim()
@@ -311,7 +319,6 @@ test('loop is wired: workflow runs sync + check on the lanes clock, registry row
 });
 
 test('recordBlindSource writes a blind receipt instead of reading as zero advisories', async () => {
-  const { recordBlindSource } = await import('./security-advisory-intake.mjs');
   const dir = mkdtempSync(path.join(tmpdir(), 'secadv-blind-'));
   const receipt = path.join(dir, 'receipt.json');
   const prior = process.env.RECEIPT_PATH;
@@ -332,4 +339,77 @@ test('recordBlindSource writes a blind receipt instead of reading as zero adviso
     else process.env.RECEIPT_PATH = prior;
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('blind sync persists the repair-card result and rejects failed writes', async t => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'secadv-card-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const receiptPath = path.join(dir, 'receipt.json');
+  const priorPath = process.env.RECEIPT_PATH;
+  const priorKey = process.env.LINEAR_API_KEY;
+  process.env.RECEIPT_PATH = receiptPath;
+  process.env.LINEAR_API_KEY = 'fixture-linear-credential';
+  const request = {
+    repo: 'fixture/repo',
+    error: new Error('unreadable'),
+    now: NOW,
+  };
+  const calls = [];
+  const dependencies = {
+    resolveLabel: async () => 'devin-label',
+    upsert: async input => {
+      calls.push(input);
+      return { ok: false, action: 'failed' };
+    },
+  };
+  try {
+    await assert.rejects(
+      recordBlindSource(request, dependencies),
+      /Failed to persist/
+    );
+    const receipt = JSON.parse(readFileSync(receiptPath, 'utf8'));
+    assert.equal(receipt.blind, true);
+    assert.equal(receipt.actions[0].ok, false);
+    assert.equal(calls[0].fingerprint, 'secadv-blind-source');
+    assert.equal(calls[0].reopenTerminal, true);
+    assert.deepEqual(calls[0].createLabelIds, ['devin-label']);
+    dependencies.upsert = async () => ({ ok: true, action: 'existing' });
+    await recordBlindSource(request, dependencies);
+    assert.equal(
+      JSON.parse(readFileSync(receiptPath, 'utf8')).actions[0].ok,
+      true
+    );
+    dependencies.resolveLabel = async () => null;
+    await assert.rejects(
+      recordBlindSource(request, dependencies),
+      /label "devin" not found/
+    );
+    assert.equal(JSON.parse(readFileSync(receiptPath, 'utf8')).blind, true);
+  } finally {
+    if (priorPath === undefined) delete process.env.RECEIPT_PATH;
+    else process.env.RECEIPT_PATH = priorPath;
+    if (priorKey === undefined) delete process.env.LINEAR_API_KEY;
+    else process.env.LINEAR_API_KEY = priorKey;
+  }
+});
+
+for (const args of [['--check'], []]) {
+  test(`CLI ${args.join(' ') || 'sync'} fails closed on blindness and preserves its receipt`, t => {
+    const { env, run } = cliFixture(t);
+    env.FIXTURE_BLIND = '1';
+    const result = run(args);
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    const receipt = JSON.parse(readFileSync(env.RECEIPT_PATH, 'utf8'));
+    assert.equal(receipt.blind, true);
+    assert.equal(receipt.open, undefined);
+    assert.deepEqual(receipt.actions, []);
+  });
+}
+
+test('CLI blind dry-run records uncertainty without requiring a Linear write', t => {
+  const { env, run } = cliFixture(t);
+  env.FIXTURE_BLIND = '1';
+  const result = run(['--dry-run']);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(JSON.parse(readFileSync(env.RECEIPT_PATH, 'utf8')).blind, true);
 });

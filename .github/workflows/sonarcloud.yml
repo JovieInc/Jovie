@@ -40,6 +40,19 @@ jobs:
           echo "SONAR_TOKEN is not configured; SonarCloud analysis did not run." >&2
           exit 1
 
+      - name: Validate SonarCloud token before the scan
+        if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
+        run: |
+          # Reject dead credentials before installing dependencies or preparing coverage.
+          if ! valid="$(curl -fsS -m 20 -H "Authorization: Bearer ${SONAR_TOKEN}" https://sonarcloud.io/api/authentication/validate)"; then
+            echo "::error::SonarCloud token validation request failed; analysis did not run. Check SonarCloud connectivity and SONAR_TOKEN permissions."
+            exit 1
+          fi
+          if ! printf '%s' "$valid" | jq -e '.valid == true' >/dev/null 2>&1; then
+            echo "::error::SONAR_TOKEN is invalid or expired. Rotate it (ops/registry/credentials.json id sonarcloud-token): create a new token in SonarCloud account security and store it as the SONAR_TOKEN repository secret."
+            exit 1
+          fi
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
         with:
@@ -85,18 +98,6 @@ jobs:
           path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
-
-      - name: Validate SonarCloud token before the scan
-        if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
-        run: |
-          # An expired or revoked token surfaces as an opaque 403 on JRE
-          # metadata deep inside the scanner (runs 40798874133..40926826704,
-          # 2026-10-29). Fail here with the cause and the owner action.
-          valid="$(curl -sS -m 20 -H "Authorization: Bearer ${SONAR_TOKEN}" https://sonarcloud.io/api/authentication/validate || true)"
-          if ! printf '%s' "$valid" | grep -q '"valid":true'; then
-            echo "::error::SONAR_TOKEN is invalid or expired. Rotate it (ops/registry/credentials.json id sonarcloud-token): create a new token in SonarCloud account security and store it as the SONAR_TOKEN repository secret."
-            exit 1
-          fi
 
       - name: Disable SonarCloud automatic analysis
         if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}

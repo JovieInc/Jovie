@@ -96,9 +96,15 @@ export const BLIND_FINGERPRINT = 'secadv-blind-source';
  * "Dependabot alerts: read" permission, run 40924917151). A silent zero would
  * read as "no advisories", so write a blind receipt and file ONE owned Linear
  * card naming the grant; the findings loop counts the blind source as a breach.
- * Exits 0: the loop cannot fix a missing app permission, the card can.
+ * The check remains red while blind; syncing requires a successful repair card.
  */
-export async function recordBlindSource({ repo, error, dryRun, now }) {
+export async function recordBlindSource(
+  { repo, error, dryRun, check, now },
+  {
+    resolveLabel = resolveLabelId,
+    upsert = upsertLinearIssueByTitleFingerprint,
+  } = {}
+) {
   const receipt = {
     schema: 'jovie.security-advisory-receipt/v1',
     observedAt: now.toISOString(),
@@ -107,9 +113,18 @@ export async function recordBlindSource({ repo, error, dryRun, now }) {
     reason: String(error?.message ?? error).slice(0, 200),
     actions: [],
   };
-  if (!dryRun && process.env.LINEAR_API_KEY) {
-    const devin = await resolveLabelId('devin', process.env.LINEAR_API_KEY);
-    const r = await upsertLinearIssueByTitleFingerprint({
+  const receiptPath =
+    process.env.RECEIPT_PATH || 'security-advisory-receipt.json';
+  // Preserve evidence even if the repair-card write fails or is unconfigured.
+  writeFileSync(receiptPath, JSON.stringify(receipt, null, 2));
+  if (!dryRun && !check) {
+    if (!process.env.LINEAR_API_KEY)
+      throw new Error(
+        'LINEAR_API_KEY is required to report a blind advisory source'
+      );
+    const devin = await resolveLabel('devin', process.env.LINEAR_API_KEY);
+    if (!devin) throw new Error('Linear label "devin" not found');
+    const r = await upsert({
       fingerprint: BLIND_FINGERPRINT,
       title: `Grant Dependabot alerts read to the Jovie Bot app [${BLIND_FINGERPRINT}]`,
       description:
@@ -127,15 +142,14 @@ export async function recordBlindSource({ repo, error, dryRun, now }) {
       action: r.action,
     });
   }
-  writeFileSync(
-    process.env.RECEIPT_PATH || 'security-advisory-receipt.json',
-    JSON.stringify(receipt, null, 2)
-  );
+  writeFileSync(receiptPath, JSON.stringify(receipt, null, 2));
   console.log(JSON.stringify({ ...receipt, actions: receipt.actions.length }));
   if (process.env.GITHUB_ACTIONS === 'true')
     console.log(
       `::warning::Dependabot alerts unreadable (${receipt.reason}); loop is blind.`
     );
+  if (receipt.actions.some(action => !action.ok))
+    throw new Error('Failed to persist the blind advisory repair card');
 }
 
 async function main() {
@@ -160,7 +174,8 @@ async function main() {
   } catch (error) {
     // Quota deferral (75) is not blindness: let the caller defer the run.
     if (error.exitCode === 75) throw error;
-    await recordBlindSource({ repo, error, dryRun, now });
+    await recordBlindSource({ repo, error, dryRun, check, now });
+    if (check) process.exitCode = 1;
     return;
   }
   const deployedAt = await latestProductionDeploy(repo, process.env.GH_TOKEN);
