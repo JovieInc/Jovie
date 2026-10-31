@@ -259,6 +259,7 @@ export function useHudShippingStateQuery(kioskToken: string | null) {
     operationalTasks: query.data?.operationalTasks ?? EMPTY_OPERATIONAL_FEED,
     isPending: query.isPending && !query.data,
     isFetching: query.isFetching,
+    dataUpdatedAt: query.dataUpdatedAt,
     operationalRequestState: query.data?.operationalRequestState ?? 'idle',
     refetch: query.refetch,
   };

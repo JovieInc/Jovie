@@ -25,6 +25,11 @@ const MAX_TOTAL_CAPTURE_BYTES = 24 * 1024 * 1024;
 const PNG_SIGNATURE = Buffer.from('89504e470d0a1a0a', 'hex');
 
 export const REQUIRED_CAPTURE_VIEWPORTS = ['desktop', 'mobile'];
+export const CAPTURE_VIEWPORTS = {
+  desktop: { width: 1440, height: 900 },
+  mobile: { width: 390, height: 844 },
+  ultrawide: { width: 3440, height: 1440 },
+};
 export const MAX_CAPTURE_WORKERS = 4;
 export const DEFAULT_CAPTURE_WORKERS = 2;
 export const CRITICAL_JOURNEY_CAPTURE_SCHEMA =
@@ -35,6 +40,30 @@ const PUBLIC_CARD_CAPTURE_FILE =
   /^(?:apps\/web\/app\/\(marketing\)\/card\/|apps\/web\/data\/jovieCardCopy\.ts$)/;
 const PUBLIC_PROFILE_CAPTURE_ROUTE = '/demo/showcase/public-profile';
 const AUTHENTICATED_CHAT_CAPTURE_ROUTE = '/app/chat';
+// Ovie Home (the operator's company HUD) and its Full Screen mode. These are
+// admin-only app routes: they need the admin test-auth persona, and the
+// ultra-wide viewport is part of what Full Screen promises.
+export const OVIE_HOME_CAPTURE_ROUTE = '/app/ov';
+export const OVIE_FULLSCREEN_CAPTURE_ROUTE = '/app/ov?fullscreen=1';
+// Home -> conversation: the capture types a message and waits for the thread
+// to replace the HUD. `capture=chat` is read by the capture script only.
+export const OVIE_CHAT_CAPTURE_ROUTE = '/app/ov?capture=chat';
+export const OVIE_FULLSCREEN_CHAT_CAPTURE_ROUTE =
+  '/app/ov?fullscreen=1&capture=chat';
+export const OVIE_HOME_CAPTURE_ROUTES = [
+  OVIE_HOME_CAPTURE_ROUTE,
+  OVIE_FULLSCREEN_CAPTURE_ROUTE,
+  OVIE_CHAT_CAPTURE_ROUTE,
+  OVIE_FULLSCREEN_CHAT_CAPTURE_ROUTE,
+];
+// Any Ovie operator-app file: its evidence is the Ovie app, never marketing.
+const OVIE_SURFACE_CAPTURE_FILE =
+  /^apps\/web\/(?:components\/features\/admin\/|lib\/ovie\/|app\/app\/\(shell\)\/admin\/|app\/hud\/)/;
+const OVIE_HOME_CAPTURE_FILE =
+  /^apps\/web\/(?:components\/features\/admin\/hud\/(?:Ovie(?:HomeCanvas|CompanyHome|CompanyHud|InFlightColumn|Fullscreen|FeedBanner)|useOvie|GithubHeadroom)|lib\/ovie\/home\/|app\/app\/\(shell\)\/admin\/chat\/)/;
+// The shared chat swaps Ovie's HUD for the thread, so its changes are also
+// evidence on Ovie Home (in addition to the customer chat route).
+const OVIE_CHAT_SWAP_FILE = /^apps\/web\/components\/jovie\/JovieChat\.tsx$/;
 // Changes to the session boundary can leave a public route perfectly healthy
 // while making every authenticated surface unusable. Keep this deliberately
 // narrow: these are the files that establish the app-shell session and route
@@ -95,6 +124,74 @@ export function sanitizeCaptureText(value) {
   return sanitizeForPrompt(value)
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]')
     .slice(0, 8_000);
+}
+
+export function isOvieCaptureRoute(route) {
+  return route === '/app/ov' || String(route).startsWith('/app/ov?');
+}
+
+/** Viewports a route must be captured at. Ovie Home adds the ultra-wide. */
+export function captureViewportNamesForRoute(route) {
+  if (String(route).includes('capture=chat')) return ['desktop', 'ultrawide'];
+  return isOvieCaptureRoute(route)
+    ? ['desktop', 'mobile', 'ultrawide']
+    : REQUIRED_CAPTURE_VIEWPORTS;
+}
+
+/** Test-auth persona for a route: Ovie is admin-only, everything else is a creator. */
+export function capturePersonaForRoute(route) {
+  return isOvieCaptureRoute(route) ? 'admin' : 'creator-ready';
+}
+
+/**
+ * Guard (Tim, 2026-10-25): a capture whose route does not match the changed
+ * files fails. Independent of the routing table above, this states the
+ * invariants: files of a surface must be captured on that surface's route,
+ * and the marketing home must not stand in for an app surface. Returns
+ * failure strings.
+ */
+export function validateRoutesMatchChange(files, routes) {
+  const failures = [];
+  const list = Array.isArray(routes) ? routes : [];
+  const changed = Array.isArray(files) ? files : [];
+  if (
+    changed.some(
+      file =>
+        OVIE_HOME_CAPTURE_FILE.test(file) || OVIE_CHAT_SWAP_FILE.test(file)
+    ) &&
+    !OVIE_HOME_CAPTURE_ROUTES.every(route => list.includes(route))
+  )
+    failures.push(
+      `Ovie Home files changed but routes ${JSON.stringify(list)} do not include ${OVIE_HOME_CAPTURE_ROUTES.join(', ')}`
+    );
+  if (
+    changed.some(file => PUBLIC_CARD_CAPTURE_FILE.test(file)) &&
+    !list.includes(PUBLIC_CARD_CAPTURE_ROUTE)
+  )
+    failures.push(
+      `Card files changed but ${PUBLIC_CARD_CAPTURE_ROUTE} was not captured`
+    );
+  if (
+    changed.some(file => OVIE_SURFACE_CAPTURE_FILE.test(file)) &&
+    !list.includes(OVIE_HOME_CAPTURE_ROUTE)
+  )
+    failures.push(
+      `Ovie app files changed but ${OVIE_HOME_CAPTURE_ROUTE} was not captured`
+    );
+  if (list.includes(PUBLIC_HOME_CAPTURE_ROUTE)) {
+    const justified = changed.some(
+      file =>
+        UI_FILE.test(file) &&
+        !OVIE_SURFACE_CAPTURE_FILE.test(file) &&
+        !PUBLIC_CARD_CAPTURE_FILE.test(file) &&
+        !AUTHENTICATED_SHELL_CAPTURE_FILE.test(file)
+    );
+    if (!justified)
+      failures.push(
+        'Marketing home was captured but no changed file belongs to it'
+      );
+  }
+  return failures;
 }
 
 export function resolveCaptureJourneyId(route) {
@@ -178,11 +275,17 @@ export function routeChangedFiles(files) {
     };
   const routes = new Set();
   for (const file of changed) {
+    if (OVIE_CHAT_SWAP_FILE.test(file))
+      for (const ovieRoute of OVIE_HOME_CAPTURE_ROUTES) routes.add(ovieRoute);
     // Route only to fixtures that are present in the production build. Generic
     // UI changes belong on the public home surface; `/demo` and `/demo/admin`
     // require data/authentication that the capture runner intentionally does
     // not invent.
-    if (PUBLIC_CARD_CAPTURE_FILE.test(file))
+    if (OVIE_HOME_CAPTURE_FILE.test(file)) {
+      for (const ovieRoute of OVIE_HOME_CAPTURE_ROUTES) routes.add(ovieRoute);
+    } else if (OVIE_SURFACE_CAPTURE_FILE.test(file))
+      routes.add(OVIE_HOME_CAPTURE_ROUTE);
+    else if (PUBLIC_CARD_CAPTURE_FILE.test(file))
       routes.add(PUBLIC_CARD_CAPTURE_ROUTE);
     else if (AUTHENTICATED_SHELL_CAPTURE_FILE.test(file))
       routes.add(AUTHENTICATED_CHAT_CAPTURE_ROUTE);
@@ -208,10 +311,14 @@ export function routeChangedFiles(files) {
  * a successful run with fewer screenshots.
  *
  * @param {{ routes?: unknown, viewports?: unknown, captures?: unknown }} manifest
- * @param {{ routes?: string[], viewportNames?: string[] }} [expected]
+ * @param {{ routes?: string[], viewportNames?: string[], viewportNamesForRoute?: (route: string) => string[] }} [expected]
  */
 export function validateCaptureManifest(manifest, expected = {}) {
   const routes = expected.routes ?? manifest?.routes;
+  const viewportsForRoute =
+    typeof expected.viewportNamesForRoute === 'function'
+      ? expected.viewportNamesForRoute
+      : null;
   const viewportNames =
     expected.viewportNames ??
     (manifest?.viewports && typeof manifest.viewports === 'object'
@@ -224,7 +331,7 @@ export function validateCaptureManifest(manifest, expected = {}) {
     failures.push('no required routes');
   if (!Array.isArray(viewportNames) || viewportNames.length === 0)
     failures.push('no required viewports');
-  if (captures.length > 12)
+  if (captures.length > 16)
     failures.push(`too many captures: ${captures.length}`);
 
   const byTarget = new Map();
@@ -236,7 +343,11 @@ export function validateCaptureManifest(manifest, expected = {}) {
   }
 
   for (const route of Array.isArray(routes) ? routes : []) {
-    for (const viewport of Array.isArray(viewportNames) ? viewportNames : []) {
+    for (const viewport of viewportsForRoute
+      ? viewportsForRoute(route)
+      : Array.isArray(viewportNames)
+        ? viewportNames
+        : []) {
       const key = `${route}::${viewport}`;
       const capture = byTarget.get(key);
       if (!capture) {

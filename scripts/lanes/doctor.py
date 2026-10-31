@@ -2001,7 +2001,18 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "autoscale": _autoscale_block(host),
             "machine": _machine_block(host),
             # Real-limit record (jovie.capacity-limit): which measured limit holds lanes back.
-            "capacityLimit": _capacity_limit_block(host)}
+            "capacityLimit": _capacity_limit_block(host),
+            # GitHub API headroom (jovie-actions-quota-headroom/v1) for Ovie Fleet.
+            "githubHeadroom": _github_headroom_block(host)}
+
+
+def _github_headroom_block(host) -> dict | None:
+    """Cached headroom report; refreshes in the background, never blocks the tick."""
+    try:
+        import github_headroom
+        return github_headroom.read_block(host.state, host.repo)
+    except Exception:  # the feed never fails on an optional record
+        return None
 
 
 def _capacity_limit_block(host) -> dict | None:

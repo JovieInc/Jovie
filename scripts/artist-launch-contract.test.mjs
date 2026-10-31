@@ -159,8 +159,29 @@ test('checks fail on new, removed and renamed routes until the inventory is revi
       'apps/web/app/unreviewed/page.tsx',
       'export default function Page() {}'
     );
-    assert.throws(() => main(['--check'], root), /inventory drift/);
+    const saved = readFileSync(join(root, MANIFEST), 'utf8');
+    assert.throws(
+      () => main(['--check'], root),
+      error => {
+        assert.ok(error instanceof Error);
+        assert.match(error.message, /inventory drift/);
+        assert.match(error.message, /apps\/web\/app\/unreviewed\/page\.tsx/);
+        assert.match(
+          error.message,
+          /node scripts\/artist-launch-contract\.mjs --write/
+        );
+        return true;
+      }
+    );
+    assert.equal(readFileSync(join(root, MANIFEST), 'utf8'), saved);
+    main(['--write'], root);
+    assert.match(main(['--check'], root), /records/);
     rmSync(join(root, 'apps/web/app/unreviewed/page.tsx'));
+    assert.throws(
+      () => main(['--check'], root),
+      /apps\/web\/app\/unreviewed\/page\.tsx/
+    );
+    main(['--write'], root);
     rmSync(join(root, 'apps/web/app/signin/page.tsx'));
     assert.throws(() => main(['--check'], root), /orphan (entry|route)/);
   }));

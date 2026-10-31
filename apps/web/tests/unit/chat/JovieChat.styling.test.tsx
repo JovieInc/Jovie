@@ -780,7 +780,7 @@ describe('JovieChat styling regressions', () => {
     expect(container.querySelector('[data-testid="chat-usage"]')).toBeNull();
   });
 
-  it('keeps a living Home canvas as the surface after messages, with the transcript on request', () => {
+  it('an active chat replaces a living Home canvas; Back To Home returns and the canvas can reopen the thread', () => {
     const states: { isStreaming: boolean; count: number }[] = [];
     const { container, getByRole } = renderWithQueryClient(
       <JovieChat
@@ -801,6 +801,13 @@ describe('JovieChat styling regressions', () => {
       />
     );
 
+    // A reply is streaming, so the conversation owns the surface.
+    expect(
+      container.querySelector('[data-testid="chat-empty-state-viewport"]')
+    ).toBeNull();
+    act(() => {
+      getByRole('button', { name: 'Back To Home' }).click();
+    });
     expect(
       container
         .querySelector('[data-testid="chat-empty-state-viewport"]')
@@ -818,12 +825,6 @@ describe('JovieChat styling regressions', () => {
     expect(
       container.querySelector('[data-testid="chat-empty-state-viewport"]')
     ).toBeNull();
-    act(() => {
-      getByRole('button', { name: 'Back To Home' }).click();
-    });
-    expect(
-      container.querySelector('[data-testid="chat-empty-state-viewport"]')
-    ).toBeTruthy();
   });
 
   it('keeps the bare Jovie empty state when no Home canvas is supplied', () => {

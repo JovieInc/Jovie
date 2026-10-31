@@ -29,6 +29,11 @@ describe('Shipping query contract', () => {
   };
   it.each([
     ['measured', measured, measured],
+    [
+      'legacy quota omitted',
+      { ...measured, lanes: { ...measured.lanes, githubHeadroom: undefined } },
+      measured,
+    ],
     ['missing', undefined, empty],
     ['null', null, empty],
     ['invalid', { lanes: { running: 'invalid' } }, empty],

@@ -184,6 +184,44 @@ describe('lanes-status deployHealth block', () => {
 });
 
 describe('lanes-status (symphony-lanes-status/v1 gist)', () => {
+  it('carries the github headroom block through, and drops a malformed one without losing the lanes', async () => {
+    const quotaWindow = {
+      bucket: 'github-token',
+      windowStart: '2026-09-27T01:00:00.000Z',
+      limit: 5000,
+      samples: 12,
+      minRemaining: 0,
+      medianRemaining: 389,
+      exhaustedSamples: 3,
+      emptyShare: 0.25,
+    };
+    const report = {
+      schema: 'jovie-actions-quota-headroom/v1',
+      generatedAt: '2026-09-27T01:58:00.000Z',
+      windows: [quotaWindow],
+    };
+    const ok = await readLanesStatus(
+      io(async () => json({ ...LANES_FEED, githubHeadroom: report }))
+    );
+    expect(ok).toMatchObject({
+      status: 'ok',
+      delivery: { lanes: { githubHeadroom: { windows: [quotaWindow] } } },
+    });
+    const bad = await readLanesStatus(
+      io(async () =>
+        json({ ...LANES_FEED, githubHeadroom: { schema: 'other/v1' } })
+      )
+    );
+    expect(bad).toMatchObject({
+      status: 'ok',
+      delivery: { lanes: { githubHeadroom: null, running: { value: 7 } } },
+    });
+    const absent = await readLanesStatus(io(async () => json(LANES_FEED)));
+    expect(absent).toMatchObject({
+      delivery: { lanes: { githubHeadroom: null } },
+    });
+  });
+
   it('reads running / slots / pool / alerts from the published feed', async () => {
     const live = io(async () => json(LANES_FEED));
     const read = await readLanesStatus(live);

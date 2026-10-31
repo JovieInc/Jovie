@@ -443,6 +443,9 @@ describe('HomeLoopAnswerPanel', () => {
     expect(handlers.onOpenTranscript).toHaveBeenCalledOnce();
     expect(handlers.onHome).toHaveBeenCalledOnce();
     expect(screen.getByTestId('home-loop-answer')).toHaveTextContent('1 of 2');
+    expect(screen.getByTestId('home-loop-answer')).toHaveTextContent(
+      'You asked: Status?'
+    );
   });
 
   it('replaces the in-flight rows when generated UI updates them in place', () => {

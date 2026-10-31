@@ -53,7 +53,8 @@ export function HomeLoopAnswerPanel({
     >
       <header className='flex items-center gap-2'>
         <p className='min-w-0 flex-1 truncate text-xs text-tertiary-token'>
-          {prompt}
+          <span className='font-medium text-secondary-token'>You asked</span>
+          {`: ${prompt}`}
         </p>
         <span className='text-2xs tabular-nums text-tertiary-token'>
           {`${position} of ${total}`}

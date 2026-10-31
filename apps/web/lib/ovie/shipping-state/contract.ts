@@ -6,6 +6,7 @@
  * becomes now, zero, healthy, or blank.
  */
 
+import type { HeadroomReport } from '@/lib/ovie/home/github-headroom';
 import type { CapacityHorizon } from './capacity';
 
 export const SHIPPING_STATE_SCHEMA = 'ovie.shipping-state.v1' as const;
@@ -473,6 +474,8 @@ export type DeliveryLanes = {
    */
   readonly stageSummary?: StageSummary | null;
   readonly flow?: DeliveryFlow | null;
+  /** GitHub API headroom (`jovie-actions-quota-headroom/v1`); null until published. */
+  readonly githubHeadroom?: HeadroomReport | null;
   /** Production deploy failure and lag per repo (Jovie, LogYourBody). Null when the feed does not publish it. */
   readonly deployHealth?: DeployHealth | null;
   readonly publishedAt: string | null;
@@ -642,6 +645,7 @@ export function emptyDeliverySummary(): DeliverySummary {
       heldByReason: {},
       failedByReason: {},
       capacity: null,
+      githubHeadroom: null,
       stageSummary: null,
       deployHealth: null,
       publishedAt: null,

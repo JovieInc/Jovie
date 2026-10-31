@@ -329,12 +329,26 @@ export function main(args, root = ROOT) {
   if (args[0] === '--write') {
     mkdirSync(dirname(output), { recursive: true });
     writeFileSync(output, serialized);
-  } else if (
-    serializeManifest(JSON.parse(readFileSync(output, 'utf8'))) !== serialized
-  )
-    throw new Error(
-      'launch inventory drift: classify/review new routes and regenerate the manifest'
-    );
+  } else {
+    const saved = JSON.parse(readFileSync(output, 'utf8'));
+    if (serializeManifest(saved) !== serialized) {
+      const before = new Set(saved.inventory.map(row => JSON.stringify(row)));
+      const after = new Set(manifest.inventory.map(row => JSON.stringify(row)));
+      const changed = [
+        ...new Set(
+          [
+            ...saved.inventory.filter(row => !after.has(JSON.stringify(row))),
+            ...manifest.inventory.filter(
+              row => !before.has(JSON.stringify(row))
+            ),
+          ].map(row => row.source)
+        ),
+      ].sort();
+      throw new Error(
+        `launch inventory drift: classify/review changed routes${changed.length ? ` (${changed.join(', ')})` : ''}; run node scripts/artist-launch-contract.mjs --write`
+      );
+    }
+  }
   return `artist launch contract: ${manifest.inventory.length} records; runtime UNVERIFIED`;
 }
 

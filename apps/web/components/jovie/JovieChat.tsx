@@ -543,16 +543,36 @@ export function JovieChat({
   // Pin mode uses the thread chrome (docked composer + header) so the card
   // stays above the transcript, matching inbox → pinned-card behavior.
   const livingCanvas = homeCanvas != null && homeCanvasMode === 'living';
-  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  // A living canvas (Ovie Home) opens on the HUD, never on a restored thread.
+  // The first message sent replaces the HUD with the conversation, like a new
+  // chat becoming a thread; Back To Home (or Esc on an empty composer) returns.
+  const [homeOpen, setHomeOpen] = useState(true);
   const hasThread =
     conversationExists || conversationInProgress || pinnedOpportunity !== null;
-  // A living canvas keeps owning the surface after messages arrive; the
-  // transcript is an explicit disclosure.
-  const showThreadView = hasThread && (!livingCanvas || transcriptOpen);
+  const showThreadView = hasThread && (!livingCanvas || !homeOpen);
   const showBottomComposer = showThreadView;
   // Shared shell (founder decision 2026-10-20): any persona may supply a
   // living Home canvas that owns the empty state above the docked composer.
   const showHomeCanvas = homeCanvas != null && !showThreadView;
+  const chatActive = isSubmitting || isStreaming;
+  useEffect(() => {
+    if (livingCanvas && chatActive) setHomeOpen(false);
+  }, [livingCanvas, chatActive]);
+  useEffect(() => {
+    if (!livingCanvas || !showThreadView || chatActive) return;
+    // Capture phase and stopImmediatePropagation: on a thread Esc means "back
+    // to the HUD" before it means "leave Full Screen".
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      // A typed draft keeps Esc for itself: only an empty composer goes home.
+      if (draft.getSnapshot().trim()) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setHomeOpen(true);
+    };
+    globalThis.addEventListener('keydown', onKey, true);
+    return () => globalThis.removeEventListener('keydown', onKey, true);
+  }, [livingCanvas, showThreadView, chatActive, draft]);
   const hasDraftIntent = useComposerDraftIntent(
     draft,
     !showThreadView && !showHomeCanvas
@@ -939,9 +959,17 @@ export function JovieChat({
         >
           <div
             ref={scrollContainerRef}
+            // Remount on HUD <-> thread so the swap fades in (calm, quick,
+            // none under reduced motion). Other personas never remount.
+            key={livingCanvas ? (showThreadView ? 'thread' : 'home') : 'static'}
             data-testid='chat-message-scroll'
+            data-surface={
+              livingCanvas ? (showThreadView ? 'thread' : 'home') : undefined
+            }
             className={cn(
               'absolute inset-0 overflow-y-auto',
+              livingCanvas &&
+                'animate-in fade-in-0 duration-fast ease-subtle motion-reduce:animate-none',
               showThreadView
                 ? 'px-4 py-5 sm:px-5'
                 : CHAT_EMPTY_VIEWPORT_CLASSNAME,
@@ -974,7 +1002,7 @@ export function JovieChat({
                             messages,
                             isStreaming:
                               status === 'submitted' || status === 'streaming',
-                            onOpenTranscript: () => setTranscriptOpen(true),
+                            onOpenTranscript: () => setHomeOpen(false),
                           })
                         : homeCanvas
                     }
@@ -1019,7 +1047,7 @@ export function JovieChat({
                       type='button'
                       variant='ghost'
                       size='sm'
-                      onClick={() => setTranscriptOpen(false)}
+                      onClick={() => setHomeOpen(true)}
                       data-testid='chat-back-to-home-canvas'
                     >
                       Back To Home

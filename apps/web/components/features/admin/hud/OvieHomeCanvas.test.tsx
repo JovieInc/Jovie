@@ -1,15 +1,15 @@
+import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HomeCanvasState } from '@/components/jovie/types';
-import { mockFitLayout } from '@/components/organisms/home-loop/fit-layout.test-utils';
 import { HOME_LOOP_UNDO_WINDOW_MS } from '@/components/organisms/home-loop/useUndoableAnswers';
-import { APP_ROUTES } from '@/constants/routes';
 import type { OvieInbox } from '@/lib/ovie/inbox';
 import { INTERACTION_CASE_CONTRACT } from '@/lib/ovie/interaction-case';
 import { SUMMER_OPS_CARD_SCHEMA } from '@/lib/ovie/ops-card';
 import { emptyDeliverySummary } from '@/lib/ovie/shipping-state/contract';
 import { OvieHomeCanvas } from './OvieHomeCanvas';
+import type { OvieFullscreenState } from './useOvieFullscreen';
 
 const toastMock = vi.hoisted(() =>
   Object.assign(vi.fn(), {
@@ -23,6 +23,60 @@ vi.mock('@/components/feedback', () => ({ toast: toastMock }));
 const readyTiming = vi.hoisted(() => vi.fn());
 vi.mock('./useOvieHomeReadyTiming', () => ({
   useOvieHomeReadyTiming: readyTiming,
+}));
+
+const company = vi.hoisted(() => ({
+  metrics: {
+    isPending: false,
+    data: {
+      overview: {
+        mrrUsd: 0,
+        activeSubscribers: 0,
+        balanceUsd: 22.96,
+        burnRateUsd: 110,
+        runwayMonths: 0.2,
+        defaultStatus: 'dead',
+        defaultStatusDetail: 'Revenue growth is not yet outpacing burn.',
+        financialDataAvailable: true,
+        weekAgo: { mrrUsd: 0, activeSubscribers: 0 },
+      },
+      reliability: { incidents24h: 0, unresolvedSentryIssues24h: 0 },
+    } as unknown,
+  },
+  funnel: {
+    isPending: false,
+    data: {
+      stages: [
+        {
+          key: 'chats',
+          label: 'Onboarding chats',
+          description: '',
+          count: 3,
+          conversionRate: null,
+          dropOff: null,
+          identifiable: false,
+          drillDownHref: null,
+        },
+        {
+          key: 'paid',
+          label: 'Paid',
+          description: '',
+          count: 0,
+          conversionRate: 0,
+          dropOff: 3,
+          identifiable: true,
+          drillDownHref: null,
+        },
+      ],
+      timeRange: '7d',
+      biggestDropOffKey: 'paid',
+      errors: [],
+      definitionVersion: 'founder-funnel.v2',
+    } as unknown,
+  },
+}));
+vi.mock('./useOvieCompanyQueries', () => ({
+  useOvieCompanyQueries: () => company,
 }));
 
 const shipping = vi.hoisted(() => ({
@@ -108,15 +162,33 @@ function snapshot() {
   };
 }
 
-function renderCanvas(chat?: HomeCanvasState) {
+const fullscreenStub = (over: Partial<OvieFullscreenState> = {}) => ({
+  on: false,
+  toggle: vi.fn(),
+  inDesktopApp: false,
+  ...over,
+});
+
+function renderCanvas(
+  chat?: HomeCanvasState,
+  fullscreen: OvieFullscreenState = fullscreenStub()
+) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return render(
+  const tree = (next?: HomeCanvasState) => (
     <QueryClientProvider client={client}>
-      <OvieHomeCanvas chat={chat} />
+      <TooltipProvider>
+        <OvieHomeCanvas chat={next} fullscreen={fullscreen} />
+      </TooltipProvider>
     </QueryClientProvider>
   );
+  const utils = render(tree(chat));
+  return {
+    ...utils,
+    /** Same query client and component instance, new chat state (a new turn arrives). */
+    rerenderCanvas: (next: HomeCanvasState) => utils.rerender(tree(next)),
+  };
 }
 
 function opsCard(kind: 'shipping' | 'revenue', title: string) {
@@ -177,6 +249,7 @@ describe('OvieHomeCanvas', () => {
 
   beforeEach(() => {
     readyTiming.mockReset();
+    globalThis.localStorage.clear();
     shipping.data = snapshot();
     inbox = INBOX;
     toastMock.mockClear();
@@ -195,93 +268,42 @@ describe('OvieHomeCanvas', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders the company loop from shipping state and the inbox', async () => {
+  it('renders the company tiles and the decisions that block the operator', async () => {
     renderCanvas();
     expect(
       await screen.findByText('Vercel on-demand concurrency')
     ).toBeVisible();
-    expect(screen.getByTestId('home-loop-constraint')).toHaveTextContent(
-      '1 item is blocked'
-    );
-    expect(screen.getByTestId('home-loop-done')).toHaveTextContent('3 merges');
-    const strip = screen.getByTestId('home-loop-stage-strip');
-    expect(strip).toHaveTextContent('Not measured');
-    expect(strip).toHaveTextContent('Stage events not published yet');
-    expect(within(strip).queryByTestId('home-loop-strip-item')).toBeNull();
-    expect(screen.getByTestId('home-loop-kanban-card')).toHaveAttribute(
-      'data-attention',
-      'blocked'
-    );
+    const tile = (id: string) => screen.getByTestId(`ovie-tile-${id}`);
+    expect(tile('alive')).toHaveTextContent('Dead');
+    expect(tile('alive')).toHaveTextContent('$22.96 cash');
+    expect(tile('revenue')).toHaveTextContent('$0.00');
+    expect(tile('funnel')).toHaveTextContent('3 → 0');
+    expect(tile('shipping')).toHaveTextContent('3');
+    expect(tile('blocked')).toHaveTextContent('1');
+    expect(screen.getByTestId('home-loop-done-section')).toHaveTextContent('3');
   });
 
-  it('renders live stage spans and measurement coverage', () => {
-    const base = snapshot();
-    shipping.data = {
-      ...base,
-      view: {
-        ...base.view,
-        delivery: {
-          ...base.view.delivery,
-          lanes: {
-            ...base.view.delivery.lanes,
-            stageSummary: {
-              at: '2026-10-21T12:00:00.000Z',
-              stagesTotal: 31,
-              stagesWithData: 14,
-              regressions: [],
-              slowestP95: [],
-              endToEnd7d: [
-                {
-                  pipeline: 'shipping:pr-open->merged',
-                  p50: 2280,
-                  p95: 102600,
-                  n: 571,
-                  regressed: false,
-                },
-              ],
-            },
-          },
-        },
-      },
-    };
+  it('cuts the ledger from Home: no stage strip, no in-flight board, no pulse counters', async () => {
     renderCanvas();
-    const strip = screen.getByRole('region', {
-      name: 'Stage Time 7d (P50 / P95)',
-    });
-    expect(strip).toHaveTextContent('Shipping · PR Open → Merged 38m / 29h');
-    expect(strip).toHaveTextContent('14 of 31 stages measured');
-    expect(strip).not.toHaveTextContent('Not measured');
-  });
-
-  it('links overflowing in-flight tasks to the shipping surface', () => {
-    const base = snapshot();
-    shipping.data = {
-      ...base,
-      operationalTasks: {
-        ...base.operationalTasks,
-        tasks: Array.from({ length: 4 }, (_, index) => ({
-          ...base.operationalTasks.tasks[0],
-          id: `linear:JOV-${index + 1}`,
-          linearIdentifier: `JOV-${index + 1}`,
-        })),
-      },
-    };
-    const restore = mockFitLayout('home-loop-kanban-cards', 150);
-    try {
-      renderCanvas();
-      const more = screen.getByRole('link', { name: '+3 more' });
-      expect(more).toHaveAttribute('href', APP_ROUTES.ADMIN_SHIPPING);
-    } finally {
-      restore();
+    await screen.findByText('Vercel on-demand concurrency');
+    for (const gone of [
+      'home-loop-stage-strip',
+      'home-loop-kanban-card',
+      'home-loop-pulse',
+      'home-loop-constraint',
+      'home-loop-in-flight-section',
+    ]) {
+      expect(screen.queryByTestId(gone)).toBeNull();
     }
   });
 
-  it('shows loading while shipping state has not arrived', () => {
+  it('keeps the tile frame while any source has not answered', () => {
     shipping.data = undefined;
     renderCanvas();
-    expect(screen.getByTestId('home-loop-in-flight-section')).toHaveAttribute(
-      'data-state',
-      'loading'
+    expect(screen.getAllByTestId('ovie-tile-loading')).toHaveLength(6);
+    expect(screen.getByTestId('ovie-company-hud')).toHaveAttribute(
+      'aria-busy',
+      'true'
     );
   });
 
@@ -297,7 +319,7 @@ describe('OvieHomeCanvas', () => {
       },
     };
     renderCanvas();
-    expect(screen.getByTestId('home-loop-in-flight-section')).toHaveAttribute(
+    expect(screen.getByTestId('home-loop-done-section')).toHaveAttribute(
       'data-state',
       'loading'
     );
@@ -318,12 +340,12 @@ describe('OvieHomeCanvas', () => {
         },
       };
       renderCanvas();
-      expect(screen.getByTestId('home-loop-in-flight-section')).toHaveAttribute(
+      expect(screen.getByTestId('home-loop-done-section')).toHaveAttribute(
         'data-state',
         'error'
       );
       expect(
-        within(screen.getByTestId('home-loop-in-flight-section')).getByText(
+        within(screen.getByTestId('home-loop-done-section')).getByText(
           'Shipping data could not load.'
         )
       ).toBeVisible();
@@ -332,19 +354,18 @@ describe('OvieHomeCanvas', () => {
     }
   );
 
-  it('keeps reconciled tasks visible when a later shipping read fails', () => {
-    const base = snapshot();
-    shipping.data = {
-      ...base,
-      view: { ...base.view, connection: 'disconnected' },
-      operationalRequestState: 'error',
-    };
+  it('says Not measured for a failed company source instead of holding the HUD in skeleton', async () => {
+    company.metrics = { isPending: false, data: undefined };
     renderCanvas();
-    expect(screen.getByTestId('home-loop-in-flight-section')).toHaveAttribute(
-      'data-state',
-      'populated'
+    await screen.findByText('Vercel on-demand concurrency');
+    expect(screen.getByTestId('ovie-tile-alive')).toHaveTextContent(
+      'Not measured'
     );
-    expect(screen.getByText('Blocked task')).toBeVisible();
+    expect(screen.getByTestId('ovie-tile-alive')).toHaveAttribute(
+      'data-measured',
+      'false'
+    );
+    expect(screen.getByTestId('ovie-tile-funnel')).toHaveTextContent('3 → 0');
   });
 
   it('records an approval only after the undo window closes', async () => {
@@ -594,19 +615,29 @@ describe('OvieHomeCanvas', () => {
     ).toHaveAttribute('href', '/app/ov/inbox');
   });
 
-  it('renders the latest turn in place and restores earlier canvas states', async () => {
-    const chat = chatState();
-    renderCanvas(chat);
+  it('restored chat history does not take over Home (no stale hi card on open)', async () => {
+    renderCanvas(chatState());
     await screen.findByText('Vercel on-demand concurrency');
+    expect(screen.queryByTestId('home-loop-answer')).toBeNull();
+    expect(screen.getByTestId('ovie-company-home')).toBeInTheDocument();
+  });
 
-    const answer = screen.getByTestId('home-loop-answer');
-    expect(answer).toHaveTextContent('Shipping?');
+  it('renders a new turn in place and restores earlier canvas states', async () => {
+    const full = chatState();
+    const chat = { ...full, messages: full.messages.slice(0, 2) };
+    const { rerenderCanvas } = renderCanvas(chat);
+    await screen.findByText('Vercel on-demand concurrency');
+    expect(screen.queryByTestId('home-loop-answer')).toBeNull();
+    rerenderCanvas({ ...full, onOpenTranscript: chat.onOpenTranscript });
+
+    const answer = await screen.findByTestId('home-loop-answer');
+    expect(answer).toHaveTextContent('You asked: Shipping?');
     expect(answer).toHaveTextContent('2 of 2');
     // Shipping cards update the in-flight section in place.
     expect(
       screen.getByTestId('home-loop-in-flight-generated')
     ).toHaveTextContent('Shipping Now');
-    expect(screen.queryByTestId('home-loop-kanban-card')).toBeNull();
+    expect(screen.queryByTestId('ovie-shipped-list')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Previous Answer' }));
     expect(screen.getByTestId('home-loop-answer')).toHaveTextContent(
@@ -615,13 +646,21 @@ describe('OvieHomeCanvas', () => {
     expect(screen.getByTestId('home-loop-answer')).toHaveTextContent(
       'Monthly Revenue'
     );
-    expect(screen.getByTestId('home-loop-kanban-card')).toBeVisible();
+    expect(screen.queryByTestId('home-loop-in-flight-generated')).toBeNull();
+    expect(screen.getByTestId('home-loop-done-section')).toHaveTextContent('3');
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Conversation' }));
     expect(chat.onOpenTranscript).toHaveBeenCalledOnce();
 
     fireEvent.click(screen.getByTestId('home-loop-answer-home'));
     expect(screen.queryByTestId('home-loop-answer')).toBeNull();
+  });
+
+  it('never claims an empty pipeline it did not measure (all-clear guard)', async () => {
+    renderCanvas();
+    await screen.findByText('Vercel on-demand concurrency');
+    expect(screen.queryByText('No work in flight.')).toBeNull();
+    expect(screen.queryByText('Nothing is blocking shipping')).toBeNull();
   });
 
   it('reserves the answer slot while a reply streams', async () => {
@@ -643,5 +682,34 @@ describe('OvieHomeCanvas', () => {
       'pending'
     );
     expect(screen.getByTestId('home-loop-answer-pending')).toBeVisible();
+  });
+});
+
+describe('Home full screen', () => {
+  it('has a labelled toggle that asks the owner of the state to flip', async () => {
+    const fullscreen = fullscreenStub();
+    renderCanvas(undefined, fullscreen);
+    const toggle = await screen.findByTestId('ovie-fullscreen-toggle');
+    expect(toggle).toHaveAccessibleName(/^Full Screen/);
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(toggle);
+    expect(fullscreen.toggle).toHaveBeenCalledOnce();
+  });
+
+  it('on: scales the same Home inside the frame and offers a way out, no portal', async () => {
+    const fullscreen = fullscreenStub({ on: true });
+    const { container } = renderCanvas(undefined, fullscreen);
+    const frame = await screen.findByTestId('ovie-fullscreen');
+    expect(container.contains(frame)).toBe(true);
+    expect(within(frame).getByTestId('ovie-company-home')).toBeInTheDocument();
+    const exit = screen.getByTestId('ovie-fullscreen-toggle');
+    expect(exit).toHaveAccessibleName(/^Exit Full Screen/);
+    expect(exit).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('off: no frame', async () => {
+    renderCanvas();
+    await screen.findByTestId('ovie-company-home');
+    expect(screen.queryByTestId('ovie-fullscreen')).toBeNull();
   });
 });

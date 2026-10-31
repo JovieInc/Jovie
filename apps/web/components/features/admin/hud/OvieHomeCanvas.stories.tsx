@@ -66,6 +66,9 @@ const meta = {
   title: 'Features/Admin/Hud/OvieHomeCanvas',
   beforeEach: stubHomeFetch,
   component: OvieHomeCanvas,
+  args: {
+    fullscreen: { on: false, toggle: () => undefined, inDesktopApp: false },
+  },
   parameters: { layout: 'fullscreen' },
   decorators: [
     Story => (

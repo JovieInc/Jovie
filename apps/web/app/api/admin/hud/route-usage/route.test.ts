@@ -14,47 +14,112 @@ vi.mock('@/lib/ovie/route-usage.server', () => ({
   recordOvieRouteView: mocks.record,
 }));
 
-const url = 'https://example.test/api/admin/hud/route-usage';
-const post = (body: string) => POST(new Request(url, { method: 'POST', body }));
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.entitlements.mockResolvedValue({
+    isAuthenticated: true,
+    isAdmin: true,
+  });
+  mocks.record.mockResolvedValue(true);
+  mocks.read.mockResolvedValue([]);
+});
 
 describe('Ovie route usage access', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.entitlements.mockResolvedValue({
-      isAuthenticated: true,
-      isAdmin: true,
-    });
-    mocks.record.mockResolvedValue(true);
-    mocks.read.mockResolvedValue({ measured: true, rows: [] });
-  });
-
-  it.each([
-    [false, false, 401],
-    [true, false, 403],
-  ])(
-    'denies both methods before storage access (%s, %s)',
-    async (isAuthenticated, isAdmin, status) => {
-      mocks.entitlements.mockResolvedValue({ isAuthenticated, isAdmin });
-      for (const response of [await GET(new Request(url)), await post('{}')]) {
-        expect(response.status).toBe(status);
-        expect(response.headers.get('cache-control')).toBe('no-store');
-      }
+  for (const handler of [GET, POST]) {
+    it(`denies anonymous and non-admin ${handler.name} before accessing usage`, async () => {
+      mocks.entitlements.mockResolvedValue({
+        isAuthenticated: false,
+        isAdmin: false,
+      });
+      expect(
+        (
+          await handler(
+            new Request('https://example.com/api/admin/hud/route-usage')
+          )
+        ).status
+      ).toBe(401);
+      mocks.entitlements.mockResolvedValue({
+        isAuthenticated: true,
+        isAdmin: false,
+      });
+      expect(
+        (
+          await handler(
+            new Request('https://example.com/api/admin/hud/route-usage')
+          )
+        ).status
+      ).toBe(403);
       expect(mocks.read).not.toHaveBeenCalled();
       expect(mocks.record).not.toHaveBeenCalled();
-    }
-  );
+    });
+  }
 
-  it('uses audited read access for observations and normalizes recorded routes', async () => {
-    const response = await post(
-      JSON.stringify({ path: '/app/admin/ops?secret=ignored' })
+  it('records a canonical route template with the audited observation scope', async () => {
+    const response = await POST(
+      new Request('https://example.com/api/admin/hud/route-usage', {
+        method: 'POST',
+        body: JSON.stringify({ path: '/app/ov?secret=discarded' }),
+      })
     );
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ recorded: true });
+    expect(mocks.entitlements).toHaveBeenCalledWith({ purpose: 'read' });
+    expect(mocks.record).toHaveBeenCalledWith('home');
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+  });
+
+  it('rejects malformed and non-Ovie paths without recording usage', async () => {
+    for (const body of ['invalid', JSON.stringify({ path: '/outside' })]) {
+      expect(
+        (
+          await POST(
+            new Request('https://example.com/api/admin/hud/route-usage', {
+              method: 'POST',
+              body,
+            })
+          )
+        ).status
+      ).toBe(400);
+    }
+    expect(mocks.record).not.toHaveBeenCalled();
+  });
+
+  it('reports an unavailable usage write as accepted rather than recorded', async () => {
+    mocks.record.mockResolvedValue(false);
+    const response = await POST(
+      new Request('https://example.com/api/admin/hud/route-usage', {
+        method: 'POST',
+        body: JSON.stringify({ path: '/app/ov' }),
+      })
+    );
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({ recorded: false });
+  });
+
+  it('normalizes legacy observations and reads the requested period', async () => {
+    mocks.read.mockResolvedValue({ measured: true, rows: [] });
+    const recorded = await POST(
+      new Request('https://example.test/api/admin/hud/route-usage', {
+        method: 'POST',
+        body: JSON.stringify({ path: '/app/admin/ops?secret=ignored' }),
+      })
+    );
+    expect(recorded.status).toBe(200);
     expect(mocks.record).toHaveBeenCalledWith('ops');
-    const read = await GET(new Request(`${url}?days=7`));
+    const read = await GET(
+      new Request('https://example.test/api/admin/hud/route-usage?days=7')
+    );
     expect(read.status).toBe(200);
     expect(await read.json()).toEqual({ measured: true, rows: [] });
     expect(mocks.read).toHaveBeenCalledWith(7);
-    expect(mocks.entitlements).toHaveBeenCalledWith({ purpose: 'read' });
+    expect(read.headers.get('cache-control')).toBe('no-store');
+  });
+
+  it('falls back to the default read period for an invalid number', async () => {
+    const response = await GET(
+      new Request('https://example.com/api/admin/hud/route-usage?days=invalid')
+    );
+    expect(mocks.read).toHaveBeenCalledWith(30);
+    expect(response.status).toBe(200);
   });
 });

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { parseHeadroomReport } from '@/lib/ovie/home/github-headroom';
 import { type CapacityHorizon, capacityHorizonSchema } from './capacity';
 import {
   DELIVERY_MERGE_REPOS,
@@ -165,6 +166,11 @@ const deliveryLanesSchema = z.object({
   heldByReason: z.record(z.string(), z.number().int().nonnegative()),
   failedByReason: z.record(z.string(), z.number().int().nonnegative()),
   capacity: capacityHorizonSchema.nullable().optional().default(null),
+  // A malformed block reads as not published; it never discards the lanes.
+  githubHeadroom: z
+    .unknown()
+    .optional()
+    .transform(value => parseHeadroomReport(value)),
   deployHealth: z
     .object({
       observedAt: z.string().nullable(),

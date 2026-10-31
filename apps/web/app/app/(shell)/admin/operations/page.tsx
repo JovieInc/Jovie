@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { FleetVerdictPanel } from '@/components/features/admin/hud/FleetVerdictPanel';
+import { GithubHeadroomPanel } from '@/components/features/admin/hud/GithubHeadroomPanel';
 import { HudSystemHealthStrip } from '@/components/features/admin/hud/HudSystemHealthStrip';
 import { OperationalTasksPanel } from '@/components/features/admin/hud/OperationalTasksPanel';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
@@ -28,6 +29,7 @@ export default async function OperationsPage() {
         label='Fleet Views'
       />
       <FleetVerdictPanel />
+      <GithubHeadroomPanel />
       <HudSystemHealthStrip metrics={metrics} presentation='page' />
       <OperationalTasksPanel presentation='page' />
       <nav aria-label='Related Operations'>
