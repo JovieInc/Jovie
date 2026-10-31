@@ -3135,6 +3135,35 @@ console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
                 events.repair_evidence_body(self.PR, body, win_evidence=invalid)
 
+    def test_win_repair_preserves_fenced_red_logs_and_passes_fleet(self):
+        win = ("## Win\n- Claim: Generation converges in one pass\n- Area: ci\n"
+               "- Theme: merge-throughput\n"
+               "- Metric: generation passes | runs | lower | 2 | 1 | regression fixture | pnpm test\n"
+               "- Verify: https://github.com/JovieInc/Jovie/pull/23665\n")
+        bodies = []
+        for fence in ("```", "~~~"):
+            for newline in ("\n", "\r\n"):
+                for placeholder in ("", "## Win\n\n", "## Win\n- none\n"):
+                    original = ("## Red-before-green\n- Failing command: `node probe.mjs`\n"
+                                "- Failing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/41220044050\n\n"
+                                + fence + "text\nFAIL diagnostic\n## Win\n## Diagnostic\n"
+                                + fence + "\n\n## Proof\nKeep this.\n").replace("\n", newline)
+                    with self.subTest(fence=fence, newline=newline, placeholder=placeholder):
+                        body = original + placeholder.replace("\n", newline)
+                        updated = events.repair_evidence_body(self.PR, body, win_evidence=win)
+                        self.assertTrue(updated.startswith(original))
+                        self.assertTrue(updated.rstrip().endswith(win.rstrip()))
+                        self.assertEqual(events.repair_evidence_body(self.PR, updated, win_evidence=win), updated)
+                        bodies.append(updated)
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+console.log(JSON.stringify(JSON.parse(readFileSync(0, 'utf8')).map(body => evaluateFleetRules({
+  pr: {title: 'fix(ci): preserve red logs', body, labels: ['compounding']}, files: [],
+}).errors)));
+"""], cwd=ROOT, input=json.dumps(bodies), text=True, capture_output=True, check=True, timeout=15)
+        self.assertEqual(json.loads(checked.stdout), [[] for _ in bodies])
+
     def test_ensure_writes_explicit_win_without_a_red_run(self):
         win = "## Win\n\n- Claim: Caller supplies measurements; canonical Fleet validates them.\n"
         written = []

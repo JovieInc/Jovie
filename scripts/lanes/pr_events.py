@@ -957,18 +957,24 @@ JOB_URL = re.compile(r"^(https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\
 RED_RUN_URL = re.compile(r"https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\d*(?:/attempts/[1-9]\d*)?")
 
 
+def visible_evidence_markdown(body: str) -> str:
+    """Mask hidden comments and fenced examples, retaining source replacement offsets."""
+    visible = re.sub(r"<!--[\s\S]*?-->", lambda match: re.sub(r"[^\n]", " ", match[0]), body)
+    fenced = False
+    lines = []
+    for line in visible.splitlines(keepends=True):
+        marker = re.match(r"^\s*(?:```|~~~)", line)
+        if marker:
+            fenced = not fenced
+        lines.append(re.sub(r"[^\n]", " ", line) if marker or fenced else line)
+    return "".join(lines)
+
+
 def red_section_bounds(lines: list[str]) -> tuple[int, int] | None:
     """Match Fleet's section boundaries: headings inside code fences are log text."""
-    # Ignore hidden Markdown while retaining source line indexes for replacement.
-    visible = re.sub(r"<!--[\s\S]*?-->", lambda match: "\n" * match.group().count("\n"), "\n".join(lines))
-    fenced = False
+    visible = visible_evidence_markdown("\n".join(lines))
     start = None
     for index, line in enumerate(visible.split("\n")):
-        if re.match(r"^\s*(?:```|~~~)", line):
-            fenced = not fenced
-            continue
-        if fenced:
-            continue
         if start is None:
             if RED_HEADING.match(line.strip()):
                 start = index
@@ -1075,9 +1081,9 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
     if win_evidence is not None:
         if not isinstance(win_evidence, str) or not re.match(r"\A## Win\s*\n\s*\S", win_evidence):
             raise ValueError("win evidence requires an explicit ## Win section")
-        # Mask comments without changing offsets so a placeholder can be replaced
-        # in the original body while retaining hidden customer/repair decisions.
-        visible = re.sub(r"<!--[\s\S]*?-->", lambda m: re.sub(r"[^\n]", " ", m[0]), updated)
+        # Retain offsets so replacing a placeholder preserves raw failure logs
+        # and hidden customer/repair decisions in the original body.
+        visible = visible_evidence_markdown(updated)
         win = re.search(r"^#{2,3}[ \t]*Win[ \t\r]*$([\s\S]*?)(?=^#{1,3}\s|\Z)", visible, re.I | re.M)
         if win is None:
             updated = updated.rstrip("\n") + "\n\n" + win_evidence.rstrip("\n") + "\n"
