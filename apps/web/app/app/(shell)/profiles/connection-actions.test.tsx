@@ -53,4 +53,24 @@ describe('buildConnectionActions', () => {
     expect(actions).toHaveLength(2);
     expect(actions).not.toContainEqual({ type: 'separator' });
   });
+
+  it('adds Fix With Jovie only when a fix callback is supplied', () => {
+    const onFix = vi.fn();
+    const base = {
+      onViewDetails: vi.fn(),
+      onOpen: vi.fn(),
+      onPrimaryAction: vi.fn(),
+    };
+    const labels = (actions: ReturnType<typeof buildConnectionActions>) =>
+      actions.flatMap(a => ('label' in a ? [a.label] : []));
+    expect(labels(buildConnectionActions(spotify, 'open', base))).not.toContain(
+      'Fix With Jovie'
+    );
+    const withFix = buildConnectionActions(spotify, 'open', { ...base, onFix });
+    expect(labels(withFix)).toContain('Fix With Jovie');
+    const fix = withFix.find(a => 'id' in a && a.id === 'connection-fix');
+    if (!fix || !('onClick' in fix)) throw new Error('Expected fix action');
+    fix.onClick();
+    expect(onFix).toHaveBeenCalledWith(spotify);
+  });
 });

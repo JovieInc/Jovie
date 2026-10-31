@@ -51,6 +51,7 @@ import {
   selectLanes,
   selectNodeRuntimeContractCommands,
   structuralLocks,
+  typecheckEnvironment,
   validateLaneGroups,
 } from '../../ci-fast-lanes.mjs';
 import { buildControlTestCommands } from '../../run-affected-tests.mjs';
@@ -1153,7 +1154,10 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
-  it('selects physical-pointer onboarding recovery through the guarded Storybook matrix', () => {
+  it.each([
+    'tests/e2e/storybook-onboarding-recovery.spec.ts',
+    'tests/e2e/storybook-onboarding-dsp-strip-clearance.spec.ts',
+  ])('selects %s through the guarded Storybook matrix', spec => {
     const surfaces = jobBlock(
       'ci-storybook-surfaces',
       'ci-cross-product-integration'
@@ -1167,9 +1171,8 @@ describe('ci-fast bounded parallel workflow', () => {
     ).not.toBeNull();
     const selected =
       invocation[1].match(/tests\/e2e\/storybook-[a-z0-9-]+\.spec\.ts/g) ?? [];
-    const recovery = 'tests/e2e/storybook-onboarding-recovery.spec.ts';
-    expect(selected.filter(path => path === recovery)).toHaveLength(1);
-    expect(existsSync(resolve(REPO_ROOT, 'apps/web', recovery))).toBe(true);
+    expect(selected.filter(path => path === spec)).toHaveLength(1);
+    expect(existsSync(resolve(REPO_ROOT, 'apps/web', spec))).toBe(true);
     expect(surfaces).toContain('guard-playwright-artifacts.mjs" --run --');
     expect(surfaces).toContain('--project=chromium --reporter=line');
     expect(surfaces).toContain('--workers=2');
@@ -1916,7 +1919,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'design-system-source-ratchet': 'pnpm design:source-count-ratchet',
       'design-exception-registry': 'pnpm design:exception-registry:check',
       'design-governance-enforcement':
-        'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target && pnpm --filter @jovie/web run lint:ui-feel && pnpm --filter @jovie/web run lint:composite-field',
+        'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target && pnpm --filter @jovie/web run lint:ui-feel && pnpm --filter @jovie/web run lint:composite-field && pnpm --filter @jovie/web run lint:design-noise',
       'ios-fast': 'pnpm run ios:lint && pnpm run ios:app-store:test',
       'merge-group-guards':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts',
@@ -2272,7 +2275,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('keeps workflow contracts in the bounded CI control suite', () => {
     expect(PACKAGE_JSON.scripts['ci:control:test']).toBe(
-      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs && node scripts/ci-workflow-topology.mjs && pnpm ownership:check && node scripts/sources-of-truth.mjs && node scripts/invariants/duplicate-literals.mjs'
+      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs scripts/workflow-runner-pin-check.test.mjs && node scripts/ci-workflow-topology.mjs && pnpm ownership:check && node scripts/sources-of-truth.mjs && node scripts/invariants/duplicate-literals.mjs'
     );
     expect(PACKAGE_JSON.scripts['ownership:check']).toBe(
       'node --test scripts/ownership-registry.test.mjs && node scripts/ownership-registry.mjs --report'
@@ -3343,14 +3346,33 @@ describe('CI diff selection on a divergent PR', () => {
         all: ['notes.md', 'pr-only.ts'],
         ts: ['pr-only.ts'],
       });
-      expect(select('merge_group', 'origin/main')).toEqual({
+      // Preserve exact two-tree removal coverage: the divergent head removes
+      // main-only.ts relative to main, but it is not part of the PR delta.
+      expect(select('push', 'origin/main')).toEqual({
         all: ['main-only.ts', 'notes.md', 'pr-only.ts'],
         ts: ['main-only.ts', 'pr-only.ts'],
+      });
+      expect(select('merge_group', 'origin/main')).toEqual({
+        all: ['notes.md', 'pr-only.ts'],
+        ts: ['pr-only.ts'],
       });
       expect(select('push')).toEqual({
         all: ['notes.md', 'pr-only.ts'],
         ts: ['pr-only.ts'],
       });
+      // A docs-only tail must still typecheck the preceding queue entry.
+      const precedingEntry = git('rev-parse', 'HEAD');
+      writeFileSync(join(repository, 'notes.md'), 'docs-only tail\n');
+      git('add', '.');
+      git('commit', '-m', 'docs-only tail');
+      expect(select('merge_group', precedingEntry).ts).toEqual(['pr-only.ts']);
+      expect(typecheckEnvironment(repository).TURBO_SCM_BASE).toBe(base);
+      expect(typecheckEnvironment(repository).TURBO_SCM_HEAD).toBe('HEAD');
+      // Other events retain their existing affected range.
+      vi.stubEnv('GITHUB_EVENT_NAME', 'pull_request');
+      expect(typecheckEnvironment(repository).TURBO_SCM_BASE).toBe(
+        precedingEntry
+      );
       git('update-ref', '-d', 'refs/remotes/origin/main');
       expect(select('pull_request', base)).toEqual({
         all: ['notes.md', 'pr-only.ts'],
