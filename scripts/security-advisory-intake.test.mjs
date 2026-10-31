@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { load } from 'js-yaml';
 import { credentialState } from '../packages/api-client/policy.ts';
 import {
   FileLedgerStore,
@@ -412,4 +413,43 @@ test('CLI blind dry-run records uncertainty without requiring a Linear write', t
   const result = run(['--dry-run']);
   assert.equal(result.status, 0, result.stderr);
   assert.equal(JSON.parse(readFileSync(env.RECEIPT_PATH, 'utf8')).blind, true);
+});
+
+test('workflow check preserves the sync receipt when both record a blind source', t => {
+  const { dir, env, run } = cliFixture(t);
+  const workflow = load(
+    readFileSync(
+      path.join(ROOT, '.github/workflows/security-advisory-loop.yml'),
+      'utf8'
+    )
+  );
+  const steps = workflow.jobs.loop.steps;
+  const sync = steps.find(
+    step => step.run === 'node scripts/security-advisory-intake.mjs'
+  );
+  const check = steps.find(
+    step => step.run === 'node scripts/security-advisory-intake.mjs --check'
+  );
+  const upload = steps.find(step =>
+    step.uses?.startsWith('actions/upload-artifact@')
+  );
+  env.FIXTURE_BLIND = '1';
+  env.RECEIPT_PATH = path.join(
+    dir,
+    sync.env.RECEIPT_PATH || 'security-advisory-receipt.json'
+  );
+  const syncPath = env.RECEIPT_PATH;
+  assert.equal(run([]).status, 1);
+  const syncReceipt = readFileSync(syncPath, 'utf8');
+  env.RECEIPT_PATH = path.join(
+    dir,
+    check.env.RECEIPT_PATH || 'security-advisory-receipt.json'
+  );
+  assert.equal(run(['--check']).status, 1);
+  assert.notEqual(env.RECEIPT_PATH, syncPath);
+  assert.equal(readFileSync(syncPath, 'utf8'), syncReceipt);
+  assert.equal(JSON.parse(readFileSync(env.RECEIPT_PATH, 'utf8')).blind, true);
+  const uploaded = upload.with.path.trim().split(/\s+/);
+  assert.ok(uploaded.includes(path.basename(syncPath)));
+  assert.ok(uploaded.includes(path.basename(env.RECEIPT_PATH)));
 });
