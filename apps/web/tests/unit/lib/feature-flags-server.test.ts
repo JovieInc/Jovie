@@ -141,6 +141,19 @@ describe('Statsig server initialization', () => {
     expect(statsigWarnings).toHaveLength(1);
   });
 
+  it('never builds a Statsig client from the vercel pull [SENSITIVE] placeholder', async () => {
+    envState.STATSIG_SERVER_SECRET = '[SENSITIVE]';
+
+    const { checkGateForUser } = await import('@/lib/flags/statsig');
+    await checkGateForUser(
+      'user-1',
+      LEGACY_STATSIG_GATE_KEYS.SUBSCRIBE_CTA_EXPERIMENT
+    );
+
+    expect(statsigConstructorMock).not.toHaveBeenCalled();
+    expect(initializeMock).not.toHaveBeenCalled();
+  });
+
   it('creates a fresh Statsig client after initialization fails', async () => {
     envState.STATSIG_SERVER_SECRET = 'secret-server-key';
     initializeMock
