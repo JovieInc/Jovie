@@ -18,8 +18,8 @@
 // OWNERLESS_GRACE_MS. Release removes the label and leaves one comment; the
 // Jovie Bot unlabel event wakes Merge Queue Green Enroll, whose required
 // checks remain the only merge gate.
-import { execFileSync } from 'node:child_process';
 import { STOP_HOLD_LABELS } from './lib/admission-hold-labels.mjs';
+import { EX_TEMPFAIL, runWithGitHubRetry } from './lib/github-rate-limit.mjs';
 import { extractReceiptFromComment } from './lib/queue-deferral-receipt.mjs';
 
 export const HOLD_LABEL = 'hold';
@@ -32,6 +32,16 @@ export const RECEIPT_SKEW_MS = 3600 * 1000;
 
 const SHA = /^[0-9a-f]{40}$/;
 const RECEIPT = /<!--\s*jovie-hold\/v1\s+(\{[\s\S]*?\})\s*-->/g;
+
+// The sweep draws on the shared Jovie Bot installation GraphQL/REST budget
+// every workflow uses. 2026-10-29 12:52-12:58 PT (runs 40944019979,
+// 40944172375, 40944333276, 40944845412): the open-PR list died with
+// 'GraphQL: API rate limit already exceeded for installation ID 112037986'
+// and exited 1. Every call now retries quota/transient failures within this
+// budget and defers (exit 75, `github-quota-deferred`) past it; a deferred
+// sweep releases nothing and is re-run by the next enroll wake. Real errors
+// still exit 1.
+const HOLD_SWEEP_MAX_WAIT_MS = 90_000;
 
 /** @returns {{ owner: string, until: number | null, head: string | null, reason: string } | null} */
 export function parseHoldReceipt(body) {
@@ -132,18 +142,40 @@ export function releaseComment({ reason, owner, label = HOLD_LABEL }) {
 const QUERY = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){state headRefOid labels(first:100){nodes{name}} timelineItems(last:100,itemTypes:[LABELED_EVENT]){nodes{... on LabeledEvent{createdAt label{name}}}} comments(last:100){nodes{body createdAt}}}}}`;
 
 function gh(args) {
-  return execFileSync('gh', args, {
-    encoding: 'utf8',
-    maxBuffer: 32 * 1024 * 1024,
-    stdio: ['ignore', 'pipe', 'pipe'],
+  return runWithGitHubRetry(['gh', ...args], {
+    attempts: 4,
+    maxWaitMs: HOLD_SWEEP_MAX_WAIT_MS,
   });
 }
 
-export function sweepHolds({ now, dryRun, io }) {
+/**
+ * Throw the outcome as an error carrying a deferred marker, so the sweep can
+ * report an infrastructure deferral (exit 75) without turning it into a
+ * verdict on any hold.
+ */
+function ghError(outcome) {
+  const message = `${outcome.stderr}\n${outcome.stdout}`.trim();
+  const error = new Error(
+    outcome.deferred
+      ? `GitHub quota deferral: ${message || 'hold sweep deferred'}`
+      : message || `gh exited ${outcome.code}`
+  );
+  error.deferred = Boolean(outcome.deferred);
+  error.exitCode = error.deferred ? EX_TEMPFAIL : outcome.code || 1;
+  return error;
+}
+
+async function ghOrThrow(args) {
+  const outcome = await gh(args);
+  if (outcome.deferred || outcome.code !== 0) throw ghError(outcome);
+  return outcome.stdout;
+}
+
+export async function sweepHolds({ now, dryRun, io }) {
   /** @type {Array<ReturnType<typeof evaluateHold> & { number: number, label: string }>} */
   const results = [];
-  for (const number of io.listHeld()) {
-    const pr = io.read(number);
+  for (const number of await io.listHeld()) {
+    const pr = await io.read(number);
     if (pr?.state !== 'OPEN') continue;
     const present = new Set((pr.labels?.nodes ?? []).map(l => l?.name));
     // Each stop label is its own hold with its own labeled time; one receipt
@@ -164,8 +196,8 @@ export function sweepHolds({ now, dryRun, io }) {
       });
       results.push({ number, label, ...verdict });
       if (verdict.action !== 'release' || dryRun) continue;
-      io.comment(number, releaseComment({ ...verdict, label }));
-      io.unlabel(number, label);
+      await io.comment(number, releaseComment({ ...verdict, label }));
+      await io.unlabel(number, label);
     }
   }
   for (const result of results) {
@@ -176,65 +208,76 @@ export function sweepHolds({ now, dryRun, io }) {
   return results;
 }
 
-function main() {
+async function main() {
   const repository = process.env.GITHUB_REPOSITORY;
   if (!repository) throw new Error('GITHUB_REPOSITORY is required');
   const [owner, name] = repository.split('/');
-  sweepHolds({
-    now: Date.now(),
-    dryRun: process.env.DRY_RUN === 'true',
-    io: {
-      // One open-PR read; `gh pr list --label` ANDs repeated labels.
-      listHeld: () =>
-        JSON.parse(
-          gh([
-            'pr',
-            'list',
-            '--repo',
-            repository,
-            '--state',
-            'open',
-            '--limit',
-            '1000',
-            '--json',
-            'number,labels',
-          ])
-        )
-          .filter(pr =>
-            (pr.labels ?? []).some(l => CONTRACT_LABELS.includes(l?.name))
+  try {
+    await sweepHolds({
+      now: Date.now(),
+      dryRun: process.env.DRY_RUN === 'true',
+      io: {
+        // One open-PR read; a pr list with repeated --label flags ANDs them.
+        listHeld: async () =>
+          JSON.parse(
+            await ghOrThrow([
+              'pr',
+              'list',
+              '--repo',
+              repository,
+              '--state',
+              'open',
+              '--limit',
+              '1000',
+              '--json',
+              'number,labels',
+            ])
           )
-          .map(pr => pr.number),
-      read: number =>
-        JSON.parse(
-          gh([
+            .filter(pr =>
+              (pr.labels ?? []).some(l => CONTRACT_LABELS.includes(l?.name))
+            )
+            .map(pr => pr.number),
+        read: async number =>
+          JSON.parse(
+            await ghOrThrow([
+              'api',
+              'graphql',
+              '-f',
+              `query=${QUERY}`,
+              '-F',
+              `owner=${owner}`,
+              '-F',
+              `name=${name}`,
+              '-F',
+              `number=${number}`,
+            ])
+          ).data.repository.pullRequest,
+        comment: async (number, body) =>
+          ghOrThrow([
             'api',
-            'graphql',
+            `repos/${repository}/issues/${number}/comments`,
             '-f',
-            `query=${QUERY}`,
-            '-F',
-            `owner=${owner}`,
-            '-F',
-            `name=${name}`,
-            '-F',
-            `number=${number}`,
-          ])
-        ).data.repository.pullRequest,
-      comment: (number, body) =>
-        gh([
-          'api',
-          `repos/${repository}/issues/${number}/comments`,
-          '-f',
-          `body=${body}`,
-        ]),
-      unlabel: (number, label) =>
-        gh([
-          'api',
-          '--method',
-          'DELETE',
-          `repos/${repository}/issues/${number}/labels/${encodeURIComponent(label)}`,
-        ]),
-    },
-  });
+            `body=${body}`,
+          ]),
+        unlabel: async (number, label) =>
+          ghOrThrow([
+            'api',
+            '--method',
+            'DELETE',
+            `repos/${repository}/issues/${number}/labels/${encodeURIComponent(label)}`,
+          ]),
+      },
+    });
+  } catch (error) {
+    if (error?.deferred) {
+      console.warn(
+        `Hold contract sweep deferred (${error.message}); the remaining holds were not judged and stay applied. It re-runs on the next enroll wake.`
+      );
+      process.exitCode = error.exitCode ?? EX_TEMPFAIL;
+      return;
+    }
+    throw error;
+  }
 }
 
-if (process.argv[1]?.endsWith('hold-contract.mjs')) main();
+if (process.argv[1]?.endsWith('hold-contract.mjs')) await main();

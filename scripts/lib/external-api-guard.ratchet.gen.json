@@ -438,9 +438,6 @@
     "scripts/golden-path-lock.mjs": {
       "gh-subprocess": 1
     },
-    "scripts/hold-contract.mjs": {
-      "gh-subprocess": 2
-    },
     "scripts/invariants/jev-gateway.mjs": {
       "provider-host": 1
     },

@@ -144,7 +144,7 @@ test('receipts from before the current hold do not keep it, and the newest recei
   );
 });
 
-test('the sweep comments then unlabels only released holds and dry runs never write', () => {
+test('the sweep comments then unlabels only released holds and dry runs never write', async () => {
   const prs = {
     1: {
       state: 'OPEN',
@@ -186,7 +186,7 @@ test('the sweep comments then unlabels only released holds and dry runs never wr
   const log = console.log;
   console.log = () => {};
   try {
-    const dry = sweepHolds({ now: T0 + 30 * HOUR, dryRun: true, io });
+    const dry = await sweepHolds({ now: T0 + 30 * HOUR, dryRun: true, io });
     assert.deepEqual(
       dry.map(r => [r.number, r.action]),
       [
@@ -195,7 +195,7 @@ test('the sweep comments then unlabels only released holds and dry runs never wr
       ]
     );
     assert.deepEqual(writes, []);
-    sweepHolds({ now: T0 + 30 * HOUR, dryRun: false, io });
+    await sweepHolds({ now: T0 + 30 * HOUR, dryRun: false, io });
   } finally {
     console.log = log;
   }
@@ -237,12 +237,12 @@ test('the enroll workflow runs the trusted hold contract with a Jovie Bot token'
   );
 });
 
-function runHoldSweep(pr, now) {
+async function runHoldSweep(pr, now) {
   const writes = [];
   const log = console.log;
   console.log = () => {};
   try {
-    const results = sweepHolds({
+    const results = await sweepHolds({
       now,
       dryRun: false,
       io: {
@@ -261,7 +261,7 @@ function runHoldSweep(pr, now) {
 // EVENT 2026-10-28: no stop label is human-owned. The retired labels are not in
 // the contract vocabulary, so the sweep neither honours nor touches them.
 for (const label of ['tim-hold', 'tim:hold', 'hold:tim', 'do-not-merge']) {
-  test(`${label} is retired: not a stop label and never preserved`, () => {
+  test(`${label} is retired: not a stop label and never preserved`, async () => {
     assert.ok(!CONTRACT_LABELS.includes(label));
     const pr = {
       state: 'OPEN',
@@ -272,13 +272,13 @@ for (const label of ['tim-hold', 'tim:hold', 'hold:tim', 'do-not-merge']) {
       },
       comments: { nodes: [] },
     };
-    const { results, writes } = runHoldSweep(pr, T0 + MAX_HOLD_MS + HOUR);
+    const { results, writes } = await runHoldSweep(pr, T0 + MAX_HOLD_MS + HOUR);
     assert.deepEqual(results, []);
     assert.deepEqual(writes, []);
   });
 }
 
-test('a machine hold alongside a retired human label still follows the contract', () => {
+test('a machine hold alongside a retired human label still follows the contract', async () => {
   const pr = {
     state: 'OPEN',
     headRefOid: 'b'.repeat(40),
@@ -286,14 +286,14 @@ test('a machine hold alongside a retired human label still follows the contract'
     timelineItems: { nodes: [{ createdAt: LABELED, label: { name: 'hold' } }] },
     comments: { nodes: [comment({ owner: 'gem', head: HEAD })] },
   };
-  const { results } = runHoldSweep(pr, T0 + MAX_HOLD_MS + HOUR);
+  const { results } = await runHoldSweep(pr, T0 + MAX_HOLD_MS + HOUR);
   assert.deepEqual(
     results.map(row => [row.label, row.action]),
     [['hold', 'release']]
   );
 });
 
-test('machine stop labels follow their own labeled time', () => {
+test('machine stop labels follow their own labeled time', async () => {
   // #21014 / #20953: `gated` applied 2026-10-08 with no owner or expiry sat
   // outside the contract and blocked admission indefinitely.
   const pr = {
@@ -317,7 +317,7 @@ test('machine stop labels follow their own labeled time', () => {
   const log = console.log;
   console.log = () => {};
   try {
-    const results = sweepHolds({
+    const results = await sweepHolds({
       now: T0 + 30 * HOUR,
       dryRun: false,
       io: {
