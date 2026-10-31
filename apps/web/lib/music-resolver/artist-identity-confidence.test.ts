@@ -127,6 +127,33 @@ describe('scoreArtistIdentity', () => {
     expect(result.unverifiedVendorMatches).toBe(0);
   });
 
+  it.each([
+    { providerId: 'spotify', externalArtistId: null },
+    { providerId: 'apple_music', externalArtistId: null },
+    { providerId: 'apple_music', externalArtistId: '123' },
+  ])(
+    'does not trust unrelated confirmed links: $providerId/$externalArtistId',
+    row => {
+      const result = scoreArtistIdentity({
+        boundIds: { spotify: SPOTIFY_ID },
+        matches: [
+          match({
+            ...row,
+            status: 'confirmed',
+            matchSource: 'manual',
+            confidenceScore: null,
+            matchingIsrcCount: 0,
+          }),
+        ],
+        sameNameCollisions: 1,
+      });
+      expect(result.decision).toBe('needs_confirmation');
+      expect(result.score).toBe(0.3);
+      expect(result.reasons).not.toContain('owner_confirmed');
+      expect(result.reasons).toContain('same_name_collision');
+    }
+  );
+
   it('reports unbound when there is no provider identity at all', () => {
     const result = scoreArtistIdentity({
       boundIds: { spotify: null, apple_music: '' },

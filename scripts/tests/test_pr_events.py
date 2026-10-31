@@ -3065,10 +3065,14 @@ console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
         self.assertEqual(written, ["Summary\n\n" + self.WIN])
 
     def test_explicit_invalid_win_is_rejected_instead_of_silently_omitted(self):
-        for invalid in ("", 0, False, [], {}, "- Metric: incomplete"):
+        for invalid in (0, False, [], {}, "- Metric: incomplete"):
             with self.subTest(invalid=invalid):
                 with self.assertRaisesRegex(ValueError, "complete ## Win section"):
                     events.repair_evidence_body(self.PR, "Summary", win_section=invalid)
+
+    def test_empty_optional_win_keeps_existing_caller_contract(self):
+        body = events.repair_evidence_body(self.PR, "Summary")
+        self.assertEqual(events.repair_evidence_body(self.PR, "Summary", win_section=""), body)
 
     def test_block_carries_the_failing_run_and_red_output_and_passes_the_parser_shape(self):
         block = events.red_before_green_block(self.PR, "### Source Validation\n# not a heading\nAssertionError: x")

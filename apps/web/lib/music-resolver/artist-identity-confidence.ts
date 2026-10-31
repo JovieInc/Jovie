@@ -87,8 +87,8 @@ export function isEvidencedMatch(match: ArtistIdentityMatchEvidence): boolean {
 }
 
 /**
- * Only the owner's confirm route writes `confirmed`; machine matchers write
- * `auto_confirmed` or `suggested`. `confirmed_by` is not populated today.
+ * Owner-confirmed suggestions and manual links both write `confirmed`;
+ * machine matchers write `auto_confirmed` or `suggested`.
  */
 function isOwnerConfirmed(match: ArtistIdentityMatchEvidence): boolean {
   return match.status === 'confirmed';
@@ -134,7 +134,13 @@ export function scoreArtistIdentity(
     return result(0, 'conflict');
   }
 
-  const ownerConfirmed = accepted.some(isOwnerConfirmed);
+  const ownerConfirmed = accepted.some(
+    match =>
+      isOwnerConfirmed(match) &&
+      typeof match.externalArtistId === 'string' &&
+      match.externalArtistId.length > 0 &&
+      match.externalArtistId === evidence.boundIds[match.providerId]
+  );
   if (!bound.length && !ownerConfirmed) {
     reasons.push('no_provider_identity');
     return result(0, 'unbound');
