@@ -518,6 +518,7 @@ export async function fileRemediationPlans(plans, { dryRun, upsert, apiKey }) {
  * @param {() => Promise<any[]>} [options.loadDomains]
  * @param {() => Promise<{ plans: any[], warnings?: string[] }>} [options.loadCredentials]
  * @param {() => Promise<{ plans: any[], warnings?: string[] }>} [options.loadDrift]
+ * @param {() => { generatedAt: string, total: number, byRule: Record<string, number>, topFiles: { rule: string, file: string, count: number }[] } | Promise<{ generatedAt: string, total: number, byRule: Record<string, number>, topFiles: { rule: string, file: string, count: number }[] }>} [options.loadSwiftArch]
  * @param {boolean} [options.vercelTokenPresent]
  * @param {(args: any) => Promise<any>} [options.upsert]
  * @param {string} [options.apiKey]

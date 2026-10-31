@@ -1,13 +1,15 @@
 import 'server-only';
 
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getOutboundClaimUrl } from '@/lib/outbound/claim-url';
-import { generateClaimTokenPair } from '@/lib/security/claim-token';
 import { DEFAULT_DM_TEMPLATE } from './constants';
 import { filterEmail } from './email-filter';
+import {
+  ensureLeadClaimToken,
+  persistLeadClaimToken,
+} from './lead-claim-token';
 import { detectRepresentation } from './management-filter';
 import { pipelineLog, pipelineWarn } from './pipeline-logger';
 
@@ -64,37 +66,16 @@ export async function routeLead(leadId: string): Promise<RouteLeadResult> {
     hasInstagram: lead.hasInstagram,
   });
 
-  // 6. Reuse token if present and not expired, otherwise generate claim token
-  const token = lead.claimToken;
-  const tokenHash = lead.claimTokenHash;
-  const expiresAt = lead.claimTokenExpiresAt;
-
-  const isTokenValid =
-    token && tokenHash && expiresAt && expiresAt > new Date();
-  const tokenPair = isTokenValid
-    ? { token, tokenHash, expiresAt }
-    : await generateClaimTokenPair();
+  // 6. One canonical token per lead, stored hashed. The plaintext is derived
+  // on demand (lead-claim-token.ts), never persisted. The profile holds the
+  // same hash, so the link we send resolves on the claim route.
+  const tokenPair = await ensureLeadClaimToken({
+    id: leadId,
+    claimTokenHash: lead.claimTokenHash,
+    claimTokenExpiresAt: lead.claimTokenExpiresAt,
+  });
   const claimUrl = getOutboundClaimUrl(tokenPair.token);
-
-  // One canonical token: the claim route resolves creator_profiles first, so
-  // the profile must hold the hash of the exact token this lead sends. Ingestion
-  // stores its own pair on the profile; without this sync the link we send
-  // carries a token the profile has never seen.
-  if (lead.creatorProfileId) {
-    await db
-      .update(creatorProfiles)
-      .set({
-        claimToken: tokenPair.tokenHash,
-        claimTokenExpiresAt: tokenPair.expiresAt,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(creatorProfiles.id, lead.creatorProfileId),
-          eq(creatorProfiles.isClaimed, false)
-        )
-      );
-  }
+  await persistLeadClaimToken(leadId, lead.creatorProfileId, tokenPair);
 
   // 7. Build DM copy if needed
   let dmCopy: string | null = null;
@@ -117,9 +98,6 @@ export async function routeLead(leadId: string): Promise<RouteLeadResult> {
     .set({
       outreachRoute: route,
       outreachStatus: 'pending',
-      claimToken: tokenPair.token,
-      claimTokenHash: tokenPair.tokenHash,
-      claimTokenExpiresAt: tokenPair.expiresAt,
       emailInvalid: emailResult.invalid,
       emailSuspicious: emailResult.suspicious,
       emailInvalidReason: emailResult.reason,

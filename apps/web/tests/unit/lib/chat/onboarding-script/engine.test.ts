@@ -275,6 +275,33 @@ describe('decideFallbackTurn', () => {
     );
   });
 
+  it('checks a different handle the visitor types in chat', async () => {
+    for (const typed of ['@newname', 'newname', 'can I use @newname instead']) {
+      const turn = await decide([
+        ...baseThroughArtist(),
+        assistant('Claiming @testartist.', [HANDLE_CHECKED]),
+        user(typed),
+      ]);
+      expect(turn.guardedStep).toBe('handle');
+      expect(turn.toolEvents[0]?.toolName).toBe('checkHandle');
+      expect(turn.toolEvents[0]?.output).toMatchObject({
+        action: 'check_handle',
+        handle: 'newname',
+      });
+      expect(turn.text).toContain('@newname');
+    }
+  });
+
+  it('keeps the suggested handle when the reply is not a handle', async () => {
+    const turn = await decide([
+      ...baseThroughArtist(),
+      assistant('Claiming @testartist.', [HANDLE_CHECKED]),
+      user('what does a handle do here?'),
+    ]);
+    expect(turn.toolEvents).toEqual([]);
+    expect(turn.text).toContain('@testartist');
+  });
+
   it('advances on structured handle_confirmed widget event', async () => {
     const turn = await decide([
       ...baseThroughArtist(),
