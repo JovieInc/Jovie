@@ -318,6 +318,13 @@ struct JoviePillButtonStyle: ButtonStyle {
       .scaleEffect(configuration.isPressed ? JovieMotion.pressScale : 1)
       .animation(JovieMotion.subtle, value: configuration.isPressed)
       .padding(.vertical, JoviePillButtonStyle.hitInset)
+      // Enforce the declared 44pt minimum hit target on every pill button:
+      // the hit area is the whole padded control, not just the painted pill
+      // (the background above was already drawn, so this adds no paint).
+      .frame(
+        minWidth: JoviePillButtonStyle.minimumHitHeight,
+        minHeight: JoviePillButtonStyle.minimumHitHeight
+      )
       .contentShape(Rectangle())
   }
 }
