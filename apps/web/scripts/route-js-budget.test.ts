@@ -81,6 +81,42 @@ function buildFixture() {
 }
 
 describe('route-js-budget', () => {
+  it('rejects the server provider registry in public initial chunks', () => {
+    const nextDir = buildFixture();
+    const providerChunk = 'static/chunks/provider-registry.js';
+    const registry = JSON.parse(
+      readFileSync(
+        join(__dirname, '../../../packages/api-client/providers.json'),
+        'utf8'
+      )
+    );
+    writeFileSync(
+      join(nextDir, providerChunk),
+      `globalThis.providers=${JSON.stringify(registry)};`
+    );
+    writeFileSync(
+      join(nextDir, 'app-build-manifest.json'),
+      JSON.stringify({
+        pages: {
+          '/demo/page': [providerChunk],
+          '/[username]/[slug]/page': [providerChunk],
+          '/safe/page': ['static/chunks/main.js'],
+        },
+      })
+    );
+    const rule = FORBIDDEN_CLIENT_CODE.find(
+      entry => entry.id === 'api-provider-registry'
+    );
+    expect(findForbiddenClientCode(nextDir)).toEqual([
+      {
+        id: 'api-provider-registry',
+        fix: rule?.fix,
+        file: providerChunk,
+        routes: ['/[username]/[slug]', '/demo'],
+      },
+    ]);
+  });
+
   it('normalizes route groups and page suffixes', () => {
     expect(routeFromManifestKey('/app/(shell)/settings/touring/page')).toBe(
       '/app/settings/touring'
