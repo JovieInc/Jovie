@@ -81,15 +81,16 @@ export interface LibraryStatusGlyphSpec {
  * never shows two stacked "Draft" words (#10384 / JOV-3333). Progress reads
  * left to right: empty ring (draft), half (scheduled), check (out). Review is
  * the one approval state that needs attention, so it owns the glyph; any
- * other approval state only qualifies the label.
+ * other approval state only qualifies the label. Only a lifecycle-archived
+ * item owns the canceled X — an archived APPROVAL axis on an active item
+ * stays visible on the All tab, so it must keep the release-status shape and
+ * name both axes instead of reading as an unexplained failed status
+ * (JOV-9022).
  */
 export function resolveLibraryStatusGlyph(
   asset: LibraryReleaseAsset
 ): LibraryStatusGlyphSpec {
-  if (
-    asset.lifecycleStatus === 'archived' ||
-    asset.approvalStatus === 'archived'
-  ) {
+  if (asset.lifecycleStatus === 'archived') {
     return { state: 'canceled', label: 'Archived' };
   }
   const status = formatLibraryStatus(asset);
@@ -102,6 +103,9 @@ export function resolveLibraryStatusGlyph(
       : asset.status === 'scheduled'
         ? 'in_progress'
         : 'todo';
+  if (asset.approvalStatus === 'archived') {
+    return { state, label: `${status} · Approval archived` };
+  }
   if (asset.approvalStatus === 'approved') {
     return { state, label: `${status} · Approved` };
   }

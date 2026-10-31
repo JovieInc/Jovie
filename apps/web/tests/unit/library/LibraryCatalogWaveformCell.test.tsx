@@ -8,6 +8,7 @@ import {
   LibraryCatalogArtistCell,
   LibraryCatalogArtworkCell,
   LibraryCatalogWaveformCell,
+  resolveLibraryStatusGlyph,
 } from '@/components/features/library/library-catalog-columns';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
@@ -117,5 +118,57 @@ describe('library type data labels (JOV-8963)', () => {
     );
     expect(cell).toHaveClass('whitespace-nowrap');
     expect(cell.className).not.toContain('truncate');
+  });
+});
+
+describe('resolveLibraryStatusGlyph (JOV-9022)', () => {
+  it('keeps the canceled X for genuinely lifecycle-archived work', () => {
+    const [asset] = buildLibraryReleaseAssets([
+      { ...buildRelease('verified'), deletedAt: '2026-07-31' },
+    ]);
+
+    expect(resolveLibraryStatusGlyph(asset!)).toEqual({
+      state: 'canceled',
+      label: 'Archived',
+    });
+  });
+
+  it('never borrows the canceled X for an archived approval axis on active work', () => {
+    const [asset] = buildLibraryReleaseAssets([
+      { ...buildRelease('verified'), status: 'scheduled' },
+    ]);
+
+    expect(
+      resolveLibraryStatusGlyph({ ...asset!, approvalStatus: 'archived' })
+    ).toEqual({
+      state: 'in_progress',
+      label: 'Scheduled · Approval archived',
+    });
+  });
+
+  it('gives every status-by-approval combination a non-empty accessible label', () => {
+    const [asset] = buildLibraryReleaseAssets([buildRelease('verified')]);
+    const statuses = ['draft', 'scheduled', 'released'] as const;
+    const approvals = [
+      'draft',
+      'needs_review',
+      'approved',
+      'archived',
+    ] as const;
+
+    for (const status of statuses) {
+      for (const approvalStatus of approvals) {
+        const spec = resolveLibraryStatusGlyph({
+          ...asset!,
+          status,
+          approvalStatus,
+        });
+        expect(
+          spec.label,
+          `${status}/${approvalStatus} glyph must have an accessible name`
+        ).not.toEqual('');
+        expect(spec.state).not.toEqual('');
+      }
+    }
   });
 });

@@ -964,7 +964,7 @@ describe('LibrarySurface', () => {
     });
   });
 
-  it('marks archived work with the canceled glyph on rows and tiles (#10384)', () => {
+  it('marks lifecycle-archived work with the canceled glyph, and an archived approval axis never borrows it (#10384, JOV-9022)', () => {
     renderLibrary([
       buildAsset({
         status: 'released',
@@ -972,13 +972,126 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
+    // An active item with an archived APPROVAL axis stays on the All tab, so
+    // its glyph keeps the release-status shape and names both axes — the
+    // circled-X would read as an unexplained failed status (JOV-9022).
+    const glyph = () => screen.getByTestId('library-status-glyph-release-1');
+    expect(glyph()).toHaveAccessibleName('Released · Approval archived');
+    expect(glyph()).toHaveAttribute('data-status-glyph', 'done');
+
+    clickGridView();
+
+    expect(glyph()).toHaveAccessibleName('Released · Approval archived');
+    expect(glyph()).toHaveAttribute('data-status-glyph', 'done');
+  });
+
+  it('marks genuinely archived work with the canceled glyph (#10384)', async () => {
+    const user = userEvent.setup();
+    renderLibrary([
+      buildAsset({
+        status: 'released',
+        lifecycleStatus: 'archived',
+      }),
+    ]);
+
+    // Archived work lives on the Archived tab, where the canceled glyph is
+    // truthful and named.
+    await user.click(screen.getByRole('button', { name: /^Show filters/i }));
+    await user.click(
+      within(screen.getByTestId('library-view-filter-chips')).getByRole(
+        'button',
+        { name: /Archived/u }
+      )
+    );
+    await user.keyboard('{Escape}');
+
     const glyph = () => screen.getByTestId('library-status-glyph-release-1');
     expect(glyph()).toHaveAccessibleName('Archived');
     expect(glyph()).toHaveAttribute('data-status-glyph', 'canceled');
+    expect(screen.queryByTestId('library-status-hidden-note')).toBeNull();
 
     clickGridView();
 
     expect(glyph()).toHaveAccessibleName('Archived');
+  });
+
+  it('names the default-hidden archived set in the status bar (JOV-9022)', () => {
+    renderLibrary([
+      buildAsset(),
+      buildAsset({ id: 'release-2', title: 'Second Track' }),
+      buildAsset({ id: 'release-3', title: 'Third Track' }),
+      buildAsset({
+        id: 'release-4',
+        title: 'Old Single',
+        lifecycleStatus: 'archived',
+      }),
+      buildAsset({
+        id: 'release-5',
+        title: 'Older Single',
+        lifecycleStatus: 'archived',
+      }),
+    ]);
+
+    // All lists every active row; the footer names how many are hidden and
+    // why instead of reading "3 of 5 Items" with no filter in sight.
+    expect(
+      screen.getByTestId('library-release-row-release-1')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('library-release-row-release-2')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('library-release-row-release-3')
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('library-release-row-release-4')).toBeNull();
+    expect(screen.queryByTestId('library-release-row-release-5')).toBeNull();
+    expect(screen.getByText(/^3 of 5 Items/u)).toBeInTheDocument();
+    expect(screen.getByTestId('library-status-hidden-note')).toHaveTextContent(
+      'Hiding 2 archived'
+    );
+  });
+
+  it('shows every item on All when nothing is hidden (JOV-9022 dogfood guard)', () => {
+    renderLibrary([
+      buildAsset(),
+      buildAsset({ id: 'release-2', title: 'Second Track' }),
+      buildAsset({ id: 'release-3', title: 'Third Track' }),
+    ]);
+
+    expect(screen.getByText(/^3 of 3 Items/u)).toBeInTheDocument();
+    expect(screen.queryByTestId('library-status-hidden-note')).toBeNull();
+    expect(screen.queryByText(/Hiding \d+ archived/u)).toBeNull();
+  });
+
+  it('gives every status glyph an accessible name across both axes (JOV-9022)', () => {
+    const statuses = ['draft', 'scheduled', 'released'] as const;
+    const approvals = [
+      'draft',
+      'needs_review',
+      'approved',
+      'archived',
+    ] as const;
+    const assets = statuses.flatMap((status, statusIndex) =>
+      approvals.map((approvalStatus, approvalIndex) =>
+        buildAsset({
+          id: `release-${statusIndex * approvals.length + approvalIndex + 1}`,
+          title: `Item ${status}-${approvalStatus}`,
+          status,
+          approvalStatus,
+        })
+      )
+    );
+    renderLibrary(assets);
+
+    // DS rule: a status icon that only speaks through its glyph still owes
+    // the tree an accessible name.
+    for (const asset of assets) {
+      const glyph = screen.getByTestId(`library-status-glyph-${asset.id}`);
+      expect(
+        glyph.getAttribute('aria-label'),
+        `${asset.title} glyph must have an accessible name`
+      ).toBeTruthy();
+    }
   });
 
   it('keeps Approval Status once in the detail rail editor only', () => {
