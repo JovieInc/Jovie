@@ -163,6 +163,23 @@ describe('spend runway and caps', () => {
     expect(critical.severity).toBe('critical');
   });
 
+  it('pages when a prepaid provider has under 3 days of runway', () => {
+    const { findings } = evaluate(
+      credentials(),
+      spend([{ ...gateway, burnPerDayUsd: { value: 8 } }]),
+      '2026-10-20T01:00:00Z'
+    );
+    expect(findings.map(f => f.fingerprint)).toEqual([
+      'spend-runway:gateway',
+      'spend-runway-page:gateway',
+    ]);
+    expect(findings[1]).toMatchObject({
+      type: 'runway-page',
+      severity: 'critical',
+      runwayDays: 2.6,
+    });
+  });
+
   it('measures burn from the committed snapshot and a live read', () => {
     const burn = burnRate(gateway, {
       observedAt: '2026-10-22T00:00:00Z',
