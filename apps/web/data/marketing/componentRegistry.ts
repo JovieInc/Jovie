@@ -1,3 +1,5 @@
+export { MARKETING_MEDIA_PRESENTATIONS as MARKETING_MEDIA_COMPONENT_REGISTRY } from './mediaRecipes';
+
 /** Server-safe canonical projection of marketing shells, sections, and recipes. */
 
 import {

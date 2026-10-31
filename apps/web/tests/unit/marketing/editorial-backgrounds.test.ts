@@ -76,9 +76,7 @@ describe('marketing editorial backgrounds (JOV-6249)', () => {
     // soft → ultra (subdued violet haze), flow → ion (production cyan family)
     expect(EDITORIAL_BACKGROUND_SOFT.accent.role).toBe('ultra');
     expect(EDITORIAL_BACKGROUND_FLOW.accent.role).toBe('ion');
-    expect(EDITORIAL_BACKGROUND_FLOW.accent.uiToken).toBe(
-      '--system-b-accent-cyan'
-    );
+    expect(EDITORIAL_BACKGROUND_FLOW.accent.uiToken).toBe('--noir-ion-ion');
   });
 
   it('declares off-center focal points and content-safe dark regions', () => {
