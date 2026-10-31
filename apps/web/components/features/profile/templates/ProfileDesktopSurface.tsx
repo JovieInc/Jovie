@@ -1081,6 +1081,7 @@ export function ProfileDesktopSurface({
                   artistHandle={artist.handle}
                   showCTA={false}
                   size='sm'
+                  mark='brand'
                 />
               </div>
             ) : null}

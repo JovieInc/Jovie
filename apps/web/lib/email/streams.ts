@@ -1,79 +1,117 @@
 /**
- * Email stream registry (JOV email-sending-streams, 2026-10-29).
+ * Email stream registry, typed. The data lives in stream-registry.json (one
+ * source of truth, read by the gateway, the CI guard and the deliverability
+ * loop); this module only types it and answers questions about it.
  *
- * Every outbound email belongs to exactly one stream. Streams exist so a
- * reputation problem in one (cold outreach, a bad lifecycle send) cannot burn
- * the domain that carries sign-in codes and receipts, or jov.ie itself, which
- * hosts the team's Google Workspace mail.
- *
- *   transactional  receipts, sign-in codes, dunning, system notifications
- *   lifecycle      product updates and changelog mail to opted-in subscribers
- *   founder        1:1 plain-text mail from Tim to existing users
- *   cold           outreach to people who never opted in; never on jov.ie
- *
- * Sending domains come from env so a stream moves without a deploy of code:
- * set the variable after the domain is verified at the provider. Defaults keep
- * today's behaviour (everything on send.jov.ie) until that happens.
+ * Every outbound email belongs to exactly one stream so a reputation problem
+ * in one (a bad broadcast, cold outreach) cannot burn the domain that carries
+ * sign-in codes and receipts, or jov.ie itself, which hosts Google Workspace.
  * Decision: gbrain decisions/company/email-sending-streams-2026-10-29.
  */
+import registry from './stream-registry.json';
 
 export const EMAIL_STREAMS = [
   'transactional',
   'lifecycle',
   'founder',
+  'broadcast',
+  'inbox',
   'cold',
 ] as const;
 export type EmailStream = (typeof EMAIL_STREAMS)[number];
 
-/** The core domain and everything under it. */
-export const CORE_DOMAIN = 'jov.ie';
+export const CONSENT_BASES = [
+  'auth-request',
+  'account-transaction',
+  'opt-in',
+  'artist-request',
+  'account-relationship',
+  'existing-relationship',
+  'inbound-reply',
+  'legitimate-interest',
+] as const;
+export type ConsentBasis = (typeof CONSENT_BASES)[number];
 
-/** Env var that overrides each stream's sending domain. */
-export const STREAM_DOMAIN_ENV: Record<EmailStream, string> = {
-  transactional: 'EMAIL_STREAM_TRANSACTIONAL_DOMAIN',
-  lifecycle: 'EMAIL_STREAM_LIFECYCLE_DOMAIN',
-  founder: 'EMAIL_STREAM_FOUNDER_DOMAIN',
-  cold: 'EMAIL_STREAM_COLD_DOMAIN',
-};
+export type SuppressionScope = 'all' | 'delivery';
+export type EmailProviderName = keyof typeof registry.providers;
 
-/** Defaults preserve current production behaviour. Cold has none by design. */
-export const DEFAULT_STREAM_DOMAIN: Record<EmailStream, string | null> = {
-  transactional: 'send.jov.ie',
-  lifecycle: 'send.jov.ie',
-  founder: 'send.jov.ie',
-  cold: null,
-};
+export interface StreamThresholds {
+  /** Fractions, not percents. Above `*Rate`: incident. Above `*Pause`: pause. */
+  readonly bounceRate: number;
+  readonly bounceRatePause: number;
+  readonly complaintRate: number;
+  readonly complaintRatePause: number;
+}
 
-/** Target separation once notify.jov.ie is verified in Resend. */
-export const TARGET_STREAM_DOMAIN: Record<EmailStream, string | null> = {
-  transactional: 'send.jov.ie',
-  lifecycle: 'notify.jov.ie',
-  founder: 'notify.jov.ie',
-  cold: null,
-};
+export interface StreamPolicy {
+  readonly status: 'open' | 'closed';
+  readonly closedReason?: string;
+  readonly description: string;
+  readonly provider: EmailProviderName | null;
+  readonly fromDomain: string | null;
+  readonly fromDomainEnv: string;
+  readonly targetFromDomain?: string;
+  readonly fromLocalPart: string | null;
+  readonly fromLocalPartOverride: boolean;
+  readonly defaultFromName: string;
+  readonly fromNameOverride: boolean;
+  readonly replyTo: string | null;
+  readonly replyToOverride: boolean;
+  readonly consentBases: readonly ConsentBasis[];
+  readonly requiredHeaders: readonly string[];
+  readonly requirePostalAddress: boolean;
+  readonly suppression: SuppressionScope;
+  readonly rateLimit: { readonly perHour: number };
+  readonly approval: 'none' | 'summer-card';
+  readonly pausable: boolean;
+  readonly thresholds: StreamThresholds;
+}
 
-/** Providers whose terms permit each stream. Resend forbids unsolicited mail. */
-export const PROVIDER_STREAMS = {
-  resend: ['transactional', 'lifecycle', 'founder'],
-  'cloudflare-email': ['transactional'],
-  // Cold-capable tools. Not wired yet; named so the guard has one vocabulary.
-  instantly: ['cold'],
-  smartlead: ['cold'],
-} as const satisfies Record<string, readonly EmailStream[]>;
-export type EmailProviderName = keyof typeof PROVIDER_STREAMS;
+export interface EmailStreamRegistry {
+  readonly schema: string;
+  readonly coreDomain: string;
+  readonly mailingAddressEnv: string;
+  readonly providers: Record<
+    EmailProviderName,
+    {
+      readonly status: 'live' | 'not-approved';
+      readonly hosts: readonly string[];
+      readonly streams: readonly EmailStream[];
+    }
+  >;
+  readonly streams: Record<EmailStream, StreamPolicy>;
+  readonly deliverability: {
+    readonly windowDays: number;
+    readonly minSample: number;
+    readonly forge: {
+      readonly status: string;
+      readonly readyWhen: {
+        readonly minDeliveredPerStream: number;
+        readonly maxBounceRate: number;
+        readonly maxComplaintRate: number;
+      };
+    };
+  };
+}
 
-/** Deliverability ceilings per stream, as fractions (not percents). */
-export const STREAM_THRESHOLDS: Record<
-  EmailStream,
-  { bounceRate: number; complaintRate: number }
-> = {
-  // Resend AUP: complaints < 0.08%, bounces < 4%.
-  transactional: { bounceRate: 0.02, complaintRate: 0.0008 },
-  lifecycle: { bounceRate: 0.02, complaintRate: 0.0008 },
-  founder: { bounceRate: 0.03, complaintRate: 0.0008 },
-  // Cold tools tolerate more bounce; Google's hard line is 0.3% spam.
-  cold: { bounceRate: 0.03, complaintRate: 0.001 },
-};
+export const EMAIL_STREAM_REGISTRY = registry as unknown as EmailStreamRegistry;
+
+/** The core domain; cold mail never uses it or any subdomain. */
+export const CORE_DOMAIN = EMAIL_STREAM_REGISTRY.coreDomain;
+
+export function isEmailStream(value: unknown): value is EmailStream {
+  return (
+    typeof value === 'string' &&
+    (EMAIL_STREAMS as readonly string[]).includes(value)
+  );
+}
+
+export function streamPolicy(
+  stream: EmailStream,
+  source: EmailStreamRegistry = EMAIL_STREAM_REGISTRY
+): StreamPolicy {
+  return source.streams[stream];
+}
 
 export function normalizeDomain(value: string): string {
   return value.trim().toLowerCase().replace(/^@/, '').replace(/\.$/, '');
@@ -93,39 +131,68 @@ export function senderDomainOf(from: string | null | undefined): string | null {
 
 export type StreamEnv = Record<string, string | undefined>;
 
+/** The stream's sending domain: env override (after verification), else registry. */
 export function getStreamDomain(
   stream: EmailStream,
-  source: StreamEnv = process.env
+  source: StreamEnv = process.env,
+  reg: EmailStreamRegistry = EMAIL_STREAM_REGISTRY
 ): string | null {
-  const configured = source[STREAM_DOMAIN_ENV[stream]]?.trim();
+  const policy = streamPolicy(stream, reg);
+  const configured = source[policy.fromDomainEnv]?.trim();
   if (configured) return normalizeDomain(configured);
-  return DEFAULT_STREAM_DOMAIN[stream];
+  return policy.fromDomain;
 }
 
 export interface StreamViolation {
-  stream: EmailStream;
-  rule: 'cold-on-core-domain' | 'cold-without-domain';
-  domain: string | null;
+  readonly stream: EmailStream;
+  readonly rule:
+    | 'cold-on-core-domain'
+    | 'cold-on-transactional-provider'
+    | 'provider-not-allowed';
+  readonly detail: string;
 }
 
 /**
- * Hard rules. Cold mail never uses jov.ie or any subdomain of it. A cold
- * domain that is unset is not a violation of this rule: it means the stream is
- * closed, and `requireStreamDomain` refuses to send.
+ * Registry and environment rules that must always hold. Cold mail never uses
+ * jov.ie or a subdomain, and never a provider whose terms forbid it.
  */
 export function findHardViolations(
-  source: StreamEnv = process.env
+  source: StreamEnv = process.env,
+  reg: EmailStreamRegistry = EMAIL_STREAM_REGISTRY
 ): StreamViolation[] {
-  const cold = getStreamDomain('cold', source);
-  return cold && isCoreDomain(cold)
-    ? [{ stream: 'cold', rule: 'cold-on-core-domain', domain: cold }]
-    : [];
+  const out: StreamViolation[] = [];
+  const cold = getStreamDomain('cold', source, reg);
+  if (cold && isCoreDomain(cold)) {
+    out.push({
+      stream: 'cold',
+      rule: 'cold-on-core-domain',
+      detail: `cold domain ${cold} is ${CORE_DOMAIN} or a subdomain of it`,
+    });
+  }
+  const coldProvider = streamPolicy('cold', reg).provider;
+  if (coldProvider === 'resend') {
+    out.push({
+      stream: 'cold',
+      rule: 'cold-on-transactional-provider',
+      detail: 'cold may not use the Resend transactional account',
+    });
+  }
+  for (const stream of Object.keys(reg.streams) as EmailStream[]) {
+    const provider = streamPolicy(stream, reg).provider;
+    if (!provider) continue;
+    const allowed = reg.providers[provider]?.streams ?? [];
+    if (!allowed.includes(stream)) {
+      out.push({
+        stream,
+        rule: 'provider-not-allowed',
+        detail: `${provider} does not permit the ${stream} stream`,
+      });
+    }
+  }
+  return out;
 }
 
-/**
- * Separation status. Not a hard failure: it reports whether lifecycle and
- * founder mail still share a domain (and so a reputation) with transactional.
- */
+/** Streams that still share a domain (and so a reputation) with transactional. */
 export function separationGaps(
   source: StreamEnv = process.env
 ): { stream: EmailStream; sharesWith: EmailStream; domain: string }[] {
@@ -135,7 +202,7 @@ export function separationGaps(
     sharesWith: EmailStream;
     domain: string;
   }[] = [];
-  for (const stream of ['lifecycle', 'founder'] as const) {
+  for (const stream of ['lifecycle', 'founder', 'broadcast'] as const) {
     const domain = getStreamDomain(stream, source);
     if (domain && tx && domain === tx) {
       gaps.push({ stream, sharesWith: 'transactional', domain });
@@ -144,50 +211,29 @@ export function separationGaps(
   return gaps;
 }
 
-/** Throws unless `stream` has a usable sending domain. */
-export function requireStreamDomain(
-  stream: EmailStream,
-  source: StreamEnv = process.env
-): string {
-  const violations = findHardViolations(source);
-  if (stream === 'cold' && violations.length > 0) {
-    throw new Error(
-      `Cold email stream may not use ${violations[0]?.domain}: cold outreach never uses ${CORE_DOMAIN} or its subdomains.`
-    );
-  }
-  const domain = getStreamDomain(stream, source);
-  if (!domain) {
-    throw new Error(
-      `Email stream "${stream}" has no sending domain. Set ${STREAM_DOMAIN_ENV[stream]}.`
-    );
-  }
-  return domain;
-}
-
-export function isProviderAllowedForStream(
-  provider: EmailProviderName,
-  stream: EmailStream
-): boolean {
-  return (PROVIDER_STREAMS[provider] as readonly EmailStream[]).includes(
-    stream
-  );
-}
-
-/** Which stream a sender address belongs to, by configured domain. */
+/**
+ * The stream a sender domain belongs to, for provider events that carry no
+ * `stream` tag. A domain shared by several streams reports the first match
+ * (transactional), so the attribution is conservative.
+ */
 export function streamForSenderDomain(
   domain: string,
   source: StreamEnv = process.env
 ): EmailStream | 'unknown' {
   const d = normalizeDomain(domain);
-  // Most specific first: a domain shared by several streams reports the
-  // strictest (transactional) so the metric is conservative.
-  for (const stream of [
-    'transactional',
-    'lifecycle',
-    'founder',
-    'cold',
-  ] as const) {
+  for (const stream of EMAIL_STREAMS) {
     if (getStreamDomain(stream, source) === d) return stream;
   }
   return 'unknown';
+}
+
+/** The stream's default sender address, e.g. `notifications@send.jov.ie`. */
+export function streamFromEmail(
+  stream: EmailStream,
+  source: StreamEnv = process.env
+): string | null {
+  const policy = streamPolicy(stream);
+  const domain = getStreamDomain(stream, source);
+  if (!domain || !policy.fromLocalPart) return null;
+  return `${policy.fromLocalPart}@${domain}`;
 }

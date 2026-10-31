@@ -61,16 +61,12 @@ export function StepCard({
           className={cn(cardBaseClasses, interactive && 'hover:border-strong')}
         >
           <div className='text-center'>
-            {/* Icon circle */}
-            <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-accent text-on-accent shadow-lg'>
-              {icon}
-            </div>
+            {/* Bare icon: no bordered or filled tile. */}
+            <div className='mx-auto inline-flex text-accent'>{icon}</div>
 
             <div className='mt-6'>
-              {/* Step number */}
-              <div className='text-xs font-semibold uppercase tracking-wider text-accent'>
-                Step {stepNumber}
-              </div>
+              {/* The count is screen-reader only; never visible text. */}
+              <span className='sr-only'>Step {stepNumber}</span>
 
               {/* Title */}
               <TitleTag className='mt-3 text-xl font-semibold text-primary-token'>

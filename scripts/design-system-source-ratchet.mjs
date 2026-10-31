@@ -25,6 +25,12 @@ import {
 } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { evaluateBaseDesignRatchet } from './design-system-base-ratchet.mjs';
+
+export {
+  RAW_HEX_PATTERN,
+  RAW_PALETTE_PATTERN,
+} from './design-system-base-ratchet.mjs';
 
 const THIS_DIR = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = join(THIS_DIR, '..');
@@ -405,14 +411,20 @@ function main() {
   }
 
   const result = evaluateDesignSystemSourceRatchet();
+  const baseResult = evaluateBaseDesignRatchet();
   const summary = `${result.metrics[0].count} identities (${result.metrics[0].newCount} new / baseline ${result.metrics[0].baseline})`;
-  if (!result.ok) {
+  if (!result.ok || !baseResult.ok) {
     console.error(`[design-system-source-ratchet] FAIL — ${summary}`);
     for (const issue of result.issues) console.error(issue);
+    for (const identity of baseResult.newIdentities)
+      console.error(`new design identity: ${identity}`);
     process.exitCode = 1;
     return;
   }
   console.log(`[design-system-source-ratchet] PASS — ${summary}`);
+  console.log(
+    `[design-system-base-ratchet] PASS — ${baseResult.identities.length} identities (0 new / base ${baseResult.base})`
+  );
 }
 
 if (

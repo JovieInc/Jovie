@@ -1,10 +1,11 @@
 import {
+  EMAIL_STREAM_REGISTRY,
   type EmailStream,
   findHardViolations,
-  STREAM_THRESHOLDS,
   type StreamEnv,
   separationGaps,
   streamForSenderDomain,
+  streamPolicy,
 } from './streams';
 
 export const STREAM_DELIVERABILITY_SCHEMA = 'jovie.email-deliverability/v1';
@@ -30,7 +31,7 @@ export interface DomainDeliverability {
 }
 
 /** Below this many outcomes a rate is noise, so it is reported but not judged. */
-export const MIN_SAMPLE = 50;
+export const MIN_SAMPLE = EMAIL_STREAM_REGISTRY.deliverability.minSample;
 
 export function summarizeDeliverability(
   rows: readonly DeliveryCountRow[],
@@ -69,10 +70,9 @@ export function summarizeDeliverability(
     if (outcomes >= MIN_SAMPLE) {
       entry.bounceRate = entry.bounced / outcomes;
       entry.complaintRate = entry.complained / Math.max(entry.delivered, 1);
-      const limits =
-        entry.stream === 'unknown'
-          ? STREAM_THRESHOLDS.transactional
-          : STREAM_THRESHOLDS[entry.stream];
+      const limits = streamPolicy(
+        entry.stream === 'unknown' ? 'transactional' : entry.stream
+      ).thresholds;
       if (entry.bounceRate > limits.bounceRate)
         entry.breaches.push(
           `bounce ${(entry.bounceRate * 100).toFixed(2)}% > ${limits.bounceRate * 100}%`

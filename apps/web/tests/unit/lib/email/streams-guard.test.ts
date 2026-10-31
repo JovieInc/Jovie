@@ -1,12 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import {
-  CORE_DOMAIN,
-  DEFAULT_STREAM_DOMAIN,
-  isCoreDomain,
-  TARGET_STREAM_DOMAIN,
-} from '@/lib/email/streams';
+import { CORE_DOMAIN, isCoreDomain, streamPolicy } from '@/lib/email/streams';
 import { isColdClaimInviteSendOpen } from '@/lib/outbound/cold-claim-invites';
 
 /**
@@ -37,10 +32,13 @@ function stripComments(source: string): string {
 
 describe('email stream guard', () => {
   it('has no default or target cold domain, and none under jov.ie', () => {
-    expect(DEFAULT_STREAM_DOMAIN.cold).toBeNull();
-    expect(TARGET_STREAM_DOMAIN.cold).toBeNull();
-    for (const map of [DEFAULT_STREAM_DOMAIN, TARGET_STREAM_DOMAIN]) {
-      if (map.cold) expect(isCoreDomain(map.cold)).toBe(false);
+    expect(streamPolicy('cold').fromDomain).toBeNull();
+    expect(streamPolicy('cold').targetFromDomain ?? null).toBeNull();
+    for (const domain of [
+      streamPolicy('cold').fromDomain,
+      streamPolicy('cold').targetFromDomain,
+    ]) {
+      if (domain) expect(isCoreDomain(domain)).toBe(false);
     }
   });
 

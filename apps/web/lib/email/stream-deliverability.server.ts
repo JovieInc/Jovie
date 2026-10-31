@@ -7,8 +7,9 @@ import {
   type DeliveryCountRow,
   summarizeDeliverability,
 } from './stream-deliverability';
+import { EMAIL_STREAM_REGISTRY } from './streams';
 
-const WINDOW_DAYS = 7;
+const WINDOW_DAYS = EMAIL_STREAM_REGISTRY.deliverability.windowDays;
 
 export async function loadStreamDeliverability(now = new Date()) {
   const result = await db.execute(drizzleSql`

@@ -1,7 +1,8 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { BadgeCheck, BarChart3, Sparkles, Wallet } from 'lucide-react';
+import { BadgeCheck, BarChart3, Mail, Sparkles } from 'lucide-react';
+import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { recordOnboardingUpgradeOfferDecision } from '@/app/onboarding/actions/upgrade-offer';
@@ -19,7 +20,8 @@ import { track } from '@/lib/analytics';
 import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import { clearPlanIntent, type PlanIntentTier } from '@/lib/auth/plan-intent';
 import { PROOF_PENDING_TERMS } from '@/lib/claim/proof-terms';
-import { getEntitlements } from '@/lib/entitlements/registry';
+import { getEntitlements, getLimit } from '@/lib/entitlements/registry';
+import type { OnboardingCatalogPreview } from '@/lib/onboarding/catalog-preview';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import type { ClaimTimeFinding } from '@/lib/proof/claim-time-proof';
 import { cn } from '@/lib/utils';
@@ -41,6 +43,8 @@ interface OnboardingCheckoutClientProps {
   readonly proofFindings?: readonly ClaimTimeFinding[];
   /** Free-admission page waiting for ownership proof: say so before paying. */
   readonly proofPending?: boolean;
+  /** JOV-9758: the artist's real catalog, shown above the price. */
+  readonly catalog?: OnboardingCatalogPreview | null;
 }
 
 // formatPrice replaced by formatAmount per @jovie/no-ad-hoc-currency rule
@@ -53,25 +57,91 @@ function getAnnualSavingsPercent(
   return Math.round(((yearlyAtMonthly - annualAmount) / yearlyAtMonthly) * 100);
 }
 
+const PRO_ANALYTICS_DAYS = getLimit('pro', 'analyticsRetentionDays');
+
+// Paid-only, entitlement-gated items. Tips are not plan-gated, so they are not
+// sold as an upgrade; verification is a reviewed request, not automatic.
 const OFFER_HIGHLIGHTS = [
   {
-    // JOV-7794: a certified capability, not internal-only monitoring.
-    icon: Wallet,
-    label: 'Payments',
-    detail: 'Take tips and payments on your profile',
+    icon: Mail,
+    label: 'Release Emails',
+    detail: 'Email your verified subscribers when new music drops',
   },
   {
     icon: BarChart3,
-    // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Numeric-leading duration is valid Title Case; the rule's canonical suggestion is identical.
-    label: '90-day Analytics',
+    label: `${PRO_ANALYTICS_DAYS}-day Analytics`,
     detail: 'Geographic insights & advanced data',
   },
   {
     icon: BadgeCheck,
     label: 'Verified Badge',
-    detail: 'Build trust with your audience',
+    detail: 'Request verification, reviewed by our team',
   },
 ] as const;
+
+function releaseYear(releaseDate: string | null): string | null {
+  return releaseDate?.slice(0, 4) || null;
+}
+
+/**
+ * JOV-9758: value before price. The artist sees their own releases on their
+ * page before the plan and price render.
+ */
+function CatalogPreviewCard({
+  catalog,
+}: {
+  readonly catalog: OnboardingCatalogPreview;
+}) {
+  const visible = catalog.releases.slice(0, 3);
+  if (visible.length === 0) return null;
+  return (
+    <div className='mb-6' data-testid='checkout-catalog-preview'>
+      <ContentSurfaceCard>
+        <div className='p-4'>
+          <p className='mb-3 text-xs font-medium text-tertiary-token tabular-nums'>
+            {catalog.total === 1
+              ? '1 release on your page'
+              : `${catalog.total} releases on your page`}
+          </p>
+          <ul className='space-y-2'>
+            {visible.map((release, index) => (
+              <li
+                key={release.id}
+                className='flex items-center gap-3'
+                data-testid='checkout-catalog-release'
+              >
+                {release.artworkUrl ? (
+                  <Image
+                    src={release.artworkUrl}
+                    alt=''
+                    width={40}
+                    height={40}
+                    className='h-10 w-10 shrink-0 rounded-md object-cover'
+                  />
+                ) : (
+                  <div className='h-10 w-10 shrink-0 rounded-md bg-surface-2' />
+                )}
+                <div className='min-w-0'>
+                  <p className='truncate text-app font-medium text-primary-token'>
+                    {release.title}
+                  </p>
+                  <p className='text-xs text-tertiary-token tabular-nums'>
+                    {[
+                      index === 0 ? 'Latest' : null,
+                      releaseYear(release.releaseDate),
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </ContentSurfaceCard>
+    </div>
+  );
+}
 
 interface ProfilePreviewCardProps {
   readonly avatarUrl: string | null;
@@ -252,6 +322,7 @@ export function OnboardingCheckoutClient({
   isDefaultUpsell,
   proofFindings = [],
   proofPending = false,
+  catalog = null,
 }: OnboardingCheckoutClientProps) {
   const searchParams = useSearchParams();
   // Pre-compute savings to determine annual default
@@ -380,6 +451,8 @@ export function OnboardingCheckoutClient({
             username={username}
           />
         ) : null}
+
+        {catalog ? <CatalogPreviewCard catalog={catalog} /> : null}
 
         {proofPending ? (
           <p

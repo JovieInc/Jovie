@@ -13,6 +13,7 @@ import {
   ADMIN_NAV_REGISTRY,
   ADMIN_PRIMARY_WORKSPACE_IDS,
   ADMIN_SETTINGS_TOOL_IDS,
+  ADMIN_WORKSPACE_TABS,
 } from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { resolveAppShellModeFromPathname } from '@/lib/app-shell/mode';
@@ -114,10 +115,24 @@ describe('exclusive customer vs OV navigation', () => {
       'Investors',
       'Revenue Lift',
     ]);
-    expect(ADMIN_SETTINGS_TOOL_IDS.slice(0, 2)).toEqual(['product', 'ops']);
-    expect(
-      ADMIN_NAV_REGISTRY.find(item => item.id === 'activity')
-    ).toMatchObject({ label: 'Timeline', section: 'utilities' });
+    expect(ADMIN_SETTINGS_TOOL_IDS.slice(0, 2)).toEqual([
+      'ops',
+      'certifications',
+    ]);
+    // Product and Timeline are Shipping views, Agents is a Fleet view: they
+    // keep their routes but have no sidebar row.
+    for (const id of ['product', 'activity']) {
+      expect(ADMIN_NAV_REGISTRY.some(item => item.id === id)).toBe(false);
+    }
+    expect(ADMIN_WORKSPACE_TABS.shipping.map(tab => tab.label)).toEqual([
+      'Pipeline',
+      'Customer Reality',
+      'Timeline',
+    ]);
+    expect(ADMIN_WORKSPACE_TABS.operations.map(tab => tab.label)).toEqual([
+      'Health',
+      'Agents',
+    ]);
     expect(
       ADMIN_NAV_REGISTRY.filter(item =>
         ['certifications', 'shipping'].includes(item.id)
@@ -127,6 +142,13 @@ describe('exclusive customer vs OV navigation', () => {
       { id: 'certifications', section: 'utilities' },
     ]);
     expect(ADMIN_SETTINGS_TOOL_IDS).toContain('certifications');
+    expect(
+      ADMIN_NAV_REGISTRY.find(item => item.id === 'capacity')
+    ).toMatchObject({
+      label: 'Agent Plans',
+      href: APP_ROUTES.ADMIN_CAPACITY,
+      section: 'utilities',
+    });
   });
 
   it('gives every operator review workspace a canonical navigation door', () => {

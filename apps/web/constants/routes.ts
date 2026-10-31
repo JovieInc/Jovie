@@ -191,6 +191,7 @@ export const APP_ROUTES = {
   DEMO: '/demo',
   DEMO_VIDEO: '/demovideo',
   DEVELOPERS: '/developers',
+  DEVELOPERS_AGENTS: '/developers/agents',
   CLI: '/cli',
   API_VERSIONING: '/api-versioning',
   ENGAGEMENT_ENGINE: '/engagement-engine',

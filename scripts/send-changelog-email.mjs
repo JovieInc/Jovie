@@ -22,6 +22,9 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import emailStreamRegistry from '../apps/web/lib/email/stream-registry.json' with {
+  type: 'json',
+};
 import { isInternalEntry } from './lib/changelog-filter-rules.mjs';
 import { getLatestRelease } from './lib/changelog-parser.mjs';
 
@@ -183,12 +186,12 @@ async function main() {
       process.exit(0);
     }
 
-    // Lifecycle stream: changelog mail goes to opted-in subscribers from the
-    // lifecycle domain, never the transactional one (lib/email/streams.ts).
-    const lifecycleDomain =
-      process.env.EMAIL_STREAM_LIFECYCLE_DOMAIN?.trim() || 'send.jov.ie';
-    const fromEmail =
-      process.env.CHANGELOG_FROM_EMAIL || `Jovie <updates@${lifecycleDomain}>`;
+    // Opted-in changelog mail follows the canonical broadcast stream policy.
+    const broadcastPolicy = emailStreamRegistry.streams.broadcast;
+    const broadcastDomain =
+      process.env[broadcastPolicy.fromDomainEnv]?.trim() ||
+      broadcastPolicy.fromDomain;
+    const fromEmail = `Jovie <${broadcastPolicy.fromLocalPart}@${broadcastDomain}>`;
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://jov.ie';
     let sent = 0;
     let errors = 0;

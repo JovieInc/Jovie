@@ -27,6 +27,28 @@ describe('ProfilePrimaryActionCard', () => {
     expect(screen.getByText('Listen')).toBeInTheDocument();
   });
 
+  it('renders the collaborator line through the canonical credit formatter', () => {
+    render(
+      <ProfilePrimaryActionCard
+        artist={PROFILE_STORY_ARTIST}
+        latestRelease={{
+          title: 'Neon Hearts',
+          slug: 'neon-hearts',
+          artworkUrl: '/images/releases/neon-hearts.jpg',
+          releaseDate: new Date(Date.now() - 5 * 86_400_000).toISOString(),
+          releaseType: 'single',
+          metadata: { artistNames: ['Tim White', 'Cosmic Gate', 'LYNX'] },
+        }}
+        tourDates={[]}
+        hasPlayableDestinations={false}
+      />
+    );
+
+    // ds-cert:credit-format: the profile card never joins credit names
+    // locally — collaborators render as "w/ A and B".
+    expect(screen.getByText('w/ Cosmic Gate and LYNX')).toBeInTheDocument();
+  });
+
   it('renders nothing when no action state is eligible', () => {
     render(
       <ProfilePrimaryActionCard

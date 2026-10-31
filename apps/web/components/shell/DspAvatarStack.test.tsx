@@ -87,6 +87,25 @@ describe('DspAvatarStack', () => {
     expect(screen.queryByText(/^\+/)).not.toBeInTheDocument();
   });
 
+  it.each([
+    { dsps: ITEMS, maxVisible: 1, name: 'View DSP Distribution Details +2' },
+    { dsps: ITEMS, maxVisible: 2, name: 'View DSP Distribution Details +1' },
+    { dsps: ITEMS, maxVisible: 3, name: 'View DSP Distribution Details' },
+    { dsps: [ITEMS[1]], maxVisible: 1, name: 'View DSP Distribution Details' },
+  ])(
+    'names the DSP trigger from its content with maxVisible=$maxVisible and $dsps.length DSPs (WCAG 2.5.3, JOV-8781)',
+    ({ dsps, maxVisible, name }) => {
+      render(<DspAvatarStack dsps={dsps} maxVisible={maxVisible} />);
+
+      const trigger = screen.getByRole('button', {
+        name: /View DSP Distribution Details/,
+      });
+      expect(trigger).not.toHaveAttribute('aria-label');
+      expect(trigger).not.toHaveAttribute('aria-labelledby');
+      expect(trigger).toHaveAccessibleName(name);
+    }
+  );
+
   it('lists every DSP label inside the popover', async () => {
     render(<DspAvatarStack dsps={ITEMS} />);
     await revealDetails();

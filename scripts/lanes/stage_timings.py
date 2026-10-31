@@ -37,7 +37,9 @@ def compute(state_dir, now: float, window_s: int = WINDOW_S) -> dict:
     try:
         handle = open(Path(state_dir) / "runs" / "ledger.jsonl", "rb")
     except OSError:
-        return {"schema": SCHEMA, "windowS": window_s, "observedAt": now, "stages": {}, "error": "ledger-unreadable"}
+        release = release_stage(state_dir, now, window_s)
+        return {"schema": SCHEMA, "windowS": window_s, "observedAt": now, "error": "ledger-unreadable",
+                "stages": {RELEASE_STAGE: release} if release else {}}
     with handle:
         for raw in handle:
             if b"jovie-lane-run" not in raw:
@@ -60,7 +62,27 @@ def compute(state_dir, now: float, window_s: int = WINDOW_S) -> dict:
         n = len(slot["durations"])
         out[name] = {"count": n, "convertedPerAttempt": round(slot["converted"] / n, 3), "claimErrors": slot["claimErrors"],
                      "p50S": _pct(slot["durations"], .5), "p95S": _pct(slot["durations"], .95)}
+    release = release_stage(state_dir, now, window_s)
+    if release:
+        out[RELEASE_STAGE] = release
     return {"schema": SCHEMA, "windowS": window_s, "observedAt": now, "stages": out}
+
+
+# Merge -> production lead time per release, recorded by deploy_health when the SHA jov.ie serves changes
+# (deploy-lag-jovie.json `releases`; leadTimeS is the release's newest merge to its production deploy).
+RELEASE_STAGE, RELEASE_FILE = "release/merge-to-production", "deploy-lag-jovie.json"
+
+
+def release_stage(state_dir, now: float, window_s: int = WINDOW_S) -> dict | None:
+    try:
+        rows = json.loads((Path(state_dir) / RELEASE_FILE).read_text()).get("releases") or []
+    except (OSError, ValueError, AttributeError):
+        return None
+    lead = [float(r["leadTimeS"]) for r in rows if isinstance(r, dict) and isinstance(r.get("leadTimeS"), int)
+            and isinstance(r.get("at"), (int, float)) and 0 <= now - r["at"] <= window_s]
+    if not lead:
+        return None
+    return {"count": len(lead), "p50S": _pct(lead, .5), "p95S": _pct(lead, .95)}
 
 
 def cached(state_dir, now: float) -> dict:

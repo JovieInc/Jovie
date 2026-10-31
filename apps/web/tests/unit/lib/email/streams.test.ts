@@ -4,71 +4,113 @@ import {
   summarizeDeliverability,
 } from '@/lib/email/stream-deliverability';
 import {
+  CORE_DOMAIN,
+  EMAIL_STREAM_REGISTRY,
+  EMAIL_STREAMS,
+  type EmailStreamRegistry,
   findHardViolations,
   getStreamDomain,
   isCoreDomain,
-  isProviderAllowedForStream,
-  requireStreamDomain,
+  isEmailStream,
+  normalizeDomain,
   senderDomainOf,
   separationGaps,
   streamForSenderDomain,
+  streamFromEmail,
+  streamPolicy,
 } from '@/lib/email/streams';
 
-describe('email streams', () => {
-  it('defaults keep production on send.jov.ie and leave cold closed', () => {
-    expect(getStreamDomain('transactional', {})).toBe('send.jov.ie');
-    expect(getStreamDomain('founder', {})).toBe('send.jov.ie');
-    expect(getStreamDomain('cold', {})).toBeNull();
-    expect(() => requireStreamDomain('cold', {})).toThrow(/no sending domain/);
+describe('email stream registry', () => {
+  it('declares exactly the typed streams', () => {
+    expect(Object.keys(EMAIL_STREAM_REGISTRY.streams).sort()).toEqual(
+      [...EMAIL_STREAMS].sort()
+    );
+    expect(isEmailStream('broadcast')).toBe(true);
+    expect(isEmailStream('newsletter')).toBe(false);
+    expect(isEmailStream(undefined)).toBe(false);
   });
 
-  it('env moves a stream to its own domain and clears the separation gap', () => {
+  it('keeps cold closed, off jov.ie and off the Resend account', () => {
+    const cold = streamPolicy('cold');
+    expect(cold.status).toBe('closed');
+    expect(cold.provider).toBeNull();
+    expect(EMAIL_STREAM_REGISTRY.providers.resend.streams).not.toContain(
+      'cold'
+    );
+    expect(findHardViolations({})).toEqual([]);
+  });
+
+  it('flags cold pointed at jov.ie or any subdomain', () => {
+    for (const domain of ['jov.ie', 'send.jov.ie', 'outreach.jov.ie.']) {
+      expect(findHardViolations({ EMAIL_STREAM_COLD_DOMAIN: domain })).toEqual([
+        expect.objectContaining({
+          stream: 'cold',
+          rule: 'cold-on-core-domain',
+        }),
+      ]);
+    }
+    expect(
+      findHardViolations({ EMAIL_STREAM_COLD_DOMAIN: 'meetjovie.com' })
+    ).toEqual([]);
+  });
+
+  it('flags cold on Resend and a provider that does not permit its stream', () => {
+    const bad = structuredClone(EMAIL_STREAM_REGISTRY) as EmailStreamRegistry;
+    (bad.streams.cold as { provider: string | null }).provider = 'resend';
+    const rules = findHardViolations({}, bad).map(v => v.rule);
+    expect(rules).toContain('cold-on-transactional-provider');
+    expect(rules).toContain('provider-not-allowed');
+  });
+
+  it('resolves sending domains from env overrides, else the registry', () => {
+    expect(getStreamDomain('transactional', {})).toBe('send.jov.ie');
+    expect(
+      getStreamDomain('lifecycle', {
+        EMAIL_STREAM_LIFECYCLE_DOMAIN: ' Notify.Jov.ie ',
+      })
+    ).toBe('notify.jov.ie');
+    expect(getStreamDomain('cold', {})).toBeNull();
+    expect(streamFromEmail('transactional', {})).toBe(
+      'notifications@send.jov.ie'
+    );
+    expect(streamFromEmail('cold', {})).toBeNull();
+    expect(streamFromEmail('inbox', {})).toBeNull();
+  });
+
+  it('reports streams that still share the transactional reputation', () => {
     expect(separationGaps({}).map(g => g.stream)).toEqual([
       'lifecycle',
       'founder',
+      'broadcast',
     ]);
-    const env = {
-      EMAIL_STREAM_LIFECYCLE_DOMAIN: 'notify.jov.ie',
-      EMAIL_STREAM_FOUNDER_DOMAIN: ' Notify.jov.ie. ',
-    };
-    expect(separationGaps(env)).toEqual([]);
-    expect(requireStreamDomain('founder', env)).toBe('notify.jov.ie');
+    expect(
+      separationGaps({
+        EMAIL_STREAM_LIFECYCLE_DOMAIN: 'notify.jov.ie',
+        EMAIL_STREAM_FOUNDER_DOMAIN: 'notify.jov.ie',
+        EMAIL_STREAM_BROADCAST_DOMAIN: 'notify.jov.ie',
+      })
+    ).toEqual([]);
   });
 
-  it.each(['jov.ie', 'mail.jov.ie', '@Send.JOV.ie.'])(
-    'refuses cold on core domain %s',
-    domain => {
-      const env = { EMAIL_STREAM_COLD_DOMAIN: domain };
-      expect(findHardViolations(env)).toHaveLength(1);
-      expect(() => requireStreamDomain('cold', env)).toThrow(
-        /never uses jov\.ie/
-      );
-    }
-  );
-
-  it('allows cold on a separate domain and does not confuse lookalikes with core', () => {
-    const env = { EMAIL_STREAM_COLD_DOMAIN: 'meetjovie.com' };
-    expect(findHardViolations(env)).toEqual([]);
-    expect(requireStreamDomain('cold', env)).toBe('meetjovie.com');
-    expect(isCoreDomain('notjov.ie')).toBe(false);
-    expect(isCoreDomain('jov.ie.evil.com')).toBe(false);
-  });
-
-  it('restricts providers by stream (Resend forbids cold, Cloudflare is transactional only)', () => {
-    expect(isProviderAllowedForStream('resend', 'cold')).toBe(false);
-    expect(isProviderAllowedForStream('resend', 'lifecycle')).toBe(true);
-    expect(isProviderAllowedForStream('cloudflare-email', 'lifecycle')).toBe(
-      false
+  it('parses sender domains and attributes them to streams', () => {
+    expect(senderDomainOf('Jovie <notifications@Send.Jov.ie>')).toBe(
+      'send.jov.ie'
     );
-    expect(isProviderAllowedForStream('instantly', 'cold')).toBe(true);
+    expect(senderDomainOf('tim@jov.ie')).toBe('jov.ie');
+    expect(senderDomainOf('no address')).toBeNull();
+    expect(senderDomainOf(undefined)).toBeNull();
+    expect(streamForSenderDomain('send.jov.ie', {})).toBe('transactional');
+    expect(streamForSenderDomain('jovie.fm', {})).toBe('inbox');
+    expect(streamForSenderDomain('example.com', {})).toBe('unknown');
   });
 
-  it('parses sender domains', () => {
-    expect(senderDomainOf('Tim White <tim@Send.jov.ie>')).toBe('send.jov.ie');
-    expect(senderDomainOf('a@b.co')).toBe('b.co');
-    expect(senderDomainOf('nope')).toBeNull();
-    expect(streamForSenderDomain('send.jov.ie', {})).toBe('transactional');
-    expect(streamForSenderDomain('other.com', {})).toBe('unknown');
+  it('normalizes domains and recognises the core domain', () => {
+    expect(CORE_DOMAIN).toBe('jov.ie');
+    expect(normalizeDomain('@Send.Jov.ie.')).toBe('send.jov.ie');
+    expect(isCoreDomain('jov.ie')).toBe(true);
+    expect(isCoreDomain('send.jov.ie')).toBe(true);
+    expect(isCoreDomain('notjov.ie')).toBe(false);
+    expect(isCoreDomain('meetjovie.com')).toBe(false);
   });
 });
 
