@@ -40,8 +40,8 @@ enabled = true
 
 [vars]
 # Kinds the hub answers (read-only, Workers AI) when no real reader handled their mail within the grace.
-# aeon is out: it has a real executor (mesh-worker on the office Air, canon MESH-SWARM.md).
-EXECUTOR_KINDS = "codex,grokbot,chloe,lola,muse,dots,stella,instinct,devin"
+# aeon, grokbot and stella are out: each has a real reader (canon MESH-SWARM.md); a stand-in would ack their mail first.
+EXECUTOR_KINDS = "codex,chloe,lola,muse,dots,instinct,devin"
 EXECUTOR_GRACE_MS = "20000"
 # Alarm once when peer mail sits unhandled this long (ms).
 MAIL_STALE_MS = "600000"
