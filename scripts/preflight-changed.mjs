@@ -365,7 +365,13 @@ function biomeTargets(files) {
 export function typecheckTargets(files, cwd) {
   const out = new Set();
   for (const f of files) {
-    if (f.status === 'removed' || !/\.(?:tsx?|mts|cts)$/.test(f.filename))
+    if (
+      f.status === 'removed' ||
+      !(
+        /\.(?:tsx?|mts|cts)$/.test(f.filename) ||
+        /^scripts\/.*\.mjs$/.test(f.filename)
+      )
+    )
       continue;
     const isTest = /\.(?:test|spec)\.[^/]+$|\/tests?\//.test(f.filename);
     const web = f.filename.startsWith('apps/web/');
