@@ -14,7 +14,8 @@ time-to-limit is shorter than the resource's lead time to fix (minutes for a cle
 hardware, hours for cloud containers, same day for a budget). Alarms are change-only events on the
 host-alarms feed plus an escalation card (recommendation, default, deadline). Nothing is bought:
 cards are decisions for Tim. Auto-remediation runs only allowlisted registry commands, only with
---remediate, only on the resource's own host. No secrets are read or printed (Doppler: names only).
+--remediate, only on the resource's own host. No secrets are printed (Doppler: names only, plus
+named token lookups read in memory, never logged).
 """
 from __future__ import annotations
 
@@ -36,6 +37,12 @@ WINDOW_S = 7 * 86400
 MIN_SPAN_S = 6 * 3600
 HEADROOM_WARN = 0.85
 INF = float("inf")
+
+# Why a collector last returned no reading, keyed "<collector-type>:<metric>": surfaces the
+# exact cause (missing variable, HTTP status) into GAP rows so the doctor card names the fix
+# instead of a bare "collector is blind".
+COLLECTOR_ERRORS: dict[str, str] = {}
+LAST_HTTP_ERROR = ""
 
 
 def iso(t: float) -> str:
@@ -123,19 +130,31 @@ def c_spend(spec: dict, now: float) -> dict | None:
 
 
 def _http_json(url: str, token: str, method: str = "GET") -> dict | None:
+    global LAST_HTTP_ERROR
+    import urllib.error
     import urllib.request
+    LAST_HTTP_ERROR = ""
     try:
         req = urllib.request.Request(url, method=method, headers={"Authorization": f"Bearer {token}"})
         with urllib.request.urlopen(req, timeout=20) as r:
             return json.load(r)
+    except urllib.error.HTTPError as e:
+        LAST_HTTP_ERROR = f"HTTP {e.code}"
+        return None
     except (OSError, ValueError):
+        LAST_HTTP_ERROR = "unreachable"
         return None
 
 
 def neon_token() -> str | None:
-    """NEON_API_KEY, else the neonctl OAuth token on this host (read in memory, never printed)."""
+    """NEON_API_KEY from the environment, then the Doppler lanes store (agent-mesh/prd, the same
+    store c_resend reads RESEND_READ_KEY from), then the neonctl OAuth token on this host
+    (read in memory, never printed)."""
     if os.environ.get("NEON_API_KEY"):
-        return os.environ["NEON_API_KEY"]
+        return os.environ["NEON_API_KEY"].strip()
+    token = run(["doppler", "secrets", "get", "NEON_API_KEY", "-p", "agent-mesh", "-c", "prd", "--plain"])
+    if token and token.strip():
+        return token.strip()
     try:
         return json.loads((Path.home() / ".config/neonctl/credentials.json").read_text())["access_token"]
     except (OSError, ValueError, KeyError):
@@ -150,18 +169,25 @@ def c_neon(spec: dict, now: float) -> dict | None:
     """
     token = neon_token()
     if not token:
+        COLLECTOR_ERRORS[f"neon:{spec.get('metric', '')}"] = (
+            "no NEON_API_KEY on this host — add it to Doppler agent-mesh/prd (the lanes store the "
+            "collector already reads) or the collector's environment; provisioning is Tim-only")
         return None
     base = "https://console.neon.tech/api/v2"
     org = spec["orgId"]
     if spec["metric"] == "branches":
         proj = _http_json(f"{base}/projects/{spec['projectId']}/branches?limit=500", token)
-        return {"value": len(proj["branches"]), "limit": spec["limit"]} if proj else None
+        if not proj:
+            COLLECTOR_ERRORS[f"neon:{spec.get('metric', '')}"] = f"Neon API {LAST_HTTP_ERROR or 'unreachable'}"
+            return None
+        return {"value": len(proj["branches"]), "limit": spec["limit"]}
     start = datetime.fromtimestamp(now, timezone.utc).replace(day=1, hour=0, minute=0, second=0)
     stamp = lambda d: d.strftime("%Y-%m-%dT%H:%M:%SZ")
     url = (f"{base}/consumption_history/v2/projects?org_id={org}&granularity=daily&from={stamp(start)}"
            f"&to={iso(now)}&limit=100&metrics=compute_unit_seconds,public_network_transfer_bytes,extra_branches_month")
     data = _http_json(url, token)
     if not data:
+        COLLECTOR_ERRORS[f"neon:{spec.get('metric', '')}"] = f"Neon API {LAST_HTTP_ERROR or 'unreachable'}"
         return None
     totals: dict[str, float] = {}
     for proj in data.get("projects", []):
@@ -275,6 +301,15 @@ def evaluate(res: dict, reading: dict | None, history: list[tuple[float, float]]
     return row
 
 
+def apply_collector_error(row: dict, res: dict) -> dict:
+    """Surface a recorded collector failure reason into a GAP row's why (no-op when it read fine)."""
+    if "value" not in row:
+        reason = COLLECTOR_ERRORS.get(f"{res['collector']['type']}:{res['collector'].get('metric', '')}")
+        if reason:
+            row["why"] = reason
+    return row
+
+
 def card(res: dict, row: dict, now: float) -> dict:
     esc = res.get("fix", {}).get("escalate") or {}
     ttl = row.get("ttlHours", INF)
@@ -380,6 +415,7 @@ def main(argv: list[str] | None = None) -> int:
             last = next(r for r in reversed(merged) if r.get("id") == res["id"])
             reading, hist = {"value": last["value"], "limit": last["limit"]}, hist[:-1]
         row = evaluate(res, reading, hist, now)
+        row = apply_collector_error(row, res)
         if reading is None and not own and kind != "none":
             row["why"] = f"no samples from {res['host']} (install collector, then --remote {res['host']})"
         rows.append(row)
