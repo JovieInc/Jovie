@@ -262,6 +262,54 @@ describe('apply idle plans', () => {
   });
 });
 
+import {
+  HEAD_STUCK_ALERT_MIN,
+  headDwell,
+  shouldFailOver,
+} from '../main-red-eject.mjs';
+
+describe('app-installation rate-limit guard (2026-10-31 5 h queue stall)', () => {
+  it('fails over to GITHUB_TOKEN only when a fallback exists and the app is exhausted', () => {
+    const limited = {
+      code: 1,
+      stderr: 'gh: API rate limit already exceeded for installation ID 1',
+    };
+    expect(shouldFailOver(limited, 'tok')).toBe(true);
+    expect(shouldFailOver({ code: 75, deferred: true }, 'tok')).toBe(true);
+    expect(shouldFailOver(limited, undefined)).toBe(false);
+    expect(shouldFailOver({ code: 1, stderr: 'HTTP 404' }, 'tok')).toBe(false);
+    expect(shouldFailOver({ code: 0 }, 'tok')).toBe(false);
+  });
+
+  it('measures how long the queue head has been waiting', () => {
+    const now = Date.parse('2026-10-31T14:00:00Z');
+    const m = headDwell(
+      [
+        {
+          number: 7,
+          position: 1,
+          state: 'AWAITING_CHECKS',
+          enqueuedAt: '2026-10-31T09:00:00Z',
+        },
+      ],
+      now
+    );
+    expect(m).toMatchObject({ head: 7, stuckMin: 300 });
+    expect(m.stuckMin).toBeGreaterThan(HEAD_STUCK_ALERT_MIN);
+    expect(headDwell([], now).head).toBeNull();
+  });
+
+  it('keeps the workflow wired: failover token, write scopes, and a failure alert', () => {
+    const wf = readFileSync(
+      new URL('../../../.github/workflows/main-red-eject.yml', import.meta.url),
+      'utf8'
+    );
+    expect(wf).toContain('GH_FALLBACK_TOKEN: ${{ github.token }}');
+    expect(wf).toMatch(/pull-requests: write/);
+    expect(wf).toMatch(/if: \$\{\{ failure\(\) \}\}[\s\S]*alert-failure/);
+  });
+});
+
 describe('workflow dispatch inputs', () => {
   const root = resolve(here, '../../..');
   const dispatches = caller =>
