@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ChangelogRelease } from './changelog-parser';
 import { resolveCustomerChangelogHero } from './customer-changelog';
 import {
+  isWhatsNewActionComplete,
   parseWhatsNewFeed,
   projectWhatsNew,
   resolveUnseenWhatsNew,
@@ -256,5 +257,26 @@ describe('published hero inheritance', () => {
       ],
     });
     expect(parsed?.entries[0]?.hero).toBeNull();
+  });
+});
+
+describe('isWhatsNewActionComplete', () => {
+  it('treats a claim-your-link entry as stale once a handle is claimed', () => {
+    const entry = { title: 'Choose your Jovie link' };
+    expect(isWhatsNewActionComplete(entry, { hasClaimedHandle: true })).toBe(
+      true
+    );
+    expect(isWhatsNewActionComplete(entry, { hasClaimedHandle: false })).toBe(
+      false
+    );
+  });
+
+  it('never suppresses entries that ask for nothing', () => {
+    expect(
+      isWhatsNewActionComplete(
+        { title: 'Your latest releases' },
+        { hasClaimedHandle: true }
+      )
+    ).toBe(false);
   });
 });
