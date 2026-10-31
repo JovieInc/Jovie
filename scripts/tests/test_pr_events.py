@@ -3104,6 +3104,48 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         self.assertEqual(events.repair_evidence_body(self.PR, updated,
                                                    customer_decision={"releaseWorthy": False}), updated)
 
+    def test_explicit_measured_win_repairs_compounding_metadata_and_passes_fleet(self):
+        body = events.repair_evidence_body(self.PR, "## Summary\nKeep this.",
+                                            customer_decision={"releaseWorthy": False})
+        win = ("## Win\n\n- Claim: Generation converges in one pass\n- Area: ci\n"
+               "- Theme: merge-throughput\n"
+               "- Metric: generation passes | runs | lower | 2 | 1 | regression fixture | pnpm test\n"
+               "- Verify: https://github.com/JovieInc/Jovie/pull/23665\n")
+        updated = events.repair_evidence_body(self.PR, body, win_evidence=win)
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+const bodies = JSON.parse(readFileSync(0, 'utf8'));
+console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
+  pr: {title: 'fix(agent-mcp): single pass', body, labels: ['compounding']}, files: [],
+}).errors)));
+"""], cwd=ROOT, input=json.dumps([body, updated]), text=True, capture_output=True, check=True)
+        before, after = json.loads(checked.stdout)
+        self.assertTrue(any(error.startswith("win:") for error in before), before)
+        self.assertEqual(after, [])
+        self.assertTrue(updated.startswith(body))
+        self.assertEqual(updated.count("customer-changelog/v1"), 1)
+        self.assertEqual(updated.count("## Red-before-green"), 1)
+        self.assertEqual(events.repair_evidence_body(self.PR, updated, win_evidence=win), updated)
+        self.assertEqual(events.repair_evidence_body(self.PR, updated,
+                                                   win_evidence=win.replace("2 | 1", "3 | 1")), updated)
+        for invalid in ("", "- Claim: missing heading", 42):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                events.repair_evidence_body(self.PR, body, win_evidence=invalid)
+
+    def test_ensure_writes_explicit_win_without_a_red_run(self):
+        win = "## Win\n\n- Claim: Caller supplies measurements; canonical Fleet validates them.\n"
+        written = []
+
+        def shell(args):
+            if args[:2] == ["pr", "view"]:
+                return SimpleNamespace(returncode=0, stdout="## Summary\nKeep this.")
+            written.append(Path(args[args.index("--body-file") + 1]).read_text())
+            return SimpleNamespace(returncode=0, stdout="")
+
+        self.assertTrue(events.ensure_red_before_green({"number": 23665}, sh=shell, win_evidence=win))
+        self.assertEqual(written, ["## Summary\nKeep this.\n\n" + win])
+
     def test_explicit_locking_pr_repairs_missing_provenance_and_passes_fleet(self):
         body = events.red_before_green_block(self.PR)
         updated = events.repair_evidence_body(self.PR, body, locking_pr=23295,
