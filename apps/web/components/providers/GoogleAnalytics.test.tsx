@@ -96,3 +96,10 @@ describe('GoogleAnalytics', () => {
     expect((window as AnalyticsWindow).gtag).not.toHaveBeenCalled();
   });
 });
+
+vi.mock('@/lib/tracking/use-tracking-eligibility', () => ({
+  useTrackingEligibility: () => ({ ga: true }),
+}));
+vi.mock('@/lib/tracking/vendor-navigation', () => ({
+  isolateTrackingDocument: vi.fn(),
+}));

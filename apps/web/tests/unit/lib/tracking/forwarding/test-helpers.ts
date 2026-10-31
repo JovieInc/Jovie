@@ -12,6 +12,7 @@ export function makeEvent(
   overrides: Partial<NormalizedEvent> = {}
 ): NormalizedEvent {
   return {
+    profileId: 'profile-a',
     eventId: 'evt-001',
     eventType: 'page_view',
     eventTime: 1700000000,

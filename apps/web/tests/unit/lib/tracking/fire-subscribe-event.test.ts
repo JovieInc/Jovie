@@ -76,6 +76,7 @@ describe('fireSubscribeCAPIEvent', () => {
 
     await fireSubscribeCAPIEvent({
       creatorProfileId: 'prof-1',
+      visitor: {},
       email: 'Test@Example.COM',
       sourceUrl: 'https://jov.ie/artist',
     });
@@ -105,6 +106,7 @@ describe('fireSubscribeCAPIEvent', () => {
 
     await fireSubscribeCAPIEvent({
       creatorProfileId: 'prof-1',
+      visitor: {},
       email: 'fan@test.com',
       sourceUrl: 'https://jov.ie/artist',
     });
@@ -122,6 +124,7 @@ describe('fireSubscribeCAPIEvent', () => {
 
     await fireSubscribeCAPIEvent({
       creatorProfileId: 'prof-1',
+      visitor: {},
       sourceUrl: 'https://jov.ie/artist',
     });
 
@@ -147,6 +150,7 @@ describe('fireSubscribeCAPIEvent', () => {
 
     await fireSubscribeCAPIEvent({
       creatorProfileId: 'prof-1',
+      visitor: {},
       email: 'fan@test.com',
       sourceUrl: 'https://jov.ie/artist',
     });
@@ -176,6 +180,7 @@ describe('fireSubscribeCAPIEvent', () => {
 
     await fireSubscribeCAPIEvent({
       creatorProfileId: 'prof-1',
+      visitor: {},
       email: 'fan@test.com',
       sourceUrl: 'https://jov.ie/artist',
     });
@@ -187,6 +192,7 @@ describe('fireSubscribeCAPIEvent', () => {
     // No creator pixel, no Jovie env
     await fireSubscribeCAPIEvent({
       creatorProfileId: 'prof-1',
+      visitor: {},
       sourceUrl: 'https://jov.ie/artist',
     });
 
@@ -202,6 +208,7 @@ describe('fireSubscribeCAPIEvent', () => {
     await expect(
       fireSubscribeCAPIEvent({
         creatorProfileId: 'prof-1',
+        visitor: {},
         sourceUrl: 'https://jov.ie/artist',
       })
     ).resolves.toBeUndefined();
@@ -213,6 +220,7 @@ describe('fireSubscribeCAPIEvent', () => {
 
     await fireSubscribeCAPIEvent({
       creatorProfileId: 'prof-1',
+      visitor: {},
       phone: '+1234567890',
       sourceUrl: 'https://jov.ie/artist',
     });
@@ -227,6 +235,7 @@ describe('fireSubscribeCAPIEvent', () => {
 
     await fireSubscribeCAPIEvent({
       creatorProfileId: 'prof-1',
+      visitor: {},
       ipAddress: '10.0.0.1',
       userAgent: 'TestBrowser/1.0',
       sourceUrl: 'https://jov.ie/artist',
@@ -240,3 +249,7 @@ describe('fireSubscribeCAPIEvent', () => {
     expect(normalizedEvent.eventId).toContain('sub_prof-1_');
   });
 });
+
+vi.mock('@/lib/tracking/eligibility.server', () => ({
+  readTrackingProfile: vi.fn().mockResolvedValue({ youngAudience: false }),
+}));

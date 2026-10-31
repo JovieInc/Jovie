@@ -82,7 +82,12 @@ async function main(args) {
     return 0;
   }
   const runs = [];
-  if (node.length > 0) runs.push(run(process.execPath, ['--test', ...node]));
+  // Both runners spawn subprocesses. Share a four-worker budget instead of
+  // each fanning out to every host core and starving real CLI deadlines.
+  if (node.length > 0)
+    runs.push(
+      run(process.execPath, ['--test', '--test-concurrency=2', ...node])
+    );
   if (vitest.length > 0)
     runs.push(
       run('pnpm', [
@@ -93,6 +98,7 @@ async function main(args) {
         '--config',
         'vitest.config.mts',
         'run',
+        '--maxWorkers=2',
         ...vitest.map(test => test.replace(/^scripts\//u, '')),
       ])
     );

@@ -216,3 +216,17 @@ describe('EditorialRetargeting', () => {
     expect(runtimeState()).toBe('suppressed-demo-recording');
   });
 });
+
+vi.mock('@/lib/tracking/use-tracking-eligibility', async () => {
+  const { useMarketingConsent } = await import(
+    '@/lib/tracking/use-marketing-consent'
+  );
+  return {
+    useTrackingEligibility: (skip: boolean, young: boolean) => ({
+      facebook: useMarketingConsent(skip || young),
+    }),
+  };
+});
+vi.mock('@/lib/tracking/vendor-navigation', () => ({
+  isolateTrackingDocument: vi.fn(),
+}));

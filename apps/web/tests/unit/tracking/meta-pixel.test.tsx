@@ -37,14 +37,12 @@ vi.mock('@/lib/demo-recording', () => ({
   isDemoRecordingClient: () => _isDemo,
 }));
 
-vi.mock('@/lib/tracking/consent', async importOriginal => {
-  const original =
-    await importOriginal<typeof import('@/lib/tracking/consent')>();
-  return {
-    ...original,
-    isMarketingAllowed: () => _marketingAllowed,
-  };
-});
+vi.mock('@/lib/tracking/use-tracking-eligibility', () => ({
+  useTrackingEligibility: () => ({ facebook: _marketingAllowed }),
+}));
+vi.mock('@/lib/tracking/vendor-navigation', () => ({
+  isolateTrackingDocument: vi.fn(),
+}));
 
 // Import the component AFTER mocks are set up
 let MetaPixel: typeof import('@/features/tracking/MetaPixel').MetaPixel;

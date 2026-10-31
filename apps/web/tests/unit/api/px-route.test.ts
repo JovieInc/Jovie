@@ -64,10 +64,10 @@ vi.mock('@/lib/utils/logger', () => ({
 
 const { POST } = await import('@/app/api/px/route');
 
-function buildRequest() {
+function buildRequest(headers: Record<string, string> = {}) {
   return new NextRequest('http://localhost/api/px', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify({
       profileId: '550e8400-e29b-41d4-a716-446655440000',
       sessionId: 'session-id',
@@ -139,6 +139,7 @@ describe('POST /api/px', () => {
             {
               id: '550e8400-e29b-41d4-a716-446655440000',
               isPublic: true,
+              youngAudience: false,
               username: 'dualipa',
             },
           ]),
@@ -165,4 +166,42 @@ describe('POST /api/px', () => {
       })
     );
   });
+});
+
+describe('pixel intake privacy', () => {
+  it.each<{ youngAudience: boolean; headers: Record<string, string> }>([
+    { youngAudience: true, headers: {} },
+    { youngAudience: false, headers: { 'sec-gpc': '1' } },
+    {
+      youngAudience: false,
+      headers: { cookie: 'jv_tracking_consent=rejected' },
+    },
+    { youngAudience: false, headers: { 'x-vercel-ip-country': 'DE' } },
+  ])(
+    'persists denial for retries despite a forged consent=true payload: %j',
+    async ({ youngAudience, headers }) => {
+      mockPublicVisitLimiterLimit.mockResolvedValue({ success: true });
+      mockDbSelect.mockReturnValue({
+        from: () => ({
+          where: () => ({
+            limit: async () => [
+              {
+                id: 'synthetic',
+                isPublic: true,
+                youngAudience,
+                username: 'synthetic',
+              },
+            ],
+          }),
+        }),
+      });
+      const values = vi.fn().mockReturnValue({ returning: async () => [] });
+      mockDbInsert.mockReturnValue({ values });
+      const response = await POST(buildRequest(headers));
+      expect(response.status).toBe(200);
+      expect(values).toHaveBeenCalledWith(
+        expect.objectContaining({ consentGiven: false })
+      );
+    }
+  );
 });

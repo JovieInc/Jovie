@@ -1,12 +1,19 @@
+// @coverage-via apps/web/lib/tracking/use-tracking-eligibility.test.tsx
 'use client';
 
 import { Analytics as VercelAnalytics } from '@vercel/analytics/react';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { page } from '@/lib/analytics';
+import { useTrackingEligibility } from '@/lib/tracking/use-tracking-eligibility';
+import { isolateTrackingDocument } from '@/lib/tracking/vendor-navigation';
 
 export function Analytics() {
   const pathname = usePathname();
+  const allowed = useTrackingEligibility().vercel;
+  useEffect(() => {
+    if (allowed) isolateTrackingDocument();
+  }, [allowed]);
 
   useEffect(() => {
     try {
@@ -20,5 +27,5 @@ export function Analytics() {
     }
   }, [pathname]);
 
-  return <VercelAnalytics />;
+  return allowed ? <VercelAnalytics /> : null;
 }

@@ -30,6 +30,9 @@ describe('mocked rate-limit refusals never become annotations', () => {
   it('testflight-release-lease tests emit no workflow commands', () => {
     const { status, output } = runCaptured('node', [
       '--test',
+      // Exercise the quota-emitting fixtures; the full lease suite already runs
+      // in SCRIPT_CONTRACT_NODE_TESTS, including its real-gh integration.
+      '--test-name-pattern=installation quota exhaustion|installation rate limit',
       '.github/scripts/testflight-release-lease.test.mjs',
     ]);
     expect(status, output.slice(-400)).toBe(0);

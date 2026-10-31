@@ -300,6 +300,20 @@
       "liveAuthority": "the measurement source named in each metric, re-run after deploy"
     },
     {
+      "id": "third-party-tracking-eligibility",
+      "title": "Third-party tracking eligibility",
+      "owner": {
+        "kind": "file",
+        "ref": "apps/web/lib/tracking/eligibility.ts",
+        "note": "Central vendor eligibility from artist youngAudience and visitor GPC, opt-out and consent. Persistent flag owner: creator_profiles.young_audience."
+      },
+      "derived": [
+        "apps/web/lib/tracking/use-tracking-eligibility.ts",
+        "apps/web/lib/tracking/forwarding/dispatch.ts",
+        "apps/web/app/api/tracking/eligibility/route.ts"
+      ]
+    },
+    {
       "id": "proof-stats",
       "title": "Public numbers and proof stats (counts, speed, benchmarks, milestones)",
       "owner": {

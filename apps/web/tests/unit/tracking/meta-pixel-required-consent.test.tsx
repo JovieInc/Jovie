@@ -1,6 +1,8 @@
 import { act, cleanup, render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('next/navigation', () => ({ usePathname: () => '/synthetic-artist' }));
+
 vi.mock('next/script', () => ({
   default: (props: Record<string, unknown>) => (
     <script data-testid='next-script' {...props} />
@@ -33,6 +35,22 @@ function setConsentRequiredCookie() {
 
 describe('MetaPixel required-region consent gate', () => {
   beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          pathname: '/synthetic-artist',
+          eligibility: {
+            facebook: true,
+            google: true,
+            tiktok: true,
+            ga: true,
+            vercel: true,
+          },
+        }),
+      })
+    );
     setConsentRequiredCookie();
     localStorage.clear();
     globalThis.JVConsent = undefined;
@@ -42,7 +60,10 @@ describe('MetaPixel required-region consent gate', () => {
     delete pixelWindow.__jovieMetaPixelInited;
   });
 
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
 
   it('enables Meta only after a mounted pixel observes affirmative consent', async () => {
     const listeners = new Set<(value: unknown) => void>();
@@ -62,6 +83,7 @@ describe('MetaPixel required-region consent gate', () => {
     await waitFor(() => {
       expect(container.querySelector('[data-testid="next-script"]')).toBeNull();
       expect((globalThis.window as MetaWindow).fbq).toBeUndefined();
+      expect(fetch).toHaveBeenCalled();
     });
 
     localStorage.setItem(

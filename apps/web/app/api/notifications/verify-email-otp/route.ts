@@ -69,7 +69,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await verifyEmailOtpDomain(body);
+    const result = await verifyEmailOtpDomain(body, {
+      headers: request.headers,
+    });
     const response = createNotificationJsonResponse(
       result.body,
       result.status,

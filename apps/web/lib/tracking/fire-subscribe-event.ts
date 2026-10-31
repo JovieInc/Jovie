@@ -15,11 +15,13 @@ import { checkBoolean } from '@/lib/entitlements/registry';
 import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
 import { decryptPII } from '@/lib/utils/pii-encryption';
-import { forwardToFacebook } from './forwarding/facebook';
+import type { TrackingVisitor } from './eligibility';
+import { dispatchToVendor } from './forwarding/dispatch';
 import type { NormalizedEvent, PlatformConfig } from './forwarding/types';
 
 interface FireSubscribeEventOptions {
   creatorProfileId: string;
+  visitor: TrackingVisitor;
   email?: string;
   phone?: string;
   ipAddress?: string;
@@ -53,6 +55,7 @@ export async function fireSubscribeCAPIEvent(
     ]);
 
     const normalizedEvent: NormalizedEvent = {
+      profileId: opts.creatorProfileId,
       eventId: `sub_${opts.creatorProfileId}_${Date.now()}`,
       eventType: 'subscribe',
       eventTime: Math.floor(Date.now() / 1000),
@@ -120,7 +123,13 @@ export async function fireSubscribeCAPIEvent(
     // Fire all in parallel, non-blocking
     const results = await Promise.allSettled(
       pixelConfigs.map(({ config, label }) =>
-        forwardToFacebook(normalizedEvent, config).then(result => {
+        dispatchToVendor(
+          'facebook',
+          normalizedEvent,
+          config,
+          opts.creatorProfileId,
+          opts.visitor
+        ).then(result => {
           if (!result.success) {
             logger.error(`[CAPI Subscribe] ${label} forward failed`, {
               error: result.error,
@@ -133,7 +142,7 @@ export async function fireSubscribeCAPIEvent(
     );
 
     const successCount = results.filter(
-      r => r.status === 'fulfilled' && r.value.success
+      r => r.status === 'fulfilled' && r.value.success && !r.value.skipped
     ).length;
 
     if (successCount > 0) {

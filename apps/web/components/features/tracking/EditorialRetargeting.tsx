@@ -14,11 +14,10 @@ import {
   hasSensitiveQueryParams,
   resolveEditorialRetargetingState,
 } from '@/lib/retargeting/editorial';
-import {
-  ensureFbqStub,
-  type Fbq,
-  useMarketingConsent,
-} from '@/lib/tracking/use-marketing-consent';
+import { ensureFbqStub, type Fbq } from '@/lib/tracking/use-marketing-consent';
+
+import { useTrackingEligibility } from '@/lib/tracking/use-tracking-eligibility';
+import { isolateTrackingDocument } from '@/lib/tracking/vendor-navigation';
 
 interface EditorialRetargetingProps {
   /** Registered approved editorial routes from buildEditorialRetargetingRegistry. */
@@ -50,7 +49,7 @@ export function EditorialRetargeting({
   const isPassive = env.IS_TEST || env.IS_E2E;
   const isDemo = isDemoRecordingClient();
   const skipConsent = !pixelId || isPassive || !entry || isDemo;
-  const allowed = useMarketingConsent(skipConsent);
+  const allowed = useTrackingEligibility(skipConsent).facebook;
 
   const state: EditorialRetargetingState = resolveEditorialRetargetingState({
     hasPixelId: Boolean(pixelId),
@@ -80,6 +79,7 @@ export function EditorialRetargeting({
     if (state !== 'eligible' || !entry) return;
     if (globalThis.window === undefined) return;
 
+    isolateTrackingDocument();
     // MetaPixel installs the fbq stub once its own consent effect resolves,
     // which can lag this parent effect by a commit. Install the same queueing
     // stub here so the bounded event is never dropped while fbevents.js loads.

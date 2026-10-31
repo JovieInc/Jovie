@@ -11,6 +11,7 @@ import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useDeleteAccountMutation, useExportDataMutation } from '@/lib/queries';
 import type { Artist } from '@/types/db';
 import { SettingsSearchabilitySection } from './SettingsSearchabilitySection';
+import { SettingsYoungAudienceSection } from './SettingsYoungAudienceSection';
 
 export function DataPrivacySection({
   artist,
@@ -44,6 +45,12 @@ export function DataPrivacySection({
 
   return (
     <div className='space-y-4'>
+      {artist && (
+        <SettingsYoungAudienceSection
+          artist={artist}
+          onArtistUpdate={onArtistUpdate}
+        />
+      )}
       {artist && (
         <SettingsSearchabilitySection
           artist={artist}

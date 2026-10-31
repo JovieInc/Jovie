@@ -106,6 +106,30 @@ describe('PUT /api/dashboard/profile exact transaction', () => {
     });
   });
 
+  it.each([true, false])(
+    'hard-expires profile caches on young audience change to %s',
+    async youngAudience => {
+      mocks.parseProfileUpdates.mockReturnValue({
+        ok: true,
+        parsed: { youngAudience },
+      });
+      mocks.buildProfileUpdateContext.mockReturnValue({
+        dbProfileUpdates: { youngAudience },
+      });
+      const { PUT } = await import('@/app/api/dashboard/profile/route');
+      const response = await PUT(
+        new Request('https://jov.ie/api/dashboard/profile', { method: 'PUT' })
+      );
+      expect(response.status).toBe(200);
+      expect(mocks.updateProfileRecords).toHaveBeenCalledWith(
+        expect.objectContaining({ dbProfileUpdates: { youngAudience } })
+      );
+      expect(mocks.finalizeProfileResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ privacyChanged: true })
+      );
+    }
+  );
+
   it('passes the exact profile, app UUID, username, and CAS token into one transaction', async () => {
     const { PUT } = await import('@/app/api/dashboard/profile/route');
     const response = await PUT(

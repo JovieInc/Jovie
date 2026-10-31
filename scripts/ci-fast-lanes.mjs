@@ -941,6 +941,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/capability-benchmark/capability-reconciliation.test.mjs',
   'scripts/ci-cache-policy.test.mjs',
   'scripts/db/lint-changed-migrations.test.mjs',
+  'scripts/db/staged-migration-guard.test.mjs',
   'scripts/ci-release-incident-contract.test.mjs',
   'scripts/company-assets/company-assets.test.mjs',
   'scripts/deprecation-intake.test.mjs',

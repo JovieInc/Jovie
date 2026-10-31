@@ -140,3 +140,12 @@ describe('MetaPixel', () => {
     expect(fbqCalls()).toEqual([]);
   });
 });
+
+vi.mock('@/lib/tracking/use-tracking-eligibility', () => ({
+  useTrackingEligibility: (skip: boolean, young: boolean) => ({
+    facebook: !skip && !young && _marketingAllowed,
+  }),
+}));
+vi.mock('@/lib/tracking/vendor-navigation', () => ({
+  isolateTrackingDocument: vi.fn(),
+}));

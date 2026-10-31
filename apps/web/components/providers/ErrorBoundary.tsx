@@ -2,6 +2,7 @@
 
 import React, { Component, type ErrorInfo, type ReactNode } from 'react';
 import { toast } from '@/components/feedback';
+import { track } from '@/lib/analytics';
 import {
   captureErrorInSentry,
   getUserFriendlyErrorMessage,
@@ -55,14 +56,7 @@ export class ErrorBoundary extends Component<Props, State> {
       });
     }
 
-    // Track error for monitoring with gtag as backup
-    if (typeof window !== 'undefined' && 'gtag' in window) {
-      // @ts-expect-error - gtag is not typed
-      globalThis.gtag('event', 'exception', {
-        description: error.message,
-        fatal: false,
-      });
-    }
+    track('exception', { description: error.message, fatal: false });
   }
 
   render() {

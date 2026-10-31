@@ -210,12 +210,14 @@
         "/app/settings/data-privacy",
         "/app/settings/delete-account",
         "/api/account/delete",
-        "/api/account/export"
+        "/api/account/export",
+        "/api/tracking/eligibility"
       ],
       "entry": "/app/settings/data-privacy",
       "channels": ["navigation", "settings", "deep-link", "search", "api"],
       "components": [
-        "apps/web/components/features/dashboard/organisms/DataPrivacySection.tsx"
+        "apps/web/components/features/dashboard/organisms/DataPrivacySection.tsx",
+        "apps/web/components/features/dashboard/organisms/SettingsYoungAudienceSection.tsx"
       ],
       "actions": [],
       "prerequisites": ["authentication"]
@@ -4617,6 +4619,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/tracking/eligibility/route.ts",
+      "kind": "handler",
+      "route": "/api/tracking/eligibility",
+      "methods": ["GET"],
+      "surface": "privacy",
+      "classification": "A"
+    },
+    {
       "source": "apps/web/app/api/unsubscribe/claim-invites/route.ts",
       "kind": "handler",
       "route": "/api/unsubscribe/claim-invites",
@@ -7608,6 +7618,12 @@
       "kind": "component",
       "surface": "deferred",
       "classification": "C"
+    },
+    {
+      "source": "apps/web/components/features/dashboard/organisms/SettingsYoungAudienceSection.tsx",
+      "kind": "component",
+      "surface": "privacy",
+      "classification": "A"
     },
     {
       "source": "apps/web/components/features/dashboard/organisms/shopify/ShopifyStoreCard.tsx",

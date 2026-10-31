@@ -51,3 +51,7 @@ export const Unlisted: Story = {
   args: { artist: { ...artist, settings: { searchable: false } } },
 };
 export const WithoutSelectedProfile: Story = { args: { artist: null } };
+
+export const YoungAudience: Story = {
+  args: { artist: { ...artist, young_audience: true } },
+};

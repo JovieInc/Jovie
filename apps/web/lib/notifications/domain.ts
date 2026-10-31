@@ -74,6 +74,7 @@ import {
   normalizeSubscriptionEmail,
   normalizeSubscriptionPhone,
 } from '@/lib/notifications/validation';
+import { trackingVisitorFromHeaders } from '@/lib/tracking/eligibility.server';
 import { fireSubscribeCAPIEvent } from '@/lib/tracking/fire-subscribe-event';
 import { getAccountMetricCohort } from '@/lib/utils/email';
 import {
@@ -678,6 +679,7 @@ async function firePostSubscribeActions({
   if (!shouldVerifyEmail) {
     void fireSubscribeCAPIEvent({
       creatorProfileId: artist_id,
+      visitor: trackingVisitorFromHeaders(headers),
       email: normalizedEmail ?? undefined,
       phone: normalizedPhone ?? undefined,
       ipAddress: ipAddress ?? undefined,
@@ -926,7 +928,8 @@ export const subscribeToNotificationsDomain = async (
 };
 
 export const verifyEmailOtpDomain = async (
-  payload: unknown
+  payload: unknown,
+  context: NotificationDomainContext = {}
 ): Promise<
   NotificationDomainResponse<{
     success: true;
@@ -1020,6 +1023,7 @@ export const verifyEmailOtpDomain = async (
   // Fire CAPI Subscribe event now that the email subscriber is confirmed
   void fireSubscribeCAPIEvent({
     creatorProfileId: parsed.data.artist_id,
+    visitor: trackingVisitorFromHeaders(context.headers),
     email: normalizedEmail ?? undefined,
   });
 

@@ -495,6 +495,7 @@ async function ArtistPageContent({
           customer-one retarget path. */}
       {isPublicNoAuthSmoke ? null : (
         <MetaPixel
+          youngAudience={profile.young_audience}
           pixelIds={[creatorMetaPixelId, env.JOVIE_FACEBOOK_PIXEL_ID].filter(
             (id): id is string => Boolean(id)
           )}

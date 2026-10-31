@@ -56,6 +56,7 @@ export type ProfileData = Pick<
   | 'soundcloudId'
   | 'musicbrainzId'
   | 'isPublic'
+  | 'youngAudience'
   | 'isVerified'
   | 'isClaimed'
   | 'claimToken'

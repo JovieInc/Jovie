@@ -4,9 +4,8 @@ import { z } from 'zod';
 import { creatorPixels } from '@/lib/db/schema/pixels';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
-import { forwardToFacebook } from '@/lib/tracking/forwarding/facebook';
-import { forwardToGoogle } from '@/lib/tracking/forwarding/google';
-import { forwardToTikTok } from '@/lib/tracking/forwarding/tiktok';
+import { trackingVisitorFromRequest } from '@/lib/tracking/eligibility.server';
+import { dispatchToVendor } from '@/lib/tracking/forwarding/dispatch';
 import type {
   NormalizedEvent,
   PlatformConfig,
@@ -125,6 +124,7 @@ export async function POST(req: Request) {
 
       // Build synthetic test event
       const testEvent: NormalizedEvent = {
+        profileId,
         eventId: `test_${profileId}_${Date.now()}`,
         eventType: 'page_view',
         sourceUrl: `https://jov.ie/${username}`,
@@ -133,12 +133,13 @@ export async function POST(req: Request) {
       };
 
       // Forward to the specified platform
-      const forwarders = {
-        facebook: forwardToFacebook,
-        google: forwardToGoogle,
-        tiktok: forwardToTikTok,
-      } as const;
-      const result = await forwarders[platform](testEvent, config);
+      const result = await dispatchToVendor(
+        platform,
+        testEvent,
+        config,
+        profileId,
+        trackingVisitorFromRequest(req)
+      );
 
       logger.info('[Pixels Test] Test event sent', {
         profileId,
@@ -149,7 +150,7 @@ export async function POST(req: Request) {
 
       return NextResponse.json(
         {
-          success: result.success,
+          success: result.success && !result.skipped,
           error: result.error,
           platform,
         },

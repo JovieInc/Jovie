@@ -9,6 +9,8 @@ import { captureError } from '@/lib/error-tracking';
 import { scheduleAfter } from '@/lib/next/schedule-after';
 import { createRateLimitHeaders, publicVisitLimiter } from '@/lib/rate-limit';
 import { ensureClaimRetargetingCreatives } from '@/lib/retargeting/claim-creatives';
+import { trackingEligibility } from '@/lib/tracking/eligibility';
+import { trackingVisitorFromRequest } from '@/lib/tracking/eligibility.server';
 import { forwardEvent } from '@/lib/tracking/forwarding';
 import { detectBot, recordAnonymousBotMetric } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
@@ -122,6 +124,7 @@ export async function POST(request: NextRequest) {
       .select({
         id: creatorProfiles.id,
         isPublic: creatorProfiles.isPublic,
+        youngAudience: creatorProfiles.youngAudience,
         username: creatorProfiles.username,
       })
       .from(creatorProfiles)
@@ -141,6 +144,12 @@ export async function POST(request: NextRequest) {
         { status: 403, headers: NO_STORE_HEADERS }
       );
     }
+
+    const eligibility = trackingEligibility({
+      profile,
+      visitor: trackingVisitorFromRequest(request),
+    });
+    const forwardingConsent = consent && eligibility.facebook;
 
     // Get user agent
     const userAgent = request.headers.get('user-agent') || undefined;
@@ -190,7 +199,7 @@ export async function POST(request: NextRequest) {
         ...(consent && acquisitionId ? { acquisitionId } : {}),
         eventType,
         eventData: enrichedEventData,
-        consentGiven: consent,
+        consentGiven: forwardingConsent,
         clientIp: clientIP, // Raw IP for ad platform forwarding (Facebook CAPI, TikTok Events API)
         ipHash, // Hashed IP for analytics
         userAgent,

@@ -184,13 +184,34 @@ export function companionChecklist(files, read) {
       nums.length === 1,
       'Migration Guard allows one new migration per PR; split the rest'
     );
-    const n = file.filename.match(/migrations\/(\d+)_/)[1];
+    const journalPath = 'apps/web/drizzle/migrations/meta/_journal.json';
+    const tag = file.filename
+      .split('/')
+      .pop()
+      .replace(/\.sql$/, '');
+    let entry;
+    try {
+      const entries = JSON.parse(read(journalPath)).entries;
+      const matches = Array.isArray(entries)
+        ? entries.filter(row => row.tag === tag)
+        : [];
+      if (
+        matches.length === 1 &&
+        Number.isInteger(matches[0].idx) &&
+        matches[0].idx >= 0
+      )
+        entry = matches[0];
+    } catch {
+      // A missing or invalid journal cannot establish the snapshot identity.
+    }
+    const snapshot =
+      entry &&
+      `apps/web/drizzle/migrations/meta/${String(entry.idx).padStart(4, '0')}_snapshot.json`;
     push(
       file.filename,
       'snapshot and journal updated',
-      has(`apps/web/drizzle/migrations/meta/${n}_snapshot.json`) &&
-        has('apps/web/drizzle/migrations/meta/_journal.json'),
-      'run drizzle-kit generate so meta/<n>_snapshot.json and _journal.json change with the SQL'
+      has(journalPath) && snapshot && has(snapshot),
+      'run drizzle-kit generate and commit the snapshot matching the SQL tag entry in _journal.json'
     );
   }
 
