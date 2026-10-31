@@ -2,11 +2,13 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { load } from 'js-yaml';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiClient } from '../../../packages/api-client/client.ts';
 import { MemoryLedgerStore } from '../../../packages/api-client/store.ts';
 import {
   lsRemoteMain,
+  observeWorkflowFailureStreak,
   runLiveness as runLivenessImpl,
   main as runMain,
 } from '../../automation-liveness.mjs';
@@ -1759,5 +1761,90 @@ describe('alert state preservation (JOV-8843)', () => {
         action: 'skip',
       });
     }
+  });
+});
+
+describe('budget diagnostics failure isolation', () => {
+  /** @typedef {{id?: string, name?: string, if?: string, run?: string}} BudgetStep */
+  /** @typedef {{needs: string, if: string, steps: BudgetStep[]}} BudgetJob */
+  it('uses the same due gate without becoming a heartbeat dependency', () => {
+    const workflow = /** @type {{jobs: Record<string, BudgetJob>}} */ (
+      load(
+        readFileSync(
+          join(repoRoot, '.github/workflows/automation-liveness.yml'),
+          'utf8'
+        )
+      )
+    );
+    const budget = workflow.jobs['installation-budget'];
+    const heartbeat = workflow.jobs.liveness;
+    expect(budget.needs).toBe('gate');
+    expect(heartbeat.needs).toBe('gate');
+    expect(budget.if).toBe(heartbeat.if);
+    expect(heartbeat.steps.some(step => step.id === 'ci-app-token')).toBe(
+      false
+    );
+    expect(
+      heartbeat.steps.some(
+        step => step.name === 'Preserve synthetic dead-man failure'
+      )
+    ).toBe(true);
+    const sample = budget.steps.find(step => step.id === 'installation-budget');
+    expect(sample.if).toBe('${{ always() }}');
+    expect(sample.run).toBe('node scripts/installation-budget-sentinel.mjs');
+    const alert = budget.steps.find(
+      step => step.name === 'Send Slack Alert on Low Installation Budget'
+    );
+    expect(alert.if).toContain(
+      "steps.installation-budget.outputs.shared_github_token_low == 'true'"
+    );
+    expect(alert.if).toContain(
+      "steps.installation-budget.outputs.ci_app_low == 'true'"
+    );
+  });
+});
+
+describe('workflow failure streak (production controller alarm)', () => {
+  const nowMs = Date.parse('2026-10-29T23:00:00Z');
+  const receipt = {
+    repo: 'JovieInc/Jovie',
+    workflow: 'production-controller.yml',
+    streak: 3,
+  };
+  const runsFetch = conclusions => async () => ({
+    status: 200,
+    json: async () => ({
+      workflow_runs: conclusions.map((conclusion, index) => ({
+        id: 100 - index,
+        conclusion,
+        created_at: new Date(nowMs - index * 60_000).toISOString(),
+        updated_at: new Date(nowMs - index * 60_000).toISOString(),
+      })),
+    }),
+  });
+
+  it('goes silent after 3 consecutive failures, ignoring skipped runs', async () => {
+    const observed = await observeWorkflowFailureStreak(receipt, {
+      fetchImpl: runsFetch([
+        'failure',
+        'skipped',
+        'failure',
+        'failure',
+        'cancelled',
+      ]),
+      token: 'test-token',
+      nowMs,
+    });
+    expect(observed.reason).toContain('3-consecutive-failures');
+    expect(Date.parse(observed.lastProofAt)).toBeLessThan(nowMs - 60 * 60_000);
+  });
+
+  it('stays healthy when a success interrupts the failures', async () => {
+    const observed = await observeWorkflowFailureStreak(receipt, {
+      fetchImpl: runsFetch(['failure', 'failure', 'success', 'failure']),
+      token: 'test-token',
+      nowMs,
+    });
+    expect(observed.lastProofAt).toBe(new Date(nowMs).toISOString());
   });
 });

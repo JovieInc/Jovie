@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // Hoisted mocks (must be before imports of SUT)
 const {
   mockGetCachedAuth,
+  mockLinkOnboardingSessionReplaysToUser,
   mockGetCachedCurrentUser,
   mockGetDbUser,
   mockGetCurrentOnboardingSessionId,
@@ -20,6 +21,7 @@ const {
   mockIsWaitlistGateEnabled,
 } = vi.hoisted(() => ({
   mockGetCachedAuth: vi.fn(),
+  mockLinkOnboardingSessionReplaysToUser: vi.fn(),
   mockGetCachedCurrentUser: vi.fn(),
   mockGetDbUser: vi.fn(),
   mockGetCurrentOnboardingSessionId: vi.fn(),
@@ -48,6 +50,10 @@ const mockDecideGoldenPathAdmission = vi.hoisted(() =>
 vi.mock('@/lib/waitlist/golden-path-admission.server', () => ({
   decideGoldenPathAdmissionForArtist: mockDecideGoldenPathAdmission,
   requiresProofBeforePublic: mockRequiresProofBeforePublic,
+}));
+
+vi.mock('@/lib/analytics/signup-replay.server', () => ({
+  linkOnboardingSessionReplaysToUser: mockLinkOnboardingSessionReplaysToUser,
 }));
 
 vi.mock('@/lib/auth/cached', () => ({
@@ -395,6 +401,7 @@ function pickPrimaryAndOthers<T extends { createdAt: Date }>(
 describe('POST /api/onboarding/claim — race, idempotency, failure paths', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockLinkOnboardingSessionReplaysToUser.mockResolvedValue(undefined);
     mockGetCachedAuth.mockResolvedValue({
       userId: '3a53ba3e-150c-4ab5-8e73-2d2499764e2c',
       sessionId: 'ba_session_123',
@@ -435,6 +442,7 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     const json = await res.json();
     expect(json.errorCode).toBe('UNAUTHORIZED');
     expect(mockGetCurrentOnboardingSessionId).not.toHaveBeenCalled();
+    expect(mockLinkOnboardingSessionReplaysToUser).not.toHaveBeenCalled();
   });
 
   it('returns 401 when a Better Auth session has no provisioned app user', async () => {
@@ -458,6 +466,7 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ claimed: 0 });
     expect(mockClearOnboardingSessionCookie).not.toHaveBeenCalled();
+    expect(mockLinkOnboardingSessionReplaysToUser).not.toHaveBeenCalled();
   });
 
   it('clears cookie and returns {claimed:0} when no unclaimed conversations for session', async () => {
@@ -544,6 +553,9 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
       readyForCheckout: true,
     });
     expect(mockClearOnboardingSessionCookie).toHaveBeenCalledTimes(1);
+    expect(
+      mockLinkOnboardingSessionReplaysToUser
+    ).toHaveBeenCalledExactlyOnceWith('sess_abc123', appUserId);
     expect(mockDbUpdate).toHaveBeenCalled();
     expect(mockDbInsert).toHaveBeenCalled();
     expect(mockDbUpdate.mock.results[0]?.value.set).toHaveBeenCalledWith(
@@ -557,6 +569,31 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     );
     // ip/ua passed via extract
     expect(mockExtractClientIP).toHaveBeenCalled();
+  });
+
+  it('completes the claim when best-effort replay linking fails', async () => {
+    const replayError = new Error('Replay storage unavailable');
+    mockLinkOnboardingSessionReplaysToUser.mockRejectedValueOnce(replayError);
+    setupDbSelectForCandidates(
+      [{ id: 'conv_1', createdAt: new Date('2026-05-01') }],
+      instantAccessDecisionMessageRows()
+    );
+    setupUpdateForPrimary(1);
+    setupInsertAudit(true);
+
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      claimed: 1,
+      conversationId: 'conv_1',
+    });
+    expect(mockClearOnboardingSessionCookie).toHaveBeenCalledTimes(1);
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'Onboarding replay link failed',
+      replayError,
+      { route: '/api/onboarding/claim', method: 'POST' }
+    );
   });
 
   it('persists a waitlist decision, returns its durable receipt, and reserves the handle on a hidden profile', async () => {

@@ -84,6 +84,7 @@ import {
 } from '@/lib/rate-limit';
 import { isLocalDevelopmentAutomationHostname } from '@/lib/security/development-only';
 import { resolveSyntheticPassage } from '@/lib/synthetic/passage.server';
+import { resolveSyntheticPassageToken } from '@/lib/synthetic/passage-token.server';
 import {
   isTurnstileConfigured,
   verifyTurnstileTestModeToken,
@@ -489,10 +490,21 @@ export async function tryHandleAnonymousOnboardingChat(
         'onboarding_chat',
         { requestId }
       );
-      if (syntheticPrincipal) {
-        Sentry.setTag('synthetic_principal', syntheticPrincipal.actorId);
+      // Anonymous production certification (JOV-9625): a short-lived,
+      // single-use canary token minted in CI selects the same test mode.
+      // Absent or invalid tokens fall through to the real verification.
+      const passageToken = syntheticPrincipal
+        ? null
+        : await resolveSyntheticPassageToken(req.headers, 'onboarding_chat', {
+            consume: true,
+            requestId,
+          });
+      const syntheticActorId =
+        syntheticPrincipal?.actorId ?? passageToken?.actorId ?? null;
+      if (syntheticActorId) {
+        Sentry.setTag('synthetic_principal', syntheticActorId);
       }
-      const verify = syntheticPrincipal
+      const verify = syntheticActorId
         ? await verifyTurnstileTestModeToken(parsed.data.turnstileToken, ip)
         : await verifyTurnstileToken(
             parsed.data.turnstileToken,

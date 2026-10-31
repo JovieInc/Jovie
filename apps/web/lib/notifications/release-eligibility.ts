@@ -1,4 +1,15 @@
+import type { ReleaseSourceType } from '@/lib/discography/queries';
 import { TRIAL_NOTIFICATION_RECIPIENT_LIMIT } from '@/lib/entitlements/registry';
+
+/**
+ * Source type the Spotify catalog import writes (`lib/discography/spotify-import.ts`).
+ * The `ingestion_source_type` enum is `manual | admin | ingested`; there is no
+ * `spotify` value, so comparing against `'spotify'` made every release
+ * ineligible from 2026-04-14 until JOV-9779. Typed against the enum so a
+ * value outside it fails typecheck instead of silently excluding everyone.
+ */
+export const DSP_IMPORTED_RELEASE_SOURCE_TYPE =
+  'ingested' as const satisfies ReleaseSourceType;
 
 export type ProfileNotificationReadiness =
   | 'claim_required'
@@ -37,7 +48,7 @@ export interface ReleaseNotificationEligibilityInput {
   readonly hasSmartLink: boolean;
   readonly isClaimed: boolean;
   readonly isTrialing: boolean;
-  readonly releaseSourceType: string | null;
+  readonly releaseSourceType: ReleaseSourceType | null;
   readonly spotifyId: string | null;
   readonly spotifyImportStatus?: string | null;
   readonly trialNotificationsSent?: number | null;
@@ -108,7 +119,7 @@ export function getReleaseNotificationEligibility(
     return { eligible: false, reason: 'catalog_import_pending' };
   }
 
-  if (input.releaseSourceType !== 'spotify') {
+  if (input.releaseSourceType !== DSP_IMPORTED_RELEASE_SOURCE_TYPE) {
     return { eligible: false, reason: 'release_not_spotify_imported' };
   }
 

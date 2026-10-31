@@ -1010,7 +1010,7 @@ describe('ProfileCompactTemplate', () => {
 
     const branding = await screen.findByTestId('profile-jovie-branding');
     expect(
-      within(branding).getByRole('link', { name: /Jovie home/i })
+      within(branding).getByRole('link', { name: /Made with Jovie/i })
     ).toHaveAttribute(
       'href',
       `/?utm_source=profile&utm_artist=${mockArtist.handle}`
@@ -1595,6 +1595,72 @@ describe('ProfileCompactTemplate', () => {
 
     pushStateSpy.mockRestore();
     replaceStateSpy.mockRestore();
+  });
+
+  it('restores a stripped deep-link landing even when the strip never wakes React', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([]);
+    mockUseProfileShell.mockImplementation(() => ({
+      locationMode: 'listen',
+      notificationsContextValue: {
+        subscribedChannels: {},
+        subscriptionDetails: {},
+        setSubscribedChannels: vi.fn(),
+        setSubscriptionDetails: vi.fn(),
+        setState: vi.fn(),
+      },
+      notificationsController: {
+        contentPreferences: null,
+      },
+    }));
+    window.history.replaceState(null, '', '/artist-profiles');
+    window.history.pushState(null, '', '/test-artist?mode=listen&source=qr');
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+
+    render(
+      <ProfileCompactTemplate
+        mode='listen'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          modeOverride: 'listen',
+          sourceOverride: 'qr',
+        })
+      );
+    });
+
+    const historyLengthAfterLanding = window.history.length;
+    // Next's entry updater strips the landed ?mode=… entry with a bare
+    // replaceState — no React wake, no rerender. On the standalone E2E
+    // server the strip lands LATE (post-hydration, ~seconds in): after the
+    // first fix's fixed 200/600/1400ms wake ticks had all fired, so the
+    // correction still never ran (verify run 41097577290). Delay the strip
+    // past that fixed window so only the 250ms strip detector can catch it.
+    await new Promise(resolve => setTimeout(resolve, 1800));
+    act(() => {
+      window.history.replaceState(window.history.state, '', '/test-artist');
+    });
+    pushStateSpy.mockClear();
+
+    // Deliberately NO view.rerender here: only the strip detector's wake
+    // may correct the strip.
+    await waitFor(
+      () => {
+        expect(`${window.location.pathname}${window.location.search}`).toBe(
+          '/test-artist?mode=listen&source=qr'
+        );
+      },
+      { timeout: 4500 }
+    );
+    expect(pushStateSpy).not.toHaveBeenCalled();
+    expect(window.history.length).toBe(historyLengthAfterLanding);
+
+    pushStateSpy.mockRestore();
   });
 
   it('does not revert a client Link navigation to a different mode', async () => {

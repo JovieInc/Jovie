@@ -1,0 +1,15 @@
+{
+  "schema": "jovie.advisory-exceptions/v1",
+  "policy": "An exception is allowed only when no patched release exists or the vulnerable code path is provably unreachable. It must name a reason with the reachability proof and expire within 30 days; the loop fails the ratchet once it expires.",
+  "exceptions": [
+    {
+      "ghsa": "GHSA-86w9-cpqp-85rv",
+      "package": "node-forge",
+      "alerts": [618],
+      "reason": "No patched release (latest 1.4.0). Only reachable through @parse/node-apn 8.1.0, which uses forge solely to parse our own APNs/PassKit PEM/PKCS#12 credentials (pem.decode, pkcs12FromAsn1, certificateFromAsn1, getPublicKeyFingerprint); it never verifies an untrusted RSA PKCS#1 v1.5 signature, the affected operation.",
+      "owner": "jovie-ci",
+      "exposure": "runtime, unreachable path",
+      "expires": "2026-11-24T00:00:00Z"
+    }
+  ]
+}
