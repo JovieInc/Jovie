@@ -58,8 +58,12 @@ vi.mock('next/dynamic', () => ({
     ({ content }: { content: string }) => <div>{content}</div>,
 }));
 
-vi.mock('@/components/jovie/components/ChatMarkdown', () => ({
-  ChatMarkdown: ({ content }: { content: string }) => <div>{content}</div>,
+// Markdown chunk loading has its own AssistantMessageText tests. Mock at
+// that boundary so this card suite never leaves its idle preload pending.
+vi.mock('@/components/jovie/components/AssistantMessageText', () => ({
+  AssistantMessageText: ({ content }: { content: string }) => (
+    <div>{content}</div>
+  ),
 }));
 
 describe('ChatMessage analytics cards', () => {
