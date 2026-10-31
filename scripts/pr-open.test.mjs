@@ -642,3 +642,29 @@ test('a referenced Linear issue can supply the measured before-value', async () 
   );
   assert.equal(found.metric, metric);
 });
+
+test('draft resolves the current branch explicitly for gh --repo', async () => {
+  const { repo, cleanup } = localRepo();
+  try {
+    const branch = execFileSync('git', ['branch', '--show-current'], {
+      cwd: repo,
+      encoding: 'utf8',
+    }).trim();
+    const github = (_cwd, args) => {
+      if (args[0] === 'pr') {
+        assert.equal(args[2], branch);
+        return ok(targetPr(42));
+      }
+      return ok([]);
+    };
+    assert.equal(
+      await main(['draft', '--repo', repo], () => {}, {
+        github,
+        diagnose: () => {},
+      }),
+      0
+    );
+  } finally {
+    cleanup();
+  }
+});

@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// api-budget: github-user-core 300/hr - on-demand, 10 updates/hr at <=30 REST calls including bounded fresh-run confirmation
+// api-budget: github-user-graphql 100/hr - on-demand, 10 updates/hr at <=10 points for PR metadata and body edits
+// api-budget: linear-requests 10/hr - on-demand, one referenced-issue lookup per update at 10 updates/hr
 /**
  * The one way to open (or repair) a PR: drafts a gate-compliant body from the
  * diff, runs the body-level gates locally, and refuses to open a failing PR.
@@ -686,7 +689,12 @@ export async function main(
     let pr;
     // Resolve the target BEFORE reading any local diff or choosing a title.
     if (a.number || (!a.bodyFile && a.cmd !== 'open')) {
-      const result = github(a.repo, prViewArgs(a.number));
+      const target =
+        a.number ||
+        execute('git', ['branch', '--show-current'], {
+          cwd: a.repo,
+        }).stdout.trim();
+      const result = github(a.repo, prViewArgs(target));
       if (result.status === 0) pr = JSON.parse(result.stdout);
       else if (a.number)
         throw new Error(
