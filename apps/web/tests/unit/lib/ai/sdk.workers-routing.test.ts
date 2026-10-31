@@ -51,7 +51,7 @@ describe('Workers AI routing in the shared AI layer', () => {
       providerOptions: { workersAi: { reasoningEffort: string } };
     };
 
-    expect(modelOf(routed).provider).toBe('workers-ai');
+    expect(modelOf(routed).provider).toBe('workers-ai.chat');
     expect(options.providerOptions.workersAi.reasoningEffort).toBe('low');
   });
 
@@ -155,7 +155,7 @@ describe('Workers AI routing in the shared AI layer', () => {
 
     expect(workersGenerate).toHaveBeenCalledTimes(1);
     expect(String(fetchSpy.mock.calls[0]?.[0])).toContain(
-      '/ai/v1/chat/completions'
+      '/v1/chat/completions'
     );
     expect(result.content[0]?.text).toBe('from-workers-ai');
     fetchSpy.mockRestore();
