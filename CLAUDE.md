@@ -49,7 +49,7 @@ The Mac staging app is retired; use early-access opt-in in the regular app.
 
 Read the relevant rule before editing its area. Do not preload docs, skills,
 provider guides, or search results. Start with `rg`; read bounded sections and
-expand only for concrete uncertainty. One canonical copy per instruction.
+expand only for uncertainty. One canonical copy per instruction.
 Context guidance: [agent context](docs/agent-context/README.md).
 
 | Task | Read |
@@ -72,10 +72,10 @@ Context guidance: [agent context](docs/agent-context/README.md).
 | New fact (price, limit, copy) | [owner first](.claude/rules/source-of-truth.md): `canon/sources-of-truth.json`; derive, never copy |
 
 Other scoped rules: ci-branching, event-driven, infra, linear, motion,
-pr-stacking, swarm, hermes-air, anti-slop.
+pr-stacking, swarm, hermes-air, anti-slop, rate-limits.
 Company domain canon: [index](canon/README.md). API/cron/webhook maps:
 [AI_AGENT_GUIDE](docs/AI_AGENT_GUIDE.md). Codex: [CODEX](CODEX.md).
-<!-- doc-freshness:scoped-rules-count:24 -->
+<!-- doc-freshness:scoped-rules-count:25 -->
 
 ## Tools and workflow
 
