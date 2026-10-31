@@ -37,8 +37,8 @@ interface TokenizedTextProps {
  *
  * When an `EntityResolutionProvider` is mounted above, entity chips lift
  * thumbnail + meta out of the existing TanStack Query cache and render the
- * hover popover with rich preview. Outside the provider, chips hide stored
- * labels and degrade to a neutral unavailable reference (still surface-aware via `tone`).
+ * hover popover with rich preview. Outside the provider, chips fall back to
+ * the entity kind's neutral name (still surface-aware via `tone`).
  */
 export function TokenizedText({
   content,
