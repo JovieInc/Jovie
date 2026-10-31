@@ -398,11 +398,8 @@ describe('live Stripe fixture probe', () => {
       'price_1USkjzASl9B9udHvEYkZLYZp',
     STRIPE_WEBHOOK_SECRET: 'whsec_5f2_probeSecretNotReal',
   };
-  const stripeResponse = (ok, body) => ({
-    ok,
-    status: ok ? 200 : 401,
-    json: async () => body,
-  });
+  const stripeResponse = (ok, body) =>
+    Response.json(body, { status: ok ? 200 : 401 });
   const priceFixture = {
     livemode: false,
     active: true,
