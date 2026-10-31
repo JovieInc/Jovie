@@ -376,6 +376,7 @@ export function typecheckTargets(files, cwd) {
     const isTest = /\.(?:test|spec)\.[^/]+$|\/tests?\//.test(f.filename);
     const web = f.filename.startsWith('apps/web/');
     if (web) {
+      if (/\.stories\.[^/]+$/.test(f.filename)) out.add('web-stories');
       out.add(isTest ? 'web-tests' : 'web');
       if (!isTest) {
         // Source changes also affect test consumers and Ovie's TS graph.
@@ -405,6 +406,8 @@ function typecheckCommand(target, cwd) {
     return `cd apps/web && ${cap} pnpm exec node ../../scripts/typecheck-singleflight.mjs -- tsc -p tsconfig.typecheck.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo`;
   if (target === 'web-tests')
     return `cd apps/web && ${cap} node ../../scripts/typecheck-singleflight.mjs -- node ../../scripts/typecheck-web-tests.mjs`;
+  if (target === 'web-stories')
+    return `cd apps/web && ${cap} node ../../scripts/typecheck-singleflight.mjs -- node ../../scripts/typecheck-web-stories.mjs`;
   if (target === 'scripts') return `${cap} pnpm typecheck:scripts`;
   return `${cap} pnpm --filter ${target.slice(4)} run typecheck`;
 }

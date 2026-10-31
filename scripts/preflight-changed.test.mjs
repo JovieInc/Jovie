@@ -205,6 +205,15 @@ test('two new migrations violate the single-migration rule', () => {
   assert.ok(items.some(i => /exactly one migration/.test(i.item) && !i.done));
 });
 
+test('changed stories select the same story typecheck that Source Validation runs', () => {
+  assert.ok(
+    typecheckTargets(
+      [file('apps/web/components/Example.stories.tsx')],
+      process.cwd()
+    ).includes('web-stories')
+  );
+});
+
 test('typecheck targets are the affected packages only', () => {
   const t = typecheckTargets(
     [
