@@ -331,6 +331,13 @@ export async function main(argv = process.argv.slice(2), log = console.log) {
   const bodyFile = path.join(tmpdir(), `pr-open-body-${process.pid}.md`);
   writeFileSync(bodyFile, body);
   if (a.cmd === 'update') {
+    writeFileSync(
+      bodyFile,
+      body.replaceAll(
+        PR_URL_PLACEHOLDER,
+        `https://github.com/JovieInc/Jovie/pull/${a.number}`
+      )
+    );
     return (
       run(
         'gh',
