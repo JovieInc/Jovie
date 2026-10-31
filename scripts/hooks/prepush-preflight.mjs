@@ -45,11 +45,13 @@ export async function main() {
   let outcome;
   let infra = null;
   let code;
+  let lastRemote = null;
   if (mode === 'remote') {
     console.error(
       `[pre-push] load ${load.toFixed(0)} > ${cores} cores x 1.5: running the identical gate on Gem (preflight:remote), evidence bound to HEAD sha + tree`
     );
-    ({ code } = await run(REMOTE));
+    lastRemote = await run(REMOTE);
+    code = lastRemote.code;
     if (code === 127 || code === 255) {
       infra = 'gem-unreachable';
       console.error(
@@ -67,8 +69,21 @@ export async function main() {
         `\n[pre-push] INFRA FAILURE, not a code verdict: a check timed out or was killed under host load ${loadavg()[0].toFixed(0)} on ${cores} cores. Re-running the identical gate on Gem.`
       );
       mode = 'remote-after-timeout';
-      ({ code } = await run(REMOTE));
+      lastRemote = await run(REMOTE);
+      code = lastRemote.code;
     }
+  }
+  if (
+    code !== 0 &&
+    mode.startsWith('remote') &&
+    lastRemote &&
+    isInfraTimeout(lastRemote)
+  ) {
+    infra = `${infra ?? 'remote'}+gem-timeout`;
+    console.error(
+      '\n[pre-push] INFRA FAILURE, not a code verdict: a check timed out on Gem under load. Retrying the identical gate on Gem once.'
+    );
+    ({ code } = await run(REMOTE));
   }
   outcome = code === 0 ? 'pass' : 'fail';
   if (code !== 0) {
