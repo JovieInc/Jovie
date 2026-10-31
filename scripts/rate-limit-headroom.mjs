@@ -10,6 +10,11 @@
  * --write publishes the result to $LANES_STATE/api-ledger/headroom.json
  * (default ~/.local/state/jovie-lanes), the file Summer and Ovie read.
  * Read-only; never prints a credential.
+ *
+ * Cadence is the six-hourly credentials tick, plus manual reads. GET /rate_limit
+ * does not spend a bucket; the ceiling still covers the app-token mint.
+ * api-budget: github-user-core 1/hr - six-hourly headroom probe; rate_limit is uncounted
+ * api-budget: github-app-core 1/hr - six-hourly app token mint plus rate_limit probe
  */
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';

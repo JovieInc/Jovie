@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -78,6 +79,18 @@ describe('new consumer guard', () => {
     ).toBe(false);
     expect(isNewConsumer('scripts/a.test.mjs', client)).toBe(false);
     expect(isNewConsumer('packages/api-client/x.ts', client)).toBe(false);
+  });
+  it('accepts the headroom publisher budget', () => {
+    const text = readFileSync(
+      resolve(root, 'scripts/rate-limit-headroom.mjs'),
+      'utf8'
+    );
+    expect(check({ 'scripts/rate-limit-headroom.mjs': text })).toEqual([]);
+    expect(
+      parseBudgets(text)
+        .map(b => `${b.limit} ${b.perHour}`)
+        .sort()
+    ).toEqual(['github-app-core 1', 'github-user-core 1']);
   });
   it('accepts the existing github-token-budget line on a scheduled workflow', () => {
     expect(

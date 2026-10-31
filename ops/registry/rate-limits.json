@@ -18,7 +18,7 @@
       "window": "hour",
       "scope": "per user token, shared by every process using it",
       "basis": "measured",
-      "source": "x-ratelimit-limit via gh api rate_limit, 2026-10-28",
+      "source": "x-ratelimit-limit header on the rate_limit resource, 2026-10-28",
       "live": {
         "kind": "github-rate-limit",
         "credential": "gh-user",
@@ -41,7 +41,7 @@
       "window": "hour",
       "scope": "per user token",
       "basis": "measured",
-      "source": "gh api rate_limit, 2026-10-28",
+      "source": "GitHub rate_limit resource, measured 2026-10-28",
       "live": {
         "kind": "github-rate-limit",
         "credential": "gh-user",
@@ -63,7 +63,7 @@
       "window": "minute",
       "scope": "per token",
       "basis": "measured",
-      "source": "gh api rate_limit, 2026-10-28",
+      "source": "GitHub rate_limit resource, measured 2026-10-28",
       "live": {
         "kind": "github-rate-limit",
         "credential": "gh-user",
