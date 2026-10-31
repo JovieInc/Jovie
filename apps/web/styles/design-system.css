@@ -139,6 +139,14 @@
     var(--app-shell-gap)
   );
   --app-shell-content-inset: var(--app-shell-gap);
+  /* The route header spans the panel edge to edge, outside the content
+     inset every route sits in. Its seam adds that inset back so the title,
+     toolbars, table cells and footers share one content axis (Pen JwsdW
+     app-panel-inset 20; design-present content-axis check). */
+  --app-shell-header-seam-x: calc(
+    var(--app-shell-content-inset) +
+    var(--app-shell-header-padding-x)
+  );
   --app-shell-border: rgba(0, 0, 0, 0.05);
   --app-shell-sidebar-seam: rgba(0, 0, 0, 0.05);
   --app-shell-frame-seam: rgba(0, 0, 0, 0.045);

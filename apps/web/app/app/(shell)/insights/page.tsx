@@ -1,6 +1,7 @@
 import { APP_ROUTES } from '@/constants/routes';
 import { InsightsPanel } from '@/features/dashboard/insights/InsightsPanel';
 import { loadAppShellRouteContext } from '../app-shell-route-context';
+import { AudienceWorkspaceTabs } from '../contacts/AudienceWorkspaceTabs';
 
 export const runtime = 'nodejs';
 
@@ -14,5 +15,11 @@ export default async function InsightsPage() {
     return routeContext.error;
   }
 
-  return <InsightsPanel />;
+  // Insights is the Audience root's third destination: keep its sub-nav.
+  return (
+    <div className='flex min-h-0 min-w-0 flex-1 flex-col'>
+      <AudienceWorkspaceTabs activeTab='insights' />
+      <InsightsPanel />
+    </div>
+  );
 }

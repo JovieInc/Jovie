@@ -1,8 +1,6 @@
 import type { Metadata } from 'next';
 import type { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
-import { RouteSegmentControl } from '@/components/molecules/RouteSegmentControl';
-import { PageToolbar } from '@/components/organisms/table/molecules/PageToolbar';
 import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
@@ -10,7 +8,6 @@ import { AudienceTableLoadingShell } from '@/features/dashboard/organisms/dashbo
 import type { AudienceSegment } from '@/features/dashboard/organisms/dashboard-audience-table/types';
 import { LazyDashboardAudienceClient } from '@/features/dashboard/organisms/LazyDashboardAudienceClient';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
-import { getAudienceWorkspaceNavigation } from '@/lib/audience/workspace-navigation';
 import { captureError } from '@/lib/error-tracking';
 import { audienceFilters, audienceSearchParams } from '@/lib/nuqs';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
@@ -26,11 +23,9 @@ import {
 } from '../app-shell-route-context';
 import { getAudienceServerData } from '../dashboard/audience/audience-data';
 import { loadUpcomingTourDates } from '../dashboard/tour-dates/actions';
+import { AudienceWorkspaceTabs } from './AudienceWorkspaceTabs';
 import { ContactsPageClient } from './ContactsPageClient';
-import {
-  type ContactsWorkspaceTab,
-  resolveContactsWorkspaceTab,
-} from './contacts-workspace';
+import { resolveContactsWorkspaceTab } from './contacts-workspace';
 
 export { resolveContactsWorkspaceTab } from './contacts-workspace';
 
@@ -51,30 +46,6 @@ function buildAudienceWorkspaceHref(searchParams: SearchParams): string {
   }
   params.set('tab', 'audience');
   return `${APP_ROUTES.CONTACTS}?${params.toString()}`;
-}
-
-function AudienceWorkspaceTabs({
-  activeTab,
-  searchParams,
-}: Readonly<{
-  activeTab: ContactsWorkspaceTab;
-  searchParams: SearchParams;
-}>) {
-  return (
-    <PageToolbar
-      className='border-b border-subtle'
-      start={
-        <RouteSegmentControl
-          value={activeTab}
-          aria-label='Audience Workspace'
-          className='max-w-72'
-          options={getAudienceWorkspaceNavigation(
-            buildAudienceWorkspaceHref(searchParams)
-          )}
-        />
-      }
-    />
-  );
 }
 
 export default async function ContactsPage({
@@ -108,7 +79,7 @@ export default async function ContactsPage({
       toolbar={
         <AudienceWorkspaceTabs
           activeTab={activeTab}
-          searchParams={resolvedSearchParams}
+          audienceHref={buildAudienceWorkspaceHref(resolvedSearchParams)}
         />
       }
     >

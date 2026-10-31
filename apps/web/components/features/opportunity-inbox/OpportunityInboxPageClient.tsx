@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { NotebookPen } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -17,6 +17,11 @@ import { NavigationDestinationReady } from '@/components/features/dashboard/Navi
 import { JovieWorkFeed } from '@/components/features/dashboard/organisms/jovie-work-feed/JovieWorkFeed';
 import { ErrorBanner } from '@/components/features/feedback/ErrorBanner';
 import { PageShell } from '@/components/organisms/PageShell';
+import {
+  PageToolbar,
+  PageToolbarActionButton,
+  PageToolbarTabButton,
+} from '@/components/organisms/table/molecules/PageToolbar';
 import { useRuntimeUpdate } from '@/components/shell/RuntimeUpdateProvider';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -489,6 +494,40 @@ export function OpportunityInboxPageClient({
         connectedDSPs={connectedDSPs}
         initialLinks={initialLinks}
       />
+      <PageToolbar
+        data-testid='opportunity-inbox-toolbar'
+        start={
+          <div
+            className='flex items-center gap-1'
+            role='toolbar'
+            aria-label='Inbox View'
+          >
+            <PageToolbarTabButton
+              label='Needs You'
+              active={inboxView === 'needs'}
+              onClick={() => selectInboxView('needs')}
+            />
+            <PageToolbarTabButton
+              label='Done For You'
+              active={inboxView === 'done'}
+              onClick={() => selectInboxView('done')}
+            />
+          </div>
+        }
+        end={
+          notes.length === 0 ? (
+            <PageToolbarActionButton
+              ref={notesButtonRef}
+              label={notesOpen ? 'Hide Notes' : 'Add Notes'}
+              icon={<NotebookPen aria-hidden='true' />}
+              active={notesOpen}
+              aria-expanded={notesOpen}
+              aria-controls='opportunity-inbox-notes-panel'
+              onClick={() => setNotesOpen(open => !open)}
+            />
+          ) : null
+        }
+      />
       <div className='min-h-0 flex-1 overflow-y-auto overflow-x-hidden'>
         <div
           ref={inboxPageRef}
@@ -496,42 +535,13 @@ export function OpportunityInboxPageClient({
           data-testid='opportunity-inbox-content'
         >
           <div
-            className='mb-4 flex min-h-7 items-center justify-center gap-1'
-            role='toolbar'
-            aria-label='Inbox View'
+            className='flex flex-col'
+            data-testid='opportunity-inbox-notes'
+            hidden={!notesOpen && !notes}
           >
-            <Button
-              size='sm'
-              variant={inboxView === 'needs' ? 'secondary' : 'ghost'}
-              aria-pressed={inboxView === 'needs'}
-              onClick={() => selectInboxView('needs')}
-            >
-              Needs You
-            </Button>
-            <Button
-              size='sm'
-              variant={inboxView === 'done' ? 'secondary' : 'ghost'}
-              aria-pressed={inboxView === 'done'}
-              onClick={() => selectInboxView('done')}
-            >
-              Done For You
-            </Button>
-          </div>
-          <div className='mb-4' data-testid='opportunity-inbox-notes'>
-            {notes.length === 0 ? (
-              <Button
-                ref={notesButtonRef}
-                size='sm'
-                variant='ghost'
-                aria-expanded={notesOpen}
-                aria-controls='opportunity-inbox-notes-panel'
-                onClick={() => setNotesOpen(open => !open)}
-              >
-                {notesOpen ? 'Hide Notes' : 'Add Notes'}
-              </Button>
-            ) : null}
             <div
               id='opportunity-inbox-notes-panel'
+              className='w-full'
               hidden={!notesOpen && !notes}
             >
               <label
@@ -572,7 +582,7 @@ export function OpportunityInboxPageClient({
               </p>
             )
           ) : null}
-          <div hidden={inboxView !== 'needs'}>
+          <div hidden={inboxView !== 'needs'} className='flex flex-1 flex-col'>
             <InboxRuntimeNotification />
             {pendingTourDates.length > 0 ? (
               <section

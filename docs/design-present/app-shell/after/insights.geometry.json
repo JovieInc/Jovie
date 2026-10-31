@@ -1,0 +1,273 @@
+{
+  "schema": "design-present-geometry/v1",
+  "url": "/app/insights",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "column": {
+    "left": 240,
+    "right": 1432,
+    "top": 8,
+    "bottom": 892,
+    "width": 1192,
+    "height": 884
+  },
+  "atoms": [
+    {
+      "kind": "box",
+      "left": 260,
+      "right": 333.67,
+      "top": 65.5,
+      "bottom": 93.5,
+      "label": "button.relative.min-w-0.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 333.67,
+      "right": 410.17,
+      "top": 65.5,
+      "bottom": 93.5,
+      "label": "button.relative.min-w-0.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 410.17,
+      "right": 477.34,
+      "top": 65.5,
+      "bottom": 93.5,
+      "label": "button.relative.min-w-0.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 260,
+      "right": 296.61,
+      "top": 106,
+      "bottom": 134,
+      "label": "button.relative.min-w-0.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 296.61,
+      "right": 385.38,
+      "top": 106,
+      "bottom": 134,
+      "label": "button.relative.min-w-0.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 385.38,
+      "right": 449.14,
+      "top": 106,
+      "bottom": 134,
+      "label": "button.relative.min-w-0.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 449.14,
+      "right": 516.8,
+      "top": 106,
+      "bottom": 134,
+      "label": "button.relative.min-w-0.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 516.8,
+      "right": 588.5,
+      "top": 106,
+      "bottom": 134,
+      "label": "button.relative.min-w-0.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 588.5,
+      "right": 636.56,
+      "top": 106,
+      "bottom": 134,
+      "label": "button.relative.min-w-0.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 636.56,
+      "right": 706.88,
+      "top": 106,
+      "bottom": 134,
+      "label": "button.relative.min-w-0.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 706.88,
+      "right": 801.16,
+      "top": 106,
+      "bottom": 134,
+      "label": "button.relative.min-w-0.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 801.16,
+      "right": 862.42,
+      "top": 106,
+      "bottom": 134,
+      "label": "button.relative.min-w-0.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 1324.22,
+      "right": 1412,
+      "top": 106,
+      "bottom": 134,
+      "label": "button.relative.[font-weight:var(--font-weight-medium)].duration-subtle",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 731.66,
+      "right": 854.75,
+      "top": 522.58,
+      "bottom": 550.58,
+      "label": "button.relative.inline-flex.items-center",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 866.75,
+      "right": 940.33,
+      "top": 522.58,
+      "bottom": 550.58,
+      "label": "a.relative.inline-flex.items-center",
+      "bleed": false
+    },
+    {
+      "kind": "text",
+      "text": "Audience",
+      "left": 260,
+      "right": 314.2,
+      "top": 22,
+      "bottom": 37,
+      "label": "h1.min-w-0.truncate.font-semibold",
+      "bleed": false
+    },
+    {
+      "kind": "text",
+      "text": "No Insights Yet",
+      "left": 794.25,
+      "right": 877.73,
+      "top": 448.41,
+      "bottom": 463.41,
+      "label": "h3.mb-1.text-app.font-caption",
+      "bleed": false
+    },
+    {
+      "kind": "text",
+      "text": "Generate your first set of AI-powered insights to discover a",
+      "left": 673.34,
+      "right": 998.66,
+      "top": 468.8,
+      "bottom": 483.8,
+      "label": "p.mb-5.max-w-sm.text-app",
+      "bleed": false
+    }
+  ],
+  "iconTiles": [],
+  "emptyStatePlates": [],
+  "tabs": [
+    {
+      "text": "Contacts",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    },
+    {
+      "text": "Audience",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    },
+    {
+      "text": "Insights",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    },
+    {
+      "text": "All",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    },
+    {
+      "text": "Geographic",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    },
+    {
+      "text": "Growth",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    },
+    {
+      "text": "Content",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    },
+    {
+      "text": "Revenue",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    },
+    {
+      "text": "Tour",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    },
+    {
+      "text": "Platform",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    },
+    {
+      "text": "Engagement",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    },
+    {
+      "text": "Timing",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    }
+  ],
+  "devChrome": [],
+  "shellRows": [
+    {
+      "y": 0,
+      "height": 44,
+      "label": "header[data-testid=dashboard-header].z-20.bg-(--app-shell-content-surface)"
+    },
+    {
+      "y": 52,
+      "height": 40,
+      "label": "div.flex.min-h-10.min-w-0"
+    }
+  ],
+  "horizontalOverflow": 0
+}

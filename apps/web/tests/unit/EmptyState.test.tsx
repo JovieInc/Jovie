@@ -282,4 +282,17 @@ describe('EmptyState (canonical molecule API)', () => {
       'sm:gap-3'
     );
   });
+
+  it('keeps the 12px app size and a 12px step before the quiet action', () => {
+    render(
+      <EmptyState
+        heading='Your Inbox Is Clear'
+        action={{ href: '/app/chat', label: 'Start A Chat' }}
+        presentation='quiet'
+      />
+    );
+    const heading = screen.getByText('Your Inbox Is Clear');
+    // text-app must survive beside the colour token (cn merge regression).
+    expect(heading).toHaveClass('text-app', 'text-secondary-token', 'mb-3');
+  });
 });

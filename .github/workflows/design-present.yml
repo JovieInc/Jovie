@@ -1,0 +1,37 @@
+# Presentation gate (design-present/v1). A PR body that shows UI screenshots
+# must cite a passing design-present receipt committed on the PR head: every
+# frame passed the rendered design invariants (content axis, sub-pixel edges,
+# founder bans, clean frame, Pen row parity) and a vision critique against
+# its Pen reference, and is shown as Pen | before | after.
+# Rule: .claude/rules/design-present.md ("never show Tim a screenshot that
+# fails our invariants"). Reads the event payload and the checkout only; no
+# GitHub API calls, no secrets.
+name: Design Present
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: design-present-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  present:
+    name: Design present gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Screenshots in the PR body pass the presentation gate
+        run: node scripts/design-present/pr-body-check.mjs
+
+      - name: Gate self-test (deliberate-red fixtures)
+        run: node --test scripts/design-present/design-present.test.mjs

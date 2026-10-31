@@ -367,6 +367,17 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:invariant-stewardship
     jobCount: 2
+  - name: Design Present
+    path: .github/workflows/design-present.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+    terminalReceipt: job:present
+    jobCount: 1
   - name: desktop-release
     path: .github/workflows/desktop-release.yml
     active: true

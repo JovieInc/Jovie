@@ -439,7 +439,9 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     cell: ({ row }) => (
       <span
         title={formatLibraryItemType(row.original)}
-        className='system-b-library-meta-text system-b-library-fluid-cell block truncate text-tertiary-token'
+        // Not fluid: type labels are short (Single, EP, Album) and a 0-width
+        // fluid cell let the column collapse to its header ("Sin…").
+        className='system-b-library-meta-text block whitespace-nowrap text-tertiary-token'
       >
         {formatLibraryItemType(row.original)}
       </span>
@@ -516,6 +518,8 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     minSize: 72,
     meta: {
       className: 'px-2',
+      // Numeric column: header and values share the right edge.
+      align: 'right',
       priority: 5,
       minWidth: 80,
     },

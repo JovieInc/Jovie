@@ -1,0 +1,35 @@
+{
+  "schema": "design-present-manifest/v1",
+  "set": "app-shell",
+  "pr": 23710,
+  "persona": "creator-ready",
+  "viewport": { "width": 1440, "height": 900 },
+  "axisInset": 20,
+  "pen": {
+    "file": "$HOME/Documents/Jovie/Jovie Marketing Workspace/Jovie Design Studio — canonical.lib.pen",
+    "frame": "CJcKQ",
+    "geometry": "pen/pen-reference.json"
+  },
+  "scope": "Main content column (main#main-content). The sidebar is owned by the shell IA registry (#23689) and the sidebar optical ratchet.",
+  "screens": [
+    { "id": "home", "title": "Home", "route": "/app", "penNode": "AxYq9" },
+    {
+      "id": "audience",
+      "title": "Audience",
+      "route": "/app/contacts?tab=audience",
+      "penNode": "N934h"
+    },
+    {
+      "id": "insights",
+      "title": "Insights",
+      "route": "/app/insights",
+      "penNode": "wQ7fn"
+    },
+    {
+      "id": "work",
+      "title": "Work",
+      "route": "/app/library",
+      "penNode": "gbNxo"
+    }
+  ]
+}

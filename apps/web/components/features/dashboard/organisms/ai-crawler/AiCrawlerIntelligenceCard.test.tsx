@@ -86,10 +86,11 @@ describe('AiCrawlerIntelligenceCard', () => {
     render(<AiCrawlerIntelligenceCard onOpenDetail={() => undefined} />);
 
     const skeleton = screen.getByTestId('ai-crawler-card-skeleton');
-    expect(skeleton).toHaveClass('min-h-12');
-    // JOV-7710: the row sits on the main plane's material; only its border
-    // outlines it (no nested surface-1 fill).
+    expect(skeleton).toHaveClass('min-h-10');
+    // JOV-7710 + founder ban 2026-10-28: the row sits on the main plane with
+    // no fill and no bordered plate; it reads as one line of the page.
     expect(skeleton.className).not.toMatch(/(^|\s)bg-/);
+    expect(skeleton.className).not.toMatch(/(^|\s)(border|rounded-xl)(\s|$)/);
     expect(screen.getAllByTestId('loading-skeleton')).toHaveLength(3);
   });
 

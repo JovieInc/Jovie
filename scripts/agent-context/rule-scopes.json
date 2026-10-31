@@ -20,6 +20,16 @@
     "bodySha256": "827454729d91ae084f5accd102eda950842fccfeb8094182866d04e0c323df32"
   },
   {
+    "file": ".claude/rules/design-present.md",
+    "paths": [
+      "docs/design-present/**",
+      "scripts/design-present/**",
+      "apps/web/components/**",
+      "apps/web/app/**"
+    ],
+    "bodySha256": "d5da544631845969c2a75593bf7cd289fbced75def1c3102b9554caa7260db0f"
+  },
+  {
     "file": ".claude/rules/domain-writes.md",
     "paths": ["apps/web/**"],
     "bodySha256": "95d9db99d51c78dd7d07d0836f4692415ef8c2180896e9ed820fae44c99601c4"
@@ -199,6 +209,6 @@
       "DESIGN.md",
       "docs/design-system/**"
     ],
-    "bodySha256": "8d31145e6c638bd6e7fd89698abae04dd5e21de1ba1b50688efed603b14495f8"
+    "bodySha256": "2f20b5a2b987a8515682717f832208802bcbe794f1824857f8cee8baebb677bc"
   }
 ]

@@ -441,14 +441,47 @@ describe('OpportunityInboxPageClient', () => {
     expect(screen.getByTestId('opportunity-inbox-content')).toHaveClass(
       'system-b-opportunity-inbox-page'
     );
-    expect(screen.getByRole('toolbar', { name: 'Inbox View' })).toHaveClass(
-      'justify-center'
-    );
+    // The view tabs live in the canonical page toolbar, on the content axis.
+    expect(
+      screen
+        .getByRole('toolbar', { name: 'Inbox View' })
+        .closest('[data-page-toolbar]')
+    ).toBe(screen.getByTestId('opportunity-inbox-toolbar'));
     expect(screen.queryByRole('textbox', { name: 'Notes' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Add Notes' })).toHaveAttribute(
       'aria-expanded',
       'false'
     );
+  });
+
+  it('switches views with the canonical toolbar tabs on one centre axis', async () => {
+    const user = userEvent.setup();
+    render(
+      <OpportunityInboxPageClient
+        inbox={{
+          cards: [],
+          availability: HEALTHY_AVAILABILITY,
+          emptyActionCards: [],
+        }}
+      />
+    );
+    const needs = screen.getByRole('button', { name: 'Needs You' });
+    const done = screen.getByRole('button', { name: 'Done For You' });
+    expect(needs).toHaveAttribute('aria-pressed', 'true');
+    expect(done).toHaveAttribute('aria-pressed', 'false');
+    // Shell canon: the view tabs start the toolbar row and Add Notes ends it,
+    // so both share the page toolbar's content axis.
+    const toolbar = screen.getByTestId('opportunity-inbox-toolbar');
+    expect(toolbar).toHaveAttribute('data-page-toolbar');
+    expect(toolbar).toContainElement(
+      screen.getByRole('toolbar', { name: 'Inbox View' })
+    );
+    expect(toolbar).toContainElement(
+      screen.getByRole('button', { name: 'Add Notes' })
+    );
+    await user.click(done);
+    expect(done).toHaveAttribute('aria-pressed', 'true');
+    expect(needs).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('discloses empty notes by keyboard and restores focus on Escape', async () => {

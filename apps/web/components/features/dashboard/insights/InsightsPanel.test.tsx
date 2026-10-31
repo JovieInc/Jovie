@@ -29,7 +29,7 @@ describe('InsightsPanelView', () => {
     });
   });
 
-  it('wraps every category filter inside the compact viewport', () => {
+  it('keeps every category filter in the toolbar row beside Generate', () => {
     render(
       <TooltipProvider>
         <InsightsPanelView
@@ -48,7 +48,14 @@ describe('InsightsPanelView', () => {
     const tablist = screen.getByRole('tablist', {
       name: 'Filter Insights By Category',
     });
-    expect(tablist).toHaveClass('flex-wrap', 'gap-1.5');
+    // One toolbar row: filters in the start slot (scrolls when compact),
+    // the Generate action in the end slot.
+    const toolbarRow = screen.getByTestId('insights-toolbar');
+    expect(toolbarRow).toContainElement(tablist);
+    expect(toolbarRow).toContainElement(
+      screen.getByRole('button', { name: 'Generate insights' })
+    );
+    expect(tablist).not.toHaveClass('flex-wrap');
 
     const tabs = screen.getAllByRole('tab');
     expect(tabs).toHaveLength(9);
@@ -58,7 +65,7 @@ describe('InsightsPanelView', () => {
     }
   });
 
-  it('uses the canonical workspace empty state without decorative card chrome', () => {
+  it('uses the canonical empty state without a card plate', () => {
     render(
       <TooltipProvider>
         <InsightsPanelView
@@ -77,7 +84,13 @@ describe('InsightsPanelView', () => {
     const emptyState = screen.getByTestId('insights-empty-state');
     expect(emptyState.tagName).toBe('OUTPUT');
     expect(emptyState.querySelector('svg')).toBeNull();
-    expect(screen.getByText('No Insights Yet')).toHaveClass('text-sm');
+    // Founder ban: empty states never sit on a bordered card.
+    expect(emptyState).toHaveAttribute(
+      'data-empty-state-presentation',
+      'default'
+    );
+    expect(emptyState.querySelector('[data-empty-state-card]')).toBeNull();
+    expect(screen.getByText('No Insights Yet')).toHaveClass('text-app');
   });
 
   it('renders the canonical recoverable error state', () => {

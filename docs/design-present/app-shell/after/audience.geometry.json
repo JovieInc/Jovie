@@ -1,0 +1,324 @@
+{
+  "schema": "design-present-geometry/v1",
+  "url": "/app/contacts?tab=audience",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "column": {
+    "left": 240,
+    "right": 1432,
+    "top": 8,
+    "bottom": 892,
+    "width": 1192,
+    "height": 884
+  },
+  "atoms": [
+    {
+      "kind": "box",
+      "left": 1304,
+      "right": 1340,
+      "top": 12,
+      "bottom": 48,
+      "label": "button.relative.inline-flex.items-center",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 1344,
+      "right": 1376,
+      "top": 14,
+      "bottom": 46,
+      "label": "button.relative.inline-flex.items-center",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 1380,
+      "right": 1412,
+      "top": 14,
+      "bottom": 46,
+      "label": "button.relative.inline-flex.items-center",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 260,
+      "right": 333.67,
+      "top": 65.5,
+      "bottom": 93.5,
+      "label": "button.relative.min-w-0.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 333.67,
+      "right": 410.17,
+      "top": 65.5,
+      "bottom": 93.5,
+      "label": "button.relative.min-w-0.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 410.17,
+      "right": 477.34,
+      "top": 65.5,
+      "bottom": 93.5,
+      "label": "button.relative.min-w-0.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 260,
+      "right": 316.38,
+      "top": 106,
+      "bottom": 134,
+      "label": "button.relative.rounded-full.[font-weight:var(--font-weight-medium)]",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 320.38,
+      "right": 415.7,
+      "top": 106,
+      "bottom": 134,
+      "label": "button.relative.rounded-full.[font-weight:var(--font-weight-medium)]",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 419.7,
+      "right": 529.58,
+      "top": 106,
+      "bottom": 134,
+      "label": "button.relative.rounded-full.[font-weight:var(--font-weight-medium)]",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 1352,
+      "right": 1380,
+      "top": 106,
+      "bottom": 134,
+      "label": "button.relative.[font-weight:var(--font-weight-medium)].duration-subtle",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 1384,
+      "right": 1412,
+      "top": 106,
+      "bottom": 134,
+      "label": "button.relative.[font-weight:var(--font-weight-medium)].duration-subtle",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 1309.73,
+      "right": 1388,
+      "top": 153.5,
+      "bottom": 174.5,
+      "label": "span.inline-flex.shrink-0.items-center",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 1164.42,
+      "right": 1252.42,
+      "top": 189,
+      "bottom": 221,
+      "label": "button.py-1.5.text-app.font-caption",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 1264.42,
+      "right": 1355.77,
+      "top": 189,
+      "bottom": 221,
+      "label": "button.py-1.5.text-app.font-caption",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 708.2,
+      "right": 823.59,
+      "top": 353.58,
+      "bottom": 381.58,
+      "label": "button.relative.inline-flex.items-center",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 835.59,
+      "right": 963.8,
+      "top": 353.58,
+      "bottom": 381.58,
+      "label": "a.relative.inline-flex.items-center",
+      "bleed": false
+    },
+    {
+      "kind": "text",
+      "text": "Audience",
+      "left": 260,
+      "right": 314.2,
+      "top": 22,
+      "bottom": 37,
+      "label": "h1.min-w-0.truncate.font-semibold",
+      "bleed": false
+    },
+    {
+      "kind": "text",
+      "text": "AI Crawler Reads",
+      "left": 284,
+      "right": 399.89,
+      "top": 155,
+      "bottom": 172,
+      "label": "span.shrink-0.text-sm.font-semibold",
+      "bleed": false
+    },
+    {
+      "kind": "text",
+      "text": "0 reads · Waiting for first AI crawl",
+      "left": 407.89,
+      "right": 597.66,
+      "top": 156,
+      "bottom": 171,
+      "label": "span.min-w-0.flex-1.truncate",
+      "bleed": false
+    },
+    {
+      "kind": "text",
+      "table": "head",
+      "column": 0,
+      "columnLeft": 248,
+      "text": "Member",
+      "left": 260,
+      "right": 308.89,
+      "top": 197,
+      "bottom": 212,
+      "label": "div.py-1.5.text-app.font-caption",
+      "bleed": false
+    },
+    {
+      "kind": "text",
+      "table": "head",
+      "column": 1,
+      "columnLeft": 966.421875,
+      "text": "State",
+      "left": 978.42,
+      "right": 1009.13,
+      "top": 197,
+      "bottom": 212,
+      "label": "div.py-1.5.text-app.font-caption",
+      "bleed": false
+    },
+    {
+      "kind": "text",
+      "table": "head",
+      "column": 2,
+      "columnLeft": 1062.421875,
+      "text": "Alerts",
+      "left": 1074.42,
+      "right": 1109.94,
+      "top": 197,
+      "bottom": 212,
+      "label": "div.py-1.5.text-app.font-caption",
+      "bleed": false
+    },
+    {
+      "kind": "text",
+      "table": "head",
+      "column": 5,
+      "columnLeft": 1361.765625,
+      "text": "Action",
+      "left": 1373.77,
+      "right": 1412,
+      "top": 197,
+      "bottom": 212,
+      "label": "div.text-right",
+      "bleed": false
+    },
+    {
+      "kind": "text",
+      "table": "body",
+      "column": 0,
+      "columnLeft": 248,
+      "text": "Grow Your Audience",
+      "left": 778.86,
+      "right": 893.13,
+      "top": 279.41,
+      "bottom": 294.41,
+      "label": "h3.mb-1.text-app.font-caption",
+      "bleed": false
+    },
+    {
+      "kind": "text",
+      "table": "body",
+      "column": 0,
+      "columnLeft": 248,
+      "text": "Share your profile link on social media to invite visitors. ",
+      "left": 648.28,
+      "right": 1023.7,
+      "top": 299.8,
+      "bottom": 314.8,
+      "label": "p.mb-5.max-w-sm.text-app",
+      "bleed": false
+    },
+    {
+      "kind": "glyph",
+      "left": 260,
+      "right": 276,
+      "top": 156,
+      "bottom": 172,
+      "label": "svg",
+      "bleed": false
+    },
+    {
+      "kind": "glyph",
+      "left": 1396,
+      "right": 1412,
+      "top": 156,
+      "bottom": 172,
+      "label": "svg",
+      "bleed": false
+    }
+  ],
+  "iconTiles": [],
+  "emptyStatePlates": [],
+  "tabs": [
+    {
+      "text": "Contacts",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    },
+    {
+      "text": "Audience",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    },
+    {
+      "text": "Insights",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    }
+  ],
+  "devChrome": [],
+  "shellRows": [
+    {
+      "y": 0,
+      "height": 44,
+      "label": "header[data-testid=dashboard-header].z-20.bg-(--app-shell-content-surface)"
+    },
+    {
+      "y": 52,
+      "height": 40,
+      "label": "div.flex.min-h-10.min-w-0"
+    }
+  ],
+  "horizontalOverflow": 0
+}

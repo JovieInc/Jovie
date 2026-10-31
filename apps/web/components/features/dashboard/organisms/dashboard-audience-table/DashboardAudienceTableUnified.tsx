@@ -2,7 +2,7 @@
 
 import { Button, CommonDropdown, type CommonDropdownItem } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
-import { Copy, Download, ExternalLink, Users } from 'lucide-react';
+import { Copy, Download, ExternalLink } from 'lucide-react';
 import * as React from 'react';
 import { memo, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
@@ -91,7 +91,6 @@ function AudienceCrmEmptyState({
 >) {
   return (
     <TableEmptyState
-      icon={<Users className='h-5 w-5' aria-hidden='true' />}
       heading={heading}
       description={description}
       action={action}
@@ -619,7 +618,11 @@ export const DashboardAudienceTableUnified = memo(
       ]
     );
 
-    const columns = useMemo(() => buildAudienceMemberColumns(mode), [mode]);
+    const hasRows = rows.length > 0;
+    const columns = useMemo(
+      () => buildAudienceMemberColumns(mode, { selectable: hasRows }),
+      [mode, hasRows]
+    );
     const prioritySpecs = useMemo(
       () => columnPrioritySpecsFromDefs(columns),
       [columns]
@@ -892,7 +895,7 @@ export const DashboardAudienceTableUnified = memo(
               <p className='sr-only'>{getSrDescription(rows.length === 0)}</p>
 
               <div className='flex-1 min-h-0 flex flex-col'>
-                <div className='shrink-0 border-b border-subtle px-4 py-2'>
+                <div className='shrink-0 border-b border-subtle py-1'>
                   <AiCrawlerIntelligenceCard
                     onOpenDetail={() => {
                       openPanel('ai-crawlers');

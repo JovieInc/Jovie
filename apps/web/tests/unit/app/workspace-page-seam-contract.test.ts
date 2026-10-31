@@ -46,13 +46,18 @@ describe('workspace page optical seam contract', () => {
     expect(usesSharedWorkspaceSeam(source)).toBe(true);
   });
 
-  it('resolves the desktop dashboard header seam through the shared 12px token', () => {
+  it('puts the desktop dashboard header on the route content seam', () => {
     const header = read(
       'components/features/dashboard/organisms/DashboardHeader.tsx'
     );
-    expect(header).toContain('sm:px-(--app-shell-header-padding-x)');
-    expect(read('styles/design-system.css')).toMatch(
-      /--app-shell-header-padding-x:\s*12px;/
+    const tokens = read('styles/design-system.css');
+    // The header spans the panel edge to edge, outside the content inset that
+    // every route sits in, so its seam adds the inset back: title, toolbars
+    // and first cells share one axis (design-present content-axis check).
+    expect(header).toContain('sm:px-(--app-shell-header-seam-x)');
+    expect(tokens).toMatch(/--app-shell-header-padding-x:\s*12px;/);
+    expect(tokens).toMatch(
+      /--app-shell-header-seam-x:\s*calc\(\s*var\(--app-shell-content-inset\)\s*\+\s*var\(--app-shell-header-padding-x\)\s*\);/
     );
   });
 

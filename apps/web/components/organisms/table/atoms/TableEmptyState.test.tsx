@@ -91,4 +91,14 @@ describe('TableEmptyState', () => {
       'error'
     );
   });
+
+  it('never puts the empty state on a bordered card (founder ban 2026-10-28)', () => {
+    const { container } = render(
+      <TableEmptyState heading='No Releases Yet' description='Add one.' />
+    );
+    expect(
+      container.querySelector('[data-empty-state-presentation]')
+    ).toHaveAttribute('data-empty-state-presentation', 'default');
+    expect(container.querySelector('[data-empty-state-card]')).toBeNull();
+  });
 });
