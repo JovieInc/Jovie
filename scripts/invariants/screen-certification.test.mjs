@@ -1243,13 +1243,15 @@ if (p.endsWith('/zip')) {
       'utf8'
     );
     // These screens were registered but uncovered (no rendered producer).
-    // Two bind to already-captured marketing routes; the rest share one
-    // multi-screen proof spec whose entries must match these bindings.
-    assert.equal(SCREEN_MARKETING_ROUTES['web.marketing-renders'], '/renders');
-    assert.equal(
-      SCREEN_MARKETING_ROUTES['web.profile-admission'],
-      '/renders/profile-admission'
-    );
+    // They all share one multi-screen proof spec whose entries must match
+    // these bindings. web.marketing-renders and web.profile-admission are
+    // intentionally NOT marketing-bound: /renders* are render-fixture routes
+    // excluded from MARKETING_EXACT_PUBLIC_ROUTE_TARGETS, so the shared
+    // marketing artifact can never carry their evidence (binding them made
+    // every certification invocation reject that artifact — JOV-INV-018
+    // incident 2026-10-30, run 41106813919).
+    assert.equal(SCREEN_MARKETING_ROUTES['web.marketing-renders'], undefined);
+    assert.equal(SCREEN_MARKETING_ROUTES['web.profile-admission'], undefined);
     const batchScreens = [
       'web.root-document',
       'web.root-layout',
@@ -3850,10 +3852,13 @@ if (p.endsWith('/zip')) {
       sources: [source],
       viewports: ['desktop', 'mobile'],
     });
-    assert.equal(
-      SCREEN_MARKETING_ROUTES['web.engineering-preview'],
-      '/engineering/preview'
-    );
+    // NOT marketing-bound: /engineering/preview is production-blocked and
+    // noindex, so it renders not-found in this workflow's production build
+    // and MARKETING_EXACT_PUBLIC_ROUTE_TARGETS excludes it. Binding it made
+    // every certification invocation reject the shared marketing artifact
+    // (JOV-INV-018 incident 2026-10-30, run 41106813919) instead of the
+    // honest "missing exact-head proof" for this screen.
+    assert.equal(SCREEN_MARKETING_ROUTES['web.engineering-preview'], undefined);
 
     const result = evaluateChangedScreens({
       changedFiles: [
