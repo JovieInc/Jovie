@@ -362,3 +362,60 @@ describe('OnboardingChat completed guarded steps (JOV-7078)', () => {
     expect(screen.getAllByTestId('handle-card')).toHaveLength(1);
   });
 });
+
+describe('OnboardingChat Pen transcript anatomy (R6As7U)', () => {
+  beforeEach(() => {
+    chatMocks.messages = [];
+    chatMocks.status = 'ready';
+  });
+
+  it('opens each agent turn with one Jovie speaker row and aligns widgets to the text edge', () => {
+    chatMocks.messages = [
+      {
+        id: 'u1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'I want to claim jov.ie/validartist' }],
+      },
+      {
+        id: 'a1',
+        role: 'assistant',
+        parts: [
+          { type: 'text', text: 'That name is open.' },
+          {
+            type: 'tool-checkHandle',
+            toolCallId: 't-check',
+            state: 'output-available',
+            output: { action: 'check_handle', handle: 'validartist' },
+          },
+        ],
+      },
+      {
+        id: 'a2',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'One more thing.' }],
+      },
+      {
+        id: 'u2',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Sounds good' }],
+      },
+      {
+        id: 'a3',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'Great.' }],
+      },
+    ];
+
+    renderChat();
+
+    const chat = screen.getByTestId('onboarding-chat');
+    expect(chat).toHaveClass('system-b-onboarding-chat');
+    // Two agent turns (a1+a2 run, a3) → two speaker rows, none for users.
+    const speakerRows = screen.getAllByTestId('onboarding-speaker-row');
+    expect(speakerRows).toHaveLength(2);
+    expect(speakerRows[0]).toHaveTextContent('Jovie');
+    // Widget column starts at the agent text edge (no avatar-gutter indent).
+    const widgetColumn = screen.getByTestId('handle-card').parentElement;
+    expect(widgetColumn?.className).not.toMatch(/\bpl-\d/);
+  });
+});
