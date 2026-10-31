@@ -96,7 +96,7 @@ run_publication() {
   # scripts/lib/source-validation-manifest.mjs), static checks only (--fast).
   # JOVIE_PREFLIGHT_CHANGED=0 skips it.
   echo "[pre-push-gate] running preflight:changed (fast)"
-  node scripts/preflight-changed.mjs --hook --fast
+  node scripts/hooks/prepush-preflight.mjs
 }
 
 run_format() {
