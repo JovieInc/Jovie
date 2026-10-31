@@ -77,3 +77,35 @@ test('vendorFor matches subdomains, not lookalikes', () => {
   assert.equal(vendorFor('connect.facebook.net', reg)?.id, 'meta');
   assert.equal(vendorFor('evilfacebook.net', reg), null);
 });
+
+test('eu: a missing bar fails only where something consent-gated runs', () => {
+  const snap = cleanControlSnapshot();
+  snap.pages[3].consent_banner = { visible: false, accept: 0, reject: 0 };
+  const fails = evaluate(snap, CONTROL_REGISTRY).filter(
+    r => r.status === 'fail'
+  );
+  assert.deepEqual(
+    fails.map(r => r.rule),
+    ['eu-consent-first']
+  );
+  // Same page on a surface that loads nothing gated: no bar is owed.
+  const quiet = cleanControlSnapshot();
+  quiet.pages = quiet.pages.filter(
+    p => p.surface !== 'home' || p.scenario === 'eu'
+  );
+  quiet.pages.find(p => p.scenario === 'eu').consent_banner = {
+    visible: false,
+    accept: 0,
+    reject: 0,
+  };
+  quiet.pages.push({
+    ...quiet.pages.find(p => p.scenario === 'eu'),
+    scenario: 'us-default',
+  });
+  assert.equal(
+    evaluate(quiet, CONTROL_REGISTRY).filter(
+      r => r.rule === 'eu-consent-first' && r.status === 'fail'
+    ).length,
+    0
+  );
+});
