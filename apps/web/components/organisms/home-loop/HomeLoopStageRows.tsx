@@ -206,11 +206,17 @@ export function HomeLoopDoneChips({
   items,
   summary,
   fit = false,
+  total,
+  moreHref,
 }: Readonly<{
   readonly items: readonly HomeLoopDoneItem[];
   /** Optional aggregate, e.g. "12 merges", shown as the first chip. */
   readonly summary?: string | null;
   readonly fit?: boolean;
+  /** Full count when `items` is a sample; the rest show as "+N more". */
+  readonly total?: number | null;
+  /** Where the full list lives. */
+  readonly moreHref?: string;
 }>) {
   const { ref, hidden } = useFitList<HTMLUListElement>(
     items.map(item => item.id).join('|'),
@@ -243,7 +249,24 @@ export function HomeLoopDoneChips({
         className='h-4 shrink-0 px-1 text-2xs tabular-nums text-tertiary-token'
         data-testid='home-loop-done-more'
       >
-        {hidden > 0 ? `+${hidden} more` : null}
+        {(() => {
+          const sampled = total != null && total > items.length;
+          if (!sampled && hidden <= 0) return null;
+          // A sample links to the full list by its total; fit overflow alone
+          // keeps the plain "+N more".
+          const label = sampled ? `All ${total} →` : `+${hidden} more`;
+          return moreHref ? (
+            <a
+              href={moreHref}
+              className='text-secondary-token underline underline-offset-2 hover:text-primary-token focus-visible:text-primary-token'
+              data-testid='home-loop-done-more-link'
+            >
+              {label}
+            </a>
+          ) : (
+            label
+          );
+        })()}
       </p>
     </div>
   );

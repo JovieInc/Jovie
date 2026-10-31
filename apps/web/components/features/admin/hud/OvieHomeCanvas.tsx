@@ -119,15 +119,8 @@ function sinceAgo(at: number | null, now: number): string | null {
       : `${Math.round(minutes / 1440)}d ago`;
 }
 
-function withVisitAge<T extends { readonly was: string | null }>(
-  tiles: readonly T[],
-  ago: string | null
-): readonly T[] {
-  return ago
-    ? tiles.map(tile =>
-        tile.was ? { ...tile, was: `${tile.was}, ${ago}` } : tile
-      )
-    : tiles;
+function visitCaption(row: string, ago: string | null): string {
+  return ago ? `${row} · "Was" = at your last visit, ${ago}` : row;
 }
 
 async function fetchJson<T>(url: string, signal: AbortSignal): Promise<T> {
@@ -451,11 +444,12 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       copy={OVIE_HOME_COPY}
       stages={activeStages}
       constraint={constraint}
-      pulse={withVisitAge(home?.pulse ?? [], visitAgo)}
+      pulse={home?.pulse ?? []}
       asks={asks}
       rows={home?.rows ?? []}
       done={home?.done ?? []}
       doneCount={home?.mergesToday ?? null}
+      doneMoreHref={APP_ROUTES.ADMIN_SHIPPING}
       loopStatus={loopStatus}
       asksStatus={asksStatus}
       asksNotice={asksNotice}
@@ -467,10 +461,10 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       onRetryLoop={() => void shipping.refetch()}
       onRetryAsks={() => void inbox.refetch()}
       asksMoreHref={APP_ROUTES.ADMIN_INBOX}
-      company={withVisitAge(companyTiles, visitAgo)}
+      company={companyTiles}
       companyLoading={company.isPending}
-      companyCaption='Company'
-      pulseCaption='Shipping'
+      companyCaption={visitCaption('Company', visitAgo)}
+      pulseCaption={visitCaption('Shipping', visitAgo)}
       onAsksHiddenChange={setAsksHidden}
       asksHideMore
       inFlightMoreHref={APP_ROUTES.ADMIN_SHIPPING}

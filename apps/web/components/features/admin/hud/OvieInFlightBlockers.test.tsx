@@ -18,6 +18,7 @@ describe('OvieInFlightBlockers', () => {
           stuck: 7,
           moving: 2,
           groups: [{ reason: 'Source Validation', count: 7, prs }],
+          movingPrs: [prs[0]!],
         }}
       />
     );
@@ -37,11 +38,35 @@ describe('OvieInFlightBlockers', () => {
     ).toHaveAttribute('href', '/app/ov/shipping');
   });
 
+  it('lists moving work last so the rows add up to the total', () => {
+    render(
+      <OvieInFlightBlockers
+        moreHref='/app/ov/shipping'
+        summary={{
+          total: 3,
+          stuck: 0,
+          moving: 3,
+          groups: [],
+          movingPrs: prs.slice(0, 3),
+        }}
+      />
+    );
+    expect(screen.getByTestId('ovie-moving-group')).toHaveTextContent(
+      'Moving Normally3 PRs'
+    );
+  });
+
   it('says nothing is stuck instead of an empty list', () => {
     render(
       <OvieInFlightBlockers
         moreHref='/app/ov/shipping'
-        summary={{ total: 3, stuck: 0, moving: 3, groups: [] }}
+        summary={{
+          total: 3,
+          stuck: 0,
+          moving: 3,
+          groups: [],
+          movingPrs: prs.slice(0, 3),
+        }}
       />
     );
     expect(screen.getByText('Nothing is stuck.')).toBeInTheDocument();

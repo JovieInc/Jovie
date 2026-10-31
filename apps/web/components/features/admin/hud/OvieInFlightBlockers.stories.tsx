@@ -44,6 +44,7 @@ const meta = {
           prs: [pr(23805, 'fix(profile): canonical launch')],
         },
       ],
+      movingPrs: [pr(23806, 'fix(table): prevent render spikes')],
     },
   },
 } satisfies Meta<typeof OvieInFlightBlockers>;
@@ -53,5 +54,13 @@ type Story = StoryObj<typeof meta>;
 
 export const Stuck: Story = {};
 export const NothingStuck: Story = {
-  args: { summary: { total: 4, stuck: 0, moving: 4, groups: [] } },
+  args: {
+    summary: {
+      total: 1,
+      stuck: 0,
+      moving: 1,
+      groups: [],
+      movingPrs: [pr(23806, 'fix(table): prevent render spikes')],
+    },
+  },
 };

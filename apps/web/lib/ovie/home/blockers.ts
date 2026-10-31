@@ -29,6 +29,8 @@ export interface OvieInFlightSummary {
   readonly stuck: number;
   readonly moving: number;
   readonly groups: readonly OvieBlockerGroup[];
+  /** Work moving normally, listed last so the total reconciles. */
+  readonly movingPrs: readonly OvieBlockerPr[];
 }
 
 /** Plain reasons for the checks that hold most PRs; others keep their name. */
@@ -48,6 +50,16 @@ export function blockerReason(check: string): string {
   if (/^Private data guard\b/i.test(name)) return 'Private data guard failing';
   const base = name.replace(/\s*\(\d+\/\d+\)\s*$/, '');
   return PLAIN_REASONS[base] ?? (base || 'Unknown check');
+}
+
+function prOf(task: OperationalTask): OvieBlockerPr {
+  return {
+    id: task.id,
+    label: task.pullRequest
+      ? `#${task.pullRequest.number} ${task.title}`
+      : `${task.linearIdentifier} ${task.title}`,
+    url: task.pullRequest?.url ?? task.linearUrl,
+  };
 }
 
 function isStuck(task: OperationalTask): boolean {
@@ -90,13 +102,7 @@ export function buildInFlightSummary(
         (frequency.get(b) ?? 0) - (frequency.get(a) ?? 0) || a.localeCompare(b)
     )[0] as string;
     const list = byReason.get(primary) ?? [];
-    list.push({
-      id: task.id,
-      label: task.pullRequest
-        ? `#${task.pullRequest.number} ${task.title}`
-        : `${task.linearIdentifier} ${task.title}`,
-      url: task.pullRequest?.url ?? task.linearUrl,
-    });
+    list.push(prOf(task));
     byReason.set(primary, list);
   }
   const ranked = [...byReason.entries()]
@@ -117,5 +123,6 @@ export function buildInFlightSummary(
     stuck: stuck.length,
     moving: open.length - stuck.length,
     groups,
+    movingPrs: open.filter(task => !isStuck(task)).map(prOf),
   };
 }

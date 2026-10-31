@@ -74,6 +74,10 @@ describe('buildInFlightSummary', () => {
       ['Unit tests failing', 1],
     ]);
     expect(summary.groups.reduce((n, g) => n + g.count, 0)).toBe(summary.stuck);
+    expect(summary.movingPrs.map(pr => pr.id)).toEqual([
+      'linear:JOV-4',
+      'linear:JOV-5',
+    ]);
     expect(summary.groups[0]?.prs[0]).toEqual({
       id: 'linear:JOV-1',
       label: '#101 Task 1',
