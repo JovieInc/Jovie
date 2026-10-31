@@ -111,6 +111,33 @@ describe('send gateway production wiring', () => {
     });
   });
 
+  it('reads Resend quota headers and reports a quota refusal as an error', async () => {
+    h.send.mockResolvedValueOnce({
+      data: { id: 'msg_q' },
+      error: null,
+      headers: { 'x-resend-daily-quota': '95' },
+    });
+    expect(await sendStreamEmail(otp)).toMatchObject({ status: 'sent' });
+    expect(h.captureError).toHaveBeenCalledWith(
+      '[email-gateway] provider quota warn',
+      expect.any(Error),
+      expect.objectContaining({ pressure: 'warn' }),
+      'warning'
+    );
+    h.send.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'quota', name: 'daily_quota_exceeded' },
+      headers: null,
+    });
+    expect(await sendStreamEmail(otp)).toMatchObject({ status: 'error' });
+    expect(h.captureError).toHaveBeenCalledWith(
+      '[email-gateway] provider quota exhausted',
+      expect.any(Error),
+      expect.objectContaining({ pressure: 'exhausted' }),
+      'error'
+    );
+  });
+
   it('skips when Resend is not configured, the address is suppressed or the limit is hit', async () => {
     h.env.RESEND_API_KEY = undefined;
     expect(await sendStreamEmail(otp)).toMatchObject({

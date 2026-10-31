@@ -6,10 +6,25 @@
 import { Resend } from 'resend';
 import { env } from '@/lib/env-server';
 import type { PreparedEmail } from './policy';
+import {
+  exhaustedQuota,
+  QUOTA_ERROR_NAMES,
+  type QuotaReading,
+  quotaLimitsFor,
+  readQuota,
+} from './quota';
 
 export type TransportResult =
-  | { readonly ok: true; readonly messageId: string | null }
-  | { readonly ok: false; readonly error: string };
+  | {
+      readonly ok: true;
+      readonly messageId: string | null;
+      readonly quota?: QuotaReading | null;
+    }
+  | {
+      readonly ok: false;
+      readonly error: string;
+      readonly quota?: QuotaReading | null;
+    };
 
 export interface EmailTransport {
   readonly name: 'resend';
@@ -52,8 +67,15 @@ export const resendTransport: EmailTransport = {
             idempotencyKey: email.idempotencyKey,
           })
         : await getClient().emails.send(request);
-      if (response.error) return { ok: false, error: response.error.message };
-      return { ok: true, messageId: response.data?.id ?? null };
+      const limits = quotaLimitsFor('resend');
+      const quota =
+        response.error && QUOTA_ERROR_NAMES.has(response.error.name)
+          ? exhaustedQuota(limits)
+          : readQuota(response.headers, limits);
+      if (response.error) {
+        return { ok: false, error: response.error.message, quota };
+      }
+      return { ok: true, messageId: response.data?.id ?? null, quota };
     } catch (error) {
       return {
         ok: false,

@@ -77,6 +77,12 @@ export interface EmailStreamRegistry {
       readonly status: 'live' | 'not-approved';
       readonly hosts: readonly string[];
       readonly streams: readonly EmailStream[];
+      readonly quota?: {
+        readonly plan: string;
+        readonly daily: number | null;
+        readonly monthly: number | null;
+        readonly warnAt: number;
+      };
     }
   >;
   readonly streams: Record<EmailStream, StreamPolicy>;

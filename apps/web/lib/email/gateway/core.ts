@@ -13,6 +13,7 @@ import {
   type StreamEmailRequest,
   type SuppressionFact,
 } from './policy';
+import type { QuotaReading } from './quota';
 import type { EmailTransport } from './resend-transport';
 
 export type StreamSendResult =
@@ -62,7 +63,16 @@ export interface GatewayDeps {
     readonly code?: string;
     readonly ms: number;
     readonly fromDomain?: string;
+    /** Provider quota after this send, when the provider reported it. */
+    readonly quotaUsedFrac?: number;
+    readonly quotaDailyUsed?: number;
+    readonly quotaMonthlyUsed?: number;
   }): void;
+  /**
+   * Called when a send leaves the provider quota at or past its warn level, or
+   * the provider refused for quota. Sign-in codes share this quota.
+   */
+  onQuotaPressure?(reading: QuotaReading, stream: EmailStream): void;
   /** Called for rejections: a caller asked for something the registry forbids. */
   onViolation(error: Error, context: Record<string, unknown>): void;
 }
@@ -74,7 +84,11 @@ export async function runGateway(
 ): Promise<StreamSendResult> {
   const started = now();
   const stream = request.stream;
-  const done = (result: StreamSendResult, fromDomain?: string) => {
+  const done = (
+    result: StreamSendResult,
+    fromDomain?: string,
+    quota?: QuotaReading | null
+  ) => {
     deps.record({
       stream,
       purpose: request.purpose,
@@ -82,7 +96,15 @@ export async function runGateway(
       ...('code' in result && { code: result.code }),
       ms: now() - started,
       ...(fromDomain && { fromDomain }),
+      ...(quota?.usedFrac != null && { quotaUsedFrac: quota.usedFrac }),
+      ...(quota?.dailyUsed != null && { quotaDailyUsed: quota.dailyUsed }),
+      ...(quota?.monthlyUsed != null && {
+        quotaMonthlyUsed: quota.monthlyUsed,
+      }),
     });
+    if (quota && quota.pressure !== 'ok') {
+      deps.onQuotaPressure?.(quota, stream);
+    }
     if (result.status === 'rejected') {
       deps.onViolation(
         new Error(`email-gateway rejected (${result.code}): ${result.detail}`),
@@ -179,6 +201,7 @@ export async function runGateway(
     sent.ok
       ? { status: 'sent', stream, messageId: sent.messageId, from: email.from }
       : { status: 'error', stream, error: sent.error },
-    email.fromDomain
+    email.fromDomain,
+    sent.quota
   );
 }

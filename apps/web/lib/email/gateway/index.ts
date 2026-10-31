@@ -33,6 +33,22 @@ export { EmailPolicyError } from './policy';
 
 const limiters = new Map<EmailStream, RateLimiter>();
 
+/**
+ * Report each quota pressure level at most once per UTC day per instance.
+ * Noise control only: the structured log line still fires on every send.
+ */
+const reportedQuota = new Set<string>();
+export function shouldReportQuota(
+  pressure: string,
+  now: Date = new Date()
+): boolean {
+  const key = `${pressure}:${now.toISOString().slice(0, 10)}`;
+  if (reportedQuota.has(key)) return false;
+  if (reportedQuota.size > 32) reportedQuota.clear();
+  reportedQuota.add(key);
+  return true;
+}
+
 function limiterFor(stream: EmailStream, perHour: number): RateLimiter {
   let limiter = limiters.get(stream);
   if (!limiter) {
@@ -90,6 +106,20 @@ function productionDeps(): GatewayDeps {
     },
     onViolation(error, context) {
       void captureError('[email-gateway] policy violation', error, context);
+    },
+    onQuotaPressure(reading, stream) {
+      // Warn-level event: the capacity loop and Summer read it; at
+      // 'exhausted' sign-in codes are failing, so it reports as an error.
+      logger.warn('email_gateway_quota_pressure', { stream, ...reading });
+      if (!shouldReportQuota(reading.pressure)) return;
+      void captureError(
+        `[email-gateway] provider quota ${reading.pressure}`,
+        new Error(
+          `Resend quota ${reading.pressure}: daily ${reading.dailyUsed ?? '?'}/${reading.dailyLimit ?? '?'}, monthly ${reading.monthlyUsed ?? '?'}/${reading.monthlyLimit ?? '?'}`
+        ),
+        { stream, pressure: reading.pressure, usedFrac: reading.usedFrac },
+        reading.pressure === 'exhausted' ? 'error' : 'warning'
+      );
     },
   };
 }

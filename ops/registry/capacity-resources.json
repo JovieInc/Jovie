@@ -1,7 +1,7 @@
 {
   "schema": "jovie.capacity-resources/v1",
   "description": "Every resource that can stop shipping: metric, hard limit, what happens at the limit, and the lead time to fix. Read by scripts/capacity/forecast.py. Joins ops/registry/spend.json (spend collectors) and canon/automation-registry.jsonl (collector liveness). Metadata only, no secrets.",
-  "updatedAt": "2026-10-30T00:00:00Z",
+  "updatedAt": "2026-10-31T00:00:00Z",
   "cloudCollector": "gem",
   "hostAliases": {
     "gem": ["gem"],
@@ -815,6 +815,43 @@
           "options": [],
           "default": "wire collector, then forecast",
           "deadlineHours": 72
+        }
+      }
+    },
+    {
+      "id": "resend-send-quota",
+      "group": "email",
+      "host": "cloud",
+      "label": "Resend sending quota (Free: 100/day, 3,000/month; limits in apps/web/lib/email/stream-registry.json providers.resend.quota)",
+      "unit": "count",
+      "collector": {
+        "type": "none",
+        "note": "The send gateway reads x-resend-daily-quota / x-resend-monthly-quota on every send and logs email_gateway_send.quotaDailyUsed; at 80% it raises email_gateway_quota_pressure (Sentry warning, error when exhausted). Feed that reading here once a log or Redis sink exists."
+      },
+      "hardLimit": "providers.resend.quota in stream-registry.json",
+      "atLimit": {
+        "effect": "deny",
+        "note": "Resend refuses every send for the rest of the UTC day: sign-in codes, receipts and release mail stop (2026-10-31, test sign-ins used the Free quota)"
+      },
+      "leadTimeHours": 1,
+      "mode": "level",
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [
+            {
+              "label": "Resend Pro: 50k/month, no daily cap",
+              "cost": "$20/mo",
+              "lead": "minutes"
+            },
+            {
+              "label": "Stay on Free; keep test and canary sign-ins off Resend (#23903)",
+              "cost": "$0",
+              "lead": "hours"
+            }
+          ],
+          "default": "Upgrade to Resend Pro the first time pressure reaches warn on real (non-test) traffic; sign-in mail cannot share a 100/day cap",
+          "deadlineHours": 24
         }
       }
     }
