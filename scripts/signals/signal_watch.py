@@ -53,6 +53,7 @@ SUMMER_SCHEMA = "jovie.market-signal/v1"
 SUMMER_ROUTE = "/summer/v1/symphony/market-signals"
 JEV_URL = "https://ai-gateway.vercel.sh/typesafe/v1/systemone"
 JEV_MODEL = "typesafe-ai/jev"
+import system_one  # noqa: E402  (Workers AI first, Gateway fallback: one shared model route)
 USER_AGENT = "JovieSignalWatch/1.0 (+https://jov.ie)"
 DEFAULT_STATE = Path.home() / ".local/state/jovie-signals/state.json"
 DEFAULT_INBOX = Path.home() / ".local/state/jovie-signals/bookmarks-inbox"
@@ -608,10 +609,11 @@ def budget_today(state: dict, now: float | None = None) -> dict:
     return budget
 
 
-def classify(item: dict, api_key: str, poster=post_json) -> dict:
+def classify(item: dict, api_key: str, poster=None) -> dict:
+    poster = poster or system_one.route(post_json)
     status, body = poster(JEV_URL, {"model": JEV_MODEL, "state": jev_state(item), "questions": QUESTIONS},
                           {"Authorization": f"Bearer {api_key}"})
-    if status != 200 or body.get("model") != JEV_MODEL:
+    if status != 200 or body.get("model") not in system_one.SYSTEM_ONE_MODELS:
         raise RuntimeError(f"jev-http-{status}")
     answers = body.get("answers") or {}
     action, surface, priority, worth = (answers.get(key) or {} for key in ("action", "surface", "priority", "worth"))

@@ -317,10 +317,11 @@ def jev_state(item):
                       f"Summary: {signal_watch.compact(item.get('summary') or '', 1600)}"])[:5800]
 
 
-def score_jev(item, api_key, poster=signal_watch.post_json):
+def score_jev(item, api_key, poster=None):
+    poster = poster or signal_watch.system_one.route(signal_watch.post_json)
     status, body = poster(signal_watch.JEV_URL, {"model": signal_watch.JEV_MODEL, "state": jev_state(item), "questions": QUESTIONS},
                           {"Authorization": f"Bearer {api_key}"})
-    if status != 200 or body.get("model") != signal_watch.JEV_MODEL:
+    if status != 200 or body.get("model") not in signal_watch.system_one.SYSTEM_ONE_MODELS:
         raise RuntimeError(f"jev-http-{status}")
     a = body.get("answers") or {}
     pick = lambda key, allowed: (a.get(key) or {}).get("choice") if (a.get(key) or {}).get("choice") in allowed else None  # noqa: E731
@@ -511,7 +512,7 @@ def stage_rows(scored_n, routed_n, observed, started, ended):
 # ---------------------------------------------------------------------------------------------
 # run
 
-def run(state_dir, *, env=None, topics=None, researcher=research_hits, extra_items=(), poster=signal_watch.post_json,
+def run(state_dir, *, env=None, topics=None, researcher=research_hits, extra_items=(), poster=None,
         put=signal_watch.yc_corpus.gbrain_put, canon=CANON_PATTERNS, factory_dir=None, now=None, dry_run=False):
     env = os.environ if env is None else env
     now = now or time.time()

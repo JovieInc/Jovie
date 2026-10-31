@@ -126,5 +126,72 @@ class InboxTests(unittest.TestCase):
             B.x_grok.sandbox_args = saved
 
 
+class SystemOneTests(unittest.TestCase):
+    QUESTIONS = {"relevance": {"type": "noul", "instructions": "?"},
+                 "kind": {"type": "choice", "instructions": "?", "criteria": {"tip": "a", "tool": "b"}}}
+
+    class Client:
+        def __init__(self, status, content):
+            self.status, self.content, self.calls = status, content, []
+
+        def request(self, url, **kw):
+            self.calls.append((url, kw))
+            status, content = self.status, self.content
+
+            class R:
+                pass
+            r = R()
+            r.status = status
+            r.json = lambda: {"choices": [{"message": {"content": content}}], "usage": {}}
+            return r
+
+    def test_jev_requests_are_answered_by_workers_ai_in_jevs_contract(self):
+        import system_one as S
+        client = self.Client(200, json.dumps({"relevance": 0.7, "kind": "tool", "kind__confidence": 0.9}))
+        fallback = lambda *a, **k: (599, {})  # noqa: E731
+        status, body = S.route(fallback, env={"WORKERS_AI_TOKEN": "t"}, client=client)(
+            "https://gw/typesafe/v1/systemone", {"model": S.JEV_MODEL, "state": f"x {CANARY}", "questions": self.QUESTIONS}, {})
+        self.assertEqual((status, body["model"]), (200, S.SERVED_SYSTEM_ONE))
+        self.assertEqual(body["answers"], {"relevance": {"noul": 0.7}, "kind": {"choice": "tool", "probabilities": {"tool": 0.9}}})
+        sent = client.calls[0][1]
+        self.assertIn("User-Agent", sent["headers"])
+        self.assertEqual(sent["body"]["chat_template_kwargs"], {"enable_thinking": False})
+
+    def test_relay_failure_or_off_contract_falls_back_to_the_gateway(self):
+        import system_one as S
+        fallback = lambda *a, **k: (200, {"model": S.JEV_MODEL, "answers": {}})  # noqa: E731
+        body = {"model": S.JEV_MODEL, "state": "x", "questions": self.QUESTIONS}
+        for client in (self.Client(502, "{}"), self.Client(200, json.dumps({"relevance": 0.5, "kind": "made-up"}))):
+            self.assertEqual(S.route(fallback, env={"WORKERS_AI_TOKEN": "t"}, client=client)("u", body, {})[1]["model"], S.JEV_MODEL)
+        off = self.Client(200, "{}")
+        S.route(fallback, env={}, client=off)("u", body, {})
+        self.assertEqual(off.calls, [])  # no token -> straight to the gateway, as before
+
+
+class MeshIntakeTests(unittest.TestCase):
+    def line(self, sender, body, kind="message", mid="m1"):
+        return json.dumps({"id": mid, "from": sender, "kind": kind, "body": body, "acceptedAt": "2026-10-31T10:00:00Z"}) + "\n"
+
+    def test_takes_only_grokbot_bookmarks_drops_invented_ids_and_dedupes(self):
+        good = {"id": "2116405414921384099", "author": "a", "text": "post", "createdAt": "Sat, 31 Oct 2026 05:42:26 GMT",
+                "thread": ["more"], "derivedLinks": ["https://example.com/x"]}
+        invented = {"id": "123456789012345678", "text": "fake", "createdAt": "Sat, 31 Oct 2026 05:42:26 GMT"}
+        seen = {"id": "2112481939563438091", "text": "already backfilled"}
+        payload = json.dumps({"kind": "x-bookmarks", "bookmarks": [good, invented, seen]})
+        with tempfile.TemporaryDirectory() as d:
+            state, spool = Path(d), Path(d) / "inbox.jsonl"
+            B.save_state(state, {"seen": ["2112481939563438091"]})
+            spool.write_text(self.line("summer", payload, mid="x") + self.line("grokbot", "hello") + self.line("grokbot", payload))
+            runs = []
+            out = B.mesh_intake(state, spool=spool, env={}, runner=lambda sd, env: runs.append(1) or {"status": "ok"}, ack=False)
+            self.assertEqual((out["messages"], out["records"], out["fresh"], out["duplicates"]), (1, 2, 1, 1))
+            self.assertEqual(len(runs), 1)
+            dropped = json.loads(next(state.glob("bookmarks-inbox/grokbot-*.json")).read_text())
+            self.assertEqual(dropped[0]["derivedText"], ["more"])
+            self.assertIsNotNone(out["latencyS"]["postedToIngested"]["p50"])
+            again = B.mesh_intake(state, spool=spool, env={}, runner=lambda sd, env: runs.append(1), ack=False)
+            self.assertEqual((again["messages"], len(runs)), (0, 1))  # cursor advanced; nothing re-read
+
+
 if __name__ == "__main__":
     unittest.main()
