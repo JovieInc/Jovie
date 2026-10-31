@@ -41,11 +41,24 @@ export function completeList(pages, key) {
   return rows;
 }
 
+/** Nearest-rank p95, the estimator performance-budgets-guard prints as the route summary. */
+export function nearestRankP95(values) {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.max(1, Math.ceil(0.95 * sorted.length)) - 1];
+}
+
+// The guard's sample count is read from the log (`sample i/N`), not assumed:
+// #22656 raised it from 5 to 20 after the 2026-10-21 receipt, and a hard-coded
+// 5 then marked every later measurement invalid. Every route in one log must
+// use the same N >= MIN_SAMPLES_PER_ROUTE.
+export const MIN_SAMPLES_PER_ROUTE = 5;
+
 export function parseAliasSamples(log) {
   const samples = {};
   const summaries = {};
   let current;
   let invalid = false;
+  let samplesPerRoute = null;
   for (const raw of log.split('\n')) {
     const line = raw
       .replace(/\u001b\[[0-9;]*m/g, '')
@@ -64,7 +77,11 @@ export function parseAliasSamples(log) {
     if (summary) current = summary[1];
     const sample = line.match(/^\s+sample (\d+)\/(\d+): ([\d.]+)ms/);
     if (sample && samples[current]) {
-      if (+sample[1] !== samples[current].length + 1 || +sample[2] !== 5)
+      samplesPerRoute ??= +sample[2];
+      if (
+        +sample[1] !== samples[current].length + 1 ||
+        +sample[2] !== samplesPerRoute
+      )
         invalid = true;
       samples[current].push(+sample[3]);
     }
@@ -78,13 +95,15 @@ export function parseAliasSamples(log) {
   }
   const valid =
     !invalid &&
+    samplesPerRoute >= MIN_SAMPLES_PER_ROUTE &&
     ALIAS_ROUTES.every(
       route =>
-        samples[route]?.length === 5 &&
+        samples[route]?.length === samplesPerRoute &&
         samples[route].every(value => Number.isFinite(value) && value > 0) &&
-        Math.max(...samples[route]) === summaries[route]
+        nearestRankP95(samples[route]) === summaries[route]
     );
   return {
+    samplesPerRoute,
     routeSamplesMs: samples,
     routeP95Ms: summaries,
     valid,
@@ -112,6 +131,14 @@ export function selectAliasWindow(inventory, surface, cutoff) {
         b.controllerRunId - a.controllerRunId
     )
     .slice(0, 14);
+}
+
+/** The receipt's samplesPerRoute: one value across every valid measurement, or null. */
+export function uniformSamplesPerRoute(measurements) {
+  const counts = new Set(
+    measurements.filter(row => row.valid).map(row => row.samplesPerRoute)
+  );
+  return counts.size === 1 ? [...counts][0] : null;
 }
 
 export function aliasDecision(measurements) {
@@ -304,7 +331,7 @@ export async function collectAliasGraduation({
     },
     policy: {
       metric: 'usable-alias-result-max',
-      samplesPerRoute: 5,
+      samplesPerRoute: uniformSamplesPerRoute(measurements),
       p95Estimator: 'nearest-rank',
       thresholdMs: 1500,
       requiredConsecutiveRuns: 14,
