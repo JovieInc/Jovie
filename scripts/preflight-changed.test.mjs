@@ -103,6 +103,57 @@ test('two new migrations violate the single-migration rule', () => {
   assert.ok(items.some(i => /exactly one migration/.test(i.item) && !i.done));
 });
 
+test('agent distribution selects icon, legal and docs readiness inputs', () => {
+  const generator = GENERATORS.find(g => g.id === 'agent-distribution');
+  assert.ok(generator);
+  for (const input of [
+    'packages/brand/svg/jovie-mark-white.svg',
+    'design.tokens.json',
+    'apps/web/components/site/public-shell.constants.ts',
+    'apps/web/constants/routes.ts',
+    'apps/web/content/legal/privacy.md',
+    'apps/web/content/legal/terms.md',
+    'apps/web/app/(dynamic)/legal/privacy/page.tsx',
+    'apps/web/app/(dynamic)/legal/terms/page.tsx',
+    'apps/web/app/(marketing)/developers/agents/page.tsx',
+  ]) {
+    assert.equal(generator.when.test(input), true, input);
+  }
+  assert.equal(
+    generator.when.test('apps/web/content/legal/unrelated.md'),
+    false
+  );
+});
+
+test('web token source edits select the canonical token generator', () => {
+  const generator = GENERATORS.find(g => g.id === 'web-design-tokens');
+  assert.ok(generator);
+  assert.equal(generator.when.test('apps/web/design/tokens.json'), true);
+  assert.equal(
+    generator.when.test('apps/web/scripts/build-design-tokens.mjs'),
+    true
+  );
+  assert.equal(generator.when.test('apps/web/design/unrelated.json'), false);
+});
+
+test('script-only edits select checkJs without a TypeScript companion', () => {
+  for (const extension of ['mjs', 'mts', 'ts', 'cts']) {
+    assert.deepEqual(
+      typecheckTargets([file(`scripts/check.${extension}`)], '/repo'),
+      ['scripts'],
+      extension
+    );
+  }
+  assert.deepEqual(
+    typecheckTargets([file('scripts/check.mjs', 'removed')], '/repo'),
+    []
+  );
+  assert.deepEqual(
+    typecheckTargets([file('apps/web/public/embed.mjs')], '/repo'),
+    []
+  );
+});
+
 test('typecheck targets are the affected packages only', () => {
   const t = typecheckTargets(
     [
@@ -173,9 +224,8 @@ test('default preflight checks heading bounds without truncating marketing copy'
   assert.ok(
     command.startsWith('node scripts/design-system-source-ratchet.mjs && ')
   );
-  assert.ok(
-    command.includes('tests/unit/design-system/mac-header-two-lines-v1.test.ts')
-  );
+  // The whole locked design-system dir, as CI runs it (one-primary-action-per-screen, #23573 round 4).
+  assert.ok(/ tests\/unit\/design-system /.test(command));
   assert.ok(
     command.includes(
       'tests/unit/marketing/marketing-headline-line-clamp-guard.test.ts'
@@ -183,7 +233,7 @@ test('default preflight checks heading bounds without truncating marketing copy'
   );
   assert.equal(
     NARROWED['merge-group-unit-guards'].note,
-    'source identity, metrics-layer, locked chrome and heading contracts; full suite with --thorough'
+    'source identity, the whole locked design-system dir (one-primary-action, mac header, ratchets), metrics-layer, locked chrome and heading contracts; ~13s; full suite with --thorough'
   );
 });
 
@@ -209,4 +259,26 @@ test('merge-tree conflict output yields the conflicting paths', () => {
     'apps/web/a.ts',
     'b.ts deleted in HEAD and modified in x',
   ]);
+});
+
+test('Fleet Rules body lint uses CI parser: trailing punctuation on the locking PR fails (PR #23573 follow-up)', () => {
+  const files = [file('apps/web/styles/design-system.css')];
+  const run = body =>
+    lintPrBody({
+      body,
+      title: 'fix(design): x',
+      files,
+      evaluateFleetRules,
+    }).errors.map(e => e.id);
+  const base = '## Blast radius\nWhat could break: x\nProof: y\n';
+  assert.ok(
+    run(`${base}## Locked areas\nLocking PR: #123.\n`).includes('locked-areas')
+  );
+  assert.ok(
+    !run(`${base}## Locked areas\nLocking PR: #123\n`).includes('locked-areas')
+  );
+});
+
+test('--pr-body is an alias for --body-file', () => {
+  assert.equal(parseArgs(['--pr-body', 'b.md']).bodyFile, 'b.md');
 });
