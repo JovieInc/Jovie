@@ -35,6 +35,15 @@ class Detectors(unittest.TestCase):
         self.assertEqual(w.detect(spec, 20, None, 10)["status"], "WASTE")
         self.assertEqual(w.detect(spec, 11, None, 10)["status"], "OK")
 
+    def test_open_asks_of_tim_have_a_ceiling_of_three(self):
+        # Tim 2026-10-30: Ovie Home showed 36 asks; doctrine says most default.
+        spec = SPECS["tim.open_asks"]
+        cls = next(c for c in REG["classes"] if any(m["id"] == "tim.open_asks" for m in c["metrics"]))
+        self.assertEqual(cls["id"], "tim-attention")
+        self.assertEqual(w.detect(spec, 36, None, None)["status"], "WASTE")
+        self.assertEqual(w.detect(spec, 3, None, None)["status"], "OK")
+        self.assertEqual(w.detect(spec, None, None, None)["status"], "GAP")
+
     def test_missing_reading_is_a_gap_never_ok(self):
         self.assertEqual(w.detect(SPECS["ci.cancelled_share"], None, None, None)["status"], "GAP")
 

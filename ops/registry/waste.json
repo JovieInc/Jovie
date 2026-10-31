@@ -239,6 +239,16 @@
       "unit": "interrupts per day",
       "metrics": [
         {
+          "id": "tim.open_asks",
+          "label": "Asks waiting on Tim right now (Ovie Home shows at most 3; the rest must default)",
+          "unit": "count",
+          "source": "feed:time-leverage.json:openAsks",
+          "detector": {
+            "kind": "ceiling",
+            "max": 3
+          }
+        },
+        {
           "id": "tim.unneeded_asks",
           "label": "Escalation cards resolved by their own default (Tim not needed)",
           "unit": "count/7d",
