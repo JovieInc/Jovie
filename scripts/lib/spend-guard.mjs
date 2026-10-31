@@ -251,7 +251,7 @@ export function evaluate({
   anomalies = [],
   projects = [],
   policy = {},
-  watch,
+  watch = undefined,
 }) {
   const crossed = thresholdsCrossed(spentUsd, budgetUsd);
   const projection = project({ series, spentUsd, budgetUsd, periodEnd, now });
