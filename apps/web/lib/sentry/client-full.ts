@@ -22,6 +22,11 @@ import {
   SENTRY_DSN_CLIENT,
   TRACES_SAMPLE_RATE,
 } from './config';
+import {
+  getReplaySessionSampleRate,
+  isAutomatedBrowser,
+  isGoldenPathRoute,
+} from './replay-policy';
 
 /**
  * Flag to track initialization state.
@@ -52,8 +57,22 @@ type SentryIntegration = Extract<
  */
 const clientSentry = Sentry as typeof Sentry & {
   breadcrumbsIntegration: () => SentryIntegration;
-  replayIntegration: () => SentryIntegration;
+  replayIntegration: (options?: Record<string, unknown>) => SentryIntegration;
 };
+
+/**
+ * Privacy options for every Replay recording. All text and inputs (emails,
+ * passwords, one-time codes) are masked, media is blocked, and no request or
+ * response bodies are captured. Passed explicitly so a future SDK default
+ * change cannot loosen masking.
+ */
+export const REPLAY_PRIVACY_OPTIONS = {
+  maskAllText: true,
+  maskAllInputs: true,
+  blockAllMedia: true,
+  networkDetailAllowUrls: [] as string[],
+  networkCaptureBodies: false,
+} as const;
 
 /**
  * Full Sentry configuration options.
@@ -115,7 +134,7 @@ export function getFullClientConfig(
     replaysOnErrorSampleRate = REPLAY_ERROR_SAMPLE_RATE,
     additionalIntegrations = [],
     enableBreadcrumbs = true,
-    enableReplay = process.env.NODE_ENV === 'development',
+    enableReplay = true,
   } = options;
 
   // Build integrations array - full set including Replay
@@ -128,7 +147,9 @@ export function getFullClientConfig(
 
   // Add Replay integration if enabled
   if (enableReplay) {
-    integrations.push(clientSentry.replayIntegration());
+    integrations.push(
+      clientSentry.replayIntegration({ ...REPLAY_PRIVACY_OPTIONS })
+    );
     isReplayLoaded = true;
   }
 
@@ -197,53 +218,49 @@ export function initFullSentry(options: FullSentryConfig = {}): boolean {
 }
 
 /**
- * Dynamically loads and adds the Replay integration to an already-initialized Sentry client.
+ * Dynamically loads and adds the Replay integration to an already-initialized
+ * Sentry client (lite or full).
  *
- * This is useful when upgrading from a lite SDK to full SDK during navigation,
- * without re-initializing the entire SDK.
+ * Replay's compression worker is an inline blob (CSP `worker-src 'self' blob:`
+ * is already allowed); it does not need `unsafe-eval`, so this runs in
+ * production too.
  *
- * **Note:** This function is only available in development due to CSP restrictions.
- * Sentry Replay uses eval() internally, which is blocked by Content Security Policy
- * in production where 'unsafe-eval' is not allowed. In production, this function
- * returns false immediately without loading replay.
- *
- * @returns Promise<boolean> - true if Replay was added, false if:
- *   - Running in production (CSP restriction)
- *   - Replay already loaded
- *   - Sentry client not initialized
- *
- * @example
- * // Upgrade lite SDK with Replay when user navigates to dashboard (dev only)
- * if (isNavigatingToDashboard) {
- *   await addReplayIntegration();
- * }
+ * @param sessionSampleRate - Session sample rate for this route (see
+ *   replay-policy). Defaults to the shared dashboard rate.
+ * @param buffer - Buffer mode: record into memory and send nothing until
+ *   `replay.flush()` is called (see replay-start). Error auto-send is off so
+ *   every send goes through the monthly cap guard.
+ * @returns true if Replay was added, false if already loaded or no client.
  */
-export async function addReplayIntegration(): Promise<boolean> {
-  // Skip in production - Sentry Replay uses eval() which violates CSP
-  // when 'unsafe-eval' is not allowed (only permitted in development)
-  if (process.env.NODE_ENV !== 'development') {
-    return false;
-  }
-
-  // Skip if Replay is already loaded
+export async function addReplayIntegration(
+  sessionSampleRate: number = REPLAY_SESSION_SAMPLE_RATE,
+  buffer = false
+): Promise<boolean> {
   if (isReplayLoaded) {
     return false;
   }
 
-  // Get the current client
   const client = Sentry.getClient();
   if (!client) {
     return false;
   }
 
-  // Dynamically import Replay integration to enable code splitting.
+  // The Replay integration reads its sample rates from the client options when
+  // it is added, so set them first.
+  const options = client.getOptions() as unknown as Record<string, unknown>;
+  options.replaysSessionSampleRate = buffer ? 0 : sessionSampleRate;
+  options.replaysOnErrorSampleRate = buffer ? 0 : REPLAY_ERROR_SAMPLE_RATE;
+
   // replayIntegration is a client-only runtime export (see clientSentry note).
   const mod = (await import('@sentry/nextjs')) as unknown as {
-    replayIntegration: () => SentryIntegration;
+    replayIntegration: (options?: Record<string, unknown>) => SentryIntegration;
   };
 
-  // Add the Replay integration to the existing client
-  client.addIntegration(mod.replayIntegration());
+  const integration = mod.replayIntegration({ ...REPLAY_PRIVACY_OPTIONS });
+  client.addIntegration(integration);
+  if (buffer) {
+    (integration as unknown as { startBuffering: () => void }).startBuffering();
+  }
   isReplayLoaded = true;
 
   return true;
@@ -281,12 +298,7 @@ export async function initFullSentryAsync(
     return false;
   }
 
-  // Default enableReplay to development-only to avoid CSP violations in production.
-  // Sentry Replay uses eval() internally, which violates CSP when 'unsafe-eval' is not allowed.
-  const {
-    enableReplay = process.env.NODE_ENV === 'development',
-    ...restOptions
-  } = options;
+  const { enableReplay = true, ...restOptions } = options;
 
   // First, initialize with base configuration (no Replay yet)
   const configWithoutReplay = getFullClientConfig({
@@ -298,8 +310,13 @@ export async function initFullSentryAsync(
   isInitialized = true;
 
   // Then, if Replay is enabled, load it asynchronously
-  if (enableReplay) {
-    await addReplayIntegration();
+  if (enableReplay && !isAutomatedBrowser(globalThis.navigator)) {
+    const pathname = globalThis.location?.pathname ?? '/app';
+    const rate = restOptions.replaysSessionSampleRate;
+    await addReplayIntegration(
+      rate ?? getReplaySessionSampleRate(pathname),
+      isGoldenPathRoute(pathname)
+    );
   }
 
   return true;
