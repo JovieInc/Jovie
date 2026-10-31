@@ -1025,6 +1025,16 @@ test.describe('Production Auth Smoke @production-smoke', () => {
           { timeout: 30_000 }
         );
         assertExactNavigationUrl(page.url(), expectedOrigin, 'Signup landing');
+        // The post-signup redirect chain is still settling at this point: the
+        // OTP form lands the fresh user on /app, and the NEEDS_ONBOARDING
+        // state redirects to /start?fresh_signup=true. waitForURL unblocks at
+        // the first off-/signin commit, so the chain and the landing page's
+        // own load can still be in flight. Settle before this run navigates
+        // again — a goto issued mid-chain aborts the in-flight navigation
+        // (net::ERR_ABORTED, probes run 41152444713).
+        await page.waitForLoadState('domcontentloaded', {
+          timeout: SMOKE_TIMEOUTS.NAVIGATION,
+        });
         const text = (await page.locator('body').innerText()).toLowerCase();
         expect(text).not.toMatch(/application error|something went wrong/);
         return new URL(page.url()).pathname;
