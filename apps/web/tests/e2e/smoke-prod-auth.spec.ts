@@ -9,6 +9,7 @@ import {
   test,
 } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import {
   mintPassageToken,
   PASSAGE_TOKEN_HEADER,
@@ -1015,8 +1016,12 @@ test.describe('Production Auth Smoke @production-smoke', () => {
         await expect(
           page.getByRole('heading', { name: /upgrade to/i }).first()
         ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+        // The CTA is `Upgrade to ${planMarketing.displayName}`
+        // (OnboardingCheckoutClient); derive the plan name from the registry
+        // instead of pinning old copy ("Pro" became "Artist Presence" and
+        // blocked every production promotion on 2026-10-31).
         const upgradeButton = page.getByRole('button', {
-          name: /upgrade to pro/i,
+          name: `Upgrade to ${getPlanDisplayName('pro')}`,
         });
         await expect(upgradeButton).toBeVisible({
           timeout: SMOKE_TIMEOUTS.VISIBILITY,
