@@ -22,7 +22,7 @@ describe('readQuota', () => {
     expect(readQuota({ 'content-type': 'json' }, limits)).toBeNull();
   });
 
-  it('reads headers case-insensitively and takes the tighter window', () => {
+  it('reads headers case-insensitively and takes the tighter limit', () => {
     const q = readQuota(
       { 'X-Resend-Daily-Quota': '85', 'x-resend-monthly-quota': '900' },
       limits
