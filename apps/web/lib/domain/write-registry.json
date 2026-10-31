@@ -58,6 +58,13 @@
       "tables": ["creatorProfiles"]
     },
     {
+      "id": "profile.test-cleanup",
+      "entity": "profile",
+      "module": "apps/web/lib/services/profile/test-profile-unpublish.ts",
+      "exports": ["buildUnpublishTestProfilesQuery"],
+      "tables": ["creatorProfiles"]
+    },
+    {
       "id": "social-links",
       "entity": "link",
       "module": "apps/web/lib/services/social-links/mutations.ts",
