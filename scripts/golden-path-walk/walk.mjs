@@ -37,10 +37,11 @@ const { neon } = require('@neondatabase/serverless');
 
 const ORIGIN = process.env.ORIGIN ?? 'https://jov.ie';
 const OUT = process.env.OUT ?? join(process.cwd(), `run-${Date.now()}`);
-const ARTIST = process.env.ARTIST ?? 'Unmarked Pavement';
+// Unmarked Pavement left the shared pool for the admitted canary (#24002).
+const ARTIST = process.env.ARTIST ?? 'Unmarked Cars';
 const ARTIST_SPOTIFY =
   process.env.ARTIST_SPOTIFY ??
-  'https://open.spotify.com/artist/0T4McYgGzOzXOWzLaukIjD';
+  'https://open.spotify.com/artist/6TWG4bY1qzp0lJuxxFtl6F';
 const STOP_AFTER = process.env.STOP_AFTER ?? '';
 const VIEWPORT = process.env.MOBILE
   ? { width: 390, height: 844 }
@@ -148,6 +149,14 @@ page.on('console', m => {
 page.on('pageerror', e =>
   (consoleNotes[current] ??= []).push(`pageerror: ${String(e).slice(0, 300)}`)
 );
+// The claim response decides where a new visitor lands; keep it as evidence.
+page.on('response', async r => {
+  if (new URL(r.url()).pathname !== '/api/onboarding/claim') return;
+  const body = await r.text().catch(() => '');
+  (consoleNotes[current] ??= []).push(
+    `claim ${r.status()} ${body.slice(0, 400)}`
+  );
+});
 page.on('response', r => {
   if (r.status() >= 400 && new URL(r.url()).origin === ORIGIN)
     (consoleNotes[current] ??= []).push(

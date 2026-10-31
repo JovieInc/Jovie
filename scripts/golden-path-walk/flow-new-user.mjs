@@ -32,11 +32,11 @@ export default async function flow({
   await settle(6000);
   await snap('after claim settle');
   await pickArtist(arguments[0]);
-  await say(
-    arguments[0],
-    process.env.REPLY1 ?? 'unmarkedpavement',
-    'reply handle'
-  );
+  // A fresh handle per walk that differs from the homepage one, so every walk
+  // exercises the handle-change path without colliding with an earlier walk's
+  // reservation (2026-10-31 pm: a fixed default was already reserved).
+  const typed = process.env.REPLY1 ?? `${handle}x`;
+  await say(arguments[0], typed, 'reply handle');
   const ctx = arguments[0];
   const btn = ctx.page.getByTestId('onboarding-confirm-handle').last();
   if (await btn.isDisabled().catch(() => true)) {
@@ -46,9 +46,7 @@ export default async function flow({
     if (await change.isVisible().catch(() => false)) await change.click();
     const f = ctx.page.getByLabel(/edit (proposed )?handle/i).last();
     await f.fill('');
-    await f.pressSequentially(process.env.REPLY1 ?? 'unmarkedpave', {
-      delay: 60,
-    });
+    await f.pressSequentially(`${typed}y`.slice(0, 30), { delay: 60 });
     await ctx.settle(2500);
     await ctx.snap('handle edited');
   }
@@ -56,9 +54,19 @@ export default async function flow({
   await say(arguments[0], 'Under 500', 'reply audience');
   if (process.env.SOCIAL)
     await say(arguments[0], process.env.SOCIAL, 'reply social');
+  const signedUpAt = Date.now();
   await emailSignup(arguments[0]);
-  await settle(8000);
-  await snap('post signup final');
+  // Time to the waitlist receipt is the walk's exit metric; a walk that never
+  // reaches it in 45s is a defect, not a slow pass.
+  const reached = await page
+    .waitForURL(u => u.pathname.startsWith('/waitlist'), { timeout: 45000 })
+    .then(() => true)
+    .catch(() => false);
+  await settle(2500);
+  await snap('post signup final', {
+    receiptReached: reached,
+    receiptMs: reached ? Date.now() - signedUpAt : null,
+  });
 }
 
 export async function pickArtist({ page, snap, settle, ARTIST }) {
