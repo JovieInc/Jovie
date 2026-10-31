@@ -24,6 +24,7 @@ import { and, eq, ne } from 'drizzle-orm';
 import { getDeterministicTestBetterAuthUserId } from '../../../apps/web/lib/auth/dev-test-auth-identity';
 import { db } from '../../../apps/web/lib/db';
 import { users } from '../../../apps/web/lib/db/schema/auth';
+import { baUsers } from '../../../apps/web/lib/db/schema/better-auth';
 import { creatorProfiles } from '../../../apps/web/lib/db/schema/profiles';
 import {
   CANARY_SEED_SPEC_VERSION,
@@ -167,6 +168,12 @@ async function seedReturning(): Promise<void> {
       .update(users)
       .set({ name: spec.displayName, updatedAt: new Date() })
       .where(eq(users.id, row.userId));
+    // The signed-in shell reads the Better Auth user name (sidebar avatar),
+    // so keep it in step with the app user. Keyed by the canary's own email.
+    await db
+      .update(baUsers)
+      .set({ name: spec.displayName, updatedAt: new Date() })
+      .where(eq(baUsers.email, spec.email));
     const { runOnboardingCatalogImport } = await import(
       '../../../apps/web/lib/onboarding/catalog-import.server'
     );

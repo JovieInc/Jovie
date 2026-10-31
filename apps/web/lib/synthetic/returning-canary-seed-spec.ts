@@ -34,7 +34,7 @@ export interface CanarySeedIdentity {
 
 export const RETURNING_CANARY_SEED: CanarySeedIdentity = Object.freeze({
   email: PRODCERT_RETURNING_CANARY_EMAIL,
-  handle: 'good-dropouts-canary',
+  handle: 'gooddropouts',
   displayName: RETURNING_CANARY_RESERVED_ARTIST.name,
   bio: 'Public catalog and links, imported from Spotify.',
   artist: RETURNING_CANARY_RESERVED_ARTIST,
