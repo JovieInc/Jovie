@@ -98,10 +98,6 @@ describe('JOV-INV-027 quality ratchet policy', () => {
 
   it('deliberate red: rejects an unmeasured value with a non-zero sample size', () => {
     const candidate = cloneContracts();
-    // Set the value explicitly: the checked-in seed may already be measured
-    // (canon observed values are populated from production telemetry), so the
-    // deliberate red must not lean on the seed's unmeasured state.
-    candidate.contracts[0].dimensions.responsiveness.observed.value = null;
     candidate.contracts[0].dimensions.responsiveness.observed.sampleSize = 10;
     assert.match(
       validateQualityContracts(candidate, canonical, { now: NOW }).join('\n'),

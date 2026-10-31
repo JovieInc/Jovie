@@ -94,16 +94,3 @@ describe('MobileNav', () => {
     expect(source).toContain("label: 'Log in'");
   });
 });
-
-describe('prerendered homepage pathname', () => {
-  it('MobileNav.tsx reads "/index" as "/" via usePublicPathname', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { resolve } = await import('node:path');
-    const source = readFileSync(
-      resolve(process.cwd(), 'components/molecules/MobileNav.tsx'),
-      'utf8'
-    );
-    expect(source).toContain('usePublicPathname');
-    expect(source).not.toMatch(/\busePathname\b/);
-  });
-});

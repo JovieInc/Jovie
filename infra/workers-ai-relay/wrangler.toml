@@ -14,11 +14,3 @@ namespace_id = "1029"
   period = 60
 
 # WORKERS_AI_BEARER is a Worker secret (wrangler secret put), never a var here.
-
-# /v1/embeddings gets its own bucket so a bulk re-embed never starves chat.
-[[ratelimits]]
-name = "EMBED_LIMITER"
-namespace_id = "1031"
-  [ratelimits.simple]
-  limit = 600
-  period = 60

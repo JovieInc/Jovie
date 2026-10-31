@@ -1,10 +1,10 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { MetaPixel } from '@/components/features/tracking/MetaPixel';
 import { isDemoRecordingClient } from '@/lib/demo-recording';
 import { env } from '@/lib/env-client';
-import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
 import {
   buildEditorialRetargetingEventFields,
   EDITORIAL_RETARGETING_EVENT,
@@ -45,7 +45,7 @@ export function EditorialRetargeting({
   entries,
   pixelId,
 }: EditorialRetargetingProps) {
-  const pathname = usePublicPathname();
+  const pathname = usePathname();
   const entry = findEditorialRetargetingEntry(pathname, entries);
   const isPassive = env.IS_TEST || env.IS_E2E;
   const isDemo = isDemoRecordingClient();

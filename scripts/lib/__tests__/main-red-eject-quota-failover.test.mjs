@@ -43,9 +43,7 @@ vi.mock('../../../packages/api-client/gh.ts', () => ({
 }));
 
 vi.mock('../../merge-queue-backend.mjs', async importOriginal => {
-  // importOriginal is typed Promise<unknown> by vitest; the spread operand
-  // must be an object type (TS2698) — cast the module namespace to a record.
-  const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
+  const actual = await importOriginal();
   return {
     ...actual,
     // Only the runner factory is faked; dequeuePullRequest and the real

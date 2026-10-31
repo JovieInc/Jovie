@@ -1,10 +1,10 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { isDemoRecordingClient } from '@/lib/demo-recording';
 import { env } from '@/lib/env-client';
 import { publicEnv } from '@/lib/env-public';
-import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
 import { useMarketingConsent } from '@/lib/tracking/use-marketing-consent';
 
 // Allowlist approach (fail-closed): the pixel only fires on explicit marketing
@@ -71,7 +71,7 @@ export function resolveInstantlyRuntimeState({
 }
 
 export function InstantlyPixel() {
-  const pathname = usePublicPathname();
+  const pathname = usePathname();
   const pixelId = publicEnv.NEXT_PUBLIC_INSTANTLY_PIXEL_ID;
   const isPassive = env.IS_TEST || env.IS_E2E;
   const isAllowed = isAllowedRoute(pathname);
