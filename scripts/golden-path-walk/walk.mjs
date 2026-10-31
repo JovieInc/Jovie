@@ -30,7 +30,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const WEB = resolve(HERE, '../../apps/web');
+const WEB = process.env.WEB_ROOT ?? resolve(HERE, '../../apps/web');
 const require = createRequire(process.env.PW_BASE ?? join(WEB, 'package.json'));
 const { chromium } = require('playwright');
 const { neon } = require('@neondatabase/serverless');
