@@ -1,0 +1,80 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: TimWhite
+# capability-gap: Dependabot PRs stall (DIRTY lockfiles, held majors) with nothing that recreates a conflicted head or turns a held major into migration work, and nothing measures update dwell or lag. This comments `@dependabot recreate` on conflicted heads, files a deduped agent migration issue per open major, and publishes dwell metrics. It never merges or arms auto-merge (Merge Queue Green Enroll is the sole queue writer).
+# removal-trigger: Remove when Summer or Dependabot grouping owns conflict recovery, major migrations and update dwell natively.
+name: Dependency Loop
+
+# Event-driven: a Dependabot PR opening/updating, a landed lockfile change
+# (the event that makes sibling update PRs DIRTY), or CI finishing re-runs the
+# policy. The Gem lanes clock `clock_dependency_loop` (12h) is the backstop only.
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - 'pnpm-lock.yaml'
+      - '.github/dependabot.yml'
+      - 'scripts/dependency-loop.mjs'
+      - 'scripts/lib/dependency-loop.mjs'
+      - '.github/workflows/dependency-loop.yml'
+  repository_dispatch:
+    types: [clock_dependency_loop]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print actions without commenting or filing
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: dependency-loop
+  cancel-in-progress: false
+
+jobs:
+  loop:
+    name: Recreate conflicts, route majors, measure dwell
+    # pull_request_target runs trusted base code; only react to Dependabot PRs.
+    if: ${{ github.event_name != 'pull_request_target' || github.event.pull_request.user.login == 'dependabot[bot]' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-pull-requests: write
+
+      - name: Run the dependency loop
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: |
+          flag=
+          if [ "$DRY_RUN" = 'true' ]; then flag=--dry-run; fi
+          node scripts/dependency-loop.mjs $flag --metrics-out "$RUNNER_TEMP/dependency-loop.json"
+          node scripts/toolchain-drift.mjs
+
+      - name: Preserve metrics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dependency-loop-${{ github.run_id }}
+          path: ${{ runner.temp }}/dependency-loop.json
+          if-no-files-found: ignore
+          retention-days: 30

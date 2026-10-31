@@ -34,6 +34,7 @@
     {"id": "workflow:dependabot-auto-merge", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/dependabot-auto-merge.yml"},
     {"id": "workflow:dependabot-pin-sync", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/dependabot-pin-sync.yml"},
     {"id": "workflow:security-advisory-loop", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/security-advisory-loop.yml", "note": "Dependabot advisories to owned Linear work with severity SLA; ratchet fails on breach."},
+    {"id": "workflow:dependency-loop", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/dependency-loop.yml", "note": "Recreates conflicted Dependabot heads, routes majors to agent migration issues, publishes update dwell metrics."},
     {"id": "workflow:deprecation-intake", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/deprecation-intake.yml", "note": "Workflow header names TimWhite as accountable writer; the routine owner is the agent role here."},
     {"id": "workflow:design-gate", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/design-gate.yml"},
     {"id": "workflow:design-governance", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/design-governance.yml"},

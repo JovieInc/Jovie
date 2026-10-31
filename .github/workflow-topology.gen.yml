@@ -330,6 +330,20 @@ nodes:
       - workflow_run
     terminalReceipt: job:commit
     jobCount: 2
+  - name: Dependency Loop
+    path: .github/workflows/dependency-loop.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_target
+      - push
+      - repository_dispatch
+      - workflow_dispatch
+    terminalReceipt: job:loop
+    jobCount: 1
   - name: Deprecation Intake (Linear devin lane)
     path: .github/workflows/deprecation-intake.yml
     active: true

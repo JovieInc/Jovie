@@ -251,7 +251,7 @@ class CadenceClocksTest(unittest.TestCase):
                         self.assertIn("'repository_dispatch'", condition)
 
     def test_stale_workflows_are_dispatched_once_on_their_own_intervals(self):
-        self.age = {"stale-branch-sweep.yml": 8 * 86400, "postdeploy-probes.yml": 13 * 3600}
+        self.age = {c.workflow: c.interval_s + 3600 for c in clock.CLOCKS}
         result = clock.tick(self.path, "gem", self.api, NOW)
         self.assertEqual(result["status"], "dispatch-requested")
         self.assertEqual(set(result["clocks"]), {c.name for c in clock.CLOCKS[1:]})
@@ -265,6 +265,20 @@ class CadenceClocksTest(unittest.TestCase):
         self.assertEqual(sorted(self.posts()), sorted([
             "event_type=clock_production_continuity", "event_type=clock_runner_heartbeat",
             "event_type=clock_runner_health_monitor"]))
+
+    def test_dependency_loop_dispatches_at_its_twelve_hour_cadence(self):
+        dependency = next(c for c in clock.CLOCKS if c.name == "dependencyLoop")
+        self.age = {dependency.workflow: 6 * 3600}
+        result = clock.tick_one(self.path, dependency, self.api, NOW)
+        self.assertEqual(result["status"], "current")
+        self.assertEqual(self.posts(), [])
+        result = clock.tick_one(self.path, dependency, self.api, NOW + 12 * 3600)
+        self.assertEqual(result["status"], "dispatch-requested")
+        self.assertEqual(self.posts(), ["event_type=clock_dependency_loop"])
+        self.calls.clear()
+        result = clock.tick_one(self.path, dependency, self.api, NOW + 12 * 3600 + 600)
+        self.assertEqual(result["status"], "cooldown")
+        self.assertEqual(self.calls, [])
 
     def test_a_never_run_cronless_workflow_is_due_but_a_cron_backstopped_one_fails_closed(self):
         sweep = next(c for c in clock.CLOCKS if c.name == "staleBranchSweep")
