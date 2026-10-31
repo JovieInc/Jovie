@@ -308,3 +308,54 @@ export function shouldFailOver(result, fallbackToken) {
     /rate limit (already )?exceeded/i.test(result.stderr ?? '')
   );
 }
+
+/** Required merge-group contexts (CI / PR Ready aggregates ci-fast, so a red ci-fast guarantees it). */
+export const REQUIRED_CHECK_NAMES = Object.freeze([
+  'PR Ready',
+  'Migration Guard',
+  'Fork PR Gate',
+  'PR Size Guard',
+]);
+export const REQUIRED_CHECK_PREFIXES = Object.freeze(['ci-fast (']);
+
+const isRequiredCheck = name => {
+  const bare = String(name).replace(/^CI \/ /, '');
+  return (
+    REQUIRED_CHECK_NAMES.includes(bare) ||
+    REQUIRED_CHECK_PREFIXES.some(p => bare.startsWith(p))
+  );
+};
+
+/**
+ * Required checks whose latest run on the merge-group head concluded FAILURE.
+ * @param {Array<{id:number, name:string, conclusion:string|null}>} checkRuns
+ * @returns {string[]} sorted names
+ */
+export function failingRequiredChecks(checkRuns = []) {
+  const latest = new Map();
+  for (const c of checkRuns) {
+    const prev = latest.get(c.name);
+    if (!prev || c.id > prev.id) latest.set(c.name, c);
+  }
+  return [...latest.values()]
+    .filter(c => c.conclusion === 'failure' && isRequiredCheck(c.name))
+    .map(c => c.name)
+    .sort();
+}
+
+/**
+ * A queue head with a failed required check blocks everyone behind it even
+ * though GitHub never ejects it (#23966: 5 h). Dequeue only when main is green,
+ * so a red main stays the revert path's business. Never re-enqueues, never jumps.
+ * @param {{head?: {number:number, position:number, state:string, sha?:string|null}|null, failing: string[], mainGreen: boolean}} input
+ */
+export function decideFailingHead({ head, failing, mainGreen }) {
+  const no = reason => ({ dequeue: false, reason });
+  if (!head || head.position !== 1) return no('no-head');
+  if (!failing.length) return no('no-failed-required-check');
+  if (!mainGreen) return no('main-not-green');
+  return { dequeue: true, reason: 'required-check-failed', failing };
+}
+
+export const failingHeadComment = (head, failing) =>
+  `${marker({ failingHeadDequeued: head.sha ?? null })}\nRemoved from the merge queue: required check${failing.length === 1 ? '' : 's'} failed on the merge group (${failing.map(n => `\`${n}\``).join(', ')}) while main CI is green. Fix and push; Merge Queue Green Enroll re-admits it when checks pass.`;

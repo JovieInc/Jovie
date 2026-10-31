@@ -1,5 +1,6 @@
 import 'server-only';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
+import { AI_ROUTING } from '@/lib/ai/routing';
 import { env } from '@/lib/env-server';
 
 /**
@@ -18,10 +19,11 @@ import { env } from '@/lib/env-server';
 /**
  * Jovie's relay Worker (infra/workers-ai-relay): an OpenAI-compatible front for
  * the Workers AI binding, so no Cloudflare API token lives in Vercel, CI or
- * Doppler. `WORKERS_AI_BASE_URL` overrides it (tests, a staging relay).
+ * Doppler. The URL lives in routing.json (also read by scripts/buyer-eval);
+ * `WORKERS_AI_BASE_URL` overrides it (tests, a staging relay).
  */
-export const WORKERS_AI_RELAY_BASE_URL =
-  'https://jovie-workers-ai.tim-fd8.workers.dev/v1';
+export const WORKERS_AI_RELAY_BASE_URL: string =
+  AI_ROUTING.providers['workers-ai'].relayBaseUrl;
 
 /**
  * Gateway model id -> Workers AI model id. Only models that exist on both

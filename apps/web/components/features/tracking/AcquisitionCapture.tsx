@@ -1,9 +1,9 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import { stageForFunnelPath } from '@/lib/acquisition/artist-offer-funnel';
 import { publicEnv } from '@/lib/env-public';
+import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
 import {
   clearAcquisitionId,
   getOrCreateAcquisitionId,
@@ -62,7 +62,7 @@ function captureAcquisition(): void {
 }
 
 export function AcquisitionCapture() {
-  const pathname = usePathname();
+  const pathname = usePublicPathname();
   const initialPathname = useRef<string | null>(pathname);
 
   // Client-side navigation into a funnel page (e.g. /pricing) records its
