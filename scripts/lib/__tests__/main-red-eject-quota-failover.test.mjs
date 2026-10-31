@@ -18,10 +18,16 @@ let primaryExhausted = true;
 let backendPrimaryExhausted = true;
 /** Identity the fallback credential authenticates as. */
 let fallbackViewerLogin = 'jovie-bot[bot]';
+/**
+ * Fake `gh` result: {code, stdout, stderr} like runGh returns.
+ * @typedef {{code: number, stdout: string, stderr: string}} GhResult
+ */
 /** Router for backend calls made with the fallback credential. */
-let backendRoute = async () => rateLimited;
+/** @type {(line: string) => GhResult | Promise<GhResult>} */
+let backendRoute = () => rateLimited;
 /** Router for gh() calls made with the fallback credential. */
-let ghRoutes = async () => {
+/** @type {(line: string) => GhResult | Promise<GhResult>} */
+let ghRoutes = () => {
   throw new Error('unrouted gh call');
 };
 
@@ -210,8 +216,11 @@ describe('stuck-head dequeue under installation quota exhaustion (run 4122729902
     fallbackViewerLogin = 'github-actions[bot]';
     const out = await stuckHead({ doApply: true, now: NOW });
     expect(out).toMatchObject({ dequeued: false, deferred: true, stuck: true });
-    expect(out.reason).toContain('not a trusted native queue mutation actor');
-    expect(out.reason).toContain('github-actions[bot]');
+    const reason = /** @type {string} */ (
+      /** @type {{ deferred?: boolean, reason?: string }} */ (out).reason
+    );
+    expect(reason).toContain('not a trusted native queue mutation actor');
+    expect(reason).toContain('github-actions[bot]');
     // The safety check held: the mutation never ran on the fallback token.
     expect(backendCalls.some(c => c.line.includes('DequeuePullRequest'))).toBe(
       false
@@ -227,7 +236,10 @@ describe('stuck-head dequeue under installation quota exhaustion (run 4122729902
     backendRoute = async () => rateLimited;
     const out = await stuckHead({ doApply: true, now: NOW });
     expect(out).toMatchObject({ dequeued: false, deferred: true });
-    expect(out.reason).toContain('fallback token also exhausted');
+    const reason = /** @type {string} */ (
+      /** @type {{ deferred?: boolean, reason?: string }} */ (out).reason
+    );
+    expect(reason).toContain('fallback token also exhausted');
     expect(backendCalls.some(c => c.line.includes('DequeuePullRequest'))).toBe(
       false
     );
@@ -274,5 +286,67 @@ describe('stuck-head dequeue under installation quota exhaustion (run 4122729902
     expect(backendCalls.every(c => c.credential === 'installation-token')).toBe(
       true
     );
+  });
+
+  it('defers the failing-head dequeue honestly instead of crashing when the fallback identity is refused', async () => {
+    // #24021's failingHead() path (run for non-UNMERGEABLE heads with failing
+    // required checks) must honor the same defer contract as the stuck path:
+    // the mutation-actor check refuses the fallback credential, so nothing is
+    // mutated, one incident is filed, and no failing-head comment is posted.
+    fallbackViewerLogin = 'github-actions[bot]';
+    ghRoutes = line => {
+      if (line.includes('mergeQueue(branch:'))
+        return okJson({
+          data: {
+            repository: {
+              mergeQueue: {
+                entries: {
+                  nodes: [
+                    {
+                      position: 1,
+                      state: 'AWAITING_CHECKS',
+                      enqueuedAt: '2026-10-31T17:56:00Z',
+                      headCommit: { oid: HEAD },
+                      pullRequest: { number: HEAD_PR, labels: { nodes: [] } },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        });
+      if (line.includes('check-runs'))
+        return okJson({
+          check_runs: [{ id: 1, name: 'PR Ready', conclusion: 'failure' }],
+        });
+      if (line.includes('branch=main&event=push'))
+        return okJson({
+          workflow_runs: [{ status: 'completed', conclusion: 'success' }],
+        });
+      if (line.includes('labels=main-health-incident')) return okJson([]);
+      if (line.includes('/issues -f')) return okJson({ number: 556 });
+      if (line.includes('-X POST')) return okJson({});
+      if (line.includes('workflow run')) return okJson('');
+      return { code: 1, stdout: '', stderr: `unrouted gh call: ${line}` };
+    };
+    const out = await stuckHead({ doApply: true, now: NOW });
+    expect(out).toMatchObject({
+      failingHead: true,
+      dequeued: false,
+      deferred: true,
+    });
+    const reason = /** @type {string} */ (
+      /** @type {{ deferred?: boolean, reason?: string }} */ (out).reason
+    );
+    expect(reason).toContain('not a trusted native queue mutation actor');
+    // The safety check held: the mutation never ran on the fallback token.
+    expect(backendCalls.some(c => c.line.includes('DequeuePullRequest'))).toBe(
+      false
+    );
+    // One incident write only: no failing-head comment, no other writes.
+    const lines = writes().map(c => c.line);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('/issues -f');
+    expect(lines[0]).toContain('dequeue deferred');
   });
 });

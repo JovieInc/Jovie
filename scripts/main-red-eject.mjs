@@ -21,9 +21,12 @@ import {
   checkKey,
   classifyEvidence,
   decideEject,
+  decideFailingHead,
   detectConsecutiveGroupFailure,
   detectStuckHead,
   FIX_RED_LABEL,
+  failingHeadComment,
+  failingRequiredChecks,
   failureSignature,
   HEAD_STUCK_ALERT_MIN,
   headDwell,
@@ -300,7 +303,7 @@ function commandProbe(cmd) {
 // ---- queue -----------------------------------------------------------------
 
 async function queueEntries() {
-  const q = `query($o:String!,$r:String!){repository(owner:$o,name:$r){mergeQueue(branch:"main"){entries(first:50){nodes{position state enqueuedAt pullRequest{number labels(first:30){nodes{name}}}}}}}}`;
+  const q = `query($o:String!,$r:String!){repository(owner:$o,name:$r){mergeQueue(branch:"main"){entries(first:50){nodes{position state enqueuedAt headCommit{oid} pullRequest{number labels(first:30){nodes{name}}}}}}}}`;
   const [o, r] = REPO.split('/');
   const out = JSON.parse(
     await gh(
@@ -311,6 +314,7 @@ async function queueEntries() {
   return (out.data.repository.mergeQueue?.entries.nodes ?? []).map(n => ({
     number: n.pullRequest.number,
     position: n.position,
+    sha: n.headCommit?.oid ?? null,
     state: n.state,
     enqueuedAt: n.enqueuedAt,
     compounding: n.pullRequest.labels.nodes.some(
@@ -623,6 +627,82 @@ export async function reopen(revertPr) {
   return { reopened: true, pr: created.number };
 }
 
+// ---- failing head ----------------------------------------------------------
+
+async function mainCiGreen() {
+  const { workflow_runs } = await api(
+    `repos/${REPO}/actions/workflows/${CI_WORKFLOW}/runs?branch=main&event=push&per_page=1`,
+    'poll'
+  );
+  const latest = workflow_runs[0];
+  return latest?.status === 'completed' && latest.conclusion === 'success';
+}
+
+/** Dequeue a head whose merge group has a failed required check while main CI is green. */
+async function failingHead(head, doApply) {
+  if (!head.sha) return { failingHead: false };
+  const runs = [];
+  for (let page = 1; page <= 3; page += 1) {
+    const out = await api(
+      `repos/${REPO}/commits/${head.sha}/check-runs?per_page=100&page=${page}`,
+      'poll'
+    );
+    runs.push(...out.check_runs);
+    if (out.check_runs.length < 100) break;
+  }
+  const failing = failingRequiredChecks(runs);
+  if (!failing.length) return { failingHead: false };
+  const decision = decideFailingHead({
+    head: { ...head, position: 1 },
+    failing,
+    mainGreen: await mainCiGreen(),
+  });
+  if (!decision.dequeue || !doApply) return { failingHead: true, ...decision };
+  let deferReason = null;
+  try {
+    await dequeue(head.number);
+  } catch (error) {
+    if (error?.code !== QUOTA_DEFERRED_CODE) throw error;
+    deferReason = error.message;
+  }
+  if (deferReason !== null) {
+    // Same honest-defer contract as the stuck path: the mutation-actor check
+    // refused the fallback credential or both token buckets are exhausted.
+    // Nothing was mutated (no dequeue, no failing-head comment); the next
+    // ejector wake retries once quota heals.
+    const note = `Queue head #${head.number} is failing but the dequeue is deferred — ${deferReason}. Nothing was mutated (no dequeue, no failing-head comment); the next ejector wake retries.`;
+    console.error(`::warning::queue-mutation-deferred: ${note}`);
+    await incident(
+      `failing-head:${head.number}`,
+      `queue head #${head.number} failing (dequeue deferred)`,
+      note
+    ).catch(error =>
+      console.error(
+        `::warning::deferred dequeue incident failed: ${error.message}`
+      )
+    );
+    return {
+      failingHead: true,
+      ...decision,
+      dequeued: false,
+      deferred: true,
+      reason: deferReason,
+    };
+  }
+  // The dequeue is the fix; a failed comment must not undo or retry it.
+  await gh([
+    'api',
+    '-X',
+    'POST',
+    `repos/${REPO}/issues/${head.number}/comments`,
+    '-f',
+    `body=${failingHeadComment(head, failing)}`,
+  ]).catch(error =>
+    console.error(`::warning::failing-head comment failed: ${error.message}`)
+  );
+  return { failingHead: true, ...decision, dequeued: true };
+}
+
 // ---- stuck head ------------------------------------------------------------
 
 export async function stuckHead({ doApply = false, now = Date.now() } = {}) {
@@ -639,7 +719,8 @@ export async function stuckHead({ doApply = false, now = Date.now() } = {}) {
       `Queue head #${head.number} has been at position 1 for ${metric.stuckMin} min in state ${head.state} (alert threshold ${HEAD_STUCK_ALERT_MIN} min). Dequeue it if it is red.`
     );
   // Only an UNMERGEABLE head needs the first-sighting comment read: skip the call otherwise.
-  if (head.state !== 'UNMERGEABLE') return { stuck: false, metric };
+  if (head.state !== 'UNMERGEABLE')
+    return { stuck: false, metric, ...(await failingHead(head, doApply)) };
   // First sighting is recorded on the PR (durable across runs); GitHub exposes no state-change time.
   const comments = await api(
     `repos/${REPO}/issues/${head.number}/comments?per_page=100`,
