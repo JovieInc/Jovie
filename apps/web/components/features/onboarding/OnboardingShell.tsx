@@ -78,6 +78,14 @@ export interface OnboardingShellProps {
 export function buildEntryProfileBuilderState(
   entryProfile: StartEntryProfile | null | undefined
 ): OnboardingProfileBuilderState {
+  // An open name still seeds the draft panel (Pen R6As7U): the visitor sees
+  // jov.ie/<handle> taking shape before the first message.
+  if (entryProfile?.status === 'available') {
+    return {
+      ...EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
+      handle: entryProfile.handle,
+    };
+  }
   if (entryProfile?.status !== 'claimable') {
     return EMPTY_ONBOARDING_PROFILE_BUILDER_STATE;
   }

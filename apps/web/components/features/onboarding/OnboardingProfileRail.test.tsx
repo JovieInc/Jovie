@@ -171,7 +171,7 @@ describe('OnboardingProfileRail', () => {
     expect(
       screen.queryByTestId('onboarding-dsp-match-strip')
     ).not.toBeInTheDocument();
-    expect(screen.getByText('Preview — not claimed yet')).toBeInTheDocument();
+    expect(screen.getByText('Preview · not claimed yet')).toBeInTheDocument();
     expect(screen.queryByText(/Draft · /)).toBeNull();
     expect(screen.queryByText('Test Artist')).not.toBeInTheDocument();
   });
@@ -244,6 +244,25 @@ describe('OnboardingProfileRail', () => {
 });
 
 describe('resolvePreviewArtist', () => {
+  it('previews a claimed handle before any link is shared (Pen R6As7U)', () => {
+    expect(
+      resolvePreviewArtist({
+        artist: null,
+        artistConfirmed: false,
+        handle: 'timwhite',
+        socialLinks: [],
+      })
+    ).toEqual({ id: 'handle-timwhite', name: 'timwhite', url: '' });
+    expect(
+      resolvePreviewArtist({
+        artist: null,
+        artistConfirmed: false,
+        handle: null,
+        socialLinks: [],
+      })
+    ).toBeNull();
+  });
+
   it('previews a handle-only profile once social links exist', () => {
     expect(
       resolvePreviewArtist({
