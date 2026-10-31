@@ -129,7 +129,7 @@ export function setConsentState(state: 'accepted' | 'rejected'): void {
  */
 export function isTrackingAllowed(): boolean {
   const state = getConsentState();
-  return state === 'accepted';
+  return state === 'accepted' && isMarketingAllowed();
 }
 
 /**

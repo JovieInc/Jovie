@@ -24,7 +24,9 @@ export function useMarketingConsent(skip: boolean): boolean {
     if (skip) return;
     if (globalThis.window === undefined) return;
 
-    setAllowed(isMarketingAllowed());
+    const syncConsent = () => setAllowed(isMarketingAllowed());
+    syncConsent();
+    globalThis.addEventListener('storage', syncConsent);
 
     let unsubConsent: (() => void) | undefined;
 
@@ -38,6 +40,7 @@ export function useMarketingConsent(skip: boolean): boolean {
     if (globalThis.JVConsent) {
       attach();
       return () => {
+        globalThis.removeEventListener('storage', syncConsent);
         unsubConsent?.();
       };
     }
@@ -45,6 +48,7 @@ export function useMarketingConsent(skip: boolean): boolean {
     const onReady = () => attach();
     globalThis.addEventListener('jvconsent:ready', onReady, { once: true });
     return () => {
+      globalThis.removeEventListener('storage', syncConsent);
       globalThis.removeEventListener('jvconsent:ready', onReady);
       unsubConsent?.();
     };
