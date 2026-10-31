@@ -39,7 +39,7 @@ export default async function flowReturning({
   await snap('after signin landing');
   await settle(6000);
   await snap('dashboard settled');
-  const handle = process.env.PROFILE_HANDLE ?? 'browse-ready-user';
+  const handle = process.env.PROFILE_HANDLE ?? 'good-dropouts-canary';
   await page.goto(`${ORIGIN}/${handle}`, { waitUntil: 'domcontentloaded' });
   await settle(3500);
   await snap('public profile');
