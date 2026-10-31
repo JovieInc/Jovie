@@ -87,6 +87,7 @@ jobs:
           sparse-checkout: |
             scripts/lib/merge-group-local-evidence.mjs
             scripts/lib/merge-group-member-policy.mjs
+            scripts/lib/pr-size-exclusions.mjs
             scripts/lib/pr-size-guard-policy.mjs
             scripts/lib/repo-hygiene-limits.mjs
           sparse-checkout-cone-mode: false
@@ -372,6 +373,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
           PR_DIFF_BASE: ${{ steps.pr-merge-base.outputs.sha }}
+          SIZE_POLICY_REF: ${{ steps.pr-merge-base.outputs.base_tip }}
           REPO: ${{ github.repository }}
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
@@ -386,8 +388,6 @@ jobs:
               echo "✅ opt-out label present — PR Size Guard skipped"; exit 0;;
           esac
 
-          # Exclude generated / lock / snapshot / vendored noise from the count.
-          EXCLUDE='pnpm-lock\.yaml|package-lock\.json|yarn\.lock|\.lock$|/generated/|\.gen\.|__snapshots__/|\.snap$|\.svg$|\.po$|/dist/|/build/|\.min\.|drizzle/migrations/meta/'
           # Count from the exact merge base this job already checked out: no
           # GitHub API call, so the shared GITHUB_TOKEN quota (1,000 REST/h for
           # every workflow in the repo) can never turn this required check red
@@ -412,7 +412,17 @@ jobs:
             }
             process.stdout.write(rows.join("\n"));
           ' "$PR_DIFF_BASE")
-          counted=$(printf '%s\n' "$rows" | grep -vE "$EXCLUDE" || true)
+          # Exclusions live in scripts/lib/pr-size-exclusions.mjs (tests and
+          # fixtures do not count; generated/lock noise does not count). Run it
+          # from the base tip so a PR cannot widen the list that judges it; fall
+          # back to the PR copy only while the base predates the module.
+          policy_dir="$RUNNER_TEMP/size-exclusions"
+          rm -rf "$policy_dir" && mkdir -p "$policy_dir"
+          exclusions="$policy_dir/scripts/lib/pr-size-exclusions.mjs"
+          if ! git archive "${SIZE_POLICY_REF}" scripts/lib/pr-size-exclusions.mjs 2>/dev/null | tar -x -C "$policy_dir"; then
+            exclusions=scripts/lib/pr-size-exclusions.mjs
+          fi
+          counted=$(printf '%s\n' "$rows" | node "$exclusions")
           lines=$(printf '%s\n' "$counted" | awk -F'\t' '{s+=$1} END{print s+0}')
           files=$(printf '%s\n' "$counted" | grep -c . || true)
 

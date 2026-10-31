@@ -825,7 +825,7 @@ test.describe('Production Auth Smoke @production-smoke', () => {
         // redirect), not the billing settings page. The step stops before
         // the Stripe handoff — it asserts the upgrade entry rendered.
         await page.goto(
-          `${expectedOrigin}/onboarding/checkout?source=intent&plan=pro`,
+          `${expectedOrigin}/onboarding/checkout?source=intent&plan=pro&interval=month`,
           {
             waitUntil: 'domcontentloaded',
             timeout: SMOKE_TIMEOUTS.NAVIGATION,
@@ -836,6 +836,13 @@ test.describe('Production Auth Smoke @production-smoke', () => {
           expectedOrigin,
           'Onboarding checkout navigation'
         );
+        // The receipt labels this surface web.onboarding-checkout, so the cert
+        // must actually LAND on the registered screen: the origin check above
+        // alone would pass a soft redirect to pricing or billing (JOV-9625).
+        expect(
+          new URL(page.url()).pathname,
+          'the checkout cert must land on the registered /onboarding/checkout screen'
+        ).toBe(APP_ROUTES.ONBOARDING_CHECKOUT);
         await waitForHydration(page);
         await expect(
           page.getByRole('heading', { name: /upgrade to/i }).first()
@@ -858,6 +865,9 @@ test.describe('Production Auth Smoke @production-smoke', () => {
           /application error|something went wrong/
         );
         expect(checkoutText).toMatch(/pro/);
+        // The paid plan is presented with its per-interval price; the cert
+        // navigates with interval=month, so the monthly price must render.
+        expect(checkoutText).toMatch(/\/mo/);
       },
       () =>
         'onboarding/checkout entry rendered the upgrade CTA; stopped before payment'
@@ -998,6 +1008,15 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       url => url.origin === expectedOrigin && url.pathname.startsWith('/app'),
       { timeout: 30_000 }
     );
+    // Navigate to the real chat surface: /app is the Opportunity Inbox whose
+    // shell composer has no attach toolbar, so the attach-button contracts
+    // below must run on /app/chat (the round-1 in-setup flow navigated here
+    // explicitly; the decoupling lost the navigation — JOV-10150).
+    await page.goto(APP_ROUTES.CHAT, {
+      waitUntil: 'domcontentloaded',
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+    });
+    assertExactNavigationUrl(page.url(), expectedOrigin, 'Chat navigation');
     await waitForHydration(page);
     const telemetry = createSurfaceTelemetry(page);
     const composer = page.getByRole('textbox', { name: /chat message input/i });

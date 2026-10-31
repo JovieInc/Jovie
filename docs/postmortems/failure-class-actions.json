@@ -3,6 +3,11 @@
   "sourceIssue": "JOV-6690",
   "actions": [
     {
+      "failureClass": "evidence-forgery-or-staleness",
+      "issue": "JOV-10152",
+      "url": "https://linear.app/jovie/issue/JOV-10152/pm-classevidence-forgery-or-staleness-evidence-must-be-fresh-and-bound"
+    },
+    {
       "failureClass": "green-by-implication",
       "issue": "JOV-8303",
       "url": "https://linear.app/jovie/issue/JOV-8303/pm-classgreen-by-implication-forbid-false-green-across-automation"
@@ -26,6 +31,11 @@
       "failureClass": "silent-production-staleness",
       "issue": "JOV-8300",
       "url": "https://linear.app/jovie/issue/JOV-8300/pm-classsilent-production-staleness-failure-class-hardening-across"
+    },
+    {
+      "failureClass": "unowned-incident",
+      "issue": "JOV-10151",
+      "url": "https://linear.app/jovie/issue/JOV-10151/pm-classunowned-incident-every-incident-gets-an-owner-and-a-ticket"
     }
   ]
 }
