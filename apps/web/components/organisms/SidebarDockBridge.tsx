@@ -7,9 +7,11 @@ import {
 } from '@/components/shell/SidebarDock';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 import {
+  isWhatsNewActionComplete,
   parseWhatsNewFeed,
   WHATS_NEW_PATH,
   type WhatsNewEntry,
+  type WhatsNewUserState,
 } from '@/lib/whats-new';
 import {
   requestFullAudioPlayer,
@@ -24,9 +26,11 @@ export function SidebarDockBridge({
   collapsed,
   children,
   fetchImpl = fetch,
+  userState,
 }: {
   readonly fetchImpl?: typeof fetch;
   readonly userId: string;
+  readonly userState?: WhatsNewUserState;
   readonly collapsed: boolean;
   readonly children: (status: SidebarDockStatus | undefined) => ReactNode;
 }) {
@@ -59,7 +63,11 @@ export function SidebarDockBridge({
       collapsed={collapsed}
       update={update?.state}
       onUpdate={update?.openModal}
-      release={release}
+      release={
+        release && userState && isWhatsNewActionComplete(release, userState)
+          ? null
+          : release
+      }
       audio={
         activeTrack
           ? {
