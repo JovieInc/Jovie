@@ -45,7 +45,7 @@ def run_task(task: dict, ctx: dict, run=subprocess.run) -> tuple[bool, float]:
     try:
         result = run([expand(a, ctx) for a in task["argv"]], env=env, capture_output=True,
                      timeout=task.get("timeoutS", 300))
-        ok = result.returncode == 0
+        ok = result.returncode in task.get("okCodes", [0])
     except (OSError, subprocess.SubprocessError):
         ok = False
     return ok, round((time.monotonic() - started) * 1000)

@@ -45,6 +45,12 @@ class MacTickTest(unittest.TestCase):
         self.assertEqual(mt.overdue(tasks, state, 10 * 60), [])
         self.assertEqual(mt.overdue(tasks, state, 20 * 60), ["a"], "no success for 3 intervals")
 
+    def test_ok_codes_treat_a_capacity_alarm_exit_as_a_successful_run(self):
+        task = {"id": "c", "everyMin": 5, "argv": ["x"], "okCodes": [0, 2]}
+        self.assertTrue(mt.run_task(task, {}, lambda *a, **k: Result(2))[0])
+        self.assertFalse(mt.run_task(task, {}, lambda *a, **k: Result(1))[0])
+        self.assertFalse(mt.run_task(T("a"), {}, lambda *a, **k: Result(2))[0])
+
     def test_timeout_counts_as_failure(self):
         def run(argv, **kw):
             raise subprocess.TimeoutExpired(argv, 1)

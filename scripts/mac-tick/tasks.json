@@ -12,6 +12,7 @@
       "id": "mac:capacity-collector",
       "everyMin": 30,
       "timeoutS": 300,
+      "okCodes": [0, 2],
       "env": { "CAPACITY_HOST": "{capacity_host}" },
       "argv": [
         "/usr/bin/python3",
