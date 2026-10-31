@@ -124,8 +124,8 @@ test('workflow records wins in the store and never opens a ledger PR', () => {
     ),
     'utf8'
   );
-  const steps = load(text)
-    .jobs.ingest.steps.map(s => s.run ?? '')
+  const steps = /** @type {any} */ (load(text)).jobs.ingest.steps
+    .map(s => s.run ?? '')
     .join('\n');
   assert.match(steps, /wins-ledger\.mjs ingest --pr "\$PR_NUMBER" --store/);
   assert.doesNotMatch(steps, /git (commit|push)|pr create/);
