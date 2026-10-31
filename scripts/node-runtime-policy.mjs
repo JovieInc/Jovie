@@ -11,12 +11,13 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export function parseVersion(version) {
   const match = String(version)
     .trim()
-    .match(/^v?(\d+)\.(\d+)\.(\d+)$/);
+    .match(/^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z][0-9A-Za-z.-]*))?$/);
   if (!match) throw new Error(`Invalid Node version: ${version}`);
   return {
     major: Number(match[1]),
     minor: Number(match[2]),
     patch: Number(match[3]),
+    prerelease: match[4] ?? null,
     version: `${match[1]}.${match[2]}.${match[3]}`,
   };
 }
@@ -50,6 +51,7 @@ export function getReleaseStatus(scheduleEntry, now = new Date()) {
 }
 export function latestReleaseForMajor(index, major) {
   const releases = index
+    .filter(release => parseVersion(release.version).prerelease === null)
     .filter(release => parseVersion(release.version).major === major)
     .sort((a, b) => compareVersions(b.version, a.version));
   if (releases.length === 0) {
@@ -136,6 +138,12 @@ export function validateRepositoryPolicy(policy, repoRoot = defaultRepoRoot) {
 }
 export function evaluateOfficialReleases({ policy, schedule, index, now }) {
   const errors = [];
+  // Pre-release index entries (e.g. v27.0.0-alpha.0.0.0) are lifecycle noise:
+  // never an LTS line and never a patch target. Classify and skip them; a
+  // genuinely malformed version still throws from parseVersion.
+  const stableIndex = index.filter(
+    release => parseVersion(release.version).prerelease === null
+  );
   const productionVersion = policy.productionVersion;
   const productionMajor = parseVersion(productionVersion).major;
   const productionSchedule = schedule[`v${productionMajor}`];
@@ -150,10 +158,10 @@ export function evaluateOfficialReleases({ policy, schedule, index, now }) {
       `Production Node ${productionMajor} is ${productionStatus}, not an allowed LTS status`
     );
   }
-  const latestProduction = latestReleaseForMajor(index, productionMajor);
+  const latestProduction = latestReleaseForMajor(stableIndex, productionMajor);
   const normalizedProduction = parseVersion(productionVersion).version;
   if (
-    !index.some(
+    !stableIndex.some(
       release => parseVersion(release.version).version === normalizedProduction
     )
   ) {
@@ -161,7 +169,7 @@ export function evaluateOfficialReleases({ policy, schedule, index, now }) {
       `Production ${productionVersion} is missing from the official release index`
     );
   }
-  const overdueSecurityRelease = index
+  const overdueSecurityRelease = stableIndex
     .filter(
       release =>
         parseVersion(release.version).major === productionMajor &&
@@ -191,7 +199,7 @@ export function evaluateOfficialReleases({ policy, schedule, index, now }) {
     );
   }
   const matrix = policy.compatibility.candidates.map(candidate => {
-    const latest = latestReleaseForMajor(index, candidate.major);
+    const latest = latestReleaseForMajor(stableIndex, candidate.major);
     const status = getReleaseStatus(schedule[`v${candidate.major}`], now);
     return {
       major: candidate.major,

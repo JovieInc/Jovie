@@ -11,6 +11,7 @@ import {
   CONSENT_COOKIE_NAME,
   parseConsentCookieValue,
 } from '@/lib/cookies/consent-state';
+import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { logStatsigEvent } from '@/lib/flags/statsig';
 import { getClientIP, publicProfilePacEventLimiter } from '@/lib/rate-limit';
@@ -40,10 +41,19 @@ const LEGACY_TRACKING_CONSENT_COOKIE = 'jv_tracking_consent';
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const clientIp = getClientIP(request);
-    const rateLimitResult = await publicProfilePacEventLimiter.limit(clientIp);
+    // The E2E matrix serves every parallel test on a shard from one
+    // 127.0.0.1 bucket; the anonymous per-IP budget 429s under shard load on
+    // a healthy app (public-profile-smoke, run 41153386766). Test mode skips
+    // the bucket — the allowance the auth OTP rules already honor.
+    const rateLimitResult =
+      env.E2E_TEST_MODE === '1'
+        ? null
+        : await publicProfilePacEventLimiter.limit(clientIp);
     const backendDegraded =
-      rateLimitResult.degraded === true || rateLimitResult.unavailable === true;
-    if (!rateLimitResult.success && !backendDegraded) {
+      rateLimitResult !== null &&
+      (rateLimitResult.degraded === true ||
+        rateLimitResult.unavailable === true);
+    if (rateLimitResult && !rateLimitResult.success && !backendDegraded) {
       return createRateLimitedResponse(rateLimitResult);
     }
     if (backendDegraded) {

@@ -60,10 +60,23 @@ jobs:
           repositories: |
             Jovie
             summer-config
+            Ops
+          permission-contents: read
           permission-checks: read
           permission-issues: read
           permission-pull-requests: read
           permission-statuses: read
+
+      # The credentials check reads private grants from JovieInc/Ops
+      # (jovie-private/). Without them it fails loudly and files an alert.
+      - name: Checkout private Ops data
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: JovieInc/Ops
+          token: ${{ steps.github-read-token.outputs.token }}
+          path: ops-private
+          sparse-checkout: jovie-private
+          persist-credentials: false
 
       - name: Resolve dry run
         id: mode
@@ -83,6 +96,7 @@ jobs:
           # Credentials/spend registry live reads: Gateway credit balance only.
           AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
           CREDENTIALS_RUN_RECEIPT: ${{ runner.temp }}/credentials-spend-run.json
+          JOVIE_PRIVATE_DIR: ${{ github.workspace }}/ops-private/jovie-private
           # Source-of-truth drift: Stripe prices need a restricted read-only key; absent, that check is skipped with a warning.
           STRIPE_READONLY_KEY: ${{ secrets.STRIPE_READONLY_KEY }}
           DRIFT_RUN_RECEIPT: ${{ runner.temp }}/source-drift-run.json

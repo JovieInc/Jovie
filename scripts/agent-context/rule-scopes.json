@@ -1,5 +1,10 @@
 [
   {
+    "file": ".claude/rules/anti-slop.md",
+    "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
+    "bodySha256": "17ed298ea129cb191c56f2d3ff1ebccf036817325b44c1c524230fb0b511a844"
+  },
+  {
     "file": ".claude/rules/auth.md",
     "paths": ["apps/web/**/auth/**", "apps/web/proxy.ts", "apps/web/tests/**"],
     "bodySha256": "75c6e6ebb898dfa5265b39f4a57844cd1c0fd0452adf105262e244e008650936"
@@ -107,7 +112,7 @@
       "scripts/lanes/**",
       "docs/PR_FLOW.md"
     ],
-    "bodySha256": "f0c1a664484bc6f73d8c6ab76cf8c814873c784d543dbe07ce859ed63d3bd084"
+    "bodySha256": "196fc8918b6923e4d1b4d67430c4dc91b2bf7e88b85f92e1e833ad103971d3d0"
   },
   {
     "file": ".claude/rules/macos.md",
@@ -151,7 +156,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "5998b5a821de1c3ae4dc6ab2faadfbb8db382c83dfb3ff5cbc5f9c239f07db0c"
+    "bodySha256": "ca459e3269b5bae49e476b18e8d104ecde98d6e6de1bedd49e29d7b39f8b22cd"
   },
   {
     "file": ".claude/rules/security.md",
@@ -199,7 +204,7 @@
       "**/vitest.config.*",
       "**/playwright.config.*"
     ],
-    "bodySha256": "7cf119f5b7f3df3983b22e6eb33ffbd8b67f96dd9d73696ac10481bc6574e59c"
+    "bodySha256": "245b0404c1d52ce4abe9f9f6a3a68c80036f415026b73e80d8afd5e7e2ec4de0"
   },
   {
     "file": ".claude/rules/ui.md",

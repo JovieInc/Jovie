@@ -104,6 +104,27 @@ describe('MobileReleaseList', () => {
     expect(screen.getByText('No Date Release')).toBeInTheDocument();
   });
 
+  it('truncates long credit lists to "A and N more" with the full list on title', () => {
+    render(
+      <MobileReleaseList
+        releases={[
+          createRelease({
+            artistNames: ['Vigel', 'Cosmic Gate', 'LYNX'],
+          }),
+        ]}
+        artistName='Vigel'
+        onEdit={vi.fn()}
+      />
+    );
+
+    // ds-cert:credit-format: mobile rows truncate through the canonical
+    // formatter (budget of one) and keep the full list reachable via title.
+    expect(screen.getByText('Vigel and 2 more')).toBeInTheDocument();
+    expect(
+      screen.getByTitle('Vigel, Cosmic Gate and LYNX')
+    ).toBeInTheDocument();
+  });
+
   it('routes row taps through the edit handler', async () => {
     const user = userEvent.setup();
     const onEdit = vi.fn();

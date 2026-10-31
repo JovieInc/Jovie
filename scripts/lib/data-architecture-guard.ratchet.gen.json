@@ -1,8 +1,7 @@
 {
   "schema": "jovie-data-architecture-ratchet/v1",
-  "totals": {"revalidate-path":106,"revalidate-path-broad":9,"global-tag-revalidate":20,"router-refresh":55,"route-segment-config":277,"unstable-cache":39,"no-store":46,"fetch-in-effect":25,"polling":28,"db-client-path":4,"runtime-nodejs-export":456,"network-in-transaction":0,"await-db-in-loop":62},
+  "totals": {"revalidate-path":106,"revalidate-path-broad":9,"global-tag-revalidate":19,"router-refresh":55,"route-segment-config":276,"unstable-cache":39,"no-store":46,"fetch-in-effect":25,"polling":28,"db-client-path":4,"runtime-nodejs-export":456,"network-in-transaction":0,"await-db-in-loop":62},
   "entries": {
-    "apps/console/app/api/health/route.ts": {"route-segment-config":1},
     "apps/docs/app/docs-index.json/route.ts": {"route-segment-config":1},
     "apps/docs/app/llms.txt/route.ts": {"route-segment-config":1},
     "apps/docs/app/robots.ts": {"route-segment-config":1},
@@ -737,7 +736,7 @@
     "apps/web/lib/leads/discovery.ts": {"await-db-in-loop":2},
     "apps/web/lib/leads/outreach-batch.ts": {"await-db-in-loop":5},
     "apps/web/lib/merch/orders.ts": {"await-db-in-loop":3},
-    "apps/web/lib/merch/service.ts": {"global-tag-revalidate":1,"await-db-in-loop":2},
+    "apps/web/lib/merch/service.ts": {"await-db-in-loop":2},
     "apps/web/lib/notifications/campaign-scheduling.ts": {"await-db-in-loop":1},
     "apps/web/lib/notifications/domain.ts": {"await-db-in-loop":1},
     "apps/web/lib/onboarding/claim-profile.ts": {"await-db-in-loop":2},
