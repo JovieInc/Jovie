@@ -37,7 +37,7 @@
         "oracle": "TODO: the paywall shows the live price and a test purchase unlocks the paid plan"
       }
     ],
-    "flows": { "web": "certification/flows/should-i-make.mjs" },
+    "flows": { "web": "canon/certification/flows/should-i-make.mjs" },
     "accounts": {
       "policy": "canary-only",
       "source": "TODO: doppler:<project>/<config> keys for canary accounts (never in git)"
@@ -52,13 +52,13 @@
     "freeAlternative": "TODO: what the buyer does instead of paying"
   },
   "buyer": {
-    "personas": "certification/should-i-make-personas.json",
-    "calibration": "certification/should-i-make-calibration.json",
+    "personas": "canon/certification/should-i-make-personas.json",
+    "calibration": "canon/certification/should-i-make-calibration.json",
     "privatePersonaDir": "~/.local/state/should-i-make-buyer-eval/personas"
   },
   "privacy": {
     "profile": "standard",
-    "registry": "certification/should-i-make-tracker-registry.json",
+    "registry": "canon/certification/should-i-make-tracker-registry.json",
     "crawl": [{ "url": "TODO: https://<prod>/", "input": false }],
     "policyUrl": "TODO: https://<prod>/privacy",
     "counselSignoff": null

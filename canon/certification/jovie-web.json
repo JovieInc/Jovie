@@ -55,13 +55,13 @@
     "freeAlternative": "Jovie Free (profile, smart links, release pages, fan capture) or a free link-in-bio"
   },
   "buyer": {
-    "personas": "certification/jovie-web-personas.json",
-    "calibration": "certification/jovie-web-calibration.json",
+    "personas": "canon/certification/jovie-web-personas.json",
+    "calibration": "canon/certification/jovie-web-calibration.json",
     "privatePersonaDir": "~/.local/state/jovie-buyer-eval/personas"
   },
   "privacy": {
     "profile": "standard",
-    "registry": "certification/jovie-web-tracker-registry.json",
+    "registry": "canon/certification/jovie-web-tracker-registry.json",
     "policyUrl": "https://jov.ie/legal/privacy",
     "counselSignoff": null,
     "crawl": [

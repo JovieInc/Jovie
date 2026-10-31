@@ -95,7 +95,6 @@
     "version.json",
     "vitest.config.mts",
     "workers",
-    "WORKFLOW.md",
-    "certification"
+    "WORKFLOW.md"
   ]
 }
