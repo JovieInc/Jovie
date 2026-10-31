@@ -122,14 +122,24 @@ def c_spend(spec: dict, now: float) -> dict | None:
             "burnPerHour": burn / 24, "observedAt": iso(observed)}
 
 
-def _http_json(url: str, token: str, method: str = "GET") -> dict | None:
+def _http_json_err(url: str, token: str, method: str = "GET") -> tuple[dict | None, str | None]:
+    """GET (or method) JSON with a bearer token; returns (data, error). The error string lets callers
+    fail closed instead of mistaking an auth or API failure for an empty successful result."""
+    import urllib.error
     import urllib.request
     try:
         req = urllib.request.Request(url, method=method, headers={"Authorization": f"Bearer {token}"})
         with urllib.request.urlopen(req, timeout=20) as r:
-            return json.load(r)
+            return json.load(r), None
+    except urllib.error.HTTPError as e:
+        return None, f"HTTP {e.code}"
     except (OSError, ValueError):
-        return None
+        return None, "request failed"
+
+
+def _http_json(url: str, token: str, method: str = "GET") -> dict | None:
+    data, _err = _http_json_err(url, token, method)
+    return data
 
 
 def neon_token() -> str | None:
@@ -188,7 +198,9 @@ def c_neon(spec: dict, now: float) -> dict | None:
 
 def c_resend(spec: dict, now: float) -> dict | None:
     """Emails sent today (UTC) or this month vs the plan quota. Needs a full-access key: the production
-    key is send-only (401 on list), so this reads RESEND_READ_KEY and is a GAP until Tim mints one."""
+    key is send-only (401 on list), so this reads RESEND_READ_KEY and is a GAP until Tim mints one.
+    Any API error (a 401 from a send-only key included) fails closed to no reading: an error must
+    never count as 0 sent, or the forecast reports a false all-clear while sends are being denied."""
     token = os.environ.get("RESEND_READ_KEY") or run(
         ["doppler", "secrets", "get", "RESEND_READ_KEY", "-p", "agent-mesh", "-c", "prd", "--plain"])
     if not token:
@@ -198,7 +210,9 @@ def c_resend(spec: dict, now: float) -> dict | None:
         else day.strftime("%Y-%m-01")
     count, after = 0, ""
     for _ in range(100):
-        page = _http_json(f"https://api.resend.com/emails?limit=100{after}", token.strip())
+        page, err = _http_json_err(f"https://api.resend.com/emails?limit=100{after}", token.strip())
+        if err:
+            return None
         rows = (page or {}).get("data")
         if not rows:
             break
