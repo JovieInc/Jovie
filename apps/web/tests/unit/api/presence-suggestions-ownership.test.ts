@@ -5,6 +5,8 @@ import { GET } from '@/app/api/suggestions/route';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 
 const mocks = vi.hoisted(() => ({
+  invalidateSocialLinksCache: vi.fn(),
+  syncPrimaryMusicUrls: vi.fn(),
   auth: vi.fn(),
   select: vi.fn(),
   update: vi.fn(),
@@ -14,6 +16,12 @@ const mocks = vi.hoisted(() => ({
   dspOrdering: [] as SQL[],
 }));
 vi.mock('@/lib/auth/cached', () => ({ getCachedAuth: mocks.auth }));
+vi.mock('@/lib/cache', () => ({
+  invalidateSocialLinksCache: mocks.invalidateSocialLinksCache,
+}));
+vi.mock('@/lib/db/social-links-sync', () => ({
+  syncPrimaryMusicUrlsFromSocialLinks: mocks.syncPrimaryMusicUrls,
+}));
 vi.mock('@/lib/db', () => ({
   db: { select: mocks.select, update: mocks.update, insert: mocks.insert },
 }));
@@ -283,6 +291,43 @@ describe('Presence suggestions owner authorization', () => {
       expect((await POST(request(), params)).status).toBe(200);
       expect(mocks.update).toHaveBeenCalledTimes(1);
     });
+    if (route.name === 'social approve') {
+      it('social approve writes with the dashboard contract: canonical url, music sync, cache invalidation', async () => {
+        mocks.rows = [
+          [{ ...owner, usernameNormalized: 'artist' }],
+          [
+            {
+              id: 'candidate-1',
+              creatorProfileId: profileId,
+              status: 'pending',
+              platform: 'instagram',
+              url: 'instagram.com/artist/',
+            },
+          ],
+        ];
+        const values = vi.fn();
+        mocks.insert.mockReturnValue({ values });
+        const { POST } = await route.load();
+        expect((await POST(request(), params)).status).toBe(200);
+        expect(values).toHaveBeenCalledWith(
+          expect.objectContaining({
+            platform: 'instagram',
+            platformType: 'social',
+            url: expect.stringMatching(
+              /^https:\/\/(www\.)?instagram\.com\/artist/
+            ),
+          })
+        );
+        expect(mocks.syncPrimaryMusicUrls).toHaveBeenCalledWith(
+          expect.anything(),
+          profileId
+        );
+        expect(mocks.invalidateSocialLinksCache).toHaveBeenCalledWith(
+          profileId,
+          'artist'
+        );
+      });
+    }
     it(`${route.name} denies another owner before any write`, async () => {
       mocks.rows = [
         [{ ...owner, userId: 'another-owner', clerkId: appUserId }],
