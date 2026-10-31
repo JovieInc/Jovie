@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { isProfileComplete } from '@/lib/auth/profile-completeness';
 import { getPublicProfileIdentityExclusionReason } from '@/lib/profile/public-profile-identity-policy';
 import {
   CANARY_SEED_IDENTITIES,
   type CanaryProfileSnapshot,
+  CHAT_HEALTH_CANARY_SEED,
+  chatHealthCanaryProfileSeedInput,
   isCanarySeedEmail,
   planCanaryProfileUpdate,
   RETURNING_CANARY_SEED,
@@ -100,5 +103,34 @@ describe('returning canary seed spec', () => {
         'production_canary'
       );
     }
+  });
+
+  it('chat-health canary seeds a COMPLETE profile, so the chat shell never redirects it to /start (JOV-10150)', () => {
+    const seededAt = new Date('2026-10-31T00:00:00.000Z');
+    const input = chatHealthCanaryProfileSeedInput(seededAt);
+
+    // The exact gate that broke the post-deploy chat cert: DashboardShellContent
+    // redirects every chat route (including /app/chat) to /start while
+    // isProfileComplete is false, and the /start onboarding composer renders
+    // the same 'Chat Message Input' textarea with NO attach toolbar.
+    expect(
+      isProfileComplete({
+        username: input.username,
+        usernameNormalized: input.usernameNormalized,
+        displayName: input.displayName,
+        isPublic: input.isPublic,
+        onboardingCompletedAt: input.onboardingCompletedAt,
+      })
+    ).toBe(true);
+
+    // The seeded identity is the spec's own, and the profile is claimed and
+    // public — a real publishable profile, not an onboarding-pending shell.
+    expect(input.username).toBe(CHAT_HEALTH_CANARY_SEED.handle);
+    expect(input.usernameNormalized).toBe(CHAT_HEALTH_CANARY_SEED.handle);
+    expect(input.displayName).toBe(CHAT_HEALTH_CANARY_SEED.displayName);
+    expect(input.bio).toBe(CHAT_HEALTH_CANARY_SEED.bio);
+    expect(input.isPublic).toBe(true);
+    expect(input.isClaimed).toBe(true);
+    expect(input.onboardingCompletedAt).toBe(seededAt);
   });
 });
