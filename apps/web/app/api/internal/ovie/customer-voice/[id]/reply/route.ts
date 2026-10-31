@@ -8,9 +8,6 @@ import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { verifySummerOidcRequest } from '@/lib/ovie/summer-oidc.server';
 
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
-
 function json(body: Readonly<Record<string, unknown>>, status: number) {
   return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
 }
