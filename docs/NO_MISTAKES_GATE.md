@@ -79,7 +79,7 @@ Before opening or updating a draft PR, autonomous shippers should run:
 pnpm ship:verify -- --base origin/main
 ```
 
-It classifies the diff with the checked-in CI harness, runs affected local checks plus the risk-required smoke/build commands, and writes a machine-readable receipt to `artifacts/verification/result.json` (ignored by Git). Add `--with-performance` for route-budget verification on performance-sensitive work. This is a fast feedback loop, not a CI replacement: the PR and merge paths still run independently in clean runners.
+It classifies the diff with the checked-in CI harness, runs affected local checks plus the risk-required smoke/build commands, and writes a machine-readable receipt to `artifacts/verification/result.json` (ignored by Git). Add `--with-performance` for route-budget verification on performance-sensitive work. The receipt is `passed` only when at least one check ran and every check passed; `--dry-run` lists the plan and records `blocked` (exit 1) because nothing was verified. This is a fast feedback loop, not a CI replacement: the PR and merge paths still run independently in clean runners.
 
 ## Evidence artifacts
 
