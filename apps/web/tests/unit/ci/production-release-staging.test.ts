@@ -596,11 +596,9 @@ describe.skipIf(!gh)(
     });
 
     it('requires every production gate and an exact immutable deployment', async () => {
-      for (const gate of [
-        'migrate-production',
-        'production-public-profile-alias-gate',
-        'promote-production',
-      ]) {
+      // The public-profile alias gate runs after release-result, beside
+      // post-deploy smoke, and blocks production-verified instead.
+      for (const gate of ['migrate-production', 'promote-production']) {
         const failed = await resolveResult({ [gate]: { result: 'failure' } });
         expect(failed.code, gate).toBe(1);
         expect(failed.outputs.released, gate).toBe('false');
