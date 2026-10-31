@@ -1,14 +1,14 @@
 {
   "schema": "jovie.wins-metrics/v1",
-  "at": "2026-10-30T23:15:58.875Z",
-  "winsTotal": 27,
+  "at": "2026-10-31T08:41:18.132Z",
+  "winsTotal": 28,
   "winsVerified": 1,
-  "winsClaimed": 14,
+  "winsClaimed": 15,
   "winsUnverified": 3,
   "winsNotReproduced": 1,
   "winsPendingMerge": 4,
   "winsPendingMeasure": 4,
-  "winsLast7d": 27,
+  "winsLast7d": 28,
   "clusters": [
     {
       "theme": "release-reliability",
@@ -54,6 +54,12 @@
     },
     {
       "theme": "runner-pin",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "false-green",
       "total": 1,
       "verified": 0,
       "ready": false
@@ -166,6 +172,10 @@
     },
     {
       "id": "win-2026-10-30-the-runner-pin-gate-is-green",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-31-the-shared-outcome-verifier-rejects-all",
       "status": "claimed"
     }
   ]
