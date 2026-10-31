@@ -2299,6 +2299,55 @@ def repair_inventory_process(root, role, entered, release, preclaim, done, outpu
         done.set();raise
 
 
+class StartDeliveryExpiryTest(unittest.TestCase):
+    NOW = 1_800_000_000.0
+
+    def host_with(self, tmp, events):
+        host = lane.Host(state=Path(tmp), repo=Path(tmp))
+        (host.state / "escalation.json").write_text(json.dumps({"events": events}))
+        return host
+
+    def row(self, error, status="failed", age_s=3 * 86400, running=False):
+        return {"running": running, "startDelivery": {"attempts": 0, "status": status, "error": error,
+                                                      "deadline": self.NOW - age_s, "nextAt": self.NOW - age_s}}
+
+    def test_stale_terminal_start_failures_are_retired_counted_by_class_and_kept_on_disk(self):
+        # Gem 2026-10-25: 57 failed start deliveries (46 preimage-changed, 7 ownership-unproven, 4 cap-exhausted).
+        with tempfile.TemporaryDirectory() as tmp:
+            events = {"a": self.row("event-start-preimage-changed"), "b": self.row("event-start-ownership-unproven", "exhausted"),
+                      "c": self.row("event-start-cap-exhausted"),
+                      "recent": self.row("event-start-preimage-changed", age_s=3600),
+                      "transient": self.row("TimeoutError"),
+                      "live": self.row("event-start-preimage-changed", running=True),
+                      "done": {"startDelivery": {"status": "acknowledged"}}}
+            host = self.host_with(tmp, events)
+            self.assertEqual(lane.start_delivery_errors(events),
+                             {"event-start-preimage-changed": 3, "event-start-ownership-unproven": 1,
+                              "event-start-cap-exhausted": 1, "TimeoutError": 1})
+            result = lane.expire_stale_start_deliveries(host, self.NOW)
+            self.assertEqual(result["expired"], 3)
+            self.assertEqual(result["byError"], {"event-start-preimage-changed": 1, "event-start-ownership-unproven": 1,
+                                                 "event-start-cap-exhausted": 1})
+            saved = json.loads((host.state / "escalation.json").read_text())["events"]
+            self.assertEqual(saved["a"]["startDelivery"]["status"], "expired")
+            self.assertEqual(saved["a"]["startDelivery"]["error"], "event-start-preimage-changed", "evidence stays")
+            self.assertEqual(saved["b"]["startDelivery"]["expiredFrom"], "exhausted")
+            for key in ("recent", "transient", "live"):
+                self.assertNotEqual(saved[key]["startDelivery"]["status"], "expired", key)
+            self.assertEqual(lane.start_delivery_errors(saved),
+                             {"event-start-preimage-changed": 2, "TimeoutError": 1})
+            self.assertEqual(lane.expire_stale_start_deliveries(host, self.NOW)["expired"], 0, "idempotent")
+
+    def test_snapshot_reports_error_classes_and_excludes_expired_rows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = self.host_with(tmp, {"a": self.row("event-start-preimage-changed"),
+                                        "b": self.row("event-start-preimage-changed", "expired")})
+            (host.state / "event-delivery.json").write_text(json.dumps({"schema": lane.EVENT_DELIVERY_SCHEMA, "actions": {}, "commits": []}))
+            report = lane._event_delivery_snapshot(host, self.NOW)
+            self.assertEqual(report["deliveryFailed"], 1)
+            self.assertEqual(report["deliveryErrors"], {"event-start-preimage-changed": 1})
+
+
 class IdleExitAtomicityTest(unittest.TestCase):
     def test_worker_idle_is_replaced_whole_so_lock_free_readers_never_see_a_torn_file(self):
         # Gem 2026-10-25: a truncating write let a concurrent reader parse an empty file

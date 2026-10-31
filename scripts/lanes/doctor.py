@@ -1027,6 +1027,7 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
             f"failed={delivery.get('deliveryFailed', 'unknown')}, "
             f"exhausted={delivery.get('deliveryExhausted', 'unknown')}, "
             f"next retry={delivery.get('deliveryNextAt', 'unknown')}"
+            + (f", error classes={delivery['deliveryErrors']}" if delivery.get("deliveryErrors") else "")
             + (f", reconciliation error={delivery_error}" if delivery_error else "")
             + "; inspect event-delivery.json")
     elif delivery_error:

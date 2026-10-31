@@ -441,6 +441,13 @@ class JudgeTest(unittest.TestCase):
         for lag in ({"behindS": 600}, {"behindS": 0}, {"behindS": None}, {}):
             self.assertNotIn("install-lag", doctor.judge(obs(installLag=lag)))
 
+    def test_delivery_incident_names_the_error_classes(self):
+        failed = obs(tick={'remediationEvents': {'deliveryFailed': 57, 'deliveryExhausted': 0, 'deliveryNextAt': None,
+                                                 'deliveryErrors': {'event-start-preimage-changed': 46,
+                                                                    'event-start-ownership-unproven': 7}}})
+        text = doctor.judge(failed)['remediation-delivery']
+        self.assertIn("error classes={'event-start-preimage-changed': 46", text)
+
     def test_failed_event_delivery_is_actionable_and_acknowledgement_clears_it(self):
         failed = obs(tick={'remediationEvents': {'deliveryFailed': 1, 'deliveryExhausted': 0, 'deliveryNextAt': 100}})
         alerts = doctor.judge(failed)
