@@ -145,6 +145,35 @@ from `ziawi-color-sot-v1` (no parallel theme provider or React-only color root).
 - `--app-shell-audio-bar-max-height`
 - `--app-shell-audio-compact-height`
 
+### Unified elevation ladder (JOV-8976)
+
+One elevation system governs shell depth. Levels follow importance —
+page → category → entity — and each level is a surface + 1px border +
+shadow, defined as `--elev-{0..5}-{surface,border,shadow}` in
+`apps/web/styles/design-system.css` (light and dark):
+
+- `--elev-0-*` — window background behind the left rail
+- `--elev-1-*` — sidebar nav
+- `--elev-2-*` — page canvas/layout — ONE flat, uniform-color surface
+  (Notion/Linear style): no 'main content card' level, no unnecessary
+  separators/borders/dividers inside the canvas (table row hairlines
+  stay where needed)
+- `--elev-3-*` — right rail / entity detail panels
+- `--elev-4-*` — popovers, tooltips, menus
+- `--elev-5-*` — modal (one tier above popovers), with its own scrim
+  token `--elev-5-scrim` (the shared overlay primitive consumes it;
+  identical value in light and dark)
+
+Shadows stay subtle and blur-free (no glassmorphism); the 1px border ring
+at the head of each level's shadow token IS that level's border, so
+applying surface + shadow delivers the full treatment. The L1 and L2
+border treatment supersedes the 2025-09-25 borderless canvas lock. Legacy
+`--app-shell-*-shadow` names alias the ladder (`--app-shell-shadow` →
+`--elev-2-shadow`, `--app-shell-sidebar-shadow` → `--elev-1-shadow`,
+`--app-shell-card-shadow` → `--elev-0-shadow` — cards on the flat L2
+canvas carry no elevation of their own, `--app-shell-drawer-shadow` →
+`--elev-3-shadow`); new work consumes `--elev-*` directly.
+
 ## Canonical Surface Contract
 
 The four current canonical design-system surfaces are defined in
