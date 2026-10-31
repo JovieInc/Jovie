@@ -760,7 +760,8 @@ class PromptTest(unittest.TestCase):
         prompt = lane.render_prompt(issue(), "codex/jov-1", "")
         self.assertIn("Never stop to ask", prompt)
         self.assertIn("do not run gstack or other skill", prompt)
-        self.assertIn("gh pr create --draft", prompt)
+        self.assertIn("pnpm pr:open open --draft", prompt)
+        self.assertIn("never raw `gh pr create`", prompt)
 
     def test_issue_runs_get_a_goal_and_definition_of_done_and_may_autoplan(self):
         plain = lane.render_prompt(issue("JOV-42"), "codex/jov-42", "")
