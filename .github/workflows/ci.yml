@@ -6733,6 +6733,8 @@ jobs:
           JOURNEY_EVIDENCE_REPORT: ${{ runner.temp }}/journey-evidence/playwright-report.json
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           GOLDEN_PATH_REVIEW_GATEWAY_KEY: ${{ secrets.GOLDEN_PATH_REVIEW_GATEWAY_KEY }}
+          # Workers AI (Cloudflare credits) is tried first by the reviewer; unset = Gateway only.
+          GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN: ${{ secrets.GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN }}
           VISUAL_REVIEW_BASE_URL: ${{ vars.VISUAL_REVIEW_BASE_URL }}
           # The runner also needs the database and deterministic E2E OTP flag.
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -6767,6 +6769,7 @@ jobs:
           # journey keyframes are declared public (failure captures never are).
           review() {
             AI_GATEWAY_API_KEY="$GOLDEN_PATH_REVIEW_GATEWAY_KEY" \
+              WORKERS_AI_TOKEN="$GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN" \
               PLAYWRIGHT_ARTIFACT_PATHS=apps/web/test-results/golden-path-keyframes \
               PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES=true \
               node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
@@ -6782,6 +6785,8 @@ jobs:
           fi
         env:
           GOLDEN_PATH_REVIEW_GATEWAY_KEY: ${{ secrets.GOLDEN_PATH_REVIEW_GATEWAY_KEY }}
+          # Workers AI (Cloudflare credits) is tried first by the reviewer; unset = Gateway only.
+          GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN: ${{ secrets.GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN }}
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           VISUAL_REVIEW_BASE_URL: ${{ vars.VISUAL_REVIEW_BASE_URL }}
 
