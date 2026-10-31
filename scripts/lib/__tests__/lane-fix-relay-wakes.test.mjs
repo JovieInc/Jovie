@@ -21,6 +21,128 @@ const workflow = load(
 );
 const condition = String(workflow.jobs.relay.if);
 
+// Evaluate the checked-in expression over event fixtures, as the green-enroll
+// concurrency tests do. Missing GitHub context properties resolve to empty values.
+function relayGroup(eventName, event = {}, runId = 1) {
+  const github = {
+    event_name: eventName,
+    run_id: runId,
+    event: {
+      ...event,
+      pull_request: event.pull_request ?? {},
+      workflow_run: {
+        pull_requests: [{}],
+        ...event.workflow_run,
+      },
+      deployment: event.deployment ?? {},
+    },
+  };
+  const expression = workflow.concurrency.group.slice(3, -2).trim();
+  const format = (template, ...values) =>
+    template.replace(/\{(\d+)\}/g, (_, index) => values[Number(index)]);
+  return new Function('github', 'format', `return (${expression});`)(
+    github,
+    format
+  );
+}
+
+test('unscoped relay bursts keep one slot across run IDs and event types', () => {
+  const groups = new Set();
+  for (const event of ['workflow_dispatch', 'repository_dispatch']) {
+    for (let runId = 1; runId <= 100; runId += 1) {
+      groups.add(relayGroup(event, {}, runId));
+    }
+  }
+  assert.equal(groups.size, 1, 'unscoped backfills must coalesce');
+});
+
+test('failure wakes preserve an in-progress review or dequeue relay', () => {
+  const expression = workflow.concurrency['cancel-in-progress']
+    .slice(3, -2)
+    .trim();
+  const cancel = new Function('github', `return (${expression});`);
+  for (const [eventName, conclusion, expected] of [
+    ['push', undefined, true],
+    ['workflow_run', 'success', true],
+    ['workflow_run', 'failure', false],
+    ['workflow_run', 'timed_out', false],
+    ['workflow_run', 'startup_failure', false],
+    ['workflow_run', 'cancelled', false],
+    ['pull_request_review', undefined, false],
+    ['pull_request_target', undefined, false],
+    ['workflow_dispatch', undefined, false],
+  ]) {
+    assert.equal(
+      cancel({
+        event_name: eventName,
+        event: { workflow_run: { conclusion } },
+      }),
+      expected,
+      `${eventName}/${conclusion} cancellation policy`
+    );
+  }
+});
+
+test('failure, review and dequeue bursts share one slot per PR', () => {
+  const groups = new Set();
+  for (const name of workflow.on.workflow_run.workflows) {
+    for (const conclusion of ['failure', 'timed_out', 'startup_failure']) {
+      groups.add(
+        relayGroup('workflow_run', {
+          workflow_run: { name, conclusion, pull_requests: [{ number: 7 }] },
+        })
+      );
+    }
+  }
+  for (const event of [
+    'pull_request_review',
+    'pull_request_review_comment',
+    'pull_request_target',
+  ]) {
+    groups.add(relayGroup(event, { pull_request: { number: 7 } }));
+  }
+  assert.deepEqual([...groups], ['lane-fix-relay-7']);
+  assert.notEqual(
+    relayGroup('pull_request_review', { pull_request: { number: 8 } }),
+    [...groups][0],
+    'different PRs retain their own repair slot'
+  );
+});
+
+test('head fallbacks coalesce and green wakes cannot replace a repair wake', () => {
+  const red = head_sha => ({
+    workflow_run: { head_sha, conclusion: 'failure' },
+  });
+  assert.equal(
+    relayGroup('workflow_run', red('head-a'), 1),
+    relayGroup('workflow_run', red('head-a'), 2)
+  );
+  assert.notEqual(
+    relayGroup('workflow_run', red('head-a')),
+    relayGroup('workflow_run', red('head-b'))
+  );
+  assert.equal(
+    relayGroup('deployment_status', { deployment: { sha: 'head-a' } }),
+    relayGroup('workflow_run', red('head-a'))
+  );
+  const green = name => ({
+    workflow_run: {
+      name,
+      conclusion: 'success',
+      pull_requests: [{ number: 7 }],
+    },
+  });
+  assert.equal(
+    relayGroup('workflow_run', green('Source Validation'), 1),
+    relayGroup('workflow_run', green('PR Fleet Rules'), 2)
+  );
+  assert.notEqual(
+    relayGroup('workflow_run', green('Source Validation')),
+    relayGroup('pull_request_review', { pull_request: { number: 7 } })
+  );
+  assert.equal(relayGroup('push', {}, 1), relayGroup('push', {}, 2));
+});
+
 // Lane Fix Relay ran about 125 times an hour, ~336 successful wakes in 3 hours, each paying a
 // 20 s debounce, a checkout, an App mint and github.token calls. Green wakes now come only from
 // Source Validation, the slowest required producer; every failure signal still wakes.
