@@ -260,6 +260,39 @@ describe('UserButton billing actions', () => {
     });
   });
 
+  it('shows Account without an email-derived name or username for an email-only user', async () => {
+    const current = mockUseUserSafe();
+    mockUseUserSafe.mockReturnValue({
+      ...current,
+      user: {
+        ...current.user!,
+        fullName: null,
+        firstName: null,
+        lastName: null,
+        username: null,
+        primaryEmailAddress: {
+          id: 'email_only',
+          emailAddress: 'john.doe+tag@example.com',
+        },
+        emailAddresses: [
+          { id: 'email_only', emailAddress: 'john.doe+tag@example.com' },
+        ],
+      },
+    });
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as ReturnType<typeof useBillingStatusQuery>);
+
+    render(<UserButton showUserInfo />);
+    expect(screen.getByText('Account')).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: /^Account/ }));
+    const menu = await screen.findByRole('menu');
+    expect(within(menu).getByText('Account')).toBeVisible();
+    expect(within(menu).queryByText('@john.doe+tag')).not.toBeInTheDocument();
+  });
+
   it('keeps the menu actionable with collapsed dock status and names every badge', async () => {
     mockUseBillingStatusQuery.mockReturnValue({
       data: { isPro: false, plan: null, hasStripeCustomer: false },

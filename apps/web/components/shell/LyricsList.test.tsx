@@ -36,6 +36,7 @@ describe('LyricsList', () => {
     const edit = screen.getByRole('button', { name: 'Edit' });
     expect(edit.className).toContain('tracking-normal');
     expect(edit.className).not.toMatch(/\buppercase\b/);
+    expect(edit).toHaveAttribute('type', 'button');
     fireEvent.click(edit);
     expect(onEdit).toHaveBeenCalledOnce();
   });

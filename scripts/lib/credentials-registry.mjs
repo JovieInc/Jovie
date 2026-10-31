@@ -445,6 +445,7 @@ export function evaluateRegistry({
   credentials,
   spend,
   thirdPartyGrants = [],
+  privateDataIssues = [],
   nowMs = Date.now(),
   live = /** @type {{ credentials?: object[], spend?: Record<string, object> }} */ ({}),
   thresholds = {},
@@ -468,6 +469,7 @@ export function evaluateRegistry({
     ...inventory.findings,
     ...spendResult.findings,
     ...evaluateThirdPartyGrants(thirdPartyGrants, nowMs),
+    ...privateDataFindings(privateDataIssues),
   ]);
   const counts = {
     credentials: merged.credentials.length,
@@ -550,6 +552,26 @@ export function lastUsedMonths(text) {
   const n = Number(match[1]);
   const unit = match[2].toLowerCase();
   return unit === 'week' ? n / 4.35 : unit === 'year' ? n * 12 : n;
+}
+
+/**
+ * Private inputs (JovieInc/Ops jovie-private/) a host could not read. A missing
+ * private file must never read as "nothing to report": each becomes a high
+ * finding, which the remediation intake files as an alert.
+ *
+ * @param {Array<{ subject: string, path: string, reason: string }>} issues
+ */
+export function privateDataFindings(issues) {
+  return (issues ?? []).map(issue =>
+    finding({
+      fingerprint: `private-data:${issue.subject}-unavailable`,
+      type: 'private-data',
+      severity: 'high',
+      subject: issue.subject,
+      owner: 'tim',
+      message: `Private ${issue.subject} unavailable on this host (${issue.reason}); the check ran WITHOUT it. Provision a JovieInc/Ops checkout and set JOVIE_PRIVATE_DIR to its jovie-private/ folder (expected file: ${issue.path}).`,
+    })
+  );
 }
 
 /**
