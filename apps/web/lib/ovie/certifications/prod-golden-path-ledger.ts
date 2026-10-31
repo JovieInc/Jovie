@@ -1,3 +1,5 @@
+import { sha256 as sha256Bytes } from '@noble/hashes/sha2.js';
+import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 import type { CertificationReviewPacket } from '@/lib/agent-os/certification';
 import { JOVIE_CERTIFICATION_CONTRACT } from '@/lib/agent-os/certification';
 import {
@@ -6,7 +8,10 @@ import {
   mutateCertificationRecord,
 } from '@/lib/agent-os/certification-cas';
 import type { CertificationPacketFile } from './packet-files.server';
-import type { OvieCertificationDomainId } from './types';
+import type {
+  OvieCertificationDomainId,
+  OvieCertificationProductionEvidence,
+} from './types';
 
 /**
  * Production golden-path certification ledger (JOV-9625).
@@ -329,6 +334,12 @@ export async function recordProdGoldenPathRun(input: {
   });
 }
 
+export const PROD_GOLDEN_PATH_FRESHNESS_MS = 7 * 24 * 60 * 60 * 1000;
+
+function contentDigest(value: string): string {
+  return `sha256:${bytesToHex(sha256Bytes(utf8ToBytes(value)))}`;
+}
+
 const EVIDENCE_STATUS = {
   passed: 'passed',
   failed: 'failed',
@@ -353,18 +364,42 @@ function summarize(receipt: ProdGoldenPathReceipt): string {
 }
 
 /**
- * Project each stored surface into the packet-file shape the Ovie inventory
- * already renders. The evidence is runtime_dogfood bound to the deployed SHA.
+ * Project EVERY golden-path surface into the packet-file shape the Ovie
+ * inventory already renders (JOV-9625). The evidence is runtime_dogfood bound
+ * to the deployed SHA, and the projection is total:
+ *
+ *   - a surface with no recorded receipt projects missing states (empty
+ *     source, no dogfood receipt) — never a silently-omitted row;
+ *   - a receipt older than PROD_GOLDEN_PATH_FRESHNESS_MS projects expired —
+ *     the dogfood tier reads blocked, because a pass that no longer binds to
+ *     a current production receipt must never read as a current pass.
  */
 export function prodGoldenPathPacketFiles(
-  ledger: ProdGoldenPathLedger
+  ledger: ProdGoldenPathLedger,
+  now: string = new Date().toISOString()
 ): CertificationPacketFile[] {
   const files: CertificationPacketFile[] = [];
   for (const id of PROD_GOLDEN_PATH_SURFACE_IDS) {
-    const record = ledger.surfaces[id];
-    if (!record) continue;
-    const receipt = record.latest;
     const meta = PROD_GOLDEN_PATH_SURFACES[id];
+    const record = ledger.surfaces[id];
+    const receipt = record?.latest ?? null;
+    const expired =
+      receipt !== null &&
+      Date.parse(now) - Date.parse(receipt.endedAt) >
+        PROD_GOLDEN_PATH_FRESHNESS_MS;
+    const productionEvidence: OvieCertificationProductionEvidence | undefined =
+      receipt
+        ? {
+            consoleErrorCount: receipt.consoleErrorCount ?? null,
+            networkErrorCount: receipt.networkErrorCount ?? null,
+            screenshot: receipt.screenshot
+              ? {
+                  href: receipt.screenshot.dataUrl,
+                  digest: contentDigest(receipt.screenshot.dataUrl),
+                }
+              : null,
+          }
+        : undefined;
     const packet: CertificationReviewPacket = {
       contract: JOVIE_CERTIFICATION_CONTRACT,
       subject: {
@@ -372,42 +407,67 @@ export function prodGoldenPathPacketFiles(
         kind: 'production-surface',
         title: `${meta.title} (production)`,
       },
-      source: {
-        repository: 'JovieInc/Jovie',
-        ref: 'production',
-        sha: receipt.sha,
-        paths: [...receipt.screenIds],
-        digest: null,
-      },
+      // No receipt means nothing binds to a deployed commit: the source is
+      // missing, never assumed.
+      source: receipt
+        ? {
+            repository: 'JovieInc/Jovie',
+            ref: 'production',
+            sha: receipt.sha,
+            paths: [...receipt.screenIds],
+            digest: null,
+          }
+        : null,
       canonicalReferences: [],
       invariantEvaluation: [],
       testsCoverage: [],
-      visualProof: [],
+      // The receipt's screenshot frame is the surface's visual proof, bound
+      // to the receipt's own SHA and digest-verified; absent when the surface
+      // was not browser-exercised or its evidence expired.
+      visualProof:
+        receipt && receipt.screenshot && !expired
+          ? [
+              {
+                id: `prod-golden-path:visual:${id}`,
+                tier: 'visual_proof',
+                status: 'passed',
+                sourceSha: receipt.sha,
+                ref: `ledger:prod-golden-path/screenshot/${id}`,
+                digest: contentDigest(receipt.screenshot.dataUrl),
+                summary: `Production screenshot captured at ${receipt.endedAt} on ${receipt.sha.slice(0, 8)}.`,
+              },
+            ]
+          : [],
       requiredVariants: [],
       itemMedia: [],
       operational: {
-        runtimeDogfood: [
-          {
-            id: `prod-golden-path:${id}:${receipt.sha.slice(0, 8)}`,
-            tier: 'runtime_dogfood',
-            status: EVIDENCE_STATUS[receipt.status],
-            sourceSha: receipt.sha,
-            ref: receipt.runUrl ?? 'prod-golden-path',
-            digest: null,
-            summary: summarize(receipt),
-          },
-        ],
+        runtimeDogfood: receipt
+          ? [
+              {
+                id: `prod-golden-path:${id}:${receipt.sha.slice(0, 8)}`,
+                tier: 'runtime_dogfood',
+                status: expired ? 'blocked' : EVIDENCE_STATUS[receipt.status],
+                sourceSha: receipt.sha,
+                ref: receipt.runUrl ?? 'prod-golden-path',
+                digest: null,
+                summary: expired
+                  ? `Production evidence expired: the last receipt for ${receipt.sha.slice(0, 8)} ran at ${receipt.endedAt}, older than the ${Math.round(PROD_GOLDEN_PATH_FRESHNESS_MS / 86_400_000)}-day freshness window.`
+                  : summarize(receipt),
+              },
+            ]
+          : [],
       },
     };
     files.push({
       domain: meta.domain,
       surface: meta.title,
       owner: null,
-      packetUpdatedAt: receipt.endedAt,
-      links: receipt.runUrl
+      packetUpdatedAt: receipt?.endedAt ?? ledger.updatedAt,
+      links: receipt?.runUrl
         ? [{ label: 'Production run', href: receipt.runUrl, kind: 'test_run' }]
         : [],
       packet,
+      ...(productionEvidence ? { productionEvidence } : {}),
       file: `ledger:prod-golden-path/${id}`,
     });
   }

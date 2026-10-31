@@ -15,6 +15,7 @@ import {
   type OvieCertificationHistoryEvent,
   type OvieCertificationInventory,
   type OvieCertificationLink,
+  type OvieCertificationProductionEvidence,
   type OvieCertificationRow,
   type OvieCertificationState,
   type OvieCertificationTier,
@@ -34,6 +35,11 @@ export interface KernelCertificationRowInput {
   readonly auditHistory: readonly CertificationAuditEvent[];
   readonly updatedAt: string;
   readonly links?: readonly OvieCertificationLink[];
+  /**
+   * Production golden-path ledger rows only (JOV-9625): the latest receipt's
+   * browser evidence, carried through to the row.
+   */
+  readonly productionEvidence?: OvieCertificationProductionEvidence;
   /**
    * Domain-owned precondition for founder actions beyond kernel admission,
    * e.g. marketing's assurance profile. `null` means no extra gate.
@@ -277,6 +283,11 @@ export function normalizeKernelCertificationRow(
     links: input.links ?? [],
     history: history(input.auditHistory, input.decisions),
     decision: decisionAvailability(input),
+    // Ledger rows carry the receipt's browser evidence; every other domain
+    // omits the key rather than projecting a null it never measured.
+    ...(input.productionEvidence
+      ? { productionEvidence: input.productionEvidence }
+      : {}),
     source: packet.source
       ? {
           repository: packet.source.repository,

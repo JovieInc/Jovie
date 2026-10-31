@@ -147,6 +147,12 @@ export interface OvieCertificationRow {
   readonly history: readonly OvieCertificationHistoryEvent[];
   readonly decision: OvieCertificationDecisionAvailability;
   /**
+   * Production golden-path ledger rows only (JOV-9625): the latest receipt's
+   * per-surface browser evidence. Absent on every other domain's row and on
+   * a surface that has no production receipt yet.
+   */
+  readonly productionEvidence?: OvieCertificationProductionEvidence;
+  /**
    * Customers domain only (CERTIFICATION_V2_CUSTOMERS section 11): the
    * pipeline ranking fields. Absent on every other domain's row.
    */
@@ -166,6 +172,21 @@ export type OvieCertificationDomainStatus =
   | 'empty'
   | 'not_connected'
   | 'error';
+
+/**
+ * The latest production receipt's browser evidence, carried through to the
+ * inventory row (JOV-9625): never dropped between the stored receipt and the
+ * admin surface. The screenshot href is the receipt's own JPEG data URL, and
+ * its digest binds the row to those bytes.
+ */
+export interface OvieCertificationProductionEvidence {
+  readonly consoleErrorCount: number | null;
+  readonly networkErrorCount: number | null;
+  readonly screenshot: {
+    readonly href: string;
+    readonly digest: string;
+  } | null;
+}
 
 export interface OvieCertificationDomainSummary {
   readonly domain: OvieCertificationDomainId;

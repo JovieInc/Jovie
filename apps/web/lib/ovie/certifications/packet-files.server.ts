@@ -9,6 +9,7 @@ import type {
   OvieCertificationInventoryIssue,
   OvieCertificationLink,
   OvieCertificationLinkKind,
+  OvieCertificationProductionEvidence,
 } from './types';
 
 export const CERTIFICATION_PACKET_FILE_SCHEMA =
@@ -46,6 +47,11 @@ export interface CertificationPacketFile {
   readonly packetUpdatedAt: string;
   readonly links: readonly OvieCertificationLink[];
   readonly packet: CertificationReviewPacket;
+  /**
+   * Prod golden-path ledger rows only (JOV-9625): the latest receipt's
+   * browser evidence, carried through packetProjection to the row.
+   */
+  readonly productionEvidence?: OvieCertificationProductionEvidence;
   /** Repo-relative path, for issue reporting and the rail's source line. */
   readonly file: string;
 }

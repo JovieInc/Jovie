@@ -248,6 +248,7 @@ function packetProjection(
       auditHistory: record?.auditHistory ?? [],
       updatedAt,
       links: file.links,
+      productionEvidence: file.productionEvidence,
     }),
     delivery: {
       admission,

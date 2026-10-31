@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import type { CertificationRecordBackend } from '@/lib/agent-os/certification-cas';
 import {
   isProdGoldenPathReceipt,
+  PROD_GOLDEN_PATH_FRESHNESS_MS,
+  PROD_GOLDEN_PATH_LEDGER_CONTRACT,
   PROD_GOLDEN_PATH_RECEIPT_SCHEMA,
+  PROD_GOLDEN_PATH_SURFACE_IDS,
+  type ProdGoldenPathLedger,
   type ProdGoldenPathReceipt,
   prodGoldenPathPacketFiles,
   readProdGoldenPathLedger,
@@ -165,6 +169,156 @@ describe('prod golden-path ledger', () => {
     expect(withEvidence.consoleErrorCount).toBe(1);
     expect(withEvidence.screenshot?.dataUrl).toBe(
       'data:image/jpeg;base64,frame'
+    );
+  });
+});
+
+describe('JOV-9625 outcome verifier: certified/expired/missing projection', () => {
+  const NOW = '2026-10-31T00:00:00.000Z';
+
+  function ledgerOf(
+    entries: Record<string, ProdGoldenPathReceipt>
+  ): ProdGoldenPathLedger {
+    return {
+      schemaVersion: 1,
+      contract: PROD_GOLDEN_PATH_LEDGER_CONTRACT,
+      surfaces: Object.fromEntries(
+        Object.entries(entries).map(([surface, latest]) => [
+          surface,
+          {
+            latest,
+            lastPassedSha: latest.status === 'passed' ? latest.sha : null,
+            history: [
+              {
+                sha: latest.sha,
+                status: latest.status,
+                endedAt: latest.endedAt,
+              },
+            ],
+          },
+        ])
+      ),
+      updatedAt: NOW,
+    };
+  }
+
+  it('projects every surface as missing when the ledger is empty — never zero rows', () => {
+    const files = prodGoldenPathPacketFiles(
+      {
+        schemaVersion: 1,
+        contract: PROD_GOLDEN_PATH_LEDGER_CONTRACT,
+        surfaces: {},
+        updatedAt: NOW,
+      },
+      NOW
+    );
+    expect(files).toHaveLength(PROD_GOLDEN_PATH_SURFACE_IDS.length);
+    expect(files.map(f => f.packet.subject.id)).toContain(
+      'golden-path:checkout'
+    );
+    for (const file of files) {
+      // A surface with no receipt binds to nothing: source missing, dogfood
+      // tier missing, no evidence counts.
+      expect(file.packet.source).toBeNull();
+      expect(file.packet.operational?.runtimeDogfood).toEqual([]);
+      expect(file.packet.visualProof).toEqual([]);
+      expect(file.productionEvidence).toBeUndefined();
+    }
+  });
+
+  it('projects a surface absent from a non-empty ledger as missing too', () => {
+    const files = prodGoldenPathPacketFiles(
+      ledgerOf({ landing: receipt() }),
+      NOW
+    );
+    expect(files).toHaveLength(PROD_GOLDEN_PATH_SURFACE_IDS.length);
+    const checkout = files.find(
+      f => f.packet.subject.id === 'golden-path:checkout'
+    );
+    expect(checkout?.packet.source).toBeNull();
+    expect(checkout?.packet.operational?.runtimeDogfood).toEqual([]);
+  });
+
+  it('a current passed receipt keeps runtime_dogfood passed and binds the screenshot as visual proof', () => {
+    const current = receipt({
+      endedAt: '2026-10-30T23:00:05.000Z',
+      consoleErrorCount: 0,
+      networkErrorCount: 8,
+      screenshot: {
+        format: 'jpeg',
+        dataUrl: 'data:image/jpeg;base64,frame',
+      },
+    });
+    const files = prodGoldenPathPacketFiles(
+      ledgerOf({ landing: current }),
+      NOW
+    );
+    const landing = files.find(
+      f => f.packet.subject.id === 'golden-path:landing'
+    );
+    const dogfood = landing?.packet.operational?.runtimeDogfood?.[0];
+    expect(dogfood?.status).toBe('passed');
+    expect(dogfood?.sourceSha).toBe(SHA);
+    // The screenshot frame is carried through as visual proof, digest-bound.
+    const visual = landing?.packet.visualProof[0];
+    expect(visual?.status).toBe('passed');
+    expect(visual?.sourceSha).toBe(SHA);
+    expect(visual?.digest).toMatch(/^sha256:[0-9a-f]{64}$/u);
+    // And the counts/screenshot survive to the row evidence.
+    expect(landing?.productionEvidence).toEqual({
+      consoleErrorCount: 0,
+      networkErrorCount: 8,
+      screenshot: {
+        href: 'data:image/jpeg;base64,frame',
+        digest: visual?.digest,
+      },
+    });
+  });
+
+  it('a receipt older than the freshness window projects expired, not passed', () => {
+    const stale = receipt({
+      endedAt: new Date(
+        Date.parse(NOW) - PROD_GOLDEN_PATH_FRESHNESS_MS - 60_000
+      ).toISOString(),
+      screenshot: {
+        format: 'jpeg',
+        dataUrl: 'data:image/jpeg;base64,stale',
+      },
+    });
+    const files = prodGoldenPathPacketFiles(ledgerOf({ landing: stale }), NOW);
+    const landing = files.find(
+      f => f.packet.subject.id === 'golden-path:landing'
+    );
+    const dogfood = landing?.packet.operational?.runtimeDogfood?.[0];
+    expect(dogfood?.status).toBe('blocked');
+    expect(dogfood?.summary).toContain('expired');
+    // Expired evidence is not current visual proof either.
+    expect(landing?.packet.visualProof).toEqual([]);
+  });
+
+  it('a failed receipt keeps runtime_dogfood failed so the tier never reads green', () => {
+    const failed = receipt({
+      status: 'failed',
+      endedAt: '2026-10-30T23:00:05.000Z',
+      checks: [
+        {
+          id: 'landing-renders',
+          status: 'failed',
+          startedAt: '2026-10-30T23:00:00.000Z',
+          endedAt: '2026-10-30T23:00:05.000Z',
+          summary: 'HTTP 500',
+        },
+      ],
+    });
+    const files = prodGoldenPathPacketFiles(ledgerOf({ landing: failed }), NOW);
+    const landing = files.find(
+      f => f.packet.subject.id === 'golden-path:landing'
+    );
+    expect(landing?.packet.operational?.runtimeDogfood?.[0]?.status).toBe(
+      'failed'
+    );
+    expect(landing?.packet.operational?.runtimeDogfood?.[0]?.summary).toContain(
+      'Failed on production'
     );
   });
 });
