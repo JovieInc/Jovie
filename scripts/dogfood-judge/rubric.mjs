@@ -10,7 +10,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-export const RUBRIC_VERSION = 'tim-taste-rubric/2026-10-29.3';
+export const RUBRIC_VERSION = 'tim-taste-rubric/2026-10-31.1';
 export const SEVERITIES = /** @type {const} */ (['blocker', 'major', 'minor']);
 
 const ASR_REGISTRY = fileURLToPath(
@@ -121,16 +121,17 @@ export const CRITERIA = Object.freeze([
   {
     id: 'TT-08',
     slug: 'restrained-type-and-controls',
-    title: 'Linear precision: restrained type, sentence case, quiet controls',
+    title:
+      'Linear precision: restrained type, Title Case controls, never all caps, quiet controls',
     asr: ['ASR-025', 'ASR-041', 'ASR-022', 'ASR-005'],
     severity: 'major',
-    look: 'Fail on oversized headlines or text tabs, Title Case labels and buttons, all-caps eyebrows by default, text under 12px, default-disabled grey primary buttons and stacked title/subtitle/label/helper layers.',
+    look: 'Fail on oversized headlines or text tabs, ALL-CAPS labels, buttons, eyebrows or table rows, sentence-case buttons or nav labels (house rule .claude/rules/ui.md: Title Case for labels, headings, buttons, badges, column headers and nav items, Apple style; sentence case for body, descriptions, tooltips and toasts), text under 12px, default-disabled grey primary buttons and stacked title/subtitle/label/helper layers.',
     fail: [
-      '"Resume At Start" Title Case button.',
+      '"SMART LINKS" all-caps comparison row label.',
       'Billboard-size marketing headline Tim called the "consumer oversized everything trap".',
     ],
     pass: [
-      'Sentence-case labels, one heading size step above body, one microcopy line.',
+      'Title Case buttons and labels ("Confirm Handle", "Start Over"), sentence-case body, one heading size step above body, one microcopy line.',
     ],
   },
   {
