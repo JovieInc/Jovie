@@ -84,7 +84,7 @@ export function migrationIssue(pr, c) {
 
 /**
  * Decide what the loop does for one open Dependabot PR.
- * @returns {{action: 'migrate'|'recreate'|'none', reason: string}}
+ * @returns {{action: 'migrate'|'recreate'|'none', reason: string, class: ReturnType<typeof classifyPr>}}
  */
 export function decide(pr, now = new Date()) {
   const c = classifyPr(pr);

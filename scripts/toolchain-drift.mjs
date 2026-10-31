@@ -30,7 +30,10 @@ export function cmp(a, b) {
   return 0;
 }
 
-/** @returns {{ok: boolean, drift: {check: string, expected: string, actual: string}[]}} */
+/**
+ * @param {{nvmrc: string, nodeVersionFile?: string, engineNode: string, packageManager: string, latestInLine?: string, host?: {node?: string, pnpm?: string}}} input
+ * @returns {{ok: boolean, drift: {check: string, expected: string, actual: string}[]}}
+ */
 export function compare({
   nvmrc,
   nodeVersionFile,
@@ -86,7 +89,7 @@ async function latestPatch(pin) {
       signal: AbortSignal.timeout(15_000),
     });
     const major = parseSemver(pin)?.[0];
-    const rows = await res.json();
+    const rows = /** @type {{version: string}[]} */ (await res.json());
     return rows
       .map(r => trim(r.version))
       .filter(v => parseSemver(v)?.[0] === major)

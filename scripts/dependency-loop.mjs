@@ -70,6 +70,7 @@ async function main() {
       'number,createdAt,mergedAt',
     ])
   );
+  /** @type {{pr: number, action: 'recreate'|'migrate', reason: string, kind: string, ok?: boolean}[]} */
   const actions = [];
   const agentReady =
     dryRun || !process.env.LINEAR_API_KEY

@@ -65,6 +65,23 @@ test('majors route to a migration issue with a stable fingerprint', () => {
   assert.equal(migrationFingerprint(d.class), 'depmajor-electron-44-9-1');
 });
 
+test('every action carries its dependency classification for metrics and migrations', () => {
+  for (const update of [
+    pr({ mergeStateStatus: 'DIRTY' }),
+    pr({ title: 'bump foo from 1.0.0 to 2.0.0' }),
+    pr(),
+    pr({ labels: ['hold'] }),
+  ]) {
+    const decision = decide(update, NOW);
+    assert.deepEqual(decision.class, classifyPr(update));
+    assert.deepEqual(Object.keys(decision).sort(), [
+      'action',
+      'class',
+      'reason',
+    ]);
+  }
+});
+
 test('DIRTY patch/minor heads get one recreate per 24h', () => {
   assert.equal(
     decide(pr({ mergeStateStatus: 'DIRTY' }), NOW).action,
