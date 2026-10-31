@@ -169,7 +169,7 @@ describe('POST /api/px', () => {
 });
 
 describe('pixel intake privacy', () => {
-  it.each([
+  it.each<{ youngAudience: boolean; headers: Record<string, string> }>([
     { youngAudience: true, headers: {} },
     { youngAudience: false, headers: { 'sec-gpc': '1' } },
     {

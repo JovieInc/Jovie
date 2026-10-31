@@ -717,7 +717,9 @@ test('the BLOCKED follow-up uses the job token, not the Jovie Bot app token', ()
   assert.equal(uses.length, 1);
 });
 
-test('a 70-PR sweep with UNKNOWN entries reads in parallel, never sleeps, and stays inside its budget', async () => {
+test('a 70-PR sweep with UNKNOWN entries reads in parallel, never sleeps, and stays inside its budget', async t => {
+  // Measure simulated provider latency, independent of host scheduling pauses.
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
   // 2026-10-12 22:31Z onward: every push-to-main sweep (45-70 PRs, ~3 s per
   // read, 3 s + 6 s UNKNOWN re-read sleeps) was cancelled at the 5-minute
   // timeout and re-armed nothing.
@@ -728,7 +730,8 @@ test('a 70-PR sweep with UNKNOWN entries reads in parallel, never sleeps, and st
   let inFlight = 0;
   let peak = 0;
   const started = Date.now();
-  const result = await fixture({
+  let settled = false;
+  const operation = fixture({
     roster,
     eventName: 'push',
     // A sleep would block the test far past its own timeout.
@@ -750,6 +753,18 @@ test('a 70-PR sweep with UNKNOWN entries reads in parallel, never sleeps, and st
       return { ...current(number), mergeStateStatus: state };
     },
   });
+  operation.finally(() => {
+    settled = true;
+  });
+  while (!settled && Date.now() - started < 20 * 70) {
+    await new Promise(resolve => setImmediate(resolve));
+    if (!settled) t.mock.timers.tick(20);
+  }
+  assert.ok(
+    settled,
+    'the sweep must finish within its simulated latency budget'
+  );
+  const result = await operation;
   assert.ok(
     Date.now() - started < 20 * 70,
     'reads overlap instead of running serially'

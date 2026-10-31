@@ -162,6 +162,43 @@ test('companion edits present in the diff clear the checklist', () => {
   );
 });
 
+test('migration companions follow the journal index when SQL numbering is sparse', () => {
+  const sql = file(
+    'apps/web/drizzle/migrations/0162_young_audience_tracking.sql',
+    'added'
+  );
+  const journal = file('apps/web/drizzle/migrations/meta/_journal.json');
+  const snapshot = file(
+    'apps/web/drizzle/migrations/meta/0153_snapshot.json',
+    'added'
+  );
+  const read = () =>
+    JSON.stringify({
+      entries: [{ idx: 153, tag: '0162_young_audience_tracking' }],
+    });
+  const pending = files =>
+    companionChecklist(files, read).filter(
+      i => /snapshot and journal/.test(i.item) && !i.done
+    );
+  assert.deepEqual(pending([sql, journal, snapshot]), []);
+  assert.equal(pending([sql, journal]).length, 1);
+  assert.equal(pending([sql, snapshot]).length, 1);
+  assert.equal(
+    pending([
+      sql,
+      journal,
+      file('apps/web/drizzle/migrations/meta/0162_snapshot.json', 'added'),
+    ]).length,
+    1
+  );
+  assert.equal(
+    companionChecklist([sql, journal, snapshot], () => '{}').filter(
+      i => /snapshot and journal/.test(i.item) && !i.done
+    ).length,
+    1
+  );
+});
+
 test('two new migrations violate the single-migration rule', () => {
   const m = n => file(`apps/web/drizzle/migrations/${n}_x.sql`, 'added');
   const items = companionChecklist([m('0151'), m('0152')], () => '');
