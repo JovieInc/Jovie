@@ -305,7 +305,7 @@ function EntryRow({ entry }: { readonly entry: CustomerChangelogEntry }) {
                 : 'Limited availability'}
             </p>
           ) : null}
-          <h3 className='changelog-entry__title'>
+          <h3 className='changelog-entry__title text-balance'>
             <NoOrphanText>{entry.title}</NoOrphanText>
           </h3>
           {entry.media ? <EntryMedia media={entry.media} /> : null}
