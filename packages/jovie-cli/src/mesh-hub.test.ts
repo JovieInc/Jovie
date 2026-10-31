@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -14,7 +14,6 @@ import {
   hubWatch,
   outboxDir,
 } from './mesh-hub.js';
-import { hubRelay, type RelaySocket } from './mesh-relay.js';
 
 const TOKEN = `t_${'y'.repeat(60)}`;
 const SENDER_ID = '44444444-4444-4444-8444-444444444444';
@@ -414,118 +413,6 @@ describe('hub watch', () => {
   });
 });
 
-class FakeSocket implements RelaySocket {
-  sent: string[] = [];
-  listeners: Record<string, ((event: { data?: unknown }) => void)[]> = {};
-  send(data: string) {
-    this.sent.push(data);
-  }
-  close() {
-    this.fire('close');
-  }
-  addEventListener(
-    type: string,
-    listener: (event: { data?: unknown }) => void
-  ) {
-    (this.listeners[type] ??= []).push(listener);
-  }
-  fire(type: string, data?: unknown) {
-    for (const listener of this.listeners[type] ?? []) listener({ data });
-  }
-}
-
-describe('hub relay', () => {
-  it('spools messages durably before the receipt, answers probes, dedupes, and reconnects after a drop', async () => {
-    const controller = new AbortController();
-    const sockets: FakeSocket[] = [];
-    const headers: Record<string, string>[] = [];
-    const lines: string[] = [];
-    const api = server(() => ({ status: 202, body: { ok: true } }));
-    const run = hubRelay(
-      {},
-      {
-        env,
-        fetchImpl: api.fetchImpl,
-        signal: controller.signal,
-        emit: line => lines.push(line),
-        sleep: async () => undefined,
-        connect: (url, h) => {
-          expect(url).toBe(
-            'wss://jovie-mesh-hub.tim-fd8.workers.dev/v1/stream'
-          );
-          headers.push(h);
-          const socket = new FakeSocket();
-          sockets.push(socket);
-          queueMicrotask(() => {
-            socket.fire('open');
-            const batch = {
-              type: 'messages',
-              messages: [
-                hubMessage('grokbot:mesh-relay-001'),
-                hubMessage('mesh-probe:claude:1', {
-                  kind: 'probe',
-                  from: 'mesh-probe',
-                }),
-              ],
-            };
-            socket.fire('message', JSON.stringify(batch));
-            socket.fire('message', 'pong');
-            socket.fire('message', 'not json');
-            if (sockets.length === 1) socket.fire('close');
-            else {
-              socket.fire('message', JSON.stringify(batch));
-              controller.abort();
-            }
-          });
-          return socket;
-        },
-      }
-    );
-    const result = await run;
-    expect(result).toEqual({ ok: true, stopped: true, spooled: 1 });
-    expect(headers[0]).toEqual({ Authorization: `Bearer ${TOKEN}` });
-    expect(sockets).toHaveLength(2);
-    expect(
-      JSON.parse(sockets[0].sent.find(s => s.startsWith('{')) ?? '{}')
-    ).toEqual({
-      type: 'receipt',
-      ids: ['grokbot:mesh-relay-001', 'mesh-probe:claude:1'],
-    });
-    const spool = readFileSync(join(state, 'claude', 'inbox.jsonl'), 'utf8')
-      .trim()
-      .split('\n');
-    expect(spool).toHaveLength(1);
-    expect(JSON.parse(spool[0] ?? '{}')).toMatchObject({
-      id: 'grokbot:mesh-relay-001',
-      dataNotInstructions: true,
-    });
-    expect(lines.filter(l => l.startsWith('relay connected'))).toHaveLength(2);
-  });
-
-  it('backs off when the connection cannot be created', async () => {
-    const controller = new AbortController();
-    const sleeps: number[] = [];
-    let attempts = 0;
-    await hubRelay(
-      {},
-      {
-        env,
-        signal: controller.signal,
-        emit: () => undefined,
-        sleep: async ms => {
-          sleeps.push(ms);
-          if (sleeps.length === 3) controller.abort();
-        },
-        connect: () => {
-          attempts++;
-          throw new Error('no network');
-        },
-      }
-    );
-    expect(attempts).toBe(3);
-  });
-});
-
 describe('runMesh routing', () => {
   it('routes send/read/ack/status to the hub by default and keeps legacy when JOVIE_MESH_HUB=0', async () => {
     const api = server(url => {
@@ -550,7 +437,7 @@ describe('runMesh routing', () => {
     });
     await expect(runMesh(['mesh', 'ack'], {}, deps)).rejects.toThrow('<id>');
     await expect(runMesh(['mesh', 'bogus'], {}, deps)).rejects.toThrow(
-      'relay, status'
+      'watch, status'
     );
     const legacy = await runMesh(
       ['mesh', 'send', 'hi'],
