@@ -200,6 +200,37 @@ export const RATE_LIMITERS = {
     trafficClass: 'internal',
   } satisfies RateLimitConfig,
 
+  /**
+   * Unverified-budget marker admissions for the /start bot check
+   * (JOV-10194): 4 per IP per hour. Redis only — an unavailable backend
+   * denies the marker and the visitor falls back to the retryable check.
+   */
+  onboardingBotCheckIp: {
+    name: 'Onboarding Bot Check (IP)',
+    limit: 4,
+    window: '1 h',
+    prefix: 'onb_bot_check_ip',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
+  /**
+   * Global ceiling for unverified marker admissions (JOV-10194): 120 per
+   * hour across every IP, keyed on one constant key. Redis only.
+   */
+  onboardingBotCheckGlobal: {
+    name: 'Onboarding Bot Check (Global)',
+    limit: 120,
+    window: '1 h',
+    prefix: 'onb_bot_check_global',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
   anonymousOnboardingChatFirstTouch: {
     name: 'Anonymous Onboarding Chat (First Touch)',
     limit: 20,

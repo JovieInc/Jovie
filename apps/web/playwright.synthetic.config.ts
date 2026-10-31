@@ -26,6 +26,10 @@ export default defineConfig({
     // probe. Prod gates the full turn behind Turnstile, so the smoke verifies
     // the interview *initializes* (the gap the prod break fell through).
     '**/canary-auth-signup-onboarding.spec.ts',
+    // JOV-10194: the /start bot-check fail-open must keep reaching the first
+    // assistant reply in the two incident UA classes (headless desktop
+    // Chrome, Instagram iOS webview) — no passage token, marker path only.
+    '**/synthetic-start-chat.spec.ts',
   ],
   fullyParallel: false, // Sequential for stability in prod
   forbidOnly: true, // Always enforced in synthetic mode

@@ -66,6 +66,12 @@ vi.mock('@/lib/synthetic/passage-token.server', () => ({
   resolveSyntheticPassageToken: passageTokenMock,
 }));
 
+// JOV-10194: unverified marker-token budget admission. Defaults to denial.
+const admitBotCheckMock = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/turnstile/bot-check-budget.server', () => ({
+  admitOnboardingUnverifiedFirstTouch: admitBotCheckMock,
+}));
+
 vi.mock('@/lib/flags/server', () => ({
   checkGateForUser: hoisted.checkGateForUserMock,
 }));
@@ -1495,6 +1501,159 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       expect(result?.status).toBe(403);
       expect(hoisted.verifyTurnstileTokenMock).toHaveBeenCalledTimes(1);
       expect(hoisted.verifyTurnstileTestModeTokenMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('marker-token fail-open budget (JOV-10194)', () => {
+    const MARKER = 'jovie-onboarding-turnstile-unavailable';
+
+    function arrangeProduction() {
+      vi.resetModules();
+      stubRuntimeEnv({ nodeEnv: 'production', vercelEnv: 'production' });
+      hoisted.checkGateForUserMock.mockResolvedValue(false);
+      hoisted.isTurnstileConfiguredMock.mockReturnValue(true);
+      hoisted.verifyTurnstileTokenMock.mockResolvedValue({
+        success: false,
+        reason: 'siteverify_failed',
+      });
+      hoisted.verifyTurnstileTestModeTokenMock.mockResolvedValue({
+        success: true,
+      });
+      hoisted.executeChatTurnMock.mockResolvedValue({
+        streamResult: {
+          toUIMessageStreamResponse: ({
+            headers,
+          }: {
+            headers: Record<string, string>;
+          }) => new Response('fail-open reply', { status: 200, headers }),
+        },
+        selectedModel: 'anthropic/claude-haiku-4-5-20251001',
+        systemPrompt: '',
+        toolNames: [],
+        modelMessages: [],
+      });
+    }
+
+    async function firstTurn(requestId: string, body: Record<string, unknown>) {
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      return tryHandleAnonymousOnboardingChat(
+        makeRequest(
+          { mode: 'onboarding', messages: [userMessage('hi')], ...body },
+          '',
+          {
+            'user-agent':
+              'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) Mobile/15E148 Instagram 335.0',
+          }
+        ),
+        requestId
+      );
+    }
+
+    it('admits a marker token within budget without calling siteverify', async () => {
+      arrangeProduction();
+      admitBotCheckMock.mockResolvedValueOnce({
+        admitted: true,
+        reason: 'within_budget',
+      });
+
+      const result = await firstTurn('req-marker-ok', {
+        turnstileToken: MARKER,
+        botCheckClientStatus: 'error',
+      });
+
+      expect(result?.status).toBe(200);
+      expect(admitBotCheckMock).toHaveBeenCalledWith({
+        ip: '203.0.113.5',
+        clientStatus: 'error',
+        userAgent:
+          'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) Mobile/15E148 Instagram 335.0',
+        requestId: 'req-marker-ok',
+      });
+      expect(hoisted.verifyTurnstileTokenMock).not.toHaveBeenCalled();
+      expect(hoisted.verifyTurnstileTestModeTokenMock).not.toHaveBeenCalled();
+      expect(hoisted.checkAnonymousChatRateLimitMock).toHaveBeenCalled();
+    });
+
+    it('defaults client_status when the client sends no status', async () => {
+      arrangeProduction();
+      admitBotCheckMock.mockResolvedValueOnce({
+        admitted: true,
+        reason: 'within_budget',
+      });
+
+      const result = await firstTurn('req-marker-nostatus', {
+        turnstileToken: MARKER,
+      });
+
+      expect(result?.status).toBe(200);
+      expect(admitBotCheckMock).toHaveBeenCalledWith(
+        expect.objectContaining({ clientStatus: null })
+      );
+    });
+
+    it.each([
+      ['ip_budget_exhausted', 'unverified_budget_ip_budget_exhausted'],
+      ['global_budget_exhausted', 'unverified_budget_global_budget_exhausted'],
+      ['budget_unavailable', 'unverified_budget_budget_unavailable'],
+    ])(
+      'falls back to the retryable check when the budget denies (%s)',
+      async (budgetReason, expectedReason) => {
+        arrangeProduction();
+        admitBotCheckMock.mockResolvedValueOnce({
+          admitted: false,
+          reason: budgetReason,
+        });
+
+        const result = await firstTurn(`req-marker-${budgetReason}`, {
+          turnstileToken: MARKER,
+          botCheckClientStatus: 'loading',
+        });
+
+        expect(result?.status).toBe(403);
+        await expect(result?.json()).resolves.toMatchObject({
+          errorCode: 'TURNSTILE_REQUIRED',
+          reason: expectedReason,
+        });
+        expect(hoisted.verifyTurnstileTokenMock).not.toHaveBeenCalled();
+        expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+      }
+    );
+
+    it('a passage-token actor never draws on the marker budget', async () => {
+      arrangeProduction();
+      passageTokenMock.mockResolvedValueOnce({ actorId: 'prodcert' });
+
+      const result = await firstTurn('req-marker-passage', {
+        turnstileToken: MARKER,
+        botCheckClientStatus: 'error',
+      });
+
+      // The sanctioned agent path owns verification: test mode runs (and
+      // here succeeds on the mocked verdict), the budget is never consulted.
+      expect(result?.status).toBe(200);
+      expect(admitBotCheckMock).not.toHaveBeenCalled();
+      expect(hoisted.verifyTurnstileTestModeTokenMock).toHaveBeenCalledWith(
+        MARKER,
+        '203.0.113.5'
+      );
+      expect(hoisted.verifyTurnstileTokenMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects an out-of-contract client status instead of guessing', async () => {
+      arrangeProduction();
+
+      const result = await firstTurn('req-marker-badstatus', {
+        turnstileToken: MARKER,
+        botCheckClientStatus: 'everything-is-fine',
+      });
+
+      expect(result?.status).toBe(400);
+      await expect(result?.json()).resolves.toMatchObject({
+        errorCode: 'INVALID_ONBOARDING_PAYLOAD',
+      });
+      expect(admitBotCheckMock).not.toHaveBeenCalled();
     });
   });
 

@@ -50,6 +50,12 @@ import {
   buildStartEntryDraft,
   type StartEntryProfile,
 } from '@/lib/onboarding/start-entry-profile';
+import {
+  ONBOARDING_TURNSTILE_FAIL_OPEN_STATUSES,
+  ONBOARDING_TURNSTILE_FAIL_OPEN_WAIT_MS,
+  ONBOARDING_TURNSTILE_MARKER_TOKEN,
+  type OnboardingBotCheckClientStatus,
+} from '@/lib/turnstile/marker-token';
 import { cn } from '@/lib/utils';
 import { ChatProposeCheckoutCard } from './ChatProposeCheckoutCard';
 import { ChatProposeNextStepCard } from './ChatProposeNextStepCard';
@@ -142,10 +148,16 @@ interface OnboardingChatProps {
 }
 
 class OnboardingChatTransport extends DefaultChatTransport<UIMessage> {
-  private readonly turnstileState: { token: string | null };
+  private readonly turnstileState: {
+    token: string | null;
+    botCheckClientStatus: OnboardingBotCheckClientStatus | null;
+  };
 
   constructor(conversationId: string | null) {
-    const turnstileState = { token: null as string | null };
+    const turnstileState = {
+      token: null as string | null,
+      botCheckClientStatus: null as OnboardingBotCheckClientStatus | null,
+    };
     super({
       api: '/api/chat',
       body: {
@@ -159,6 +171,10 @@ class OnboardingChatTransport extends DefaultChatTransport<UIMessage> {
           messages: messages.slice(-50),
           ...(turnstileState.token
             ? { turnstileToken: turnstileState.token }
+            : {}),
+          ...(turnstileState.token === ONBOARDING_TURNSTILE_MARKER_TOKEN &&
+          turnstileState.botCheckClientStatus
+            ? { botCheckClientStatus: turnstileState.botCheckClientStatus }
             : {}),
         },
       }),
@@ -193,14 +209,29 @@ class OnboardingChatTransport extends DefaultChatTransport<UIMessage> {
     this.turnstileState = turnstileState;
   }
 
-  setTurnstileToken(token: string | null): void {
+  setTurnstileToken(
+    token: string | null,
+    botCheckClientStatus: OnboardingBotCheckClientStatus | null = null
+  ): void {
     this.turnstileState.token = token;
+    this.turnstileState.botCheckClientStatus = botCheckClientStatus;
   }
 }
 
 const BLOCKED_TURNSTILE_TOKEN_STATUSES: ReadonlySet<
   OnboardingTurnstileStatus | undefined
 > = new Set(['expired', 'timeout', 'error', 'unsupported', 'unconfigured']);
+
+/** Widget statuses that fail the first message open (JOV-10194). */
+const FAIL_OPEN_TURNSTILE_STATUSES: ReadonlySet<string> = new Set(
+  ONBOARDING_TURNSTILE_FAIL_OPEN_STATUSES
+);
+
+function isFailOpenTurnstileStatus(
+  status: OnboardingTurnstileStatus | undefined
+): status is (typeof ONBOARDING_TURNSTILE_FAIL_OPEN_STATUSES)[number] {
+  return status !== undefined && FAIL_OPEN_TURNSTILE_STATUSES.has(status);
+}
 
 type OnboardingToolRendererArgs = {
   readonly part: ToolPart;
@@ -870,6 +901,30 @@ export function OnboardingChat({
     }
   }, [turnstileStatus, turnstileToken]);
 
+  // --- JOV-10194 fail-open ---
+  // A widget hard failure no longer dead-ends the first message: the client
+  // substitutes the marker token and the server decides on the unverified
+  // budget. Cleared the moment a real token mints, and cleared again when the
+  // server rejects the marker so the retry waits for genuine verification.
+  const hasUsableTurnstileToken = isTurnstileTokenUsable(
+    turnstileToken,
+    turnstileStatus
+  );
+  const [failOpenClientStatus, setFailOpenClientStatus] =
+    useState<OnboardingBotCheckClientStatus | null>(null);
+  const failOpenMarkerEngaged =
+    !hasUsableTurnstileToken && failOpenClientStatus !== null;
+
+  useEffect(() => {
+    if (hasUsableTurnstileToken) {
+      setFailOpenClientStatus(null);
+      return;
+    }
+    if (isFailOpenTurnstileStatus(turnstileStatus)) {
+      setFailOpenClientStatus(turnstileStatus);
+    }
+  }, [hasUsableTurnstileToken, turnstileStatus]);
+
   // AI SDK's useChat captures its transport when the Chat instance is created.
   // Keep it stable and update its request state before any passive send effect.
   const transport = useMemo(
@@ -877,8 +932,21 @@ export function OnboardingChat({
     [conversationId]
   );
   useLayoutEffect(() => {
-    transport.setTurnstileToken(turnstileToken);
-  }, [transport, turnstileToken]);
+    transport.setTurnstileToken(
+      hasUsableTurnstileToken
+        ? turnstileToken
+        : failOpenMarkerEngaged
+          ? ONBOARDING_TURNSTILE_MARKER_TOKEN
+          : null,
+      failOpenMarkerEngaged ? failOpenClientStatus : null
+    );
+  }, [
+    transport,
+    turnstileToken,
+    hasUsableTurnstileToken,
+    failOpenMarkerEngaged,
+    failOpenClientStatus,
+  ]);
 
   const { messages, sendMessage, setMessages, status, stop } = useChat({
     id: conversationId ?? 'onboarding',
@@ -906,6 +974,9 @@ export function OnboardingChat({
       if (metadata.errorCode === 'TURNSTILE_REQUIRED') {
         setHasSentFirst(false);
         setVerificationRequested(true);
+        // The server spent the unverified budget (or rejected a real token):
+        // stop sending the marker so the retry waits for fresh verification.
+        setFailOpenClientStatus(null);
         onTurnstileRejected?.();
       }
     },
@@ -944,7 +1015,19 @@ export function OnboardingChat({
     localAutomationBypass !== null &&
     requiresTurnstile &&
     !hasSentFirst &&
-    !isTurnstileTokenUsable(turnstileToken, turnstileStatus);
+    !failOpenMarkerEngaged &&
+    !hasUsableTurnstileToken;
+  // JOV-10194: once a send is held waiting for the widget, fail open after a
+  // bounded wait instead of holding the first message forever.
+  useEffect(() => {
+    if (!verificationRequested || !isAwaitingFirstToken || isBusy) return;
+    const timer = globalThis.setTimeout(() => {
+      setFailOpenClientStatus(
+        current => current ?? ('loading' as OnboardingBotCheckClientStatus)
+      );
+    }, ONBOARDING_TURNSTILE_FAIL_OPEN_WAIT_MS);
+    return () => globalThis.clearTimeout(timer);
+  }, [verificationRequested, isAwaitingFirstToken, isBusy]);
   const lastMessage = messages[messages.length - 1];
   const shouldShowThinking = isBusy && lastMessage?.role === 'user';
   const displayMessages = getDisplayMessages(messages, shouldShowThinking);

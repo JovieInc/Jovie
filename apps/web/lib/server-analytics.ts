@@ -294,6 +294,15 @@ export const SERVER_ANALYTICS_EVENTS = {
       'fallback',
     ],
   },
+  /**
+   * JOV-10194: one row per unverified marker-token decision on the /start
+   * bot check. `client_status` is why the client failed open (widget status
+   * or `loading` after the 8s wait); `ua_class` is the coarse UA class.
+   */
+  onboarding_bot_check: {
+    category: 'funnel',
+    properties: ['result', 'reason', 'client_status', 'ua_class'],
+  },
   asset_page_viewed: limitedDropEvent,
   drop_countdown_viewed: limitedDropEvent,
   drop_capture_started: limitedDropEvent,
@@ -470,6 +479,11 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
     path: 'lib/chat/onboarding-script/telemetry.server.ts',
     invocations: 1,
     events: ['onboarding_reply'],
+  },
+  {
+    path: 'lib/turnstile/bot-check-budget.server.ts',
+    invocations: 1,
+    events: ['onboarding_bot_check'],
   },
   {
     path: 'lib/analytics/limited-drop-funnel.server.ts',

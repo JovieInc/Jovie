@@ -85,6 +85,11 @@ import {
 import { isLocalDevelopmentAutomationHostname } from '@/lib/security/development-only';
 import { resolveSyntheticPassage } from '@/lib/synthetic/passage.server';
 import { resolveSyntheticPassageToken } from '@/lib/synthetic/passage-token.server';
+import { admitOnboardingUnverifiedFirstTouch } from '@/lib/turnstile/bot-check-budget.server';
+import {
+  ONBOARDING_BOT_CHECK_CLIENT_STATUSES,
+  ONBOARDING_TURNSTILE_MARKER_TOKEN,
+} from '@/lib/turnstile/marker-token';
 import {
   isTurnstileConfigured,
   verifyTurnstileTestModeToken,
@@ -148,6 +153,11 @@ const MAX_ONBOARDING_MESSAGE_LENGTH = 4000;
 const onboardingPayloadSchema = z.object({
   mode: z.literal('onboarding'),
   turnstileToken: z.string().max(2048).optional(),
+  /**
+   * JOV-10194: why the client failed open and sent the marker token — the
+   * widget's hard-failure status, or `loading` after the 8s wait.
+   */
+  botCheckClientStatus: z.enum(ONBOARDING_BOT_CHECK_CLIENT_STATUSES).optional(),
   onboardingConversationId: z.string().uuid().optional(),
   /**
    * UIMessage[] from the AI SDK client. Validated for shape elsewhere (message
@@ -170,6 +180,7 @@ const IMPLICIT_ONBOARDING_ENVELOPE_KEYS = new Set([
   'mode',
   'messages',
   'turnstileToken',
+  'botCheckClientStatus',
   'id',
   'trigger',
   'messageId',
@@ -504,29 +515,74 @@ export async function tryHandleAnonymousOnboardingChat(
       if (syntheticActorId) {
         Sentry.setTag('synthetic_principal', syntheticActorId);
       }
-      const verify = syntheticActorId
-        ? await verifyTurnstileTestModeToken(parsed.data.turnstileToken, ip)
-        : await verifyTurnstileToken(
-            parsed.data.turnstileToken,
-            ip,
-            extractRequestHostname(req)
-          );
-      if (!verify.success) {
-        return NextResponse.json(
-          {
-            error: 'Bot challenge failed',
-            errorCode: 'TURNSTILE_REQUIRED',
-            reason: verify.reason,
-            requestId,
-          },
-          {
-            status: 403,
-            headers: {
-              ...corsHeaders,
-              'x-request-id': requestId,
+      // JOV-10194 fail-open: a widget that cannot run (headless Chrome,
+      // Instagram's iOS webview, script blockers) sends the marker token.
+      // Sanctioned agents never take this path — their passage token resolved
+      // a synthetic actor above and verifies in test mode below.
+      const isMarkerToken =
+        parsed.data.turnstileToken === ONBOARDING_TURNSTILE_MARKER_TOKEN;
+      if (isMarkerToken && !syntheticActorId) {
+        const admission = await admitOnboardingUnverifiedFirstTouch({
+          ip,
+          clientStatus: parsed.data.botCheckClientStatus ?? null,
+          userAgent: req.headers.get('user-agent'),
+          requestId,
+        });
+        if (!admission.admitted) {
+          // Budget spent: fall back to the existing retryable check. Same 403
+          // TURNSTILE_REQUIRED contract the client already knows how to retry
+          // (widget reset + verification instruction), without burning a
+          // siteverify round trip on a token that can never verify.
+          return NextResponse.json(
+            {
+              error: 'Bot challenge failed',
+              errorCode: 'TURNSTILE_REQUIRED',
+              reason: `unverified_budget_${admission.reason}`,
+              requestId,
             },
-          }
-        );
+            {
+              status: 403,
+              headers: {
+                ...corsHeaders,
+                'x-request-id': requestId,
+              },
+            }
+          );
+        }
+        Sentry.addBreadcrumb({
+          category: 'onboarding-chat',
+          message: 'bot_check_marker_admitted',
+          level: 'info',
+          data: {
+            reason: admission.reason,
+            clientStatus: parsed.data.botCheckClientStatus ?? null,
+          },
+        });
+      } else {
+        const verify = syntheticActorId
+          ? await verifyTurnstileTestModeToken(parsed.data.turnstileToken, ip)
+          : await verifyTurnstileToken(
+              parsed.data.turnstileToken,
+              ip,
+              extractRequestHostname(req)
+            );
+        if (!verify.success) {
+          return NextResponse.json(
+            {
+              error: 'Bot challenge failed',
+              errorCode: 'TURNSTILE_REQUIRED',
+              reason: verify.reason,
+              requestId,
+            },
+            {
+              status: 403,
+              headers: {
+                ...corsHeaders,
+                'x-request-id': requestId,
+              },
+            }
+          );
+        }
       }
     }
   }

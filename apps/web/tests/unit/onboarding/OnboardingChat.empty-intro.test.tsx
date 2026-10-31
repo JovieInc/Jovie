@@ -366,6 +366,32 @@ describe('OnboardingChat empty intro', () => {
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
   });
 
+  it('auto-sends the starter through the marker path when the widget hard-fails (JOV-10194)', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    try {
+      render(
+        <OnboardingChat
+          starterHandoff={{
+            kind: 'prompt',
+            prompt: 'Help me plan my next release.',
+          }}
+          turnstileToken={null}
+          turnstileStatus='unsupported'
+        />
+      );
+
+      // An interactive challenge holds the starter; an unsupported browser
+      // fails open and the queued starter still sends.
+      await waitFor(() =>
+        expect(chatMocks.sendMessage).toHaveBeenCalledWith({
+          text: 'Help me plan my next release.',
+        })
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('sizes pending starter guidance once without announcing or submitting it', async () => {
     vi.stubEnv('NODE_ENV', 'test');
     const onTurnstileRequired = vi.fn();

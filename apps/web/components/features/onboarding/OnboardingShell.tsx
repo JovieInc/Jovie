@@ -213,15 +213,11 @@ export function OnboardingShell({
     turnstileSiteKey
   );
 
-  const isTurnstileUnavailable =
-    turnstileState.status === 'error' ||
-    turnstileState.status === 'timeout' ||
-    turnstileState.status === 'unsupported' ||
-    turnstileState.status === 'unconfigured';
-  const turnstileFailureMessage = isTurnstileUnavailable
-    ? (turnstileState.message ??
-      "We couldn't start your chat. Refresh the page to try again.")
-    : null;
+  // JOV-10194: a widget hard failure no longer dead-ends the chat — the
+  // client fails open with the marker token and the server's unverified
+  // budget decides. A server-side rejection surfaces through the chat's own
+  // TURNSTILE_REQUIRED error handling, so the old "We couldn't start your
+  // chat" banner copy would now be false and is gone.
 
   const handleTurnstileRequired = useCallback(
     (message?: string) => {
@@ -351,11 +347,6 @@ export function OnboardingShell({
                 visible={Boolean(actionError)}
               />
 
-              <OnboardingShellStatus
-                kind='error'
-                message={turnstileFailureMessage}
-                visible={Boolean(turnstileFailureMessage)}
-              />
               <OnboardingShellStatus
                 kind='status'
                 message='Saving this conversation to your account…'

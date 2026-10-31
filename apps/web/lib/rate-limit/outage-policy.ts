@@ -77,6 +77,10 @@ export const RATE_LIMIT_OUTAGE_POLICY = {
   anonymousOnboardingChatAsn: mandatoryDenyFixed,
   syntheticPassageToken: mandatoryDenyFixed,
   anonymousOnboardingChatSession: mandatoryDenyFixed,
+  // Unverified marker admissions (JOV-10194): deny on Redis outage so the
+  // fail-open budget never degrades to per-instance memory.
+  onboardingBotCheckIp: mandatoryDenyFixed,
+  onboardingBotCheckGlobal: mandatoryDenyFixed,
   // Fresh-session allowance only (Turnstile-gated); memory-degrades on Redis
   // outage so a new visitor's first message never hard-fails (JOV-6114).
   anonymousOnboardingChatFirstTouch: advisoryAllow,

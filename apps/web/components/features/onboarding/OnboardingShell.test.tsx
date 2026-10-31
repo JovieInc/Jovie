@@ -342,7 +342,7 @@ describe('OnboardingShell status', () => {
     expect(signIn).toHaveFocus();
   });
 
-  it('reports a failed chat start without verification jargon or error codes', () => {
+  it('keeps a widget hard failure off the dead-end banner — the chat fails open instead (JOV-10194)', () => {
     render(<OnboardingShell sessionLabel='pending' />);
 
     act(() => {
@@ -352,11 +352,12 @@ describe('OnboardingShell status', () => {
       });
     });
 
-    const alert = screen.getByText(
-      "We couldn't start your chat. Refresh the page to try again."
-    );
-    expect(alert).toHaveAttribute('role', 'alert');
-    expect(alert.textContent).not.toMatch(/verification failed|\(\d+\)/i);
+    // The marker path owns the decision server-side; a banner claiming the
+    // chat could not start would be false while the first message sends.
+    expect(
+      screen.queryByText(/We couldn't start your chat/i)
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('passes headerOverlay to the chat while the visitor is anonymous (JOV-7192)', () => {

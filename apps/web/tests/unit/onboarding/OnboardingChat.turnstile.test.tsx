@@ -700,6 +700,99 @@ describe('OnboardingChat Turnstile gating', () => {
     });
   });
 
+  it('fails open with the marker token when the widget hard-fails (JOV-10194)', () => {
+    const onTurnstileRequired = vi.fn();
+    render(
+      <TurnstileHarness
+        unverifiedStatus='error'
+        onTurnstileRequired={onTurnstileRequired}
+      />
+    );
+
+    const input = screen.getByLabelText('Chat Message Input');
+    fireEvent.change(input, { target: { value: 'help me launch a song' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+
+    // Not held for verification: the first message sends immediately with
+    // the marker token and the widget status that caused the fail-open.
+    expect(chatMocks.sendMessage).toHaveBeenCalledTimes(1);
+    expect(onTurnstileRequired).not.toHaveBeenCalled();
+    expect(
+      transportMocks.options[0]?.prepareSendMessagesRequest({
+        messages: [{ id: 'message-1', role: 'user', parts: [] }],
+      }).body
+    ).toMatchObject({
+      turnstileToken: 'jovie-onboarding-turnstile-unavailable',
+      botCheckClientStatus: 'error',
+    });
+  });
+
+  it('fails open after an 8s wait when a held send never gets a token (JOV-10194)', async () => {
+    vi.useFakeTimers();
+    try {
+      render(<TurnstileHarness unverifiedStatus='loading' />);
+
+      const input = screen.getByLabelText('Chat Message Input');
+      fireEvent.change(input, { target: { value: 'help me launch a song' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+
+      // Held while the widget is still warming up...
+      expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(8_000);
+      });
+
+      // ...then the bounded wait fails the send open with the marker.
+      expect(chatMocks.sendMessage).toHaveBeenCalledTimes(1);
+      expect(
+        transportMocks.options[0]?.prepareSendMessagesRequest({
+          messages: [{ id: 'message-1', role: 'user', parts: [] }],
+        }).body
+      ).toMatchObject({
+        turnstileToken: 'jovie-onboarding-turnstile-unavailable',
+        botCheckClientStatus: 'loading',
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops sending the marker after the server rejects it (JOV-10194)', () => {
+    render(<TurnstileHarness unverifiedStatus='error' />);
+
+    const input = screen.getByLabelText('Chat Message Input');
+    fireEvent.change(input, { target: { value: 'help me launch a song' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    expect(chatMocks.sendMessage).toHaveBeenCalledTimes(1);
+
+    chatMocks.messages = [
+      {
+        id: 'message-1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'help me launch a song' }],
+      },
+    ];
+    errorMocks.metadata = {
+      errorCode: 'TURNSTILE_REQUIRED',
+      message: 'Bot challenge failed',
+      requestId: 'req-marker-1',
+    };
+    act(() => {
+      chatMocks.onError?.(new Error('Bot challenge failed'));
+    });
+
+    // Marker cleared: the next send waits for genuine verification instead
+    // of looping the rejected marker back to the server.
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    expect(chatMocks.sendMessage).toHaveBeenCalledTimes(1);
+    expect(
+      transportMocks.options[0]?.prepareSendMessagesRequest({
+        messages: [{ id: 'message-1', role: 'user', parts: [] }],
+      }).body
+    ).not.toHaveProperty('turnstileToken');
+  });
+
   it('renders one semantic recovery row outside the bordered composer', () => {
     render(<TurnstileHarness initialToken='token-1' />);
 

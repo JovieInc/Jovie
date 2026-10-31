@@ -149,6 +149,24 @@ export const syntheticPassageTokenLimiter = createRateLimiter(
   { requireRedis: true }
 );
 
+/**
+ * Unverified-budget marker admissions for the /start bot check (JOV-10194):
+ * 4 per IP per hour. Redis only — the marker is denied when unavailable.
+ */
+export const onboardingBotCheckIpLimiter = createRateLimiter(
+  RATE_LIMITERS.onboardingBotCheckIp,
+  { requireRedis: true }
+);
+
+/**
+ * Global ceiling for unverified marker admissions (JOV-10194): 120 per hour
+ * across every IP (constant key). Redis only.
+ */
+export const onboardingBotCheckGlobalLimiter = createRateLimiter(
+  RATE_LIMITERS.onboardingBotCheckGlobal,
+  { requireRedis: true }
+);
+
 export interface AnonymousChatLimitInput {
   readonly ip: string;
   readonly sessionId: string;
