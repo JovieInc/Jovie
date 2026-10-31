@@ -10479,17 +10479,19 @@ def _selftest_process_row(entry: Path, pid: int, uid: int) -> tuple | None:
             raise SelftestCleanupHeld("selftest-process-uid-changed", pid=pid, start=start, source="proc-stat")
         return row
     except (FileNotFoundError, ProcessLookupError) as error:
-        # A process mid-exit answers ESRCH instead of ENOENT; both are the kernel's own
-        # proof of absence (CI #22351: selftest-process-birth-unavailable on an exiting
-        # sibling's proc entry ejected a merge group).
+        # Both ENOENT and ESRCH can race process exit while proc is read. Only
+        # a fresh missing-directory observation proves absence; a live/reused
+        # directory or another unreadable observation still holds cleanup.
         try:
             entry.stat()
-        except (FileNotFoundError, ProcessLookupError):
+        except FileNotFoundError:
             return None  # proc confirms this enumerated directory no longer exists
         except OSError as observation_error:
             raise SelftestCleanupHeld("selftest-process-birth-unavailable", pid=pid, start=start,
                                       source="proc-stat", error=observation_error) from observation_error
-        raise SelftestCleanupHeld("selftest-process-birth-missing", pid=pid, start=start,
+        code = ("selftest-process-birth-missing" if isinstance(error, FileNotFoundError)
+                else "selftest-process-birth-unavailable")
+        raise SelftestCleanupHeld(code, pid=pid, start=start,
                                   source="proc-stat", error=error) from error
     except (OSError, ValueError, IndexError) as error:
         raise SelftestCleanupHeld("selftest-process-birth-unavailable", pid=pid, start=start,
