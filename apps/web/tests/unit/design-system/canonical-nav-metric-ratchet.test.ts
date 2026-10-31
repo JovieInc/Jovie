@@ -26,7 +26,7 @@ const BASELINE_PATH = path.join(
 );
 
 export const NAV_METRIC_RULES = {
-  adHocTabs: /role=\{?['"]tab(?:list|panel)?['"]\}?|aria-selected=/g,
+  adHocTabs: /role=\{?['"]tab(?:list|panel)?['"]\}?/g,
   adHocRouteNav: /<nav\b[^>]*>[\s\S]{0,1200}?aria-current=/g,
   localMetricComponent:
     /^(?:export\s+)?(?:function|const)\s+[A-Z]\w*(?:StatCard|MetricCard|Metric|Stat|Stats|Kpi|StatTile|MetricTile)\b/gm,
@@ -112,7 +112,7 @@ describe('canonical navigation, metric and unknown-value ratchet', () => {
       countNavMetric(
         `<div role='tablist'><button role="tab" aria-selected={a}/>`
       ).adHocTabs
-    ).toBe(3);
+    ).toBe(2);
     expect(
       countNavMetric(`<nav aria-label='x'><Link aria-current='page' /></nav>`)
         .adHocRouteNav
@@ -127,6 +127,17 @@ describe('canonical navigation, metric and unknown-value ratchet', () => {
     ).toBe(3);
     expect(
       countNavMetric(`value ?? 'Unknown'; 'n/a-ish'`).barePlaceholder
+    ).toBe(0);
+  });
+
+  it('does not classify listbox options or table rows as tab navigation', () => {
+    expect(
+      countNavMetric(
+        `<div role='listbox'><button aria-selected={active} role='option' /></div>`
+      ).adHocTabs
+    ).toBe(0);
+    expect(
+      countNavMetric(`<tr role='row' aria-selected={selected} />`).adHocTabs
     ).toBe(0);
   });
 });

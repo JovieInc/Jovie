@@ -59,10 +59,10 @@ and the capability evidence matrix.
 
 Remaining debt across Jovie and Ovie app routes is grandfathered per file in
 [`canonical-nav-metric.baseline.json`](../../apps/web/tests/unit/design-system/canonical-nav-metric.baseline.json)
-and only shrinks: hand-built tab roles (9 files), `<nav>` link rows with
+and only shrinks: hand-built tab roles (4 files), `<nav>` link rows with
 `aria-current` (4), local `*Metric`/`*Stat`/`*Kpi` components (7, e.g.
 `CampaignMetric`, `HudKpiSubgrid`, `FunnelMetricsStrip`) and bare
-placeholders (57 files).
+placeholders (56 files).
 
 ## Guards
 

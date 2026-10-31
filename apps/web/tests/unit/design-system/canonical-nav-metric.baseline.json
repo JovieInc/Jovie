@@ -1,14 +1,9 @@
 {
   "adHocTabs": {
-    "app/app/(shell)/admin/shipping/ShippingMatrix.tsx": 1,
-    "app/app/(shell)/library/LibraryPageClient.tsx": 7,
+    "app/app/(shell)/library/LibraryPageClient.tsx": 6,
     "app/app/(shell)/library/LibrarySurface.tsx": 5,
-    "app/app/(shell)/profiles/AddConnectionRail.tsx": 1,
-    "components/features/admin/CreatorProfileTableRow.tsx": 1,
-    "components/features/admin/hud/HudDrilldownSearch.tsx": 3,
-    "components/features/dashboard/dashboard-analytics/DashboardAnalytics.tsx": 1,
-    "components/features/demo/DemoReleasesPanel.tsx": 1,
-    "components/features/release/ActionDial.tsx": 1
+    "components/features/admin/hud/HudDrilldownSearch.tsx": 2,
+    "components/features/dashboard/dashboard-analytics/DashboardAnalytics.tsx": 1
   },
   "adHocRouteNav": {
     "components/features/admin/capacity/CapacityBoard.tsx": 1,
@@ -61,7 +56,6 @@
     "components/features/admin/hud/OvieShippingStateCard.tsx": 1,
     "components/features/admin/hud/VisualQaReviewPanel.tsx": 1,
     "components/features/admin/investors/HypotheticalDilutionPreview.tsx": 1,
-    "components/features/admin/leads/GoldenPathFunnelPanel.tsx": 1,
     "components/features/dashboard/dashboard-analytics/DashboardAnalytics.tsx": 3,
     "components/features/dashboard/organisms/account-settings/utils.ts": 1,
     "components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.tsx": 1,
