@@ -49,6 +49,14 @@ class Canonical(unittest.TestCase):
         self.assertNotEqual(F.canonical_url("https://example.com/p?id=1"), F.canonical_url("https://example.com/p?id=2"))
 
 
+class Tidy(unittest.TestCase):
+    def test_summary_is_plain_and_the_trial_names_a_real_metric(self):
+        self.assertEqual(F.tidy("# Title\n\nA  **bold** claim ```code``` here"), "A bold claim here")
+        signal = F.factory_signal(F.new_pattern(item(), verdict(), "trial", "o"))
+        self.assertIn("minutes from push to required checks green", signal["metric"]["name"])
+        self.assertIsNone(factory_intake.validate(signal))
+
+
 class Decide(unittest.TestCase):
     def test_free_small_scored_is_a_trial(self):
         self.assertEqual(F.decide(verdict(), 0)[0], "trial")

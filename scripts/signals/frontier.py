@@ -214,7 +214,15 @@ class Registry:
         rewrite_jsonl(self.path, sorted(self.machine.values(), key=lambda r: r["id"]))
 
 
+def tidy(text, limit=300):
+    """Plain one-line summary: no markdown headings, fences or runs of whitespace."""
+    text = re.sub(r"```.*?```", " ", str(text or ""), flags=re.S)
+    text = re.sub(r"^#+\s*[^\n]*\n", "", text.strip())
+    return re.sub(r"\s+", " ", re.sub(r"[#*_`>|]+", " ", text)).strip()[:limit]
+
+
 def new_pattern(item, verdict, status, observed, reason=None):
+    item = {**item, "summary": tidy(item.get("summary"), 400)}
     return {"schema": PATTERN_SCHEMA, "id": f"pat-{sha(canonical_url(item['url']))[:12]}", "name": item["title"][:160],
             "problem": (item.get("summary") or item["title"])[:400], "status": status, "reason": reason,
             "source": {"url": item["url"], "origin": item.get("origin", "frontier"), "reporter": item.get("author"),
@@ -350,11 +358,22 @@ def decide(verdict, trials_today, max_trials=MAX_TRIALS_PER_DAY):
 # ---------------------------------------------------------------------------------------------
 # route
 
+STACK_METRICS = {
+    "ci-build": ("p50 and p95 minutes from push to required checks green", "docs/metrics/shipping-slo-latest.json (shipping stage timings)"),
+    "agent-fleet": ("merges per hour and fix-no-change share of lane runs", "scripts/lanes/fleet_ledger.py metrics"),
+    "verification": ("escaped-defect rate: red on main after a green merge", "docs/metrics/shipping-slo-latest.json"),
+    "nextjs-vercel": ("production build wall time and p95 route latency", "Vercel deployment build duration and the route budgets"),
+    "neon-db": ("preview-database provision time and migration job duration", "the CI job durations on the PR"),
+    "cloudflare": ("Worker p95 latency and monthly spend", "wrangler tail and the Cloudflare analytics export"),
+}
+
+
 def factory_signal(pattern, baseline_metric=None):
     """A trial as a jovie-factory-signal/v1: the lanes admission runs it like any other issue."""
     stack = pattern["applies"]["stack"]
-    metric = baseline_metric or {"name": f"{stack} trial: measured delta vs baseline", "baseline": "measure before the change",
-                                 "target": "improvement in the named metric, or revert", "measuredBy": "the pattern's trial block"}
+    name, by = STACK_METRICS.get(stack, ("the one metric the report claims to move", "the pattern's trial block"))
+    metric = baseline_metric or {"name": name, "baseline": "measure on current main before the change",
+                                 "target": "a measured improvement that holds for a week, or revert", "measuredBy": by}
     return {"schema": FACTORY_SCHEMA, "fingerprint": f"frontier-{slug(pattern['name'], 40)}-{pattern['id'][-6:]}", "source": "frontier-feed",
             "title": f"Trial: {pattern['name'][:120]}",
             "problem": (f"Outside report (a prior, not proof): {pattern['source']['claim'] or pattern['name']}\n\nSource: {pattern['source']['url']}\n"
