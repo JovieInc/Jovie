@@ -319,7 +319,7 @@ describe('sendPendingNotifications (dispatch path behind the policy)', () => {
             slug: 'new-album',
             artworkUrl: null,
             releaseDate: null,
-            sourceType: 'spotify',
+            sourceType: 'ingested',
           },
         ])
       )
@@ -437,7 +437,7 @@ describe('sendPendingNotifications (dispatch path behind the policy)', () => {
             slug: 'new-album',
             artworkUrl: null,
             releaseDate: null,
-            sourceType: 'spotify',
+            sourceType: 'ingested',
           },
         ])
       )
@@ -572,7 +572,7 @@ describe('sendPendingNotifications (dispatch path behind the policy)', () => {
             slug: 'new-album',
             artworkUrl: null,
             releaseDate: null,
-            sourceType: 'spotify',
+            sourceType: 'ingested',
           },
         ])
       )

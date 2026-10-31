@@ -66,6 +66,10 @@ jobs:
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
           permission-pull-requests: read
           permission-issues: read
+      - name: Smoke the log path (gh version, one real job log, fails loudly if empty)
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: python3 scripts/swarm/pr_remediation_swarm.py smoke
       - name: Quota-aware selection
         id: pick
         env:

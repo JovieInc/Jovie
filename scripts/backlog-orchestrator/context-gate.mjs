@@ -370,11 +370,15 @@ export async function collectContextEvidence({
   let requiredTheses;
   try {
     requiredTheses = requiredStrategyTheses(issue);
-  } catch {
+  } catch (error) {
     return {
       evidence: null,
       reason: CONTEXT_BLOCKER.STRATEGY_MISS,
-      detail: 'strategy-theses-index-unavailable',
+      detail:
+        error instanceof Error &&
+        error.message.startsWith('strategy-theses-index-unavailable')
+          ? error.message
+          : 'strategy-theses-index-unavailable',
     };
   }
   if (requiredTheses.length > 0) {

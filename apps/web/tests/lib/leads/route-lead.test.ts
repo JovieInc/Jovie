@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Lead } from '@/lib/db/schema/leads';
 
 vi.mock('server-only', () => ({}));
 
@@ -6,8 +7,10 @@ vi.mock('server-only', () => ({}));
 
 const {
   mockSetWhere,
+  mockSet,
   mockDb,
-  mockGenerateClaimTokenPair,
+  mockEnsureLeadClaimToken,
+  mockPersistLeadClaimToken,
   mockFilterEmail,
   mockDetectRepresentation,
 } = vi.hoisted(() => {
@@ -25,14 +28,17 @@ const {
     update: mockUpdate,
   };
 
-  const mockGenerateClaimTokenPair = vi.fn();
+  const mockEnsureLeadClaimToken = vi.fn();
+  const mockPersistLeadClaimToken = vi.fn();
   const mockFilterEmail = vi.fn();
   const mockDetectRepresentation = vi.fn();
 
   return {
     mockSetWhere,
+    mockSet,
     mockDb,
-    mockGenerateClaimTokenPair,
+    mockEnsureLeadClaimToken,
+    mockPersistLeadClaimToken,
     mockFilterEmail,
     mockDetectRepresentation,
   };
@@ -47,8 +53,9 @@ vi.mock('@/lib/db/schema/leads', () => ({
   leadPipelineSettings: { id: 'leadPipelineSettings.id' },
 }));
 
-vi.mock('@/lib/security/claim-token', () => ({
-  generateClaimTokenPair: mockGenerateClaimTokenPair,
+vi.mock('@/lib/leads/lead-claim-token', () => ({
+  ensureLeadClaimToken: mockEnsureLeadClaimToken,
+  persistLeadClaimToken: mockPersistLeadClaimToken,
 }));
 
 vi.mock('@/lib/leads/email-filter', () => ({
@@ -74,6 +81,7 @@ import { routeLead } from '@/lib/leads/route-lead';
 
 const baseLead = {
   id: 'lead-1',
+  creatorProfileId: null,
   contactEmail: 'artist@gmail.com',
   bio: 'I make music',
   hasInstagram: true,
@@ -90,16 +98,14 @@ const baseLead = {
 const futureDate = new Date();
 futureDate.setDate(futureDate.getDate() + 10);
 
-const pastDate = new Date();
-pastDate.setDate(pastDate.getDate() - 10);
-
 const freshTokenPair = {
   token: 'new-token-123',
   tokenHash: 'new-hash-123',
   expiresAt: futureDate,
+  rotated: true,
 };
 
-function setupLead(overrides: Record<string, unknown> = {}) {
+function setupLead(overrides: Partial<Lead> = {}) {
   const lead = { ...baseLead, ...overrides };
 
   // Reset select chain — where() is called for both lead fetch and settings fetch
@@ -126,7 +132,7 @@ describe('routeLead', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mockGenerateClaimTokenPair.mockResolvedValue(freshTokenPair);
+    mockEnsureLeadClaimToken.mockResolvedValue(freshTokenPair);
 
     mockFilterEmail.mockReturnValue({
       invalid: false,
@@ -216,29 +222,35 @@ describe('routeLead', () => {
     expect(result.route).toBe('manual_review');
   });
 
-  it('generates a new token when existing token is expired', async () => {
+  it('asks for the lead token from its stored hash inputs, never plaintext', async () => {
     setupLead({
-      claimToken: 'old-token',
-      claimTokenHash: 'old-hash',
-      claimTokenExpiresAt: pastDate,
-    });
-
-    const result = await routeLead('lead-1');
-
-    expect(mockGenerateClaimTokenPair).toHaveBeenCalledOnce();
-    expect(result.claimUrl).toBe('https://jov.ie/claim/new-token-123');
-  });
-
-  it('reuses an existing valid claim token', async () => {
-    setupLead({
-      claimToken: 'existing-token',
-      claimTokenHash: 'existing-hash',
+      claimToken: 'legacy-plaintext',
+      claimTokenHash: 'stored-hash',
       claimTokenExpiresAt: futureDate,
     });
 
-    const result = await routeLead('lead-1');
+    await routeLead('lead-1');
 
-    expect(mockGenerateClaimTokenPair).not.toHaveBeenCalled();
-    expect(result.claimUrl).toBe('https://jov.ie/claim/existing-token');
+    expect(mockEnsureLeadClaimToken).toHaveBeenCalledWith({
+      id: 'lead-1',
+      claimTokenHash: 'stored-hash',
+      claimTokenExpiresAt: futureDate,
+    });
+  });
+
+  it('persists only the hash on the lead and its profile', async () => {
+    const lead = setupLead({ creatorProfileId: 'profile-1' });
+
+    await routeLead('lead-1');
+
+    expect(mockPersistLeadClaimToken).toHaveBeenCalledWith(
+      'lead-1',
+      lead.creatorProfileId,
+      freshTokenPair
+    );
+    const written = mockSet.mock.calls.map(call => call[0]);
+    for (const row of written) {
+      expect(row).not.toHaveProperty('claimToken');
+    }
   });
 });

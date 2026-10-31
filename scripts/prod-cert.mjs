@@ -19,7 +19,10 @@ import {
   remediationTriggersEnabled,
   upsertLinearIssueByTitleFingerprint,
 } from './lib/linear-issue-intake.mjs';
-import { runProductionCertification } from './lib/prod-cert.mjs';
+import {
+  certificationVerdict,
+  runProductionCertification,
+} from './lib/prod-cert.mjs';
 
 export function surfaceFingerprint(surface) {
   return `prod-cert-${surface}`;
@@ -79,6 +82,49 @@ Run: ${runUrl ?? 'n/a'}`,
     }
   }
   return results;
+}
+
+export const OVERALL_FINGERPRINT = 'prod-cert-overall';
+
+/**
+ * One owned Linear issue for the whole golden path (JOV-9822): open while any
+ * surface is not green on the served SHA, closed when all eight are. Summer
+ * picks it up from the Launch project; per-surface issues carry the detail.
+ * @param {ReturnType<typeof certificationVerdict>} verdict
+ * @param {{ runUrl?: string | null, deps?: { upsert?: Function, close?: Function } }} [options]
+ */
+export async function fileOverallIssue(verdict, { runUrl, deps = {} } = {}) {
+  const upsert = deps.upsert ?? upsertLinearIssueByTitleFingerprint;
+  const close = deps.close ?? closeLinearIssueByFingerprint;
+  const sha = verdict.servedSha.slice(0, 8);
+  if (verdict.certified) {
+    return close({
+      fingerprint: OVERALL_FINGERPRINT,
+      labelKey: OVERALL_FINGERPRINT,
+      comment: `All 8 golden-path surfaces passed on production ${sha}.`,
+      runId: process.env.GITHUB_RUN_ID,
+    });
+  }
+  return upsert({
+    fingerprint: OVERALL_FINGERPRINT,
+    labelKey: OVERALL_FINGERPRINT,
+    title: 'Production golden path is not certified',
+    description: `## Source
+Production golden-path certification (JOV-9822), served build \`${verdict.servedSha}\`.
+
+## Not green
+${verdict.notGreen.map(n => `- \`${n.surface}\`: ${n.why}`).join('\n')}
+
+## Why it matters
+The recovery email gate, agent-marketplace readiness and launch certification all require every surface to pass on the current production SHA within 24h.
+
+## Acceptance criteria or triage question
+A production certification run passes all eight surfaces on the served SHA; this issue closes itself then.
+
+Run: ${runUrl ?? 'n/a'}`,
+    priority: 1,
+    reopenTerminal: true,
+  });
 }
 
 async function postReceipts(receipts, origin) {
@@ -147,8 +193,15 @@ async function main() {
       }`
     );
   }
+  const verdict = certificationVerdict(receipts, { servedSha: served.sha });
+  console.log(
+    verdict.certified
+      ? `certified: all surfaces passed on ${served.sha}`
+      : `not certified on ${served.sha}: ${verdict.notGreen.map(n => `${n.surface} (${n.why})`).join(', ')}`
+  );
   if (values['file-issues'] && remediationTriggersEnabled()) {
     console.log(JSON.stringify(await fileSurfaceIssues(receipts, { runUrl })));
+    console.log(JSON.stringify(await fileOverallIssue(verdict, { runUrl })));
   }
   if (values.post)
     console.log(JSON.stringify(await postReceipts(receipts, values.origin)));

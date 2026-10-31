@@ -134,6 +134,27 @@ from `SOURCE_GUARDS` or mark it advisory.
 
 ## Preflight before every push
 
+Run `pnpm preflight:changed` before every push (JOV-9727; also in the pre-push
+gate). It scopes to the diff vs `origin/main` and runs, in about a minute,
+every rule CI would otherwise teach one 20-40 minute round at a time: generators
+(topology, harness docs; written, not just checked), the Source Validation
+guards selected by path (private-data, external-api, gate-weakening,
+metrics-layer, ownership/registries, script contracts), the customer-changelog
+marker, Migration Guard, changed-line coverage, biome, and typecheck of only the
+affected packages under a heap cap (`JOVIE_PREFLIGHT_HEAP_MB`, default 4096).
+It lints the PR body (`--body-file f`, `--pr N`, or the open PR) and prints a
+filled template for any missing section (Red-before-green, Blast radius,
+Locked areas, changelog marker), plus a checklist of companion edits for new
+workflows, scripts, tests and migrations. `--thorough` adds heavy guards,
+`--no-coverage` / `--no-typecheck` trim it, `JOVIE_PREFLIGHT_CHANGED=0` skips
+the hook only. Commit first: coverage and the private-data guard read commits.
+Every run appends to `~/.local/state/jovie-lanes/preflight-changed.jsonl`; CI
+rounds per merged PR (target <= 1.3) and the Source Validation first-push pass
+rate are in the shipping SLO report.
+
+`pnpm preflight` below is the broader pass over the Source Validation job.
+
+
 Run `pnpm preflight` before every push (workers: every push, no exceptions; the
 pre-push gate also runs it, so do not bypass hooks). It derives its plan from
 the `deterministic` job of `.github/workflows/source-validation.yml`, runs each
