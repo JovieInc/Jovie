@@ -269,6 +269,7 @@ describe('publication range failures', () => {
       'scripts/lib/policy-gate-liveness.mjs',
       'scripts/hooks/pre-push-gate.test.mjs',
       'scripts/preflight-changed.mjs',
+      'scripts/hooks/prepush-preflight.mjs',
     ]) {
       mkdirSync(dirname(resolve(root, file)), { recursive: true });
       writeFileSync(resolve(root, file), '');
