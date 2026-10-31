@@ -20,6 +20,16 @@ import {
 
 const SCRIPT = resolve('scripts/workflow-expression-budget.mjs');
 
+// Synthetic repositories must not inherit host signing, hooks, or Git routing.
+// Repository-local hooks remain active for the behavioral controls below.
+const fixtureEnv = {
+  ...Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
+  ),
+  GIT_CONFIG_GLOBAL: '/dev/null',
+  GIT_CONFIG_NOSYSTEM: '1',
+};
+
 // The 2026-10-20 stall: ci.yml's path-detect step carries 18 interpolations.
 // Main's script built a 20,773-character format() expression and loaded; #21826
 // grew it to 21,052 and GitHub refused the whole workflow (zero-job runs).
@@ -85,7 +95,11 @@ test('a group stacked on an already broken base is a victim, not the culprit', (
 test('CLI fails the exact head and the head merged into a moved base', () => {
   const root = mkdtempSync(join(tmpdir(), 'workflow-budget-'));
   const git = (...args) =>
-    execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+    execFileSync('git', args, {
+      cwd: root,
+      encoding: 'utf8',
+      env: fixtureEnv,
+    }).trim();
   const write = (text, extra = '') => {
     mkdirSync(join(root, '.github/workflows'), { recursive: true });
     writeFileSync(join(root, '.github/workflows/ci.yml'), text);
@@ -95,6 +109,7 @@ test('CLI fails the exact head and the head merged into a moved base', () => {
     spawnSync(process.execPath, [SCRIPT, ...args], {
       cwd: root,
       encoding: 'utf8',
+      env: fixtureEnv,
     });
   try {
     git('init', '--quiet', '--initial-branch=main');
@@ -142,7 +157,11 @@ test('CLI fails the exact head and the head merged into a moved base', () => {
       {
         cwd: root,
         encoding: 'utf8',
-        env: { PATH: '/nonexistent', WORKFLOW_BUDGET_YAML: 'yq' },
+        env: {
+          ...fixtureEnv,
+          PATH: '/nonexistent',
+          WORKFLOW_BUDGET_YAML: 'yq',
+        },
       }
     );
     assert.equal(noTool.status, 0, noTool.stdout + noTool.stderr);
@@ -162,7 +181,11 @@ test('the workflow load guard runs from a trusted-base extraction (JOV-8840)', (
   const guardRoot = mkdtempSync(join(tmpdir(), 'workflow-budget-guard-'));
   const guard = join(guardRoot, 'scripts', 'workflow-expression-budget.mjs');
   const git = (...args) =>
-    execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+    execFileSync('git', args, {
+      cwd: root,
+      encoding: 'utf8',
+      env: fixtureEnv,
+    }).trim();
   const write = text => {
     mkdirSync(join(root, '.github/workflows'), { recursive: true });
     writeFileSync(join(root, '.github/workflows/ci.yml'), text);
@@ -173,7 +196,7 @@ test('the workflow load guard runs from a trusted-base extraction (JOV-8840)', (
       encoding: 'utf8',
       // The guard root has no node_modules up-tree, so js-yaml resolves
       // through NODE_PATH exactly as it does in a workspace checkout.
-      env: { ...process.env, NODE_PATH: resolve('node_modules') },
+      env: { ...fixtureEnv, NODE_PATH: resolve('node_modules') },
     });
   try {
     mkdirSync(join(guardRoot, 'scripts'), { recursive: true });
