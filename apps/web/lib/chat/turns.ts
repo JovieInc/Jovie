@@ -1,4 +1,6 @@
 import { and, asc, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
+import { runAfterResponse } from '@/lib/customer-voice/after-response';
+import { isFeedbackTurn } from '@/lib/customer-voice/classify';
 import { db } from '@/lib/db';
 import {
   type ChatMessage,
@@ -392,6 +394,27 @@ export async function reserveChatTurn(input: {
     .update(chatConversations)
     .set({ updatedAt: now })
     .where(eq(chatConversations.id, conversationId));
+
+  // Customer voice: a complaint, price pushback, bug or ask in chat reaches
+  // Tim by iMessage with a drafted reply (lib/customer-voice). Optional and
+  // after the response; never affects the turn.
+  if (input.audience === 'customer' && isFeedbackTurn(input.userMessage)) {
+    const userMessage = input.userMessage;
+    const userId = input.userId;
+    const surface = `${String(input.source).replaceAll('_', ' ')} chat`;
+    runAfterResponse(async () => {
+      const { captureCustomerVoice } = await import(
+        '@/lib/customer-voice/capture.server'
+      );
+      await captureCustomerVoice({
+        channel: 'chat',
+        text: userMessage,
+        receivedAt: now,
+        userId,
+        surface,
+      });
+    });
+  }
 
   // JOV-4514: durable work record for the conversation. Idempotent —
   // attaches to the existing record on retries and covers both the
