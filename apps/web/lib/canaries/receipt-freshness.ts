@@ -3,7 +3,7 @@ export const CANARY_RECEIPT_MAX_AGE_MS = 26 * 60 * 60_000;
 const CLOCK_SKEW_MS = 60_000;
 
 type CanaryReceipt = { readonly runAt: string } | null;
-type CanaryId = 'auth-signup-onboarding' | 'public-profile';
+type CanaryId = 'auth-signup-onboarding' | 'public-profile' | 'release-email';
 type StaleReceipt = {
   readonly id: CanaryId;
   readonly reason: 'missing' | 'invalid' | 'future' | 'stale';
@@ -27,7 +27,11 @@ export function assertCanaryReceiptsFresh(
 ): { checkedAt: string; receipts: Array<{ id: CanaryId; runAt: string }> } {
   const failures: StaleReceipt[] = [];
   const receipts: Array<{ id: CanaryId; runAt: string }> = [];
-  for (const id of ['auth-signup-onboarding', 'public-profile'] as const) {
+  for (const id of [
+    'auth-signup-onboarding',
+    'public-profile',
+    'release-email',
+  ] as const) {
     const report = reports[id];
     if (!report) {
       failures.push({ id, reason: 'missing' });

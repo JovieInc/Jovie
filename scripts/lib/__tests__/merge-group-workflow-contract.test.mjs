@@ -458,7 +458,7 @@ describe('merge_group workflow contract', () => {
     expect(admission).toContain('needs: [ci-path-changes]');
     expect(admission).toContain("github.event_name == 'merge_group'");
     expect(admission).toContain(
-      'runs-on: [self-hosted, Linux, X64, jovie-fixed]'
+      'runs-on: ${{ vars.MERGE_GATE_POOL == \'fixed\' && fromJSON(\'["self-hosted","Linux","X64","jovie-fixed"]\') || \'ubuntu-latest\' }}'
     );
     expect(admission).toContain('timeout-minutes: 75');
     expect(admission).not.toContain('sleep "$wait_s"');
@@ -4258,6 +4258,41 @@ describe('resolveMergeGroupPathDiff coalesced heads (JOV-4905)', () => {
       files: ['apps/web/product.ts'],
       baseSha: rootSha,
       headSha,
+    });
+  });
+
+  it('widens a stacked head to the entries ahead of it (HEADGREEN, #23600)', () => {
+    const { seed, rootSha } = createFixture();
+    git(seed, ['update-ref', 'refs/remotes/origin/main', rootSha]);
+    git(seed, ['switch', '-q', '-c', 'queue']);
+    const entryAhead = writeAndCommit(
+      seed,
+      'apps/web/components/site/MarketingFooter.tsx',
+      'export const footer = 1;\n',
+      'entry ahead'
+    );
+    const headSha = writeAndCommit(
+      seed,
+      'docs/ci/memo.md',
+      'docs only\n',
+      'docs-only head'
+    );
+
+    const result = resolveMergeGroupPathDiff({
+      git: createGitRunner(seed),
+      eventBaseSha: entryAhead,
+      eventHeadSha: headSha,
+      fetchLiveMain: false,
+    });
+
+    expect(result).toMatchObject({
+      source: 'live_main_merge_base',
+      isNoop: false,
+      baseSha: rootSha,
+      files: [
+        'apps/web/components/site/MarketingFooter.tsx',
+        'docs/ci/memo.md',
+      ],
     });
   });
 

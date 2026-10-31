@@ -92,6 +92,28 @@ export function isNextStepPayload(
   );
 }
 
+/**
+ * Whether the transcript's latest completed `proposeNextStep` decision is
+ * terminal (`waitlist` or `instant_access`). Mirrors the claim route's
+ * `deriveTerminalDecisionKind`: such a transcript is waiting on a claim
+ * handoff, so a restored copy must claim on mount instead of waiting for a
+ * turn the visitor has no reason to send.
+ */
+export function endsInTerminalNextStep(
+  messages: readonly UIMessage[]
+): boolean {
+  for (const message of messages.toReversed()) {
+    for (const part of getToolParts(message).toReversed()) {
+      if (getToolName(part) !== 'proposeNextStep') continue;
+      if (part.state !== 'output-available') continue;
+      if (!isNextStepPayload(part.output)) continue;
+      const kind = part.output.decision?.kind;
+      return kind === 'waitlist' || kind === 'instant_access';
+    }
+  }
+  return false;
+}
+
 export function isCheckoutPayload(
   output: unknown
 ): output is CheckoutCardPayload {

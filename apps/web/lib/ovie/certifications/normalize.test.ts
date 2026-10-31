@@ -78,6 +78,69 @@ describe('normalizeKernelCertificationRow', () => {
     }
   );
 
+  it('maps the golden-path lifecycle state only when the summary carries one (JOV-9625)', () => {
+    const goldenPathDogfood = (
+      id: string,
+      status: 'passed' | 'failed' | 'blocked',
+      summary: string
+    ) => ({
+      id,
+      tier: 'runtime_dogfood' as const,
+      status,
+      sourceSha: FIXTURE_SHA,
+      ref: 'prod-golden-path',
+      digest: null,
+      summary,
+    });
+    const certified = fixturePacket('golden-certified', {
+      operational: {
+        runtimeDogfood: [
+          goldenPathDogfood(
+            'prod-golden-path:landing:abcdef01',
+            'passed',
+            'state=certified; 6 production checks passed as anonymous'
+          ),
+        ],
+      },
+    });
+    const certifiedRow = normalizeKernelCertificationRow({
+      domain: 'flows',
+      surface: 'Landing',
+      packet: certified,
+      admission: evaluateCertificationAdmission({ packet: certified }),
+      decisions: [],
+      auditHistory: [],
+      updatedAt: FIXTURE_NOW,
+    });
+    expect(certifiedRow.goldenPathState).toBe('certified');
+
+    const failed = fixturePacket('golden-failed', {
+      operational: {
+        runtimeDogfood: [
+          goldenPathDogfood(
+            'prod-golden-path:chat:abcdef01',
+            'failed',
+            'Failed on production: first-reply (timeout after 60s)'
+          ),
+        ],
+      },
+    });
+    const failedRow = normalizeKernelCertificationRow({
+      domain: 'flows',
+      surface: 'In-app chat first reply',
+      packet: failed,
+      admission: evaluateCertificationAdmission({ packet: failed }),
+      decisions: [],
+      auditHistory: [],
+      updatedAt: FIXTURE_NOW,
+    });
+    // A failed/blocked receipt carries no `state=` marker, so the row must
+    // not report a lifecycle state at all — 'missing' is reserved for a
+    // surface with no receipt, never for an exercised failure (JOV-9625).
+    expect('goldenPathState' in failedRow).toBe(false);
+    expect(failedRow.goldenPathState).toBeUndefined();
+  });
+
   it('projects a review-ready packet into a decidable row bound to the kernel digest', () => {
     const packet = fixturePacket('signup');
     const row = fixtureRow('signup');

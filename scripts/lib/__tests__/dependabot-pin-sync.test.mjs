@@ -248,6 +248,7 @@ describe('Dependabot Pin Sync workflow', () => {
   it('runs only after Source Validation, never in merge_group or on PR code events', () => {
     expect(Object.keys(workflow.on)).toEqual(['workflow_run']);
     expect(workflow.on.workflow_run).toEqual({
+      branches: ['dependabot/npm_and_yarn/**'],
       workflows: ['Source Validation'],
       types: ['completed'],
     });
