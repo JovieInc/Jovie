@@ -156,6 +156,12 @@
       "command": ["node", "scripts/invariants/shell-ia.mjs"],
       "requires": ["scripts/invariants/shell-ia.mjs"],
       "remediation": "Render navigation through the registered shell chrome; the raw nav/aside baseline only shrinks (JOV-INV-047)."
+    },
+    {
+      "id": "postmortem-class-actions",
+      "command": ["node", "scripts/postmortem-review.mjs", "--check"],
+      "requires": ["scripts/postmortem-review.mjs"],
+      "remediation": "A post-mortem made a failure class recurring: add it to docs/postmortems/failure-class-actions.json with its class-action issue."
     }
   ],
   "exempt": [
