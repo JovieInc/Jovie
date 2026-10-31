@@ -39,6 +39,7 @@
     {"id": "workflow:design-governance", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/design-governance.yml"},
     {"id": "workflow:desktop-release", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/desktop-release.yml"},
     {"id": "workflow:doc-gardening-agent", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/doc-gardening-agent.yml"},
+    {"id": "workflow:dsp-dial-e2e", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/dsp-dial-e2e.yml"},
     {"id": "workflow:e2e-full-matrix", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/e2e-full-matrix.yml"},
     {"id": "workflow:eve-pilot", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/eve-pilot.yml"},
     {"id": "workflow:fixed-runner-canary", "kind": "workflow", "owner": "gem-hostops", "status": "active", "ref": ".github/workflows/fixed-runner-canary.yml"},
