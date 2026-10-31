@@ -980,7 +980,8 @@ def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
     the failed jobs' error lines the fixer is shown. Preserve a command that exits nonzero
     for the failed run: `gh run view --log-failed` only displays logs and exits successfully.
     Repair PRs require this evidence; agents forget it (45 of 138 Fleet Rules failures on
-    2026-10-25) and the lane already has it. None when no red check names a run."""
+    2026-10-25) and the lane already has it. Conflict-only repairs use observed git merge
+    failure output instead. None without a red run or an observed merge failure."""
     for check in pr.get("statusCheckRollup") or []:
         if str(check.get("conclusion") or "").lower() not in RED_CONCLUSIONS:
             continue
@@ -998,6 +999,18 @@ def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
             f"- Failing command: `gh run watch {run_url.rsplit('/', 1)[-1]} --repo {REPO} --exit-status`",
             f"- Failing run (before fix): {run_url}", "",
             "```text", *lines, "```", "", RED_BLOCK_MARKER])
+    # Conflict-only repairs have no failed CI run. Require both the observed
+    # git merge failure and a conflicting PR state; a label alone is not red proof.
+    observed = str(excerpt or "").splitlines()
+    conflicts = [line for line in observed if re.fullmatch(r"CONFLICT \([^)]+\): .+", line)]
+    if (pr.get("mergeable") == "CONFLICTING" or pr.get("mergeStateStatus") == "DIRTY") and conflicts and (
+            "Automatic merge failed; fix conflicts and then commit the result." in observed):
+        return "\n".join([
+            "## Red-before-green", "",
+            "- Failing command: `git merge origin/main --no-edit`", "",
+            "```text", *conflicts[:25],
+            "Automatic merge failed; fix conflicts and then commit the result.",
+            "```", "", RED_BLOCK_MARKER])
     return None
 
 

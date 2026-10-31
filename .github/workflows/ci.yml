@@ -552,6 +552,8 @@ jobs:
       run_golden_eval_set: ${{ steps.detect.outputs.run_golden_eval_set || 'false' }}
       run_e2e: ${{ steps.detect.outputs.run_e2e || 'false' }}
       run_golden_path: ${{ steps.detect.outputs.run_golden_path || 'false' }}
+      # Empty (run the model review) unless the diff touched no UI files; see detect step.
+      golden_path_no_ui_diff: ${{ steps.detect.outputs.golden_path_no_ui_diff || '' }}
       # JOV-5960: selects the source-lane visual snapshot compare on homepage
       # PRs so a skipped compare can never read as green there.
       run_homepage_visual: ${{ steps.homepage-visual.outputs.run_homepage_visual || 'false' }}
@@ -977,6 +979,9 @@ jobs:
           else
             echo "run_golden_path=false" >> "$GITHUB_OUTPUT"
           fi
+
+          # No UI file changed: skip the paid golden-path model review (empty = review runs)
+          echo "$CHANGED_FILES" | grep -q -E '^(apps/web/(app|components|styles|public)/|apps/web/.*\.(css|scss|tsx)$|packages/ui/)' || echo "golden_path_no_ui_diff=true" >> "$GITHUB_OUTPUT"
 
           # Drizzle paths
           DRIZZLE_PATTERN='^(apps/web/drizzle/|apps/web/lib/db/|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts))'
@@ -6750,7 +6755,7 @@ jobs:
       # the auth/billing journey evidence, which is built from the journey step.
       - name: Review golden-path keyframes (visual verdict)
         id: visual_review
-        if: ${{ !cancelled() && steps.canonical_journey.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.canonical_journey.outcome == 'success' && needs.ci-path-changes.outputs.golden_path_no_ui_diff != 'true' }}
         run: |
           cd "$GITHUB_WORKSPACE"
           # JOV-5489: recorded visual review of the golden-path keyframes. A

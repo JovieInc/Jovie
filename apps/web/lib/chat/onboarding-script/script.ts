@@ -22,6 +22,8 @@ import {
   ONBOARDING_OPENER_PRIMARY,
   ONBOARDING_WAITLIST_RECEIPT,
 } from '@/lib/chat/prompts/onboarding';
+import type { SegmentScope } from '@/lib/creator/segment-registry';
+import { MUSIC_SEGMENTS } from '@/lib/creator/segments';
 
 export type ScriptStepId =
   | 'greet'
@@ -48,10 +50,27 @@ export interface ScriptLine {
   readonly stepId: ScriptStepId;
   readonly variant: string;
   readonly text: string;
+  /**
+   * Segment scope (JOV-9679). Omitted means untagged legacy copy: shown until
+   * a non-matching segment is resolved, then dropped. Use 'neutral' for lines
+   * safe for every creator.
+   */
+  readonly segments?: SegmentScope;
 }
 
-function line(stepId: ScriptStepId, variant: string, text: string): ScriptLine {
-  return { key: `${stepId}:${variant}`, stepId, variant, text };
+function line(
+  stepId: ScriptStepId,
+  variant: string,
+  text: string,
+  segments?: SegmentScope
+): ScriptLine {
+  return {
+    key: `${stepId}:${variant}`,
+    stepId,
+    variant,
+    text,
+    ...(segments ? { segments } : {}),
+  };
 }
 
 export const SCRIPT_LINES: readonly ScriptLine[] = [
@@ -134,12 +153,26 @@ export const SCRIPT_LINES: readonly ScriptLine[] = [
   line(
     'clarify',
     'v1',
-    'Give me the artist name, or paste the Spotify link. I will take it from there.'
+    'Give me the artist name, or paste the Spotify link. I will take it from there.',
+    MUSIC_SEGMENTS
+  ),
+  line(
+    'clarify',
+    'v2',
+    'Tell me your name, or paste a link to your work. I will take it from there.',
+    'neutral'
   ),
   line(
     'faq_what',
     'v1',
-    'Jovie builds an artist profile from your Spotify data and keeps it current. Pick the artist, claim a handle, and the page takes shape.'
+    'Jovie builds an artist profile from your Spotify data and keeps it current. Pick the artist, claim a handle, and the page takes shape.',
+    MUSIC_SEGMENTS
+  ),
+  line(
+    'faq_what',
+    'v2',
+    'Jovie builds your profile from the accounts you connect and keeps it current. Claim a handle, and the page takes shape.',
+    'neutral'
   ),
   line(
     'faq_price',

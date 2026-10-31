@@ -133,8 +133,11 @@ test.describe('Homepage', () => {
         String(HOMEPAGE_FAN_STATES_COPY.states.length)
       );
       for (const state of HOMEPAGE_FAN_STATES_COPY.states) {
+        // hasText is a substring match and every caption body contains the
+        // word "listen", so filter on the title's exact text instead (the
+        // title span is the only element whose full text equals it).
         const item = gallery.getByRole('listitem').filter({
-          hasText: state.title,
+          has: page.getByText(state.title, { exact: true }),
         });
         await item.scrollIntoViewIfNeeded();
         await expect(item).toBeVisible();
