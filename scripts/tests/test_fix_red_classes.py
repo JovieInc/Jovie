@@ -38,6 +38,18 @@ class ClassifyTest(unittest.TestCase):
         self.assertEqual(got["files"], ["scripts/a.test.mjs", "scripts/b.test.mjs"])
         self.assertEqual(got["checks"], ["Source Validation"])
 
+    def test_unwired_guard_error_outranks_quota_and_infra_fixture_output(self):
+        log = (
+            "echo 'github-quota-deferred; Fleet rule evidence is missing'\n"
+            "✔ handles API rate limit exceeded and HTTP 503\n"
+            "AssertionError: Unwired: scripts/lib/__tests__/tooling-health.test.mjs. "
+            "Wire each file into a ci-fast lane\n"
+            "##[error]script-contracts failed (exit 1); read its output above.\n"
+        )
+        got = classes.classify(pr("Source Validation"), {"Source Validation": log})
+        self.assertEqual((got["cls"], got["action"]), ("ci-fast-wiring", "wire-ci-fast"))
+        self.assertEqual(got["files"], ["scripts/lib/__tests__/tooling-health.test.mjs"])
+
     def test_mixed_classes_go_to_the_model_and_behind_branches_sync_main(self):
         mixed = classes.classify(pr("A", "B"), {"A": "API rate limit exceeded", "B": "AssertionError"})
         self.assertEqual((mixed["cls"], mixed["action"]), ("mixed", "agent"))
