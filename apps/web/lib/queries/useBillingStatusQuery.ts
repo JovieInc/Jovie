@@ -48,7 +48,7 @@ async function fetchBillingStatus({
   return {
     isPro,
     // Effective plan: also corrects stale cached payloads that carry a raw plan.
-    plan: getEffectivePlan(payload?.plan, isPro),
+    plan: payload?.plan ? getEffectivePlan(payload.plan, isPro) : null,
     hasStripeCustomer: Boolean(payload?.stripeCustomerId),
     stripeSubscriptionId: payload?.stripeSubscriptionId ?? null,
     stale: Boolean(payload?._stale),
