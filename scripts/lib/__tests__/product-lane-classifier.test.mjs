@@ -112,6 +112,19 @@ describe('product lane classifier', () => {
     ).toThrow(ProductLaneClassificationError);
   });
 
+  it('routes the mesh hub worker through the web gate, which runs its typecheck and tests', () => {
+    const receipt = classifyProductLanes([
+      'workers/mesh-hub/src/index.ts',
+      'workers/mesh-hub/src/core.test.mjs',
+      'workers/mesh-hub/package.json',
+      'workers/mesh-hub/wrangler.toml',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['web']);
+    expect(() =>
+      classifyProductLanes(['workers/mesh-hub-other/src/index.ts'])
+    ).toThrow(ProductLaneClassificationError);
+  });
+
   it('routes the prod-liveness probe worker through operations, not a product lane', () => {
     const receipt = classifyProductLanes([
       'workers/prod-liveness/.gitignore',
