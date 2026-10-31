@@ -1134,6 +1134,7 @@ test('ejection re-enrollment admits bots within bounds and preserves human deque
     reason: 'manual',
     actor: { __typename: 'Bot', login: 'jovie-bot[bot]' },
   };
+  /** @type {Array<[typeof removal, number, number]>} */
   const cases = [
     [removal, 1, 1],
     [{ ...removal, actor: { __typename: 'User', login: 'tim' } }, 1, 0],
