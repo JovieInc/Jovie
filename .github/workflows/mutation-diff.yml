@@ -13,7 +13,9 @@ name: Mutation Diff
 # when Stryker itself breaks, so a dead harness cannot pass as a clean run.
 # Not a merge-queue required check: it does not run on pull requests.
 #
-# Hosted-by-default (2026-10-26): every job here runs on GitHub-hosted ubuntu-latest. The repo
+# Gem-only (2026-10-29, Tim, test-quality loop): every job runs on the Gem self-hosted jovie-fixed pool because
+# hosted CI is saturated. Superseded the hosted-by-default note below, kept for the load history.
+# Hosted-by-default (2026-10-26, superseded): every job here ran on GitHub-hosted ubuntu-latest. The repo
 # is public, so hosted minutes are free and concurrency is ~120; Stryker on the gem pool held the
 # machine at load 25-50 on 16 cores (mutation processes ~10 cores plus their vitest workers) and
 # starved the shipping lanes. The rolling sweep keeps its per-module score state in an Actions
@@ -72,7 +74,7 @@ jobs:
   mutate:
     name: Mutate changed high-risk source
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'diff' && github.ref == 'refs/heads/main')
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 45
     permissions:
       contents: read
@@ -106,7 +108,12 @@ jobs:
         env:
           CI: 'true'
           FILES: ${{ steps.files.outputs.files }}
-        run: node scripts/mutation-diff.mjs --files "$FILES" --summary "$GITHUB_STEP_SUMMARY"
+          STRYKER_CONCURRENCY: '1'
+          MUTATION_MAX_LOAD: '8'
+        run: |
+          # Off-peak only: skip (not fail) while Gem's 5-minute load is 8 or more.
+          if ! node scripts/mutation-sweep-preflight.mjs; then echo "Gem busy; diff mutation skipped."; exit 0; fi
+          node scripts/mutation-diff.mjs --files "$FILES" --summary "$GITHUB_STEP_SUMMARY"
 
       - name: Upload mutation reports
         if: ${{ always() && hashFiles('apps/web/reports/mutation/diff/*.json') != '' }}
@@ -123,7 +130,9 @@ jobs:
         (github.event_name == 'workflow_dispatch' && inputs.mode != 'diff') ||
         (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
       )
-    runs-on: ubuntu-latest
+    # Gem self-hosted runners (test-quality loop, 2026-10-29): hosted is saturated, Gem has
+    # spare cores. The preflight below still skips when Gem is short on RAM, disk or CPU.
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 120
     permissions:
       contents: read
@@ -145,9 +154,9 @@ jobs:
       - name: Check the runner has spare capacity
         id: capacity
         env:
-          # A hosted runner is dedicated to this job: its load is its own and it has ~14 GB free disk.
-          MUTATION_MAX_LOAD: '1000'
-          MUTATION_MIN_DISK_GB: '5'
+          # Off-peak only (2026-10-29): run only when Gem's 5-minute load is below 8. Gated on load, not a clock.
+          MUTATION_MAX_LOAD: '8'
+          MUTATION_MIN_DISK_GB: '15'
         run: |
           set +e
           node scripts/mutation-sweep-preflight.mjs
@@ -174,6 +183,8 @@ jobs:
         if: steps.capacity.outputs.run == 'true'
         env:
           CI: 'true'
+          STRYKER_CONCURRENCY: '1'
+          MUTATION_MAX_LOAD: '8'
           MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'sweep' }}
           MAX_FILES: ${{ github.event_name == 'workflow_dispatch' && inputs.max_files || (github.event_name == 'workflow_run' && '4') || '6' }}
         run: |
@@ -183,7 +194,12 @@ jobs:
           # Runners share one HOME; serialize on the state file.
           exec 9>"$state_dir/sweep.lock"
           flock -n 9 || { echo "Another sweep holds the state lock; skipping."; exit 0; }
+          # Rank modules by how high-touch they are (tier weight + git churn) so the sweep
+          # expands from billing, auth and the golden path outward.
+          git fetch --quiet --unshallow origin main 2>/dev/null || git fetch --quiet --depth=2000 origin main
+          node scripts/test-quality-loop.mjs rank --out "$RUNNER_TEMP/ranked.json" --top 0
           nice -n 19 node scripts/mutation-sweep.mjs \
+            --touch-file "$RUNNER_TEMP/ranked.json" \
             --state "$state_dir/sweep-state.json" \
             --mode "$MODE" --max-files "$MAX_FILES" --max-minutes 90 \
             --summary "$GITHUB_STEP_SUMMARY" \
