@@ -342,7 +342,7 @@ describe('OnboardingShell status', () => {
     expect(signIn).toHaveFocus();
   });
 
-  it('reports a failed chat start without verification jargon or error codes', () => {
+  it('never dead-ends a failed bot check: the chat sends on the unverified path', () => {
     render(<OnboardingShell sessionLabel='pending' />);
 
     act(() => {
@@ -352,11 +352,8 @@ describe('OnboardingShell status', () => {
       });
     });
 
-    const alert = screen.getByText(
-      "We couldn't start your chat. Refresh the page to try again."
-    );
-    expect(alert).toHaveAttribute('role', 'alert');
-    expect(alert.textContent).not.toMatch(/verification failed|\(\d+\)/i);
+    expect(screen.queryByText(/couldn.t start your chat/i)).toBeNull();
+    expect(chatProps.current?.turnstileToken).toBe('jv-unverified:error');
   });
 
   it('passes headerOverlay to the chat while the visitor is anonymous (JOV-7192)', () => {

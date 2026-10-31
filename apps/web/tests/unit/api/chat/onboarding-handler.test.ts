@@ -103,6 +103,17 @@ vi.mock('@/lib/auth/better-auth', () => ({
   auth: { api: { getSession: hoisted.getBetterAuthSessionMock } },
 }));
 
+// Fail-open bot check: unverified starts are denied unless a test grants
+// the unverified budget.
+const botCheck = vi.hoisted(() => ({
+  admit: vi.fn(),
+  record: vi.fn(),
+}));
+vi.mock('@/lib/turnstile/onboarding-bot-check.server', () => ({
+  admitUnverifiedOnboardingStart: botCheck.admit,
+  recordOnboardingBotCheck: botCheck.record,
+}));
+
 vi.mock('@/lib/turnstile/verify', () => ({
   isTurnstileConfigured: hoisted.isTurnstileConfiguredMock,
   verifyTurnstileToken: hoisted.verifyTurnstileTokenMock,
@@ -225,7 +236,87 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     );
     hoisted.appUserMock.mockResolvedValue(null);
     hoisted.findConversationMock.mockResolvedValue(null);
+    botCheck.admit.mockResolvedValue({ admitted: false, reason: 'ip_budget' });
     installDefaultDbMocks();
+  });
+
+  describe('fail-open bot check', () => {
+    async function firstMessage(turnstileToken?: string) {
+      vi.resetModules();
+      stubRuntimeEnv({ nodeEnv: 'production', vercelEnv: 'production' });
+      // Kill switch on: the scripted reply answers, so no LLM is needed.
+      hoisted.checkGateForUserMock.mockResolvedValue(true);
+      hoisted.isTurnstileConfiguredMock.mockReturnValue(true);
+      hoisted.verifyTurnstileTokenMock.mockResolvedValue(
+        turnstileToken === 'real-token'
+          ? { success: true }
+          : { success: false, reason: 'missing_token' }
+      );
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      return tryHandleAnonymousOnboardingChat(
+        makeRequest({
+          mode: 'onboarding',
+          ...(turnstileToken ? { turnstileToken } : {}),
+          messages: [userMessage('hi')],
+        }),
+        'req-fail-open'
+      );
+    }
+
+    it('admits a widget failure on the unverified budget without siteverify', async () => {
+      botCheck.admit.mockResolvedValue({ admitted: true, reason: 'admitted' });
+      const result = await firstMessage('jv-unverified:error');
+      expect(result?.status).toBe(200);
+      expect(hoisted.verifyTurnstileTokenMock).not.toHaveBeenCalled();
+      expect(botCheck.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          outcome: 'degraded',
+          reason: 'client_error',
+          clientStatus: 'error',
+        })
+      );
+    });
+
+    it('admits a missing token on the unverified budget', async () => {
+      botCheck.admit.mockResolvedValue({ admitted: true, reason: 'admitted' });
+      const result = await firstMessage();
+      expect(result?.status).toBe(200);
+      expect(botCheck.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          outcome: 'degraded',
+          reason: 'missing_token',
+        })
+      );
+    });
+
+    it('returns the retryable check once the unverified budget is spent', async () => {
+      botCheck.admit.mockResolvedValue({
+        admitted: false,
+        reason: 'global_budget',
+      });
+      const result = await firstMessage('jv-unverified:unsupported');
+      expect(result?.status).toBe(403);
+      await expect(result?.json()).resolves.toMatchObject({
+        errorCode: 'TURNSTILE_REQUIRED',
+      });
+      expect(botCheck.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          outcome: 'denied',
+          reason: 'client_unsupported:global_budget',
+        })
+      );
+    });
+
+    it('never charges the unverified budget for a verified token', async () => {
+      const result = await firstMessage('real-token');
+      expect(result?.status).toBe(200);
+      expect(botCheck.admit).not.toHaveBeenCalled();
+      expect(botCheck.record).toHaveBeenCalledWith(
+        expect.objectContaining({ outcome: 'verified' })
+      );
+    });
   });
 
   it.each([

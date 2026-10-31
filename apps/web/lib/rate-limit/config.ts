@@ -47,9 +47,15 @@ const ALBUM_ART_GENERATION_BURST_LIMIT = parseIntEnv(
 // Rate Limiter Configurations
 // ============================================================================
 
-/**
- * All rate limiter configurations in the application
- */
+const UNVERIFIED_ONBOARDING_LIMIT = {
+  window: '1 h',
+  analytics: false,
+  algorithm: 'fixed-window',
+  trafficClass: 'anonymous',
+  requireRedis: true,
+} as const;
+
+/** All rate limiter configurations in the application */
 export const RATE_LIMITERS = {
   // ---------------------------------------------------------------------------
   // Authentication & User Operations
@@ -210,6 +216,20 @@ export const RATE_LIMITERS = {
     trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
+  /** Fail-open /start: fresh chats whose Turnstile check failed, per IP. */
+  anonymousOnboardingChatUnverifiedIp: {
+    name: 'Anonymous Onboarding Chat (Unverified, IP)',
+    limit: 4,
+    prefix: 'anon_onb_chat_unverified_ip',
+    ...UNVERIFIED_ONBOARDING_LIMIT,
+  } satisfies RateLimitConfig,
+  /** Global hourly AI cost ceiling on unverified fresh chats. */
+  anonymousOnboardingChatUnverifiedGlobal: {
+    name: 'Anonymous Onboarding Chat (Unverified, Global)',
+    limit: 120,
+    prefix: 'anon_onb_chat_unverified_global',
+    ...UNVERIFIED_ONBOARDING_LIMIT,
+  } satisfies RateLimitConfig,
   /** Anonymous onboarding chat: 20 messages per hour per IP */
   anonymousOnboardingChatIp: {
     name: 'Anonymous Onboarding Chat (IP)',

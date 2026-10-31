@@ -42,6 +42,11 @@ const DEFAULT_RESULT_FILES = (
     required: true,
   },
   {
+    name: 'synthetic-start-chat',
+    path: 'apps/web/test-results/synthetic-start-chat-results.json',
+    required: true,
+  },
+  {
     name: 'synthetic-legacy-otp',
     path: 'apps/web/test-results/synthetic-legacy-otp-results.json',
     required: legacyCanaryEnabled,

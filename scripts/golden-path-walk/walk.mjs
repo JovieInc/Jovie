@@ -17,7 +17,6 @@
 // teardown releases shared-pool artist bindings held by canary accounts
 // (same contract as releaseGoldenPathTestBindings). Run it from a host other
 // than your workstation if you walk often: anonymous chat is 20 msgs/IP/hour.
-import { createHmac, hkdfSync, randomBytes } from 'node:crypto';
 import {
   mkdirSync,
   readdirSync,
@@ -28,6 +27,7 @@ import {
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { installPassageRoute } from '../synthetic-passage-mint.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WEB = process.env.WEB_ROOT ?? resolve(HERE, '../../apps/web');
@@ -66,32 +66,6 @@ const POOL = [
 mkdirSync(join(OUT, 'dom'), { recursive: true });
 mkdirSync(join(OUT, 'video'), { recursive: true });
 
-const passageKey = Buffer.from(
-  hkdfSync(
-    'sha256',
-    process.env.CRON_SECRET,
-    'jovie-synthetic-passage',
-    'jovie.synthetic-passage/v1',
-    32
-  )
-);
-function mint(scp) {
-  const iat = Math.floor(Date.now() / 1000);
-  const claims = {
-    sub: email,
-    scp,
-    iat,
-    exp: iat + 600,
-    jti: randomBytes(18).toString('base64url'),
-    run,
-  };
-  const body = Buffer.from(JSON.stringify(claims)).toString('base64url');
-  const sig = createHmac('sha256', passageKey)
-    .update(`jsp1.${body}`)
-    .digest()
-    .toString('base64url');
-  return `jsp1.${body}.${sig}`;
-}
 const sql = neon(process.env.DATABASE_URL);
 async function otp(startedAt) {
   const id = `sign-in-otp-${email}`;
@@ -113,22 +87,12 @@ const context = await browser.newContext({
 });
 const t0 = Date.now();
 const page = await context.newPage();
-let token = mint('onboarding_chat');
-let mintedAt = Date.now();
-await page.route('**/*', async route => {
-  const req = route.request();
-  if (new URL(req.url()).origin !== ORIGIN) return route.continue();
-  if (Date.now() - mintedAt > 240000) {
-    token = mint('onboarding_chat');
-    mintedAt = Date.now();
-  }
-  return route.continue({
-    headers: {
-      ...req.headers(),
-      'x-jovie-synthetic-passage': token,
-      'x-synthetic-monitoring': 'prod-cert',
-    },
-  });
+await installPassageRoute(page, {
+  origin: ORIGIN,
+  rootSecret: process.env.CRON_SECRET,
+  sub: email,
+  run,
+  extraHeaders: { 'x-synthetic-monitoring': 'prod-cert' },
 });
 await context
   .addCookies([
