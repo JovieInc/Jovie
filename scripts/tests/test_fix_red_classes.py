@@ -149,6 +149,68 @@ class NarrowedPreflightMergeTest(unittest.TestCase):
         self.assertIsNone(classes.merge_narrowed_guard_command(self.OURS, self.THEIRS.replace("vitest run", "vitest watch")))
 
 
+class AdditiveQuotedListMergeTest(unittest.TestCase):
+    def test_unions_quoted_entries_and_rejects_unknown_hunks(self):
+        text = (
+            "export const TESTS = Object.freeze([\n"
+            "  'scripts/lib/__tests__/external-api-guard.test.mjs',\n"
+            "<<<<<<< HEAD\n"
+            "  'scripts/lib/__tests__/api-budget.test.mjs',\n"
+            "=======\n"
+            "  'scripts/lib/__tests__/model-id-guard.test.mjs',\n"
+            "  'scripts/lib/__tests__/ai-call-guard.test.mjs',\n"
+            ">>>>>>> origin/main\n"
+            "  'scripts/lib/__tests__/domain-write-guard.test.mjs',\n"
+            "]);\n"
+        )
+        resolved = classes.resolve_additive_quoted_list_text(text)
+        self.assertEqual(resolved, (
+            "export const TESTS = Object.freeze([\n"
+            "  'scripts/lib/__tests__/external-api-guard.test.mjs',\n"
+            "  'scripts/lib/__tests__/model-id-guard.test.mjs',\n"
+            "  'scripts/lib/__tests__/ai-call-guard.test.mjs',\n"
+            "  'scripts/lib/__tests__/api-budget.test.mjs',\n"
+            "  'scripts/lib/__tests__/domain-write-guard.test.mjs',\n"
+            "]);\n"
+        ))
+        self.assertIsNone(classes.resolve_additive_quoted_list_text(text.replace(
+            "  'scripts/lib/__tests__/api-budget.test.mjs',\n",
+            "limitations. Keep the goal.\n",
+        )))
+        self.assertIsNone(classes.merge_additive_quoted_entries("", "  'scripts/a.test.mjs',\n"))
+
+
+class AdditiveIdentifierListMergeTest(unittest.TestCase):
+    def test_unions_slug_lines_and_rejects_unknown_hunks(self):
+        text = (
+            "Other scoped rules: ci-branching, event-driven, infra, linear, motion,\n"
+            "<<<<<<< HEAD\n"
+            "pr-stacking, swarm, hermes-air, rate-limits.\n"
+            "=======\n"
+            "pr-stacking, swarm, hermes-air, anti-slop.\n"
+            ">>>>>>> origin/main\n"
+            "Company domain canon: [index](canon/README.md).\n"
+        )
+        resolved = classes.resolve_additive_identifier_list_text(text)
+        self.assertEqual(resolved, (
+            "Other scoped rules: ci-branching, event-driven, infra, linear, motion,\n"
+            "pr-stacking, swarm, hermes-air, anti-slop, rate-limits.\n"
+            "Company domain canon: [index](canon/README.md).\n"
+        ))
+        self.assertIsNone(classes.resolve_additive_identifier_list_text(text.replace(
+            "pr-stacking, swarm, hermes-air, rate-limits.\n",
+            "keep both sides' intent.\n",
+        )))
+        self.assertIsNone(classes.merge_additive_identifier_list(
+            "swarm, pr-stacking.\n",
+            "pr-stacking, swarm.\n",
+        ))
+        self.assertIsNone(classes.merge_additive_identifier_list(
+            "pr-stacking, swarm\n",
+            "pr-stacking, swarm.\n",
+        ))
+
+
 class AndChainMergeTest(unittest.TestCase):
     OURS = (
         "node scripts/run-affected-tests.mjs --control && "

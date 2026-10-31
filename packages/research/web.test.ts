@@ -212,10 +212,11 @@ describe('rendering', () => {
         ],
       })
     );
-    expect(text.split('\n')[1]).toContain('PRIOR DECISIONS');
+    expect(text).toContain('DEGRADED:');
+    expect(text).toContain('PRIOR DECISIONS');
     expect(text).toContain('skipped: exa:cap dailyUsd 1');
     expect(renderResult(sampleResult({ hits: [] }))).toContain(
-      'No relevant results'
+      'No verified external evidence'
     );
   });
 });

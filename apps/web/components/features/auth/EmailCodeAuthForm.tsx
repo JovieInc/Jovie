@@ -389,8 +389,12 @@ export function EmailCodeAuthForm({
         <p
           className={`text-app text-secondary-token ${align === 'left' ? 'text-left' : 'text-center'}`}
         >
-          Enter the code sent to{' '}
-          <span className='break-all font-medium text-primary-token'>
+          Enter the code sent to
+          <span
+            data-auth-email-address
+            title={emailAddress.trim()}
+            className='block max-w-full truncate whitespace-nowrap font-medium text-primary-token'
+          >
             {emailAddress.trim()}
           </span>
         </p>

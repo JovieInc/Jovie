@@ -33,6 +33,7 @@ import {
   scanConcentricSwift,
   semanticDeclarations,
   swiftColor,
+  trustedPaintCeiling,
 } from './native-design-system.mjs';
 
 const manifest = JSON.parse(readFileSync(resolve(ROOT, MANIFEST), 'utf8'));
@@ -449,6 +450,68 @@ test('the selected source gate goes red on wrong native paint/token bypass and g
     );
     writeFileSync(themePath, theme);
     assert.deepEqual(checkNativeDesign(root), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// The first-introduction branch of trustedPaintCeiling ran only when the CI
+// checkout's merge-base happened to lack the paint-debt file, so coverage of
+// this file (95% floor) passed or failed by checkout, not by code (2026-10-31:
+// 91.9% on some PRs, green on others). Exercise both branches explicitly.
+test('trusted paint ceiling measures an immutable base without a paint-debt file, and reads it when present', () => {
+  const root = mkdtempSync(join(tmpdir(), 'jovie-native-ceiling-'));
+  const git = args => {
+    const result = spawnSync('git', args, {
+      cwd: root,
+      encoding: 'utf8',
+      timeout: 10000,
+    });
+    assert.equal(result.status, 0, result.stderr);
+  };
+  try {
+    const swift = 'apps/ios/Jovie/Feature/View.swift';
+    mkdirSync(dirname(resolve(root, swift)), { recursive: true });
+    writeFileSync(
+      resolve(root, swift),
+      'import SwiftUI\nlet tint = Color(red: 1, green: 0, blue: 0)\n'
+    );
+    mkdirSync(resolve(root, 'apps/ios/Jovie/DesignSystem'), {
+      recursive: true,
+    });
+    writeFileSync(
+      resolve(root, 'apps/ios/Jovie/DesignSystem/JovieTheme.swift'),
+      'let x = Color(red: 0, green: 0, blue: 0)\n'
+    );
+    git(['init', '-q']);
+    git(['config', 'user.name', 'Native fixture']);
+    git(['config', 'user.email', 'fixture@invalid']);
+    git(['config', 'commit.gpgsign', 'false']);
+    git(['add', '.']);
+    git(['commit', '-qm', 'base without paint debt']);
+    git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    const fixtureManifest = {
+      ...manifest,
+      paintDebt: 'apps/ios/paint-debt.json',
+    };
+    const measured = trustedPaintCeiling(root, fixtureManifest);
+    const keys = Object.keys(measured);
+    assert.equal(keys.length, 1);
+    assert.match(
+      keys[0],
+      /^apps\/ios\/Jovie\/Feature\/View\.swift :: let tint/
+    );
+
+    writeFileSync(
+      resolve(root, fixtureManifest.paintDebt),
+      JSON.stringify({ identities: { 'pinned :: line': 2 } })
+    );
+    git(['add', '.']);
+    git(['commit', '-qm', 'paint debt introduced']);
+    git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    assert.deepEqual(trustedPaintCeiling(root, fixtureManifest), {
+      'pinned :: line': 2,
+    });
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

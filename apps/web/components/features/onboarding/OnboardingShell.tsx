@@ -2,7 +2,7 @@
 
 // @coverage-via apps/web/tests/unit/onboarding/OnboardingShell.sign-in-placement.test.tsx
 
-import { Button, Link as JovieLink, Skeleton } from '@jovie/ui';
+import { Button, Link as JovieLink } from '@jovie/ui';
 import type { UIMessage } from 'ai';
 import NextLink from 'next/link';
 import {
@@ -78,6 +78,14 @@ export interface OnboardingShellProps {
 export function buildEntryProfileBuilderState(
   entryProfile: StartEntryProfile | null | undefined
 ): OnboardingProfileBuilderState {
+  // An open name still seeds the draft panel (Pen R6As7U): the visitor sees
+  // jov.ie/<handle> taking shape before the first message.
+  if (entryProfile?.status === 'available') {
+    return {
+      ...EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
+      handle: entryProfile.handle,
+    };
+  }
   if (entryProfile?.status !== 'claimable') {
     return EMPTY_ONBOARDING_PROFILE_BUILDER_STATE;
   }
@@ -338,7 +346,7 @@ export function OnboardingShell({
               />
               <OnboardingShellStatus
                 kind='status'
-                message='Linking your conversation...'
+                message='Saving this conversation to your account…'
                 visible={isLinking}
               />
               <OnboardingShellStatus
@@ -434,7 +442,7 @@ export function OnboardingIdentityConflict({
   );
 }
 
-function OnboardingShellStatus({
+export function OnboardingShellStatus({
   kind,
   message,
   visible,
@@ -452,12 +460,13 @@ function OnboardingShellStatus({
         role='status'
         aria-live='polite'
         aria-busy='true'
-        data-testid='onboarding-linking-skeleton'
+        data-testid='onboarding-linking-status'
       >
-        <div className='flex h-3.5 w-44'>
-          <Skeleton className='flex-1' rounded='md' />
-        </div>
-        <span className='sr-only'>{message}</span>
+        {/* Words, not a bare skeleton bar: a wordless placeholder after sign-up
+            read as a stuck load (2026-10-31 golden-path walk). */}
+        <span className='text-xs leading-5 text-secondary-token'>
+          {message}
+        </span>
       </div>
     );
   }

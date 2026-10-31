@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { type ReactNode, useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildEntryProfileBuilderState,
   OnboardingShell,
+  OnboardingShellStatus,
 } from './OnboardingShell';
 
 vi.mock('@/components/organisms/AppShellFrame', () => ({
@@ -361,7 +362,7 @@ describe('OnboardingShell status', () => {
     expect(screen.getByTestId('onboarding-profile-rail')).toBeInTheDocument();
   });
 
-  it('keeps the rail hidden for an open handle with no page yet', () => {
+  it('shows the draft profile for an open handle from the first paint (Pen R6As7U)', () => {
     render(
       <OnboardingShell
         sessionLabel='pending'
@@ -369,9 +370,11 @@ describe('OnboardingShell status', () => {
       />
     );
 
+    const rail = screen.getByTestId('onboarding-profile-rail');
     expect(
-      screen.queryByTestId('onboarding-profile-rail')
-    ).not.toBeInTheDocument();
+      within(rail).getByRole('heading', { name: 'Your Draft Profile' })
+    ).toBeInTheDocument();
+    expect(within(rail).getByText('jov.ie/newartist')).toBeInTheDocument();
   });
 
   it('keeps the profile preview in the chat main rather than the shell overlay', () => {
@@ -466,6 +469,17 @@ describe('buildEntryProfileBuilderState (JOV-7753)', () => {
     ).toBeNull();
     expect(buildEntryProfileBuilderState(null).artist).toBeNull();
   });
+
+  it('seeds the draft panel with an open handle before the first message (Pen R6As7U)', () => {
+    expect(
+      buildEntryProfileBuilderState({ status: 'available', handle: 'timwhite' })
+    ).toEqual({
+      artist: null,
+      artistConfirmed: false,
+      handle: 'timwhite',
+      socialLinks: [],
+    });
+  });
 });
 
 // JOV-7973: the /start shell pane must clip without owning a programmatically
@@ -485,5 +499,22 @@ describe('OnboardingShell route pane (JOV-7973)', () => {
 
     expect(source).toContain("contentClassName='overflow-clip!'");
     expect(source).not.toContain("contentClassName='overflow-hidden!'");
+  });
+});
+
+describe('OnboardingShellStatus (2026-10-31 golden-path walk)', () => {
+  it('shows the status in words, never a bare skeleton bar', () => {
+    render(
+      <OnboardingShellStatus
+        kind='status'
+        message='Saving this conversation to your account…'
+        visible
+      />
+    );
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent(
+      'Saving this conversation to your account…'
+    );
+    expect(status.querySelector('.sr-only')).toBeNull();
   });
 });

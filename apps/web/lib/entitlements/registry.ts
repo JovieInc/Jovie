@@ -492,7 +492,7 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
       {
         // Fan email capture is uncapped on every plan; contactsLimit only
         // applies to saved team/press/booking contacts (creatorContactPeople).
-        name: 'Fan email capture',
+        name: 'Audience email capture',
         free: 'Unlimited',
         pro: 'Unlimited',
         max: 'Unlimited',
@@ -504,7 +504,7 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
         max: 'Unlimited',
       },
       {
-        name: 'Release notifications (email to fans)',
+        name: 'Release notifications (email to your audience)',
         free: false,
         pro: true,
         max: true,
@@ -632,6 +632,18 @@ export function hasAdvancedFeatures(plan: string | null | undefined): boolean {
 /** Display name for UI. */
 export function getPlanDisplayName(plan: string | null | undefined): string {
   return getEntitlements(plan).marketing.displayName;
+}
+
+/**
+ * The plan a user is actually entitled to right now. A stored paid `plan`
+ * without an active entitlement (`isPro` false) is Free, so no surface can
+ * print a paid plan name next to a Free state.
+ */
+export function getEffectivePlan(
+  plan: string | null | undefined,
+  isPro: boolean
+): string {
+  return isPro && plan ? plan : 'free';
 }
 
 /** All valid plan IDs. */

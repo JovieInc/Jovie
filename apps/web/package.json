@@ -246,6 +246,7 @@
   },
   "dependencies": {
     "@ai-sdk/gateway": "^4.0.117",
+    "@ai-sdk/openai-compatible": "3.0.26",
     "@ai-sdk/react": "^4.0.148",
     "@better-auth/oauth-provider": "1.7.6",
     "@better-auth/passkey": "1.7.11",
