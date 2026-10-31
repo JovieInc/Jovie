@@ -41,7 +41,9 @@ describe('workers inventory', () => {
       },
     });
     expect(errors.join('\n')).toMatch(/has source in git now/);
-    expect(errors.join('\n')).toMatch(/gone: listed as unversioned but not deployed/);
+    expect(errors.join('\n')).toMatch(
+      /gone: listed as unversioned but not deployed/
+    );
   });
 
   it('an unreadable Cloudflare listing throws instead of reading green', async () => {
@@ -49,7 +51,11 @@ describe('workers inventory', () => {
       fetchDeployedWorkers({
         accountId: 'a',
         token: 't',
-        fetchImpl: async () => ({ ok: false, status: 403, json: async () => ({ success: false }) }),
+        fetchImpl: async () => ({
+          ok: false,
+          status: 403,
+          json: async () => ({ success: false }),
+        }),
       })
     ).rejects.toThrow(/workers-list-unreadable/);
   });
