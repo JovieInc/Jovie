@@ -1,0 +1,7 @@
+{
+  "schema": "company.tracker-registry/v1",
+  "app": "jovie-web",
+  "note": "Pointer: Jovie's tracker registry is canon/privacy/tracker-registry.json (PR #23958). When that PR lands, move it here or point privacy.registry at it; one source of truth.",
+  "first_party_domains": ["jov.ie"],
+  "vendors": []
+}

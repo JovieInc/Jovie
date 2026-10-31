@@ -1,0 +1,32 @@
+{
+  "schema": "company.buyer-calibration/v1",
+  "note": "From gbrain decisions/company/buyer-eval-gate-2026-10-31 (rubric v2, prod 3299d79). Walk run directories live in ~/.local/state/jovie-buyer-eval/walks/<id>.",
+  "holdouts": [
+    {
+      "id": "waitlisted-onboarding-10-29",
+      "expect": "no_pay",
+      "why": "$12 ask while waitlisted, fans copy",
+      "walk": "holdout-waitlisted-onboarding"
+    },
+    {
+      "id": "invite-invalid-waitlist-error",
+      "expect": "no_pay",
+      "why": "invite invalid then waitlist error frames",
+      "walk": "holdout-invite-invalid"
+    },
+    {
+      "id": "signup-blank-restoring",
+      "expect": "no_pay",
+      "why": "signup into a blank Restoring screen",
+      "walk": "holdout-restoring"
+    },
+    {
+      "id": "placeholder-preview",
+      "expect": "no_pay",
+      "why": "polished but hollow preview with a placeholder handle",
+      "walk": "holdout-placeholder-preview"
+    }
+  ],
+  "controls": [{ "persona": "control-link-in-bio", "expect": "no_pay" }],
+  "positiveCanaries": []
+}
