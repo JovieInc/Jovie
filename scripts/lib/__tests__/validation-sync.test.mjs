@@ -1012,6 +1012,11 @@ describe('batched closed-pull snapshot (repo quota, 2026-10-30)', () => {
     const fetchImpl = async url => {
       const href = String(url);
       requested.push(href);
+      // A Link header carries an absolute URL; the client must never request
+      // it with the API origin prepended a second time.
+      if (/^https:\/\/api\.github\.com\/https?:/i.test(href)) {
+        throw new Error(`doubled API origin: ${href}`);
+      }
       if (href.endsWith('page=1')) {
         return page(
           [
@@ -1031,6 +1036,9 @@ describe('batched closed-pull snapshot (repo quota, 2026-10-30)', () => {
       repository: REPO,
     });
     expect(requested).toHaveLength(2);
+    expect(requested[1]).toBe(
+      'https://api.github.com/repos/JovieInc/Jovie/pulls?state=closed&sort=updated&direction=desc&per_page=100&page=2'
+    );
     expect(snapshot.size).toBe(4);
     expect(snapshot.get(101)).toMatchObject({
       merged: true,

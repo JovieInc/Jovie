@@ -268,6 +268,18 @@ function nextPageLink(link) {
 }
 
 /**
+ * The GitHub client takes an API path, while a Link header carries an
+ * absolute URL. Return the path so the next page is not requested as
+ * `https://api.github.com/https://api.github.com/...` (a 404 that would
+ * silently degrade the snapshot to its fallback after one page).
+ * @param {string} url
+ * @returns {string}
+ */
+function apiPathFromLinkUrl(url) {
+  return String(url).replace(/^https:\/\/api\.github\.com\//i, '');
+}
+
+/**
  * One bounded listing that answers whether the pull requests Linear attaches
  * to lifecycle issues are merged, without a per-issue `pulls/N` read. A full
  * sweep re-reads every attachment number otherwise; unmerged pulls are never
@@ -321,7 +333,7 @@ export async function readClosedPullSnapshot(input) {
     }
     const next = nextPageLink(link);
     if (!next) break;
-    path = next;
+    path = apiPathFromLinkUrl(next);
   }
   return snapshot;
 }
