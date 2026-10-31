@@ -174,3 +174,38 @@ describe('PWA install within the shared dock', () => {
     ).toHaveBeenCalledOnce();
   });
 });
+
+it('suppresses a what-is-new entry whose action the user already completed', async () => {
+  const claimEntry = {
+    ...entry,
+    id: '2026-10-16',
+    title: 'Choose your Jovie link',
+  };
+  const fetchImpl = vi.fn(async () =>
+    Response.json({
+      version: 1,
+      changelogUrl: '/changelog',
+      entries: [claimEntry],
+    })
+  );
+  const { unmount } = render(
+    <SidebarDockBridge
+      {...props}
+      fetchImpl={fetchImpl}
+      userState={{ hasClaimedHandle: false }}
+    />
+  );
+  expect(await screen.findByRole('link')).toBeInTheDocument();
+  unmount();
+
+  render(
+    <SidebarDockBridge
+      {...props}
+      fetchImpl={fetchImpl}
+      userState={{ hasClaimedHandle: true }}
+    />
+  );
+  await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(2));
+  await new Promise(resolve => setTimeout(resolve, 50));
+  expect(screen.queryByRole('link')).toBeNull();
+});

@@ -69,6 +69,21 @@ describe('ProfileHomeRail', () => {
     expect(screen.queryByTestId('profile-home-carousel')).toBeNull();
   });
 
+  it('does not fake a release card from streaming destinations alone', () => {
+    render(
+      <ProfileHomeRail
+        artist={PROFILE_STORY_ARTIST}
+        tourDates={[]}
+        hasPlayableDestinations
+        renderMode='preview'
+        isSubscribed={false}
+      />
+    );
+
+    expect(screen.queryByTestId('profile-pac')).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Listen now' })).toBeNull();
+  });
+
   it('features the newest playable release, not a far-future one', () => {
     render(
       <ProfileHomeRail

@@ -519,16 +519,18 @@ export function OpportunityInboxPageClient({
           </div>
           <div className='mb-4' data-testid='opportunity-inbox-notes'>
             {notes.length === 0 ? (
-              <Button
-                ref={notesButtonRef}
-                size='sm'
-                variant='ghost'
-                aria-expanded={notesOpen}
-                aria-controls='opportunity-inbox-notes-panel'
-                onClick={() => setNotesOpen(open => !open)}
-              >
-                {notesOpen ? 'Hide Notes' : 'Add Notes'}
-              </Button>
+              <div className='flex justify-center'>
+                <Button
+                  ref={notesButtonRef}
+                  size='sm'
+                  variant='ghost'
+                  aria-expanded={notesOpen}
+                  aria-controls='opportunity-inbox-notes-panel'
+                  onClick={() => setNotesOpen(open => !open)}
+                >
+                  {notesOpen ? 'Hide Notes' : 'Add Notes'}
+                </Button>
+              </div>
             ) : null}
             <div
               id='opportunity-inbox-notes-panel'
