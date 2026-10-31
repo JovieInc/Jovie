@@ -1072,6 +1072,16 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
         visible = re.sub(r"<!--[\s\S]*?-->", "", updated)
         if not re.search(r"^#{1,6}\s+Locked areas\s*$", visible, re.I | re.M):
             updated = updated.rstrip("\n") + f"\n\n## Locked areas\n\nLocking PR: #{locking_pr}\n"
+        else:
+            lines = updated.split("\n")
+            start = next(i for i, line in enumerate(lines)
+                         if re.fullmatch(r"#{1,6}\s+Locked areas\s*", line, re.I))
+            end = next((i for i in range(start + 1, len(lines)) if ANY_HEADING.match(lines[i])), len(lines))
+            # Templates can already contain an empty heading. Fill it using
+            # caller-supplied provenance; retain any existing decision verbatim.
+            if not re.sub(r"<!--[\s\S]*?-->", "", "\n".join(lines[start + 1:end])).strip():
+                lines.insert(start + 1, f"\nLocking PR: #{locking_pr}\n")
+                updated = "\n".join(lines)
     return updated
 
 

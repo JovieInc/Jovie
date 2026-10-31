@@ -3184,6 +3184,26 @@ console.log(JSON.stringify(JSON.parse(readFileSync(0, 'utf8')).map(body =>
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
                 events.repair_evidence_body(self.PR, body, locking_pr=invalid)
 
+    def test_explicit_locking_pr_fills_empty_section_without_duplicating_it(self):
+        for empty in ("", "\n", "<!-- Add provenance here. -->\n"):
+            body = (events.red_before_green_block(self.PR) + "\n## Locked areas\n" + empty
+                    + "\n## Test plan\nKeep these checks.\n")
+            with self.subTest(empty=empty):
+                updated = events.repair_evidence_body(self.PR, body, locking_pr=22331)
+                self.assertIn("Locking PR: #22331\n", updated)
+                self.assertEqual(updated.count("## Locked areas"), 1)
+                self.assertIn("## Test plan\nKeep these checks.\n", updated)
+                self.assertEqual(events.repair_evidence_body(self.PR, updated, locking_pr=22331), updated)
+                checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+console.log(JSON.stringify(evaluateFleetRules({
+  pr: {title: 'fix: repair evidence', body: readFileSync(0, 'utf8')},
+  files: [{filename: 'scripts/lib/external-api-guard.ratchet.gen.json', status: 'modified'}],
+}).errors));
+"""], cwd=ROOT, input=updated, text=True, capture_output=True, check=True)
+                self.assertEqual(json.loads(checked.stdout), [])
+
     def test_public_decision_round_trips_without_comment_injection(self):
         decision = {"releaseWorthy": True, "text": "Choose a link --> continue"}
         updated = events.repair_evidence_body(self.PR, "Summary", customer_decision=decision)
