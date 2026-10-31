@@ -870,7 +870,9 @@ export function OnboardingSocialLinkCard({
             />
           </OnboardingToolField>
           <p className='mt-1.5 text-xs leading-5 text-secondary-token'>
-            {parseHint ?? host ?? 'Paste the full URL fans already use.'}
+            {parseHint ??
+              host ??
+              'Paste the full profile URL, like instagram.com/yourname.'}
           </p>
           {onAttachAccount ? (
             <Button
