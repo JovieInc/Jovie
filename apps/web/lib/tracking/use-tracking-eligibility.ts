@@ -94,7 +94,14 @@ export function useTrackingEligibility(
     let unsubscribe: (() => void) | undefined;
     const attach = () => {
       unsubscribe?.();
-      unsubscribe = globalThis.JVConsent?.onChange(() => {
+      const consentEvents = (
+        globalThis as typeof globalThis & {
+          JVConsent?: {
+            onChange: (cb: (value: unknown) => void) => () => void;
+          };
+        }
+      ).JVConsent;
+      unsubscribe = consentEvents?.onChange(() => {
         // Unmount cannot revoke opaque SDK listeners; discard that document.
         liveDecision = undefined;
         resetTrackingDocument();
