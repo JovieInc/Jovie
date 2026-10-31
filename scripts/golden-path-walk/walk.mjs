@@ -33,7 +33,10 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const WEB = process.env.WEB_ROOT ?? resolve(HERE, '../../apps/web');
 const require = createRequire(process.env.PW_BASE ?? join(WEB, 'package.json'));
 const { chromium } = require('playwright');
-const { neon } = require('@neondatabase/serverless');
+// Resolved from apps/web at runtime (createRequire above); a variable keeps the
+// scripts typecheck from resolving it against the repo root.
+const NEON_MODULE = '@neondatabase/serverless';
+const { neon } = require(NEON_MODULE);
 
 const ORIGIN = process.env.ORIGIN ?? 'https://jov.ie';
 const OUT = process.env.OUT ?? join(process.cwd(), `run-${Date.now()}`);
