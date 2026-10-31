@@ -1,0 +1,260 @@
+{
+  "files": {
+    "apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailPasteForm.tsx": {
+      "disabled-submit": 1
+    },
+    "apps/web/app/[username]/[slug]/download/PromoDownloadGate.tsx": {
+      "email-capture": 1
+    },
+    "apps/web/app/app/(shell)/admin/investors/links/InvestorLinksManager.tsx": {
+      "email-capture": 1
+    },
+    "apps/web/app/app/(shell)/dashboard/profile/ProfilePageChat.tsx": {
+      "icon-tile": 2
+    },
+    "apps/web/app/app/(shell)/profiles/AddConnectionRail.tsx": {
+      "icon-tile": 3
+    },
+    "apps/web/app/app/(shell)/profiles/ProfilesWorkspace.tsx": {
+      "icon-tile": 2
+    },
+    "apps/web/app/billing/cancel/page.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/app/desktop-auth/DesktopAuthCodeForm.tsx": {
+      "disabled-submit": 1
+    },
+    "apps/web/app/error/user-creation-failed/page.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/app/out/[id]/InterstitialClient.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/app/out/[id]/page.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/app/report/ReportForm.tsx": {
+      "email-capture": 1
+    },
+    "apps/web/components/atoms/IconBadge.tsx": {
+      "icon-tile-comp": 1
+    },
+    "apps/web/components/atoms/VerifiedBadge.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/admin/BulkDeleteCreatorDialog.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/admin/DeleteCreatorDialog.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/admin/SendInviteDialog.tsx": {
+      "icon-tile": 1,
+      "email-capture": 1
+    },
+    "apps/web/components/features/admin/contacts-table/AdminContactsTable.tsx": {
+      "disabled-submit": 1
+    },
+    "apps/web/components/features/admin/ingest-profile-dropdown/IngestProfileDropdown.tsx": {
+      "disabled-submit": 1
+    },
+    "apps/web/components/features/admin/leads/GrowthIntakeComposer.tsx": {
+      "disabled-submit": 1
+    },
+    "apps/web/components/features/admin/outreach/DmQueueCard.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/alerts/AlertGrowthLanding.tsx": {
+      "email-capture": 1
+    },
+    "apps/web/components/features/auth/EmailCodeAuthForm.tsx": {
+      "disabled-submit": 2
+    },
+    "apps/web/components/features/dashboard/atoms/PlatformPill.parts.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/dashboard/atoms/link-actions/LinkActions.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/dashboard/dashboard-pay/DashboardPay.tsx": {
+      "icon-tile": 3
+    },
+    "apps/web/components/features/dashboard/insights/InsightCategoryIcon.tsx": {
+      "icon-tile-comp": 2
+    },
+    "apps/web/components/features/dashboard/molecules/DspMatchCard.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/dashboard/molecules/ProfilePaySurface.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/dashboard/molecules/universal-link-input/MultiLinkPasteDialog.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/dashboard/organisms/DashboardFeedbackModal.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/dashboard/organisms/EarningsTab.tsx": {
+      "icon-tile": 2
+    },
+    "apps/web/components/features/dashboard/organisms/SettingsAdPixelsSection.tsx": {
+      "disabled-submit": 1
+    },
+    "apps/web/components/features/dashboard/organisms/SettingsSmsAccessSection.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/dashboard/organisms/account-settings/ConnectedAccountsCard.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/dashboard/organisms/account-settings/EmailManagementCard.tsx": {
+      "email-capture": 1
+    },
+    "apps/web/components/features/dashboard/organisms/artist-selection-form/ArtistSelectionForm.tsx": {
+      "disabled-submit": 1
+    },
+    "apps/web/components/features/dashboard/organisms/dashboard-activity-feed/DashboardActivityFeed.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/dashboard/organisms/dsp-matches/ConfirmMatchDialog.tsx": {
+      "icon-tile": 2
+    },
+    "apps/web/components/features/dashboard/organisms/dsp-presence/AddPlatformDialog.tsx": {
+      "disabled-submit": 1
+    },
+    "apps/web/components/features/dashboard/organisms/dsp-presence/DspPresenceSidebar.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/dashboard/organisms/dsp-presence/DspPresenceTable.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/dashboard/organisms/jovie-work-feed/JovieWorkFeed.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/dashboard/organisms/onboarding-v2/OnboardingV2Form.tsx": {
+      "icon-tile": 2
+    },
+    "apps/web/components/features/dashboard/organisms/onboarding/OnboardingNameStep.tsx": {
+      "disabled-submit": 1
+    },
+    "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/ProfileAboutTab.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/SuggestedDspMatches.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseProviderMatrixNotices.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/SmartLinkGateBanner.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/dashboard/organisms/shopify/ShopifyStoreCard.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/dashboard/organisms/tour-dates/TourDatesEmptyState.tsx": {
+      "icon-tile": 2
+    },
+    "apps/web/components/features/dashboard/organisms/tour-dates/TourDatesManager.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/dashboard/tasks/TaskListRow.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/dashboard/youtube/ChannelIntelligencePanel.tsx": {
+      "icon-tile": 2
+    },
+    "apps/web/components/features/dashboard/youtube/RevivalQueuePanel.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/dashboard/youtube/YouTubeChannelPilotPanel.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/home/HeroSpotifySearch.tsx": {
+      "icon-tile": 2
+    },
+    "apps/web/components/features/library-share/LibrarySharePassphraseGate.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/library/LibraryFilesPanel.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/profile/artist-notifications-cta/ProfileMobileNotificationsFlow.tsx": {
+      "icon-tile": 2
+    },
+    "apps/web/components/features/profile/pac/ProfilePacCard.tsx": {
+      "email-capture": 1
+    },
+    "apps/web/components/features/release/ReleaseAudioAssetPanel.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/waitlist/WaitlistOutcomeView.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/features/waitlist/WaitlistSpotifySearch.tsx": {
+      "icon-tile": 3
+    },
+    "apps/web/components/jovie/components/ChatAlbumArtSwipeReview.tsx": {
+      "icon-tile": 2
+    },
+    "apps/web/components/jovie/components/ChatMerchCard.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/jovie/components/FeatureIntroCard.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/jovie/components/FeedbackForm.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/marketing/MarketingStoryPrimitives.tsx": {
+      "icon-tile": 2
+    },
+    "apps/web/components/marketing/artist-profile/ArtistProfileSpecWall.tsx": {
+      "icon-tile": 3
+    },
+    "apps/web/components/molecules/AvatarProgressRing.tsx": {
+      "icon-tile": 3
+    },
+    "apps/web/components/organisms/CreateProfileDialog.tsx": {
+      "disabled-submit": 1
+    },
+    "apps/web/components/organisms/PersistentAudioBar.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/organisms/WrappedLinkMissingState.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/organisms/billing/BillingHistorySection.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/organisms/billing/GrowthAccessRequestModal.tsx": {
+      "icon-tile": 2
+    },
+    "apps/web/components/organisms/home-loop/HomeLoopAsks.tsx": {
+      "disabled-submit": 2
+    },
+    "apps/web/components/organisms/media-canvas/MediaCanvasViewer.tsx": {
+      "icon-tile": 3
+    },
+    "apps/web/components/organisms/release-sidebar/ReleaseSidebarSections.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/organisms/release-sidebar/TrackSidebar.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/shell/DrawerHero.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/shell/EntityThreadGlyph.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/components/shell/SidebarBottomNowPlaying.tsx": {
+      "icon-tile": 1
+    },
+    "apps/web/lib/design-studio/registry.tsx": {
+      "icon-tile": 2
+    }
+  }
+}

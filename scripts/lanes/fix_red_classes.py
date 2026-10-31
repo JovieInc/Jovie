@@ -29,10 +29,12 @@ from atomic_state import atomic_write_text
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REPAIR_FETCH_STUB, AGENT = (
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, REPAIR_FETCH_STUB, AGENT = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "merge-narrowed-preflight", "repair-fetch-stub", "agent")
-DETERMINISTIC = frozenset({RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REPAIR_FETCH_STUB})
+    "merge-narrowed-preflight", "register-domain-writes", "repair-fetch-stub", "agent")
+DETERMINISTIC = frozenset({
+    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED,
+    REGISTER_DOMAIN, REPAIR_FETCH_STUB})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -51,6 +53,14 @@ BODY_TEXT = re.compile(r"red-before-green:|PR body is missing|missing (?:a )?`?#
 INTERNAL_CHANGELOG_NOTE = '<!-- customer-changelog/v1 {"releaseWorthy":false} -->'
 CHANGELOG_MISSING = re.compile(r"Customer outcome decision missing or invalid \(missing-metadata\)")
 CHANGELOG_QUOTA_READ = re.compile(r"github-quota-deferred: PR metadata read hit GitHub")
+# Design-surface census throws this when a canonical digest no longer matches the
+# source bytes. Main renews that certification. A red required check reports
+# BLOCKED, so the BEHIND fallback never runs and a model is sent to rewrite a
+# digest main already owns. Sync main instead. This pattern is checked before
+# platform text: the same Source Validation log contains passing-test rate-limit
+# lines. A branch that already contains main fails update-branch and still
+# reaches a model, which is the only path that may renew a digest the PR owns.
+CENSUS_CERTIFICATION = re.compile(r"source changed; renew certification evidence")
 # Armed spacing ratchet (spacing-scale-ratchet.test.ts). The count grew because a
 # PR added a 10px/14px utility. Snap those added utilities; do not raise the floor.
 SPACING_RATCHET_TEXT = re.compile(
@@ -66,12 +76,22 @@ CONSERVATIVE_UTILITY = re.compile(
 SNAP_STEP = {"2.5": "2", "3.5": "3"}
 SPACING_SCAN_PREFIXES = ("apps/web/app/", "apps/web/components/", "packages/ui/")
 NON_PRODUCT_SPACING = re.compile(r"\.(?:test|spec|stories)\.[tj]sx?$")
-# Source Validation's merge probe. Only this one file has a deterministic union:
-# both sides append to the same NARROWED vitest command. Any other path stays a model fix.
+# Source Validation's merge probe. The NARROWED vitest command has its own union.
+# Any conflict hunk whose only change is a shell && chain (node --test or vitest
+# paths, plus added prefixes) uses merge_and_chain. Any other hunk stays a model fix.
 NARROWED_PREFLIGHT = "scripts/preflight-changed.mjs"
 NARROWED_CONFLICT = re.compile(
     r"This PR conflicts with \S+ in: scripts/preflight-changed\.mjs\s*\. "
     r"Resolve the conflict \(lane-fix-conflict\)")
+# An allowed-0 direct write is a new path, not grandfathered debt. Register that
+# module. A positive cap and "lower ratchet" lines stay with the model.
+DOMAIN_WRITE = re.compile(
+    r"domain-write-guard: (?P<path>apps/web/(?:app|lib|components)/[\w./-]+\.(?:ts|tsx)) "
+    r"writes (?P<table>[A-Za-z_][A-Za-z0-9_]*) directly \d+x \(allowed 0\)")
+_DOMAIN_REGISTRY = "apps/web/lib/domain/write-registry.json"
+_EXPORT_START = re.compile(
+    r"(?m)^export\s+(?:async\s+)?(?:function|const)\s+([A-Za-z_][A-Za-z0-9_]*)\b")
+_DOMAINS_END = re.compile(r'\n    \}\n  \],\n  "agentTools":')
 _NARROWED_NOTE_PHRASES = (
     "source identity",
     "metrics-layer",
@@ -88,6 +108,9 @@ _NARROWED_HUNK = re.compile(
 _NARROWED_SIDE = re.compile(
     r"\A(?P<prefix>(?:[ \t]*command:\n)?)(?P<cindent>[ \t]*)'(?P<command>[^'\n]+)',\n"
     r"(?P<nindent>[ \t]*)note: '(?P<note>[^'\n]+)',\n?\Z")
+_AND_CHAIN_LINE = re.compile(
+    r"""^(?P<indent>[ \t]*)(?P<prefix>(?:"[^"\n]+"\s*:\s*)?)(?P<q>['"])(?P<command>[^'"\n]*&&[^'"\n]*)(?P=q)(?P<suffix>,?)\s*$""")
+_JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
 
 # scripts-typecheck (checkJs) rejects a plain {ok,status,json} double assigned to
 # typeof fetch. The diagnostic cites the file; the repair below rewrites only that shape.
@@ -107,10 +130,14 @@ FETCH_RESPONSE_STUB_OBJECT = re.compile(
 SIGNATURES = (
     ("fetch-response-stub", FETCH_RESPONSE_STUB_LOG, REPAIR_FETCH_STUB),
     ("narrowed-preflight", NARROWED_CONFLICT, MERGE_NARROWED),
+    # Before platform-infra: a Source Validation log can carry passing-test
+    # rate-limit lines beside the guard error that actually failed the job.
+    ("domain-write", DOMAIN_WRITE, REGISTER_DOMAIN),
     ("changelog-metadata", CHANGELOG_MISSING, STAMP_CHANGELOG),
     # Before platform-infra: the ratchet message includes a count such as 591,
     # and `\b5\d\d\b` would otherwise treat that count as an HTTP 5xx.
     ("spacing-scale", SPACING_RATCHET_TEXT, SNAP_SPACING),
+    ("census-certification", CENSUS_CERTIFICATION, SYNC_MAIN),
     ("quota-deferred", QUOTA_TEXT, RERUN),
     ("platform-infra", PLATFORM_TEXT, RERUN),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
@@ -192,6 +219,8 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         for name in names:
             files.extend(FETCH_RESPONSE_STUB_FILE.findall(logs.get(name) or ""))
         files = sorted({rel for rel in files if ".." not in Path(rel).parts})
+    elif cls == "domain-write":
+        files = sorted(_domain_write_hits("\n".join(logs.get(name) or "" for name in names)))
     return {"schema": SCHEMA, "cls": cls, "key": fingerprint_key(cls, names, signature), "action": action,
             "checks": names, "signature": signature, "files": files}
 
@@ -311,6 +340,184 @@ def _vitest_prefix_and_files(segment: str) -> tuple[str, list[str]] | None:
     if "vitest run" not in prefix:
         return None
     return prefix, files
+
+
+def _file_list_prefix_and_files(segment: str) -> tuple[str, list[str]] | None:
+    """A vitest invocation, or `node --test` plus test paths and nothing else."""
+    vitest = _vitest_prefix_and_files(segment)
+    if vitest:
+        return vitest
+    if not segment.startswith("node --test"):
+        return None
+    files = _NARROWED_TEST.findall(segment)
+    if not files:
+        return None
+    prefix = segment
+    for name in files:
+        prefix = re.sub(rf"(^|\s){re.escape(name)}(?=\s|$)", " ", prefix)
+    prefix = re.sub(r"\s+", " ", prefix).strip()
+    if prefix != "node --test":
+        return None
+    return prefix, files
+
+
+def _opaque_command_key(segment: str) -> tuple[str, ...]:
+    """Identity of one && segment. Flags-only commands key on the executable."""
+    tokens = segment.split()
+    if len(tokens) >= 2 and not tokens[1].startswith("-"):
+        return tokens[0], tokens[1]
+    return (tokens[0],)
+
+
+def merge_and_chain(ours: str, theirs: str) -> str | None:
+    """Union two shell `&&` chains. Base segments stay in base order, then
+    head-only segments. `node --test` and vitest paths union the same way.
+    The same script with different arguments, a changed runner, or quotes
+    returns None."""
+    ours_parts = _split_shell_and(str(ours or "").strip())
+    theirs_parts = _split_shell_and(str(theirs or "").strip())
+    if not ours_parts or not theirs_parts:
+        return None
+
+    def classify(parts: list[str]) -> tuple[list[tuple[str, list[str]]], list[str]] | None:
+        lists = []
+        opaque = []
+        seen: dict[tuple[str, ...], str] = {}
+        for part in parts:
+            parsed = _file_list_prefix_and_files(part)
+            if parsed:
+                lists.append(parsed)
+                continue
+            key = _opaque_command_key(part)
+            if seen.get(key, part) != part:
+                return None
+            seen[key] = part
+            opaque.append(part)
+        if len(lists) > 1:
+            return None
+        return lists, opaque
+
+    ours_split = classify(ours_parts)
+    theirs_split = classify(theirs_parts)
+    if not ours_split or not theirs_split:
+        return None
+    ours_lists, ours_opaque = ours_split
+    theirs_lists, theirs_opaque = theirs_split
+    if len(ours_lists) != len(theirs_lists):
+        return None
+    if ours_lists and ours_lists[0][0] != theirs_lists[0][0]:
+        return None
+    theirs_by = {_opaque_command_key(part): part for part in theirs_opaque}
+    ours_by = {_opaque_command_key(part): part for part in ours_opaque}
+    for key in set(theirs_by) & set(ours_by):
+        if theirs_by[key] != ours_by[key]:
+            return None
+    files: list[str] = []
+    merged_list = None
+    if theirs_lists:
+        for name in theirs_lists[0][1] + ours_lists[0][1]:
+            if name not in files:
+                files.append(name)
+        merged_list = f"{theirs_lists[0][0]} {' '.join(files)}"
+    result: list[str] = []
+    for segment in theirs_parts:
+        result.append(merged_list if _file_list_prefix_and_files(segment) else segment)
+    list_at = next((index for index, segment in enumerate(ours_parts) if _file_list_prefix_and_files(segment)), None)
+    for index, segment in enumerate(ours_parts):
+        if _file_list_prefix_and_files(segment) or segment in result:
+            continue
+        if merged_list and list_at is not None and index < list_at:
+            result.insert(result.index(merged_list), segment)
+        else:
+            result.append(segment)
+    return " && ".join(result)
+
+
+def _and_chain_commands(lines: list[str]) -> tuple[list[re.Match[str]], list[str]] | None:
+    found = []
+    other = []
+    for line in lines:
+        match = _AND_CHAIN_LINE.match(line)
+        if match:
+            found.append(match)
+        else:
+            other.append(line)
+    if len(found) != 1:
+        return None
+    return found, other
+
+
+def _json_key_conflicts(ours: list[str], theirs: list[str]) -> bool:
+    """Two different values for one JSON key are an edit, not an addition."""
+    theirs_by: dict[str, str] = {}
+    for line in theirs:
+        match = _JSON_KEY.match(line)
+        if match:
+            theirs_by[match.group(1)] = line
+    for line in ours:
+        match = _JSON_KEY.match(line)
+        if match and match.group(1) in theirs_by and theirs_by[match.group(1)] != line:
+            return True
+    return False
+
+
+def _resolve_and_chain_hunk(ours: str, theirs: str) -> str | None:
+    ours_parsed = _and_chain_commands(ours.splitlines())
+    theirs_parsed = _and_chain_commands(theirs.splitlines())
+    if not ours_parsed or not theirs_parsed:
+        return None
+    ours_command, ours_other = ours_parsed
+    theirs_command, theirs_other = theirs_parsed
+    ours_match, theirs_match = ours_command[0], theirs_command[0]
+    if ours_match.group("q") != theirs_match.group("q") \
+            or ours_match.group("indent") != theirs_match.group("indent") \
+            or ours_match.group("prefix") != theirs_match.group("prefix") \
+            or ours_match.group("suffix") != theirs_match.group("suffix"):
+        return None
+    if _json_key_conflicts(ours_other, theirs_other):
+        return None
+    merged = merge_and_chain(ours_match.group("command"), theirs_match.group("command"))
+    if merged is None:
+        return None
+    command_line = (
+        f"{theirs_match.group('indent')}{theirs_match.group('prefix')}"
+        f"{theirs_match.group('q')}{merged}{theirs_match.group('q')}{theirs_match.group('suffix')}")
+    lines = []
+    for line in theirs.splitlines():
+        match = _AND_CHAIN_LINE.match(line)
+        lines.append(command_line if match else line)
+    for line in ours_other:
+        if line not in lines:
+            lines.append(line)
+    ending = "\n" if ours.endswith("\n") or theirs.endswith("\n") else ""
+    return "\n".join(lines) + ending
+
+
+def resolve_and_chain_text(text: str) -> str | None:
+    """Replace conflict hunks that are only a shell `&&` chain, plus lines added
+    on one side. None when any hunk has another shape, so the caller aborts."""
+    if "<<<<<<<" not in str(text or ""):
+        return None
+    hunks = list(_NARROWED_HUNK.finditer(text))
+    if not hunks:
+        return None
+    cleared = _NARROWED_HUNK.sub("", text)
+    if "<<<<<<<" in cleared or ">>>>>>>" in cleared:
+        return None
+    pieces = []
+    last = 0
+    for hunk in hunks:
+        resolved = _resolve_and_chain_hunk(hunk.group("ours"), hunk.group("theirs"))
+        if resolved is None:
+            return None
+        pieces.append(text[last:hunk.start()])
+        pieces.append(resolved)
+        last = hunk.end()
+    pieces.append(text[last:])
+    resolved = "".join(pieces)
+    if "<<<<<<<" in resolved or ">>>>>>>" in resolved or resolved == text:
+        return None
+    return resolved
 
 
 def merge_narrowed_guard_command(ours: str, theirs: str) -> str | None:
@@ -484,6 +691,172 @@ def repair_fetch_response_stubs(root: Path, files: list[str]) -> list[str]:
         atomic_write_text(path, repaired)
         written.append(rel)
     return written
+
+
+def _domain_write_hits(log: str) -> dict[str, list[str]]:
+    """Allowed-0 guard lines, in file order. A positive cap is not a hit."""
+    hits: dict[str, list[str]] = {}
+    for match in DOMAIN_WRITE.finditer(str(log or "")):
+        tables = hits.setdefault(match.group("path"), [])
+        if match.group("table") not in tables:
+            tables.append(match.group("table"))
+    return hits
+
+
+def _writes_table(text: str, table: str, sql: object) -> bool:
+    if re.search(rf"\.(?:insert|update|delete)\(\s*(?:schema\.)?{re.escape(table)}\s*\)", text):
+        return True
+    if isinstance(sql, str) and "_" in sql and re.search(
+            rf"\b(?:insert\s+into|update|delete\s+from)\s+\"?(?:public\.)?\"?{re.escape(sql)}\b", text, re.I):
+        return True
+    return False
+
+
+def _core_tables_written(text: str, core: dict) -> set[str]:
+    return {table for table, sql in core.items() if isinstance(table, str) and _writes_table(text, table, sql)}
+
+
+def _export_spans(source: str) -> list[tuple[str, str]]:
+    found = list(_EXPORT_START.finditer(source))
+    spans = []
+    for index, match in enumerate(found):
+        end = found[index + 1].start() if index + 1 < len(found) else len(source)
+        spans.append((match.group(1), source[match.start():end]))
+    return spans
+
+
+def _domain_id(path: str) -> str | None:
+    rel = path
+    for prefix in ("apps/web/lib/", "apps/web/app/", "apps/web/components/"):
+        if rel.startswith(prefix):
+            rel = rel[len(prefix):]
+            break
+    else:
+        return None
+    rel = re.sub(r"\.(?:tsx|ts)$", "", rel)
+    parts = []
+    for part in rel.split("/"):
+        if re.fullmatch(r"\([^)]*\)", part):
+            continue
+        part = part.replace("_", "-").lower()
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", part):
+            return None
+        parts.append(part)
+    ident = ".".join(parts)
+    if not ident or not re.fullmatch(r"[a-z0-9]+(?:[.-][a-z0-9]+)*", ident):
+        return None
+    return ident
+
+
+def _domain_block(entry: dict) -> str:
+    exports = entry["exports"]
+    if len(exports) == 1:
+        exports_txt = json.dumps(exports)
+    else:
+        lines = ",\n".join(f"        {json.dumps(name)}" for name in exports)
+        exports_txt = f"[\n{lines}\n      ]"
+    return (
+        "    {\n"
+        f"      \"id\": {json.dumps(entry['id'])},\n"
+        f"      \"entity\": {json.dumps(entry['entity'])},\n"
+        f"      \"module\": {json.dumps(entry['module'])},\n"
+        f"      \"exports\": {exports_txt},\n"
+        f"      \"tables\": {json.dumps(entry['tables'])}\n"
+        "    }"
+    )
+
+
+def _domain_entry(root: Path, path: str, tables: list[str], core: dict, side: dict) -> dict | None:
+    """One registry domain for a file whose every core write is an allowed-0 export. None when a model must decide."""
+    if not re.fullmatch(r"apps/web/(?:app|lib|components)/[\w./-]+\.(?:ts|tsx)", path):
+        return None
+    if ".." in Path(path).parts or re.search(r"\.(?:test|spec|stories)\.", path):
+        return None
+    source_path = Path(root) / path
+    if not source_path.is_file():
+        return None
+    try:
+        source = source_path.read_text(errors="replace")
+    except OSError:
+        return None
+    reported = list(dict.fromkeys(tables))
+    if not reported or any(table not in core for table in reported):
+        return None
+    if _core_tables_written(source, core) != set(reported):
+        return None
+    for table in reported:
+        needed = side.get(table)
+        if isinstance(needed, list) and needed and not any(isinstance(name, str) and name in source for name in needed):
+            return None
+    exports = []
+    covered: set[str] = set()
+    for name, span in _export_spans(source):
+        written = [table for table in reported if _writes_table(span, table, core.get(table))]
+        if not written:
+            continue
+        exports.append(name)
+        covered.update(written)
+    if not exports or covered != set(reported):
+        return None
+    ident = _domain_id(path)
+    if not ident:
+        return None
+    stem = re.sub(r"\.(?:tsx|ts)$", "", Path(path).name).replace("-", " ").replace("_", " ")
+    return {"id": ident, "entity": stem, "module": path, "exports": exports, "tables": reported}
+
+
+def register_direct_domain_writes(root: Path, log: str) -> list[str]:
+    """Append a domain for each allowed-0 writer the guard names. Returns modules added.
+
+    Skips a path that is already registered, missing, written outside an export, missing a
+    required side effect, or writing a core table the log did not report. Grandfathered
+    (allowed > 0) files are never registered. The registry is inserted in place so the
+    rest of the file is not reformatted.
+    """
+    hits = _domain_write_hits(log)
+    if not hits:
+        return []
+    registry_path = Path(root) / _DOMAIN_REGISTRY
+    try:
+        text = registry_path.read_text()
+        registry = json.loads(text)
+    except (OSError, json.JSONDecodeError):
+        return []
+    domains = registry.get("domains")
+    core = registry.get("coreTables")
+    if not isinstance(domains, list) or not isinstance(core, dict):
+        return []
+    modules = {row.get("module") for row in domains if isinstance(row, dict)}
+    ids = {row.get("id") for row in domains if isinstance(row, dict)}
+    side = registry.get("sideEffects") if isinstance(registry.get("sideEffects"), dict) else {}
+    blocks = []
+    added = []
+    for path in sorted(hits):
+        if path in modules:
+            continue
+        entry = _domain_entry(Path(root), path, hits[path], core, side)
+        if entry is None or entry["id"] in ids:
+            continue
+        ids.add(entry["id"])
+        modules.add(path)
+        blocks.append(_domain_block(entry))
+        added.append(path)
+    if not blocks:
+        return []
+    match = _DOMAINS_END.search(text)
+    if not match:
+        return []
+    updated = (text[:match.start()] + "\n    },\n" + ",\n".join(blocks)
+               + '\n  ],\n  "agentTools":' + text[match.end():])
+    try:
+        parsed = json.loads(updated)
+    except json.JSONDecodeError:
+        return []
+    registered = {row.get("module") for row in parsed.get("domains") or [] if isinstance(row, dict)}
+    if not set(added) <= registered:
+        return []
+    atomic_write_text(registry_path, updated if updated.endswith("\n") else updated + "\n")
+    return added
 
 
 def wire_ci_fast(root: Path, files: list[str]) -> list[str]:

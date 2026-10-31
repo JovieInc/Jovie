@@ -58,6 +58,12 @@ export type MeshDependencies = {
   readonly keychain?: MeshKeychain;
   readonly now?: () => Date;
   readonly userAgent?: string;
+  /** `mesh watch` only: one call per new message line. */
+  readonly emit?: (line: string) => void;
+  /** `mesh watch` only: stops the loop cleanly (Ctrl-C, tests). */
+  readonly signal?: AbortSignal;
+  /** `mesh watch` only: reconnect delay seam for tests. */
+  readonly sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
 };
 
 type MeshFlags = Readonly<Record<string, string | undefined>>;
@@ -215,11 +221,19 @@ const KNOWN_CODES = new Set([
 
 async function meshRequest(
   path: string,
-  init: { method: 'GET' | 'POST'; token: string; body?: unknown },
+  init: {
+    method: 'GET' | 'POST';
+    token: string;
+    body?: unknown;
+    timeoutMs?: number;
+  },
   deps: MeshDependencies
 ): Promise<Record<string, unknown>> {
   const origin = meshOrigin(deps.env ?? process.env);
-  const signal = AbortSignal.timeout(30_000);
+  const timeout = AbortSignal.timeout(init.timeoutMs ?? 30_000);
+  const signal = deps.signal
+    ? AbortSignal.any([timeout, deps.signal])
+    : timeout;
   let response: Response;
   try {
     response = await (deps.fetchImpl ?? globalThis.fetch)(`${origin}${path}`, {
@@ -366,6 +380,123 @@ export async function meshRead(
   return { ok: true, ...result };
 }
 
+const WATCH_WAIT_SECONDS = 25;
+const WATCH_BACKOFF_START_MS = 1_000;
+const WATCH_BACKOFF_MAX_MS = 60_000;
+const WATCH_SEEN_LIMIT = 500;
+const WATCH_MIN_HOLD_MS = 2_000;
+const WATCH_FALLBACK_PAUSE_MS = 10_000;
+
+const defaultSleep = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>(resolve => {
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      { once: true }
+    );
+  });
+
+/**
+ * Hold a long-poll on the caller's own mailbox and emit one line per new
+ * message, so a Monitor wakes on stdout with no polling loop of its own. Same
+ * credentials and mailbox cursor as `mesh read`; the server holds each request
+ * (`wait`) until a message lands. Starts after the existing backlog unless
+ * `--cursor` resumes from a saved position. Reconnects with exponential backoff
+ * on transport errors and 503; auth and input errors end the watch.
+ */
+export async function meshWatch(
+  flags: MeshFlags,
+  deps: MeshDependencies = {}
+): Promise<Record<string, unknown>> {
+  const emit =
+    deps.emit ?? ((line: string) => process.stdout.write(`${line}\n`));
+  const sleep = deps.sleep ?? defaultSleep;
+  const clock = () => (deps.now?.() ?? new Date()).toISOString().slice(0, 10);
+  const credentials = await meshCredentials(flags, deps);
+  const seen = new Set<string>();
+  let day = clock();
+  let cursor: string | undefined = flags.cursor;
+  let primed = flags.cursor !== undefined;
+  let backoff = WATCH_BACKOFF_START_MS;
+  let emitted = 0;
+  const line = (message: Record<string, unknown>) =>
+    flags.json === 'true'
+      ? JSON.stringify(message)
+      : `mesh from=${String(message.senderKind)} to=${String(message.to)} id=${String(message.correlationId)} at=${String(message.receivedAt)} body=${String(message.quotedBody)}`;
+  const read = async (readDay: string, wait: number) => {
+    const query = new URLSearchParams({ day: readDay });
+    if (cursor) query.set('cursor', cursor);
+    if (wait) query.set('wait', String(wait));
+    return meshRequest(
+      `/summer/v1/mesh/mailbox?${query}`,
+      {
+        method: 'GET',
+        token: credentials.token,
+        timeoutMs: (wait + 10) * 1000,
+      },
+      deps
+    );
+  };
+  const take = (page: Record<string, unknown>, print: boolean) => {
+    const messages = Array.isArray(page.messages)
+      ? (page.messages as Record<string, unknown>[])
+      : [];
+    for (const message of messages) {
+      const id = String(message.correlationId);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      if (seen.size > WATCH_SEEN_LIMIT)
+        seen.delete(seen.values().next().value as string);
+      if (print) {
+        emit(line(message));
+        emitted++;
+      }
+    }
+    if (typeof page.nextCursor === 'string') cursor = page.nextCursor;
+    return page.hasMore === true;
+  };
+  while (!deps.signal?.aborted) {
+    try {
+      const today = clock();
+      if (today !== day) {
+        // Midnight UTC: drain what is left of the old day, then start the new one.
+        while (take(await read(day, 0), true)) if (deps.signal?.aborted) break;
+        day = today;
+        cursor = undefined;
+      }
+      if (!primed) {
+        // Skip the existing backlog: only messages that arrive after the watch starts.
+        while (take(await read(day, 0), false)) if (deps.signal?.aborted) break;
+        primed = true;
+        continue;
+      }
+      const startedAt = Date.now();
+      const page = await read(day, WATCH_WAIT_SECONDS);
+      backoff = WATCH_BACKOFF_START_MS;
+      const quiet = !Array.isArray(page.messages) || page.messages.length === 0;
+      while (take(page, true)) {
+        if (deps.signal?.aborted) break;
+        Object.assign(page, await read(day, 0));
+      }
+      // A server that ignores `wait` (not yet deployed) answers at once: never spin on it.
+      if (quiet && Date.now() - startedAt < WATCH_MIN_HOLD_MS)
+        await sleep(WATCH_FALLBACK_PAUSE_MS, deps.signal);
+    } catch (error) {
+      if (deps.signal?.aborted) break;
+      const retryable =
+        error instanceof JovieRequestError && error.retryable === true;
+      if (!retryable) throw error;
+      await sleep(backoff, deps.signal);
+      backoff = Math.min(backoff * 2, WATCH_BACKOFF_MAX_MS);
+    }
+  }
+  return { ok: true, stopped: true, emitted };
+}
+
 /**
  * Generate this agent's token locally and keep it in the keychain. Prints only
  * the registry entry (sha256), which Tim adds or another agent vouches for.
@@ -438,6 +569,7 @@ export async function meshVouch(
 export const MESH_USAGE = `Agent mesh (company agents only; needs a registered mesh token):
   mesh send <message> [--to summer|all|<kind>] [--refs JOV-1,JOV-2] [--correlation-id <id>] [--as <kind>]
   mesh read [--day YYYY-MM-DD] [--cursor <c>] [--as <kind>]
+  mesh watch [--as <kind>] [--cursor <c>] [--json]   Hold a long-poll; one line per new message (for Monitor, no polling loop)
   mesh register --kind <kind> [--owner <name>]   Create this agent's token in the keychain; prints the sha256 entry
   mesh vouch --kind <kind> --sender-id <uuid> --token-sha256 <hex> [--owner <name>] [--as <kind>]
   Credentials: JOVIE_MESH_TOKEN + JOVIE_MESH_SENDER_ID + JOVIE_MESH_SENDER_KIND, else keychain item jovie.mesh.<kind>.
@@ -458,9 +590,10 @@ export async function runMesh(
   if (arg !== undefined)
     throw new JovieInputError(`Unexpected argument for mesh ${action}.`);
   if (action === 'read') return meshRead(flags, deps);
+  if (action === 'watch') return meshWatch(flags, deps);
   if (action === 'register') return meshRegister(flags, deps);
   if (action === 'vouch') return meshVouch(flags, deps);
   throw new JovieInputError(
-    `Unknown mesh command: ${action ?? ''}. Use send, read, register, or vouch.`
+    `Unknown mesh command: ${action ?? ''}. Use send, read, watch, register, or vouch.`
   );
 }
