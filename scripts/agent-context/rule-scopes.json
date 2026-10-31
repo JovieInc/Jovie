@@ -7,7 +7,7 @@
   {
     "file": ".claude/rules/ci-branching.md",
     "paths": [".github/**", "scripts/ci-*", "scripts/lib/ci-*"],
-    "bodySha256": "5fabc1298ed53a98b1841258926c05b2a001435651388c5f414d2b3bb145bd54"
+    "bodySha256": "1223758f66e167c5b5b7d8037715f8834ac36bf0b866302087953669718a7a0c"
   },
   {
     "file": ".claude/rules/code-style.md",
@@ -177,7 +177,7 @@
       "scripts/backlog-orchestrator/**",
       ".claude/commands/qa-swarm*"
     ],
-    "bodySha256": "7cbdca7e2c0d7146e1e97cb310e271a00ee3aba4c6f3a5a06ea471e9e955d3e6"
+    "bodySha256": "b32eee913c7046abbf51b40b5601111d73e5054088d1c2150aba3827e09ddbb9"
   },
   {
     "file": ".claude/rules/testing.md",

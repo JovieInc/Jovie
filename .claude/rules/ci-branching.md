@@ -132,6 +132,17 @@ Findings still print. Local run:
 `node scripts/invariants/gate-weakening-detector.mjs --check`. Do not remove it
 from `SOURCE_GUARDS` or mark it advisory.
 
+## Open PRs with `pnpm pr:open`
+
+`pnpm pr:open open` is the one way to open a PR (`update N` repairs a body, `draft` prints
+it, `check --body-file f` gates one). It drafts the body from the diff (changelog marker, Win
+as Pending with your measured `--metric` before value, Blast radius from the changed paths,
+Locked areas from the ownership map, Red-before-green from `--failing-command/--failing-run`),
+runs the Fleet Rules, changelog, lane-classifier and coverage-plan gates locally, and refuses to
+open a failing PR. Unknown facts stay `<placeholders>` that the gate rejects; nothing is
+invented. Each run appends a verdict row to `~/.local/state/jovie-lanes/pr-open.jsonl`; the
+waste-registry metric `pr.first_push_gate_failure_rate` tracks the CI-side rate.
+
 ## Preflight before every push
 
 Run `pnpm preflight:changed` before every push (JOV-9727; also in the pre-push
