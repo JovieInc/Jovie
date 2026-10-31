@@ -1020,6 +1020,24 @@ async function fetchDashboardCoreWithSession(
       clerkUserId,
       selected.id
     ).catch((error: unknown) => {
+      // Expected transient timeouts on a fail-soft supplementary read are
+      // log-only (JOV-5754, same doctrine as the inbox-count and tipping
+      // reads): Neon cold-start PG statement timeouts, idle-in-transaction
+      // terminations, and JS-level query timeouts are infrastructure
+      // conditions, not data bugs. Drizzle names the failing statement —
+      // typically set_config('statement_timeout', $1, true) — so reporting
+      // them pages Sentry with this fingerprint (JOV-8864) instead of the
+      // graceful UNKNOWN fallback that already shipped to the user.
+      if (isQueryTimeoutError(error) || isPostgresTimeoutError(error)) {
+        logger.warn(
+          '[avatar-quality] avatar read timed out; degrading to unknown quality',
+          {
+            error: error instanceof Error ? error.message : String(error),
+          }
+        );
+        return UNKNOWN_AVATAR_QUALITY;
+      }
+
       Sentry.captureException(error, {
         level: 'warning',
         tags: {
