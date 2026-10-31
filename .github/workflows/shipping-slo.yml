@@ -91,6 +91,14 @@ jobs:
           permission-pull-requests: read
           permission-statuses: read
 
+      # Sampled hosted queue wait + control-plane spend; exit 2 = p95 > 120s
+      # alarm, which is surfaced in the report instead of failing the SLO run.
+      - name: Sample hosted runner capacity
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/ci-capacity-slo.mjs --minutes 15 --max-runs 120 >> "$GITHUB_STEP_SUMMARY" || true
+
       - name: Measure and evaluate
         id: slo
         env:

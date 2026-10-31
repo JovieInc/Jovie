@@ -44,3 +44,10 @@ runs:
       if: steps.runner-prereqs.outputs.playwright_warm != 'true'
       shell: bash
       run: pnpm --filter=@jovie/web exec playwright install chromium
+
+    - name: Name the runner image when Playwright cannot install
+      if: failure()
+      shell: bash
+      run: |
+        os_name="$(. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME" || uname -sr)"
+        echo "::error title=Playwright cannot install on this runner image::runner image ${ImageOS:-unknown} ${ImageVersion:-unknown} (${os_name}); runs-on may be a floating label. Pin it to a supported image such as ubuntu-24.04; see scripts/workflow-runner-pin-check.mjs."

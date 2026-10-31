@@ -23,14 +23,9 @@
  * Rules:
  *   - Each count must NEVER exceed the baseline in
  *     ui-feel-ratchet.baseline.json.
- *   - The committed baseline must track the debt exactly. A count below its
- *     baseline is stale headroom and fails the gate too, matching the
- *     merge-group exact-match test ('committed baseline matches current debt
- *     without regression headroom'). That test only runs in merge-group unit
- *     shards, so before this gate failed in both directions a PR could shrink
- *     debt without regenerating the baseline, stay green on PR CI, and then
- *     eject its merge group on the queue (JOV-8878). Either direction: rerun
- *     with `--update` and commit the file.
+ *   - A count BELOW its baseline passes with a notice (`::notice` in CI),
+ *     so improvements never fail a PR or merge group (JOV-8878). Run
+ *     `--update` and commit the file to lock the gain in.
  *
  * PR time: the CI workflow (and this ratchet) only runs in the merge group,
  * so Source Validation's lint:eslint:changed calls `--changed <baseRef>`,
@@ -44,8 +39,8 @@
  *   node scripts/lint-ui-feel.mjs --list     # print file:line locations
  *   node scripts/lint-ui-feel.mjs --update   # lower the baseline
  *
- * Exit 0 = counts match the baseline exactly. Exit 1 = regression beyond
- * the baseline, or stale headroom (debt shrank without `--update`).
+ * Exit 0 = no count exceeds the baseline (shrink prints a notice). Exit 1 =
+ * regression beyond the baseline.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -278,8 +273,8 @@ export function regressions(current, baseline) {
 
 /**
  * Baseline entries whose debt shrank below the committed floor. Stale
- * headroom: a future regression could hide inside the slack, so the gate
- * fails until `--update` re-locks the floor to the measured debt.
+ * headroom: reported as a notice, never a failure; the gate
+ * passes with a notice; `--update` re-locks the floor to the measured debt.
  * @param {Record<string, number>} current
  * @param {Record<string, number>} baseline
  * @returns {Array<{check: string, baseline: number, current: number}>}
@@ -307,7 +302,7 @@ export function writeBaseline(counts, path = BASELINE_PATH) {
     `${JSON.stringify(
       {
         _comment:
-          'UI-feel ratchet baseline — per-check counts of @jovie/ui-feel violations (JOV-8197). To change: fix violations then run `pnpm --filter web lint:ui-feel -- --update` (or `node scripts/lint-ui-feel.mjs --update`) and commit this file. CI fails if any count drifts from its baseline in either direction — growth is a regression, and shrink without this update is stale headroom.',
+          'UI-feel ratchet baseline — per-check counts of @jovie/ui-feel violations (JOV-8197). To change: fix violations then run `pnpm --filter web lint:ui-feel -- --update` (or `node scripts/lint-ui-feel.mjs --update`) and commit this file. CI fails if any count grows past its baseline; a shrink passes with a notice until this file is updated.',
         ...sorted,
       },
       null,
@@ -376,37 +371,36 @@ export async function main(
   const baseline = readBaseline(baselinePath);
   const failures = regressions(counts, baseline);
   const stale = staleBaseline(counts, baseline);
-  if (failures.length === 0 && stale.length === 0) {
+  if (stale.length > 0) {
+    const detail = stale
+      .map(
+        entry => `${entry.check}: ${entry.current} < baseline ${entry.baseline}`
+      )
+      .join('; ');
+    const notice = `[lint:ui-feel] debt shrank below the committed baseline (${detail}). Great - run \`pnpm --filter web lint:ui-feel -- --update\` and commit ui-feel-ratchet.baseline.json to lock the gain in (JOV-8197).`;
+    if (process.env.GITHUB_ACTIONS === 'true') {
+      log(`::notice title=ui-feel ratchet improved::${notice}`);
+    } else {
+      log(notice);
+    }
+  }
+
+  if (failures.length === 0) {
     log(
-      `[lint:ui-feel] ok — counts within baseline: ${JSON.stringify(counts)}`
+      `[lint:ui-feel] ok - counts within baseline: ${JSON.stringify(counts)}`
     );
     return 0;
   }
 
-  if (failures.length > 0) {
-    console.error('[lint:ui-feel] regression beyond baseline:');
-    for (const failure of failures) {
-      console.error(
-        `  ${failure.check}: ${failure.current} > baseline ${failure.baseline}`
-      );
-    }
+  console.error('[lint:ui-feel] regression beyond baseline:');
+  for (const failure of failures) {
     console.error(
-      '[lint:ui-feel] fix the new violations, or rerun with --list for locations.'
+      `  ${failure.check}: ${failure.current} > baseline ${failure.baseline}`
     );
   }
-  if (stale.length > 0) {
-    console.error(
-      '[lint:ui-feel] baseline stale — debt shrank below the committed baseline (headroom):'
-    );
-    for (const entry of stale) {
-      console.error(
-        `  ${entry.check}: ${entry.current} < baseline ${entry.baseline}`
-      );
-    }
-    console.error(
-      '[lint:ui-feel] rerun with --update and commit ui-feel-ratchet.baseline.json so the floor follows the debt (JOV-8197).'
-    );
-  }
+  console.error(
+    '[lint:ui-feel] fix the new violations, or rerun with --list for locations.'
+  );
   return 1;
 }
 

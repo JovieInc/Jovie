@@ -6,7 +6,7 @@ import { cn } from '../lib/utils';
 
 export type CompositeFieldShape = 'pill' | 'md';
 export type CompositeFieldSize = 'sm' | 'md';
-export type CompositeFieldSurface = 'none' | 'page' | 'shell';
+export type CompositeFieldSurface = 'none' | 'page' | 'shell' | 'field';
 
 export interface CompositeFieldProps
   extends React.ComponentPropsWithoutRef<'div'> {

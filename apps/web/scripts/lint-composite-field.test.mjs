@@ -6,6 +6,7 @@ import {
   compareToBaseline,
   countsOf,
   findOffenders,
+  shrinkNotices,
 } from './lint-composite-field.mjs';
 
 describe('findOffenders', () => {
@@ -40,8 +41,13 @@ describe('compareToBaseline', () => {
     expect(compareToBaseline({ 'a.tsx': 1 }, {})).toHaveLength(1);
   });
 
-  it('fails stale headroom when debt shrinks', () => {
-    expect(compareToBaseline({}, { 'a.tsx': 1 })).toHaveLength(1);
+  it('fails growth past the baseline', () => {
+    expect(compareToBaseline({ 'a.tsx': 3 }, { 'a.tsx': 2 })).toHaveLength(1);
+  });
+
+  it('passes a shrink with a notice', () => {
+    expect(compareToBaseline({}, { 'a.tsx': 1 })).toEqual([]);
+    expect(shrinkNotices({}, { 'a.tsx': 1 })).toHaveLength(1);
   });
 
   it('passes when counts equal the baseline', () => {
@@ -50,7 +56,7 @@ describe('compareToBaseline', () => {
 });
 
 describe('repository state', () => {
-  it('matches the committed baseline exactly', () => {
+  it('never exceeds the committed baseline', () => {
     const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')).files;
     expect(compareToBaseline(countsOf(collect()), baseline)).toEqual([]);
   });
