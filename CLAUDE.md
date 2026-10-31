@@ -75,7 +75,6 @@ Other scoped rules: ci-branching, event-driven, infra, linear, motion,
 pr-stacking, swarm, hermes-air, anti-slop.
 Company domain canon: [index](canon/README.md). API/cron/webhook maps:
 [AI_AGENT_GUIDE](docs/AI_AGENT_GUIDE.md). Codex: [CODEX](CODEX.md).
-<!-- doc-freshness:scoped-rules-count:24 -->
 
 ## Tools and workflow
 

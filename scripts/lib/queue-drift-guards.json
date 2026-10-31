@@ -1,0 +1,29 @@
+{
+  "$comment": "Cheap, git-history-free guards whose verdict depends on main. Run by scripts/queue-drift-precheck.mjs against a test merge of the PR with the latest main before Merge Queue Green Enroll enqueues it. Add a guard here only if it is node-only (no pnpm install), finishes in seconds, and counts or ratchets something other PRs also move. A guard whose `requires` paths are absent is skipped, so a guard can be listed before it lands.",
+  "guards": [
+    {
+      "id": "doc-freshness",
+      "command": ["node", "scripts/doc-freshness-lint.mjs"],
+      "requires": ["scripts/doc-freshness-lint.mjs"],
+      "remediation": "Run `pnpm doc:freshness:check` after merging main and fix the drift it names."
+    },
+    {
+      "id": "data-architecture-guard",
+      "command": ["node", "scripts/data-architecture-guard.mjs"],
+      "requires": ["scripts/data-architecture-guard.mjs"],
+      "remediation": "Run `node scripts/data-architecture-guard.mjs` after merging main; shrink the ratchet, never raise it."
+    },
+    {
+      "id": "workflow-token-budget",
+      "command": ["node", "scripts/workflow-token-budget-guard.mjs"],
+      "requires": ["scripts/workflow-token-budget-guard.mjs"],
+      "remediation": "Run `node scripts/workflow-token-budget-guard.mjs` after merging main and reconcile the GITHUB_TOKEN ratchet."
+    },
+    {
+      "id": "external-api-guard",
+      "command": ["node", "scripts/external-api-guard.mjs"],
+      "requires": ["scripts/external-api-guard.mjs"],
+      "remediation": "Run `node scripts/external-api-guard.mjs` after merging main and route new provider calls through packages/api-client."
+    }
+  ]
+}

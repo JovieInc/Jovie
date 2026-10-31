@@ -29,11 +29,6 @@
   "freshnessMarkers": [
     {
       "id": "scoped-rules-count",
-      "files": ["CLAUDE.md"],
-      "computer": "scoped-rules-count"
-    },
-    {
-      "id": "scoped-rules-count",
       "files": ["docs/doc-gardening/SEED-STALE.md"],
       "computer": "scoped-rules-count",
       "gardeningOnly": true

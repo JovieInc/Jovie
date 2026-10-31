@@ -222,13 +222,17 @@ describe('ci-harness manifest', () => {
     const prReady = extractWorkflowJobBlock(workflow, 'ci-pr-ready');
 
     expect(prReady).toContain(
-      'needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare, ci-slop-guard]'
+      'needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare, ci-slop-guard, ci-storybook-surfaces]'
     );
     expect(prReady).toContain('needs.ci-exact-head-coverage.result');
     expect(prReady).toContain('Evaluate deterministic source PR checks');
     expect(prReady).toContain('All deterministic source PR checks passed.');
     expect(workflow).not.toContain('withgraphite/graphite-ci-action');
     expect(workflow).not.toContain('steps.graphite');
+    // Storybook Surface Matrix is the one heavy lane that does feed source PR
+    // Ready, only for stories/spec/component PRs: it was queue-only and a green
+    // PR (#24008) poisoned merge groups (2026-10-31, ~12 ejections).
+    expect(prReady).toContain('ci-storybook-surfaces');
     for (const heavyJob of [
       'ci-unit-tests',
       'ci-build-public',
@@ -243,7 +247,6 @@ describe('ci-harness manifest', () => {
       'ci-build-layout',
       'ci-build-ovie',
       'ci-typecheck-ovie',
-      'ci-storybook-surfaces',
       'ci-ios',
       'ci-macos',
       'ci-promptfoo-evals',
