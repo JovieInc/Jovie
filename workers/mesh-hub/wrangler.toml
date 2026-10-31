@@ -1,0 +1,32 @@
+name = "jovie-mesh-hub"
+main = "src/index.ts"
+compatibility_date = "2026-10-15"
+workers_dev = true
+preview_urls = false
+
+# Company agent mesh hub (gbrain projects/jovie/agent-mesh-hub-architecture-2026-10-31).
+# Runs on Cloudflare only: no Vercel, Gem or Mac in the delivery path.
+[[durable_objects.bindings]]
+name = "MAILBOX"
+class_name = "Mailbox"
+
+[[durable_objects.bindings]]
+name = "REGISTRY"
+class_name = "Registry"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Mailbox", "Registry"]
+
+[observability]
+enabled = true
+
+# Secrets (wrangler secret put; values live in Doppler agent-mesh/prd, never here):
+#   HUB_ADMIN_TOKEN            registry writes only
+#   SUMMER_HUB_WEBHOOK_SECRET  HMAC for pushes to Summer (optional until Summer consumes the hub)
+# Vars:
+#   SUMMER_HUB_WEBHOOK_URL     unset until summer-config ships /summer/v1/mesh/hub
+
+# Registry sweep (presence, silence, probes) every minute; also the dead-man for DO alarms.
+[triggers]
+crons = ["* * * * *"]
