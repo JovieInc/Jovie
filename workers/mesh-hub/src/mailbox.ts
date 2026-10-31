@@ -405,8 +405,33 @@ export class Mailbox extends DurableObject<Env> {
       for (const dead of this.store.sweepDead(now, config.deadAfterMs))
         await this.notifyDead(config, dead);
     }
+    await this.alarmStale(config, now);
     if (this.store.unackedCount() > 0 || this.outbox.open(1).length)
       this.outbox.schedule('sweep', now + SWEEP_MS);
+  }
+
+  /**
+   * Mail received but not handled within MAIL_STALE_MS (default 10 min) alarms once per
+   * oldest message through the registry (-> Summer + ALERT_KINDS), whatever the cause:
+   * dead reader, executor failure, or no reader at all.
+   */
+  private async alarmStale(config: MailboxConfig | null, now: number) {
+    const oldest = this.store.oldestUnackedMessage();
+    if (!config || !oldest) return;
+    const staleMs = Math.max(60_000, Number(this.env.MAIL_STALE_MS ?? 600_000));
+    const age = now - oldest.acceptedAt;
+    if (age < staleMs || this.store.getMeta('staleAlarmedFor') === oldest.id)
+      return;
+    this.store.setMeta('staleAlarmedFor', oldest.id);
+    const registry = this.env.REGISTRY.get(
+      this.env.REGISTRY.idFromName('registry')
+    );
+    await registry.recordEvent('mail.stale', config.kind, {
+      id: oldest.id,
+      from: oldest.from,
+      ageMin: Math.round(age / 60_000),
+      unhandled: this.store.unackedCount(),
+    });
   }
 
   /** DLQ: one deterministic wrapper per dead message to the fallback owner. */

@@ -19,4 +19,6 @@ export type Env = {
   EXECUTOR_KINDS?: string;
   /** How long a real reader gets before the executor takes a message (ms). */
   EXECUTOR_GRACE_MS?: string;
+  /** Unhandled-mail alarm threshold in ms (default 600000, min 60000). */
+  MAIL_STALE_MS?: string;
 };

@@ -462,6 +462,16 @@ export class MailboxStore {
       .toArray().length;
   }
 
+  /** Oldest unhandled peer message (not events/wrappers: alarms must not alarm on themselves). */
+  oldestUnackedMessage(): Delivered | null {
+    const row = this.sql
+      .exec(
+        "SELECT * FROM messages WHERE acked_at IS NULL AND kind = 'message' ORDER BY seq LIMIT 1"
+      )
+      .toArray()[0];
+    return row ? toDelivered(row) : null;
+  }
+
   oldestUnacked(): Delivered | null {
     const row = this.sql
       .exec(
