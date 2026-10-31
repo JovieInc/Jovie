@@ -5,7 +5,7 @@
 import { registerHooks } from 'node:module';
 import { pathToFileURL } from 'node:url';
 
-const dir = new URL('./script-runtime-shims/', import.meta.url);
+const dir = new URL('./shims/', import.meta.url);
 const shims = {
   'server-only': pathToFileURL(new URL('server-only.mjs', dir).pathname).href,
   'next/cache': pathToFileURL(new URL('next-cache.mjs', dir).pathname).href,

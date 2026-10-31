@@ -13,18 +13,18 @@
  * Idempotent. Dry-run by default (reads and prints the planned writes; writes
  * nothing). Writes touch only rows owned by the two spec emails.
  *
- *   pnpm --filter @jovie/web exec tsx --import ./scripts/script-runtime-shim-preload.mjs \
- *     scripts/seed-returning-canary.ts [--apply]
+ *   cd apps/web && npx tsx --import ../../scripts/ops/canary-seed/shim-preload.mjs \
+ *     ../../scripts/ops/canary-seed/seed-returning-canary.ts [--apply]
  *
  * Needs DATABASE_URL, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET (Doppler
  * jovie-web/prd; never printed).
  */
 
 import { and, eq, ne } from 'drizzle-orm';
-import { getDeterministicTestBetterAuthUserId } from '@/lib/auth/dev-test-auth-identity';
-import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getDeterministicTestBetterAuthUserId } from '../../../apps/web/lib/auth/dev-test-auth-identity';
+import { db } from '../../../apps/web/lib/db';
+import { users } from '../../../apps/web/lib/db/schema/auth';
+import { creatorProfiles } from '../../../apps/web/lib/db/schema/profiles';
 import {
   CANARY_SEED_SPEC_VERSION,
   type CanaryArtistData,
@@ -33,7 +33,7 @@ import {
   isCanarySeedEmail,
   planCanaryProfileUpdate,
   RETURNING_CANARY_SEED,
-} from '@/lib/synthetic/returning-canary-seed-spec';
+} from '../../../apps/web/lib/synthetic/returning-canary-seed-spec';
 
 const APPLY = process.argv.includes('--apply');
 
@@ -68,7 +68,7 @@ async function fetchArtist(
   spec: CanarySeedIdentity
 ): Promise<CanaryArtistData | null> {
   if (!spec.artist) return null;
-  const { getSpotifyArtist } = await import('@/lib/spotify');
+  const { getSpotifyArtist } = await import('../../../apps/web/lib/spotify');
   const artist = await getSpotifyArtist(spec.artist.spotifyId);
   if (!artist?.name) {
     throw new Error(`Spotify returned no artist for ${spec.artist.spotifyId}`);
@@ -168,7 +168,7 @@ async function seedReturning(): Promise<void> {
       .set({ name: spec.displayName, updatedAt: new Date() })
       .where(eq(users.id, row.userId));
     const { runOnboardingCatalogImport } = await import(
-      '@/lib/onboarding/catalog-import.server'
+      '../../../apps/web/lib/onboarding/catalog-import.server'
     );
     const result = await runOnboardingCatalogImport({
       profileId: row.profileId,
@@ -195,7 +195,7 @@ async function seedChatHealth(): Promise<void> {
     ensureUserProfileClaim,
     ensureUserRecord,
     setActiveProfileForUser,
-  } = await import('@/lib/testing/test-user-provision.server');
+  } = await import('../../../apps/web/lib/testing/test-user-provision.server');
   const baId = await ensureBetterAuthTestUser({
     email: spec.email,
     fullName: spec.displayName,
