@@ -75,6 +75,28 @@ describe('VirtualizedTableRow', () => {
     expect(screen.getByRole('cell')).toHaveTextContent('One');
   });
 
+  it('releases measurement and keyboard references when a virtual row unmounts', () => {
+    const measureElement = vi.fn();
+    const rowRefsMap = new Map<number, HTMLTableRowElement>();
+    const { unmount } = render(
+      <table>
+        <tbody>
+          <VirtualizedTableRow
+            {...baseProps}
+            rowRefsMap={rowRefsMap}
+            shouldVirtualize
+            measureElement={measureElement}
+          />
+        </tbody>
+      </table>
+    );
+    expect(measureElement).toHaveBeenLastCalledWith(screen.getByRole('row'));
+    expect(rowRefsMap.size).toBe(1);
+    unmount();
+    expect(measureElement).toHaveBeenLastCalledWith(null);
+    expect(rowRefsMap.size).toBe(0);
+  });
+
   it('forwards extra HTML props onto the <tr> element', () => {
     render(
       <table>

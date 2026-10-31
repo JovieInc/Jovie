@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { CostsTable } from '@/app/app/(shell)/admin/costs/CostsTable';
+import { mockTableViewport } from '@/tests/utils/table-viewport';
 
 const ITEM = {
   label: 'Vercel',
@@ -11,6 +12,8 @@ const ITEM = {
   externalUrl: 'https://vercel.com/acme',
   lastUpdatedLabel: 'Today',
 };
+
+mockTableViewport();
 
 describe('CostsTable', () => {
   it('uses the canonical table anatomy and an accessible external action', () => {

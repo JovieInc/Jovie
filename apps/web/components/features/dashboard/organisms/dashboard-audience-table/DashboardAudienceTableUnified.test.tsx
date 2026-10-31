@@ -7,6 +7,7 @@ import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import { TableMetaProvider } from '@/contexts/TableMetaContext';
 import { AudiencePanelProvider } from '@/features/dashboard/organisms/AudiencePanelContext';
+import { mockTableViewport } from '@/tests/utils/table-viewport';
 import type { AudienceMember } from '@/types';
 import { DashboardAudienceTableUnified } from './DashboardAudienceTableUnified';
 import { DEFAULT_AUDIENCE_FILTERS } from './types';
@@ -36,6 +37,8 @@ function renderWithProviders(ui: ReactElement) {
   );
   return render(ui, { wrapper });
 }
+
+mockTableViewport();
 
 describe('DashboardAudienceTableUnified', () => {
   afterEach(() => vi.unstubAllGlobals());

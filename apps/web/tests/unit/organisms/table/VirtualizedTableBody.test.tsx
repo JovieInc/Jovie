@@ -69,6 +69,23 @@ const baseProps = {
 };
 
 describe('VirtualizedTableBody', () => {
+  it.each([undefined, []])(
+    'keeps an unmeasured virtual window empty (%s)',
+    virtualRows => {
+      render(
+        <table>
+          <VirtualizedTableBody
+            {...baseProps}
+            rows={[createRow('1', 'One')]}
+            shouldVirtualize
+            virtualRows={virtualRows}
+          />
+        </table>
+      );
+      expect(screen.queryByTestId('table-row-1')).not.toBeInTheDocument();
+    }
+  );
+
   it('skips stale virtual items whose index no longer maps to a row', () => {
     const rows = [createRow('1', 'One')];
     const staleVirtualRows = [

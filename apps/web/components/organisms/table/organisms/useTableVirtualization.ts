@@ -9,8 +9,8 @@ import { type RefObject, useCallback } from 'react';
 
 /**
  * Viewport assumed before the scroll container is measured (SSR and the first
- * client render). Without it the virtualizer returns no rows, the body falls
- * back to rendering every row, and a 10k-row table paints 10k rows once.
+ * client render). It provides a bounded first window before ResizeObserver
+ * reports the real viewport; hidden viewports subsequently render no rows.
  */
 export const VIRTUALIZATION_INITIAL_VIEWPORT_PX = 1080;
 
