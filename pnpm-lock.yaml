@@ -232,10 +232,7 @@ importers:
         version: 44.9.3
       electron-builder:
         specifier: ^26.15.3
-        version: 26.15.3(electron-builder-squirrel-windows@26.18.0)
-      electron-builder-squirrel-windows:
-        specifier: ^26.15.3
-        version: 26.18.0(dmg-builder@26.15.3)
+        version: 26.15.3
       esbuild:
         specifier: 0.28.2
         version: 0.28.2
@@ -10301,9 +10298,6 @@ packages:
     resolution: {integrity: sha512-UeJmFfOrAQS8OJWPZ4qtgHyWExa088/MtK5UEyoJGFH67cDEXkZSviOiKRCZ4Xij0zxI3JECgYs3oKx+AizQBA==}
     engines: {node: '>=0.10.0'}
     hasBin: true
-
-  electron-builder-squirrel-windows@26.18.0:
-    resolution: {integrity: sha512-a2elgTipboXNIsxqS1HOmHMGp4Pd3LJgIZOdIFTOskBSawvxKyZWYWQ1d7KKA4CtINSchYCYEKzhxRqiKZev9Q==}
 
   electron-builder@26.15.3:
     resolution: {integrity: sha512-a1KM5heqS3gQCZzizXEI8RjJy3QVogULPdeSknt76uLDpBIW/HDGsMg/XgP0riP6PI9COsRvFITKKGDqA8fJxA==}
@@ -25059,7 +25053,7 @@ snapshots:
 
   anynum@1.0.1: {}
 
-  app-builder-lib@26.15.3(dmg-builder@26.15.3)(electron-builder-squirrel-windows@26.18.0):
+  app-builder-lib@26.15.3(dmg-builder@26.15.3):
     dependencies:
       '@electron/asar': 3.4.1
       '@electron/fuses': 1.8.0
@@ -25080,11 +25074,10 @@ snapshots:
       chromium-pickle-js: 0.2.0
       ci-info: 4.3.1
       debug: 4.4.3(supports-color@8.1.1)
-      dmg-builder: 26.15.3(electron-builder-squirrel-windows@26.18.0)
+      dmg-builder: 26.15.3
       dotenv: 16.6.1
       dotenv-expand: 11.0.7
       ejs: 3.1.10
-      electron-builder-squirrel-windows: 26.18.0(dmg-builder@26.15.3)
       electron-publish: 26.15.3
       fs-extra: 10.1.0
       hosted-git-info: 4.1.0
@@ -25107,7 +25100,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  app-builder-lib@26.18.0(dmg-builder@26.15.3)(electron-builder-squirrel-windows@26.18.0):
+  app-builder-lib@26.18.0(dmg-builder@26.15.3):
     dependencies:
       '@electron/asar': 3.4.1
       '@electron/fuses': 1.8.0
@@ -25128,11 +25121,10 @@ snapshots:
       chromium-pickle-js: 0.2.0
       ci-info: 4.3.1
       debug: 4.4.3(supports-color@8.1.1)
-      dmg-builder: 26.15.3(electron-builder-squirrel-windows@26.18.0)
+      dmg-builder: 26.15.3
       dotenv: 16.6.1
       dotenv-expand: 11.0.7
       ejs: 3.1.10
-      electron-builder-squirrel-windows: 26.18.0(dmg-builder@26.15.3)
       electron-publish: 26.18.0
       fs-extra: 10.1.0
       hosted-git-info: 4.1.0
@@ -26722,14 +26714,13 @@ snapshots:
 
   dlv@1.1.3: {}
 
-  dmg-builder@26.15.3(electron-builder-squirrel-windows@26.18.0):
+  dmg-builder@26.15.3:
     dependencies:
-      app-builder-lib: 26.15.3(dmg-builder@26.15.3)(electron-builder-squirrel-windows@26.18.0)
+      app-builder-lib: 26.15.3(dmg-builder@26.15.3)
       builder-util: 26.15.3
       fs-extra: 10.1.0
       js-yaml: 5.5.0
     transitivePeerDependencies:
-      - electron-builder-squirrel-windows
       - supports-color
 
   do-not-zip@1.0.0: {}
@@ -26890,29 +26881,19 @@ snapshots:
     dependencies:
       jake: 10.9.4
 
-  electron-builder-squirrel-windows@26.18.0(dmg-builder@26.15.3):
+  electron-builder@26.15.3:
     dependencies:
-      app-builder-lib: 26.18.0(dmg-builder@26.15.3)(electron-builder-squirrel-windows@26.18.0)
-      builder-util: 26.16.0
-      electron-winstaller: 5.4.0
-    transitivePeerDependencies:
-      - dmg-builder
-      - supports-color
-
-  electron-builder@26.15.3(electron-builder-squirrel-windows@26.18.0):
-    dependencies:
-      app-builder-lib: 26.15.3(dmg-builder@26.15.3)(electron-builder-squirrel-windows@26.18.0)
+      app-builder-lib: 26.15.3(dmg-builder@26.15.3)
       builder-util: 26.15.3
       builder-util-runtime: 9.7.0
       chalk: 4.1.2
       ci-info: 4.4.0
-      dmg-builder: 26.15.3(electron-builder-squirrel-windows@26.18.0)
+      dmg-builder: 26.15.3
       fs-extra: 10.1.0
       lazy-val: 1.0.5
       simple-update-notifier: 2.0.0
       yargs: 17.7.3
     transitivePeerDependencies:
-      - electron-builder-squirrel-windows
       - supports-color
 
   electron-publish@26.15.3:
