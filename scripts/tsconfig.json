@@ -47,6 +47,10 @@
     // Frozen promotion-gate-ci.mjs from e806124. Imports are relative to
     // scripts/, so checkJs reports TS2307 from this fixture path. Same
     // exclusion as the other non-typechecked fixture trees above.
-    "lib/__tests__/fixtures/promotion-gate-ci.e806124.mjs"
+    "lib/__tests__/fixtures/promotion-gate-ci.e806124.mjs",
+    // Operator script that runs under tsx from apps/web and imports the web
+    // app's `@/` modules; this nodenext config cannot resolve them (TS2307).
+    // The web typecheck covers the spec it consumes.
+    "ops/canary-seed"
   ]
 }
