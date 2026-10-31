@@ -111,6 +111,8 @@ export const ServerEnvSchema = z.object({
   EMAIL_STREAM_TRANSACTIONAL_DOMAIN: z.string().optional(),
   EMAIL_STREAM_LIFECYCLE_DOMAIN: z.string().optional(),
   EMAIL_STREAM_FOUNDER_DOMAIN: z.string().optional(),
+  EMAIL_STREAM_BROADCAST_DOMAIN: z.string().optional(),
+  EMAIL_STREAM_INBOX_DOMAIN: z.string().optional(),
   EMAIL_STREAM_COLD_DOMAIN: z.string().optional(),
 
   // Slack notifications (admin alerts for claims, signups, upgrades, waitlist)
@@ -580,6 +582,8 @@ export const ENV_KEYS = [
   'EMAIL_STREAM_TRANSACTIONAL_DOMAIN',
   'EMAIL_STREAM_LIFECYCLE_DOMAIN',
   'EMAIL_STREAM_FOUNDER_DOMAIN',
+  'EMAIL_STREAM_BROADCAST_DOMAIN',
+  'EMAIL_STREAM_INBOX_DOMAIN',
   'EMAIL_STREAM_COLD_DOMAIN',
   'SLACK_WEBHOOK_URL',
   'DATABASE_URL',
