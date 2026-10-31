@@ -12,6 +12,7 @@ import { creatorPixels } from '@/lib/db/schema/pixels';
 import { checkBoolean } from '@/lib/entitlements/registry';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { mergeProfileTheme } from '@/lib/profile/profile-theme';
+import { shouldHideTestProfileFromDirectUrl } from '@/lib/profile/test-profile-policy';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import { isDspPlatform } from '@/lib/services/social-links/types';
 import { toISOStringSafe } from '@/lib/utils/date';
@@ -151,6 +152,30 @@ const fetchProfileAndLinks = async (
     if (!result?.isPublic) {
       // Expected 404 — profile not found or not public. No Sentry capture needed;
       // these are normal from typos, crawlers, and enumeration traffic (JOV-1321).
+      return {
+        profile: null,
+        links: [],
+        contacts: [],
+        creatorIsPro: false,
+        creatorClerkId: null,
+        creatorMetaPixelId: null,
+        genres: null,
+        latestRelease: null,
+        pressPhotos: [],
+        status: 'not_found',
+      };
+    }
+
+    // Test/e2e/golden-path accounts are never publicly viewable (canary
+    // fixtures are exempt by exact handle/email/setting). Same 404 as a
+    // missing profile so nothing leaks.
+    if (
+      shouldHideTestProfileFromDirectUrl({
+        handle: username,
+        ownerEmail: result.userEmail,
+        settings: result.settings,
+      })
+    ) {
       return {
         profile: null,
         links: [],

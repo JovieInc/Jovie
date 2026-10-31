@@ -109,7 +109,7 @@ function buildProfileWithLinks(
     updatedAt: CREATED_AT,
     userIsPro: false,
     userClerkId: 'clerk-1',
-    userEmail: 'artist@example.com',
+    userEmail: 'artist@gmail.com',
     userPlan: null,
     socialLinks: [],
     contacts: [],
@@ -324,7 +324,7 @@ describe('public profile loader behavior (JOV-5778)', () => {
       buildProfileWithLinks({
         displayName: 'Test Artist',
         avatarUrl: 'https://example.com/avatar.jpg',
-        userEmail: 'artist@example.com',
+        userEmail: 'artist@gmail.com',
         spotifyUrl: 'https://open.spotify.com/artist/123',
       })
     );
