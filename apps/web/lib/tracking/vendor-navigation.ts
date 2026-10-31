@@ -1,10 +1,6 @@
 import { isReservedUsername } from '@/lib/validation/username-core';
 
-/**
- * Third-party SDKs retain history listeners after React unmounts. Once one is
- * loaded, use document navigation so it cannot observe the next artist before
- * that artist's fresh eligibility decision. Installed before vendor scripts.
- */
+// Opaque SDK listeners outlive React mounts: isolate artist documents.
 function crossesArtistBoundary(target: URL): boolean {
   const isArtist = (path: string) =>
     Boolean(path.split('/')[1] && !isReservedUsername(path.split('/')[1]));
