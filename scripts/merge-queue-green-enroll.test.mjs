@@ -879,21 +879,12 @@ test('a queue-breaker dequeue is re-admitted after the freeze and its marker rem
   );
   const failed = await fixture({
     overrides: { 1: breaker('FAILED_CHECKS') },
-    statuses: [
-      {
-        context: 'jovie-queue-failure-hold/v1',
-        state: 'success',
-        creator: { type: 'Bot', login: 'jovie-bot[bot]' },
-        description: 'class=deterministic-source;n=1;run=456;try=1',
-        target_url: 'https://github.com/JovieInc/Jovie/actions/runs/456',
-      },
-    ],
     eventName: 'push',
   });
   assert.deepEqual(
     failed.mutations,
     [],
-    'the marker never bypasses a recorded source failure'
+    'the marker never re-admits a failed_checks removal'
   );
   const notGreen = await fixture({
     overrides: { 1: { ...breaker('MANUAL'), mergeStateStatus: 'BLOCKED' } },
@@ -1073,7 +1064,7 @@ test('enrolls a required-green head once lane-fix-red is gone', async () => {
   assert.deepEqual(result.mutations, [{ id: 'PR_1', oid: sha }]);
 });
 
-test('a released manual dequeue and unheld automatic ejection re-enroll; source failure holds block', async () => {
+test('a hold released after a manual dequeue re-enrolls the same head; check failures never do', async () => {
   const removal = reason => ({
     timelineItems: { nodes: [{ createdAt: '2026-10-02T13:00:00Z', reason }] },
   });
@@ -1097,7 +1088,7 @@ test('a released manual dequeue and unheld automatic ejection re-enroll; source 
   );
   assert.equal(
     await enqueued({ ...removal('FAILED_CHECKS'), ...release('lane-fix-red') }),
-    1
+    0
   );
   assert.equal(
     await enqueued({
@@ -1108,7 +1099,7 @@ test('a released manual dequeue and unheld automatic ejection re-enroll; source 
   );
   assert.equal(
     await enqueued({ ...removal('FAILED_CHECKS'), ...release('hold') }),
-    1
+    0
   );
   assert.equal(
     await enqueued({ ...removal(undefined), ...release('hold') }),
@@ -1126,41 +1117,6 @@ test('a released manual dequeue and unheld automatic ejection re-enroll; source 
     overrides: { 1: { ...removal('manual'), ...release('hold') } },
   });
   assert.deepEqual(held.mutations, []);
-});
-
-test('ejection re-enrollment admits bots within bounds and preserves human dequeues', async () => {
-  const removal = {
-    createdAt: new Date(Date.now() - 600_000).toISOString(),
-    reason: 'manual',
-    actor: { __typename: 'Bot', login: 'jovie-bot[bot]' },
-  };
-  /** @type {Array<[typeof removal, number, number]>} */
-  const cases = [
-    [removal, 1, 1],
-    [{ ...removal, actor: { __typename: 'User', login: 'tim' } }, 1, 0],
-    [removal, 3, 0],
-    [{ ...removal, createdAt: new Date().toISOString() }, 1, 0],
-  ];
-  for (const [event, count, expected] of cases) {
-    const result = await fixture({
-      overrides: {
-        1: {
-          timelineItems: { nodes: [event] },
-          breakerEvents: {
-            nodes: Array.from({ length: count }, () => ({
-              ...event,
-              __typename: 'RemovedFromMergeQueueEvent',
-            })),
-          },
-        },
-      },
-    });
-    assert.equal(
-      result.mutations.length,
-      expected,
-      JSON.stringify({ event, count })
-    );
-  }
 });
 
 test('main is read only to resolve a held candidate, never on an ineligible wake', async () => {
