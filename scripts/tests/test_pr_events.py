@@ -3025,11 +3025,11 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
 
     def test_explicit_measured_win_repairs_compounding_body_and_passes_fleet(self):
         body = events.red_before_green_block(self.PR)
-        updated = events.repair_evidence_body(self.PR, body, measured_win=self.WIN,
+        updated = events.repair_evidence_body(self.PR, body, win_section=self.WIN,
                                               customer_decision={"releaseWorthy": False})
         self.assertIn(body, updated)
         self.assertIn(self.WIN, updated)
-        self.assertEqual(events.repair_evidence_body(self.PR, updated, measured_win=self.WIN), updated)
+        self.assertEqual(events.repair_evidence_body(self.PR, updated, win_section=self.WIN), updated)
         checked = subprocess.run(["node", "--input-type=module", "-e", """
 import { readFileSync } from 'node:fs';
 import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
@@ -3048,10 +3048,10 @@ console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
         for existing in ("## Win\n\nnone\n", self.WIN, "### Win\n\n- Claim: incomplete\n"):
             with self.subTest(existing=existing):
                 original = body + "\n" + existing
-                self.assertEqual(events.repair_evidence_body(self.PR, original, measured_win=self.WIN), original)
+                self.assertEqual(events.repair_evidence_body(self.PR, original, win_section=self.WIN), original)
         # A template in a comment or failure log is not the author's Win section.
         template = "\n<!--\n## Win\n-->\n```text\n## Win\n```\n"
-        updated = events.repair_evidence_body(self.PR, body + template, measured_win=self.WIN)
+        updated = events.repair_evidence_body(self.PR, body + template, win_section=self.WIN)
         self.assertTrue(updated.endswith(self.WIN))
 
     def test_ensure_can_write_measured_win_without_a_red_run(self):
@@ -3061,8 +3061,14 @@ console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
                 return SimpleNamespace(returncode=0, stdout="Summary")
             written.append(Path(args[args.index("--body-file") + 1]).read_text())
             return SimpleNamespace(returncode=0, stdout="")
-        self.assertTrue(events.ensure_red_before_green({"number": 7}, sh=shell, measured_win=self.WIN))
+        self.assertTrue(events.ensure_red_before_green({"number": 7}, sh=shell, win_section=self.WIN))
         self.assertEqual(written, ["Summary\n\n" + self.WIN])
+
+    def test_explicit_invalid_win_is_rejected_instead_of_silently_omitted(self):
+        for invalid in ("", 0, False, [], {}, "- Metric: incomplete"):
+            with self.subTest(invalid=invalid):
+                with self.assertRaisesRegex(ValueError, "complete ## Win section"):
+                    events.repair_evidence_body(self.PR, "Summary", win_section=invalid)
 
     def test_block_carries_the_failing_run_and_red_output_and_passes_the_parser_shape(self):
         block = events.red_before_green_block(self.PR, "### Source Validation\n# not a heading\nAssertionError: x")
