@@ -284,12 +284,17 @@ export function normalizeKernelCertificationRow(
     state: admission.state,
     ...(goldenPathDogfood
       ? {
-          goldenPathState:
-            (goldenPathStateMatch?.[1] as
-              | 'certified'
-              | 'expired'
-              | 'missing'
-              | undefined) ?? 'missing',
+          // Only a `state=` marker maps to a lifecycle state; blocked/failed
+          // receipts carry none, so the field stays absent rather than
+          // defaulting to 'missing' (JOV-9625 review rework).
+          ...(goldenPathStateMatch
+            ? {
+                goldenPathState: goldenPathStateMatch[1] as
+                  | 'certified'
+                  | 'expired'
+                  | 'missing',
+              }
+            : {}),
           consoleErrorCount: goldenPathCountsMatch
             ? Number(goldenPathCountsMatch[1])
             : null,

@@ -370,9 +370,12 @@ export type ProdGoldenPathRuntimeState = 'certified' | 'expired' | 'missing';
 function runtimeState(
   receipt: ProdGoldenPathReceipt | undefined,
   nowMs: number
-): ProdGoldenPathRuntimeState {
+): ProdGoldenPathRuntimeState | undefined {
   if (!receipt) return 'missing';
-  if (receipt.status !== 'passed') return 'missing';
+  // A failed/blocked receipt was exercised on production: it keeps its own
+  // status and carries no lifecycle state, so it is never conflated with a
+  // surface that has no receipt at all (JOV-9625 review rework).
+  if (receipt.status !== 'passed') return undefined;
   if (nowMs - Date.parse(receipt.endedAt) > PROD_GOLDEN_PATH_FRESHNESS_MS) {
     return 'expired';
   }
@@ -381,7 +384,7 @@ function runtimeState(
 
 function summarize(
   receipt: ProdGoldenPathReceipt | undefined,
-  state: ProdGoldenPathRuntimeState,
+  state: ProdGoldenPathRuntimeState | undefined,
   nowMs: number
 ): string {
   if (!receipt) {
@@ -392,12 +395,14 @@ function summarize(
     typeof receipt.networkErrorCount === 'number'
       ? `; consoleErrors=${receipt.consoleErrorCount ?? 'n/a'}; networkErrors=${receipt.networkErrorCount ?? 'n/a'}`
       : '';
+  // Blocked and failed receipts carry no `state=` marker: their own status
+  // is the verdict, and `missing` is reserved for never-recorded surfaces.
   if (receipt.status === 'blocked') {
-    return `state=missing; Not exercised on production: ${receipt.blocker}${evidenceCounts}`;
+    return `Not exercised on production: ${receipt.blocker}${evidenceCounts}`;
   }
   const failed = receipt.checks.filter(c => c.status === 'failed');
   if (failed.length > 0) {
-    return `state=missing; Failed on production: ${failed.map(c => `${c.id} (${c.summary})`).join('; ')}${evidenceCounts}`.slice(
+    return `Failed on production: ${failed.map(c => `${c.id} (${c.summary})`).join('; ')}${evidenceCounts}`.slice(
       0,
       1_900
     );

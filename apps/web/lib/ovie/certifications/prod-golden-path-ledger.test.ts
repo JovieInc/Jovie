@@ -194,6 +194,52 @@ describe('prod golden-path ledger', () => {
     expect(files[1].packet.source).toBeNull();
   });
 
+  it('failed and blocked receipts carry no lifecycle state (JOV-9625)', async () => {
+    const backend = memoryBackend();
+    await recordProdGoldenPathRun({
+      backend,
+      receipts: [
+        receipt({
+          surface: 'chat',
+          status: 'blocked',
+          blocker: 'needs a chat-capable synthetic identity',
+          checks: [],
+          screenIds: ['web.chat'],
+          identity: 'creator-ready',
+        }),
+        receipt({
+          surface: 'smartlink',
+          status: 'failed',
+          screenIds: ['web.smartlink-release'],
+          checks: [
+            {
+              id: 'smartlink-renders',
+              status: 'failed',
+              startedAt: '2026-10-28T20:00:00.000Z',
+              endedAt: '2026-10-28T20:00:05.000Z',
+              summary: 'HTTP 500',
+            },
+          ],
+        }),
+      ],
+    });
+    const ledger = await readProdGoldenPathLedger(backend);
+    const files = prodGoldenPathPacketFiles(ledger!);
+    const chat = files.find(f => f.surface === 'In-app chat first reply');
+    const smartlink = files.find(f => f.surface === 'Release smartlinks');
+    // Blocked and failed receipts keep their own status and carry no
+    // `state=` marker — 'missing' is reserved for never-recorded surfaces,
+    // so exercised failures are never conflated with absence.
+    const chatDogfood = chat?.packet.operational?.runtimeDogfood?.[0];
+    expect(chatDogfood?.status).toBe('blocked');
+    expect(chatDogfood?.summary).toContain('Not exercised on production');
+    expect(chatDogfood?.summary).not.toMatch(/\bstate=/);
+    const smartlinkDogfood = smartlink?.packet.operational?.runtimeDogfood?.[0];
+    expect(smartlinkDogfood?.status).toBe('failed');
+    expect(smartlinkDogfood?.summary).toContain('Failed on production');
+    expect(smartlinkDogfood?.summary).not.toMatch(/\bstate=/);
+  });
+
   it('preserves the screenshot frame and console/network counts in the projection (JOV-9625)', async () => {
     const backend = memoryBackend();
     await recordProdGoldenPathRun({
