@@ -432,6 +432,32 @@ describe('JOV-9625 outcome rework: per-surface browser evidence', () => {
     expect(chat.screenshot.dataUrl).toBe('data:image/jpeg;base64,second');
   });
 
+  it('folds the admin inventory readback into the landing receipt only (JOV-9625)', async () => {
+    const steps = [
+      {
+        kind: 'readback',
+        status: 'blocked',
+        detail:
+          'GET /api/ovie/certifications returned HTTP 403 — fixture is not an admin',
+      },
+    ];
+    const { receipts } = await runProductionCertification({
+      fetchImpl: fakeFetch(),
+      steps,
+      authStatus: 'passed',
+    });
+    const landing = receipts.find(r => r.surface === 'landing');
+    expect(landing.adminInventoryReadback).toEqual({
+      status: 'blocked',
+      detail:
+        'GET /api/ovie/certifications returned HTTP 403 — fixture is not an admin',
+    });
+    // Evidence only: a blocked readback never turns a surface red.
+    expect(landing.status).toBe('passed');
+    const chat = receipts.find(r => r.surface === 'chat');
+    expect(chat.adminInventoryReadback).toBeNull();
+  });
+
   it('expects the profile edit readback and the fresh-user onboarding step', () => {
     expect(EXPECTED_BROWSER_CHECKS['public-profile']).toContain(
       'profile-edit-save-readback'
