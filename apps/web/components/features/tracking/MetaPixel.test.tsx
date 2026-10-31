@@ -1,4 +1,4 @@
-import { cleanup, render, waitFor } from '@testing-library/react';
+import { act, cleanup, render, waitFor } from '@testing-library/react';
 import {
   afterEach,
   beforeAll,
@@ -138,5 +138,17 @@ describe('MetaPixel', () => {
     const { container: c2 } = render(<MetaPixel pixelIds={['px-1']} />);
     expect(hasScript(c2)).toBe(false);
     expect(fbqCalls()).toEqual([]);
+  });
+  it('revokes a loaded runtime and grants only after consent is restored', async () => {
+    const { container } = render(<MetaPixel pixelIds={['px-1']} />);
+    await waitFor(() => expect(hasScript(container)).toBe(true));
+    _marketingAllowed = false;
+    act(() => window.dispatchEvent(new StorageEvent('storage')));
+    expect(hasScript(container)).toBe(false);
+    expect(fbqCalls()).toContainEqual(['consent', 'revoke']);
+    _marketingAllowed = true;
+    act(() => window.dispatchEvent(new StorageEvent('storage')));
+    expect(hasScript(container)).toBe(true);
+    expect(fbqCalls().at(-1)).toEqual(['consent', 'grant']);
   });
 });

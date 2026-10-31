@@ -22,7 +22,12 @@ describe('Footer', () => {
   it('gives every profile legal link a 44pt hit box', () => {
     render(<Footer variant='profile' artistHandle='tim' />);
 
-    for (const label of ['Privacy', 'Terms', 'Report']) {
+    for (const label of [
+      'Privacy',
+      'Terms',
+      'Report',
+      'Your Privacy Choices',
+    ]) {
       for (const link of screen.getAllByRole('link', { name: label })) {
         expect(link).toHaveClass('min-h-11', 'min-w-11');
       }

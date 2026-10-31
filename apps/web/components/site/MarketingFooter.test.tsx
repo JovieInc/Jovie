@@ -49,6 +49,19 @@ function footerColumnTitle(name: string) {
 }
 
 describe('MarketingFooter', () => {
+  it('keeps privacy choices available even with published legal links', () => {
+    render(
+      <MarketingFooter
+        legalLinks={[{ href: '/legal/privacy', label: 'Privacy' }]}
+      />
+    );
+    expect(
+      screen.getByRole('link', {
+        name: 'Do Not Sell or Share My Personal Information',
+      })
+    ).toHaveAttribute('href', '/legal/privacy#privacy-choices');
+  });
+
   beforeEach(() => {
     mockUsePathname.mockReturnValue('/about');
     themeState.theme = 'dark';

@@ -1,3 +1,4 @@
+// @coverage-via apps/web/components/organisms/PrivacyChoices.test.tsx
 'use client';
 import {
   DropdownMenu,
@@ -17,6 +18,7 @@ import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
+import { PRIVACY_CHOICES_HREF } from '@/lib/cookies/consent-state';
 import { cn } from '@/lib/utils';
 
 interface ProfileNavButtonProps {
@@ -56,11 +58,7 @@ export function ProfileNavButton({
             size='md'
             variant='pearl'
             ariaLabel='Open profile menu'
-            className={cn(
-              'group backdrop-blur-xl',
-              'transition-[opacity,transform,filter,background-color,box-shadow] duration-subtle ease-subtle hover:opacity-95',
-              className
-            )}
+            className={cn('group', className)}
           >
             <BrandLogo
               size='chrome'
@@ -108,6 +106,10 @@ export function ProfileNavButton({
             <Link href={APP_ROUTES.SIGNUP}>Claim your profile</Link>
           </DropdownMenuItem>
 
+          <DropdownMenuItem asChild>
+            <a href={PRIVACY_CHOICES_HREF}>Your Privacy Choices</a>
+          </DropdownMenuItem>
+
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>Legal</DropdownMenuSubTrigger>
             <DropdownMenuSubContent sideOffset={8}>
@@ -143,7 +145,7 @@ export function ProfileNavButton({
       size='md'
       variant='pearl'
       ariaLabel='Back to profile'
-      className={cn('backdrop-blur-xl text-primary-token/76', className)}
+      className={className}
     >
       <Link href={`/${artistHandle}`} data-testid='back-button'>
         <ArrowLeft
