@@ -4,12 +4,21 @@ import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 
-const { loadRouteContextMock, contactsPageClientMock, routerPushMock } =
-  vi.hoisted(() => ({
-    loadRouteContextMock: vi.fn(),
-    contactsPageClientMock: vi.fn(),
-    routerPushMock: vi.fn(),
-  }));
+const {
+  loadRouteContextMock,
+  contactsPageClientMock,
+  routerPushMock,
+  audienceServerDataMock,
+  tourDatesMock,
+  lazyAudienceMock,
+} = vi.hoisted(() => ({
+  loadRouteContextMock: vi.fn(),
+  contactsPageClientMock: vi.fn(),
+  routerPushMock: vi.fn(),
+  audienceServerDataMock: vi.fn(),
+  tourDatesMock: vi.fn(),
+  lazyAudienceMock: vi.fn(),
+}));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: routerPushMock }),
@@ -18,6 +27,24 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/app/app/(shell)/app-shell-route-context', () => ({
   loadAppShellRouteContext: loadRouteContextMock,
 }));
+
+vi.mock('@/app/app/(shell)/dashboard/audience/audience-data', () => ({
+  getAudienceServerData: audienceServerDataMock,
+}));
+
+vi.mock('@/app/app/(shell)/dashboard/tour-dates/actions', () => ({
+  loadUpcomingTourDates: tourDatesMock,
+}));
+
+vi.mock(
+  '@/components/features/dashboard/organisms/LazyDashboardAudienceClient',
+  () => ({
+    LazyDashboardAudienceClient: (props: unknown) => {
+      lazyAudienceMock(props);
+      return <div>Audience client</div>;
+    },
+  })
+);
 
 vi.mock('@/app/app/(shell)/contacts/ContactsPageClient', () => ({
   ContactsPageClient: (props: unknown) => {
@@ -46,10 +73,14 @@ describe('canonical contacts page', () => {
     loadRouteContextMock.mockReset();
     contactsPageClientMock.mockReset();
     routerPushMock.mockReset();
+    audienceServerDataMock.mockReset();
+    tourDatesMock.mockReset();
+    lazyAudienceMock.mockReset();
+    tourDatesMock.mockResolvedValue([]);
     loadRouteContextMock.mockResolvedValue({
       ok: true,
       profileId: profile.id,
-      dashboardData: { selectedProfile: profile },
+      dashboardData: { selectedProfile: profile, user: { id: 'user_1' } },
     });
   });
 
@@ -108,6 +139,52 @@ describe('canonical contacts page', () => {
 
     expect(screen.getByText('Route error')).toBeInTheDocument();
     expect(contactsPageClientMock).not.toHaveBeenCalled();
+  });
+
+  it('renders the audience workspace from the bounded server read', async () => {
+    audienceServerDataMock.mockResolvedValue({
+      mode: 'members',
+      view: 'all',
+      rows: [],
+      total: 0,
+      page: 1,
+      pageSize: 25,
+      sort: 'lastSeen',
+      direction: 'desc',
+      subscriberCount: 0,
+      totalAudienceCount: 0,
+    });
+
+    render(
+      await ContactsPage({
+        searchParams: Promise.resolve({ tab: 'audience' }),
+      })
+    );
+
+    expect(await screen.findByText('Audience client')).toBeInTheDocument();
+    expect(audienceServerDataMock).toHaveBeenCalledOnce();
+  });
+
+  it('degrades to visible error UI when the audience read wedges past the bound', async () => {
+    // resilience.spec.ts contract: never park the document on the shell
+    // skeleton — a hung read must become a named error state (JOV-8791).
+    vi.useFakeTimers();
+    try {
+      audienceServerDataMock.mockReturnValue(new Promise(() => {}));
+      const pending = ContactsPage({
+        searchParams: Promise.resolve({ tab: 'audience' }),
+      });
+      render(await pending);
+      await vi.advanceTimersByTimeAsync(10_001);
+
+      expect(
+        await screen.findByText(
+          'Failed to load audience data. Please refresh the page.'
+        )
+      ).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('fails visibly when no artist profile is available', async () => {
