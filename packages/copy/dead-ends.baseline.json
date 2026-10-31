@@ -1,7 +1,7 @@
 {
   "schema": "jovie.dead-ends/v1",
   "invariant": "JOV-INV-046",
-  "totalFindings": 157,
+  "totalFindings": 142,
   "files": {
     "apps/desktop/src/build-identity.ts": {
       "copy:dead-end-not-available:development (build time unavailable)": 1
@@ -232,24 +232,8 @@
     "apps/web/components/features/pay/EmptyStates.tsx": {
       "copy:dead-end-coming-soon:Payment Metrics Coming Soon": 1
     },
-    "apps/web/components/features/profile/ProfilePrimaryTabPanel.tsx": {
-      "code:disabled-no-reason:<Button disabled>": 1
-    },
-    "apps/web/components/features/profile/TourModePanel.tsx": {
-      "code:disabled-no-reason:<Button disabled>": 1
-    },
     "apps/web/components/features/profile/artist-notifications-cta/shared.tsx": {
       "copy:dead-end-only-on-platform:[SubscriptionPearlComposer] tone=\"hero\" is only supported with inline layout.": 1
-    },
-    "apps/web/components/features/profile/pac/ProfilePacCard.tsx": {
-      "copy:dead-end-coming-soon:Coming soon": 1
-    },
-    "apps/web/components/features/release/AudioWaveformEditor.tsx": {
-      "copy:dead-end-not-available:Audio preview unavailable": 2,
-      "copy:dead-end-not-available:Preview not supported": 1
-    },
-    "apps/web/components/features/release/SmartLinkAudioPreview.tsx": {
-      "copy:dead-end-not-available:Preview unavailable": 1
     },
     "apps/web/components/jovie/components/AssistantMessageText.tsx": {
       "copy:dead-end-not-available:Unavailable reference": 1
@@ -292,14 +276,8 @@
     "apps/web/components/molecules/EmptyState.tsx": {
       "code:disabled-no-reason:<Button disabled>": 1
     },
-    "apps/web/components/molecules/QRCode.tsx": {
-      "copy:dead-end-not-available:QR code unavailable": 1
-    },
     "apps/web/components/molecules/drawer/DrawerAnalyticsSummaryCard.tsx": {
       "copy:dead-end-not-available:Analytics unavailable": 1
-    },
-    "apps/web/components/organisms/PersistentAudioBar.tsx": {
-      "copy:dead-end-not-available:Preview unavailable": 1
     },
     "apps/web/components/organisms/WrappedLinkMissingState.tsx": {
       "copy:dead-end-not-available:The link you followed may be broken, expired, or unavailable.": 1
@@ -313,19 +291,8 @@
     "apps/web/components/organisms/entity-card/adapters.ts": {
       "copy:dead-end-coming-soon:Coming Soon": 1
     },
-    "apps/web/components/organisms/profile-shell/ProfileShell.tsx": {
-      "code:noop-handler:onClick=noop": 1
-    },
     "apps/web/components/organisms/release-sidebar/ReleaseSmartLinkAnalytics.tsx": {
       "copy:dead-end-not-available:Analytics unavailable": 1
-    },
-    "apps/web/components/organisms/release-sidebar/ReleaseTrackList.tsx": {
-      "copy:dead-end-not-available:Preview unavailable.": 1
-    },
-    "apps/web/components/organisms/release-sidebar/TrackSidebar.tsx": {
-      "copy:dead-end-not-available:Preview unavailable.": 1,
-      "copy:dead-end-not-available:Preview unavailable": 2,
-      "copy:dead-end-not-available:Preview unavailable. Verify on streaming platforms.": 1
     },
     "apps/web/components/organisms/table/utils/useViewMode.ts": {
       "copy:dead-end-not-available:View mode \"${mode}\" is not available.": 1

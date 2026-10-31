@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProfileShell } from '@/components/organisms/profile-shell';
@@ -30,6 +32,10 @@ vi.mock('@/lib/hooks/useNotifications', () => ({
   }),
 }));
 
+function readSource(path: string) {
+  return readFileSync(resolve(process.cwd(), path), 'utf8');
+}
+
 function makeArtist(overrides: Partial<Artist> = {}): Artist {
   return {
     id: 'artist-1',
@@ -52,6 +58,14 @@ describe('ProfileShell notification trigger', () => {
     routerPushMock.mockReset();
     window.localStorage.clear();
     window.history.replaceState(null, '', '/testartist?mode=pay');
+  });
+
+  it('keeps the notifications loading placeholder a transient, not a silent dead end', () => {
+    // JOV-INV-046 receipt evidence for ProfileShell: the dynamic-import
+    // loading placeholder is annotated as a deliberate transient state.
+    expect(
+      readSource('components/organisms/profile-shell/ProfileShell.tsx')
+    ).toContain('dead-end-ok: transient loading placeholder');
   });
 
   it('routes bell clicks from pay mode to subscribe mode when there are no active subscriptions', () => {

@@ -512,6 +512,10 @@ describe('ProfileDesktopSurface', () => {
     expect(
       screen.queryByTestId('mock-desktop-alerts-cta')
     ).not.toBeInTheDocument();
+    // Resolving placeholder, not a dead end: it carries the real CTA label
+    // and never explains its own absence with dead-end copy (JOV-INV-046).
+    expect(resolving).toHaveTextContent('Get Alerts');
+    expect(screen.queryByText(/unavailable|not available/i)).toBeNull();
   });
 
   it('mounts the hero subscribe CTA once the visitor assignment is resolved', () => {

@@ -73,7 +73,9 @@ describe('QRCode', () => {
     fireEvent.error(img);
 
     // Should show error fallback (aria-hidden div with text)
-    expect(screen.getByText('QR code unavailable')).toBeInTheDocument();
+    expect(
+      screen.getByText('QR code failed to load. Refresh to try again.')
+    ).toBeInTheDocument();
   });
 
   it('properly encodes special characters in data', () => {
