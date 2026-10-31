@@ -389,6 +389,23 @@ test.describe('Public profile redirect parity @regression', () => {
       expect(new URL(page.url()).pathname + new URL(page.url()).search).toBe(
         expectedFinalPath
       );
+    } catch (error) {
+      // Attach the guard-level history receipts (lib/testing/runtime-trace)
+      // so a red run names the misfiring guard instead of needing a rerun.
+      const trace = await page
+        .evaluate(
+          () =>
+            (window as unknown as { __JOVIE_RUNTIME_TRACE__?: unknown })
+              .__JOVIE_RUNTIME_TRACE__ ?? null
+        )
+        .catch(() => null);
+      await testInfo
+        .attach('profile-history-trace.json', {
+          body: JSON.stringify(trace, null, 2),
+          contentType: 'application/json',
+        })
+        .catch(() => undefined);
+      throw error;
     } finally {
       await page.close().catch(() => undefined);
       await context.close().catch(() => undefined);

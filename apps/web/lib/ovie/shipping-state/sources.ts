@@ -5,8 +5,10 @@ import {
   emptyCounts,
   emptyDurations,
   isExactSha,
+  isLaneAgent,
   LANE_AGENT_RE,
   LANE_ISSUE_RE,
+  type LaneAgent,
   measuredCount,
   measuredDuration,
   NOT_MEASURED_COUNT,
@@ -320,6 +322,11 @@ function lanePrChecks(
   return { rollup, failing };
 }
 
+function laneAgentOf(prefix: string | undefined): LaneAgent | null {
+  const agent = prefix?.toLowerCase();
+  return isLaneAgent(agent) ? agent : null;
+}
+
 function lanePrDetail(
   pr: Readonly<Record<string, unknown>>,
   prNumber: number
@@ -331,9 +338,7 @@ function lanePrDetail(
     number: prNumber,
     url: safeHttpsUrl(pr.url),
     branch: safeDisplayText(pr.headRefName),
-    agent: agentMatch
-      ? (agentMatch[1]?.toLowerCase() as 'devin' | 'codex')
-      : null,
+    agent: laneAgentOf(agentMatch?.[1]),
     isDraft: pr.isDraft === true,
     checks: lanePrChecks(pr),
     queuePosition: Number.isSafeInteger(pr.mergeQueuePosition)

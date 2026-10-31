@@ -1,0 +1,59 @@
+name: Wins Ledger
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Devin
+# necessary-trust-boundary: Runs from the trusted base checkout on a merged PR event, reads only that PR's "## Win" section through the GitHub API, and writes one win record to the runtime store. It never merges, deploys, publishes or records founder decisions.
+# removal-trigger: Remove when the Symphony control plane records wins natively from merged-PR events and the ledger PR hop becomes redundant.
+
+# Every merged PR with a measurable before/after becomes one ledger record
+# (runtime store, summer-company/wins-ledger/). Event-driven: the merge is the trigger, so there is
+# no clock and no backstop to register. The same run then checks whether a theme
+# reached the draft threshold (scripts/wins-posts.mjs, PR b of this stack).
+
+on:
+  pull_request_target:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: 'Merged PR number to ingest'
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: wins-ledger
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    name: Ingest merged PR win
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged == true && contains(github.event.pull_request.body, 'Win')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout trusted base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+
+      # Data lives in the runtime store, not in git (JovieInc/ci canon/COMPANY.md,
+      # "Data vs behaviour"). The record is also durable in the merged PR body.
+      # github-token-budget: 1 call/run - one pulls read for the merged PR body
+      - name: Write the Win to the runtime store
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr }}
+          SUMMER_STORE_URL: ${{ vars.SUMMER_STORE_URL }}
+          SUMMER_STORE_TOKEN: ${{ secrets.SUMMER_STORE_TOKEN }}
+        run: node scripts/wins-ledger.mjs ingest --pr "$PR_NUMBER" --store

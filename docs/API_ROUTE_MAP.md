@@ -202,6 +202,7 @@ needs an auditable PR-body marker line — `api-breaking: <reason>`.
 
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
+| `/api/content-records/stage-events` | GET | public (rows carry only kind/key@version and timestamps) | NDJSON `marketing-change` stage feed (data-edit, data-live; rolling 28 d) read by the shipping SLO collector. |
 | `/api/content-records/[kind]/[key]` | GET, POST | `admin` or `CONTENT_PUBLISH_SECRET` bearer + `x-content-actor` | Versioned content-as-data store: history (GET); validate, draft (returns signed preview URL), publish, rollback (POST). Every publish/rollback writes an audit row. See `lib/content-records/`. |
 
 ### Creator

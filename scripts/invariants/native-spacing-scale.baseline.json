@@ -10,9 +10,9 @@
   },
   "surfaces": {
     "ios": {
-      "conservative": 12,
+      "conservative": 11,
       "strict": 20,
-      "files": 10
+      "files": 9
     },
     "desktop": {
       "conservative": 4,

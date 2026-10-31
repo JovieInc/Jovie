@@ -2,7 +2,7 @@
 
 // @coverage-via apps/web/tests/unit/onboarding/OnboardingShell.sign-in-placement.test.tsx
 
-import { Button, Link as JovieLink, Skeleton } from '@jovie/ui';
+import { Button, Link as JovieLink } from '@jovie/ui';
 import type { UIMessage } from 'ai';
 import NextLink from 'next/link';
 import {
@@ -39,6 +39,8 @@ import {
   type OnboardingTurnstileState,
 } from './OnboardingTurnstile';
 import { useOnboardingClaim } from './useOnboardingClaim';
+
+const SIGN_IN_LABEL = 'Sign in';
 
 /**
  * App-shell frame for the anonymous onboarding chat.
@@ -252,7 +254,7 @@ export function OnboardingShell({
         sidebar={null}
         flushContent
         containerClassName='[color-scheme:dark]'
-        contentClassName='overflow-hidden!'
+        contentClassName='overflow-clip!'
         main={
           <div className='flex min-h-0 min-w-0 flex-1'>
             <div
@@ -293,9 +295,12 @@ export function OnboardingShell({
                       asChild
                       variant='compact'
                       touchTarget
+                      reserveLabel={SIGN_IN_LABEL}
                       className='shrink-0 whitespace-nowrap'
                     >
-                      <NextLink href={APP_ROUTES.SIGNIN}>Sign in</NextLink>
+                      <NextLink href={APP_ROUTES.SIGNIN}>
+                        {SIGN_IN_LABEL}
+                      </NextLink>
                     </JovieLink>
                   ) : null}
                 </OnboardingIdentityConflict>
@@ -333,7 +338,7 @@ export function OnboardingShell({
               />
               <OnboardingShellStatus
                 kind='status'
-                message='Linking your conversation...'
+                message='Saving this conversation to your account…'
                 visible={isLinking}
               />
               <OnboardingShellStatus
@@ -429,7 +434,7 @@ export function OnboardingIdentityConflict({
   );
 }
 
-function OnboardingShellStatus({
+export function OnboardingShellStatus({
   kind,
   message,
   visible,
@@ -447,12 +452,13 @@ function OnboardingShellStatus({
         role='status'
         aria-live='polite'
         aria-busy='true'
-        data-testid='onboarding-linking-skeleton'
+        data-testid='onboarding-linking-status'
       >
-        <div className='flex h-3.5 w-44'>
-          <Skeleton className='flex-1' rounded='md' />
-        </div>
-        <span className='sr-only'>{message}</span>
+        {/* Words, not a bare skeleton bar: a wordless placeholder after sign-up
+            read as a stuck load (2026-10-31 golden-path walk). */}
+        <span className='text-xs leading-5 text-secondary-token'>
+          {message}
+        </span>
       </div>
     );
   }

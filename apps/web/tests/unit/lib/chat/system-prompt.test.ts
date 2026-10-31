@@ -92,6 +92,32 @@ describe('buildSystemPrompt', () => {
     );
   });
 
+  it('keeps an explicit creator segment together with the pinned release clock', () => {
+    const prompt = buildSystemPrompt(
+      baseContext,
+      [
+        {
+          title: 'Night Swim',
+          releaseType: 'single',
+          releaseDate: '2026-10-30',
+          totalTracks: 1,
+        },
+      ],
+      {
+        aiCanUseTools: true,
+        aiWeeklyMessageLimit: 10,
+        segment: 'comedian',
+        now: new Date('2026-10-28T15:00:00Z'),
+      }
+    );
+
+    expect(prompt).toContain('- **Today:** 2026-10-28 (Wednesday)');
+    expect(prompt).toContain('UPCOMING, out Friday 2026-10-30, in 2 days');
+    expect(prompt).toContain('## Creator Segment');
+    expect(prompt).toContain('show date');
+    expect(prompt).not.toContain('Friday is the standard release day');
+  });
+
   it('includes the analytics tool guidance when insights are enabled', () => {
     const prompt = buildSystemPrompt(baseContext, [], {
       aiCanUseTools: true,
@@ -137,7 +163,6 @@ describe('buildSystemPrompt', () => {
       aiCanUseTools: true,
       aiWeeklyMessageLimit: 70,
       accountContext: {
-        email: 'tim@jov.ie',
         plan: 'pro',
         displayPlan: 'Artist Presence',
         isPro: true,
@@ -168,7 +193,8 @@ describe('buildSystemPrompt', () => {
     });
 
     expect(prompt).toContain('## Account & Access');
-    expect(prompt).toContain('- **Account Email:** tim@jov.ie');
+    expect(prompt).not.toContain('tim@jov.ie');
+    expect(prompt).not.toContain('Account Email');
     expect(prompt).toContain('- **Plan:** Artist Presence');
     expect(prompt).toContain('- **Merch Creation:** Available');
     expect(prompt).toContain(
@@ -184,7 +210,6 @@ describe('buildSystemPrompt', () => {
       aiCanUseTools: false,
       aiWeeklyMessageLimit: 10,
       accountContext: {
-        email: 'tim@jov.ie',
         plan: 'free',
         displayPlan: 'Unverified',
         isPro: false,
