@@ -20,7 +20,6 @@ const scope = readReleaseEmailCanaryScope({
   RELEASE_EMAIL_CANARY_PROFILE_ID: PROFILE_ID,
   RELEASE_EMAIL_CANARY_INBOX: INBOX,
 });
-
 describe('release-email canary identities', () => {
   it('quarantines both canary identities from customer metrics', () => {
     expect(isInternalOrTestAccountEmail(INBOX)).toBe(true);
@@ -30,7 +29,6 @@ describe('release-email canary identities', () => {
     expect(isReleaseEmailCanarySubscriberEmail(ARTIST)).toBe(false);
     expect(isReleaseEmailCanaryArtistEmail(INBOX)).toBe(false);
   });
-
   it('rejects real or differently tagged addresses', () => {
     for (const email of [
       'fan@gmail.com',
@@ -42,7 +40,6 @@ describe('release-email canary identities', () => {
     }
   });
 });
-
 describe('readReleaseEmailCanaryScope (fail closed)', () => {
   it('returns the normalized scope when both values are valid', () => {
     expect(scope).toEqual({
@@ -50,7 +47,6 @@ describe('readReleaseEmailCanaryScope (fail closed)', () => {
       recipientEmail: INBOX,
     });
   });
-
   it.each([
     [{}],
     [{ RELEASE_EMAIL_CANARY_PROFILE_ID: PROFILE_ID }],
@@ -71,14 +67,12 @@ describe('readReleaseEmailCanaryScope (fail closed)', () => {
     expect(readReleaseEmailCanaryScope(env)).toBeNull();
   });
 });
-
 describe('isReleaseEmailCanaryRecipient', () => {
   const target = {
     creatorProfileId: PROFILE_ID,
     channel: 'email',
     email: INBOX,
   };
-
   it('admits only the configured profile, email channel and inbox', () => {
     expect(isReleaseEmailCanaryRecipient(scope, target)).toBe(true);
     expect(
@@ -88,7 +82,6 @@ describe('isReleaseEmailCanaryRecipient', () => {
       })
     ).toBe(true);
   });
-
   it.each([
     ['no scope', null, target],
     [
@@ -103,7 +96,6 @@ describe('isReleaseEmailCanaryRecipient', () => {
     expect(isReleaseEmailCanaryRecipient(s, t)).toBe(false);
   });
 });
-
 describe('evaluateReleaseEmailCanary', () => {
   const runAt = new Date('2026-10-29T18:00:00.000Z');
   const created = new Date('2026-10-29T17:00:00.000Z');
@@ -138,7 +130,6 @@ describe('evaluateReleaseEmailCanary', () => {
     ],
     nextRunId: 'rel-20261029180000',
   };
-
   it('passes with stage latencies when exactly one correct email arrived in the SLA', () => {
     const receipt = evaluateReleaseEmailCanary(base);
     expect(receipt).toMatchObject({
@@ -155,62 +146,37 @@ describe('evaluateReleaseEmailCanary', () => {
       },
     });
   });
-
+  const pendingNote = {
+    id: 'n',
+    status: 'pending',
+    createdAt: created,
+    sentAt: null,
+  };
+  const delivered = base.inboxMessages?.[0];
+  const late = new Date(
+    created.getTime() + RELEASE_EMAIL_CANARY_DELIVERY_SLA_MS + 1
+  );
+  const duplicate = [delivered, delivered].filter(Boolean) as NonNullable<
+    ReleaseEmailCanaryObservation['inboxMessages']
+  >;
+  const mismatch = [
+    { receivedAt: runAt, subject: title, bodyHtml: '<p>no links</p>' },
+  ];
   it.each<[string, Partial<ReleaseEmailCanaryObservation>]>([
     ['no_pending_run', { pending: null }],
     ['not_scheduled', { notification: null }],
-    [
-      'not_sent',
-      {
-        notification: {
-          id: 'n',
-          status: 'pending',
-          createdAt: created,
-          sentAt: null,
-        },
-      },
-    ],
+    ['not_sent', { notification: pendingNote }],
     ['no_provider_message_id', { providerMessageId: null }],
     ['inbox_unavailable', { inboxMessages: null }],
     ['not_delivered', { inboxMessages: [] }],
-    [
-      'duplicate_delivery',
-      {
-        inboxMessages: [
-          ...(base.inboxMessages ?? []),
-          ...(base.inboxMessages ?? []),
-        ],
-      },
-    ],
-    [
-      'content_mismatch',
-      {
-        inboxMessages: [
-          { receivedAt: runAt, subject: title, bodyHtml: '<p>no links</p>' },
-        ],
-      },
-    ],
-    [
-      'sla_exceeded',
-      {
-        inboxMessages: [
-          {
-            ...(base.inboxMessages?.[0] as NonNullable<
-              ReleaseEmailCanaryObservation['inboxMessages']
-            >[number]),
-            receivedAt: new Date(
-              created.getTime() + RELEASE_EMAIL_CANARY_DELIVERY_SLA_MS + 1
-            ),
-          },
-        ],
-      },
-    ],
+    ['duplicate_delivery', { inboxMessages: duplicate }],
+    ['content_mismatch', { inboxMessages: mismatch }],
+    ['sla_exceeded', { inboxMessages: [{ ...delivered!, receivedAt: late }] }],
   ])('fails with %s', (reason, override) => {
     const receipt = evaluateReleaseEmailCanary({ ...base, ...override });
     expect(receipt.status).toBe('failed');
     expect(receipt.failureReason).toBe(reason);
   });
-
   it('records a refusal receipt when the canary is not configured', () => {
     expect(
       buildReleaseEmailCanaryRefusal(runAt, null, 'not_configured')

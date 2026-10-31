@@ -248,10 +248,7 @@ export async function scheduleReleaseNotifications(): Promise<{
   const policy = denyAudienceEffect('audience.delivery.schedule');
   let canaryScope: ReleaseEmailCanaryScope | null = null;
   if (!policy.dispatchAllowed) {
-    // Do not create or revive audience jobs while dispatch is disabled. The
-    // one exception is the JOV-9779 release-email canary: one configured
-    // synthetic profile and one synthetic inbox. Without that config this
-    // returns before any database read, as before.
+    // JOV-9779: one synthetic profile and inbox, or the original refusal.
     canaryScope = readReleaseEmailCanaryScope(env);
     if (!canaryScope) {
       return { scheduled: 0, releasesFound: 0, policyBlocked: policy };

@@ -1,55 +1,26 @@
-/**
- * Release-email production canary (JOV-9779).
- *
- * Certifies the paid plan's core capability on production: when a new release
- * is ingested, the production cron schedules and sends a release email that
- * arrives in a reserved canary inbox.
- *
- * Identities are synthetic roster principals (`release` actor):
- *   - artist:     `<base>+synthetic-release-artist@<domain>` owns the canary profile;
- *   - subscriber: `<base>+synthetic-release-email@<domain>` is the canary inbox.
- * Both carry the `+synthetic-` tag, so `isInternalOrTestAccountEmail` keeps them
- * out of customer metrics.
- *
- * Audience delivery stays denied by `denyAudienceEffect` (JOV-8029). The only
- * carve-out is {@link ReleaseEmailCanaryScope}: exactly one configured profile
- * id and one configured canary inbox. Missing or malformed configuration
- * returns null, so the carve-out fails closed and real subscribers are never
- * reachable through it.
- */
-
+/** JOV-9779 release-email canary. Fail closed without both synthetic ids. */
 import { z } from 'zod';
 import { parseSyntheticPrincipalEmail } from '@/lib/synthetic/principals';
 import {
   isInternalOrTestAccountEmail,
   normalizeEmail,
 } from '@/lib/utils/email';
-
 export const RELEASE_EMAIL_CANARY_NAME = 'release-email' as const;
 export const RELEASE_EMAIL_CANARY_ACTOR_ID = 'release' as const;
 export const RELEASE_EMAIL_CANARY_SUBSCRIBER_RUN_TAG = 'email' as const;
 export const RELEASE_EMAIL_CANARY_ARTIST_RUN_TAG = 'artist' as const;
-
-/** Latest receipt for the admin panel and the freshness check. */
 export const RELEASE_EMAIL_CANARY_REDIS_KEY = 'canary:release-email:latest';
-/** The run triggered last, evaluated by the next run. */
 export const RELEASE_EMAIL_CANARY_PENDING_REDIS_KEY =
   'canary:release-email:pending';
-/** Proposed SLA: release created to email in the inbox. */
 export const RELEASE_EMAIL_CANARY_DELIVERY_SLA_MS = 30 * 60_000;
-/** Marker stored on the canary release so its rows are identifiable. */
 export const RELEASE_EMAIL_CANARY_METADATA_KEY = 'releaseEmailCanaryRunId';
-
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const RUN_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
-
 export interface ReleaseEmailCanaryScope {
   readonly creatorProfileId: string;
-  /** Normalized canary inbox address; the only recipient the carve-out allows. */
   readonly recipientEmail: string;
 }
-
 function isCanaryPrincipal(email: string, runTag: string): boolean {
   const parsed = parseSyntheticPrincipalEmail(email);
   return (
@@ -58,8 +29,6 @@ function isCanaryPrincipal(email: string, runTag: string): boolean {
     isInternalOrTestAccountEmail(email)
   );
 }
-
-/** True for the canary subscriber identity (`+synthetic-release-email`). */
 export function isReleaseEmailCanarySubscriberEmail(
   email: string | null | undefined
 ): boolean {
@@ -67,8 +36,6 @@ export function isReleaseEmailCanarySubscriberEmail(
     !!email && isCanaryPrincipal(email, RELEASE_EMAIL_CANARY_SUBSCRIBER_RUN_TAG)
   );
 }
-
-/** True for the canary artist identity (`+synthetic-release-artist`). */
 export function isReleaseEmailCanaryArtistEmail(
   email: string | null | undefined
 ): boolean {
@@ -76,11 +43,6 @@ export function isReleaseEmailCanaryArtistEmail(
     !!email && isCanaryPrincipal(email, RELEASE_EMAIL_CANARY_ARTIST_RUN_TAG)
   );
 }
-
-/**
- * Canary scope from server env. Null unless both values are present and the
- * inbox is the reserved synthetic subscriber identity.
- */
 export function readReleaseEmailCanaryScope(
   env: Readonly<{
     RELEASE_EMAIL_CANARY_PROFILE_ID?: string | undefined;
@@ -97,11 +59,6 @@ export function readReleaseEmailCanaryScope(
     recipientEmail: normalizeEmail(inbox),
   };
 }
-
-/**
- * The carve-out's per-recipient check: the configured profile, the email
- * channel, and exactly the configured canary inbox.
- */
 export function isReleaseEmailCanaryRecipient(
   scope: ReleaseEmailCanaryScope | null,
   target: Readonly<{
@@ -117,21 +74,18 @@ export function isReleaseEmailCanaryRecipient(
     isReleaseEmailCanarySubscriberEmail(target.email)
   );
 }
-
 export function buildReleaseEmailCanaryRunId(now: Date): string {
   return `rel-${now
     .toISOString()
     .replaceAll(/[^0-9]/g, '')
     .slice(0, 14)}`;
 }
-
 export function buildReleaseEmailCanaryReleaseTitle(runId: string): string {
   if (!RUN_ID_PATTERN.test(runId)) {
     throw new Error(`Release-email canary run id "${runId}" is malformed`);
   }
   return `Release canary ${runId}`;
 }
-
 export const releaseEmailCanaryPendingRunSchema = z.object({
   schemaVersion: z.literal(1),
   runId: z.string().regex(RUN_ID_PATTERN),
@@ -144,7 +98,6 @@ export const releaseEmailCanaryPendingRunSchema = z.object({
 export type ReleaseEmailCanaryPendingRun = z.infer<
   typeof releaseEmailCanaryPendingRunSchema
 >;
-
 export const RELEASE_EMAIL_CANARY_FAILURE_REASONS = [
   'not_configured',
   'canary_profile_invalid',
@@ -160,17 +113,14 @@ export const RELEASE_EMAIL_CANARY_FAILURE_REASONS = [
 ] as const;
 export type ReleaseEmailCanaryFailureReason =
   (typeof RELEASE_EMAIL_CANARY_FAILURE_REASONS)[number];
-
 const isoOrNull = z.string().datetime().nullable();
 const msOrNull = z.number().int().nonnegative().nullable();
-
 export const releaseEmailCanaryReceiptSchema = z.object({
   schemaVersion: z.literal(1),
   canary: z.literal(RELEASE_EMAIL_CANARY_NAME),
   runAt: z.string().datetime(),
   status: z.enum(['passed', 'failed']),
   failureReason: z.enum(RELEASE_EMAIL_CANARY_FAILURE_REASONS).nullable(),
-  /** SHA of the build that ran the cron, from `/api/health/build-info`. */
   deployedSha: z.string().nullable(),
   evaluatedRunId: z.string().nullable(),
   releaseId: z.string().nullable(),
@@ -191,7 +141,6 @@ export const releaseEmailCanaryReceiptSchema = z.object({
 export type ReleaseEmailCanaryReceipt = z.infer<
   typeof releaseEmailCanaryReceiptSchema
 >;
-
 export interface ReleaseEmailCanaryObservation {
   readonly runAt: Date;
   readonly deployedSha: string | null;
@@ -203,7 +152,6 @@ export interface ReleaseEmailCanaryObservation {
     readonly sentAt: Date | null;
   } | null;
   readonly providerMessageId: string | null;
-  /** Null when no inbox reader is configured; [] when configured but empty. */
   readonly inboxMessages: ReadonlyArray<{
     readonly receivedAt: Date;
     readonly subject: string | null;
@@ -211,17 +159,33 @@ export interface ReleaseEmailCanaryObservation {
   }> | null;
   readonly nextRunId: string | null;
 }
-
 function diffMs(from: Date | null, to: Date | null): number | null {
   if (!from || !to) return null;
   return Math.max(0, to.getTime() - from.getTime());
 }
-
-/**
- * Evaluate one triggered run. Passing requires the schedule row, a provider
- * message id, and exactly one inbox message with the release title, smart
- * link and unsubscribe link, within the SLA.
- */
+const EMPTY_RECEIPT = {
+  schemaVersion: 1 as const,
+  canary: RELEASE_EMAIL_CANARY_NAME,
+  status: 'failed' as const,
+  failureReason: null,
+  deployedSha: null,
+  evaluatedRunId: null,
+  releaseId: null,
+  notificationId: null,
+  providerMessageId: null,
+  releaseCreatedAt: null,
+  scheduledAt: null,
+  sentAt: null,
+  inboxReceivedAt: null,
+  latenciesMs: { schedule: null, send: null, delivered: null, total: null },
+  nextRunId: null,
+};
+function finishReceipt(
+  fields: Partial<ReleaseEmailCanaryReceipt> &
+    Pick<ReleaseEmailCanaryReceipt, 'runAt'>
+): ReleaseEmailCanaryReceipt {
+  return releaseEmailCanaryReceiptSchema.parse({ ...EMPTY_RECEIPT, ...fields });
+}
 export function evaluateReleaseEmailCanary(
   observation: ReleaseEmailCanaryObservation
 ): ReleaseEmailCanaryReceipt {
@@ -237,7 +201,6 @@ export function evaluateReleaseEmailCanary(
       : [];
   const delivered = matching.length === 1 ? matching[0] : null;
   const inboxReceivedAt = delivered?.receivedAt ?? null;
-
   let failureReason: ReleaseEmailCanaryFailureReason | null = null;
   if (!pending) failureReason = 'no_pending_run';
   else if (!notification) failureReason = 'not_scheduled';
@@ -259,10 +222,7 @@ export function evaluateReleaseEmailCanary(
     RELEASE_EMAIL_CANARY_DELIVERY_SLA_MS
   )
     failureReason = 'sla_exceeded';
-
-  return releaseEmailCanaryReceiptSchema.parse({
-    schemaVersion: 1,
-    canary: RELEASE_EMAIL_CANARY_NAME,
+  return finishReceipt({
     runAt: observation.runAt.toISOString(),
     status: failureReason ? 'failed' : 'passed',
     failureReason,
@@ -284,29 +244,15 @@ export function evaluateReleaseEmailCanary(
     nextRunId: observation.nextRunId,
   });
 }
-
-/** Receipt for a run that could not evaluate or trigger anything. */
 export function buildReleaseEmailCanaryRefusal(
   runAt: Date,
   deployedSha: string | null,
   failureReason: 'not_configured' | 'canary_profile_invalid'
 ): ReleaseEmailCanaryReceipt {
-  return releaseEmailCanaryReceiptSchema.parse({
-    schemaVersion: 1,
-    canary: RELEASE_EMAIL_CANARY_NAME,
+  return finishReceipt({
     runAt: runAt.toISOString(),
     status: 'failed',
     failureReason,
     deployedSha,
-    evaluatedRunId: null,
-    releaseId: null,
-    notificationId: null,
-    providerMessageId: null,
-    releaseCreatedAt: null,
-    scheduledAt: null,
-    sentAt: null,
-    inboxReceivedAt: null,
-    latenciesMs: { schedule: null, send: null, delivered: null, total: null },
-    nextRunId: null,
   });
 }

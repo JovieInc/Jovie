@@ -521,8 +521,7 @@ async function processNotificationWithBatchedData(ctx: {
         email: subscriber?.email,
       })
     ) {
-      // Audience delivery is denied; leave the row untouched (no claim,
-      // no cancel, no retry) unless it targets the reserved canary inbox.
+      // Leave a non-canary row untouched while audience delivery is denied.
       return 'skipped';
     }
     const links = linksMap.get(release.id) ?? [];
@@ -797,8 +796,7 @@ export async function sendPendingNotifications(): Promise<{
   if (!policy.dispatchAllowed) {
     // Refuse stored jobs, recovery and retries before reading recipients or
     // mutating queue rows. Consent and entitlements cannot grant dispatch.
-    // The one exception is the JOV-9779 release-email canary (one configured
-    // synthetic profile and inbox); without that config nothing is read.
+    // JOV-9779: one synthetic profile and inbox, or the original refusal.
     canaryScope = readReleaseEmailCanaryScope(env);
     if (!canaryScope) {
       return {

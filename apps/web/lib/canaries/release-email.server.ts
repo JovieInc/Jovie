@@ -1,5 +1,4 @@
 import 'server-only';
-
 import { and, desc, sql as drizzleSql, eq, gte } from 'drizzle-orm';
 import { BASE_URL } from '@/constants/domains';
 import {
@@ -30,13 +29,10 @@ import { captureError } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
 import { logger } from '@/lib/utils/logger';
 
-/** Matches the other canaries: a receipt older than a day is not healthy. */
 const RECEIPT_TTL_SECONDS = 26 * 60 * 60;
-
 function deployedSha(): string | null {
   return env.VERCEL_GIT_COMMIT_SHA ?? null;
 }
-
 async function readPendingRun(): Promise<ReleaseEmailCanaryPendingRun | null> {
   const redis = getRedis();
   if (!redis) return null;
@@ -46,7 +42,6 @@ async function readPendingRun(): Promise<ReleaseEmailCanaryPendingRun | null> {
   );
   return parsed.success ? parsed.data : null;
 }
-
 async function verifyCanaryProfile(
   scope: ReleaseEmailCanaryScope
 ): Promise<{ username: string } | null> {
@@ -60,7 +55,6 @@ async function verifyCanaryProfile(
     .leftJoin(users, eq(users.id, creatorProfiles.userId))
     .where(eq(creatorProfiles.id, scope.creatorProfileId))
     .limit(1);
-  // Fail closed: the profile must be claimed by the synthetic canary artist.
   if (
     !row?.username ||
     row.isClaimed !== true ||
@@ -70,7 +64,6 @@ async function verifyCanaryProfile(
   }
   return { username: row.username };
 }
-
 async function observePendingRun(
   scope: ReleaseEmailCanaryScope,
   pending: ReleaseEmailCanaryPendingRun
@@ -83,8 +76,6 @@ async function observePendingRun(
       sentAt: fanReleaseNotifications.sentAt,
     })
     .from(fanReleaseNotifications)
-    // The canary release is scheduled only for the canary inbox: the
-    // scheduler and sender carve-outs admit no other recipient.
     .where(
       and(
         eq(fanReleaseNotifications.releaseId, pending.releaseId),
@@ -93,7 +84,6 @@ async function observePendingRun(
     )
     .orderBy(desc(fanReleaseNotifications.createdAt))
     .limit(1);
-
   let providerMessageId: string | null = null;
   if (notification) {
     const [delivery] = await db
@@ -108,9 +98,6 @@ async function observePendingRun(
       .limit(1);
     providerMessageId = delivery?.providerMessageId ?? null;
   }
-
-  // The inbox is readable only when Resend inbound delivers to
-  // /api/webhooks/resend-inbound (its signing secret configured).
   const inboxMessages = env.RESEND_INBOUND_WEBHOOK_SECRET
     ? (
         await db
@@ -129,15 +116,12 @@ async function observePendingRun(
           )
       ).map(row => ({ ...row }))
     : null;
-
   return {
     notification: notification ?? null,
     providerMessageId,
     inboxMessages,
   };
 }
-
-/** Insert the next canary release through the release domain functions. */
 async function triggerCanaryRelease(
   scope: ReleaseEmailCanaryScope,
   username: string,
@@ -152,7 +136,6 @@ async function triggerCanaryRelease(
     releaseType: 'single',
     releaseDate: now,
     totalTracks: 1,
-    // The value the Spotify import writes, so eligibility is exercised as-is.
     sourceType: 'ingested',
     metadata: { [RELEASE_EMAIL_CANARY_METADATA_KEY]: runId },
   });
@@ -174,7 +157,6 @@ async function triggerCanaryRelease(
     deployedSha: deployedSha(),
   });
 }
-
 async function persist(
   receipt: ReleaseEmailCanaryReceipt,
   nextPending: ReleaseEmailCanaryPendingRun | null
@@ -195,11 +177,6 @@ async function persist(
     );
   }
 }
-
-/**
- * One canary run: evaluate the release triggered last run, then trigger the
- * next one. The frequent cron schedules and sends it like any other release.
- */
 export async function runReleaseEmailCanary(
   now: Date = new Date()
 ): Promise<ReleaseEmailCanaryReceipt> {
@@ -213,7 +190,6 @@ export async function runReleaseEmailCanary(
     await persist(receipt, null);
     return receipt;
   }
-
   const profile = await verifyCanaryProfile(scope);
   if (!profile) {
     const receipt = buildReleaseEmailCanaryRefusal(
@@ -229,13 +205,11 @@ export async function runReleaseEmailCanary(
     );
     return receipt;
   }
-
   const pending = await readPendingRun();
   const observed = pending
     ? await observePendingRun(scope, pending)
     : { notification: null, providerMessageId: null, inboxMessages: null };
   const next = await triggerCanaryRelease(scope, profile.username, now);
-
   const receipt = evaluateReleaseEmailCanary({
     runAt: now,
     deployedSha: deployedSha(),
@@ -244,7 +218,6 @@ export async function runReleaseEmailCanary(
     nextRunId: next.runId,
   });
   await persist(receipt, next);
-
   if (
     receipt.status === 'failed' &&
     receipt.failureReason !== 'no_pending_run'
@@ -256,8 +229,6 @@ export async function runReleaseEmailCanary(
   }
   return receipt;
 }
-
-/** Latest stored receipt, for the freshness check and the ops panel. */
 export async function getReleaseEmailCanaryStatus(): Promise<ReleaseEmailCanaryReceipt | null> {
   const redis = getRedis();
   if (!redis) return null;
