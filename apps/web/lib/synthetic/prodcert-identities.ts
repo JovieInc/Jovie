@@ -1,5 +1,6 @@
 import { DEFAULT_DEV_TEST_AUTH_EMAILS } from '@/lib/auth/dev-test-auth-identity';
 import { normalizeEmail } from '@/lib/utils/email';
+import { isAdmittedCanaryEmail } from './admitted-canary-fixture';
 
 /**
  * Production certification canary identities (JOV-9625).
@@ -12,7 +13,9 @@ import { normalizeEmail } from '@/lib/utils/email';
  *   - the seeded returning canary (`browse-ready+clerk_test@jov.ie`), which
  *     owns a claimed profile;
  *   - per-run new-user addresses
- *     `browse-ready+synthetic-prodcert-<run>@jov.ie`.
+ *     `browse-ready+synthetic-prodcert-<run>@jov.ie`;
+ *   - the admitted canary (`admitted-canary-fixture.ts`), the one permanent
+ *     admitted identity with a live profile (exact address only).
  *
  * The OTP reader and the passage token both refuse every other address.
  */
@@ -29,7 +32,8 @@ export function isProdcertCanaryEmail(
   const normalized = normalizeEmail(email);
   return (
     normalized === PRODCERT_RETURNING_CANARY_EMAIL ||
-    PRODCERT_NEW_USER_EMAIL_PATTERN.test(normalized)
+    PRODCERT_NEW_USER_EMAIL_PATTERN.test(normalized) ||
+    isAdmittedCanaryEmail(normalized)
   );
 }
 

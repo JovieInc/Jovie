@@ -77,3 +77,29 @@ describe('selectUnclaimedCertArtist', () => {
     ).rejects.toThrow('probe unavailable');
   });
 });
+
+describe('admitted canary reserved artist', () => {
+  it('is never in the shared e2e pool', async () => {
+    const { ADMITTED_CANARY_RESERVED_ARTIST, SHARED_E2E_ARTIST_POOL } =
+      await import('./prodcert-artist-fixture');
+    expect(
+      SHARED_E2E_ARTIST_POOL.map(artist => artist.spotifyId)
+    ).not.toContain(ADMITTED_CANARY_RESERVED_ARTIST.spotifyId);
+  });
+
+  it('is skipped by the selector even when passed in', async () => {
+    const { ADMITTED_CANARY_RESERVED_ARTIST } = await import(
+      './prodcert-artist-fixture'
+    );
+    const probed: string[] = [];
+    const chosen = await selectUnclaimedCertArtist(
+      [ADMITTED_CANARY_RESERVED_ARTIST, ...POOL],
+      async spotifyId => {
+        probed.push(spotifyId);
+        return false;
+      }
+    );
+    expect(chosen).toBe(POOL[0]);
+    expect(probed).not.toContain(ADMITTED_CANARY_RESERVED_ARTIST.spotifyId);
+  });
+});

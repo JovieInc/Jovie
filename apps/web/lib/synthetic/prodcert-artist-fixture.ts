@@ -58,6 +58,9 @@ export async function selectUnclaimedCertArtist(
 ): Promise<ProdcertArtistFixture> {
   const taken: string[] = [];
   for (const candidate of candidates) {
+    // The admitted canary owns its artist permanently; claiming it would
+    // conflict with (or steal) the fixture's binding.
+    if (isReservedAdmittedCanaryArtist(candidate.spotifyId)) continue;
     if (await isIdentityTaken(candidate.spotifyId)) {
       taken.push(candidate.spotifyId);
       continue;
@@ -79,11 +82,6 @@ export const SHARED_E2E_ARTIST_POOL: readonly ProdcertArtistFixture[] = [
     url: 'https://open.spotify.com/artist/1ZlSI1juLMMN1HU8X7RViN',
   },
   {
-    spotifyId: '0T4McYgGzOzXOWzLaukIjD',
-    name: 'Unmarked Pavement',
-    url: 'https://open.spotify.com/artist/0T4McYgGzOzXOWzLaukIjD',
-  },
-  {
     spotifyId: '6knM2BGm18cXek6FXbWd0t',
     name: 'Good Dropouts',
     url: 'https://open.spotify.com/artist/6knM2BGm18cXek6FXbWd0t',
@@ -94,3 +92,19 @@ export const SHARED_E2E_ARTIST_POOL: readonly ProdcertArtistFixture[] = [
     url: 'https://open.spotify.com/artist/6TWG4bY1qzp0lJuxxFtl6F',
   },
 ];
+
+/**
+ * Permanently bound to the admitted production canary
+ * (`admitted-canary-fixture.ts`). Never part of the shared pool: run-time
+ * claim journeys skip it, so its binding is never released or contested.
+ */
+export const ADMITTED_CANARY_RESERVED_ARTIST: ProdcertArtistFixture =
+  Object.freeze({
+    spotifyId: '0T4McYgGzOzXOWzLaukIjD',
+    name: 'Unmarked Pavement',
+    url: 'https://open.spotify.com/artist/0T4McYgGzOzXOWzLaukIjD',
+  });
+
+export function isReservedAdmittedCanaryArtist(spotifyId: string): boolean {
+  return spotifyId === ADMITTED_CANARY_RESERVED_ARTIST.spotifyId;
+}
