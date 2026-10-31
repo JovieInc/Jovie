@@ -470,6 +470,64 @@ function isLoopbackBetterAuthHostText(
 }
 
 /**
+ * JOV-10124 / Sentry 7822218012: the owner verified-merge guard in
+ * collaborator-profile-reconciliation.ts is a designed fail-closed gate
+ * (JOV-4838). It re-fires on every catalog import/backfill for the affected
+ * profile until an operator routes the owner through an explicit verified
+ * merge, so filing it as a Sentry exception pages on an expected path
+ * (JOV-10124 / JOV-10125 / JOV-10191). Keep the captureWarning receipt
+ * (console + analytics) and the fail-closed skip; drop only the Sentry
+ * filing. Real identity conflicts detected during candidate reconciliation
+ * keep their own capture classes and must not match.
+ */
+const OWNER_IDENTITY_VERIFIED_MERGE_GUARD_PATTERN =
+  /owner identity requires an explicit verified profile merge/i;
+
+export const OWNER_IDENTITY_VERIFIED_MERGE_GUARD_IGNORE_ERRORS: ReadonlyArray<RegExp> =
+  [OWNER_IDENTITY_VERIFIED_MERGE_GUARD_PATTERN];
+
+/**
+ * True when a capture is the expected owner verified-merge guard receipt,
+ * not an unexpected reconciliation failure.
+ */
+export function isOwnerIdentityVerifiedMergeGuardCapture(
+  value: unknown
+): boolean {
+  if (typeof value === 'string') {
+    return OWNER_IDENTITY_VERIFIED_MERGE_GUARD_PATTERN.test(value);
+  }
+  if (value instanceof Error) {
+    return OWNER_IDENTITY_VERIFIED_MERGE_GUARD_PATTERN.test(value.message);
+  }
+  return false;
+}
+
+/**
+ * True when a Sentry/Linear title is the owner verified-merge guard receipt.
+ */
+export function isNonActionableOwnerIdentityVerifiedMergeGuardIssue(
+  issue: SentryIssueSummary
+): boolean {
+  return (
+    OWNER_IDENTITY_VERIFIED_MERGE_GUARD_PATTERN.test(issue.title ?? '') ||
+    OWNER_IDENTITY_VERIFIED_MERGE_GUARD_PATTERN.test(issue.culprit ?? '')
+  );
+}
+
+/**
+ * True when a Sentry event is the owner verified-merge guard receipt.
+ */
+export function isNonActionableOwnerIdentityVerifiedMergeGuardEvent(
+  event: SentryExceptionLike
+): boolean {
+  return collectSentryEventCaptureValues(event).some(
+    value =>
+      typeof value === 'string' &&
+      OWNER_IDENTITY_VERIFIED_MERGE_GUARD_PATTERN.test(value)
+  );
+}
+
+/**
  * True when a Sentry/Linear title is a Better Auth loopback Host rejection
  * (JOV-5843). Real remote-host allowlist failures must not match.
  */

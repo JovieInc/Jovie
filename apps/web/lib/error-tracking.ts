@@ -33,6 +33,7 @@ import {
 import {
   isMusicfetchCutoverCapture,
   isOpaqueUpstashErrorJsonBag,
+  isOwnerIdentityVerifiedMergeGuardCapture,
   isSpotifyReleaseCreditBoundCapture,
   isUpstashQuotaNoise,
 } from '@/lib/sentry/non-actionable-issues';
@@ -315,12 +316,19 @@ export async function captureError(
     isMusicfetchCutoverCapture(resolvedError) ||
     isMusicfetchCutoverCapture(message) ||
     isMusicfetchCutoverCapture(errorData.message);
+  // Owner verified-merge guard (JOV-10124 / Sentry 7822218012): a designed
+  // fail-closed receipt that re-fires until an operator merges the colliding
+  // identity. Keep console + analytics; never file a Sentry exception.
+  const ownerMergeGuard =
+    isOwnerIdentityVerifiedMergeGuardCapture(message) ||
+    isOwnerIdentityVerifiedMergeGuardCapture(resolvedError);
 
   if (
     !opaqueBag &&
     !quotaNoise &&
     !boundedCreditReceipt &&
-    !musicfetchCutover
+    !musicfetchCutover &&
+    !ownerMergeGuard
   ) {
     sendToSentry({
       error: resolvedError ?? message,
