@@ -167,7 +167,7 @@ export function CookieBannerMount() {
       {gpc && !privacyOpen ? (
         <aside
           aria-label='Privacy Signal'
-          className='fixed bottom-24 left-4 right-4 z-50 max-w-85 sm:left-auto rounded-xl border border-subtle bg-surface-1 px-4 py-3 text-xs text-secondary-token shadow-card'
+          className='fixed bottom-24 left-4 right-4 z-banner max-w-85 sm:left-auto rounded-xl border border-subtle bg-surface-1 px-4 py-3 text-xs text-secondary-token shadow-card'
         >
           <p role='status'>{GPC_CONFIRMATION}</p>
         </aside>
