@@ -78,6 +78,22 @@ export function declaredGatewayModels(routing) {
   return models;
 }
 
+/** Workers AI list price per 1,000 neurons (USD); neurons are what Cloudflare bills credits against. */
+export const WORKERS_AI_USD_PER_1K_NEURONS = 0.011;
+
+/** USD per day by date from `aiInferenceAdaptiveGroups` rows grouped by `date`. */
+export function workersAiUsdByDay(groups) {
+  const out = {};
+  for (const g of groups ?? []) {
+    const day = g?.dimensions?.date;
+    if (!day) continue;
+    out[day] =
+      (out[day] ?? 0) +
+      ((g.sum?.totalNeurons ?? 0) / 1000) * WORKERS_AI_USD_PER_1K_NEURONS;
+  }
+  return out;
+}
+
 export function evaluateRouting({
   routing,
   keyRows = [],
@@ -86,6 +102,7 @@ export function evaluateRouting({
   credits = null,
   health = {},
   envNames = null,
+  workersAiByDay = null,
 }) {
   const findings = [];
   const keyUsd = usdPerDayByKey(keyRows, days);
@@ -186,6 +203,14 @@ export function evaluateRouting({
     schema: ROUTING_CHECK_SCHEMA,
     days,
     gatewayUsdPerDay: round(Object.values(keyUsd).reduce((a, b) => a + b, 0)),
+    workersAiUsdByDay: workersAiByDay
+      ? Object.fromEntries(
+          Object.entries(workersAiByDay).map(([day, usd]) => [day, round(usd)])
+        )
+      : null,
+    workersAiUsdPerDay: workersAiByDay
+      ? round(Object.values(workersAiByDay).reduce((a, b) => a + b, 0) / days)
+      : null,
     byKey: Object.fromEntries(
       Object.entries(keyUsd).map(([k, v]) => [
         k,
