@@ -33,6 +33,7 @@ import {
   scanConcentricSwift,
   semanticDeclarations,
   swiftColor,
+  trustedPaintCeiling,
 } from './native-design-system.mjs';
 
 const manifest = JSON.parse(readFileSync(resolve(ROOT, MANIFEST), 'utf8'));
@@ -449,6 +450,97 @@ test('the selected source gate goes red on wrong native paint/token bypass and g
     );
     writeFileSync(themePath, theme);
     assert.deepEqual(checkNativeDesign(root), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+function gitFixture(prefix) {
+  const root = mkdtempSync(join(tmpdir(), prefix));
+  const git = args => {
+    const result = spawnSync('git', args, {
+      cwd: root,
+      encoding: 'utf8',
+      timeout: 10000,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout;
+  };
+  const write = (path, text) => {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), text);
+  };
+  const commitBase = () => {
+    git(['init', '-q']);
+    git(['config', 'user.name', 'Native fixture']);
+    git(['config', 'user.email', 'fixture@invalid']);
+    git(['config', 'commit.gpgsign', 'false']);
+    git(['add', '.']);
+    git(['commit', '-qm', 'immutable base']);
+    git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  };
+  return { root, git, write, commitBase };
+}
+
+test('trusted paint ceiling reads the committed baseline at the merge base, not the working tree', () => {
+  const { root, write, commitBase } = gitFixture('jovie-native-ceiling-');
+  const debtPath = 'apps/ios/native-color-debt.json';
+  try {
+    write(debtPath, JSON.stringify({ identities: { 'a.swift :: x': 1 } }));
+    write('apps/ios/Jovie/A.swift', 'let a = 1\n');
+    commitBase();
+    // A proposed (uncommitted) baseline cannot raise its own ceiling.
+    write(
+      debtPath,
+      JSON.stringify({ identities: { 'a.swift :: x': 9, 'b.swift :: y': 3 } })
+    );
+    assert.deepEqual(trustedPaintCeiling(root, { paintDebt: debtPath }), {
+      'a.swift :: x': 1,
+    });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('first baseline introduction measures raw paint in the immutable base blobs, with exact exclusions', () => {
+  const { root, write, commitBase } = gitFixture('jovie-native-first-');
+  const debtPath = 'apps/ios/native-color-debt.json';
+  const raw = 'let tint = Color(red: 1, green: 0, blue: 0)';
+  assert.equal(rawColors(raw).length, 1, 'fixture line must be raw paint');
+  try {
+    write('apps/ios/Jovie/Feature/Card.swift', `${raw}\n${raw}\nlet ok = 1\n`);
+    write('apps/ios/Jovie/Other.swift', `struct S {}\n${raw}\n`);
+    // Exempt owners and non-Swift files never enter the floor.
+    write('apps/ios/Jovie/DesignSystem/JovieTheme.swift', `${raw}\n`);
+    write('apps/ios/Jovie/Testing/UITestHarnessViews.swift', `${raw}\n`);
+    write('apps/ios/Jovie/notes.md', `${raw}\n`);
+    commitBase();
+    // Working-tree edits after the base (new paint, a proposed floor) are ignored.
+    write('apps/ios/Jovie/Feature/Card.swift', `${raw}\n${raw}\n${raw}\n`);
+    write(debtPath, JSON.stringify({ identities: { inflated: 99 } }));
+    assert.deepEqual(trustedPaintCeiling(root, { paintDebt: debtPath }), {
+      [`apps/ios/Jovie/Feature/Card.swift :: ${raw}`]: 2,
+      [`apps/ios/Jovie/Other.swift :: ${raw}`]: 1,
+    });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('the CLI fails closed with a named error when the checked root is unreadable', () => {
+  const root = mkdtempSync(join(tmpdir(), 'jovie-native-cli-'));
+  try {
+    const result = spawnSync(
+      process.execPath,
+      [
+        resolve(ROOT, 'apps/ios/scripts/native-design-system.mjs'),
+        '--root',
+        root,
+      ],
+      { encoding: 'utf8', timeout: 20000 }
+    );
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /^\[native-design-system\] FAIL: /m);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
