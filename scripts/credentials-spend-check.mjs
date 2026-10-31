@@ -18,7 +18,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -45,8 +45,10 @@ export const SPEND_PATH = resolve(REPO_ROOT, 'ops/registry/spend.json');
 /** Third-party grants on Tim's/org accounts, one JSON object per line. */
 /**
  * The grants file is private (JovieInc/Ops jovie-private/). Read it from
- * JOVIE_PRIVATE_DIR (or ~/Ops/jovie-private); when absent the check runs with
- * no grants rather than failing.
+ * JOVIE_PRIVATE_DIR (or ~/Ops/jovie-private). When it is absent or empty the
+ * load reports a privateDataIssue with the specific reason; runCheck turns that
+ * into a failed `read-private-grants` stage and a high finding (alert). It is
+ * never a silent pass with zero grants.
  */
 export const GRANTS_PATH = resolve(
   process.env.JOVIE_PRIVATE_DIR ||
@@ -70,16 +72,32 @@ export function loadRegistry({
 } = {}) {
   const credentials = JSON.parse(readFileSync(credentialsPath, 'utf8'));
   const inventory = JSON.parse(readFileSync(inventoryPath, 'utf8'));
+  const privateDataIssues = [];
+  let grantsText = '';
+  try {
+    grantsText = readFileSync(grantsPath, 'utf8');
+  } catch (error) {
+    privateDataIssues.push({
+      subject: 'third-party-grants',
+      path: grantsPath,
+      reason: `read failed: ${error?.code ?? 'unknown error'}`,
+    });
+  }
+  const thirdPartyGrants = grantsText
+    .split('\n')
+    .filter(line => line.trim())
+    .map(line => JSON.parse(line));
+  if (!privateDataIssues.length && !thirdPartyGrants.length)
+    privateDataIssues.push({
+      subject: 'third-party-grants',
+      path: grantsPath,
+      reason: 'file is empty',
+    });
   return {
     credentials: { ...credentials, stores: inventory.stores ?? [] },
     spend: JSON.parse(readFileSync(spendPath, 'utf8')),
-    thirdPartyGrants: (existsSync(grantsPath)
-      ? readFileSync(grantsPath, 'utf8')
-      : ''
-    )
-      .split('\n')
-      .filter(line => line.trim())
-      .map(line => JSON.parse(line)),
+    thirdPartyGrants,
+    privateDataIssues,
   };
 }
 
@@ -137,9 +155,26 @@ export async function runCheck({
     value: registry ?? loadRegistry(),
   }));
   if (!loaded.ok) throw new Error(`registry unreadable: ${loaded.reason}`);
-  const { credentials, spend, thirdPartyGrants = [] } = loaded.value;
-  const overlay = { spend: {}, credentials: [] };
+  const {
+    credentials,
+    spend,
+    thirdPartyGrants = [],
+    privateDataIssues = [],
+  } = loaded.value;
   const reads = {};
+  for (const issue of privateDataIssues) {
+    // Loud, specific, recorded: the stage fails with the reason and the finding
+    // below files an alert. Never a silent pass with zero grants.
+    await stage(stages, `read-private-${issue.subject}`, now, async () => ({
+      ok: false,
+      reason: `${issue.reason} at ${issue.path}`,
+    }));
+    reads.privateGrants = `unavailable: ${issue.reason}`;
+    process.stderr.write(
+      `credentials-spend-check: private ${issue.subject} unavailable (${issue.reason}) at ${issue.path}; set JOVIE_PRIVATE_DIR to a JovieInc/Ops jovie-private checkout\n`
+    );
+  }
+  const overlay = { spend: {}, credentials: [] };
   if (live) {
     const gateway = await stage(stages, 'read-gateway-credits', now, () =>
       readGatewayCredits({
@@ -194,6 +229,7 @@ export async function runCheck({
       credentials,
       spend,
       thirdPartyGrants,
+      privateDataIssues,
       nowMs: now(),
       live: overlay,
     }),

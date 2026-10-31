@@ -64,6 +64,7 @@ LOCKFILES = frozenset({"pnpm-lock.yaml"})
 # extends the same deterministic rung to the generated workflow topology so Symphony PRs
 # stop hand-merging `.gen.` output.
 GENERATED_RESOLVERS = {
+    "canon/SOURCES_OF_TRUTH.md": ("node", "scripts/sources-of-truth.mjs", "--write"),
     ".github/workflow-topology.gen.yml": ("pnpm", "ci:topology:write"),
     "pnpm-lock.yaml": ("pnpm", "install", "--lockfile-only", "--ignore-scripts"),
 }

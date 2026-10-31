@@ -27,7 +27,14 @@ export const MESH_KINDS = [
   'devin',
   'muse',
   'lola',
+  'summer',
 ] as const;
+/**
+ * Kinds are owned by the hub registry (GET /v1/agents), not this list: a stale
+ * local build must never reject a registered agent (the 10-31 Lola failure).
+ * MESH_KINDS stays as the known set for help text and legacy routing.
+ */
+export const MESH_KIND_PATTERN = /^[a-z][a-z0-9-]{1,31}$/;
 export const MESH_FLAG_NAMES = [
   'to',
   'refs',
@@ -39,8 +46,11 @@ export const MESH_FLAG_NAMES = [
   'owner',
   'sender-id',
   'token-sha256',
+  'hours',
 ] as const;
-const MESH_RECIPIENTS = new Set<string>(['summer', 'all', ...MESH_KINDS]);
+/** Value-less mesh switches; parsed as booleans and passed on as 'true'. */
+export const MESH_BOOLEAN_FLAG_NAMES = ['peek', 'install'] as const;
+const isRecipient = (to: string) => to === 'all' || MESH_KIND_PATTERN.test(to);
 const KEYCHAIN_SERVICE_PREFIX = 'jovie.mesh.';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -58,6 +68,12 @@ export type MeshDependencies = {
   readonly keychain?: MeshKeychain;
   readonly now?: () => Date;
   readonly userAgent?: string;
+  /** `mesh watch` only: one call per new message line. */
+  readonly emit?: (line: string) => void;
+  /** `mesh watch` only: stops the loop cleanly (Ctrl-C, tests). */
+  readonly signal?: AbortSignal;
+  /** `mesh watch` only: reconnect delay seam for tests. */
+  readonly sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
 };
 
 type MeshFlags = Readonly<Record<string, string | undefined>>;
@@ -121,16 +137,16 @@ export const macKeychain: MeshKeychain = {
   },
 };
 
-function kindFrom(value: string | undefined, label: string): string {
+export function kindFrom(value: string | undefined, label: string): string {
   const kind = value?.trim() ?? '';
-  if (!(MESH_KINDS as readonly string[]).includes(kind))
+  if (!MESH_KIND_PATTERN.test(kind))
     throw new JovieInputError(
-      `${label} must be one of: ${MESH_KINDS.join(', ')}.`
+      `${label} must be a registered agent kind (for example ${MESH_KINDS.slice(0, 4).join(', ')}).`
     );
   return kind;
 }
 
-function meshOrigin(env: MeshDependencies['env']): string {
+export function meshOrigin(env: MeshDependencies['env']): string {
   const raw = env?.JOVIE_MESH_URL?.trim() || MESH_DEFAULT_URL;
   let url: URL;
   try {
@@ -213,13 +229,21 @@ const KNOWN_CODES = new Set([
   'invalid_json',
 ]);
 
-async function meshRequest(
+export async function meshRequest(
   path: string,
-  init: { method: 'GET' | 'POST'; token: string; body?: unknown },
+  init: {
+    method: 'GET' | 'POST';
+    token: string;
+    body?: unknown;
+    timeoutMs?: number;
+  },
   deps: MeshDependencies
 ): Promise<Record<string, unknown>> {
   const origin = meshOrigin(deps.env ?? process.env);
-  const signal = AbortSignal.timeout(30_000);
+  const timeout = AbortSignal.timeout(init.timeoutMs ?? 30_000);
+  const signal = deps.signal
+    ? AbortSignal.any([timeout, deps.signal])
+    : timeout;
   let response: Response;
   try {
     response = await (deps.fetchImpl ?? globalThis.fetch)(`${origin}${path}`, {
@@ -296,9 +320,9 @@ export async function meshSend(
   if (!body.trim() || body.length > 4000)
     throw new JovieInputError('Message body must be 1–4000 characters.');
   const to = flags.to?.trim() || 'summer';
-  if (!MESH_RECIPIENTS.has(to))
+  if (!isRecipient(to))
     throw new JovieInputError(
-      `--to must be summer, all, or one of: ${MESH_KINDS.join(', ')}.`
+      '--to must be summer, all, or a registered agent kind.'
     );
   const refs = (flags.refs ?? '')
     .split(',')
@@ -364,6 +388,123 @@ export async function meshRead(
     deps
   );
   return { ok: true, ...result };
+}
+
+const WATCH_WAIT_SECONDS = 25;
+const WATCH_BACKOFF_START_MS = 1_000;
+const WATCH_BACKOFF_MAX_MS = 60_000;
+const WATCH_SEEN_LIMIT = 500;
+const WATCH_MIN_HOLD_MS = 2_000;
+const WATCH_FALLBACK_PAUSE_MS = 10_000;
+
+const defaultSleep = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>(resolve => {
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      { once: true }
+    );
+  });
+
+/**
+ * Hold a long-poll on the caller's own mailbox and emit one line per new
+ * message, so a Monitor wakes on stdout with no polling loop of its own. Same
+ * credentials and mailbox cursor as `mesh read`; the server holds each request
+ * (`wait`) until a message lands. Starts after the existing backlog unless
+ * `--cursor` resumes from a saved position. Reconnects with exponential backoff
+ * on transport errors and 503; auth and input errors end the watch.
+ */
+export async function meshWatch(
+  flags: MeshFlags,
+  deps: MeshDependencies = {}
+): Promise<Record<string, unknown>> {
+  const emit =
+    deps.emit ?? ((line: string) => process.stdout.write(`${line}\n`));
+  const sleep = deps.sleep ?? defaultSleep;
+  const clock = () => (deps.now?.() ?? new Date()).toISOString().slice(0, 10);
+  const credentials = await meshCredentials(flags, deps);
+  const seen = new Set<string>();
+  let day = clock();
+  let cursor: string | undefined = flags.cursor;
+  let primed = flags.cursor !== undefined;
+  let backoff = WATCH_BACKOFF_START_MS;
+  let emitted = 0;
+  const line = (message: Record<string, unknown>) =>
+    flags.json === 'true'
+      ? JSON.stringify(message)
+      : `mesh from=${String(message.senderKind)} to=${String(message.to)} id=${String(message.correlationId)} at=${String(message.receivedAt)} body=${String(message.quotedBody)}`;
+  const read = async (readDay: string, wait: number) => {
+    const query = new URLSearchParams({ day: readDay });
+    if (cursor) query.set('cursor', cursor);
+    if (wait) query.set('wait', String(wait));
+    return meshRequest(
+      `/summer/v1/mesh/mailbox?${query}`,
+      {
+        method: 'GET',
+        token: credentials.token,
+        timeoutMs: (wait + 10) * 1000,
+      },
+      deps
+    );
+  };
+  const take = (page: Record<string, unknown>, print: boolean) => {
+    const messages = Array.isArray(page.messages)
+      ? (page.messages as Record<string, unknown>[])
+      : [];
+    for (const message of messages) {
+      const id = String(message.correlationId);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      if (seen.size > WATCH_SEEN_LIMIT)
+        seen.delete(seen.values().next().value as string);
+      if (print) {
+        emit(line(message));
+        emitted++;
+      }
+    }
+    if (typeof page.nextCursor === 'string') cursor = page.nextCursor;
+    return page.hasMore === true;
+  };
+  while (!deps.signal?.aborted) {
+    try {
+      const today = clock();
+      if (today !== day) {
+        // Midnight UTC: drain what is left of the old day, then start the new one.
+        while (take(await read(day, 0), true)) if (deps.signal?.aborted) break;
+        day = today;
+        cursor = undefined;
+      }
+      if (!primed) {
+        // Skip the existing backlog: only messages that arrive after the watch starts.
+        while (take(await read(day, 0), false)) if (deps.signal?.aborted) break;
+        primed = true;
+        continue;
+      }
+      const startedAt = Date.now();
+      const page = await read(day, WATCH_WAIT_SECONDS);
+      backoff = WATCH_BACKOFF_START_MS;
+      const quiet = !Array.isArray(page.messages) || page.messages.length === 0;
+      while (take(page, true)) {
+        if (deps.signal?.aborted) break;
+        Object.assign(page, await read(day, 0));
+      }
+      // A server that ignores `wait` (not yet deployed) answers at once: never spin on it.
+      if (quiet && Date.now() - startedAt < WATCH_MIN_HOLD_MS)
+        await sleep(WATCH_FALLBACK_PAUSE_MS, deps.signal);
+    } catch (error) {
+      if (deps.signal?.aborted) break;
+      const retryable =
+        error instanceof JovieRequestError && error.retryable === true;
+      if (!retryable) throw error;
+      await sleep(backoff, deps.signal);
+      backoff = Math.min(backoff * 2, WATCH_BACKOFF_MAX_MS);
+    }
+  }
+  return { ok: true, stopped: true, emitted };
 }
 
 /**
@@ -435,9 +576,15 @@ export async function meshVouch(
   };
 }
 
-export const MESH_USAGE = `Agent mesh (company agents only; needs a registered mesh token):
+export const MESH_USAGE = `Agent mesh (company agents only; needs a registered mesh token). Transport: the Cloudflare mesh hub
+(JOVIE_MESH_HUB_URL), with Summer's legacy inbox as a best-effort dual-write for summer/all (JOVIE_MESH_LEGACY=0 disables;
+JOVIE_MESH_HUB=0 uses legacy only):
   mesh send <message> [--to summer|all|<kind>] [--refs JOV-1,JOV-2] [--correlation-id <id>] [--as <kind>]
-  mesh read [--day YYYY-MM-DD] [--cursor <c>] [--as <kind>]
+       Written to a local outbox first; if the hub is unreachable it stays queued and is delivered later with the same id.
+  mesh read [--peek] [--day YYYY-MM-DD] [--as <kind>]   Unhandled messages (marked handled unless --peek); --day = that day's history
+  mesh ack <id[,id]> [--as <kind>]                      Mark messages handled (DLQ escalates unhandled mail to the fallback owner)
+  mesh watch [--as <kind>] [--json]                     Long-poll stream; one line per new message (for Monitor)
+  mesh status [--hours N] [--as <kind>]                 Agents, presence, alarms, delivery p50/p95, dead and unhandled counts
   mesh register --kind <kind> [--owner <name>]   Create this agent's token in the keychain; prints the sha256 entry
   mesh vouch --kind <kind> --sender-id <uuid> --token-sha256 <hex> [--owner <name>] [--as <kind>]
   Credentials: JOVIE_MESH_TOKEN + JOVIE_MESH_SENDER_ID + JOVIE_MESH_SENDER_KIND, else keychain item jovie.mesh.<kind>.
@@ -450,17 +597,36 @@ export async function runMesh(
 ): Promise<Record<string, unknown>> {
   const [, action, arg, ...extra] = positionals;
   if (extra.length) throw new JovieInputError('Too many arguments for mesh.');
+  const hub = await import('./mesh-hub.js');
+  const useHub = hub.hubEnabled(deps);
   if (action === 'send') {
     if (arg === undefined)
       throw new JovieInputError('Missing required argument <message>.');
-    return meshSend(arg, flags, deps);
+    return useHub ? hub.hubSend(arg, flags, deps) : meshSend(arg, flags, deps);
+  }
+  if (action === 'ack') {
+    if (arg === undefined)
+      throw new JovieInputError('Missing required argument <id>.');
+    return hub.hubAck(arg, flags, deps);
   }
   if (arg !== undefined)
     throw new JovieInputError(`Unexpected argument for mesh ${action}.`);
-  if (action === 'read') return meshRead(flags, deps);
+  if (action === 'read')
+    return useHub ? hub.hubRead(flags, deps) : meshRead(flags, deps);
+  if (action === 'watch') {
+    if (!useHub) return meshWatch(flags, deps);
+    // Summer still replies through its legacy mailbox until it consumes the hub.
+    const legacy = (deps.env ?? process.env).JOVIE_MESH_LEGACY !== '0';
+    const [result] = await Promise.all([
+      hub.hubWatch(flags, deps),
+      legacy ? meshWatch(flags, deps).catch(() => undefined) : undefined,
+    ]);
+    return result;
+  }
+  if (action === 'status') return hub.hubStatus(flags, deps);
   if (action === 'register') return meshRegister(flags, deps);
   if (action === 'vouch') return meshVouch(flags, deps);
   throw new JovieInputError(
-    `Unknown mesh command: ${action ?? ''}. Use send, read, register, or vouch.`
+    `Unknown mesh command: ${action ?? ''}. Use send, read, ack, watch, status, register, or vouch.`
   );
 }

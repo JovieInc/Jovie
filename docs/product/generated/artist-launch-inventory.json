@@ -4001,6 +4001,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/ovie/fleet-audit/route.ts",
+      "kind": "handler",
+      "route": "/api/ovie/fleet-audit",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/ovie/inbox/route.ts",
       "kind": "handler",
       "route": "/api/ovie/inbox",
@@ -4029,6 +4037,14 @@
       "kind": "handler",
       "route": "/api/ovie/mcp",
       "methods": ["GET", "OPTIONS", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/ovie/music-resolver/route.ts",
+      "kind": "handler",
+      "route": "/api/ovie/music-resolver",
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },

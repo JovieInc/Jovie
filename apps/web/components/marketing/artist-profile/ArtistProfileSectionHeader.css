@@ -11,7 +11,12 @@
  */
 
 .ap-shell-h2 {
-  font-size: clamp(2rem, 4.8vw, 3.5rem);
+  /* Mobile floor 28px (the locked display size): at 320px the public gutter
+     (1.5rem x 2) leaves a 272px column, where the previous 32px floor wraps
+     the longest two-word section tails onto a one-word orphan line (measured
+     on /artist-profiles: "audience outcomes." paints 276px at 32px, 4px past
+     the column). 28px keeps the tail on its own line with ~30px of margin. */
+  font-size: clamp(1.75rem, 4.8vw, 3.5rem);
   line-height: 1.02;
   letter-spacing: -0.04em;
 }
