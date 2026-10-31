@@ -15,7 +15,7 @@ import { appendFileSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { fetchRows } from './ai-gateway-report.mjs';
-import { evaluateRouting } from './lib/ai-routing-drift.mjs';
+import { evaluateRouting, workersAiUsdByDay } from './lib/ai-routing-drift.mjs';
 import { readGatewayCredits } from './lib/credentials-live-reads.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -37,6 +37,50 @@ async function relayHealth(fetchImpl) {
     }
   }
   return out;
+}
+
+const CLOUDFLARE_ACCOUNT_ID = 'fd8a6fcfa0ff0b708dbae942af18c49b';
+
+/**
+ * Workers AI usage by day from Cloudflare's GraphQL analytics (neurons x list
+ * price; billed against the startup credits). Optional: needs CLOUDFLARE_API_TOKEN
+ * or a local wrangler login, so CI without either reports null.
+ */
+export async function readWorkersAiByDay(days, fetchImpl, env = process.env) {
+  const tokens = [];
+  if (env.CLOUDFLARE_API_TOKEN) tokens.push(env.CLOUDFLARE_API_TOKEN);
+  const login = spawnSync('wrangler', ['auth', 'token'], {
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  if (login.status === 0) tokens.push(login.stdout.trim().split('\n').pop());
+  const since = new Date(Date.now() - days * 864e5).toISOString();
+  const until = new Date(Date.now() + 864e5).toISOString();
+  const query = `query { viewer { accounts(filter:{accountTag:"${CLOUDFLARE_ACCOUNT_ID}"}) { aiInferenceAdaptiveGroups(limit:200, filter:{datetime_geq:"${since}", datetime_leq:"${until}"}) { dimensions { date } sum { totalNeurons } } } } }`;
+  // A scoped API token may lack analytics access; fall through to the next one.
+  for (const token of tokens) {
+    try {
+      const res = await fetchImpl(
+        'https://api.cloudflare.com/client/v4/graphql',
+        {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${token}`,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({ query }),
+          signal: AbortSignal.timeout(20_000),
+        }
+      );
+      if (!res.ok) continue;
+      const groups = (await res.json())?.data?.viewer?.accounts?.[0]
+        ?.aiInferenceAdaptiveGroups;
+      if (Array.isArray(groups)) return workersAiUsdByDay(groups);
+    } catch {
+      // try the next token
+    }
+  }
+  return null;
 }
 
 /** Production env NAMES (never values) for each project a route declares. */
@@ -95,6 +139,7 @@ export async function main(
     credits: creditsRead.ok ? creditsRead.value : null,
     health: await relayHealth(fetchImpl),
     envNames: argv.includes('--vercel') ? vercelEnvNames(routing) : null,
+    workersAiByDay: await readWorkersAiByDay(days, fetchImpl, env),
   });
   const record = {
     ...result,
@@ -106,7 +151,7 @@ export async function main(
   if (argv.includes('--json')) console.log(JSON.stringify(record, null, 2));
   else {
     console.log(
-      `AI routing check (last ${days}d): Gateway $${result.gatewayUsdPerDay}/day, runway ${result.runwayDays ?? 'n/a'} days`
+      `AI routing check (last ${days}d): Gateway $${result.gatewayUsdPerDay}/day, Workers AI $${result.workersAiUsdPerDay ?? 'n/a'}/day, Gateway runway ${result.runwayDays ?? 'n/a'} days`
     );
     for (const [key, v] of Object.entries(result.byKey))
       console.log(

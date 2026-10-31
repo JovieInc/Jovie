@@ -5,6 +5,7 @@ import {
   declaredGatewayModels,
   evaluateRouting,
   OIDC_KEY,
+  workersAiUsdByDay,
 } from '../ai-routing-drift.mjs';
 
 const routing = JSON.parse(
@@ -27,6 +28,19 @@ describe('routing.json shape', () => {
   });
 });
 
+describe('workersAiUsdByDay', () => {
+  it('prices neurons at list and sums per day', () => {
+    const usd = workersAiUsdByDay([
+      { dimensions: { date: '2026-10-29' }, sum: { totalNeurons: 500_000 } },
+      { dimensions: { date: '2026-10-29' }, sum: { totalNeurons: 300_000 } },
+      { dimensions: { date: '2026-10-30' }, sum: { totalNeurons: 100_000 } },
+    ]);
+    expect(usd['2026-10-29']).toBeCloseTo(8.8);
+    expect(usd['2026-10-30']).toBeCloseTo(1.1);
+    expect(workersAiUsdByDay(undefined)).toEqual({});
+  });
+});
+
 describe('evaluateRouting', () => {
   const calm = {
     routing,
@@ -42,6 +56,15 @@ describe('evaluateRouting', () => {
 
   it('is quiet when spend matches the documented routing', () => {
     expect(evaluateRouting(calm).findings).toEqual([]);
+  });
+
+  it('reports Workers AI spend next to the Gateway so both providers are measured', () => {
+    const result = evaluateRouting({
+      ...calm,
+      workersAiByDay: { '2026-10-30': 1.2, '2026-10-31': 0.4 },
+    });
+    expect(result.gatewayUsdPerDay).toBe(0.35);
+    expect(result.workersAiUsdPerDay).toBe(0.8);
   });
 
   it('flags a workers-first caller whose key still spends like the Gateway is primary', () => {
