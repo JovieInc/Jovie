@@ -9,7 +9,10 @@ vi.mock('server-only', () => ({}));
 vi.mock('@jovie/api-client', () => ({ createApiClient: createClient }));
 vi.mock('@/lib/env-server', () => ({ env }));
 
-import { mintDictationToken } from './elevenlabs.server';
+import {
+  mintDictationToken,
+  transcribeDictationAudio,
+} from './elevenlabs.server';
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -47,5 +50,29 @@ describe('server token minting', () => {
     await expect(mintDictationToken()).rejects.toThrow('token');
     request.mockResolvedValue({ status: 429, json: () => ({}) });
     await expect(mintDictationToken()).rejects.toThrow('provider-down');
+  });
+  it('uploads server-validated audio as multipart with the current batch model', async () => {
+    request.mockResolvedValue({
+      status: 200,
+      json: () => ({ text: 'Batch transcript' }),
+    });
+    const signal = new AbortController().signal;
+    expect(await transcribeDictationAudio(new ArrayBuffer(4), signal)).toBe(
+      'Batch transcript'
+    );
+    const call = request.mock.calls[0][0];
+    expect(call.body).toBeInstanceOf(FormData);
+    expect(call.body.get('model_id')).toBe('scribe_v2');
+    expect(call.body.get('file').size).toBe(4);
+    expect(call.signal).toBe(signal);
+    expect(call.maxAttempts).toBe(1);
+    request.mockResolvedValue({ status: 200, json: () => ({}) });
+    await expect(
+      transcribeDictationAudio(new ArrayBuffer(4), signal)
+    ).rejects.toThrow('provider-down');
+    request.mockResolvedValue({ status: 429 });
+    await expect(
+      transcribeDictationAudio(new ArrayBuffer(4), signal)
+    ).rejects.toThrow('provider-down');
   });
 });

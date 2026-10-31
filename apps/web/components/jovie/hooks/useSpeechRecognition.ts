@@ -15,6 +15,7 @@ import {
   useDesktopDictationStatus,
 } from '@/lib/desktop/electron-bridge';
 import { createAdaptiveTranscriber } from '@/lib/dictation/adaptive-transcriber';
+import { createElevenLabsBatchProvider } from '@/lib/dictation/elevenlabs-batch';
 import { createElevenLabsStreamProvider } from '@/lib/dictation/elevenlabs-stream';
 import { createWebSpeechProvider } from '@/lib/dictation/web-speech';
 
@@ -130,6 +131,7 @@ export function useSpeechRecognition({
         runtime: isElectronRuntime() ? 'electron' : 'web',
         providers: [
           createElevenLabsStreamProvider(),
+          createElevenLabsBatchProvider(),
           createWebSpeechProvider({ lang, browserWindow }),
         ],
         onFallback: () => {
