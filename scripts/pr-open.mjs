@@ -40,6 +40,7 @@ const PR_URL_PLACEHOLDER = '<PR URL, set after open>';
 export const CUSTOMER_MARKER =
   '<!-- customer-changelog/v1 {"releaseWorthy":false} -->';
 const REPAIR_TITLE = /^fix(?:\([^\n)]+\))?!?:/i;
+/** @type {Array<[RegExp, string]>} */
 const AREAS_BY_PATH = [
   [/^\.github\/|^scripts\/ci|^scripts\/preflight|^scripts\/lanes\//, 'ci'],
   [/^ops\/|^canon\/|^docs\//, 'repo'],
@@ -79,7 +80,24 @@ function blastRadius(paths) {
   ].join('\n');
 }
 
-/** Draft a body from the diff. Pure; unknown facts stay as <placeholders> that the gate then rejects. */
+/**
+ * Draft a body from the diff. Pure; unknown facts stay as <placeholders> that the gate then rejects.
+ * @param {{
+ *   title: string,
+ *   files: Array<{ filename: string, status?: string, patch?: string, previous_filename?: string }>,
+ *   labels?: string[],
+ *   summary?: string,
+ *   metric?: string,
+ *   claim?: string,
+ *   area?: string,
+ *   theme?: string,
+ *   perMerge?: boolean,
+ *   failingCommand?: string,
+ *   failingRun?: string,
+ *   customerVisible?: string,
+ *   prUrl?: string,
+ * }} input
+ */
 export function draftBody({
   title,
   files,
