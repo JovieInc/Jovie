@@ -29,7 +29,12 @@ const SCOPES = new Set(['onboarding_chat', 'smartlink_click']);
 
 export function mintPassageTokenFromSecret(
   rootSecret,
-  { sub = DEFAULT_PASSAGE_SUBJECT, scp = 'onboarding_chat', run, ttl = 600 }
+  {
+    sub = DEFAULT_PASSAGE_SUBJECT,
+    scp = 'onboarding_chat',
+    run = `agent${Date.now().toString(36)}`,
+    ttl = 600,
+  } = {}
 ) {
   if (!SCOPES.has(scp)) throw new Error(`unknown passage scope ${scp}`);
   if (!/^browse-ready\+[a-z0-9_-]+@jov\.ie$/u.test(sub)) {
@@ -43,7 +48,7 @@ export function mintPassageTokenFromSecret(
     iat,
     exp: iat + Math.min(ttl, 600),
     jti: randomBytes(18).toString('base64url'),
-    run: run ?? `agent${Date.now().toString(36)}`,
+    run,
   };
   const body = Buffer.from(JSON.stringify(claims)).toString('base64url');
   const sig = createHmac('sha256', key)

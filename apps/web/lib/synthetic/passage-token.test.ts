@@ -207,7 +207,10 @@ describe('agent mint parity (scripts/synthetic-passage-mint.mjs)', () => {
     const verdict = verifyPassageToken(token, KEY, 'onboarding_chat');
     expect(verdict.ok).toBe(true);
     expect(() =>
-      mintPassageTokenFromSecret(ROOT, { sub: 'someone@example.com' })
+      mintPassageTokenFromSecret(ROOT, {
+        sub: 'someone@example.com',
+        run: 'agent-test',
+      })
     ).toThrow(/non-canary/);
   });
 });
