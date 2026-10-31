@@ -43,26 +43,13 @@ export function MetaPixel({ pixelIds }: MetaPixelProps) {
   const allowed = useMarketingConsent(skip);
 
   useEffect(() => {
-    if (skip) return;
-    if (!allowed) {
-      (globalThis.window as MetaPixelWindow | undefined)?.fbq?.(
-        'consent',
-        'revoke'
-      );
-      return;
-    }
-    (globalThis.window as MetaPixelWindow | undefined)?.fbq?.(
-      'consent',
-      'grant'
-    );
-    if (hasTrackedPageView.current) return;
-    if (globalThis.window === undefined) return;
-    hasTrackedPageView.current = true;
-
+    if (skip || !allowed || globalThis.window === undefined) return;
     const metaWindow = globalThis.window as MetaPixelWindow;
     const fbq = ensureFbqStub(metaWindow);
     if (!fbq) return;
     fbq('consent', 'grant');
+    if (hasTrackedPageView.current) return;
+    hasTrackedPageView.current = true;
 
     // init is idempotent per pixel ID across mounts (client-side navigation
     // remounts this component); PageView fires once per mount and applies to
