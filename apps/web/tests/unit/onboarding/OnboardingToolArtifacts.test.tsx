@@ -292,6 +292,7 @@ describe('onboarding tool artifacts', () => {
     expect(screen.getByLabelText('Edit Proposed Handle')).toHaveValue(
       'validartist'
     );
+    expect(screen.getByLabelText('Edit Proposed Handle')).toHaveFocus();
 
     fireEvent.change(screen.getByLabelText('Edit Proposed Handle'), {
       target: { value: 'test' },

@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import type { ReactNode } from 'react';
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   ATTACH_ACCOUNT_CTA_LABEL,
   CONFIRM_HANDLE_CTA_LABEL,
@@ -598,6 +598,11 @@ export function OnboardingHandleCheckCard({
   const [draftHandle, setDraftHandle] = useState(handle ?? '');
   const [confirmed, setConfirmed] = useState(false);
   const [editing, setEditing] = useState(false);
+  const handleInputRef = useRef<HTMLInputElement>(null);
+  // Change Handle moves focus into the field it just opened.
+  useEffect(() => {
+    if (editing) handleInputRef.current?.focus();
+  }, [editing]);
   const outputConfirmed = output?.action === 'handle_confirmed';
   const normalizedDraft = draftHandle.replace(/^@/, '').trim().toLowerCase();
   const availabilityQuery = useHandleAvailabilityQuery({
@@ -748,8 +753,7 @@ export function OnboardingHandleCheckCard({
               autoCapitalize='none'
               spellCheck={false}
               disabled={disabled || confirmed}
-              // biome-ignore lint/a11y/noAutofocus: the user just asked to edit
-              autoFocus={editing}
+              ref={handleInputRef}
             />
           </OnboardingToolField>
           {helper ? (
