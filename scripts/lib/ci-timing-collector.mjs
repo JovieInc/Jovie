@@ -18,7 +18,7 @@ import { parseTurboCacheLog } from './turbo-cache-stats.mjs';
 
 export const SCHEMA_VERSION = 1;
 
-/** @type {{ maxJobPages: number, jobsPerPage: number, maxQueueRunsPages: number, maxRowsPerRunEvent: number, maxBackfillRuns: number, backfillWindowMinutes: number, retentionDays: number, maxPruneDeletes: number, dataBranch: string, dataDir: string }} */
+/** @type {{ maxJobPages: number, jobsPerPage: number, maxQueueRunsPages: number, maxRowsPerRunEvent: number, maxBackfillRuns: number, backfillWindowMinutes: number, retentionDays: number, maxPruneDeletes: number, turboCacheSampleModulo: number, maxTurboLogJobsPerRun: number, dataBranch: string, dataDir: string }} */
 export const CAPS = {
   maxJobPages: 10,
   jobsPerPage: 100,
