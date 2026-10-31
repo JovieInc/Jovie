@@ -13,6 +13,13 @@ let _measurementId: string | undefined = 'G-TMY7Z8HK47';
 let _isTest = false;
 let _isE2E = false;
 let _isDemo = false;
+const privacy = vi.hoisted(() => ({ allowed: true }));
+vi.mock('@/lib/tracking/use-tracking-eligibility', () => ({
+  useTrackingEligibility: () => ({ ga: privacy.allowed }),
+}));
+vi.mock('@/lib/tracking/vendor-navigation', () => ({
+  isolateTrackingDocument: vi.fn(),
+}));
 
 vi.mock('next/script', () => ({
   default: (props: Record<string, unknown>) => {
@@ -61,6 +68,7 @@ function getScripts(container: HTMLElement): HTMLElement[] {
 
 describe('GoogleAnalytics', () => {
   beforeEach(() => {
+    privacy.allowed = true;
     _measurementId = 'G-TMY7Z8HK47';
     _isTest = false;
     _isE2E = false;
@@ -84,6 +92,13 @@ describe('GoogleAnalytics', () => {
     );
     expect(globalThis.gtag).toHaveBeenCalledWith('js', expect.any(Date));
     expect(globalThis.gtag).toHaveBeenCalledWith('config', 'G-TMY7Z8HK47');
+  });
+
+  it('suppresses a configured loader and direct config when policy denies tracking', () => {
+    privacy.allowed = false;
+    const { container } = render(<GoogleAnalytics />);
+    expect(getScripts(container)).toHaveLength(0);
+    expect(globalThis.gtag).not.toHaveBeenCalled();
   });
 
   it('returns null when measurement ID is missing', () => {

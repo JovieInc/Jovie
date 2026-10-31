@@ -30,7 +30,7 @@ describe('uncached public tracking authority', () => {
     expect(second.headers.get('cache-control')).toContain('no-store');
     expect(lookup).toHaveBeenCalledTimes(2);
   });
-  it.each([
+  it.each<Record<string, string>>([
     { 'sec-gpc': '1' },
     { cookie: 'jv_tracking_consent=rejected' },
     { 'x-vercel-ip-country': 'DE' },
