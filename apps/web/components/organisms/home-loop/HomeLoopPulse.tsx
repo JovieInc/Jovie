@@ -40,28 +40,43 @@ const PLACEHOLDER_SLOTS = [
 const TILE_FRAME =
   'flex h-20 min-w-34 flex-1 basis-0 flex-col justify-between gap-0.5 rounded-lg bg-surface-1 px-3 py-2';
 
-/** The single highest-severity condition; a quiet line when there is none. */
+/**
+ * The single highest-severity condition; a quiet line when there is none.
+ * An unknown read renders as unknown (JOV-9019) — never the all-clear copy.
+ */
 export function HomeLoopConstraintBanner({
   constraint,
   emptyLabel,
   loading = false,
+  unknownLabel = null,
 }: Readonly<{
   readonly constraint: HomeLoopConstraint | null;
   readonly emptyLabel: string;
   readonly loading?: boolean;
+  /** Rendered instead of the all-clear while the loop read is unknown. */
+  readonly unknownLabel?: string | null;
 }>) {
-  const Icon = constraint
-    ? constraint.tone === 'bad'
+  // A named constraint wins over the unknown line, including its tone.
+  const unknown = !loading && constraint == null && unknownLabel != null;
+  const Icon =
+    constraint?.tone === 'bad'
       ? CircleAlert
-      : AlertTriangle
-    : CheckCircle2;
+      : constraint || unknown
+        ? AlertTriangle
+        : CheckCircle2;
   return (
     <div
       role='status'
       aria-live='polite'
       className='flex min-h-10 items-center gap-2 rounded-lg bg-surface-1 px-3 py-2 text-sm'
       data-testid='home-loop-constraint'
-      data-tone={loading ? 'loading' : (constraint?.tone ?? 'clear')}
+      data-tone={
+        loading
+          ? 'loading'
+          : unknown
+            ? 'unknown'
+            : (constraint?.tone ?? 'clear')
+      }
     >
       {loading ? (
         <LoadingSkeleton height='h-4' width='w-2/3' />
@@ -71,20 +86,22 @@ export function HomeLoopConstraintBanner({
             aria-hidden='true'
             className={cn(
               'size-4 shrink-0',
-              constraint
-                ? constraint.tone === 'bad'
-                  ? 'text-error'
-                  : 'text-warning'
-                : 'text-success'
+              constraint?.tone === 'bad'
+                ? 'text-error'
+                : constraint || unknown
+                  ? 'text-warning'
+                  : 'text-success'
             )}
           />
           <span
             className={cn(
               'min-w-0 truncate',
-              constraint ? 'text-primary-token' : 'text-secondary-token'
+              constraint || unknown
+                ? 'text-primary-token'
+                : 'text-secondary-token'
             )}
           >
-            {constraint ? constraint.text : emptyLabel}
+            {constraint?.text ?? unknownLabel ?? emptyLabel}
           </span>
           {constraint?.detailsHref ? (
             <a

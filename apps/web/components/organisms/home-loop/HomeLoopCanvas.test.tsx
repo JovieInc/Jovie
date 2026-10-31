@@ -15,6 +15,7 @@ import {
   HOME_LOOP_FIXTURE_PULSE,
   HOME_LOOP_FIXTURE_ROWS,
   HOME_LOOP_FIXTURE_STAGES,
+  HOME_LOOP_FIXTURE_UNMEASURED_PULSE,
 } from './fixtures';
 import { HomeLoopAnswerPanel } from './HomeLoopAnswerPanel';
 import { HomeLoopAsks } from './HomeLoopAsks';
@@ -121,6 +122,12 @@ describe('HomeLoopCanvas', () => {
         })}
       />
     );
+    // A failed read never claims the all-clear; the banner names the
+    // failure (JOV-9019).
+    const banner = screen.getByTestId('home-loop-constraint');
+    expect(banner).toHaveTextContent('Shipping data could not load.');
+    expect(banner).not.toHaveTextContent('Nothing is blocking shipping');
+    expect(banner).toHaveAttribute('data-tone', 'unknown');
     expect(screen.getByTestId('home-loop-in-flight-section')).toHaveAttribute(
       'data-state',
       'error'
@@ -154,6 +161,21 @@ describe('HomeLoopCanvas', () => {
     expect(screen.getByText('Nothing needs your decision.')).toBeVisible();
     expect(screen.getByText('No work in flight.')).toBeVisible();
     expect(screen.getByText('Nothing has landed yet today.')).toBeVisible();
+  });
+
+  it('never claims the all-clear while no metric is measured', () => {
+    render(
+      <HomeLoopCanvas
+        {...props({
+          constraint: null,
+          pulse: HOME_LOOP_FIXTURE_UNMEASURED_PULSE,
+        })}
+      />
+    );
+    const banner = screen.getByTestId('home-loop-constraint');
+    expect(banner).toHaveTextContent('Shipping status is unknown');
+    expect(banner).not.toHaveTextContent('Nothing is blocking shipping');
+    expect(banner).toHaveAttribute('data-tone', 'unknown');
   });
 
   it('answers in one click and sends a written reply', () => {

@@ -318,6 +318,12 @@ describe('OvieHomeCanvas', () => {
         },
       };
       renderCanvas();
+      // A failed read never claims the all-clear; the banner names the
+      // failure beside the sections that could not load (JOV-9019).
+      const banner = screen.getByTestId('home-loop-constraint');
+      expect(banner).toHaveTextContent('Shipping data could not load.');
+      expect(banner).not.toHaveTextContent('Nothing is blocking shipping');
+      expect(banner).toHaveAttribute('data-tone', 'unknown');
       expect(screen.getByTestId('home-loop-in-flight-section')).toHaveAttribute(
         'data-state',
         'error'
@@ -331,6 +337,26 @@ describe('OvieHomeCanvas', () => {
       expect(readyTiming).toHaveBeenLastCalledWith(true);
     }
   );
+
+  it('renders unknown instead of the all-clear when no metric is measured', () => {
+    const base = snapshot();
+    shipping.data = {
+      ...base,
+      view: { ...base.view, delivery: emptyDeliverySummary() },
+      operationalTasks: { ...base.operationalTasks, tasks: [] },
+    };
+    renderCanvas();
+    const banner = screen.getByTestId('home-loop-constraint');
+    expect(banner).toHaveTextContent('Shipping status is unknown');
+    expect(banner).not.toHaveTextContent('Nothing is blocking shipping');
+    expect(banner).toHaveAttribute('data-tone', 'unknown');
+    expect(screen.getAllByTestId(/^home-loop-tile-/)).toHaveLength(11);
+    expect(
+      screen
+        .getAllByTestId(/^home-loop-tile-/)
+        .every(tile => tile.getAttribute('data-measured') === 'false')
+    ).toBe(true);
+  });
 
   it('keeps reconciled tasks visible when a later shipping read fails', () => {
     const base = snapshot();

@@ -175,6 +175,8 @@ export interface HomeLoopCopy {
   readonly doneTitle: string;
   readonly doneEmpty: string;
   readonly approveLabel?: string;
+  /** Banner copy while the read is ready but no metric is measured. */
+  readonly constraintUnknown?: string;
   readonly latencyTitle?: string;
   readonly latencyEmpty?: string;
 }
