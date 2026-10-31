@@ -13,8 +13,13 @@
  * Idempotent. Dry-run by default (reads and prints the planned writes; writes
  * nothing). Writes touch only rows owned by the two spec emails.
  *
+ * `--only=chat-health` (or `--only=returning`) scopes the run to one canary so
+ * the post-deploy cert pipelines can provision the chat-health canary alone,
+ * without Spotify credentials and without depending on the returning canary
+ * (JOV-10150).
+ *
  *   cd apps/web && npx tsx --import ../../scripts/ops/canary-seed/shim-preload.mjs \
- *     ../../scripts/ops/canary-seed/seed-returning-canary.ts [--apply]
+ *     ../../scripts/ops/canary-seed/seed-returning-canary.ts [--apply] [--only=chat-health]
  *
  * Needs DATABASE_URL, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET (Doppler
  * jovie-web/prd; never printed).
@@ -31,12 +36,26 @@ import {
   type CanaryArtistData,
   type CanarySeedIdentity,
   CHAT_HEALTH_CANARY_SEED,
+  chatHealthCanaryProfileSeedInput,
   isCanarySeedEmail,
   planCanaryProfileUpdate,
   RETURNING_CANARY_SEED,
 } from '../../../apps/web/lib/synthetic/returning-canary-seed-spec';
 
 const APPLY = process.argv.includes('--apply');
+
+/** Optional scope: provision only one canary (JOV-10150). Default: both. */
+const SCOPE = (() => {
+  const scoped = process.argv.find(arg => arg.startsWith('--only='));
+  if (!scoped) return 'all' as const;
+  const scope = scoped.slice('--only='.length);
+  if (scope !== 'returning' && scope !== 'chat-health') {
+    throw new Error(
+      `Unknown --only scope: ${scope} (expected 'returning' or 'chat-health')`
+    );
+  }
+  return scope;
+})();
 
 function log(step: string, detail: unknown): void {
   console.log(`[canary-seed] ${step}`, JSON.stringify(detail));
@@ -207,8 +226,16 @@ async function seedChatHealth(): Promise<void> {
     email: spec.email,
     fullName: spec.displayName,
   });
+  // Production reality (JOV-10150): the first email-OTP sign-in auto-creates
+  // the Better Auth user with its own id, which differs from the deterministic
+  // local-dev id. `ensureBetterAuthTestUser` resolves the existing row by
+  // email, and every step below keys off that resolved identity — so a
+  // differing id is a notice, not a refusal.
   if (baId !== getDeterministicTestBetterAuthUserId(spec.email)) {
-    throw new Error('Unexpected Better Auth id for chat-health canary');
+    log('chat-health', {
+      state: 'existing-better-auth-id',
+      note: 'resolved by email; differs from the deterministic local-dev id',
+    });
   }
   const user = await ensureUserRecord(db, {
     clerkId: baId,
@@ -228,15 +255,7 @@ async function seedChatHealth(): Promise<void> {
   const profileId = await ensureCreatorProfileRecord(db, {
     userId: user.id,
     creatorType: 'artist',
-    username: spec.handle,
-    usernameNormalized: spec.handle,
-    displayName: spec.displayName,
-    bio: spec.bio,
-    isPublic: true,
-    isVerified: false,
-    isClaimed: true,
-    ingestionStatus: 'idle',
-    onboardingCompletedAt: new Date(),
+    ...chatHealthCanaryProfileSeedInput(new Date()),
   });
   await ensureUserProfileClaim(db, user.id, profileId);
   await setActiveProfileForUser(db, user.id, profileId);
@@ -244,9 +263,13 @@ async function seedChatHealth(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  log('start', { version: CANARY_SEED_SPEC_VERSION, apply: APPLY });
-  await seedReturning();
-  await seedChatHealth();
+  log('start', {
+    version: CANARY_SEED_SPEC_VERSION,
+    apply: APPLY,
+    scope: SCOPE,
+  });
+  if (SCOPE === 'all' || SCOPE === 'returning') await seedReturning();
+  if (SCOPE === 'all' || SCOPE === 'chat-health') await seedChatHealth();
   log('done', { apply: APPLY });
 }
 
