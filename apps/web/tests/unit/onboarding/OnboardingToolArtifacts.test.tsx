@@ -279,13 +279,20 @@ describe('onboarding tool artifacts', () => {
       />
     );
 
-    expect(screen.getByText('@validartist')).toBeDefined();
+    // Pen R6As7U: one line ("jov.ie/<handle> is available"), the handle shown
+    // once, and the field behind an explicit Change Handle action.
+    expect(screen.getByText('jov.ie/validartist')).toBeDefined();
     expect(screen.getByText('is available')).toBeDefined();
+    expect(screen.queryByText('@validartist')).toBeNull();
+    expect(screen.getAllByText(/validartist/)).toHaveLength(1);
+    expect(screen.queryByLabelText('Edit Proposed Handle')).toBeNull();
+    expect(screen.queryByText('checkHandle')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change Handle' }));
     expect(screen.getByLabelText('Edit Proposed Handle')).toHaveValue(
       'validartist'
     );
-    expect(screen.getByText('jov.ie/validartist')).toBeDefined();
-    expect(screen.queryByText('checkHandle')).toBeNull();
+    expect(screen.getByLabelText('Edit Proposed Handle')).toHaveFocus();
 
     fireEvent.change(screen.getByLabelText('Edit Proposed Handle'), {
       target: { value: 'test' },
@@ -311,6 +318,9 @@ describe('onboarding tool artifacts', () => {
     );
 
     expect(screen.getByText('is not available')).toBeDefined();
+    // A taken name offers one way forward, not a disabled confirm.
+    expect(screen.queryByTestId('onboarding-confirm-handle')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Change Handle' })).toBeDefined();
     const card = screen.getByTestId('onboarding-handle-check');
     expect(card.className).toContain('text-error');
     expect(card.className).not.toMatch(/\bred-\d/);
@@ -491,6 +501,8 @@ describe('onboarding tool artifacts', () => {
         />
       </>
     );
+    // The handle field is behind Change Handle (Pen R6As7U); open it.
+    fireEvent.click(screen.getByRole('button', { name: 'Change Handle' }));
 
     const fields = screen
       .getAllByRole('textbox')

@@ -189,6 +189,31 @@ describe('OnboardingChat empty intro', () => {
     expect(chatMocks.sendMessage).not.toHaveBeenCalled();
   });
 
+  it('opens each restored agent turn with one Jovie speaker row (Pen R6As7U)', () => {
+    const text = (id: string, role: 'user' | 'assistant', value: string) =>
+      ({ id, role, parts: [{ type: 'text', text: value }] }) as UIMessage;
+    render(
+      <OnboardingChat
+        conversationId='saved-conversation'
+        initialMessages={[
+          text('u1', 'user', 'I want to claim jov.ie/validartist'),
+          text('a1', 'assistant', 'That name is open.'),
+          text('a2', 'assistant', 'Confirm it to continue.'),
+          text('u2', 'user', 'Done'),
+          text('a3', 'assistant', 'Great.'),
+        ]}
+        turnstileToken='token'
+        turnstileStatus='verified'
+      />
+    );
+    expect(screen.getByTestId('onboarding-chat')).toHaveClass(
+      'system-b-onboarding-chat'
+    );
+    const rows = screen.getAllByTestId('onboarding-speaker-row');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent('Jovie');
+  });
+
   it('renders persisted progress without auto-submitting a starter or re-triggering claim activity', async () => {
     const initialMessages: UIMessage[] = [
       {

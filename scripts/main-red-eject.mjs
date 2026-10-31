@@ -588,7 +588,9 @@ export async function stuckHead({ doApply = false, now = Date.now() } = {}) {
       'run',
       'pr-remediation-swarm.yml',
       '-f',
-      `pr_numbers=${head.number}`,
+      // The swarm's workflow_dispatch input is `prs` (comma-separated); an
+      // undeclared input makes the dispatch fail with HTTP 422 (run 41122896980).
+      `prs=${head.number}`,
     ],
     'repair'
   );

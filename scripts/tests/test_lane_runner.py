@@ -8077,6 +8077,7 @@ class FixRedTest(unittest.TestCase):
         prompt = lane.render_fix_prompt(dirty, "")
         self.assertIn("conflicts with main", prompt)
         self.assertIn("renumber yours", prompt)
+        self.assertIn("merge_additive_identifier_list", prompt)
 
     def test_a_pushed_fix_records_pending_intent_without_publishing_unverified_head(self):
         real, real_excerpt = lane.sh, lane.failure_excerpt
@@ -8178,6 +8179,127 @@ class FixRedTest(unittest.TestCase):
         self.assertNotIn(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], calls)
         self.assertEqual(pending, {"5": "h9"})
         self.assertFalse(any(c[:3] in (["gh", "pr", "ready"], ["gh", "pr", "merge"]) for c in calls))
+
+    def test_an_additive_list_conflict_skips_the_agent(self):
+        real_sh = lane.sh
+        real_gen = lane.resolve_generated_conflict
+        real_narrow = lane.resolve_narrowed_preflight_conflict
+        real_chain = lane.resolve_and_chain_conflict
+        real_add = lane.resolve_additive_list_conflict
+        real_agent = lane.run_agent
+        lane.resolve_generated_conflict = lambda *a, **k: False
+        lane.resolve_narrowed_preflight_conflict = lambda *a, **k: False
+        lane.resolve_and_chain_conflict = lambda *a, **k: False
+        lane.resolve_additive_list_conflict = lambda *a, **k: True
+        lane.run_agent = lambda *a, **k: self.fail("quoted-list conflicts need no model")
+
+        def fake(args, cwd=None, timeout=600, env=None, log=None):
+            if args[:2] == ["git", "rev-parse"]:
+                return SimpleNamespace(returncode=0, stdout="h9\n")
+            if args[:2] == ["git", "reflog"]:
+                return SimpleNamespace(returncode=0, stdout="h9\0commit: repair\n")
+            if args[:2] == ["git", "ls-remote"]:
+                return SimpleNamespace(returncode=0, stderr="", stdout="h9\trefs/heads/devin/jov-1\n")
+            return SimpleNamespace(returncode=0, stderr="", stdout="")
+
+        lane.sh = fake
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            try:
+                receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]},
+                                          {**self.pr(), "isDraft": False, "mergeStateStatus": "DIRTY"})
+            finally:
+                lane.sh = real_sh
+                lane.resolve_generated_conflict = real_gen
+                lane.resolve_narrowed_preflight_conflict = real_narrow
+                lane.resolve_and_chain_conflict = real_chain
+                lane.resolve_additive_list_conflict = real_add
+                lane.run_agent = real_agent
+        self.assertEqual((receipt["verdict"], receipt["resolution"]), ("fix-pushed", "additive-list-merged"))
+
+    def test_an_identifier_list_conflict_skips_the_agent(self):
+        real_sh = lane.sh
+        real_gen = lane.resolve_generated_conflict
+        real_narrow = lane.resolve_narrowed_preflight_conflict
+        real_chain = lane.resolve_and_chain_conflict
+        real_add = lane.resolve_additive_list_conflict
+        real_ident = lane.resolve_identifier_list_conflict
+        real_agent = lane.run_agent
+        lane.resolve_generated_conflict = lambda *a, **k: False
+        lane.resolve_narrowed_preflight_conflict = lambda *a, **k: False
+        lane.resolve_and_chain_conflict = lambda *a, **k: False
+        lane.resolve_additive_list_conflict = lambda *a, **k: False
+        lane.resolve_identifier_list_conflict = lambda *a, **k: True
+        lane.run_agent = lambda *a, **k: self.fail("identifier-list conflicts need no model")
+
+        def fake(args, cwd=None, timeout=600, env=None, log=None):
+            if args[:2] == ["git", "rev-parse"]:
+                return SimpleNamespace(returncode=0, stdout="h9\n")
+            if args[:2] == ["git", "reflog"]:
+                return SimpleNamespace(returncode=0, stdout="h9\0commit: repair\n")
+            if args[:2] == ["git", "ls-remote"]:
+                return SimpleNamespace(returncode=0, stderr="", stdout="h9\trefs/heads/devin/jov-1\n")
+            return SimpleNamespace(returncode=0, stderr="", stdout="")
+
+        lane.sh = fake
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            try:
+                receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]},
+                                          {**self.pr(), "isDraft": False, "mergeStateStatus": "DIRTY"})
+            finally:
+                lane.sh = real_sh
+                lane.resolve_generated_conflict = real_gen
+                lane.resolve_narrowed_preflight_conflict = real_narrow
+                lane.resolve_and_chain_conflict = real_chain
+                lane.resolve_additive_list_conflict = real_add
+                lane.resolve_identifier_list_conflict = real_ident
+                lane.run_agent = real_agent
+        self.assertEqual((receipt["verdict"], receipt["resolution"]), ("fix-pushed", "identifier-list-merged"))
+
+    def test_unknown_conflict_still_reaches_the_model_after_every_class(self):
+        real_sh = lane.sh
+        real_agent = lane.run_agent
+        names = (
+            "resolve_generated_conflict",
+            "resolve_narrowed_preflight_conflict",
+            "resolve_and_chain_conflict",
+            "resolve_additive_list_conflict",
+            "resolve_identifier_list_conflict",
+        )
+        saved = {name: getattr(lane, name) for name in names}
+        for name in names:
+            setattr(lane, name, lambda *a, **k: False)
+        called = []
+
+        def agent(*_a, **_k):
+            called.append(True)
+            return SimpleNamespace(returncode=0)
+
+        def fake(args, cwd=None, timeout=600, env=None, log=None):
+            if args[:2] == ["git", "rev-parse"]:
+                return SimpleNamespace(returncode=0, stdout="h9\n")
+            if args[:2] == ["git", "reflog"]:
+                return SimpleNamespace(returncode=0, stdout="h9\0commit: repair\n")
+            if args[:2] == ["git", "ls-remote"]:
+                return SimpleNamespace(returncode=0, stderr="", stdout="h9\trefs/heads/devin/jov-1\n")
+            return SimpleNamespace(returncode=0, stderr="", stdout="")
+
+        lane.sh = fake
+        lane.run_agent = agent
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            try:
+                receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]},
+                                          {**self.pr(), "isDraft": False, "mergeStateStatus": "DIRTY"})
+            finally:
+                lane.sh = real_sh
+                lane.run_agent = real_agent
+                for name, fn in saved.items():
+                    setattr(lane, name, fn)
+        self.assertEqual(called, [True])
+        self.assertEqual(receipt["verdict"], "fix-pushed")
+        self.assertNotIn("resolution", receipt)
 
     def test_excerpt_keeps_failing_lines_and_prompt_forbids_new_prs(self):
         real = lane.sh
@@ -12372,6 +12494,26 @@ class LockfileConflictTest(unittest.TestCase):
             self.assertEqual(self.git("show", f"devin/jov-1-20260927:{path}", cwd=origin), "regenerated")
             self.assertEqual(self.git("show", "devin/jov-1-20260927:a.ts", cwd=origin), "main")
 
+    def test_sources_of_truth_conflict_regenerates_from_merged_source(self):
+        path = "canon/SOURCES_OF_TRUTH.md"
+        generator = "scripts/sources-of-truth.mjs"
+        source = "canon/sources-of-truth.json"
+        script = (
+            "import {readFileSync,writeFileSync} from 'node:fs';\n"
+            f"if(readFileSync('{path}','utf8') !== 'main\\n') throw Error('must restore main');\n"
+            f"writeFileSync('{path}',JSON.parse(readFileSync('{source}','utf8')).domains.join('\\n'));\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, work = self.repo(Path(tmp), {path: "pr\n", generator: script,
+                                     source: '{"domains":["engineering-wins","proof-stats"]}'},
+                                     main_changes={path: "main\n", "a.ts": "main\n"})
+            ok, calls = self.run_resolve(work)
+            self.assertTrue(ok)
+            self.assertEqual(calls.count(["node", generator, "--write"]), 1)
+            self.assertEqual(self.git("show", f"devin/jov-1-20260927:{path}", cwd=origin),
+                             "engineering-wins\nproof-stats")
+            self.assertEqual(self.git("show", "devin/jov-1-20260927:a.ts", cwd=origin), "main")
+
     def test_mixed_generated_conflicts_run_each_resolver_once(self):
         topology = ".github/workflow-topology.gen.yml"
         with tempfile.TemporaryDirectory() as tmp:
@@ -13041,6 +13183,49 @@ class NoHumanHoldTest(unittest.TestCase):
             text,
         )
         self.assertIn('"fleet:check"', text)
+        self.assertNotIn("<<<<<<<", text)
+        after = git("rev-parse", "HEAD").stdout.strip()
+        self.assertEqual(after, git("rev-parse", "origin/feature").stdout.strip())
+        self.assertNotEqual(after, before)
+        self.assertEqual(git("merge-base", "--is-ancestor", before, after).returncode, 0)
+
+    def test_identifier_list_conflict_unions_slugs_and_fast_forwards(self):
+        root = Path(self.tmp.name)
+        origin = root / "origin.git"
+        work = root / "work"
+        work.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "main", str(work)], check=True)
+        subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True)
+
+        def git(*args, cwd=work):
+            return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True)
+
+        hooks = root / "hooks"
+        hooks.mkdir()
+        for key, value in (("user.name", "t"), ("user.email", "t@example.test"), ("commit.gpgsign", "false"),
+                           ("core.hooksPath", str(hooks))):
+            git("config", key, value)
+        git("remote", "add", "origin", str(origin))
+        path = work / "CLAUDE.md"
+        base = "Other scoped rules: ci-branching,\npr-stacking, swarm.\n"
+        path.write_text(base)
+        git("add", "CLAUDE.md")
+        git("commit", "-qm", "base")
+        git("branch", "feature")
+        git("push", "-q", "origin", "HEAD:refs/heads/main")
+        git("checkout", "-q", "feature")
+        path.write_text(base.replace("pr-stacking, swarm.", "pr-stacking, swarm, rate-limits."))
+        git("commit", "-qam", "head adds rate-limits")
+        git("push", "-q", "origin", "HEAD:refs/heads/feature")
+        git("checkout", "-q", "main")
+        path.write_text(base.replace("pr-stacking, swarm.", "pr-stacking, swarm, anti-slop."))
+        git("commit", "-qam", "main adds anti-slop")
+        git("push", "-q", "origin", "HEAD:refs/heads/main")
+        git("checkout", "-q", "feature")
+        before = git("rev-parse", "HEAD").stdout.strip()
+        self.assertTrue(lane.resolve_identifier_list_conflict(work, "feature", None))
+        text = path.read_text()
+        self.assertEqual(text, "Other scoped rules: ci-branching,\npr-stacking, swarm, anti-slop, rate-limits.\n")
         self.assertNotIn("<<<<<<<", text)
         after = git("rev-parse", "HEAD").stdout.strip()
         self.assertEqual(after, git("rev-parse", "origin/feature").stdout.strip())
