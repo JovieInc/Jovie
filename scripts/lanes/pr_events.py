@@ -957,14 +957,39 @@ JOB_URL = re.compile(r"^(https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\
 RED_RUN_URL = re.compile(r"https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\d*(?:/attempts/[1-9]\d*)?")
 
 
+def red_section_bounds(body: str) -> tuple[int, int] | None:
+    """Fleet Rules boundaries mapped back to raw offsets, preserving comments on edits."""
+    visible = body
+    offsets = list(range(len(body)))
+    for comment in reversed(list(re.finditer(r"<!--[\s\S]*?-->", body))):
+        visible = visible[:comment.start()] + visible[comment.end():]
+        del offsets[comment.start():comment.end()]
+    fenced = False
+    start = None
+    offset = 0
+    for line in visible.splitlines(keepends=True):
+        raw_offset = offsets[offset]
+        offset += len(line)
+        if re.match(r"^\s*(```|~~~)", line):
+            fenced = not fenced
+            continue
+        if fenced or not ANY_HEADING.match(line):
+            continue
+        if start is not None:
+            return start, raw_offset
+        if RED_HEADING.match(line):
+            start = raw_offset
+    return (start, len(body)) if start is not None else None
+
+
 def red_section_complete(body: str) -> bool:
     """Mirror of scripts/pr-fleet-rules.mjs: a Failing command plus a red-output fence or run URL."""
-    lines = re.sub(r"<!--[\s\S]*?-->", "", body or "").split("\n")
-    start = next((i for i, line in enumerate(lines) if RED_HEADING.match(line.strip())), None)
-    if start is None:
+    body = re.sub(r"<!--[\s\S]*?-->", "", body or "")
+    bounds = red_section_bounds(body)
+    if bounds is None:
         return False
-    end = next((i for i in range(start + 1, len(lines)) if ANY_HEADING.match(lines[i])), len(lines))
-    section = "\n".join(lines[start + 1:end])
+    start, end = bounds
+    section = body[start:end].split("\n", 1)[1] if "\n" in body[start:end] else ""
     command = re.search(r"^\s*(?:-\s*)?Failing command:\s*(.+)$", section, re.I | re.M)
     run_url = re.search(r"^\s*(?:-\s*)?Failing run \(before fix\):\s*`?(https://\S+?)`?\s*$", section, re.I | re.M)
     fence = re.search(r"```(?:text|console|log|bash|sh)?\n[\s\S]*?\b(?:FAIL|Error|AssertionError|ERR_|expected|not ok)[\s\S]*?```",
@@ -1015,13 +1040,16 @@ def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
 
 
 def with_red_section(body: str, block: str) -> str:
-    """Replace an empty/placeholder Red-before-green section with the block, or append one."""
-    lines = (body or "").split("\n")
-    start = next((i for i, line in enumerate(lines) if RED_HEADING.match(line.strip())), None)
-    if start is None:
+    """Replace incomplete evidence, retaining opaque metadata even in the last section."""
+    body = body or ""
+    bounds = red_section_bounds(body)
+    if bounds is None:
         return (body or "").rstrip("\n") + "\n\n" + block + "\n"
-    end = next((i for i in range(start + 1, len(lines)) if ANY_HEADING.match(lines[i])), len(lines))
-    return "\n".join(lines[:start] + block.split("\n") + [""] + lines[end:])
+    start, end = bounds
+    comments = "\n".join(comment.group() for comment in re.finditer(r"<!--[\s\S]*?-->", body[start:end])
+                         if comment.group() not in block)
+    metadata = comments + "\n\n" if comments else ""
+    return body[:start] + block + "\n\n" + metadata + body[end:]
 
 
 def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None,

@@ -224,6 +224,19 @@ function isIdleTransactionTermination(error: unknown): boolean {
       );
 }
 
+/**
+ * Transient transport/connection failure on a fail-soft dashboard read
+ * (JOV-8845). A Neon websocket crash mid-statement surfaces as Drizzle's
+ * "Failed query: SELECT set_config('statement_timeout', $1, true)" — the
+ * set_config is only the first statement issued on the broken connection and
+ * the transport cause lives on the error chain, so reporting the event files
+ * Sentry issues titled after the set_config fingerprint. Reads designed to
+ * fail open treat these like JOV-5754 timeouts: log-only degradation.
+ */
+function isTransientTransportError(error: unknown): boolean {
+  return isRetryableError(error) && !isPostgresTimeoutError(error);
+}
+
 async function buildBioLinkActivation(
   clerkUserId: string,
   profile: Pick<CreatorProfile, 'id' | 'onboardingCompletedAt'>
@@ -304,6 +317,16 @@ async function buildBioLinkActivation(
         createdAt: Date;
         eventType: string;
       }>;
+    }
+
+    // Transient connection failures already consumed one retry; degrade
+    // log-only (JOV-8845) instead of filing set_config-titled Sentry issues.
+    if (isTransientTransportError(error)) {
+      logger.warn(
+        '[Dashboard] creator_distribution_events read failed on a transient connection error; skipping activation lookup',
+        { profileId: profile.id }
+      );
+      return [];
     }
 
     const level =
@@ -403,6 +426,17 @@ async function fetchSocialLinkExistence(
       });
 
       if (!migrationResult.shouldRetry) {
+        return { hasLinks: false, hasMusicLinks: false };
+      }
+
+      // Transient connection failures are infrastructure conditions on a
+      // read designed to fail open (JOV-8845): log-only degradation instead
+      // of filing set_config-titled Sentry issues.
+      if (isTransientTransportError(error)) {
+        logger.warn(
+          '[Dashboard] social link existence read failed on a transient connection error; degrading to no links',
+          { profileId }
+        );
         return { hasLinks: false, hasMusicLinks: false };
       }
 
@@ -593,6 +627,16 @@ async function loadInboxNavigationAvailability(
     if (isQueryTimeoutError(error) || isPostgresTimeoutError(error)) {
       logger.warn(
         '[inbox-navigation] inbox count read timed out; degrading to unknown availability'
+      );
+      return UNKNOWN_INBOX_NAVIGATION_AVAILABILITY;
+    }
+    // Transient connection failures on this fail-soft read are log-only too
+    // (JOV-8845): a Neon websocket crash otherwise files Sentry issues titled
+    // after the first statement issued on the broken connection —
+    // set_config('statement_timeout') — instead of the transport cause.
+    if (isTransientTransportError(error)) {
+      logger.warn(
+        '[inbox-navigation] inbox count read failed on a transient connection error; degrading to unknown availability'
       );
       return UNKNOWN_INBOX_NAVIGATION_AVAILABILITY;
     }
@@ -1020,6 +1064,15 @@ async function fetchDashboardCoreWithSession(
       clerkUserId,
       selected.id
     ).catch((error: unknown) => {
+      // Transient connection failures are log-only (JOV-8845); the internal
+      // JOV-2285 guard only matches transport text on the outer message, so
+      // Drizzle-wrapped causes still reach this catch.
+      if (isTransientTransportError(error)) {
+        logger.warn(
+          '[dashboard] avatar quality read failed on a transient connection error; degrading to unknown'
+        );
+        return UNKNOWN_AVATAR_QUALITY;
+      }
       Sentry.captureException(error, {
         level: 'warning',
         tags: {
@@ -1180,6 +1233,16 @@ async function fetchTippingStatsWithSession(
     if (isQueryTimeoutError(error) || isPostgresTimeoutError(error)) {
       logger.warn(
         '[tipping-stats] tipping stats query timed out; degrading to empty stats'
+      );
+      return createEmptyTippingStats();
+    }
+
+    // Transient connection failures are infrastructure noise on a read that
+    // already degrades to empty stats (JOV-8845): log-only instead of paging
+    // Sentry with the set_config fingerprint.
+    if (isTransientTransportError(error)) {
+      logger.warn(
+        '[tipping-stats] tipping stats query failed on a transient connection error; degrading to empty stats'
       );
       return createEmptyTippingStats();
     }
