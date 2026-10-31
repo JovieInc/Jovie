@@ -27,7 +27,14 @@ export const MESH_KINDS = [
   'devin',
   'muse',
   'lola',
+  'summer',
 ] as const;
+/**
+ * Kinds are owned by the hub registry (GET /v1/agents), not this list: a stale
+ * local build must never reject a registered agent (the 10-31 Lola failure).
+ * MESH_KINDS stays as the known set for help text and legacy routing.
+ */
+export const MESH_KIND_PATTERN = /^[a-z][a-z0-9-]{1,31}$/;
 export const MESH_FLAG_NAMES = [
   'to',
   'refs',
@@ -39,8 +46,11 @@ export const MESH_FLAG_NAMES = [
   'owner',
   'sender-id',
   'token-sha256',
+  'hours',
 ] as const;
-const MESH_RECIPIENTS = new Set<string>(['summer', 'all', ...MESH_KINDS]);
+/** Value-less mesh switches; parsed as booleans and passed on as 'true'. */
+export const MESH_BOOLEAN_FLAG_NAMES = ['peek', 'install'] as const;
+const isRecipient = (to: string) => to === 'all' || MESH_KIND_PATTERN.test(to);
 const KEYCHAIN_SERVICE_PREFIX = 'jovie.mesh.';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -127,16 +137,16 @@ export const macKeychain: MeshKeychain = {
   },
 };
 
-function kindFrom(value: string | undefined, label: string): string {
+export function kindFrom(value: string | undefined, label: string): string {
   const kind = value?.trim() ?? '';
-  if (!(MESH_KINDS as readonly string[]).includes(kind))
+  if (!MESH_KIND_PATTERN.test(kind))
     throw new JovieInputError(
-      `${label} must be one of: ${MESH_KINDS.join(', ')}.`
+      `${label} must be a registered agent kind (for example ${MESH_KINDS.slice(0, 4).join(', ')}).`
     );
   return kind;
 }
 
-function meshOrigin(env: MeshDependencies['env']): string {
+export function meshOrigin(env: MeshDependencies['env']): string {
   const raw = env?.JOVIE_MESH_URL?.trim() || MESH_DEFAULT_URL;
   let url: URL;
   try {
@@ -219,7 +229,7 @@ const KNOWN_CODES = new Set([
   'invalid_json',
 ]);
 
-async function meshRequest(
+export async function meshRequest(
   path: string,
   init: {
     method: 'GET' | 'POST';
@@ -310,9 +320,9 @@ export async function meshSend(
   if (!body.trim() || body.length > 4000)
     throw new JovieInputError('Message body must be 1–4000 characters.');
   const to = flags.to?.trim() || 'summer';
-  if (!MESH_RECIPIENTS.has(to))
+  if (!isRecipient(to))
     throw new JovieInputError(
-      `--to must be summer, all, or one of: ${MESH_KINDS.join(', ')}.`
+      '--to must be summer, all, or a registered agent kind.'
     );
   const refs = (flags.refs ?? '')
     .split(',')
@@ -566,10 +576,15 @@ export async function meshVouch(
   };
 }
 
-export const MESH_USAGE = `Agent mesh (company agents only; needs a registered mesh token):
+export const MESH_USAGE = `Agent mesh (company agents only; needs a registered mesh token). Transport: the Cloudflare mesh hub
+(JOVIE_MESH_HUB_URL), with Summer's legacy inbox as a best-effort dual-write for summer/all (JOVIE_MESH_LEGACY=0 disables;
+JOVIE_MESH_HUB=0 uses legacy only):
   mesh send <message> [--to summer|all|<kind>] [--refs JOV-1,JOV-2] [--correlation-id <id>] [--as <kind>]
-  mesh read [--day YYYY-MM-DD] [--cursor <c>] [--as <kind>]
-  mesh watch [--as <kind>] [--cursor <c>] [--json]   Hold a long-poll; one line per new message (for Monitor, no polling loop)
+       Written to a local outbox first; if the hub is unreachable it stays queued and is delivered later with the same id.
+  mesh read [--peek] [--day YYYY-MM-DD] [--as <kind>]   Unhandled messages (marked handled unless --peek); --day = that day's history
+  mesh ack <id[,id]> [--as <kind>]                      Mark messages handled (DLQ escalates unhandled mail to the fallback owner)
+  mesh watch [--as <kind>] [--json]                     Long-poll stream; one line per new message (for Monitor)
+  mesh status [--hours N] [--as <kind>]                 Agents, presence, alarms, delivery p50/p95, dead and unhandled counts
   mesh register --kind <kind> [--owner <name>]   Create this agent's token in the keychain; prints the sha256 entry
   mesh vouch --kind <kind> --sender-id <uuid> --token-sha256 <hex> [--owner <name>] [--as <kind>]
   Credentials: JOVIE_MESH_TOKEN + JOVIE_MESH_SENDER_ID + JOVIE_MESH_SENDER_KIND, else keychain item jovie.mesh.<kind>.
@@ -582,18 +597,36 @@ export async function runMesh(
 ): Promise<Record<string, unknown>> {
   const [, action, arg, ...extra] = positionals;
   if (extra.length) throw new JovieInputError('Too many arguments for mesh.');
+  const hub = await import('./mesh-hub.js');
+  const useHub = hub.hubEnabled(deps);
   if (action === 'send') {
     if (arg === undefined)
       throw new JovieInputError('Missing required argument <message>.');
-    return meshSend(arg, flags, deps);
+    return useHub ? hub.hubSend(arg, flags, deps) : meshSend(arg, flags, deps);
+  }
+  if (action === 'ack') {
+    if (arg === undefined)
+      throw new JovieInputError('Missing required argument <id>.');
+    return hub.hubAck(arg, flags, deps);
   }
   if (arg !== undefined)
     throw new JovieInputError(`Unexpected argument for mesh ${action}.`);
-  if (action === 'read') return meshRead(flags, deps);
-  if (action === 'watch') return meshWatch(flags, deps);
+  if (action === 'read')
+    return useHub ? hub.hubRead(flags, deps) : meshRead(flags, deps);
+  if (action === 'watch') {
+    if (!useHub) return meshWatch(flags, deps);
+    // Summer still replies through its legacy mailbox until it consumes the hub.
+    const legacy = (deps.env ?? process.env).JOVIE_MESH_LEGACY !== '0';
+    const [result] = await Promise.all([
+      hub.hubWatch(flags, deps),
+      legacy ? meshWatch(flags, deps).catch(() => undefined) : undefined,
+    ]);
+    return result;
+  }
+  if (action === 'status') return hub.hubStatus(flags, deps);
   if (action === 'register') return meshRegister(flags, deps);
   if (action === 'vouch') return meshVouch(flags, deps);
   throw new JovieInputError(
-    `Unknown mesh command: ${action ?? ''}. Use send, read, watch, register, or vouch.`
+    `Unknown mesh command: ${action ?? ''}. Use send, read, ack, watch, status, register, or vouch.`
   );
 }

@@ -75,11 +75,14 @@ CONSERVATIVE_UTILITY = re.compile(
 SNAP_STEP = {"2.5": "2", "3.5": "3"}
 SPACING_SCAN_PREFIXES = ("apps/web/app/", "apps/web/components/", "packages/ui/")
 NON_PRODUCT_SPACING = re.compile(r"\.(?:test|spec|stories)\.[tj]sx?$")
-# Source Validation's merge probe. The NARROWED vitest command has its own union.
-# Any conflict hunk whose only change is a shell && chain (node --test or vitest
-# paths, plus added prefixes) uses merge_and_chain. Disjoint added siblings
-# (a list item, run_mode line, parameter, property, const, void call, or @param)
-# use resolve_additive_sibling_text. Any other hunk stays a model fix.
+# Source Validation's merge probe. Deterministic unions:
+# - NARROWED vitest command in scripts/preflight-changed.mjs
+# - shell && chains (node --test or vitest paths, plus added prefixes)
+# - quoted list entries (both sides only add 'path', lines)
+# - one-line comma-separated identifier lists (main order, then head-only tokens)
+# - disjoint added siblings (list items, run_mode lines, parameters, properties,
+#   const or void statements, and @param lines)
+# Any other hunk stays a model fix.
 NARROWED_PREFLIGHT = "scripts/preflight-changed.mjs"
 NARROWED_CONFLICT = re.compile(
     r"This PR conflicts with \S+ in: scripts/preflight-changed\.mjs\s*\. "
@@ -109,6 +112,8 @@ _NARROWED_HUNK = re.compile(
 _NARROWED_SIDE = re.compile(
     r"\A(?P<prefix>(?:[ \t]*command:\n)?)(?P<cindent>[ \t]*)'(?P<command>[^'\n]+)',\n"
     r"(?P<nindent>[ \t]*)note: '(?P<note>[^'\n]+)',\n?\Z")
+_QUOTED_LIST_ENTRY = re.compile(r"^[ \t]*'[^'\n]+',[ \t]*$")
+_IDENT_TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9-]*")
 _AND_CHAIN_LINE = re.compile(
     r"""^(?P<indent>[ \t]*)(?P<prefix>(?:"[^"\n]+"\s*:\s*)?)(?P<q>['"])(?P<command>[^'"\n]*&&[^'"\n]*)(?P=q)(?P<suffix>,?)\s*$""")
 _JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
@@ -547,6 +552,8 @@ def _line_depth_end(line: str, depth: int, in_block: bool) -> tuple[int, bool] |
             quote = char
             index += 1
             continue
+        if char in ";," and depth == 0 and line[index + 1:].strip():
+            return None
         if char in "([{":
             depth += 1
         elif char in ")]}":
@@ -594,8 +601,11 @@ def _take_additive_record(lines: list[str], start: int) -> tuple[str, str, int] 
             return None
         depth, in_block = ended
         stripped = lines[start + count - 1].strip()
-        if depth == 0 and not in_block and stripped.endswith((",", ";")):
-            break
+        if depth == 0 and not in_block:
+            if stripped.endswith((",", ";")):
+                break
+            if not stripped.endswith(("=", "=>")):
+                return None
     else:
         return None
     if depth != 0 or in_block:
@@ -648,7 +658,7 @@ def _additive_norm(record: dict) -> str:
     body = record["body"].strip()
     if record["kind"] == "ol":
         body = re.sub(r"^\d+\.\s+", "", re.sub(r"\s+", " ", body))
-    return re.sub(r"\s+", " ", body).strip()
+    return body
 
 
 def _render_additive(records: list[dict]) -> str:
@@ -665,8 +675,8 @@ def _render_additive(records: list[dict]) -> str:
                 record["body"],
                 count=1,
             )
-            prefix = record["text"][:len(record["text"]) - len(record["body"])]
-            pieces.append(prefix + body)
+            prefix, _, suffix = record["text"].partition(record["body"])
+            pieces.append(prefix + body + suffix)
         return "".join(pieces)
     return "".join(record["text"] for record in records)
 
@@ -873,6 +883,131 @@ def resolve_preflight_narrowed_text(text: str) -> str | None:
         pieces.append(
             f"{ours.group('prefix')}{ours.group('cindent')}'{command}',\n"
             f"{ours.group('nindent')}note: '{note}',\n")
+        last = hunk.end()
+    pieces.append(text[last:])
+    resolved = "".join(pieces)
+    if "<<<<<<<" in resolved or ">>>>>>>" in resolved:
+        return None
+    return resolved
+
+
+def merge_additive_quoted_entries(ours: str, theirs: str) -> str | None:
+    """Union two conflict sides that only add quoted list entries.
+
+    Main's order stays, then head-only lines. A blank side, a non-entry line, or a
+    repeated path with different text returns None."""
+
+    def rows(side: str) -> list[str] | None:
+        if not str(side or "").endswith("\n"):
+            return None
+        lines = side[:-1].split("\n")
+        if not lines or any(_QUOTED_LIST_ENTRY.fullmatch(line) is None for line in lines):
+            return None
+        return lines
+
+    ours_rows = rows(ours)
+    theirs_rows = rows(theirs)
+    if ours_rows is None or theirs_rows is None:
+        return None
+    seen: list[str] = []
+    for line in theirs_rows + ours_rows:
+        if line not in seen:
+            seen.append(line)
+    return "\n".join(seen) + "\n"
+
+
+def merge_additive_identifier_list(ours: str, theirs: str) -> str | None:
+    """Union two one-line comma-separated identifier lists.
+
+    Main's order stays, then head-only tokens. A trailing period must match.
+    Prose, a second line, a reordered shared token, or a repeated token returns None."""
+
+    def parse(side: str) -> tuple[str, list[str], bool] | None:
+        if not str(side or "").endswith("\n"):
+            return None
+        line = side[:-1]
+        if "\n" in line:
+            return None
+        indent = line[:len(line) - len(line.lstrip(" \t"))]
+        body = line.strip()
+        period = body.endswith(".")
+        if period:
+            body = body[:-1].rstrip()
+        if not body or body.endswith(","):
+            return None
+        tokens = [part.strip() for part in body.split(",")]
+        if any(_IDENT_TOKEN.fullmatch(part) is None for part in tokens):
+            return None
+        if len(tokens) != len(set(tokens)) or body != ", ".join(tokens):
+            return None
+        return indent, tokens, period
+
+    ours_parsed = parse(ours)
+    theirs_parsed = parse(theirs)
+    if not ours_parsed or not theirs_parsed:
+        return None
+    indent, ours_tokens, ours_period = ours_parsed
+    theirs_indent, theirs_tokens, theirs_period = theirs_parsed
+    if indent != theirs_indent or ours_period != theirs_period:
+        return None
+    theirs_set = set(theirs_tokens)
+    ours_set = set(ours_tokens)
+    if [token for token in ours_tokens if token in theirs_set] != [token for token in theirs_tokens if token in ours_set]:
+        return None
+    merged = list(theirs_tokens)
+    for token in ours_tokens:
+        if token not in merged:
+            merged.append(token)
+    text = indent + ", ".join(merged)
+    if theirs_period:
+        text += "."
+    return text + "\n"
+
+
+def resolve_additive_identifier_list_text(text: str) -> str | None:
+    """Replace conflict hunks that are only a one-line identifier list. None when any
+    hunk has another shape, so the caller leaves that merge to a model."""
+    if "<<<<<<<" not in str(text or ""):
+        return None
+    hunks = list(_NARROWED_HUNK.finditer(text))
+    if not hunks:
+        return None
+    if "<<<<<<<" in _NARROWED_HUNK.sub("", text) or ">>>>>>>" in _NARROWED_HUNK.sub("", text):
+        return None
+    pieces = []
+    last = 0
+    for hunk in hunks:
+        merged = merge_additive_identifier_list(hunk.group("ours"), hunk.group("theirs"))
+        if merged is None:
+            return None
+        pieces.append(text[last:hunk.start()])
+        pieces.append(merged)
+        last = hunk.end()
+    pieces.append(text[last:])
+    resolved = "".join(pieces)
+    if "<<<<<<<" in resolved or ">>>>>>>" in resolved:
+        return None
+    return resolved
+
+
+def resolve_additive_quoted_list_text(text: str) -> str | None:
+    """Replace conflict hunks that are only quoted list entries. None when any hunk
+    has another shape, so the caller leaves that merge to a model."""
+    if "<<<<<<<" not in str(text or ""):
+        return None
+    hunks = list(_NARROWED_HUNK.finditer(text))
+    if not hunks:
+        return None
+    if "<<<<<<<" in _NARROWED_HUNK.sub("", text) or ">>>>>>>" in _NARROWED_HUNK.sub("", text):
+        return None
+    pieces = []
+    last = 0
+    for hunk in hunks:
+        merged = merge_additive_quoted_entries(hunk.group("ours"), hunk.group("theirs"))
+        if merged is None:
+            return None
+        pieces.append(text[last:hunk.start()])
+        pieces.append(merged)
         last = hunk.end()
     pieces.append(text[last:])
     resolved = "".join(pieces)

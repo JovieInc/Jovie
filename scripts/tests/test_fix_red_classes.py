@@ -149,6 +149,68 @@ class NarrowedPreflightMergeTest(unittest.TestCase):
         self.assertIsNone(classes.merge_narrowed_guard_command(self.OURS, self.THEIRS.replace("vitest run", "vitest watch")))
 
 
+class AdditiveQuotedListMergeTest(unittest.TestCase):
+    def test_unions_quoted_entries_and_rejects_unknown_hunks(self):
+        text = (
+            "export const TESTS = Object.freeze([\n"
+            "  'scripts/lib/__tests__/external-api-guard.test.mjs',\n"
+            "<<<<<<< HEAD\n"
+            "  'scripts/lib/__tests__/api-budget.test.mjs',\n"
+            "=======\n"
+            "  'scripts/lib/__tests__/model-id-guard.test.mjs',\n"
+            "  'scripts/lib/__tests__/ai-call-guard.test.mjs',\n"
+            ">>>>>>> origin/main\n"
+            "  'scripts/lib/__tests__/domain-write-guard.test.mjs',\n"
+            "]);\n"
+        )
+        resolved = classes.resolve_additive_quoted_list_text(text)
+        self.assertEqual(resolved, (
+            "export const TESTS = Object.freeze([\n"
+            "  'scripts/lib/__tests__/external-api-guard.test.mjs',\n"
+            "  'scripts/lib/__tests__/model-id-guard.test.mjs',\n"
+            "  'scripts/lib/__tests__/ai-call-guard.test.mjs',\n"
+            "  'scripts/lib/__tests__/api-budget.test.mjs',\n"
+            "  'scripts/lib/__tests__/domain-write-guard.test.mjs',\n"
+            "]);\n"
+        ))
+        self.assertIsNone(classes.resolve_additive_quoted_list_text(text.replace(
+            "  'scripts/lib/__tests__/api-budget.test.mjs',\n",
+            "limitations. Keep the goal.\n",
+        )))
+        self.assertIsNone(classes.merge_additive_quoted_entries("", "  'scripts/a.test.mjs',\n"))
+
+
+class AdditiveIdentifierListMergeTest(unittest.TestCase):
+    def test_unions_slug_lines_and_rejects_unknown_hunks(self):
+        text = (
+            "Other scoped rules: ci-branching, event-driven, infra, linear, motion,\n"
+            "<<<<<<< HEAD\n"
+            "pr-stacking, swarm, hermes-air, rate-limits.\n"
+            "=======\n"
+            "pr-stacking, swarm, hermes-air, anti-slop.\n"
+            ">>>>>>> origin/main\n"
+            "Company domain canon: [index](canon/README.md).\n"
+        )
+        resolved = classes.resolve_additive_identifier_list_text(text)
+        self.assertEqual(resolved, (
+            "Other scoped rules: ci-branching, event-driven, infra, linear, motion,\n"
+            "pr-stacking, swarm, hermes-air, anti-slop, rate-limits.\n"
+            "Company domain canon: [index](canon/README.md).\n"
+        ))
+        self.assertIsNone(classes.resolve_additive_identifier_list_text(text.replace(
+            "pr-stacking, swarm, hermes-air, rate-limits.\n",
+            "keep both sides' intent.\n",
+        )))
+        self.assertIsNone(classes.merge_additive_identifier_list(
+            "swarm, pr-stacking.\n",
+            "pr-stacking, swarm.\n",
+        ))
+        self.assertIsNone(classes.merge_additive_identifier_list(
+            "pr-stacking, swarm\n",
+            "pr-stacking, swarm.\n",
+        ))
+
+
 class AndChainMergeTest(unittest.TestCase):
     OURS = (
         "node scripts/run-affected-tests.mjs --control && "
@@ -271,31 +333,25 @@ class AdditiveSiblingMergeTest(unittest.TestCase):
         self.assertIn("planOpsHealth(await runConformance({ compare: ghCompare })),", both)
         self.assertIn("loadDrift: () => loadDriftPlans(),", both)
 
+    def test_literal_whitespace_control_flow_and_list_spacing_are_preserved(self):
+        self.assertIsNone(classes.merge_additive_siblings('const s = "  ";\n', 'const s = " ";\n'))
+        self.assertIsNone(classes.merge_additive_siblings("const head = 1, shared = 2;\n", "const main = 3, shared = 4;\n"))
+        for separator in ("; ", "\n"):
+            self.assertIsNone(classes.merge_additive_siblings(
+                f"const head = 1{separator}return head;\n", f"const main = 2{separator}return main;\n"))
+        self.assertEqual(classes.merge_additive_siblings("12. Head\n\n", "12. Main\n\n"), "12. Main\n\n13. Head\n\n")
+
     def test_unknown_control_flow_and_changed_binding_stay_unresolved(self):
-        edited = (
-            "<<<<<<< HEAD\n"
-            "  return buildLegacy();\n"
-            "=======\n"
-            "  return buildNext();\n"
-            ">>>>>>> origin/main\n"
-        )
+        def hunk(ours, theirs):
+            return f"<<<<<<< HEAD\n{ours}=======\n{theirs}>>>>>>> origin/main\n"
+        edited = hunk("  return buildLegacy();\n", "  return buildNext();\n")
         self.assertIsNone(classes.resolve_additive_sibling_text(edited))
-        rebound = (
-            "<<<<<<< HEAD\n"
-            "  const ops = await getOpsHealthEnvelope();\n"
-            "=======\n"
-            "  const ops = null;\n"
-            ">>>>>>> origin/main\n"
-        )
+        rebound = hunk("  const ops = await getOpsHealthEnvelope();\n", "  const ops = null;\n")
         self.assertIsNone(classes.resolve_additive_sibling_text(rebound))
         self.assertIsNone(classes.resolve_additive_sibling_text(self.ROUTE + edited))
-        chained = (
-            "<<<<<<< HEAD\n"
-            '    "ci:control:test": "node --test scripts/a.test.mjs && pnpm ownership:check",\n'
-            "=======\n"
-            '    "ci:control:test": "node --test scripts/a.test.mjs && pnpm ownership:check && node scripts/sources-of-truth.mjs",\n'
-            ">>>>>>> origin/main\n"
-        )
+        chained = hunk(
+            '    "ci:control:test": "node --test scripts/a.test.mjs && pnpm ownership:check",\n',
+            '    "ci:control:test": "node --test scripts/a.test.mjs && pnpm ownership:check && node scripts/sources-of-truth.mjs",\n')
         self.assertIsNone(classes.resolve_additive_sibling_text(chained))
         self.assertIsNotNone(classes.resolve_and_chain_text(chained))
 

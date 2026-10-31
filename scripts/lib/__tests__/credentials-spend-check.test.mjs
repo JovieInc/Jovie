@@ -18,6 +18,7 @@ import {
   summarizeProviderTrialLedger,
 } from '../credentials-live-reads.mjs';
 import {
+  closeSpendFunding,
   DAY_MS,
   evaluateRegistry,
   validateCredentialsRegistry,
@@ -436,7 +437,7 @@ describe('Summer provider-trial ledger', () => {
   const FIXTURE = fileURLToPath(
     new URL('./fixtures/provider-trial-ledger.json', import.meta.url)
   );
-  const trialSpend = () =>
+  const spendProviders = () =>
     JSON.parse(
       readFileSync(
         fileURLToPath(
@@ -444,7 +445,33 @@ describe('Summer provider-trial ledger', () => {
         ),
         'utf8'
       )
-    ).providers.filter(entry => entry.id.startsWith('summer-trial-'));
+    ).providers;
+  const trialSpend = () => {
+    const providers = spendProviders();
+    return closeSpendFunding(
+      providers,
+      providers.filter(entry => entry.id.startsWith('summer-trial-'))
+    );
+  };
+
+  it('keeps the credit pools a summer-trial slice draws from', () => {
+    const providers = spendProviders();
+    const sliced = providers.filter(entry =>
+      entry.id.startsWith('summer-trial-')
+    );
+    expect(validateSpendLedger(spend(sliced))).toEqual([
+      'summer-trial-workers-ai: funding.creditPoolId cloudflare-credits is not a spend entry',
+      'summer-trial-anthropic-api: funding.creditPoolId anthropic-api-credit is not a spend entry',
+    ]);
+    const closed = closeSpendFunding(providers, sliced);
+    expect(validateSpendLedger(spend(closed))).toEqual([]);
+    expect(closed.map(entry => entry.id)).toEqual([
+      'cloudflare-credits',
+      'anthropic-api-credit',
+      'summer-trial-workers-ai',
+      'summer-trial-anthropic-api',
+    ]);
+  });
 
   it('books the current UTC month per channel, $0 for an empty channel', () => {
     const ledger = JSON.parse(readFileSync(FIXTURE, 'utf8'));

@@ -486,23 +486,24 @@ test.describe('canonical /start onboarding chat', () => {
 
     const bubble = page.getByTestId('chat-user-bubble').first();
     await expect(bubble).toBeVisible();
-    // Chat body text follows --text-app, which #19154 consolidated onto the
-    // 10/12/14 scale (12px; was 13px).
+    // Pen R6As7U (T68xUV): the onboarding transcript reads at 16px body in a
+    // dark surface-2 bubble padded 16/20 (was the app chat's 12px pill).
     await expect(bubble.locator('.system-b-chat-user-text')).toHaveCSS(
       'font-size',
-      '12px'
+      '16px'
     );
-    await expect(bubble).toHaveCSS('padding-top', '6px');
-    await expect(bubble).toHaveCSS('padding-right', '12px');
-    await expect(bubble).toHaveCSS('padding-bottom', '6px');
-    await expect(bubble).toHaveCSS('padding-left', '12px');
+    await expect(bubble).toHaveCSS('padding-top', '16px');
+    await expect(bubble).toHaveCSS('padding-right', '20px');
+    await expect(bubble).toHaveCSS('padding-bottom', '16px');
+    await expect(bubble).toHaveCSS('padding-left', '20px');
 
     const bubbleBox = await bubble.boundingBox();
     const composerBox = await page.locator(COMPOSER_SURFACE).boundingBox();
     expect(bubbleBox).not.toBeNull();
     expect(composerBox).not.toBeNull();
     if (bubbleBox && composerBox) {
-      expect(bubbleBox.height).toBeLessThanOrEqual(40);
+      // One 16px line at 1.45 plus 32px vertical padding.
+      expect(bubbleBox.height).toBeLessThanOrEqual(60);
       expect(bubbleBox.y + bubbleBox.height).toBeLessThan(composerBox.y);
     }
 
