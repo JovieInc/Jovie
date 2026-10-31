@@ -56,6 +56,26 @@ materially different effect receives a different ID.
   and CLI adapters. These define binding contracts; they do **not** claim
   runtime support.
 
+## Tool route receipts (JOV-8119)
+
+`tool-route.ts` owns `jovie.tool-route-receipt/v1`, shared by Hermes job logs
+and the optional `ActionReceipt.route` in the existing invocation ledger.
+Transport policy travels as `HermesDispatchRequest.routePolicy`; omission means
+observe mode. Observe mode reports violations without rejecting ordinary jobs.
+
+A receipt describes its observed boundary: fleet HTTP ingress records `rest`,
+regardless of the caller's claimed CLI/MCP channel. Idempotent replay retains
+the original execution receipt. Hermes records a CLI launch only after spawn;
+child tools and egress remain unknown. References use SHA-256 of the dispatch,
+execution or idempotency identity. No raw arguments, headers or credentials are
+accepted. A missing verifier reference stays null.
+
+Controlled benchmark and policy-bound Hermes runs exit 78 before launch because
+the current subprocess boundary cannot isolate or completely attest routes.
+The scoring predicate rejects mixed, unknown, disallowed, unisolated or failed
+benchmark evidence and missing verifier references. Successful sandbox execution and benchmark
+integration are tracked in JOV-8485; these receipts do not certify that work.
+
 ## Result and receipt
 
 Every invocation resolves to exactly one `ActionResult` variant, each carrying
