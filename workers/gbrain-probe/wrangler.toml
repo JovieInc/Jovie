@@ -1,0 +1,12 @@
+name = "jovie-gbrain-probe"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+# Fail-safe dead-man: there is no event for "the memory endpoint died" (JOV-10028).
+[triggers]
+crons = ["*/5 * * * *"]
+
+[[kv_namespaces]]
+binding = "STATE"
+id = "c86fe006f8d64fffa5d23c979b90cd2f"
