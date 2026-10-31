@@ -245,9 +245,9 @@ export const SOURCE_GUARDS = Object.freeze([
     // measured and auditable), and the dead-man liveness contract stays green.
     id: 'automation-registry',
     command:
-      'node --test --experimental-test-coverage --test-coverage-include=scripts/installation-budget-sentinel.mjs --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=100 scripts/installation-budget-sentinel.test.mjs && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/automation-registry.test.mjs lib/__tests__/automation-liveness.test.mjs',
+      'node scripts/lib/automation-registry.mjs check-change && node --test --experimental-test-coverage --test-coverage-include=scripts/installation-budget-sentinel.mjs --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=100 scripts/installation-budget-sentinel.test.mjs && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/automation-registry.test.mjs lib/__tests__/automation-registry-admission.test.mjs lib/__tests__/automation-registry-transition.test.mjs lib/__tests__/automation-registry-runner.test.mjs lib/__tests__/automation-liveness.test.mjs',
     inputs:
-      /^(?:\.github\/workflows\/[^/]+\.ya?ml|(?:apps\/[^/]+\/)?vercel\.json|scripts\/lanes\/continuity_clock\.py|canon\/automation-registry\.jsonl|scripts\/(?:automation-liveness\.mjs|installation-budget-sentinel(?:\.test)?\.mjs)|scripts\/lib\/(?:automation-registry\.mjs|__tests__\/automation-(?:registry|liveness)\.test\.mjs))/u,
+      /^(?:\.github\/workflows\/[^/]+\.ya?ml|(?:(?:apps|workers|packages)\/(?:[^/]+\/)*)?vercel\.json|scripts\/lanes\/continuity_clock\.py|canon\/automation-registry\.jsonl|scripts\/(?:ci-fast-lanes\.mjs|automation-liveness\.mjs|installation-budget-sentinel(?:\.test)?\.mjs)|scripts\/lib\/(?:automation-registry(?:-policy|-command)?\.mjs|__tests__\/automation-(?:registry(?:-admission|-transition|-runner)?|liveness)\.test\.mjs))/u,
     prOnly: false,
   }),
   Object.freeze({

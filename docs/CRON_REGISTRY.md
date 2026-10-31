@@ -47,14 +47,27 @@ own resource identities. A pending workflow-sourced lanes record can cover one
 clock. Multiple clocks need an explicit `trigger.clocks` list and `groupReason`
 on that same row; every declared clock must dispatch the named workflow.
 
-The existing registry CI suite checks declared-identity and execution collisions
-on the source and composed merge-group tree. Two callers can both pass against
-one unchanged snapshot; this is **not atomic admission**. Register through the
-existing PR/merge path, recheck the composed inventory, and leave provider
-creation and custody with its incumbent owner. Legacy rows remain valid without
-identity fields, so direct manual additions that bypass this proposal command
-are not an enforced all-new-row identity gate. Provider-side exclusion requires
-that provider owner's existing admission boundary; this helper grants none.
+The existing `automation-registry` source guard runs
+`node scripts/lib/automation-registry.mjs check-change` before its tests. It binds
+the base and candidate to the runner's GitHub event and registry tree;
+missing, unrelated or wrongly bound evidence fails closed. PR checks use the
+exact base (the verified first parent for a PR merge checkout). Source Validation's
+prepared source-head checkout is compared with the independently computed merge
+tree of its trusted base and exact PR head. Merge-group checks use the event's
+exact base/head. Local runs compare against the merge
+base with `origin/main` (or the previous commit when already on that base).
+Manual additions and changed live rows must declare identity. Unchanged legacy
+and retired history stays valid; deleting an incumbent, stripping/replacing an
+identity or reactivating a retired row fails. A retirement-only change may set
+`status`, `retiredAt` and `archive` while preserving all operating metadata.
+
+The guard checks declared-identity and execution collisions on the complete
+candidate tree. Two callers can both pass against one unchanged snapshot; this
+is **not atomic admission**. Register through the existing PR/merge path and
+leave provider creation and custody with its incumbent owner. Source admission
+does not prove live provider inventory or enforce its creation APIs. Provider-side
+exclusion requires that owner's existing admission boundary; this helper grants
+none. Never infer provider registration or activation from a passing source check.
 
 ## Codex Workspace Automations
 

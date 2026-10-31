@@ -158,8 +158,8 @@
     },
     ".claude/rules/infra.md": {
       "owner": "@itstimwhite",
-      "claim": "Infra follows the engineering canon; company automation proposals check canonical purpose/scope and execution identity through the existing registry helper before creation.",
-      "documentSha256": "5107b8bd4e60886a391a332c2b807f92410882456bb8262ccd8971d839d63123",
+      "claim": "Infra follows the engineering canon; the canonical automation registry checks purpose/scope and execution identity before proposals and enforces manual additions and live updates against the trusted base/candidate source trees.",
+      "documentSha256": "fcb8ff12c8613c9a9bc49ed43e8e19e220783dafc7ac2a3852f7077879377c1d",
       "sources": [
         {
           "path": "canon/ENGINEERING.md",
@@ -168,7 +168,15 @@
         },
         {
           "path": "scripts/lib/automation-registry.mjs",
-          "sha256": "f420042c31e683dba3f6a5b854f68f648659d9ac1859b5c1046bf6b3f85196bb"
+          "sha256": "2552c111971cd74be4a7328ebb07c9cd6a4471a80829117c6a38c36938e84a93"
+        },
+        {
+          "path": "scripts/lib/automation-registry-policy.mjs",
+          "sha256": "2f1cc5bc6f57361748877a32f6f0f46bfef0277390bb089f7fb95ad745c783f4"
+        },
+        {
+          "path": "scripts/lib/automation-registry-command.mjs",
+          "sha256": "d77c2bb1b2eb8ac1aec2b4677f0fe4017d231280b4a954d4d02f98b9f446b8f3"
         }
       ]
     },

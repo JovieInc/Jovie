@@ -27,6 +27,9 @@ The [proposal contract](../../docs/CRON_REGISTRY.md#before-creating-company-auto
 requires a concrete purpose/scope identity and fails closed on ambiguous evidence.
 Reuse the incumbent identity and preserve ownership/holds. This is a snapshot
 preflight, not a reservation or permission to create a schedule.
+The same registry lane enforces `check-change` against the trusted base/candidate
+commits, including manual new rows and changed live rows. Missing base evidence
+fails closed; unchanged legacy history and retirement-only changes are preserved.
 
 ## Rules for Cron Jobs & Scheduled Tasks
 
