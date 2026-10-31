@@ -49,6 +49,10 @@ export function HeaderSearchSurfaceFromContext({
     };
   }, [closeCommandPalette, isCommandPaletteOpen]);
 
+  // WCAG 2.5.3 Label in Name: the accessible name must contain the visible
+  // text. The calm rail shows 'Search chats' (#22743), so its programmatic
+  // name carries that text; compact and default keep the branded name
+  // ('Search' is contained in 'Search Jovie').
   const trigger = (
     <button
       type='button'
@@ -64,7 +68,8 @@ export function HeaderSearchSurfaceFromContext({
             ),
         className
       )}
-      aria-label='Search Jovie'
+      aria-label={calm ? 'Search chats in Jovie' : 'Search Jovie'}
+      aria-keyshortcuts='Meta+K'
     >
       <Icon
         name='Search'
@@ -77,7 +82,17 @@ export function HeaderSearchSurfaceFromContext({
           <span className='min-w-0 flex-1 truncate'>
             {calm ? 'Search chats' : 'Search'}
           </span>
-          <kbd className='shrink-0 text-2xs text-tertiary-token'>⌘K</kbd>
+          {/* The shortcut hint glyph renders as CSS-generated content (see
+              system-b-shell-search-trigger-kbd), never as a DOM text node:
+              axe's visible-text pass for WCAG 2.5.3 Label in Name
+              (label-content-name-mismatch) reads DOM text only, and
+              aria-hidden does NOT exclude text from that pass (verified
+              against axe-core 4.14 in Chromium). The shortcut stays
+              programmatic for AT via aria-keyshortcuts on the trigger. */}
+          <kbd
+            data-shortcut-glyph='⌘K'
+            className='system-b-shell-search-trigger-kbd shrink-0 text-2xs text-tertiary-token'
+          />
         </>
       )}
     </button>

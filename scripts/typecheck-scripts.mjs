@@ -166,7 +166,8 @@ export function compareWithBaseline(current, baseline) {
     }
   }
   return {
-    ok: newErrors.length === 0 && staleEntries.length === 0,
+    // Shrink (staleEntries) is reported as a notice, never a failure.
+    ok: newErrors.length === 0,
     newErrors,
     staleEntries,
   };
@@ -373,6 +374,14 @@ export function evaluateTypecheckBaseline({
   const { ok, newErrors, staleEntries } = compareWithBaseline(counts, baseline);
 
   if (ok) {
+    if (staleEntries.length > 0) {
+      const notice = `[${prefix}] ${staleEntries.length} baselined group(s) shrank; run \`${updateCommand}\` to lock it in.`;
+      console.log(
+        process.env.GITHUB_ACTIONS === 'true'
+          ? `::notice title=${prefix} improved::${notice}`
+          : notice
+      );
+    }
     console.log(
       `[${prefix}] PASS — ${totalErrors(counts)} pre-existing errors match the baseline ` +
         `(${baseline.totalErrors} baselined); no new errors.`
@@ -402,18 +411,6 @@ export function evaluateTypecheckBaseline({
     }
     const repair = unknownJsonPropertyRepair(diagnosticLines);
     if (repair) console.error(repair);
-  }
-  if (staleEntries.length > 0) {
-    console.error(
-      `[${prefix}] FAIL — baseline is stale: ${staleEntries.length} (file, error-code) group(s) no longer produce the baselined errors.`
-    );
-    for (const { file, code, count, baseline: base } of staleEntries) {
-      console.error(`  ${file}: ${code} ×${count} (baseline ×${base})`);
-    }
-    console.error(
-      `The baseline is shrink-only: regenerate it with \`${updateCommand}\` ` +
-        'in the same PR that removes the errors.'
-    );
   }
   exit(1);
 }

@@ -150,6 +150,14 @@ describe('runProductionCertification', () => {
         summary: 'ok',
       },
       {
+        surface: 'onboarding',
+        id: 'fresh-user-onboarding-first-value',
+        status: 'passed',
+        startedAt: T,
+        endedAt: T,
+        summary: 'ok',
+      },
+      {
         surface: 'checkout',
         id: 'checkout-entry-renders',
         status: 'failed',
@@ -347,6 +355,89 @@ describe('JOV-9822 retries, full green and the overall verdict', () => {
     );
     expect(close).toHaveBeenCalledWith(
       expect.objectContaining({ fingerprint: 'prod-cert-overall' })
+    );
+  });
+});
+
+describe('JOV-9625 outcome rework: per-surface browser evidence', () => {
+  it('folds telemetry and screenshot steps into the surface receipt', async () => {
+    const steps = [
+      {
+        kind: 'telemetry',
+        surface: 'chat',
+        consoleErrors: 2,
+        networkErrors: 1,
+      },
+      {
+        kind: 'screenshot',
+        surface: 'chat',
+        format: 'jpeg',
+        dataUrl: 'data:image/jpeg;base64,abc',
+      },
+    ];
+    const { receipts } = await runProductionCertification({
+      fetchImpl: fakeFetch(),
+      steps,
+      authStatus: 'passed',
+    });
+    const chat = receipts.find(r => r.surface === 'chat');
+    expect(chat.consoleErrorCount).toBe(2);
+    expect(chat.networkErrorCount).toBe(1);
+    expect(chat.screenshot).toEqual({
+      format: 'jpeg',
+      dataUrl: 'data:image/jpeg;base64,abc',
+    });
+    // A surface with no browser evidence records absence, never a zero.
+    const landing = receipts.find(r => r.surface === 'landing');
+    expect(landing.consoleErrorCount).toBeNull();
+    expect(landing.networkErrorCount).toBeNull();
+    expect(landing.screenshot).toBeNull();
+  });
+
+  it('the latest telemetry and screenshot step for a surface wins', async () => {
+    const steps = [
+      {
+        kind: 'telemetry',
+        surface: 'chat',
+        consoleErrors: 5,
+        networkErrors: 5,
+      },
+      {
+        kind: 'screenshot',
+        surface: 'chat',
+        format: 'jpeg',
+        dataUrl: 'data:image/jpeg;base64,first',
+      },
+      {
+        kind: 'telemetry',
+        surface: 'chat',
+        consoleErrors: 0,
+        networkErrors: 0,
+      },
+      {
+        kind: 'screenshot',
+        surface: 'chat',
+        format: 'jpeg',
+        dataUrl: 'data:image/jpeg;base64,second',
+      },
+    ];
+    const { receipts } = await runProductionCertification({
+      fetchImpl: fakeFetch(),
+      steps,
+      authStatus: 'passed',
+    });
+    const chat = receipts.find(r => r.surface === 'chat');
+    expect(chat.consoleErrorCount).toBe(0);
+    expect(chat.networkErrorCount).toBe(0);
+    expect(chat.screenshot.dataUrl).toBe('data:image/jpeg;base64,second');
+  });
+
+  it('expects the profile edit readback and the fresh-user onboarding step', () => {
+    expect(EXPECTED_BROWSER_CHECKS['public-profile']).toContain(
+      'profile-edit-save-readback'
+    );
+    expect(EXPECTED_BROWSER_CHECKS.onboarding).toContain(
+      'fresh-user-onboarding-first-value'
     );
   });
 });

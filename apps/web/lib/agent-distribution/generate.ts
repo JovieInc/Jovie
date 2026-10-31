@@ -1,5 +1,6 @@
 import { lintCopy } from '@jovie/copy';
 import { canonicalJson, hashTools, sha256 } from './hash';
+import { ICON_SIZES, type IconSourceInfo } from './icons';
 import type { Listing } from './listing';
 import {
   bullets,
@@ -10,6 +11,7 @@ import {
   numbered,
   page,
 } from './markdown';
+import { evaluateAll, type ReadinessInputs } from './readiness';
 
 export interface DistributionTool {
   readonly name: string;
@@ -30,11 +32,7 @@ export const LIMITS = {
   chatgpt: { displayName: 30, shortDescription: 30, longDescription: 4000 },
   claude: { name: 100, oneLiner: 200, description: 2000, categories: [1, 5] },
 } as const;
-/** Existing brand app icons (repo-relative). 48/64 have no committed source. */
-export const ICON_SOURCES = {
-  512: 'apps/web/public/brand/app-icons/jovie-app-icon-512.png',
-  1024: 'apps/web/public/brand/app-icons/jovie-app-icon-1024.png',
-} as const;
+export const ICON_OUTPUT_DIR = '.agent-distribution-out/icons';
 export const REQUIRED_HINTS = [
   'readOnlyHint',
   'destructiveHint',
@@ -102,13 +100,15 @@ export function validateDistribution(
     check(`negativeTests[${i}].expected`, t.expected);
   });
   check('dataHandling', listing.dataHandling);
+  for (const [key, value] of Object.entries(listing.docsPage))
+    for (const [i, text] of [value].flat().entries())
+      check(`docsPage.${key}.${i}`, text);
   if (listing.positiveTests.length < 5)
     errors.push('chatgpt: need at least 5 positive test cases');
   if (listing.negativeTests.length < 3)
     errors.push('chatgpt: need at least 3 negative test cases');
   blockers.push(
-    'docsUrl points at /support: add a public docs page for the agent MCP before submission',
-    'icons: 512 and 1024 reuse the brand app icon; 48 and 64 PNGs still need to be exported (binary assets are blocked by repo-hygiene outside allowlisted paths)'
+    'icons: render the 48, 64, 512 and 1024 PNGs with agent-distribution:icons before uploading to a marketplace'
   );
   return { errors, blockers };
 }
@@ -124,12 +124,20 @@ const json = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;
 export function buildDistribution(
   tools: readonly DistributionTool[],
   listing: Listing,
-  assets: Record<string, string> = {}
+  assets: Record<string, string> = {},
+  readinessInputs: ReadinessInputs | null = null,
+  icons: IconSourceInfo | null = null
 ): DistributionOutput {
   const served = tools.map(t => ({ ...t }));
   const toolsListHash = hashTools(served);
   const listingHash = sha256(canonicalJson(listing));
   const issues = validateDistribution(tools, listing);
+  if (icons)
+    issues.blockers.splice(
+      0,
+      issues.blockers.length,
+      ...issues.blockers.filter(b => !b.startsWith('icons:'))
+    );
   const version = (adapter: string) =>
     sha256(`${toolsListHash}:${listingHash}:${adapter}`).slice(0, 12);
   const provenance = (adapter: string) => ({
@@ -153,8 +161,10 @@ export function buildDistribution(
       website: listing.website,
       description: listing.oneLiner,
       examplePrompts: listing.examplePrompts,
-      icon512: ICON_SOURCES[512],
-      icon1024: ICON_SOURCES[1024],
+      icon512: `${ICON_OUTPUT_DIR}/icon-512.png`,
+      icons: Object.fromEntries(
+        ICON_SIZES.map(size => [size, `${ICON_OUTPUT_DIR}/icon-${size}.png`])
+      ),
       acceptsPayments: false,
       contact: listing.supportEmail,
       supportUrl: listing.supportUrl,
@@ -291,10 +301,19 @@ export function buildDistribution(
     tools: toolSummary,
   };
 
+  const platforms = readinessInputs
+    ? evaluateAll(readinessInputs, listing, toolsListHash, null)
+    : null;
   const readiness = {
     _generated: provenance('readiness'),
-    ready: issues.blockers.length === 0,
+    ready:
+      issues.blockers.length === 0 &&
+      platforms !== null &&
+      Object.values(platforms).every(p => p.ready),
     blockers: issues.blockers,
+    timeChecks:
+      'Receipt age and deadlines are checked by the agent-distribution:ready script, not here.',
+    platforms,
   };
 
   const files: Record<string, string> = {
@@ -311,6 +330,7 @@ export function buildDistribution(
     files[`${chatgptRoot}/assets/${path}`] = content;
   files['manifest.json'] = json({
     ...provenance('manifest'),
+    icons,
     files: Object.keys(files).sort(),
     versions: Object.fromEntries(
       ['muse', 'grok', 'chatgpt', 'claude'].map(a => [a, version(a)])

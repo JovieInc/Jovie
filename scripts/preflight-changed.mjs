@@ -45,6 +45,7 @@ import {
   parseMergeConflicts,
 } from './lib/preflight-changed.mjs';
 import { checkInstallMatchesLockfile } from './lib/preflight-install.mjs';
+import { remoteHint } from './lib/remote-hint.mjs';
 
 const SELF = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HEAP_MB = process.env.JOVIE_PREFLIGHT_HEAP_MB || '4096';
@@ -357,8 +358,11 @@ export function typecheckTargets(files, cwd) {
     const web = f.filename.startsWith('apps/web/');
     if (web) {
       out.add(isTest ? 'web-tests' : 'web');
-      // Ovie compiles shared web routes/components under its own TS graph.
-      if (!isTest) out.add('pkg:@jovie/ovie');
+      if (!isTest) {
+        // Source changes also affect test consumers and Ovie's TS graph.
+        out.add('web-tests');
+        out.add('pkg:@jovie/ovie');
+      }
     } else if (/^scripts\//.test(f.filename)) out.add('scripts');
     else {
       let dir = path.dirname(f.filename);
@@ -397,6 +401,8 @@ export async function main({
     return 0;
   }
   const cwd = args.repo;
+  const hint = remoteHint({ env });
+  if (hint) log(hint);
   // Fail fast before any check runs against an install this worktree did not make.
   const install = checkInstallMatchesLockfile({ repo: cwd });
   if (!install.ok) {
@@ -510,6 +516,24 @@ export async function main({
       'ownership registry',
       'node scripts/ownership-registry.mjs --report',
       1
+    );
+  // One source of truth per fact (canon/SOURCES_OF_TRUTH.md): the map must stay
+  // sound whenever it, the rule or an owner file changes.
+  if (
+    any(
+      /^(?:canon\/(?:sources-of-truth\.json|SOURCES_OF_TRUTH\.md)|\.claude\/rules\/source-of-truth\.md|scripts\/(?:lib\/)?sources-of-truth|apps\/web\/lib\/(?:config\/plan-prices|entitlements\/registry|analytics\/data-retention)|ops\/registry\/)/
+    )
+  )
+    cmd(
+      'sources-of-truth',
+      'sources-of-truth map',
+      'node scripts/sources-of-truth.mjs'
+    );
+  if (any(/^apps\/(?:web|docs)\/(?:app|components|data|content|lib)\//))
+    cmd(
+      'duplicate-literals',
+      'no copied owner values (prices, names, retention, limits)',
+      'node scripts/invariants/duplicate-literals.mjs'
     );
   if (any(/(?:^|\/)package\.json$|pnpm-lock\.yaml$/))
     cmd(

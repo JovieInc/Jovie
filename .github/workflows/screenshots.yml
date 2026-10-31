@@ -114,10 +114,8 @@ jobs:
         working-directory: apps/web
     env:
       DATABASE_URL: postgresql://localhost/noop
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_mock
-      CLERK_SECRET_KEY: sk_test_mock
       NEXT_DISABLE_TOOLBAR: '1'
-      NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+      NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
       E2E_USE_TEST_AUTH_BYPASS: '1'
       E2E_CLERK_USER_ID: user_test
       PUBLIC_NOAUTH_SMOKE: '1'
@@ -1092,6 +1090,19 @@ jobs:
           EXISTING_PR=$(gh pr list --head "$BRANCH" --state open --json number \
             -q '.[0].number' 2>/dev/null || true)
 
+          # Batch refreshes: a new PR costs a merge-queue slot plus a full CI run,
+          # so open one at most per day. Updating an open PR is always allowed.
+          LAST_MERGED=$(node packages/api-client/cli.ts gh --priority default -- pr list --head "$BRANCH" --state merged --limit 1 \
+            --json mergedAt -q '.[0].mergedAt' 2>/dev/null || true)
+          CADENCE=$(node .github/scripts/screenshot-publish-cadence.mjs \
+            "$EXISTING_PR" "$LAST_MERGED")
+          echo "screenshot-cadence: $CADENCE"
+          echo "screenshot-cadence: $CADENCE" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$(printf '%s' "$CADENCE" | jq -r .publish)" != true ]; then
+            echo "::notice::Screenshot refresh batched into the next daily PR (queue slot saved)."
+            exit 0
+          fi
+
           git checkout -b "$BRANCH"
           git add apps/web/public/product-screenshots/ apps/web/screenshot-catalog/current/
           git commit -m "chore: update product screenshots [auto]
@@ -1110,10 +1121,8 @@ jobs:
             # auth behavior, so run the hook without the screenshot job env.
             PUSH_OUTPUT=$(env \
               -u DATABASE_URL \
-              -u NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY \
-              -u CLERK_SECRET_KEY \
               -u NEXT_DISABLE_TOOLBAR \
-              -u NEXT_PUBLIC_CLERK_PROXY_DISABLED \
+              -u NEXT_PUBLIC_AUTH_PROXY_DISABLED \
               -u E2E_USE_TEST_AUTH_BYPASS \
               -u E2E_CLERK_USER_ID \
               git -c "http.https://github.com/.extraheader=$AUTH_HEADER" push --force origin "$BRANCH" 2>&1)

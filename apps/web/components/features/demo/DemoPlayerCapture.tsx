@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
 import { captureTrackPlayback } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { FOUNDER_DEMO_PERSONA } from '@/lib/demo-personas';
+import { formatReleaseArtistLine } from '@/lib/discography/formatting';
 
 // Reuse the canonical real release, artwork and duration, never invented UI.
 export const DEMO_PLAYER_RELEASE = FOUNDER_DEMO_PERSONA.releases[0];
@@ -19,7 +20,9 @@ export function DemoPlayerCapture() {
           id: DEMO_PLAYER_RELEASE.id,
           title: DEMO_PLAYER_RELEASE.title,
           releaseTitle: DEMO_PLAYER_RELEASE.title,
-          artistName: DEMO_PLAYER_RELEASE.artistNames.join(' & '),
+          artistName:
+            formatReleaseArtistLine(DEMO_PLAYER_RELEASE.artistNames) ??
+            'Unknown artist',
           artworkUrl: DEMO_PLAYER_RELEASE.artworkUrl,
         },
         (DEMO_PLAYER_RELEASE.totalDurationMs ?? 0) / 1000,

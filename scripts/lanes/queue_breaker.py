@@ -10,7 +10,8 @@ PR's current head existed belongs to an older head and is ignored, so a fix push
 inherits the old head's failures. The hold stays while the head is the one that failed (the sweep puts
 the label back if the relay cleared it); when a new head is pushed the sweep removes `lane-fix-red`
 itself, for PRs this breaker tripped only (a human or hold-contract label is never touched). State: queue-breaker.json, log:
-queue-breaker.jsonl. All GitHub access goes through the injected budgeted gh runner."""
+queue-breaker.jsonl. HEADGREEN grouping (live 2026-10-29): only a group head's build gates the merge, so a failed
+build of an entry that is still queued on that same synthetic commit did not eject it and is not counted. All GitHub access goes through the injected budgeted gh runner."""
 from __future__ import annotations
 
 import json
@@ -23,7 +24,7 @@ from pathlib import Path
 WINDOW_S, TRIP_FAILURES, STATE_KEEP_S, MAX_TRIPS_PER_TICK = 3 * 3600, 2, 24 * 3600, 2
 STATE_FILE, LOG_FILE, HOLD_LABEL = "queue-breaker.json", "queue-breaker.jsonl", "lane-fix-red"
 QUEUE_QUERY = ("query($o:String!,$r:String!){repository(owner:$o,name:$r){mergeQueue(branch:\"main\"){entries(first:50)"
-               "{nodes{state pullRequest{id number headRefOid}}}}}}")
+               "{nodes{state headCommit{oid} pullRequest{id number headRefOid}}}}}}")
 DEQUEUE = "mutation($id:ID!){dequeuePullRequest(input:{id:$id}){clientMutationId}}"
 BRANCH = re.compile(r"^gh-readonly-queue/main/pr-(\d+)-")
 AGGREGATORS = ("ci-fast", "PR Ready", "Product Lane Receipt")
@@ -109,9 +110,15 @@ def sweep(state, run, now: float | None = None, repo: str = "JovieInc/Jovie") ->
         out["errors"].append(f"read: {error}")
         return out
     queued = {(e.get("pullRequest") or {}).get("number"): e["pullRequest"] for e in entries if e.get("pullRequest")}
+    live_commits = {(e.get("pullRequest") or {}).get("number"): ((e.get("headCommit") or {}).get("oid") or "").lower()
+                    for e in entries if e.get("pullRequest")}
     for number, fails in sorted(failures_by_pr(runs, now).items()):
         pr = queued.get(number)
         if len(fails) < TRIP_FAILURES or pr is None or len(out["tripped"]) >= MAX_TRIPS_PER_TICK:
+            continue
+        live = live_commits.get(number)
+        fails = [f for f in fails if not live or str(f.get("head") or "").lower() != live]
+        if len(fails) < TRIP_FAILURES:
             continue
         fails = current_head_failures(fails, head_since(run, repo, pr.get("headRefOid")))
         if len(fails) < TRIP_FAILURES:

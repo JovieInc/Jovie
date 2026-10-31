@@ -147,4 +147,24 @@ describe('prod golden-path ledger', () => {
     expect(chat?.sourceSha).toBe(SHA);
     expect(chat?.summary).toContain('Not exercised on production');
   });
+  it('keeps receipts without the browser-evidence fields parseable (JOV-9625)', () => {
+    // Receipts recorded before the evidence fields existed must still parse.
+    expect(isProdGoldenPathReceipt(receipt())).toBe(true);
+  });
+
+  it('carries per-surface browser evidence on the receipt (JOV-9625)', () => {
+    const withEvidence = receipt({
+      consoleErrorCount: 1,
+      networkErrorCount: 0,
+      screenshot: {
+        format: 'jpeg',
+        dataUrl: 'data:image/jpeg;base64,frame',
+      },
+    });
+    expect(isProdGoldenPathReceipt(withEvidence)).toBe(true);
+    expect(withEvidence.consoleErrorCount).toBe(1);
+    expect(withEvidence.screenshot?.dataUrl).toBe(
+      'data:image/jpeg;base64,frame'
+    );
+  });
 });
