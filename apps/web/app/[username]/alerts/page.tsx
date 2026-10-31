@@ -75,7 +75,12 @@ export default async function AlertsPage({ params }: AlertsPageProps) {
   // shell renders synchronously above the form.
   return (
     <>
-      {metaPixelIds.length > 0 ? <MetaPixel pixelIds={metaPixelIds} /> : null}
+      {metaPixelIds.length > 0 ? (
+        <MetaPixel
+          youngAudience={result.profile.young_audience}
+          pixelIds={metaPixelIds}
+        />
+      ) : null}
       <Suspense fallback={null}>
         <AlertGrowthLanding artist={artist} />
       </Suspense>

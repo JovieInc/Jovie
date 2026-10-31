@@ -176,6 +176,7 @@ export const profileUpdateSchema = z
     youtubeUrl: httpUrlSchema.optional(),
     /** Profile visibility flag */
     isPublic: z.boolean().optional(),
+    youngAudience: z.boolean().optional(),
     /** Marketing opt-out flag */
     marketingOptOut: z.boolean().optional(),
     /** Current location shown on the public profile */

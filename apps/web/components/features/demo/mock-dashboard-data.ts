@@ -48,6 +48,7 @@ const DEFAULT_DEMO_PROFILE: CreatorProfile = {
   bandsintownArtistName: DEFAULT_PERSONA.bandsintownArtistName,
   bandsintownApiKey: null,
   isPublic: true,
+  youngAudience: false,
   isVerified: true,
   isFeatured: DEFAULT_PERSONA.isFeaturedByDefault,
   marketingOptOut: false,

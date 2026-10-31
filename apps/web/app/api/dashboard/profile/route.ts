@@ -219,6 +219,7 @@ export async function PUT(req: Request) {
         clerkUserId: appUserId,
         privacyChanged:
           parsedUpdates.isPublic !== undefined ||
+          parsedUpdates.youngAudience !== undefined ||
           parsedUpdates.settings?.searchable !== undefined,
       }),
     ]);

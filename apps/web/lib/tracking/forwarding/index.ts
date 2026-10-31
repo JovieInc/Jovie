@@ -24,9 +24,7 @@ import { checkBoolean } from '@/lib/entitlements/registry';
 import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
 import { decryptPII } from '@/lib/utils/pii-encryption';
-import { forwardToFacebook } from './facebook';
-import { forwardToGoogle } from './google';
-import { forwardToTikTok } from './tiktok';
+import { dispatchToVendor } from './dispatch';
 import {
   extractPlatformConfigs,
   type ForwardingResult,
@@ -44,18 +42,6 @@ const MAX_RETRIES = 5;
 
 type Platform = 'facebook' | 'google' | 'tiktok';
 type JoviePlatform = 'jovie_facebook' | 'jovie_google' | 'jovie_tiktok';
-
-const platformForwarders: Record<
-  Platform,
-  (
-    event: ReturnType<typeof normalizeEvent>,
-    config: PlatformConfig
-  ) => Promise<ForwardingResult>
-> = {
-  facebook: forwardToFacebook,
-  google: forwardToGoogle,
-  tiktok: forwardToTikTok,
-};
 
 const joviePlatformMap: Record<Platform, JoviePlatform> = {
   facebook: 'jovie_facebook',
@@ -92,10 +78,15 @@ async function forwardToPlatforms(
 
   const settled = await Promise.allSettled(
     tasks.map(async ({ platform, config }) => {
-      const forwarder = platformForwarders[platform];
       const platformName = isJovie ? joviePlatformMap[platform] : platform;
       const start = Date.now();
-      const result = await forwarder(normalizedEvent, config);
+      const result = await dispatchToVendor(
+        platform,
+        normalizedEvent,
+        config,
+        normalizedEvent.profileId,
+        { consent: { analytics: true, marketing: true } }
+      );
       const latencyMs = Date.now() - start;
       logger.info('[Pixel Metrics] Event forwarded', {
         platform: platformName,
@@ -288,7 +279,7 @@ function buildForwardingStatus(
 
   for (const result of results) {
     forwardingStatus[result.platform] = {
-      status: result.success ? 'sent' : 'failed',
+      status: result.skipped ? 'skipped' : result.success ? 'sent' : 'failed',
       sentAt: new Date().toISOString(),
       ...(result.error && { error: result.error }),
     };

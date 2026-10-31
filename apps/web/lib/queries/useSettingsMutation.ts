@@ -22,6 +22,7 @@ import { handleMutationError, handleMutationSuccess } from './mutation-utils';
  */
 export type SettingsUpdateInput = {
   updates: {
+    youngAudience?: boolean;
     theme?: {
       preference: 'light' | 'dark' | 'system';
       highContrast?: boolean;

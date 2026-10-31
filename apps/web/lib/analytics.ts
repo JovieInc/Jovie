@@ -3,6 +3,7 @@
 import { forwardAnalyticsEventToFunnel } from '@/lib/analytics/signup-funnel-client';
 import { env } from '@/lib/env-client';
 import { publicEnv } from '@/lib/env-public';
+import { getBrowserTrackingEligibility } from '@/lib/tracking/use-tracking-eligibility';
 
 type AnalyticsWindow = Window & {
   gtag?: (
@@ -45,6 +46,7 @@ function getEnvTag(host: string): 'dev' | 'prod' | 'preview' {
  */
 export type TrackDispatchOutcome =
   | 'dispatched'
+  | 'skipped_ineligible'
   | 'skipped_no_transport'
   | 'dispatch_failed';
 
@@ -55,6 +57,7 @@ export function track(
   // First-party funnel steps carry no identifiers, so they do not wait on the
   // GA consent gate below.
   forwardAnalyticsEventToFunnel(event, properties);
+  if (!getBrowserTrackingEligibility().ga) return 'skipped_ineligible';
   const analyticsWindow = getAnalyticsWindow();
   if (!analyticsWindow?.gtag) return 'skipped_no_transport';
 

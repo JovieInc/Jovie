@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const privacy = vi.hoisted(() => ({ allowed: true }));
+
 vi.mock('@/lib/env-client', () => ({
   env: { IS_DEV: false },
 }));
@@ -37,6 +39,7 @@ describe('client analytics delivery contract', () => {
   let storage: Map<string, string>;
 
   beforeEach(() => {
+    privacy.allowed = true;
     storage = new Map();
     vi.stubGlobal('localStorage', {
       getItem: (key: string) => storage.get(key) ?? null,
@@ -57,6 +60,14 @@ describe('client analytics delivery contract', () => {
   it('reports skipped dispatch when gtag is absent', () => {
     setWindow({ location: { hostname: 'jovie.test' } });
     expect(track('checkout_initiated')).toBe('skipped_no_transport');
+  });
+
+  it('never queues events for an ineligible surface even when the global gtag stub exists', () => {
+    privacy.allowed = false;
+    const gtag = vi.fn();
+    setWindow({ gtag, location: { hostname: 'jovie.test' } });
+    expect(track('policy_probe')).toBe('skipped_ineligible');
+    expect(gtag).not.toHaveBeenCalled();
   });
 
   it('reports dispatch when gtag is present', () => {
@@ -124,3 +135,7 @@ describe('client analytics delivery contract', () => {
     expect(gtag).toHaveBeenCalledTimes(1);
   });
 });
+
+vi.mock('@/lib/tracking/use-tracking-eligibility', () => ({
+  getBrowserTrackingEligibility: () => ({ ga: privacy.allowed }),
+}));

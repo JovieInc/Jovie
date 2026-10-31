@@ -83,6 +83,7 @@ describe('public profile loading boundaries', () => {
     mocks.profile.mockResolvedValue({
       ...profile(),
       userIsPro: true,
+      youngAudience: true,
       userClerkId: 'identity-1',
       genres: ['folk'],
       socialLinks: [
@@ -115,6 +116,7 @@ describe('public profile loading boundaries', () => {
     expect(result.profile).toMatchObject({
       id: 'profile-1',
       display_name: 'Test Artist',
+      young_audience: true,
       profile_completion_pct: 100,
       claim_token: null,
     });

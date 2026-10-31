@@ -16,6 +16,7 @@ export const ALLOWED_PROFILE_FIELDS = new Set([
   'appleMusicUrl',
   'youtubeUrl',
   'isPublic',
+  'youngAudience',
   'marketingOptOut',
   'location',
   'hometown',

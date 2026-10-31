@@ -151,6 +151,7 @@ export const creatorProfiles = pgTable(
     bandsintownArtistName: text('bandsintown_artist_name'), // For Bandsintown sync
     bandsintownApiKey: text('bandsintown_api_key'), // Encrypted user-provided API key
     isPublic: boolean('is_public').default(true),
+    youngAudience: boolean('young_audience').notNull().default(false),
     isVerified: boolean('is_verified').default(false),
     isFeatured: boolean('is_featured').default(false),
     marketingOptOut: boolean('marketing_opt_out').default(false),

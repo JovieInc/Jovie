@@ -1,0 +1,1 @@
+ALTER TABLE "creator_profiles" ADD COLUMN "young_audience" boolean DEFAULT false NOT NULL;

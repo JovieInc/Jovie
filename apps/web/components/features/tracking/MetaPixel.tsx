@@ -4,11 +4,10 @@ import Script from 'next/script';
 import { useEffect, useRef } from 'react';
 import { isDemoRecordingClient } from '@/lib/demo-recording';
 import { env } from '@/lib/env-client';
-import {
-  ensureFbqStub,
-  type Fbq,
-  useMarketingConsent,
-} from '@/lib/tracking/use-marketing-consent';
+import { ensureFbqStub, type Fbq } from '@/lib/tracking/use-marketing-consent';
+
+import { useTrackingEligibility } from '@/lib/tracking/use-tracking-eligibility';
+import { isolateTrackingDocument } from '@/lib/tracking/vendor-navigation';
 
 const FBEVENTS_SRC = 'https://connect.facebook.net/en_US/fbevents.js';
 
@@ -20,6 +19,7 @@ type MetaPixelWindow = Window & {
 
 interface MetaPixelProps {
   /** Meta pixel IDs to init (creator pixel + Jovie platform pixel). */
+  readonly youngAudience?: boolean;
   readonly pixelIds: readonly string[];
 }
 
@@ -32,7 +32,7 @@ interface MetaPixelProps {
  * marketing consent (fire-by-default unless explicitly rejected), matching
  * the InstantlyPixel consent wiring.
  */
-export function MetaPixel({ pixelIds }: MetaPixelProps) {
+export function MetaPixel({ pixelIds, youngAudience }: MetaPixelProps) {
   const ids = [...new Set(pixelIds.filter(Boolean))];
   const idsKey = ids.join(',');
   const isPassive = env.IS_TEST || env.IS_E2E;
@@ -40,11 +40,12 @@ export function MetaPixel({ pixelIds }: MetaPixelProps) {
   const skip = ids.length === 0 || isPassive || isDemo;
   const hasTrackedPageView = useRef(false);
 
-  const allowed = useMarketingConsent(skip);
+  const allowed = useTrackingEligibility(skip, youngAudience).facebook;
 
   useEffect(() => {
     if (skip || !allowed || hasTrackedPageView.current) return;
     if (globalThis.window === undefined) return;
+    isolateTrackingDocument();
     hasTrackedPageView.current = true;
 
     const metaWindow = globalThis.window as MetaPixelWindow;

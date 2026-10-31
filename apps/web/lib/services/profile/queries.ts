@@ -59,6 +59,7 @@ const profileSelectColumns = {
   soundcloudId: creatorProfiles.soundcloudId,
   musicbrainzId: creatorProfiles.musicbrainzId,
   isPublic: creatorProfiles.isPublic,
+  youngAudience: creatorProfiles.youngAudience,
   isVerified: creatorProfiles.isVerified,
   isClaimed: creatorProfiles.isClaimed,
   claimToken: creatorProfiles.claimToken,
@@ -89,6 +90,7 @@ const legacyProfileSelectColumns = {
   appleMusicUrl: creatorProfiles.appleMusicUrl,
   youtubeUrl: creatorProfiles.youtubeUrl,
   isPublic: creatorProfiles.isPublic,
+  youngAudience: creatorProfiles.youngAudience,
   isVerified: creatorProfiles.isVerified,
   isClaimed: creatorProfiles.isClaimed,
   claimToken: creatorProfiles.claimToken,
@@ -491,6 +493,7 @@ function buildProfileFallbackDefaults(
         appleMusicUrl: string | null;
         youtubeUrl: string | null;
         isPublic: boolean | null;
+        youngAudience: boolean;
         isVerified: boolean | null;
         isClaimed: boolean | null;
         claimToken: string | null;
@@ -701,6 +704,7 @@ export async function getProfileSummary(
       displayName: creatorProfiles.displayName,
       avatarUrl: creatorProfiles.avatarUrl,
       isPublic: creatorProfiles.isPublic,
+      youngAudience: creatorProfiles.youngAudience,
       isClaimed: creatorProfiles.isClaimed,
       claimToken: creatorProfiles.claimToken,
       isVerified: creatorProfiles.isVerified,

@@ -23,6 +23,7 @@ export interface ForwardingResult {
     | 'jovie_tiktok'
     | 'skipped';
   success: boolean;
+  skipped?: boolean;
   error?: string;
   responseId?: string;
 }
@@ -31,6 +32,7 @@ export interface ForwardingResult {
  * Normalized event data for forwarding
  */
 export interface NormalizedEvent {
+  profileId: string;
   eventId: string;
   eventType:
     | 'page_view'
@@ -128,6 +130,7 @@ export function normalizeEvent(event: PixelEvent): NormalizedEvent {
   const eventData = event.eventData as Record<string, unknown> | null;
 
   return {
+    profileId: event.profileId,
     eventId: event.id,
     eventType: event.eventType as NormalizedEvent['eventType'],
     eventTime: Math.floor(event.createdAt.getTime() / 1000),

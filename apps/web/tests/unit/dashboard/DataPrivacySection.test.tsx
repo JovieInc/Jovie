@@ -60,7 +60,12 @@ describe('DataPrivacySection', () => {
     expect(
       screen.getByRole('switch', { name: 'Show in Jovie discovery' })
     ).not.toBeChecked();
-    expect(screen.getByRole('switch')).toBeEnabled();
+    expect(
+      screen.getByRole('switch', { name: 'Show in Jovie discovery' })
+    ).toBeEnabled();
+    expect(
+      screen.getByRole('switch', { name: 'Young audience' })
+    ).not.toBeChecked();
     expect(screen.getByRole('button', { name: 'Export data' })).toBeVisible();
     expect(
       screen.getByRole('button', { name: 'Delete Account' })

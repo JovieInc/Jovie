@@ -73,3 +73,22 @@ describe('owner searchability choice validation', () => {
     }
   );
 });
+
+describe('young audience profile choice', () => {
+  it.each([true, false])(
+    'accepts boolean %s without changing unrelated settings',
+    youngAudience => {
+      expect(ProfileUpdateSchema.parse({ youngAudience })).toEqual({
+        youngAudience,
+      });
+    }
+  );
+  it.each([null, 'true', 1, {}])(
+    'rejects malformed choice %j',
+    youngAudience => {
+      expect(ProfileUpdateSchema.safeParse({ youngAudience }).success).toBe(
+        false
+      );
+    }
+  );
+});

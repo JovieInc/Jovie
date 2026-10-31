@@ -265,3 +265,7 @@ describe('forwardEvent', () => {
     expect(mockUpdate).toHaveBeenCalled();
   });
 });
+
+vi.mock('@/lib/tracking/eligibility.server', () => ({
+  readTrackingProfile: vi.fn().mockResolvedValue({ youngAudience: false }),
+}));

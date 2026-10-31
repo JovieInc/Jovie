@@ -13,6 +13,9 @@ import {
   isValidGaMeasurementId,
 } from '@/lib/tracking/google-consent-mode';
 
+import { useTrackingEligibility } from '@/lib/tracking/use-tracking-eligibility';
+import { isolateTrackingDocument } from '@/lib/tracking/vendor-navigation';
+
 function isConsentPayload(value: unknown): value is Consent {
   if (!value || typeof value !== 'object') return false;
   const consent = value as Partial<Consent>;
@@ -32,12 +35,16 @@ export function GoogleAnalytics() {
   const measurementId = publicEnv.NEXT_PUBLIC_GA_MEASUREMENT_ID;
   const isPassive = env.IS_TEST || env.IS_E2E;
   const isDemo = isDemoRecordingClient();
-  const skip = !isValidGaMeasurementId(measurementId) || isPassive || isDemo;
+  const disabled =
+    !isValidGaMeasurementId(measurementId) || isPassive || isDemo;
+  const allowed = useTrackingEligibility(disabled).ga;
+  const skip = disabled || !allowed;
 
   useEffect(() => {
     if (skip) return;
     if (globalThis.window === undefined) return;
 
+    isolateTrackingDocument();
     const analyticsWindow = globalThis.window as AnalyticsWindow;
     const gtag =
       analyticsWindow.gtag ??

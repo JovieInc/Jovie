@@ -110,6 +110,7 @@ export interface CreatorProfile {
   soundcloud_id?: string | null;
   musicbrainz_id?: string | null;
   // Visibility and metadata
+  young_audience?: boolean;
   is_public: boolean;
   is_verified: boolean;
   is_featured: boolean;
@@ -180,6 +181,7 @@ export interface Artist {
   genres?: string[] | null;
   career_highlights?: string | null;
   target_playlists?: string[] | null;
+  young_audience?: boolean;
   published: boolean; // maps to is_public
   is_verified: boolean;
   is_featured: boolean;
@@ -421,6 +423,7 @@ type CanonicalArtistProfileShape = {
   genres?: string[] | null;
   careerHighlights?: string | null;
   targetPlaylists?: string[] | null;
+  youngAudience?: boolean;
   isPublic: boolean;
   isVerified: boolean;
   isFeatured: boolean;
@@ -474,6 +477,7 @@ function mapCanonicalProfileToArtist(
     genres: profile.genres ?? null,
     career_highlights: profile.careerHighlights ?? null,
     target_playlists: profile.targetPlaylists ?? null,
+    young_audience: profile.youngAudience,
     published: profile.isPublic,
     is_verified: profile.isVerified,
     is_featured: profile.isFeatured,
@@ -505,6 +509,7 @@ export function convertCreatorProfileToArtist(profile: CreatorProfile): Artist {
     genres: profile.genres,
     careerHighlights: profile.career_highlights,
     targetPlaylists: profile.target_playlists,
+    youngAudience: profile.young_audience,
     isPublic: profile.is_public,
     isVerified: profile.is_verified,
     isFeatured: profile.is_featured,
@@ -540,6 +545,7 @@ export function convertArtistToCreatorProfile(
     youtube_url: artist.youtube_url,
     spotify_id: artist.spotify_id,
     career_highlights: artist.career_highlights ?? null,
+    young_audience: artist.young_audience,
     is_public: artist.published,
     is_verified: artist.is_verified,
     is_featured: artist.is_featured,
@@ -575,6 +581,7 @@ export function convertDrizzleCreatorProfileToArtist(
     genres: profile.genres,
     careerHighlights: profile.careerHighlights,
     targetPlaylists: profile.targetPlaylists,
+    youngAudience: profile.youngAudience,
     isPublic: profile.isPublic ?? false,
     isVerified: profile.isVerified ?? false,
     isFeatured: profile.isFeatured ?? false,
