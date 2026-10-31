@@ -114,8 +114,9 @@ describe('public profile Liquid Glass navigation', () => {
       /<PrimaryPill shape=\{pillShape\} tone='glass' href=\{listenHref\}>\s*\{listenLabel\}/
     );
     // Label resolves per release state; an upcoming subject never says Listen.
+    // (The dead-end-ok comment annotates the upcoming link target: JOV-INV-046.)
     expect(PAC).toMatch(
-      /listenLabel = isPacReleaseUpcoming\(release\)\s*\?\s*'Coming soon'\s*:\s*isFeatured\s*\?\s*'Listen now'\s*:\s*'Listen'/
+      /listenLabel = isPacReleaseUpcoming\(release\)\s*\?(?:\s*\/\/[^\n]*)?\s*'Coming soon'\s*:\s*isFeatured\s*\?\s*'Listen now'\s*:\s*'Listen'/
     );
     expect(PAC).toMatch(
       /<PrimaryPill\s+shape=\{pillShape\}\s+tone='glass'\s+href=\{listenHref\}\s+onClick=\{handlePlayClick\}/
