@@ -55,11 +55,11 @@ test.describe('sticky table header occlusion (JOV-9079)', () => {
           element.style.visibility = 'hidden';
         });
         const cleared = await page.screenshot({ clip, animations: 'disabled' });
-        await testInfo.attach('header-with-scrolled-rows', {
+        await testInfo.attach('header-with-scrolled-rows.png', {
           body: painted,
           contentType: 'image/png',
         });
-        await testInfo.attach('header-without-scrolled-rows', {
+        await testInfo.attach('header-without-scrolled-rows.png', {
           body: cleared,
           contentType: 'image/png',
         });
