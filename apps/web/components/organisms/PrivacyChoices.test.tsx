@@ -23,7 +23,7 @@ vi.mock('@/lib/env-client', () => ({ env: { IS_TEST: false, IS_E2E: false } }));
 vi.mock('@/lib/demo-recording', () => ({ isDemoRecordingClient: () => false }));
 vi.mock('next/script', () => ({
   default: ({ src }: { src: string }) => (
-    <script async src={src} data-testid='ad-pixel' />
+    <script defer src={src} data-testid='ad-pixel' />
   ),
 }));
 
