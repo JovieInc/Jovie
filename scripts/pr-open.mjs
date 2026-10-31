@@ -173,16 +173,14 @@ function blastRadius(paths) {
   ].join('\n');
 }
 
-/**
- * @param {{
+/** @param {{
  *   title: string,
  *   files: Array<{ filename: string, status?: string, patch?: string, previous_filename?: string }>,
  *   labels?: string[],
  *   summary?: string, metric?: string, claim?: string, area?: string, theme?: string,
  *   perMerge?: boolean, failingCommand?: string, failingRun?: string,
  *   customerVisible?: string, prUrl?: string, number?: string | number, failingLog?: string,
- * }} input
- */
+ * }} input */
 export function draftBody({
   title,
   files,
