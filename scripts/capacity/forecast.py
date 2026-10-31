@@ -255,7 +255,7 @@ def c_deadline(spec: dict, now: float) -> dict | None:
 def c_stuck_procs(spec: dict, now: float) -> dict | None:
     """Agent processes alive for hours with almost no CPU: blocked on stdin, a prompt or a dead pipe.
 
-    2026-10-31: three `codex exec` jobs sat ~9h on "Reading additional input from stdin" and nothing
+    2026-10-31: three non-interactive Codex jobs sat ~9h waiting on an open stdin and nothing
     noticed. A process counts when it matches `match`, is older than `maxHours` and used less than
     `maxCpuFrac` of its wall time. Report only; killing agent work is the owner's call.
     """
