@@ -1,11 +1,8 @@
-// @coverage-via apps/web/tests/unit/marketing/component-registry.test.ts
-import Image from 'next/image';
+// @coverage-via apps/web/components/marketing/artist-profile/ArtistProfileHowItWorks.test.tsx
+import { ProductShot } from '@/components/marketing/ProductShot';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
-import { getMarketingExportImage } from '@/lib/screenshots/registry';
-import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
-import ONBOARDING_DSP_CAPTURE from '@/screenshot-catalog/current/onboarding-dsp-desktop.png';
-import ONBOARDING_HANDLE_CAPTURE from '@/screenshot-catalog/current/onboarding-handle-desktop.png';
+import type { ProductShotId } from '@/lib/screenshots/product-shots';
 import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 
@@ -13,31 +10,28 @@ interface ArtistProfileHowItWorksProps {
   readonly howItWorks: ArtistProfileLandingCopy['howItWorks'];
 }
 
-const LIVE_PROFILE = getMarketingExportImage('tim-white-profile-live-mobile');
-
-const SETUP_STAGES = [
+/** One registry shot per step, each cropped to the moment the step names. */
+const SETUP_STAGES: readonly {
+  readonly id: 'claim' | 'connect' | 'share';
+  readonly shot: ProductShotId;
+  readonly sizes: string;
+}[] = [
   {
     id: 'claim',
-    label: 'Claim',
-    detail: TIM_WHITE_PROFILE.publicProfileDisplay,
-    src: ONBOARDING_HANDLE_CAPTURE,
-    alt: 'Jovie onboarding with the Tim White profile handle ready to claim.',
+    shot: 'setup-claim-handle',
+    sizes: '(min-width: 1024px) 46rem, 92vw',
   },
   {
     id: 'connect',
-    label: 'Connect',
-    detail: 'Import your catalog',
-    src: ONBOARDING_DSP_CAPTURE,
-    alt: 'Jovie onboarding asking an artist to connect their music catalog.',
+    shot: 'setup-connect-music',
+    sizes: '(min-width: 1024px) 22rem, 92vw',
   },
   {
     id: 'share',
-    label: 'Share',
-    detail: `${TIM_WHITE_PROFILE.publicProfileDisplay} is live`,
-    src: LIVE_PROFILE.publicUrl,
-    alt: "Tim White's live Jovie artist profile ready to share from one link.",
+    shot: 'setup-share-profile',
+    sizes: '(min-width: 1024px) 22rem, 92vw',
   },
-] as const;
+];
 
 export function ArtistProfileHowItWorks({
   howItWorks,
@@ -81,45 +75,16 @@ export function ArtistProfileHowItWorks({
           </ol>
         </div>
 
-        <figure className='ap-how-it-works__product-window relative overflow-hidden border border-subtle bg-surface-0'>
-          <div className='ap-how-it-works__window-bar flex items-center gap-2 border-b border-subtle px-4 py-3'>
-            <span aria-hidden='true' />
-            <span aria-hidden='true' />
-            <span aria-hidden='true' />
-            <figcaption className='ml-2 font-mono text-3xs text-tertiary-token'>
-              Set up your profile
-            </figcaption>
-          </div>
-          <ol className='ap-how-it-works__setup-flow'>
-            {SETUP_STAGES.map((stage, index) => (
-              <li
-                key={stage.id}
-                className={`ap-how-it-works__setup-stage ap-how-it-works__setup-stage--${stage.id}`}
-              >
-                <div className='ap-how-it-works__setup-stage-header'>
-                  <span className='font-mono text-3xs text-tertiary-token'>
-                    {String(index + 1).padStart(2, '0')}
-                  </span>
-                  <strong className='text-sm font-semibold text-primary-token'>
-                    {stage.label}
-                  </strong>
-                  <span className='ap-how-it-works__setup-stage-detail font-mono text-3xs text-tertiary-token'>
-                    {stage.detail}
-                  </span>
-                </div>
-                <div className='ap-how-it-works__setup-media'>
-                  <Image
-                    fill
-                    src={stage.src}
-                    alt={stage.alt}
-                    className={`ap-how-it-works__setup-image ap-how-it-works__setup-image--${stage.id}`}
-                    sizes='(min-width: 1024px) 48rem, 100vw'
-                  />
-                </div>
-              </li>
-            ))}
-          </ol>
-        </figure>
+        <ol className='ap-how-it-works__shots'>
+          {SETUP_STAGES.map(stage => (
+            <li
+              key={stage.id}
+              className={`ap-how-it-works__shot ap-how-it-works__shot--${stage.id}`}
+            >
+              <ProductShot id={stage.shot} sizes={stage.sizes} staged />
+            </li>
+          ))}
+        </ol>
       </div>
     </ArtistProfileSectionShell>
   );
