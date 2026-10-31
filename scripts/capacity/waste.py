@@ -86,6 +86,38 @@ def col_github() -> dict:
     return out
 
 
+GATE_CHECKS = ("Fleet Rules Evidence", "PR Fleet Rules", "Source Validation", "PR Ready")
+FIRST_PUSH_QUERY = (
+    'query{repository(owner:"%s",name:"%s"){pullRequests(first:40,orderBy:{field:CREATED_AT,direction:DESC}){nodes{'
+    "commits(first:1){nodes{commit{statusCheckRollup{contexts(first:60){nodes{__typename ... on CheckRun{name conclusion}}}}}}}}}}}"
+)
+
+
+def first_push_failure_share(prs: list) -> tuple[float | None, int]:
+    """Share of PRs whose first commit finished with a red PR-body or source gate. A PR counts only
+    once all four gates have a conclusion; multi-commit first pushes and unfinished PRs are skipped."""
+    seen = failed = 0
+    for pr in prs or []:
+        commits = ((pr or {}).get("commits") or {}).get("nodes") or []
+        roll = ((commits[0] if commits else {}).get("commit") or {}).get("statusCheckRollup")
+        if not roll:
+            continue
+        got = {c["name"]: c.get("conclusion") for c in roll["contexts"]["nodes"]
+               if c.get("__typename") == "CheckRun" and c.get("name") in GATE_CHECKS}
+        if len(got) < len(GATE_CHECKS) or any(v is None for v in got.values()):
+            continue
+        seen += 1
+        failed += any(v != "SUCCESS" for v in got.values())
+    return (failed / seen if seen else None), seen
+
+
+def col_pr_gates() -> dict:
+    owner, name = GH_REPO.split("/")
+    data = gh_json(["graphql", "-f", "query=" + FIRST_PUSH_QUERY % (owner, name), "--jq", ".data.repository.pullRequests.nodes"])
+    share, n = first_push_failure_share(data if isinstance(data, list) else [])
+    return {} if share is None else {"firstPushGateFailureShare": share, "firstPushSamples": n}
+
+
 def col_ci(merged7d: float | None) -> dict:
     """Sample the latest 200 workflow runs: cancelled share, runner minutes, runs per merged PR.
 
@@ -195,7 +227,7 @@ def collect_all(reg: dict) -> dict:
     gh = col_github()
     gw = col_gateway()
     inputs = reg.get("inputs", {})
-    data = {"github": gh, "ci": col_ci(gh.get("merged7d")), "gateway": gw, "storage": col_storage(),
+    data = {"github": gh, "ci": col_ci(gh.get("merged7d")), "pr": col_pr_gates(), "gateway": gw, "storage": col_storage(),
             "debt": col_debt(), "money": col_money(inputs, gh.get("merged7d"), gw),
             "inputs": {"activeUsers": inputs.get("activeUsers", {}).get("value")}}
     data["llm"] = {"gatewayUsdPerMergedPr": data["money"].get("gatewayUsdPerMergedPr")}

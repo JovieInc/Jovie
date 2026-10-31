@@ -190,12 +190,23 @@
             "kind": "ceiling",
             "max": 0.15
           }
+        },
+        {
+          "id": "pr.first_push_gate_failure_rate",
+          "label": "PRs whose first push fails Fleet Rules, Source Validation or PR Ready (fix: scripts/pr-open.mjs, pnpm pr:open)",
+          "unit": "share",
+          "source": "pr.firstPushGateFailureShare",
+          "detector": {
+            "kind": "ceiling",
+            "max": 0.1
+          }
         }
       ],
       "feeds": [
         "scripts/lanes/queue_breaker.py",
         "merge-queue ejections (fleet_ledger)",
-        "data-vs-PR guard (ci#19)"
+        "data-vs-PR guard (ci#19)",
+        "scripts/pr-open.mjs (#23936)"
       ]
     },
     {
