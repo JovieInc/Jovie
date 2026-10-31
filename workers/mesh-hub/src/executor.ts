@@ -30,6 +30,7 @@ export function isExecutable(message: {
     message.kind === 'message' &&
     message.from !== message.to &&
     message.from !== 'mesh-hub' &&
+    message.from !== 'board' &&
     !message.correlationId.startsWith('reply') &&
     !message.correlationId.startsWith('dlq:')
   );

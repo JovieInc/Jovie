@@ -27,6 +27,21 @@ analysis and adversarial review are in gbrain at
   `hub.suspect`) go to Summer plus `ALERT_KINDS` (default `claude,codex`), and to
   `ALERT_WEBHOOK_URL` when that is set.
 
+## Task board (swarm)
+
+`Board` (a singleton Durable Object, `src/board.ts`) is the fleet task board:
+post, claim with a lease, update, done, answer, cancel and caps, over REST
+(`/v1/board/*`) or a mesh send `to: "board"`. Notices go out as ordinary mail
+from kind `board`, so push, at-least-once delivery and `mail.stale` apply. Expired
+leases return to the pool (alarm plus the cron sweep). `fanout` creates children
+and a merge task. `GET /v1/board/metrics` gives per-agent p50/p95 pickup and work
+time. Protocol: JovieInc/ci `canon/MESH-SWARM.md`.
+
+`worker/mesh-worker.mjs` is the reference executor: it long-polls one kind's
+mailbox, works board tasks from trusted posters with `codex exec` (read-only,
+live search) and answers direct messages. It runs as `aeon` on the office
+MacBook Air (`worker/ie.jov.mesh-worker.aeon.plist.example`, token file chmod 600).
+
 ## Operate
 
 ```sh
