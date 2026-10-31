@@ -24,6 +24,12 @@
       "rule": "provider-host",
       "max": 2,
       "reason": "Research router source: the literal is the url passed to @jovie/api-client ApiClient.request, so the call is budgeted."
+    },
+    {
+      "path": ".github/workflows/main-red-eject.yml",
+      "rule": "gh-shell",
+      "max": 2,
+      "reason": "The gate job exists to skip a wake without checkout, Node or an app-token mint: it makes two GitHub reads (queue head, check runs) with the job GITHUB_TOKEN and fails open. Routing through node packages/api-client/cli.ts would need checkout and setup-node on every wake, which is the cost the gate removes."
     }
   ]
 }
