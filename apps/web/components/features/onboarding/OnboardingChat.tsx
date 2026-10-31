@@ -949,8 +949,13 @@ export function OnboardingChat({
   const shouldShowThinking = isBusy && lastMessage?.role === 'user';
   const displayMessages = getDisplayMessages(messages, shouldShowThinking);
   const lastAssistantMessageId = findLastAssistantMessageId(displayMessages);
-  const { isStuckToBottom, onScroll, totalSizeRef, scrollContainerRef } =
-    useStickToBottom();
+  const {
+    isStuckToBottom,
+    onScroll,
+    setStuckToBottom,
+    totalSizeRef,
+    scrollContainerRef,
+  } = useStickToBottom();
   const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
   const { onSend: notifyJankSend } = useChatJankMonitor({
     conversationId: 'onboarding',
@@ -1267,6 +1272,16 @@ export function OnboardingChat({
     }
     scrollContainer.scrollTop = 0;
   }, [displayMessages.length, scrollContainerRef, shouldDockComposer, status]);
+  // Docking hands the transcript to stick-to-bottom while it is still at the
+  // top (the undocked thread is pinned up). Re-pin on dock and on every user
+  // turn so the active tool card scrolls above the composer (JOV-10131).
+  useLayoutEffect(() => {
+    if (!shouldDockComposer || userTurnCount === 0) return;
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    setStuckToBottom(true);
+  }, [scrollContainerRef, setStuckToBottom, shouldDockComposer, userTurnCount]);
 
   // Card drafts and user confirmation taps are provisional. A persisted tool
   // confirmation keeps later questions from inheriting the old handle prompt.
