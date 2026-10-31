@@ -63,6 +63,23 @@ describe('SettingsBillingSection', () => {
     pushMock.mockReset();
   });
 
+  it('never pairs a paid plan name with a Free badge when not entitled', () => {
+    billingQueryState.data = {
+      isPro: false,
+      plan: 'pro',
+      hasStripeCustomer: false,
+      stripeSubscriptionId: null,
+      stale: false,
+      staleReason: null,
+    };
+
+    render(<SettingsBillingSection />);
+
+    expect(screen.getByText('Free plan')).toBeInTheDocument();
+    expect(screen.getByText('Free', { selector: 'span' })).toBeInTheDocument();
+    expect(screen.queryByText(/Artist Presence/)).not.toBeInTheDocument();
+  });
+
   it('does not present a failed plan lookup as a free subscription', async () => {
     billingQueryState.isError = true;
 

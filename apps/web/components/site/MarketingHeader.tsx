@@ -20,6 +20,7 @@ import {
   type MarketingHeaderBrand,
   resolveMarketingHeaderBrand,
 } from '@/data/marketing/headerBrand';
+import { HOME_MARKETING_HEADER_CTA } from '@/data/marketing/headerCta';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import {
   MARKETING_CUSTOMERS_FLYOUT,
@@ -66,8 +67,7 @@ const MARKETING_HEADER_CTA_BY_PATH: Readonly<
   // The label names the homepage's one action, the artist-profile claim
   // (EVENT 2026-10-20); marketing-header-cta-consistency pins it to the
   // shared claim-profile CTA intent label.
-  // ui-casing-allow: shared CTA intent copy (sentence case, as on /artist-profiles)
-  [APP_ROUTES.HOME]: { label: 'Claim your profile', href: APP_ROUTES.START },
+  [APP_ROUTES.HOME]: HOME_MARKETING_HEADER_CTA,
 };
 
 /**

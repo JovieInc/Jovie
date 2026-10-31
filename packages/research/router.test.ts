@@ -211,6 +211,94 @@ describe('router', () => {
     expect(result.stoppedAtTier).toBe(0);
   });
 
+  it('marks all unavailable providers degraded and retries after recovery', async () => {
+    const sources = {
+      gbrain: source([]),
+      repo: source([]),
+      firecrawl: source([], { available: () => false }),
+      exa: source([], { available: () => false }),
+      last30days: source([], { available: () => false }),
+    };
+    const router = createRouter({ state, sources, judges: [] });
+    const result = await router.research({
+      query: 'provider outage',
+      social: true,
+    });
+    expect(result.verdict).toBe('degraded');
+    expect(result.reasons).toEqual(
+      expect.arrayContaining([
+        'no external sources',
+        'firecrawl: no credential',
+        'exa: no credential',
+        'last30days: no credential',
+      ])
+    );
+    sources.firecrawl.available = () => true;
+    sources.firecrawl.run.mockResolvedValue({
+      hits: [hit('firecrawl', 'good')],
+      usd: 0,
+    });
+    const recovered = await createRouter({
+      state,
+      sources,
+      judges: [titleJudge()],
+    }).research({ query: 'provider outage', maxTier: 1 });
+    expect(recovered.verdict).toBe('ok');
+  });
+
+  it('keeps healthy external research green (negative control)', async () => {
+    const router = createRouter({
+      state,
+      judges: [titleJudge()],
+      sources: {
+        gbrain: source([]),
+        repo: source([]),
+        firecrawl: source([hit('firecrawl', 'good')]),
+      },
+    });
+    const result = await router.research({ query: 'healthy' });
+    expect(result.verdict).toBe('ok');
+    expect(result.reasons).toEqual([]);
+  });
+
+  it('does not promote local evidence to external research at max-tier 0', async () => {
+    const router = createRouter({
+      state,
+      judges: [titleJudge()],
+      sources: {
+        gbrain: source([hit('gbrain', 'good')]),
+        repo: source([]),
+      },
+    });
+    const result = await router.research({
+      query: 'local only',
+      maxTier: 0,
+      social: true,
+    });
+    expect(result.verdict).toBe('degraded');
+    expect(result.reasons).toContain('no external sources');
+    expect(result.reasons).toContain('external providers not run');
+  });
+
+  it('rejects legacy cached empty answers and records unavailable checks as degraded', async () => {
+    const legacy = sampleResult({ hits: [], answer: 'Unsupported answer' });
+    const router = createRouter({
+      state,
+      judges: [],
+      loadPersisted: async () => legacy,
+      sources: {
+        firecrawl: source([], {
+          available: async () => {
+            throw new Error('availability failed');
+          },
+        }),
+      },
+    });
+    const result = await router.research({ query: 'legacy empty answer' });
+    expect(result.verdict).toBe('degraded');
+    expect(result.reasons).toContain('firecrawl: availability failed');
+  });
+
   it('coalesces concurrent identical queries into one execution', async () => {
     let release!: () => void;
     const gate = new Promise<void>(r => {

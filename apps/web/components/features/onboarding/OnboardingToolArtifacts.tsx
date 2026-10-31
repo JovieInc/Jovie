@@ -1,4 +1,5 @@
 'use client';
+// @coverage-via apps/web/tests/unit/onboarding/OnboardingToolArtifacts.test.tsx
 
 import { Button } from '@jovie/ui';
 import {
@@ -11,7 +12,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import type { ReactNode } from 'react';
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   ATTACH_ACCOUNT_CTA_LABEL,
   CONFIRM_HANDLE_CTA_LABEL,
@@ -452,7 +453,7 @@ export function OnboardingSpotifyArtistPickerCard({
 
         {!isSearching && !hasQuery ? (
           <div className='px-2 py-3 text-xs leading-5 text-secondary-token'>
-            Start with the artist name fans see on Spotify.
+            Start with the artist name as it appears on Spotify.
           </div>
         ) : null}
 
@@ -505,12 +506,9 @@ function ArtistResultRow({
     { source: 'spotify_search' }
   );
   const followers = formatFollowers(getDisplaySpotifyFollowers(metrics));
-  const meta = [
-    followers,
-    artist.popularity ? `Pop ${artist.popularity}` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  // Followers only: Spotify's internal "popularity" score ("Pop 60") means
+  // nothing to an artist (2026-10-31 golden-path walk).
+  const meta = followers;
 
   return (
     <button
@@ -599,6 +597,12 @@ export function OnboardingHandleCheckCard({
   const fieldId = useId();
   const [draftHandle, setDraftHandle] = useState(handle ?? '');
   const [confirmed, setConfirmed] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const handleInputRef = useRef<HTMLInputElement>(null);
+  // Change Handle moves focus into the field it just opened.
+  useEffect(() => {
+    if (editing) handleInputRef.current?.focus();
+  }, [editing]);
   const outputConfirmed = output?.action === 'handle_confirmed';
   const normalizedDraft = draftHandle.replace(/^@/, '').trim().toLowerCase();
   const availabilityQuery = useHandleAvailabilityQuery({
@@ -665,27 +669,49 @@ export function OnboardingHandleCheckCard({
       ? undefined
       : availability.available;
   const error = availability.error;
-  const profilePath = normalizedDraft ? `jov.ie/${normalizedDraft}` : null;
+  const profilePath = `jov.ie/${normalizedDraft || handle}`;
   const canConfirm =
     Boolean(normalizedDraft) &&
     available === true &&
     !loading &&
     !disabled &&
     !confirmed;
+  // Pen R6As7U: one line and one action. Editing stays reachable but
+  // secondary, behind an explicit Change Handle.
+  const showEditor = editing;
+  const isTaken = available === false;
+  const statusLabel =
+    loading || available === undefined
+      ? 'is being checked'
+      : available
+        ? 'is available'
+        : 'is not available';
+  const helper =
+    error ??
+    (available === false
+      ? availability.suggestedAlternatives &&
+        availability.suggestedAlternatives.length > 0
+        ? `${SUGGESTED_AVAILABLE_HANDLE_LABEL}: @${availability.suggestedAlternatives[0]}`
+        : 'Try a sharper variant.'
+      : null);
 
   return (
     <div
       className={cn(
-        'w-full max-w-110 px-1 py-2 text-primary-token',
+        'w-full max-w-110 py-1 text-primary-token',
         available === false && 'text-error'
       )}
       data-testid='onboarding-handle-check'
+      data-editing={showEditor ? 'true' : 'false'}
       role={available === false ? 'alert' : 'status'}
     >
-      <div className='flex items-start gap-3'>
+      <div
+        className='flex items-center gap-1.5 text-sm leading-5 tracking-[-0.01em]'
+        data-testid='onboarding-handle-status'
+      >
         <span
           className={cn(
-            'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center text-secondary-token',
+            'flex h-4 w-4 shrink-0 items-center justify-center text-secondary-token',
             available && 'text-green-500',
             available === false && 'text-error'
           )}
@@ -699,22 +725,21 @@ export function OnboardingHandleCheckCard({
             <AlertCircle className='h-3.5 w-3.5' />
           )}
         </span>
-        <div className='min-w-0 flex-1'>
-          <div className='flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-sm leading-5 tracking-[-0.01em]'>
-            <strong className='font-semibold text-primary-token'>
-              @{normalizedDraft || handle}
-            </strong>
-            <span className='text-secondary-token'>
-              {loading || available === undefined
-                ? 'is being checked'
-                : available
-                  ? 'is available'
-                  : 'is not available'}
-            </span>
-          </div>
+        <strong className='font-semibold text-primary-token'>
+          {profilePath}
+        </strong>
+        <span className='text-secondary-token'>{statusLabel}</span>
+      </div>
+      {helper && !showEditor ? (
+        <p className='mt-1.5 text-xs leading-5 text-secondary-token'>
+          {helper}
+        </p>
+      ) : null}
+      {showEditor ? (
+        <>
           <OnboardingToolField density='compact' htmlFor={fieldId}>
             <span className='text-app text-tertiary-token' aria-hidden>
-              @
+              jov.ie/
             </span>
             <span className='sr-only'>Edit Proposed Handle</span>
             <input
@@ -728,18 +753,19 @@ export function OnboardingHandleCheckCard({
               autoCapitalize='none'
               spellCheck={false}
               disabled={disabled || confirmed}
+              ref={handleInputRef}
             />
           </OnboardingToolField>
-          <p className='mt-1.5 text-xs leading-5 text-secondary-token'>
-            {error ??
-              (available === false
-                ? availability.suggestedAlternatives &&
-                  availability.suggestedAlternatives.length > 0
-                  ? `${SUGGESTED_AVAILABLE_HANDLE_LABEL}: @${availability.suggestedAlternatives[0]}`
-                  : 'Try a sharper variant.'
-                : (profilePath ?? 'Edit the handle before it is claimed.'))}
-          </p>
-          {onConfirmHandle ? (
+          {helper ? (
+            <p className='mt-1.5 text-xs leading-5 text-secondary-token'>
+              {helper}
+            </p>
+          ) : null}
+        </>
+      ) : null}
+      {onConfirmHandle || !(showEditor || confirmed) ? (
+        <div className='mt-3 flex items-center gap-2'>
+          {isTaken || !onConfirmHandle ? null : (
             <Button
               type='button'
               data-testid='onboarding-confirm-handle'
@@ -750,7 +776,7 @@ export function OnboardingHandleCheckCard({
                 onConfirmHandle(normalizedDraft);
               }}
               className={cn(
-                'mt-3 h-9 rounded-full px-3.5 text-app font-semibold',
+                'h-9 rounded-full px-3.5 text-app font-semibold',
                 canConfirm
                   ? 'bg-white text-black hover:bg-white/90 dark:bg-white dark:text-black'
                   : 'cursor-not-allowed border border-subtle bg-surface-0 text-tertiary-token'
@@ -758,9 +784,21 @@ export function OnboardingHandleCheckCard({
             >
               {confirmed ? 'Handle Confirmed' : CONFIRM_HANDLE_CTA_LABEL}
             </Button>
-          ) : null}
+          )}
+          {showEditor || confirmed ? null : (
+            <Button
+              type='button'
+              variant={isTaken ? 'primary' : 'ghost'}
+              size='sm'
+              data-testid='onboarding-edit-handle'
+              disabled={disabled}
+              onClick={() => setEditing(true)}
+            >
+              Change Handle
+            </Button>
+          )}
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
@@ -870,7 +908,9 @@ export function OnboardingSocialLinkCard({
             />
           </OnboardingToolField>
           <p className='mt-1.5 text-xs leading-5 text-secondary-token'>
-            {parseHint ?? host ?? 'Paste the full URL fans already use.'}
+            {parseHint ??
+              host ??
+              'Paste the full profile URL, like instagram.com/yourname.'}
           </p>
           {onAttachAccount ? (
             <Button

@@ -7,9 +7,14 @@ import {
 
 const now = new Date('2026-10-05T13:00:00.000Z');
 const current = { runAt: now.toISOString() };
-const reports = (auth = current, profile = current) => ({
+const reports = (
+  auth = current,
+  profile = current,
+  releaseEmail = current
+) => ({
   'auth-signup-onboarding': auth,
   'public-profile': profile,
+  'release-email': releaseEmail,
 });
 
 describe('scheduled canary receipt freshness', () => {
@@ -20,6 +25,7 @@ describe('scheduled canary receipt freshness', () => {
       receipts: [
         { id: 'auth-signup-onboarding', ...current },
         { id: 'public-profile', ...current },
+        { id: 'release-email', ...current },
       ],
     });
   });
@@ -62,20 +68,35 @@ describe('scheduled canary receipt freshness', () => {
   it('reports both expired Redis keys rather than inventing healthy zeroes', () => {
     expect(() =>
       assertCanaryReceiptsFresh(
-        { 'auth-signup-onboarding': null, 'public-profile': null },
+        {
+          'auth-signup-onboarding': null,
+          'public-profile': null,
+          'release-email': null,
+        },
         now
       )
     ).toThrow(
-      'Scheduled canary receipt unavailable: auth-signup-onboarding (missing), public-profile (missing)'
+      'Scheduled canary receipt unavailable: auth-signup-onboarding (missing), public-profile (missing), release-email (missing)'
     );
   });
 
   it('detects public-profile silence independently', () => {
     expect(() =>
       assertCanaryReceiptsFresh(
-        { 'auth-signup-onboarding': current, 'public-profile': null },
+        {
+          'auth-signup-onboarding': current,
+          'public-profile': null,
+          'release-email': current,
+        },
         now
       )
     ).toThrow('public-profile (missing)');
+  });
+
+  // JOV-9779: a silent release-email canary is red even when the other two run.
+  it('detects release-email silence independently', () => {
+    expect(() =>
+      assertCanaryReceiptsFresh(reports(current, current, null as never), now)
+    ).toThrow('Scheduled canary receipt unavailable: release-email (missing)');
   });
 });

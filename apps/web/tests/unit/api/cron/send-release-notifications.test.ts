@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   GET,
   sendPendingNotifications,
@@ -783,4 +783,173 @@ describe('fan release audience dispatch denial', () => {
       expect(mockSendNotification).not.toHaveBeenCalled();
     }
   );
+});
+
+// JOV-9779: with audience delivery denied, only the configured release-email
+// canary (one synthetic profile and one synthetic inbox) may be dispatched.
+describe('release-email canary carve-out under the audience denial', () => {
+  const CANARY_PROFILE_ID = '0de33b39-ebcf-42ef-bcdd-c22bd8577368';
+  const CANARY_INBOX = 'release-canary+synthetic-release-email@jovie.fm';
+  let mockedEnv: Record<string, unknown>;
+
+  function primeDueNotification(subscriberEmail: string) {
+    mockDbSelect.mockReset();
+    mockDbSelect
+      .mockReturnValueOnce(
+        createPendingNotificationsChain([
+          {
+            id: 'notif_c',
+            creatorProfileId: CANARY_PROFILE_ID,
+            releaseId: 'release_c',
+            notificationSubscriptionId: 'sub_c',
+            notificationType: 'release_day',
+            metadata: {},
+          },
+        ])
+      )
+      .mockReturnValueOnce(
+        createWhereResolvedChain([
+          {
+            id: 'release_c',
+            title: 'Release canary rel-1',
+            slug: 'rel-1',
+            artworkUrl: null,
+            releaseDate: null,
+            sourceType: 'ingested',
+          },
+        ])
+      )
+      .mockReturnValueOnce(
+        createWhereResolvedChain([
+          {
+            id: CANARY_PROFILE_ID,
+            displayName: 'Release Canary',
+            isClaimed: true,
+            ownerUserId: 'user_c',
+            settings: { spotifyImportStatus: 'complete' },
+            spotifyId: 'spotify_c',
+            trialNotificationsSent: 0,
+            username: 'release-canary',
+            usernameNormalized: 'release-canary',
+          },
+        ])
+      )
+      .mockReturnValueOnce(
+        createWhereResolvedChain([
+          {
+            id: 'sub_c',
+            channel: 'email',
+            email: subscriberEmail,
+            phone: null,
+            name: null,
+          },
+        ])
+      )
+      .mockReturnValueOnce(
+        createWhereResolvedChain([
+          {
+            releaseId: 'release_c',
+            providerId: 'spotify',
+            url: 'https://jov.ie/release-canary/rel-1',
+          },
+        ])
+      );
+  }
+
+  beforeEach(async () => {
+    vi.resetAllMocks();
+    audiencePolicy.open = false;
+    mockedEnv = (await import('@/lib/env-server')).env as unknown as Record<
+      string,
+      unknown
+    >;
+    mockedEnv.RELEASE_EMAIL_CANARY_PROFILE_ID = CANARY_PROFILE_ID;
+    mockedEnv.RELEASE_EMAIL_CANARY_INBOX = CANARY_INBOX;
+    mockDbUpdate.mockReturnValue({ set: mockDbUpdateSet });
+    mockDbUpdateSet.mockReturnValue({ where: mockDbUpdateWhere });
+    mockDbUpdateWhere.mockReturnValue({ returning: mockDbUpdateReturning });
+    mockGetBatchCreatorEntitlements.mockResolvedValue(
+      new Map([
+        [
+          CANARY_PROFILE_ID,
+          {
+            plan: 'pro',
+            entitlements: {
+              booleans: { canSendNotifications: true },
+              limits: {},
+            },
+          },
+        ],
+      ])
+    );
+    mockGetReleaseDayNotificationEmail.mockReturnValue({
+      subject: 'New release',
+      text: 'text',
+      html: '<p>html</p>',
+    });
+    mockSendNotification.mockResolvedValue({
+      delivered: ['email'],
+      skipped: [],
+      errors: [],
+    });
+  });
+
+  afterEach(() => {
+    delete mockedEnv.RELEASE_EMAIL_CANARY_PROFILE_ID;
+    delete mockedEnv.RELEASE_EMAIL_CANARY_INBOX;
+  });
+
+  it('sends to the reserved canary inbox and reports canary-only', async () => {
+    primeDueNotification(CANARY_INBOX);
+    mockDbUpdateReturning
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: 'notif_c' }]);
+
+    const result = await sendPendingNotifications();
+
+    expect(result).toMatchObject({
+      sent: 1,
+      canaryOnly: true,
+      policyBlocked: { reason: 'audience_delivery_disabled' },
+    });
+    expect(mockSendNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'notif_c' }),
+      { email: CANARY_INBOX }
+    );
+  });
+
+  it('leaves a real subscriber row untouched: no claim, cancel or send', async () => {
+    primeDueNotification('fan@example.com');
+    mockDbUpdateReturning.mockResolvedValue([]);
+
+    const result = await sendPendingNotifications();
+
+    expect(result).toMatchObject({ sent: 0, skipped: 1, canaryOnly: true });
+    expect(mockSendNotification).not.toHaveBeenCalled();
+    // Only the scoped stuck-row recovery ran; no claim or status write.
+    expect(mockDbUpdate).toHaveBeenCalledTimes(1);
+    expect(mockDbUpdateSet).not.toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'sending' })
+    );
+    expect(mockDbUpdateSet).not.toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'cancelled' })
+    );
+  });
+
+  it('stays fully closed when the canary inbox is not a synthetic identity', async () => {
+    mockedEnv.RELEASE_EMAIL_CANARY_INBOX = 'fan@example.com';
+    mockDbSelect.mockImplementation(() => {
+      throw new Error('must not read audiences');
+    });
+
+    const result = await sendPendingNotifications();
+
+    expect(result).toMatchObject({
+      processed: 0,
+      policyBlocked: { reason: 'audience_delivery_disabled' },
+    });
+    expect(result).not.toHaveProperty('canaryOnly');
+    expect(mockDbSelect).not.toHaveBeenCalled();
+    expect(mockSendNotification).not.toHaveBeenCalled();
+  });
 });

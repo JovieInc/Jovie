@@ -10,6 +10,7 @@
   "providers": [
     {
       "id": "vercel-ai-gateway-credits",
+      "funding": { "source": "cash" },
       "label": "Vercel AI Gateway credit balance (team jovie)",
       "provider": "vercel",
       "owner": "tim",
@@ -34,6 +35,7 @@
     },
     {
       "id": "summer-gateway-monthly",
+      "funding": { "source": "cash" },
       "label": "Summer standing AI Gateway budget",
       "provider": "summer-config",
       "owner": "summer-config",
@@ -435,6 +437,7 @@
     },
     {
       "id": "summer-trial-workers-ai",
+      "funding": { "source": "credits", "creditPoolId": "cloudflare-credits" },
       "label": "Summer provider trial: Workers AI sub-cap",
       "provider": "cloudflare",
       "owner": "summer-config",
@@ -454,6 +457,10 @@
     },
     {
       "id": "summer-trial-anthropic-api",
+      "funding": {
+        "source": "credits",
+        "creditPoolId": "anthropic-api-credit"
+      },
       "label": "Summer provider trial: Anthropic API sub-cap",
       "provider": "anthropic",
       "owner": "summer-config",

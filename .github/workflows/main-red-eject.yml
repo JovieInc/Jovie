@@ -52,6 +52,12 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+      # GITHUB_TOKEN is the ejector's failover bucket when the shared Jovie Bot
+      # installation budget is exhausted (2026-10-31 5 h queue stall).
+      pull-requests: write
+      issues: write
+    env:
+      GH_FALLBACK_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -96,6 +102,12 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: node scripts/main-red-eject.mjs reopen --pr "${{ inputs.pr }}"
+      - name: Alert on ejector failure
+        if: ${{ failure() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: node scripts/main-red-eject.mjs alert-failure
 
   land:
     name: Re-land ejected change

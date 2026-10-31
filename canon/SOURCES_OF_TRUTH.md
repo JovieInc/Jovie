@@ -30,6 +30,7 @@ Machine-readable map: [`sources-of-truth.json`](./sources-of-truth.json). Rule f
 | Binding invariants | file | `canon/invariants.jsonl` | `scripts/invariants/registry.mjs` | - |
 | Engineering wins and the numbers in engineering posts | file | `canon/wins/wins.jsonl` | `apps/web/content/engineering/`<br>`docs/metrics/wins-latest.json` | the measurement source named in each metric, re-run after deploy |
 | Third-party tracking eligibility | file | `apps/web/lib/tracking/eligibility.ts` | `apps/web/lib/tracking/use-tracking-eligibility.ts`<br>`apps/web/lib/tracking/forwarding/dispatch.ts`<br>`apps/web/app/api/tracking/eligibility/route.ts` | - |
+| Public numbers and proof stats (counts, speed, benchmarks, milestones) | file | `apps/web/data/proof-stats/registry.json` | `apps/web/lib/proof-stats/registry.ts`<br>`scripts/invariants/stat-claims/check.mjs`<br>`docs/proof/STATS.md` | production database (counts), Public Profile Benchmark receipts (speed, agent score), founder-approved Summer cards (comparative claims) |
 
 - **Models and prices per access path.** Model ids, access paths (subscription, gateway, API) and per-path price. The model-registry-sync worker (branch opus/model-registry-sync) adds scripts/model-id-guard.mjs and its ratchet; this map does not duplicate that guard.
 - **Plans, prices, offers.** ARTIST_VISIBILITY_OFFER and PLAN_PRICES. Stripe is the live authority for what is charged.
@@ -53,3 +54,4 @@ Machine-readable map: [`sources-of-truth.json`](./sources-of-truth.json). Rule f
 - **Binding invariants.** Binding and adopted company invariants; enforcement consumers name the checks.
 - **Engineering wins and the numbers in engineering posts.** One record per measured engineering win with before/after, source, query, PRs and post-deploy receipts. Status is computed (scripts/lib/wins-ledger.mjs), never stored.
 - **Third-party tracking eligibility.** Central vendor eligibility from artist youngAudience and visitor GPC, opt-out and consent. Persistent flag owner: creator_profiles.young_audience.
+- **Public numbers and proof stats (counts, speed, benchmarks, milestones).** Definition of every stat: template, rounding, threshold, freshness SLA, fallback, methodology, legal class, visibility. Measured values are the proof-stats/observations content record, written only by apps/web/lib/proof-stats (hourly production refresh and /api/internal/proof-stats intake). Copy binds with {stat:<id>}; scripts/invariants/stat-claims fails hand-written numeric claims.
