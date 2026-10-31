@@ -25,6 +25,7 @@ export function ArtistNotificationsLanding({
 }: Readonly<ArtistNotificationsLandingProps>) {
   return (
     <MarketingPageShell
+      className='artist-notifications-landing'
       penContractId={MARKETING_PEN_CONTRACT_IDS.recipe.feature}
     >
       <div className='overflow-hidden bg-black dark:bg-black text-primary-token'>
