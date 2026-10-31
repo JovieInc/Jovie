@@ -130,6 +130,7 @@ export function JovieChat({
     isSubmitting,
     hasMessages,
     collapsedSummerFailureCount,
+    summerProgress,
     showCollapsedSummerFailures,
     isLoadingConversation,
     conversationTitle,
@@ -1055,6 +1056,7 @@ export function JovieChat({
                   conversationId={activeConversationId ?? conversationId}
                   collapsedFailureCount={collapsedSummerFailureCount}
                   onShowCollapsedFailures={showCollapsedSummerFailures}
+                  summerProgress={summerProgress}
                 />
                 <ChatStickScrollButton
                   subscribe={subscribeStuckToBottom}

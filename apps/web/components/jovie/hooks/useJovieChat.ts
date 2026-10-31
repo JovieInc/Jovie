@@ -35,6 +35,11 @@ import {
 } from '@/lib/chat/model-rotation-store';
 import { consumePendingChatPrompt } from '@/lib/chat/open-chat-with-prompt';
 import { trimMessagesForChatRequest } from '@/lib/chat/request-validation';
+import {
+  parseSummerProgress,
+  SUMMER_PROGRESS_MAX_PARTS,
+  type SummerProgressPart,
+} from '@/lib/chat/summer-progress';
 import { buildChatThreadRoute } from '@/lib/chat/sync-chat-thread-url';
 import { isRecoverableToolErrorCode } from '@/lib/chat/tool-errors';
 import { CHAT_TRANSCRIPT_WINDOW_VARIANT_IDENTITY } from '@/lib/chat/transcript-window';
@@ -395,6 +400,9 @@ export function useJovieChatController({
   // Failure hop carried on a data part so a stream error still knows whether
   // Retry may reuse the turn id (message metadata is not readable in onError).
   const pendingSummerFailureRef = useRef<SummerFailure | null>(null);
+  const [summerProgress, setSummerProgress] = useState<
+    readonly SummerProgressPart[]
+  >([]);
   const loadedConversationIdsRef = useRef<Set<string>>(new Set());
   const [draft] = useState(() =>
     createComposerDraft(readComposerDraft(conversationId ?? null))
@@ -450,6 +458,7 @@ export function useJovieChatController({
     activeChatLatencyRef.current = null;
     pendingSendRef.current = null;
     pendingSummerFailureRef.current = null;
+    setSummerProgress([]);
     replacingTurnRef.current = false;
   }, []);
   const resetTurnContext = useCallback(() => {
@@ -860,11 +869,21 @@ export function useJovieChatController({
     onData: dataPart => {
       if (dataPart.type === 'data-summer-failure') {
         pendingSummerFailureRef.current = parseSummerFailure(dataPart.data);
+        setSummerProgress([]);
+      }
+      if (dataPart.type === 'data-summer-progress') {
+        const part = parseSummerProgress(dataPart.data);
+        if (part) {
+          setSummerProgress(previous =>
+            [...previous, part].slice(-SUMMER_PROGRESS_MAX_PARTS)
+          );
+        }
       }
     },
     onFinish: ({ message, isError, isAbort, isDisconnect }) => {
       // stop() settles the cancelled turn. Its eventual SDK callback must not
       // settle a replacement, even when it arrives after a fresh submission.
+      setSummerProgress([]);
       if (isAbort) return;
       const metadata = extractChatTurnMetadata(message.metadata);
       const finishedConversationId =
@@ -1523,6 +1542,7 @@ export function useJovieChatController({
       });
 
       try {
+        setSummerProgress([]);
         const result = sendMessage(payload, sendOptions);
         if (!options?.preserveComposerDraft) {
           clearComposerDraft(activeConversationId);
@@ -1738,6 +1758,8 @@ export function useJovieChatController({
     hasMessages,
     /** Earlier unanswered Summer turns hidden behind one control. */
     collapsedSummerFailureCount,
+    /** Truthful Summer progress parts for the in-flight turn (cleared on finish or failure). */
+    summerProgress,
     showCollapsedSummerFailures: () => setShowSupersededSummerFailures(true),
     isLoadingConversation:
       chatMode === 'ov'
