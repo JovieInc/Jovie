@@ -5,8 +5,8 @@
  *
  *   pnpm pr:open draft  [--title t] [flags]   print the drafted body
  *   pnpm pr:open check  --body-file f [--title t] [--label l]   gate an existing body
- *   pnpm pr:open open   [--title t] [flags]   gate, push, `gh pr create`
- *   pnpm pr:open update <number> [flags]      gate, then `gh pr edit` title and body
+ *   pnpm pr:open open   [--title t] [flags]   gate, push, create the PR
+ *   pnpm pr:open update <number> [flags]      gate, then edit the title and body
  *
  * Flags: --base main  --summary "text"  --label compounding (repeatable)
  *   --metric "name|unit|lower|before|source|query"   measured BEFORE value (after is filled
@@ -161,6 +161,20 @@ export function gate({ title, body, labels = [], files, extra = [] }) {
   return { errors, warnings: lint.warnings.map(w => w.message) };
 }
 
+/** GitHub goes through the shared budgeted client (external-apis rule). */
+const gh = (cwd, args, opts = {}) =>
+  spawnSync(
+    'node',
+    [
+      path.join(cwd, 'packages/api-client/cli.ts'),
+      'gh',
+      '--priority',
+      'default',
+      '--',
+      ...args,
+    ],
+    { cwd, encoding: 'utf8', ...opts }
+  );
 const run = (cmd, args, opts = {}) =>
   spawnSync(cmd, args, { encoding: 'utf8', ...opts });
 
@@ -339,8 +353,8 @@ export async function main(argv = process.argv.slice(2), log = console.log) {
       )
     );
     return (
-      run(
-        'gh',
+      gh(
+        a.repo,
         ['pr', 'edit', a.number, '--title', title, '--body-file', bodyFile],
         { cwd: a.repo, stdio: 'inherit' }
       ).status ?? 1
@@ -365,12 +379,12 @@ export async function main(argv = process.argv.slice(2), log = console.log) {
     ...(a.draft ? ['--draft'] : []),
     ...labels.flatMap(l => ['--label', l]),
   ];
-  const made = run('gh', create, { cwd: a.repo, encoding: 'utf8' });
+  const made = gh(a.repo, create, { encoding: 'utf8' });
   log((made.stdout || made.stderr).trim());
   const url = made.stdout.trim().split('\n').pop();
   if (made.status === 0 && body.includes(PR_URL_PLACEHOLDER)) {
     writeFileSync(bodyFile, body.replaceAll(PR_URL_PLACEHOLDER, url));
-    run('gh', ['pr', 'edit', url, '--body-file', bodyFile], { cwd: a.repo });
+    gh(a.repo, ['pr', 'edit', url, '--body-file', bodyFile]);
   }
   return made.status ?? 1;
 }
