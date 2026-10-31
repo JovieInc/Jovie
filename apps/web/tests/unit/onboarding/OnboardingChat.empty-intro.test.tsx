@@ -86,6 +86,12 @@ vi.mock('@/components/jovie/utils', () => ({
 }));
 
 vi.mock('@/components/features/onboarding/OnboardingToolArtifacts', () => ({
+  // A known handle now renders the draft profile preview (Pen R6As7U), which
+  // reads these formatters from the same module.
+  formatCompactCount: () => null,
+  formatExactCount: () => null,
+  formatGenreLabel: (value: string) => value,
+  getSafeSpotifyArtistUrl: () => null,
   OnboardingArtistConfirmedCard: () => null,
   OnboardingHandleCheckCard: () => null,
   OnboardingSocialLinkCard: () => null,
