@@ -15,12 +15,10 @@ Pure functions over parsed values; lane_runner owns every side effect (gh, git, 
 from __future__ import annotations
 
 import argparse
-import ast
 import hashlib
 import json
 import re
 import sys
-import symtable
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -31,11 +29,11 @@ from atomic_state import atomic_write_text
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, AGENT = (
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, AGENT = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "agent")
+    "merge-narrowed-preflight", "register-domain-writes", "agent")
 DETERMINISTIC = frozenset({
-    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE})
+    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -133,7 +131,7 @@ SIGNATURES = (
     ("platform-infra", PLATFORM_TEXT, RERUN),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
     ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
-    ("atomic-write", ATOMIC_TEXT, ATOMIC_WRITE),
+    ("atomic-write", ATOMIC_TEXT, AGENT),
     ("pr-body", BODY_TEXT, AGENT),
 )
 BEHIND_CLASS = "stale-branch"
@@ -933,80 +931,6 @@ def register_direct_domain_writes(root: Path, log: str) -> list[str]:
         return []
     atomic_write_text(registry_path, updated if updated.endswith("\n") else updated + "\n")
     return added
-
-
-def repair_atomic_state_writes(root: Path, log: str) -> list[str]:
-    """Repair only ratchet-named write_text calls with an existing atomic writer import.
-
-    Unknown signatures, open modes, imports and paths stay with the agent. The
-    caller still runs the ratchet and behavior tests before publication.
-    """
-    if not ATOMIC_TEXT.search(log):
-        return []
-    hits = re.findall(r"\('([A-Za-z_]\w*\.py)', '([A-Za-z_]\w*)', 'write_text'\)", log)
-    lanes = (Path(root) / "scripts/lanes").resolve()
-    changed = []
-    for filename in sorted({name for name, _ in hits}):
-        path = lanes / filename
-        if path.is_symlink() or path.resolve().parent != lanes:
-            continue
-        try:
-            source = path.read_text()
-            tree = ast.parse(source)
-        except (OSError, SyntaxError):
-            continue
-        if not any(isinstance(n, ast.ImportFrom) and n.module == "atomic_state" and n.level == 0
-                   and any(a.name == "atomic_write_text" and a.asname is None for a in n.names)
-                   for n in tree.body):
-            continue
-        symbol = symtable.symtable(source, str(path), "exec").lookup("atomic_write_text")
-        if symbol.is_assigned() or sum((a.asname or a.name) == "atomic_write_text"
-                                      for n in ast.walk(tree) if isinstance(n, (ast.Import, ast.ImportFrom))
-                                      for a in n.names) != 1:
-            continue
-        functions = {fn for name, fn in hits if name == filename}
-        lines = source.encode().splitlines(keepends=True)
-        offsets = [0]
-        for line in lines:
-            offsets.append(offsets[-1] + len(line))
-        edits = {}
-        for fn in tree.body:
-            if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)) or fn.name not in functions:
-                continue
-            if any(isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda))
-                   for child in fn.body for n in ast.walk(child)):
-                continue
-            # A local binding could shadow the imported helper.
-            if any((isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store) and n.id == "atomic_write_text")
-                   or (isinstance(n, ast.arg) and n.arg == "atomic_write_text") for n in ast.walk(fn)):
-                continue
-            for statement in ast.walk(fn):
-                call = statement.value if isinstance(statement, ast.Expr) else None
-                if not (isinstance(call, ast.Call) and isinstance(call.func, ast.Attribute)
-                        and call.func.attr == "write_text" and 1 <= len(call.args) <= 2
-                        and not any(isinstance(a, ast.Starred) for a in call.args)
-                        and all(k.arg == "encoding" for k in call.keywords)):
-                    continue
-                if sum(isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "write_text"
-                       for n in ast.walk(call)) != 1:
-                    continue
-                receiver = ast.get_source_segment(source, call.func.value)
-                arguments = [ast.get_source_segment(source, a) for a in call.args]
-                arguments += [f"{k.arg}={ast.get_source_segment(source, k.value)}" for k in call.keywords]
-                start = offsets[call.lineno - 1] + call.col_offset
-                end = offsets[call.end_lineno - 1] + call.end_col_offset
-                edits[start] = (end, f"atomic_write_text({receiver}, {', '.join(arguments)})".encode())
-        data = source.encode()
-        for start, (end, replacement) in sorted(edits.items(), reverse=True):
-            data = data[:start] + replacement + data[end:]
-        if edits:
-            try:
-                ast.parse(data)
-            except SyntaxError:
-                continue
-            atomic_write_text(path, data.decode())
-            changed.append(f"scripts/lanes/{filename}")
-    return changed
 
 
 def wire_ci_fast(root: Path, files: list[str]) -> list[str]:

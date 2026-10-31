@@ -220,7 +220,6 @@
     "preflight": "node scripts/preflight.mjs",
     "preflight:changed": "node scripts/preflight-changed.mjs",
     "preflight:remote": "node scripts/preflight-remote.mjs",
-    "pr:open": "node scripts/pr-open.mjs",
     "copy-inventory": "node scripts/copy-inventory/extract.mjs",
     "test:copy-inventory": "node --test scripts/copy-inventory/extract.test.mjs",
     "ci:rounds": "node scripts/ci-rounds-report.mjs",

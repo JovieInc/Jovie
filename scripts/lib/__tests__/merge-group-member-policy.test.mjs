@@ -20,7 +20,7 @@ import {
   parseTrackedRegularTree,
   readBoundedResponseText,
   resolveMergeGroupMembers,
-  runPolicy as runPolicyWithCheckout,
+  runPolicy,
 } from '../merge-group-member-policy.mjs';
 import { HYGIENE_LIMITS } from '../repo-hygiene-limits.mjs';
 
@@ -29,13 +29,6 @@ const FIRST = '2'.repeat(40);
 const HEAD = '3'.repeat(40);
 const SOURCE_101 = 'a'.repeat(40);
 const TREE = '4'.repeat(40);
-
-// API fixtures use synthetic SHAs; never probe this host's partial clone.
-// Tests supplying local evidence override this boundary explicitly.
-/** @param {Parameters<typeof runPolicyWithCheckout>[0]} options */
-function runPolicy(options) {
-  return runPolicyWithCheckout({ readLocal: async () => null, ...options });
-}
 
 function treeEntry(mode, type, size, path, sha = 'f'.repeat(40)) {
   return {
