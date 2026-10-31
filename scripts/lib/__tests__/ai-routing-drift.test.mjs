@@ -62,7 +62,7 @@ describe('evaluateRouting', () => {
     const { findings } = evaluateRouting({
       ...calm,
       keyRows: [row('mystery-key', 1)],
-      modelRows: [model('moonshotai/kimi-k3.1-pro', 1)],
+      modelRows: [model('google/gemini-3-flash', 1)],
       health: { 'jovie-workers-ai': 'http-503' },
     });
     expect(findings.map(f => f.type).sort()).toEqual([
@@ -90,7 +90,7 @@ describe('evaluateRouting', () => {
       ...calm,
       credits: { balanceUsd: 1 },
     });
-    expect(runwayDays).toBe(1.4);
+    expect(runwayDays).toBe(2.9);
     expect(findings).toEqual([
       expect.objectContaining({ type: 'gateway-runway', severity: 'critical' }),
     ]);
