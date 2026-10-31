@@ -125,6 +125,8 @@ describe('AdminWaitlistTableUnified', () => {
       'spotify',
       'heardAbout',
       'status',
+      // Admission gate: which certification leg blocks the entry.
+      'admission',
       'created',
       'actions',
     ]);

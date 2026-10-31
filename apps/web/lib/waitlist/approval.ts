@@ -276,6 +276,21 @@ export async function finalizeWaitlistApproval(result: WaitlistApprovalResult) {
   if (result.outcome === 'approved' && result.clerkId) {
     await invalidateProxyUserStateCache(result.clerkId);
   }
+  if (result.outcome === 'approved' && result.profileId) {
+    // Approval is a certification event; a failure dispatches remediation
+    // (an empty catalog imports now, so the invitee never lands on a shell).
+    try {
+      const { scheduleProfileCertification } = await import(
+        '@/lib/waitlist/profile-certification-runner.server'
+      );
+      scheduleProfileCertification({
+        profileId: result.profileId,
+        trigger: 'waitlist_approval',
+      });
+    } catch {
+      // Certification is evidence; it never blocks the approval itself.
+    }
+  }
   if (result.outcome === 'approved' && result.proofRequest) {
     // After commit and lazy: the review module pulls in billing and the Ovie
     // inbox. A card that fails to file is retried by the proof check.

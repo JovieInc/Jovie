@@ -24,6 +24,10 @@ import {
 import { getMarketingCertificationStore } from '@/lib/agent-os/certification-runtime-store';
 import { postgresRecordBackend } from '@/lib/ovie/mcp/postgres-backend';
 import {
+  PROFILE_CERT_LEDGER_KEY,
+  parseProfileCertLedger,
+} from '@/lib/waitlist/profile-certification';
+import {
   countCertificationStates,
   normalizeKernelCertificationRow,
 } from './normalize';
@@ -42,6 +46,7 @@ import {
   prodGoldenPathPacketFiles,
   readProdGoldenPathLedger,
 } from './prod-golden-path-ledger';
+import { profileCertPacketFiles } from './profile-cert-packets';
 import {
   OVIE_CERTIFICATION_DOMAIN_LABELS,
   OVIE_CERTIFICATION_INVENTORY_CONTRACT,
@@ -136,7 +141,10 @@ export interface OvieCertificationInventoryDeps {
 export async function readPacketFilesWithGoldenPath(
   backend: () => CertificationRecordBackend = postgresRecordBackend
 ): Promise<CertificationPacketFileRead> {
-  const committed = await readCertificationPacketFiles();
+  const committed = await withProfileCertPackets(
+    await readCertificationPacketFiles(),
+    backend
+  );
   try {
     const ledger = await readProdGoldenPathLedger(backend());
     if (!ledger) return committed;
@@ -153,6 +161,36 @@ export async function readPacketFilesWithGoldenPath(
           domain: null,
           source: 'ledger:prod-golden-path',
           message: `Production golden-path ledger could not be read: ${error instanceof Error ? error.message : String(error)}`,
+        },
+      ],
+    };
+  }
+}
+
+/** Per-profile waitlist certifications; a read failure is an inventory issue. */
+async function withProfileCertPackets(
+  read: CertificationPacketFileRead,
+  backend: () => CertificationRecordBackend
+): Promise<CertificationPacketFileRead> {
+  try {
+    const raw = await backend().get(PROFILE_CERT_LEDGER_KEY);
+    if (raw === null || raw === undefined) return read;
+    return {
+      ...read,
+      files: [
+        ...read.files,
+        ...profileCertPacketFiles(parseProfileCertLedger(raw)),
+      ],
+    };
+  } catch (error) {
+    return {
+      ...read,
+      issues: [
+        ...read.issues,
+        {
+          domain: 'public_profiles',
+          source: 'ledger:waitlist-profiles',
+          message: `Waitlist profile certification ledger could not be read: ${error instanceof Error ? error.message : String(error)}`,
         },
       ],
     };

@@ -101,7 +101,7 @@ export const SCRIPT_LINES: readonly ScriptLine[] = [
   line(
     'confirm_artist',
     'v4',
-    '{name} is the match. Enrichment shows {followers} Spotify followers. Claim a handle next.'
+    '{name} is the match, with {followers} Spotify followers. Claim a handle next.'
   ),
 
   line(

@@ -1,6 +1,8 @@
 import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { db, doesTableExist } from '@/lib/db';
 import { type WaitlistEntry, waitlistEntries } from '@/lib/db/schema/waitlist';
+import type { AdmissionLeg } from '@/lib/waitlist/admission-gate';
+import { decideAdmissionForEntries } from '@/lib/waitlist/admission-gate.server';
 import { organicWaitlistEntrySql } from './organic-waitlist';
 
 export interface WaitlistEntryRow {
@@ -19,6 +21,12 @@ export interface WaitlistEntryRow {
   primarySocialFollowerCount: number | null;
   createdAt: Date;
   updatedAt: Date;
+  /**
+   * Admission legs blocking this entry on the current production SHA
+   * (profile, golden_path, design). Empty when admissible; null when the
+   * entry is not waiting or the gate could not be read.
+   */
+  admissionBlocking?: readonly AdmissionLeg[] | null;
 }
 
 export interface GetAdminWaitlistParams {
@@ -263,6 +271,13 @@ export async function getAdminWaitlistEntries(
       .limit(pageSize)
       .offset(offset);
 
+    const waitingIds = entries
+      .filter(entry => entry.status === 'new' || entry.status === 'waitlisted')
+      .map(entry => entry.id);
+    const admission = await decideAdmissionForEntries(waitingIds)
+      .then(result => result.decisions)
+      .catch(() => null);
+
     return {
       entries: entries.map(entry => ({
         id: entry.id,
@@ -282,6 +297,7 @@ export async function getAdminWaitlistEntries(
         primarySocialFollowerCount: entry.primarySocialFollowerCount,
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
+        admissionBlocking: admission?.get(entry.id)?.blocking ?? null,
       })),
       page,
       pageSize,

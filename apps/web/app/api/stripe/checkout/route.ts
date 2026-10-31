@@ -54,6 +54,7 @@ import {
 } from '@/lib/stripe/retry';
 import { ACQUISITION_COOKIE_NAME } from '@/lib/tracking/consent';
 import { logger } from '@/lib/utils/logger';
+import { readPaymentAdmissionHold } from '@/lib/waitlist/admission-gate.server';
 
 export const runtime = 'nodejs';
 
@@ -181,6 +182,23 @@ export async function POST(request: NextRequest) {
     const { userId } = await getCachedAuth({ session: 'fresh' });
     if (!userId) return jsonError('Unauthorized', 401);
     affectedUserId = userId;
+
+    // Admission gate (Tim, 2026-10-29): never charge someone we will not
+    // admit. A waiting customer the gate does not admit is refused here,
+    // before Stripe is reached; the webhook refunds any payment that races
+    // past this (lib/waitlist/paid-admission.ts).
+    const admissionHold = await readPaymentAdmissionHold(userId);
+    if (admissionHold) {
+      return NextResponse.json(
+        {
+          error: 'admission_gate_closed',
+          message:
+            "You're on the waitlist. Checkout opens when you're let in, so you're never charged while waiting.",
+          blocking: admissionHold,
+        },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
 
     const parsedBody = await parseJsonBody<{
       humanConfirmed?: unknown;

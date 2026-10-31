@@ -88,6 +88,8 @@ export async function refundFirstMonthAndCancel(input: {
   readonly subscriptionId: string;
   /** Stable per claim, e.g. `claim-verification-reject:<profileId>:<subscriptionId>`. */
   readonly idempotencyKey: string;
+  /** Recorded on the refund's metadata; defaults to the claim rejection. */
+  readonly source?: string;
 }): Promise<ClaimRejectionRefundResult> {
   const invoice = await firstPaidInvoice(input.subscriptionId);
   let refundId: string | null = null;
@@ -106,7 +108,7 @@ export async function refundFirstMonthAndCancel(input: {
         amount: invoice.amount_paid,
         reason: 'requested_by_customer',
         metadata: {
-          source: 'claim_verification_rejected',
+          source: input.source ?? 'claim_verification_rejected',
           subscription: input.subscriptionId,
           invoice: invoice.id,
         },

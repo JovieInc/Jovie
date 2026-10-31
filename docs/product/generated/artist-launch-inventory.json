@@ -3457,6 +3457,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/waitlist/profile-certification/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/waitlist/profile-certification",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/investors/respond/route.ts",
       "kind": "handler",
       "route": "/api/investors/respond",

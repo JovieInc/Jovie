@@ -184,6 +184,11 @@ vi.mock('@/lib/onboarding/catalog-import.server', () => ({
   scheduleOnboardingCatalogImport: mockScheduleCatalogImport,
 }));
 
+const mockScheduleProfileCertification = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/waitlist/profile-certification-runner.server', () => ({
+  scheduleProfileCertification: mockScheduleProfileCertification,
+}));
+
 vi.mock('@/lib/tasks/chat-work-record', () => ({
   ensureChatWorkRecord: vi.fn().mockResolvedValue(null),
 }));
@@ -619,6 +624,11 @@ describe('materializeClaimedOnboardingProfile', () => {
     expect(inserted.displayName).not.toBe('Famous Artist');
     // A held identity is not attached, so its catalog is not imported yet.
     expect(mockScheduleCatalogImport).not.toHaveBeenCalled();
+    // Without an import the claim itself is the certification event.
+    expect(mockScheduleProfileCertification).toHaveBeenCalledWith({
+      profileId: 'profile_new',
+      trigger: 'claim',
+    });
     expect(claimVerification.request).toHaveBeenCalledWith(
       expect.objectContaining({
         profileId: 'profile_new',

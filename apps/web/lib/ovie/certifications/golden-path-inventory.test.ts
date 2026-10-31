@@ -13,6 +13,13 @@ vi.mock('@/lib/ovie/mcp/postgres-backend', () => ({
   postgresRecordBackend: () => ({}),
 }));
 
+import {
+  applyProfileCertReceipt,
+  emptyProfileCertLedger,
+  PROFILE_CERT_LEDGER_KEY,
+  PROFILE_CERT_RECEIPT_SCHEMA,
+  type ProfileCertReceipt,
+} from '@/lib/waitlist/profile-certification';
 import { readPacketFilesWithGoldenPath } from './inventory.server';
 import {
   PROD_GOLDEN_PATH_RECEIPT_SCHEMA,
@@ -79,6 +86,50 @@ describe('readPacketFilesWithGoldenPath', () => {
       compareAndSet: async () => false,
     };
     const read = await readPacketFilesWithGoldenPath(() => backend);
-    expect(read.issues[0]?.source).toBe('ledger:prod-golden-path');
+    expect(read.issues.map(issue => issue.source)).toEqual([
+      'ledger:waitlist-profiles',
+      'ledger:prod-golden-path',
+    ]);
+  });
+
+  it('adds one packet per certified waitlist profile, without PII', async () => {
+    const backend = memoryBackend();
+    const receipt: ProfileCertReceipt = {
+      schema: PROFILE_CERT_RECEIPT_SCHEMA,
+      profileId: '11111111-2222-3333-4444-555555555555',
+      waitlistEntryId: null,
+      status: 'failed',
+      sha: 'f'.repeat(40),
+      trigger: 'waitlist_approval',
+      startedAt: '2026-10-29T10:00:00.000Z',
+      endedAt: '2026-10-29T10:00:01.000Z',
+      checks: [
+        { id: 'releases_present', status: 'failed', summary: 'No releases.' },
+      ],
+      remediation: ['import_catalog'],
+      evidence: {
+        videoUrl: 'https://example.com/walk.webm',
+        screenshots: [],
+      },
+    };
+    const ledger = applyProfileCertReceipt(
+      emptyProfileCertLedger(receipt.endedAt),
+      receipt,
+      receipt.endedAt
+    ).ledger;
+    await backend.setIfAbsent(
+      PROFILE_CERT_LEDGER_KEY,
+      JSON.stringify(ledger),
+      0
+    );
+
+    const read = await readPacketFilesWithGoldenPath(() => backend);
+    expect(read.files).toHaveLength(1);
+    const [file] = read.files;
+    expect(file?.domain).toBe('public_profiles');
+    expect(file?.links[0]?.href).toBe('https://example.com/walk.webm');
+    expect(file?.packet.operational?.runtimeDogfood?.[0]?.status).toBe(
+      'failed'
+    );
   });
 });
