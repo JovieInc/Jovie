@@ -1,0 +1,125 @@
+#!/usr/bin/env node
+/**
+ * node scripts/ai-routing-check.mjs [--days 2] [--json] [--record <jsonl>] [--vercel]
+ *
+ * Compares the documented AI routing (apps/web/lib/ai/routing.json) with the
+ * live deployment: Gateway spend by key and model against each caller's declared
+ * ceiling, the Workers AI relay health, the Vercel env flags that switch a route
+ * on, and Gateway credit runway (page under 3 days). Exits 1 on any high or
+ * critical finding. --record appends the per-provider $/day snapshot (measure
+ * everything) to a JSONL ledger. Reads AI_GATEWAY_API_KEY from the environment
+ * and never prints it.
+ */
+import { spawnSync } from 'node:child_process';
+import { appendFileSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fetchRows } from './ai-gateway-report.mjs';
+import { evaluateRouting } from './lib/ai-routing-drift.mjs';
+import { readGatewayCredits } from './lib/credentials-live-reads.mjs';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+export const ROUTING_PATH = resolve(ROOT, 'apps/web/lib/ai/routing.json');
+/** Public, unauthenticated /health of each relay Worker the routing depends on. */
+export const RELAYS = {
+  'jovie-workers-ai': 'https://jovie-workers-ai.tim-fd8.workers.dev/health',
+  'summer-workers-ai': 'https://summer-workers-ai.tim-fd8.workers.dev/health',
+};
+
+async function relayHealth(fetchImpl) {
+  const out = {};
+  for (const [name, url] of Object.entries(RELAYS)) {
+    try {
+      const res = await fetchImpl(url, { signal: AbortSignal.timeout(8000) });
+      out[name] = res.ok ? 'ok' : `http-${res.status}`;
+    } catch (error) {
+      out[name] = error instanceof Error ? error.name : 'unreachable';
+    }
+  }
+  return out;
+}
+
+/** Production env NAMES (never values) for each project a route declares. */
+function vercelEnvNames(routing) {
+  const out = {};
+  const projects = new Set(
+    (routing.callers ?? [])
+      .map(caller => caller.liveFlags?.vercelProject)
+      .filter(Boolean)
+  );
+  for (const project of projects) {
+    const res = spawnSync(
+      'vercel',
+      ['env', 'ls', 'production', '--project', project],
+      { encoding: 'utf8', timeout: 60_000 }
+    );
+    if (res.status !== 0) continue;
+    out[project] = res.stdout
+      .split('\n')
+      .map(line => line.trim().split(/\s+/u)[0])
+      .filter(name => /^[A-Z][A-Z0-9_]+$/u.test(name));
+  }
+  return out;
+}
+
+export async function main(
+  argv = process.argv.slice(2),
+  env = process.env,
+  fetchImpl = fetch
+) {
+  const apiKey = env.AI_GATEWAY_API_KEY;
+  if (!apiKey) {
+    console.error('ai-routing-check: AI_GATEWAY_API_KEY is not set');
+    return 2;
+  }
+  const flag = name => {
+    const i = argv.indexOf(name);
+    return i >= 0 ? argv[i + 1] : undefined;
+  };
+  const days = Number(flag('--days')) || 2;
+  const routing = JSON.parse(readFileSync(ROUTING_PATH, 'utf8'));
+  const [keyRows, modelRows] = await Promise.all([
+    fetchRows('api_key_name', days, apiKey, fetchImpl),
+    fetchRows('model', days, apiKey, fetchImpl),
+  ]);
+  const creditsRead = await readGatewayCredits({
+    token: apiKey,
+    fetchImpl,
+    now: Date.now,
+  });
+  const result = evaluateRouting({
+    routing,
+    keyRows,
+    modelRows,
+    days,
+    credits: creditsRead.ok ? creditsRead.value : null,
+    health: await relayHealth(fetchImpl),
+    envNames: argv.includes('--vercel') ? vercelEnvNames(routing) : null,
+  });
+  const record = {
+    ...result,
+    checkedAt: new Date().toISOString(),
+    gatewayBalanceUsd: creditsRead.ok ? creditsRead.value.balanceUsd : null,
+  };
+  const ledger = flag('--record');
+  if (ledger) appendFileSync(ledger, `${JSON.stringify(record)}\n`);
+  if (argv.includes('--json')) console.log(JSON.stringify(record, null, 2));
+  else {
+    console.log(
+      `AI routing check (last ${days}d): Gateway $${result.gatewayUsdPerDay}/day, runway ${result.runwayDays ?? 'n/a'} days`
+    );
+    for (const [key, v] of Object.entries(result.byKey))
+      console.log(
+        `  ${key.padEnd(34)} $${v.usdPerDay}/day  ceiling ${v.ceilingUsdPerDay ?? 'undeclared'}`
+      );
+    for (const f of result.findings)
+      console.log(`  [${f.severity}] ${f.message}`);
+    if (result.findings.length === 0) console.log('  no drift');
+  }
+  return result.findings.some(f => ['high', 'critical'].includes(f.severity))
+    ? 1
+    : 0;
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href)
+  main().then(code => process.exit(code));
