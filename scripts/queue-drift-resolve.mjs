@@ -6,6 +6,7 @@ import { randomBytes } from 'node:crypto';
 //   publish  turn the guards step outcome and report file into job outputs
 // Every undecidable case writes run=false / no verdict (fail open): the merge
 // group stays the authoritative gate.
+// api-budget: github-actions-token 150/hr - about 3 REST reads per green-PR wake (PR, main ref, compare), debounced by the enroll concurrency group
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
