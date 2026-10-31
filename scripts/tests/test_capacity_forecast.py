@@ -1,5 +1,7 @@
-import json, sys, tempfile, unittest
+import json, os, sys, tempfile, unittest
 from pathlib import Path
+from unittest import mock
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "capacity"))
 import forecast as f
 
@@ -61,6 +63,42 @@ class Forecast(unittest.TestCase):
             self.assertIn(r["collector"]["type"], list(f.COLLECTORS) + ["none"], r["id"])
             self.assertIn(r["host"], ("gem", "mac", "air", "cloud", "any"), r["id"])
         self.assertIn(reg["cloudCollector"], reg["hostAliases"])
+
+
+class ResendCollector(unittest.TestCase):
+    """c_resend must fail closed: an API/auth error is no reading, never a fabricated 0 sent."""
+
+    DAY_SPEC = {"type": "resend", "window": "day", "limit": 100}
+    MONTH_SPEC = {"type": "resend", "window": "month", "limit": 3000}
+    NOW = f.parse_iso("2026-10-31T12:00:00Z")
+
+    def setUp(self):
+        os.environ.pop("RESEND_READ_KEY", None)
+
+    def test_no_token_returns_none(self):
+        with mock.patch.object(f, "run", return_value=None):
+            self.assertIsNone(f.c_resend(self.DAY_SPEC, self.NOW))
+
+    def test_api_error_fails_closed_not_zero(self):
+        # 401 from a send-only key: previously the loop broke on no rows and returned value 0 (OK).
+        with mock.patch.object(f, "run", return_value="re_test"), \
+             mock.patch.object(f, "_http_json_err", return_value=(None, "HTTP 401")):
+            self.assertIsNone(f.c_resend(self.DAY_SPEC, self.NOW))
+
+    def test_counts_window_and_stops_at_floor(self):
+        page = {"data": [{"created_at": "2026-10-31T09:00:00Z", "id": "c"},
+                         {"created_at": "2026-10-30T23:00:00Z", "id": "b"},
+                         {"created_at": "2026-09-30T09:00:00Z", "id": "a"}], "has_more": False}
+        with mock.patch.object(f, "run", return_value="re_test"), \
+             mock.patch.object(f, "_http_json_err", return_value=(page, None)):
+            self.assertEqual(f.c_resend(self.DAY_SPEC, self.NOW), {"value": 1, "limit": 100})
+            self.assertEqual(f.c_resend(self.MONTH_SPEC, self.NOW), {"value": 2, "limit": 3000})
+
+    def test_error_mid_pagination_fails_closed(self):
+        page = {"data": [{"created_at": "2026-10-31T09:00:00Z", "id": "c"}], "has_more": True}
+        with mock.patch.object(f, "run", return_value="re_test"), \
+             mock.patch.object(f, "_http_json_err", side_effect=[(page, None), (None, "HTTP 500")]):
+            self.assertIsNone(f.c_resend(self.DAY_SPEC, self.NOW))
 
 
 if __name__ == "__main__":
