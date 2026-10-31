@@ -9447,7 +9447,7 @@ class UpdateBackoffTest(unittest.TestCase):
             host.state.mkdir()
             real = lane.sh
             lane.sh = lambda cmd, **k: SimpleNamespace(returncode=0, stderr="", stdout="t1\n" if "rev-parse" in cmd else "")
-            identity = patch.object(lane, "release_identity", return_value={"bundleDigest": "t1", "sourceCommit": "a" * 40})
+            identity = patch.object(lane, "release_identity", return_value={"bundleDigest": "t1", "sourceCommit": "a" * 40, "objects": {"scripts/lanes": "f" * 40}})
             identity.start()
             try:
                 refused = host.state / "update-refused.json"
@@ -10759,7 +10759,7 @@ class StagingGateAdmissionTest(unittest.TestCase):
             self.assertEqual(sum(future.result() == "admitted" for future in futures), 1)
 
     def test_active_qualification_preserves_refused_stage_before_any_archive_or_cleanup(self):
-        bundle = {"bundleDigest": "b" * 64, "sourceCommit": "a" * 40}
+        bundle = {"bundleDigest": "b" * 64, "sourceCommit": "a" * 40, "objects": {"scripts/lanes": "f" * 40}}
         stage = self.host.state / "releases" / ("." + bundle["bundleDigest"] + ".tmp")
         stage.mkdir(parents=True)
         retained = stage / "original-diagnostic"
@@ -10782,7 +10782,7 @@ class StagingGateAdmissionTest(unittest.TestCase):
             seat.release()
 
     def test_real_custody_exception_is_not_retried_or_converted_to_a_test_failure(self):
-        bundle = {"bundleDigest": "b" * 64, "sourceCommit": "a" * 40}
+        bundle = {"bundleDigest": "b" * 64, "sourceCommit": "a" * 40, "objects": {"scripts/lanes": "f" * 40}}
         original = lane.SelftestCleanupHeld("selftest-process-custody-unreadable")
         calls = []
 
