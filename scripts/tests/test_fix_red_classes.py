@@ -206,6 +206,90 @@ class AndChainMergeTest(unittest.TestCase):
         self.assertIsNone(classes.resolve_and_chain_text(unknown))
 
 
+def _manifest_conflict(section: str, ours: str, theirs: str, *, after: str = "") -> str:
+    """Conflict text whose markers stay inside quoted lines so git --check accepts the file."""
+    return (
+        "{\n"
+        f'  "{section}": {{\n'
+        "<<<<<<< HEAD\n"
+        f"{ours}"
+        "=======\n"
+        f"{theirs}"
+        ">>>>>>> origin/main\n"
+        f"{after}"
+        "  }\n"
+        "}\n"
+    )
+
+
+class PackageManifestMergeTest(unittest.TestCase):
+    REAL = _manifest_conflict(
+        "dependencies",
+        '    "@ai-sdk/gateway": "^4.0.128",\n    "@ai-sdk/react": "^4.0.159",\n',
+        '    "@ai-sdk/gateway": "^4.0.117",\n'
+        '    "@ai-sdk/openai-compatible": "3.0.26",\n'
+        '    "@ai-sdk/react": "^4.0.148",\n',
+        after='    "@better-auth/oauth-provider": "1.7.6"\n',
+    )
+
+    def test_keeps_the_higher_semver_and_main_only_dependency(self):
+        resolved = classes.merge_package_manifest(self.REAL)
+        parsed = json.loads(resolved)
+        self.assertEqual(list(parsed["dependencies"]), [
+            "@ai-sdk/gateway",
+            "@ai-sdk/openai-compatible",
+            "@ai-sdk/react",
+            "@better-auth/oauth-provider",
+        ])
+        self.assertEqual(parsed["dependencies"]["@ai-sdk/gateway"], "^4.0.128")
+        self.assertEqual(parsed["dependencies"]["@ai-sdk/openai-compatible"], "3.0.26")
+        self.assertEqual(parsed["dependencies"]["@ai-sdk/react"], "^4.0.159")
+        self.assertNotIn("<<<<<<<", resolved)
+
+    def test_equal_version_prefers_main_and_main_higher_wins(self):
+        tie = _manifest_conflict(
+            "dependencies",
+            '    "react": "^19.3.1",\n',
+            '    "react": "19.3.1",\n',
+        )
+        self.assertEqual(json.loads(classes.merge_package_manifest(tie))["dependencies"]["react"], "19.3.1")
+        main_higher = tie.replace('"^19.3.1"', '"^19.3.0"').replace('"19.3.1"', '"^19.3.2"')
+        self.assertEqual(json.loads(classes.merge_package_manifest(main_higher))["dependencies"]["react"], "^19.3.2")
+        release = tie.replace('"^19.3.1"', '"1.0.0"').replace('"19.3.1"', '"1.0.0-rc.1"')
+        self.assertEqual(json.loads(classes.merge_package_manifest(release))["dependencies"]["react"], "1.0.0")
+
+    def test_drops_the_trailing_comma_before_a_closing_brace(self):
+        text = _manifest_conflict(
+            "dependencies",
+            '    "@ai-sdk/react": "^4.0.159"\n',
+            '    "@ai-sdk/openai-compatible": "3.0.26",\n    "@ai-sdk/react": "^4.0.148"\n',
+        )
+        resolved = classes.merge_package_manifest(text)
+        self.assertIn('"@ai-sdk/openai-compatible": "3.0.26",\n    "@ai-sdk/react": "^4.0.159"\n', resolved)
+        json.loads(resolved)
+
+    def test_script_duplicate_and_incomparable_hunks_fail_closed(self):
+        script = _manifest_conflict(
+            "scripts",
+            '    "build": "tsc",\n',
+            '    "build": "tsc -p tsconfig.json",\n',
+        )
+        self.assertIsNone(classes.merge_package_manifest(script))
+        duplicate = self.REAL.replace(
+            '    "@ai-sdk/gateway": "^4.0.128",\n',
+            '    "@ai-sdk/gateway": "^4.0.128",\n    "@ai-sdk/gateway": "^4.0.127",\n',
+        )
+        self.assertIsNone(classes.merge_package_manifest(duplicate))
+        literal = self.REAL.replace('"^4.0.128"', '"workspace:*"')
+        self.assertIsNone(classes.merge_package_manifest(literal))
+        one_sided_script = self.REAL.replace(
+            '    "@ai-sdk/react": "^4.0.159",\n',
+            '    "@ai-sdk/react": "^4.0.159",\n    "postinstall": "node scripts/setup.js",\n',
+        )
+        self.assertIsNone(classes.merge_package_manifest(one_sided_script))
+        self.assertIsNone(classes.merge_package_manifest("{\n  \"dependencies\": {}\n}\n"))
+
+
 class SpacingSnapTest(unittest.TestCase):
     DIFF = """diff --git a/apps/web/components/Card.tsx b/apps/web/components/Card.tsx
 --- a/apps/web/components/Card.tsx

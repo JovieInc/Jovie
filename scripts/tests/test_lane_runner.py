@@ -12293,11 +12293,13 @@ class LockfileConflictTest(unittest.TestCase):
         return subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", *args], cwd=cwd,
                               check=True, capture_output=True, text=True).stdout.strip()
 
-    def repo(self, tmp: Path, pr_changes: dict, main_changes: dict | None = None):
+    def repo(self, tmp: Path, pr_changes: dict, main_changes: dict | None = None, base_files: dict | None = None):
         origin, work = tmp / "origin.git", tmp / "work"
         self.git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp)
         self.git("clone", "-q", str(origin), str(work), cwd=tmp)
-        for name, text in {"package.json": "{}\n", "pnpm-lock.yaml": "base\n", "a.ts": "a\n"}.items():
+        files = {"package.json": "{}\n", "pnpm-lock.yaml": "base\n", "a.ts": "a\n"}
+        files.update(base_files or {})
+        for name, text in files.items():
             (work / name).write_text(text)
         self.git("add", "-A", cwd=work)
         self.git("commit", "-qm", "base", cwd=work)
@@ -12411,6 +12413,86 @@ class LockfileConflictTest(unittest.TestCase):
             self.assertTrue(ok)
             self.assertEqual(calls.count(["pnpm", "ci:topology:write"]), 1)
             self.assertEqual(self.git("show", f"devin/jov-1-20260927:{topology}", cwd=origin), "regenerated")
+
+    def test_manifest_and_lock_conflict_unions_dependencies_and_regenerates(self):
+        base = """{
+  "dependencies": {
+    "@ai-sdk/gateway": "^4.0.117",
+    "@ai-sdk/react": "^4.0.148"
+  }
+}
+"""
+        head = base.replace('"^4.0.117"', '"^4.0.128"').replace('"^4.0.148"', '"^4.0.159"')
+        main = """{
+  "dependencies": {
+    "@ai-sdk/gateway": "^4.0.117",
+    "@ai-sdk/openai-compatible": "3.0.26",
+    "@ai-sdk/react": "^4.0.148"
+  }
+}
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, work = self.repo(
+                Path(tmp), {"package.json": head, "pnpm-lock.yaml": "pr\n"},
+                main_changes={"package.json": main, "pnpm-lock.yaml": "main\n", "a.ts": "main\n"},
+                base_files={"package.json": base})
+            real = lane.sh
+
+            def sh(args, cwd=None, timeout=600, env=None, log=None, stream=False, pass_fds=()):
+                if args[:2] == ["pnpm", "install"]:
+                    (Path(cwd) / "pnpm-lock.yaml").write_text("regenerated\n")
+                    return SimpleNamespace(returncode=0, stdout="", stderr="")
+                return real(args, cwd=cwd, timeout=timeout, env=env, log=log, stream=stream, pass_fds=pass_fds)
+
+            lane.sh = sh
+            try:
+                with open(os.devnull, "w") as log:
+                    ok = lane.resolve_manifest_lock_conflict(work, "devin/jov-1-20260927", log)
+            finally:
+                lane.sh = real
+            self.assertTrue(ok)
+            parsed = json.loads(self.git("show", "devin/jov-1-20260927:package.json", cwd=origin))
+            self.assertEqual(parsed["dependencies"]["@ai-sdk/gateway"], "^4.0.128")
+            self.assertEqual(parsed["dependencies"]["@ai-sdk/openai-compatible"], "3.0.26")
+            self.assertEqual(parsed["dependencies"]["@ai-sdk/react"], "^4.0.159")
+            self.assertEqual(self.git("show", "devin/jov-1-20260927:pnpm-lock.yaml", cwd=origin), "regenerated")
+            prompt = lane.render_fix_prompt(
+                {"number": 1, "title": "t", "headRefName": "b", "mergeStateStatus": "DIRTY"}, "")
+            self.assertIn("fix_red_classes.merge_package_manifest", prompt)
+
+    def test_a_non_manifest_conflict_aborts_before_install(self):
+        base = """{
+  "dependencies": {
+    "@ai-sdk/gateway": "^4.0.117",
+    "@ai-sdk/react": "^4.0.148"
+  }
+}
+"""
+        head = base.replace('"^4.0.117"', '"^4.0.128"')
+        main = base.replace('"^4.0.117"', '"^4.0.120"')
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, work = self.repo(
+                Path(tmp), {"package.json": head, "a.ts": "pr\n", "pnpm-lock.yaml": "pr\n"},
+                main_changes={"package.json": main, "a.ts": "main\n", "pnpm-lock.yaml": "main\n"},
+                base_files={"package.json": base})
+            before = self.git("rev-parse", "devin/jov-1-20260927", cwd=origin)
+            calls = []
+            real = lane.sh
+
+            def sh(args, cwd=None, timeout=600, env=None, log=None, stream=False, pass_fds=()):
+                calls.append(args)
+                return real(args, cwd=cwd, timeout=timeout, env=env, log=log, stream=stream, pass_fds=pass_fds)
+
+            lane.sh = sh
+            try:
+                with open(os.devnull, "w") as log:
+                    ok = lane.resolve_manifest_lock_conflict(work, "devin/jov-1-20260927", log)
+            finally:
+                lane.sh = real
+            self.assertFalse(ok)
+            self.assertFalse(any(cmd[:2] == ["pnpm", "install"] for cmd in calls))
+            self.assertFalse((work / ".git" / "MERGE_HEAD").exists(), "merge aborted")
+            self.assertEqual(self.git("rev-parse", "devin/jov-1-20260927", cwd=origin), before)
 
     def test_a_source_conflict_is_left_to_the_agent_untouched(self):
         with tempfile.TemporaryDirectory() as tmp:
