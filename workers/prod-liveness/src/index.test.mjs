@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { nextState, probe, run } from './index.ts';
+import worker, { nextState, probe, run } from './index.ts';
 
 const res = (status, headers = {}) => ({
   status,
@@ -72,4 +72,21 @@ test('run: a paused site is paged through every configured channel', async () =>
   assert.equal(out.page, 'down');
   assert.ok(calls.includes('https://hooks.example/page'));
   assert.equal(out.delivered, 1);
+});
+
+test('cron-hub dispatch: unauthenticated or secretless calls are rejected, authenticated runs the probe', async () => {
+  const env = { TARGETS: '' };
+  const post = headers =>
+    new Request('https://x/__cron', { method: 'POST', headers });
+  assert.equal((await worker.fetch(post({}), env)).status, 401);
+  assert.equal(
+    (await worker.fetch(post({ authorization: 'Bearer s' }), env)).status,
+    401,
+    'no secret configured'
+  );
+  const ok = await worker.fetch(post({ authorization: 'Bearer s' }), {
+    ...env,
+    CRON_HUB_SECRET: 's',
+  });
+  assert.equal(ok.status, 200);
 });

@@ -1,4 +1,5 @@
 import { and, sql as drizzleSql, eq, inArray, isNull, or } from 'drizzle-orm';
+import { kickQueue } from '@/lib/cron/kick-queue';
 import { type DbOrTransaction, db } from '@/lib/db';
 import { isUniqueViolation } from '@/lib/db/errors';
 import { ingestionJobs } from '@/lib/db/schema/ingestion';
@@ -52,6 +53,7 @@ async function insertJobWithDedup(
       .returning({ id: ingestionJobs.id });
 
     if (result.length > 0) {
+      kickQueue('ingestion');
       return result[0].id;
     }
   } catch (error: unknown) {

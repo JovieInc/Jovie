@@ -29,18 +29,6 @@
       "schedule": "0 5 * * *"
     },
     {
-      "path": "/api/cron/process-ingestion-jobs",
-      "schedule": "*/6 * * * *"
-    },
-    {
-      "path": "/api/cron/process-merch-fulfillment",
-      "schedule": "*/10 * * * *"
-    },
-    {
-      "path": "/api/cron/summarize-interviews",
-      "schedule": "*/5 * * * *"
-    },
-    {
       "path": "/api/cron/generate-playlist",
       "schedule": "0 6 * * *"
     },
@@ -57,14 +45,6 @@
       "schedule": "0 4 * * *"
     },
     {
-      "path": "/api/cron/process-workflow-runs",
-      "schedule": "*/6 * * * *"
-    },
-    {
-      "path": "/api/cron/voice-pipeline",
-      "schedule": "*/5 * * * *"
-    },
-    {
       "path": "/api/cron/public-profile-canary",
       "schedule": "13 6 * * *"
     },
@@ -75,6 +55,10 @@
     {
       "path": "/api/cron/artist-daily-snapshots",
       "schedule": "15 9 * * *"
+    },
+    {
+      "path": "/api/cron/queue-tick",
+      "schedule": "*/5 * * * *"
     }
   ],
   "functions": {

@@ -3,6 +3,7 @@ import 'server-only';
 import crypto from 'node:crypto';
 import { and, asc, sql as drizzleSql, eq, inArray, ne } from 'drizzle-orm';
 import type Stripe from 'stripe';
+import { kickQueue } from '@/lib/cron/kick-queue';
 import { db } from '@/lib/db';
 import {
   type MerchCard,
@@ -473,6 +474,7 @@ export async function handleMerchCheckoutCompleted(
     .insert(merchFulfillmentJobs)
     .values({ merchOrderId: orderId, status: 'queued' })
     .onConflictDoNothing({ target: merchFulfillmentJobs.merchOrderId });
+  kickQueue('merch');
 
   const [ledgerEntry] = await db
     .insert(merchPayoutLedgerEntries)
