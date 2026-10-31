@@ -36,6 +36,7 @@ import {
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { stripVTControlCharacters } from 'node:util';
 import { load as yamlLoad } from 'js-yaml';
 import {
   companionChecklist,
@@ -129,6 +130,35 @@ export function downgradeHostRed(check, result, platform = process.platform) {
       skip: `host-only reds (${[...new Set(failed)].join(', ')}); CI runs Linux`,
     };
   return result;
+}
+
+/** Preserve a failure's name and nearby cause within the existing display bound. */
+export function failureSummaryLines(out) {
+  const lines = stripVTControlCharacters(String(out))
+    .split('\n')
+    .filter(line => line.trim());
+  const anchors = [
+    /^\s*test at .+:\d+(?::\d+)?$/,
+    /^\s*FAIL(?:\s|\|)/,
+    /^\s*not ok \d+\b/,
+    /^\s*[✖✗×]\s+(?!failing tests:)/,
+    /^\s*(?:\w*Error(?:\s*\[[^\]]+\])?:|(?:.+(?::\d+(?::\d+)?|\(\d+,\d+\)):\s*)?error TS\d+:)/,
+  ];
+  for (const anchor of anchors) {
+    const start = lines.findIndex(
+      line => !/^\s*(?:[✓✔]|ok \d+\b|PASS\b)/.test(line) && anchor.test(line)
+    );
+    if (start !== -1) {
+      return [
+        '[first recognized failure context; output is bounded]',
+        ...lines.slice(start, start + 13),
+      ].map(line => line.slice(0, 220));
+    }
+  }
+  return [
+    '[no explicit failure header in retained output; showing tail]',
+    ...lines.slice(-13),
+  ].map(line => line.slice(0, 220));
 }
 
 export function parseArgs(argv) {
@@ -758,12 +788,7 @@ export async function main({
   for (const w of results.filter(r => r.warn)) log(`\n[~] ${w.warn}`);
   for (const r of red) {
     log(`\n[ ] ${r.name}`);
-    const lines = r.out.split('\n').filter(Boolean);
-    const loud = lines.filter(l =>
-      /fail|error|violation|missing|✗|×|TS\d{4}|not registered/i.test(l)
-    );
-    for (const l of (loud.length ? loud : lines).slice(-14))
-      log(`      ${l.slice(0, 220)}`);
+    for (const l of failureSummaryLines(r.out)) log(`      ${l}`);
   }
   for (const e of body.errors) log(`\n[ ] PR body: ${e.message}`);
   for (const w of body.warnings) log(`\n[~] PR body: ${w.message}`);
