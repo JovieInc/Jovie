@@ -439,10 +439,10 @@ export async function GET(request: Request) {
         let processed = 0;
         for (const job of claimed) {
           try {
-            await withSystemIngestionSession(async tx => {
-              await processJob(tx, job);
-              await succeedJob(tx, job);
-            });
+            // No transaction wraps processJob — see JOV-10139: processors
+            // await external HTTP and must never hold BEGIN across it.
+            await processJob(db, job);
+            await withSystemIngestionSession(tx => succeedJob(tx, job));
             processed++;
           } catch (error) {
             await withSystemIngestionSession(tx =>

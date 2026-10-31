@@ -1,4 +1,3 @@
-import type { DbOrTransaction } from '@/lib/db';
 import {
   extractLaylo,
   extractLayloHandle,
@@ -45,8 +44,7 @@ export const layloJobConfig: JobExecutorConfig<LayloPayload> = {
  * Process a Laylo import job.
  */
 export async function processLayloJob(
-  tx: DbOrTransaction,
   jobPayload: unknown
 ): Promise<JobExecutionResult> {
-  return executeIngestionJob(tx, jobPayload, layloJobConfig);
+  return executeIngestionJob(jobPayload, layloJobConfig);
 }

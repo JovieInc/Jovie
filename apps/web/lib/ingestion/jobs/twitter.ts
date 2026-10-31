@@ -1,4 +1,3 @@
-import type { DbOrTransaction } from '@/lib/db';
 import { extractTwitter, fetchTwitterDocument } from '../strategies/twitter';
 import { executeIngestionJob } from './executor';
 import { type TwitterPayload, twitterPayloadSchema } from './schemas';
@@ -20,8 +19,7 @@ export const twitterJobConfig: JobExecutorConfig<TwitterPayload> = {
  * Process a Twitter import job.
  */
 export async function processTwitterJob(
-  tx: DbOrTransaction,
   jobPayload: unknown
 ): Promise<JobExecutionResult> {
-  return executeIngestionJob(tx, jobPayload, twitterJobConfig);
+  return executeIngestionJob(jobPayload, twitterJobConfig);
 }

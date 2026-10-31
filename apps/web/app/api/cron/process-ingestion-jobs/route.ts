@@ -14,7 +14,7 @@
 
 import { NextResponse } from 'next/server';
 import { verifyCronRequest } from '@/lib/cron/auth';
-import { withRetry } from '@/lib/db';
+import { db, withRetry } from '@/lib/db';
 import { captureError } from '@/lib/error-tracking';
 import {
   claimPendingJobs,
@@ -53,36 +53,41 @@ export async function GET(request: Request) {
     const processJobTransaction = async (
       job: (typeof claimed)[number]
     ): Promise<boolean> => {
-      const result = await withSystemIngestionSession(async tx => {
-        try {
-          await processJob(tx, job);
-          await succeedJob(tx, job);
-          return { ok: true as const };
-        } catch (error) {
-          await handleIngestionJobFailure(tx, job, error);
+      try {
+        // No transaction wraps processJob: its processors await external HTTP
+        // (platform scrapes, MusicFetch, Resend). Holding BEGIN across those
+        // awaits leaves the Postgres session idle-in-transaction until Neon's
+        // idle_in_transaction_session_timeout terminates the connection
+        // (JOV-10139). Processors manage their own short DB-only phases.
+        await processJob(db, job);
+        await withSystemIngestionSession(tx => succeedJob(tx, job));
+        return true;
+      } catch (error) {
+        // Failure bookkeeping runs on its own healthy connection — never
+        // inside the session that observed the failure.
+        await withSystemIngestionSession(tx =>
+          handleIngestionJobFailure(tx, job, error)
+        );
 
-          const msg = error instanceof Error ? error.message : String(error);
-          logger.error('Ingestion job failed', {
-            jobId: job.id,
-            error:
-              error instanceof Error
-                ? { message: error.message, stack: error.stack }
-                : String(error),
-          });
+        const msg = error instanceof Error ? error.message : String(error);
+        logger.error('Ingestion job failed', {
+          jobId: job.id,
+          error:
+            error instanceof Error
+              ? { message: error.message, stack: error.stack }
+              : String(error),
+        });
 
-          await captureError('Ingestion job failed', error, {
-            route: '/api/cron/process-ingestion-jobs',
-            jobId: job.id,
-            jobType: job.jobType,
-            attempts: job.attempts,
-          });
+        await captureError('Ingestion job failed', error, {
+          route: '/api/cron/process-ingestion-jobs',
+          jobId: job.id,
+          jobType: job.jobType,
+          attempts: job.attempts,
+        });
 
-          errors.push(`Job ${job.id}: ${msg}`);
-          return { ok: false as const };
-        }
-      });
-
-      return result.ok;
+        errors.push(`Job ${job.id}: ${msg}`);
+        return false;
+      }
     };
 
     for (let i = 0; i < claimed.length; i += MAX_CONCURRENT_JOBS) {

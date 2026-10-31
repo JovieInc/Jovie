@@ -1,4 +1,3 @@
-import type { DbOrTransaction } from '@/lib/db';
 import { extractBeacons, fetchBeaconsDocument } from '../strategies/beacons';
 import { executeIngestionJob } from './executor';
 import { type BeaconsPayload, beaconsPayloadSchema } from './schemas';
@@ -20,8 +19,7 @@ export const beaconsJobConfig: JobExecutorConfig<BeaconsPayload> = {
  * Process a Beacons import job.
  */
 export async function processBeaconsJob(
-  tx: DbOrTransaction,
   jobPayload: unknown
 ): Promise<JobExecutionResult> {
-  return executeIngestionJob(tx, jobPayload, beaconsJobConfig);
+  return executeIngestionJob(jobPayload, beaconsJobConfig);
 }
