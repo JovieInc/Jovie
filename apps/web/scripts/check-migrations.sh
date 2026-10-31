@@ -68,6 +68,12 @@ if git rev-parse -q --verify MERGE_HEAD > /dev/null 2>&1; then
     # migrations). Diff the base against the staged merge result instead.
     STAGED_TREE=$(git write-tree)
     CHANGED_FILES=$(git diff --name-status --relative "$BASE_BRANCH" "$STAGED_TREE" -- "$MIGRATIONS_DIR" "$ONLINE_INDEXES_DIR" 2>/dev/null || echo "")
+elif ! git diff --cached --quiet -- "$MIGRATIONS_DIR" "$ONLINE_INDEXES_DIR"; then
+    # Pre-commit must validate the proposed tree, including repairs to an
+    # unpublished migration. HEAD alone would reject the previous filename.
+    STAGED_TREE=$(git write-tree)
+    BASE_COMMIT=$(git merge-base "$BASE_BRANCH" HEAD)
+    CHANGED_FILES=$(git diff --no-renames --name-status --relative "$BASE_COMMIT" "$STAGED_TREE" -- "$MIGRATIONS_DIR" "$ONLINE_INDEXES_DIR")
 else
     CHANGED_FILES=$(git diff --name-status --relative "$BASE_BRANCH"...HEAD -- "$MIGRATIONS_DIR" "$ONLINE_INDEXES_DIR" 2>/dev/null || echo "")
 fi

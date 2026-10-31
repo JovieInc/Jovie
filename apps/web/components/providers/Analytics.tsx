@@ -1,3 +1,4 @@
+// @coverage-via apps/web/lib/tracking/use-tracking-eligibility.test.tsx
 'use client';
 
 import { Analytics as VercelAnalytics } from '@vercel/analytics/react';

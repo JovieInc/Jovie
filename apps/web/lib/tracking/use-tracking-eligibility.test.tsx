@@ -1,6 +1,7 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MetaPixel } from '@/components/features/tracking/MetaPixel';
+import { Analytics } from '@/components/providers/Analytics';
 import { GoogleAnalytics } from '@/components/providers/GoogleAnalytics';
 import { trackingEligibility } from './eligibility';
 
@@ -9,6 +10,9 @@ const state = vi.hoisted(() => ({
   youngAudience: false,
 }));
 vi.mock('next/navigation', () => ({ usePathname: () => state.pathname }));
+vi.mock('@vercel/analytics/react', () => ({
+  Analytics: () => <div data-testid='vercel-analytics' />,
+}));
 vi.mock('next/script', () => ({
   default: ({ id }: { id: string }) => <script data-testid={id} />,
 }));
@@ -27,6 +31,7 @@ function surface() {
     <>
       <MetaPixel pixelIds={['synthetic']} youngAudience={false} />
       <GoogleAnalytics />
+      <Analytics />
     </>
   );
 }
@@ -61,16 +66,24 @@ afterEach(() => {
 });
 
 describe('live browser policy with stale profile payloads', () => {
-  it('loads Meta and GA when eligible, then blocks BOTH on a warm cached profile visit after flag change', async () => {
+  it('blocks the global Vercel loader for a young audience', async () => {
+    state.youngAudience = true;
+    render(<Analytics />);
+    await act(async () => {});
+    expect(screen.queryByTestId('vercel-analytics')).toBeNull();
+  });
+  it('loads vendors when eligible, then blocks all on a warm cached profile visit after flag change', async () => {
     const first = render(surface());
     await screen.findByTestId('meta-fbevents-loader');
     await screen.findByTestId('ga-gtag-loader');
+    await screen.findByTestId('vercel-analytics');
     first.unmount();
     state.youngAudience = true;
     render(surface()); // deliberately replay the old youngAudience=false payload
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(6));
     expect(screen.queryByTestId('meta-fbevents-loader')).toBeNull();
     expect(screen.queryByTestId('ga-gtag-loader')).toBeNull();
+    expect(screen.queryByTestId('vercel-analytics')).toBeNull();
     expect(
       fetchMock.mock.calls.every(([, options]) => options.cache === 'no-store')
     ).toBe(true);
@@ -87,6 +100,7 @@ describe('live browser policy with stale profile payloads', () => {
     await act(async () => {});
     expect(screen.queryByTestId('meta-fbevents-loader')).toBeNull();
     expect(screen.queryByTestId('ga-gtag-loader')).toBeNull();
+    expect(screen.queryByTestId('vercel-analytics')).toBeNull();
     expect((window as Window & { fbq?: unknown }).fbq).toBeUndefined();
   });
   it.each(['gpc', 'opt-out', 'EU', 'offline', 'malformed'] as const)(
@@ -111,6 +125,7 @@ describe('live browser policy with stale profile payloads', () => {
       await act(async () => {});
       expect(screen.queryByTestId('meta-fbevents-loader')).toBeNull();
       expect(screen.queryByTestId('ga-gtag-loader')).toBeNull();
+      expect(screen.queryByTestId('vercel-analytics')).toBeNull();
     }
   );
   it('denies synchronously during a client route transition and ignores an old response', async () => {
@@ -142,5 +157,6 @@ describe('live browser policy with stale profile payloads', () => {
     );
     expect(screen.queryByTestId('meta-fbevents-loader')).toBeNull();
     expect(screen.queryByTestId('ga-gtag-loader')).toBeNull();
+    expect(screen.queryByTestId('vercel-analytics')).toBeNull();
   });
 });
