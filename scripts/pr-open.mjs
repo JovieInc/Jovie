@@ -151,7 +151,9 @@ export function gate({ title, body, labels = [], files, extra = [] }) {
       .filter(
         t =>
           t !== PR_URL_PLACEHOLDER &&
-          !/^<(?:!--|\/?[a-z][a-z0-9-]*(?:\s+[\w-]+=|\s*\/?>))/.test(t) &&
+          !/^<(?:!--|\/?(?:details|summary|br|hr|p|a|img|code|pre|kbd|sub|sup|b|i|em|strong|ul|ol|li|table|thead|tbody|tr|td|th|div|span)(?:\s[^>]*)?\/?>)/.test(
+            t
+          ) &&
           !/^<https?:/.test(t)
       )
       .map(t => `placeholder: replace ${t} with real content`),
