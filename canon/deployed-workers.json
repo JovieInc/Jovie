@@ -24,6 +24,11 @@
       "disposition": "Source not recoverable (no source map). Import or delete."
     },
     {
+      "name": "jovie-gbrain-probe",
+      "modifiedOn": "2026-10-31",
+      "disposition": "Source is in open PR #23982 (off-Mac gbrain read-path dead-man); remove from this list when it merges."
+    },
+    {
       "name": "jovie-mesh-hub",
       "modifiedOn": "2026-10-31",
       "disposition": "Source is in open PRs #23955/#23965 (workers/mesh-hub); remove when they merge."
