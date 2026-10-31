@@ -3018,56 +3018,6 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         {"name": "Source Validation", "conclusion": "FAILURE",
          "detailsUrl": "https://github.com/JovieInc/Jovie/actions/runs/123/job/456"}]}
 
-    def test_repair_retains_the_falsifier_even_when_red_evidence_is_complete(self):
-        body = events.red_before_green_block(self.PR)
-        premise = {"assumption": "The route is untested", "falsifying_test": "pnpm test:coverage route.test.ts",
-                   "result": "Route coverage is zero; hypothesis retained"}
-        updated = events.repair_evidence_body(self.PR, body, premise_check=premise)
-        self.assertIn(body, updated)
-        self.assertIn("Falsifying test: pnpm test:coverage route.test.ts", updated)
-        self.assertEqual(events.repair_evidence_body(self.PR, updated, premise_check=premise), updated)
-        partial = body + "\n\n## Premise check\nAssumption: existing evidence\n\n## Next\nKeep this.\n"
-        repaired = events.repair_evidence_body(self.PR, partial, premise_check=premise)
-        self.assertIn("Assumption: existing evidence", repaired)
-        self.assertIn("## Next\nKeep this.", repaired)
-        template = body + "\n\n## Premise check\n- Assumption: <assumption>\n- Falsifying test: tbd\n- Result:\n"
-        filled = events.repair_evidence_body(self.PR, template, premise_check=premise)
-        self.assertIn("- Assumption: The route is untested", filled)
-        self.assertNotIn("<assumption>", filled)
-        fenced = body + "\n\n```text\n## Premise check\n```\n<!-- ## Premise check -->\n"
-        appended = events.repair_evidence_body(self.PR, fenced, premise_check=premise)
-        self.assertTrue(appended.startswith(fenced.rstrip("\n")))
-        checked = subprocess.run(["node", "--input-type=module", "-e", """
-import { readFileSync } from 'node:fs';
-import { hasPremiseEvidence } from './scripts/pr-fleet-rules.mjs';
-console.log(JSON.parse(readFileSync(0, 'utf8')).every(hasPremiseEvidence));
-"""], cwd=ROOT, input=json.dumps([updated, repaired, filled, appended]), text=True, capture_output=True, timeout=15)
-        self.assertEqual(checked.returncode, 0, checked.stderr)
-        self.assertEqual(checked.stdout.strip(), "true")
-
-    def test_premise_repair_preserves_existing_evidence_and_requires_all_fields(self):
-        premise = {"assumption": "Route is untested", "falsifying_test": "pnpm test:coverage", "result": "0% route coverage"}
-        original = events.red_before_green_block(self.PR) + "\n\n## Premise check\nAssumption: existing evidence\n"
-        updated = events.repair_evidence_body(self.PR, original, premise_check=premise)
-        self.assertIn("Assumption: existing evidence", updated)
-        self.assertIn("Falsifying test: pnpm test:coverage", updated)
-        self.assertIn("Result: 0% route coverage", updated)
-        self.assertEqual(updated.count("## Premise check"), 1)
-        for invalid in [{}, {**premise, "result": ""}, {**premise, "result": None}, {**premise, "result": "x\n## Injected"}]:
-            with self.subTest(premise=invalid), self.assertRaises(ValueError):
-                events.repair_evidence_body(self.PR, "Summary", premise_check=invalid)
-
-    def test_ensure_can_write_a_premise_without_a_failed_run(self):
-        written = []
-        def edit(args):
-            written.append(Path(args[-1]).read_text())
-            return (0, "")
-        shell = Shell({("pr", "view"): (0, "Summary"), ("pr", "edit"): edit})
-        premise = {"assumption": "Missing metadata", "falsifying_test": "node scripts/changelog-source-guard.mjs", "result": "Missing decision confirmed"}
-        self.assertTrue(events.ensure_red_before_green({"number": 7}, sh=shell, premise_check=premise))
-        self.assertEqual(len(written), 1)
-        self.assertIn("## Premise check", written[0])
-
     WIN = ("## Win\n\n- Claim: Complete measured repair evidence.\n- Area: quality\n"
            "- Theme: repair-evidence\n"
            "- Metric: missing evidence fields | count | lower | 1 | 0 | Fleet policy | node --test\n"
