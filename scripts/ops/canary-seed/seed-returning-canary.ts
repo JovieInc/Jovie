@@ -57,6 +57,7 @@ async function loadOwned(spec: CanarySeedIdentity) {
       spotifyId: creatorProfiles.spotifyId,
       spotifyUrl: creatorProfiles.spotifyUrl,
       avatarUrl: creatorProfiles.avatarUrl,
+      isPublic: creatorProfiles.isPublic,
     })
     .from(users)
     .leftJoin(creatorProfiles, eq(creatorProfiles.userId, users.id))
@@ -126,6 +127,7 @@ async function seedReturning(): Promise<void> {
       spotifyId: row.spotifyId,
       spotifyUrl: row.spotifyUrl,
       avatarUrl: row.avatarUrl,
+      isPublic: row.isPublic,
     },
     artist,
     Boolean(bound)
@@ -148,6 +150,7 @@ async function seedReturning(): Promise<void> {
           ...(set.spotify_id ? { spotifyId: String(set.spotify_id) } : {}),
           ...(set.spotify_url ? { spotifyUrl: String(set.spotify_url) } : {}),
           ...(set.avatar_url ? { avatarUrl: String(set.avatar_url) } : {}),
+          ...(set.is_public === true ? { isPublic: true } : {}),
           ...(artist
             ? {
                 genres: [...artist.genres],
@@ -191,7 +194,53 @@ async function seedChatHealth(): Promise<void> {
   const spec = CHAT_HEALTH_CANARY_SEED;
   const existing = await loadOwned(spec);
   if (existing?.profileId) {
-    log('chat-health', { state: 'exists', profileId: existing.profileId });
+    // Converge, not just create: a cleanup that unpublishes test accounts
+    // left this canary private, and the app shell then sends it to /start.
+    const plan = planCanaryProfileUpdate(
+      spec,
+      {
+        profileId: existing.profileId,
+        ownerEmail: existing.email ?? '',
+        username: existing.username,
+        displayName: existing.displayName,
+        bio: existing.bio,
+        spotifyId: existing.spotifyId,
+        spotifyUrl: existing.spotifyUrl,
+        avatarUrl: existing.avatarUrl,
+        isPublic: existing.isPublic,
+      },
+      null,
+      false
+    );
+    log('chat-health', {
+      state: 'exists',
+      profileId: existing.profileId,
+      plan,
+    });
+    const set = plan[0]?.set;
+    if (APPLY && set) {
+      await db
+        .update(creatorProfiles)
+        .set({
+          ...(set.username ? { username: String(set.username) } : {}),
+          ...(set.username_normalized
+            ? { usernameNormalized: String(set.username_normalized) }
+            : {}),
+          ...(set.display_name
+            ? { displayName: String(set.display_name) }
+            : {}),
+          ...(set.bio ? { bio: String(set.bio) } : {}),
+          ...(set.is_public === true ? { isPublic: true } : {}),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(creatorProfiles.id, existing.profileId),
+            eq(creatorProfiles.userId, existing.userId)
+          )
+        );
+      log('chat-health', { state: 'converged', profileId: existing.profileId });
+    }
     return;
   }
   log('chat-health', { state: 'missing', willCreate: APPLY });

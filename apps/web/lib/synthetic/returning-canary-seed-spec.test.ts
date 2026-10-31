@@ -3,6 +3,7 @@ import { getPublicProfileIdentityExclusionReason } from '@/lib/profile/public-pr
 import {
   CANARY_SEED_IDENTITIES,
   type CanaryProfileSnapshot,
+  CHAT_HEALTH_CANARY_SEED,
   isCanarySeedEmail,
   planCanaryProfileUpdate,
   RETURNING_CANARY_SEED,
@@ -17,6 +18,7 @@ const legacy: CanaryProfileSnapshot = {
   spotifyId: null,
   spotifyUrl: 'https://open.spotify.com/artist/4NHQUkpP4uKj7LKEMstSxN',
   avatarUrl: '/avatars/default-user.png',
+  isPublic: true,
 };
 const artist = {
   imageUrl: 'https://i.scdn.co/image/abc',
@@ -68,6 +70,37 @@ describe('returning canary seed spec', () => {
     };
     expect(
       planCanaryProfileUpdate(RETURNING_CANARY_SEED, converged, artist, false)
+    ).toEqual([]);
+  });
+
+  it('republishes an unpublished chat-health canary so /app stays reachable', () => {
+    const unpublished: CanaryProfileSnapshot = {
+      profileId: 'p2',
+      ownerEmail: CHAT_HEALTH_CANARY_SEED.email,
+      username: CHAT_HEALTH_CANARY_SEED.handle,
+      displayName: CHAT_HEALTH_CANARY_SEED.displayName,
+      bio: CHAT_HEALTH_CANARY_SEED.bio,
+      spotifyId: null,
+      spotifyUrl: null,
+      avatarUrl: null,
+      isPublic: false,
+    };
+    expect(
+      planCanaryProfileUpdate(CHAT_HEALTH_CANARY_SEED, unpublished, null, false)
+    ).toEqual([
+      {
+        table: 'creator_profiles',
+        key: { id: 'p2' },
+        set: { is_public: true },
+      },
+    ]);
+    expect(
+      planCanaryProfileUpdate(
+        CHAT_HEALTH_CANARY_SEED,
+        { ...unpublished, isPublic: true },
+        null,
+        false
+      )
     ).toEqual([]);
   });
 
