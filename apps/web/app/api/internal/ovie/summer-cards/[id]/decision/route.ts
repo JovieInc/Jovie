@@ -6,7 +6,6 @@ import { decideSummerCard } from '@/lib/ovie/summer-cards.server';
 import { verifySummerOidcRequest } from '@/lib/ovie/summer-oidc.server';
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
 
 const ROUTE = '/api/internal/ovie/summer-cards/[id]/decision';
 const CARD_ID = /^sc_[0-9a-f]{32}$/;
