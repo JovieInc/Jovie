@@ -43,3 +43,25 @@ test('evidence must pass and match the exact sha and tree', () => {
   );
   assert.equal(parseEvidence('nothing'), null);
 });
+
+test('backend order: local, then Gem when its load is fine, else Actions', async () => {
+  const { chooseBackend } = await import('../prepush-offload.mjs');
+  assert.equal(chooseBackend({ load: 3, cores: 10 }), 'local');
+  assert.equal(
+    chooseBackend({ load: 60, cores: 10, gem: { load: 8, cores: 16 } }),
+    'gem'
+  );
+  assert.equal(
+    chooseBackend({ load: 60, cores: 10, gem: { load: 110, cores: 16 } }),
+    'actions'
+  );
+  assert.equal(chooseBackend({ load: 60, cores: 10, gem: null }), 'actions');
+  assert.equal(
+    chooseBackend({
+      load: 1,
+      cores: 10,
+      env: { JOVIE_PREPUSH_BACKEND: 'actions' },
+    }),
+    'actions'
+  );
+});
