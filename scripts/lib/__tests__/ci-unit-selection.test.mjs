@@ -190,9 +190,10 @@ describe('selected web unit lane', () => {
         return JSON.parse(result.stdout);
       };
       // Execute the production branch, not a second implementation of it.
-      const workflow = load(
-        readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8')
-      );
+      const workflow =
+        /** @type {{ jobs: Record<string, { steps: { name: string, run: string }[] }> }} */ (
+          load(readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8'))
+        );
       const script = workflow.jobs['ci-unit-tests'].steps.find(
         step => step.name === 'Run unit tests'
       ).run;
@@ -232,13 +233,15 @@ describe('selected web unit lane', () => {
       );
       write('runtime-input.txt', 'valid');
       assertGreen(selected()); // Conservatively selected no-op lane is valid.
-      for (const [path, token, expectsWeb] of [
+      /** @type {Array<[path: string, token: string, expectsWeb: boolean]>} */
+      const changes = [
         ['apps/ovie/source.js', 'WEB_EXECUTED', false],
         ['packages/jovie-cli/source.js', 'CLI_EXECUTED', false],
         ['apps/web/source.js', 'WEB_EXECUTED', true],
         ['packages/shared/source.js', 'WEB_EXECUTED', true],
         ['turbo.json', 'WEB_EXECUTED', true],
-      ]) {
+      ];
+      for (const [path, token, expectsWeb] of changes) {
         env.TURBO_SCM_BASE = base;
         write(
           path,
