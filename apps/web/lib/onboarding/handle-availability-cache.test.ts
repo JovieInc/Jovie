@@ -16,6 +16,7 @@ vi.mock('@/lib/error-tracking', () => ({
 
 import {
   cacheHandleAvailability,
+  getCachedHandleAvailability,
   invalidateHandleCache,
 } from './handle-availability-cache';
 
@@ -34,13 +35,13 @@ describe('handle availability Redis contract', () => {
     );
   });
 
-  it('uses the canonical normalized key and 30-day unavailable TTL', async () => {
+  it('uses the canonical normalized key and a 10-minute unavailable TTL', async () => {
     await cacheHandleAvailability('@TakenArtist', false);
 
     expect(redis.set).toHaveBeenCalledExactlyOnceWith(
       'onboarding:handle-availability:takenartist',
       '0',
-      { ex: 2_592_000 }
+      { ex: 600 }
     );
   });
 
@@ -50,5 +51,18 @@ describe('handle availability Redis contract', () => {
     expect(redis.del).toHaveBeenCalledExactlyOnceWith(
       'onboarding:handle-availability:oldartist'
     );
+  });
+
+  it('reads Upstash-deserialized values: number 1 is available, 0 is taken', async () => {
+    redis.get.mockResolvedValueOnce(1);
+    await expect(getCachedHandleAvailability('newartist')).resolves.toBe(true);
+    redis.get.mockResolvedValueOnce('1');
+    await expect(getCachedHandleAvailability('newartist')).resolves.toBe(true);
+    redis.get.mockResolvedValueOnce(0);
+    await expect(getCachedHandleAvailability('newartist')).resolves.toBe(false);
+    redis.get.mockResolvedValueOnce(null);
+    await expect(getCachedHandleAvailability('newartist')).resolves.toBeNull();
+    redis.get.mockResolvedValueOnce('garbage');
+    await expect(getCachedHandleAvailability('newartist')).resolves.toBeNull();
   });
 });

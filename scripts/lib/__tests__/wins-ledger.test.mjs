@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { test } from 'node:test';
+import { load } from 'js-yaml';
 import {
   clusters,
   dueMeasurements,
@@ -109,6 +112,23 @@ test('n/a declines; malformed section errors; absent is silent', () => {
   assert.equal(parseWinSection('## Win\nn/a\n').declined, true);
   assert.deepEqual(winSectionErrors('## Summary\nx'), []);
   assert.ok(winSectionErrors('## Win\n- Claim: only a claim\n').length > 0);
+});
+
+// Data is not shipped as PRs: the workflow writes the Win to the runtime store
+// and never opens a ledger PR or commits to git.
+test('workflow records wins in the store and never opens a ledger PR', () => {
+  const text = readFileSync(
+    join(
+      resolve(import.meta.dirname, '../../..'),
+      '.github/workflows/wins-ledger.yml'
+    ),
+    'utf8'
+  );
+  const steps = /** @type {any} */ (load(text)).jobs.ingest.steps
+    .map(s => s.run ?? '')
+    .join('\n');
+  assert.match(steps, /wins-ledger\.mjs ingest --pr "\$PR_NUMBER" --store/);
+  assert.doesNotMatch(steps, /git (commit|push)|pr create/);
 });
 
 test('clusters trigger at ten verified wins only', () => {

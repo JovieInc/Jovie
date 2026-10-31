@@ -4261,6 +4261,41 @@ describe('resolveMergeGroupPathDiff coalesced heads (JOV-4905)', () => {
     });
   });
 
+  it('widens a stacked head to the entries ahead of it (HEADGREEN, #23600)', () => {
+    const { seed, rootSha } = createFixture();
+    git(seed, ['update-ref', 'refs/remotes/origin/main', rootSha]);
+    git(seed, ['switch', '-q', '-c', 'queue']);
+    const entryAhead = writeAndCommit(
+      seed,
+      'apps/web/components/site/MarketingFooter.tsx',
+      'export const footer = 1;\n',
+      'entry ahead'
+    );
+    const headSha = writeAndCommit(
+      seed,
+      'docs/ci/memo.md',
+      'docs only\n',
+      'docs-only head'
+    );
+
+    const result = resolveMergeGroupPathDiff({
+      git: createGitRunner(seed),
+      eventBaseSha: entryAhead,
+      eventHeadSha: headSha,
+      fetchLiveMain: false,
+    });
+
+    expect(result).toMatchObject({
+      source: 'live_main_merge_base',
+      isNoop: false,
+      baseSha: rootSha,
+      files: [
+        'apps/web/components/site/MarketingFooter.tsx',
+        'docs/ci/memo.md',
+      ],
+    });
+  });
+
   it('recomputes against live main when the event-base range is empty', () => {
     const { origin, seed, rootSha } = createFixture();
     git(seed, ['switch', '-q', '-c', 'feature']);
@@ -4809,6 +4844,14 @@ describe('merge-queue green enroll scan window and failure hold', () => {
     // revision failure hold, may re-enroll an unchanged removed head.
     expect(ENROLL).toContain("removalReason === 'manual'");
     expect(ENROLL).toContain("failure.action === 'allow' &&");
+    // 2026-10-29 ejection re-enroll: a non-human removal with no revision
+    // failure hold is re-admitted (bounded); a failure hold still blocks first
+    // and admission never runs from a cron (JOV-INV-042).
+    expect(ENROLL).toContain("failureBeforeReenroll === 'allow'");
+    expect(ENROLL).toContain("reason: 'ejection-reenroll'");
+    expect(ENROLL).toContain('removalsOnHead < REENROLL_MAX_REMOVALS');
+    expect(ENROLL).toContain('!humanDequeued');
+    expect(ENROLL).not.toMatch(/^\s{2}schedule:/m);
     for (const runtimePath of [
       'scripts/merge-group-failure-hold.mjs',
       'scripts/lib/merge-queue-guard.mjs',

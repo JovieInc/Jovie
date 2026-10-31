@@ -36,13 +36,10 @@ You are tasked with creating a complete commit-to-PR workflow. Follow these step
    - Push to origin with upstream tracking: `git push -u origin {branch-name}`
 
 6. **Create Pull Request**
-   - Use `gh pr create` to open a PR
+   - Use `pnpm pr:open open` (never raw `gh pr create`): it drafts the body from the diff,
+     runs the Fleet Rules, changelog, lane and coverage gates, and refuses a failing PR
    - Title: Same as commit subject line
-   - Body should include:
-     - ## Goal: 1-2 sentences explaining the purpose
-     - ## Changes: Bullet list of key changes
-     - ## Testing: How to verify the changes
-     - The Claude Code footer
+   - Pass `--summary`, plus `--metric` (compounding/ci/perf) or `--failing-command`/`--failing-run` (fix:) when asked
    - Target branch: `main`
    - Auto-assign to the current user if possible
 

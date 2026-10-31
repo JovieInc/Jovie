@@ -1,14 +1,14 @@
 {
   "schema": "jovie.wins-metrics/v1",
-  "at": "2026-10-29T19:36:09.030Z",
-  "winsTotal": 12,
+  "at": "2026-10-31T08:10:01.098Z",
+  "winsTotal": 28,
   "winsVerified": 1,
-  "winsClaimed": 4,
+  "winsClaimed": 14,
   "winsUnverified": 3,
   "winsNotReproduced": 1,
-  "winsPendingMerge": 3,
-  "winsPendingMeasure": 0,
-  "winsLast7d": 12,
+  "winsPendingMerge": 4,
+  "winsPendingMeasure": 5,
+  "winsLast7d": 28,
   "clusters": [
     {
       "theme": "release-reliability",
@@ -18,7 +18,7 @@
     },
     {
       "theme": "merge-throughput",
-      "total": 6,
+      "total": 16,
       "verified": 0,
       "ready": false
     },
@@ -30,6 +30,36 @@
     },
     {
       "theme": "source-of-truth",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "resolver-coverage",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "workflow-reliability",
+      "total": 2,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "golden-path-reliability",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "runner-pin",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "golden-path",
       "total": 1,
       "verified": 0,
       "ready": false
@@ -83,6 +113,70 @@
     {
       "id": "win-2026-10-29-remote-preflight",
       "status": "unverified"
+    },
+    {
+      "id": "win-2026-10-29-resolver-coverage",
+      "status": "pending-merge"
+    },
+    {
+      "id": "win-2026-10-29-remove-three-workflow-token-budget-violations",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-30-a-stalled-production-pipeline-is-detected",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-30-self-cleaning-golden-path-fixture-eliminates",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-30-wins-ledger-stops-failing-every-merged",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-30-production-authorize-stops-reading-the-healed",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-30-wins-ledger-bot-prs-pass-source",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-30-remove-the-stale-shared-ui-inventory",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-30-eliminate-16-newly-introduced-script-type",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-30-nightly-evidence-coverage-publishers-survive-large",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-30-remove-the-three-mutually-dependent-shared",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-30-the-staging-production-bind-now-rides",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-30-eliminate-the-false-failing-publication-transport",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-30-coherent-grouped-codeql-releases-pass-the",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-30-the-runner-pin-gate-is-green",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-31-typed-handles-are-honored-and-freed",
+      "status": "pending-measure"
     }
   ]
 }
