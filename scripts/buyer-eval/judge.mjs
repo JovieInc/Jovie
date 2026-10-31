@@ -163,6 +163,7 @@ export function buildContent(prompt, steps, encode = encodeFrames) {
   const bytes = encoded.reduce((sum, unit) => sum + unit.bytes.length, 0);
   if (bytes * 1.34 > MAX_IMAGE_BYTES)
     throw new Error('walk frames exceed the relay body budget');
+  /** @type {Array<{ type: string, text?: string, image_url?: { url: string } }>} */
   const content = [{ type: 'text', text: prompt }];
   for (const unit of encoded) {
     content.push({ type: 'text', text: `Image: ${unit.label}` });
