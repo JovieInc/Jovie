@@ -36,6 +36,11 @@ OWNER = "Jovie Owner (798b223e)"
 class MissingConfig(RuntimeError):
     """A watcher lacks required env vars. Fail fast, record ONE clear
     'missing config: <VARS>' heartbeat/status -- never crash-loop or file duplicates."""
+
+
+class LinearIssueMissing(RuntimeError):
+    """The Linear issue id the ledger holds is deleted, or not visible to this API key (moved
+    team/project, rotated key). The loop relinks -- files a fresh issue -- instead of crashing."""
 STATE = Path(os.environ.get("PROD_ERRORS_STATE", Path.home() / ".local/state/jovie-prod-errors"))
 # Hosts come from the shared provider contract; every call goes through scripts/apiclient.
 SENTRY_API = os.environ.get("SENTRY_API", f"https://{provider_spec('sentry')['hosts'][0]}/api/0")
@@ -281,7 +286,10 @@ class Linear:
         try:
             return self.client.graphql(query, variables)
         except LinearGraphQLError as e:
-            raise RuntimeError(f"linear: {(e.errors or [{}])[0].get('message')}") from e
+            msg = str((e.errors or [{}])[0].get("message") or "")
+            if "not found" in msg.lower():  # deleted/invisible issue id: relinkable, not fatal
+                raise LinearIssueMissing(f"linear: {msg}") from e
+            raise RuntimeError(f"linear: {msg}") from e
 
     def team_id(self) -> str:
         d = self.gql("query($k:String!){teams(filter:{key:{eq:$k}}){nodes{id}}}", {"k": self.team})
@@ -375,6 +383,23 @@ def issue_body(issue: dict, flow: str | None, trace: str, suspects: list[dict], 
     return "\n".join(lines)
 
 
+def refile_missing(sid: str, entry: dict, linear: Linear, title: str, body: str, labels: list[str],
+                   priority: int, why: str) -> str | None:
+    """A ledger-held Linear id turned out deleted or invisible to this key: drop it, file a FRESH
+    issue, relink the entry, and log on stderr so the event stays visible in unit output. Synthetic
+    entries never file an issue; they just drop the dead link. Only raises if filing the fresh
+    issue itself fails (fatal by design -- never silently swallowed)."""
+    old = entry.get("linear")
+    if entry.get("synthetic"):
+        entry.update(linear=None, adopted=False, relinkedFrom=old)
+        print(f"prod-errors: sentry {sid}: stale Linear link {old} ({why}); dropped (synthetic)", file=sys.stderr)
+        return None
+    ident = linear.create(f"[Sentry {sid}] {title}", body, labels, priority)
+    entry.update(linear=ident, adopted=False, relinkedFrom=old)
+    print(f"prod-errors: sentry {sid}: stale Linear link {old} ({why}); filed fresh {ident}", file=sys.stderr)
+    return ident
+
+
 def handle_issue(issue: dict, ledger: dict, sentry: Sentry, linear: Linear, merges: list[dict],
                  at: float, state: Path = STATE, rollup: str | None = None, group_qualifies: bool = False) -> str:
     sid = str(issue["id"])
@@ -393,19 +418,26 @@ def handle_issue(issue: dict, ledger: dict, sentry: Sentry, linear: Linear, merg
         synthetic = is_synthetic(issue)
         ident = linear.find_by_label(f"sentry:{sid}") or rollup or linked_linear(issue)
         adopted = bool(ident) and not synthetic
+        body = issue_body(issue, flow, trace, suspects, gate)
         if not ident and not synthetic:
-            ident = linear.create(f"[Sentry {sid}] {issue.get('title')}",
-                                  issue_body(issue, flow, trace, suspects, gate), labels, 1 if flow else 2)
+            ident = linear.create(f"[Sentry {sid}] {issue.get('title')}", body, labels, 1 if flow else 2)
         entry = ledger[sid] = {"sentryId": sid, "linear": ident, "flow": flow, "gate": gate, "synthetic": synthetic,
                                "status": "deployed" if synthetic else "claimed", "openedAt": at,
                                "claimExpiresAt": at + CLAIM_S, "title": issue.get("title"),
                                "users": issue.get("userCount"), "lastSeen": last_seen,
                                "firstSeen": first, "project": (issue.get("project") or {}).get("slug"),
                                "adopted": adopted}
+        relink = False
         if adopted and ident:
-            linear.comment(ident, f"Tracked by the prod-errors loop (Sentry {sid}, {issue.get('userCount')} users, "
-                           f"{issue.get('count')} events). Closing is done only by the post-deploy verifier after 24h "
-                           "with zero events; a later event reopens this issue and escalates.")
+            try:
+                linear.comment(ident, f"Tracked by the prod-errors loop (Sentry {sid}, {issue.get('userCount')} users, "
+                               f"{issue.get('count')} events). Closing is done only by the post-deploy verifier after 24h "
+                               "with zero events; a later event reopens this issue and escalates.")
+            except LinearIssueMissing as exc:
+                # Adopted/rolled-up id is gone or invisible to this key: file fresh and relink.
+                ident = refile_missing(sid, entry, linear, issue.get("title"), body, labels,
+                                       1 if flow else 2, str(exc))
+                relink = True
         if synthetic:
             entry["deployedAt"] = at
         elif gate:
@@ -414,20 +446,33 @@ def handle_issue(issue: dict, ledger: dict, sentry: Sentry, linear: Linear, merg
                   "Root-cause is in the Linear issue; apply the exact config change there.", siren, linear, state)
         elif flow == "checkout":
             alert("checkout", f"Checkout error {issue.get('title')} ({ident}), lane dispatched.", True, linear, state)
-        return "opened"
+        return "relinked" if relink else "opened"
     entry.update(users=issue.get("userCount"), lastSeen=last_seen)
     if entry["status"] in ("closed", "deployed") and last_seen > (entry.get("closedAt") or entry.get("deployedAt") or at):
         entry.update(status="claimed", reopenedAt=at, claimExpiresAt=at + CLAIM_S, reopens=entry.get("reopens", 0) + 1)
+        relink = False
         if entry.get("linear"):
-            linear.set_state(entry["linear"], "unstarted")
-            linear.comment(entry["linear"], f"Reopened by gem verifier: new event at {iso(last_seen)} after deploy/close. Escalating.")
+            try:
+                linear.set_state(entry["linear"], "unstarted")
+                linear.comment(entry["linear"], f"Reopened by gem verifier: new event at {iso(last_seen)} after deploy/close. Escalating.")
+            except LinearIssueMissing as exc:
+                refile_missing(sid, entry, linear, issue.get("title") or entry.get("title") or "prod error",
+                               f"Reopened episode (Sentry {sid}): a new event arrived after deploy/close, and the "
+                               f"previous Linear issue went away ({exc}). This fresh issue carries the escalation.",
+                               [f"sentry:{sid}", "prod-error"] + (["golden-path"] if flow else [])
+                               + (["human-gate", "hold"] if entry.get("gate") else ["agent-ready"]),
+                               1 if flow else 2, str(exc))
+                relink = True
         alert("reopened", f"Sentry {sid} regressed after fix ({entry.get('linear')}).", flow == "checkout", linear, state)
-        return "reopened"
+        return "relinked" if relink else "reopened"
     return "tracked"
 
 
-def advance(ledger: dict, linear: Linear, sentry: Sentry, prs: list[dict], at: float, state: Path = STATE) -> None:
-    """claim expiry -> escalate; merged PR -> deployed; 24h quiet after deploy -> close (only closer)."""
+def advance(ledger: dict, linear: Linear, sentry: Sentry, prs: list[dict], at: float, state: Path = STATE) -> int:
+    """claim expiry -> escalate; merged PR -> deployed; 24h quiet after deploy -> close (only closer).
+    Returns how many stale ledger links were hit this pass (deleted/invisible Linear ids are
+    relinked or logged, never fatal)."""
+    stale = 0
     for sid, e in ledger.items():
         if e["status"] == "claimed" and e.get("linear"):
             pr = next((p for p in prs if e["linear"] in (p.get("title", "") + p.get("body", "") + p.get("headRefName", ""))
@@ -439,7 +484,16 @@ def advance(ledger: dict, linear: Linear, sentry: Sentry, prs: list[dict], at: f
             elif at > e["claimExpiresAt"] and not e.get("gate"):
                 e["claimExpiresAt"] = at + CLAIM_S
                 e["escalations"] = e.get("escalations", 0) + 1
-                linear.comment(e["linear"], "Claim expired with no PR. Escalated to Jovie Owner; re-arming claim.")
+                try:
+                    linear.comment(e["linear"], "Claim expired with no PR. Escalated to Jovie Owner; re-arming claim.")
+                except LinearIssueMissing as exc:
+                    refile_missing(sid, e, linear, e.get("title") or "prod error",
+                                   f"Claim expired with no PR (Sentry {sid}); the previous Linear issue went away "
+                                   f"({exc}). The claim is re-armed on this fresh issue.",
+                                   [f"sentry:{sid}", "prod-error"] + (["golden-path"] if e.get("flow") else [])
+                                   + (["human-gate", "hold"] if e.get("gate") else ["agent-ready"]),
+                                   1 if e.get("flow") else 2, str(exc))
+                    stale += 1
                 alert("claim-expired", f"No PR for Sentry {sid} ({e['linear']}) within claim window.",
                       e.get("flow") == "checkout", linear, state)
         if e["status"] == "deployed" and at - e["deployedAt"] >= QUIET_S and e.get("lastSeen", 0) <= e["deployedAt"]:
@@ -451,9 +505,17 @@ def advance(ledger: dict, linear: Linear, sentry: Sentry, prs: list[dict], at: f
             shared = any(o is not e and o.get("linear") == e.get("linear") and o["status"] != "closed"
                          for o in ledger.values())
             if e.get("linear") and not shared:
-                linear.set_state(e["linear"], "completed")
-                linear.comment(e["linear"], "Closed by gem post-deploy verifier: zero events for 24h after deploy "
-                               f"(Sentry {sid} resolved; receipt: deployed {iso(e['deployedAt'])}, closed {iso(at)}).")
+                try:
+                    linear.set_state(e["linear"], "completed")
+                    linear.comment(e["linear"], "Closed by gem post-deploy verifier: zero events for 24h after deploy "
+                                   f"(Sentry {sid} resolved; receipt: deployed {iso(e['deployedAt'])}, closed {iso(at)}).")
+                except LinearIssueMissing as exc:
+                    # The Linear side is already gone; there is nothing to close there. Stay closed
+                    # and keep the event visible -- no fresh issue just to close it.
+                    print(f"prod-errors: sentry {sid}: stale Linear link {e['linear']} at close ({exc}); "
+                          "Linear issue already gone", file=sys.stderr)
+                    stale += 1
+    return stale
 
 
 def golden_path_sentry(ledger: dict) -> dict:
@@ -544,8 +606,13 @@ def bot_threads(linear: Linear, state: Path = STATE) -> dict:
             ident = seen.get(key, {}).get("linear") if seen.get(key, {}).get("open", True) else None
             ident = ident or linear.find_by_label(key, open_only=True)
             if ident:
-                linear.comment(ident, "\n".join(body))
-            else:
+                try:
+                    linear.comment(ident, "\n".join(body))
+                except LinearIssueMissing:
+                    print(f"prod-errors: threads {key}: stale Linear link {ident}; filing a fresh issue",
+                          file=sys.stderr)
+                    ident = None
+            if not ident:
                 ident = linear.create(f"[review threads] {repo}#{pr['number']} {pr['title']}"[:200],
                                       "\n".join(body), [key, "prod-error", "agent-ready"], 2)
             seen[key] = {"sig": sig, "linear": ident, "at": iso(now())}
@@ -582,7 +649,9 @@ def sweep(sentry: Sentry, linear: Linear, state: Path = STATE) -> dict:
         if ledger.get(sid, {}).get("linear") and not linked_linear(issue):
             groups.setdefault(key, ledger[sid]["linear"])
         counts[r] = counts.get(r, 0) + 1
-    advance(ledger, linear, sentry, prs, at, state)
+    stale = advance(ledger, linear, sentry, prs, at, state)
+    if stale:
+        counts["stale-link"] = stale  # visible in the sweep result + heartbeat, never silent
     write_json(state / "ledger.json", ledger)
     record_metrics(ledger, list(issues.values()), at, state)
     try:
@@ -630,7 +699,12 @@ def ci_main(linear: Linear, state: Path = STATE) -> dict:
                 opened += 1
         elif r["conclusion"] == "success" and entry.get("state") == "red":
             if entry.get("linear"):
-                linear.set_state(entry["linear"], "completed")
+                try:
+                    linear.set_state(entry["linear"], "completed")
+                except LinearIssueMissing as exc:
+                    print(f"prod-errors: ci {wf}: stale Linear link {entry['linear']} at green recovery ({exc}); "
+                          "dropping the dead link", file=sys.stderr)
+                    entry["linear"] = None  # the next red episode files a fresh issue
             entry.update(state="green")
         elif r["conclusion"] == "cancelled":
             # Concurrency supersession is normal: a newer main push started a newer run for a
