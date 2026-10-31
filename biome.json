@@ -22,6 +22,7 @@
       "!**/.next",
       "!apps/web/styles/generated/**",
       "!apps/web/lib/design/generated/**",
+      "!apps/web/lib/agent-distribution/generated/**",
       "!apps/web/design/oklch-palette.json",
       "!apps/web/typecheck-tests-baseline.json",
       "!apps/web/typecheck-stories-baseline.json",

@@ -56,15 +56,14 @@ export async function sendEmailOtp(input: EmailOtpSendInput): Promise<void> {
   try {
     // Lazy import keeps the email stack off the auth module's hot path.
     const { sendEmail } = await import('@/lib/email/send');
-    const {
-      getAuthOtpHtml,
-      getAuthOtpFromEmail,
-      getAuthOtpSubject,
-      getAuthOtpText,
-    } = await import('@/lib/email/templates/auth-otp');
+    const { getAuthOtpHtml, getAuthOtpSubject, getAuthOtpText } = await import(
+      '@/lib/email/templates/auth-otp'
+    );
     const result = await sendEmail({
+      stream: 'transactional',
+      purpose: 'auth-otp',
+      consent: 'auth-request',
       to: input.email,
-      from: getAuthOtpFromEmail(),
       subject: getAuthOtpSubject(),
       text: getAuthOtpText({ otpCode: input.otp }),
       html: getAuthOtpHtml({ otpCode: input.otp }),

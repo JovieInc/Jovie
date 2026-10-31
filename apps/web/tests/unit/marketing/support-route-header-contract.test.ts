@@ -125,4 +125,11 @@ describe('support route header contract', () => {
     expect(footerStoryStart).toBeGreaterThan(headerStoryStart);
     expect(headerStory).toContain("<MarketingHeader variant='landing' />");
   });
+
+  it('lets the published site-chrome nav replace the code-default links', () => {
+    const headerSource = readWebSource('components/site/MarketingHeader.tsx');
+    expect(headerSource).toContain('export interface MarketingHeaderChromeNav');
+    expect(headerSource).toContain('navLinks ?? chromeNav?.primary');
+    expect(headerSource).toContain('links: plainLinks(chromeNav.customers)');
+  });
 });

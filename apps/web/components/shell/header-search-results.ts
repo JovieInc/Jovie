@@ -1,5 +1,6 @@
 import { APP_ROUTES } from '@/constants/routes';
 import { COPY_FALLBACKS } from '@/data/copyFallbacks';
+import { formatReleaseArtistLine } from '@/lib/discography/formatting';
 import type { ChatConversation } from '@/lib/queries/useChatConversationsQuery';
 
 export type HeaderSearchGroupKind = 'threads' | 'entities' | 'library-assets';
@@ -106,7 +107,8 @@ export function buildHeaderSearchGroups(
       id: `library:${release.id}`,
       kind: 'library-assets' as const,
       label: release.title,
-      description: release.artistNames?.join(', ') || 'Work release',
+      description:
+        formatReleaseArtistLine(release.artistNames) ?? 'Work release',
       href: release.smartLinkPath,
       provider: release.provider,
     }));

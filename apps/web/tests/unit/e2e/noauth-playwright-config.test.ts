@@ -34,6 +34,9 @@ describe('no-auth Playwright config', () => {
       {
         cwd: webRoot,
         encoding: 'utf8',
+        // The full --list output passed the 1 MiB default buffer at 7,215
+        // tests (2026-10-29), which failed this check with ENOBUFS.
+        maxBuffer: 16 * 1024 * 1024,
         env: {
           ...process.env,
           CI: 'true',

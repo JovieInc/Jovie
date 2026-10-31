@@ -60,6 +60,12 @@ vi.mock('@/lib/spotify', () => ({
     `https://open.spotify.com/artist/${id}`,
 }));
 
+// JOV-9625: anonymous canary passage tokens. Defaults to no token.
+const passageTokenMock = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/synthetic/passage-token.server', () => ({
+  resolveSyntheticPassageToken: passageTokenMock,
+}));
+
 vi.mock('@/lib/flags/server', () => ({
   checkGateForUser: hoisted.checkGateForUserMock,
 }));
@@ -1208,7 +1214,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     vi.resetModules();
     stubRuntimeEnv({ nodeEnv: 'test' });
     vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
-    vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
     hoisted.checkGateForUserMock.mockResolvedValue(true);
     hoisted.isTurnstileConfiguredMock.mockReturnValue(false);
     hoisted.executeChatTurnMock.mockResolvedValue({
@@ -1319,7 +1325,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     vi.resetModules();
     stubRuntimeEnv({ nodeEnv: 'production', vercelEnv: 'preview' });
     vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
-    vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
     vi.stubEnv('PUBLIC_NOAUTH_SMOKE', '1');
     hoisted.checkGateForUserMock.mockResolvedValue(false);
     hoisted.isTurnstileConfiguredMock.mockReturnValue(false);
@@ -1421,8 +1427,33 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       );
     });
 
+    it('verifies an anonymous canary passage token in test mode, consuming it (JOV-9625)', async () => {
+      arrangeProduction();
+      passageTokenMock.mockResolvedValueOnce({ actorId: 'prodcert' });
+
+      const result = await firstTurn('req-passage-token');
+
+      expect(result?.status).toBe(200);
+      expect(passageTokenMock).toHaveBeenCalledWith(
+        expect.anything(),
+        'onboarding_chat',
+        { consume: true, requestId: 'req-passage-token' }
+      );
+      expect(hoisted.verifyTurnstileTestModeTokenMock).toHaveBeenCalledWith(
+        DUMMY_TOKEN,
+        '203.0.113.5'
+      );
+      expect(hoisted.verifyTurnstileTokenMock).not.toHaveBeenCalled();
+      expect(hoisted.checkAnonymousChatRateLimitMock).toHaveBeenCalled();
+      expect(hoisted.setTagMock).toHaveBeenCalledWith(
+        'synthetic_principal',
+        'prodcert'
+      );
+    });
+
     it('still challenges an anonymous visitor who sends the dummy token', async () => {
       arrangeProduction();
+      passageTokenMock.mockResolvedValueOnce(null);
 
       const result = await firstTurn('req-anon-dummy');
 
@@ -1997,7 +2028,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       stubRuntimeEnv({ nodeEnv: 'test' });
       vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
       vi.stubEnv('E2E_REQUIRE_TURNSTILE_GATE', '1');
-      vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+      vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
     }
 
     it('disarms the E2E bypass so an anonymous first message reaches the Turnstile gate', async () => {
@@ -2032,7 +2063,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       stubRuntimeEnv({ nodeEnv: 'test' });
       vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
       vi.stubEnv('E2E_REQUIRE_TURNSTILE_GATE', '');
-      vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+      vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
       hoisted.isTurnstileConfiguredMock.mockReturnValue(true);
       hoisted.verifyTurnstileTokenMock.mockResolvedValue({
         success: false,
@@ -2088,7 +2119,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       vi.resetModules();
       stubRuntimeEnv({ nodeEnv: 'test' });
       vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
-      vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+      vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
       hoisted.checkGateForUserMock.mockResolvedValue(true);
       hoisted.executeChatTurnMock.mockResolvedValue({
         streamResult: {
@@ -2127,7 +2158,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       stubRuntimeEnv({ nodeEnv: 'test', vercelEnv: 'preview' });
       vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
       vi.stubEnv('E2E_REQUIRE_TURNSTILE_GATE', '1');
-      vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+      vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
       hoisted.isTurnstileConfiguredMock.mockReturnValue(true);
       hoisted.verifyTurnstileTokenMock.mockResolvedValue({
         success: false,

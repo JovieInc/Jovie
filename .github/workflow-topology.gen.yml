@@ -92,6 +92,17 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:report
     jobCount: 1
+  - name: Auto-Merge Base Guard
+    path: .github/workflows/auto-merge-base-guard.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_target
+    terminalReceipt: job:guard
+    jobCount: 1
   - name: Auto-Ready Agent Drafts
     path: .github/workflows/auto-ready-agent-drafts.yml
     active: false
@@ -115,7 +126,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:liveness
-    jobCount: 2
+    jobCount: 3
   - name: Canary Health Gate
     path: .github/workflows/canary-health-gate.yml
     active: true
@@ -160,8 +171,10 @@ nodes:
     allowedConsumers:
       - iOS CI
       - Mac CI
+      - Component Certificate
       - Fleet Gate Refresh
       - Lane Fix Relay
+      - Main Red Eject
       - Merge Queue Green Enroll
       - Mutation Diff
       - PR Conflict Handler
@@ -233,6 +246,18 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:analyze
+    jobCount: 1
+  - name: Component Certificate
+    path: .github/workflows/component-certificate.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:certify
     jobCount: 1
   - name: Controller Quota Replay
     path: .github/workflows/controller-quota-replay.yml
@@ -676,6 +701,19 @@ nodes:
       - workflow_call
     terminalReceipt: job:build
     jobCount: 2
+  - name: Main Red Eject
+    path: .github/workflows/main-red-eject.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_target
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:land
+    jobCount: 2
   - name: Marketing Certification Producer
     path: .github/workflows/marketing-certification-producer.yml
     active: true
@@ -694,7 +732,8 @@ nodes:
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Main Red Eject
     triggeringStateTransition:
       - pull_request_target
       - push
@@ -881,10 +920,11 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - repository_dispatch
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:notify-failure
-    jobCount: 6
+    jobCount: 7
   - name: PR Conflict Handler
     path: .github/workflows/pr-conflict-handler.yml
     active: false
@@ -931,6 +971,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - repository_dispatch
       - workflow_dispatch
     terminalReceipt: job:report
     jobCount: 3
@@ -1013,6 +1054,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - merge_group
       - pull_request
       - push
     terminalReceipt: job:guard
@@ -1209,6 +1251,19 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:certify
     jobCount: 3
+  - name: Security Advisory Loop (Linear devin lane)
+    path: .github/workflows/security-advisory-loop.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - repository_dispatch
+      - workflow_dispatch
+    terminalReceipt: job:loop
+    jobCount: 1
   - name: Security Suppression Audit
     path: .github/workflows/security-suppression-audit.yml
     active: true
@@ -1436,7 +1491,7 @@ nodes:
       - pull_request_target
       - workflow_dispatch
     terminalReceipt: job:unstack
-    jobCount: 1
+    jobCount: 2
   - name: Vercel Preview Cleanup
     path: .github/workflows/vercel-preview-cleanup.yml
     active: true
@@ -1484,6 +1539,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:mine
     jobCount: 1
+  - name: Wins Ledger
+    path: .github/workflows/wins-ledger.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_target
+      - workflow_dispatch
+    terminalReceipt: job:ingest
+    jobCount: 1
 edges:
   - from: Production Continuity Guard
     to: Automation Liveness
@@ -1503,6 +1570,9 @@ edges:
   - from: CLI Chaos
     to: Mac Lane Route
     type: workflow_call
+  - from: CI
+    to: Component Certificate
+    type: workflow_run
   - from: Staging Controller
     to: Controller Quota Replay
     type: workflow_run
@@ -1581,6 +1651,12 @@ edges:
   - from: Mac CI
     to: Mac Lane Route
     type: workflow_call
+  - from: CI
+    to: Main Red Eject
+    type: workflow_run
+  - from: Merge Queue Green Enroll
+    to: Main Red Eject
+    type: workflow_run
   - from: Source Validation
     to: Merge Queue Green Enroll
     type: workflow_run
