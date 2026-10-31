@@ -56,6 +56,33 @@ test('unscoped relay bursts keep one slot across run IDs and event types', () =>
   assert.equal(groups.size, 1, 'unscoped backfills must coalesce');
 });
 
+test('failure wakes preserve an in-progress review or dequeue relay', () => {
+  const expression = workflow.concurrency['cancel-in-progress']
+    .slice(3, -2)
+    .trim();
+  const cancel = new Function('github', `return (${expression});`);
+  for (const [eventName, conclusion, expected] of [
+    ['push', undefined, true],
+    ['workflow_run', 'success', true],
+    ['workflow_run', 'failure', false],
+    ['workflow_run', 'timed_out', false],
+    ['workflow_run', 'startup_failure', false],
+    ['workflow_run', 'cancelled', false],
+    ['pull_request_review', undefined, false],
+    ['pull_request_target', undefined, false],
+    ['workflow_dispatch', undefined, false],
+  ]) {
+    assert.equal(
+      cancel({
+        event_name: eventName,
+        event: { workflow_run: { conclusion } },
+      }),
+      expected,
+      `${eventName}/${conclusion} cancellation policy`
+    );
+  }
+});
+
 test('failure, review and dequeue bursts share one slot per PR', () => {
   const groups = new Set();
   for (const name of workflow.on.workflow_run.workflows) {
