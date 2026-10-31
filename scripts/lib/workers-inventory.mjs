@@ -42,23 +42,38 @@ export function compareWorkers({ deployed, repoNames, canon }) {
   const debt = new Map((canon.unversioned ?? []).map(w => [w.name, w]));
   for (const [name, w] of debt) {
     if (repoNames.has(name))
-      errors.push(`${name}: has source in git now; remove it from ${DEPLOYED_PATH} (the list only shrinks)`);
+      errors.push(
+        `${name}: has source in git now; remove it from ${DEPLOYED_PATH} (the list only shrinks)`
+      );
     if (!w.disposition || String(w.disposition).trim().length < 10)
-      errors.push(`${name}: unversioned entry needs a disposition (import source, or delete the Worker)`);
+      errors.push(
+        `${name}: unversioned entry needs a disposition (import source, or delete the Worker)`
+      );
     if (deployed && !deployed.includes(name))
-      errors.push(`${name}: listed as unversioned but not deployed; remove it from ${DEPLOYED_PATH}`);
+      errors.push(
+        `${name}: listed as unversioned but not deployed; remove it from ${DEPLOYED_PATH}`
+      );
   }
   for (const name of deployed ?? [])
     if (!repoNames.has(name) && !debt.has(name))
-      errors.push(`${name}: deployed Worker has no source in git (workers/**/wrangler.toml name) and is not in ${DEPLOYED_PATH}; commit the source or delete the Worker`);
+      errors.push(
+        `${name}: deployed Worker has no source in git (workers/**/wrangler.toml name) and is not in ${DEPLOYED_PATH}; commit the source or delete the Worker`
+      );
   return errors;
 }
 
-export async function fetchDeployedWorkers({ accountId, token, fetchImpl = fetch }) {
-  const res = await fetchImpl(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts`, {
-    headers: { authorization: `Bearer ${token}` },
-    signal: AbortSignal.timeout(15_000),
-  });
+export async function fetchDeployedWorkers({
+  accountId,
+  token,
+  fetchImpl = fetch,
+}) {
+  const res = await fetchImpl(
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts`,
+    {
+      headers: { authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(15_000),
+    }
+  );
   const body = await res.json();
   if (!res.ok || !body.success || !Array.isArray(body.result))
     throw new Error(`workers-list-unreadable:${res.status}`); // unreadable is red, never green
@@ -70,10 +85,19 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const canon = loadDeployedCanon(root);
   const token = process.env.CLOUDFLARE_API_TOKEN;
   const deployed = process.argv.includes('--live')
-    ? await fetchDeployedWorkers({ accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? canon.accountId, token })
+    ? await fetchDeployedWorkers({
+        accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? canon.accountId,
+        token,
+      })
     : null;
-  const errors = compareWorkers({ deployed, repoNames: repoWorkerNames(root), canon });
+  const errors = compareWorkers({
+    deployed,
+    repoNames: repoWorkerNames(root),
+    canon,
+  });
   for (const e of errors) console.error(`::error::${e}`);
-  console.log(`workers-inventory: ${errors.length ? 'FAIL' : 'ok'} (${deployed ? deployed.length + ' deployed' : 'offline'})`);
+  console.log(
+    `workers-inventory: ${errors.length ? 'FAIL' : 'ok'} (${deployed ? deployed.length + ' deployed' : 'offline'})`
+  );
   process.exit(errors.length ? 1 : 0);
 }
