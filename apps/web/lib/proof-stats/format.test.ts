@@ -74,6 +74,15 @@ describe('conservative rounding', () => {
 });
 
 describe('resolveProofStat', () => {
+  it('makes inclusive latency claims at exact rounding boundaries', () => {
+    expect(
+      resolveProofStat(stat('profile_ttfb_ms'), observation(70), PUBLIC)
+    ).toMatchObject({
+      state: 'publishable',
+      sentence: 'Profiles start responding within 70 ms',
+    });
+  });
+
   it('publishes a fresh public count over threshold', () => {
     const resolved = resolveProofStat(
       stat('accounts_total'),
@@ -132,7 +141,7 @@ describe('resolveProofStat', () => {
       resolveProofStat(definition, observation(63.1, 24), PUBLIC)
     ).toMatchObject({
       state: 'publishable',
-      sentence: 'Profiles start responding in under 70 ms',
+      sentence: 'Profiles start responding within 70 ms',
     });
     expect(
       resolveProofStat(definition, observation(450, 24), PUBLIC).state

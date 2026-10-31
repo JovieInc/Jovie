@@ -162,7 +162,7 @@
       "threshold": null,
       "ceiling": 200,
       "display": {
-        "sentence": "Profiles start responding in under {value} ms",
+        "sentence": "Profiles start responding within {value} ms",
         "rounding": { "mode": "ceil", "step": 10 }
       },
       "fallback": null,
@@ -376,7 +376,7 @@
       "threshold": null,
       "ceiling": 72,
       "display": {
-        "sentence": "High-severity fixes ship in under {value} hours",
+        "sentence": "High-severity fixes ship within {value} hours",
         "rounding": { "mode": "ceil", "step": 1 }
       },
       "fallback": null,
@@ -496,7 +496,7 @@
       "freshnessSlaHours": 30,
       "threshold": null,
       "display": {
-        "sentence": "Fixes reach production in under {value} minutes",
+        "sentence": "Fixes reach production within {value} minutes",
         "rounding": { "mode": "ceil", "step": 5 }
       },
       "fallback": null,

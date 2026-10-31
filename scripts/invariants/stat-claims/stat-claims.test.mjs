@@ -52,6 +52,14 @@ describe('stat-claims patterns', () => {
       ['accounts_total', 'profile_ttfb_ms']
     );
   });
+
+  for (const binding of ['{stat:accounts_total}', '{stat:malformed']) {
+    it(`still flags literal claims beside ${binding}`, () => {
+      assert.ok(
+        hits(`Trusted by 999999 artists; ${binding}`).includes('count_claim')
+      );
+    });
+  }
 });
 
 describe('stat-claims scan', () => {

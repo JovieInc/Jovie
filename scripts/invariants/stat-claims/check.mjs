@@ -47,8 +47,8 @@ export function isExcluded(path) {
 
 /** Pattern ids a piece of copy hits. Bound copy ({stat:...}) never hits. */
 export function hits(text) {
-  if (text.includes('{stat:')) return [];
-  return PATTERNS.filter(p => p.regex.test(text)).map(p => p.id);
+  const literal = text.replaceAll(BINDING, '');
+  return PATTERNS.filter(p => p.regex.test(literal)).map(p => p.id);
 }
 
 /** Stat ids bound in a piece of text. */
