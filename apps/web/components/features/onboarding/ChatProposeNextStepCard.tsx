@@ -40,10 +40,16 @@ export interface NextStepCardPayload {
 
 interface ChatProposeNextStepCardProps {
   readonly payload: NextStepCardPayload;
+  /**
+   * Handle the conversation settled on. Passed to AuthShell so its
+   * "Claim @handle" heading never falls back to a stale homepage `?handle=`.
+   */
+  readonly claimHandle?: string | null;
 }
 
 export function ChatProposeNextStepCard({
   payload,
+  claimHandle,
 }: ChatProposeNextStepCardProps) {
   const { isSignedIn } = useAuthSafe();
   const canRenderClerkUi = useCanRenderClerkUi();
@@ -121,6 +127,7 @@ export function ChatProposeNextStepCard({
         <AuthShell
           mode='sign-up'
           compact
+          claimHandle={claimHandle ?? undefined}
           fallbackRedirectUrl={APP_ROUTES.START}
         />
       </div>
@@ -159,6 +166,7 @@ export function ChatProposeNextStepCard({
       <AuthShell
         mode='sign-up'
         compact
+        claimHandle={claimHandle ?? undefined}
         fallbackRedirectUrl={APP_ROUTES.START}
       />
     </div>
