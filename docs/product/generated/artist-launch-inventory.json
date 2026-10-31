@@ -3449,14 +3449,6 @@
       "classification": "C"
     },
     {
-      "source": "apps/web/app/api/internal/proof-stats/route.ts",
-      "kind": "handler",
-      "route": "/api/internal/proof-stats",
-      "methods": ["GET", "POST"],
-      "surface": "deferred",
-      "classification": "C"
-    },
-    {
       "source": "apps/web/app/api/internal/release-communications/merge-events/route.ts",
       "kind": "handler",
       "route": "/api/internal/release-communications/merge-events",
