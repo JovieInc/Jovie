@@ -1673,14 +1673,20 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
   });
 
   it('measures production public-profile alias budgets as warning-only', () => {
-    const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const releaseWorkflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const controllerWorkflow = readFileSync(
+      productionControllerWorkflowPath,
+      'utf8'
+    );
     const aliasGate = getJobBlock(
-      workflow,
+      controllerWorkflow,
       'production-public-profile-alias-gate'
     );
-    const releaseResult = getJobBlock(workflow, 'release-result');
+    const verified = getJobBlock(controllerWorkflow, 'production-verified');
 
-    expect(aliasGate).toContain('needs: [promote-production]');
+    expect(aliasGate).toContain(
+      'needs: [authorize-production, production-release]'
+    );
     expect(aliasGate).toContain('setup-playwright');
     expect(aliasGate).toContain('--base-url https://jov.ie');
     expect(aliasGate).toContain('--runs 5');
@@ -1704,7 +1710,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(aliasGate).not.toMatch(
       /if ! pnpm exec tsx scripts\/performance-budgets-guard\.ts[\s\S]*?exit 1/
     );
-    const promoteJob = getJobBlock(workflow, 'promote-production');
+    const promoteJob = getJobBlock(releaseWorkflow, 'promote-production');
     const stagedPerformanceGate = getStepBlock(
       promoteJob,
       'Prove canonical navigation budgets on exact staged build'
@@ -1736,10 +1742,14 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     ]) {
       expect(aliasGate).toContain(`--route-id ${routeId}`);
     }
-    // Downstream still requires job successful completion (exit 0), not a perf pass.
-    expect(releaseResult).toContain('production-public-profile-alias-gate,');
-    expect(releaseResult).toContain(
-      'production-public-profile-alias-gate:${{ needs.production-public-profile-alias-gate.result }}'
+    // Job success still blocks Production Verified. A budget miss only warns,
+    // and the gate is no longer an input to the release result.
+    expect(verified).toContain('production-public-profile-alias-gate,');
+    expect(verified).toContain(
+      'Public-profile alias gate:${{ needs.production-public-profile-alias-gate.result }}'
+    );
+    expect(releaseWorkflow).not.toContain(
+      'production-public-profile-alias-gate'
     );
   });
 
