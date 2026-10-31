@@ -86,6 +86,43 @@ describe('runLegacyDbTransaction', () => {
 });
 
 describe('atomic retry boundary', () => {
+  it('pins the RLS identity before the residual transaction deadline (JOV-8807)', async () => {
+    // The deadline in runAtomicDbOperation includes pool checkout and any
+    // serialization retry, so under contention the residual budget can be
+    // near zero. When the deadline guard ran first, the next statement — the
+    // RLS set_config — inherited that doomed server-side budget and failed
+    // with a timeout reported as revenue-spine:v1:rls_setup:timeout
+    // (Sentry 7806231669). The RLS identity must be pinned first, bounded by
+    // the pool-level statement_timeout instead.
+    const { applyRlsTransactionUser } = await import('@/lib/db');
+    const applyRlsMock = vi.mocked(applyRlsTransactionUser);
+    const order: string[] = [];
+    applyRlsMock.mockImplementation(async () => {
+      order.push('rls_setup');
+    });
+    const tx = {
+      execute: vi.fn(async () => {
+        order.push('deadline_guard');
+      }),
+    };
+    transactionMock.mockReset().mockImplementation(async fn => fn(tx));
+
+    await expect(
+      runAtomicDbOperation(async () => 'written', {
+        actorId: 'trusted-user',
+        retry: 'never',
+      })
+    ).resolves.toBe('written');
+
+    expect(order[0]).toBe('rls_setup');
+    expect(order[1]).toBe('deadline_guard');
+    expect(applyRlsMock).toHaveBeenCalledWith(
+      tx,
+      'trusted-user',
+      expect.any(String)
+    );
+  });
+
   it('does not replay an ambiguous commit or a no-retry operation', async () => {
     const failure = new Error('connection lost during COMMIT');
     transactionMock.mockReset().mockImplementation(async fn => {
