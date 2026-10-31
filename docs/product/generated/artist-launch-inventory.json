@@ -3289,6 +3289,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/customer-voice/[id]/reply/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/customer-voice/[id]/reply",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/design-ci-judge-evidence/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/design-ci-judge-evidence",

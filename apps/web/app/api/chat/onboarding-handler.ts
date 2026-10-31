@@ -56,6 +56,8 @@ import {
   createOnboardingTurnState,
 } from '@/lib/chat/tools/onboarding-tool-impls';
 import type { ChatTelemetry } from '@/lib/chat/types';
+import { runAfterResponse } from '@/lib/customer-voice/after-response';
+import { isFeedbackTurn } from '@/lib/customer-voice/classify';
 import { db } from '@/lib/db';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { getEntitlements } from '@/lib/entitlements/registry';
@@ -645,6 +647,26 @@ export async function tryHandleAnonymousOnboardingChat(
       latestUserMessage,
       ownedConversationId: ownedConversation?.id,
     });
+    // Customer voice: complaints and price pushback in onboarding chat reach
+    // Tim by iMessage with a drafted reply (lib/customer-voice). Signed-in
+    // visitors get the reply at their account email; anonymous ones are an
+    // FYI with nothing to send.
+    if (isFeedbackTurn(latestUserMessage.text)) {
+      const text = latestUserMessage.text;
+      const email = signedInSession?.user.email ?? null;
+      runAfterResponse(async () => {
+        const { captureCustomerVoice } = await import(
+          '@/lib/customer-voice/capture.server'
+        );
+        await captureCustomerVoice({
+          channel: 'chat',
+          text,
+          receivedAt: new Date(),
+          replyTo: email,
+          surface: 'onboarding chat',
+        });
+      });
+    }
   } catch (error) {
     Sentry.captureException(error, {
       tags: { context: 'onboarding_handler_persistence' },
