@@ -1079,7 +1079,7 @@ test.describe('Production Auth Smoke @production-smoke', () => {
               '(needsOnboarding redirect): apply the canary seed with ' +
               '`cd apps/web && npx tsx --import ../../scripts/ops/canary-seed/shim-preload.mjs ' +
               '../../scripts/ops/canary-seed/seed-returning-canary.ts --apply` ' +
-              '(CHAT_HEALTH_CANARY_SEED, apps/web/lib/synthetic/returning-canary-seed.ts).'
+              '(CHAT_HEALTH_CANARY_SEED, apps/web/lib/synthetic/returning-canary-seed-spec.ts).'
           );
         }
 
