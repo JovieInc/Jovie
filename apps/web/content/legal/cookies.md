@@ -60,7 +60,7 @@ When enabled, these allow us to deliver relevant advertisements and measure camp
 | Cookie Name | Purpose | Duration |
 |------------|---------|----------|
 | `jovie_lead_attribution` | Stores claim-invite attribution for signup and campaign conversion measurement | 30 days |
-| `_fbp` | Set by the Meta pixel to recognize a browser across visits for ad measurement and retargeting | 90 days |
+| `_fbp` | Set by the Meta pixel to recognize a browser across visits for ad measurement and retargeting | 3 months |
 
 When marketing cookies are allowed, we also use server-side event forwarding to send profile visit data to advertising platforms including Meta, Google, and TikTok, to measure retargeting campaigns.
 
