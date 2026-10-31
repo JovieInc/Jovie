@@ -38,14 +38,15 @@ export async function getCachedHandleAvailability(
 
 /**
  * Read cache and project through the canonical availability contract.
- * Returns null on cache miss so callers can fall through to DB.
+ * Returns null on cache miss, and also on a cached "taken", which is advisory
+ * (stale entries outlive deleted rows), so callers fall through to the DB.
  */
 export async function getCachedHandleAvailabilityResult(
   handle: string
 ): Promise<HandleAvailabilityResult | null> {
   const cached = await getCachedHandleAvailability(handle);
-  if (cached === null) return null;
-  return toHandleAvailabilityResult({ handle, available: cached });
+  if (cached !== true) return null;
+  return toHandleAvailabilityResult({ handle, available: true });
 }
 
 export async function cacheHandleAvailability(
