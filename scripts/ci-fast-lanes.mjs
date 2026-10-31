@@ -381,7 +381,8 @@ export const SOURCE_GUARDS = Object.freeze([
     // runs with the script contracts (SCRIPT_CONTRACT_VITEST_TESTS).
     // Also runs model-id-guard (same inputs): a concrete OpenAI model id lives only in
     // ops/registry/capacity.json modelFamilies; grandfathered sites only shrink.
-    command: `node ${shellQuote(fileURLToPath(new URL('./external-api-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./model-id-guard.mjs', import.meta.url)))}`,
+    // Also runs ai-call-guard: model calls go through apps/web/lib/ai/sdk.ts so Gateway spend is tagged.
+    command: `node ${shellQuote(fileURLToPath(new URL('./external-api-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./model-id-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./ai-call-guard.mjs', import.meta.url)))}`,
     inputs:
       /(?:\.(?:ts|tsx|js|mjs|cjs|mts|cts|py|sh|bash|ya?ml)$|^packages\/api-client\/providers\.json$|^scripts\/lib\/external-api-guard\.)/u,
     prOnly: false,
@@ -1017,6 +1018,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/weekly-agent-readiness.test.mjs',
   'scripts/lib/__tests__/pr-fleet-rules-workflow.test.mjs',
   'scripts/lib/__tests__/wake-fanout-contract.test.mjs',
+  'scripts/design-system-source-ratchet.test.mjs',
 ]);
 export const DEPRECATION_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/deprecation-clearance.mjs --test-coverage-include=scripts/lib/deprecation-observation.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=90 scripts/deprecation-clearance.test.mjs';
@@ -1174,6 +1176,8 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
   'scripts/lib/__tests__/external-api-guard.test.mjs',
   'scripts/lib/__tests__/model-id-guard.test.mjs',
+  'scripts/lib/__tests__/ai-gateway-report.test.mjs',
+  'scripts/lib/__tests__/ai-call-guard.test.mjs',
   'scripts/lib/__tests__/domain-write-guard.test.mjs',
   'scripts/lib/__tests__/screen-audit-receipts.test.mjs',
   'scripts/lib/__tests__/component-certificate.test.mjs',
