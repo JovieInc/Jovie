@@ -6,6 +6,7 @@ import { Button } from '@jovie/ui';
 import { FileAudio2, Paperclip } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import {
+  type CSSProperties,
   forwardRef,
   type ReactNode,
   useCallback,
@@ -1318,13 +1319,18 @@ function InputRow({
         layout={reducedMotion ? false : 'size'}
         ref={containerRef}
         transition={reducedMotion ? undefined : TRANSITION_SURFACE}
+        style={
+          {
+            '--system-b-chat-composer-measured-input-height': `${measuredHeight}px`,
+          } as CSSProperties
+        }
         className={cn(
           'relative',
           // Symmetric token padding (px-4 / py-2) so placeholder + text are evenly
           // inset — replaces ad-hoc compact padding from JOV-3531.
           useHeroPill
             ? 'flex min-h-13 items-center gap-2 px-4 py-2 sm:min-h-14'
-            : 'grid content-start gap-2 px-4 py-2'
+            : 'system-b-chat-composer-input-grid grid content-start gap-2 px-4 py-2'
         )}
       >
         <div ref={hiddenDivRef} style={HIDDEN_DIV_STYLES} aria-hidden />
