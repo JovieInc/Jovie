@@ -637,6 +637,136 @@ def resolve_preflight_narrowed_text(text: str) -> str | None:
     return resolved
 
 
+# Dependency lines only. A script, comment, or other JSON value fails closed.
+_DEP_LINE = re.compile(
+    r'^(?P<indent>[ \t]*)"(?P<key>(?:[^"\\\n]|\\.)+)"\s*:\s*'
+    r'"(?P<spec>(?:[^"\\\n]|\\.)*)"\s*,?\s*$')
+_LITERAL_SPEC = re.compile(
+    r"^(?:workspace:|catalog:|file:|link:|git\+|github:|https?:|npm:)")
+_SEMVER_SPEC = re.compile(
+    r"^(?P<prefix>\^|~|>=|<=|>|<|=)?"
+    r"(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)(?:\.(?P<patch>0|[1-9]\d*))?"
+    r"(?P<pre>-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$")
+
+
+def _parse_dep_side(text: str) -> list[tuple[str, str, str]] | None:
+    """(indent, key, spec) in order. None on a non-dependency line or a duplicate key."""
+    rows: list[tuple[str, str, str]] = []
+    seen: set[str] = set()
+    for line in text.splitlines():
+        match = _DEP_LINE.match(line)
+        if not match or match.group("key") in seen:
+            return None
+        seen.add(match.group("key"))
+        rows.append((match.group("indent"), match.group("key"), match.group("spec")))
+    return rows
+
+
+def _spec_rank(spec: str):
+    """Comparable rank, or None when the specifier is not a version or a literal protocol."""
+    if _LITERAL_SPEC.match(spec):
+        return ("literal", spec)
+    match = _SEMVER_SPEC.match(spec)
+    if not match:
+        return None
+    patch = int(match.group("patch") or 0)
+    pre = match.group("pre")
+    if pre:
+        idents = []
+        for part in pre[1:].split("."):
+            idents.append((0, int(part)) if part.isdigit() else (1, part))
+        pre_rank = (0, tuple(idents))
+    else:
+        pre_rank = (1,)
+    return ("semver", (int(match.group("major")), int(match.group("minor")), patch, pre_rank))
+
+
+def _prefer_spec(ours_spec: str, theirs_spec: str) -> str | None:
+    """Higher semver wins and keeps that side's original specifier. A tie keeps main's."""
+    if ours_spec == theirs_spec:
+        return theirs_spec
+    ours_rank = _spec_rank(ours_spec)
+    theirs_rank = _spec_rank(theirs_spec)
+    if not ours_rank or not theirs_rank or ours_rank[0] != theirs_rank[0] or ours_rank[0] == "literal":
+        return None
+    if ours_rank[1] == theirs_rank[1]:
+        return theirs_spec
+    return ours_spec if ours_rank[1] > theirs_rank[1] else theirs_spec
+
+
+def _resolve_manifest_hunk(ours: str, theirs: str, after: str) -> str | None:
+    """Union one dependency hunk. Main's order, then branch-only keys. Unknown lines stay unresolved."""
+    ours_rows = _parse_dep_side(ours)
+    theirs_rows = _parse_dep_side(theirs)
+    if ours_rows is None or theirs_rows is None:
+        return None
+    ours_by = {key: spec for _indent, key, spec in ours_rows}
+    ordered: list[tuple[str, str, str]] = []
+    seen: set[str] = set()
+    for indent, key, spec in theirs_rows:
+        seen.add(key)
+        if key in ours_by:
+            chosen = _prefer_spec(ours_by[key], spec)
+            if chosen is None:
+                return None
+            ordered.append((indent, key, chosen))
+        elif _spec_rank(spec) is None:
+            return None
+        else:
+            ordered.append((indent, key, spec))
+    for indent, key, spec in ours_rows:
+        if key in seen:
+            continue
+        if _spec_rank(spec) is None:
+            return None
+        ordered.append((indent, key, spec))
+    if not ordered:
+        return None
+    trailing_comma = not after.lstrip(" \t\r\n").startswith("}")
+    written = []
+    for index, (indent, key, spec) in enumerate(ordered):
+        comma = "," if trailing_comma or index < len(ordered) - 1 else ""
+        written.append(f'{indent}"{key}": "{spec}"{comma}')
+    ending = "\n" if ours.endswith("\n") or theirs.endswith("\n") else ""
+    return "\n".join(written) + ending
+
+
+def merge_package_manifest(text: str) -> str | None:
+    """Union conflict hunks that are only package.json dependency lines.
+
+    The first side is the PR branch and the second is main. Higher semver wins and
+    keeps that side's specifier (^, ~, >=, or exact). Equal versions keep main's
+    specifier. Key order is main's, then branch-only keys. A script, comment,
+    duplicate key, or incomparable specifier returns None so the caller aborts.
+    """
+    if "<<<<<<<" not in str(text or ""):
+        return None
+    hunks = list(_NARROWED_HUNK.finditer(text))
+    if not hunks:
+        return None
+    cleared = _NARROWED_HUNK.sub("", text)
+    if "<<<<<<<" in cleared or ">>>>>>>" in cleared:
+        return None
+    pieces = []
+    last = 0
+    for hunk in hunks:
+        resolved = _resolve_manifest_hunk(hunk.group("ours"), hunk.group("theirs"), text[hunk.end():])
+        if resolved is None:
+            return None
+        pieces.append(text[last:hunk.start()])
+        pieces.append(resolved)
+        last = hunk.end()
+    pieces.append(text[last:])
+    resolved = "".join(pieces)
+    if "<<<<<<<" in resolved or ">>>>>>>" in resolved or resolved == text:
+        return None
+    try:
+        json.loads(resolved)
+    except json.JSONDecodeError:
+        return None
+    return resolved
+
+
 def _domain_write_hits(log: str) -> dict[str, list[str]]:
     """Allowed-0 guard lines, in file order. A positive cap is not a hit."""
     hits: dict[str, list[str]] = {}

@@ -6107,6 +6107,10 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
                    "Other shell && chains are unioned by fix_red_classes.merge_and_chain",
                    "(base order, then head-only prefixes; node --test and vitest paths union).",
                    "Unknown hunks stay unresolved.",
+                   "When every conflict is a package.json manifest plus a generated file, union",
+                   "dependency lines with fix_red_classes.merge_package_manifest (higher semver,",
+                   "main's specifier on a tie, main's order, then head-only keys) and regenerate.",
+                   "Unknown hunks stay unresolved.",
                    "Run the related checks after resolving.", ""]
     else:
         problem = []
@@ -6266,6 +6270,62 @@ def resolve_and_chain_conflict(worktree: Path, branch: str, log, *, guard=lambda
             return False
         guard()
         if sh(["git", "add", "--", *conflicted], cwd=worktree, log=log).returncode != 0 \
+                or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+    guard()
+    return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+
+
+def _package_manifest(path: str) -> bool:
+    parts = Path(path).parts
+    return Path(path).name == "package.json" and not Path(path).is_absolute() and ".." not in parts
+
+
+def resolve_manifest_lock_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
+    """Union package.json dependency hunks, then regenerate the lockfile from main.
+
+    Conflicts must be only package manifests plus machine-generated paths. Higher
+    semver wins; an equal version keeps main's specifier; one-sided version keys
+    stay. A hunk that is not dependency lines aborts and leaves the PR to the model.
+    The push is a fast-forward of the PR branch; this never rebases or force-pushes."""
+    guard()
+    merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
+    if merged.returncode != 0:
+        conflicted = [path for path in (sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout or "").split() if path]
+        manifests = [path for path in conflicted if _package_manifest(path)]
+        generated = [path for path in conflicted if path in remediation.GENERATED_RESOLVERS]
+        if not conflicted or set(conflicted) != set(manifests) | set(generated) or not manifests:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        resolved_texts: dict[Path, str] = {}
+        for rel in manifests:
+            target = worktree / rel
+            try:
+                outcome = fix_red_classes.merge_package_manifest(target.read_text())
+            except (OSError, UnicodeError):
+                outcome = None
+            if outcome is None:
+                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+                return False
+            resolved_texts[target] = outcome
+        try:
+            for target, outcome in resolved_texts.items():
+                atomic_write_text(target, outcome)
+        except OSError:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        if sh(["git", "add", "--", *manifests], cwd=worktree, log=log).returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        changed = sh(["git", "diff", "--name-only", "HEAD"], cwd=worktree)
+        paths = set(conflicted) | set(changed.stdout.splitlines())
+        if (worktree / "pnpm-lock.yaml").is_file() or "pnpm-lock.yaml" in paths:
+            paths.add("pnpm-lock.yaml")
+        if changed.returncode or not regenerate_merged_generated(worktree, paths, log, guard=guard):
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        if sh(["git", "add", "--", *manifests], cwd=worktree, log=log).returncode != 0 \
                 or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
@@ -7855,6 +7915,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             resolved_generated = False
             resolved_narrowed = False
             resolved_and_chain = False
+            resolved_manifest_lock = False
             if pr.get("mergeStateStatus") == "DIRTY":
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 0, "mutations": 1}, coordination=coordination, boundary_id="repair-generated-conflict")
@@ -7867,6 +7928,10 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                     execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                                {"spend": 0, "mutations": 1}, coordination=coordination, boundary_id="repair-and-chain")
                     resolved_and_chain = resolve_and_chain_conflict(worktree, pr["headRefName"], log, guard=boundary)
+                if not resolved_generated and not resolved_narrowed and not resolved_and_chain:
+                    execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
+                                               {"spend": 0, "mutations": 1}, coordination=coordination, boundary_id="repair-manifest-lock")
+                    resolved_manifest_lock = resolve_manifest_lock_conflict(worktree, pr["headRefName"], log, guard=boundary)
             agent = None
             if resolved_generated:
                 receipt.update(resolution="generated-regenerated")
@@ -7874,6 +7939,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 receipt.update(resolution="narrowed-preflight-merged")
             elif resolved_and_chain:
                 receipt.update(resolution="and-chain-merged")
+            elif resolved_manifest_lock:
+                receipt.update(resolution="manifest-lock-merged")
             else:
                 boundary("before-install")
                 install_dependencies(host, worktree, log)
