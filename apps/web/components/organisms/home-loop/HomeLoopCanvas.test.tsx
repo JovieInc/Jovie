@@ -89,6 +89,13 @@ describe('HomeLoopCanvas', () => {
     );
   });
 
+  it('labels Done with the count it was given, not the sample length', () => {
+    render(<HomeLoopCanvas {...props({ doneCount: 92, doneSummary: null })} />);
+    expect(
+      screen.getByTestId('home-loop-done-section-count')
+    ).toHaveTextContent('92');
+  });
+
   it('omits the company row when the persona has none', () => {
     render(<HomeLoopCanvas {...props()} />);
     expect(screen.queryByRole('region', { name: 'Company' })).toBeNull();

@@ -13,13 +13,19 @@ import {
 } from '@/components/organisms/home-loop';
 import { useUndoableAnswers } from '@/components/organisms/home-loop/useUndoableAnswers';
 import { APP_ROUTES } from '@/constants/routes';
-import type { HomeLoopAsk } from '@/lib/home-loop/contract';
+import {
+  type HomeLoopAsk,
+  type HomeLoopTileMemory,
+  withTileHistory,
+} from '@/lib/home-loop/contract';
+import { buildInFlightSummary } from '@/lib/ovie/home/blockers';
 import {
   buildCanvasTurns,
   partitionCanvasCards,
 } from '@/lib/ovie/home/canvas-turns';
 import {
   buildCompanyTiles,
+  type OvieCompanyKey,
   type OvieFunnelInput,
   type OvieGoldenPathRow,
 } from '@/lib/ovie/home/company-tiles';
@@ -35,6 +41,7 @@ import {
 import { inboxDecisionRequest, type OvieInbox } from '@/lib/ovie/inbox';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
 import type { HudMetrics } from '@/types/hud';
+import { OvieInFlightBlockers } from './OvieInFlightBlockers';
 import { useCanvasHistory } from './useCanvasHistory';
 import { useHudShippingStateQuery } from './useHudShippingStateQuery';
 import { useOvieHomeReadyTiming } from './useOvieHomeReadyTiming';
@@ -47,7 +54,7 @@ const OVIE_HOME_COPY: HomeLoopCopy = {
   inFlightTitle: 'In Flight',
   inFlightEmpty: 'No work in flight.',
   inFlightError: 'Shipping data could not load.',
-  doneTitle: 'Done Today',
+  doneTitle: 'Merged today',
   doneEmpty: 'Nothing has landed yet today.',
 };
 
@@ -101,8 +108,9 @@ function writeLastVisit(
   }
 }
 
-function sinceLabel(at: number | null, now: number): string {
-  if (at === null) return 'Shipping';
+/** One baseline for the whole page: Tim's last visit. */
+function sinceLabel(row: string, at: number | null, now: number): string {
+  if (at === null) return row;
   const minutes = Math.max(0, Math.round((now - at) / 60_000));
   const ago =
     minutes < 60
@@ -110,7 +118,7 @@ function sinceLabel(at: number | null, now: number): string {
       : minutes < 48 * 60
         ? `${Math.round(minutes / 60)}h`
         : `${Math.round(minutes / 1440)}d`;
-  return `Shipping · compared with your visit ${ago} ago`;
+  return `${row} · "Was" is your last visit, ${ago} ago`;
 }
 
 async function fetchJson<T>(url: string, signal: AbortSignal): Promise<T> {
@@ -120,7 +128,7 @@ async function fetchJson<T>(url: string, signal: AbortSignal): Promise<T> {
 }
 
 const COMPANY_PLACEHOLDER = buildCompanyTiles({
-  overview: null,
+  metrics: null,
   funnel: null,
   goldenPath: null,
 });
@@ -177,8 +185,7 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       if (failed > 0)
         reportOvieHomePanelError('company', `${failed} of 3 sources failed`);
       return buildCompanyTiles({
-        overview:
-          metrics.status === 'fulfilled' ? metrics.value.overview : null,
+        metrics: metrics.status === 'fulfilled' ? metrics.value : null,
         funnel: funnel.status === 'fulfilled' ? funnel.value : null,
         goldenPath:
           certifications.status === 'fulfilled'
@@ -205,9 +212,18 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
     [snapshot, lastVisit]
   );
 
+  const companyTiles = useMemo(
+    () =>
+      withTileHistory(
+        company.data ?? COMPANY_PLACEHOLDER,
+        lastVisit.memory as HomeLoopTileMemory<OvieCompanyKey>
+      ),
+    [company.data, lastVisit]
+  );
+
   useEffect(() => {
-    if (home) writeLastVisit(home.pulse);
-  }, [home]);
+    if (home && company.data) writeLastVisit([...home.pulse, ...companyTiles]);
+  }, [home, company.data, companyTiles]);
 
   const allAsks = useMemo(
     () => (inbox.data ? buildOvieAsks(inbox.data) : []),
@@ -216,7 +232,8 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
   // Only the top few reach Home (Tim 2026-10-30); every other ask carries a
   // declared default and resolves on its own unless he opens the inbox.
   const asks = allAsks.slice(0, OVIE_HOME_MAX_ASKS);
-  const deferredAsks = allAsks.length - asks.length;
+  const [asksHidden, setAsksHidden] = useState(0);
+  const deferredAsks = allAsks.length - asks.length + asksHidden;
 
   const onCommitted = useCallback(
     (id: string) => {
@@ -352,7 +369,7 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
   const asksNotice =
     [
       deferredAsks > 0
-        ? `${deferredAsks} more resolve by their defaults`
+        ? `${allAsks.length - deferredAsks} of ${allAsks.length} open; the other ${deferredAsks} resolve by their defaults`
         : null,
       inbox.data ? summarizeSourceIssues(inbox.data.issues) : null,
     ]
@@ -393,6 +410,11 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
         : null}
     </HomeLoopAnswerPanel>
   ) : null;
+  const blockers = useMemo(
+    () =>
+      snapshot ? buildInFlightSummary(snapshot.operationalTasks.tasks) : null,
+    [snapshot]
+  );
   const inFlightOverride = generated?.inFlight.length ? (
     <div
       className='flex flex-col gap-2'
@@ -405,6 +427,11 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
         />
       ))}
     </div>
+  ) : loopStatus === 'ready' && blockers && blockers.total > 0 ? (
+    <OvieInFlightBlockers
+      summary={blockers}
+      moreHref={APP_ROUTES.ADMIN_SHIPPING}
+    />
   ) : undefined;
 
   return (
@@ -418,11 +445,7 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       asks={asks}
       rows={home?.rows ?? []}
       done={home?.done ?? []}
-      doneSummary={
-        home?.mergesToday != null
-          ? `${home.mergesToday} ${home.mergesToday === 1 ? 'merge' : 'merges'}`
-          : null
-      }
+      doneCount={home?.mergesToday ?? null}
       loopStatus={loopStatus}
       asksStatus={asksStatus}
       asksNotice={asksNotice}
@@ -434,9 +457,12 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       onRetryLoop={() => void shipping.refetch()}
       onRetryAsks={() => void inbox.refetch()}
       asksMoreHref={APP_ROUTES.ADMIN_INBOX}
-      company={company.data ?? COMPANY_PLACEHOLDER}
+      company={companyTiles}
       companyLoading={company.isPending}
-      pulseCaption={sinceLabel(lastVisit.at, mountedAt)}
+      companyCaption={sinceLabel('Company', lastVisit.at, mountedAt)}
+      pulseCaption={sinceLabel('Shipping', lastVisit.at, mountedAt)}
+      onAsksHiddenChange={setAsksHidden}
+      asksHideMore
       inFlightMoreHref={APP_ROUTES.ADMIN_SHIPPING}
     />
   );

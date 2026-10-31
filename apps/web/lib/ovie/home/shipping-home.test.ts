@@ -281,7 +281,7 @@ describe('buildPulse', () => {
     );
     expect(byKey['merges-day']).toMatchObject({
       value: '25',
-      was: '20 prior 7d',
+      was: null,
       tone: 'good',
       target: 'Target ≥ 20',
     });

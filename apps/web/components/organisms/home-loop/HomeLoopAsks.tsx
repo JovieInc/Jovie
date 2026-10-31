@@ -431,11 +431,17 @@ export function HomeLoopAsks({
   maxVisible = 3,
   fit = false,
   moreHref,
+  hideMore = false,
+  onHiddenChange,
   onApprove,
   onReply,
   onFeedback,
 }: Readonly<{
   readonly asks: readonly HomeLoopAsk[];
+  /** The caller names the overflow itself (e.g. in the section notice). */
+  readonly hideMore?: boolean;
+  /** How many asks did not fit, so the section count can match the cards. */
+  readonly onHiddenChange?: (hidden: number) => void;
   /** Dense Home shows the top asks; the rest live behind `moreHref`. */
   readonly maxVisible?: number;
   readonly fit?: boolean;
@@ -453,6 +459,9 @@ export function HomeLoopAsks({
     fit
   );
   const hidden = fit ? fitHidden : asks.length - visible.length;
+  useEffect(() => {
+    onHiddenChange?.(hidden);
+  }, [hidden, onHiddenChange]);
   const cards = visible.map(ask => (
     <AskCard
       key={ask.id}
@@ -484,7 +493,7 @@ export function HomeLoopAsks({
           tabIndex={-1}
           className='h-4 shrink-0 px-1 text-xs tabular-nums text-tertiary-token'
         >
-          {hidden > 0 ? (
+          {hidden > 0 && !hideMore ? (
             <MoreDecisions hidden={hidden} moreHref={moreHref} />
           ) : null}
         </p>
@@ -494,7 +503,7 @@ export function HomeLoopAsks({
   return (
     <ul className='flex flex-col gap-2' data-testid='home-loop-asks'>
       {cards}
-      {hidden > 0 ? (
+      {hidden > 0 && !hideMore ? (
         <li className='px-1 text-xs tabular-nums text-tertiary-token'>
           <MoreDecisions hidden={hidden} moreHref={moreHref} />
         </li>

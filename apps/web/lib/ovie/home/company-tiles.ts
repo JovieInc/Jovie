@@ -1,21 +1,38 @@
 /**
  * Ovie Home company row: "are we winning?" in four tiles. Pure presentation
- * over existing reads only: `/api/hud/metrics` (Stripe + Mercury),
- * `/api/admin/hud/founder-funnel` (accounts and first value, 7d) and
- * `/api/ovie/certifications` (the production golden path). Missing sources
- * stay "Not measured"; a stub never reads as a real zero.
+ * over existing reads only: `/api/hud/metrics` (Stripe + Mercury with
+ * per-source trust), `/api/admin/hud/founder-funnel` (accounts and first
+ * value, 7d) and `/api/ovie/certifications` (the golden path).
+ *
+ * Rule (coordinator, 2026-10-31): the most important numbers must be
+ * verified against their source or say "Not measured" with the reason. A
+ * partial figure is never shown as a measurement:
+ * - Cash is Mercury's balance across every active account (verified).
+ *   Runway is NOT shown: burn is Mercury debits only, and spend paid by card
+ *   elsewhere (Neon alone is ~$130/mo vs $110 measured burn) is missing.
+ * - MRR is customer-only Stripe MRR; internal/test subscriptions are named
+ *   beside it (JOV-7362: the $199 read was an internal jov.ie account).
+ * - Golden path is certification (founder lock with judged evidence), never
+ *   a count of passing production tests.
  */
 
 import { APP_ROUTES } from '@/constants/routes';
 import {
   HOME_LOOP_NOT_MEASURED,
   type HomeLoopTile,
-  type HomeLoopTone,
 } from '@/lib/home-loop/contract';
-import type { HudOverviewMetrics } from '@/types/hud';
+import type { HudMetricSourceTrust, HudOverviewMetrics } from '@/types/hud';
 
-export type OvieCompanyKey = 'runway' | 'mrr' | 'users' | 'golden-path';
-export type OvieCompanyTile = HomeLoopTile<OvieCompanyKey>;
+export type OvieCompanyKey = 'cash' | 'mrr' | 'users' | 'golden-path';
+export type OvieCompanyTile = Omit<HomeLoopTile<OvieCompanyKey>, 'was'>;
+
+/** The slice of `/api/hud/metrics` Home reads. */
+export interface OvieCompanyMetricsInput {
+  readonly overview: HudOverviewMetrics;
+  readonly sources?: Partial<
+    Record<'stripe' | 'mercury', Pick<HudMetricSourceTrust, 'state'>>
+  >;
+}
 
 /** The slice of the founder funnel Home reads. */
 export interface OvieFunnelInput {
@@ -39,138 +56,147 @@ const usd = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0,
 });
 
-function runwayValue(months: number): string {
-  if (months < 1) {
-    const days = Math.max(0, Math.round(months * 30));
-    return `${days} ${days === 1 ? 'day' : 'days'}`;
-  }
-  return `${months < 10 ? months.toFixed(1) : Math.round(months)} mo`;
-}
+const CERTIFIED_STATES = new Set(['founder_locked', 'shipped', 'monitored']);
 
 function unmeasured(
   key: OvieCompanyKey,
   label: string,
+  reason: string,
   href: string | null
 ): OvieCompanyTile {
   return {
     key,
     label,
     value: HOME_LOOP_NOT_MEASURED,
-    was: null,
     tone: 'neutral',
     measured: false,
-    target: null,
+    target: reason,
     href,
   };
 }
 
-function trendTone(now: number, before: number | undefined): HomeLoopTone {
-  if (before === undefined) return now > 0 ? 'good' : 'bad';
-  if (now > before) return 'good';
-  if (now < before) return 'bad';
-  return now > 0 ? 'warn' : 'bad';
+function sourceOk(
+  metrics: OvieCompanyMetricsInput | null,
+  key: 'stripe' | 'mercury'
+): boolean {
+  return metrics?.sources?.[key]?.state === 'ok';
 }
 
-export function buildCompanyTiles(input: {
-  readonly overview: HudOverviewMetrics | null;
-  readonly funnel: OvieFunnelInput | null;
-  readonly goldenPath: readonly OvieGoldenPathRow[] | null;
-}): readonly OvieCompanyTile[] {
-  const { overview, funnel, goldenPath } = input;
-  const ops = APP_ROUTES.ADMIN_OPERATIONS;
-  const finance = overview?.financialDataAvailable ? overview : null;
+function cashTile(metrics: OvieCompanyMetricsInput | null): OvieCompanyTile {
+  const href = APP_ROUTES.ADMIN_OPERATIONS;
+  if (!metrics || !sourceOk(metrics, 'mercury'))
+    return unmeasured('cash', 'Cash', 'Connect Mercury', href);
+  return {
+    key: 'cash',
+    label: 'Cash (Mercury)',
+    value: usd.format(metrics.overview.balanceUsd),
+    // No trusted burn, so no runway and no alive/dead verdict; the number
+    // speaks for itself and the footer says what is missing.
+    tone: 'neutral',
+    measured: true,
+    target: 'Runway not measured: card spend not in burn',
+    href,
+  };
+}
 
-  const runway: OvieCompanyTile =
-    finance && finance.runwayMonths !== null
-      ? {
-          key: 'runway',
-          label: 'Runway',
-          value: runwayValue(finance.runwayMonths),
-          was: null,
-          tone:
-            finance.defaultStatus === 'alive'
-              ? 'good'
-              : finance.runwayMonths < 3
-                ? 'bad'
-                : 'warn',
-          measured: true,
-          target: `${finance.defaultStatus === 'alive' ? 'Default alive' : finance.defaultStatus === 'dead' ? 'Default dead' : 'Default unknown'} · ${usd.format(finance.balanceUsd)} cash`,
-          href: ops,
-        }
-      : unmeasured('runway', 'Runway', ops);
+function mrrTile(metrics: OvieCompanyMetricsInput | null): OvieCompanyTile {
+  const href = APP_ROUTES.ADMIN_OPERATIONS;
+  if (!metrics || !sourceOk(metrics, 'stripe'))
+    return unmeasured('mrr', 'Customer MRR', 'Connect Stripe', href);
+  const { mrrUsd, activeSubscribers, excludedInternal } = metrics.overview;
+  const internal =
+    excludedInternal && excludedInternal.subscribers > 0
+      ? ` · excl. ${usd.format(excludedInternal.mrrUsd)} internal`
+      : '';
+  return {
+    key: 'mrr',
+    label: 'Customer MRR',
+    value: usd.format(mrrUsd),
+    tone: mrrUsd > 0 ? 'good' : 'bad',
+    measured: true,
+    target: `${activeSubscribers} paying${internal}`,
+    href,
+  };
+}
 
-  const mrr: OvieCompanyTile = finance
-    ? {
-        key: 'mrr',
-        label: 'MRR',
-        value: usd.format(finance.mrrUsd),
-        was:
-          finance.weekAgo === undefined
-            ? null
-            : `${usd.format(finance.weekAgo.mrrUsd)} 7d ago`,
-        tone: trendTone(finance.mrrUsd, finance.weekAgo?.mrrUsd),
-        measured: true,
-        target: `${finance.activeSubscribers} paying`,
-        href: ops,
-      }
-    : unmeasured('mrr', 'MRR', ops);
-
+function usersTile(funnel: OvieFunnelInput | null): OvieCompanyTile {
   const created = funnel?.stages.find(
     stage => stage.key === 'accounts_created'
   );
+  if (!created)
+    return unmeasured(
+      'users',
+      'New accounts (7d)',
+      'Funnel unavailable',
+      APP_ROUTES.ADMIN_OPERATIONS
+    );
   const activated = funnel?.stages.find(
     stage => stage.key === 'onboarding_complete'
   );
-  const users: OvieCompanyTile = created
-    ? {
-        key: 'users',
-        label: 'New accounts (7d)',
-        value: String(created.count),
-        was: null,
-        tone: created.count > 0 ? (activated?.count ? 'good' : 'warn') : 'bad',
-        measured: true,
-        target:
-          activated === undefined
-            ? null
-            : `${activated.count} reached first value`,
-        href: created.drillDownHref,
-      }
-    : unmeasured('users', 'New accounts (7d)', null);
+  return {
+    key: 'users',
+    label: 'New accounts (7d)',
+    value: String(created.count),
+    tone: created.count > 0 ? (activated?.count ? 'good' : 'warn') : 'bad',
+    measured: true,
+    target:
+      activated === undefined ? null : `${activated.count} reached first value`,
+    href: created.drillDownHref,
+  };
+}
 
-  const flows = goldenPath?.filter(row => row.domain === 'flows') ?? null;
-  let golden: OvieCompanyTile;
-  if (!flows || flows.length === 0) {
-    golden = unmeasured(
+/**
+ * Certified = the golden-path verdict: founder lock (or later) with judged
+ * evidence. Production test passes are one tier among ten and never count as
+ * certified on their own.
+ */
+function goldenTile(
+  rows: readonly OvieGoldenPathRow[] | null
+): OvieCompanyTile {
+  const href = APP_ROUTES.ADMIN_CERTIFICATIONS;
+  const flows = rows?.filter(row => row.domain === 'flows') ?? null;
+  if (!flows || flows.length === 0)
+    return unmeasured(
       'golden-path',
       'Golden path',
-      APP_ROUTES.ADMIN_CERTIFICATIONS
+      'Certification unavailable',
+      href
     );
-  } else {
-    const passing = flows.filter(
-      row => row.tiers.runtime_dogfood === 'passed'
-    ).length;
-    const failing = flows.filter(
-      row => row.tiers.runtime_dogfood === 'failed'
-    ).length;
-    const certified = flows.filter(
-      row => row.state === 'shipped' || row.state === 'monitored'
-    ).length;
-    golden = {
-      key: 'golden-path',
-      label: 'Golden path',
-      value: `${passing} of ${flows.length} pass in prod`,
-      was: null,
-      tone:
-        failing > 0
+  const certified = flows.filter(row => CERTIFIED_STATES.has(row.state));
+  const failing = flows.filter(row =>
+    Object.values(row.tiers).includes('failed')
+  ).length;
+  const judged = flows.filter(
+    row => row.tiers.visual_proof === 'passed'
+  ).length;
+  return {
+    key: 'golden-path',
+    label: 'Golden path',
+    value: `${certified.length} of ${flows.length} certified`,
+    tone:
+      certified.length === flows.length
+        ? 'good'
+        : failing > 0 || certified.length === 0
           ? 'bad'
-          : passing === flows.length && certified === flows.length
-            ? 'good'
-            : 'warn',
-      measured: true,
-      target: `${certified} of ${flows.length} founder-certified`,
-      href: APP_ROUTES.ADMIN_CERTIFICATIONS,
-    };
-  }
+          : 'warn',
+    measured: true,
+    target:
+      failing > 0
+        ? `${failing} failing a check · ${judged} video-judged`
+        : `${judged} of ${flows.length} video-judged`,
+    href,
+  };
+}
 
-  return [runway, mrr, users, golden];
+export function buildCompanyTiles(input: {
+  readonly metrics: OvieCompanyMetricsInput | null;
+  readonly funnel: OvieFunnelInput | null;
+  readonly goldenPath: readonly OvieGoldenPathRow[] | null;
+}): readonly OvieCompanyTile[] {
+  return [
+    cashTile(input.metrics),
+    mrrTile(input.metrics),
+    usersTile(input.funnel),
+    goldenTile(input.goldenPath),
+  ];
 }

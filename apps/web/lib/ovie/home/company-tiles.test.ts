@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { HudOverviewMetrics } from '@/types/hud';
-import { buildCompanyTiles } from './company-tiles';
+import {
+  buildCompanyTiles,
+  type OvieCompanyMetricsInput,
+} from './company-tiles';
 
 const OVERVIEW: HudOverviewMetrics = {
   mrrUsd: 0,
@@ -9,77 +12,127 @@ const OVERVIEW: HudOverviewMetrics = {
   burnRateUsd: 110,
   runwayMonths: 0.2087,
   defaultStatus: 'dead',
-  defaultStatusDetail: 'Revenue growth is not yet outpacing burn.',
+  defaultStatusDetail: '',
   financialDataAvailable: true,
+  excludedInternal: { mrrUsd: 199, subscribers: 1 },
   weekAgo: { mrrUsd: 0, activeSubscribers: 0 },
 };
 
-const flow = (state: string, runtime: string) => ({
+const OK: OvieCompanyMetricsInput = {
+  overview: OVERVIEW,
+  sources: { stripe: { state: 'ok' }, mercury: { state: 'ok' } },
+};
+
+const flow = (state: string, tiers: Record<string, string>) => ({
   domain: 'flows',
   state,
-  tiers: { runtime_dogfood: runtime },
+  tiers,
 });
 
+const byKey = (input: Parameters<typeof buildCompanyTiles>[0]) =>
+  Object.fromEntries(buildCompanyTiles(input).map(tile => [tile.key, tile]));
+
 describe('buildCompanyTiles', () => {
-  it('answers "are we winning" from the live company reads', () => {
-    const byKey = Object.fromEntries(
-      buildCompanyTiles({
-        overview: OVERVIEW,
+  it('shows verified cash and never a runway built on partial burn', () => {
+    const cash = byKey({ metrics: OK, funnel: null, goldenPath: null }).cash;
+    expect(cash).toMatchObject({
+      value: '$23',
+      measured: true,
+      tone: 'neutral',
+      target: 'Runway not measured: card spend not in burn',
+    });
+    expect(cash?.value).not.toMatch(/day|mo/);
+  });
+
+  it('says Connect Mercury when the bank source is not ok', () => {
+    const cash = byKey({
+      metrics: {
+        ...OK,
+        sources: { ...OK.sources, mercury: { state: 'unavailable' } },
+      },
+      funnel: null,
+      goldenPath: null,
+    }).cash;
+    expect(cash).toMatchObject({
+      value: 'Not measured',
+      measured: false,
+      target: 'Connect Mercury',
+    });
+  });
+
+  it('reports customer MRR and names internal subscriptions it left out (JOV-7362)', () => {
+    expect(
+      byKey({ metrics: OK, funnel: null, goldenPath: null }).mrr
+    ).toMatchObject({
+      label: 'Customer MRR',
+      value: '$0',
+      tone: 'bad',
+      target: '0 paying · excl. $199 internal',
+    });
+  });
+
+  it('counts the golden path as certified only on a certification verdict', () => {
+    // Production checks passing is not certification (false-green, 2026-10-31).
+    const passingTests = flow('working', {
+      runtime_dogfood: 'passed',
+      visual_proof: 'missing',
+    });
+    const tile = byKey({
+      metrics: null,
+      funnel: null,
+      goldenPath: [passingTests, passingTests],
+    })['golden-path'];
+    expect(tile).toMatchObject({
+      value: '0 of 2 certified',
+      tone: 'bad',
+      target: '0 of 2 video-judged',
+    });
+    const certified = byKey({
+      metrics: null,
+      funnel: null,
+      goldenPath: [
+        flow('monitored', {
+          runtime_dogfood: 'passed',
+          visual_proof: 'passed',
+        }),
+        flow('working', { runtime_dogfood: 'failed', visual_proof: 'passed' }),
+      ],
+    })['golden-path'];
+    expect(certified).toMatchObject({
+      value: '1 of 2 certified',
+      tone: 'bad',
+      target: '1 failing a check · 2 video-judged',
+    });
+  });
+
+  it('reads new accounts and first value from the funnel', () => {
+    expect(
+      byKey({
+        metrics: null,
         funnel: {
           stages: [
             { key: 'accounts_created', count: 4, drillDownHref: '/x' },
             { key: 'onboarding_complete', count: 1, drillDownHref: null },
           ],
         },
-        goldenPath: [
-          flow('working', 'passed'),
-          flow('working', 'passed'),
-          { domain: 'marketing', state: 'shipped', tiers: {} },
-        ],
-      }).map(tile => [tile.key, tile])
-    );
-    expect(byKey.runway).toMatchObject({
-      value: '6 days',
-      tone: 'bad',
-      target: 'Default dead · $23 cash',
-    });
-    expect(byKey.mrr).toMatchObject({
-      value: '$0',
-      was: '$0 7d ago',
-      tone: 'bad',
-    });
-    expect(byKey.users).toMatchObject({
+        goldenPath: null,
+      }).users
+    ).toMatchObject({
       value: '4',
       target: '1 reached first value',
       href: '/x',
-      tone: 'good',
-    });
-    expect(byKey['golden-path']).toMatchObject({
-      value: '2 of 2 pass in prod',
-      target: '0 of 2 founder-certified',
-      tone: 'warn',
     });
   });
 
-  it('marks a failing production golden path bad', () => {
-    const golden = buildCompanyTiles({
-      overview: null,
-      funnel: null,
-      goldenPath: [flow('working', 'failed'), flow('shipped', 'passed')],
-    }).find(tile => tile.key === 'golden-path');
-    expect(golden).toMatchObject({ value: '1 of 2 pass in prod', tone: 'bad' });
-  });
-
-  it('never shows stub finance or a missing source as a real number', () => {
-    const tiles = buildCompanyTiles({
-      overview: { ...OVERVIEW, financialDataAvailable: false },
+  it('never shows a missing source as a number', () => {
+    for (const tile of buildCompanyTiles({
+      metrics: null,
       funnel: null,
       goldenPath: null,
-    });
-    for (const tile of tiles) {
+    })) {
       expect(tile.measured).toBe(false);
       expect(tile.value).toBe('Not measured');
-      expect(tile.tone).toBe('neutral');
+      expect(tile.target).toBeTruthy();
     }
   });
 });

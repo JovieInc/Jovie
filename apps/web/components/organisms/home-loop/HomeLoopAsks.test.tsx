@@ -121,3 +121,37 @@ describe('HomeLoopAsks answered card dim', () => {
     expect(card).not.toHaveClass('opacity-70');
   });
 });
+
+describe('HomeLoopAsks overflow', () => {
+  const asks = [1, 2, 3].map(n =>
+    reviewAsk({ id: `ask-${n}`, title: `Ask ${n}`, requiresEvidence: false })
+  );
+
+  it('reports how many asks were left out and can hide its own line', () => {
+    const onHiddenChange = vi.fn();
+    const { rerender } = render(
+      <HomeLoopAsks
+        asks={asks}
+        answers={{}}
+        maxVisible={2}
+        onHiddenChange={onHiddenChange}
+        onApprove={vi.fn()}
+        onReply={vi.fn()}
+      />
+    );
+    expect(onHiddenChange).toHaveBeenLastCalledWith(1);
+    expect(screen.getByText(/\+1 more/)).toBeInTheDocument();
+    rerender(
+      <HomeLoopAsks
+        asks={asks}
+        answers={{}}
+        maxVisible={2}
+        hideMore
+        onHiddenChange={onHiddenChange}
+        onApprove={vi.fn()}
+        onReply={vi.fn()}
+      />
+    );
+    expect(screen.queryByText(/\+1 more/)).toBeNull();
+  });
+});

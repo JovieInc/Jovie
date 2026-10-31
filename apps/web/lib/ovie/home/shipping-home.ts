@@ -311,7 +311,7 @@ function rawPulse(
   return [
     {
       key: 'merges-day',
-      label: 'Merges / day (7d)',
+      label: 'Merges / day (7d avg)',
       value: mergesPerDay === null ? OVIE_NOT_MEASURED : String(mergesPerDay),
       measured: mergesPerDay !== null,
       tone:
@@ -391,29 +391,16 @@ function rawPulse(
   ];
 }
 
-function sourceWas(
-  key: OviePulseKey,
-  delivery: DeliverySummary
-): string | null {
-  if (key === 'merges-day') {
-    const prior = perDay(delivery.merges.prior7Days);
-    return prior === null ? null : `${prior} prior 7d`;
-  }
-  return null;
-}
-
 /**
- * Throughput tiles, each with a target and a state. `was` is the source's
- * own comparison (merges vs the prior 7 days) or the value at Tim's last
- * visit from `memory`. Unmeasured values never become a `was`.
+ * Throughput tiles, each with a target and a state. `was` is the value at
+ * Tim's last visit from `memory`. Unmeasured values never become a `was`.
  */
 export function buildPulse(
   delivery: DeliverySummary,
   memory: OviePulseMemory = {}
 ): readonly OviePulseTile[] {
-  return withTileHistory(rawPulse(delivery), memory, key =>
-    sourceWas(key, delivery)
-  );
+  // One baseline for the page: the value at Tim's last visit.
+  return withTileHistory(rawPulse(delivery), memory);
 }
 
 /** Inputs the verdict needs before it may say shipping is on target. */

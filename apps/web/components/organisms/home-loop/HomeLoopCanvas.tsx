@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { type ReactNode, useCallback, useState } from 'react';
 import type {
   HomeLoopAsk,
   HomeLoopConstraint,
@@ -56,6 +56,14 @@ export interface HomeLoopCanvasProps {
   /** "Are we winning" tiles above the shipping verdict (Ovie: runway, MRR, users, golden path). */
   readonly company?: readonly HomeLoopTile[];
   readonly companyLoading?: boolean;
+  /** Heading over the company row; names its comparison baseline. */
+  readonly companyCaption?: string;
+  /** Reports asks that did not fit, so a caller can fold them into its notice. */
+  readonly onAsksHiddenChange?: (hidden: number) => void;
+  /** The asks notice already names the overflow; skip the "+N more" line. */
+  readonly asksHideMore?: boolean;
+  /** Count shown on Done today when the list is a sample (e.g. merges today). */
+  readonly doneCount?: number | null;
   /** Caption over the pulse row, e.g. what its comparison is against. */
   readonly pulseCaption?: string | null;
   /** Generated answer for the current canvas state, under the pulse. */
@@ -100,11 +108,26 @@ export function HomeLoopCanvas({
   inFlightOverride,
   company,
   companyLoading = false,
+  companyCaption = 'Company',
   pulseCaption,
+  onAsksHiddenChange,
+  asksHideMore = false,
+  doneCount,
 }: HomeLoopCanvasProps) {
-  const openAsks = asks.filter(
-    ask => !answers[ask.id] || answers[ask.id]?.state === 'failed'
-  ).length;
+  const [asksHidden, setAsksHidden] = useState(0);
+  const onHiddenChange = useCallback(
+    (hidden: number) => {
+      setAsksHidden(hidden);
+      onAsksHiddenChange?.(hidden);
+    },
+    [onAsksHiddenChange]
+  );
+  // The section count is what the reader can see, never more.
+  const openAsks = Math.max(
+    0,
+    asks.filter(ask => !answers[ask.id] || answers[ask.id]?.state === 'failed')
+      .length - asksHidden
+  );
   return (
     <div
       className='@container flex w-full flex-col gap-3 lg:h-full lg:min-h-0'
@@ -112,7 +135,12 @@ export function HomeLoopCanvas({
     >
       {company ? (
         <section aria-label='Company' className='flex flex-col gap-1.5'>
-          <h2 className='text-2xs font-medium text-tertiary-token'>Company</h2>
+          <h2
+            className='text-2xs font-medium text-tertiary-token'
+            data-testid='home-loop-company-caption'
+          >
+            {companyCaption}
+          </h2>
           <HomeLoopPulse
             tiles={company}
             loading={companyLoading}
@@ -171,6 +199,8 @@ export function HomeLoopCanvas({
             approveLabel={copy.approveLabel}
             fit
             moreHref={asksMoreHref}
+            hideMore={asksHideMore}
+            onHiddenChange={onHiddenChange}
             onApprove={onApprove}
             onReply={onReply}
             onFeedback={onFeedback}
@@ -200,7 +230,7 @@ export function HomeLoopCanvas({
           </HomeLoopSection>
           <HomeLoopSection
             title={copy.doneTitle}
-            count={done.length}
+            count={doneCount ?? done.length}
             status={loopStatus}
             isEmpty={done.length === 0 && !doneSummary}
             emptyLabel={copy.doneEmpty}
