@@ -229,6 +229,7 @@ import {
 } from '@/lib/services/pitch';
 import { isRetouchConfigured } from '@/lib/services/retouching/provider-gemini';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
+import { isProdcertCanaryEmail } from '@/lib/synthetic/prodcert-identities';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 
@@ -2873,7 +2874,26 @@ export async function POST(req: Request) {
 
   // Rate limiting - plan-aware weekly quota + burst protection. For clients
   // that send clientTurnId, reservation/replay happens before quota charging.
-  const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan);
+  //
+  // The production-certification canary (JOV-9625) is exempt: its turns are
+  // evidence collection, not customer usage, so an exhausted weekly counter
+  // must never block a promotion run's chat certification. The allowlist is
+  // the same documented canary set the OTP reader accepts
+  // (lib/synthetic/prodcert-identities.ts); every address on it is classified
+  // internal and excluded from customer metrics. This is the exemption
+  // (not a reset) decision for the outcome rework: no billing state changes,
+  // and the canary's actual model spend stays bounded by the run cadence.
+  const rateLimitResult: Awaited<
+    ReturnType<typeof checkAiChatRateLimitForPlan>
+  > = isProdcertCanaryEmail(accountContext.email)
+    ? {
+        success: true,
+        limit: 0,
+        remaining: 0,
+        reset: new Date(),
+        reason: 'prodcert canary exempt from plan quota (JOV-9625)',
+      }
+    : await checkAiChatRateLimitForPlan(userId, userPlan);
   if (!rateLimitResult.success) {
     const rateLimitMessage =
       accountContext.billingVerification === 'unavailable'

@@ -133,6 +133,12 @@ vi.mock('@/lib/chat/turns', () => ({
 vi.mock('@/lib/db', () => ({
   db: {},
 }));
+// The canary-exemption test proceeds past rate limiting; the profile access
+// check is denied shallowly so the turn never reaches the model or a deep
+// database mock.
+vi.mock('@/lib/auth/profile-access', () => ({
+  getExactProfileAccess: vi.fn(async () => ({ ok: false, reason: 'denied' })),
+}));
 
 vi.mock('@/lib/utils/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -276,6 +282,7 @@ function makeAccountContext(
   overrides: Partial<{
     plan: 'free' | 'pro' | 'max';
     billingVerification: 'verified' | 'unavailable';
+    email: string;
   }> = {}
 ): ChatAccountContext {
   const billingVerification = overrides.billingVerification ?? 'verified';
@@ -293,7 +300,7 @@ function makeAccountContext(
           ? 'Pro'
           : 'Free';
   return {
-    email: 'artist@example.com',
+    email: overrides.email ?? 'artist@example.com',
     plan,
     displayPlan,
     isPro,
@@ -441,6 +448,30 @@ describe('POST /api/chat guard wiring', () => {
 
     expect(hoisted.checkAiChatRateLimitForPlanMock).not.toHaveBeenCalled();
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+  });
+
+  it('exempts the prodcert canary identity from the plan-aware limiter (JOV-9625)', async () => {
+    hoisted.resolveChatAccountContextMock.mockResolvedValue(
+      makeAccountContext({ email: 'browse-ready+clerk_test@jov.ie' })
+    );
+    // Even a fully exhausted weekly counter must never reject the canary:
+    // its turns are evidence collection, not customer usage.
+    hoisted.checkAiChatRateLimitForPlanMock.mockResolvedValue({
+      success: false,
+      limit: 15,
+      remaining: 0,
+      reset: new Date(Date.now() + 60_000),
+      reason: 'You have reached your chat limit. Please try again later.',
+    });
+
+    const response = await POST(chatRequest(validBody()));
+
+    // The exemption branch short-circuits before the limiter, so the
+    // request can never come back as the rate-limit rejection.
+    expect(hoisted.checkAiChatRateLimitForPlanMock).not.toHaveBeenCalled();
+    expect(response.status).not.toBe(429);
+    const body = await response.json().catch(() => null);
+    expect(body?.errorCode).not.toBe('RATE_LIMITED');
   });
 
   it('returns 429 with Retry-After and rate-limit headers when the plan-aware limiter is exhausted, without dispatching the LLM', async () => {

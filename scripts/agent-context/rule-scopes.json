@@ -193,7 +193,7 @@
       "**/vitest.config.*",
       "**/playwright.config.*"
     ],
-    "bodySha256": "245b0404c1d52ce4abe9f9f6a3a68c80036f415026b73e80d8afd5e7e2ec4de0"
+    "bodySha256": "19a7d8becf04cb084bef8a2068491d534be6c6e59404ebc19197354ddec86056"
   },
   {
     "file": ".claude/rules/ui.md",
