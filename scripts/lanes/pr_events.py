@@ -957,7 +957,7 @@ JOB_URL = re.compile(r"^(https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\
 RED_RUN_URL = re.compile(r"https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\d*(?:/attempts/[1-9]\d*)?")
 
 
-def red_section_bounds(lines: list[str]) -> tuple[int, int] | None:
+def red_section_bounds(lines: list[str], heading=RED_HEADING) -> tuple[int, int] | None:
     """Match Fleet's section boundaries: headings inside code fences are log text."""
     # Ignore hidden Markdown while retaining source line indexes for replacement.
     visible = re.sub(r"<!--[\s\S]*?-->", lambda match: "\n" * match.group().count("\n"), "\n".join(lines))
@@ -970,7 +970,7 @@ def red_section_bounds(lines: list[str]) -> tuple[int, int] | None:
         if fenced:
             continue
         if start is None:
-            if RED_HEADING.match(line.strip()):
+            if heading.match(line.strip()):
                 start = index
         elif ANY_HEADING.match(line):
             return start, index
@@ -1045,11 +1045,12 @@ def with_red_section(body: str, block: str) -> str:
 
 
 def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None,
-                         locking_pr: int | None = None) -> str:
+                         locking_pr: int | None = None, measured_win: str | None = None) -> str:
     """Complete repair metadata without replacing existing evidence or customer decisions.
 
     The caller chooses the customer outcome and supplies any locking PR provenance;
-    never infer either from a failed check. Existing locked-area decisions are preserved.
+    never infer either from a failed check. Measured wins must come from the caller's
+    actual measurements; existing Win sections (including declines) are preserved.
     The canonical Fleet/changelog guards still validate the resulting body.
     """
     updated = body
@@ -1072,6 +1073,10 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
         visible = re.sub(r"<!--[\s\S]*?-->", "", updated)
         if not re.search(r"^#{1,6}\s+Locked areas\s*$", visible, re.I | re.M):
             updated = updated.rstrip("\n") + f"\n\n## Locked areas\n\nLocking PR: #{locking_pr}\n"
+    if measured_win is not None:
+        heading = re.compile(r"^#{2,3}\s+Win\s*$", re.I)
+        if red_section_bounds(updated.split("\n"), heading) is None:
+            updated = updated.rstrip("\n") + "\n\n" + measured_win.strip() + "\n"
     return updated
 
 
@@ -1086,16 +1091,18 @@ def api_gh(args, **_):
 
 
 def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_decision: dict | None = None,
-                            locking_pr: int | None = None) -> bool:
-    """Complete repair evidence and an optional caller-selected customer decision."""
+                            locking_pr: int | None = None, measured_win: str | None = None) -> bool:
+    """Complete repair evidence and optional caller-supplied decisions and measurements."""
     if not isinstance(pr.get("number"), int) or (
-            customer_decision is None and locking_pr is None and red_before_green_block(pr, excerpt) is None):
+            customer_decision is None and locking_pr is None and measured_win is None
+            and red_before_green_block(pr, excerpt) is None):
         return False
     viewed = sh(["pr", "view", str(pr["number"]), "--repo", REPO, "--json", "body", "--jq", ".body"])
     if viewed.returncode != 0:
         return False
     body = viewed.stdout or ""
-    updated = repair_evidence_body(pr, body, excerpt, customer_decision=customer_decision, locking_pr=locking_pr)
+    updated = repair_evidence_body(pr, body, excerpt, customer_decision=customer_decision,
+                                   locking_pr=locking_pr, measured_win=measured_win)
     if updated == body:
         return False
     with tempfile.TemporaryDirectory(prefix="red-before-green-") as tmp:
