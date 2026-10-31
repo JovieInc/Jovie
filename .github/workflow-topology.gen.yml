@@ -713,7 +713,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:land
-    jobCount: 2
+    jobCount: 3
   - name: Marketing Certification Producer
     path: .github/workflows/marketing-certification-producer.yml
     active: true

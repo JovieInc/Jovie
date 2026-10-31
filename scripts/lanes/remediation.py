@@ -62,11 +62,13 @@ LOCKFILES = frozenset({"pnpm-lock.yaml"})
 # Conflicts confined to machine-derived files resolve without a model: take main's copy,
 # run the file's canonical regenerator, push. JOV-6837 covered the lockfile; JOV-7594
 # extends the same deterministic rung to the generated workflow topology so Symphony PRs
-# stop hand-merging `.gen.` output.
+# stop hand-merging `.gen.` output. rule-scopes.json hashes are derived from
+# .claude/rules; --write rebuilds them from the merged rule files.
 GENERATED_RESOLVERS = {
     "canon/SOURCES_OF_TRUTH.md": ("node", "scripts/sources-of-truth.mjs", "--write"),
     ".github/workflow-topology.gen.yml": ("pnpm", "ci:topology:write"),
     "pnpm-lock.yaml": ("pnpm", "install", "--lockfile-only", "--ignore-scripts"),
+    "scripts/agent-context/rule-scopes.json": ("node", "scripts/agent-context/rule-scopes.mjs", "--write"),
 }
 # Only a secret-like file is a human call; an oversize diff is split by a repair lane and a
 # lockfile without its manifest is fixed by one (Tim 2026-10-12: no dead-end holds).

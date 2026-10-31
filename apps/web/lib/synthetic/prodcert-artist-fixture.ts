@@ -58,6 +58,9 @@ export async function selectUnclaimedCertArtist(
 ): Promise<ProdcertArtistFixture> {
   const taken: string[] = [];
   for (const candidate of candidates) {
+    // Fixtures that permanently own a pool artist (returning canary, ...)
+    // keep their binding; a claim journey must never pick or release it.
+    if (isReservedFixtureArtist(candidate.spotifyId)) continue;
     if (await isIdentityTaken(candidate.spotifyId)) {
       taken.push(candidate.spotifyId);
       continue;
@@ -84,13 +87,30 @@ export const SHARED_E2E_ARTIST_POOL: readonly ProdcertArtistFixture[] = [
     url: 'https://open.spotify.com/artist/0T4McYgGzOzXOWzLaukIjD',
   },
   {
-    spotifyId: '6knM2BGm18cXek6FXbWd0t',
-    name: 'Good Dropouts',
-    url: 'https://open.spotify.com/artist/6knM2BGm18cXek6FXbWd0t',
-  },
-  {
     spotifyId: '6TWG4bY1qzp0lJuxxFtl6F',
     name: 'Unmarked Cars',
     url: 'https://open.spotify.com/artist/6TWG4bY1qzp0lJuxxFtl6F',
   },
 ];
+
+/**
+ * Permanently bound to the seeded returning-creator canary
+ * (`returning-canary-seed-spec.ts`). Not part of the shared pool: run-time
+ * claim journeys never pick it, so its binding is never released or
+ * contested.
+ */
+export const RETURNING_CANARY_RESERVED_ARTIST: ProdcertArtistFixture =
+  Object.freeze({
+    spotifyId: '6knM2BGm18cXek6FXbWd0t',
+    name: 'Good Dropouts',
+    url: 'https://open.spotify.com/artist/6knM2BGm18cXek6FXbWd0t',
+  });
+
+/** Spotify ids owned by permanent fixtures; selection skips every one. */
+export const RESERVED_FIXTURE_ARTIST_IDS: ReadonlySet<string> = new Set([
+  RETURNING_CANARY_RESERVED_ARTIST.spotifyId,
+]);
+
+export function isReservedFixtureArtist(spotifyId: string): boolean {
+  return RESERVED_FIXTURE_ARTIST_IDS.has(spotifyId);
+}

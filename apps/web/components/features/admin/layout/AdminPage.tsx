@@ -5,7 +5,9 @@ import {
   type WorkspaceTabOption,
   WorkspaceTabsSurface,
 } from '@/components/organisms/WorkspaceTabsSurface';
+import type { AdminViewGroupId } from '@/constants/admin-navigation';
 import { cn } from '@/lib/utils';
+import { AdminRouteViews } from './AdminRouteViews';
 
 export interface AdminPageTabsConfig<
   TPrimary extends string,
@@ -39,7 +41,17 @@ export interface AdminPageProps<
    * lead the page.
    */
   readonly hero?: ReactNode;
+  /**
+   * Query-param views inside this one destination (filters of the same
+   * data). Separate routes use `views` instead.
+   */
   readonly tabs?: AdminPageTabsConfig<TPrimary, TSecondary>;
+  /**
+   * Route views behind this page's sidebar destination (Shipping: Pipeline,
+   * Product, Timeline). Rendered in the page toolbar with the canonical
+   * RouteSegmentControl. Pages never render sub-navigation markup themselves.
+   */
+  readonly views?: AdminViewGroupId;
   readonly actions?: ReactNode;
   readonly testId: string;
   readonly viewTestId?: string;
@@ -69,6 +81,7 @@ export function AdminPage<
   description,
   hero,
   tabs,
+  views,
   actions,
   testId,
   viewTestId,
@@ -96,9 +109,9 @@ export function AdminPage<
         data-testid={testId}
         data-admin-layout={layout}
       >
-        {actions ? (
+        {actions || views ? (
           <PageToolbar
-            start={null}
+            start={views ? <AdminRouteViews group={views} /> : null}
             end={actions}
             data-testid='admin-page-toolbar'
           />

@@ -38,6 +38,7 @@ import {
   OnboardingTurnstile,
   type OnboardingTurnstileState,
 } from './OnboardingTurnstile';
+import { endsInTerminalNextStep } from './onboardingChatHelpers';
 import { useOnboardingClaim } from './useOnboardingClaim';
 
 const SIGN_IN_LABEL = 'Sign in';
@@ -78,6 +79,14 @@ export interface OnboardingShellProps {
 export function buildEntryProfileBuilderState(
   entryProfile: StartEntryProfile | null | undefined
 ): OnboardingProfileBuilderState {
+  // An open name still seeds the draft panel (Pen R6As7U): the visitor sees
+  // jov.ie/<handle> taking shape before the first message.
+  if (entryProfile?.status === 'available') {
+    return {
+      ...EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
+      handle: entryProfile.handle,
+    };
+  }
   if (entryProfile?.status !== 'claimable') {
     return EMPTY_ONBOARDING_PROFILE_BUILDER_STATE;
   }
@@ -229,9 +238,20 @@ export function OnboardingShell({
   // authenticated, then retry after completed chat turns. Durable waitlist
   // receipts route to /waitlist; admitted users go to checkout; missing
   // artist identity stays in this chat.
+  //
+  // A restored owned transcript normally waits for a genuine turn, except
+  // when it already ends in a terminal next-step decision: then a claim was
+  // committed whose response never arrived (the email-code form hard-navigates
+  // to /start while the pre-navigation claim is in flight), and only this
+  // claim's idempotent alreadyClaimed recovery can deliver the receipt
+  // (golden-path cert 2026-10-31 pm, mobile walks m1-m3).
+  const awaitingClaimHandoff = useMemo(
+    () => resumeOwnedConversation && endsInTerminalNextStep(initialMessages),
+    [resumeOwnedConversation, initialMessages]
+  );
   const claimStatus = useOnboardingClaim(
     claimTrigger,
-    !resumeOwnedConversation || claimTrigger > 0
+    !resumeOwnedConversation || awaitingClaimHandoff || claimTrigger > 0
   );
   const isLinking =
     claimStatus === 'pending' || claimStatus === 'retry-after-webhook';

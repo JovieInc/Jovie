@@ -22,6 +22,9 @@ on:
       - Golden Path Prod Autofix
       - Production Controller
       - Changed-Evidence Test Suites
+    # No relay path handles a merge-group ref (PR events or main only); those wakes
+    # were ~1/3 of all relay wakes and all skipped.
+    branches-ignore: ['gh-readonly-queue/**']
     types: [completed]
   deployment_status:
   repository_dispatch:

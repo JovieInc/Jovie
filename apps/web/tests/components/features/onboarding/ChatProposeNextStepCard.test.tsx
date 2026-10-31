@@ -13,7 +13,11 @@ vi.mock('@/hooks/useClerkSafe', () => ({
 }));
 
 vi.mock('@/features/auth', () => ({
-  AuthShell: () => <div data-testid='waitlist-signup'>signup</div>,
+  AuthShell: ({ claimHandle }: { claimHandle?: string }) => (
+    <div data-testid='waitlist-signup' data-claim-handle={claimHandle ?? ''}>
+      signup
+    </div>
+  ),
 }));
 
 vi.mock('@/lib/analytics', () => ({ track: trackMock }));
@@ -72,5 +76,20 @@ describe('ChatProposeNextStepCard waitlist truthfulness', () => {
       'waitlist_decision_rendered',
       'waitlist_save_started',
     ]);
+  });
+
+  it('claims the handle the chat settled on, not the homepage ?handle=', () => {
+    // Golden-path cert 2026-10-31 pm: the visitor typed jov.ie/gpwo879d on the
+    // homepage, locked @unmarkedpave in chat, and the card said "Claim @gpwo879d".
+    render(
+      <ChatProposeNextStepCard
+        payload={waitlistPayload}
+        claimHandle='unmarkedpave'
+      />
+    );
+    expect(screen.getByTestId('waitlist-signup')).toHaveAttribute(
+      'data-claim-handle',
+      'unmarkedpave'
+    );
   });
 });
