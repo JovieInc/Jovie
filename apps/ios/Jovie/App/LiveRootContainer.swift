@@ -60,7 +60,7 @@ struct LiveRootContainer: View {
         }
 
         didHydrateNativeSession = true
-        if let nativeSession = NativeSessionTokenStore.load() {
+        if let nativeSession = await NativeSessionTokenStore.loadOffMainActor() {
           MobileAuthDiagnostics.record("native_session_hydrated")
           if BiometricLockPolicy.shouldRequireUnlock(
             isEnabled: isBiometricLockActive,
@@ -76,7 +76,11 @@ struct LiveRootContainer: View {
         } else {
           biometricLockState = .unlocked
           canRenderRoot = true
-          await appState.handleSignedInUserChange(nil)
+          // An auth callback may have committed a session while the Keychain
+          // read was in flight; never downgrade that route to signed-out.
+          if appState.activeUserID == nil {
+            await appState.handleSignedInUserChange(nil)
+          }
         }
       }
       .onChange(of: scenePhase) { _, phase in
@@ -140,7 +144,8 @@ struct LiveRootContainer: View {
       biometricLockState = .unlocked
       canRenderRoot = true
       if appState.activeUserID == nil,
-         let nativeSession = NativeSessionTokenStore.load()
+         let nativeSession = await NativeSessionTokenStore.loadOffMainActor(),
+         appState.activeUserID == nil
       {
         await appState.handleSignedInUserChange(nativeSession.userID)
       }

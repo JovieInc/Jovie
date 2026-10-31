@@ -3127,6 +3127,30 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         self.assertEqual(events.repair_evidence_body(self.PR, updated, locking_pr=23295), updated)
         self.assertEqual(updated.count("customer-changelog/v1"), 1)
 
+    def test_explicit_locking_pr_repairs_placeholder_sections_without_losing_other_evidence(self):
+        for placeholder in ("", "None touched.", "- None", "N/A", "Not applicable.", "TODO", "TBD"):
+            with self.subTest(placeholder=placeholder):
+                body = (events.red_before_green_block(self.PR) + "\n## Locked areas\n\n" + placeholder
+                        + "\n<!-- keep this note -->\n\n## Blast radius\nKeep this proof.\n")
+                updated = events.repair_evidence_body(self.PR, body, locking_pr=23667)
+                checked = subprocess.run(
+                    ["node", "--input-type=module", "-e", """
+                        import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+                        import { readFileSync } from 'node:fs';
+                        const body = readFileSync(0, 'utf8');
+                        process.stdout.write(JSON.stringify(evaluateFleetRules({
+                            pr: { title: 'fix: repair Swift guard evidence', body },
+                            files: [{ filename: 'scripts/swift-arch/baseline.json', status: 'modified' }],
+                        }).errors));
+                    """], cwd=ROOT, input=updated, text=True, capture_output=True, check=True,
+                )
+                self.assertEqual(json.loads(checked.stdout), [])
+                self.assertEqual(updated.count("## Locked areas"), 1)
+                self.assertIn("<!-- keep this note -->", updated)
+                self.assertIn("## Blast radius\nKeep this proof.", updated)
+                self.assertEqual(events.repair_evidence_body(self.PR, updated, locking_pr=23667), updated)
+                self.assertEqual(events.repair_evidence_body(self.PR, body), body)
+
     def test_locking_reference_is_explicit_validated_and_never_overwrites_authority(self):
         body = events.red_before_green_block(self.PR)
         self.assertNotIn("## Locked areas", events.repair_evidence_body(self.PR, body))

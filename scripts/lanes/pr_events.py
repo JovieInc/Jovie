@@ -1049,9 +1049,20 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
     if locking_pr is not None:
         if type(locking_pr) is not int or locking_pr < 1:
             raise ValueError("locking PR requires an explicit positive PR number")
-        visible = re.sub(r"<!--[\s\S]*?-->", "", updated)
-        if not re.search(r"^#{1,6}\s+Locked areas\s*$", visible, re.I | re.M):
+        # Keep line positions when masking comments so the explicit provenance
+        # can replace a template placeholder without losing surrounding evidence.
+        visible = re.sub(r"<!--[\s\S]*?-->", lambda m: "\n" * m[0].count("\n"), updated).split("\n")
+        start = next((i for i, line in enumerate(visible)
+                      if re.fullmatch(r"#{1,6}\s+Locked areas\s*", line, re.I)), None)
+        if start is None:
             updated = updated.rstrip("\n") + f"\n\n## Locked areas\n\nLocking PR: #{locking_pr}\n"
+        else:
+            end = next((i for i in range(start + 1, len(visible)) if ANY_HEADING.match(visible[i])), len(visible))
+            placeholder = re.compile(r"\s*(?:[-*]\s*)?(?:none(?: touched)?|n/?a|not applicable|todo|tbd)?[.!]?\s*", re.I)
+            if placeholder.fullmatch("\n".join(visible[start + 1:end])):
+                lines = updated.split("\n")
+                notes = [line for line in lines[start + 1:end] if not placeholder.fullmatch(line)]
+                updated = "\n".join(lines[:start + 1] + ["", f"Locking PR: #{locking_pr}", *notes, ""] + lines[end:])
     return updated
 
 

@@ -430,6 +430,14 @@ enum NativeSessionTokenStore {
     withLock { loadLocked() }
   }
 
+  /// `load()` for main-actor callers. The read is Keychain IPC to securityd
+  /// behind the store lock, so launch and unlock paths await it off the main
+  /// actor instead of blocking the first frame (ADR:
+  /// docs/architecture/swift-architecture-adr-2026-10-29.md).
+  static func loadOffMainActor() async -> NativeStoredSession? {
+    await Task.detached(priority: .userInitiated) { load() }.value
+  }
+
   static func requestAuthorization() -> NativeRequestAuthorization? {
     captureSessionContext().authorization
   }

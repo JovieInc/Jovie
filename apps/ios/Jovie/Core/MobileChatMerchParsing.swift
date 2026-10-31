@@ -157,7 +157,7 @@ extension MobileChatContentParser {
     ]
 
     for pattern in enumerationPatterns {
-      guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+      guard let regex = MobileChatRegexCache.regex(pattern, options: [.caseInsensitive]) else {
         continue
       }
       let range = NSRange(trimmed.startIndex..., in: trimmed)
