@@ -1833,9 +1833,12 @@ jobs:
     permissions:
       contents: read
     # Production canonical-alias policy is measured independently from staging.
-    # Ship now: BLOCK; the 2026-10-31 receipt has 14/14 qualifying runs and a
-    # current streak of 14/14 (worst twenty-sample nearest-rank p95 1268.4ms
-    # against 1500ms), which met the 2026-10-21 receipt's graduation rule.
+    # Ship now: BLOCK on certified pages only; the 2026-10-31 receipt has 14/14
+    # qualifying runs and a current streak of 14/14 (worst twenty-sample
+    # nearest-rank p95 1268.4ms against 1500ms). A route blocks only while its
+    # golden-path surface holds a current production certification in the Ovie
+    # certification ledger; every other route warns (Tim 2026-10-31: quality
+    # gates never stall launch). The blocking set grows as surfaces certify.
     # Re-evaluate when: any selected run misses, and
     # no later than 2026-11-07 (JOV-8737). Then: refresh the receipt; return
     # this gate to WARN only if the refreshed window no longer qualifies. Evidence:
@@ -1849,6 +1852,12 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
       - uses: ./.github/actions/setup-playwright
+      - uses: ./.github/actions/setup-doppler
+      - name: Resolve CRON_SECRET for the certification ledger
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+        # Unresolved means nothing is certified: the gate warns, never blocks.
+        run: node .github/scripts/resolve-synthetic-secrets.mjs --name CRON_SECRET || echo "::warning::CRON_SECRET unresolved; alias budgets warn only."
       - name: Gate canonical public-profile aliases on usable results
         id: alias-perf
         working-directory: apps/web
@@ -1856,22 +1865,46 @@ jobs:
           CI: 'true'
         run: |
           set -euo pipefail
-          # The checked-in 14-run receipt graduated canonical-alias budgets
-          # (14/14 on 2026-10-31): a miss fails closed. JOV-8737 owns the recheck.
-          if ! pnpm exec tsx scripts/performance-budgets-guard.ts \
-            --base-url https://jov.ie \
-            --runs 5 \
-            --route-id public-profile-listen \
-            --route-id public-profile-music \
-            --route-id public-profile-subscribe \
-            --route-id public-profile-tip \
-            --route-id public-profile-tour \
-            --route-id public-profile-releases; then
-            echo "::error::Production public-profile alias budgets failed on jov.ie. Receipt 2026-10-31: 14/14 qualifying, streak 14/14; review by 2026-11-07 (JOV-8737)."
-            echo "performance_status=failed" >> "$GITHUB_OUTPUT"
-            exit 1
+          routes='public-profile-listen public-profile-music public-profile-subscribe public-profile-tip public-profile-tour public-profile-releases'
+          # Certified pages come from the Ovie certification ledger, never a
+          # hand-kept list. An unreadable ledger certifies nothing.
+          ledger=''
+          if [ -n "${CRON_SECRET:-}" ]; then
+            ledger="$(curl -fsS --max-time 20 \
+              -H "authorization: Bearer ${CRON_SECRET}" \
+              https://jov.ie/api/internal/ovie/golden-path-evidence || true)"
           fi
-          echo "performance_status=passed" >> "$GITHUB_OUTPUT"
+          # shellcheck disable=SC2086 # route ids are fixed tokens.
+          split="$(printf '%s' "$ledger" | node "${GITHUB_WORKSPACE}/scripts/lib/alias-gate-certified-routes.mjs" $routes)"
+          certification="$(printf '%s\n' "$split" | sed -n 's/^certification=//p')"
+          blocking="$(printf '%s\n' "$split" | sed -n 's/^blocking=//p')"
+          warning="$(printf '%s\n' "$split" | sed -n 's/^warning=//p')"
+          echo "Certification ledger: ${certification}; blocking routes: ${blocking:-none}; warning routes: ${warning:-none}"
+          guard() {
+            local args=()
+            for route in "$@"; do args+=(--route-id "$route"); done
+            pnpm exec tsx scripts/performance-budgets-guard.ts \
+              --base-url https://jov.ie \
+              --runs 5 \
+              "${args[@]}"
+          }
+          status=passed
+          if [ -n "$warning" ]; then
+            # shellcheck disable=SC2086
+            if ! guard $warning; then
+              echo "::warning::Production public-profile alias budgets missed on uncertified pages (${warning}); warning only until their golden-path surface certifies (JOV-8737)."
+              status=warn
+            fi
+          fi
+          if [ -n "$blocking" ]; then
+            # shellcheck disable=SC2086
+            if ! guard $blocking; then
+              echo "::error::Production public-profile alias budgets failed on certified pages (${blocking}) on jov.ie. Receipt 2026-10-31: 14/14 qualifying, streak 14/14; review by 2026-11-07 (JOV-8737)."
+              echo "performance_status=failed" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
+          fi
+          echo "performance_status=${status}" >> "$GITHUB_OUTPUT"
 
   sentry-error-gate:
     name: Sentry Error Gate (production)
