@@ -3129,6 +3129,8 @@ console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
         self.assertEqual(events.repair_evidence_body(self.PR, updated, win_evidence=win), updated)
         self.assertEqual(events.repair_evidence_body(self.PR, updated,
                                                    win_evidence=win.replace("2 | 1", "3 | 1")), updated)
+        crlf = updated.replace("\n", "\r\n")
+        self.assertEqual(events.repair_evidence_body(self.PR, crlf, win_evidence=win), crlf)
         for invalid in ("", "- Claim: missing heading", 42):
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
                 events.repair_evidence_body(self.PR, body, win_evidence=invalid)
@@ -3155,15 +3157,18 @@ console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
         bodies = []
         template_win = (ROOT / ".github/pull_request_template.md").read_text().split("## Win", 1)[1]
         template_win = template_win.split("\n## ", 1)[0]
-        for placeholder in ("", template_win, "- none", "not applicable"):
+        cases = [(placeholder, newline) for placeholder in ("", template_win, "- none", "not applicable")
+                 for newline in ("\n", "\r\n")]
+        for placeholder, newline in cases:
             body = (events.red_before_green_block(self.PR) + "\n\n## Win\n" + placeholder +
                     "\n" + decision + "\n\n## Next\nKeep this section.\n")
-            with self.subTest(placeholder=placeholder):
+            body = body.replace("\n", newline)
+            with self.subTest(placeholder=placeholder, newline=newline):
                 updated = events.repair_evidence_body(self.PR, body, win_evidence=win)
                 self.assertIn(win, updated)
                 self.assertEqual(updated.count("## Win"), 1)
                 self.assertEqual(updated.count(decision), 1)
-                self.assertIn("## Next\nKeep this section.", updated)
+                self.assertTrue(updated.endswith("## Next" + body.split("## Next", 1)[1]))
                 self.assertEqual(events.repair_evidence_body(self.PR, updated, win_evidence=win), updated)
                 bodies.append(updated)
         checked = subprocess.run(["node", "--input-type=module", "-e", """
@@ -3173,7 +3178,7 @@ console.log(JSON.stringify(JSON.parse(readFileSync(0, 'utf8')).map(body => evalu
   pr: {title: 'fix(ci): repair metadata', body}, files: [],
 }).errors)));
 """], cwd=ROOT, input=json.dumps(bodies), text=True, capture_output=True, check=True)
-        self.assertEqual(json.loads(checked.stdout), [[], [], [], []])
+        self.assertEqual(json.loads(checked.stdout), [[] for _ in cases])
 
     def test_explicit_locking_pr_repairs_missing_provenance_and_passes_fleet(self):
         body = events.red_before_green_block(self.PR)

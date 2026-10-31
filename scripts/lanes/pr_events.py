@@ -1058,7 +1058,7 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
         # Mask comments without changing offsets so a placeholder can be replaced
         # in the original body while retaining hidden customer/repair decisions.
         visible = re.sub(r"<!--[\s\S]*?-->", lambda m: re.sub(r"[^\n]", " ", m[0]), updated)
-        win = re.search(r"^#{2,3}[ \t]*Win[ \t]*$([\s\S]*?)(?=^#{1,3}\s|\Z)", visible, re.I | re.M)
+        win = re.search(r"^#{2,3}[ \t]*Win[ \t\r]*$([\s\S]*?)(?=^#{1,3}\s|\Z)", visible, re.I | re.M)
         if win is None:
             updated = updated.rstrip("\n") + "\n\n" + win_evidence.rstrip("\n") + "\n"
         elif not win[1].strip() or re.fullmatch(r"(?:-\s*)?(?:n/?a|none|not applicable)[.!]?", win[1].strip(), re.I):
