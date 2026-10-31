@@ -10,7 +10,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-export const RUBRIC_VERSION = 'tim-taste-rubric/2026-10-29.2';
+export const RUBRIC_VERSION = 'tim-taste-rubric/2026-10-31.1';
 export const SEVERITIES = /** @type {const} */ (['blocker', 'major', 'minor']);
 
 const ASR_REGISTRY = fileURLToPath(
@@ -121,16 +121,17 @@ export const CRITERIA = Object.freeze([
   {
     id: 'TT-08',
     slug: 'restrained-type-and-controls',
-    title: 'Linear precision: restrained type, sentence case, quiet controls',
+    title:
+      'Linear precision: restrained type, Title Case controls, never all caps, quiet controls',
     asr: ['ASR-025', 'ASR-041', 'ASR-022', 'ASR-005'],
     severity: 'major',
-    look: 'Fail on oversized headlines or text tabs, Title Case labels and buttons, all-caps eyebrows by default, text under 12px, default-disabled grey primary buttons and stacked title/subtitle/label/helper layers.',
+    look: 'Fail on oversized headlines or text tabs, ALL-CAPS labels, buttons, eyebrows or table rows, sentence-case buttons or nav labels (house rule .claude/rules/ui.md: Title Case for labels, headings, buttons, badges, column headers and nav items, Apple style; sentence case for body, descriptions, tooltips and toasts), text under 12px, default-disabled grey primary buttons and stacked title/subtitle/label/helper layers.',
     fail: [
-      '"Resume At Start" Title Case button.',
+      '"SMART LINKS" all-caps comparison row label.',
       'Billboard-size marketing headline Tim called the "consumer oversized everything trap".',
     ],
     pass: [
-      'Sentence-case labels, one heading size step above body, one microcopy line.',
+      'Title Case buttons and labels ("Confirm Handle", "Start Over"), sentence-case body, one heading size step above body, one microcopy line.',
     ],
   },
   {
@@ -193,8 +194,10 @@ export const CRITERIA = Object.freeze([
     title: 'Audience, never "fan"',
     asr: ['ASR-028'],
     severity: 'blocker',
-    look: 'Fail on the word fan or fans anywhere on screen in Jovie product or marketing copy.',
-    fail: ['"Paste the full URL fans already use."'],
+    look: 'Fail on the word fan or fans anywhere in Jovie product or marketing copy: on screen, and in the DOM/AX text of the step (placeholders, helper text, labels, offscreen or collapsed widgets count too).',
+    fail: [
+      '"Paste the full URL fans already use." (social-link widget helper text, present in the DOM even when the widget was not on screen; missed by the first calibration run)',
+    ],
     pass: ['"Paste the link your audience already uses."'],
   },
   {
@@ -340,9 +343,16 @@ export function buildJudgeSchema(stepIds, imageNames) {
 }
 
 /**
- * @param {{ surface: string, steps: Array<{ id: string, title: string, url?: string|null, images: Array<{ name: string, path: string, t?: number|null }>, text?: string, console?: string }>, penRefs: Array<{ id: string, title: string, path: string }>, tier: 'screen' | 'confirm', prior?: any }} input
+ * @param {{ surface: string, steps: Array<{ id: string, title: string, url?: string|null, images: Array<{ name: string, path: string, t?: number|null }>, text?: string, console?: string }>, penRefs: Array<{ id: string, title: string, path: string }>, tier: 'screen' | 'confirm', prior?: any, canary?: string[] }} input
  */
-export function buildJudgePrompt({ surface, steps, penRefs, tier, prior }) {
+export function buildJudgePrompt({
+  surface,
+  steps,
+  penRefs,
+  tier,
+  prior,
+  canary = [],
+}) {
   const stepBlocks = steps
     .map(step => {
       const lines = [
@@ -354,7 +364,9 @@ export function buildJudgePrompt({ surface, steps, penRefs, tier, prior }) {
         );
       }
       if (step.text)
-        lines.push(`  Visible text / AX excerpt:\n"""\n${step.text}\n"""`);
+        lines.push(
+          `  DOM/AX text (judge copy here too, including what is not on screen):\n"""\n${step.text}\n"""`
+        );
       if (step.console) lines.push(`  Console/network notes: ${step.console}`);
       return lines.join('\n');
     })
@@ -380,7 +392,7 @@ ${penBlock}
 Run steps:
 ${stepBlocks}
 
-${tierLine}
+${canaryBlock(canary)}${tierLine}
 
 Output rules:
 - One entry per step, using the exact stepId values.
@@ -449,7 +461,7 @@ export function parseJudgeOutput(raw, stepIds) {
 // context, and is asked what is wrong. Any credible finding fails the step.
 // ---------------------------------------------------------------------------
 
-export const COLD_PASS_VERSION = 'cold-screenshot/2026-10-29.2';
+export const COLD_PASS_VERSION = 'cold-screenshot/2026-10-29.3';
 
 export function buildColdSchema(imageNames) {
   return {
@@ -489,7 +501,7 @@ export function buildColdSchema(imageNames) {
 }
 
 /** No rubric, no product context: the bar is what a sharp designer sees cold. */
-export function buildColdPrompt(images) {
+export function buildColdPrompt(images, canary = []) {
   const list = images.map(image => `  ${image.name}: ${image.path}`).join('\n');
   return `Someone sent you these screenshots with no comment. For each one, open it (use the Read tool) and tell them what's wrong with it.
 
@@ -499,7 +511,7 @@ Judge each image on its own. List what is wrong with it: visual, copy, layout, b
 - credible: true only if it is obvious: something you would point out within a few seconds of looking, without hunting, zooming or knowing how the product works, and that a careful designer would agree is wrong rather than a matter of preference. Polish ideas, pixel nitpicks, guesses about states you cannot see, and annotation labels outside the product UI are credible: false.
 - severity: blocker (they would not ship it), major (clearly wrong), minor (polish).
 - bbox: [x, y, width, height] as fractions of that image.
-- Many good screens have nothing obviously wrong. Then return an empty issues list for that image. Do not invent issues.`;
+${canary.length ? `- These are declared test-harness identities, not real data; ignore them wherever they appear: ${canary.join(', ')}\n` : ''}- Many good screens have nothing obviously wrong. Then return an empty issues list for that image. Do not invent issues.`;
 }
 
 /** Validate the cold pass output; every image must be answered. */
@@ -532,7 +544,67 @@ export function parseColdOutput(raw, imageNames) {
   });
 }
 
-/** Tim's bar: any credible cold issue is a fail, whatever its severity. */
+/**
+ * A credible blocker or major cold issue fails the step. Credible minors do
+ * not fail the gate; they ship as remediation items (calibration 2026-10-29:
+ * failing on every credible minor rejected 7/7 Tim-approved frames).
+ */
 export function coldFails(issues) {
-  return issues.some(issue => issue.credible);
+  return issues.some(issue => issue.credible && issue.severity !== 'minor');
+}
+
+function canaryBlock(canary) {
+  return canary.length
+    ? `Declared test-harness identities (the recorder's canary account; not real user data): ${canary.join(', ')}. Never report them as leaked test data; judge everything else as if a real person were signed in.\n\n`
+    : '';
+}
+
+/** Banned copy that a machine can catch without a model (ASR-028). */
+export const BANNED_TERMS = Object.freeze([
+  {
+    criterion: 'TT-13',
+    pattern: /\bfans?\b/giu,
+    fix: 'Say "audience" (or "listeners") instead of "fan".',
+  },
+]);
+
+/**
+ * Deterministic scan of a step's DOM/AX text: catches banned copy the frames
+ * never showed (offscreen helper text, collapsed widgets). Returns findings in
+ * the judge's finding shape, severity from the criterion default.
+ */
+export function scanBannedTerms(text) {
+  if (!text) return [];
+  const out = [];
+  for (const term of BANNED_TERMS) {
+    const criterion = CRITERIA.find(c => c.id === term.criterion);
+    for (const match of String(text).matchAll(term.pattern)) {
+      const start = Math.max(0, match.index - 60);
+      const snippet = String(text)
+        .slice(start, match.index + match[0].length + 60)
+        .replace(/\s+/gu, ' ')
+        .trim();
+      out.push({
+        criterion: term.criterion,
+        severity: criterion?.severity ?? 'blocker',
+        evidence: snippet,
+        detail: `Banned word "${match[0]}" in the page copy (DOM/AX text).`,
+        fix: term.fix,
+      });
+    }
+  }
+  const seen = new Set();
+  return out.filter(f =>
+    seen.has(f.evidence) ? false : (seen.add(f.evidence), true)
+  );
+}
+
+/** True when a finding is only about a declared canary identity (a harness artifact). */
+export function isCanaryArtifact(finding, canary = []) {
+  if (!canary.length) return false;
+  const hay = `${finding.evidence ?? ''} ${finding.detail ?? ''}`.toLowerCase();
+  return (
+    canary.some(id => id && hay.includes(String(id).toLowerCase())) &&
+    /test|synthetic|canary|harness|identity|email/iu.test(hay)
+  );
 }

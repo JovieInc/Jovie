@@ -70,7 +70,9 @@ export function buildLedger({
     if (receipt.verdict !== 'pass') reasons.push('judge-verdict-fail');
     if (!receipt.signoff?.nothingWrong)
       reasons.push('no-nothing-wrong-signoff');
-    if (signingKey && !verifyReceiptSignature(receipt, signingKey))
+    // Fail closed like the server: no key, no verifiable pass.
+    if (!signingKey) reasons.push('signing-key-unavailable');
+    else if (!verifyReceiptSignature(receipt, signingKey))
       reasons.push('signature-invalid-or-missing');
     const pass = reasons.length === 0;
     surfaces[surface.id] = {

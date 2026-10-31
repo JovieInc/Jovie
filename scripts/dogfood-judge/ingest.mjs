@@ -8,6 +8,9 @@
 //   <screenshots>.png referenced by steps[].screenshot
 //   dom/<step>.txt    optional visible text / AX snapshot per step
 //   console.json      optional { [step]: "notes" } of console errors and failed requests
+//   canary.json       optional { identities: ["synthetic+canary@jov.ie", "wlcert1029a"] } the
+//                     recorder's declared test identities (judge ignores them as harness artifacts)
+//   notes.jsonl       optional per-screenshot DOM text: { name: <screenshot basename>, text }
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
@@ -15,7 +18,7 @@ import { basename, extname, join, resolve } from 'node:path';
 
 export const MANIFEST_SCHEMA = 'jovie.dogfood-judge-manifest/v1';
 const SCENE_THRESHOLD = 0.18;
-const MAX_KEYFRAMES_PER_STEP = 3;
+const MAX_KEYFRAMES_PER_STEP = 4;
 const MAX_TEXT_CHARS = 1800;
 
 /** Parse ffmpeg showinfo stderr into frame timestamps (seconds). */
@@ -119,11 +122,54 @@ function readOptional(path) {
 /**
  * @param {{ runDir: string, outDir: string, surface: string, includeNotRun?: boolean }} args
  */
-export function ingestRun({ runDir, outDir, surface }) {
+/** Uniform samples every `every` seconds inside a window, merged with scene times, near-duplicates dropped. */
+export function coverWindow(sceneTimes, window, every = 5, minGap = 1.5) {
+  const end = Number.isFinite(window.end)
+    ? window.end
+    : window.start + every * 4;
+  const uniform = [];
+  for (let t = window.start + every; t < end; t += every)
+    uniform.push(Number(t.toFixed(2)));
+  const merged = [
+    ...sceneTimes.filter(t => t >= window.start && t < end),
+    ...uniform,
+  ].sort((a, b) => a - b);
+  const out = [];
+  for (const t of merged)
+    if (!out.length || t - out[out.length - 1] >= minGap) out.push(t);
+  return out;
+}
+
+export function readCanary(path) {
+  if (!path || !existsSync(path)) return [];
+  const raw = JSON.parse(readFileSync(path, 'utf8'));
+  return (Array.isArray(raw) ? raw : (raw.identities ?? []))
+    .map(String)
+    .filter(Boolean);
+}
+
+export function readNotes(path) {
+  const map = new Map();
+  if (!path || !existsSync(path)) return map;
+  for (const line of readFileSync(path, 'utf8').split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const row = JSON.parse(line);
+      if (row.name && row.text) map.set(String(row.name), String(row.text));
+    } catch {
+      // a malformed note line carries no evidence; skip it
+    }
+  }
+  return map;
+}
+
+export function ingestRun({ runDir, outDir, surface, notesPath, canaryPath }) {
   const root = resolve(runDir);
   const stepsPath = join(root, 'steps.json');
   if (!existsSync(stepsPath)) throw new Error(`no steps.json in ${root}`);
   const rawSteps = JSON.parse(readFileSync(stepsPath, 'utf8'));
+  const canary = readCanary(canaryPath ?? join(root, 'canary.json'));
+  const notes = readNotes(notesPath ?? join(root, 'notes.jsonl'));
   // A step with no screenshot and no video was never recorded: it cannot pass.
   const recorded = rawSteps.filter(step => step.screenshot || step.video);
   const notRecorded = rawSteps
@@ -174,10 +220,11 @@ export function ingestRun({ runDir, outDir, surface }) {
           window.end,
           videos.get(window.video).durationSec ?? window.end
         );
-        for (const [k, t] of pickKeyframes(sceneCache.get(videoPath), {
-          start: window.start,
-          end,
-        }).entries()) {
+        for (const [k, t] of pickKeyframes(
+          coverWindow(sceneCache.get(videoPath), { start: window.start, end }),
+          { start: window.start, end },
+          MAX_KEYFRAMES_PER_STEP
+        ).entries()) {
           const out = join(
             framesDir,
             `${id}-${basename(window.video, extname(window.video))}-${t.toFixed(2)}s.png`
@@ -194,7 +241,12 @@ export function ingestRun({ runDir, outDir, surface }) {
       }
     }
     const domText =
-      readOptional(join(root, 'dom', `${step.step}.txt`)) ?? step.text ?? null;
+      readOptional(join(root, 'dom', `${step.step}.txt`)) ??
+      step.text ??
+      (step.screenshot
+        ? notes.get(basename(step.screenshot, extname(step.screenshot)))
+        : null) ??
+      null;
     return {
       id,
       title: step.title,
@@ -213,6 +265,7 @@ export function ingestRun({ runDir, outDir, surface }) {
     schema: MANIFEST_SCHEMA,
     surface,
     runDir: root,
+    canary,
     videos: [...videos.values()],
     steps: steps.filter(step => step.images.length > 0),
     unjudgeable: [

@@ -14,10 +14,13 @@ import {
   buildJudgeSchema,
   COLD_PASS_VERSION,
   coldFails,
+  isCanaryArtifact,
   parseColdOutput,
   parseJudgeOutput,
   RUBRIC_VERSION,
   runVerdict,
+  scanBannedTerms,
+  stepVerdict,
 } from './rubric.mjs';
 
 const STEPS_PER_CALL = 4;
@@ -46,6 +49,7 @@ async function judgeBatch({
   prior = null,
   dirs,
   timeoutMs,
+  canary = [],
 }) {
   const stepIds = steps.map(step => step.id);
   const imageNames = steps.flatMap(step =>
@@ -58,7 +62,14 @@ async function judgeBatch({
   }));
   const args = buildClaudeArgs({
     model,
-    prompt: buildJudgePrompt({ surface, steps, penRefs: refs, tier, prior }),
+    prompt: buildJudgePrompt({
+      surface,
+      steps,
+      penRefs: refs,
+      tier,
+      prior,
+      canary,
+    }),
     schema: buildJudgeSchema(stepIds, imageNames),
     imageDir: dirs,
   });
@@ -111,6 +122,7 @@ export async function judgeRun({
       model: tiers.screen,
       dirs,
       timeoutMs,
+      canary: manifest.canary ?? [],
     });
     calls.push(result.call);
     for (const step of result.steps)
@@ -146,6 +158,7 @@ export async function judgeRun({
       prior,
       dirs,
       timeoutMs,
+      canary: manifest.canary ?? [],
     });
     calls.push(result.call);
     for (const step of result.steps) {
@@ -169,7 +182,7 @@ export async function judgeRun({
       const envelope = await runJudge(
         buildClaudeArgs({
           model: tiers.confirm,
-          prompt: buildColdPrompt(images),
+          prompt: buildColdPrompt(images, manifest.canary ?? []),
           schema: buildColdSchema(images.map(i => i.name)),
           imageDir: dirs,
         }),
@@ -197,9 +210,21 @@ export async function judgeRun({
       step.images.map(image => [image.name, image])
     )
   );
+  const canary = manifest.canary ?? [];
   const steps = manifest.steps.map(step => {
     const judged = byStep.get(step.id);
-    const findings = judged.findings.map((finding, index) => {
+    // Harness artifacts (declared canary identities) never count against a run.
+    const kept = judged.findings.filter(f => !isCanaryArtifact(f, canary));
+    // Deterministic DOM/AX scan catches banned copy the frames never showed.
+    const scanned = scanBannedTerms(step.text)
+      .filter(f => !kept.some(k => k.criterion === f.criterion))
+      .map(f => ({
+        ...f,
+        image: step.images[0]?.name ?? null,
+        bbox: [0, 0, 1, 1],
+        source: 'dom-scan',
+      }));
+    const findings = [...kept, ...scanned].map((finding, index) => {
       const image = imageIndex.get(finding.image);
       return {
         ...finding,
@@ -216,12 +241,14 @@ export async function judgeRun({
           : null,
       };
     });
-    const coldIssues = step.images.flatMap(image =>
-      (coldByImage.get(image.name) ?? []).map(issue => ({
-        ...issue,
-        image: image.name,
-      }))
-    );
+    const coldIssues = step.images
+      .flatMap(image =>
+        (coldByImage.get(image.name) ?? []).map(issue => ({
+          ...issue,
+          image: image.name,
+        }))
+      )
+      .filter(issue => !isCanaryArtifact(issue, canary));
     const coldFindings = coldIssues
       .filter(issue => issue.credible)
       .map((issue, index) => {
@@ -253,12 +280,13 @@ export async function judgeRun({
         ? 'fail'
         : 'pass'
       : 'not-run';
+    const rubricVerdict = stepVerdict(findings);
     const verdict =
-      judged.verdict === 'fail' || coldVerdict === 'fail' ? 'fail' : 'pass';
+      rubricVerdict === 'fail' || coldVerdict === 'fail' ? 'fail' : 'pass';
     return {
       ...step,
       ...judged,
-      rubricVerdict: judged.verdict,
+      rubricVerdict,
       coldVerdict,
       verdict,
       findings: [...findings, ...coldFindings],
