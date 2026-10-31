@@ -67,3 +67,19 @@ test('remote script runs preflight inside the agent-preflight slice when install
   );
   assert.match(s, /timeout 45m nice -n 10 \$RUN pnpm preflight:changed/);
 });
+
+test('bundle mode fetches the shipped bundle and emits sha+tree evidence', () => {
+  const s = buildRemoteScript({
+    slug: 'feat__x',
+    branch: 'feat/x',
+    sha: 'b'.repeat(40),
+    originUrl: 'git@github.com:JovieInc/Jovie.git',
+    slots: 2,
+    forward: ['--fast'],
+    bundle: true,
+  });
+  assert.match(s, /\.bundles\/b{40}\.bundle/);
+  assert.match(s, /HEAD\^\{tree\}/);
+  assert.match(s, /PREFLIGHT_REMOTE_EVIDENCE/);
+  assert.equal(parseRemoteArgs(['--bundle']).push, false);
+});
