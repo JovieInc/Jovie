@@ -158,12 +158,17 @@
     },
     ".claude/rules/infra.md": {
       "owner": "@itstimwhite",
-      "claim": "Infra follows the existing engineering canon; new infrastructure requires explicit justification.",
-      "documentSha256": "3013e30e3b6cb9e2ebf4d2d71f01fda177e52f6d83eaf0c03a9e424009980266",
+      "claim": "Infra follows the engineering canon; company automation proposals check canonical purpose/scope and execution identity through the existing registry helper before creation.",
+      "documentSha256": "5107b8bd4e60886a391a332c2b807f92410882456bb8262ccd8971d839d63123",
       "sources": [
         {
           "path": "canon/ENGINEERING.md",
-          "sha256": "ef3b80900618e178419090a8ee322d646d81e8f952ceb14a9372b1ac79e9c120"
+          "section": "## Capability sourcing and IA integration",
+          "sha256": "c38946331cba8c71293a3205dac01cbefc4d9facbdd477bfa50b6078008185a9"
+        },
+        {
+          "path": "scripts/lib/automation-registry.mjs",
+          "sha256": "f420042c31e683dba3f6a5b854f68f648659d9ac1859b5c1046bf6b3f85196bb"
         }
       ]
     },
