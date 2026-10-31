@@ -351,9 +351,11 @@ function quotaDeferredError(cause) {
 }
 
 async function dequeue(number) {
-  const { createGhRunner, dequeuePullRequest } = await import(
-    './merge-queue-backend.mjs'
-  );
+  // Only dequeuePullRequest is imported on the happy path: contract tests mock
+  // this module partially (main-red-eject-failing-head.test.mjs provides just
+  // dequeuePullRequest), and vitest fails closed on any other export access.
+  // createGhRunner is imported lazily inside the failover branch only.
+  const { dequeuePullRequest } = await import('./merge-queue-backend.mjs');
   const attempt = runners =>
     dequeuePullRequest({
       backend: 'native',
@@ -374,6 +376,7 @@ async function dequeue(number) {
     console.error(
       '::warning::github-app-quota-failover: Jovie Bot installation exhausted for the queue mutation; retrying actor verification with GITHUB_TOKEN.'
     );
+    const { createGhRunner } = await import('./merge-queue-backend.mjs');
     const runner = createGhRunner({
       env: { ...process.env, GH_TOKEN: fallback },
     });
