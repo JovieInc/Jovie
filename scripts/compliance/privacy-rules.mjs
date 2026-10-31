@@ -223,7 +223,7 @@ export function evaluate(snapshot, registry) {
       ? hostsWith(usDefault, registry, BANNED_ON_INPUT).length > 0
       : true;
     if (!banner.visible && gated) problems.push('no consent bar shown');
-    else if (!(banner.reject >= 1 && banner.accept >= 1))
+    else if (banner.visible && !(banner.reject >= 1 && banner.accept >= 1))
       problems.push(`accept ${banner.accept} vs reject ${banner.reject}`);
     results.push(
       result(
