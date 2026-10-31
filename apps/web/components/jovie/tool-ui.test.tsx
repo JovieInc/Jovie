@@ -8,6 +8,7 @@ import {
   buildSucceededToolEvent,
 } from '@/lib/onboarding/presence-build/tool-events';
 import { TOOL_STATUS_PARTS } from './fixtures/tool-status';
+import { hydratePersistedMessageParts } from './message-parts';
 import { ToolPartsRenderer } from './tool-ui';
 
 vi.mock('@/components/molecules/UpgradeButton', () => ({
@@ -191,18 +192,17 @@ describe('ToolPartsRenderer ops data cards', () => {
     );
   });
 
-  it('falls back to a status row when the ops card payload is malformed', () => {
-    // Unconfirmed rows are hidden by default; the fallback row is a verbose view.
-    window.localStorage.setItem('jovie:chat-verbose', '1');
+  it('falls back to a confirmed status row when the saved ops card payload is malformed', () => {
     render(
       <ToolPartsRenderer
         variant='chat'
-        parts={[
+        parts={hydratePersistedMessageParts('', [
           {
-            type: 'dynamic-tool',
+            schemaVersion: 2,
             toolName: 'summer_ops_snapshot',
             toolCallId: 'tool-ops-card-bad',
-            state: 'output-available',
+            state: 'succeeded',
+            uiHint: 'status',
             input: {},
             output: {
               success: true,
@@ -210,13 +210,17 @@ describe('ToolPartsRenderer ops data cards', () => {
               card: { schema: 'summer.ops-card.v1', kind: 'shipping' },
             },
           },
-        ]}
+        ])}
       />
     );
 
     expect(screen.queryByTestId('chat-ops-data-card')).not.toBeInTheDocument();
-    expect(screen.getByTestId('tool-status-row')).toBeInTheDocument();
-    window.localStorage.removeItem('jovie:chat-verbose');
+    expect(screen.getByTestId('tool-status-row')).toHaveAttribute(
+      'data-operation-status',
+      'succeeded'
+    );
+    expect(screen.getByText('Shipping read complete.')).toBeInTheDocument();
+    expect(screen.queryByText(/status unknown|not been confirmed/i)).toBeNull();
   });
 });
 

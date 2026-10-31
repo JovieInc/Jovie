@@ -508,7 +508,7 @@ describe('InlineChatArea tool invocation rendering', () => {
     expect(mockHandleRetry).toHaveBeenCalledTimes(1);
   });
 
-  it('never renders raw bookkeeping for an unconfirmed tool (default view)', () => {
+  it('never renders raw tool status for an unconfirmed tool in the default view', () => {
     mockMessages = [
       {
         id: 'msg-1',
@@ -529,12 +529,14 @@ describe('InlineChatArea tool invocation rendering', () => {
 
     renderInlineChat();
 
+    // Guard (defect: "Merch source: status unknown"): unconfirmed tool state
+    // is never surfaced as raw status text.
     expect(screen.queryByTestId('tool-status-row')).toBeNull();
-    expect(screen.queryByText(/Completion has not been confirmed/)).toBeNull();
-    expect(screen.queryByText(/status unknown/)).toBeNull();
+    expect(screen.queryByText(/status unknown/i)).toBeNull();
+    expect(screen.queryByText(/not been confirmed/i)).toBeNull();
   });
 
-  it('shows the unconfirmed row only in verbose mode', () => {
+  it('keeps raw unknown tool status out of verbose mode', () => {
     window.localStorage.setItem('jovie:chat-verbose', '1');
     try {
       mockMessages = [
@@ -553,8 +555,11 @@ describe('InlineChatArea tool invocation rendering', () => {
         },
       ];
       renderInlineChat();
-      const statusRow = screen.getByTestId('tool-status-row');
-      expect(statusRow).toHaveAttribute('data-operation-status', 'unknown');
+      expect(screen.queryByTestId('tool-status-row')).toBeNull();
+      expect(screen.queryByText(/status unknown/i)).toBeNull();
+      expect(
+        screen.queryByText(/Completion has not been confirmed/)
+      ).toBeNull();
     } finally {
       window.localStorage.removeItem('jovie:chat-verbose');
     }

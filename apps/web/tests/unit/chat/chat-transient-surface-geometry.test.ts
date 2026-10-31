@@ -47,6 +47,9 @@ describe('chat transient surface geometry (JOV-5413)', () => {
     expect(overlayRule).toContain(
       'bottom: var(--system-b-chat-composer-thread-scroll-padding)'
     );
+    // Guard: the hint docks at the bottom edge, never over message text.
+    expect(overlayRule).toContain('align-items: flex-end');
+    expect(overlayRule).not.toContain('align-items: flex-start');
     expect(overlayRule).not.toContain('inset: 0');
     expect(overlayRule).not.toContain('backdrop-filter');
 

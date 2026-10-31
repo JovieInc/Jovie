@@ -8,12 +8,14 @@
   left: 0;
   z-index: 4;
   display: flex;
-  align-items: flex-start;
+  /* Anchor to the bottom edge, never over the message column: the drop hint
+     must not obscure message text while a file is dragged over the thread. */
+  align-items: flex-end;
   justify-content: center;
   pointer-events: none;
   overflow: hidden;
   contain: paint;
-  padding-top: var(--space-5);
+  padding-bottom: var(--space-5);
   border-radius: inherit;
   background: color-mix(in oklab, var(--color-border-focus) 8%, transparent);
 }

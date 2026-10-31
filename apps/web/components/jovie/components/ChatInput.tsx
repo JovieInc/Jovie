@@ -947,11 +947,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         onCancel={cancelDictationFromBanner}
       />
     );
-    // The mic slot stays mounted when the desktop can point at system
-    // dictation, so the hint has somewhere to land.
-    const hasDictationAffordance =
-      dictationEnabled &&
-      (isDictationSupported || Boolean(dictationUnavailableHint));
+    // No dead controls: the mic only mounts when dictation actually works.
+    // When it cannot (web without Web Speech, the desktop shell until native
+    // voice ships) the control is absent instead of a button that only apologises.
+    const hasDictationAffordance = dictationEnabled && isDictationSupported;
     const inputRowProps = {
       containerRef,
       hiddenDivRef,
@@ -1432,7 +1431,7 @@ function InputRow({
           </div>
 
           <div className='flex shrink-0 items-center gap-2'>
-            {dictationEnabled ? (
+            {dictationEnabled && isDictationSupported ? (
               <ComposerMicButton
                 buttonRef={micButtonRef}
                 isListening={isListening}

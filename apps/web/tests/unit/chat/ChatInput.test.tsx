@@ -553,11 +553,7 @@ describe('ChatInput', () => {
       outline: 'none',
     });
 
-    for (const buttonName of [
-      /Attachment options/i,
-      /dictation unavailable/i,
-      /send message/i,
-    ]) {
+    for (const buttonName of [/Attachment options/i, /send message/i]) {
       expect(
         screen.getByRole('button', { name: buttonName }).className
       ).toMatch(/h-9 w-9/);
@@ -710,15 +706,24 @@ describe('ChatInput', () => {
     expect(inlineField.className).not.toContain('min-h-7');
   });
 
-  it('keeps a quiet disabled dictation control when speech input is unavailable', () => {
+  it('renders no mic at all when speech input is unavailable (no dead controls)', () => {
     fastRender(withProviders(<ChatInput {...baseProps} />));
-
-    const dictationButton = screen.getByRole('button', {
-      name: /dictation unavailable/i,
-    });
-
-    expect(dictationButton).toBeDisabled();
+    expect(screen.queryByTestId('dictation-toggle')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /dictation|microphone/i })
+    ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /send message/i })).toBeEnabled();
+  });
+
+  it('never offers a mic in the desktop shell when dictation is unavailable', async () => {
+    installMockSpeechRecognition();
+    setElectronAPI({ platform: 'darwin', versions: { app: '0.1.0' } });
+    fastRender(withProviders(<ChatInput {...baseProps} />));
+    expect(
+      screen.queryByRole('button', { name: /dictat|microphone/i })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/macOS dictation/i)).not.toBeInTheDocument();
+    expect(MockSpeechRecognition.instances).toHaveLength(0);
   });
 
   it('removes dictation chrome when the surrounding flow disables it', () => {
@@ -849,144 +854,6 @@ describe('ChatInput', () => {
     await user.keyboard('{Enter}');
     expect(screen.queryByRole('alert')).toBeNull();
     expect(dictationButton).toHaveFocus();
-  });
-
-  it('never starts Web Speech in stale Electron and points at system dictation instead', async () => {
-    installMockSpeechRecognition();
-    setElectronAPI({ versions: { app: '0.1.0' } });
-
-    fastRender(withProviders(<ChatInput {...baseProps} />));
-
-    // Stale binaries cannot dictate through Web Speech either, so the mic
-    // stays pressable only to explain how to dictate with the OS.
-    const dictationButton = await screen.findByRole('button', {
-      name: /dictation unavailable · show how to dictate/i,
-    });
-    expect(dictationButton).toBeEnabled();
-
-    fireEvent.pointerDown(dictationButton);
-    fireEvent.click(dictationButton);
-    expect(MockSpeechRecognition.instances).toHaveLength(0);
-    expect(screen.getByRole('status')).toHaveTextContent(/macOS dictation/i);
-  });
-
-  it('shows the system-dictation hint when the desktop bridge reports dictation unavailable', async () => {
-    const user = userEvent.setup();
-    installMockSpeechRecognition();
-    setElectronAPI({
-      platform: 'darwin',
-      getDictationStatus: vi.fn().mockResolvedValue({
-        ok: true,
-        nativeAvailable: false,
-        webSpeechFallbackAllowed: false,
-        mode: 'unavailable',
-        reason: 'web-speech-unsupported-in-electron-use-macos-system-dictation',
-      }),
-    });
-
-    fastRender(withProviders(<ChatInput {...baseProps} />));
-
-    const dictationButton = await screen.findByRole('button', {
-      name: /show how to dictate/i,
-    });
-    fireEvent.click(dictationButton);
-
-    expect(MockSpeechRecognition.instances).toHaveLength(0);
-    const hint = screen.getByRole('status');
-    expect(hint).toHaveTextContent(/press the 🎤 key/i);
-
-    expect(hint.closest('[data-chat-composer-overlay="true"]')).toBeNull();
-    within(hint)
-      .getByRole('button', { name: /dismiss/i })
-      .focus();
-    await user.keyboard('{Enter}');
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    expect(dictationButton).toHaveFocus();
-  });
-
-  it('keeps dictation guidance reachable when the attachment picker opens', async () => {
-    const user = userEvent.setup();
-    setElectronAPI({ platform: 'darwin', versions: { app: '0.1.0' } });
-    fastRender(
-      withProviders(<ChatInput {...baseProps} onFileAttach={vi.fn()} />)
-    );
-    const dictationButton = await screen.findByRole('button', {
-      name: /show how to dictate/i,
-    });
-    await user.click(dictationButton);
-    await user.click(
-      screen.getByRole('button', { name: /attachment options/i })
-    );
-
-    expect(screen.getByRole('listbox')).toBeInTheDocument();
-    const hint = screen.getByRole('status');
-    expect(
-      within(hint).getByRole('button', { name: /dismiss/i })
-    ).toBeVisible();
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
-    expect(hint).toBeInTheDocument();
-    within(hint)
-      .getByRole('button', { name: /dismiss/i })
-      .focus();
-    await user.keyboard('{Enter}');
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    expect(dictationButton).toHaveFocus();
-  });
-
-  it('preserves composer focus and draft when guidance is dismissed without owning focus', async () => {
-    setElectronAPI({ platform: 'darwin', versions: { app: '0.1.0' } });
-    fastRender(
-      withProviders(<ChatInput {...baseProps} value='Keep this draft' />)
-    );
-    fireEvent.click(
-      await screen.findByRole('button', { name: /show how to dictate/i })
-    );
-    const hint = screen.getByRole('status');
-    const input = screen.getByRole('textbox');
-    input.focus();
-    fireEvent.click(within(hint).getByRole('button', { name: /dismiss/i }));
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    expect(input).toHaveFocus();
-    expect(input).toHaveValue('Keep this draft');
-  });
-
-  it('degrades to the system-dictation hint when Electron Web Speech fails with a network error', async () => {
-    installMockSpeechRecognition();
-    // Older desktop binaries still advertise the Web Speech fallback.
-    setElectronAPI({
-      platform: 'darwin',
-      getDictationStatus: vi.fn().mockResolvedValue({
-        ok: true,
-        nativeAvailable: false,
-        webSpeechFallbackAllowed: true,
-        mode: 'web-speech',
-        reason: 'native-unavailable',
-      }),
-    });
-
-    fastRender(withProviders(<ChatInput {...baseProps} />));
-
-    // In Electron the hint state enables the mic before the bridge promise
-    // resolves, so wait for the live-dictation label, not just "enabled".
-    const dictationButton = await screen.findByTestId('dictation-toggle');
-    await waitFor(() =>
-      expect(dictationButton).toHaveAccessibleName(/hold to dictate/i)
-    );
-    fireEvent.pointerDown(dictationButton);
-    expect(MockSpeechRecognition.instances).toHaveLength(1);
-
-    MockSpeechRecognition.instances[0]?.onerror?.({
-      error: 'network',
-    } as unknown as Event);
-
-    // No misleading "needs a network connection" alert — the runtime simply
-    // cannot dictate, so the affordance flips to the OS-dictation hint.
-    await waitFor(() =>
-      expect(dictationButton).toHaveAccessibleName(/show how to dictate/i)
-    );
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(dictationButton).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('seals dictation before send so late results cannot re-populate the composer', async () => {

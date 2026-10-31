@@ -198,11 +198,10 @@ describe('ChatComposerSurface accessibility states', () => {
       'Add files, skills or references'
     );
 
-    const dictate = screen.getByRole('button', {
-      name: 'Dictation unavailable',
-    });
-    expect(dictate).toBeDisabled();
-    expect(dictate).toHaveAttribute('aria-pressed', 'false');
+    // No dead controls: an unavailable mic is absent, not a disabled button.
+    expect(
+      screen.queryByRole('button', { name: /dictation/i })
+    ).not.toBeInTheDocument();
   });
 
   it('explains the disabled send control via tooltip when empty', async () => {

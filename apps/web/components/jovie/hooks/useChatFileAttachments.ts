@@ -338,10 +338,21 @@ async function uploadImageAttachment(
     }
     updateFile(id, {
       status: 'failed',
-      error:
-        err instanceof Error ? err.message : `Failed to upload ${file.name}.`,
+      error: describeUploadError(err, file.name),
     });
   }
+}
+
+/**
+ * Vercel Blob surfaces token-route failures as an opaque "Failed to retrieve
+ * the presigned URL". Show a truthful, actionable message instead.
+ */
+export function describeUploadError(err: unknown, fileName: string): string {
+  const message = err instanceof Error ? err.message : '';
+  if (/presigned url|client token/i.test(message)) {
+    return `Couldn't start uploading ${fileName}. Try again.`;
+  }
+  return message || `Failed to upload ${fileName}.`;
 }
 
 async function uploadAudioAttachment(
@@ -414,7 +425,7 @@ async function uploadAudioAttachment(
   } catch (err) {
     updateFile(id, {
       status: 'failed',
-      error: err instanceof Error ? err.message : 'Upload failed',
+      error: describeUploadError(err, file.name),
     });
   }
 }
@@ -455,7 +466,7 @@ async function uploadGenericAttachment(
   } catch (err) {
     updateFile(id, {
       status: 'failed',
-      error: err instanceof Error ? err.message : 'Upload failed',
+      error: describeUploadError(err, file.name),
     });
   }
 }
@@ -623,8 +634,17 @@ export function useChatFileAttachments({
 
   const uploadSingleFile = useCallback(
     async (file: File, id: string, kind: FileKind) => {
+      // The blob path is owner-scoped; never guess an owner ('unknown' used to
+      // produce a path the token route rejects with an opaque 400).
+      if (!userId) {
+        updateFile(id, {
+          status: 'failed',
+          error: 'Still signing you in. Try again in a moment.',
+        });
+        return;
+      }
       if (kind === 'image') {
-        await uploadImageAttachment(file, id, updateFile, userId ?? 'unknown');
+        await uploadImageAttachment(file, id, updateFile, userId);
         return;
       }
       if (kind === 'audio') {
@@ -632,12 +652,12 @@ export function useChatFileAttachments({
           file,
           id,
           updateFile,
-          userId ?? 'unknown',
+          userId,
           onAudioUploaded
         );
         return;
       }
-      await uploadGenericAttachment(file, id, updateFile, userId ?? 'unknown');
+      await uploadGenericAttachment(file, id, updateFile, userId);
     },
     [onAudioUploaded, updateFile, userId]
   );

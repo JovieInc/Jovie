@@ -47,11 +47,22 @@ def fingerprint(title: str, labels=()) -> str:
     return hashlib.sha256(" ".join(words).encode()).hexdigest()[:12] if words else "unclassified"
 
 
-def check_fingerprint(pr: dict) -> str:
+def check_fingerprint(pr: dict, conflict_paths=()) -> str:
+    """Identity of a red-check repair.
+
+    Failing check names are the class. A DIRTY repair with no red checks used to
+    share one empty hash, so unrelated conflict shapes counted as one recurrence.
+    Sorted conflict paths split that class. Omit the paths and the historical
+    empty-check id stays put.
+    """
     names = sorted({str(c.get("name")) for c in pr.get("statusCheckRollup") or []
                     if str(c.get("conclusion") or "").upper() in {"FAILURE", "TIMED_OUT", "CANCELLED"}
                     and str(c.get("name") or "").lower() not in {"pr ready", "ci summary"}})
-    return "fix-red-" + hashlib.sha256("|".join(names).encode()).hexdigest()[:10]
+    paths = sorted({str(path) for path in conflict_paths or () if str(path)})
+    material = "|".join(names)
+    if paths:
+        material += "\n" + "|".join(paths)
+    return "fix-red-" + hashlib.sha256(material.encode()).hexdigest()[:10]
 
 
 def read(state: Path) -> list[dict]:

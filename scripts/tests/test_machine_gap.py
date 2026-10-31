@@ -14,6 +14,23 @@ NOW = 2_000_000_000.0
 
 
 class GateTest(unittest.TestCase):
+    def test_check_fingerprint_keeps_the_empty_id_and_splits_conflict_shapes(self):
+        empty = {"statusCheckRollup": []}
+        self.assertEqual(gap.check_fingerprint(empty), "fix-red-e3b0c44298")
+        self.assertEqual(gap.check_fingerprint(empty, ()), "fix-red-e3b0c44298")
+        paths = [
+            "apps/web/tests/unit/chat/InlineChatArea.tool-rendering.test.tsx",
+            "apps/web/components/jovie/tool-ui.tsx",
+            "apps/web/components/jovie/tool-ui.test.tsx",
+        ]
+        shaped = gap.check_fingerprint(empty, paths)
+        self.assertNotEqual(shaped, "fix-red-e3b0c44298")
+        self.assertTrue(shaped.startswith("fix-red-"))
+        self.assertEqual(shaped, gap.check_fingerprint(empty, list(reversed(paths))))
+        failed = {"statusCheckRollup": [{"name": "Source Validation", "conclusion": "FAILURE"}]}
+        self.assertNotEqual(gap.check_fingerprint(failed), gap.check_fingerprint(failed, paths))
+        self.assertEqual(gap.check_fingerprint(failed), gap.check_fingerprint(failed, ()))
+
     def test_fingerprint_ignores_ids_and_numbers_and_honours_explicit_labels(self):
         a = gap.fingerprint("fix: JOV-9001 sentry error 42 in profile page", [])
         b = gap.fingerprint("Fix Sentry error 77 in profile page (JOV-9100)", [])

@@ -6179,10 +6179,14 @@ def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda
     for pnpm-lock.yaml, `pnpm ci:topology:write` for workflow-topology.gen.yml), push (no
     force). Any other conflict, or a failed regeneration, aborts and leaves the PR to the
     agent."""
+    resolve_generated_conflict.last_conflict_paths = ()
     guard()
     merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
     if merged.returncode != 0:
         conflicted = set(sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout.split())
+        # Keep the shape even when this resolver aborts, so the repair fingerprint
+        # can tell a repeated source conflict from every other dirty PR.
+        resolve_generated_conflict.last_conflict_paths = tuple(sorted(conflicted))
         if not conflicted or not conflicted <= remediation.GENERATED_RESOLVERS.keys():
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
@@ -6204,10 +6208,12 @@ def resolve_narrowed_preflight_conflict(worktree: Path, branch: str, log, *, gua
     Both sides keep their shell prefixes and vitest paths. Any other conflict, or a hunk
     the union cannot read, aborts and leaves the PR to the model. The push is a fast-forward
     of the PR branch; this never rebases or force-pushes."""
+    resolve_narrowed_preflight_conflict.last_conflict_paths = ()
     guard()
     merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
     if merged.returncode != 0:
         conflicted = [path for path in (sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout or "").split() if path]
+        resolve_narrowed_preflight_conflict.last_conflict_paths = tuple(sorted(conflicted))
         target = worktree / fix_red_classes.NARROWED_PREFLIGHT
         if conflicted != [fix_red_classes.NARROWED_PREFLIGHT]:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
@@ -7883,8 +7889,14 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 except (OSError, subprocess.SubprocessError, ValueError):
                     pass  # evidence is best effort; the repair itself must still run
                 prompt = render_fix_prompt(pr, excerpt)
-                prompt += "\n\n" + "\n".join(machine_gate(host, f"PR{pr['number']}", "", (), excerpt, name,
-                                                           fp=machine_gap.check_fingerprint(pr), receipt=receipt))
+                conflict_paths = ()
+                if pr.get("mergeStateStatus") == "DIRTY":
+                    conflict_paths = tuple(getattr(resolve_narrowed_preflight_conflict, "last_conflict_paths", ()) or ())
+                    if not conflict_paths:
+                        conflict_paths = tuple(getattr(resolve_generated_conflict, "last_conflict_paths", ()) or ())
+                prompt += "\n\n" + "\n".join(machine_gate(
+                    host, f"PR{pr['number']}", "", (), excerpt, name,
+                    fp=machine_gap.check_fingerprint(pr, conflict_paths), receipt=receipt))
                 if preserved:
                     prompt = ("Resume the preserved repair in this checkout. Inspect git status, diff and local commits; "
                               "retain existing edits and finish verification/publication. Never reset or start over.\n\n" + prompt)
