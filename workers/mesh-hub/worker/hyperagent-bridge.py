@@ -28,7 +28,7 @@ BIN = os.environ.get("HYPERAGENT_BIN", "hyperagent")
 MODEL = os.environ.get("HYPERAGENT_MODEL", "fable-5.1")
 RUNS_PER_DAY = int(os.environ.get("HYPERAGENT_RUNS_PER_DAY", "24"))
 TIMEOUT = int(os.environ.get("HYPERAGENT_TIMEOUT_SECONDS", "1500"))
-POLL = int(os.environ.get("BRIDGE_POLL_SECONDS", "20"))
+SCAN_SECONDS = int(os.environ.get("BRIDGE_SCAN_SECONDS", "300"))
 TRUSTED = {"summer", "claude"}
 STATE = Path.home() / ".jovie" / "mesh" / "hyperagent-bridge"
 STATE.mkdir(parents=True, exist_ok=True)
@@ -132,17 +132,39 @@ def work(task):
     log("done", id=task["id"], status=status, secs=round(time.time() - t0), ok=fin.get("ok"), thread=url)
 
 
+def eligible(task):
+    return ("hyperagent" in task.get("caps", []) and task.get("type") != "question"
+            and task.get("poster") in TRUSTED and task.get("status", "open") == "open")
+
+
 def main():
+    """Event-driven: board notices arrive in this kind's mailbox (long-poll). A board scan every
+    SCAN_SECONDS is the dead-man for anything missed (reopened leases, a restart)."""
     log("start", model=MODEL)
+    hub("POST", "/v1/board/caps", {"caps": ["research", "browser", "data", "hyperagent"]})
+    last_scan = 0.0
     while True:
-        board = hub("GET", "/v1/board?status=open&limit=100")
-        tasks = [t for t in board.get("tasks", []) if "hyperagent" in t.get("caps", [])
-                 and t.get("type") != "question" and t.get("poster") in TRUSTED]
-        for task in sorted(tasks, key=lambda t: t["postedAt"]):
-            full = hub("GET", f"/v1/board/task?id={task['id']}").get("task") or task
-            work(full)
-            break
-        time.sleep(POLL)
+        box = hub("GET", "/v1/mailbox?wait=25")
+        for message in box.get("messages", []) or []:
+            try:
+                notice = json.loads(message.get("body") or "{}") if message.get("from") == "board" else {}
+            except ValueError:
+                notice = {}
+            task = notice.get("task") or {}
+            if notice.get("event") in ("task.open", "task.reopened") and eligible(task):
+                full = hub("GET", f"/v1/board/task?id={task['id']}").get("task") or task
+                if eligible(full):
+                    work(full)
+            hub("POST", "/v1/ack", {"ids": [message["id"]]})
+        if time.time() - last_scan > SCAN_SECONDS:
+            last_scan = time.time()
+            board = hub("GET", "/v1/board?status=open&limit=100")
+            for task in sorted(filter(eligible, board.get("tasks", [])), key=lambda t: t["postedAt"]):
+                full = hub("GET", f"/v1/board/task?id={task['id']}").get("task") or task
+                work(full)
+                break
+        if not box.get("ok", True):
+            time.sleep(5)
 
 
 if __name__ == "__main__":
