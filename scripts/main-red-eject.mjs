@@ -658,37 +658,7 @@ async function failingHead(head, doApply) {
     mainGreen: await mainCiGreen(),
   });
   if (!decision.dequeue || !doApply) return { failingHead: true, ...decision };
-  let deferReason = null;
-  try {
-    await dequeue(head.number);
-  } catch (error) {
-    if (error?.code !== QUOTA_DEFERRED_CODE) throw error;
-    deferReason = error.message;
-  }
-  if (deferReason !== null) {
-    // Same honest-defer contract as the stuck path: the mutation-actor check
-    // refused the fallback credential or both token buckets are exhausted.
-    // Nothing was mutated (no dequeue, no failing-head comment); the next
-    // ejector wake retries once quota heals.
-    const note = `Queue head #${head.number} is failing but the dequeue is deferred — ${deferReason}. Nothing was mutated (no dequeue, no failing-head comment); the next ejector wake retries.`;
-    console.error(`::warning::queue-mutation-deferred: ${note}`);
-    await incident(
-      `failing-head:${head.number}`,
-      `queue head #${head.number} failing (dequeue deferred)`,
-      note
-    ).catch(error =>
-      console.error(
-        `::warning::deferred dequeue incident failed: ${error.message}`
-      )
-    );
-    return {
-      failingHead: true,
-      ...decision,
-      dequeued: false,
-      deferred: true,
-      reason: deferReason,
-    };
-  }
+  await dequeue(head.number);
   // The dequeue is the fix; a failed comment must not undo or retry it.
   await gh([
     'api',

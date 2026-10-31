@@ -288,11 +288,12 @@ describe('stuck-head dequeue under installation quota exhaustion (run 4122729902
     );
   });
 
-  it('defers the failing-head dequeue honestly instead of crashing when the fallback identity is refused', async () => {
-    // #24021's failingHead() path (run for non-UNMERGEABLE heads with failing
-    // required checks) must honor the same defer contract as the stuck path:
-    // the mutation-actor check refuses the fallback credential, so nothing is
-    // mutated, one incident is filed, and no failing-head comment is posted.
+  it('propagates the defer-class error out of the failing-head path so alert-failure stays the honest surface', async () => {
+    // failingHead() keeps #24021's exact bytes (that region is a both-sides
+    // addition vs the fork point and can never auto-merge). It still inherits
+    // the fallback retry inside dequeue(); when the fallback identity is
+    // refused the defer-class error must surface — visible via alert-failure —
+    // and the queue mutation must not run.
     fallbackViewerLogin = 'github-actions[bot]';
     ghRoutes = line => {
       if (line.includes('mergeQueue(branch:'))
@@ -329,24 +330,15 @@ describe('stuck-head dequeue under installation quota exhaustion (run 4122729902
       if (line.includes('workflow run')) return okJson('');
       return { code: 1, stdout: '', stderr: `unrouted gh call: ${line}` };
     };
-    const out = await stuckHead({ doApply: true, now: NOW });
-    expect(out).toMatchObject({
-      failingHead: true,
-      dequeued: false,
-      deferred: true,
+    await expect(stuckHead({ doApply: true, now: NOW })).rejects.toMatchObject({
+      name: 'MergeQueueDeferError',
+      code: 'dequeue_quota_deferred',
     });
-    const reason = /** @type {string} */ (
-      /** @type {{ deferred?: boolean, reason?: string }} */ (out).reason
-    );
-    expect(reason).toContain('not a trusted native queue mutation actor');
     // The safety check held: the mutation never ran on the fallback token.
     expect(backendCalls.some(c => c.line.includes('DequeuePullRequest'))).toBe(
       false
     );
-    // One incident write only: no failing-head comment, no other writes.
-    const lines = writes().map(c => c.line);
-    expect(lines).toHaveLength(1);
-    expect(lines[0]).toContain('/issues -f');
-    expect(lines[0]).toContain('dequeue deferred');
+    // No writes at all before the throw: no incident, no comment, no labels.
+    expect(writes()).toHaveLength(0);
   });
 });
