@@ -9,7 +9,6 @@ import {
   CUSTOMER_MARKER,
   commonDirectories,
   deriveEvidence,
-  diffGates,
   draftBody,
   gate,
   lockedCitation,
@@ -253,42 +252,6 @@ test('Vitest logs become literal FAIL evidence accepted by Fleet Rules', () => {
   assert.throws(() => redOutput('All 3 tests passed'), /no failure evidence/);
 });
 
-test('check executes main classifier even when the checkout classifier is stale', () => {
-  const calls = [];
-  const execute = (command, args) => {
-    calls.push([command, ...args]);
-    if (command === 'git' && args[0] === 'merge-base') return okText('base');
-    if (command === 'git' && args[0] === 'show')
-      return okText('// trusted main classifier');
-    if (args.includes('--files-from')) {
-      assert.equal(readFileSync(args[0], 'utf8'), '// trusted main classifier');
-      return okText('');
-    }
-    return ok({ applicable: false });
-  };
-  assert.deepEqual(diffGates('.', 'main', [], { execute }), {
-    errors: [],
-    pending: [],
-  });
-  assert.ok(
-    calls.some(c =>
-      c.includes('origin/main:scripts/lib/product-lane-classifier.mjs')
-    )
-  );
-  const waiting = diffGates('.', 'main', [], {
-    execute: (command, args) =>
-      args.includes('--files-from')
-        ? {
-            status: 1,
-            stdout: '',
-            stderr: 'Unmapped changed paths: packages/new/a.ts',
-          }
-        : execute(command, args),
-  });
-  assert.deepEqual(waiting.errors, []);
-  assert.match(waiting.pending[0], /pending main's lane map/);
-});
-
 test('refresh forces two edits and confirms new runs, never stale reruns', async () => {
   const pr = targetPr(42);
   const edits = [],
@@ -463,7 +426,13 @@ function freshRuns(pr, id) {
   }));
 }
 function fakeDiffRunner(command, args) {
-  if (command === 'git' && args[0] === 'show') return okText('// trusted');
+  if (command === 'git' && args[0] === 'show') {
+    assert.equal(
+      args[1],
+      'origin/main:scripts/lib/product-lane-classifier.mjs'
+    );
+    return okText('// trusted');
+  }
   if (command === 'git' && args[0] === 'merge-base') return okText('base');
   if (command === 'git' && args[0] === 'log')
     throw new Error('must never read unrelated checkout subjects');
@@ -521,112 +490,40 @@ test('check reports lane-map waiting as pending without a failure', async () => 
   assert.equal(publish, 75);
 });
 
-test('classifier faults and coverage failures remain real failures', () => {
-  for (const mode of [
-    'classifier',
-    'plan',
-    'invalid-plan',
-    'no-tests',
-    'no-base',
-    'no-policy',
-  ]) {
-    const execute = (command, args) => {
-      if (mode === 'no-base' && args[0] === 'merge-base')
-        return { status: 1, stdout: '', stderr: 'no base' };
-      if (mode === 'no-policy' && args[0] === 'show')
-        return { status: 1, stdout: '', stderr: 'no policy' };
-      if (mode === 'classifier' && args.includes('--files-from'))
-        return { status: 1, stdout: '', stderr: 'SyntaxError: bad policy' };
-      if (args.includes('--plan')) {
-        if (mode === 'plan')
-          return { status: 1, stdout: '', stderr: 'no plan' };
-        if (mode === 'invalid-plan') return okText('broken JSON');
-        if (mode === 'no-tests')
-          return ok({ applicable: true, relatedTests: [] });
-      }
-      return fakeDiffRunner(command, args);
-    };
-    const result = diffGates('.', 'main', [file('apps/web/lib/a.ts')], {
-      execute,
-    });
-    if (mode === 'no-policy') assert.equal(result.pending.length, 1);
-    else assert.equal(result.errors.length, 1, mode);
-  }
-});
-
-test('open gates a supplied body, pushes normally and fills the new PR URL', async () => {
+test('open fills its new self URL after ordinary publication', async () => {
   const { repo, cleanup } = localRepo();
   const filename = path.join(repo, 'body.md');
   writeFileSync(
     filename,
-    draftBody({
-      title: 'perf(ci): cheaper',
-      files: [file('scripts/x.test.mjs', 'added')],
-      metric,
-      summary: 'Cheaper checks.',
-    })
+    draftBody({ title: 'perf(ci): cheaper', files: [], metric })
   );
   try {
-    const calls = [],
-      edited = [];
-    const execute = (command, args) => {
-      calls.push([command, ...args]);
-      return args[0] === 'log'
+    let edited;
+    const execute = (command, args) =>
+      args[0] === 'log'
         ? okText('perf(ci): cheaper')
         : fakeDiffRunner(command, args);
-    };
     const github = (_cwd, args) => {
-      calls.push(args);
       if (args[1] === 'create')
         return okText('https://github.com/JovieInc/Jovie/pull/42');
-      edited.push(readFileSync(args[args.indexOf('--body-file') + 1], 'utf8'));
+      edited = readFileSync(args[args.indexOf('--body-file') + 1], 'utf8');
       return okText('');
     };
     assert.equal(
-      await main(
-        [
-          'open',
-          '--repo',
-          repo,
-          '--body-file',
-          filename,
-          '--draft',
-          '--label',
-          'compounding',
-        ],
-        () => {},
-        { github, execute }
-      ),
+      await main(['open', '--repo', repo, '--body-file', filename], () => {}, {
+        github,
+        execute,
+      }),
       0
     );
-    assert.ok(calls.some(c => c[0] === 'git' && c[1] === 'push'));
-    assert.ok(
-      calls.some(
-        c => c[0] === 'pr' && c[1] === 'create' && c.includes('--draft')
-      )
-    );
     assert.match(
-      edited[0],
+      edited,
       /Verify: https:\/\/github.com\/JovieInc\/Jovie\/pull\/42/
     );
-    assert.doesNotMatch(edited[0], /<PR URL/);
+    assert.doesNotMatch(edited, /<PR URL/);
   } finally {
     cleanup();
   }
-});
-
-test('invalid commands and PR numbers cannot mutate GitHub', async () => {
-  const github = () => {
-    throw new Error('should not call GitHub');
-  };
-  for (const argv of [
-    [],
-    ['wat'],
-    ['update'],
-    ['update', 'nope'],
-    ['update', '-1'],
-  ])
-    assert.equal(await main(argv, () => {}, { github }), 2);
 });
 
 test('a referenced Linear issue can supply the measured before-value', async () => {

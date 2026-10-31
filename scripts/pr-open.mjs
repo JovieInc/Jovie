@@ -2,29 +2,6 @@
 // api-budget: github-user-core 300/hr - on-demand, 10 updates/hr at <=30 REST calls including bounded fresh-run confirmation
 // api-budget: github-user-graphql 100/hr - on-demand, 10 updates/hr at <=10 points for PR metadata and body edits
 // api-budget: linear-requests 10/hr - on-demand, one referenced-issue lookup per update at 10 updates/hr
-/**
- * The one way to open (or repair) a PR: drafts a gate-compliant body from the
- * diff, runs the body-level gates locally, and refuses to open a failing PR.
- *
- *   pnpm pr:open draft  [--title t] [flags]   print the drafted body
- *   pnpm pr:open check  --body-file f [--title t] [--label l]   gate an existing body
- *   pnpm pr:open open   [--title t] [flags]   gate, push, create the PR
- *   pnpm pr:open update <number> [flags]      gate, then edit the title and body
- *
- * Flags: --base main  --summary "text"  --label compounding (repeatable)
- *   --metric "name|unit|lower|before|source|query"   measured BEFORE value (after is filled
- *       as pending); required for compounding, ci, perf and throughput work
- *   --claim "one line"  --area ci  --theme x  --per-merge
- *   --failing-command c --failing-run URL (or --failing-log PATH for Vitest output)
- *   --customer-visible "availability text"  customer-facing code that is releaseWorthy
- *   --draft  --dry-run  --no-push
- *
- * Validators run here are the ones CI runs: Fleet Rules (Win, Red-before-green,
- * Blast radius, Locked areas), the customer-changelog marker, the product-lane
- * classifier and the changed-test-coverage plan. Heavy guards stay in
- * `pnpm preflight:remote`. Every run appends a gate-verdict row to
- * ~/.local/state/jovie-lanes/pr-open.jsonl (the first-push gate-failure metric).
- */
 import { spawnSync } from 'node:child_process';
 import {
   appendFileSync,
@@ -50,7 +27,6 @@ export const CUSTOMER_MARKER =
   '<!-- customer-changelog/v1 {"releaseWorthy":false} -->';
 const REPOSITORY = 'JovieInc/Jovie';
 
-/** Strip Markdown code, preserving ordinary prose for placeholder lint. */
 export function proseOnly(body) {
   let fence = '';
   return body
@@ -75,7 +51,6 @@ export function proseOnly(body) {
     .join('\n');
 }
 
-/** Keep the deepest directories; merge siblings only as needed to fit three. */
 export function commonDirectories(paths) {
   let dirs = [...new Set(paths.map(p => path.posix.dirname(p)))].sort();
   while (dirs.length > 3) {
@@ -104,7 +79,6 @@ export function commonDirectories(paths) {
   return dirs.slice(0, 3);
 }
 
-/** Preserve actual Vitest evidence, normalizing its failed-suite marker to FAIL. */
 export function redOutput(log) {
   const clean = log.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '').trim();
   const lines = clean.split('\n');
@@ -122,7 +96,6 @@ export function redOutput(log) {
   return `\`\`\`text\n${output.replaceAll('```', '~~~')}\n\`\`\``;
 }
 
-/** Reuse measured Win inputs, never infer or fabricate a measurement. */
 export function evidenceFromBody(body = '') {
   const win = section(body, 'Win');
   const value = (s, key) =>
@@ -149,7 +122,6 @@ export function evidenceFromBody(body = '') {
   };
 }
 
-/** Self references are bound to the destination, including caller-supplied bodies. */
 export function targetErrors(body, number, requireIdentity = false) {
   const refs = [
     ...body.matchAll(/https:\/\/github\.com\/JovieInc\/Jovie\/pull\/(\d+)\b/gi),
@@ -172,19 +144,17 @@ const AREAS_BY_PATH = [
   [/^apps\/web\/(?:app|components|lib)\//, 'perf'],
 ];
 
-/** GBrain pages that carry the lock for a class of locked path (ownership map: canon/ownership.json). */
 export function lockedCitation(paths) {
   const locked = paths.filter(isLockedArea);
   if (!locked.length) return null;
-  const pages = new Set();
-  for (const p of locked) {
-    if (/(?:baseline|ratchet)/i.test(p) && p.endsWith('.json'))
-      pages.add('decisions/engineering/repo-waste-sweep-2026-10-29');
-    else if (/auth|clerk|better-auth/i.test(p))
-      pages.add('canon-ownership-json');
-    else pages.add('design/design-operating-system');
-  }
-  return { locked, page: [...pages][0] };
+  const first = locked[0];
+  const page =
+    /(?:baseline|ratchet)/i.test(first) && first.endsWith('.json')
+      ? 'decisions/engineering/repo-waste-sweep-2026-10-29'
+      : /auth|clerk|better-auth/i.test(first)
+        ? 'canon-ownership-json'
+        : 'design/design-operating-system';
+  return { locked, page };
 }
 
 function blastRadius(paths) {
@@ -204,7 +174,6 @@ function blastRadius(paths) {
 }
 
 /**
- * Draft known facts only. missingEvidence supplies one consolidated prompt.
  * @param {{
  *   title: string,
  *   files: Array<{ filename: string, status?: string, patch?: string, previous_filename?: string }>,
@@ -305,7 +274,6 @@ export function missingEvidence(input) {
   return needs;
 }
 
-/** Run every body-level and diff-level gate. Returns { errors: string[], warnings: string[] }. */
 export function gate({ title, body, labels = [], files, extra = [] }) {
   const lint = lintPrBody({ body, title, labels, files, evaluateFleetRules });
   const errors = [
@@ -329,9 +297,7 @@ export function gate({ title, body, labels = [], files, extra = [] }) {
 /** @typedef {{status: number | null, stdout: string, stderr: string, error?: Error}} CommandResult */
 /** @typedef {(command: string, args: string[], options?: object) => CommandResult} Command */
 
-/** GitHub goes through the shared budgeted client (external-apis rule).
- * @type {Command}
- */
+/** @type {Command} */
 const gh = (cwd, args, opts = {}) =>
   spawnSync(
     'node',
@@ -349,7 +315,6 @@ const gh = (cwd, args, opts = {}) =>
 const run = (cmd, args, opts = {}) =>
   spawnSync(cmd, args, { encoding: 'utf8', ...opts });
 
-/** Lane classifier and changed-test-coverage plan, run the way Source Validation runs them. */
 export function diffGates(
   cwd,
   base,
@@ -359,6 +324,7 @@ export function diffGates(
   const errors = [],
     pending = [];
   const git = args => execute('git', args, { cwd });
+  const node = args => execute('node', args, { cwd });
   const merged = git(['merge-base', baseRef, head]);
   if (merged.status !== 0)
     return { errors: ['diff: cannot resolve PR base/head'], pending };
@@ -378,21 +344,13 @@ export function diffGates(
     else {
       const classifier = path.join(dir, 'product-lane-classifier.mjs');
       writeFileSync(classifier, policy.stdout);
-      const lane = execute(
-        'node',
-        [
-          classifier,
-          '--files-from',
-          list,
-          '--base-ref',
-          mb,
-          '--head-ref',
-          head,
-          '--json-out',
-          path.join(dir, 'receipt.json'),
-        ],
-        { cwd }
-      );
+      const args = ['--files-from', list, '--base-ref', mb, '--head-ref', head];
+      const lane = node([
+        classifier,
+        ...args,
+        '--json-out',
+        path.join(dir, 'receipt.json'),
+      ]);
       if (lane.status !== 0) {
         const detail = (
           lane.stderr ||
@@ -404,18 +362,8 @@ export function diffGates(
         else errors.push(`lane-classifier: ${detail}`);
       }
     }
-    const plan = execute(
-      'node',
-      [
-        'scripts/check-changed-test-coverage.mjs',
-        '--base',
-        mb,
-        '--head',
-        head,
-        '--plan',
-      ],
-      { cwd }
-    );
+    const args = ['--base', mb, '--head', head, '--plan'];
+    const plan = node(['scripts/check-changed-test-coverage.mjs', ...args]);
     if (plan.status !== 0)
       errors.push(
         `coverage-plan: ${(plan.stderr || plan.stdout || 'unavailable').trim()}`
@@ -675,6 +623,8 @@ export async function main(
   } = {}
 ) {
   const a = parse(argv);
+  const git = (args, options = {}) =>
+    execute('git', args, { cwd: a.repo, ...options });
   if (!['draft', 'check', 'open', 'update'].includes(a.cmd)) {
     log(
       'usage: pr-open <draft|check|open|update N> [flags]; --failing-log PATH reads Vitest red evidence'
@@ -687,13 +637,9 @@ export async function main(
   }
   try {
     let pr;
-    // Resolve the target BEFORE reading any local diff or choosing a title.
     if (a.number || (!a.bodyFile && a.cmd !== 'open')) {
       const target =
-        a.number ||
-        execute('git', ['branch', '--show-current'], {
-          cwd: a.repo,
-        }).stdout.trim();
+        a.number || git(['branch', '--show-current']).stdout.trim();
       const result = github(a.repo, prViewArgs(target));
       if (result.status === 0) pr = JSON.parse(result.stdout);
       else if (a.number)
@@ -732,18 +678,14 @@ export async function main(
       head = pr.headRefOid;
       baseRef = pr.baseRefOid;
       if (!a.dryRun && a.cmd !== 'draft') {
-        const fetched = execute(
-          'git',
-          [
-            'fetch',
-            '--no-tags',
-            '--no-write-fetch-head',
-            'origin',
-            head,
-            baseRef,
-          ],
-          { cwd: a.repo }
-        );
+        const fetched = git([
+          'fetch',
+          '--no-tags',
+          '--no-write-fetch-head',
+          'origin',
+          head,
+          baseRef,
+        ]);
         if (fetched.status !== 0)
           throw new Error(
             `target: unable to fetch PR commits: ${fetched.stderr}`
@@ -752,21 +694,18 @@ export async function main(
     } else {
       const { changedFiles } = await import('./preflight-changed.mjs');
       files = changedFiles(a.repo, a.base).files;
-      subjects = execute(
-        'git',
-        ['log', '--format=%s', `origin/${a.base}..HEAD`],
-        { cwd: a.repo }
-      )
+      subjects = git(['log', '--format=%s', `origin/${a.base}..HEAD`])
         .stdout.trim()
         .split('\n')
         .filter(Boolean);
       for (const f of files)
         if (f.status === 'modified' && /\.(?:test|spec)\./.test(f.filename))
-          f.patch = execute(
-            'git',
-            ['diff', `origin/${a.base}...HEAD`, '--', f.filename],
-            { cwd: a.repo }
-          ).stdout;
+          f.patch = git([
+            'diff',
+            `origin/${a.base}...HEAD`,
+            '--',
+            f.filename,
+          ]).stdout;
     }
     const title = a.title || pr?.title || subjects[0] || '';
     const labels = [
@@ -866,8 +805,7 @@ export async function main(
       const bodyFile = path.join(dir, 'body.md');
       writeFileSync(bodyFile, body);
       if (!a.noPush) {
-        const push = execute('git', ['push', '-u', 'origin', 'HEAD'], {
-          cwd: a.repo,
+        const push = git(['push', '-u', 'origin', 'HEAD'], {
           stdio: 'inherit',
         });
         if (push.status !== 0) return push.status ?? 1;
