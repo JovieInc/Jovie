@@ -10,6 +10,11 @@ import {
 } from '@/components/jovie/starter-actions';
 import { fastRender } from '@/tests/utils/fast-render';
 
+const privacy = vi.hoisted(() => ({ allowed: true }));
+vi.mock('@/lib/tracking/use-tracking-eligibility', () => ({
+  getBrowserTrackingEligibility: () => ({ ga: privacy.allowed }),
+}));
+
 describe('SuggestedPrompts', () => {
   it('renders nothing when no installed skill is explicitly featured', () => {
     const { queryByTestId, queryByText } = fastRender(
@@ -222,25 +227,33 @@ describe('SuggestedPrompts', () => {
     expect(onSelect).toHaveBeenCalledWith('Help me plan my next release.');
   });
 
-  it('tracks canonical quick-action vocabulary when selected', () => {
-    const gtag = vi.fn();
-    Object.defineProperty(globalThis.window, 'gtag', {
-      configurable: true,
-      value: gtag,
-    });
+  it.each([true, false])(
+    'tracks canonical quick-action vocabulary only when eligible (%s)',
+    allowed => {
+      privacy.allowed = allowed;
+      const gtag = vi.fn();
+      Object.defineProperty(globalThis.window, 'gtag', {
+        configurable: true,
+        value: gtag,
+      });
 
-    const { getByRole } = fastRender(<SuggestedPrompts onSelect={vi.fn()} />);
-    getByRole('button', { name: 'Plan a Release' }).click();
+      const { getByRole } = fastRender(<SuggestedPrompts onSelect={vi.fn()} />);
+      getByRole('button', { name: 'Plan a Release' }).click();
 
-    expect(gtag).toHaveBeenCalledWith(
-      'event',
-      'chat_starter_action_selected',
-      expect.objectContaining({
-        action: 'plan_release',
-        surface: 'quick_action',
-      })
-    );
-  });
+      if (!allowed) {
+        expect(gtag).not.toHaveBeenCalled();
+        return;
+      }
+      expect(gtag).toHaveBeenCalledWith(
+        'event',
+        'chat_starter_action_selected',
+        expect.objectContaining({
+          action: 'plan_release',
+          surface: 'quick_action',
+        })
+      );
+    }
+  );
 
   it('hides the profile chip when the profile is already complete', () => {
     const onSelect = vi.fn();

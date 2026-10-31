@@ -81,27 +81,21 @@ function violations(path: string, source: string): string[] {
   return failures;
 }
 function candidateFiles(): string[] {
-  // Native text prefilter keeps this whole-source guard cheap in normal CI.
-  // AST validation below owns the rule, including aliased/dynamic imports.
+  // Git is present on every CI runner; ripgrep is only a developer tool.
   const paths = execFileSync(
-    'rg',
-    [
-      '-l',
-      'fbq|gtag|forwardTo|forwarding/|facebook\\.net|google-analytics\\.com|tiktok\\.com|graph\\.facebook\\.com|@vercel/analytics',
-      'app',
-      'components',
-      'lib',
-      '--glob',
-      '*.{ts,tsx,js,jsx,mts,mjs}',
-      '--glob',
-      '!*.{test,spec,stories}.*',
-      '--glob',
-      '!*.d.ts',
-    ],
+    'git',
+    ['ls-files', '-z', 'app', 'components', 'lib'],
     { cwd: web, encoding: 'utf8' }
   )
-    .trim()
-    .split('\n');
+    .split('\0')
+    .filter(
+      path =>
+        /\.(?:[cm]?[jt]sx?)$/.test(path) &&
+        !/\.(?:test|spec|stories)\.|\.d\.ts$/.test(path) &&
+        /fbq|gtag|forwardTo|forwarding\/|facebook\.net|google-analytics\.com|tiktok\.com|graph\.facebook\.com|@vercel\/analytics/.test(
+          readFileSync(resolve(web, path), 'utf8')
+        )
+    );
   return [
     ...new Set([...paths, ...browserAdapters, dispatcher, 'lib/analytics.ts']),
   ];
