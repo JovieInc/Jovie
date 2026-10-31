@@ -441,6 +441,16 @@ class JudgeTest(unittest.TestCase):
         for lag in ({"behindS": 600}, {"behindS": 0}, {"behindS": None}, {}):
             self.assertNotIn("install-lag", doctor.judge(obs(installLag=lag)))
 
+    def test_install_lag_past_the_two_hour_slo_with_a_refusal_is_a_critical_owned_p0(self):
+        lag = {"behindS": doctor.INSTALL_LAG_P0_S + 60, "behindCommit": "423401e4f5", "error": "release-bundle-incomplete"}
+        alerts = doctor.judge(obs(installLag=lag))
+        self.assertIn("release-bundle-incomplete", alerts["install-lag-refused"])
+        self.assertIn("P0", alerts["install-lag-refused"])
+        receipt = doctor.condition_receipts(alerts, {}, obs(installLag=lag), "gem")["install-lag-refused"]
+        self.assertEqual((receipt["severity"], receipt["owner"]), ("critical", "gem-lanes-updater"))
+        self.assertNotIn("install-lag-refused", doctor.judge(obs(installLag={**lag, "error": None})))
+        self.assertNotIn("install-lag-refused", doctor.judge(obs(installLag={**lag, "behindS": 3600})))
+
     def test_failed_event_delivery_is_actionable_and_acknowledgement_clears_it(self):
         failed = obs(tick={'remediationEvents': {'deliveryFailed': 1, 'deliveryExhausted': 0, 'deliveryNextAt': 100}})
         alerts = doctor.judge(failed)
