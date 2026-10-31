@@ -401,6 +401,9 @@ describe('workflow wiring', () => {
     expect(bodies.controller).toContain(
       'production-monitor-customer-changelog'
     );
+    expect(bodies.controller).toContain(
+      'production-monitor-customer-changelog-stale'
+    );
     expect(bodies.health).toContain('production-monitor-controller-health');
     expect(bodies.release).toContain('production-monitor-vercel-deploy');
     expect(bodies.postdeploy).toContain('production-monitor-postdeploy-probes');

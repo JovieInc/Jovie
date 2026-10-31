@@ -507,8 +507,10 @@ const PublicationReceiptSchema = z.object({
     .array(
       z.object({
         passed: z.boolean(),
-        status: z.number(),
-        sha256: z.string(),
+        // Failed or unreachable checks carry no status or hash; they must not
+        // invalidate the receipt's passing evidence.
+        status: z.number().optional(),
+        sha256: z.string().optional(),
       })
     )
     .min(1),
@@ -556,7 +558,7 @@ function readCustomerPublication(
         evidence =>
           evidence.passed &&
           evidence.status === 200 &&
-          /^[a-f0-9]{64}$/.test(evidence.sha256)
+          /^[a-f0-9]{64}$/.test(evidence.sha256 ?? '')
       )
     )
       return;
