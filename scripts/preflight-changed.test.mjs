@@ -122,6 +122,22 @@ test('typecheck targets are the affected packages only', () => {
   ]);
 });
 
+test('script checkJs runs for an mjs-only repair before publication', () => {
+  for (const filename of ['scripts/intake.mjs', 'scripts/intake.test.mjs']) {
+    assert.deepEqual(typecheckTargets([file(filename)], process.cwd()), [
+      'scripts',
+    ]);
+  }
+  assert.deepEqual(
+    typecheckTargets([file('scripts/intake.mjs', 'removed')], process.cwd()),
+    []
+  );
+  assert.deepEqual(
+    typecheckTargets([file('scripts/README.md')], process.cwd()),
+    []
+  );
+});
+
 test('web source changes typecheck test consumers without a changed test file', () => {
   assert.deepEqual(
     typecheckTargets(

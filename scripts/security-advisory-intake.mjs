@@ -99,10 +99,12 @@ export const BLIND_FINGERPRINT = 'secadv-blind-source';
  * The check remains red while blind; syncing requires a successful repair card.
  */
 export async function recordBlindSource(
-  { repo, error, dryRun, check, now },
+  { repo, error, dryRun = false, check = false, now },
   {
     resolveLabel = resolveLabelId,
-    upsert = upsertLinearIssueByTitleFingerprint,
+    upsert = /** @type {(input: Parameters<typeof upsertLinearIssueByTitleFingerprint>[0]) => Promise<{ok: boolean, action?: string}>} */ (
+      upsertLinearIssueByTitleFingerprint
+    ),
   } = {}
 ) {
   const receipt = {

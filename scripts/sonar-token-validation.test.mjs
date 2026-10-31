@@ -6,12 +6,15 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { load } from 'js-yaml';
 
-const workflow = load(
-  readFileSync(
-    new URL('../.github/workflows/sonarcloud.yml', import.meta.url),
-    'utf8'
-  )
-);
+const workflow =
+  /** @type {{jobs: {sonarcloud: {steps: Array<{name?: string, uses?: string, run?: string}>}}}} */ (
+    load(
+      readFileSync(
+        new URL('../.github/workflows/sonarcloud.yml', import.meta.url),
+        'utf8'
+      )
+    )
+  );
 const steps = workflow.jobs.sonarcloud.steps;
 const validation = steps.find(
   step => step.name === 'Validate SonarCloud token before the scan'

@@ -63,6 +63,7 @@ console.log(args.includes('--include') ? 'HTTP/2.0 200 OK\\n\\n' + json : json);
     GITHUB_TOKEN: '',
     ALERTS_TOKEN: 'fixture-alerts-credential',
     LINEAR_API_KEY: '',
+    FIXTURE_BLIND: '0',
     JOVIE_GITHUB_CREDENTIAL: '',
     JOVIE_API_STATE_DIR: dir,
     GITHUB_REPOSITORY: 'fixture/repo',
@@ -417,12 +418,15 @@ test('CLI blind dry-run records uncertainty without requiring a Linear write', t
 
 test('workflow check preserves the sync receipt when both record a blind source', t => {
   const { dir, env, run } = cliFixture(t);
-  const workflow = load(
-    readFileSync(
-      path.join(ROOT, '.github/workflows/security-advisory-loop.yml'),
-      'utf8'
-    )
-  );
+  const workflow =
+    /** @type {{jobs: {loop: {steps: Array<{run?: string, uses?: string, env?: Record<string, string>, with?: {path: string}}>}}}} */ (
+      load(
+        readFileSync(
+          path.join(ROOT, '.github/workflows/security-advisory-loop.yml'),
+          'utf8'
+        )
+      )
+    );
   const steps = workflow.jobs.loop.steps;
   const sync = steps.find(
     step => step.run === 'node scripts/security-advisory-intake.mjs'
