@@ -12,6 +12,8 @@ import type { Env } from './env.ts';
 import { backoffFor, isOpen, Outbox, type RecipientStatus } from './outbox.ts';
 
 const SWEEP_MS = 5 * 60_000;
+/** Only statuses that mean "this message is bad", never "the route is not ready". */
+const WEBHOOK_TERMINAL = new Set([400, 409, 413, 422]);
 /** Webhook retry ladder for pushes to Summer (serverless, cannot hold a socket). */
 const WEBHOOK_BACKOFF_MS = [5_000, 15_000, 60_000, 300_000, 900_000] as const;
 
@@ -381,13 +383,10 @@ export class Mailbox extends DurableObject<Env> {
       if (status >= 200 && status < 300) {
         this.store.receipt([message.id], Date.now());
         failures = 0;
-      } else if (
-        status >= 400 &&
-        status < 500 &&
-        status !== 408 &&
-        status !== 429
-      ) {
-        // Poison: mark received so it cannot block the queue; flag dead for the DLQ path.
+      } else if (WEBHOOK_TERMINAL.has(status)) {
+        // Poison (the message itself is unacceptable): mark received so it cannot
+        // block the queue, and alarm. 401/404/408/429/5xx are config or deploy
+        // lag and keep retrying; never strand a message on a missing route.
         this.store.receipt([message.id], Date.now());
         const registry = this.env.REGISTRY.get(
           this.env.REGISTRY.idFromName('registry')
