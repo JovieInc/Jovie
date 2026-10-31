@@ -42,12 +42,12 @@ Canon: gbrain `decisions/company/privacy-tracking-compliance-guidelines-2026-10-
 | ID | Requirement | Current state (evidence) | Gap | Fix | Owner | Status |
 |---|---|---|---|---|---|---|
 | TRK-1 | Every third party a page loads is registered with a rationale | Crawl 2026-10-31: 15 surfaces x 4 scenarios, 0 unregistered hosts after registering goQR (`api.qrserver.com`, profile QR images) | goQR receives visitor IP and referrer | Registry added (PR). ISSUE: first-party QR images | summer | ok |
-| TRK-2 | No third-party pixel or replay on pages where people type | Crawl 2026-10-31: Meta pixel fired on `/tim/alerts` (phone signup) for default US visitors and after Accept in the EU | Fixed: pixel removed from the alerts route; static guard blocks tracker mounts on input routes. Profiles open the fan-subscribe form in a drawer on the same page as the pixel | PR. **COUNSEL** on the profile drawer (brief Q3) | summer | partial |
+| TRK-2 | No third-party pixel or replay on pages where people type | Crawl 2026-10-31: Meta pixel fired on `/tim/alerts` (phone signup) for default US visitors and after Accept in the EU | Fixed: pixel removed from the alerts route; static guard blocks tracker mounts on input routes. Profiles open the fan-subscribe form in a drawer on the same page as the pixel | PR #23971. **COUNSEL** on the profile drawer (brief Q3) | summer | partial |
 | TRK-3 | "Do Not Sell or Share" link wherever pixels run (US opt-out model) | No such link on any Jovie surface; Meta pixel loads by default for US visitors outside the five banner states | Missing link and opt-out page | ISSUE: footer and profile-menu link to a privacy-choices control | summer | gap |
 | TRK-4 | GPC honored with a visible confirmation | Crawl: with GPC, no pixel fires (honored in `isMarketingAllowed`) | No visible confirmation; consent bar still asks | ISSUE (with TRK-3): show "Global Privacy Control honored" and skip the bar | summer | partial |
 | TRK-5 | EU/UK: equal Accept/Reject, nothing pre-checked, nothing fires before Accept | Crawl (consent-required scenario): bar shown with one Accept and one Reject; no pixel before Accept; pixel fires after Accept (positive control); no pre-checked boxes | Geo detection itself is unit-tested, not crawled | none | summer | ok |
 | TRK-6 | Minors: pixels off on young-audience profiles and for visitors who signal under 16 | No young-audience flag exists; pixels run on every profile | Flag, artist toggle and crawl fixture missing | ISSUE: `young_audience` profile flag that suppresses pixels, plus crawl fixture | summer | gap |
-| TRK-7 | Policy claims literally true; every pixel vendor named | Live 2026-10-31: privacy policy said "never selling it" and omitted Meta; cookie policy said "No third-party tracking scripts are loaded on your device" | Fixed in copy (PR), pending counsel wording | PR. **COUNSEL** for final text | summer | partial |
+| TRK-7 | Policy claims literally true; every pixel vendor named | Live 2026-10-31: privacy policy said "never selling it" and omitted Meta; cookie policy said "No third-party tracking scripts are loaded on your device" | Fixed in copy (PR #23971), pending counsel wording | PR #23971. **COUNSEL** for final text | summer | partial |
 
 ### Data rights, retention and breach
 
@@ -112,5 +112,5 @@ Prices are rough planning ranges; Summer confirms current quotes before recommen
 
 | Date | Change | Source |
 |---|---|---|
-| 2026-10-31 | Added tracking rows TRK-1..7 and the compliance loop (registry, crawl, rules with negative controls, evidence log); removed the Meta pixel from release-alert signup pages; corrected the privacy and cookie policy claims. | Tim White |
+| 2026-10-31 | Added tracking rows TRK-1..7 and the compliance loop (registry, crawl, rules with negative controls, evidence log); the Meta pixel removal from release-alert signup pages and the privacy and cookie policy corrections ship separately in PR #23971. | Tim White |
 | 2026-10-28 | Created the register; Clerk references removed from the privacy and cookie policies; postal-address email footer and `/identity` legal links added. | Tim White |
