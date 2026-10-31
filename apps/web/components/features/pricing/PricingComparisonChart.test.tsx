@@ -36,7 +36,7 @@ describe('PricingComparisonChart', () => {
     }
 
     const feature = within(mobileTable).getByRole('rowheader', {
-      name: 'Fan email capture',
+      name: 'Audience email capture',
     });
     expect(feature).toHaveAttribute('scope', 'row');
     expect(feature).toHaveAttribute('data-wrap', 'feature-label');

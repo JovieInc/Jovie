@@ -6,8 +6,8 @@ import { PRICING_COMPARISON } from '@/lib/entitlements/registry';
  */
 const PUBLIC_PRICING_FEATURE_NAMES = new Set([
   'Public Jovie profile page',
-  'Fan email capture',
-  'Release notifications (email to fans)',
+  'Audience email capture',
+  'Release notifications (email to your audience)',
   'Pre-release & countdown pages',
 ]);
 

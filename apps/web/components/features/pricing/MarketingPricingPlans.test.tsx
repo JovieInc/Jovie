@@ -1,7 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ARTIST_VISIBILITY_OFFER_CONTRACT_ID } from '@/lib/billing/offer-truth';
-import { getPaidPlanAdditionNames } from '@/lib/billing/public-pricing-features';
+import {
+  getPaidPlanAdditionNames,
+  PUBLIC_PRICING_COMPARISON,
+} from '@/lib/billing/public-pricing-features';
 import { MarketingPricingPlans } from './MarketingPricingPlans';
 
 describe('MarketingPricingPlans', () => {
@@ -27,7 +30,9 @@ describe('MarketingPricingPlans', () => {
     expect(proBullets).toEqual([...getPaidPlanAdditionNames()]);
     expect(proBullets.length).toBeGreaterThan(0);
     expect(proBullets).toContain('Pre-release & countdown pages');
-    expect(proBullets).toContain('Release notifications (email to fans)');
+    expect(proBullets).toContain(
+      'Release notifications (email to your audience)'
+    );
     const freeCard = screen.getByTestId('marketing-pricing-plan-free');
     for (const bullet of proBullets) {
       expect(freeCard.textContent).not.toContain(bullet);
@@ -36,6 +41,16 @@ describe('MarketingPricingPlans', () => {
       '.marketing-pricing-plan-card__features li'
     )) {
       expect(li.querySelector('svg')).toBeNull();
+    }
+  });
+
+  it('never uses the word fan in public pricing feature labels', () => {
+    const labels = PUBLIC_PRICING_COMPARISON.flatMap(category =>
+      category.features.map(feature => feature.name)
+    );
+    expect(labels.length).toBeGreaterThan(0);
+    for (const label of labels) {
+      expect(label).not.toMatch(/\bfans?\b/i);
     }
   });
 });

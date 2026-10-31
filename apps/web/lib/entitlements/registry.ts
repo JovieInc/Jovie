@@ -492,7 +492,7 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
       {
         // Fan email capture is uncapped on every plan; contactsLimit only
         // applies to saved team/press/booking contacts (creatorContactPeople).
-        name: 'Fan email capture',
+        name: 'Audience email capture',
         free: 'Unlimited',
         pro: 'Unlimited',
         max: 'Unlimited',
@@ -504,7 +504,7 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
         max: 'Unlimited',
       },
       {
-        name: 'Release notifications (email to fans)',
+        name: 'Release notifications (email to your audience)',
         free: false,
         pro: true,
         max: true,
