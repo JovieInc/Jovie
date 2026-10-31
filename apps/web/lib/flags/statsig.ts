@@ -102,7 +102,11 @@ async function initializeStatsig(): Promise<void> {
 
   statsigInitPromise = (async () => {
     const serverSecret = env.STATSIG_SERVER_SECRET;
-    if (!serverSecret) {
+    // `vercel pull` writes the literal "[SENSITIVE]" for sensitive-typed
+    // project env vars, so CI prebuilt builds see a non-empty but invalid key
+    // and Statsig logs a 401 during static generation. Real server keys always
+    // start with "secret-"; anything else is treated as not configured.
+    if (!serverSecret || !serverSecret.startsWith('secret-')) {
       if (!statsigWarnedNoSecret) {
         logger.warn(
           '[Statsig] Server secret not configured - feature flags will use defaults'
