@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { DECISION_CARD_COPY_LIMITS } from './decision-card-copy';
 
 /** Summer ↔ Jovie contract v1: approval cards in the admin Ovie inbox. */
 
@@ -59,14 +58,6 @@ export const summerCardInputSchema = z
       .array(z.url({ protocol: /^https$/u }).max(2048))
       .max(16)
       .default([]),
-    /**
-     * The 1-3 facts the decision turns on, one line each. The card face shows
-     * these, not `body` (`jovie.decision-card-copy/v1`).
-     */
-    facts: z
-      .array(z.string().trim().min(1).max(DECISION_CARD_COPY_LIMITS.fact))
-      .max(DECISION_CARD_COPY_LIMITS.facts)
-      .default([]),
     /** When the default applies. Omitted: 48 hours after filing; capped at 14 days. */
     decideBy: z
       .string()
@@ -98,11 +89,7 @@ export const summerCardInputSchema = z
     message: 'a declared default must say what happens if silent',
   });
 
-/** Code-built cards (claim review, spend preflight, recovery) may omit facts. */
-export type SummerCardInput = Omit<
-  z.infer<typeof summerCardInputSchema>,
-  'facts'
-> & { readonly facts?: readonly string[] };
+export type SummerCardInput = z.infer<typeof summerCardInputSchema>;
 
 export const summerCardDecisionSchema = z
   .object({
@@ -138,7 +125,7 @@ export type SummerCard = {
   readonly amountUsd: number | null;
   readonly preflightReceiptId?: string | null;
   readonly evidence: readonly string[];
-  /** Filed facts; empty on cards filed before the copy contract. */
+  /** Forward-compatible reading of facts filed by the generator copy contract. */
   readonly facts?: readonly string[];
   readonly status: SummerCardStatus;
   readonly comment: string | null;

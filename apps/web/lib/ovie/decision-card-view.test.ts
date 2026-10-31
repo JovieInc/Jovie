@@ -77,24 +77,30 @@ describe('decisionCardView', () => {
     expect(due.fallback).toMatchObject({ tone: 'due', relative: null });
   });
 
-  it('never shows default text that contradicts what the deadline records', () => {
-    const view = decisionCardView(
-      {
-        ...base,
-        decisionDefault: {
-          ...base.decisionDefault!,
-          decision: 'reject',
-          summary: 'Ship at the 48h deadline.',
+  it.each([
+    ['reject', 'Ship at the 48h deadline.'],
+    ['approve', 'Do nothing at the deadline.'],
+  ] as const)(
+    'hides text contradicting the recorded %s default',
+    (decision, summary) => {
+      const view = decisionCardView(
+        {
+          ...base,
+          decisionDefault: {
+            ...base.decisionDefault!,
+            decision,
+            summary,
+          },
         },
-      },
-      NOW
-    );
-    expect(view.fallback).toMatchObject({
-      decision: 'reject',
-      conflict: true,
-      summary: null,
-    });
-  });
+        NOW
+      );
+      expect(view.fallback).toMatchObject({
+        decision,
+        conflict: true,
+        summary: null,
+      });
+    }
+  );
 
   it('hides an undeclared conservative default summary and falls back to the recommendation', () => {
     const view = decisionCardView(
