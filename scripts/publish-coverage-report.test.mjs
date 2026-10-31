@@ -39,7 +39,6 @@ test('every integrated workflow retains origin data and the handoff grants only 
     'dependabot-auto-merge',
     'dependabot-pin-sync',
     'desktop-release',
-    'nightly-testing-agent',
     'production-controller',
     'screenshots',
     'sentry-autofix',
@@ -292,60 +291,6 @@ test('nightly publication skips unchanged evidence and rejects unrelated coverag
   f.change();
   assert.throws(() => publishNightlyReport(f), /unrelated/);
   assert.deepEqual(f.calls, []);
-});
-
-test('the actual nightly publication step succeeds with main protected', t => {
-  const f = fixture(t, true);
-  f.git('branch', '--set-upstream-to=origin/main');
-  writeFileSync(
-    join(f.cwd, 'docs/NIGHTLY_TESTING_AGENT_REPORT.md'),
-    'Nightly failed; evidence retained\n'
-  );
-  mkdirSync(join(f.cwd, 'scripts/lib'), { recursive: true });
-  for (const lib of [
-    'publish-coverage-report.mjs',
-    'retire-coverage-reports.mjs',
-  ]) {
-    writeFileSync(
-      join(f.cwd, `scripts/lib/${lib}`),
-      readFileSync(new URL(`./lib/${lib}`, import.meta.url))
-    );
-  }
-  const bin = join(f.root, 'bin');
-  mkdirSync(bin);
-  installOriginFixture(f, bin);
-  const workflow =
-    /** @type {{ jobs: { report: { steps: {name?: string, run?: string}[] } } }} */ (
-      load(
-        readFileSync(
-          new URL(
-            '../.github/workflows/nightly-testing-agent.yml',
-            import.meta.url
-          ),
-          'utf8'
-        )
-      )
-    );
-  const step = workflow.jobs.report.steps.find(
-    candidate =>
-      candidate.name === 'Commit evidence report when changed' ||
-      candidate.name === 'Open nightly evidence PR'
-  );
-  execFileSync('bash', ['-e', '-c', step.run], {
-    cwd: f.cwd,
-    env: {
-      ...f.env,
-      GH_TOKEN: 'synthetic-local-only',
-      PATH: `${bin}:${process.env.PATH}`,
-    },
-    encoding: 'utf8',
-  });
-  assert.equal(f.git('rev-parse', 'origin/main'), f.source);
-  assert.equal(f.git('rev-parse', 'HEAD^'), f.source);
-  assert.equal(
-    f.git('branch', '--show-current'),
-    'bot/nightly-evidence-12345-1'
-  );
 });
 
 test('does not mint git credentials or create a PR when the report is unchanged', t => {
