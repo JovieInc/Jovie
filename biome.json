@@ -148,6 +148,12 @@
   },
   "overrides": [
     {
+      "includes": ["workers/mesh-hub/src/**"],
+      "javascript": {
+        "globals": ["WebSocketPair", "WebSocketRequestResponsePair"]
+      }
+    },
+    {
       "includes": ["scripts/agent/pen-instance-drift.js"],
       "javascript": {
         "globals": [
