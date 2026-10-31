@@ -81,6 +81,8 @@ describe('onboarding tool artifacts', () => {
     expect(screen.getByDisplayValue('Test Artist')).toBeDefined();
     expect(screen.getByText('Test Artist')).toBeDefined();
     expect(screen.getByText(/12\.3K followers/)).toBeDefined();
+    // No internal Spotify popularity score in the row (2026-10-31 walk).
+    expect(screen.queryByText(/Pop 48/)).toBeNull();
     expect(screen.queryByText('searchSpotifyArtist')).toBeNull();
 
     fireEvent.click(screen.getByText('Use'));
@@ -379,6 +381,22 @@ describe('onboarding tool artifacts', () => {
     expect(screen.queryByLabelText('Social Profile URL')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Attach Account' })).toBeNull();
     expect(screen.queryByTestId('onboarding-attach-account')).toBeNull();
+  });
+
+  it('asks for the profile URL without fan vocabulary', () => {
+    fastRender(
+      <OnboardingSocialLinkCard
+        state='output-available'
+        output={{ action: 'propose_social_link', url: null }}
+        onAttachAccount={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByText(
+        'Paste the full profile URL, like instagram.com/yourname.'
+      )
+    ).toBeDefined();
+    expect(screen.queryByText(/fans/i)).toBeNull();
   });
 
   it('renders proposed social links with Attach Account CTA', () => {

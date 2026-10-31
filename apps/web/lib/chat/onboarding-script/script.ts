@@ -15,7 +15,7 @@
  * Copy contract (audit):
  * - 1–2 sentences + action per turn
  * - Before ownership verified: "this artist", never "you"
- * - Followers: "Spotify followers (source: enrichment)" — no Jovie audience claims
+ * - Followers: "Spotify followers" — no Jovie audience claims, no pipeline words
  */
 
 import {
@@ -31,6 +31,7 @@ export type ScriptStepId =
   | 'confirm_artist'
   | 'confirm_artist_no_data'
   | 'handle'
+  | 'attach_social'
   | 'ask_audience'
   | 'instant_access'
   | 'golden_path_admitted'
@@ -88,32 +89,43 @@ export const SCRIPT_LINES: readonly ScriptLine[] = [
   ),
   line(
     'get_artist',
-    'v4',
-    'Search Spotify for the act, then pick a row so enrichment can attach.'
+    'v5',
+    'Search Spotify for the act, then pick the matching row.'
   ),
 
-  // Before ownership verified: "this artist", not "you". Followers cite enrichment source.
+  // Before ownership verified: "this artist", not "you". The handle card
+  // ships in the same turn, so the line points at it. No pipeline words
+  // ("enrichment", "(source: …)"): the rail already shows the Spotify source.
   line(
     'confirm_artist',
-    'v3',
-    'Pulled up this artist. {followers} Spotify followers (source: enrichment). Next: lock a handle for this profile.'
+    'v5',
+    'Found {name} on Spotify: {followers} followers. Confirm the handle for this page below.'
   ),
   line(
     'confirm_artist',
-    'v4',
-    '{name} is the match. Enrichment shows {followers} Spotify followers. Claim a handle next.'
+    'v6',
+    '{name} is the match, with {followers} Spotify followers. Lock in the handle below.'
   ),
 
   line(
     'confirm_artist_no_data',
-    'v3',
-    'Locked the match. Spotify enrichment is slow. We can keep moving without the counts. Next: lock a handle.'
+    'v4',
+    'Locked the match. Spotify is slow to send the counts, so we keep moving without them. Confirm the handle below.'
   ),
 
   line(
     'handle',
     'v3',
     'Checking @{handle} now. This is the public link for the profile.'
+  ),
+
+  // Shown with the social-link card right after the handle is confirmed:
+  // one ask per turn, and it matches the card (2026-10-31 walk: the audience
+  // question rode on top of an "attach an account" card).
+  line(
+    'attach_social',
+    'v1',
+    'Handle locked. Paste the link to one public profile you post on, like Instagram or TikTok.'
   ),
 
   line(
@@ -134,7 +146,7 @@ export const SCRIPT_LINES: readonly ScriptLine[] = [
     'You clear the bar. Your page goes live once we confirm it is you, and it stays private and yours to edit until then. Checkout takes about a minute and paying does not change that. The free tier is available if you want to start there.'
   ),
 
-  line('waitlist', 'v3', ONBOARDING_WAITLIST_RECEIPT),
+  line('waitlist', 'v4', ONBOARDING_WAITLIST_RECEIPT),
 
   line(
     'done',
@@ -239,6 +251,7 @@ export const SCRIPT_STEP_IDS: readonly ScriptStepId[] = [
   'confirm_artist',
   'confirm_artist_no_data',
   'handle',
+  'attach_social',
   'ask_audience',
   'instant_access',
   'golden_path_admitted',
