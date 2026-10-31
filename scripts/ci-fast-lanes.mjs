@@ -2331,6 +2331,7 @@ export const GUARDRAIL_OPERATIONS_TESTS = Object.freeze([
   'scripts/desktop-installed-apps-audit.test.mjs',
   'scripts/dev-web-fast.test.mjs',
   'scripts/ios-guardrail-rollout-audit.test.mjs',
+  'scripts/swift-arch/guard.test.mjs',
   'scripts/version-fanout-guard.test.mjs',
   'scripts/version-stamp.test.mjs',
   'scripts/agent/preflight.test.mjs',
@@ -2541,6 +2542,8 @@ function runIosFast() {
     'apps/web/design/ziawi-color-sot.json',
     'apps/web/styles/design-system.css',
     'scripts/invariants/native-spacing-scale*',
+    'scripts/swift-arch/**',
+    'apps/macos/**',
     '.github/workflows/ios-ci.yml',
     '.github/workflows/ios-testflight.yml',
   ]);

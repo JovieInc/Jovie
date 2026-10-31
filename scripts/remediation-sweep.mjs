@@ -20,6 +20,7 @@ import {
   VERCEL_TEAM_ID,
 } from './lib/remediation-sweep.mjs';
 import { runDriftChecks } from './lib/source-drift.mjs';
+import { collectSwiftArchMetrics } from './swift-arch/guard.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -364,6 +365,13 @@ async function main() {
     loadDomains: () => loadDomainRecords(),
     loadCredentials: () => loadCredentialsPlans(),
     loadDrift: () => loadDriftPlans(),
+    loadSwiftArch: () => {
+      const metrics = collectSwiftArchMetrics();
+      // Measure everything: the debt count is a timestamped run record.
+      const out = process.env.SWIFT_ARCH_METRICS_OUT;
+      if (out) writeFileSync(out, `${JSON.stringify(metrics, null, 2)}\n`);
+      return metrics;
+    },
     vercelTokenPresent: Boolean(token),
     upsert: upsertLinearIssueByTitleFingerprint,
     apiKey: process.env.LINEAR_API_KEY,
