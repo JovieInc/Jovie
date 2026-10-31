@@ -1,9 +1,9 @@
 /**
  * Analytics Data Retention Cleanup
  *
- * Automatically deletes analytics data older than the configured retention period.
- * Default: 90 days (1 year for chat data)
- * Configurable via ANALYTICS_RETENTION_DAYS environment variable.
+ * Automatically deletes analytics data older than the configured retention window.
+ * Windows live in retention-windows.ts. ANALYTICS_RETENTION_DAYS may override
+ * the default for this cleanup only.
  *
  * Uses batched deletes to avoid locking tables or timing out the cron window.
  * The cron will chip away at large backlogs over multiple daily runs.
@@ -22,6 +22,10 @@ import {
   type SQL,
 } from 'drizzle-orm';
 import { getTableConfig, type PgTable } from 'drizzle-orm/pg-core';
+import {
+  CHAT_RETENTION_DAYS,
+  DEFAULT_RETENTION_DAYS,
+} from '@/lib/analytics/retention-windows';
 import { db } from '@/lib/db';
 import { adminAuditLog } from '@/lib/db/schema/admin';
 import {
@@ -45,9 +49,6 @@ import {
 import { sqlTimestamp } from '@/lib/db/sql-helpers';
 import { env } from '@/lib/env-server';
 
-// Default retention period in days
-const DEFAULT_RETENTION_DAYS = 90;
-const CHAT_RETENTION_DAYS = 365;
 const BATCH_SIZE = 1000;
 
 // Get configured retention period
@@ -77,7 +78,7 @@ export interface RetentionCleanupResult {
   audienceMembersDeleted: number;
   notificationSubscriptionsDeleted: number;
   serverAnalyticsEventsDeleted: number;
-  // New tables - 90 day retention
+  // Tables on the default retention window
   pixelEventsDeleted: number;
   stripeWebhookEventsDeleted: number;
   webhookEventsDeleted: number;

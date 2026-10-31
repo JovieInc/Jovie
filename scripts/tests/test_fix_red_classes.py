@@ -23,6 +23,7 @@ class ClassifyTest(unittest.TestCase):
             "domain-write-guard: apps/web/lib/leads/lead-claim-token.ts writes creatorProfiles directly 1x (allowed 0).": ("domain-write", "register-domain-writes"),
             "This PR conflicts with main in: scripts/preflight-changed.mjs . Resolve the conflict (lane-fix-conflict).": ("narrowed-preflight", "merge-narrowed-preflight"),
             "AssertionError: off-grid 10px/14px spacing steps (*-2.5, *-3.5) grew: 591 > baseline 590.": ("spacing-scale", "snap-spacing"),
+            "duplicate-literals: apps/web/content/legal/privacy.md has 3 retention-days literal(s), ledger allows 2.": ("duplicate-retention", "derive-retention"),
             "Error: apps/web/app/(marketing)/pricing/page.tsx: source changed; renew certification evidence": ("census-certification", "sync-main"),
             "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "agent"),
             "red-before-green: include Failing command:": ("pr-body", "agent"),
@@ -253,6 +254,84 @@ diff --git a/apps/web/lib/skip.ts b/apps/web/lib/skip.ts
             path.write_text("const kept = 'gap-2.5'\nalready snapped gap-2\n")
             self.assertEqual(classes.snap_added_conservative_spacing(root, self.DIFF), [])
             self.assertIn("already snapped gap-2\n", path.read_text())
+
+
+class RetentionDeriveTest(unittest.TestCase):
+    SOT = json.dumps({
+        "scans": [{
+            "id": "retention-days",
+            "owner": "apps/web/lib/analytics/retention-windows.ts",
+        }]
+    })
+    OWNER = (
+        "export const DEFAULT_RETENTION_DAYS = 90;\n"
+        "export const CHAT_RETENTION_DAYS = 365;\n"
+    )
+    DIFF = """diff --git a/apps/web/content/legal/privacy.md b/apps/web/content/legal/privacy.md
+--- a/apps/web/content/legal/privacy.md
++++ b/apps/web/content/legal/privacy.md
+@@ -1,0 +2 @@
++- Recordings are deleted after 90 days. Chat stays 365 days.
+diff --git a/apps/web/content/other.md b/apps/web/content/other.md
+--- a/apps/web/content/other.md
++++ b/apps/web/content/other.md
+@@ -1,0 +1 @@
++- also 90 days
+"""
+    LOG = (
+        "HttpError: API rate limit exceeded for installation\n"
+        "duplicate-literals: apps/web/content/legal/privacy.md has 3 retention-days literal(s), "
+        "ledger allows 2. Import the value from its owner instead of copying it.\n"
+    )
+
+    def tree(self, tmp, privacy):
+        root = Path(tmp)
+        (root / "canon").mkdir()
+        (root / "canon/sources-of-truth.json").write_text(self.SOT)
+        owner = root / "apps/web/lib/analytics/retention-windows.ts"
+        owner.parent.mkdir(parents=True)
+        owner.write_text(self.OWNER)
+        path = root / "apps/web/content/legal/privacy.md"
+        path.parent.mkdir(parents=True)
+        path.write_text(privacy)
+        other = root / "apps/web/content/other.md"
+        other.write_text("- also 90 days\n")
+        return root, path, other
+
+    def test_rate_limit_noise_does_not_outrank_the_retention_guard(self):
+        got = classes.classify(pr("Source Validation"), {"Source Validation": self.LOG})
+        self.assertEqual((got["cls"], got["action"]), ("duplicate-retention", "derive-retention"))
+        self.assertEqual(got["files"], ["apps/web/content/legal/privacy.md"])
+
+    def test_rewrites_only_the_added_line_in_the_named_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, path, other = self.tree(
+                tmp, "kept after 90 days\n- Recordings are deleted after 90 days. Chat stays 365 days.\n")
+            changed = classes.derive_added_retention_literals(
+                root, self.DIFF, ["apps/web/content/legal/privacy.md"])
+            self.assertEqual(changed, ["apps/web/content/legal/privacy.md"])
+            text = path.read_text()
+            self.assertTrue(text.startswith("kept after 90 days\n"))
+            self.assertIn("{{DEFAULT_RETENTION_DAYS}} days", text)
+            self.assertIn("{{CHAT_RETENTION_DAYS}} days", text)
+            self.assertNotIn("deleted after 90 days", text)
+            self.assertEqual(other.read_text(), "- also 90 days\n")
+            self.assertFalse((root / "scripts/invariants/duplicate-literals.baseline.json").exists())
+
+    def test_stale_line_and_ambiguous_owner_write_nothing(self):
+        added = "- Recordings are deleted after 90 days. Chat stays 365 days.\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            root, path, _other = self.tree(tmp, "kept after 90 days\nalready derived\n")
+            self.assertEqual(classes.derive_added_retention_literals(
+                root, self.DIFF, ["apps/web/content/legal/privacy.md"]), [])
+            self.assertIn("already derived\n", path.read_text())
+            (root / "apps/web/lib/analytics/retention-windows.ts").write_text(
+                "export const DEFAULT_RETENTION_DAYS = 90;\n"
+                "export const OTHER_RETENTION_DAYS = 90;\n")
+            path.write_text("kept after 90 days\n" + added)
+            self.assertEqual(classes.derive_added_retention_literals(
+                root, self.DIFF, ["apps/web/content/legal/privacy.md"]), [])
+            self.assertTrue(path.read_text().endswith(added))
 
 
 class WireTest(unittest.TestCase):

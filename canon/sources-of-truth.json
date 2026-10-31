@@ -202,12 +202,14 @@
       "title": "Retention windows and numeric limits quoted in copy",
       "owner": {
         "kind": "file",
-        "ref": "apps/web/lib/analytics/data-retention.ts",
+        "ref": "apps/web/lib/analytics/retention-windows.ts",
         "note": "DEFAULT_RETENTION_DAYS and CHAT_RETENTION_DAYS. Privacy policy and pricing copy quote these; they must derive from this owner, not restate it."
       },
       "derived": [
         "apps/web/content/legal/privacy.md",
-        "apps/web/app/api/cron/data-retention/route.ts"
+        "apps/web/app/api/cron/data-retention/route.ts",
+        "apps/web/lib/analytics/data-retention.ts",
+        "apps/web/lib/docs/getMarkdownDocument.ts"
       ],
       "scan": "retention-days"
     },
@@ -349,7 +351,7 @@
       "id": "retention-days",
       "domain": "retention-and-limits",
       "label": "Retention window",
-      "owner": "apps/web/lib/analytics/data-retention.ts",
+      "owner": "apps/web/lib/analytics/retention-windows.ts",
       "extract": ["_RETENTION_DAYS\\s*=\\s*(\\d+)"],
       "literal": "\\b{n}[- ]days?\\b",
       "scope": [

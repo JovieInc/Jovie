@@ -29,11 +29,12 @@ from atomic_state import atomic_write_text
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, AGENT = (
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, DERIVE_RETENTION, AGENT = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "merge-narrowed-preflight", "register-domain-writes", "agent")
+    "merge-narrowed-preflight", "register-domain-writes", "derive-retention", "agent")
 DETERMINISTIC = frozenset({
-    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN})
+    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED,
+    REGISTER_DOMAIN, DERIVE_RETENTION})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -87,6 +88,16 @@ NARROWED_CONFLICT = re.compile(
 DOMAIN_WRITE = re.compile(
     r"domain-write-guard: (?P<path>apps/web/(?:app|lib|components)/[\w./-]+\.(?:ts|tsx)) "
     r"writes (?P<table>[A-Za-z_][A-Za-z0-9_]*) directly \d+x \(allowed 0\)")
+# Shrink-only retention-days ledger. Copy quoted the owner's day count. Replace
+# the added phrase with the owner's template token. Do not raise the ledger.
+# Before platform-infra: a Source Validation log also contains passing-test
+# 502 and rate-limit lines.
+RETENTION_LITERAL = re.compile(
+    r"duplicate-literals: (?P<path>\S+) has \d+ retention-days literal\(s\), ledger allows \d+")
+_RETENTION_ASSIGN = re.compile(
+    r"(?m)^(?:export\s+)?const\s+(?P<name>[A-Z0-9_]*RETENTION_DAYS)\s*=\s*(?P<days>\d+)\s*;")
+_RETENTION_OWNER_MAP = "canon/sources-of-truth.json"
+_RETENTION_BASELINE = "scripts/invariants/duplicate-literals.baseline.json"
 _DOMAIN_REGISTRY = "apps/web/lib/domain/write-registry.json"
 _EXPORT_START = re.compile(
     r"(?m)^export\s+(?:async\s+)?(?:function|const)\s+([A-Za-z_][A-Za-z0-9_]*)\b")
@@ -121,6 +132,7 @@ SIGNATURES = (
     # Before platform-infra: the ratchet message includes a count such as 591,
     # and `\b5\d\d\b` would otherwise treat that count as an HTTP 5xx.
     ("spacing-scale", SPACING_RATCHET_TEXT, SNAP_SPACING),
+    ("duplicate-retention", RETENTION_LITERAL, DERIVE_RETENTION),
     ("census-certification", CENSUS_CERTIFICATION, SYNC_MAIN),
     ("quota-deferred", QUOTA_TEXT, RERUN),
     ("platform-infra", PLATFORM_TEXT, RERUN),
@@ -201,6 +213,8 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         files = sorted(set(files))
     elif cls == "domain-write":
         files = sorted(_domain_write_hits("\n".join(logs.get(name) or "" for name in names)))
+    elif cls == "duplicate-retention":
+        files = retention_violation_files("\n".join(logs.get(name) or "" for name in names))
     return {"schema": SCHEMA, "cls": cls, "key": fingerprint_key(cls, names, signature), "action": action,
             "checks": names, "signature": signature, "files": files}
 
@@ -286,6 +300,132 @@ def snap_added_conservative_spacing(root: Path, diff: str) -> list[str]:
             if current != added:
                 continue
             file_lines[index] = snapped + ending
+            dirty = True
+        if not dirty:
+            continue
+        try:
+            atomic_write_text(path, "".join(file_lines))
+        except OSError:
+            continue
+        changed.append(rel)
+    return sorted(changed)
+
+
+def retention_violation_files(log: str) -> list[str]:
+    """Paths the duplicate-literals guard named for a retention-days overage."""
+    return sorted({match.group("path") for match in RETENTION_LITERAL.finditer(str(log or ""))})
+
+
+def retention_windows(root: Path) -> dict[str, str]:
+    """Day-count string to const name, read from the retention-days owner.
+
+    Empty when the map, owner, or assignments are missing, or two consts share
+    one count. Callers then write nothing.
+    """
+    try:
+        manifest = json.loads((Path(root) / _RETENTION_OWNER_MAP).read_text())
+        owner = next(
+            scan["owner"]
+            for scan in manifest.get("scans") or []
+            if isinstance(scan, dict) and scan.get("id") == "retention-days")
+        if not isinstance(owner, str) or not owner or owner.startswith("/") or ".." in Path(owner).parts:
+            return {}
+        source = (Path(root) / owner).read_text()
+    except (OSError, json.JSONDecodeError, KeyError, StopIteration, TypeError, UnicodeError):
+        return {}
+    windows: dict[str, str] = {}
+    for match in _RETENTION_ASSIGN.finditer(source):
+        days, name = match.group("days"), match.group("name")
+        previous = windows.get(days)
+        if previous is not None and previous != name:
+            return {}
+        windows[days] = name
+    return windows
+
+
+def _retention_phrase(windows: dict[str, str]) -> re.Pattern[str]:
+    counts = "|".join(re.escape(days) for days in sorted(windows, key=len, reverse=True))
+    return re.compile(rf"\b(?P<n>{counts})[- ]days?\b")
+
+
+def _derive_retention_line(line: str, windows: dict[str, str], phrase: re.Pattern[str]) -> str:
+    def repl(match: re.Match) -> str:
+        return "{{" + windows[match.group("n")] + "}} days"
+    return phrase.sub(repl, line)
+
+
+def _added_retention_edits(diff: str, allowed: set[str], windows: dict[str, str]) -> dict[str, dict[int, tuple[str, str]]]:
+    """Eligible file -> {new 1-based line: (added text, derived text)} for copied day counts."""
+    edits: dict[str, dict[int, tuple[str, str]]] = {}
+    phrase = _retention_phrase(windows)
+    rel = ""
+    eligible = False
+    new_line = 0
+    in_hunk = False
+    for raw in str(diff or "").splitlines():
+        if raw.startswith("+++ b/"):
+            rel = raw[6:]
+            eligible = rel in allowed and rel != _RETENTION_BASELINE and ".." not in Path(rel).parts
+            in_hunk = False
+            continue
+        if raw.startswith("--- ") or raw.startswith("diff --git "):
+            continue
+        header = re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@", raw)
+        if header:
+            new_line = int(header.group(1))
+            in_hunk = True
+            continue
+        if not in_hunk:
+            continue
+        if raw.startswith("\\"):
+            continue
+        if raw.startswith("+"):
+            added = raw[1:]
+            derived = _derive_retention_line(added, windows, phrase)
+            if eligible and derived != added:
+                edits.setdefault(rel, {})[new_line] = (added, derived)
+            new_line += 1
+        elif raw.startswith("-"):
+            continue
+        else:
+            new_line += 1
+    return edits
+
+
+def derive_added_retention_literals(root: Path, diff: str, files: list[str] | None) -> list[str]:
+    """Replace an added `<n> days` phrase with `{{CONST}} days` from the owner.
+
+    Only files the guard named are eligible. A line that no longer matches the
+    diff is left alone. The baseline is never written. Returns the files written,
+    or [] when the owner cannot be read.
+    """
+    allowed = {
+        str(path).replace("\\", "/")
+        for path in (files or [])
+        if path and not str(path).startswith("/") and ".." not in Path(str(path)).parts
+    }
+    windows = retention_windows(root)
+    if not allowed or not windows:
+        return []
+    changed = []
+    root = Path(root)
+    for rel, lines in _added_retention_edits(diff, allowed, windows).items():
+        path = root / rel
+        try:
+            original = path.read_text()
+        except OSError:
+            continue
+        file_lines = original.splitlines(keepends=True)
+        dirty = False
+        for lineno, (added, derived) in lines.items():
+            index = lineno - 1
+            if index < 0 or index >= len(file_lines):
+                continue
+            ending = "\r\n" if file_lines[index].endswith("\r\n") else "\n" if file_lines[index].endswith("\n") else ""
+            current = file_lines[index][: len(file_lines[index]) - len(ending)]
+            if current != added:
+                continue
+            file_lines[index] = derived + ending
             dirty = True
         if not dirty:
             continue

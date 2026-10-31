@@ -84,7 +84,7 @@ We automatically gather operational signals to keep Jovie reliable:
 - Analytics about profile visits, clicks, and link engagement
 - Device, browser, and user-agent details for rendering safely
 - IP addresses (anonymized for monitoring abuse)
-- Session recordings: on our start, claim, pricing, sign-in, sign-up, onboarding, and billing pages, and for a sample of signed-in dashboard sessions, your browser keeps a short in-memory recording of your clicks, scrolling, and page navigation. It is sent to us only if you appear stuck or leave without finishing, an error occurs, or you sign up or claim a profile, so we can find where sign-up breaks. All text and form fields, including email addresses and passwords, are masked before they leave your browser, and media is blocked. Recordings are stored by Sentry, linked to your account only for internal product review, and deleted after 90 days. We do not record automated browsers.
+- Session recordings: on our start, claim, pricing, sign-in, sign-up, onboarding, and billing pages, and for a sample of signed-in dashboard sessions, your browser keeps a short in-memory recording of your clicks, scrolling, and page navigation. It is sent to us only if you appear stuck or leave without finishing, an error occurs, or you sign up or claim a profile, so we can find where sign-up breaks. All text and form fields, including email addresses and passwords, are masked before they leave your browser, and media is blocked. Recordings are stored by Sentry, linked to your account only for internal product review, and deleted after {{DEFAULT_RETENTION_DAYS}} days. We do not record automated browsers.
 
 ### Third-Party Services
 
