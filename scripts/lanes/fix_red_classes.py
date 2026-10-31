@@ -122,10 +122,12 @@ SIGNATURES = (
     # and `\b5\d\d\b` would otherwise treat that count as an HTTP 5xx.
     ("spacing-scale", SPACING_RATCHET_TEXT, SNAP_SPACING),
     ("census-certification", CENSUS_CERTIFICATION, SYNC_MAIN),
+    # The inventory assertion is actionable even when passing tests or echoed
+    # workflow scripts mention quota/infra failures elsewhere in the same log.
+    ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
     ("quota-deferred", QUOTA_TEXT, RERUN),
     ("platform-infra", PLATFORM_TEXT, RERUN),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
-    ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
     ("atomic-write", ATOMIC_TEXT, AGENT),
     ("pr-body", BODY_TEXT, AGENT),
 )
