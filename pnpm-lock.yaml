@@ -1113,6 +1113,15 @@ importers:
         specifier: ^5.8.2
         version: 5.9.3
 
+  workers/competitor-watch:
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^5.20260921.1
+        version: 5.20261016.1
+      typescript:
+        specifier: ^5.8.2
+        version: 5.9.3
+
   workers/observability-ingest:
     dependencies:
       htmlparser2:

@@ -1,0 +1,16 @@
+name = "jovie-competitor-watch"
+main = "src/index.ts"
+compatibility_date = "2026-03-01"
+
+[triggers]
+crons = ["7 * * * *"]
+
+[ai]
+binding = "AI"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "jovie-competitor-watch"
+database_id = "dd40c262-9b5e-456e-90ed-78e2c3b2add7"
+
+# Secrets: READ_TOKEN (bearer for GET /items, POST /items/:id/routed).
