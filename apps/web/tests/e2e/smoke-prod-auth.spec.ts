@@ -77,6 +77,36 @@ function runTag(): string {
     : `local${Date.now().toString(36)}`;
 }
 
+/**
+ * The reply element is also the surface a quota wall or an application error
+ * renders into: run 41165214531's receipt claimed a passed first reply at
+ * 703ms while its frame showed "You have reached your weekly AI message
+ * limit". A visible reply element proves nothing on its own — the reply must
+ * carry real assistant content and must never be the rate limit or an error
+ * surface (JOV-9625). This intentionally extends the chat cert's inline quota
+ * pattern (#24014) with the generic error surfaces.
+ */
+const PROD_REPLY_FAILURE_PATTERN =
+  /reached your chat limit|out of messages|weekly (ai )?(message|chat) limit|message limit|application error|something went wrong|internal server error|could not verify your billing|temporarily limited|try again later/u;
+
+async function assertAssistantReply(page: Page, label: string): Promise<void> {
+  const reply = page.getByTestId('chat-message-reply').first();
+  let text = '';
+  await expect
+    .poll(
+      async () => {
+        text = (await reply.innerText()).trim();
+        return text.length;
+      },
+      { timeout: 15_000 }
+    )
+    .toBeGreaterThanOrEqual(2);
+  expect(
+    text,
+    `${label}: the reply is a quota or error surface, not an assistant response: ${text.slice(0, 200)}`
+  ).not.toMatch(PROD_REPLY_FAILURE_PATTERN);
+}
+
 function hasProdAuthCredentials(): boolean {
   return resolveProductionAuthCredentials() !== null;
 }
@@ -1342,6 +1372,10 @@ test.describe('Production Auth Smoke @production-smoke', () => {
         await expect(
           page.locator("[data-testid='chat-message-reply']").first()
         ).toBeVisible({ timeout: 60_000 });
+        // The reply element is also where a quota wall renders (the weekly
+        // limit streams its notice as an assistant message); a visible
+        // element alone is a false pass (JOV-9625). Require real content.
+        await assertAssistantReply(page, 'fresh-user onboarding first value');
         return 'first assistant reply';
       },
       () => 'fresh user reached first value: onboarding chat first reply'
