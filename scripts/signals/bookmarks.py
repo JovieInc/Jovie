@@ -43,12 +43,15 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "lanes"))
 sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE.parent))
 import frontier  # noqa: E402
 import signal_watch  # noqa: E402
 import x_grok  # noqa: E402
+from apiclient.client import ApiClient  # noqa: E402
+from apiclient.gh import run_gh  # noqa: E402
 
 DEFAULT_DIR = Path.home() / ".local/state/jovie-signals"
-GATEWAY_CHAT = "https://ai-gateway.vercel.sh/v1/chat/completions"
+GATEWAY_CHAT = signal_watch.JEV_URL.split("/typesafe/")[0] + "/v1/chat/completions"
 EXTRACT_MODEL = "alibaba/qwen3.7-flash"  # multimodal, $0.03/$0.13 per M tokens (gateway list, 2026-10-31); no openai/anthropic (JOV-7119)
 PRICE_PER_TOKEN = {"in": 0.03e-6, "out": 0.13e-6}
 DAILY_BUDGET_USD = 0.25
@@ -101,6 +104,24 @@ GATE_QUESTION = {"conflict": {"type": "choice", "instructions": (
 
 # ---------------------------------------------------------------------------------------------
 # helpers
+
+_GATEWAY = None
+
+
+def gateway_post(url, body, headers, timeout=60):
+    """Every model call goes through the shared api-client ledger (provider `ai-gateway`, priority poll),
+    with the same (status, json) contract as signal_watch.post_json."""
+    global _GATEWAY
+    _GATEWAY = _GATEWAY or ApiClient("ai-gateway", "ai-gateway-key")
+    try:
+        response = _GATEWAY.request(url, method="POST", headers={"Content-Type": "application/json", **headers}, body=body,
+                                    priority="poll", write=False, idempotent=True, timeout_ms=timeout * 1000, max_attempts=2)
+        try:
+            return response.status, response.json() or {}
+        except ValueError:
+            return response.status, {}
+    except Exception as error:  # noqa: BLE001  (budget, breaker, network: the caller treats non-200 as unavailable)
+        return 0, {"code": type(error).__name__}
 
 def sha(text):
     return hashlib.sha256(str(text).encode()).hexdigest()
@@ -232,16 +253,15 @@ def verify_thread(rec, posts):
     return full, follow[:6], links[:10]
 
 
-def resolve_link(url, run=subprocess.run, opener=None):
+def resolve_link(url, run=run_gh, opener=None):
     """A derived link is real only if it resolves. GitHub repos via `gh api`, everything else via HTTP."""
     m = re.match(r"https://github\.com/([\w.-]+)/([\w.-]+)", url)
     if m:
         try:
-            done = run(["gh", "api", f"repos/{m.group(1)}/{m.group(2).removesuffix('.git')}", "--jq",
-                        "{full_name,stargazers_count,license:.license.spdx_id,pushed_at,archived}"],
-                       capture_output=True, text=True, timeout=30)
-            return json.loads(done.stdout) if done.returncode == 0 else None
-        except (OSError, subprocess.SubprocessError, ValueError):
+            done = run(["api", f"repos/{m.group(1)}/{m.group(2).removesuffix('.git')}", "--jq",
+                        "{full_name,stargazers_count,license:.license.spdx_id,pushed_at,archived}"], priority="poll")
+            return json.loads(done["stdout"]) if done.get("code") == 0 else None
+        except (OSError, ValueError, KeyError):
             return None
     try:
         request = urllib.request.Request(url, method="HEAD", headers={"User-Agent": signal_watch.USER_AGENT})
@@ -251,7 +271,7 @@ def resolve_link(url, run=subprocess.run, opener=None):
         return None
 
 
-def chat(messages, api_key, poster=signal_watch.post_json, max_tokens=1800):
+def chat(messages, api_key, poster=gateway_post, max_tokens=1800):
     status, body = poster(GATEWAY_CHAT, {"model": EXTRACT_MODEL, "messages": messages, "max_tokens": max_tokens,
                                          "temperature": 0, "response_format": {"type": "json_object"}},
                           {"Authorization": f"Bearer {api_key}"})
@@ -266,7 +286,7 @@ def chat(messages, api_key, poster=signal_watch.post_json, max_tokens=1800):
     return objs[0], cost
 
 
-def ocr(rec, api_key, poster=signal_watch.post_json):
+def ocr(rec, api_key, poster=gateway_post):
     """Transcription only, a separate call from extraction: the text in each image, verbatim."""
     if not rec["images"]:
         return "", 0.0
@@ -327,7 +347,7 @@ def ground(ideas, ground_text, derived_text, ground_links, derived_links):
     return kept, dropped, link_drops
 
 
-def classify(idea, api_key, poster=signal_watch.post_json):
+def classify(idea, api_key, poster=gateway_post):
     state = f"Idea: {idea['title']}\nClaim: {idea['claim']}\nWhy: {idea['mechanism']}"[:3000]
     status, body = poster(signal_watch.JEV_URL, {"model": signal_watch.JEV_MODEL, "state": state, "questions": QUESTIONS},
                           {"Authorization": f"Bearer {api_key}"})
@@ -376,7 +396,7 @@ def gbrain_decisions(text, run=subprocess.run):
     return [{"slug": r.get("slug"), "title": r.get("title"), "text": str(r.get("chunk_text") or "")[:1500]} for r in rows or []]
 
 
-def decision_gate(idea, api_key, decisions=gbrain_decisions, poster=signal_watch.post_json):
+def decision_gate(idea, api_key, decisions=gbrain_decisions, poster=gateway_post):
     """-> (ok, decisionRef, cost). Blocks filing when a recorded decision is contradicted or already covers it."""
     found = decisions(f"{idea['title']}. {idea['claim']}")
     if found is None:
@@ -564,7 +584,7 @@ def process_grok(recs, threads, *, resolver, grok_run=None, env=None):
 # ---------------------------------------------------------------------------------------------
 # run
 
-def gateway_ok(api_key, poster=signal_watch.post_json):
+def gateway_ok(api_key, poster=gateway_post):
     """One cheap probe: a 402 (key budget reached) or auth failure routes the run to the Grok seat."""
     status, _ = poster(signal_watch.JEV_URL, {"model": signal_watch.JEV_MODEL, "state": "probe",
                                               "questions": {"ok": {"type": "noul", "instructions": "Is this a probe?"}}},
@@ -608,7 +628,7 @@ def process(rec, api_key, *, threads, poster, resolver):
     return scored, stats
 
 
-def run(state_dir=DEFAULT_DIR, *, inbox=None, env=None, backfill=False, file_work=True, limit=None, poster=signal_watch.post_json,
+def run(state_dir=DEFAULT_DIR, *, inbox=None, env=None, backfill=False, file_work=True, limit=None, poster=gateway_post,
         resolver=resolve_link, grok_run=None, decisions=gbrain_decisions, put=signal_watch.yc_corpus.gbrain_put, now=None, workers=8):
     env = os.environ if env is None else env
     now = now or time.time()
