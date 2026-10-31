@@ -180,6 +180,37 @@ class AdditiveQuotedListMergeTest(unittest.TestCase):
         self.assertIsNone(classes.merge_additive_quoted_entries("", "  'scripts/a.test.mjs',\n"))
 
 
+class AdditiveIdentifierListMergeTest(unittest.TestCase):
+    def test_unions_slug_lines_and_rejects_unknown_hunks(self):
+        text = (
+            "Other scoped rules: ci-branching, event-driven, infra, linear, motion,\n"
+            "<<<<<<< HEAD\n"
+            "pr-stacking, swarm, hermes-air, rate-limits.\n"
+            "=======\n"
+            "pr-stacking, swarm, hermes-air, anti-slop.\n"
+            ">>>>>>> origin/main\n"
+            "Company domain canon: [index](canon/README.md).\n"
+        )
+        resolved = classes.resolve_additive_identifier_list_text(text)
+        self.assertEqual(resolved, (
+            "Other scoped rules: ci-branching, event-driven, infra, linear, motion,\n"
+            "pr-stacking, swarm, hermes-air, anti-slop, rate-limits.\n"
+            "Company domain canon: [index](canon/README.md).\n"
+        ))
+        self.assertIsNone(classes.resolve_additive_identifier_list_text(text.replace(
+            "pr-stacking, swarm, hermes-air, rate-limits.\n",
+            "keep both sides' intent.\n",
+        )))
+        self.assertIsNone(classes.merge_additive_identifier_list(
+            "swarm, pr-stacking.\n",
+            "pr-stacking, swarm.\n",
+        ))
+        self.assertIsNone(classes.merge_additive_identifier_list(
+            "pr-stacking, swarm\n",
+            "pr-stacking, swarm.\n",
+        ))
+
+
 class AndChainMergeTest(unittest.TestCase):
     OURS = (
         "node scripts/run-affected-tests.mjs --control && "
