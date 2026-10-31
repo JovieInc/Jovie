@@ -317,7 +317,7 @@ describe('changelog email signup connected flow (component + API + mail sink)', 
     // 1. Submit a typo'd address through the real subscribe route. The typo
     // lives in the LOCAL part so every send stays inside the controlled
     // @example.com domain.
-    fireEvent.change(screen.getByLabelText('Email Address'), {
+    fireEvent.change(screen.getByLabelText('Email address'), {
       target: { value: 'artits@example.com' },
     });
     fireEvent.submit(screen.getByTestId('changelog-subscribe-form'));
@@ -349,7 +349,7 @@ describe('changelog email signup connected flow (component + API + mail sink)', 
     fireEvent.click(
       within(panel).getByRole('button', { name: 'Use A Different Email' })
     );
-    const input = screen.getByLabelText('Email Address');
+    const input = screen.getByLabelText('Email address');
     expect(input).toHaveValue('artits@example.com');
     await waitFor(() => expect(input).toHaveFocus());
 

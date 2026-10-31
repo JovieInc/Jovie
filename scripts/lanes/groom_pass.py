@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Readiness pass: a cheap model judges groomed-but-unlabelled Backlog issues against the refill's agent-ready bar.
+"""(Label retired 2026-10-29: admission no longer needs `agent-ready`; a ready verdict only comments.) Readiness pass: a cheap model judges groomed-but-unlabelled Backlog issues against the refill's agent-ready bar.
 
   groom_pass.py select N [--teams JOV,LYB] > cands.json     ranked candidates (backlog_rank order), never held/epic
   groom_pass.py judge cands.json > verdicts.json            one single-turn model call per issue, no tools
@@ -26,7 +26,7 @@ MODEL = "grok-4.7"
 
 def apply(state, verdicts, outbox_enqueue=None):
     """Queue the Linear writes for judged issues through the outbox (readback, retry, never overwrites a
-    remote decision). ready: label agent-ready + one-line rationale. not_ready: comment exactly what is
+    remote decision). ready: one-line rationale comment (no label). not_ready: comment exactly what is
     missing. Both: label readiness-checked so the pass never re-reads the same issue. Errors write nothing."""
     import linear_sync
     enqueue = outbox_enqueue or (lambda op, issue_id, **kw: linear_sync.enqueue(Path(state), op, issue_id, **kw))
@@ -40,7 +40,6 @@ def apply(state, verdicts, outbox_enqueue=None):
         if not row or verdict.get("verdict") not in ("ready", "not_ready"):
             continue
         if verdict["verdict"] == "ready":
-            enqueue("label", row["id"], body="agent-ready")
             enqueue("comment", row["id"], body=f"Readiness pass ({verdict.get('model', MODEL)}): agent-ready. {verdict['rationale']}")
         elif row["priority"] in (1, 2):  # only Urgent/High earn a comment; the rest are labelled silently so 400 bots-notes never hit the team
             missing = "\n".join(f"- {item}" for item in verdict.get("missing") or [verdict["rationale"]])
@@ -57,7 +56,7 @@ def cands(n, teams, seed=None):
         open_ids = {r["identifier"] for r in rows}
         pool = [r for r in rows if r["state"] == "Backlog" and "agent-ready" not in [l.lower() for l in r["labels"]]
                 and r.get("labelsComplete") and not ({l.lower() for l in r["labels"]} & (binding_refill.HOLD_LABELS | {CHECKED_LABEL}))
-                and len(r["description"]) >= 200 and binding_refill.ACCEPTANCE.search(r["description"])]
+                and len(r["description"]) >= 200 and binding_refill.ACCEPTANCE.search(r["description"])]  # unlabelled is no longer a reason to judge
         out += [dict(r, score=backlog_rank.score(r, now)) for r in pool]
     out.sort(key=lambda r: -r["score"])
     if seed is not None:  # unbiased sample for precision measurement: top-ranked rows are the ones humans already held back

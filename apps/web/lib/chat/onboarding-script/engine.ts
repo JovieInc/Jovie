@@ -15,6 +15,7 @@ import {
   buildConfirmSpotifyArtistOutput,
   type OnboardingTurnState,
 } from '@/lib/chat/tools/onboarding-tool-impls';
+import { inferSegment } from '@/lib/creator/segments';
 import {
   availableOnboardingModules,
   onboardingDraftQuestion,
@@ -101,6 +102,23 @@ function messageText(message: UIMessage): string {
     .filter(part => part.type === 'text' && typeof part.text === 'string')
     .map(part => part.text)
     .join('');
+}
+
+/**
+ * A handle the visitor typed: "@name" anywhere, or a whole message that is
+ * one valid handle ("name"). Acks like "ok" never count.
+ */
+function typedHandleFrom(message: UIMessage | null): string | null {
+  if (!message) return null;
+  const text = messageText(message)
+    .replace(/https?:\/\/\S+/gi, '')
+    .trim();
+  if (!text || isIncompleteAdvanceMessage(text)) return null;
+  const candidate =
+    /(?:^|\s)@([a-z0-9_-]{1,30})\b/i.exec(text)?.[1] ??
+    /^([a-z0-9_-]{2,30})$/i.exec(text)?.[1];
+  const handle = candidate?.toLowerCase() ?? null;
+  return handle && validateUsername(handle).isValid ? handle : null;
 }
 
 function findWidgetEventInHistory(
@@ -576,8 +594,16 @@ export async function decideFallbackTurn(
   const sessionId = state.sessionId;
   // Seeds merged with nightly-promoted lines (DB failure degrades to seeds).
   const bank = await loadScriptBank();
+  // Segment from what the visitor has said so far (JOV-9679). Unknown stays
+  // unresolved and keeps the legacy copy until a signal arrives.
+  const segment = inferSegment({
+    onboardingAnswer: uiMessages
+      .filter(message => message.role === 'user')
+      .map(message => messageText(message))
+      .join(' '),
+  }).segment;
   const pick = (stepId: ScriptStepId): ScriptLine =>
-    pickFromBank(bank, stepId, sessionId);
+    pickFromBank(bank, stepId, sessionId, segment);
   const latest = lastUserMessage(uiMessages);
   const selectedArtistId = parseArtistSelection(latest);
   const latestEvent = latest
@@ -742,16 +768,34 @@ export async function decideFallbackTurn(
   // Handle shown but not confirmed via widget event — stay on handle.
   // Free-text "ok" / "k" does not advance.
   if (!hasHandleConfirmed(uiMessages)) {
-    // Re-surface handle step; do not decide access.
-    const handle =
+    const shownHandle =
       typeof existingHandleCheck.handle === 'string'
         ? existingHandleCheck.handle
         : handleFromArtistName(state.spotifyArtistName ?? '');
+    // A handle typed in chat replaces the suggested one: check it instead of
+    // repeating the old line (2026-10-29 canary walk: typed handles were
+    // ignored and the only way forward was editing the card's field).
+    const typedHandle = latestEvent ? null : typedHandleFrom(latest);
+    const handle =
+      typedHandle && typedHandle !== shownHandle ? typedHandle : shownHandle;
     const line = pick('handle');
     return {
       line,
       text: renderLine(line, { handle }),
-      toolEvents: [],
+      toolEvents:
+        handle === shownHandle
+          ? []
+          : [
+              {
+                toolName: 'checkHandle',
+                input: { handle },
+                output: {
+                  action: 'check_handle',
+                  handle,
+                  summary: `Checking @${handle}.`,
+                },
+              },
+            ],
       guardedStep: 'handle',
     };
   }

@@ -49,8 +49,8 @@ class Selection(unittest.TestCase):
     def test_urgent_and_ranked_admitted_others_not(self):
         rows = [row(1, priority=1), row(2, priority=2), row(3, priority=3), row(4, priority=1, labels=())]
         got, skipped = pa.admit_candidates(rows, {"JOV-3": 1}, now=NOW)
-        self.assertEqual([r["identifier"] for r in got], ["JOV-3", "JOV-1"])
-        self.assertEqual(skipped["JOV-4"], "not-agent-ready")
+        self.assertEqual([r["identifier"] for r in got], ["JOV-3", "JOV-1", "JOV-4"])  # the label is not required
+        self.assertEqual(skipped, {})
 
     def test_hold_label_blocks_urgent(self):
         got, _ = pa.admit_candidates([row(1, priority=1, labels=("agent-ready", "needs-tim"))], {}, now=NOW)
@@ -118,6 +118,16 @@ class FakeClient:
         return {"issue": {"state": {"name": self.states.get(variables["id"], "Backlog" if variables["id"] in ("id-1", "id-2") else "Todo")}}}
 
 
+class ReadinessWithoutLabel(unittest.TestCase):
+    def test_spec_acceptance_and_holds_decide_not_the_label(self):
+        rows = [row(1, priority=1, labels=()), row(2, priority=1, labels=("needs-tim",)),
+                dict(row(3, priority=1, labels=()), description="too short"),
+                dict(row(4, priority=1, labels=()), description="x" * 300)]
+        got, skipped = pa.admit_candidates(rows, {}, now=NOW)
+        self.assertEqual([r["identifier"] for r in got], ["JOV-1"])
+        self.assertEqual(skipped, {"JOV-2": "label:needs-tim", "JOV-3": "thin-description", "JOV-4": "no-acceptance-criteria"})
+
+
 class RunTests(unittest.TestCase):
     def seed(self, d, rows):
         state = Path(d)
@@ -144,6 +154,23 @@ class RunTests(unittest.TestCase):
             with ls._mutating(ls._claims_path(Path(d)), ls.CLAIMS) as data:
                 data["claims"] = claims
             self.assertEqual(pa.measure(d, NOW + 100)["admittedToClaimedMinP50"], 1.5)
+
+    def test_unlabelled_ranked_issue_is_admitted_and_counted(self):
+        with tempfile.TemporaryDirectory() as d:
+            host = self.seed(d, [row(7, labels=()), row(8, labels=("agent-ready",), priority=3)])
+            (Path(d) / "summer-portfolio").mkdir()
+            import time as _t
+            (Path(d) / "summer-portfolio" / "rank.verified.json").write_text(json.dumps({
+                "schema": "jovie-summer-portfolio-verified/v1", "expiresAt": _t.time() + 3600, "ranks": {"JOV-7": 1, "JOV-8": 2}}))
+            receipt = pa.run(FakeLane, host, "JOV", FakeClient({"id-7": "Backlog", "id-8": "Backlog"}), now=NOW)
+            self.assertEqual(receipt["admitted"], ["JOV-7", "JOV-8"])
+            self.assertEqual(receipt["admittedUnlabelled"], ["JOV-7"])
+            rows = [json.loads(line) for line in (Path(d) / "priority-admissions.jsonl").read_text().splitlines()]
+            self.assertEqual({r["id"]: r["labelled"] for r in rows}, {"JOV-7": False, "JOV-8": True})
+            entries = ls._read(Path(d) / "linear" / "outbox.json", ls.OUTBOX)["entries"]
+            said = {e["issueId"]: e["body"] for e in entries if e["op"] == "comment" and "Priority admission" in e["body"]}
+            self.assertIn("Label at admission: none.", said["id-7"])
+            self.assertIn("Label at admission: present.", said["id-8"])
 
     def test_wip_ceiling_demotes_stale_low_priority_in_bounded_batch(self):
         stale = "2026-10-01T00:00:00.000Z"

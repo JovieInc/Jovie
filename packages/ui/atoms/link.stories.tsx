@@ -35,6 +35,9 @@ const meta: Meta<typeof Link> = {
     touchTarget: {
       control: { type: 'boolean' },
     },
+    reserveLabel: {
+      control: { type: 'text' },
+    },
   },
 };
 
@@ -142,6 +145,24 @@ export const TouchTarget: Story = {
     variant: 'compact',
     touchTarget: true,
     children: 'Compact link in a 44px hit target',
+  },
+};
+
+export const ReservedLabel: Story = {
+  args: {
+    href: '#reserved-label',
+    variant: 'compact',
+    touchTarget: true,
+    reserveLabel: 'Sign in',
+    children: 'Sign in',
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Reserves the real control’s intrinsic label width before streamed children arrive. The label also supplies its accessible name unless explicitly overridden; navigation and the expanded hit target remain on the same anchor.',
+      },
+    },
   },
 };
 

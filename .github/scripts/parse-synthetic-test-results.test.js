@@ -555,7 +555,7 @@ test('parseSyntheticTestResults keeps a logged OTP skip from failing a required 
   const result = parseSyntheticTestResults({
     resultFiles: [
       {
-        name: 'synthetic-production-waitlist',
+        name: 'synthetic-golden-path',
         path: 'waitlist.json',
         required: true,
       },
@@ -566,6 +566,68 @@ test('parseSyntheticTestResults keeps a logged OTP skip from failing a required 
   });
 
   assert.equal(result.testStatus, 'passed');
+  assert.equal(result.passedTests, 1);
+  assert.equal(result.skippedTests, 1);
+  assert.equal(
+    result.testWarnings.some(warning => warning.includes(reason)),
+    true
+  );
+  assert.equal(
+    result.testWarnings.some(warning =>
+      warning.includes('Skipping OTP-dependent synthetic steps')
+    ),
+    true
+  );
+});
+
+test('parseSyntheticTestResults fails the waitlist canary when its signup leg is skipped', () => {
+  const reason =
+    'synthetic-otp-unavailable: missing E2E_PROD_OTP_CHECK_TOKEN (Tim-only Cloudflare mailbox secrets)';
+  const fileSystem = createMemoryFileSystem({
+    'waitlist.json': JSON.stringify({
+      suites: [
+        {
+          specs: [
+            {
+              title: 'reads the production waitlist preflight receipt',
+              tests: [
+                {
+                  status: 'expected',
+                  results: [{ status: 'passed' }],
+                },
+              ],
+            },
+            {
+              title: 'retains identity and proves waitlist suppression',
+              tests: [
+                {
+                  status: 'skipped',
+                  annotations: [{ type: 'skip', description: reason }],
+                  results: [],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }),
+  });
+
+  const result = parseSyntheticTestResults({
+    resultFiles: [
+      {
+        name: 'synthetic-production-waitlist',
+        path: 'waitlist.json',
+        required: true,
+      },
+    ],
+    fileSystem,
+    otpSkipReason:
+      'Skipping OTP-dependent synthetic steps: missing E2E_PROD_OTP_CHECK_TOKEN (Tim-only Cloudflare mailbox secrets).',
+  });
+
+  // A skip here means the waitlist path was never exercised: loud, not green.
+  assert.equal(result.testStatus, 'failed');
   assert.equal(result.passedTests, 1);
   assert.equal(result.skippedTests, 1);
   assert.equal(
