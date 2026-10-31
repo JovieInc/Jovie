@@ -175,6 +175,17 @@ Never mark a task complete without confirming the fix works:
 - Full E2E details: `apps/web/tests/TESTING.md`
 - Testing philosophy: `docs/TESTING_GUIDELINES.md`
 
+## PR size counts production code
+
+PR Size Guard caps changed lines and files in production code only. Tests and
+fixtures (`*.test.*`, `*.spec.*`, `__tests__/`, `fixtures/`, `test_*.py`,
+`*_test.py`, `*Tests.swift`) do not count, along with generated, lock and
+snapshot files. The coverage floors require tests, so the size cap must not
+penalise them (#23956 went over 1500 lines only because of required coverage
+tests). The one list is `scripts/lib/pr-size-exclusions.mjs`, and the workflows
+run it from the base tip. Repository-hygiene byte and path budgets still apply
+to every file. Do not split production code into fixture paths to dodge the cap.
+
 ## Gate weakening (JOV-INV-045)
 
 Do not land `test.skip`, `it.skip`, `describe.skip`, `.only`, or `xit` to get a
