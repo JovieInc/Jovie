@@ -444,7 +444,12 @@ describe('runStructural screenshot contract discovery', () => {
       expect(
         commands.includes(DESKTOP_INSTALLED_IDENTITY_COVERAGE_COMMAND)
       ).toBe(lane === 'mac');
-    }
+    },
+    // The first case pays the cold screenshot-contract discovery scan (5.4s of
+    // this file's 6.3s on an idle host). As structural command 1 it runs beside
+    // 60 others and crossed the 30s default, ejecting #23938 and #23706 from
+    // the merge queue on 2026-10-31. Assertions are unchanged.
+    120_000
   );
 
   it.each([
