@@ -372,7 +372,7 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
   const asksNotice =
     [
       deferredAsks > 0
-        ? `${allAsks.length - deferredAsks} of ${allAsks.length} open; the other ${deferredAsks} resolve by their defaults`
+        ? `${allAsks.length - deferredAsks} of ${allAsks.length} shown; ${deferredAsks} resolve by default`
         : null,
       inbox.data ? summarizeSourceIssues(inbox.data.issues) : null,
     ]

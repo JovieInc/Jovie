@@ -653,7 +653,7 @@ describe('OvieHomeCanvas', () => {
     expect(screen.queryByText('Ask 3')).toBeNull();
     expect(
       screen.getByTestId('home-loop-asks-section-notice')
-    ).toHaveTextContent('3 of 5 open; the other 2 resolve by their defaults');
+    ).toHaveTextContent('3 of 5 shown; 2 resolve by default');
   });
 
   it('opens on the company loop, not an earlier conversation', async () => {

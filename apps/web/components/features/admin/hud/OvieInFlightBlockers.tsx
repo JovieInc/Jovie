@@ -52,7 +52,7 @@ function Disclosure({
             {pr.url ? (
               <a
                 href={pr.url}
-                className='text-secondary-token underline-offset-2 hover:text-primary-token hover:underline focus-visible:underline'
+                className='text-secondary-token underline underline-offset-2 hover:text-primary-token'
               >
                 {pr.label}
               </a>
@@ -77,9 +77,10 @@ function Disclosure({
 }
 
 /**
- * Home's In Flight: why work is stuck, one disclosure per reason (largest
- * open), then the work moving normally, so the rows always add up to the
- * total. The full board is on Shipping.
+ * Home's In Flight: why work is stuck, one collapsed disclosure per reason
+ * with its count, then the work moving normally, so the rows add up to the
+ * total. PRs stay behind the reason (agents fix them, not Tim); the full
+ * board is on Shipping.
  */
 export function OvieInFlightBlockers({
   summary,
@@ -106,13 +107,12 @@ export function OvieInFlightBlockers({
         <p className='text-sm text-secondary-token'>Nothing is stuck.</p>
       ) : null}
       <ul className='flex min-h-0 flex-col gap-1.5 overflow-hidden'>
-        {summary.groups.map((group, index) => (
+        {summary.groups.map(group => (
           <li key={group.reason}>
             <Disclosure
               label={group.reason}
               prs={group.prs}
               moreHref={moreHref}
-              open={index === 0}
             />
           </li>
         ))}

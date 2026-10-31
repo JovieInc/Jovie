@@ -28,8 +28,8 @@ describe('OvieInFlightBlockers', () => {
     const group = screen.getByTestId('ovie-blocker-group');
     expect(group).toHaveTextContent('Source Validation');
     expect(group).toHaveTextContent('7 PRs');
-    // The biggest reason starts open.
-    expect(group).toHaveAttribute('open');
+    // Reasons start collapsed: PRs are agent work, one click away.
+    expect(group).not.toHaveAttribute('open');
     expect(
       within(group).getByRole('link', { name: '#100 Task 0' })
     ).toHaveAttribute('href', 'https://github.com/JovieInc/Jovie/pull/100');
