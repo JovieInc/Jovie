@@ -121,9 +121,10 @@ def route(fallback, env=None, client=None):
         token = _token(env)
         if token and isinstance(body, dict):
             if body.get("model") == JEV_MODEL and isinstance(body.get("questions"), dict):
-                status, answer = answer_system_one(body.get("state"), body["questions"], token, env, client)
-                if status == 200:
-                    return status, answer
+                for _ in range(2):  # one retry: an off-contract answer or a transient relay error is common under load
+                    status, answer = answer_system_one(body.get("state"), body["questions"], token, env, client)
+                    if status == 200:
+                        return status, answer
             elif str(url).endswith("/chat/completions") and body.get("model") in WORKERS_MODEL_MAP:
                 status, answer = relay_chat({**NO_THINKING, **body, "model": WORKERS_MODEL_MAP[body["model"]],
                                              "max_tokens": max(int(body.get("max_tokens") or 0), MIN_RELAY_MAX_TOKENS)},
