@@ -269,10 +269,21 @@ JOV-7237 caps the Doppler `jovie-web/prd` sync at 100 secrets, so the canary val
 `E2E_PROD_OTP_CHECK_ORIGIN`, `E2E_PROD_OTP_CHECK_TOKEN`, and `E2E_PROD_OTP_CHECK_URL` are Tim-only and may be absent. When any of them is empty after resolution:
 
 - The legacy OTP step logs `::warning title=Tim-only OTP secrets absent::` with the missing names and does not run Playwright. The parser does not require its results file for that run.
-- The waitlist OTP traversal calls `test.skip` with `synthetic-otp-unavailable`. The parser records that annotation as a warning and does not fail the job for it.
+- The waitlist OTP traversal calls `test.skip` with `synthetic-otp-unavailable`. The parser records that annotation as a warning, and the waitlist canary's own skip still fails the run (it is in the parser's skip-is-failure set): the signup leg was never exercised, so the run is loud on purpose. The preflight leg still passes and still proves what it covers.
 - The waitlist preflight, signup readiness, SEO/AEO ratchet, Layer A auth UI, golden path, and public profile smoke still run. They do not read the OTP secrets. The production onboarding robot does not run.
 
 A missing preflight result, a preflight failure, or any other required skip still fails the job. An OTP skip without that annotation is not a pass.
+
+### Resolution failure is not missing (2026-10-31)
+
+`resolve-synthetic-secrets.mjs` reads Doppler with one batched `doppler secrets download --no-file --format json` call (retried 3 times with backoff, no fallback-file reads). Two states must never be conflated:
+
+- **Verified absent** — Doppler answered and the name is not in `jovie-web/prd`. Reported as `missing`, warned as `Tim-only OTP secrets absent`, and the OTP-dependent steps skip with `synthetic-otp-unavailable`.
+- **Read failure** — Doppler errored, timed out, or returned unparseable output after every attempt. Reported as `doppler-error` with an `::error title=Synthetic secret resolution failed::` annotation naming the name and the failure descriptor (never Doppler's stderr). The OTP skip reason says "could not read … not a verified missing secret", and the step continues so the Doppler-free waitlist canary preflight still runs.
+
+Incident: scheduled runs 41200920816 (12:23Z) and 41243915793 (21:30Z) on 2026-10-31 failed with the waitlist signup leg skipped because `E2E_PROD_MAILBOX_PROVIDER`, `E2E_PROD_OTP_CHECK_ORIGIN`, `E2E_PROD_OTP_CHECK_TOKEN`, and `E2E_PROD_OTP_CHECK_URL` were missing from GitHub secrets and Doppler in every run that day. The 05:37Z run (41173333130) looked green only because it ran the pre-#23733 parser, which treated that acknowledged skip as a pass; the 13:54Z "green" run (41207692269) was the daily Web AI cron, which never runs the canary. The skip was never intermittent — it became visible when #23733 made it loud. Provisioning the four names (GitHub Actions secrets, per the table above, or Doppler `jovie-web/prd`) is the fix that turns these runs green.
+
+The parser's `failed_tests` output also carries the cause inline: a failing skip is listed as `<source>: <title> (skip reason: …)` plus a `Skip cause:` line from the resolver, so the Slack "Failed Tests" block and the Linear intake body name why the run is red instead of a bare "Skipped tests" line.
 
 On [run 37071206285](https://github.com/JovieInc/Jovie/actions/runs/37071206285) (2026-10-02T22:13Z) the old `--no-fallback` invocation exited before Playwright because those names were absent from Doppler. Playwright never started, so `apps/web/test-results/synthetic-production-waitlist-results.json` was never written, and the parser treated that missing required file as `error`. The same six names were missing on [run 36431588956](https://github.com/JovieInc/Jovie/actions/runs/36431588956) (2026-09-28). That history is the provisioning evidence for moving the names to GitHub. It is not the current command. Signup readiness, the SEO/AEO ratchet, Layer A auth UI, the golden path, public profile smoke, and limiter store health passed on that run. The Slack step posted the missing-file and skipped-onboarding text.
 

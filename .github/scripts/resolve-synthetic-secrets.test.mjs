@@ -45,6 +45,62 @@ test('uses Doppler only when the GitHub value is empty', () => {
   );
 });
 
+test('classifies a failed Doppler read as doppler-error, never as missing', () => {
+  const resolved = resolveSyntheticSecret({
+    name: 'E2E_PROD_OTP_CHECK_TOKEN',
+    githubValue: '',
+    dopplerValue: { value: '', error: 'exit-7' },
+  });
+  assert.equal(resolved.source, 'doppler-error');
+  assert.equal(resolved.value, '');
+  assert.equal(resolved.error, 'exit-7');
+
+  const result = resolveSyntheticSecrets({
+    names: ['E2E_PROD_OTP_CHECK_TOKEN', 'E2E_PROD_OTP_CHECK_URL'],
+    env: {},
+    dopplerValues: {
+      E2E_PROD_OTP_CHECK_TOKEN: { value: '', error: 'spawn-ETIMEDOUT' },
+      E2E_PROD_OTP_CHECK_URL: { value: '', error: 'spawn-ETIMEDOUT' },
+    },
+  });
+  assert.equal(result.otpAvailable, false);
+  assert.match(result.otpSkipReason, /could not read E2E_PROD_OTP_CHECK_TOKEN/);
+  assert.match(result.otpSkipReason, /E2E_PROD_OTP_CHECK_URL/);
+  assert.match(
+    result.otpSkipReason,
+    /resolution failure, not a verified missing secret/
+  );
+  assert.match(result.otpSkipReason, /synthetic-otp-unavailable/);
+  assert.doesNotMatch(
+    result.otpSkipReason,
+    /Skipping OTP-dependent synthetic steps: missing/
+  );
+});
+
+test('a partial Doppler failure still fails OTP availability and names both shapes', () => {
+  const result = resolveSyntheticSecrets({
+    names: ['E2E_PROD_OTP_CHECK_TOKEN', 'E2E_PROD_OTP_CHECK_URL'],
+    env: {},
+    dopplerValues: {
+      E2E_PROD_OTP_CHECK_TOKEN: '',
+      E2E_PROD_OTP_CHECK_URL: { value: '', error: 'exit-7' },
+    },
+  });
+  assert.equal(result.otpAvailable, false);
+  assert.match(result.otpSkipReason, /could not read E2E_PROD_OTP_CHECK_URL/);
+  assert.match(result.otpSkipReason, /missing E2E_PROD_OTP_CHECK_TOKEN/);
+});
+
+test('a batched Doppler read with values present resolves from doppler', () => {
+  const result = resolveSyntheticSecrets({
+    names: ['E2E_PROD_OTP_CHECK_TOKEN'],
+    env: {},
+    dopplerValues: { E2E_PROD_OTP_CHECK_TOKEN: 'otp-token' },
+  });
+  assert.equal(result.otpAvailable, true);
+  assert.equal(result.otpSkipReason, '');
+});
+
 test('names missing Tim-only OTP secrets and does not treat them as present', () => {
   const result = resolveSyntheticSecrets({
     names: [
@@ -78,30 +134,24 @@ test('mask lines escape workflow command metacharacters', () => {
   assert.equal(formatMaskLine('a%b\nc\rd'), '::add-mask::a%25b%0Ac%0Dd');
 });
 
+function writeFakeDoppler(root, body) {
+  writeFileSync(join(root, 'doppler'), `#!/bin/sh\n${body}\n`, {
+    mode: 0o755,
+  });
+}
+
 test('CLI keeps GitHub values, falls back per name, and never logs values', () => {
   const root = mkdtempSync(join(tmpdir(), 'jovie-resolve-secrets-'));
   try {
-    writeFileSync(
-      join(root, 'doppler'),
-      `#!/bin/sh
-name=""
-while [ "$#" -gt 0 ]; do
-  if [ "$1" = "get" ]; then name="$2"; fi
-  shift
-done
-if [ "$name" = "E2E_PROD_SIGNUP_EMAIL_BASE" ]; then
-  printf '%s' 'doppler-stderr-secret-do-not-leak' >&2
-  exit 1
-fi
-if [ "$name" = "CRON_SECRET" ]; then
-  printf '%s' 'doppler-stderr-secret-do-not-leak' >&2
-  printf '%s' 'doppler-cron-value'
+    writeFakeDoppler(
+      root,
+      `if [ "$1 $2" = "secrets download" ]; then
+  printf '%s' '{"CRON_SECRET":"doppler-cron-value"}'
   exit 0
 fi
-printf '%s' 'unexpected-doppler-value' >&2
+printf '%s' 'unexpected-doppler-argv' >&2
 exit 1
-`,
-      { mode: 0o755 }
+`
     );
     const result = spawnSync(
       process.execPath,
@@ -134,15 +184,22 @@ exit 1
     assert.match(result.stdout, /::add-mask::doppler-cron-value/);
     assert.doesNotMatch(result.stderr, /github-email-base/);
     assert.doesNotMatch(result.stderr, /doppler-cron-value/);
-    assert.doesNotMatch(result.stderr, /doppler-stderr-secret-do-not-leak/);
     assert.doesNotMatch(result.stderr, /doppler-token-do-not-leak/);
     assert.doesNotMatch(result.stdout, /doppler-token-do-not-leak/);
     assert.match(result.stderr, /E2E_PROD_SIGNUP_EMAIL_BASE source=github/);
     assert.match(result.stderr, /CRON_SECRET source=doppler/);
     assert.match(result.stderr, /E2E_PROD_OTP_CHECK_TOKEN source=missing/);
+    assert.doesNotMatch(
+      result.stderr,
+      /E2E_PROD_OTP_CHECK_TOKEN source=doppler-error/
+    );
     assert.match(
       result.stderr,
       /::warning title=Tim-only OTP secrets absent::Skipping OTP-dependent synthetic steps: missing E2E_PROD_OTP_CHECK_TOKEN/
+    );
+    assert.doesNotMatch(
+      result.stderr,
+      /::error title=Synthetic secret resolution failed::/
     );
 
     const exported = readFileSync(join(root, 'github-env'), 'utf8');
@@ -156,6 +213,129 @@ exit 1
     assert.match(summary, /E2E_PROD_SIGNUP_EMAIL_BASE` \| github/);
     assert.doesNotMatch(summary, /github-email-base/);
     assert.doesNotMatch(summary, /doppler-cron-value/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('CLI retries a transient Doppler failure and resolves on a later attempt', () => {
+  const root = mkdtempSync(join(tmpdir(), 'jovie-resolve-secrets-retry-'));
+  try {
+    writeFakeDoppler(
+      root,
+      `count_file="$TMPDOPPLERCOUNT"
+count=$(cat "$count_file" 2>/dev/null || echo 0)
+count=$((count + 1))
+printf '%s' "$count" > "$count_file"
+if [ "$count" -lt 3 ]; then
+  exit 1
+fi
+printf '%s' '{"E2E_PROD_OTP_CHECK_TOKEN":"retried-otp-token"}'
+`
+    );
+    const result = spawnSync(
+      process.execPath,
+      [SCRIPT.pathname, '--name', 'E2E_PROD_OTP_CHECK_TOKEN'],
+      {
+        encoding: 'utf8',
+        env: {
+          PATH: `${root}:${process.env.PATH}`,
+          GITHUB_ACTIONS: 'true',
+          GITHUB_ENV: join(root, 'github-env'),
+          GITHUB_OUTPUT: join(root, 'github-output'),
+          GITHUB_STEP_SUMMARY: join(root, 'summary.md'),
+          DOPPLER_TOKEN: 'doppler-token',
+          DOPPLER_RETRY_BACKOFF_MS: '10,10',
+          TMPDOPPLERCOUNT: join(root, 'doppler-calls'),
+          E2E_PROD_OTP_CHECK_TOKEN: '',
+        },
+      }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stderr, /E2E_PROD_OTP_CHECK_TOKEN source=doppler/);
+    const exported = readFileSync(join(root, 'github-env'), 'utf8');
+    assert.match(exported, /retried-otp-token/);
+    assert.match(exported, /E2E_PROD_OTP_AVAILABLE<<[\s\S]*true/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('CLI reports a Doppler resolution failure without masquerading as missing', () => {
+  const root = mkdtempSync(join(tmpdir(), 'jovie-resolve-secrets-error-'));
+  try {
+    writeFakeDoppler(
+      root,
+      `if [ "$1 $2" = "secrets download" ]; then
+  exit 7
+fi
+exit 1
+`
+    );
+    const result = spawnSync(
+      process.execPath,
+      [
+        SCRIPT.pathname,
+        '--name',
+        'E2E_PROD_OTP_CHECK_TOKEN',
+        '--name',
+        'CRON_SECRET',
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          PATH: `${root}:${process.env.PATH}`,
+          GITHUB_ACTIONS: 'true',
+          GITHUB_ENV: join(root, 'github-env'),
+          GITHUB_OUTPUT: join(root, 'github-output'),
+          GITHUB_STEP_SUMMARY: join(root, 'summary.md'),
+          DOPPLER_TOKEN: 'doppler-token',
+          DOPPLER_RETRY_BACKOFF_MS: '10,10',
+          CRON_SECRET: '',
+          E2E_PROD_OTP_CHECK_TOKEN: '',
+        },
+      }
+    );
+    // The step continues so the Doppler-free canaries still run; the failure
+    // is surfaced as ::error:: and the OTP skip reason names the truth.
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(
+      result.stderr,
+      /::error title=Synthetic secret resolution failed::E2E_PROD_OTP_CHECK_TOKEN: Doppler jovie-web\/prd read failed after 3 attempts \(exit-7\)\. This is a resolution failure, not a missing secret/
+    );
+    assert.match(
+      result.stderr,
+      /::error title=Synthetic secret resolution failed::CRON_SECRET: Doppler jovie-web\/prd read failed after 3 attempts \(exit-7\)/
+    );
+    assert.match(
+      result.stderr,
+      /E2E_PROD_OTP_CHECK_TOKEN source=doppler-error/
+    );
+    assert.doesNotMatch(
+      result.stderr,
+      /E2E_PROD_OTP_CHECK_TOKEN source=missing/
+    );
+    assert.doesNotMatch(
+      result.stderr,
+      /::warning::E2E_PROD_OTP_CHECK_TOKEN missing from GitHub secrets/
+    );
+
+    const exported = readFileSync(join(root, 'github-env'), 'utf8');
+    assert.match(exported, /E2E_PROD_OTP_AVAILABLE<<[\s\S]*false/);
+    assert.doesNotMatch(exported, /E2E_PROD_OTP_CHECK_TOKEN=/);
+
+    const output = readFileSync(join(root, 'github-output'), 'utf8');
+    assert.match(output, /otp_available=false/);
+    assert.match(
+      output,
+      /otp_skip_reason<<[\s\S]*could not read E2E_PROD_OTP_CHECK_TOKEN[\s\S]*exit-7[\s\S]*not a verified missing secret/
+    );
+
+    const summary = readFileSync(join(root, 'summary.md'), 'utf8');
+    assert.match(
+      summary,
+      /E2E_PROD_OTP_CHECK_TOKEN` \| doppler-error \(exit-7\)/
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
