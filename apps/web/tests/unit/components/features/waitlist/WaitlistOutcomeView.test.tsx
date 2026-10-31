@@ -70,6 +70,37 @@ describe('WaitlistOutcomeView Start Pro (JOV-7701: anyone can buy)', () => {
     expect(screen.getByTestId('waitlist-resume-start')).toBeInTheDocument();
   });
 
+  it('says paying skips the waitlist, quoting the offer claim price (JOV-10183)', () => {
+    render(
+      <WaitlistOutcomeView
+        outcome='pending'
+        proCheckoutPriceId='price_pro_monthly'
+      />
+    );
+
+    const claim = getPublicPriceClaim('pro');
+    const note = screen.getByTestId('waitlist-start-pro-skip-note');
+    expect(note.textContent).toBe(
+      `Start ${claim.displayName} for ${claim.priceLabel}${claim.cadence ?? '/mo'} and skip the waitlist. You go straight into setup.`
+    );
+    // The note quotes the config price, never a hardcoded literal.
+    expect(note.textContent).toContain(claim.priceLabel);
+    expect(note.textContent).toContain('skip the waitlist');
+  });
+
+  it('hides the skip-the-waitlist note with the Start Pro CTA', () => {
+    const { rerender } = render(<WaitlistOutcomeView outcome='pending' />);
+    expect(screen.queryByTestId('waitlist-start-pro-skip-note')).toBeNull();
+
+    rerender(
+      <WaitlistOutcomeView
+        outcome='save_failed'
+        proCheckoutPriceId='price_pro_monthly'
+      />
+    );
+    expect(screen.queryByTestId('waitlist-start-pro-skip-note')).toBeNull();
+  });
+
   it('hides Start Pro without a configured price or on error receipts', () => {
     const { rerender } = render(<WaitlistOutcomeView outcome='pending' />);
     expect(screen.queryByTestId('waitlist-start-pro-checkout')).toBeNull();

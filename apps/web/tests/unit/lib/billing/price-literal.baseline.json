@@ -1,0 +1,4 @@
+{
+  "count": 83,
+  "note": "Hardcoded $<digits> price literals in apps/web/{components,app}. Ratchet only goes down — render price copy from lib/config/plan-prices.ts (via lib/billing/offer-truth) and lower this when a PR removes literals."
+}

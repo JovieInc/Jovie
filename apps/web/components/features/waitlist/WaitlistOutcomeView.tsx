@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/features/waitlist/WaitlistOutcomeView.test.tsx
+
 import { Button } from '@jovie/ui';
 import { ArrowRight, CheckCircle2, Clock3, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
@@ -176,6 +178,10 @@ export const WAITLIST_START_PRO_TEST_ID = 'waitlist-start-pro-checkout';
  */
 function StartProCheckoutButton({ priceId }: { readonly priceId: string }) {
   const checkout = useCheckoutMutation();
+  // JOV-10183: the receipt must say that paying skips the waitlist — a
+  // verified payment admits the person (JOV-7701 founder decision) — and the
+  // price must come from the published offer claim, never a literal.
+  const claim = getPublicPriceClaim('pro');
 
   return (
     <div className='flex flex-col gap-2'>
@@ -200,10 +206,14 @@ function StartProCheckoutButton({ priceId }: { readonly priceId: string }) {
           );
         }}
       >
-        {checkout.isPending
-          ? 'Opening Checkout...'
-          : getPublicPriceClaim('pro').ctaLabel}
+        {checkout.isPending ? 'Opening Checkout...' : claim.ctaLabel}
       </Button>
+      <p
+        className='text-sm leading-5 text-white/62'
+        data-testid='waitlist-start-pro-skip-note'
+      >
+        {`Start ${claim.displayName} for ${claim.priceLabel}${claim.cadence ?? '/mo'} and skip the waitlist. You go straight into setup.`}
+      </p>
       {checkout.isError ? (
         <p className='text-sm text-error' role='alert'>
           {"Checkout didn't open. Try again in a moment."}
