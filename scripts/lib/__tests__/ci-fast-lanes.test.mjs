@@ -2204,7 +2204,7 @@ describe('source-read guard selection', () => {
       'apps/web/app/api/cron/example/route.test.ts',
       [
         'artist-launch-contract',
-        'privacy-input-route-trackers',
+        'privacy-compliance',
         'merge-group-unit-guards',
         'node-environment-files',
       ],
@@ -2245,7 +2245,7 @@ describe('source-read guard selection', () => {
       'apps/web/app/(marketing)/download/page.tsx',
       [
         'artist-launch-contract',
-        'privacy-input-route-trackers',
+        'privacy-compliance',
         'merge-group-unit-guards',
         'static-revalidate-policy',
         'art-direction',
@@ -2378,7 +2378,7 @@ describe('source-read guard selection', () => {
     expect(selected('workflow_dispatch', ['README.md'])).toEqual([
       'native-design-system',
       'artist-launch-contract',
-      'privacy-input-route-trackers',
+      'privacy-compliance',
       'artist-profile-conformance',
       'ci-schedule-inventory',
       'automation-registry',
@@ -2398,7 +2398,7 @@ describe('source-read guard selection', () => {
     expect(selected('merge_group', null)).toEqual([
       'native-design-system',
       'artist-launch-contract',
-      'privacy-input-route-trackers',
+      'privacy-compliance',
       'artist-profile-conformance',
       'ci-schedule-inventory',
       'automation-registry',
@@ -2436,14 +2436,14 @@ describe('source-read guard selection', () => {
         );
         continue;
       }
-      if (guard.id === 'privacy-input-route-trackers') {
+      if (guard.id === 'privacy-compliance') {
         expect(guard.prOnly).toBe(false);
         expect(guard.command).toContain(
-          'scripts/compliance/input-page-trackers.test.mjs'
+          'scripts/compliance/privacy-rules.test.mjs'
         );
         expect(
           readFileSync(
-            join(REPO_ROOT, 'scripts/compliance/input-page-trackers.test.mjs'),
+            join(REPO_ROOT, 'scripts/compliance/privacy-rules.test.mjs'),
             'utf8'
           )
         ).toContain("from 'node:test'");
