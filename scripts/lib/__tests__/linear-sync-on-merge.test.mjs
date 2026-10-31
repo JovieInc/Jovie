@@ -1751,6 +1751,82 @@ describe('linear sync on merge', () => {
     );
   });
 
+  it('defers the sweep visibly when the closed-pull snapshot hits the quota', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].state = 'Merging';
+    const exhausted = intercept(fetchImpl, async url =>
+      url.includes('pulls?state=closed')
+        ? {
+            ok: false,
+            status: 403,
+            headers: new Headers({ 'x-ratelimit-remaining': '0' }),
+            json: async () => ({
+              message: 'API rate limit exceeded for installation.',
+            }),
+          }
+        : null
+    );
+    const logs = [];
+    const result = await syncLinearIssueOnMerge({
+      env: { ...BASE_ENV, LIFECYCLE_MODE: 'sweep' },
+      fetchImpl: exhausted,
+      harnessManifest: HARNESS_MANIFEST,
+      assuranceMatrix: NO_UI_MATRIX,
+      verifyMarker: () => true,
+      sleep: async () => {},
+      log: message => logs.push(message),
+    });
+    expect(result.action).toBe('deferred');
+    expect(result.deferred).toBe(0);
+    expect(world.updates).toEqual([]);
+    expect(world.issues['JOV-1'].state).toBe('Merging');
+    expect(logs.join('\n')).toContain('Closed pull request snapshot deferred');
+    expect(logs.join('\n')).toContain('installation-quota-403');
+  });
+
+  it('fails closed when the closed-pull snapshot is refused', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].state = 'Merging';
+    const denied = intercept(fetchImpl, async url =>
+      url.includes('pulls?state=closed')
+        ? {
+            ok: false,
+            status: 403,
+            headers: new Headers({ 'x-ratelimit-remaining': '4000' }),
+            json: async () => ({
+              message: 'Resource not accessible by integration',
+            }),
+          }
+        : null
+    );
+    await expect(sweep(denied)).rejects.toThrow(
+      /Closed pull request snapshot refused/
+    );
+    expect(world.updates).toEqual([]);
+    expect(world.issues['JOV-1'].state).toBe('Merging');
+  });
+
+  it('falls back to per-pull reads when the snapshot is malformed', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].state = 'Merging';
+    const malformed = intercept(fetchImpl, async url =>
+      url.includes('pulls?state=closed') ? json({ no: 'list' }) : null
+    );
+    const logs = [];
+    await syncLinearIssueOnMerge({
+      env: { ...BASE_ENV, LIFECYCLE_MODE: 'sweep' },
+      fetchImpl: malformed,
+      harnessManifest: HARNESS_MANIFEST,
+      assuranceMatrix: NO_UI_MATRIX,
+      verifyMarker: () => true,
+      log: message => logs.push(message),
+    });
+    expect(logs.join('\n')).toContain('Closed pull request snapshot failed');
+    expect(logs.join('\n')).toContain('falling back to per-pull reads');
+    // The per-pull read still binds #101, so the issue finishes normally.
+    expect(world.issues['JOV-1'].state).toBe('Done');
+  });
+
   it('skips one unreadable pull request and still closes the other issue', async () => {
     const { world, fetchImpl } = createWorld();
     world.issues['JOV-1'].state = 'Merging';
