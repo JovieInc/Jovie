@@ -998,6 +998,15 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       url => url.origin === expectedOrigin && url.pathname.startsWith('/app'),
       { timeout: 30_000 }
     );
+    // Navigate to the real chat surface: /app is the Opportunity Inbox whose
+    // shell composer has no attach toolbar, so the attach-button contracts
+    // below must run on /app/chat (the round-1 in-setup flow navigated here
+    // explicitly; the decoupling lost the navigation — JOV-10150).
+    await page.goto(APP_ROUTES.CHAT, {
+      waitUntil: 'domcontentloaded',
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+    });
+    assertExactNavigationUrl(page.url(), expectedOrigin, 'Chat navigation');
     await waitForHydration(page);
     const telemetry = createSurfaceTelemetry(page);
     const composer = page.getByRole('textbox', { name: /chat message input/i });
