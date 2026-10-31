@@ -105,6 +105,11 @@ function getConfidencePresentation(confidence: number): {
  * READ-ONLY in C-PR-2: Approve/Reject endpoints are wired in C-PR-3.
  * The slot-based preview block is ready for v1.1 fan-facing side effects.
  */
+/** Honest data-absence fallbacks for scraped email fields (JOV-INV-046). */
+const LOCATION_FALLBACK = 'Location not listed';
+const SOURCE_SUBJECT_FALLBACK = 'Subject not listed';
+const DATE_FALLBACK = 'Date not listed';
+
 export function SuggestedActionCard({
   id,
   title,
@@ -125,12 +130,11 @@ export function SuggestedActionCard({
   const startsAtLabel = formatDateTime(startsAt);
   const endsAtLabel = endsAt ? formatDateTime(endsAt) : null;
   const locationLine =
-    buildLocationLine(venueName, city, region, country) ??
-    'Location unavailable';
+    buildLocationLine(venueName, city, region, country) ?? LOCATION_FALLBACK;
   const rawSubject = sourceRef?.subject;
   const sourceSubject =
     (typeof rawSubject === 'string' && rawSubject.trim()) ||
-    'Source email unavailable';
+    SOURCE_SUBJECT_FALLBACK;
   const confidencePresentation = getConfidencePresentation(confidence);
   const isPending = status === 'pending';
 
@@ -169,7 +173,7 @@ export function SuggestedActionCard({
         {startsAtLabel ? (
           <time dateTime={startsAt}>{startsAtLabel}</time>
         ) : (
-          <span>Date unavailable</span>
+          <span>{DATE_FALLBACK}</span>
         )}
         {endsAtLabel && (
           <>
@@ -189,7 +193,7 @@ export function SuggestedActionCard({
         <span
           className='truncate text-xs text-tertiary'
           title={
-            sourceSubject === 'Source email unavailable'
+            sourceSubject === SOURCE_SUBJECT_FALLBACK
               ? undefined
               : sourceSubject
           }

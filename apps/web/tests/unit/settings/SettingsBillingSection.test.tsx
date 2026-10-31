@@ -69,7 +69,7 @@ describe('SettingsBillingSection', () => {
     render(<SettingsBillingSection />);
 
     expect(
-      screen.getByText('Billing unavailable', {
+      screen.getByText("Billing didn't load", {
         selector: 'span:not([aria-hidden])',
       })
     ).toBeInTheDocument();

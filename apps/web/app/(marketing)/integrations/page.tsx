@@ -70,8 +70,14 @@ export default function IntegrationsDirectoryPage() {
         ))}
         {integrations.length === 0 && (
           <p className='py-6 text-secondary'>
-            Account connections are currently unavailable. Check Settings for
-            connection status and recovery options.
+            No account connections are advertised on this deployment yet.{' '}
+            <Link
+              href={APP_ROUTES.SETTINGS_CONNECTORS}
+              className='text-sm text-primary underline underline-offset-4'
+            >
+              Review your account connections in Settings
+            </Link>{' '}
+            for live status and recovery options.
           </p>
         )}
       </div>

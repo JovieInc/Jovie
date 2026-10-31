@@ -202,17 +202,20 @@ export function SettingsPaymentsSection() {
     );
   }
 
-  // Platform profile incomplete — fail-soft unavailable state
+  // Platform profile incomplete — fail-soft state with a working retry
   if (isPlatformProfileUnavailable && !status?.connected) {
     return renderPanel(
       <SettingsActionRow
         icon={<AlertTriangle className='h-4 w-4' aria-hidden />}
         title='Payout setup temporarily unavailable'
-        disabled
         description='Stripe payout onboarding is paused while jovie finishes platform setup. Your account is safe — try again later.'
         action={
-          <Button variant='secondary' size='sm' disabled>
-            Connect Stripe
+          <Button
+            variant='secondary'
+            size='sm'
+            onClick={() => void fetchStatus()}
+          >
+            Try again
           </Button>
         }
       />,

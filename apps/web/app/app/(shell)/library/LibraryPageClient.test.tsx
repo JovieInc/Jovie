@@ -2,15 +2,16 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 
-const { discardDrafts, replace, search } = vi.hoisted(() => ({
+const { discardDrafts, pageRefresh, replace, search } = vi.hoisted(() => ({
   discardDrafts: vi.fn(),
+  pageRefresh: vi.fn(),
   replace: vi.fn(),
   search: { value: '' },
 }));
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/app/library',
-  useRouter: () => ({ replace }),
+  useRouter: () => ({ replace, refresh: pageRefresh }),
   useSearchParams: () => new URLSearchParams(search.value),
 }));
 vi.mock('../dashboard/releases/ReleaseCatalogPageClient', () => ({
@@ -93,6 +94,19 @@ describe('LibraryPageClient stages', () => {
       'data-catalog-view',
       'assets'
     );
+  });
+
+  it('explains paused Artist Rules and YouTube import when the profile did not load', () => {
+    render(
+      <LibraryPageClient creatorProfileId='unavailable' merchCards={[]} />
+    );
+
+    const notice = screen.getByTestId('library-profile-unavailable');
+    expect(notice).toHaveTextContent(/didn't load/i);
+    expect(notice).toHaveTextContent(/Artist Rules and YouTube/i);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
+    expect(pageRefresh).toHaveBeenCalledTimes(1);
   });
 
   it('sends artist-rule deep links to settings', () => {

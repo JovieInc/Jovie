@@ -1,7 +1,7 @@
 {
   "schema": "jovie.dead-ends/v1",
   "invariant": "JOV-INV-046",
-  "totalFindings": 157,
+  "totalFindings": 130,
   "files": {
     "apps/desktop/src/build-identity.ts": {
       "copy:dead-end-not-available:development (build time unavailable)": 1
@@ -50,15 +50,6 @@
     },
     "apps/web/app/app/(shell)/library/LibrarySurface.tsx": {
       "copy:dead-end-not-available:Not supported": 1
-    },
-    "apps/web/app/app/(shell)/profiles/ProfilesWorkspace.tsx": {
-      "copy:dead-end-not-available:Search Unavailable": 1,
-      "copy:dead-end-not-available:Monitoring Unknown: Search Unavailable": 1,
-      "copy:dead-end-not-available:Search rank is not available for connectors.": 1,
-      "copy:dead-end-not-available:Automatic inspection is unavailable for this source. Open the profile to compare.": 1,
-      "copy:dead-end-not-available:Source unavailable. Your profile link and identity decisions are still available.": 1,
-      "copy:dead-end-not-available:No live source claim is currently available.": 1,
-      "copy:dead-end-not-available:Rank change is not available for connectors.": 1
     },
     "apps/web/app/claim/page.tsx": {
       "copy:dead-end-not-available:Artist Lookup Unavailable": 1
@@ -138,24 +129,8 @@
     "apps/web/components/features/admin/table/AdminTablePagination.tsx": {
       "code:disabled-no-reason:<Button disabled>": 1
     },
-    "apps/web/components/features/connectors/SuggestedActionCard.tsx": {
-      "copy:dead-end-not-available:Location unavailable": 1,
-      "copy:dead-end-not-available:Source email unavailable": 2,
-      "copy:dead-end-not-available:Date unavailable": 1
-    },
     "apps/web/components/features/dashboard/dashboard-nav/DashboardNav.tsx": {
       "copy:dead-end-not-available:${item.name} is not available in demo mode": 1
-    },
-    "apps/web/components/features/dashboard/organisms/DashboardAnalyticsCards.tsx": {
-      "copy:dead-end-not-available:Analytics Overview Unavailable": 1,
-      "copy:dead-end-not-available:Profile Views Metric Unavailable": 1,
-      "copy:dead-end-not-available:Unique Visitors Metric Unavailable": 1
-    },
-    "apps/web/components/features/dashboard/organisms/SettingsBillingSection.tsx": {
-      "copy:dead-end-not-available:Billing unavailable": 1
-    },
-    "apps/web/components/features/dashboard/organisms/SettingsPaymentsSection.tsx": {
-      "code:disabled-no-reason:<Button disabled>": 1
     },
     "apps/web/components/features/dashboard/organisms/SettingsUsageStatsSection.tsx": {
       "copy:dead-end-not-available:Usage stats are unavailable in the passive runtime.": 1
@@ -169,20 +144,11 @@
     "apps/web/components/features/dashboard/organisms/onboarding-v2/shared/errors.ts": {
       "copy:dead-end-not-available:Not available. Try another handle.": 1
     },
-    "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/ProfileSmartLinkAnalytics.tsx": {
-      "copy:dead-end-not-available:Analytics unavailable": 1
-    },
     "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleasePlanWizard.tsx": {
       "code:disabled-no-reason:<Button disabled>": 1
     },
     "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseTableSubheader.tsx": {
       "code:disabled-no-reason:<Button disabled>": 2
-    },
-    "apps/web/components/features/dashboard/release-tasks/MetadataAgentPanel.tsx": {
-      "copy:dead-end-not-available:Metadata submission storage is not available in this environment.": 2,
-      "copy:dead-end-not-available:Current Status: Unavailable": 1,
-      "copy:dead-end-not-available:Unavailable In This Environment": 1,
-      "copy:dead-end-not-available:Tracking unavailable": 1
     },
     "apps/web/components/features/dashboard/tasks/TasksPageClient.tsx": {
       "copy:dead-end-not-available:Release unavailable": 1,
@@ -295,17 +261,11 @@
     "apps/web/components/molecules/QRCode.tsx": {
       "copy:dead-end-not-available:QR code unavailable": 1
     },
-    "apps/web/components/molecules/drawer/DrawerAnalyticsSummaryCard.tsx": {
-      "copy:dead-end-not-available:Analytics unavailable": 1
-    },
     "apps/web/components/organisms/PersistentAudioBar.tsx": {
       "copy:dead-end-not-available:Preview unavailable": 1
     },
     "apps/web/components/organisms/WrappedLinkMissingState.tsx": {
       "copy:dead-end-not-available:The link you followed may be broken, expired, or unavailable.": 1
-    },
-    "apps/web/components/organisms/billing/PlanComparisonSection.tsx": {
-      "code:disabled-no-reason:<Button disabled>": 2
     },
     "apps/web/components/organisms/combobox/Combobox.tsx": {
       "code:disabled-no-reason:<ComboboxButton disabled>": 1
@@ -315,9 +275,6 @@
     },
     "apps/web/components/organisms/profile-shell/ProfileShell.tsx": {
       "code:noop-handler:onClick=noop": 1
-    },
-    "apps/web/components/organisms/release-sidebar/ReleaseSmartLinkAnalytics.tsx": {
-      "copy:dead-end-not-available:Analytics unavailable": 1
     },
     "apps/web/components/organisms/release-sidebar/ReleaseTrackList.tsx": {
       "copy:dead-end-not-available:Preview unavailable.": 1
@@ -332,9 +289,6 @@
     },
     "apps/web/components/organisms/user-button/UsageMenuItem.tsx": {
       "copy:dead-end-not-available:Usage details are unavailable right now.": 1
-    },
-    "apps/web/components/organisms/user-button/UserButton.tsx": {
-      "code:disabled-no-reason:<CommonDropdown disabled>": 1
     },
     "apps/web/components/organisms/user-button/useUserButton.ts": {
       "copy:dead-end-not-available:Couldn't confirm your plan. Billing actions may be unavailable.": 1

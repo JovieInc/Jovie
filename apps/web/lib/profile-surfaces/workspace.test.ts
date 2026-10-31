@@ -67,7 +67,7 @@ describe('connections workspace helpers', () => {
 
   it('does not claim healthy monitoring during an unavailable search provider', () => {
     expect(getConnectionStatus(surface(), false)).toMatchObject({
-      label: 'Search Unavailable',
+      label: 'Search Unknown',
       tone: 'neutral',
       needsAttention: false,
     });

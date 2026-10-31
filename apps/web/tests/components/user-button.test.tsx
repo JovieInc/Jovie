@@ -835,6 +835,15 @@ describe('UserButton billing actions', () => {
 
     expect(screen.getByText('Jovie Menu')).toBeInTheDocument();
     expect(document.querySelector('.animate-pulse')).toBeNull();
+    // No dead dropdown while loading: the slot stays visible and busy (JOV-INV-046).
+    expect(
+      document.querySelector(
+        '[data-testid="user-button-loading"] [aria-busy="true"]'
+      )
+    ).not.toBeNull();
+    expect(
+      document.querySelector('[data-slot="common-dropdown-trigger"]')
+    ).toBeNull();
   });
 
   it('keeps the loading sidebar identity footprint collapse-safe', () => {

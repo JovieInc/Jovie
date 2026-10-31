@@ -1028,9 +1028,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     const instagram = data.rows.find(row => row.id === 'instagram');
     if (!instagram) throw new Error('Missing profile fixture');
     renderWorkspace({ ...data, providerAvailable: false, rows: [instagram] });
-    for (const status of screen.getAllByLabelText(
-      'Monitoring Unknown: Search Unavailable'
-    ))
+    for (const status of screen.getAllByLabelText('Monitoring status unknown'))
       expect(status).toHaveTextContent('Unknown');
     fireEvent.click(screen.getByRole('row', { name: /Instagram/ }));
     const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
@@ -1048,12 +1046,12 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     );
     const details = screen.getByRole('button', { name: 'Monitoring details' });
     expect(details).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByText(/Search Unavailable\./)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Search Unknown\./)).not.toBeInTheDocument();
     details.focus();
     await user.keyboard('{Enter}');
     expect(details).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByText(/Search Unavailable\./)).toHaveTextContent(
-      'Search checks are unavailable'
+    expect(screen.getByText(/Search Unknown\./)).toHaveTextContent(
+      'Search checks are off right now'
     );
     expect(
       within(screen.getByTestId('profiles-monitoring-details')).getByText('—')

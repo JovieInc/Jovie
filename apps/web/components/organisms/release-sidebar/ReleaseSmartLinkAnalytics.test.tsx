@@ -1,6 +1,6 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { BASE_URL } from '@/constants/domains';
 import { ReleaseSmartLinkAnalytics } from './ReleaseSmartLinkAnalytics';
 import type { Release } from './types';
@@ -58,6 +58,26 @@ describe('ReleaseSmartLinkAnalytics', () => {
     expect(
       within(control).getByRole('button', { name: 'Copy smart link' })
     ).toHaveAttribute('title', 'Copy smart link');
+  });
+
+  it('offers a working retry when analytics fail to load', async () => {
+    const fetchMock = vi.fn(() => Promise.reject(new Error('offline')));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <ReleaseSmartLinkAnalytics
+        release={mockRelease}
+        artistName='Calvin Harris'
+      />
+    );
+
+    expect(
+      await screen.findByText("Couldn't load analytics")
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    vi.unstubAllGlobals();
   });
 
   it('server-renders a wall-clock-independent last-click value so hydration cannot mismatch', () => {

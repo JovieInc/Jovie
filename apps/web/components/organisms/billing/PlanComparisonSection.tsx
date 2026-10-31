@@ -49,7 +49,12 @@ function renderCtaButton({
 }) {
   if (isCurrentPlan) {
     return (
-      <Button variant='secondary' className='w-full' disabled>
+      <Button
+        variant='secondary'
+        className='w-full'
+        disabled
+        title='You are already on this plan'
+      >
         <Check className='mr-2 h-4 w-4' />
         Current Plan
       </Button>
@@ -78,13 +83,8 @@ function renderCtaButton({
       </UpgradeButton>
     );
   }
-  if (planKey !== 'free' && !hasAvailablePrice) {
-    return (
-      <Button variant='secondary' className='w-full' disabled>
-        Coming Soon
-      </Button>
-    );
-  }
+  // Unpriced paid plans are not rendered (JOV-INV-046): a card without a
+  // price or a working CTA is a dead end. `max` keeps its Early Access path.
   return null;
 }
 
@@ -100,6 +100,11 @@ export function PlanComparisonSection({
   const billingInterval = 'month' as const;
   const [growthModalOpen, setGrowthModalOpen] = useState(false);
   const activePlan = currentPlan ?? 'free';
+  const visiblePlanKeys = PLAN_KEYS.filter(planKey => {
+    if (planKey === 'free' || planKey === 'max') return true;
+    if (planKey === activePlan) return true;
+    return Boolean(findPriceForPlan(pricingOptions, planKey, billingInterval));
+  });
 
   return (
     <motion.div
@@ -115,7 +120,7 @@ export function PlanComparisonSection({
       />
 
       <div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
-        {PLAN_KEYS.map(planKey => {
+        {visiblePlanKeys.map(planKey => {
           const planData = PLAN_FEATURES[planKey];
           const isCurrentPlan = activePlan === planKey;
           const priceOption = findPriceForPlan(
@@ -167,7 +172,7 @@ export function PlanComparisonSection({
                 <div className='mt-4 flex items-baseline gap-1'>
                   {priceDisplay === null ? (
                     <span className='text-app font-caption text-tertiary-token'>
-                      Coming soon
+                      {planKey === 'max' ? 'Early access' : '—'}
                     </span>
                   ) : (
                     <>

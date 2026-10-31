@@ -173,6 +173,7 @@ export function ArtistRulesSheet({
           size='sm'
           variant='secondary'
           disabled={creatorProfileId === 'unavailable'}
+          title='Artist Rules need your artist profile — reload the page to retry'
         >
           <ShieldCheck className='h-3.5 w-3.5' aria-hidden='true' />
           Artist Rules

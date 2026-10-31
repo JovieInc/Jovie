@@ -18,6 +18,8 @@ export interface DrawerAnalyticsSummaryCardProps {
   readonly footer?: ReactNode;
   readonly emptyMessage?: string;
   readonly errorMessage?: string;
+  /** Rendered beside the error message so callers can offer retry. */
+  readonly errorAction?: ReactNode;
   readonly testId?: string;
   readonly variant?: 'card' | 'flat';
   readonly stableLayout?: boolean;
@@ -82,6 +84,7 @@ function DrawerAnalyticsSummaryBody({
   metrics,
   emptyMessage,
   errorMessage,
+  errorAction,
   gridClassName,
   loadingMetricKeys,
   stableLayout,
@@ -90,6 +93,7 @@ function DrawerAnalyticsSummaryBody({
   metrics: readonly DrawerAnalyticsSummaryMetric[];
   emptyMessage?: string;
   errorMessage: string;
+  errorAction?: ReactNode;
   gridClassName: string;
   loadingMetricKeys: readonly string[];
   stableLayout: boolean;
@@ -109,10 +113,11 @@ function DrawerAnalyticsSummaryBody({
 
   if (state === 'error') {
     return (
-      <div className='flex min-h-18 items-center'>
+      <div className='flex min-h-18 items-center gap-2'>
         <p className='text-xs leading-[18px] tracking-wide text-secondary-token'>
           {errorMessage}
         </p>
+        {errorAction ? <div className='ml-auto'>{errorAction}</div> : null}
       </div>
     );
   }
@@ -174,7 +179,8 @@ export function DrawerAnalyticsSummaryCard({
   dimmed = false,
   footer,
   emptyMessage,
-  errorMessage = 'Analytics unavailable',
+  errorMessage = "Couldn't load analytics",
+  errorAction,
   testId,
   variant = 'card',
   stableLayout = false,
@@ -215,6 +221,7 @@ export function DrawerAnalyticsSummaryCard({
             metrics={metrics}
             emptyMessage={emptyMessage}
             errorMessage={errorMessage}
+            errorAction={errorAction}
             gridClassName={gridClassName}
             loadingMetricKeys={loadingMetricKeys}
             stableLayout={stableLayout}

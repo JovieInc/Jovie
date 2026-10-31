@@ -57,6 +57,17 @@ describe('PlanComparisonSection', () => {
     expect(screen.getAllByText('Current Plan').length).toBeGreaterThan(0);
   });
 
+  it('hides paid plans without a configured price instead of a Coming Soon dead end', () => {
+    renderSection({ pricingOptions: [] });
+
+    expect(screen.queryByText('Coming Soon')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('coming soon', { exact: false })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Upgrade to')).not.toBeInTheDocument();
+    expect(screen.getByText('$0')).toBeInTheDocument();
+  });
+
   it('redacts plan prices when money visibility is hidden', () => {
     renderSection({}, { moneyHidden: true });
     expect(screen.queryByText('$19')).toBeNull();

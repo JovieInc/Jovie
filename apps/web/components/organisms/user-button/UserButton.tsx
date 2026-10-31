@@ -631,19 +631,13 @@ export function UserButton({
   // Handle loading state or no user
   if (!isLoaded || !user) {
     if (trigger) {
+      // Keep the caller's visual slot without offering a dead dropdown
+      // (JOV-INV-046); the menu opens once the user session resolves.
       return (
         <div data-testid='user-button-loading' className='contents'>
-          <CommonDropdown
-            variant='dropdown'
-            items={[]}
-            trigger={trigger}
-            align='start'
-            open={isMenuOpen}
-            onOpenChange={setIsMenuOpen}
-            disabled
-            contentClassName={USER_MENU_CONTENT_CLASS}
-            maxHeight={USER_MENU_MAX_HEIGHT}
-          />
+          <span aria-busy={!isLoaded || undefined} className='contents'>
+            {trigger}
+          </span>
         </div>
       );
     }

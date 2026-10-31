@@ -220,8 +220,31 @@ export function LibraryPageClient({
     </div>
   );
 
+  // JOV-INV-046: an unloaded creator profile pauses Artist Rules and the
+  // YouTube import — say so and offer reload instead of silent dead controls.
+  const profileUnavailable = creatorProfileId === 'unavailable';
+
   return (
     <div className='flex min-h-0 flex-1 flex-col'>
+      {profileUnavailable ? (
+        <div
+          role='status'
+          data-testid='library-profile-unavailable'
+          className='flex flex-wrap items-center gap-2 px-3 py-2 text-sm text-warning'
+        >
+          <span>
+            Your artist profile didn't load, so Artist Rules and YouTube import
+            are paused. Reload to retry.
+          </span>
+          <Button
+            size='sm'
+            variant='secondary'
+            onClick={() => router.refresh()}
+          >
+            Reload
+          </Button>
+        </div>
+      ) : null}
       {documentId ? (
         <div className='flex h-10 shrink-0 items-center gap-2 px-3'>
           {stageTabs}

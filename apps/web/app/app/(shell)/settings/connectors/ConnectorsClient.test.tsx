@@ -161,6 +161,22 @@ describe('ConnectorsClient', () => {
     expect(push).toHaveBeenCalledTimes(2);
   });
 
+  it('describes the dev extract tool without platform dead-end copy', () => {
+    renderClient({
+      isDev: true,
+      connectors: {
+        ...disconnectedConnectors,
+        gmail: { status: 'connected' as const },
+      },
+    });
+
+    expect(screen.getByText('Extract now (dev)')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Runs the Gmail extraction now/)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Only available in/)).not.toBeInTheDocument();
+  });
+
   it('keeps unavailable and identity-less providers visible without offering usable connections', async () => {
     renderClient({
       connectors: {

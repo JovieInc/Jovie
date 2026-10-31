@@ -64,26 +64,30 @@ function DashboardAnalyticsOverviewLoading() {
   );
 }
 
-function DashboardAnalyticsOverviewError() {
+function DashboardAnalyticsOverviewError({
+  onRetry,
+}: Readonly<{ onRetry: () => void }>) {
   return (
-    <OverviewMetricGrid
-      role='alert'
-      statusLabel='Analytics Overview Unavailable'
-    >
+    <OverviewMetricGrid role='alert' statusLabel='Analytics failed to load'>
       <ContentMetricCard
         as='section'
         label='Profile Views'
-        value='Temporarily unavailable'
+        value='—'
         icon={BarChart3}
-        aria-label='Profile Views Metric Unavailable'
+        aria-label='Profile Views metric failed to load'
       />
       <ContentMetricCard
         as='section'
         label='Unique Visitors'
-        value='Temporarily unavailable'
+        value='—'
         icon={Users}
-        aria-label='Unique Visitors Metric Unavailable'
+        aria-label='Unique Visitors metric failed to load'
       />
+      <div className='col-span-2 flex justify-center pt-1'>
+        <Button variant='secondary' size='sm' onClick={onRetry}>
+          Retry
+        </Button>
+      </div>
     </OverviewMetricGrid>
   );
 }
@@ -243,7 +247,8 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
 
   const renderContent = () => {
     if (showInitialSkeleton) return <DashboardAnalyticsOverviewLoading />;
-    if (error) return <DashboardAnalyticsOverviewError />;
+    if (error)
+      return <DashboardAnalyticsOverviewError onRetry={() => void refetch()} />;
     if (showEmpty) {
       return (
         <EmptyState

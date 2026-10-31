@@ -64,7 +64,7 @@ describe('MetadataAgentPanel status callouts', () => {
     renderPanel();
 
     const warning = await screen.findByText(
-      'Metadata submission storage is not available in this environment.'
+      'Metadata submission storage is not provisioned on this database yet.'
     );
     expect(warning).toHaveClass('bg-warning-subtle', 'text-warning');
     expect(warning.className).not.toMatch(PALETTE);

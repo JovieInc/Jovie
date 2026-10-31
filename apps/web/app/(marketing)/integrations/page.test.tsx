@@ -34,10 +34,15 @@ describe('public integrations projection', () => {
       screen.getByRole('link', { name: 'Manage integrations' })
     ).toHaveAttribute('href', '/app/settings/connectors');
   });
-  it('explains unavailable connection setup without offering placeholder connections', () => {
+  it('offers an actionable path when no connections are advertised', () => {
     configuration.mockReturnValue(availability(false));
     render(<IntegrationsDirectoryPage />);
-    present(/Account connections are currently unavailable/);
+    present(/No account connections are advertised on this deployment/);
+    expect(
+      screen.getByRole('link', {
+        name: 'Review your account connections in Settings',
+      })
+    ).toHaveAttribute('href', '/app/settings/connectors');
     expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument();
   });
 });

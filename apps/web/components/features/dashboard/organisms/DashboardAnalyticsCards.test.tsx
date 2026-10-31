@@ -26,7 +26,7 @@ describe('DashboardAnalyticsCards consumer states', () => {
     query.refetch.mockReset();
   });
 
-  it('transitions from initial skeleton to truthful unavailable metrics', () => {
+  it('transitions from initial skeleton to a retryable error state', () => {
     query.isLoading = true;
     const { rerender } = render(<DashboardAnalyticsCards refreshSignal={0} />, {
       wrapper: TooltipProvider,
@@ -38,12 +38,16 @@ describe('DashboardAnalyticsCards consumer states', () => {
     query.error = new Error('Unavailable');
     rerender(<DashboardAnalyticsCards refreshSignal={1} />);
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'Analytics Overview Unavailable'
+      'Analytics failed to load'
     );
     expect(
-      screen.getByLabelText('Profile Views Metric Unavailable')
-    ).toHaveTextContent('Temporarily unavailable');
+      screen.getByLabelText('Profile Views metric failed to load')
+    ).toHaveTextContent('—');
     expect(screen.queryByText('No profile views yet')).not.toBeInTheDocument();
+
+    // A failed overview must offer a working retry that re-issues the fetch.
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(query.refetch).toHaveBeenCalledTimes(1);
   });
 
   it('shows the sharing empty state only after observed empty data', () => {

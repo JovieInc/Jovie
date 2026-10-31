@@ -163,12 +163,12 @@ export function getConnectionStatus(
   }
   if (!providerAvailable) {
     return {
-      label: 'Search Unavailable',
+      label: 'Search Unknown',
       tone: 'neutral',
       needsAttention: false,
       sortPriority: 3,
       nextAction:
-        'Search checks are unavailable. You can still inspect the source page.',
+        'Search checks are off right now. You can still inspect the source page.',
     };
   }
   if (row.monitoringState === 'unavailable') {

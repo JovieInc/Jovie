@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { useState } from 'react';
 import { toast } from '@/components/feedback';
 import {
@@ -51,10 +52,11 @@ export function ProfileSmartLinkAnalytics({
   variant = 'card',
 }: ProfileSmartLinkAnalyticsProps) {
   const [range] = useState<AnalyticsRange>('30d');
-  const { data, isLoading, isFetching, isError } = useDashboardAnalyticsQuery({
-    range,
-    view: 'traffic',
-  });
+  const { data, isLoading, isFetching, isError, refetch } =
+    useDashboardAnalyticsQuery({
+      range,
+      view: 'traffic',
+    });
 
   const profileViews = data?.profile_views ?? 0;
   const totalClicks = data?.total_clicks ?? 0;
@@ -83,10 +85,17 @@ export function ProfileSmartLinkAnalytics({
         )}
 
         {!showSkeleton && isError && (
-          <DrawerInlineNote
-            className='min-h-13 px-0 py-0'
-            message='Analytics unavailable'
-          />
+          <div className='space-y-2'>
+            <DrawerInlineNote
+              className='min-h-13 px-0 py-0'
+              message="Couldn't load analytics"
+            />
+            <div>
+              <Button variant='ghost' size='sm' onClick={() => void refetch()}>
+                Retry
+              </Button>
+            </div>
+          </div>
         )}
 
         {!showSkeleton && !isError && (

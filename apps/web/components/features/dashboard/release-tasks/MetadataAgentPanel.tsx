@@ -136,7 +136,7 @@ export function MetadataAgentPanel({
         if (statusPayload.storageAvailable === false) {
           setError(
             statusPayload.error ??
-              'Metadata submission storage is not available in this environment.'
+              'Metadata submission storage is not provisioned on this database yet.'
           );
         }
         setActionState('idle');
@@ -211,7 +211,7 @@ export function MetadataAgentPanel({
       if (!available) {
         setError(
           payload.error ??
-            'Metadata submission storage is not available in this environment.'
+            'Metadata submission storage is not provisioned on this database yet.'
         );
       }
     });
@@ -294,14 +294,14 @@ export function MetadataAgentPanel({
     });
   };
 
-  let currentStatusLabel = 'Current Status: Unavailable';
+  let currentStatusLabel = 'Current Status: Not provisioned';
   if (storageAvailable) {
     currentStatusLabel = latestRequest
       ? `Current Status: ${formatStatusLabel(latestRequest.status)}`
       : 'Current Status: Not Started';
   }
 
-  let reviewLabel = 'Unavailable In This Environment';
+  let reviewLabel = 'Setup required';
   if (storageAvailable && hasBlockingFields) {
     reviewLabel = `${latestRequest?.missingFields.length ?? 0} blockers`;
   } else if (storageAvailable && latestRequest) {
@@ -320,7 +320,7 @@ export function MetadataAgentPanel({
       'Prepare the release sheet, images, and bio bundle before send approval.';
   }
 
-  let trackingLabel = 'Tracking unavailable';
+  let trackingLabel = 'Tracking not provisioned';
   if (storageAvailable) {
     trackingLabel = latestRequest?.targets.length
       ? `${latestRequest.targets.length} live targets`

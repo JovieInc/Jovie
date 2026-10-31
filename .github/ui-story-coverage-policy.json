@@ -266,10 +266,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/ProfileSmartLinkAnalytics.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/dashboard/organisms/ProfileEditorSection.tsx",
       "linearIssue": "JOV-8847"
     },

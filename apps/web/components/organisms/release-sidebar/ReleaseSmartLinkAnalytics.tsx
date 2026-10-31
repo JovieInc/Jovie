@@ -1,6 +1,6 @@
 'use client';
 
-import { CommonDropdown } from '@jovie/ui';
+import { Button, CommonDropdown } from '@jovie/ui';
 import { Share2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
@@ -222,6 +222,7 @@ export function ReleaseSmartLinkAnalytics({
   const [isLoading, setIsLoading] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [retryToken, setRetryToken] = useState(0);
 
   // formatTimeAgo depends on the wall clock, so it can only run after
   // hydration: prerendered pages bake server HTML at build time, and the
@@ -265,7 +266,7 @@ export function ReleaseSmartLinkAnalytics({
 
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- data ref is intentionally stale to detect first-load vs switch
-  }, [release.id, analyticsOverride]);
+  }, [release.id, analyticsOverride, retryToken]);
 
   const totalClicks = data?.totalClicks ?? 0;
   const last7DaysClicks = data?.last7DaysClicks ?? 0;
@@ -305,7 +306,16 @@ export function ReleaseSmartLinkAnalytics({
       state={state}
       dimmed={isSwitching}
       emptyMessage='No clicks yet. Share your smart link to start tracking where fans listen.'
-      errorMessage='Analytics unavailable'
+      errorMessage="Couldn't load analytics"
+      errorAction={
+        <Button
+          variant='ghost'
+          size='sm'
+          onClick={() => setRetryToken(token => token + 1)}
+        >
+          Retry
+        </Button>
+      }
       testId='release-smart-link-analytics'
       variant={variant}
       stableLayout

@@ -246,8 +246,7 @@ export function ConnectorsClient({
               {isPendingExtract ? 'Extracting…' : 'Extract now (dev)'}
             </Button>
             <p className='mt-1 text-xs text-tertiary'>
-              Triggers Gmail extraction immediately. Only available in
-              development.
+              Runs the Gmail extraction now. Development builds only.
             </p>
           </div>
         </SettingsPanel>

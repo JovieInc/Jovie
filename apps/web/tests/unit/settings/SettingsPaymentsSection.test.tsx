@@ -76,28 +76,30 @@ describe('SettingsPaymentsSection', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('renders platform profile unavailable as a disabled settings action row', async () => {
-    fetchMock.mockImplementationOnce(() =>
+  it('renders platform profile unavailability with a working retry', async () => {
+    const unavailableStatus = () =>
       jsonResponse({
         connected: false,
         onboardingComplete: false,
         payoutsEnabled: false,
         email: null,
         onboardingAvailable: false,
-      })
-    );
+      });
+    fetchMock.mockImplementationOnce(unavailableStatus);
 
     render(<SettingsPaymentsSection />);
 
-    const title = await screen.findByText(
-      'Payout setup temporarily unavailable'
-    );
-    const row = title.closest('[data-state="disabled"]');
-
-    expect(row).toHaveAttribute('data-tone', 'default');
-    expect(row).toHaveAttribute('aria-disabled', 'true');
+    await screen.findByText('Payout setup temporarily unavailable');
+    // No dead disabled Connect Stripe button (JOV-INV-046).
     expect(
-      screen.getByRole('button', { name: 'Connect Stripe' })
-    ).toBeDisabled();
+      screen.queryByRole('button', { name: 'Connect Stripe' })
+    ).not.toBeInTheDocument();
+
+    const retry = screen.getByRole('button', { name: 'Try again' });
+    expect(retry).toBeEnabled();
+
+    fetchMock.mockImplementationOnce(unavailableStatus);
+    fireEvent.click(retry);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

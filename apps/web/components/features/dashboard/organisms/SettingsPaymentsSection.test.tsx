@@ -14,33 +14,35 @@ describe('SettingsPaymentsSection', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders platform-unavailable payout setup as a disabled action state', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        jsonResponse({
-          connected: false,
-          onboardingComplete: false,
-          payoutsEnabled: false,
-          email: null,
-          onboardingAvailable: false,
-        })
-      )
+  it('renders platform-unavailable payout setup with a working retry', async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        connected: false,
+        onboardingComplete: false,
+        payoutsEnabled: false,
+        email: null,
+        onboardingAvailable: false,
+      })
     );
+    vi.stubGlobal('fetch', fetchMock);
 
     render(<SettingsPaymentsSection />);
 
     expect(
       await screen.findByText('Payout setup temporarily unavailable')
     ).toBeInTheDocument();
+    // No dead disabled Connect Stripe button (JOV-INV-046).
     expect(
-      screen.getByRole('button', { name: 'Connect Stripe' })
-    ).toBeDisabled();
+      screen.queryByRole('button', { name: 'Connect Stripe' })
+    ).not.toBeInTheDocument();
     expect(
       screen.getByText(
         'Payout setup is temporarily unavailable. Please try again later.'
       )
     ).toHaveClass('text-warning');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('keeps a connect failure destructive and a platform disconnect failure as a warning', async () => {

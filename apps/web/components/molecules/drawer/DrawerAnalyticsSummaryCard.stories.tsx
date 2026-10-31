@@ -1,3 +1,4 @@
+import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { DrawerAnalyticsSummaryMetric } from './DrawerAnalyticsSummaryCard';
 import { DrawerAnalyticsSummaryCard } from './DrawerAnalyticsSummaryCard';
@@ -40,7 +41,12 @@ export const Loading: Story = {
 export const ErrorState: Story = {
   args: {
     state: 'error',
-    errorMessage: 'Analytics unavailable right now.',
+    errorMessage: "Couldn't load analytics",
+    errorAction: (
+      <Button variant='ghost' size='sm'>
+        Retry
+      </Button>
+    ),
   },
 };
 

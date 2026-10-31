@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/settings/SettingsBillingSection.test.tsx
 'use client';
 
 import { Badge, Button } from '@jovie/ui';
@@ -97,7 +98,7 @@ export function SettingsBillingSection() {
     isPro,
   });
   const summaryTitle = billingUnavailable
-    ? 'Billing unavailable'
+    ? "Billing didn't load"
     : billingLoading
       ? 'Loading billing'
       : `${planLabel} plan`;
@@ -156,7 +157,7 @@ export function SettingsBillingSection() {
               aria-hidden
               className='invisible col-start-1 row-start-1 flex flex-wrap items-center gap-1.5'
             >
-              Billing unavailable
+              Billing didn't load
               <Badge variant='warning' size='sm'>
                 Unavailable
               </Badge>

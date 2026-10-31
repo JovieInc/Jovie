@@ -550,10 +550,10 @@ function StatusCell({
   providerAvailable,
 }: Readonly<{ row: ProfileWorkspaceRow; providerAvailable: boolean }>) {
   const status = getConnectionStatus(row, providerAvailable);
-  if (status.label !== 'Search Unavailable')
+  if (status.label !== 'Search Unknown')
     return <PresenceStatusBadge status={status} />;
   return (
-    <span role='img' aria-label='Monitoring Unknown: Search Unavailable'>
+    <span role='img' aria-label='Monitoring status unknown'>
       <PresenceStatusBadge
         status={{
           ...status,
@@ -595,7 +595,7 @@ function MonitoringCell({ row }: Readonly<{ row: ProfileWorkspaceRow }>) {
 
 function RankCell({ row }: Readonly<{ row: ProfileWorkspaceRow }>) {
   if (row.rowType === 'connector') {
-    return <EmptyCell tooltip='Search rank is not available for connectors.' />;
+    return <EmptyCell tooltip='Connectors do not carry search rank.' />;
   }
   if (row.monitoringState === 'locked') {
     return <PresenceLockAffordance />;
@@ -768,12 +768,12 @@ function ConnectionRail({
                       {sourceLoading
                         ? 'Checking Public Profile…'
                         : sourceIdentity?.status === 'unsupported'
-                          ? 'Automatic inspection is unavailable for this source. Open the profile to compare.'
+                          ? 'Automatic inspection does not cover this source. Open the profile to compare.'
                           : sourceIdentity?.status === 'available'
                             ? sourceIdentity.photo.kind === 'profile'
                               ? 'Profile photo observed at this source. Ownership is reviewed separately.'
                               : 'Public page metadata is available; no profile portrait was identified.'
-                            : 'Source unavailable. Your profile link and identity decisions are still available.'}
+                            : "Couldn't load this source. Your profile link and identity decisions still work."}
                     </p>
                     {sourceIdentity?.pageTitle ? (
                       <p className='truncate text-xs text-secondary-token'>
@@ -942,7 +942,7 @@ function IdentityConfirmationSection({
       : `${Math.round(evidence.confidence * 100)}% match`;
   const evidenceSummary =
     evidence.sourceCount === 0
-      ? 'No live source claim is currently available.'
+      ? 'No live source claim yet.'
       : [
           `${evidence.sourceCount} live ${evidence.sourceCount === 1 ? 'source' : 'sources'}`,
           sourceSummary,
@@ -1706,9 +1706,7 @@ function ProfilesWorkspaceContent({
         cell: context => {
           const row = context.row.original;
           if (row.rowType === 'connector') {
-            return (
-              <EmptyCell tooltip='Rank change is not available for connectors.' />
-            );
+            return <EmptyCell tooltip='Connectors do not carry rank change.' />;
           }
           const change = formatProfileRankChange(row.rank, row.previousRank);
           if (change === '—') {
