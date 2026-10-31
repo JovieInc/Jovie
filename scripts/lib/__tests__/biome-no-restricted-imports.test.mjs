@@ -10,16 +10,20 @@ const REPO_ROOT = resolve(import.meta.dirname, '../../..');
 const BIOME_BIN = resolve(REPO_ROOT, 'node_modules/.bin/biome');
 
 function runBiome(file) {
-  return spawnSync(BIOME_BIN, ['check', '--reporter=json', file], {
-    cwd: REPO_ROOT,
-    encoding: 'utf8',
-  });
+  return spawnSync(
+    BIOME_BIN,
+    ['check', '--reporter=json', '--vcs-enabled=false', file],
+    {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    }
+  );
 }
 
 function categories(result) {
   const raw = `${result.stdout ?? ''}`;
   const start = raw.indexOf('{');
-  if (start < 0) return [];
+  expect(start, result.stderr).toBeGreaterThan(-1);
   const report = JSON.parse(raw.slice(start));
   return (report.diagnostics ?? []).map(item => item.category);
 }
@@ -33,7 +37,9 @@ describe('Biome noRestrictedImports for simple-icons', () => {
         file,
         "import { siSpotify } from 'simple-icons';\nexport const icon = siSpotify;\n"
       );
-      const cats = categories(runBiome(file));
+      const result = runBiome(file);
+      expect(result.status, result.stderr).toBe(1);
+      const cats = categories(result);
       expect(cats.join('\n')).toMatch(/lint\/style\/noRestrictedImports/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
