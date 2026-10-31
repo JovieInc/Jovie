@@ -124,9 +124,10 @@ export interface CreditFailoverInput<MODEL extends FailoverCapableModel> {
   /** Call-site label (telemetry functionId or `gateway`) for the failover log line. */
   readonly label: string;
   readonly primary: { readonly name: AiProviderName; readonly model: MODEL };
+  /** Typed loosely: the two providers can resolve different `@ai-sdk/provider` patch versions. */
   readonly secondary: {
     readonly name: AiProviderName;
-    readonly model: MODEL | undefined;
+    readonly model: FailoverCapableModel | undefined;
   };
   /** Which errors on the primary are worth one replay on the secondary. */
   readonly shouldFailover?: (error: unknown) => boolean;
@@ -151,7 +152,7 @@ export function createCreditFailoverModel<MODEL extends FailoverCapableModel>(
   const emit = input.onFailover ?? logFailover;
 
   async function run<RESULT>(
-    invoke: (model: MODEL) => PromiseLike<RESULT>
+    invoke: (model: FailoverCapableModel) => PromiseLike<RESULT>
   ): Promise<RESULT> {
     const fallbackModel = secondary.model;
     if (fallbackModel && creditBreakerOpen(primary.name, now())) {
