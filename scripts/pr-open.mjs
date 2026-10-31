@@ -327,6 +327,7 @@ export function diffGates(
   if (merged.status !== 0)
     return { errors: ['diff: cannot resolve PR base/head'], pending };
   const mb = merged.stdout.trim();
+  head = git(['rev-parse', head]).stdout.trim();
   const dir = mkdtempSync(path.join(tmpdir(), 'pr-open-lanes-'));
   try {
     const list = path.join(dir, 'paths.txt');
@@ -359,6 +360,12 @@ export function diffGates(
           pending.push(`lane-classifier: pending main's lane map: ${detail}`);
         else errors.push(`lane-classifier: ${detail}`);
       }
+    }
+    if (head !== git(['rev-parse', 'HEAD']).stdout.trim()) {
+      pending.push(
+        'coverage-plan: target PR head differs from this checkout; exact-head coverage remains required in CI'
+      );
+      return { errors, pending };
     }
     const args = ['--base', mb, '--head', head, '--plan'];
     const plan = node(['scripts/check-changed-test-coverage.mjs', ...args]);
@@ -783,7 +790,7 @@ export async function main(
         : 'all PR-body and diff gates pass'
     );
     if (a.dryRun || a.cmd === 'check') return 0;
-    if (diff.pending.length) return 75;
+    if (diff.pending.length && a.cmd === 'open') return 75;
     if (a.cmd === 'update') {
       const current = githubJson(a.repo, prViewArgs(a.number), github);
       if (

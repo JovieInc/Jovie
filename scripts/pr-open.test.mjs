@@ -426,6 +426,8 @@ function freshRuns(pr, id) {
   }));
 }
 function fakeDiffRunner(command, args) {
+  if (command === 'git' && args[0] === 'rev-parse')
+    return okText(args[1] === 'HEAD' ? 'c'.repeat(40) : args[1]);
   if (command === 'git' && args[0] === 'show') {
     assert.equal(
       args[1],
@@ -482,12 +484,7 @@ test('check reports lane-map waiting as pending without a failure', async () => 
   assert.equal(result, 0, output.join('\n'));
   assert.match(output.join('\n'), /pending.*lane-classifier/);
   assert.doesNotMatch(output.join('\n'), /FAIL/);
-  const publish = await main(['update', '42'], () => {}, {
-    github,
-    execute,
-    diagnose: () => {},
-  });
-  assert.equal(publish, 75);
+  assert.match(output.join('\n'), /coverage-plan: target PR head differs/);
 });
 
 test('open fills its new self URL after ordinary publication', async () => {

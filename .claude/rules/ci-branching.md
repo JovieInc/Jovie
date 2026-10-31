@@ -134,16 +134,12 @@ from `SOURCE_GUARDS` or mark it advisory.
 
 ## Open PRs with `pnpm pr:open`
 
-`pnpm pr:open open` opens a PR; `draft [N]` drafts from the diff, `check --body-file f`
-gates a body, and `update N` repairs N using its own diff and metadata. Drafting recovers
-measured Win inputs from the PR/issue and the last red CI URL, then asks once on stderr
-for missing `--metric`, `--failing-command`, `--failing-run` or `--failing-log PATH` evidence.
-Blast radius severity matches CI. Main's lane classifier reports unmapped paths as pending;
-pending qualification blocks publication. Updates reject mismatched PR references and require
-body files to identify N with its PR URL or `<!-- pr-open-target: JovieInc/Jovie#N -->`.
-Two actual body edits trigger fresh events; success requires new Fleet Rules and Source
-Validation run IDs. Check verdicts append to `~/.local/state/jovie-lanes/pr-open.jsonl`;
-`pr.first_push_gate_failure_rate` is the CI-side metric.
+`pnpm pr:open open` opens a PR; `draft [N]` drafts, `check --body-file f` validates,
+and `update N` repairs N from its own diff. Drafting recovers PR/issue metrics and red CI URLs,
+then asks once for missing `--metric`, `--failing-command`, `--failing-run` or `--failing-log`.
+Blast radius severity matches CI; main's classifier reports unmapped paths as pending.
+Updates guard PR references (body files need N's URL or `<!-- pr-open-target: JovieInc/Jovie#N -->`)
+and confirm fresh validation runs via real edits. Verdicts: `~/.local/state/jovie-lanes/pr-open.jsonl`.
 
 ## Preflight before every push
 
