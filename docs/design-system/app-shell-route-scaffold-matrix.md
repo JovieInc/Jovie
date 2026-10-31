@@ -2,6 +2,7 @@
 
 System of record for which scaffold each authenticated route renders through.
 Source ticket: JOV-4867 (P1 UI drift — `docs/audits/JOVIE_UI_DRIFT_AUDIT_2026-08-03.md`).
+Cross-surface shell and IA contract: [`shell-ia.md`](./shell-ia.md) (JOV-INV-047).
 
 ## Layer contract
 

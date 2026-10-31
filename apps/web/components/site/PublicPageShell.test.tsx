@@ -34,6 +34,25 @@ describe('PublicPageShell', () => {
     );
   });
 
+  it('renders route-owned pageContract markers and footer CTA suppression regardless of pathname', () => {
+    pathnameRef.current = '/not-the-route';
+    const { container } = render(
+      <PublicPageShell
+        footerShowCta={false}
+        pageContract={MARKETING_PAGE_CONTRACTS['(home)/page.tsx']}
+      >
+        <p>route content</p>
+      </PublicPageShell>
+    );
+    pathnameRef.current = '/';
+
+    expect(container.querySelector('[data-primary-cta]')).toHaveAttribute(
+      'href',
+      MARKETING_PAGE_CONTRACTS['(home)/page.tsx'].primaryCta.href
+    );
+    expect(screen.queryByTestId('marketing-footer-cta')).toBeNull();
+  });
+
   it('renders children inside main#main-content with the header offset by default', () => {
     const { container } = render(
       <PublicPageShell>
@@ -183,5 +202,21 @@ describe('PublicPageShell', () => {
     expect(
       screen.queryByRole('link', { name: 'Skip to content' })
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('prerendered homepage pathname', () => {
+  it('MarketingPageContractMarkers.tsx reads "/index" as "/" via usePublicPathname', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/site/MarketingPageContractMarkers.tsx'
+      ),
+      'utf8'
+    );
+    expect(source).toContain('usePublicPathname');
+    expect(source).not.toMatch(/\busePathname\b/);
   });
 });

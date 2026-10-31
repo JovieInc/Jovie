@@ -232,6 +232,19 @@ export function changedFiles(cwd, base) {
   return { mergeBase: mb, files: rows };
 }
 
+/** Run changed invariant contracts locally even when the full suite is deferred. */
+export function invariantTestFiles(files, repo) {
+  const tests = new Set();
+  for (const file of files) {
+    for (const source of [file.filename, file.previous_filename]) {
+      if (!/^scripts\/invariants\/.+\.mjs$/.test(source ?? '')) continue;
+      const candidate = source.replace(/(?:\.test)?\.mjs$/, '.test.mjs');
+      if (existsSync(path.join(repo, candidate))) tests.add(candidate);
+    }
+  }
+  return [...tests].sort();
+}
+
 /** GitHub reads go through the shared budgeted client (external-apis rule). */
 function ghClient(cwd, ghArgs) {
   return spawnSync(
@@ -352,8 +365,11 @@ function biomeTargets(files) {
 export function typecheckTargets(files, cwd) {
   const out = new Set();
   for (const f of files) {
-    if (f.status === 'removed' || !/\.(?:tsx?|mts|cts)$/.test(f.filename))
-      continue;
+    // scripts/ is checkJs (typecheck:scripts), so .mjs/.js count there.
+    const ext = /^scripts\//.test(f.filename)
+      ? /\.(?:tsx?|mts|cts|mjs|js)$/
+      : /\.(?:tsx?|mts|cts)$/;
+    if (f.status === 'removed' || !ext.test(f.filename)) continue;
     const isTest = /\.(?:test|spec)\.[^/]+$|\/tests?\//.test(f.filename);
     const web = f.filename.startsWith('apps/web/');
     if (web) {
@@ -486,6 +502,14 @@ export async function main({
       narrow ? narrow.command : guard.command
     );
   }
+
+  const invariantTests = invariantTestFiles(files, cwd);
+  if (invariantTests.length)
+    cmd(
+      'invariant-tests',
+      `changed invariant contracts (${invariantTests.length} files)`,
+      `node --test ${invariantTests.map(f => `'${f.replaceAll("'", "'\\''")}'`).join(' ')}`
+    );
 
   const any = re => paths.some(p => re.test(p));
   if (any(/^\.github\/(?:workflows|actions)\//)) {

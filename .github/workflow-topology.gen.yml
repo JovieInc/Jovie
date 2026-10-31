@@ -186,7 +186,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:main-release-ready
-    jobCount: 64
+    jobCount: 65
   - name: Claim Checkout Dogfood
     path: .github/workflows/claim-checkout-dogfood.yml
     active: true
@@ -713,7 +713,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:land
-    jobCount: 2
+    jobCount: 3
   - name: Marketing Certification Producer
     path: .github/workflows/marketing-certification-producer.yml
     active: true

@@ -56,7 +56,22 @@ export function isReservedTestEmailDomain(domain: string): boolean {
   );
 }
 
+/**
+ * Synthetic canary mailboxes on jov.ie (`browse-ready+...`) have no inbox: sends
+ * bounce, burn the transactional quota and hurt sender reputation. The canaries
+ * read their sign-in code from the verification table, never from mail.
+ */
+const SYNTHETIC_CANARY_RECIPIENT = /^browse-ready\+[^@]+@jov\.ie$/u;
+
+export function isSyntheticCanaryRecipient(email: string): boolean {
+  return SYNTHETIC_CANARY_RECIPIENT.test(normalizeEmail(email));
+}
+
 export function getEmailSendBlockReason(email: string): string | null {
+  if (isSyntheticCanaryRecipient(email)) {
+    return 'Recipient is a synthetic canary mailbox with no inbox';
+  }
+
   const domain = getEmailDomain(email);
 
   if (!domain) {

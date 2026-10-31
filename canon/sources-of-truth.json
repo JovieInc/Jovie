@@ -298,6 +298,22 @@
         "docs/metrics/wins-latest.json"
       ],
       "liveAuthority": "the measurement source named in each metric, re-run after deploy"
+    },
+    {
+      "id": "proof-stats",
+      "title": "Public numbers and proof stats (counts, speed, benchmarks, milestones)",
+      "owner": {
+        "kind": "file",
+        "ref": "apps/web/data/proof-stats/registry.json",
+        "note": "Definition of every stat: template, rounding, threshold, freshness SLA, fallback, methodology, legal class, visibility. Measured values are the proof-stats/observations content record, written only by apps/web/lib/proof-stats (hourly production refresh and /api/internal/proof-stats intake). Copy binds with {stat:<id>}; scripts/invariants/stat-claims fails hand-written numeric claims."
+      },
+      "derived": [
+        "apps/web/lib/proof-stats/registry.ts",
+        "apps/web/lib/proof-stats/format.ts",
+        "scripts/invariants/stat-claims/check.mjs",
+        "docs/proof/STATS.md"
+      ],
+      "liveAuthority": "production database (counts), Public Profile Benchmark receipts (speed, agent score), founder-approved Summer cards (comparative claims)"
     }
   ],
   "scans": [

@@ -47,7 +47,7 @@ export function statusFromChecks(checks) {
 }
 
 /**
- * @param {{ surface: string, checks: any[], sha: any, deploymentId?: any, runUrl?: any, startedAt: any, endedAt: any, identity?: any, observations?: any[], consoleErrorCount?: number | null, networkErrorCount?: number | null, screenshot?: { format: string, dataUrl: string } | null }} input
+ * @param {{ surface: string, checks: any[], sha: any, deploymentId?: any, runUrl?: any, startedAt: any, endedAt: any, identity?: any, observations?: any[], consoleErrorCount?: number | null, networkErrorCount?: number | null, screenshot?: { format: string, dataUrl: string } | null, adminInventoryReadback?: { status: string, detail: string } | null }} input
  */
 export function buildReceipt({
   surface,
@@ -62,6 +62,7 @@ export function buildReceipt({
   consoleErrorCount = null,
   networkErrorCount = null,
   screenshot = null,
+  adminInventoryReadback = null,
 }) {
   const meta = SURFACES[surface];
   if (!meta) throw new Error(`unknown surface ${surface}`);
@@ -95,6 +96,7 @@ export function buildReceipt({
     consoleErrorCount,
     networkErrorCount,
     screenshot,
+    adminInventoryReadback,
   };
 }
 
@@ -309,6 +311,7 @@ export function stepChecks(
   const observationsBySurface = {};
   const telemetryBySurface = {};
   const screenshotBySurface = {};
+  let readback = null;
   for (const step of steps ?? []) {
     if (step.kind === 'observation') {
       (observationsBySurface[step.surface] ??= []).push({
@@ -334,6 +337,14 @@ export function stepChecks(
       };
       continue;
     }
+    if (step.kind === 'readback') {
+      // One admin inventory-readback attempt per run; the latest wins.
+      readback = {
+        status: step.status,
+        detail: step.detail,
+      };
+      continue;
+    }
     // A Playwright retry re-records the same check. The latest attempt is
     // the verdict, so one failed attempt followed by a pass is one passed
     // check, not a failed surface (JOV-9822).
@@ -356,6 +367,7 @@ export function stepChecks(
     observationsBySurface,
     telemetryBySurface,
     screenshotBySurface,
+    adminInventoryReadback: readback,
     authStatus,
     now,
   };
@@ -469,6 +481,11 @@ export async function runProductionCertification({
         networkErrorCount:
           stepState.telemetryBySurface[surface]?.networkErrorCount ?? null,
         screenshot: stepState.screenshotBySurface[surface] ?? null,
+        // One readback per run, carried on the front-door receipt only.
+        adminInventoryReadback:
+          surface === 'landing'
+            ? (stepState.adminInventoryReadback ?? null)
+            : undefined,
       })
     );
   }

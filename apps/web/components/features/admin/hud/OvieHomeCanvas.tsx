@@ -19,6 +19,7 @@ import {
   partitionCanvasCards,
 } from '@/lib/ovie/home/canvas-turns';
 import { buildStageStrip } from '@/lib/ovie/home/flow-home';
+import { reportOvieHomePanelError } from '@/lib/ovie/home/panel-alerts';
 import {
   buildOvieAsks,
   buildOvieHomeShipping,
@@ -237,6 +238,21 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
     : inbox.isError
       ? 'error'
       : 'loading';
+  // Every panel error state is an incident (panel-alerts.ts), not just copy.
+  const loopErrorReason =
+    loopStatus === 'error'
+      ? connection === 'unauthorized'
+        ? 'unauthorized'
+        : 'operational-tasks-unavailable'
+      : null;
+  useEffect(() => {
+    if (loopErrorReason)
+      reportOvieHomePanelError('shipping-loop', loopErrorReason);
+  }, [loopErrorReason]);
+  useEffect(() => {
+    if (asksStatus === 'error')
+      reportOvieHomePanelError('asks', 'inbox-unavailable');
+  }, [asksStatus]);
   // Mirror the inbox: a successful read can still omit a source. Showing the
   // loaded asks alone would claim the section is complete.
   // First meaningful paint: both sections past their skeletons.
