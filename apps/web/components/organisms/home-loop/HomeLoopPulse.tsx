@@ -104,14 +104,11 @@ export function HomeLoopConstraintBanner({
 export function HomeLoopTileCard({
   tile,
 }: Readonly<{ readonly tile: HomeLoopTile }>) {
-  return (
-    <div
-      className={TILE_FRAME}
-      data-fit-item
-      data-measured={tile.measured}
-      data-testid={`home-loop-tile-${tile.key}`}
-      data-tone={tile.tone}
-    >
+  const footer = [tile.target, tile.was ? `Was ${tile.was}` : null]
+    .filter(Boolean)
+    .join(' · ');
+  const body = (
+    <>
       <div className='flex items-center justify-between gap-2'>
         <span className='truncate text-2xs text-tertiary-token'>
           {tile.label}
@@ -133,8 +130,31 @@ export function HomeLoopTileCard({
         {tile.value}
       </span>
       <span className='truncate text-2xs tabular-nums text-tertiary-token'>
-        {tile.was ? `Was ${tile.was}` : '\u00a0'}
+        {footer || '\u00a0'}
       </span>
+    </>
+  );
+  const shared = {
+    'data-fit-item': true,
+    'data-measured': tile.measured,
+    'data-testid': `home-loop-tile-${tile.key}`,
+    'data-tone': tile.tone,
+    title: [tile.label, tile.value, footer].filter(Boolean).join(' · '),
+  } as const;
+  return tile.href ? (
+    <a
+      {...shared}
+      href={tile.href}
+      className={cn(
+        TILE_FRAME,
+        'transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+      )}
+    >
+      {body}
+    </a>
+  ) : (
+    <div {...shared} className={TILE_FRAME}>
+      {body}
     </div>
   );
 }
@@ -148,10 +168,12 @@ export function HomeLoopPulse({
   tiles,
   loading = false,
   placeholderCount = 7,
+  testId = 'home-loop-pulse',
 }: Readonly<{
   readonly tiles: readonly HomeLoopTile[];
   readonly loading?: boolean;
   readonly placeholderCount?: number;
+  readonly testId?: string;
 }>) {
   const { ref } = useFitList<HTMLDivElement>(
     loading
@@ -162,7 +184,7 @@ export function HomeLoopPulse({
     <div
       ref={ref}
       className='relative flex h-20 shrink-0 flex-wrap gap-2 overflow-hidden'
-      data-testid='home-loop-pulse'
+      data-testid={testId}
       aria-busy={loading}
     >
       {loading || tiles.length === 0

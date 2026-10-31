@@ -19,7 +19,6 @@ import {
   mergeDoneWithRecent,
   OVIE_NOT_MEASURED,
   OVIE_SHIP_STAGES,
-  rememberPulse,
   shipStageForTask,
   stageLabel,
 } from './shipping-home';
@@ -221,22 +220,45 @@ describe('buildDoneToday', () => {
   });
 });
 
+function onTargetDelivery(): DeliverySummary {
+  const base = measuredDelivery();
+  return delivery({
+    ...base,
+    lanes: {
+      ...base.lanes,
+      running: count(4),
+      slots: count(4),
+      flow: {
+        openPrs: 40,
+        redPrs: 2,
+        dirtyPrs: 0,
+        cleanNotQueued: 0,
+        exhaustedPrs: 0,
+        mergesPerHour: 2,
+        queueEjectionRate: 0.05,
+        queueWaitP95Seconds: 600,
+        productionLagP95Seconds: 900,
+        eligiblePool: 5,
+        candidatePool: 8,
+        ownerless: 0,
+        regressions: [],
+        at: '2026-10-20T18:00:00.000Z',
+      },
+    },
+    merges: { ...base.merges, last7Days: count(175), prior7Days: count(140) },
+  });
+}
+
 describe('buildPulse', () => {
   it('shows Not measured, neutral tone, and no was for an empty summary', () => {
     const pulse = buildPulse(delivery());
     expect(pulse.map(tile => tile.key)).toEqual([
+      'merges-day',
+      'ejections',
       'prod',
       'lyb-deploy',
-      'merges-hour',
-      'queue',
-      'red-prs',
       'lanes',
-      'eligible',
-      'held',
       'ownerless',
-      'merges-today',
-      'merges-7d',
-      'gem-disk',
     ]);
     for (const tile of pulse) {
       expect(tile.value).toBe(OVIE_NOT_MEASURED);
@@ -246,46 +268,55 @@ describe('buildPulse', () => {
     }
   });
 
-  it('formats measured values and uses the source comparison for 7d merges', () => {
-    const byKey = Object.fromEntries(
-      buildPulse(measuredDelivery()).map(tile => [tile.key, tile])
-    );
-    expect(byKey.prod).toMatchObject({ value: 'c9b767a', tone: 'good' });
-    expect(byKey['merges-today']).toMatchObject({ value: '7', tone: 'good' });
-    expect(byKey['merges-7d']).toMatchObject({
-      value: '40',
-      was: '31',
-      tone: 'good',
-    });
-    expect(byKey.lanes).toMatchObject({ value: '3/4', tone: 'good' });
-    expect(byKey.queue).toMatchObject({ value: '2', tone: 'neutral' });
-    expect(byKey.held).toMatchObject({ value: '0', tone: 'good' });
-    expect(byKey['gem-disk']).toMatchObject({ value: '18%', tone: 'good' });
+  it('gives every tile a target and a drill-down, never a raw counter', () => {
+    for (const tile of buildPulse(onTargetDelivery())) {
+      expect(tile.target, tile.key).toMatch(/^Target /);
+      expect(tile.href, tile.key).toMatch(/^\/app\/ov\//);
+    }
   });
 
-  it('flags falling throughput, held work, low disk, and stale lanes', () => {
-    const base = measuredDelivery();
+  it('judges each value against its target', () => {
+    const byKey = Object.fromEntries(
+      buildPulse(onTargetDelivery()).map(tile => [tile.key, tile])
+    );
+    expect(byKey['merges-day']).toMatchObject({
+      value: '25',
+      was: '20 prior 7d',
+      tone: 'good',
+      target: 'Target ≥ 20',
+    });
+    expect(byKey.ejections).toMatchObject({ value: '5%', tone: 'good' });
+    expect(byKey.prod).toMatchObject({ value: 'Current', tone: 'good' });
+    expect(byKey.lanes).toMatchObject({ value: '4 of 4', tone: 'good' });
+    expect(byKey.ownerless).toMatchObject({ value: '0', tone: 'good' });
+  });
+
+  it('turns warn when off target and bad when more than twice off', () => {
+    const base = onTargetDelivery();
+    const flow = base.lanes.flow;
+    if (!flow) throw new Error('fixture has flow');
     const byKey = Object.fromEntries(
       buildPulse(
         delivery({
           ...base,
           lanes: {
             ...base.lanes,
-            heldByReason: { budget: 2, auth: 1 },
-            diskFreePct: 3,
-            stale: true,
+            running: count(1),
+            flow: { ...flow, queueEjectionRate: 0.58, ownerless: 6 },
           },
-          merges: { ...base.merges, today: count(0), last7Days: count(10) },
-          production: { ...base.production, behindMain: count(4) },
+          merges: { ...base.merges, last7Days: count(105) },
+          production: { ...base.production, behindMain: count(1) },
         })
       ).map(tile => [tile.key, tile])
     );
-    expect(byKey.prod?.tone).toBe('warn');
-    expect(byKey['merges-today']).toMatchObject({ value: '0', tone: 'warn' });
-    expect(byKey['merges-7d']?.tone).toBe('warn');
-    expect(byKey.held).toMatchObject({ value: '3', tone: 'bad' });
-    expect(byKey['gem-disk']?.tone).toBe('bad');
-    expect(byKey.lanes?.tone).toBe('neutral');
+    expect(byKey['merges-day']).toMatchObject({ value: '15', tone: 'warn' });
+    expect(byKey.ejections).toMatchObject({ value: '58%', tone: 'bad' });
+    expect(byKey.prod).toMatchObject({
+      value: '1 behind',
+      tone: 'warn',
+    });
+    expect(byKey.lanes).toMatchObject({ value: '1 of 4', tone: 'bad' });
+    expect(byKey.ownerless).toMatchObject({ value: '6', tone: 'bad' });
   });
 
   it('shows LogYourBody production deploy health on Home, failing in bad tone', () => {
@@ -353,46 +384,28 @@ describe('buildPulse', () => {
     ).toMatchObject({ value: OVIE_NOT_MEASURED, tone: 'neutral' });
   });
 
-  it('fills was from the last different observed value', () => {
-    const first = buildPulse(measuredDelivery());
-    let memory = rememberPulse({}, first);
+  it('compares against the value at the last visit', () => {
+    const base = onTargetDelivery();
+    const pulse = buildPulse(base, {
+      prod: { value: '3 behind', was: null },
+      ejections: { value: '5%', was: null },
+    });
+    expect(pulse.find(t => t.key === 'prod')?.was).toBe('3 behind');
+    // Unchanged since the last visit: nothing to compare.
+    expect(pulse.find(t => t.key === 'ejections')?.was).toBeNull();
+    // Unmeasured tiles never show a comparison.
     expect(
-      buildPulse(measuredDelivery(), memory).find(t => t.key === 'prod')?.was
+      buildPulse(delivery(), { prod: { value: 'Current', was: null } }).find(
+        t => t.key === 'prod'
+      )?.was
     ).toBeNull();
-
-    const base = measuredDelivery();
-    const next = delivery({
-      ...base,
-      production: { ...base.production, sha: 'abc1234ffff' },
-    });
-    const second = buildPulse(next, memory);
-    expect(second.find(t => t.key === 'prod')).toMatchObject({
-      value: 'abc1234',
-      was: 'c9b767a',
-    });
-
-    memory = rememberPulse(memory, second);
-    expect(memory.prod).toEqual({ value: 'abc1234', was: 'c9b767a' });
-    // An unchanged observation keeps the remembered comparison.
-    expect(buildPulse(next, memory).find(t => t.key === 'prod')?.was).toBe(
-      'c9b767a'
-    );
-  });
-
-  it('never remembers or compares against unmeasured values', () => {
-    const memory = rememberPulse({}, buildPulse(delivery()));
-    expect(memory).toEqual({});
-    const unmeasured = buildPulse(delivery(), {
-      prod: { value: 'c9b767a', was: null },
-    });
-    expect(unmeasured.find(t => t.key === 'prod')?.was).toBeNull();
   });
 });
 
 describe('buildConstraint', () => {
   const rows = (tasks: Task[]) => buildShipRows(feed(tasks));
 
-  it('prefers a published lanes alert', () => {
+  it('leads with a degraded fleet and links to it', () => {
     const base = measuredDelivery();
     expect(
       buildConstraint(
@@ -408,7 +421,7 @@ describe('buildConstraint', () => {
       )
     ).toEqual({
       tone: 'bad',
-      text: 'Fleet degraded: 0 of 28 Todo issues eligible · 3 of 4 lanes running',
+      text: 'Shipping off target: fleet degraded (1 alert) · 6 merges/day (target 20) · +2 more',
       detailsHref: APP_ROUTES.ADMIN_OPERATIONS,
     });
   });
@@ -428,65 +441,55 @@ describe('buildConstraint', () => {
       [],
       'fresh'
     );
-    expect(constraint).toEqual({
+    expect(constraint).toMatchObject({
       tone: 'bad',
-      text: 'Fleet degraded: Remediation alerts are not being acknowledged (45 failed delivery records) · 3 of 4 lanes running',
       detailsHref: APP_ROUTES.ADMIN_OPERATIONS,
     });
+    expect(constraint?.text).toContain('fleet degraded (1 alert)');
+    expect(constraint?.text).not.toMatch(/event-delivery|failed=45/);
   });
 
-  it('names blocked, failing, behind-main, and stale conditions in order', () => {
-    const base = measuredDelivery();
-    expect(
-      buildConstraint(
-        base,
-        rows([task(1, 'blocked'), task(2, 'blocked')]),
-        'fresh'
-      )
-    ).toEqual({ tone: 'bad', text: '2 items are blocked' });
-    expect(
-      buildConstraint(
-        base,
-        rows([task(1, 'running', { rollup: 'failure' })]),
-        'fresh'
-      )
-    ).toEqual({ tone: 'warn', text: '1 PR has failing checks' });
-    expect(
-      buildConstraint(
-        delivery({
-          ...base,
-          production: { ...base.production, behindMain: count(1) },
-        }),
-        [],
-        'fresh'
-      )
-    ).toEqual({ tone: 'warn', text: 'Production is 1 commit behind main' });
-    expect(
-      buildConstraint(
-        delivery({ ...base, lanes: { ...base.lanes, stale: true } }),
-        [],
-        'fresh'
-      )
-    ).toEqual({
-      tone: 'bad',
-      text: 'Fleet not reporting: the lanes feed is stale · 3 of 4 lanes running',
-      detailsHref: APP_ROUTES.ADMIN_OPERATIONS,
-    });
-    expect(buildConstraint(base, [], 'failed')).toEqual({
+  it('never says shipping is fine without evidence (guard)', () => {
+    // Tim 2026-10-30: "Nothing is blocking shipping" sat beside a 58% queue
+    // ejection rate. The clear verdict now requires every input measured.
+    const verdict = buildConstraint(delivery(), [], 'fresh');
+    expect(verdict).not.toBeNull();
+    expect(verdict?.text).toMatch(/^Shipping health unknown: /);
+    expect(buildConstraint(onTargetDelivery(), [], 'syncing')).toMatchObject({
       tone: 'warn',
-      text: 'Work items are not current',
+      text: 'Shipping health unknown: work items not measured',
     });
   });
 
-  it('returns null when nothing needs attention', () => {
-    expect(buildConstraint(measuredDelivery(), [], 'fresh')).toBeNull();
+  it('names breaches worst first, from the same evidence as the tiles', () => {
+    const base = onTargetDelivery();
+    const flow = base.lanes.flow;
+    if (!flow) throw new Error('fixture has flow');
+    const verdict = buildConstraint(
+      delivery({
+        ...base,
+        lanes: { ...base.lanes, flow: { ...flow, queueEjectionRate: 0.58 } },
+        production: { ...base.production, behindMain: count(1) },
+      }),
+      rows([task(1, 'blocked'), task(2, 'running', { rollup: 'failure' })]),
+      'fresh'
+    );
+    expect(verdict).toEqual({
+      tone: 'bad',
+      text: 'Shipping off target: 58% of queue entries ejected (target 10%) · 1 item blocked · +2 more',
+      detailsHref: APP_ROUTES.ADMIN_SHIPPING,
+    });
+  });
+
+  it('is clear only when every input is measured and on target', () => {
+    expect(buildConstraint(onTargetDelivery(), [], 'fresh')).toBeNull();
   });
 });
 
 describe('buildOvieHomeShipping', () => {
   it('composes constraint, pulse, rows, and done today from one read', () => {
     const home = buildOvieHomeShipping({
-      delivery: measuredDelivery(),
+      delivery: onTargetDelivery(),
       operationalTasks: feed([
         task(1, 'running', { rollup: 'pending' }),
         task(2, 'production-verified'),
@@ -506,7 +509,7 @@ describe('buildOvieHomeShipping', () => {
     });
     expect(home.mergesToday).toBeNull();
     expect(home.done).toEqual([]);
-    expect(home.constraint).toBeNull();
+    expect(home.constraint?.text).toMatch(/^Shipping health unknown/);
   });
 });
 
