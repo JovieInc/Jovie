@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildEntryProfileBuilderState,
   OnboardingShell,
+  OnboardingShellStatus,
 } from './OnboardingShell';
 
 vi.mock('@/components/organisms/AppShellFrame', () => ({
@@ -485,5 +486,22 @@ describe('OnboardingShell route pane (JOV-7973)', () => {
 
     expect(source).toContain("contentClassName='overflow-clip!'");
     expect(source).not.toContain("contentClassName='overflow-hidden!'");
+  });
+});
+
+describe('OnboardingShellStatus (2026-10-31 golden-path walk)', () => {
+  it('shows the status in words, never a bare skeleton bar', () => {
+    render(
+      <OnboardingShellStatus
+        kind='status'
+        message='Saving this conversation to your account…'
+        visible
+      />
+    );
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent(
+      'Saving this conversation to your account…'
+    );
+    expect(status.querySelector('.sr-only')).toBeNull();
   });
 });

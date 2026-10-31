@@ -1,5 +1,10 @@
 [
   {
+    "file": ".claude/rules/anti-slop.md",
+    "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
+    "bodySha256": "17ed298ea129cb191c56f2d3ff1ebccf036817325b44c1c524230fb0b511a844"
+  },
+  {
     "file": ".claude/rules/auth.md",
     "paths": ["apps/web/**/auth/**", "apps/web/proxy.ts", "apps/web/tests/**"],
     "bodySha256": "75c6e6ebb898dfa5265b39f4a57844cd1c0fd0452adf105262e244e008650936"

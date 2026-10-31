@@ -1,0 +1,16 @@
+name = "jovie-workers-ai"
+main = "src/index.ts"
+compatibility_date = "2026-09-29"
+workers_dev = true
+
+[ai]
+binding = "AI"
+
+[[ratelimits]]
+name = "LIMITER"
+namespace_id = "1029"
+  [ratelimits.simple]
+  limit = 300
+  period = 60
+
+# WORKERS_AI_BEARER is a Worker secret (wrangler secret put), never a var here.
