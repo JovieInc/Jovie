@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --experimental-strip-types --no-warnings --experimental-test-coverage --test-coverage-include='src/{core,outbox,presence,scan}.ts' --test-coverage-lines=85 --test-coverage-branches=75 --test src/*.test.mjs",
+    "test": "node --experimental-strip-types --no-warnings --experimental-test-coverage --test-coverage-include='src/{core,outbox,presence,scan,board}.ts' --test-coverage-lines=85 --test-coverage-branches=75 --test src/*.test.mjs",
     "typecheck": "tsc --noEmit",
     "deploy": "wrangler deploy"
   },

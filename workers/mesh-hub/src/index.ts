@@ -16,6 +16,7 @@ import type { Env } from './env.ts';
 import { type AgentEntry } from './registry.ts';
 import { scanBody } from './scan.ts';
 
+export { Board } from './board-do.ts';
 export { Mailbox } from './mailbox.ts';
 export { Registry } from './registry.ts';
 
@@ -37,6 +38,9 @@ const failure = (status: number, code: string, retryable = false) =>
 
 function registry(env: Env) {
   return env.REGISTRY.get(env.REGISTRY.idFromName('registry'));
+}
+function board(env: Env) {
+  return env.BOARD.get(env.BOARD.idFromName('board'));
 }
 function mailbox(env: Env, kind: string) {
   return env.MAILBOX.get(env.MAILBOX.idFromName(kind));
@@ -101,6 +105,21 @@ async function send(
     `${input.body}\n${(input.refs as string[]).join('\n')}`
   );
   if (!verdict.ok) return failure(422, verdict.code);
+  if (input.to === 'board') {
+    // Task board op over the mesh (canon MESH-SWARM.md): the response carries the result.
+    const result = await board(env).fromMesh(
+      from,
+      input.body,
+      (input.inReplyTo as string | null) ?? null
+    );
+    if (!result.ok) return failure(result.status, result.code);
+    return json(202, {
+      ok: true,
+      status: 'accepted',
+      to: 'board',
+      board: result,
+    });
+  }
   const active = await registry(env).activeKinds();
   let recipients: string[];
   if (input.to === 'all') recipients = active.filter(kind => kind !== from);
@@ -159,6 +178,71 @@ function parseIds(body: unknown): string[] {
   )
     throw new HubError(422, 'invalid_ack');
   return ids as string[];
+}
+
+const BOARD_OPS = new Set([
+  'caps',
+  'post',
+  'claim',
+  'update',
+  'done',
+  'answer',
+  'cancel',
+]);
+
+async function boardRoute(
+  request: Request,
+  env: Env,
+  kind: string,
+  url: URL
+): Promise<Response> {
+  const path = url.pathname;
+  if (
+    request.method === 'GET' &&
+    (path === '/v1/board' || path === '/v1/board/task')
+  ) {
+    const limit = Number(url.searchParams.get('limit') ?? 50);
+    return json(200, {
+      ok: true,
+      self: kind,
+      dataNotInstructions: true,
+      ...((await board(env).read({
+        id: url.searchParams.get('id'),
+        status: url.searchParams.get('status'),
+        limit: Number.isFinite(limit) ? limit : 50,
+      })) as Record<string, unknown>),
+    });
+  }
+  if (request.method === 'GET' && path === '/v1/board/metrics') {
+    const hours = Math.min(
+      Math.max(Number(url.searchParams.get('hours') ?? 24) || 24, 1),
+      24 * 30
+    );
+    return json(200, {
+      ok: true,
+      ...((await board(env).metrics(hours * 3_600_000)) as Record<
+        string,
+        unknown
+      >),
+    });
+  }
+  const op = path.slice('/v1/board/'.length);
+  if (request.method === 'POST' && BOARD_OPS.has(op)) {
+    const input = await readJson(request, 32_768);
+    if (!input || typeof input !== 'object' || Array.isArray(input))
+      return failure(400, 'invalid_json');
+    const text = JSON.stringify(input);
+    const verdict = scanBody(text);
+    if (!verdict.ok) return failure(422, verdict.code);
+    const result = await board(env).op(
+      kind,
+      op,
+      input as Record<string, unknown>
+    );
+    if (!result.ok) return failure(result.status, result.code);
+    return json(200, result);
+  }
+  return failure(404, 'not_found');
 }
 
 async function route(request: Request, env: Env): Promise<Response> {
@@ -239,6 +323,7 @@ async function route(request: Request, env: Env): Promise<Response> {
   }
   if (path === '/v1/stream' && request.method === 'GET')
     return mailbox(env, kind).fetch(request);
+  if (path.startsWith('/v1/board')) return boardRoute(request, env, kind, url);
   if (path === '/v1/agents' && request.method === 'GET')
     return json(200, {
       ok: true,
@@ -281,6 +366,12 @@ export default {
     ctx: ExecutionContext
   ) {
     ctx.waitUntil(registry(env).sweep());
+    // Dead-man for board leases and undelivered notices.
+    ctx.waitUntil(
+      board(env)
+        .sweep()
+        .catch(() => undefined)
+    );
   },
 } satisfies ExportedHandler<Env>;
 

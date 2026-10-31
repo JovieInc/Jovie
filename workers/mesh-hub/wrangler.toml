@@ -14,9 +14,18 @@ class_name = "Mailbox"
 name = "REGISTRY"
 class_name = "Registry"
 
+[[durable_objects.bindings]]
+name = "BOARD"
+class_name = "Board"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Mailbox", "Registry"]
+
+# Fleet task board (canon MESH-SWARM.md).
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Board"]
 
 # Hub model executor (failover for kinds with no live reader). Workers AI binding: no secret.
 [ai]
@@ -31,7 +40,8 @@ enabled = true
 
 [vars]
 # Kinds the hub answers (read-only, Workers AI) when no real reader handled their mail within the grace.
-EXECUTOR_KINDS = "codex,grokbot,chloe,lola,muse,dots,stella,instinct,devin,aeon"
+# aeon is out: it has a real executor (mesh-worker on the office Air, canon MESH-SWARM.md).
+EXECUTOR_KINDS = "codex,grokbot,chloe,lola,muse,dots,stella,instinct,devin"
 EXECUTOR_GRACE_MS = "20000"
 # Alarm once when peer mail sits unhandled this long (ms).
 MAIL_STALE_MS = "600000"
