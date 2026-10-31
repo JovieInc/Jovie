@@ -44,6 +44,6 @@ describe('library share action System B styling', () => {
 
     expect(assetSharePanelSource).not.toContain("variant='outline'");
     expect(assetSharePanelSource).toContain('OverflowMenu');
-    expect(assetSharePanelSource).toContain('CopyLinkInput');
+    expect(assetSharePanelSource).toContain('CopyableUrlRow');
   });
 });

@@ -274,7 +274,7 @@ export function ArtistRulesSheet({
           </form>
 
           <section aria-label='Current Artist Rules' className='space-y-2'>
-            <h3 className='text-xs font-medium uppercase tracking-wide text-tertiary-token'>
+            <h3 className='text-xs font-medium text-tertiary-token'>
               Current Rules
             </h3>
             {rules.length === 0 ? (
