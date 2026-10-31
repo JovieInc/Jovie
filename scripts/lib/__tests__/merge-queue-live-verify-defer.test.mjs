@@ -28,7 +28,7 @@ function stubGh(script) {
 }
 
 function runVerify(extraArgs = []) {
-  return spawnSync(
+  const run = spawnSync(
     process.execPath,
     [SCRIPT, 'verify', '--allow-unavailable-bypass-actors', ...extraArgs],
     {
@@ -40,6 +40,8 @@ function runVerify(extraArgs = []) {
       timeout: 60_000,
     }
   );
+  if (run.error) throw run.error;
+  return run;
 }
 
 describe('merge queue live verify under quota exhaustion', () => {
@@ -82,14 +84,24 @@ describe('merge queue live verify under quota exhaustion', () => {
     expect(run.stderr).toContain('Resource not accessible by integration');
     expect(run.stderr).not.toContain('github-quota-deferred');
   });
-});
+  it('keeps actual ruleset drift a hard red after a successful read', () => {
+    const ruleset = JSON.parse(readFileSync(RULESET_FIXTURE, 'utf8'));
+    ruleset.rules.find(
+      rule => rule.type === 'required_status_checks'
+    ).parameters.required_status_checks = [];
+    stubGh(`cat <<'RULESET'\n${JSON.stringify(ruleset)}\nRULESET`);
+    const run = runVerify();
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain('PR Ready');
+    expect(run.stderr).not.toContain('github-quota-deferred');
+    expect(run.stdout).not.toContain('Live ruleset OK');
+  });
 
-// Guards the import surface the deferral relies on stays in sync.
-describe('merge queue live verify retry wiring', () => {
-  it('routes the live read through the shared quota-aware retry layer', () => {
-    const source = readFileSync(SCRIPT, 'utf8');
-    expect(source).toContain('runWithGitHubRetry');
-    expect(source).toContain("from './lib/github-rate-limit.mjs'");
-    expect(source).not.toContain("execFileSync(\n      'gh'");
+  it('rejects malformed successful responses without deferring', () => {
+    stubGh("echo '{invalid json}'");
+    const run = runVerify();
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain('Live GitHub ruleset verification failed');
+    expect(run.stderr).not.toContain('github-quota-deferred');
   });
 });
