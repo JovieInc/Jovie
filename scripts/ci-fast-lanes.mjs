@@ -686,6 +686,7 @@ export const STRUCTURAL_PYTEST_FILES = Object.freeze([
   'scripts/tests/test_runner_routing.py',
   'scripts/tests/test_signal_watch.py',
   'scripts/tests/test_frontier.py',
+  'scripts/tests/test_bookmarks.py',
   'scripts/tests/test_x_grok.py',
 ]);
 

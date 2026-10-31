@@ -317,10 +317,11 @@ def jev_state(item):
                       f"Summary: {signal_watch.compact(item.get('summary') or '', 1600)}"])[:5800]
 
 
-def score_jev(item, api_key, poster=signal_watch.post_json):
+def score_jev(item, api_key, poster=None):
+    poster = poster or signal_watch.system_one.route(signal_watch.post_json)
     status, body = poster(signal_watch.JEV_URL, {"model": signal_watch.JEV_MODEL, "state": jev_state(item), "questions": QUESTIONS},
                           {"Authorization": f"Bearer {api_key}"})
-    if status != 200 or body.get("model") != signal_watch.JEV_MODEL:
+    if status != 200 or body.get("model") not in signal_watch.system_one.SYSTEM_ONE_MODELS:
         raise RuntimeError(f"jev-http-{status}")
     a = body.get("answers") or {}
     pick = lambda key, allowed: (a.get(key) or {}).get("choice") if (a.get(key) or {}).get("choice") in allowed else None  # noqa: E731
@@ -511,7 +512,7 @@ def stage_rows(scored_n, routed_n, observed, started, ended):
 # ---------------------------------------------------------------------------------------------
 # run
 
-def run(state_dir, *, env=None, topics=None, researcher=research_hits, extra_items=(), poster=signal_watch.post_json,
+def run(state_dir, *, env=None, topics=None, researcher=research_hits, extra_items=(), poster=None,
         put=signal_watch.yc_corpus.gbrain_put, canon=CANON_PATTERNS, factory_dir=None, now=None, dry_run=False):
     env = os.environ if env is None else env
     now = now or time.time()
@@ -599,6 +600,13 @@ def ingest(state_dir, rows, env=None, **kwargs):
     return run(state_dir, env=env, topics={**load_topics(), "topics": []}, extra_items=from_signal_rows(rows), **kwargs)
 
 
+def exportable(rows):
+    """Rows that may be promoted into the public canon. Private sources (Tim's X bookmarks) never are: the repo is
+    public code, private data (canon/BUILD_VS_BUY.md), and which posts Tim bookmarks is private."""
+    return sorted((r for r in rows if r.get("privacy") != "internal" and (r.get("source") or {}).get("origin") != "x-bookmark"),
+                  key=lambda r: r["id"])
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -620,7 +628,7 @@ def main(argv=None):
         return 0
     registry = Registry(args.state_dir)
     if args.command == "export":
-        for row in sorted(registry.machine.values(), key=lambda r: r["id"]):
+        for row in exportable(registry.machine.values()):
             print(json.dumps(row, sort_keys=True, ensure_ascii=False))
         return 0
     updated = record_result(registry, args.pattern_id, decision=args.decision, baseline=args.baseline, after=args.after, reason=args.reason)
