@@ -453,7 +453,7 @@ export function OnboardingSpotifyArtistPickerCard({
 
         {!isSearching && !hasQuery ? (
           <div className='px-2 py-3 text-xs leading-5 text-secondary-token'>
-            Start with the artist name fans see on Spotify.
+            Start with the artist name as it appears on Spotify.
           </div>
         ) : null}
 

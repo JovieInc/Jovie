@@ -478,11 +478,9 @@ export function OnboardingProfileRail({
                 Preview
               </span>
             }
-            caption={
-              state.profileDraft?.activeRole
-                ? `Draft · ${state.profileDraft.activeRole} · ${state.profileDraft.awaiting === 'review' ? 'Review' : 'In progress'}`
-                : 'Preview — not claimed yet'
-            }
+            // One caption for every path: internal draft state ("Draft · artist ·
+            // Review") is not visitor-facing (2026-10-31 golden-path walk).
+            caption='Preview — not claimed yet'
             overlay={<DspMatchStrip matches={dspMatches} />}
           />
           {previewArtist.tagline ? (

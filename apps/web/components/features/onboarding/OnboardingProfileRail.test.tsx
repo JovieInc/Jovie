@@ -171,7 +171,8 @@ describe('OnboardingProfileRail', () => {
     expect(
       screen.queryByTestId('onboarding-dsp-match-strip')
     ).not.toBeInTheDocument();
-    expect(screen.getByText('Draft · founder · Review')).toBeInTheDocument();
+    expect(screen.getByText('Preview — not claimed yet')).toBeInTheDocument();
+    expect(screen.queryByText(/Draft · /)).toBeNull();
     expect(screen.queryByText('Test Artist')).not.toBeInTheDocument();
   });
   it('renders nothing when there is no preview artist', () => {
