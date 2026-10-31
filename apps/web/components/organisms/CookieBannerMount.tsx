@@ -1,3 +1,4 @@
+// @coverage-via apps/web/components/organisms/PrivacyChoices.test.tsx
 'use client';
 
 import {
@@ -10,7 +11,11 @@ import {
 import { shouldSuppressCookieBannerForPathname } from '@/lib/cookies/banner-visibility';
 import type { Consent } from '@/lib/cookies/consent';
 import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
-import { setConsentState } from '@/lib/tracking/consent';
+import {
+  GPC_CONFIRMATION,
+  PRIVACY_CHOICES_HREF,
+} from '@/lib/cookies/consent-state';
+import { isGPCEnabled, setConsentState } from '@/lib/tracking/consent';
 
 type CookieModalComponent = ComponentType<{
   readonly open: boolean;
@@ -29,7 +34,7 @@ declare global {
 }
 
 function shouldMountCookieBanner(pathname: string): boolean {
-  if (shouldSuppressCookieBannerForPathname(pathname)) {
+  if (isGPCEnabled() || shouldSuppressCookieBannerForPathname(pathname)) {
     return false;
   }
 
@@ -54,13 +59,55 @@ export function CookieBannerMount() {
   const [Banner, setBanner] = useState<ComponentType | null>(null);
   const [Modal, setModal] = useState<CookieModalComponent | null>(null);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [Privacy, setPrivacy] = useState<ComponentType<{
+    onClose: () => void;
+  }> | null>(null);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
+  const [gpc, setGpc] = useState(false);
   const listenersRef = useRef(new Set<(v: unknown) => void>());
 
   const openPreferences = useCallback(() => {
     void import('@/components/organisms/CookieModal').then(mod => {
+      setPrivacyOpen(false);
       setModal(() => mod.CookieModal);
       setPreferencesOpen(true);
     });
+  }, []);
+
+  useEffect(() => {
+    setGpc(isGPCEnabled());
+    const openPrivacy = () => {
+      void import('@/components/organisms/PrivacyChoices').then(mod => {
+        setPrivacy(() => mod.PrivacyChoices);
+        setPreferencesOpen(false);
+        setPrivacyOpen(true);
+      });
+    };
+    const onHash = () => {
+      if (globalThis.location.hash === '#privacy-choices') openPrivacy();
+    };
+    const onClick = (event: MouseEvent) => {
+      if (
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      )
+        return;
+      const link =
+        event.target instanceof Element ? event.target.closest('a') : null;
+      if (link?.getAttribute('href') !== PRIVACY_CHOICES_HREF) return;
+      event.preventDefault();
+      openPrivacy();
+    };
+    onHash();
+    document.addEventListener('click', onClick, true);
+    globalThis.addEventListener('hashchange', onHash);
+    return () => {
+      document.removeEventListener('click', onClick, true);
+      globalThis.removeEventListener('hashchange', onHash);
+    };
   }, []);
 
   useEffect(() => {
@@ -117,7 +164,18 @@ export function CookieBannerMount() {
 
   return (
     <>
-      {Banner ? <Banner /> : null}
+      {gpc && !privacyOpen ? (
+        <aside
+          aria-label='Privacy Signal'
+          className='fixed bottom-24 left-4 right-4 z-50 max-w-85 sm:left-auto rounded-xl border border-subtle bg-surface-1 px-4 py-3 text-xs text-secondary-token shadow-card'
+        >
+          <p role='status'>{GPC_CONFIRMATION}</p>
+        </aside>
+      ) : null}
+      {Privacy && privacyOpen ? (
+        <Privacy onClose={() => setPrivacyOpen(false)} />
+      ) : null}
+      {Banner && !privacyOpen ? <Banner /> : null}
       {Modal ? (
         <Modal
           open={preferencesOpen}
@@ -128,6 +186,3 @@ export function CookieBannerMount() {
     </>
   );
 }
-
-// Note: The rendered banner is a compact floating bottom-right card (see CookieBannerSection).
-// All mount/visibility/geo/persistence logic is unchanged. Visual redesign is internal to the lazy Section.

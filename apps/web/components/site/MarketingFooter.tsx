@@ -13,6 +13,10 @@ import {
   type MarketingFooterColumn,
   type MarketingFooterLink,
 } from '@/data/marketingNavigation';
+import {
+  PRIVACY_CHOICES_HREF,
+  PRIVACY_CHOICES_LABEL,
+} from '@/lib/cookies/consent-state';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { isEditorialFooterCtaPath } from '@/lib/marketing/editorial-content-routes';
 import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
@@ -181,6 +185,9 @@ function FooterLegalNav({
 }: Readonly<{ links?: readonly MarketingFooterLink[] }>) {
   return (
     <nav aria-label='Legal' className='flex flex-wrap items-center gap-6'>
+      <a href={PRIVACY_CHOICES_HREF} className={footerLegalLinkClassName}>
+        {PRIVACY_CHOICES_LABEL}
+      </a>
       {links.map(link => (
         <Link
           key={link.href}
