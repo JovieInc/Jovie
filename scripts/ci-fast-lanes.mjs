@@ -213,6 +213,17 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
+    // Compliance: no third-party tracker component on routes where people
+    // type (CIPA wiretap exposure). Canon: gbrain
+    // decisions/company/privacy-tracking-compliance-guidelines-2026-10-31.
+    id: 'privacy-input-route-trackers',
+    command:
+      'node --test --test-isolation=none scripts/compliance/input-page-trackers.test.mjs',
+    inputs:
+      /^(?:apps\/web\/app\/|apps\/web\/components\/features\/tracking\/|scripts\/compliance\/|scripts\/ci-fast-lanes\.mjs$)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     id: 'artist-profile-conformance',
     // Source Validation loads this module from trusted main; older heads may lack these files.
     command: `node ${shellQuote(fileURLToPath(new URL('./artist-profile-conformance.mjs', import.meta.url)))} && node --test --test-isolation=none ${shellQuote(fileURLToPath(new URL('./artist-profile-conformance.test.mjs', import.meta.url)))}`,
