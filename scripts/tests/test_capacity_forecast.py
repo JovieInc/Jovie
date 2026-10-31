@@ -169,6 +169,14 @@ class Forecast(unittest.TestCase):
         self.assertIsNone(f.access_signature("HTTP 401', () => thing"))
         self.assertIsNone(f.access_signature("HTTP 401"))
 
+    def test_recovery_emits_a_clear_card(self):
+        with tempfile.TemporaryDirectory() as d:
+            state, feed = Path(d) / "s", Path(d) / "alarms.jsonl"
+            reg = {"resources": [RES]}
+            f.publish([f.evaluate(RES, {"value": 100, "limit": 100}, [], 0)], reg, 0, state, feed)
+            cleared = f.publish([f.evaluate(RES, {"value": 1, "limit": 100}, [], 0)], reg, 60, state, feed)
+            self.assertEqual([(c["id"], c.get("clear")) for c in cleared], [("x", True)])
+
 
 if __name__ == "__main__":
     unittest.main()

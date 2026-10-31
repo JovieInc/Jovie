@@ -483,6 +483,8 @@ def publish(rows: list[dict], registry: dict, now: float, state: Path, feed: Pat
         current[row["id"]] = row["status"]
         if bad and prior.get(row["id"]) != row["status"]:
             cards.append(card(by_id.get(row["id"]) or row["res"], row, now))
+        elif row["status"] == "OK" and prior.get(row["id"]) in BAD:
+            cards.append({"kind": "capacity-clear", "id": row["id"], "at": iso(now), "clear": True})
     state.mkdir(parents=True, exist_ok=True)
     if cards:
         feed.parent.mkdir(parents=True, exist_ok=True)
@@ -519,6 +521,11 @@ def tracker_transport(cards: list[dict]) -> list[tuple[str | None, str | None]]:
     out = []
     for c in cards:
         try:
+            if c.get("clear"):  # the condition cleared: close its issue so Triage reflects reality
+                found = tracker.existing(f"capacity:{c['id']}")
+                ok = tracker.close(found, f"capacity:{c['id']}") if found else True
+                out.append((found or "none-open", None) if ok else (None, "tracker-close-failed"))
+                continue
             issue = tracker.open(f"capacity:{c['id']}", card_text(c))
             out.append((issue, None if issue else f"tracker-open:{tracker.last_error}"))
         except Exception as e:  # noqa: BLE001
