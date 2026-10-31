@@ -16,6 +16,7 @@ Machine-readable map: [`sources-of-truth.json`](./sources-of-truth.json). Rule f
 | Rate limits and API budgets | file | `apps/web/lib/rate-limit/config.ts` (moves to #23531) | `apps/web/lib/auth/rate-limit-rules.ts`<br>`packages/api-client/providers.json` | - |
 | Credentials and spend | file | `ops/registry/credentials.json` | `ops/registry/spend.json`<br>`.github/preview-env-registry.json` | - |
 | Automations (crons, workflows, lanes clocks) | file | `canon/automation-registry.jsonl` | `docs/CRON_REGISTRY.md`<br>`vercel.json`<br>`apps/web/vercel.json` | - |
+| Pattern library (proven outside tactics scored by our own results) | file | `canon/patterns.jsonl` | - | - |
 | Design tokens | file | `apps/web/design/tokens.json` | `design.tokens.json`<br>`canon/DESIGN.md` | - |
 | Marketing copy, nav and footer | record | `apps/web/lib/content-records/registry.ts` (moves to #23595) | `apps/web/lib/content-records/marketing-page.ts`<br>`apps/web/data/product-truth/claims.ts` | - |
 | Product claims and proof | file | `apps/web/data/product-truth/claims.ts` | `apps/web/data/product-truth/registry.ts`<br>`apps/web/data/product-truth/claim-digest.gen.json` | - |
@@ -38,6 +39,7 @@ Machine-readable map: [`sources-of-truth.json`](./sources-of-truth.json). Rule f
 - **Rate limits and API budgets.** Web request limits today. PR #23531 adds the outbound API rate-limit registry and headroom file; when it lands, point this owner at it.
 - **Credentials and spend.** Metadata only. Spend caps and runway in ops/registry/spend.json; checked daily by scripts/credentials-spend-check.mjs.
 - **Automations (crons, workflows, lanes clocks).** One line per automation; CI fails on a cron with no live entry.
+- **Pattern library (proven outside tactics scored by our own results).** One jovie-pattern/v1 line per pattern. Outside reports are priors; only our measured trial moves a pattern's score. The frontier feed proposes additions.
 - **Design tokens.** Machine-readable token source; the repo-root export and CSS are generated from it.
 - **Marketing copy, nav and footer.** Content records (marketing page specs; site-chrome for header and footer in #23595). The registry file declares the record kinds; the records themselves live in the content-records table.
 - **Product claims and proof.** Each public claim names its evidence; copy that states a capability must derive from a claim.

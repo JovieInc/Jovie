@@ -120,7 +120,7 @@ class ParseTests(unittest.TestCase):
         sources = W.load_sources()
         self.assertGreaterEqual(len(sources), 15)
         categories = {item["category"] for item in sources}
-        self.assertEqual(categories, {"ai-lab", "platform", "competitor"})
+        self.assertEqual(categories, {"ai-lab", "platform", "competitor", "person"})
 
 
 class PollTests(unittest.TestCase):
@@ -185,6 +185,12 @@ class BookmarkTests(unittest.TestCase):
         bad = self.tmp_sources({"schema": "jovie.signal-sources/v1", "x": {"accounts": ["not a handle"]}, "sources": []})
         with self.assertRaises(ValueError):
             W.load_x_config(bad)
+
+    def test_x_accounts_include_the_people_in_frontier_topics(self):
+        config = W.load_x_config()
+        for handle in ("bcherny", "potetotes", "embirico"):
+            self.assertIn(handle, config["accounts"])
+        self.assertEqual(len(config["accounts"]), len({a.lower() for a in config["accounts"]}))
 
     def tmp_sources(self, data):
         tmp = tempfile.TemporaryDirectory()
@@ -421,6 +427,22 @@ class RunTests(unittest.TestCase):
             self.assertEqual(W.triage_signals("x"), {"status": "not-installed"})
         finally:
             W.shutil.which = original
+
+    def test_frontier_stage_is_opt_in_and_fail_open(self):
+        calls = []
+        self.assertNotIn("frontier", self.run_once(Poster(), Brain(), frontier=lambda *a: calls.append(a)))
+        self.assertEqual(calls, [])
+        (self.dir / "state.json").unlink()
+        result = self.run_once(Poster(), Brain(), env={"SIGNALS_FRONTIER": "1"},
+                               frontier=lambda dir, rows, env, poster, put: calls.append(len(rows)) or {"status": "ok"})
+        self.assertEqual(result["frontier"], {"status": "ok"})
+        self.assertEqual(calls, [2])  # changelog items; the bookmark inbox is empty here
+        def boom(*args):
+            raise RuntimeError("gateway down")
+        (self.dir / "state.json").unlink()
+        failed = self.run_once(Poster(), Brain(), env={"SIGNALS_FRONTIER": "1"}, frontier=boom)
+        self.assertEqual(failed["frontier"]["status"], "failed")
+        self.assertEqual(failed["status"], "ok")
 
     def test_undeployed_summer_route_keeps_cards_in_outbox(self):
         poster = Poster({"Queues GA": jev_answer("adopt", 0.9)}, summer_status=404)
