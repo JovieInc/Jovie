@@ -1672,7 +1672,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(verifyStep).toContain('EXPECTED_PRODUCTION_DEPLOYMENT_ID');
   });
 
-  it('fails production public-profile alias budgets closed once graduated', () => {
+  it('blocks production alias budgets on certified pages and warns elsewhere', () => {
     const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const aliasGate = getJobBlock(
       workflow,
@@ -1685,19 +1685,24 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(aliasGate).toContain('--base-url https://jov.ie');
     expect(aliasGate).toContain('--runs 5');
     // The 2026-10-31 receipt graduated production alias budgets (14/14,
-    // JOV-8737): a post-promote miss fails the job and release-result.
+    // JOV-8737), but a miss blocks only on routes whose golden-path surface
+    // holds a current certification in the Ovie ledger; the rest warn.
     expect(aliasGate).toContain('id: alias-perf');
+    expect(aliasGate).toContain('scripts/performance-budgets-guard.ts');
     expect(aliasGate).toContain(
-      'if ! pnpm exec tsx scripts/performance-budgets-guard.ts'
+      'https://jov.ie/api/internal/ovie/golden-path-evidence'
+    );
+    expect(aliasGate).toContain('scripts/lib/alias-gate-certified-routes.mjs');
+    expect(aliasGate).toMatch(
+      /if ! guard \$blocking; then[\s\S]*?echo "performance_status=failed" >> "\$GITHUB_OUTPUT"\s+exit 1\s+fi/
     );
     expect(aliasGate).toMatch(
-      /if ! pnpm exec tsx scripts\/performance-budgets-guard\.ts[\s\S]*?echo "performance_status=failed" >> "\$GITHUB_OUTPUT"\s+exit 1\s+fi/
+      /if ! guard \$warning; then[\s\S]*?::warning::[\s\S]*?status=warn\s+fi/
     );
     expect(aliasGate).toContain(
-      'echo "performance_status=passed" >> "$GITHUB_OUTPUT"'
+      'echo "performance_status=${status}" >> "$GITHUB_OUTPUT"'
     );
     expect(aliasGate).toContain('::error::');
-    expect(aliasGate).not.toContain('performance_status=warn');
     expect(aliasGate).toContain(
       'performance_status: ${{ steps.alias-perf.outputs.performance_status }}'
     );
@@ -1734,8 +1739,11 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       'public-profile-tour',
       'public-profile-releases',
     ]) {
-      expect(aliasGate).toContain(`--route-id ${routeId}`);
+      // Routes are split into certified (blocking) and uncertified (warning)
+      // sets by scripts/lib/alias-gate-certified-routes.mjs before the guard.
+      expect(aliasGate).toMatch(new RegExp(`routes='[^']*\\b${routeId}\\b`));
     }
+    expect(aliasGate).toContain('args+=(--route-id "$route")');
     // Downstream still requires job successful completion (exit 0), not a perf pass.
     expect(releaseResult).toContain('production-public-profile-alias-gate,');
     expect(releaseResult).toContain(
