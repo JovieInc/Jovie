@@ -1,0 +1,57 @@
+{
+ "schema": "jovie-deployed-workers/v1",
+ "_comment": "Single source of truth: every Worker deployed to the Jovie Cloudflare account has source in git (a workers/**/wrangler*.toml `name`) or is listed here as unversioned debt with a disposition. Checked by scripts/lib/workers-inventory.mjs (offline in unit tests; live from the Gem lanes tick). The list only shrinks.",
+ "accountId": "fd8a6fcfa0ff0b708dbae942af18c49b",
+ "unversioned": [
+  {
+   "name": "jovie-br-spike",
+   "modifiedOn": "2026-10-28",
+   "disposition": "3 MB bundle; spike. Import with source or delete."
+  },
+  {
+   "name": "jovie-cf-runner-spike",
+   "modifiedOn": "2026-10-29",
+   "disposition": "Spike. Import with source or delete."
+  },
+  {
+   "name": "jovie-competitor-watch",
+   "modifiedOn": "2026-10-30",
+   "disposition": "Source is in open PR #23813 (workers/competitor-watch); remove from this list when it merges."
+  },
+  {
+   "name": "jovie-copy-jam-ai",
+   "modifiedOn": "2026-10-29",
+   "disposition": "Source not recoverable (no source map). Import or delete."
+  },
+  {
+   "name": "jovie-mesh-hub",
+   "modifiedOn": "2026-10-31",
+   "disposition": "Source is in open PRs #23955/#23965 (workers/mesh-hub); remove when they merge."
+  },
+  {
+   "name": "jovie-turbo-cache",
+   "modifiedOn": "2026-10-28",
+   "disposition": "Turborepo remote cache. Source not recoverable (no source map)."
+  },
+  {
+   "name": "jovie-workers-ai",
+   "modifiedOn": "2026-10-31",
+   "disposition": "Source not recoverable (no source map)."
+  },
+  {
+   "name": "posthog",
+   "modifiedOn": "2025-08-18",
+   "disposition": "Reverse proxy from 2025-08; confirm still used, else delete."
+  },
+  {
+   "name": "summer-workers-ai",
+   "modifiedOn": "2026-10-29",
+   "disposition": "Source not recoverable (no source map); belongs in summer-config."
+  },
+  {
+   "name": "tim-white-thumbnails",
+   "modifiedOn": "2026-07-05",
+   "disposition": "Personal; confirm owner, else delete."
+  }
+ ]
+}
