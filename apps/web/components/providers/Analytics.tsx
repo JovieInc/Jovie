@@ -1,4 +1,3 @@
-// @coverage-via apps/web/tests/unit/navigation/public-pathname-guard.test.ts
 'use client';
 
 import { Analytics as VercelAnalytics } from '@vercel/analytics/react';
