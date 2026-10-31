@@ -269,9 +269,9 @@ function nextPageLink(link) {
 
 /**
  * The GitHub client takes an API path, while a Link header carries an
- * absolute URL. Return the path so the next page is not requested as
- * `https://api.github.com/https://api.github.com/...` (a 404 that would
- * silently degrade the snapshot to its fallback after one page).
+ * absolute URL. Return the path so the next page request does not carry
+ * the API origin twice (a 404 that would silently degrade the snapshot to
+ * its fallback after one page).
  * @param {string} url
  * @returns {string}
  */
