@@ -12,6 +12,9 @@ test('hovering and closing either preview keeps every main-plane frame fixed', a
     '/api/dev/test-auth/enter?persona=creator-ready&redirect=/app',
     { waitUntil: 'domcontentloaded' }
   );
+  // JOV-8973 (#23006) discloses the inbox Notes on demand; open it so the
+  // Notes box remains this spec's settle/anchor control.
+  await page.getByRole('button', { name: 'Add Notes' }).click();
   const notes = page.getByRole('textbox', { name: 'Notes', exact: true });
   await expect(notes).toBeVisible();
   await notes.fill('Continuous hover geometry regression');

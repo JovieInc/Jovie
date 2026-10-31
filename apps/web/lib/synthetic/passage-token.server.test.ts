@@ -161,4 +161,61 @@ describe('resolveSyntheticPassageToken', () => {
     ).resolves.toBeNull();
     expect(hoisted.set).not.toHaveBeenCalled();
   });
+
+  it('grants the smartlink_click scope under its own rate-limit bucket', async () => {
+    const grant = await resolveSyntheticPassageToken(
+      headersWith(
+        mintPassageToken(derivePassageKey(hoisted.env.CRON_SECRET ?? ''), {
+          sub: CANARY,
+          scp: 'smartlink_click',
+          run: '42-1',
+        })
+      ),
+      'smartlink_click',
+      { consume: true, requestId: 'req-click' }
+    );
+    expect(grant?.actorId).toBe('prodcert');
+    // The abuse limit is per scope, so certification clicks get their own
+    // bucket of the shared syntheticPassageToken limiter.
+    expect(hoisted.limit).toHaveBeenCalledWith('smartlink_click');
+    expect(hoisted.set).toHaveBeenCalledWith(
+      expect.stringMatching(/^synthetic-passage:jti:/),
+      1,
+      expect.objectContaining({ nx: true })
+    );
+  });
+
+  it('refuses an onboarding_chat passage for the smartlink click scope', async () => {
+    await expect(
+      resolveSyntheticPassageToken(headersWith(token()), 'smartlink_click', {
+        consume: true,
+      })
+    ).resolves.toBeNull();
+    expect(hoisted.warn).toHaveBeenCalledWith(
+      '[synthetic-passage-token] denied',
+      expect.objectContaining({ reason: 'wrong_scope' })
+    );
+    expect(hoisted.limit).not.toHaveBeenCalled();
+  });
+
+  it('fails closed for the smartlink click scope when the abuse limit is exhausted', async () => {
+    hoisted.limit.mockResolvedValue({ success: false });
+    await expect(
+      resolveSyntheticPassageToken(
+        headersWith(
+          mintPassageToken(derivePassageKey(hoisted.env.CRON_SECRET ?? ''), {
+            sub: CANARY,
+            scp: 'smartlink_click',
+            run: '42-1',
+          })
+        ),
+        'smartlink_click',
+        { consume: true }
+      )
+    ).resolves.toBeNull();
+    expect(hoisted.warn).toHaveBeenCalledWith(
+      '[synthetic-passage-token] denied: rate limit',
+      expect.anything()
+    );
+  });
 });

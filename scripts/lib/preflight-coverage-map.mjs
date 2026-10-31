@@ -9,6 +9,9 @@
  * Kinds are PREFLIGHT_COVERAGE_KINDS in scripts/preflight-changed.mjs.
  * Key format: `<workflow file>#<job id>`.
  */
+/** @typedef {{ covers: string[], exempt?: never } | { exempt: string, covers?: never }} PreflightCoverage */
+
+/** @type {Readonly<Record<string, PreflightCoverage>>} */
 export const REQUIRED_CHECK_PREFLIGHT = Object.freeze({
   'ci.yml#ci-path-changes': {
     exempt:

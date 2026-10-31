@@ -226,6 +226,7 @@ describe('buildPulse', () => {
     const pulse = buildPulse(delivery());
     expect(pulse.map(tile => tile.key)).toEqual([
       'prod',
+      'lyb-deploy',
       'merges-hour',
       'queue',
       'red-prs',
@@ -285,6 +286,71 @@ describe('buildPulse', () => {
     expect(byKey.held).toMatchObject({ value: '3', tone: 'bad' });
     expect(byKey['gem-disk']?.tone).toBe('bad');
     expect(byKey.lanes?.tone).toBe('neutral');
+  });
+
+  it('shows LogYourBody production deploy health on Home, failing in bad tone', () => {
+    const base = measuredDelivery();
+    const withHealth = (
+      repo: Partial<{
+        status: 'ok' | 'failing' | 'unknown';
+        failedStreak: number;
+        behindMain: number | null;
+      }>
+    ) =>
+      Object.fromEntries(
+        buildPulse(
+          delivery({
+            ...base,
+            lanes: {
+              ...base.lanes,
+              deployHealth: {
+                observedAt: '2026-10-25T17:24:52.000Z',
+                healthy: false,
+                repos: [
+                  {
+                    repo: 'JovieInc/LogYourBody',
+                    status: 'ok',
+                    failedStreak: 0,
+                    behindMain: 0,
+                    oldestUnshippedAgeSeconds: null,
+                    lastSuccessAt: null,
+                    ...repo,
+                  },
+                ],
+              },
+            },
+          })
+        ).map(tile => [tile.key, tile])
+      );
+    expect(
+      withHealth({ status: 'failing', failedStreak: 21, behindMain: 87 })[
+        'lyb-deploy'
+      ]
+    ).toMatchObject({
+      label: 'LYB prod',
+      value: 'Failing, 87 behind',
+      tone: 'bad',
+      measured: true,
+    });
+    expect(withHealth({ behindMain: 4 })['lyb-deploy']).toMatchObject({
+      value: '4 behind',
+      tone: 'warn',
+    });
+    expect(withHealth({ behindMain: 0 })['lyb-deploy']).toMatchObject({
+      value: 'Current',
+      tone: 'good',
+    });
+    expect(withHealth({ status: 'unknown' })['lyb-deploy']).toMatchObject({
+      value: OVIE_NOT_MEASURED,
+      measured: false,
+      tone: 'neutral',
+    });
+    // No published block is Not measured, never healthy.
+    expect(
+      Object.fromEntries(buildPulse(base).map(tile => [tile.key, tile]))[
+        'lyb-deploy'
+      ]
+    ).toMatchObject({ value: OVIE_NOT_MEASURED, tone: 'neutral' });
   });
 
   it('fills was from the last different observed value', () => {

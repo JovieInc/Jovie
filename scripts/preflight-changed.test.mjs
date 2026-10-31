@@ -103,6 +103,57 @@ test('two new migrations violate the single-migration rule', () => {
   assert.ok(items.some(i => /exactly one migration/.test(i.item) && !i.done));
 });
 
+test('agent distribution selects icon, legal and docs readiness inputs', () => {
+  const generator = GENERATORS.find(g => g.id === 'agent-distribution');
+  assert.ok(generator);
+  for (const input of [
+    'packages/brand/svg/jovie-mark-white.svg',
+    'design.tokens.json',
+    'apps/web/components/site/public-shell.constants.ts',
+    'apps/web/constants/routes.ts',
+    'apps/web/content/legal/privacy.md',
+    'apps/web/content/legal/terms.md',
+    'apps/web/app/(dynamic)/legal/privacy/page.tsx',
+    'apps/web/app/(dynamic)/legal/terms/page.tsx',
+    'apps/web/app/(marketing)/developers/agents/page.tsx',
+  ]) {
+    assert.equal(generator.when.test(input), true, input);
+  }
+  assert.equal(
+    generator.when.test('apps/web/content/legal/unrelated.md'),
+    false
+  );
+});
+
+test('web token source edits select the canonical token generator', () => {
+  const generator = GENERATORS.find(g => g.id === 'web-design-tokens');
+  assert.ok(generator);
+  assert.equal(generator.when.test('apps/web/design/tokens.json'), true);
+  assert.equal(
+    generator.when.test('apps/web/scripts/build-design-tokens.mjs'),
+    true
+  );
+  assert.equal(generator.when.test('apps/web/design/unrelated.json'), false);
+});
+
+test('script-only edits select checkJs without a TypeScript companion', () => {
+  for (const extension of ['mjs', 'mts', 'ts', 'cts']) {
+    assert.deepEqual(
+      typecheckTargets([file(`scripts/check.${extension}`)], '/repo'),
+      ['scripts'],
+      extension
+    );
+  }
+  assert.deepEqual(
+    typecheckTargets([file('scripts/check.mjs', 'removed')], '/repo'),
+    []
+  );
+  assert.deepEqual(
+    typecheckTargets([file('apps/web/public/embed.mjs')], '/repo'),
+    []
+  );
+});
+
 test('typecheck targets are the affected packages only', () => {
   const t = typecheckTargets(
     [
@@ -120,6 +171,30 @@ test('typecheck targets are the affected packages only', () => {
     'web',
     'web-tests',
   ]);
+});
+
+test('web source changes typecheck test consumers without a changed test file', () => {
+  assert.deepEqual(
+    typecheckTargets(
+      [file('apps/web/lib/leads/route-lead.ts')],
+      process.cwd()
+    ).sort(),
+    ['pkg:@jovie/ovie', 'web', 'web-tests']
+  );
+  assert.deepEqual(
+    typecheckTargets(
+      [file('apps/web/tests/lib/leads/route-lead.test.ts')],
+      process.cwd()
+    ),
+    ['web-tests']
+  );
+  assert.deepEqual(
+    typecheckTargets(
+      [file('apps/web/lib/leads/route-lead.ts', 'removed')],
+      process.cwd()
+    ),
+    []
+  );
 });
 
 test('arguments parse and unknown flags fail', () => {

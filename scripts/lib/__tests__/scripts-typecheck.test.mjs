@@ -174,7 +174,7 @@ describe('scripts-typecheck: compareWithBaseline', () => {
     ]);
   });
 
-  it('fails when the baseline is stale (shrink-only: errors fixed but baseline not regenerated)', () => {
+  it('passes with stale entries reported when errors shrink below the baseline', () => {
     const current = counts({ 'scripts/a.mjs': { TS2305: 1 } });
     const baseline = {
       files: {
@@ -183,7 +183,8 @@ describe('scripts-typecheck: compareWithBaseline', () => {
       },
     };
     const result = compareWithBaseline(current, baseline);
-    expect(result.ok).toBe(false);
+    expect(result.ok).toBe(true);
+    expect(result.newErrors).toHaveLength(0);
     expect(result.staleEntries).toEqual([
       { file: 'scripts/fixed.mjs', code: 'TS2339', count: 0, baseline: 3 },
     ]);

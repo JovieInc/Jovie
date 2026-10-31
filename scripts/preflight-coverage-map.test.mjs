@@ -23,8 +23,11 @@ import {
 } from './preflight-changed.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+/** @typedef {{ jobs: Record<string, { needs?: string | string[] }> }} Workflow */
 const workflow = file =>
-  load(readFileSync(path.join(ROOT, '.github/workflows', file), 'utf8'));
+  /** @type {Workflow} */ (
+    load(readFileSync(path.join(ROOT, '.github/workflows', file), 'utf8'))
+  );
 const needs = (wf, job) => {
   const n = wf.jobs[job]?.needs ?? [];
   return Array.isArray(n) ? n : [n];
@@ -112,6 +115,7 @@ test('every --check package script is a preflight generator or exempt', () => {
 });
 
 test('preflight never silently drops or mis-narrows a source guard', () => {
+  /** @type {Set<string>} */
   const ids = new Set(SOURCE_GUARDS.map(g => g.id));
   for (const id of HEAVY_GUARDS) assert.ok(ids.has(id), `heavy ${id} is gone`);
   for (const id of Object.keys(NARROWED))

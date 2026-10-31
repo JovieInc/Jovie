@@ -171,12 +171,17 @@
       "title": "Email streams and sending domains",
       "owner": {
         "kind": "file",
-        "ref": "apps/web/constants/domains.ts",
-        "pendingPr": 23585,
-        "note": "Hostname and mailbox addresses today. PR #23585 adds the stream registry (cold mail never on jov.ie); when it lands, point this owner at it."
+        "ref": "apps/web/lib/email/stream-registry.json",
+        "note": "Every email stream (transactional, lifecycle, founder, broadcast, inbox, cold) bound to provider, sending domain and address, reply-to, required headers, postal footer, consent, suppression, rate limit, approval and deliverability thresholds. The send gateway (apps/web/lib/email/gateway) and the mail rules in scripts/lib/external-api-guard.mjs read it. Cold never runs on jov.ie or the Resend account and is closed until Tim approves a cold path."
       },
-      "derived": ["apps/web/lib/email/legal-footer.ts"],
-      "liveAuthority": "DNS (SPF, DKIM, DMARC) for the sending domains"
+      "derived": [
+        "apps/web/lib/email/streams.ts",
+        "apps/web/lib/notifications/sender-policy.ts",
+        "apps/web/lib/inbox/constants.ts",
+        "apps/web/lib/email/legal-footer.ts",
+        "docs/company/email-sending-streams.md"
+      ],
+      "liveAuthority": "DNS (SPF, DKIM, DMARC) for the sending domains; Resend domain verification"
     },
     {
       "id": "legal-claims",
@@ -279,6 +284,20 @@
         "note": "Binding and adopted company invariants; enforcement consumers name the checks."
       },
       "derived": ["scripts/invariants/registry.mjs"]
+    },
+    {
+      "id": "engineering-wins",
+      "title": "Engineering wins and the numbers in engineering posts",
+      "owner": {
+        "kind": "file",
+        "ref": "canon/wins/wins.jsonl",
+        "note": "One record per measured engineering win with before/after, source, query, PRs and post-deploy receipts. Status is computed (scripts/lib/wins-ledger.mjs), never stored."
+      },
+      "derived": [
+        "apps/web/content/engineering/",
+        "docs/metrics/wins-latest.json"
+      ],
+      "liveAuthority": "the measurement source named in each metric, re-run after deploy"
     }
   ],
   "scans": [
@@ -374,5 +393,41 @@
     "\\.gen\\.",
     "/drizzle/",
     "/node_modules/"
-  ]
+  ],
+  "liveChecks": {
+    "stripe-prices": {
+      "domain": "plans-prices-offers",
+      "owner": "apps/web/lib/config/plan-prices.ts",
+      "secretEnv": "STRIPE_READONLY_KEY",
+      "severity": "high",
+      "note": "Every owner price must exist as an active recurring Stripe price in USD. Disabled until STRIPE_READONLY_KEY (restricted, read-only Prices) is added to the sweep. Max prices are legacy and not checked.",
+      "ids": ["pro-monthly", "pro-yearly"]
+    },
+    "email-dns": {
+      "domain": "email-streams-domains",
+      "domains": ["jov.ie"],
+      "require": ["spf", "dmarc"],
+      "severity": "high",
+      "note": "Sending domains must publish SPF and DMARC. Switch the domain list to the stream registry when #23585 lands."
+    },
+    "production-build": {
+      "domain": "deploy-env-and-build",
+      "url": "https://jov.ie/api/health/build-info",
+      "repo": "JovieInc/Jovie",
+      "maxBehindCommits": 60,
+      "maxAgeHours": 24,
+      "severity": "high",
+      "note": "Production must not trail main by more than this; merged-but-unreleased state is drift."
+    },
+    "vercel-env-names": {
+      "domain": "deploy-env-and-build",
+      "covered": "scripts/credentials-spend-check.mjs",
+      "note": "Vercel env names are compared with the credentials registry by the daily credentials check (unclaimed secret names); this map points to it instead of duplicating it."
+    },
+    "model-lists": {
+      "domain": "models-and-prices",
+      "covered": "opus/model-registry-sync",
+      "note": "Provider model lists are checked by the model-registry-sync worker."
+    }
+  }
 }
