@@ -3104,6 +3104,58 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         self.assertEqual(events.repair_evidence_body(self.PR, updated,
                                                    customer_decision={"releaseWorthy": False}), updated)
 
+    def test_fenced_log_headings_preserve_existing_red_evidence(self):
+        bodies = []
+        for fence in ("```", "~~~"):
+            # The evidence itself uses a supported text fence. Tilde fences in
+            # the summary must not create a fake Red-before-green section.
+            body = (f"## Summary\n{fence}text\n## Red-before-green\n{fence}\n\n"
+                    "<!-- hidden\n## Hidden heading\n-->\n"
+                    "## Red-before-green\n- Failing command: `node --test`\n"
+                    "```text\n# captured shell comment\nFAIL cold start\n```\n\n"
+                    "## Verification\nKeep this.\n"
+                    '<!-- customer-changelog/v1 {"releaseWorthy":false} -->\n')
+            with self.subTest(fence=fence):
+                self.assertTrue(events.red_section_complete(body))
+                self.assertEqual(events.repair_evidence_body(self.PR, body,
+                                 customer_decision={"releaseWorthy": False}), body)
+                bodies.append(body)
+        # The JS gate is the independent consumer of the repaired Markdown.
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+console.log(JSON.stringify(JSON.parse(readFileSync(0, 'utf8')).map(body =>
+  evaluateFleetRules({pr: {title: 'fix(ovie): delivery evidence', body}, files: []}).errors)));
+"""], cwd=ROOT, input=json.dumps(bodies), text=True, capture_output=True, check=True, timeout=15)
+        self.assertEqual(json.loads(checked.stdout), [[], []])
+
+    def test_replacing_incomplete_red_section_does_not_leave_orphaned_logs(self):
+        for following in ("", "\n## Verification\nKeep this.\n"):
+            original = ("<!-- hidden\n## Red-before-green\n-->\n"
+                        "## Summary\nKeep this too.\n\n## Red-before-green\n"
+                        "- Failing command: <cmd>\n```text\n# shell comment\nFAIL old log\n```\n"
+                        + following)
+            updated = events.repair_evidence_body(self.PR, original,
+                                                 customer_decision={"releaseWorthy": False})
+            self.assertTrue(events.red_section_complete(updated))
+            self.assertNotIn("FAIL old log", updated)
+            self.assertIn("<!-- hidden\n## Red-before-green\n-->", updated)
+            self.assertIn("## Summary\nKeep this too.", updated)
+            if following:
+                self.assertIn(following, updated)
+            self.assertEqual(events.repair_evidence_body(self.PR, updated,
+                             customer_decision={"releaseWorthy": False}), updated)
+
+    def test_hidden_and_fenced_red_headings_cannot_supply_evidence(self):
+        red = events.red_before_green_block(self.PR)
+        for body in (f"<!--\n{red}\n-->", f"```markdown\n{red}\n```",
+                     "## Summary\nNo evidence."):
+            with self.subTest(body=body):
+                self.assertFalse(events.red_section_complete(body))
+                updated = events.repair_evidence_body(self.PR, body)
+                self.assertTrue(updated.startswith(body))
+                self.assertTrue(events.red_section_complete(updated))
+
     def test_explicit_locking_pr_repairs_missing_provenance_and_passes_fleet(self):
         body = events.red_before_green_block(self.PR)
         updated = events.repair_evidence_body(self.PR, body, locking_pr=23295,
