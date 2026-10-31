@@ -36,6 +36,7 @@ import { lintPrBody } from './lib/preflight-changed.mjs';
 import { requiresWin } from './lib/wins-ledger.mjs';
 import { evaluateFleetRules, isLockedArea } from './pr-fleet-rules.mjs';
 
+const PR_URL_PLACEHOLDER = '<PR URL, set after open>';
 export const CUSTOMER_MARKER =
   '<!-- customer-changelog/v1 {"releaseWorthy":false} -->';
 const REPAIR_TITLE = /^fix(?:\([^\n)]+\))?!?:/i;
@@ -92,7 +93,7 @@ export function draftBody({
   failingCommand,
   failingRun,
   customerVisible,
-  prUrl = '<PR URL, set after open>',
+  prUrl = PR_URL_PLACEHOLDER,
 }) {
   const paths = files.map(f => f.filename);
   const out = [summary || '<what changed and why, 1-3 sentences>'];
@@ -147,7 +148,12 @@ export function gate({ title, body, labels = [], files, extra = [] }) {
     ...extra,
     ...[...body.matchAll(/<[^<>\n]{3,}>/g)]
       .map(m => m[0])
-      .filter(t => !/^<(?:!--|\/?\w+[\s/>])/.test(t) && !/^<https?:/.test(t))
+      .filter(
+        t =>
+          t !== PR_URL_PLACEHOLDER &&
+          !/^<(?:!--|\/?[a-z][a-z0-9-]*(?:\s+[\w-]+=|\s*\/?>))/.test(t) &&
+          !/^<https?:/.test(t)
+      )
       .map(t => `placeholder: replace ${t} with real content`),
   ];
   return { errors, warnings: lint.warnings.map(w => w.message) };
@@ -350,7 +356,14 @@ export async function main(argv = process.argv.slice(2), log = console.log) {
     ...(a.draft ? ['--draft'] : []),
     ...labels.flatMap(l => ['--label', l]),
   ];
-  return run('gh', create, { cwd: a.repo, stdio: 'inherit' }).status ?? 1;
+  const made = run('gh', create, { cwd: a.repo, encoding: 'utf8' });
+  log((made.stdout || made.stderr).trim());
+  const url = made.stdout.trim().split('\n').pop();
+  if (made.status === 0 && body.includes(PR_URL_PLACEHOLDER)) {
+    writeFileSync(bodyFile, body.replaceAll(PR_URL_PLACEHOLDER, url));
+    run('gh', ['pr', 'edit', url, '--body-file', bodyFile], { cwd: a.repo });
+  }
+  return made.status ?? 1;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)

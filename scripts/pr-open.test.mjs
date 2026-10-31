@@ -88,3 +88,11 @@ test('customer-facing code gets the internal marker unless declared customer-vis
     /releaseWorthy":false/
   );
 });
+
+test('unfilled <placeholders> with spaces are rejected, real HTML tags are not', () => {
+  const files = [file('scripts/x.mjs')];
+  const body = `${draftBody({ title: 'chore: a', files, summary: 'x' })}\n<what changed and why>\n<details open>`;
+  const errors = gate({ title: 'chore: a', body, files }).errors;
+  assert.ok(errors.some(e => e.includes('<what changed and why>')));
+  assert.ok(!errors.some(e => e.includes('<details open>')));
+});
