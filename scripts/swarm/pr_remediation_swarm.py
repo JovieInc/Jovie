@@ -865,8 +865,11 @@ def gh_version() -> str:
 
 def cmd_smoke(a) -> int:
     """Runner-side canary for the log path: log the gh version and fetch a known completed job's log
-    through the exact production fetch. Exits 1 (no fan-out) if the log is empty, so client drift
-    (e.g. gh refusing escape sequences) fails loudly here instead of silently skipping every PR."""
+    through the exact production fetch. Exits 1 (no fan-out) if no readable log can be found, so
+    client drift (e.g. gh refusing escape sequences) fails loudly here instead of silently skipping
+    every PR. The scan is deliberately wide (50 runs, all jobs per run): at this repo's run rate the
+    newest completed runs are mostly skipped/cancelled event handlers and the newest eligible jobs
+    may still be uploading logs, so a narrow window gives false negatives (run 40936622218)."""
     version = gh_version()
     parts = tuple(int(x) for x in re.findall(r"\d+", version)[:3]) or (0,)
     print(f"gh version {version} (minimum {'.'.join(map(str, MIN_GH))})")
@@ -874,15 +877,20 @@ def cmd_smoke(a) -> int:
     if parts < MIN_GH:
         print(f"::error title=swarm smoke::gh {version} is older than the supported minimum")
         return 1
-    runs = gh_json(["api", f"repos/{REPO}/actions/runs?status=completed&per_page=20"], priority="report")["workflow_runs"]
-    tried = 0
+    runs = gh_json(["api", f"repos/{REPO}/actions/runs?status=completed&per_page=50"], priority="report")["workflow_runs"]
+    conclusions: dict[str, int] = {}
+    eligible_runs = eligible_jobs = tried = 0
     for run in runs:
-        if run.get("conclusion") not in {"success", "failure"}:
+        conc = run.get("conclusion") or "none"
+        conclusions[conc] = conclusions.get(conc, 0) + 1
+        if conc not in {"success", "failure"}:
             continue
-        jobs = gh_json(["api", f"repos/{REPO}/actions/runs/{run['id']}/jobs?per_page=10"], priority="report")["jobs"]
-        for job in jobs:
-            if job.get("conclusion") not in {"success", "failure"} or not job.get("started_at"):
-                continue  # skipped/cancelled jobs have no log to read
+        jobs = gh_json(["api", f"repos/{REPO}/actions/runs/{run['id']}/jobs?per_page=100"], priority="report")["jobs"]
+        eligible = [j for j in jobs if j.get("conclusion") in {"success", "failure"} and j.get("started_at")]
+        if eligible:
+            eligible_runs += 1
+        for job in eligible:
+            eligible_jobs += 1
             log = fetch_job_log(job["id"])
             size = len(log.stdout or "")
             tried += 1
@@ -892,7 +900,9 @@ def cmd_smoke(a) -> int:
             if "escape" in (log.stderr or "") or tried >= 6:
                 print(f"::error title=swarm smoke::job log fetch returned rc={log.returncode} bytes={size}; gh {version} cannot read job logs")
                 return 1
-    print("::error title=swarm smoke::no readable completed job log to smoke-test the log fetch")
+    print(f"::error title=swarm smoke::no readable completed job log to smoke-test the log fetch "
+          f"(scanned {len(runs)} recent completed runs, conclusions={json.dumps(conclusions, sort_keys=True)}, "
+          f"eligible_runs={eligible_runs}, eligible_jobs={eligible_jobs}, log_attempts={tried})")
     return 1
 
 
