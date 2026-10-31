@@ -14,6 +14,7 @@ Machine-readable map: [`sources-of-truth.json`](./sources-of-truth.json). Rule f
 | Entitlements and plan limits | file | `apps/web/lib/entitlements/registry.ts` | `apps/web/lib/entitlements/server.ts`<br>`apps/web/lib/rate-limit/config.ts`<br>`apps/web/data/marketingPricingPlans.ts` | - |
 | Feature flags | file | `apps/web/lib/flags/registry.ts` | `apps/web/lib/flags/code-flags.ts`<br>`apps/web/lib/db/schema/feature-flags.ts` | - |
 | Rate limits and API budgets | file | `apps/web/lib/rate-limit/config.ts` (moves to #23531) | `apps/web/lib/auth/rate-limit-rules.ts`<br>`packages/api-client/providers.json` | - |
+| Which provider serves which model call (Gateway vs Workers AI) | file | `apps/web/lib/ai/routing.json` | `apps/web/lib/ai/routing.ts`<br>`apps/web/lib/ai/sdk.ts` | (Summer mirror: apps/summer/PROVIDER_FALLBACK.md in summer-config) AI Gateway /v1/report, Cloudflare Workers AI analytics, relay /health and Vercel env flags, proven by scripts/ai-routing-check.mjs |
 | Credentials and spend | file | `ops/registry/credentials.json` | `ops/registry/spend.json`<br>`.github/preview-env-registry.json` | - |
 | Automations (crons, workflows, lanes clocks) | file | `canon/automation-registry.jsonl` | `docs/CRON_REGISTRY.md`<br>`vercel.json`<br>`apps/web/vercel.json` | - |
 | Design tokens | file | `apps/web/design/tokens.json` | `design.tokens.json`<br>`canon/DESIGN.md` | - |
@@ -37,6 +38,7 @@ Machine-readable map: [`sources-of-truth.json`](./sources-of-truth.json). Rule f
 - **Entitlements and plan limits.** Plan features and numeric limits per plan; server gates, usePlanGate, pricing page and rate limits derive from it.
 - **Feature flags.** Flag keys and defaults. Runtime overrides live in the feature-flags table and Statsig.
 - **Rate limits and API budgets.** Web request limits today. PR #23531 adds the outbound API rate-limit registry and headroom file; when it lands, point this owner at it.
+- **Which provider serves which model call (Gateway vs Workers AI).** Per-caller route (workers-first, gateway-first, gateway-only), models, Gateway key and $/day ceiling. Runtime routing reads it; docs, memory and prose must not restate it.
 - **Credentials and spend.** Metadata only. Spend caps and runway in ops/registry/spend.json; checked daily by scripts/credentials-spend-check.mjs.
 - **Automations (crons, workflows, lanes clocks).** One line per automation; CI fails on a cron with no live entry.
 - **Design tokens.** Machine-readable token source; the repo-root export and CSS are generated from it.
