@@ -35,9 +35,8 @@ const { summerCardInputSchema } = await import('./summer-cards');
 const { summerCardId, summerCardPayloadDigest } = await import(
   './summer-card-digest'
 );
-const { decideSummerCard, submitSummerCard } = await import(
-  './summer-cards.server'
-);
+const { decideSummerCard, submitSummerCard, supersedeSummerCard } =
+  await import('./summer-cards.server');
 
 const NOW = new Date('2026-09-26T10:00:00.000Z');
 
@@ -161,6 +160,99 @@ describe('summer card store', () => {
         value: expect.objectContaining({ decidedBy: 'founder@jov.ie' }),
       })
     );
+  });
+
+  it('supersedes a decision card whose premise is gone, recording the system and the reason', async () => {
+    hoisted.selectLimit.mockResolvedValue([
+      { value: stored({ kind: 'decision' }) },
+    ]);
+    hoisted.updateReturning.mockResolvedValue([{ key: 'k' }]);
+    const result = await supersedeSummerCard(
+      { id: stored().id, reason: 'no human holds exist' },
+      new Date('2026-09-26T11:00:00.000Z')
+    );
+    expect(result).toMatchObject({
+      outcome: 'superseded',
+      card: { status: 'rejected', resolution: 'default' },
+    });
+    expect(hoisted.updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        value: expect.objectContaining({
+          decidedBy: 'premise-superseded',
+          comment: expect.stringContaining('No action taken'),
+        }),
+      })
+    );
+  });
+
+  it.each(['spend', 'outbound'])('never supersedes a %s card', async kind => {
+    hoisted.updateSet.mockClear();
+    hoisted.selectLimit.mockResolvedValue([{ value: stored({ kind }) }]);
+    expect(
+      await supersedeSummerCard({ id: stored().id, reason: 'premise gone now' })
+    ).toEqual({ outcome: 'reserved', kind });
+    expect(hoisted.updateSet).not.toHaveBeenCalled();
+  });
+
+  it('reports a missing card without attempting to supersede it', async () => {
+    hoisted.selectLimit.mockResolvedValue([]);
+    await expect(
+      supersedeSummerCard({ id: stored().id, reason: 'premise gone now' })
+    ).resolves.toEqual({ outcome: 'not_found' });
+    expect(hoisted.updateSet).not.toHaveBeenCalled();
+  });
+
+  it.each(['decision', 'taste'])(
+    'preserves %s cards that require an explicit founder decision',
+    async kind => {
+      hoisted.updateReturning.mockResolvedValue([{ key: 'k' }]);
+      hoisted.selectLimit.mockResolvedValue([
+        { value: stored({ kind, defaultDecision: 'none' }) },
+      ]);
+      await expect(
+        supersedeSummerCard({ id: stored().id, reason: 'premise gone now' })
+      ).resolves.toEqual({ outcome: 'reserved', kind });
+      expect(hoisted.updateSet).not.toHaveBeenCalled();
+    }
+  );
+
+  it('preserves a card already decided by the founder', async () => {
+    hoisted.selectLimit.mockResolvedValue([
+      { value: stored({ kind: 'decision', status: 'approved' }) },
+    ]);
+    await expect(
+      supersedeSummerCard({ id: stored().id, reason: 'premise gone now' })
+    ).resolves.toMatchObject({
+      outcome: 'already_decided',
+      card: { status: 'approved' },
+    });
+    expect(hoisted.updateSet).not.toHaveBeenCalled();
+  });
+
+  it('returns the founder decision that wins a supersede race', async () => {
+    hoisted.selectLimit
+      .mockResolvedValueOnce([{ value: stored({ kind: 'decision' }) }])
+      .mockResolvedValueOnce([{ value: stored({ kind: 'decision' }) }])
+      .mockResolvedValueOnce([
+        { value: stored({ kind: 'decision', status: 'approved' }) },
+      ]);
+    hoisted.updateReturning.mockResolvedValue([]);
+    await expect(
+      supersedeSummerCard({ id: stored().id, reason: 'premise gone now' })
+    ).resolves.toMatchObject({
+      outcome: 'already_decided',
+      card: { status: 'approved' },
+    });
+  });
+
+  it('reports a card removed while its supersede decision is being recorded', async () => {
+    hoisted.selectLimit
+      .mockResolvedValueOnce([{ value: stored({ kind: 'decision' }) }])
+      .mockResolvedValueOnce([]);
+    await expect(
+      supersedeSummerCard({ id: stored().id, reason: 'premise gone now' })
+    ).resolves.toEqual({ outcome: 'not_found' });
+    expect(hoisted.updateSet).not.toHaveBeenCalled();
   });
 
   it('never overwrites an already-decided card', async () => {
