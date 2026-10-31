@@ -47,7 +47,6 @@
     "ci.yml#ci-test-performance",
     "ci.yml#ci-pr-vercel-preview",
     "ci.yml#ci-merge-group-ready",
-    "ci.yml#ci-pr-ready",
     "ci.yml#ci-summary",
     "ci.yml#security-gate",
     "ci.yml#main-release-ready",

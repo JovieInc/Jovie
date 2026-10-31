@@ -191,7 +191,7 @@ jobs:
          (github.event.workflow_run.event == 'pull_request' ||
           github.event.workflow_run.event == 'pull_request_target'))
       )
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read

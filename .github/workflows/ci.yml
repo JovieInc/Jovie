@@ -7916,7 +7916,7 @@ jobs:
     # separately required ruleset contexts.
     needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare, ci-slop-guard, ci-storybook-surfaces]
     if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
       - name: Evaluate deterministic source PR checks
