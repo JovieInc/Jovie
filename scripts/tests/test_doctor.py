@@ -2571,6 +2571,52 @@ class PublishTest(unittest.TestCase):
             self.assertNotIn(key, public, "refusal cannot manufacture a healthy empty fleet")
         self.assertEqual(json.loads(self.api.files["lanes-status-details.json"]), feed)
 
+    def test_essential_oversize_keeps_hosted_heartbeat_paths_readable(self):
+        # JOV-9115: during the 2026-10-25 13:50-17:41Z oversize window the refusal dropped every
+        # heartbeat path, and the hosted dead-man read "heartbeat-source-missing" for both
+        # gist-backed entries while the lanes tick kept publishing on schedule.
+        feed = self.feed(0)
+        feed["conditions"]["source-unknown"]["evidence"] = "x" * (256 * 1024)
+        feed["deployHealth"] = {"schema": "jovie-deploy-health/v1", "observedAt": "2026-10-25T17:45:48Z",
+                                "healthy": True, "limits": {}, "lag": {},
+                                "repos": {"JovieInc/Jovie": {"status": "ok", "failedStreak": 0}}}
+        doctor.publish_status(self.host, self.lane, feed)
+        public = json.loads(self.api.files["lanes-status.json"])
+        self.assertEqual(public["status"], "unavailable")
+        self.assertEqual(public["reason"], "essential-public-feed-exceeds-byte-limit")
+        self.assertEqual(public["at"], feed["at"], "gem:lanes-tick reads `at` from this gist")
+        self.assertEqual(public["deployHealth"], feed["deployHealth"],
+                         "gem:deploy-health reads deployHealth.observedAt/.healthy from this gist")
+        for key in ("running", "idle", "pool", "lanes", "alerts", "conditions"):
+            self.assertNotIn(key, public, "refusal cannot manufacture a healthy empty fleet")
+        self.assertLessEqual(len(self.api.files["lanes-status.json"].encode("utf-8")), 256 * 1024)
+        self.assertEqual(json.loads(self.api.files["lanes-status-details.json"]), feed)
+
+    def test_an_oversize_heartbeat_block_is_refused_whole_never_trimmed(self):
+        feed = self.feed(0)
+        feed["conditions"]["source-unknown"]["evidence"] = "x" * (256 * 1024)
+        feed["deployHealth"] = {"observedAt": "2026-10-25T17:45:48Z", "healthy": False,
+                                "repos": {"JovieInc/Jovie": {"status": "failing", "evidence": "z" * (256 * 1024)}}}
+        doctor.publish_status(self.host, self.lane, feed)
+        public = json.loads(self.api.files["lanes-status.json"])
+        self.assertEqual(public["status"], "unavailable")
+        self.assertLessEqual(len(self.api.files["lanes-status.json"].encode("utf-8")), 256 * 1024)
+        self.assertNotIn("deployHealth", public, "a block that cannot fit is refused whole")
+        self.assertEqual(public["at"], feed["at"], "a fitting heartbeat path survives an oversize sibling")
+
+    def test_hosted_heartbeat_keys_cover_every_gist_receipt_in_the_registry(self):
+        roots = set()
+        with (ROOT / "canon" / "automation-registry.jsonl").open() as handle:
+            for line in handle:
+                entry = json.loads(line)
+                receipt = entry.get("receipt") or {}
+                if (entry.get("status") == "live" and receipt.get("kind") == "json-timestamp"
+                        and "gist" in (receipt.get("url") or "")):
+                    roots.add(str(receipt["path"]).split(".")[0])
+        self.assertLessEqual(roots, set(doctor.HEARTBEAT_FEED_KEYS),
+                             "a hosted gist heartbeat path must survive the oversize refusal: "
+                             f"add {sorted(roots - set(doctor.HEARTBEAT_FEED_KEYS))} to HEARTBEAT_FEED_KEYS")
+
     def test_utf8_limit_counts_bytes_and_preserves_full_multibyte_evidence(self):
         feed = self.feed(0)
         feed["conditions"]["source-unknown"]["evidence"] = "界" * 100_000
