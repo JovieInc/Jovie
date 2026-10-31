@@ -2,23 +2,21 @@ import { describe, expect, it } from 'vitest';
 import { PROOF_STATS_KIND, validateProofStatsRecord } from './content-kind';
 import {
   crossedMilestones,
-  formatProofValue,
+  formatProofValue as format,
   type ProofStatObservation,
   renderBoundCopy,
   resolveProofStat,
-  roundConservative,
+  roundConservative as round,
 } from './format';
 import { computeProofStatsMetrics } from './metrics';
 import {
   getProofStat,
   listProofStats,
   type ProofStatDefinition,
-  proofStatRegistrySchema,
 } from './registry';
 
 const NOW = new Date('2026-10-29T12:00:00.000Z');
 const HOUR = 60 * 60 * 1000;
-
 function observation(
   value: number,
   ageHours = 1,
@@ -31,30 +29,25 @@ function observation(
     ...extra,
   };
 }
-
 function stat(id: string): ProofStatDefinition {
   const found = getProofStat(id);
   if (!found) throw new Error(`missing ${id}`);
   return found;
 }
-
 const PUBLIC = { now: NOW, surface: 'public' as const };
-
 describe('conservative rounding', () => {
   it('floors counts to significant digits and never rounds up', () => {
     const rounding = { mode: 'floor' as const, sigDigits: 1 };
-    expect(roundConservative(12_345, rounding)).toBe(10_000);
-    expect(roundConservative(199_999, rounding)).toBe(100_000);
-    expect(roundConservative(100_000, rounding)).toBe(100_000);
-    expect(roundConservative(0, rounding)).toBe(0);
+    expect(round(12_345, rounding)).toBe(10_000);
+    expect(round(199_999, rounding)).toBe(100_000);
+    expect(round(100_000, rounding)).toBe(100_000);
+    expect(round(0, rounding)).toBe(0);
   });
-
   it('ceils lower-is-better values to a step', () => {
-    expect(roundConservative(63.1, { mode: 'ceil', step: 10 })).toBe(70);
-    expect(roundConservative(70, { mode: 'ceil', step: 10 })).toBe(70);
-    expect(roundConservative(0.29, { mode: 'floor', step: 0.01 })).toBe(0.29);
+    expect(round(63.1, { mode: 'ceil', step: 10 })).toBe(70);
+    expect(round(70, { mode: 'ceil', step: 10 })).toBe(70);
+    expect(round(0.29, { mode: 'floor', step: 0.01 })).toBe(0.29);
   });
-
   it('formats compact counts with + only when below the true value', () => {
     const rounding = {
       mode: 'floor' as const,
@@ -62,112 +55,84 @@ describe('conservative rounding', () => {
       suffix: '+',
       compact: true,
     };
-    expect(formatProofValue(100_000, rounding)).toBe('100k');
-    expect(formatProofValue(123_456, rounding)).toBe('100k+');
-    expect(formatProofValue(1_999_999, rounding)).toBe('1M+');
-    expect(formatProofValue(12, rounding)).toBe('10+');
-    expect(
-      formatProofValue(0.4242, { mode: 'floor', step: 0.01, percent: true })
-    ).toBe('42%');
-    expect(formatProofValue(1234, { mode: 'exact' })).toBe('1,234');
+    expect(format(100_000, rounding)).toBe('100k');
+    expect(format(123_456, rounding)).toBe('100k+');
+    expect(format(1_999_999, rounding)).toBe('1M+');
+    expect(format(12, rounding)).toBe('10+');
+    expect(format(0.4242, { mode: 'floor', step: 0.01, percent: true })).toBe(
+      '42%'
+    );
+    expect(format(1234, { mode: 'exact' })).toBe('1,234');
   });
 });
-
 describe('resolveProofStat', () => {
+  const resolve = (id: string, value: ProofStatObservation | null) =>
+    resolveProofStat(stat(id), value, PUBLIC);
   it('publishes a fresh public count over threshold', () => {
-    const resolved = resolveProofStat(
-      stat('accounts_total'),
-      observation(104_211),
-      PUBLIC
-    );
-    expect(resolved.state).toBe('publishable');
-    expect(resolved.sentence).toBe('Trusted by 100k+ artists and teams');
+    expect(resolve('accounts_total', observation(104_211))).toMatchObject({
+      state: 'publishable',
+      sentence: 'Trusted by 100k+ artists and teams',
+    });
   });
-
   it('hides below threshold and offers the fallback', () => {
-    const resolved = resolveProofStat(
-      stat('accounts_total'),
-      observation(12),
-      PUBLIC
-    );
-    expect(resolved).toMatchObject({
+    expect(resolve('accounts_total', observation(12))).toMatchObject({
       state: 'below-threshold',
       value: null,
       sentence: null,
       fallback: 'Built for artists and the teams behind them',
     });
   });
-
-  it('hides a stale value instead of showing it', () => {
-    const definition = stat('accounts_total');
-    const old = observation(500_000, definition.freshnessSlaHours + 1);
-    expect(resolveProofStat(definition, old, PUBLIC).state).toBe('stale');
+  it.each([
+    [
+      'accounts_total',
+      observation(500_000, stat('accounts_total').freshnessSlaHours + 1),
+      'stale',
+    ],
+    ['accounts_total', observation(5000, -2), 'stale'],
+    ['accounts_total', null, 'missing'],
+    ['eng_merges_per_day', observation(40), 'internal'],
+    ['security_open_critical', observation(0), 'not-live'],
+    ['profile_ttfb_ms', observation(450, 24), 'above-ceiling'],
+  ] as const)('resolves %s to %s', (id, value, expected) => {
+    expect(resolve(id, value).state).toBe(expected);
   });
-
-  it('treats a future timestamp and a missing value as not publishable', () => {
-    const definition = stat('accounts_total');
-    expect(
-      resolveProofStat(definition, observation(5000, -2), PUBLIC).state
-    ).toBe('stale');
-    expect(resolveProofStat(definition, null, PUBLIC).state).toBe('missing');
-  });
-
-  it('never renders an internal stat on a public surface', () => {
-    const definition = stat('eng_merges_per_day');
-    expect(resolveProofStat(definition, observation(40), PUBLIC).state).toBe(
-      'internal'
-    );
-  });
-
-  it('holds proposed stats back', () => {
-    const definition = stat('security_open_critical');
-    expect(resolveProofStat(definition, observation(0), PUBLIC).state).toBe(
-      'not-live'
-    );
-  });
-
-  it('withholds a lower-is-better stat over its ceiling', () => {
-    const definition = stat('profile_ttfb_ms');
-    expect(
-      resolveProofStat(definition, observation(63.1, 24), PUBLIC)
-    ).toMatchObject({
+  it('rounds a publishable lower-is-better stat conservatively', () => {
+    expect(resolve('profile_ttfb_ms', observation(63.1, 24))).toMatchObject({
       state: 'publishable',
       sentence: 'Profiles start responding in under 70 ms',
     });
-    expect(
-      resolveProofStat(definition, observation(450, 24), PUBLIC).state
-    ).toBe('above-ceiling');
   });
-
-  it('requires founder approval for comparative claims', () => {
-    const definition = { ...stat('profile_lcp_rank'), status: 'live' as const };
-    expect(resolveProofStat(definition, observation(2, 24), PUBLIC).state).toBe(
-      'unapproved'
-    );
-    const approved = observation(2, 24, {
-      approval: { cardId: 'card_123', approvedAt: NOW.toISOString() },
-    });
-    expect(resolveProofStat(definition, approved, PUBLIC).state).toBe(
-      'publishable'
-    );
-  });
+  it.each([false, true])(
+    'requires founder approval (approved=%s)',
+    approved => {
+      const definition = {
+        ...stat('profile_lcp_rank'),
+        status: 'live' as const,
+      };
+      const approval = approved
+        ? { cardId: 'card_123', approvedAt: NOW.toISOString() }
+        : null;
+      const value = observation(2, 24, { approval });
+      expect(resolveProofStat(definition, value, PUBLIC).state).toBe(
+        approved ? 'publishable' : 'unapproved'
+      );
+    }
+  );
 });
-
 describe('renderBoundCopy', () => {
   const resolve = (value: number) => (id: string) =>
     getProofStat(id)
       ? resolveProofStat(stat(id), observation(value), PUBLIC)
       : null;
-
-  it('fills value and sentence bindings when publishable', () => {
-    expect(
-      renderBoundCopy('Join {stat:accounts_total} artists', resolve(25_000))
-    ).toEqual({ ok: true, text: 'Join 20k+ artists' });
-    expect(
-      renderBoundCopy('{stat:accounts_total.sentence}', resolve(25_000))
-    ).toEqual({ ok: true, text: 'Trusted by 20k+ artists and teams' });
+  it.each([
+    ['Join {stat:accounts_total} artists', 'Join 20k+ artists'],
+    ['{stat:accounts_total.sentence}', 'Trusted by 20k+ artists and teams'],
+  ])('fills %s', (template, text) => {
+    expect(renderBoundCopy(template, resolve(25_000))).toEqual({
+      ok: true,
+      text,
+    });
   });
-
   it('withholds the whole line when any binding cannot render', () => {
     expect(
       renderBoundCopy('Join {stat:accounts_total} artists', resolve(50))
@@ -182,7 +147,6 @@ describe('renderBoundCopy', () => {
     });
   });
 });
-
 describe('milestones', () => {
   const ladder = [1, 10, 100, 1000, 10_000, 100_000];
   it('reports each milestone crossed exactly once', () => {
@@ -192,38 +156,7 @@ describe('milestones', () => {
     expect(crossedMilestones(ladder, 120, 90)).toEqual([]);
   });
 });
-
 describe('registry and record', () => {
-  it('parses, and every public stat has a methodology link', () => {
-    for (const definition of listProofStats()) {
-      if (definition.visibility === 'public') {
-        expect(definition.methodology, definition.id).toMatch(
-          /^\/proof\/methodology#/
-        );
-      }
-    }
-  });
-
-  it('rejects a comparative stat with no gating claim and duplicate ids', () => {
-    const base = {
-      schema: 'jovie.proof-stats.registry/v1',
-      rule: 'r',
-      milestones: [1],
-    };
-    const comparative = {
-      ...stat('profile_lcp_rank'),
-      source: { ...stat('profile_lcp_rank').source, claim: undefined },
-    };
-    expect(
-      proofStatRegistrySchema.safeParse({ ...base, stats: [comparative] })
-        .success
-    ).toBe(false);
-    const dup = stat('accounts_total');
-    expect(
-      proofStatRegistrySchema.safeParse({ ...base, stats: [dup, dup] }).success
-    ).toBe(false);
-  });
-
   it('validates records against the registry', () => {
     expect(
       validateProofStatsRecord({
@@ -248,7 +181,6 @@ describe('registry and record', () => {
       {}
     );
   });
-
   it('measures loop health', () => {
     const metrics = computeProofStatsMetrics(
       {

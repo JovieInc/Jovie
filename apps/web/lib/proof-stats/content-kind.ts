@@ -2,18 +2,9 @@ import { z } from 'zod';
 import type { ContentKindDefinition } from '@/lib/content-records/kind';
 import { getProofStat } from './registry';
 
-/**
- * Observations live in the versioned content-record store
- * (`proof-stats/observations`): every refresh is an immutable version with an
- * audit event, so each published number has a dated history and a rollback.
- * The record holds values only; definitions stay in the registry file.
- */
-
 export const PROOF_STATS_KIND_ID = 'proof-stats';
 export const PROOF_STATS_KEY = 'observations';
-
 const isoDate = z.string().datetime({ offset: true });
-
 export const proofStatObservationSchema = z
   .object({
     value: z.number().finite().min(0),
@@ -27,37 +18,23 @@ export const proofStatObservationSchema = z
       .optional(),
   })
   .strict();
-
-/**
- * Events Summer consumes (win texts, freshness alarms). Kept to the last
- * PROOF_STATS_EVENT_LIMIT; ids are stable so a consumer dedupes on them.
- */
 export const PROOF_STATS_EVENT_LIMIT = 50;
-
 export const proofStatEventSchema = z
   .object({
     id: z.string().regex(/^[a-z0-9_:.-]{8,160}$/u),
     type: z.enum(['milestone', 'published', 'withdrawn']),
     statId: z.string(),
-    /** Milestone crossed, or the value at the transition. */
     value: z.number().finite(),
-    /** Withdrawn: the state that hid it (stale, below-threshold...). */
     reason: z.string().max(40).nullable(),
     at: isoDate,
   })
   .strict();
-
 export type ProofStatEvent = z.infer<typeof proofStatEventSchema>;
-
 export const proofStatsRecordSchema = z
   .object({
     schemaVersion: z.literal(1),
     observations: z.record(z.string(), proofStatObservationSchema),
-    /**
-     * Stat ids that were publishable when this version was written. A change
-     * (stale, below threshold) writes a new version, which expires the cache
-     * tag so cached pages re-render without the number.
-     */
+    /** A state change publishes a version and invalidates the shared cache tag. */
     publishable: z.array(z.string()).default([]),
     events: z
       .array(proofStatEventSchema)
@@ -65,9 +42,7 @@ export const proofStatsRecordSchema = z
       .default([]),
   })
   .strict();
-
 export type ProofStatsRecord = z.infer<typeof proofStatsRecordSchema>;
-
 export function validateProofStatsRecord(data: ProofStatsRecord): string[] {
   const errors: string[] = [];
   for (const [id, observation] of Object.entries(data.observations)) {
@@ -87,13 +62,11 @@ export function validateProofStatsRecord(data: ProofStatsRecord): string[] {
   }
   return errors;
 }
-
 export const PROOF_STATS_KIND: ContentKindDefinition<ProofStatsRecord> = {
   kind: PROOF_STATS_KIND_ID,
   schemaVersion: 1,
   schema: proofStatsRecordSchema,
   keys: [PROOF_STATS_KEY],
-  // No observations: every stat resolves to `missing` and hides.
   defaultRecord: () => ({
     schemaVersion: 1,
     observations: {},
@@ -101,9 +74,6 @@ export const PROOF_STATS_KIND: ContentKindDefinition<ProofStatsRecord> = {
     events: [],
   }),
   validate: data => validateProofStatsRecord(data),
-  // Pages read through the cache tag; no path list to keep in sync.
   livePaths: () => [],
-  // Values come from measurement (lib/proof-stats/publish.server.ts), never
-  // from a hand-written draft through the generic content API.
   apiWritable: false,
 };

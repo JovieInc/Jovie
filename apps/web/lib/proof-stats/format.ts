@@ -1,19 +1,10 @@
 import type { ProofStatDefinition } from './registry';
 
-/**
- * Pure stat resolution: definition + latest observation + now -> what a
- * surface may render. Every path that is not provably true and current
- * returns a non-publishable state, so components hide or fall back instead
- * of showing a stale or false number.
- */
-
 export interface ProofStatObservation {
   readonly value: number;
   /** ISO time the value was measured (not when it was stored). */
   readonly measuredAt: string;
-  /** Producer, e.g. `cron:proof-stats`, `workflow:public-benchmark`. */
   readonly source: string;
-  /** Link or id of the evidence (benchmark receipt, run URL). */
   readonly receipt?: string | null;
   /** Founder approval for comparative/health claims (Summer card id). */
   readonly approval?: {
@@ -21,7 +12,6 @@ export interface ProofStatObservation {
     readonly approvedAt: string;
   } | null;
 }
-
 export type ProofStatState =
   | 'publishable'
   | 'missing'
@@ -31,29 +21,21 @@ export type ProofStatState =
   | 'internal'
   | 'unapproved'
   | 'not-live';
-
 export interface ResolvedProofStat {
   readonly id: string;
   readonly state: ProofStatState;
-  /** Formatted value ("100k+"), only when publishable. */
   readonly value: string | null;
-  /** Full sentence ("Trusted by 100k+ artists and teams"), only when publishable. */
   readonly sentence: string | null;
-  /** Registry fallback copy, offered when not publishable. */
   readonly fallback: string | null;
   readonly label: string;
   readonly methodology: string | null;
   readonly measuredAt: string | null;
   readonly rawValue: number | null;
 }
-
 const HOUR_MS = 60 * 60 * 1000;
-
 function trimZeros(text: string): string {
   return text.includes('.') ? text.replace(/\.?0+$/u, '') : text;
 }
-
-/** Round in the direction that never overstates the claim. */
 export function roundConservative(
   value: number,
   rounding: ProofStatDefinition['display']['rounding']
@@ -71,7 +53,6 @@ export function roundConservative(
     10 ** (Math.floor(Math.log10(Math.abs(value))) - digits + 1);
   return fn(value / magnitude) * magnitude;
 }
-
 function compactNumber(value: number): string {
   const units: ReadonlyArray<readonly [number, string]> = [
     [1e9, 'B'],
@@ -86,7 +67,6 @@ function compactNumber(value: number): string {
   }
   return value.toLocaleString('en-US');
 }
-
 export function formatProofValue(
   value: number,
   rounding: ProofStatDefinition['display']['rounding']
@@ -104,7 +84,6 @@ export function formatProofValue(
   const plus = rounding.suffix === '+' && rounded < value ? '+' : '';
   return `${text}${plus}`;
 }
-
 export function isFresh(
   definition: ProofStatDefinition,
   observation: ProofStatObservation,
@@ -116,13 +95,11 @@ export function isFresh(
   if (measured > now.getTime() + 5 * 60 * 1000) return false;
   return now.getTime() - measured <= definition.freshnessSlaHours * HOUR_MS;
 }
-
 export interface ResolveOptions {
   readonly now: Date;
   /** Public surfaces pass 'public' so internal stats never render there. */
   readonly surface: 'public' | 'internal';
 }
-
 export function resolveProofStat(
   definition: ProofStatDefinition,
   observation: ProofStatObservation | null | undefined,
@@ -142,7 +119,6 @@ export function resolveProofStat(
     value: null,
     sentence: null,
   });
-
   if (surface === 'public' && definition.visibility !== 'public') {
     return hidden('internal');
   }
@@ -172,7 +148,6 @@ export function resolveProofStat(
     return hidden('unapproved');
   }
   if (definition.status !== 'live') return hidden('not-live');
-
   const value = formatProofValue(
     observation.value,
     definition.display.rounding
@@ -184,11 +159,8 @@ export function resolveProofStat(
     sentence: definition.display.sentence.replaceAll('{value}', value),
   };
 }
-
-/** `{stat:accounts_total}` or `{stat:accounts_total.sentence}`. */
 export const STAT_BINDING_PATTERN =
   /\{stat:([a-z][a-z0-9_]{2,63})(?:\.(value|sentence))?\}/gu;
-
 export type BoundCopy =
   | { readonly ok: true; readonly text: string }
   | {
@@ -196,12 +168,7 @@ export type BoundCopy =
       readonly fallback: string | null;
       readonly blockedBy: readonly string[];
     };
-
-/**
- * Renders marketing copy that binds stats. If any bound stat is not
- * publishable the whole line is withheld (a sentence with a hole is a false
- * claim); the first blocked stat's registry fallback is offered instead.
- */
+/** Withhold the whole line if any bound stat is blocked; use its fallback. */
 export function renderBoundCopy(
   template: string,
   resolve: (id: string) => ResolvedProofStat | null
@@ -224,8 +191,6 @@ export function renderBoundCopy(
     ? { ok: false, fallback, blockedBy: blocked }
     : { ok: true, text };
 }
-
-/** Milestones strictly crossed going from `previous` to `next`. */
 export function crossedMilestones(
   milestones: readonly number[],
   previous: number | null,

@@ -17,20 +17,12 @@ import { logger } from '@/lib/utils/logger';
 // Reads the request (auth headers), so it is always dynamic; no segment
 // cache export (Cache Components ratchet).
 export const runtime = 'nodejs';
-
 const ROUTE = '/api/internal/proof-stats';
 const MAX_BODY_BYTES = 32 * 1024;
-
 function json(body: unknown, status = 200) {
   return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
 }
-
-/**
- * Summer's proof-stat feed (GET) and the producer intake for stats measured
- * outside the web app (POST): the public benchmark workflow, the wins ledger,
- * security and engineering feeds. Auth: admin session or the
- * CONTENT_PUBLISH_SECRET bearer with `x-content-actor`.
- */
+/** Admin/content-writer feed and intake; production counts come only from cron. */
 export async function GET(request: Request) {
   const writer = await resolveContentWriter(request);
   if (!writer.ok) return json({ error: writer.error }, writer.status);
@@ -59,7 +51,6 @@ export async function GET(request: Request) {
     return json({ error: 'Internal error' }, 500);
   }
 }
-
 const bodySchema = z
   .object({
     reason: z.string().trim().min(3).max(300),
@@ -76,7 +67,6 @@ const bodySchema = z
       .max(40),
   })
   .strict();
-
 async function admissionErrors(
   input: z.infer<typeof bodySchema>
 ): Promise<string[]> {
@@ -110,11 +100,9 @@ async function admissionErrors(
   }
   return errors;
 }
-
 export async function POST(request: Request) {
   const writer = await resolveContentWriter(request);
   if (!writer.ok) return json({ error: writer.error }, writer.status);
-
   const raw = await request.text();
   if (raw.length > MAX_BODY_BYTES)
     return json({ error: 'Body too large' }, 413);
@@ -131,7 +119,6 @@ export async function POST(request: Request) {
       400
     );
   }
-
   try {
     const errors = await admissionErrors(parsed.data);
     if (errors.length > 0) return json({ error: 'Rejected', errors }, 422);

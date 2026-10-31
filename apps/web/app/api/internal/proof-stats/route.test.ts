@@ -7,7 +7,6 @@ const state = vi.hoisted(() => ({
   card: null as null | { status: string; resolution: string | null },
   recorded: [] as unknown[],
 }));
-
 vi.mock('@/lib/content-records/access.server', () => ({
   resolveContentWriter: vi.fn(async () => state.writer),
 }));
@@ -25,12 +24,9 @@ vi.mock('@/lib/proof-stats/publish.server', () => ({
     return { written: true, versionId: 'v2', changed: [], events: [] };
   }),
 }));
-
 const { GET, POST } = await import('./route');
-
 const NOW = new Date().toISOString();
 const receipt = 'https://github.com/JovieInc/Jovie/actions/runs/40572281306';
-
 function post(body: unknown) {
   return POST(
     new Request('https://jov.ie/api/internal/proof-stats', {
@@ -39,7 +35,6 @@ function post(body: unknown) {
     })
   );
 }
-
 function obs(id: string, extra: Record<string, unknown> = {}) {
   return {
     id,
@@ -52,20 +47,17 @@ function obs(id: string, extra: Record<string, unknown> = {}) {
     },
   };
 }
-
 describe('/api/internal/proof-stats', () => {
   beforeEach(() => {
     state.writer = { ok: true, actor: 'agent:summer' };
     state.card = null;
     state.recorded = [];
   });
-
   it('rejects callers without the content writer credential', async () => {
     state.writer = { ok: false, status: 401, error: 'Unauthorized' };
     expect((await GET(new Request('https://jov.ie/x'))).status).toBe(401);
     expect((await post({})).status).toBe(401);
   });
-
   it('serves the feed with metrics and every registered stat', async () => {
     const response = await GET(new Request('https://jov.ie/x'));
     const body = await response.json();
@@ -75,7 +67,6 @@ describe('/api/internal/proof-stats', () => {
       body.stats.find((s: { id: string }) => s.id === 'accounts_total')
     ).toMatchObject({ state: 'missing', visibility: 'public' });
   });
-
   it('records a benchmark observation with a receipt', async () => {
     const response = await post({
       reason: 'weekly benchmark',
@@ -84,7 +75,6 @@ describe('/api/internal/proof-stats', () => {
     expect(response.status).toBe(200);
     expect(state.recorded).toHaveLength(1);
   });
-
   it('refuses production counts, receipt-less benchmarks and unknown stats', async () => {
     const response = await post({
       reason: 'try to type a number',
@@ -103,7 +93,6 @@ describe('/api/internal/proof-stats', () => {
     ]);
     expect(state.recorded).toHaveLength(0);
   });
-
   it('accepts an approval only from a founder-approved card', async () => {
     const approval = { cardId: 'card_lcp_1', approvedAt: NOW };
     state.card = { status: 'approved', resolution: 'default' };
@@ -119,7 +108,6 @@ describe('/api/internal/proof-stats', () => {
     });
     expect(response.status).toBe(200);
   });
-
   it('rejects malformed bodies', async () => {
     const bad = await POST(
       new Request('https://jov.ie/x', { method: 'POST', body: '{' })

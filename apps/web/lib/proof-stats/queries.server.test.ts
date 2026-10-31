@@ -6,7 +6,6 @@ const state = vi.hoisted(() => ({
   rows: [] as Record<string, unknown>[],
   queries: [] as unknown[],
 }));
-
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/db', () => ({
   db: {
@@ -16,20 +15,19 @@ vi.mock('@/lib/db', () => ({
     }),
   },
 }));
-
-const { hasProductionQuery, measureProductionStat, productionQueryRefs } =
-  await import('./queries.server');
+const {
+  hasProductionQuery,
+  measureProductionStat: measure,
+  productionQueryRefs,
+} = await import('./queries.server');
 const { listProofStats } = await import('./registry');
-
 const dialect = new PgDialect();
 const sqlText = (query: unknown) => dialect.sqlToQuery(query as SQL).sql;
-
 describe('production proof-stat queries', () => {
   beforeEach(() => {
     state.rows = [];
     state.queries = [];
   });
-
   it('has a query for every production stat in the registry', () => {
     const production = listProofStats().filter(
       stat => stat.source.kind === 'production'
@@ -40,11 +38,10 @@ describe('production proof-stat queries', () => {
     expect(productionQueryRefs()).toHaveLength(production.length);
     expect(hasProductionQuery('nope')).toBe(false);
   });
-
   it('excludes internal, test and synthetic accounts in every count', async () => {
     state.rows = [{ value: '12' }];
     for (const ref of productionQueryRefs()) {
-      await measureProductionStat(ref);
+      await measure(ref);
     }
     const [accounts, artists, links, alerts] = state.queries.map(sqlText);
     expect(accounts).toMatch(/deleted_at is null/u);
@@ -61,25 +58,15 @@ describe('production proof-stat queries', () => {
     );
     expect(alerts).toMatch(/n\.status = 'sent'/u);
   });
-
   it('returns the count as a number', async () => {
     state.rows = [{ value: '104211' }];
-    await expect(measureProductionStat('accounts_total')).resolves.toBe(
-      104_211
-    );
+    await expect(measure('accounts_total')).resolves.toBe(104_211);
   });
-
   it('throws on an unknown ref or a missing or negative count', async () => {
-    await expect(measureProductionStat('nope')).rejects.toThrow(
-      /No production query/u
-    );
+    await expect(measure('nope')).rejects.toThrow(/No production query/u);
     state.rows = [];
-    await expect(measureProductionStat('accounts_total')).rejects.toThrow(
-      /no count/u
-    );
+    await expect(measure('accounts_total')).rejects.toThrow(/no count/u);
     state.rows = [{ value: -1 }];
-    await expect(measureProductionStat('accounts_total')).rejects.toThrow(
-      /no count/u
-    );
+    await expect(measure('accounts_total')).rejects.toThrow(/no count/u);
   });
 });

@@ -7,7 +7,6 @@ const state = vi.hoisted(() => ({
   published: [] as unknown[],
   counts: {} as Record<string, number | Error>,
 }));
-
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
 vi.mock('@/lib/content-records/store.server', () => ({
@@ -39,17 +38,14 @@ vi.mock('./queries.server', () => ({
     return value ?? 0;
   }),
 }));
-
 const {
   getPublicProofStat,
   getPublicProofStats,
   recordProofObservations,
   refreshProofStats,
 } = await import('./publish.server');
-
 const T0 = new Date('2026-10-29T12:00:00.000Z');
 const at = (hours: number) => new Date(T0.getTime() + hours * 3_600_000);
-
 describe('proof-stat publishing', () => {
   beforeEach(() => {
     state.live = null;
@@ -62,7 +58,6 @@ describe('proof-stat publishing', () => {
       release_alerts_delivered: 0,
     };
   });
-
   it('measures production stats and records the first milestones', async () => {
     const result = await refreshProofStats(T0);
     expect(result).toMatchObject({ measured: 4, failed: [], written: true });
@@ -72,7 +67,6 @@ describe('proof-stat publishing', () => {
     expect(state.live?.publishable).toEqual([]);
     expect(state.published).toHaveLength(1);
   });
-
   it('publishes at the threshold, fires the milestone once, and skips no-op writes', async () => {
     await refreshProofStats(T0);
     state.counts.accounts_total = 1004;
@@ -83,13 +77,11 @@ describe('proof-stat publishing', () => {
     );
     expect(types).toContain('milestone:accounts_total:1000');
     expect(types).toContain('published:accounts_total:1004');
-
     const writes = state.versions.length;
     await refreshProofStats(at(2));
     expect(state.versions.length).toBe(writes);
     const ids = state.live?.events.map(e => e.id) ?? [];
     expect(new Set(ids).size).toBe(ids.length);
-
     const resolved = await getPublicProofStats(
       ['accounts_total', 'nope'],
       at(2)
@@ -103,7 +95,6 @@ describe('proof-stat publishing', () => {
     );
     expect(await getPublicProofStat('nope', at(2))).toBeNull();
   });
-
   it('withdraws a stat whose producer stopped and expires the cached page', async () => {
     state.counts.accounts_total = 5000;
     await refreshProofStats(T0);
@@ -125,7 +116,6 @@ describe('proof-stat publishing', () => {
       reason: 'stale',
     });
   });
-
   it('carries an approval only while the value is unchanged', async () => {
     const approval = { cardId: 'card_abc', approvedAt: T0.toISOString() };
     const base = {
@@ -133,36 +123,28 @@ describe('proof-stat publishing', () => {
       source: 'workflow:public-benchmark',
       receipt: 'https://github.com/JovieInc/Jovie/actions/runs/1',
     };
-    await recordProofObservations(
-      [
+    const record = (value: number, hours: number, approved = false) => {
+      const observation = {
+        ...base,
+        value,
+        measuredAt: at(hours).toISOString(),
+        ...(approved ? { approval } : {}),
+      };
+      return recordProofObservations(
+        [{ id: 'profile_lcp_rank', observation }],
         {
-          id: 'profile_lcp_rank',
-          observation: { ...base, value: 2, approval },
-        },
-      ],
-      { actor: 'agent:summer', reason: 'bench', now: T0 }
-    );
-    await recordProofObservations(
-      [
-        {
-          id: 'profile_lcp_rank',
-          observation: { ...base, value: 2, measuredAt: at(168).toISOString() },
-        },
-      ],
-      { actor: 'agent:summer', reason: 'bench', now: at(168) }
-    );
+          actor: 'agent:summer',
+          reason: 'bench',
+          now: at(hours),
+        }
+      );
+    };
+    await record(2, 0, true);
+    await record(2, 168);
     expect(state.live?.observations.profile_lcp_rank?.approval?.cardId).toBe(
       'card_abc'
     );
-    await recordProofObservations(
-      [
-        {
-          id: 'profile_lcp_rank',
-          observation: { ...base, value: 1, measuredAt: at(336).toISOString() },
-        },
-      ],
-      { actor: 'agent:summer', reason: 'bench', now: at(336) }
-    );
+    await record(1, 336);
     expect(state.live?.observations.profile_lcp_rank?.approval).toBeNull();
   });
 });

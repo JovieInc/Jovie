@@ -2,10 +2,6 @@ import type { ProofStatsRecord } from './content-kind';
 import { type ProofStatState, resolveProofStat } from './format';
 import { listProofStats } from './registry';
 
-/**
- * Loop health for Summer and Ovie: how many stats are published, stale or
- * waiting, so "proof" is a measured pipeline rather than a page of numbers.
- */
 export interface ProofStatsMetrics {
   readonly measuredAt: string;
   readonly total: number;
@@ -18,7 +14,6 @@ export interface ProofStatsMetrics {
   readonly byState: Readonly<Record<ProofStatState, number>>;
   readonly byStatus: Readonly<Record<string, number>>;
 }
-
 export function computeProofStatsMetrics(
   record: Pick<ProofStatsRecord, 'observations'>,
   now: Date

@@ -26,17 +26,8 @@ import {
   type ProofStatDefinition,
 } from './registry';
 
-/**
- * The one writer of proof-stat observations. Production counts are measured
- * here; other producers (benchmark workflow, wins ledger, security and
- * engineering feeds) submit through `recordProofObservations`, which applies
- * the same merge, event and publish path.
- */
-
 const HOUR_MS = 60 * 60 * 1000;
-/** Re-stamp an unchanged value at least this often so it stays fresh. */
 const RESTAMP_AFTER_MS = 6 * HOUR_MS;
-
 export async function getProofStatsRecord(): Promise<{
   readonly record: ProofStatsRecord;
   readonly versionId: string | null;
@@ -44,8 +35,6 @@ export async function getProofStatsRecord(): Promise<{
   const live = await getLiveContent(PROOF_STATS_KIND, PROOF_STATS_KEY);
   return { record: live.data, versionId: live.versionId };
 }
-
-/** Resolved stat for a public surface. Never throws; hides on any doubt. */
 export async function getPublicProofStat(
   id: string,
   now = new Date()
@@ -58,7 +47,6 @@ export async function getPublicProofStat(
     surface: 'public',
   });
 }
-
 export async function getPublicProofStats(
   ids: readonly string[],
   now = new Date()
@@ -75,23 +63,16 @@ export async function getPublicProofStats(
   }
   return out;
 }
-
 export interface ProofStatUpdate {
   readonly id: string;
   readonly observation: ProofStatObservation;
 }
-
 function eventId(parts: readonly (string | number)[]): string {
   return parts
     .join(':')
     .toLowerCase()
     .replace(/[^a-z0-9_:.-]/gu, '-');
 }
-
-/**
- * Events from moving `previous` to `next`: milestone crossings, and a stat
- * becoming publishable or being withdrawn (stale, below threshold...).
- */
 export function publishableIds(
   record: Pick<ProofStatsRecord, 'observations'>,
   now: Date
@@ -106,7 +87,6 @@ export function publishableIds(
     )
     .map(definition => definition.id);
 }
-
 export function diffProofStats(
   previous: ProofStatsRecord,
   next: Pick<ProofStatsRecord, 'observations'>,
@@ -161,7 +141,6 @@ export function diffProofStats(
   }
   return events;
 }
-
 function needsWrite(
   before: ProofStatObservation | undefined,
   after: ProofStatObservation
@@ -176,19 +155,13 @@ function needsWrite(
     RESTAMP_AFTER_MS
   );
 }
-
 export interface RecordResult {
   readonly written: boolean;
   readonly versionId: string | null;
   readonly changed: readonly string[];
   readonly events: readonly ProofStatEvent[];
 }
-
-/**
- * Merge observations into the live record and publish a new version when
- * anything changed. Comparative/health approvals are carried forward only
- * while the value is unchanged; a new value needs a new approval.
- */
+/** Publish changed observations; carry approval only while the value is unchanged. */
 export async function recordProofObservations(
   updates: readonly ProofStatUpdate[],
   input: {
@@ -252,7 +225,6 @@ export async function recordProofObservations(
   });
   return { written: true, versionId: version.id, changed, events };
 }
-
 function productionStats(): ProofStatDefinition[] {
   return listProofStats().filter(
     stat =>
@@ -260,12 +232,7 @@ function productionStats(): ProofStatDefinition[] {
       (stat.status === 'live' || stat.status === 'measuring')
   );
 }
-
-/**
- * Hourly refresh (frequent cron, hourly slot): measure every production stat
- * and publish. Also re-evaluates freshness, so a stat whose producer died is
- * withdrawn (event + cache expiry) instead of lingering on a cached page.
- */
+/** Hourly measurement also withdraws stale stats and expires their cached pages. */
 export async function refreshProofStats(now = new Date()): Promise<{
   readonly measured: number;
   readonly failed: readonly string[];

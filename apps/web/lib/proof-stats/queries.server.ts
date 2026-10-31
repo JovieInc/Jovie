@@ -7,14 +7,7 @@ import {
 import { db } from '@/lib/db';
 import { PUBLIC_PROFILE_RESERVED_IDENTITY_HANDLES } from '@/lib/profile/public-profile-identity-policy';
 
-/**
- * Production measurements for `source.kind: "production"` stats. Every count
- * excludes internal, test, synthetic and canary accounts through the one
- * classifier (`lib/accounts/internal-account.ts`, which applies
- * `isInternalOrTestAccountEmail`'s rules and the synthetic-principal tags in
- * SQL). Unclaimed, ingested profiles never count as artists.
- */
-
+/** Production counts use the canonical internal/test/synthetic account classifier. */
 function reservedHandlesSql(column: SQL): SQL {
   const handles = PUBLIC_PROFILE_RESERVED_IDENTITY_HANDLES.map(
     handle => drizzleSql`${handle}`
@@ -23,7 +16,6 @@ function reservedHandlesSql(column: SQL): SQL {
     ? drizzleSql`${column} not in (${drizzleSql.join(handles, drizzleSql`, `)})`
     : drizzleSql`true`;
 }
-
 const QUERIES: Readonly<Record<string, () => SQL>> = {
   accounts_total: () => drizzleSql`
     select count(*)::bigint as value from users
@@ -45,16 +37,12 @@ const QUERIES: Readonly<Record<string, () => SQL>> = {
     where n.status = 'sent'
       and ${notInternalProfileSql(drizzleSql.raw('n.creator_profile_id'))}`,
 };
-
 export function hasProductionQuery(ref: string): boolean {
   return Object.hasOwn(QUERIES, ref);
 }
-
 export function productionQueryRefs(): readonly string[] {
   return Object.keys(QUERIES);
 }
-
-/** Runs one named production count. Throws on an unknown ref or a bad row. */
 export async function measureProductionStat(ref: string): Promise<number> {
   const build = QUERIES[ref];
   if (!build) throw new Error(`No production query for ${ref}`);
