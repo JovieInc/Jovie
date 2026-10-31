@@ -25,7 +25,12 @@ reason = importlib.util.module_from_spec(SPEC)
 sys.modules["reason_lane"] = reason
 SPEC.loader.exec_module(reason)
 
-CONFIG = reason.load_config()
+REAL_CONFIG = reason.load_config()
+# Execution tests drive the proposer through a stdin stub so each test controls its replies. The shipped
+# proposer (Hyperagent, never a subscription login) is asserted separately in ShippedRoutesTest.
+STUB = {"name": "stub", "model": "stub-model", "timeoutS": 60, "stdin": True, "health": ["proposer_stub", "status"],
+        "healthy": ".", "cmd": ["proposer_stub", "{schema}", "{max_budget_usd}"]}
+CONFIG = {**REAL_CONFIG, "proposer": STUB}
 PROPOSAL = {"summary": "Ship the $199 upsell first", "confidence": 0.8, "assumptions": ["artists convert"],
             "risks": ["no traffic"],
             "precedentDisposition": "adapt", "materialDifference": "Jovie serves independent artists",
@@ -349,16 +354,14 @@ class ParseOutputTest(unittest.TestCase):
 
 class RunModelTest(unittest.TestCase):
     def test_success_formats_the_command_and_uses_stdin(self):
-        run = Runner(claude=claude_ok())
+        run = Runner(proposer_stub=claude_ok())
         out = reason.run_model(CONFIG["proposer"], "PROMPT", reason.PROPOSAL_SCHEMA,
                                tuple(reason.PROPOSAL_SCHEMA["required"]), run=run)
         self.assertTrue(out["ok"])
         args, kw = run.calls[0]
         self.assertEqual(kw["input"], "PROMPT")
-        self.assertIn("claude-opus-5-5", args)
-        self.assertEqual(json.loads(args[args.index("--json-schema") + 1]), reason.PROPOSAL_SCHEMA)
-        self.assertEqual(args[args.index("--max-budget-usd") + 1], "3")
-        self.assertEqual(args[args.index("--tools") + 1], "", "the proposer runs with no tools")
+        self.assertEqual(json.loads(args[1]), reason.PROPOSAL_SCHEMA)
+        self.assertEqual(args[2], "3")
 
     def test_prompt_file_is_written_then_removed(self):
         seen = {}
@@ -387,18 +390,18 @@ class RunModelTest(unittest.TestCase):
 
     def test_health_and_env_file(self):
         with tempfile.TemporaryDirectory() as tmp:
-            env = Path(tmp) / "claude.env"
-            env.write_text("# token\nexport CLAUDE_CODE_OAUTH_TOKEN='abc'\n")
-            spec = {**CONFIG["proposer"], "env": str(env)}
+            env = Path(tmp) / "stub.env"
+            env.write_text("# token\nexport STUB_TOKEN='abc'\n")
+            spec = {**CONFIG["proposer"], "env": str(env), "healthy": '"loggedIn": true'}
             seen = {}
 
             def status(args, kw):
-                seen["token"] = kw["env"].get("CLAUDE_CODE_OAUTH_TOKEN")
+                seen["token"] = kw["env"].get("STUB_TOKEN")
                 return done('{"loggedIn": true}')
-            self.assertTrue(reason.healthy(spec, run=Runner(claude=status)))
+            self.assertTrue(reason.healthy(spec, run=Runner(proposer_stub=status)))
             self.assertEqual(seen["token"], "abc")
-        self.assertFalse(reason.healthy(CONFIG["proposer"], run=Runner(claude=done('{"loggedIn": false}'))))
-        self.assertFalse(reason.healthy(CONFIG["proposer"], run=Runner(claude=OSError("gone"))))
+        self.assertFalse(reason.healthy({**CONFIG["proposer"], "healthy": '"loggedIn": true'}, run=Runner(proposer_stub=done('{"loggedIn": false}'))))
+        self.assertFalse(reason.healthy(CONFIG["proposer"], run=Runner(proposer_stub=OSError("gone"))))
         self.assertEqual(reason.load_env_file("/nonexistent/env"), {})
 
 
@@ -456,13 +459,13 @@ class ExecuteTest(unittest.TestCase):
     job = reason.parse_job("JOV-9", "t", description())
 
     def test_limited_grok_falls_back_to_the_hyperagent_reviewer_and_cools_down(self):
-        run = Runner(claude=claude_ok(), grok=[done("logged in"), done('{"type":"error","message":"402"}', 1)],
+        run = Runner(proposer_stub=claude_ok(), grok=[done("logged in"), done('{"type":"error","message":"402"}', 1)],
                      hyperagent=[done('{"models": {}}'), hyper_ok()])
         with tempfile.TemporaryDirectory() as tmp:
             out = reason.execute(self.job, CONFIG, "ctx", Path(tmp), run=run)
             self.assertTrue(reason.cooled(Path(tmp), "grok-cli"))
             again = reason.execute(self.job, CONFIG, "ctx", Path(tmp), run=Runner(
-                claude=claude_ok(), hyperagent=[done('{"models": {}}'), hyper_ok()]))
+                proposer_stub=claude_ok(), hyperagent=[done('{"models": {}}'), hyper_ok()]))
             self.assertEqual(again["record"]["reviewer"], "hyperagent-grok-reviewer (grok-4.7)",
                              "a cooled reviewer is skipped without a call")
         record = out["record"]
@@ -473,14 +476,14 @@ class ExecuteTest(unittest.TestCase):
         self.assertIn('"A1"', prompt, "the reviewer sees the proposal")
 
     def test_no_reviewer_is_low_confidence_with_reasons(self):
-        run = Runner(claude=claude_ok(), grok=done("not logged", 1), hyperagent=done("", 1))
+        run = Runner(proposer_stub=claude_ok(), grok=done("not logged", 1), hyperagent=done("", 1))
         with tempfile.TemporaryDirectory() as tmp:
             record = reason.execute(self.job, CONFIG, "ctx", Path(tmp), run=run)["record"]
         self.assertEqual(record["confidence"], "low")
         self.assertIn("grok-cli: unavailable", record["reasons"])
 
     def test_non_limit_reviewer_failure_is_not_cooled(self):
-        run = Runner(claude=claude_ok(), grok=[done("logged in"), done("gibberish")],
+        run = Runner(proposer_stub=claude_ok(), grok=[done("logged in"), done("gibberish")],
                      hyperagent=[done('{"models": {}}'), done("", 1, "approval pause")])
         with tempfile.TemporaryDirectory() as tmp:
             record = reason.execute(self.job, CONFIG, "ctx", Path(tmp), run=run)["record"]
@@ -489,7 +492,7 @@ class ExecuteTest(unittest.TestCase):
 
     def test_proposer_failure_asks_for_retry(self):
         with tempfile.TemporaryDirectory() as tmp:
-            out = reason.execute(self.job, CONFIG, "ctx", Path(tmp), run=Runner(claude=done("", 1, "not logged in")))
+            out = reason.execute(self.job, CONFIG, "ctx", Path(tmp), run=Runner(proposer_stub=done("", 1, "not logged in")))
         self.assertTrue(out["retry"])
         self.assertEqual(out["record"]["confidence"], "failed")
 
@@ -538,7 +541,7 @@ class OneJobTest(unittest.TestCase):
 
     def test_success_comments_the_block_writes_gbrain_and_closes(self):
         linear = FakeLinear()
-        run = Runner(claude=claude_ok(), grok=[done("logged in"), done(json.dumps(AGREE))], gbrain=StoringGbrain())
+        run = Runner(proposer_stub=claude_ok(), grok=[done("logged in"), done(json.dumps(AGREE))], gbrain=StoringGbrain())
         with tempfile.TemporaryDirectory() as tmp:
             record = reason.one_job(linear, {**self.issue, "description": description({**JOB_BLOCK, "contextRefs": []})},
                                     CONFIG, Path(tmp), run=run)
@@ -563,7 +566,7 @@ class OneJobTest(unittest.TestCase):
                     return stored
                 return done("ok")
             linear = FakeLinear()
-            run = Runner(claude=claude_ok(), grok=[done("logged in"), done(json.dumps(AGREE))], gbrain=gbrain)
+            run = Runner(proposer_stub=claude_ok(), grok=[done("logged in"), done(json.dumps(AGREE))], gbrain=gbrain)
             with tempfile.TemporaryDirectory() as tmp:
                 record = reason.one_job(linear, self.issue, CONFIG, Path(tmp), run=run)
             self.assertIsNone(record["gbrainSlug"])
@@ -576,7 +579,7 @@ class OneJobTest(unittest.TestCase):
 
     def test_gbrain_failure_drops_the_slug(self):
         linear = FakeLinear()
-        run = Runner(claude=claude_ok(), grok=[done("logged in"), done(json.dumps(AGREE))], gbrain=done("", 1))
+        run = Runner(proposer_stub=claude_ok(), grok=[done("logged in"), done(json.dumps(AGREE))], gbrain=done("", 1))
         with tempfile.TemporaryDirectory() as tmp:
             record = reason.one_job(linear, self.issue, CONFIG, Path(tmp), run=run)
         self.assertIsNone(record["gbrainSlug"])
@@ -587,13 +590,13 @@ class OneJobTest(unittest.TestCase):
         linear = FakeLinear()
         issue = {**self.issue, "description": description({**JOB_BLOCK, "question": "How should we price Jovie?",
                                                             "contextRefs": []})}
-        run = Runner(gbrain=done("", 1, "gbrain offline"), claude=claude_ok())
+        run = Runner(gbrain=done("", 1, "gbrain offline"), proposer_stub=claude_ok())
         with tempfile.TemporaryDirectory() as tmp:
             state = Path(tmp)
             record = reason.one_job(linear, issue, CONFIG, state, run=run)
             self.assertFalse(reason.budget_path(state).exists())
         self.assertEqual(record["priorArt"]["status"], "retrieval-failed")
-        self.assertEqual(run.made("claude"), [])
+        self.assertEqual(run.made("proposer_stub"), [])
         self.assertEqual(linear.moves[-1], ("i-9", "Todo"))
 
     def test_known_yc_playbook_reaches_the_prompt_before_a_fresh_experiment(self):
@@ -613,10 +616,10 @@ class OneJobTest(unittest.TestCase):
                     "ranking": [{**item, "evidence": ["knowledge/external/yc/playbook/hiring-team", "JOV-12"]}
                                 for item in PROPOSAL["ranking"]]}
         run = Runner(gbrain=[done(page), done("ok"), done("", 1)],
-                     claude=claude_ok(proposal), grok=[done("logged in"), done(json.dumps(AGREE))])
+                     proposer_stub=claude_ok(proposal), grok=[done("logged in"), done(json.dumps(AGREE))])
         with tempfile.TemporaryDirectory() as tmp:
             record = reason.one_job(linear, issue, CONFIG, Path(tmp), run=run)
-        prompt = run.calls[next(i for i, (args, _) in enumerate(run.calls) if args[0] == "claude")][1]["input"]
+        prompt = run.calls[next(i for i, (args, _) in enumerate(run.calls) if args[0] == "proposer_stub")][1]["input"]
         self.assertIn("knowledge/external/yc/playbook/hiring-team", prompt)
         self.assertIn("what is materially different about Jovie's case?", prompt)
         self.assertEqual(record["decisionEvidence"]["inference"]["precedentDisposition"], "adopt")
@@ -625,9 +628,9 @@ class OneJobTest(unittest.TestCase):
     def test_failure_retries_once_then_cancels(self):
         linear = FakeLinear()
         with tempfile.TemporaryDirectory() as tmp:
-            reason.one_job(linear, self.issue, CONFIG, Path(tmp), run=Runner(claude=done("", 1)))
+            reason.one_job(linear, self.issue, CONFIG, Path(tmp), run=Runner(proposer_stub=done("", 1)))
             self.assertEqual(linear.moves[-1], ("i-9", "Todo"))
-            reason.one_job(linear, self.issue, CONFIG, Path(tmp), run=Runner(claude=done("", 1)))
+            reason.one_job(linear, self.issue, CONFIG, Path(tmp), run=Runner(proposer_stub=done("", 1)))
             self.assertEqual(reason.failure_count(Path(tmp), "JOV-9"), 2)
         self.assertEqual(linear.moves[-1], ("i-9", "Canceled"))
         self.assertEqual(result_block(linear.comments[-1][1])["confidence"], "failed")
@@ -702,7 +705,7 @@ class DrainAndTickTest(unittest.TestCase):
                 return "In Progress"
             return real_state(issue_id)
         linear.state_of = state_of
-        run = Runner(claude=[done('"loggedIn": true'), claude_ok()], grok=[done("logged in"), done(json.dumps(AGREE))],
+        run = Runner(proposer_stub=[done('"loggedIn": true'), claude_ok()], grok=[done("logged in"), done(json.dumps(AGREE))],
                      gbrain=done("ok"))
         with tempfile.TemporaryDirectory() as tmp:
             host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "env")
@@ -731,7 +734,7 @@ class DrainAndTickTest(unittest.TestCase):
                                              spawn=lambda *a, **k: self.fail("cooldown must not spawn"))
                     else:
                         result = reason.drain(host, self.lane(linear), CONFIG,
-                                              run=Runner(claude=done('"loggedIn": true'), grok=done("logged in")))
+                                              run=Runner(proposer_stub=done('"loggedIn": true'), grok=done("logged in")))
                     self.assertEqual(result["status"], "linear-rate-limited")
                     self.assertEqual(result["resetAt"], error.reset_at)
                     self.assertTrue(release.called, "cooldown must release the lane/claim locks")
@@ -744,11 +747,11 @@ class DrainAndTickTest(unittest.TestCase):
             FakeLock.held_paths = {"reason.lock"}
             self.assertEqual(reason.drain(host, self.lane(FakeLinear()), CONFIG)["status"], "busy")
             FakeLock.held_paths = set()
-            unhealthy = reason.drain(host, self.lane(FakeLinear()), CONFIG, run=Runner(claude=done("", 1)))
+            unhealthy = reason.drain(host, self.lane(FakeLinear()), CONFIG, run=Runner(proposer_stub=done("", 1)))
             self.assertEqual(unhealthy["status"], "proposer-unhealthy")
             linear = FakeLinear(jobs=[{"id": "i-1", "identifier": "JOV-1", "title": "a", "description": description(), "createdAt": "1"}])
             capped = reason.drain(host, self.lane(linear), {**CONFIG, "maxJobsPerDay": 0},
-                                  run=Runner(claude=done('"loggedIn": true')))
+                                  run=Runner(proposer_stub=done('"loggedIn": true')))
             self.assertEqual(capped["status"], "budget-exhausted")
             self.assertEqual(linear.moves, [], "an over-budget job stays in Todo")
 
@@ -756,7 +759,7 @@ class DrainAndTickTest(unittest.TestCase):
         research = description({**JOB_BLOCK, "decisionType": "research", "question": "Why?"})
         linear = FakeLinear(jobs=[{"id": "i-1", "identifier": "JOV-1", "title": "rank", "description": description(), "createdAt": "1"},
                                   {"id": "i-2", "identifier": "JOV-2", "title": "research", "description": research, "createdAt": "2"}])
-        run = Runner(claude=done("", 1), hyperagent=[done('{"models": {}}'), done(json.dumps({"text": "Answer: yes"}))],
+        run = Runner(proposer_stub=done("", 1), hyperagent=[done('{"models": {}}'), done(json.dumps({"text": "Answer: yes"}))],
                      gbrain=done("ok"))
         with tempfile.TemporaryDirectory() as tmp:
             host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "env")
@@ -769,7 +772,7 @@ class DrainAndTickTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "env")
             out = reason.drain(host, self.lane(linear), CONFIG,
-                               run=Runner(claude=[done('"loggedIn": true'), done("", 1)]))
+                               run=Runner(proposer_stub=[done('"loggedIn": true'), done("", 1)]))
         self.assertEqual(out["status"], "idle")
         self.assertEqual(linear.moves[-1], ("i-1", "Todo"))
 
@@ -1580,3 +1583,57 @@ class OutcomeLaneTest(unittest.TestCase):
     def test_tick_never_runs_in_a_selftest(self):
         with patch.dict(os.environ, {"LANES_SELFTEST": "1"}):
             self.assertEqual(outcome.tick(SimpleNamespace(), SimpleNamespace())["status"], "selftest-skipped")
+
+
+class ShippedRoutesTest(unittest.TestCase):
+    """No reason-lane proposer runs on a subscription login (terms of service)."""
+    def test_proposers_are_hyperagent_credit_routes(self):
+        for key in ("proposer", "judgmentProposer"):
+            spec = REAL_CONFIG[key]
+            self.assertEqual(spec["cmd"][:2], ["hyperagent", "execute"], key)
+            self.assertNotIn("claude", json.dumps(spec).lower().replace("claude-opus-5-5", ""), key)
+            self.assertNotIn("env", spec, key)
+        self.assertEqual(REAL_CONFIG["judgmentProposer"]["model"], "claude-opus-5-5")
+
+    def test_judgment_job_blocks_carry_through_only_when_valid(self):
+        esc = {"schema": reason.ESCALATION_SCHEMA, "class": "money", "model": "claude-opus-5-5"}
+        job = reason.parse_job("JOV-9", "t", description({**JOB_BLOCK, "escalation": esc}))
+        self.assertEqual(job["escalation"], esc)
+        bad = reason.parse_job("JOV-9", "t", description({**JOB_BLOCK, "escalation": {**esc, "model": "x"}}))
+        self.assertIsNone(bad["escalation"])
+        self.assertIsNone(reason.parse_job("JOV-9", "t", description())["escalation"])
+
+    def judgment_job(self):
+        esc = {"schema": reason.ESCALATION_SCHEMA, "class": "money", "model": "claude-opus-5-5"}
+        return reason.parse_job("JOV-9", "t", description({**JOB_BLOCK, "escalation": esc}))
+
+    def test_judgment_runs_the_opus_agent_and_writes_the_receipt(self):
+        config = {**CONFIG, "judgmentProposer": {**REAL_CONFIG["judgmentProposer"], "agentId": "agent_opus_1"}}
+        envelope = {"ok": True, "thread_id": "thr_42", "text": json.dumps(PROPOSAL)}
+        run = Runner(hyperagent=[done(json.dumps(envelope)), done("", 1)], grok=done("not logged", 1))
+        with tempfile.TemporaryDirectory() as tmp:
+            out = reason.execute(self.judgment_job(), config, "ctx", Path(tmp), run=run)
+        cmd = run.made("hyperagent")[0]
+        self.assertEqual(cmd[cmd.index("--agent-id") + 1], "agent_opus_1")
+        self.assertEqual(cmd[cmd.index("--model") + 1], "claude-opus-5-5")
+        receipt = out["record"]["escalation"]
+        self.assertEqual((receipt["schema"], receipt["route"], receipt["model"], receipt["threadId"], receipt["costUsd"]),
+                         ("summer.judgment-escalation-receipt/v1", "hyperagent", "claude-opus-5-5", "thr_42", None))
+        self.assertIsInstance(receipt["latencyMs"], int)
+
+    def test_judgment_without_a_configured_agent_fails_closed_without_running(self):
+        run = Runner()
+        with tempfile.TemporaryDirectory() as tmp:
+            out = reason.execute(self.judgment_job(), CONFIG, "ctx", Path(tmp), run=run)
+        self.assertEqual(run.calls, [])
+        self.assertEqual(out["record"]["confidence"], "failed")
+        self.assertIn("judgment-agent-unconfigured", out["record"]["reasons"])
+        self.assertFalse(out["retry"])
+        self.assertNotIn("escalation", out["record"])
+
+    def test_ordinary_jobs_carry_no_receipt(self):
+        run = Runner(proposer_stub=claude_ok(), grok=done("not logged", 1), hyperagent=done("", 1))
+        job = reason.parse_job("JOV-9", "t", description())
+        with tempfile.TemporaryDirectory() as tmp:
+            out = reason.execute(job, CONFIG, "ctx", Path(tmp), run=run)
+        self.assertNotIn("escalation", out["record"])

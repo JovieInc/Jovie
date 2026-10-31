@@ -85,6 +85,16 @@ function formatCertifiedHead(certifiedHead: Delivery['certifiedHead']): string {
   return certifiedHead.sha ? certifiedHead.sha.slice(0, 7) : NOT_MEASURED;
 }
 
+function formatProdLag(health: DeliveryLanes['deployHealth']): string {
+  const lag = health?.lag?.find(row => row.repo === 'JovieInc/Jovie');
+  if (!lag || lag.p50Min === null || lag.p95Min === null) return NOT_MEASURED;
+  const target =
+    lag.targetP50Min === null || lag.targetP95Min === null
+      ? ''
+      : ` (target ${lag.targetP50Min} / ${lag.targetP95Min})`;
+  return `${Math.round(lag.p50Min)} / ${Math.round(lag.p95Min)} min${target}`;
+}
+
 function formatLybDeploy(health: DeliveryLanes['deployHealth']): string {
   const lyb = health?.repos.find(repo => repo.repo === 'JovieInc/LogYourBody');
   if (!lyb) return NOT_MEASURED;
@@ -263,6 +273,7 @@ function ShippingStateBody({
     ['Staging', formatProduction(delivery.staging)],
     ['Production', formatProduction(delivery.production)],
     ['Behind Main', formatCount(delivery.production.behindMain)],
+    ['Merge to Prod', formatProdLag(delivery.lanes.deployHealth)],
     ['LYB Deploy', formatLybDeploy(delivery.lanes.deployHealth)],
     ['CI Green', formatMeaning(view.ciGreen)],
     [

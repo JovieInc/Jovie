@@ -1381,10 +1381,25 @@ class ProductionHealthTests(unittest.TestCase):
                 "status": "green",
                 "url": url,
                 "reportedStatus": "healthy",
-                "dependencies": {"vercel-alias": {"status": "green", "detail": "canonical alias resolved without redirect"}, "database": {"status": "unknown", "detail": "database health probe: transport or malformed response"}},
+                "dependencies": {
+                    "vercel-alias": {"status": "green", "detail": "canonical alias resolved without redirect"},
+                    # Unrouted in this fixture: the bounded transport retry
+                    # exhausts and the unknown carries the last attempt's
+                    # transport reason (JOV-9971: a blip is not a verdict,
+                    # but an unobservable probe still blocks visibly).
+                    "database": {"status": "unknown", "detail": mock.ANY},
+                },
                 "deployedSha": "a" * 40,
             },
         )
+        database = observed["dependencies"]["database"]
+        self.assertTrue(
+            database["detail"].startswith(
+                "database health probe: transport or malformed response after 3 attempts"
+            ),
+            database["detail"],
+        )
+        self.assertIn("database fixture unavailable", database["detail"])
 
     def test_legacy_ok_status_remains_compatible_for_explicit_overrides(self):
         url = "https://example.test/health"
@@ -1563,6 +1578,72 @@ class DatabaseObservationTests(unittest.TestCase):
             with self.subTest(probe=type(probe).__name__):
                 result, _ = self.observe(probe)
                 self.assertNotEqual(result["dependencies"]["database"]["status"], "green")
+
+    def observe_sequence(self, probes, *, origin=URL, deploy=None):
+        """Feed urlopen responses/exceptions in sequence per probe attempt."""
+        now = MODULE.utc_now()
+        calls = []
+
+        def open_url(url, timeout=0):
+            calls.append(url)
+            if url == origin:
+                return FakeResponse(url, deploy or {"healthy": True, "timestamp": MODULE.isoformat(now)})
+            if url.endswith("/api/health/db"):
+                attempt_index = len([c for c in calls if c.endswith("/api/health/db")]) - 1
+                probe = probes[attempt_index]
+                if isinstance(probe, Exception):
+                    raise probe
+                if isinstance(probe, FakeResponse):
+                    return probe
+                return FakeResponse(url, probe)
+            if url.endswith("/build-info"):
+                return FakeResponse(url, {"commitSha": "a" * 40})
+            raise AssertionError(url)
+
+        with (
+            mock.patch.object(MODULE, "utc_now", return_value=now),
+            mock.patch.object(MODULE.urllib.request, "urlopen", side_effect=open_url),
+        ):
+            result = MODULE.observe_production(origin)
+        return result, calls
+
+    def test_transport_blip_is_retried_and_reports_green(self):
+        # One connection blip is not a database verdict: the bounded retry
+        # observes the real signal on the next attempt (JOV-9971 fleet freeze).
+        result, _ = self.observe_sequence([
+            MODULE.urllib.error.URLError("connection reset"),
+            {"healthy": True, "timestamp": MODULE.isoformat(MODULE.utc_now())},
+        ])
+        self.assertEqual(result["dependencies"]["database"]["status"], "green")
+
+    def test_persistent_transport_failure_reports_unknown_after_bounded_retries(self):
+        # A genuinely unobservable probe must still block visibly: the bounded
+        # retries exhaust and the unknown carries the transport reason.
+        result, _ = self.observe_sequence([
+            MODULE.urllib.error.URLError("down"),
+            MODULE.urllib.error.URLError("down"),
+            MODULE.urllib.error.URLError("down"),
+            MODULE.urllib.error.URLError("down"),
+        ])
+        database = result["dependencies"]["database"]
+        self.assertEqual(database["status"], "unknown")
+        self.assertIn(f"after {MODULE.DATABASE_PROBE_ATTEMPTS} attempts", database["detail"])
+
+    def test_edge_error_page_is_retried_and_never_a_verdict(self):
+        result, _ = self.observe_sequence([
+            MODULE.urllib.error.HTTPError(
+                self.DB_URL, 503, "overloaded", {}, io.BytesIO(b"<html>busy</html>")
+            ),
+            {"healthy": True, "timestamp": MODULE.isoformat(MODULE.utc_now())},
+        ])
+        self.assertEqual(result["dependencies"]["database"]["status"], "green")
+
+    def test_malformed_liveness_schema_is_authoritative_and_not_retried(self):
+        # A parseable document with a broken schema is the endpoint lying, not
+        # a blip: single attempt, immediate unknown.
+        calls = []
+        result, _ = self.observe_sequence([{"healthy": "true", "timestamp": "x"}])
+        self.assertEqual(result["dependencies"]["database"]["status"], "unknown")
 
     def test_probe_is_bound_to_the_configured_origin_without_credentials(self):
         payload = {"healthy": True, "timestamp": MODULE.isoformat(MODULE.utc_now())}
