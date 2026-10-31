@@ -37,6 +37,28 @@ function subjectRef(sub: string): string {
   return createHash('sha256').update(sub).digest('hex').slice(0, 12);
 }
 
+/**
+ * Emit a passage outcome to the logs production actually captures.
+ *
+ * The shared `logger` no-ops on production builds (lib/utils/logger.ts),
+ * which left denial reasons invisible exactly when they matter: diagnosing a
+ * prod cert red (`/api/chat` 403 `siteverify_failed`, JOV-9625) remotely,
+ * from the requestId the 403 body already carries. When the dev/preview
+ * logger is off, mirror the event to `console` so Vercel Runtime Logs carry
+ * the reason. Payloads are audit fields only — scope, hashed subject, jti,
+ * run id, requestId — never the token, the raw claims, or any secret value.
+ */
+function logPassageEvent(
+  level: 'info' | 'warn',
+  message: string,
+  payload: Record<string, unknown>
+): void {
+  logger[level](message, payload);
+  if (!logger.enabled) {
+    (level === 'warn' ? console.warn : console.info)(message, payload);
+  }
+}
+
 function passageKey(): Buffer | null {
   if (env.SYNTHETIC_PASSAGE_TOKENS_DISABLED === '1') return null;
   const root = env.CRON_SECRET;
@@ -55,13 +77,13 @@ export async function resolveSyntheticPassageToken(
 
   const key = passageKey();
   if (!key) {
-    logger.warn('[synthetic-passage-token] denied: disabled', base);
+    logPassageEvent('warn', '[synthetic-passage-token] denied: disabled', base);
     return null;
   }
 
   const verdict = verifyPassageToken(token, key, scope);
   if (!verdict.ok) {
-    logger.warn('[synthetic-passage-token] denied', {
+    logPassageEvent('warn', '[synthetic-passage-token] denied', {
       ...base,
       reason: verdict.reason,
     });
@@ -83,12 +105,20 @@ export async function resolveSyntheticPassageToken(
   try {
     const rate = await syntheticPassageTokenLimiter.limit(scope);
     if (!rate.success) {
-      logger.warn('[synthetic-passage-token] denied: rate limit', audit);
+      logPassageEvent(
+        'warn',
+        '[synthetic-passage-token] denied: rate limit',
+        audit
+      );
       return null;
     }
     const redis = getRedis();
     if (!redis) {
-      logger.warn('[synthetic-passage-token] denied: no redis', audit);
+      logPassageEvent(
+        'warn',
+        '[synthetic-passage-token] denied: no redis',
+        audit
+      );
       return null;
     }
     const ttl = Math.max(60, claims.exp - Math.floor(Date.now() / 1000) + 60);
@@ -97,17 +127,21 @@ export async function resolveSyntheticPassageToken(
       ex: ttl,
     });
     if (claimed !== 'OK') {
-      logger.warn('[synthetic-passage-token] denied: replay', audit);
+      logPassageEvent(
+        'warn',
+        '[synthetic-passage-token] denied: replay',
+        audit
+      );
       return null;
     }
   } catch (error) {
-    logger.warn('[synthetic-passage-token] denied: store error', {
+    logPassageEvent('warn', '[synthetic-passage-token] denied: store error', {
       ...audit,
       error: error instanceof Error ? error.message : String(error),
     });
     return null;
   }
 
-  logger.info('[synthetic-passage-token] granted', audit);
+  logPassageEvent('info', '[synthetic-passage-token] granted', audit);
   return { actorId: 'prodcert', claims };
 }
