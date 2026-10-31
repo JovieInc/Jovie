@@ -892,6 +892,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/wins-ledger.test.mjs',
+  'scripts/lib/__tests__/wins-store.test.mjs',
   'scripts/lib/__tests__/sources-of-truth.test.mjs',
   'scripts/invariants/duplicate-literals.test.mjs',
   'scripts/lib/__tests__/source-drift.test.mjs',
@@ -907,6 +908,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/copy-leak/copy-leak.test.mjs',
   'scripts/invariants/offer-claims/offer-claims.test.mjs',
   'scripts/copy-inventory/extract.test.mjs',
+  'scripts/invariants/stat-claims/stat-claims.test.mjs',
   'scripts/lib/__tests__/script-contract-affected.test.mjs',
   'scripts/lib/__tests__/web-source-read-tests.test.mjs',
   '.claude/hooks/post-task-validate.test.mjs',
@@ -947,6 +949,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/evals/gtm-lead-copy.test.mjs',
   'scripts/evals/release-task-cluster.test.mjs',
   'scripts/evals/summer-ops-card-copy.test.mjs',
+  'scripts/buyer-eval/buyer-eval.test.mjs',
   'scripts/funnel-judge/preview-gate.test.mjs',
   'scripts/funnel-judge/proof-gate.test.mjs',
   'scripts/funnel-judge/rubric.test.mjs',

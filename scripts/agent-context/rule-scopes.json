@@ -1,5 +1,10 @@
 [
   {
+    "file": ".claude/rules/anti-slop.md",
+    "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
+    "bodySha256": "17ed298ea129cb191c56f2d3ff1ebccf036817325b44c1c524230fb0b511a844"
+  },
+  {
     "file": ".claude/rules/auth.md",
     "paths": ["apps/web/**/auth/**", "apps/web/proxy.ts", "apps/web/tests/**"],
     "bodySha256": "75c6e6ebb898dfa5265b39f4a57844cd1c0fd0452adf105262e244e008650936"
@@ -140,7 +145,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "5998b5a821de1c3ae4dc6ab2faadfbb8db382c83dfb3ff5cbc5f9c239f07db0c"
+    "bodySha256": "ca459e3269b5bae49e476b18e8d104ecde98d6e6de1bedd49e29d7b39f8b22cd"
   },
   {
     "file": ".claude/rules/security.md",

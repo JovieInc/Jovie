@@ -12372,6 +12372,26 @@ class LockfileConflictTest(unittest.TestCase):
             self.assertEqual(self.git("show", f"devin/jov-1-20260927:{path}", cwd=origin), "regenerated")
             self.assertEqual(self.git("show", "devin/jov-1-20260927:a.ts", cwd=origin), "main")
 
+    def test_sources_of_truth_conflict_regenerates_from_merged_source(self):
+        path = "canon/SOURCES_OF_TRUTH.md"
+        generator = "scripts/sources-of-truth.mjs"
+        source = "canon/sources-of-truth.json"
+        script = (
+            "import {readFileSync,writeFileSync} from 'node:fs';\n"
+            f"if(readFileSync('{path}','utf8') !== 'main\\n') throw Error('must restore main');\n"
+            f"writeFileSync('{path}',JSON.parse(readFileSync('{source}','utf8')).domains.join('\\n'));\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, work = self.repo(Path(tmp), {path: "pr\n", generator: script,
+                                     source: '{"domains":["engineering-wins","proof-stats"]}'},
+                                     main_changes={path: "main\n", "a.ts": "main\n"})
+            ok, calls = self.run_resolve(work)
+            self.assertTrue(ok)
+            self.assertEqual(calls.count(["node", generator, "--write"]), 1)
+            self.assertEqual(self.git("show", f"devin/jov-1-20260927:{path}", cwd=origin),
+                             "engineering-wins\nproof-stats")
+            self.assertEqual(self.git("show", "devin/jov-1-20260927:a.ts", cwd=origin), "main")
+
     def test_mixed_generated_conflicts_run_each_resolver_once(self):
         topology = ".github/workflow-topology.gen.yml"
         with tempfile.TemporaryDirectory() as tmp:

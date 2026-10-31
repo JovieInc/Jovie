@@ -17,7 +17,13 @@ envf="$HOME/.config/jovie-prod-errors/env"
 chmod 600 "$envf"
 path="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin"
 # bwrap: whole FS read-only, only the state dir + checkout writable, no ssh keys, no user bus.
-sandbox="/usr/bin/bwrap --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp --tmpfs $HOME/.ssh --bind $state $state --bind $base $base --die-with-parent"
+# The apiclient budget ledger is host-wide (~/.local/state/jovie-lanes/api-ledger, shared with the
+# lanes runtime and the TS client so every caller draws one budget) and is written on every API
+# call, so the sandbox binds exactly that directory writable; the rest of the read-only root stays
+# read-only. mkdir first: bwrap fails closed when a bind source does not exist.
+ledger="$HOME/.local/state/jovie-lanes/api-ledger"
+mkdir -p "$ledger"
+sandbox="/usr/bin/bwrap --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp --tmpfs $HOME/.ssh --bind $state $state --bind $base $base --bind $ledger $ledger --die-with-parent"
 unit() { # name description schedule command
   cat >"$units/jovie-prod-errors-$1.service" <<UNIT
 [Unit]
