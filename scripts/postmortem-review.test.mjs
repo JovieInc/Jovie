@@ -292,11 +292,13 @@ test('repository class-action registry covers every recurring class', () => {
       .filter(item => item.recurring)
       .map(item => item.failureClass),
     [
+      'evidence-forgery-or-staleness',
       'green-by-implication',
       'non-convergent-control-loop',
       'pre-merge-parity-gap',
       'serial-layer-discovery',
       'silent-production-staleness',
+      'unowned-incident',
     ]
   );
 });
