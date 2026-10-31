@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # codex: fleet launcher for the Codex CLI, installed as ~/.local/bin/codex by
-# scripts/hostops/install-codex-launcher.sh. Moved here from the retired
-# ~/.hermes/scripts/codex-launcher.sh on 2026-10-31.
+# scripts/hostops/install-hostops-tools.sh. Moved here from the retired
+# Hermes codex launcher on 2026-10-31.
 #
 # Policy, unchanged from the Hermes launcher:
 #   - every non-`mcp` run gets --dangerously-bypass-approvals-and-sandbox and
