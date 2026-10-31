@@ -28,6 +28,7 @@ import {
   monthsUntilCashZero,
   peakNetBurn,
 } from './growth-model';
+import { evaluatePlan, type PlanEvaluation, type RaisePlan } from './plan';
 import { DEFAULT_FUNDRAISE_POLICY, type FundraisePolicy } from './policy';
 
 const DEFAULT_ALIVE_ENGINE_VERSION = 'jovie.default-alive/v1' as const;
@@ -49,12 +50,6 @@ export interface SourcedInput<T> {
   readonly basis: InputBasis;
 }
 
-interface DefaultAliveMilestone {
-  readonly label: string;
-  /** Months of runway the milestone needs. */
-  readonly months: number;
-}
-
 export interface DefaultAliveInputs {
   readonly cashUsd: SourcedInput<number>;
   /** Fixed monthly expenses (subscriptions, people, base plans). */
@@ -66,12 +61,13 @@ export interface DefaultAliveInputs {
   readonly mrrGrowthRateMonthly: SourcedInput<number>;
   /** Month-over-month expense growth, 0.05 = 5%. */
   readonly expenseGrowthRateMonthly: SourcedInput<number>;
-  readonly milestone?: DefaultAliveMilestone | null;
+  /** Use of funds to the next milestone. A raise funds a plan, not survival. */
+  readonly plan?: RaisePlan | null;
 }
 
 type DefaultAliveVerdict = 'default-alive' | 'default-dead' | 'unknown';
 
-type InputName = Exclude<keyof DefaultAliveInputs, 'milestone'>;
+type InputName = Exclude<keyof DefaultAliveInputs, 'plan'>;
 
 interface DefaultAliveGap {
   readonly input: InputName;
@@ -123,13 +119,25 @@ export interface DefaultAliveResult {
       readonly min: number;
       readonly max: number;
     } | null;
-    readonly forMilestoneUsd: number | null;
-    /** Rounded recommendation; the larger of default-alive and min runway. */
+    /** Plan cost to the milestone x margin, minus cash. */
+    readonly forPlanUsd: number | null;
+    /**
+     * Need before subtracting cash: max(survival floor, plan cost), both with
+     * margin. Available when cash is the only gap.
+     */
+    readonly grossNeedUsd: number | null;
+    /** Rounded recommendation: max(default alive, survival floor, plan). */
     readonly recommendedUsd: number | null;
     readonly rangeUsd: { readonly low: number; readonly high: number } | null;
     readonly basis: string;
   };
   readonly timing: RaiseTiming;
+  readonly plan:
+    | (PlanEvaluation & {
+        /** If the offer closed at evaluation time and cash were zero. */
+        readonly offerRunsOutOn: string | null;
+      })
+    | null;
   /** Plain-language reasoning, in order. */
   readonly reasoning: readonly string[];
 }
@@ -218,6 +226,17 @@ function inputGaps(
   return gaps;
 }
 
+function pathFrom(inputs: DefaultAliveInputs): GrowthPath {
+  return {
+    e0:
+      (inputs.fixedBurnUsdPerMonth.value ?? 0) +
+      (inputs.variableBurnUsdPerMonth.value ?? 0),
+    r0: inputs.mrrUsd.value ?? 0,
+    le: Math.log(1 + (inputs.expenseGrowthRateMonthly.value ?? 0)),
+    lr: Math.log(1 + (inputs.mrrGrowthRateMonthly.value ?? 0)),
+  };
+}
+
 /**
  * Evaluate default alive / dead, runway, required growth, and the raise
  * amount and timing. Deterministic for a given (inputs, evaluatedAt, policy).
@@ -237,7 +256,43 @@ export function evaluateDefaultAlive(
     policy,
   };
 
+  const evaluated = inputs.plan ? evaluatePlan(inputs.plan, policy) : null;
+  const plan = evaluated && {
+    ...evaluated,
+    offerRunsOutOn:
+      evaluated.offerRunwayMonths === null
+        ? null
+        : addMonths(evaluatedAt, evaluated.offerRunwayMonths),
+  };
+  const margin = policy.marginRate.value;
+  const target = policy.runwayTargetMonths.value;
+  const planLine = (p: PlanEvaluation) =>
+    `Plan to ${p.milestone}: ${usd(p.monthlyBurnUsd)}/mo for ${p.months} months (milestone plus raising the next round) = ${usd(p.grossCostUsd)}, ${usd(p.withMarginUsd)} with margin.${p.offerUsd !== null ? ` An offer of ${usd(p.offerUsd)} funds ${p.offerRunwayMonths} months at planned burn and ${p.offerCoversPlan ? 'covers' : 'does not cover'} the plan, leaving ${p.offerMonthsAfterMilestone} months after the milestone to raise the next round.` : ''}`;
+
   if (blocking.length > 0) {
+    // Cash alone missing: the need before cash is still computable.
+    const onlyCash = blocking.every(gap => gap.input === 'cashUsd');
+    const survivalGross = onlyCash
+      ? peakNetBurn(pathFrom(inputs), target.min) * (1 + margin)
+      : null;
+    const grossNeed =
+      survivalGross === null && plan === null
+        ? null
+        : Math.max(survivalGross ?? 0, plan?.withMarginUsd ?? 0);
+    const reasoning = blocking.map(
+      gap => `Gap: ${gap.input} is ${gap.kind}. ${gap.detail}`
+    );
+    if (survivalGross !== null) {
+      reasoning.push(
+        `Survival floor before cash: ${target.min} months of current burn x ${1 + margin} = ${usd(survivalGross)}.`
+      );
+    }
+    if (plan) reasoning.push(planLine(plan));
+    if (grossNeed !== null) {
+      reasoning.push(
+        `Need before cash: ${usd(grossNeed)}. Subtract cash once it is known.`
+      );
+    }
     return {
       ...base,
       verdict: 'unknown',
@@ -253,15 +308,15 @@ export function evaluateDefaultAlive(
       raise: {
         toDefaultAliveUsd: null,
         forRunwayTargetUsd: null,
-        forMilestoneUsd: null,
+        forPlanUsd: null,
+        grossNeedUsd: grossNeed === null ? null : Math.round(grossNeed),
         recommendedUsd: null,
         rangeUsd: null,
         basis: 'Not computed: required inputs are missing or invalid.',
       },
       timing: { kind: 'unknown', reason: 'Required inputs are missing.' },
-      reasoning: blocking.map(
-        gap => `Gap: ${gap.input} is ${gap.kind}. ${gap.detail}`
-      ),
+      plan,
+      reasoning,
     };
   }
 
@@ -272,13 +327,7 @@ export function evaluateDefaultAlive(
   const r0 = inputs.mrrUsd.value as number;
   const gR = inputs.mrrGrowthRateMonthly.value ?? 0;
   const gE = inputs.expenseGrowthRateMonthly.value as number;
-  const path: GrowthPath = {
-    e0,
-    r0,
-    le: Math.log(1 + gE),
-    lr: Math.log(1 + gR),
-  };
-  const margin = policy.marginRate.value;
+  const path = pathFrom(inputs);
   const reasoning: string[] = [];
 
   reasoning.push(
@@ -342,24 +391,27 @@ export function evaluateDefaultAlive(
   // subtracted, so a large balance never inflates the ask.
   const need = (gross: number) => Math.max(0, gross * (1 + margin) - cash);
   const toDefaultAlive = capital === null ? null : need(capital);
-  const target = policy.runwayTargetMonths.value;
   const forRunway = {
     min: need(peakNetBurn(path, target.min)),
     max: need(peakNetBurn(path, target.max)),
   };
-  const forMilestone = inputs.milestone
-    ? need(peakNetBurn(path, inputs.milestone.months))
-    : null;
+  const forPlan = plan ? Math.max(0, plan.withMarginUsd - cash) : null;
+  if (plan) reasoning.push(planLine(plan));
   const step = policy.roundToUsd.value;
-  const low = roundUp(Math.max(toDefaultAlive ?? 0, forRunway.min), step);
+  const low = roundUp(
+    Math.max(toDefaultAlive ?? 0, forRunway.min, forPlan ?? 0),
+    step
+  );
   const high = roundUp(
-    Math.max(toDefaultAlive ?? 0, forRunway.max, forMilestone ?? 0),
+    Math.max(toDefaultAlive ?? 0, forRunway.max, forPlan ?? 0),
     step
   );
   const basis =
-    toDefaultAlive !== null && toDefaultAlive >= forRunway.min
-      ? `Capital to profitability x ${1 + margin} margin, minus cash (Blackwell), rounded up to ${usd(step)}.`
-      : `${target.min} months of modelled net burn x ${1 + margin} margin, minus cash (PG ${target.min}-month sizing), rounded up to ${usd(step)}.${toDefaultAlive === null ? ' No finite raise reaches default alive on the current path, so runway buys time to find growth.' : ''}`;
+    forPlan !== null && forPlan >= Math.max(toDefaultAlive ?? 0, forRunway.min)
+      ? `Plan cost to ${plan?.milestone} x ${1 + margin} margin, minus cash; larger than the survival floor, rounded up to ${usd(step)}.`
+      : toDefaultAlive !== null && toDefaultAlive >= forRunway.min
+        ? `Capital to profitability x ${1 + margin} margin, minus cash (Blackwell), rounded up to ${usd(step)}.`
+        : `${target.min} months of modelled net burn x ${1 + margin} margin, minus cash (PG ${target.min}-month sizing), rounded up to ${usd(step)}.${toDefaultAlive === null ? ' No finite raise reaches default alive on the current path, so runway buys time to find growth.' : ''}`;
   reasoning.push(
     `Raise ${usd(low)} (range ${usd(low)} to ${usd(high)}). ${basis}`
   );
@@ -419,12 +471,19 @@ export function evaluateDefaultAlive(
         min: round(forRunway.min, 0) as number,
         max: round(forRunway.max, 0) as number,
       },
-      forMilestoneUsd: round(forMilestone, 0),
+      forPlanUsd: round(forPlan, 0),
+      grossNeedUsd: Math.round(
+        Math.max(
+          peakNetBurn(path, target.min) * (1 + margin),
+          plan?.withMarginUsd ?? 0
+        )
+      ),
       recommendedUsd: low,
       rangeUsd: { low, high },
       basis,
     },
     timing,
+    plan,
     reasoning,
   };
 }

@@ -8,6 +8,9 @@
  *
  * --attested: founder attestations (cash, fixed burn, growth) kept OUTSIDE
  *   this public repo (e.g. the private fundraising registry).
+ * --plan: a use-of-funds plan JSON (e.g. the registry's financial plan). It is
+ *   the source of truth for planned burn and overrides any plan in --attested.
+ *   YAML is not read; write the plan as JSON.
  * --revenue: the JSON body of GET /api/internal/ovie/summer-company/revenue.
  * Variable burn is read from ops/registry/spend.json caps.
  * Prints the engine result as JSON (or the reasoning with --text).
@@ -21,12 +24,14 @@ import {
   assembleDefaultAliveInputs,
   attestedFinanceSchema,
   mrrFromSummerRevenue,
+  raisePlanSchema,
   variableBurnFromSpendRegistry,
 } from '../lib/ovie/default-alive/inputs';
 
 const { values } = parseArgs({
   options: {
     attested: { type: 'string' },
+    plan: { type: 'string' },
     revenue: { type: 'string' },
     'mrr-usd': { type: 'string' },
     'mrr-source': { type: 'string' },
@@ -47,6 +52,10 @@ const spendPath =
 const attested = values.attested
   ? attestedFinanceSchema.parse(readJson(values.attested))
   : null;
+if (values.plan && !values.plan.endsWith('.json')) {
+  throw new Error('--plan must be a JSON file');
+}
+const plan = values.plan ? raisePlanSchema.parse(readJson(values.plan)) : null;
 
 let mrr = null;
 if (values.revenue) {
@@ -64,6 +73,7 @@ if (values.revenue) {
 
 const inputs = assembleDefaultAliveInputs({
   attested,
+  plan,
   mrr,
   variableBurn: variableBurnFromSpendRegistry(
     readJson(spendPath) as Parameters<typeof variableBurnFromSpendRegistry>[0]

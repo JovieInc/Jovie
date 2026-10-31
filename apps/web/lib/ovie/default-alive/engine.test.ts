@@ -14,6 +14,7 @@ import {
   assembleDefaultAliveInputs,
   attestedFinanceSchema,
   mrrFromSummerRevenue,
+  raisePlanSchema,
   variableBurnFromSpendRegistry,
 } from './inputs';
 
@@ -206,18 +207,78 @@ describe('evaluateDefaultAlive', () => {
     expect(result.gaps[0]).toMatchObject({ input: 'cashUsd', kind: 'invalid' });
   });
 
-  it('sizes a milestone raise when one is given', () => {
+  const plan = {
+    milestone: '10 paying customers',
+    milestoneMonths: 12,
+    milestoneSource: 'test',
+    lines: [
+      {
+        label: 'base',
+        usdPerMonth: 10_000,
+        source: 'test',
+        basis: 'measured' as const,
+      },
+      {
+        label: 'founder',
+        usdPerMonth: 6_000,
+        source: 'test',
+        basis: 'assumption' as const,
+      },
+    ],
+    offer: { usd: 500_000, source: 'test program' },
+  };
+
+  it('sizes the raise by the plan when the plan costs more than survival', () => {
     const result = evaluateDefaultAlive(
       inputs({
         cashUsd: n(0),
         mrrUsd: n(0),
         mrrGrowthRateMonthly: n(null),
-        milestone: { label: 'Series A metrics', months: 30 },
+        plan,
       }),
       NOW
     );
-    expect(result.raise.forMilestoneUsd).toBe(375_000);
-    expect(result.raise.rangeUsd?.high).toBe(375_000);
+    // $16K/mo x (12 + 3 to raise + 2 buffer) = $272K; x 1.25 = $340K.
+    expect(result.plan).toMatchObject({
+      months: 17,
+      monthlyBurnUsd: 16_000,
+      grossCostUsd: 272_000,
+      withMarginUsd: 340_000,
+      offerRunwayMonths: 31.3,
+      offerCoversPlan: true,
+      offerMonthsAfterMilestone: 19.3,
+      offerReachesMilestoneWithRaiseTime: true,
+      offerRunsOutOn: '2029-06-09',
+    });
+    expect(result.plan?.assumptions).toEqual(['founder: 6000/mo (test)']);
+    expect(result.raise.forPlanUsd).toBe(340_000);
+    // Survival floor is 18 x $10K x 1.25 = $225K, so the plan wins.
+    expect(result.raise.recommendedUsd).toBe(350_000);
+    expect(result.raise.basis).toContain('Plan cost');
+  });
+
+  it('keeps cash as a gap but still reports the need before cash', () => {
+    const result = evaluateDefaultAlive(
+      inputs({
+        cashUsd: n(null),
+        mrrUsd: n(0),
+        mrrGrowthRateMonthly: n(null),
+        plan,
+      }),
+      NOW
+    );
+    expect(result.verdict).toBe('unknown');
+    expect(result.raise.recommendedUsd).toBeNull();
+    expect(result.raise.grossNeedUsd).toBe(340_000);
+    expect(result.plan?.offerCoversPlan).toBe(true);
+  });
+
+  it('withholds the need before cash when burn is also missing', () => {
+    const result = evaluateDefaultAlive(
+      inputs({ cashUsd: n(null), fixedBurnUsdPerMonth: n(null) }),
+      NOW
+    );
+    expect(result.raise.grossNeedUsd).toBeNull();
   });
 
   it('is deterministic', () => {
@@ -275,6 +336,33 @@ describe('input assembly', () => {
     expect(result.verdict).toBe('unknown');
     expect(result.gaps.map(gap => gap.input)).toContain('mrrUsd');
     expect(result.gaps.map(gap => gap.input)).toContain('cashUsd');
+  });
+
+  it('takes the plan from the financial-plan source over an attested plan', () => {
+    const attested = attestedFinanceSchema.parse({
+      cashUsd: { value: null, source: 'unknown', asOf: null },
+      fixedBurnUsdPerMonth: { value: 5, source: 'founder', asOf: FRESH },
+      plan: {
+        milestone: 'old',
+        milestoneMonths: 6,
+        milestoneSource: 'founder',
+        lines: [
+          { label: 'x', usdPerMonth: 1, source: 's', basis: 'assumption' },
+        ],
+      },
+    });
+    const plan = raisePlanSchema.parse({
+      milestone: 'new',
+      milestoneMonths: 12,
+      milestoneSource: 'financial plan',
+      lines: [{ label: 'y', usdPerMonth: 2, source: 's', basis: 'measured' }],
+    });
+    expect(assembleDefaultAliveInputs({ attested, plan }).plan?.milestone).toBe(
+      'new'
+    );
+    expect(assembleDefaultAliveInputs({ attested }).plan?.milestone).toBe(
+      'old'
+    );
   });
 
   it('prefers measured MRR over an attested one', () => {

@@ -15,6 +15,33 @@ const sourcedNumber = z.object({
   asOf: z.string().min(1).nullable(),
 });
 
+/** Use-of-funds plan. Owned by the financial-plan agent's registry file. */
+export const raisePlanSchema = z.object({
+  milestone: z.string().min(1),
+  milestoneMonths: z.number().positive(),
+  milestoneSource: z.string().min(1),
+  lines: z
+    .array(
+      z.object({
+        label: z.string().min(1),
+        usdPerMonth: z.number().finite().nonnegative(),
+        source: z.string().min(1),
+        basis: z.enum([
+          'assumption',
+          'founder-attested',
+          'measured',
+          'registry-cap',
+        ]),
+      })
+    )
+    .min(1)
+    .max(20),
+  offer: z
+    .object({ usd: z.number().positive(), source: z.string().min(1) })
+    .nullable()
+    .optional(),
+});
+
 /**
  * Founder attestations. Cash is attested until a bank connector exists
  * (access gap: read-only bank API). Growth rates are optional; omitted
@@ -27,10 +54,7 @@ export const attestedFinanceSchema = z.object({
   mrrUsd: sourcedNumber.optional(),
   mrrGrowthRateMonthly: sourcedNumber.optional(),
   expenseGrowthRateMonthly: sourcedNumber.optional(),
-  milestone: z
-    .object({ label: z.string().min(1), months: z.number().positive() })
-    .nullable()
-    .optional(),
+  plan: raisePlanSchema.nullable().optional(),
 });
 
 export type AttestedFinance = z.infer<typeof attestedFinanceSchema>;
@@ -138,6 +162,8 @@ export function assembleDefaultAliveInputs(input: {
   readonly attested: AttestedFinance | null;
   readonly mrr?: SourcedInput<number> | null;
   readonly variableBurn?: SourcedInput<number> | null;
+  /** Plan from the financial-plan source of truth; wins over an attested one. */
+  readonly plan?: z.infer<typeof raisePlanSchema> | null;
 }): DefaultAliveInputs {
   const a = input.attested;
   const noAttestation = 'no founder attestation supplied';
@@ -163,6 +189,6 @@ export function assembleDefaultAliveInputs(input: {
       a?.expenseGrowthRateMonthly,
       'no expense history'
     ),
-    milestone: a?.milestone ?? null,
+    plan: input.plan ?? a?.plan ?? null,
   };
 }
