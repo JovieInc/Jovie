@@ -8194,6 +8194,23 @@ class FixRedTest(unittest.TestCase):
         self.assertIn("Do not open a new PR", prompt)
         self.assertIn("devin/jov-1", prompt)
 
+    def test_excerpt_uses_runtime_size_failure_instead_of_echoed_pr_body(self):
+        output = ("job\tstep\t##[group]Run set -euo pipefail\n"
+                  "job\tstep\tthrow new Error(`unparseable numstat row`);\n"
+                  "job\tstep\tPR_BODY: Failing command: git merge origin/main --no-edit\n"
+                  "job\tstep\tAutomatic merge failed; fix conflicts and then commit the result.\n"
+                  "job\tstep\t##[endgroup]\n"
+                  "job\tstep\t❌ exceeds standard size cap (1516 lines / 28 files; cap 1500/75)\n"
+                  "job\tstep\t##[error]Process completed with exit code 1.\n"
+                  "job\tcleanup\t##[group]Run cleanup\njob\tcleanup\t##[endgroup]\n"
+                  "job\tcleanup\tError: required certificate missing\n")
+        with patch.object(lane, "sh", return_value=SimpleNamespace(returncode=0, stdout=output)):
+            excerpt = lane.failure_excerpt(self.pr())
+        self.assertIn("required certificate missing", excerpt)
+        self.assertIn("exceeds standard size cap (1516", excerpt)
+        self.assertNotIn("git merge", excerpt)
+        self.assertNotIn("unparseable numstat", excerpt)
+
     def test_claims_are_visible_across_hosts_through_the_pr(self):
         real = lane.sh
         posted, comments = [], []

@@ -6065,8 +6065,10 @@ def failure_excerpt(pr: dict, limit: int = 6000) -> str:
         if check.get("conclusion") not in RED or not found:
             continue
         log = sh(["gh", "run", "view", "--repo", REPO_SLUG, "--job", found.group(1), "--log-failed"], timeout=120)
-        lines = [line.split("\t")[-1] for line in log.stdout.splitlines()
-                 if re.search(r"(?i)error|fail|expected|received|missing|✗|×", line)]
+        # GitHub echoes commands and PR_BODY before endgroup; those are not failures.
+        output = re.sub(r"##\[group\]Run [\s\S]*?##\[endgroup\]", "", log.stdout)
+        lines = [line.split("\t")[-1] for line in output.splitlines()
+                 if re.search(r"(?i)error|fail|expected|received|missing|exceeds|✗|×|❌", line)]
         parts.append(f"### {check.get('name')}\n" + "\n".join(lines[-40:]))
     return "\n\n".join(parts)[:limit]
 

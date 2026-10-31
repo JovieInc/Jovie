@@ -30,6 +30,12 @@ const endpoint = (conformance = 'enforced') => ({
   expectedSha: 'r',
 });
 const heads = { r: { repo: 'o/r', ref: 'main' } };
+const check = (body, options = {}, conformance = 'enforced') =>
+  checkEndpoint(endpoint(conformance), {
+    fetchImpl: respond(body),
+    now: NOW,
+    ...options,
+  });
 
 test('registry owners resolve in canon/ownership.json and conformance values are valid', () => {
   const registry = loadEndpointRegistry();
@@ -59,35 +65,20 @@ test('registry owners resolve in canon/ownership.json and conformance values are
 
 test('a conforming endpoint on the branch head passes and reports lag', async () => {
   const compare = async () => ({ status: 'ahead', ahead_by: 3 });
-  const r = await checkEndpoint(endpoint(), {
-    fetchImpl: respond(good()),
-    now: NOW,
-    compare,
-    heads,
-  });
+  const r = await check(good(), { compare, heads });
   assert.equal(r.verdict, 'ok');
   assert.deepEqual(r.lag, { state: 'behind', behindBy: 3 });
 });
 
 test('drift, a diverged commit and a wrong expected sha all fail', async () => {
-  const legacy = await checkEndpoint(endpoint(), {
-    fetchImpl: respond({ buildId: 'x', commitSha: SHA }),
-    now: NOW,
-    heads,
-  });
+  const legacy = await check({ buildId: 'x', commitSha: SHA }, { heads });
   assert.equal(legacy.verdict, 'fail');
-  const diverged = await checkEndpoint(endpoint(), {
-    fetchImpl: respond(good()),
-    now: NOW,
+  const diverged = await check(good(), {
     heads,
     compare: async () => ({ status: 'diverged' }),
   });
   assert.match(diverged.errors.join(), /not an ancestor/);
-  const wrong = await checkEndpoint(endpoint(), {
-    fetchImpl: respond(good()),
-    now: NOW,
-    expectSha: 'e'.repeat(40),
-  });
+  const wrong = await check(good(), { expectSha: 'e'.repeat(40) });
   assert.match(wrong.errors.join(), /is not expected/);
 });
 
@@ -107,15 +98,9 @@ test('unreachable and non-200 are failures, never healthy', async () => {
 });
 
 test('pending passes while non-conforming and fails once it conforms (ratchet)', async () => {
-  const stillLegacy = await checkEndpoint(endpoint('pending'), {
-    fetchImpl: respond({}),
-    now: NOW,
-  });
+  const stillLegacy = await check({}, {}, 'pending');
   assert.equal(stillLegacy.verdict, 'pending');
-  const flipped = await checkEndpoint(endpoint('pending'), {
-    fetchImpl: respond(good()),
-    now: NOW,
-  });
+  const flipped = await check(good(), {}, 'pending');
   assert.equal(flipped.verdict, 'pending-conforms');
   const report = await runConformance({
     registry: { expectedSha: {}, endpoints: [endpoint('pending')] },

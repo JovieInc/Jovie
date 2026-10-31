@@ -7,23 +7,6 @@ One envelope every internal service exposes, so Summer, Ovie and agents can answ
 - Where each service answers: [`ops/registry/health-endpoints.json`](../ops/registry/health-endpoints.json) (owners are pointers into [`ownership.json`](./ownership.json), never copied)
 - Conformance check: `node scripts/ops-health-conformance.mjs [--service jovie-web:production] [--expect-sha <sha>]`; the daily Remediation Sweep runs it (`--mode ops-health`) and files one fingerprinted Linear issue per drifting endpoint.
 
-## Shape
-
-```json
-{
-  "schema": "ops.health/v1",
-  "service": "jovie-web",
-  "environment": "production",
-  "commitSha": "<40 hex> | null",
-  "deployedAt": "ISO-8601 | null",
-  "version": "26.10.16 | null",
-  "status": "up | degraded | down | unknown",
-  "checkedAt": "ISO-8601",
-  "dependencies": [{ "name": "githubRead", "status": "up", "observedAt": "ISO-8601 | null", "latencyMs": 40, "detail": "stale" }],
-  "links": { "detail": "/api/health/comprehensive" }
-}
-```
-
 ## Rules (enforced by the validator)
 
 1. Unknown is explicit. A missing commit or build time is `null`, a short sha is `null`, never a guess. A fake `deployedAt` (request time) is a defect: jov.ie served `Date.now()` as `deployedAt` until this contract.
@@ -49,11 +32,4 @@ One envelope every internal service exposes, so Summer, Ovie and agents can answ
 | Hermes scripts, mesh | shell/py status files, no HTTP contract | n/a | pending (Linear) | gem watchers |
 | Automation registry | `canon/automation-registry.jsonl` `receipt` blocks | per-row receipt kinds (`json-timestamp`, `production-freshness`, `github-workflow`) | unchanged: it is the liveness dead-man registry, not the endpoint registry; URLs repeat there and should migrate to endpoint ids (Linear) | `scripts/automation-liveness.mjs` |
 
-## Where operational facts live
-
-| Fact | One source | Everything else |
-|---|---|---|
-| Service health URL, expected-head repo | `ops/registry/health-endpoints.json` | points to it by id |
-| Service owner and escalation | `canon/ownership.json` | `ownerRef` pointer |
-| Liveness SLOs and kill switches | `canon/automation-registry.jsonl` | n/a |
-| Credentials, spend, capacity | `ops/registry/*.json` | n/a |
+Liveness SLOs and kill switches remain in `canon/automation-registry.jsonl`; credentials, spend and capacity remain in `ops/registry/*.json`.
