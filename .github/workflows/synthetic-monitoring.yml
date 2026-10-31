@@ -202,7 +202,6 @@ jobs:
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-start-chat-results.json
         run: |
           env -u DOPPLER_TOKEN -u DATABASE_URL node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-start-chat.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-start-chat
-        continue-on-error: true
 
       - name: Confirm synthetic identity policy
         if: always()
