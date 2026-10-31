@@ -1879,6 +1879,38 @@ def fetch_slo(host, lane) -> dict | None:
     return record.get("snapshot")
 
 
+def ops_health_envelope(obs: dict, release_dir: Path | None = None) -> dict:
+    """ops.health/v1 (canon/OPS_HEALTH.md) for the lanes host, nested under `ops` because the
+    feed's own top-level `schema` is symphony-lanes-status/v1. Unknown stays explicit: a release
+    without a readable sourceCommit is commitSha null and status unknown, never up."""
+    release_dir = release_dir or Path(__file__).resolve().parent
+    commit, deployed_at = None, None
+    try:
+        manifest_path = release_dir / ".release.json"
+        raw, _ = lifecycle._read_regular(manifest_path, 65536)
+        candidate = str(json.loads(raw).get("sourceCommit") or "").lower()
+        commit = candidate if re.fullmatch(r"[0-9a-f]{40}", candidate) else None
+        deployed_at = datetime.fromtimestamp(manifest_path.stat().st_mtime, timezone.utc).isoformat().replace("+00:00", "Z")
+    except (OSError, ValueError, TypeError, AttributeError):
+        pass
+    now = now_iso()
+    github_remaining = obs.get("githubRemaining")
+    dependencies = [
+        {"name": "linear", "status": "degraded" if obs.get("linearError") else "up", "observedAt": now, "latencyMs": None},
+        {"name": "github-budget",
+         "status": ("unknown" if not isinstance(github_remaining, (int, float)) else "down" if github_remaining <= 0 else "up"),
+         "observedAt": now if isinstance(github_remaining, (int, float)) else None, "latencyMs": None},
+    ]
+    states = {d["status"] for d in dependencies}
+    status = ("down" if "down" in states else "degraded" if "degraded" in states
+              else "unknown" if "unknown" in states else "up")
+    if commit is None and status == "up":
+        status = "unknown"
+    return {"schema": "ops.health/v1", "service": "gem-lanes-host", "environment": "production",
+            "commitSha": commit, "deployedAt": deployed_at, "version": None, "status": status,
+            "checkedAt": now, "dependencies": dependencies}
+
+
 def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict | None = None,
                 conditions: dict[str, dict] | None = None) -> dict:
     """The few numbers Summer and other agents need, in one small JSON."""
@@ -1957,6 +1989,7 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
                                        "corruptRows": 0, "observedAt": None, "rows": []},
         obs.get("now") or time.time())
     return {"schema": "symphony-lanes-status/v1", "at": now_iso(), "host": lane.HOST, "release": tick.get("release"),
+            "ops": ops_health_envelope(obs),
             "fileOverlap": overlap, "linear": obs.get("linearSync") or tick.get("linear"),
             "deployHealth": deploy_health.feed_block(obs.get("deployHealth"), obs.get("now") or time.time()),
             "ownership": obs.get("ownership"),

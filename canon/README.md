@@ -27,5 +27,7 @@ Read in this order:
 13. [`SOURCES_OF_TRUTH.md`](./SOURCES_OF_TRUTH.md) — every fact domain, its one owner and
    its derived surfaces; generated from `sources-of-truth.json`. Find the owner before
    adding a fact; derive, never copy.
+14. [`OPS_HEALTH.md`](./OPS_HEALTH.md) — `ops.health/v1`, the one health/status envelope every
+   internal service exposes, its validator, endpoint registry and conformance check.
 
 Operational files (`CLAUDE.md`, `.claude/rules/*`, `docs/*`, skills, scripts, workflows) implement this canon. If they conflict, update the lower-level file or escalate to Tim.

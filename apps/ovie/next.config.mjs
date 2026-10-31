@@ -43,6 +43,11 @@ export const nextConfig = {
   transpilePackages: ['@jovie/ui'],
   serverExternalPackages: ['@statsig/statsig-node-core'],
   poweredByHeader: false,
+  // ops.health/v1 identity for the shared /api/health/build-info route.
+  env: {
+    OPS_SERVICE: 'ovie',
+    OPS_BUILD_TIME: process.env.OPS_BUILD_TIME || new Date().toISOString(),
+  },
   typescript: {
     // CI sets NEXT_IGNORE_TYPECHECK=1 only after `pnpm typecheck` has already
     // checked this exact tsconfig, so the build skips its duplicate pass.

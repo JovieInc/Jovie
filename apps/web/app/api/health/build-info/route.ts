@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDeployedBuildInfo } from '@/lib/observability/build-info';
+import { getOpsHealthEnvelope } from '@/lib/observability/ops-health';
 import { getWorktreeIdentity } from '@/lib/observability/worktree-runtime';
 import { recordShippedFixDeploys } from '@/lib/recovery/probes.server';
 
@@ -25,9 +26,13 @@ export async function GET() {
   const build = await getDeployedBuildInfo();
   // Release event hook for recovery emails: stamps shipped fixes' deploy time.
   void recordShippedFixDeploys().catch(() => undefined);
+  // ops.health/v1 envelope (canon/OPS_HEALTH.md) first; the legacy fields below
+  // stay for existing consumers (buildId drives the web update pill).
+  const ops = await getOpsHealthEnvelope();
 
   return NextResponse.json(
     {
+      ...ops,
       buildId: build.buildId,
       version: build.version,
       deployedAt: build.deployedAt,

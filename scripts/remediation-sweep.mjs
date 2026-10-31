@@ -10,8 +10,10 @@ import {
   parseWhois,
 } from './lib/domain-expiry.mjs';
 import { upsertLinearIssueByTitleFingerprint } from './lib/linear-issue-intake.mjs';
+import { ghCompare, runConformance } from './lib/ops-health-conformance.mjs';
 import {
   EXHAUSTED_LABEL,
+  planOpsHealth,
   readVercelReadonlyToken,
   runRemediationSweep,
   SUMMER_CONFIG_REPO,
@@ -364,6 +366,8 @@ async function main() {
     loadDomains: () => loadDomainRecords(),
     loadCredentials: () => loadCredentialsPlans(),
     loadDrift: () => loadDriftPlans(),
+    loadOpsHealth: async () =>
+      planOpsHealth(await runConformance({ compare: ghCompare })),
     vercelTokenPresent: Boolean(token),
     upsert: upsertLinearIssueByTitleFingerprint,
     apiKey: process.env.LINEAR_API_KEY,

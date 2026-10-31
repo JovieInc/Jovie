@@ -80,6 +80,8 @@ NON_PRODUCT_SPACING = re.compile(r"\.(?:test|spec|stories)\.[tj]sx?$")
 # - shell && chains (node --test or vitest paths, plus added prefixes)
 # - quoted list entries (both sides only add 'path', lines)
 # - one-line comma-separated identifier lists (main order, then head-only tokens)
+# - disjoint added siblings (list items, run_mode lines, parameters, properties,
+#   const or void statements, and @param lines)
 # Any other hunk stays a model fix.
 NARROWED_PREFLIGHT = "scripts/preflight-changed.mjs"
 NARROWED_CONFLICT = re.compile(
@@ -115,6 +117,17 @@ _IDENT_TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9-]*")
 _AND_CHAIN_LINE = re.compile(
     r"""^(?P<indent>[ \t]*)(?P<prefix>(?:"[^"\n]+"\s*:\s*)?)(?P<q>['"])(?P<command>[^'"\n]*&&[^'"\n]*)(?P=q)(?P<suffix>,?)\s*$""")
 _JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
+_OL_START = re.compile(r"^([ \t]*)(\d+)\. ")
+_RUN_MODE_LINE = re.compile(r"^[ \t]*run_mode[ \t]+([A-Za-z0-9][\w.-]*)[ \t]*$")
+_JSDOC_PARAM = re.compile(
+    r"^[ \t]*\*[ \t]*@param\b.*\[options\.([A-Za-z_][A-Za-z0-9_]*)\]")
+_COMMENT_LINE = re.compile(r"^[ \t]*(?://|/\*|\*(?!\s*@param\b)|#(?!!))")
+_CONST_LINE = re.compile(r"^[ \t]*(?:const|let|var)[ \t]+([A-Za-z_][A-Za-z0-9_]*)\b")
+_VOID_LINE = re.compile(r"^[ \t]*void[ \t]+")
+_PROP_LINE = re.compile(r"^[ \t]*([A-Za-z_][A-Za-z0-9_]*)[ \t]*:")
+_PARAM_LINE = re.compile(
+    r"^[ \t]*([A-Za-z_][A-Za-z0-9_]*)(?:[ \t]*=[ \t]*[^,\n]+)?,[ \t]*$")
+_ADDITIVE_RECORD_LIMIT = 12
 
 # (class, pattern, action). First match wins per check; order is most specific first.
 SIGNATURES = (
@@ -493,6 +506,242 @@ def resolve_and_chain_text(text: str) -> str | None:
     last = 0
     for hunk in hunks:
         resolved = _resolve_and_chain_hunk(hunk.group("ours"), hunk.group("theirs"))
+        if resolved is None:
+            return None
+        pieces.append(text[last:hunk.start()])
+        pieces.append(resolved)
+        last = hunk.end()
+    pieces.append(text[last:])
+    resolved = "".join(pieces)
+    if "<<<<<<<" in resolved or ">>>>>>>" in resolved or resolved == text:
+        return None
+    return resolved
+
+
+def _line_depth_end(line: str, depth: int, in_block: bool) -> tuple[int, bool] | None:
+    """Depth after one line. An unclosed quote or a negative depth fails closed."""
+    quote = None
+    escape = False
+    index = 0
+    while index < len(line):
+        char = line[index]
+        nxt = line[index + 1] if index + 1 < len(line) else ""
+        if in_block:
+            if char == "*" and nxt == "/":
+                in_block = False
+                index += 2
+                continue
+            index += 1
+            continue
+        if quote:
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == quote:
+                quote = None
+            index += 1
+            continue
+        if char == "/" and nxt == "/":
+            break
+        if char == "/" and nxt == "*":
+            in_block = True
+            index += 2
+            continue
+        if char in "'\"`":
+            quote = char
+            index += 1
+            continue
+        if char in ";," and depth == 0 and line[index + 1:].strip():
+            return None
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth -= 1
+            if depth < 0:
+                return None
+        index += 1
+    if quote:
+        return None
+    return depth, in_block
+
+
+def _take_additive_record(lines: list[str], start: int) -> tuple[str, str, int] | None:
+    """One added sibling starting at `start`: (kind, key, line count). None when the
+    shape is a control-flow edit or anything this union does not know."""
+    first = lines[start].rstrip("\n")
+    listed = _OL_START.match(first)
+    if listed:
+        count = 1
+        base_indent = len(listed.group(1))
+        while start + count < len(lines):
+            nxt = lines[start + count]
+            if not nxt.strip() or _OL_START.match(nxt.rstrip("\n")):
+                break
+            indent = len(nxt) - len(nxt.lstrip(" \t"))
+            if indent <= base_indent:
+                break
+            count += 1
+        content = re.sub(r"\s+", " ", "".join(lines[start:start + count])).strip()
+        content = re.sub(r"^\d+\.\s+", "", content, count=1)
+        return ("ol", content, count) if content else None
+    run = _RUN_MODE_LINE.match(first)
+    if run:
+        return "run", run.group(1), 1
+    documented = _JSDOC_PARAM.match(first)
+    if documented:
+        return "doc", documented.group(1), 1
+    depth, in_block, count = 0, False, 0
+    while start + count < len(lines):
+        count += 1
+        if count > _ADDITIVE_RECORD_LIMIT:
+            return None
+        ended = _line_depth_end(lines[start + count - 1], depth, in_block)
+        if ended is None:
+            return None
+        depth, in_block = ended
+        stripped = lines[start + count - 1].strip()
+        if depth == 0 and not in_block:
+            if stripped.endswith((",", ";")):
+                break
+            if not stripped.endswith(("=", "=>")):
+                return None
+    else:
+        return None
+    if depth != 0 or in_block:
+        return None
+    bound = _CONST_LINE.match(first)
+    if bound:
+        return "const", bound.group(1), count
+    if _VOID_LINE.match(first):
+        return "void", re.sub(r"\s+", " ", "".join(lines[start:start + count])).strip(), count
+    prop = _PROP_LINE.match(first)
+    if prop:
+        return "prop", prop.group(1), count
+    if count == 1:
+        param = _PARAM_LINE.match(first)
+        if param:
+            return "param", param.group(1), count
+    return None
+
+
+def _additive_records(side: str) -> list[dict] | None:
+    """Records on one side of a hunk. None when a line is not an added sibling."""
+    if not str(side or "").strip():
+        return None
+    lines = side.splitlines(keepends=True)
+    records: list[dict] = []
+    index = 0
+    pending: list[str] = []
+    while index < len(lines):
+        stripped = lines[index].rstrip("\n")
+        if not stripped.strip() or (_COMMENT_LINE.match(stripped) and not _JSDOC_PARAM.match(stripped)):
+            pending.append(lines[index])
+            index += 1
+            continue
+        taken = _take_additive_record(lines, index)
+        if taken is None:
+            return None
+        kind, key, count = taken
+        body = "".join(lines[index:index + count])
+        records.append({"kind": kind, "key": key, "body": body, "text": "".join(pending) + body})
+        pending = []
+        index += count
+    if any(line.strip() for line in pending):
+        return None
+    if pending and records:
+        records[-1]["text"] += "".join(pending)
+    return records or None
+
+
+def _additive_norm(record: dict) -> str:
+    body = record["body"].strip()
+    if record["kind"] == "ol":
+        body = re.sub(r"^\d+\.\s+", "", re.sub(r"\s+", " ", body))
+    return body
+
+
+def _render_additive(records: list[dict]) -> str:
+    if records and all(record["kind"] == "ol" for record in records):
+        first = _OL_START.match(records[0]["body"])
+        if not first:
+            return ""
+        start = int(first.group(2))
+        pieces = []
+        for offset, record in enumerate(records):
+            body = re.sub(
+                r"^([ \t]*)\d+\. ",
+                lambda match, number=start + offset: f"{match.group(1)}{number}. ",
+                record["body"],
+                count=1,
+            )
+            prefix, _, suffix = record["text"].partition(record["body"])
+            pieces.append(prefix + body + suffix)
+        return "".join(pieces)
+    return "".join(record["text"] for record in records)
+
+
+def merge_additive_siblings(ours: str, theirs: str) -> str | None:
+    """Union two additions. Base records stay in base order, then head-only records.
+    Ordered-list numbers continue after the base. The same key with a different body,
+    or a line that is not an added sibling, returns None."""
+    ours_records = _additive_records(ours)
+    theirs_records = _additive_records(theirs)
+    if not ours_records or not theirs_records:
+        return None
+    if any(record["kind"] == "ol" for record in ours_records + theirs_records) \
+            and not all(record["kind"] == "ol" for record in ours_records + theirs_records):
+        return None
+
+    def identity(record: dict) -> str:
+        return f"{record['kind']}\0{record['key']}"
+
+    def keyed(records: list[dict]) -> dict[str, str] | None:
+        found: dict[str, str] = {}
+        for record in records:
+            body = _additive_norm(record)
+            key = identity(record)
+            if key in found and found[key] != body:
+                return None
+            found[key] = body
+        return found
+
+    ours_by = keyed(ours_records)
+    theirs_by = keyed(theirs_records)
+    if ours_by is None or theirs_by is None:
+        return None
+    for key, body in ours_by.items():
+        if key in theirs_by and theirs_by[key] != body:
+            return None
+    ordered = []
+    seen: set[str] = set()
+    for record in [*theirs_records, *ours_records]:
+        key = identity(record)
+        if key in seen:
+            continue
+        seen.add(key)
+        ordered.append(record)
+    rendered = _render_additive(ordered)
+    if not rendered or "<<<<<<<" in rendered or ">>>>>>>" in rendered:
+        return None
+    return rendered
+
+
+def resolve_additive_sibling_text(text: str) -> str | None:
+    """Replace conflict hunks that are only disjoint added siblings. None when any
+    hunk has another shape, so the caller aborts and leaves the merge to a model."""
+    if "<<<<<<<" not in str(text or ""):
+        return None
+    hunks = list(_NARROWED_HUNK.finditer(text))
+    if not hunks:
+        return None
+    cleared = _NARROWED_HUNK.sub("", text)
+    if "<<<<<<<" in cleared or ">>>>>>>" in cleared:
+        return None
+    pieces = []
+    last = 0
+    for hunk in hunks:
+        resolved = merge_additive_siblings(hunk.group("ours"), hunk.group("theirs"))
         if resolved is None:
             return None
         pieces.append(text[last:hunk.start()])

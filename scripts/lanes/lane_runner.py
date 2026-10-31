@@ -6067,8 +6067,10 @@ def failure_excerpt(pr: dict, limit: int = 6000) -> str:
         if check.get("conclusion") not in RED or not found:
             continue
         log = sh(["gh", "run", "view", "--repo", REPO_SLUG, "--job", found.group(1), "--log-failed"], timeout=120)
-        lines = [line.split("\t")[-1] for line in log.stdout.splitlines()
-                 if re.search(r"(?i)error|fail|expected|received|missing|✗|×", line)]
+        # GitHub echoes commands and PR_BODY before endgroup; those are not failures.
+        output = re.sub(r"##\[group\]Run [\s\S]*?##\[endgroup\]", "", log.stdout)
+        lines = [line.split("\t")[-1] for line in output.splitlines()
+                 if re.search(r"(?i)error|fail|expected|received|missing|exceeds|✗|×|❌", line)]
         parts.append(f"### {check.get('name')}\n" + "\n".join(lines[-40:]))
     return "\n\n".join(parts)[:limit]
 
@@ -6112,6 +6114,10 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
                    "A one-line comma-separated identifier list is unioned by",
                    "fix_red_classes.merge_additive_identifier_list (main order, then head-only",
                    "tokens). Unknown hunks stay unresolved.",
+                   "Disjoint added siblings (ordered list items, run_mode lines, parameters,",
+                   "object properties, const or void statements, and @param lines) are unioned by",
+                   "fix_red_classes.resolve_additive_sibling_text: base order, then head-only",
+                   "records; ordered-list numbers continue. Unknown hunks stay unresolved.",
                    "Run the related checks after resolving.", ""]
     else:
         problem = []
@@ -6278,6 +6284,45 @@ def resolve_and_chain_conflict(worktree: Path, branch: str, log, *, guard=lambda
     return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
 
 
+def resolve_additive_sibling_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
+    """Union disjoint added siblings when every conflict hunk with main is that shape.
+
+    Base records stay in base order, then head-only records. Ordered-list numbers
+    continue. A hunk the union cannot read aborts and leaves the PR to the model.
+    The push is a fast-forward of the PR branch; this never rebases or force-pushes."""
+    guard()
+    merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
+    if merged.returncode != 0:
+        conflicted = [path for path in (sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout or "").split() if path]
+        if not conflicted:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        resolved_texts: dict[Path, str] = {}
+        for rel in conflicted:
+            target = worktree / rel
+            try:
+                outcome = fix_red_classes.resolve_additive_sibling_text(target.read_text())
+            except (OSError, UnicodeError):
+                outcome = None
+            if outcome is None:
+                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+                return False
+            resolved_texts[target] = outcome
+        try:
+            for target, outcome in resolved_texts.items():
+                atomic_write_text(target, outcome)
+        except OSError:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        guard()
+        if sh(["git", "add", "--", *conflicted], cwd=worktree, log=log).returncode != 0 \
+                or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+    guard()
+    return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+
+
 def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
     """Union quoted list entries when every conflict hunk with main is only those lines.
 
@@ -6366,6 +6411,7 @@ def conflict_resolvers():
         ("repair-and-chain", resolve_and_chain_conflict, "and-chain-merged"),
         ("repair-additive-list", resolve_additive_list_conflict, "additive-list-merged"),
         ("repair-identifier-list", resolve_identifier_list_conflict, "identifier-list-merged"),
+        ("repair-additive-sibling", resolve_additive_sibling_conflict, "additive-sibling-merged"),
     )
 
 

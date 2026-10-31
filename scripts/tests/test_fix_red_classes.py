@@ -268,6 +268,94 @@ class AndChainMergeTest(unittest.TestCase):
         self.assertIsNone(classes.resolve_and_chain_text(unknown))
 
 
+class AdditiveSiblingMergeTest(unittest.TestCase):
+    ROUTE = (
+        "  const build = await getDeployedBuildInfo();\n"
+        "<<<<<<< HEAD\n"
+        "  // ops.health/v1 envelope (canon/OPS_HEALTH.md) first; the legacy fields below\n"
+        "  // stay for existing consumers (buildId drives the web update pill).\n"
+        "  const ops = await getOpsHealthEnvelope();\n"
+        "=======\n"
+        "  // Release event hook for recovery emails: stamps shipped fixes' deploy time.\n"
+        "  void recordShippedFixDeploys().catch(() => undefined);\n"
+        ">>>>>>> origin/main\n"
+        "  return NextResponse.json({ ...ops });\n"
+    )
+    LIST = (
+        "<<<<<<< HEAD\n"
+        "12. [`OPS_HEALTH.md`](./OPS_HEALTH.md) — one envelope every\n"
+        "   internal service exposes.\n"
+        "=======\n"
+        "12. [`COMPLIANCE.md`](./COMPLIANCE.md) — legal register: requirement, evidence,\n"
+        "   gap, fix and owner.\n"
+        "\n"
+        "13. [`SOURCES_OF_TRUTH.md`](./SOURCES_OF_TRUTH.md) — one owner per fact domain.\n"
+        ">>>>>>> origin/main\n"
+    )
+
+    def test_unions_const_void_list_param_and_property_in_base_order(self):
+        resolved = classes.resolve_additive_sibling_text(self.ROUTE)
+        self.assertLess(
+            resolved.index("void recordShippedFixDeploys"),
+            resolved.index("const ops = await getOpsHealthEnvelope()"),
+        )
+        self.assertIn("...ops", resolved)
+        self.assertNotIn("<<<<<<<", resolved)
+        listed = classes.resolve_additive_sibling_text(self.LIST)
+        self.assertIn("12. [`COMPLIANCE.md`]", listed)
+        self.assertIn("13. [`SOURCES_OF_TRUTH.md`]", listed)
+        self.assertIn("14. [`OPS_HEALTH.md`]", listed)
+        self.assertNotIn("12. [`OPS_HEALTH.md`]", listed)
+        command = (
+            "          run_mode() { node scripts/remediation-sweep.mjs --mode \"$1\" $flag; }\n"
+            "<<<<<<< HEAD\n"
+            "            run_mode ops-health\n"
+            "=======\n"
+            "            run_mode drift\n"
+            ">>>>>>> origin/main\n"
+        )
+        modes = classes.resolve_additive_sibling_text(command)
+        self.assertIn("run_mode drift\n            run_mode ops-health\n", modes)
+        paired = (
+            "<<<<<<< HEAD\n"
+            " * @param {() => Promise<any[]>} [options.loadOpsHealth]\n"
+            "  loadOpsHealth,\n"
+            "    loadOpsHealth: async () =>\n"
+            "      planOpsHealth(await runConformance({ compare: ghCompare })),\n"
+            "=======\n"
+            " * @param {() => Promise<any[]>} [options.loadDrift]\n"
+            "  loadDrift,\n"
+            "    loadDrift: () => loadDriftPlans(),\n"
+            ">>>>>>> origin/main\n"
+        )
+        both = classes.resolve_additive_sibling_text(paired)
+        self.assertLess(both.index("loadDrift"), both.index("loadOpsHealth"))
+        self.assertIn("planOpsHealth(await runConformance({ compare: ghCompare })),", both)
+        self.assertIn("loadDrift: () => loadDriftPlans(),", both)
+
+    def test_literal_whitespace_control_flow_and_list_spacing_are_preserved(self):
+        self.assertIsNone(classes.merge_additive_siblings('const s = "  ";\n', 'const s = " ";\n'))
+        self.assertIsNone(classes.merge_additive_siblings("const head = 1, shared = 2;\n", "const main = 3, shared = 4;\n"))
+        for separator in ("; ", "\n"):
+            self.assertIsNone(classes.merge_additive_siblings(
+                f"const head = 1{separator}return head;\n", f"const main = 2{separator}return main;\n"))
+        self.assertEqual(classes.merge_additive_siblings("12. Head\n\n", "12. Main\n\n"), "12. Main\n\n13. Head\n\n")
+
+    def test_unknown_control_flow_and_changed_binding_stay_unresolved(self):
+        def hunk(ours, theirs):
+            return f"<<<<<<< HEAD\n{ours}=======\n{theirs}>>>>>>> origin/main\n"
+        edited = hunk("  return buildLegacy();\n", "  return buildNext();\n")
+        self.assertIsNone(classes.resolve_additive_sibling_text(edited))
+        rebound = hunk("  const ops = await getOpsHealthEnvelope();\n", "  const ops = null;\n")
+        self.assertIsNone(classes.resolve_additive_sibling_text(rebound))
+        self.assertIsNone(classes.resolve_additive_sibling_text(self.ROUTE + edited))
+        chained = hunk(
+            '    "ci:control:test": "node --test scripts/a.test.mjs && pnpm ownership:check",\n',
+            '    "ci:control:test": "node --test scripts/a.test.mjs && pnpm ownership:check && node scripts/sources-of-truth.mjs",\n')
+        self.assertIsNone(classes.resolve_additive_sibling_text(chained))
+        self.assertIsNotNone(classes.resolve_and_chain_text(chained))
+
+
 class SpacingSnapTest(unittest.TestCase):
     DIFF = """diff --git a/apps/web/components/Card.tsx b/apps/web/components/Card.tsx
 --- a/apps/web/components/Card.tsx

@@ -9,7 +9,8 @@ import { queryKeys } from './keys';
 export interface BuildInfo {
   buildId: string;
   version: string;
-  deployedAt: number;
+  /** ISO-8601, or null when the build time is unknown. */
+  deployedAt: string | null;
   commitSha?: string;
   environment?: string;
 }
