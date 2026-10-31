@@ -34,6 +34,8 @@ from types import SimpleNamespace
 
 os.environ["LANES_EXECUTION_BACKEND"] = "local-test"
 ROOT = Path(__file__).resolve().parents[2]
+# Literal header: the staged lanes release bundle carries no canon/ files.
+REGISTRY_HEADER = '{"schema": "jovie-automation-registry/v1"}\n'
 sys.path.insert(0, str(ROOT / "scripts/lanes"))
 import git_housekeeping  # noqa: E402
 
@@ -12552,7 +12554,7 @@ class LockfileConflictTest(unittest.TestCase):
     def test_append_only_registry_conflict_keeps_both_sides_without_a_model(self):
         """2026-10-29: canon/automation-registry.jsonl conflicted on 4 PRs; both sides' lines are the merge."""
         path = "canon/automation-registry.jsonl"
-        header = (ROOT / path).read_text().splitlines()[0] + "\n"
+        header = REGISTRY_HEADER
         with tempfile.TemporaryDirectory() as tmp:
             origin, work = self.repo(Path(tmp), {path: header + '{"id":"base"}\n{"id":"pr"}\n'},
                                      main_changes={path: header + '{"id":"base"}\n{"id":"main"}\n', "a.ts": "main\n"})
@@ -12570,7 +12572,7 @@ class LockfileConflictTest(unittest.TestCase):
 
     def test_registry_edits_to_the_same_id_stay_unresolved(self):
         path = "canon/automation-registry.jsonl"
-        header = (ROOT / path).read_text().splitlines()[0] + "\n"
+        header = REGISTRY_HEADER
         with tempfile.TemporaryDirectory() as tmp:
             _, work = self.repo(Path(tmp), {path: header + '{"id":"base","value":"pr"}\n'},
                                 main_changes={path: header + '{"id":"base","value":"main"}\n'})
