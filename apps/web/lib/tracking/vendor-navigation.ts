@@ -69,7 +69,10 @@ export function isolateTrackingDocument(): void {
   window.addEventListener(
     'pageshow',
     event => {
-      if (event.persisted) location.reload();
+      if (event.persisted) {
+        event.stopImmediatePropagation();
+        location.reload();
+      }
     },
     true
   );

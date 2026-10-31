@@ -43,8 +43,20 @@ describe('opaque SDK document isolation', () => {
       expect(vendorHistoryListener).not.toHaveBeenCalled();
       expect(navigation.reload).toHaveBeenCalledOnce();
       window.removeEventListener('popstate', vendorHistoryListener);
-      resetTrackingDocument();
+      const vendorRestoreListener = vi.fn();
+      window.addEventListener('pageshow', vendorRestoreListener);
+      window.dispatchEvent(
+        new PageTransitionEvent('pageshow', { persisted: false })
+      );
+      expect(vendorRestoreListener).toHaveBeenCalledOnce();
+      window.dispatchEvent(
+        new PageTransitionEvent('pageshow', { persisted: true })
+      );
+      expect(vendorRestoreListener).toHaveBeenCalledOnce();
       expect(navigation.reload).toHaveBeenCalledTimes(2);
+      window.removeEventListener('pageshow', vendorRestoreListener);
+      resetTrackingDocument();
+      expect(navigation.reload).toHaveBeenCalledTimes(3);
       navigation.pathname = '/app/dashboard';
       history.pushState({}, '', '/app/settings');
       expect(originalPush).toHaveBeenCalledTimes(2);
