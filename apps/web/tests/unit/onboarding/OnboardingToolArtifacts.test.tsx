@@ -81,6 +81,8 @@ describe('onboarding tool artifacts', () => {
     expect(screen.getByDisplayValue('Test Artist')).toBeDefined();
     expect(screen.getByText('Test Artist')).toBeDefined();
     expect(screen.getByText(/12\.3K followers/)).toBeDefined();
+    // No internal Spotify popularity score in the row (2026-10-31 walk).
+    expect(screen.queryByText(/Pop 48/)).toBeNull();
     expect(screen.queryByText('searchSpotifyArtist')).toBeNull();
 
     fireEvent.click(screen.getByText('Use'));

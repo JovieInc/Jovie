@@ -506,12 +506,9 @@ function ArtistResultRow({
     { source: 'spotify_search' }
   );
   const followers = formatFollowers(getDisplaySpotifyFollowers(metrics));
-  const meta = [
-    followers,
-    artist.popularity ? `Pop ${artist.popularity}` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  // Followers only: Spotify's internal "popularity" score ("Pop 60") means
+  // nothing to an artist (2026-10-31 golden-path walk).
+  const meta = followers;
 
   return (
     <button
