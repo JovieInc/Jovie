@@ -169,11 +169,13 @@ describe('spend runway and caps', () => {
       spend([{ ...gateway, burnPerDayUsd: { value: 8 } }]),
       '2026-10-20T01:00:00Z'
     );
-    expect(findings.map(f => f.fingerprint)).toEqual([
-      'spend-runway:gateway',
+    expect(findings.map(f => f.fingerprint).sort()).toEqual([
       'spend-runway-page:gateway',
+      'spend-runway:gateway',
     ]);
-    expect(findings[1]).toMatchObject({
+    expect(
+      findings.find(f => f.fingerprint === 'spend-runway-page:gateway')
+    ).toMatchObject({
       type: 'runway-page',
       severity: 'critical',
       runwayDays: 2.6,
