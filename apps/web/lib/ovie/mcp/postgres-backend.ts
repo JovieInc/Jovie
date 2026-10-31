@@ -5,7 +5,30 @@ import {
   listOperatingRecords,
 } from '@/lib/db/ovie-record-archive';
 import { ovieOperatingKv } from '@/lib/db/schema/ovie';
+import { captureWarning } from '@/lib/error-tracking';
 import { OVIE_MCP_INDEX_CAP, type RecordBackend } from './store';
+
+/**
+ * A KV row is read whole on every access. One MB-sized row read per request was
+ * 507 GB of Neon egress in October 2026. Rows over this budget must be split
+ * (hot state + append-only chunks); the warning makes growth visible before it
+ * costs money. Warn-only so a write never fails on size.
+ */
+export const OVIE_OPERATING_KV_ROW_BUDGET_BYTES = 256 * 1024;
+
+function warnIfOverBudget(key: string, value: unknown): void {
+  const bytes =
+    typeof value === 'string'
+      ? value.length
+      : (JSON.stringify(value)?.length ?? 0);
+  if (bytes > OVIE_OPERATING_KV_ROW_BUDGET_BYTES) {
+    void captureWarning('ovie_operating_kv row over size budget', undefined, {
+      keyPrefix: key.split(':').slice(0, 4).join(':'),
+      bytes,
+      budget: OVIE_OPERATING_KV_ROW_BUDGET_BYTES,
+    });
+  }
+}
 
 export function postgresRecordBackend(): RecordBackend {
   const backend: RecordBackend = {
@@ -18,6 +41,7 @@ export function postgresRecordBackend(): RecordBackend {
       return rows[0]?.value ?? null;
     },
     async set(key, value) {
+      warnIfOverBudget(key, value);
       const now = new Date();
       await db
         .insert(ovieOperatingKv)
@@ -28,6 +52,7 @@ export function postgresRecordBackend(): RecordBackend {
         });
     },
     async setIfAbsent(key, value) {
+      warnIfOverBudget(key, value);
       const now = new Date();
       const rows = await db
         .insert(ovieOperatingKv)
@@ -37,6 +62,7 @@ export function postgresRecordBackend(): RecordBackend {
       return rows.length === 1;
     },
     async compareAndSet(key, expectedValue, nextValue) {
+      warnIfOverBudget(key, nextValue);
       const rows = await db
         .update(ovieOperatingKv)
         .set({ value: nextValue, updatedAt: new Date() })
