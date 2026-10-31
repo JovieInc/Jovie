@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
+import { HOME_MARKETING_HEADER_CTA } from '@/data/marketing/headerCta';
 
 function readWebSource(path: string): string {
   return readFileSync(resolve(process.cwd(), path), 'utf8');
@@ -48,8 +50,12 @@ describe('support route header contract', () => {
     // the artist-profile claim -> /start even while waitlisting; other routes
     // keep the front-door CTA.
     expect(headerSource).toContain(
-      "[APP_ROUTES.HOME]: { label: 'Claim your profile', href: APP_ROUTES.START }"
+      '[APP_ROUTES.HOME]: HOME_MARKETING_HEADER_CTA'
     );
+    expect(HOME_MARKETING_HEADER_CTA).toEqual({
+      label: 'Claim your profile',
+      href: APP_ROUTES.START,
+    });
     expect(headerSource).toContain("treatment: 'wordmark'");
     expect(headerSource).toContain('MARKETING_NAV_LINKS.map');
     // Canonical Pen header: the Customers flyout is the only glass flyout.

@@ -10,7 +10,11 @@ import { getRedis } from '@/lib/redis';
 
 const HANDLE_CACHE_KEY_PREFIX = 'onboarding:handle-availability:';
 const HANDLE_AVAILABLE_TTL_SECONDS = 300; // 5 minutes — available handles can be claimed quickly
-const HANDLE_UNAVAILABLE_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days — claimed handles rarely become unclaimed
+// 10 minutes. Handles are released by renames, detached fixtures and deleted
+// accounts, and not every release path invalidates this key; a 30-day TTL
+// showed a free handle as "taken" in onboarding (2026-10-29 canary walk).
+// A miss is one indexed lookup, so a short TTL costs little.
+const HANDLE_UNAVAILABLE_TTL_SECONDS = 60 * 10;
 
 function getHandleCacheKey(handle: string): string {
   return `${HANDLE_CACHE_KEY_PREFIX}${normalizeHandleCandidate(handle)}`;
@@ -65,7 +69,7 @@ export async function cacheHandleAvailability(
 /**
  * Invalidate the cached availability for a specific handle.
  * Call this when a username is changed or an account is deleted
- * so stale "unavailable" entries don't persist for 30 days.
+ * so a stale "unavailable" entry clears immediately instead of at TTL.
  */
 export async function invalidateHandleCache(handle: string): Promise<void> {
   const redis = getRedis();

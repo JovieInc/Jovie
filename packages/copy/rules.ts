@@ -432,6 +432,18 @@ export const COPY_RULES: readonly CopyRule[] = [
     message: 'Filler. Cut the word and reread.',
   },
 
+  {
+    id: 'pipeline-jargon',
+    category: 'clarity',
+    severity: 'block',
+    registers: ['jovie-persona', 'jovie-marketing'],
+    // 2026-10-31 golden-path walk: "97 Spotify followers (source: enrichment)"
+    // shipped in the claim chat. Artists never see our pipeline's names.
+    pattern: /\benrichment\b|\(source:\s*[a-z_-]+\)/i,
+    message:
+      'Internal pipeline word. Name the real source ("on Spotify") or cut it.',
+  },
+
   // ── Product truth (registered overclaims) ──────────────────────────────
   {
     id: 'premature-ownership',

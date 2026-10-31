@@ -5,6 +5,8 @@ import {
   type ReleaseEmailCanaryScope,
   readReleaseEmailCanaryScope,
 } from '@/lib/canaries/release-email';
+import { canSendNotification } from '@/lib/creator/segment-registry';
+import { explicitSegmentFromSettings } from '@/lib/creator/segments';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
@@ -380,6 +382,11 @@ async function sendEmailNotification(
       headers: emailData.headers,
       channels: ['email'],
       category: 'marketing',
+      emailRoute: {
+        stream: 'transactional',
+        purpose: 'release-day',
+        consent: 'opt-in',
+      },
       senderContext,
     },
     { email: subscriber.email }
@@ -560,6 +567,23 @@ async function processNotificationWithBatchedData(ctx: {
         now,
         'cancelled',
         getCancellationReason(eligibility.reason)
+      );
+      return 'skipped';
+    }
+
+    // Segment gate (JOV-9679): release-day messages are music-segment
+    // templates. Only an explicit non-music segment blocks; unlabeled
+    // profiles with release records keep sending.
+    const explicitSegment = explicitSegmentFromSettings(creator.settings);
+    if (
+      explicitSegment &&
+      !canSendNotification('release_day_sms', explicitSegment)
+    ) {
+      await updateNotificationStatus(
+        notification.id,
+        now,
+        'cancelled',
+        'Release notifications do not apply to this creator segment'
       );
       return 'skipped';
     }
