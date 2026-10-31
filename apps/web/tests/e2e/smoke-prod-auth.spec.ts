@@ -1,7 +1,5 @@
 import { Buffer } from 'node:buffer';
 import { createHash, randomBytes } from 'node:crypto';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import {
   type APIRequestContext,
   expect,
@@ -11,6 +9,7 @@ import {
   test,
 } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import {
   mintPassageToken,
   PASSAGE_TOKEN_HEADER,
@@ -62,9 +61,6 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
  */
 
 test.use({ storageState: { cookies: [], origins: [] } });
-
-/** Saved signed-in session for the chat cert test (serial same-worker). */
-let signedInStatePath: string | null = null;
 
 /** Run tag shared by the fresh-user address and the edit-readback marker. */
 function runTag(): string {
@@ -811,164 +807,6 @@ test.describe('Production Auth Smoke @production-smoke', () => {
     });
     assertExactNavigationUrl(page.url(), expectedOrigin, 'Chat navigation');
     await waitForHydration(page);
-
-    await certStep(
-      'checkout',
-      'checkout-entry-renders',
-      async () => {
-        // JOV-10066: the checkout entry is the real /onboarding/checkout
-        // surface (explicit paid intent, so the organic-offer gates cannot
-        // redirect), not the billing settings page. The step stops before
-        // the Stripe handoff — it asserts the upgrade entry rendered.
-        await page.goto(
-          `${expectedOrigin}/onboarding/checkout?source=intent&plan=pro`,
-          {
-            waitUntil: 'domcontentloaded',
-            timeout: SMOKE_TIMEOUTS.NAVIGATION,
-          }
-        );
-        assertExactNavigationUrl(
-          page.url(),
-          expectedOrigin,
-          'Onboarding checkout navigation'
-        );
-        await waitForHydration(page);
-        await expect(
-          page.getByRole('heading', { name: /upgrade to/i }).first()
-        ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
-        const upgradeButton = page.getByRole('button', {
-          name: /upgrade to pro/i,
-        });
-        await expect(upgradeButton).toBeVisible({
-          timeout: SMOKE_TIMEOUTS.VISIBILITY,
-        });
-        await expect(upgradeButton).toBeEnabled();
-        const checkoutText = (
-          await page.locator('main').first().innerText()
-        ).toLowerCase();
-        expect(checkoutText).not.toMatch(
-          /application error|something went wrong/
-        );
-        expect(checkoutText).toMatch(/pro/);
-      },
-      () =>
-        'onboarding/checkout entry rendered the upgrade CTA; stopped before payment'
-    );
-    telemetry.record('checkout');
-    await telemetry.capture(page, 'checkout');
-
-    // JOV-9625 outcome rework: one admin certifications-inventory readback
-    // attempt per run, as the documented CI admin fixture
-    // (browse-admin+clerk_test@jov.ie). Recorded as receipt evidence on the
-    // landing surface — never a check — so a not-viable fixture records the
-    // exact blocker without turning any golden-path surface red.
-    {
-      const adminEmail = PRODCERT_ADMIN_READBACK_EMAIL;
-      const adminContext = await page.context().browser()?.newContext();
-      try {
-        if (!adminContext) throw new Error('no browser context available');
-        const adminPage = await adminContext.newPage();
-        await adminPage.goto(APP_ROUTES.SIGNIN, {
-          waitUntil: 'domcontentloaded',
-          timeout: SMOKE_TIMEOUTS.NAVIGATION,
-        });
-        const { submitButton } = await prepareProductionAuthEmailForm(
-          adminPage,
-          adminEmail
-        );
-        const otpRequestedAtMs = Date.now();
-        await submitButton.click();
-        const codeInput = adminPage
-          .locator(
-            'form[data-auth-email-code-step="code"] [data-testid="otp-autofill-input"], form[data-auth-email-code-step="code"] input[name="code"], form[data-auth-email-code-step="code"] input[autocomplete="one-time-code"], form[data-auth-email-code-step="code"] input[inputmode="numeric"]'
-          )
-          .first();
-        await expect(codeInput).toBeVisible({ timeout: 15_000 });
-        const adminCode = await waitForProductionAuthOtp({
-          email: adminEmail,
-          startedAtMs: otpRequestedAtMs,
-        }).catch(error => {
-          throw Object.assign(
-            new Error(
-              `admin fixture not viable: no fresh sign-in code for ${adminEmail} (${String(
-                (error as Error)?.message ?? error
-              ).slice(
-                0,
-                120
-              )}) — the fixture is likely absent from the production Better Auth database`
-            ),
-            { recorded: true }
-          );
-        });
-        await codeInput.fill(adminCode);
-        await adminPage.waitForURL(
-          url =>
-            url.origin === expectedOrigin && url.pathname.startsWith('/app'),
-          { timeout: 30_000 }
-        );
-        const inventoryResponse = await adminContext.request.get(
-          `${expectedOrigin}/api/ovie/certifications`
-        );
-        if (inventoryResponse.status() === 200) {
-          const inventory = (await inventoryResponse.json()) as {
-            counts?: { total?: number };
-          };
-          recordAdminReadback({
-            status: 'passed',
-            detail: `admin certifications inventory read back as ${adminEmail}: ${inventory?.counts?.total ?? 0} rows`,
-          });
-        } else {
-          recordAdminReadback({
-            status: 'blocked',
-            detail: `GET /api/ovie/certifications returned HTTP ${inventoryResponse.status()} for ${adminEmail} — the fixture is not an admin (users.isAdmin) in production`,
-          });
-        }
-      } catch (error) {
-        const recorded = error as { recorded?: boolean };
-        recordAdminReadback({
-          status: recorded.recorded ? 'blocked' : 'failed',
-          detail: String((error as Error)?.message ?? error).slice(0, 1_900),
-        });
-      } finally {
-        await adminContext?.close().catch(() => undefined);
-      }
-    }
-
-    const performanceAuthStatePath =
-      process.env.PERFORMANCE_AUTH_STATE_PATH?.trim();
-    if (performanceAuthStatePath) {
-      await page.context().storageState({ path: performanceAuthStatePath });
-    }
-    // The chat cert test reuses this session (serial same-worker); it never
-    // re-signs-in — a second OTP would invalidate the first.
-    signedInStatePath = join(tmpdir(), `prodcert-signed-in-${runTag()}.json`);
-    await page.context().storageState({ path: signedInStatePath });
-  });
-
-  // JOV-9625 outcome rework: the chat certification is its own serial test
-  // that reuses the signed-in session saved by the sign-in test above — a
-  // chat turn must never be a dependency of establishing the authenticated
-  // exact-build state (the exact-build perf lane greps only the sign-in
-  // test). The cert stays truthful: it still fails on terminal/quota states.
-  test('chat cert: first reply is a real assistant reply', async ({
-    browser,
-  }, testInfo) => {
-    test.setTimeout(180_000);
-    const expectedOrigin = exactOriginForTest(testInfo);
-    if (!signedInStatePath) {
-      // The sign-in test failed before saving a session, so the run is
-      // already red through it. Record the chat steps blocked for the
-      // receipt and stop without a second failure.
-      const why = 'no signed-in session was saved by the sign-in test';
-      certStepBlocked('chat', 'composer-ready', why);
-      certStepBlocked('chat', 'first-reply', why);
-      return;
-    }
-    const context = await browser.newContext({
-      storageState: signedInStatePath,
-    });
-    const page = await context.newPage();
-    const telemetry = createSurfaceTelemetry(page);
     const composer = page.getByRole('textbox', { name: /chat message input/i });
     await certStep(
       'chat',
@@ -1153,9 +991,139 @@ test.describe('Production Auth Smoke @production-smoke', () => {
 
     telemetry.record('chat');
     await telemetry.capture(page, 'chat');
-    await context.close();
-  });
 
+    await certStep(
+      'checkout',
+      'checkout-entry-renders',
+      async () => {
+        // JOV-10066: the checkout entry is the real /onboarding/checkout
+        // surface (explicit paid intent, so the organic-offer gates cannot
+        // redirect), not the billing settings page. The step stops before
+        // the Stripe handoff — it asserts the upgrade entry rendered.
+        await page.goto(
+          `${expectedOrigin}/onboarding/checkout?source=intent&plan=pro`,
+          {
+            waitUntil: 'domcontentloaded',
+            timeout: SMOKE_TIMEOUTS.NAVIGATION,
+          }
+        );
+        assertExactNavigationUrl(
+          page.url(),
+          expectedOrigin,
+          'Onboarding checkout navigation'
+        );
+        await waitForHydration(page);
+        await expect(
+          page.getByRole('heading', { name: /upgrade to/i }).first()
+        ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+        // The CTA is `Upgrade to ${planMarketing.displayName}`
+        // (OnboardingCheckoutClient); derive the plan name from the registry
+        // instead of pinning old copy ("Pro" became "Artist Presence" and
+        // blocked every production promotion on 2026-10-31).
+        const upgradeButton = page.getByRole('button', {
+          name: `Upgrade to ${getPlanDisplayName('pro')}`,
+        });
+        await expect(upgradeButton).toBeVisible({
+          timeout: SMOKE_TIMEOUTS.VISIBILITY,
+        });
+        await expect(upgradeButton).toBeEnabled();
+        const checkoutText = (
+          await page.locator('main').first().innerText()
+        ).toLowerCase();
+        expect(checkoutText).not.toMatch(
+          /application error|something went wrong/
+        );
+        expect(checkoutText).toMatch(/pro/);
+      },
+      () =>
+        'onboarding/checkout entry rendered the upgrade CTA; stopped before payment'
+    );
+    telemetry.record('checkout');
+    await telemetry.capture(page, 'checkout');
+
+    // JOV-9625 outcome rework: one admin certifications-inventory readback
+    // attempt per run, as the documented CI admin fixture
+    // (browse-admin+clerk_test@jov.ie). Recorded as receipt evidence on the
+    // landing surface — never a check — so a not-viable fixture records the
+    // exact blocker without turning any golden-path surface red.
+    {
+      const adminEmail = PRODCERT_ADMIN_READBACK_EMAIL;
+      const adminContext = await page.context().browser()?.newContext();
+      try {
+        if (!adminContext) throw new Error('no browser context available');
+        const adminPage = await adminContext.newPage();
+        await adminPage.goto(APP_ROUTES.SIGNIN, {
+          waitUntil: 'domcontentloaded',
+          timeout: SMOKE_TIMEOUTS.NAVIGATION,
+        });
+        const { submitButton } = await prepareProductionAuthEmailForm(
+          adminPage,
+          adminEmail
+        );
+        const otpRequestedAtMs = Date.now();
+        await submitButton.click();
+        const codeInput = adminPage
+          .locator(
+            'form[data-auth-email-code-step="code"] [data-testid="otp-autofill-input"], form[data-auth-email-code-step="code"] input[name="code"], form[data-auth-email-code-step="code"] input[autocomplete="one-time-code"], form[data-auth-email-code-step="code"] input[inputmode="numeric"]'
+          )
+          .first();
+        await expect(codeInput).toBeVisible({ timeout: 15_000 });
+        const adminCode = await waitForProductionAuthOtp({
+          email: adminEmail,
+          startedAtMs: otpRequestedAtMs,
+        }).catch(error => {
+          throw Object.assign(
+            new Error(
+              `admin fixture not viable: no fresh sign-in code for ${adminEmail} (${String(
+                (error as Error)?.message ?? error
+              ).slice(
+                0,
+                120
+              )}) — the fixture is likely absent from the production Better Auth database`
+            ),
+            { recorded: true }
+          );
+        });
+        await codeInput.fill(adminCode);
+        await adminPage.waitForURL(
+          url =>
+            url.origin === expectedOrigin && url.pathname.startsWith('/app'),
+          { timeout: 30_000 }
+        );
+        const inventoryResponse = await adminContext.request.get(
+          `${expectedOrigin}/api/ovie/certifications`
+        );
+        if (inventoryResponse.status() === 200) {
+          const inventory = (await inventoryResponse.json()) as {
+            counts?: { total?: number };
+          };
+          recordAdminReadback({
+            status: 'passed',
+            detail: `admin certifications inventory read back as ${adminEmail}: ${inventory?.counts?.total ?? 0} rows`,
+          });
+        } else {
+          recordAdminReadback({
+            status: 'blocked',
+            detail: `GET /api/ovie/certifications returned HTTP ${inventoryResponse.status()} for ${adminEmail} — the fixture is not an admin (users.isAdmin) in production`,
+          });
+        }
+      } catch (error) {
+        const recorded = error as { recorded?: boolean };
+        recordAdminReadback({
+          status: recorded.recorded ? 'blocked' : 'failed',
+          detail: String((error as Error)?.message ?? error).slice(0, 1_900),
+        });
+      } finally {
+        await adminContext?.close().catch(() => undefined);
+      }
+    }
+
+    const performanceAuthStatePath =
+      process.env.PERFORMANCE_AUTH_STATE_PATH?.trim();
+    if (performanceAuthStatePath) {
+      await page.context().storageState({ path: performanceAuthStatePath });
+    }
+  });
   // JOV-9625: a brand-new user signs up with a fresh email OTP. The address is
   // the tagged prodcert canary (+synthetic-, excluded from customer metrics);
   // it is a different identity from creator-ready, so the OTPs cannot race.

@@ -229,7 +229,7 @@ import {
 } from '@/lib/services/pitch';
 import { isRetouchConfigured } from '@/lib/services/retouching/provider-gemini';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
-import { isWeeklyAiQuotaExemptEmail } from '@/lib/synthetic/prodcert-identities';
+import { isChatHealthCanaryEmail } from '@/lib/synthetic/prodcert-identities';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 
@@ -2874,14 +2874,8 @@ export async function POST(req: Request) {
 
   // Rate limiting - plan-aware weekly quota + burst protection. For clients
   // that send clientTurnId, reservation/replay happens before quota charging.
-  //
-  // The production-certification canary (JOV-9625 outcome rework) skips only
-  // the WEEKLY counter: its turns are evidence collection, not customer
-  // usage, so an exhausted seven-day counter must never block a promotion
-  // run's chat certification. The hourly burst limiter above still applies —
-  // the canary's real model spend stays rate-limited.
   const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan, {
-    skipWeeklyQuota: isWeeklyAiQuotaExemptEmail(accountContext.email),
+    skipWeeklyQuota: isChatHealthCanaryEmail(accountContext.email),
   });
   if (!rateLimitResult.success) {
     const rateLimitMessage =
@@ -3106,7 +3100,7 @@ export async function POST(req: Request) {
       const failure = classifyChatStreamFailure(error);
       await markChatTurnTerminal({
         turnId: reservedTurn.turnId,
-        status: 'failed_model_error',
+        status: failure.terminalStatus,
         errorCode: failure.errorCode,
         errorMessage: failure.errorMessage,
       });
@@ -3330,7 +3324,7 @@ export async function POST(req: Request) {
       const failure = classifyChatStreamFailure(error);
       await markChatTurnTerminal({
         turnId: reservedTurn.turnId,
-        status: 'failed_model_error',
+        status: failure.terminalStatus,
         errorCode: failure.errorCode,
         errorMessage: failure.errorMessage,
       }).catch(() => null);

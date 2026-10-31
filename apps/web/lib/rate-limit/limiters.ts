@@ -881,8 +881,10 @@ export async function checkAiChatRateLimitForPlan(
       return burstAllowed;
     }
 
-    // Release-gate canaries (`isWeeklyAiQuotaExemptEmail`) skip only the
-    // weekly quota; the hourly burst limiter above still caps their spend.
+    // The dedicated production chat-health canary (see
+    // `isChatHealthCanaryEmail`) skips only the weekly quota so deploy probes
+    // cannot exhaust any account's allowance; the hourly burst limiter above
+    // still caps its spend.
     if (options.skipWeeklyQuota === true) return burstAllowed;
 
     // 2. Weekly plan quota is mandatory distributed coordination. A Redis
