@@ -31,6 +31,26 @@ export const PRODCERT_RETURNING_CANARY_EMAIL =
  */
 export const PRODCERT_ADMIN_READBACK_EMAIL = DEFAULT_DEV_TEST_AUTH_EMAILS.admin;
 
+/**
+ * Exact canary addresses whose chats run inside release gates (production
+ * promotion smoke, golden-path walks) and so must never hit the weekly AI
+ * quota: a 429 there blocks promotion, not a customer. The server skips only
+ * the weekly quota for a session whose own email is in this list; the hourly
+ * burst limiter still applies. Exact match, no patterns: per-run
+ * `synthetic-prodcert-*` users and every real address stay metered.
+ */
+export const WEEKLY_AI_QUOTA_EXEMPT_CANARY_EMAILS: readonly string[] =
+  Object.freeze([PRODCERT_RETURNING_CANARY_EMAIL]);
+
+export function isWeeklyAiQuotaExemptEmail(
+  email: string | null | undefined
+): boolean {
+  return (
+    !!email &&
+    WEEKLY_AI_QUOTA_EXEMPT_CANARY_EMAILS.includes(normalizeEmail(email))
+  );
+}
+
 export const PRODCERT_NEW_USER_EMAIL_PATTERN =
   /^browse-ready\+synthetic-prodcert-(?:[a-z\d]){6,24}@jov\.ie$/u;
 

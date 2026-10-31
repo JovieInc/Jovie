@@ -862,7 +862,8 @@ export async function checkAiChatRateLimit(
  */
 export async function checkAiChatRateLimitForPlan(
   userId: string,
-  plan: string | null
+  plan: string | null,
+  options: { readonly skipWeeklyQuota?: boolean } = {}
 ): Promise<RateLimitResult> {
   try {
     // 1. Check hourly burst limiter (applies to all plans)
@@ -879,6 +880,10 @@ export async function checkAiChatRateLimitForPlan(
     if (!burstAllowed.success) {
       return burstAllowed;
     }
+
+    // Release-gate canaries (`isWeeklyAiQuotaExemptEmail`) skip only the
+    // weekly quota; the hourly burst limiter above still caps their spend.
+    if (options.skipWeeklyQuota === true) return burstAllowed;
 
     // 2. Weekly plan quota is mandatory distributed coordination. A Redis
     // outage must not fail-open into unbounded model spend.

@@ -997,6 +997,31 @@ describe('limiters.ts', () => {
       expect(mockLimit).toHaveBeenCalledTimes(2);
     });
 
+    it('skipWeeklyQuota keeps the hourly burst limit but never charges the weekly quota (JOV-9625)', async () => {
+      mockLimit.mockResolvedValue(makeAllowedResult());
+      const { checkAiChatRateLimitForPlan } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkAiChatRateLimitForPlan('user-1', 'pro', {
+        skipWeeklyQuota: true,
+      });
+      expect(result.success).toBe(true);
+      // Only the burst limiter ran; the weekly counter was never charged.
+      expect(mockLimit).toHaveBeenCalledTimes(1);
+
+      // The burst limit still applies to a canary: an exhausted hourly
+      // bucket denies the turn even with the weekly skip set.
+      mockLimit.mockReset();
+      mockLimit.mockResolvedValue(makeDeniedResult());
+      const burstDenied = await checkAiChatRateLimitForPlan('user-1', 'pro', {
+        skipWeeklyQuota: true,
+      });
+      expect(burstDenied.success).toBe(false);
+      expect(burstDenied.reason).toBe(
+        'Too many messages in a short time. Please wait a moment.'
+      );
+    });
+
     it('returns burst failure before checking weekly limit', async () => {
       mockLimit.mockResolvedValue(makeDeniedResult());
 
