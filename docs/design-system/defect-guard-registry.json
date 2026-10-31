@@ -92,6 +92,32 @@
         "ref": "findJank rules input-reset:effect-resets-on-open-state and focus-loss:inline-component, plus the input-retention test requirement in the frontend-rules criterion",
         "status": "landed"
       }
+    },
+    {
+      "id": "DG-008",
+      "component": "apps/web/app/app/(shell)/admin/product/page.tsx (Shipping views)",
+      "title": "Ovie Product page used hand-built text tabs and decorative lifecycle pills instead of the canonical segment control and a status pipeline",
+      "class": "ia-drift",
+      "foundBy": "human",
+      "foundAt": "2026-10-29T00:00:00Z",
+      "guard": {
+        "type": "ds-primitive-constraint",
+        "ref": "apps/web/tests/unit/design-system/ovie-ia-registry.test.ts (every Ovie page matches data/appScreens/ovie-ia.ts; sub-navigation only through AdminPage views/tabs) and canonical-nav-metric-ratchet.test.ts adHocTabs/adHocRouteNav/localMetricComponent",
+        "status": "landed"
+      }
+    },
+    {
+      "id": "DG-009",
+      "component": "apps/web/components/features/admin (Delivery, capability evidence)",
+      "title": "Metrics rendered a bare n/a when a source had not answered, hiding whether data was missing, stale or broken",
+      "class": "missing-states",
+      "foundBy": "human",
+      "foundAt": "2026-10-29T00:00:00Z",
+      "guard": {
+        "type": "lint-ast-rule",
+        "ref": "apps/web/tests/unit/design-system/canonical-nav-metric-ratchet.test.ts barePlaceholder (shrink-only); MeasuredValue is the only unknown/stale owner",
+        "status": "landed"
+      }
     }
   ]
 }

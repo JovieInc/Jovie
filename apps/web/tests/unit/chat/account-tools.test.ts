@@ -92,8 +92,8 @@ describe('account chat tools', () => {
   it('returns account status without raw Stripe identifiers', () => {
     const payload = buildAccountStatusPayload(makeAccountContext());
 
+    expect(payload).not.toHaveProperty('email');
     expect(payload).toMatchObject({
-      email: 'tim@jov.ie',
       plan: 'pro',
       displayPlan: 'Artist Presence',
       billingVerification: 'verified',

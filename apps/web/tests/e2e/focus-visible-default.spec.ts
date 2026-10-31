@@ -19,13 +19,29 @@ for (const route of ROUTES) {
       const result = await page.evaluate(() => {
         const el = document.activeElement as HTMLElement | null;
         if (!el || el === document.body) return null;
-        const cs = getComputedStyle(el);
-        const ring = cs.boxShadow && cs.boxShadow !== 'none';
-        const outline =
-          cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0;
-        const underline = cs.textDecorationLine.includes('underline');
+        const paintsIndicator = (node: Element): boolean => {
+          const cs = getComputedStyle(node);
+          const ring = cs.boxShadow && cs.boxShadow !== 'none';
+          const outline =
+            cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0;
+          const underline = cs.textDecorationLine.includes('underline');
+          return Boolean(ring || outline || underline);
+        };
+        // CompositeField (packages/ui/atoms/composite-field.tsx) owns the
+        // focus treatment for fields built from a control plus adjacent
+        // parts: the container paints the ring
+        // (.composite-field:has(:is(input…):focus-visible)) and the inner
+        // control paints nothing of its own by design (#23562 — a square
+        // default ring must never show inside the rounded field). A focused
+        // control inside one is visibly indicated by its field frame, so the
+        // indicator check accepts the canonical composite host's ring. Every
+        // other focused element still has to paint its own indicator.
+        const compositeHost = el.closest("[data-component='composite-field']");
+        const ok =
+          paintsIndicator(el) ||
+          (compositeHost !== null && paintsIndicator(compositeHost));
         return {
-          ok: Boolean(ring || outline || underline),
+          ok,
           label: `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''} ${(el.getAttribute('aria-label') ?? el.textContent ?? '').trim().slice(0, 40)}`,
         };
       });

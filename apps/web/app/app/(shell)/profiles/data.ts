@@ -363,6 +363,10 @@ export async function loadProfilesWorkspaceData(input: {
         rankFor(surface.id, previousRun?.id)
       ),
       lastObservedAt: observedAt,
+      linksOut:
+        surface.kind === 'social' || surface.kind === 'website'
+          ? socialSourceIds.has(surface.id)
+          : undefined,
       identityEvidence: {
         sourceCount: sourceCountBySurface.get(surface.id) ?? 0,
         sourceTypes: [...(sourceTypesBySurface.get(surface.id) ?? [])].sort(),

@@ -1,0 +1,154 @@
+name: Main Red Eject
+# clock-class: upstream-advisory
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Devin
+# necessary-trust-boundary: Reads CI merge-group evidence and the merge queue; opens revert and re-land PRs and incident issues under the Jovie Bot app token; never merges or enqueues itself (Merge Queue Green Enroll is the only queue writer and is dispatched).
+# removal-trigger: Remove when the merge queue ejects a red entry ahead of a green head natively (HEADGREEN) and Main Health pages and reverts on its own.
+#
+# A failing check must never stop the queue (Tim, 2026-10-29). When a required check
+# fails on two or more consecutive merge groups, find the first main commit that made
+# it red, revert it as a `compounding` PR (Green Enroll jumps it; dequeue first if it is
+# already queued, because jump on a queued PR is a no-op), and re-land the change as a
+# repair PR once the revert merges. Also frees an UNMERGEABLE queue head (#23692) and
+# records incidents for operator follow-up.
+# Kill switch: repository variable MAIN_RED_EJECT_MODE = off | dry | apply (default apply).
+
+on:
+  # Event-driven only (no cron: admission/landing workflows may not run from a schedule).
+  # Merge Queue Green Enroll completes about once a minute, which is the clock the
+  # stuck-head dwell needs.
+  workflow_run:
+    workflows: ['CI', 'Main Health', 'Merge Queue Green Enroll']
+    types: [completed]
+  pull_request_target:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      command:
+        description: 'plan (dry run) | apply | stuck-head | reopen'
+        required: false
+        default: 'plan'
+      pr:
+        description: 'Revert PR number for reopen'
+        required: false
+        default: ''
+
+permissions: {}
+
+concurrency:
+  group: main-red-eject
+  cancel-in-progress: false
+
+env:
+  MAIN_RED_EJECT_MODE: ${{ vars.MAIN_RED_EJECT_MODE || 'apply' }}
+
+jobs:
+  eject:
+    name: Eject red culprit
+    if: >-
+      github.repository == 'JovieInc/Jovie' &&
+      (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      # GITHUB_TOKEN is the ejector's failover bucket when the shared Jovie Bot
+      # installation budget is exhausted (2026-10-31 5 h queue stall).
+      pull-requests: write
+      issues: write
+    env:
+      GH_FALLBACK_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+      - name: Configure git identity and push credential
+        env:
+          TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          git config user.name 'jovie-bot[bot]'
+          git config user.email 'jovie-bot[bot]@users.noreply.github.com'
+          git remote set-url origin "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+      - name: Free a stuck queue head
+        if: ${{ github.event_name == 'workflow_run' || inputs.command == 'stuck-head' }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: node scripts/main-red-eject.mjs stuck-head --apply
+      - name: Attribute and eject the culprit
+        if: >-
+          ${{ inputs.command == 'plan' || inputs.command == 'apply' ||
+          (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure' &&
+          (github.event.workflow_run.event == 'merge_group' || github.event.workflow_run.name == 'Main Health')) }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          # Manual plan is always a dry run; every automatic wake follows the mode variable.
+          CMD: ${{ github.event_name == 'workflow_dispatch' && (inputs.command || 'plan') || 'apply' }}
+        run: node scripts/main-red-eject.mjs "$CMD"
+      - name: Re-land manually
+        if: ${{ inputs.command == 'reopen' }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: node scripts/main-red-eject.mjs reopen --pr "${{ inputs.pr }}"
+      - name: Alert on ejector failure
+        if: ${{ failure() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: node scripts/main-red-eject.mjs alert-failure
+
+  land:
+    name: Re-land ejected change
+    if: >-
+      github.repository == 'JovieInc/Jovie' &&
+      github.event_name == 'pull_request_target' && github.event.pull_request.merged == true &&
+      contains(github.event.pull_request.labels.*.name, 'main-red-revert')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+      - name: Configure git identity and push credential
+        env:
+          TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          git config user.name 'jovie-bot[bot]'
+          git config user.email 'jovie-bot[bot]@users.noreply.github.com'
+          git remote set-url origin "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+      - name: Re-land ejected change
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          if [[ "$MAIN_RED_EJECT_MODE" == apply ]]; then
+            node scripts/main-red-eject.mjs reopen --pr "$PR"
+          fi

@@ -24,6 +24,7 @@
 
 import { claims } from '@/lib/billing/offer/claims';
 import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
+import { getPaidPlanAdditionNames } from '@/lib/billing/public-pricing-features';
 import type {
   MarketingCopyLineBinding,
   MarketingCopyLineRole,
@@ -340,7 +341,7 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
           'Self-serve',
           '$12/mo',
           PRO_CTA_LABEL,
-          'Public Jovie profile and audience capture',
+          ...getPaidPlanAdditionNames(),
         ],
         claimIds: ['pro-price'],
         lineBindings: [
@@ -349,7 +350,12 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
           ['supporting:0', { claim: 'pro-price' }],
           ['supporting:1', { claim: 'pro-price' }],
           ['supporting:2', { action: 'claim-pro' }],
-          ['supporting:3', { claim: 'pro-price' }],
+          ...getPaidPlanAdditionNames().map(
+            (_, index): [string, { claim: string }] => [
+              `supporting:${index + 3}`,
+              { claim: 'pro-price' },
+            ]
+          ),
         ],
       }),
       pricingSection({

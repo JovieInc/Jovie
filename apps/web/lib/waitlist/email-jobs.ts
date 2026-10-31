@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { ingestionJobs } from '@/lib/db/schema/ingestion';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { sendNotification } from '@/lib/notifications/service';
 import { logger } from '@/lib/utils/logger';
@@ -13,6 +14,7 @@ import {
   buildWaitlistConfirmationEmail,
   buildWaitlistInviteEmail,
   buildWaitlistWelcomeEmail,
+  NO_PROFILE_INVITE_COPY_APPROVED,
 } from '@/lib/waitlist/invite';
 import {
   isWaitlistInviteRedeemableStatus,
@@ -575,6 +577,11 @@ async function processApprovalInviteEmail(params: {
     fullName: entry.fullName,
     token: tokenResult,
     dedupKey: `waitlist_invite:${entry.id}`,
+    // Profile state picks the copy variant once the founder approves it;
+    // until then the read is skipped and every invite keeps approved copy.
+    hasProfile: NO_PROFILE_INVITE_COPY_APPROVED
+      ? await entryHasCreatorProfile(tx, entry.id)
+      : undefined,
   });
   message.idempotencyKey = `waitlist_invite:${entry.id}:${hashWaitlistInviteToken(tokenResult)}`;
 
@@ -593,6 +600,18 @@ async function processApprovalInviteEmail(params: {
   });
 
   return result;
+}
+
+async function entryHasCreatorProfile(
+  tx: DbOrTransaction,
+  entryId: string
+): Promise<boolean> {
+  const [profile] = await tx
+    .select({ id: creatorProfiles.id })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.waitlistEntryId, entryId))
+    .limit(1);
+  return Boolean(profile);
 }
 
 async function processWelcomeEmail(params: {
