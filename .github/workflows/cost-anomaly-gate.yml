@@ -378,7 +378,7 @@ jobs:
     # is eating vercel credits?"). Low credit runway is reported, not failed:
     # credit failover already moves traffic to Workers AI.
     name: AI Routing Drift
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Checkout
