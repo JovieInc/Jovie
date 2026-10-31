@@ -46,6 +46,11 @@ UNWIRED = re.compile(r"Unwired: (.+?)\. Wire each file into a ci-fast lane")
 ATOMIC_TEXT = re.compile(r"use atomic_state\.atomic_write_text for whole-file state")
 BODY_TEXT = re.compile(r"red-before-green:|PR body is missing|missing (?:a )?`?## ?(?:Red-before-green|Blast radius)",
                        re.IGNORECASE)
+# Source Validation includes passing fixtures that print quota/network errors.
+# A concrete component error needs regression coverage, never an infra retry.
+COMPONENT_TEST_TEXT = re.compile(
+    r"::error file=[^\s:]+::\[test-not-touched\] Component changed but test "
+    r"((?:apps/web|packages/ui)/[\w./-]+\.(?:test|spec)\.[jt]sx?) was not touched in this diff\.")
 # The internal customer-changelog decision. A second note is `ambiguous`, so a body that already
 # contains one is never stamped again. The quota form is the attempt>1 mask of the same defect:
 # the guard could not re-read the body, so the log no longer says missing-metadata.
@@ -113,6 +118,7 @@ _JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
 
 # (class, pattern, action). First match wins per check; order is most specific first.
 SIGNATURES = (
+    ("component-test-evidence", COMPONENT_TEST_TEXT, AGENT),
     ("narrowed-preflight", NARROWED_CONFLICT, MERGE_NARROWED),
     # Before platform-infra: a Source Validation log can carry passing-test
     # rate-limit lines beside the guard error that actually failed the job.
@@ -194,6 +200,8 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
             and stamp_internal_changelog(pr.get("body")) is not None:
         cls, action, signature = "changelog-metadata", STAMP_CHANGELOG, ""
     files = []
+    if cls == "component-test-evidence":
+        files = sorted({test for name in names for test in COMPONENT_TEST_TEXT.findall(logs.get(name) or "")})
     if cls == "ci-fast-wiring":
         for name in names:
             found = UNWIRED.search(logs.get(name) or "")

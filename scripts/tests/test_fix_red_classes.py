@@ -38,6 +38,24 @@ class ClassifyTest(unittest.TestCase):
         self.assertEqual(got["files"], ["scripts/a.test.mjs", "scripts/b.test.mjs"])
         self.assertEqual(got["checks"], ["Source Validation"])
 
+    def test_component_test_errors_outrank_mocked_infra_and_name_required_tests(self):
+        tests = ["apps/web/tests/components/profile/ProfileDrawerShell.interaction.test.tsx",
+                 "apps/web/tests/unit/cookie-banner-fixes.test.tsx"]
+        errors = [f"::error file=apps/web/components/{name}.tsx::[test-not-touched] "
+                  f"Component changed but test {test} was not touched in this diff. Update the test."
+                  for name, test in zip(["ProfileDrawerShell", "CookieBannerSection"], tests)]
+        log = "passing fixture: github-quota-deferred; API rate limit exceeded\n" + "\n".join(errors + errors)
+        got = classes.classify(pr("Source Validation", merge="BEHIND"), {"Source Validation": log})
+        self.assertEqual((got["cls"], got["action"]), ("component-test-evidence", "agent"))
+        self.assertEqual(got["files"], tests)
+        self.assertNotIn(got["action"], classes.DETERMINISTIC, "real regression coverage needs a repair")
+
+    def test_component_test_explanation_without_error_annotation_is_not_a_failure(self):
+        got = classes.classify(pr("Source Validation"), {"Source Validation":
+            "passing test explains [test-not-touched] Component changed but test "
+            "apps/web/tests/unit/example.test.tsx was not touched in this diff."})
+        self.assertEqual(got["cls"], "other")
+
     def test_mixed_classes_go_to_the_model_and_behind_branches_sync_main(self):
         mixed = classes.classify(pr("A", "B"), {"A": "API rate limit exceeded", "B": "AssertionError"})
         self.assertEqual((mixed["cls"], mixed["action"]), ("mixed", "agent"))

@@ -180,6 +180,15 @@ function resetScrollLock() {
 describe('ProfileDrawerShell keyboard modal contract', () => {
   afterEach(resetScrollLock);
 
+  it('places the standalone drawer and backdrop on the sheet layer above cookie consent', () => {
+    renderOpenShell('standalone');
+
+    expect(screen.getByTestId('profile-drawer-overlay')).toHaveClass('z-sheet');
+    expect(screen.getByTestId('profile-menu-drawer').parentElement).toHaveClass(
+      'z-sheet'
+    );
+  });
+
   it('rejects the deliberate-red non-modal menu fixture', () => {
     const { container } = render(
       <div data-deliberate-red=''>
