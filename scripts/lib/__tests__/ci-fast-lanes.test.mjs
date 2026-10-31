@@ -2199,6 +2199,7 @@ describe('source-read guard selection', () => {
       'apps/web/app/api/cron/example/route.test.ts',
       [
         'artist-launch-contract',
+        'privacy-input-route-trackers',
         'merge-group-unit-guards',
         'node-environment-files',
       ],
@@ -2239,6 +2240,7 @@ describe('source-read guard selection', () => {
       'apps/web/app/(marketing)/download/page.tsx',
       [
         'artist-launch-contract',
+        'privacy-input-route-trackers',
         'merge-group-unit-guards',
         'static-revalidate-policy',
         'art-direction',
@@ -2371,6 +2373,7 @@ describe('source-read guard selection', () => {
     expect(selected('workflow_dispatch', ['README.md'])).toEqual([
       'native-design-system',
       'artist-launch-contract',
+      'privacy-input-route-trackers',
       'artist-profile-conformance',
       'ci-schedule-inventory',
       'automation-registry',
@@ -2390,6 +2393,7 @@ describe('source-read guard selection', () => {
     expect(selected('merge_group', null)).toEqual([
       'native-design-system',
       'artist-launch-contract',
+      'privacy-input-route-trackers',
       'artist-profile-conformance',
       'ci-schedule-inventory',
       'automation-registry',
@@ -2425,6 +2429,19 @@ describe('source-read guard selection', () => {
         expect(guard.command).toContain(
           join(REPO_ROOT, 'scripts/artist-profile-conformance.test.mjs')
         );
+        continue;
+      }
+      if (guard.id === 'privacy-input-route-trackers') {
+        expect(guard.prOnly).toBe(false);
+        expect(guard.command).toContain(
+          'scripts/compliance/input-page-trackers.test.mjs'
+        );
+        expect(
+          readFileSync(
+            join(REPO_ROOT, 'scripts/compliance/input-page-trackers.test.mjs'),
+            'utf8'
+          )
+        ).toContain("from 'node:test'");
         continue;
       }
       if (guard.id === 'artist-launch-contract') {
