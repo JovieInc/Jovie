@@ -12395,6 +12395,61 @@ class OnePrPerIssueTest(unittest.TestCase):
             claims.assert_not_called()
 
 
+class AtomicWriteRouteTest(unittest.TestCase):
+    def test_conflict_pass_preserves_checkout_when_target_enters_queue(self):
+        pr = {"number": 1, "headRefOid": "head", "headRefName": "feature", "isDraft": False,
+              "isCrossRepository": False, "isInMergeQueue": False, "mergeStateStatus": "DIRTY"}
+        calls = []
+        refuse_add = False
+        def shell(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=int(refuse_add and args[:3] == ["git", "worktree", "add"]),
+                                   stdout="main refs/heads/main\n" if "ls-remote" in args else "head\n")
+        def resolve(*args, guard, **kwargs):
+            guard()
+        with tempfile.TemporaryDirectory() as tmp, patch.object(lane, "sh", side_effect=shell), \
+             patch.object(lane, "conflict_files", return_value=["pnpm-lock.yaml"]), \
+             patch.object(lane, "claimed_elsewhere", return_value=False), \
+             patch.object(lane, "resolve_generated_conflict", side_effect=resolve), \
+             patch.object(lane, "require_fix_target", side_effect=lane.RepairStopped("target-pr-queued", {}, "test")):
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            self.assertEqual(lane.deterministic_conflict_pass(host, [pr], now=1000), [1])
+            self.assertEqual(json.loads((Path(tmp) / "deterministic-conflict.json").read_text())["1"]["outcome"], "target-changed")
+            (Path(tmp) / "deterministic-conflict.json").unlink()
+            with patch.object(lane, "Locked", return_value=SimpleNamespace(held=False, release=Mock())):
+                self.assertEqual(lane.deterministic_conflict_pass(host, [pr], now=1000), [])
+            refuse_add = True
+            self.assertEqual(lane.deterministic_conflict_pass(host, [pr], now=1000), [1])
+        self.assertFalse(any(c[:3] == ["git", "worktree", "remove"] for c in calls))
+
+    def test_verifies_and_rechecks_target_before_fast_forward_publication(self):
+        calls = []
+        pr = {"number": 1, "headRefOid": "head", "headRefName": "feature"}
+        def shell(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        def target(*args, **kwargs):
+            self.assertEqual(calls[-1][:2], ["git", "commit"])
+        receipt = {}
+        with patch.object(lane, "failed_logs", return_value={"Source Validation": "ratchet"}), \
+             patch.object(lane.fix_red_classes, "repair_atomic_state_writes", return_value=["scripts/lanes/a.py"]), \
+             patch.object(lane, "require_fix_target", side_effect=target) as guard, \
+             patch.object(lane, "sh", side_effect=shell):
+            self.assertEqual(lane.atomic_state_fix(None, pr, {}, Path("/unused"), None, receipt).returncode, 0)
+        guard.assert_called_once()
+        self.assertEqual(calls[0], ["python3", "-m", "unittest", "scripts.tests.test_lanes_atomic_state"])
+        self.assertIn(["pnpm", "preflight:changed"], calls)
+        self.assertEqual(calls[-1], ["git", "push", "-q", "origin", "HEAD:feature"])
+        self.assertEqual(receipt["atomicFiles"], ["scripts/lanes/a.py"])
+
+    def test_failed_ratchet_keeps_edits_local(self):
+        with patch.object(lane, "failed_logs", return_value={"Source Validation": "ratchet"}), \
+             patch.object(lane.fix_red_classes, "repair_atomic_state_writes", return_value=["scripts/lanes/a.py"]), \
+             patch.object(lane, "sh", return_value=SimpleNamespace(returncode=1)) as shell:
+            self.assertIsNone(lane.atomic_state_fix(None, {}, {}, Path("/unused"), None, {}))
+        self.assertEqual(shell.call_count, 1)
+
+
 class LockfileConflictTest(unittest.TestCase):
     """JOV-6837/JOV-7594: a generated-file-only conflict is resolved without a model; anything else is not."""
 
@@ -12494,6 +12549,34 @@ class LockfileConflictTest(unittest.TestCase):
             self.assertEqual(self.git("show", f"devin/jov-1-20260927:{path}", cwd=origin), "regenerated")
             self.assertEqual(self.git("show", "devin/jov-1-20260927:a.ts", cwd=origin), "main")
 
+    def test_append_only_registry_conflict_keeps_both_sides_without_a_model(self):
+        """2026-10-29: canon/automation-registry.jsonl conflicted on 4 PRs; both sides' lines are the merge."""
+        path = "canon/automation-registry.jsonl"
+        header = (ROOT / path).read_text().splitlines()[0] + "\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, work = self.repo(Path(tmp), {path: header + '{"id":"base"}\n{"id":"pr"}\n'},
+                                     main_changes={path: header + '{"id":"base"}\n{"id":"main"}\n', "a.ts": "main\n"})
+            ok, calls = self.run_resolve(work)
+            self.assertTrue(ok)
+            merged = self.git("show", f"devin/jov-1-20260927:{path}", cwd=origin)
+            self.assertIn('"id":"pr"', merged)
+            self.assertIn('"id":"main"', merged)
+            self.assertNotIn("<<<<<<<", merged)
+
+    def test_rule_scopes_record_is_a_generated_resolver(self):
+        self.assertEqual(lane.remediation.GENERATED_RESOLVERS["scripts/agent-context/rule-scopes.json"],
+                         ("node", "scripts/agent-context/rule-scopes.mjs", "--write"))
+        self.assertIn("canon/automation-registry.jsonl", lane.remediation.RESOLVABLE_CONFLICT_FILES)
+
+    def test_registry_edits_to_the_same_id_stay_unresolved(self):
+        path = "canon/automation-registry.jsonl"
+        header = (ROOT / path).read_text().splitlines()[0] + "\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            _, work = self.repo(Path(tmp), {path: header + '{"id":"base","value":"pr"}\n'},
+                                main_changes={path: header + '{"id":"base","value":"main"}\n'})
+            ok, _ = self.run_resolve(work)
+            self.assertFalse(ok)
+            self.assertEqual((work / path).read_text(), header + '{"id":"base","value":"pr"}\n')
     def test_sources_of_truth_conflict_regenerates_from_merged_source(self):
         path = "canon/SOURCES_OF_TRUTH.md"
         generator = "scripts/sources-of-truth.mjs"
