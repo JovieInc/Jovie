@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ARTIST_VISIBILITY_OFFER_CONTRACT_ID } from '@/lib/billing/offer-truth';
+import { getPaidPlanAdditionNames } from '@/lib/billing/public-pricing-features';
 import { MarketingPricingPlans } from './MarketingPricingPlans';
 
 describe('MarketingPricingPlans', () => {
@@ -18,15 +19,23 @@ describe('MarketingPricingPlans', () => {
     expect(screen.getByText('$12')).toBeInTheDocument();
     expect(screen.queryByText('Max')).not.toBeInTheDocument();
     expect(screen.queryByText('$149')).not.toBeInTheDocument();
-    const features = container.querySelectorAll(
+    const proCard = screen.getByTestId('marketing-pricing-plan-pro');
+    const proBullets = Array.from(
+      proCard.querySelectorAll('.marketing-pricing-plan-card__features li')
+    ).map(li => li.textContent);
+    // Paid card lists exactly what the comparison table says it adds over Free.
+    expect(proBullets).toEqual([...getPaidPlanAdditionNames()]);
+    expect(proBullets.length).toBeGreaterThan(0);
+    expect(proBullets).toContain('Pre-release & countdown pages');
+    expect(proBullets).toContain('Release notifications (email to fans)');
+    const freeCard = screen.getByTestId('marketing-pricing-plan-free');
+    for (const bullet of proBullets) {
+      expect(freeCard.textContent).not.toContain(bullet);
+    }
+    for (const li of container.querySelectorAll(
       '.marketing-pricing-plan-card__features li'
-    );
-    expect(features.length).toBeGreaterThan(0);
-    for (const feature of features) {
-      expect(feature.textContent).toBe(
-        'Public Jovie profile and audience capture'
-      );
-      expect(feature.querySelector('svg')).toBeNull();
+    )) {
+      expect(li.querySelector('svg')).toBeNull();
     }
   });
 });
