@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fileOverallIssue, fileSurfaceIssues } from '../../prod-cert.mjs';
+import {
+  fileOverallIssue,
+  fileSurfaceIssues,
+  postReceipts,
+  stripEvidenceOnlyKeys,
+} from '../../prod-cert.mjs';
 import {
   buildReceipt,
   certificationVerdict,
@@ -465,5 +470,102 @@ describe('JOV-9625 outcome rework: per-surface browser evidence', () => {
     expect(EXPECTED_BROWSER_CHECKS.onboarding).toContain(
       'fresh-user-onboarding-first-value'
     );
+  });
+});
+
+describe('ledger POST across a served-build schema skew (JOV-9625)', () => {
+  const receipt = () =>
+    buildReceipt({
+      surface: 'landing',
+      checks: [check('passed', 'front-door-renders')],
+      sha: SHA,
+      startedAt: T,
+      endedAt: T,
+      adminInventoryReadback: { status: 'passed', detail: '8 surfaces' },
+    });
+
+  it('stripEvidenceOnlyKeys removes only the allowlisted keys', () => {
+    const [stripped] = stripEvidenceOnlyKeys([
+      {
+        surface: 'landing',
+        status: 'passed',
+        sha: SHA,
+        adminInventoryReadback: { status: 'passed', detail: 'd' },
+        screenshot: { format: 'jpeg', dataUrl: 'data:image/jpeg;base64,x' },
+      },
+    ]);
+    expect(stripped).toEqual({
+      surface: 'landing',
+      status: 'passed',
+      sha: SHA,
+      screenshot: { format: 'jpeg', dataUrl: 'data:image/jpeg;base64,x' },
+    });
+    // The original receipt is untouched — the --out file keeps the readback.
+    expect(receipt().adminInventoryReadback).toEqual({
+      status: 'passed',
+      detail: '8 surfaces',
+    });
+  });
+
+  it('reposts without the evidence-only key when the served ledger predates it', async () => {
+    const bodies = [];
+    const sentAdminKeys = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url, init) => {
+        const body = JSON.parse(init.body);
+        bodies.push(body);
+        sentAdminKeys.push(
+          body.receipts.map(r => 'adminInventoryReadback' in r)
+        );
+        if (bodies.length === 1)
+          return new Response(
+            JSON.stringify({
+              error: 'invalid_receipts',
+              unrecognized_keys: ['adminInventoryReadback'],
+            }),
+            { status: 400, headers: { 'content-type': 'application/json' } }
+          );
+        return new Response(JSON.stringify({ ok: true, inserted: 8 }), {
+          status: 200,
+        });
+      })
+    );
+    const prevSecret = process.env.CRON_SECRET;
+    process.env.CRON_SECRET = 'test-secret';
+    try {
+      const result = await postReceipts([receipt()], 'https://jov.ie');
+      expect(result).toEqual({ ok: true, inserted: 8 });
+      expect(bodies).toHaveLength(2);
+      expect(sentAdminKeys[0]).toEqual([true]);
+      expect(sentAdminKeys[1]).toEqual([false]);
+    } finally {
+      process.env.CRON_SECRET = prevSecret;
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('still fails loudly on a 400 that is not the evidence-key skew', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ error: 'invalid_receipts', issues: [] }),
+            { status: 400, headers: { 'content-type': 'application/json' } }
+          )
+      )
+    );
+    const prevSecret = process.env.CRON_SECRET;
+    process.env.CRON_SECRET = 'test-secret';
+    try {
+      await expect(postReceipts([receipt()], 'https://jov.ie')).rejects.toThrow(
+        /ledger POST HTTP 400/
+      );
+      expect(vi.mocked(fetch).mock.calls).toHaveLength(1);
+    } finally {
+      process.env.CRON_SECRET = prevSecret;
+      vi.unstubAllGlobals();
+    }
   });
 });
