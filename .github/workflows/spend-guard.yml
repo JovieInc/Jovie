@@ -117,8 +117,9 @@ jobs:
         run: |
           set -euo pipefail
           jq -c '.items[:3][]' log-report.json | while read -r item; do
-            export REMEDIATION_FINGERPRINT="vercel-log-$(printf '%s' "$item" | jq -r .fingerprint | sha256sum | cut -c1-16)"
-            export REMEDIATION_DETAIL="$(printf '%s' "$item" | jq -r '"\(.kind) \(.project) x\(.count): \(.sample[0:200])"')"
+            REMEDIATION_FINGERPRINT="vercel-log-$(printf '%s' "$item" | jq -r .fingerprint | sha256sum | cut -c1-16)"
+            REMEDIATION_DETAIL="$(printf '%s' "$item" | jq -r '"\(.kind) \(.project) x\(.count): \(.sample[0:200])"')"
+            export REMEDIATION_FINGERPRINT REMEDIATION_DETAIL
             node scripts/remediation-signal-intake.mjs || true
           done
 
