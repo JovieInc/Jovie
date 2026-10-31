@@ -346,7 +346,7 @@ dates. It never holds a secret value.
 | File | Holds |
 | --- | --- |
 | `ops/registry/credentials.json` | Each credential (owner, consumers, scope, name patterns, created/expiry, rotation, blast radius) |
-| `jovie-private/ops/registry/third-party-grants.jsonl` (private `JovieInc/Ops` repo, read via `JOVIE_PRIVATE_DIR`; absent means no grants are checked) | Grants third parties hold on Tim's and the org's accounts: Google linked apps (tim@jov.ie), GitHub OAuth and GitHub App user authorizations, JovieInc app installations. Each has scope, purpose, owner, last use and a revoke URL. The check lists stale, never-used or unexplained grants for review and never revokes anything |
+| `jovie-private/ops/registry/third-party-grants.jsonl` (private `JovieInc/Ops` repo, read via `JOVIE_PRIVATE_DIR`; absent or empty fails the check loudly: a failed `read-private-third-party-grants` stage and a high `private-data:third-party-grants-unavailable` finding) | Grants third parties hold on Tim's and the org's accounts: Google linked apps (tim@jov.ie), GitHub OAuth and GitHub App user authorizations, JovieInc app installations. Each has scope, purpose, owner, last use and a revoke URL. The check lists stale, never-used or unexplained grants for review and never revokes anything |
 | `ops/registry/inventory.gen.json` | Generated name inventory of every Doppler config, Vercel project, GitHub Actions store and the GitHub App installation list |
 | `ops/registry/spend.json` | Each spend line (balance or spend snapshot, burn per day, cap and period, dated credits, read path) |
 
