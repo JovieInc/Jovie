@@ -62,7 +62,7 @@ describe('profile opengraph-image', () => {
 
   it('declares the nodejs runtime and static OG metadata', () => {
     expect(profileRuntime).toBe('nodejs');
-    expect(profileAlt).toBe('Public profile preview');
+    expect(profileAlt).toBe('Artist profile card on Jovie with photo and name');
     expect(profileSize).toEqual({ width: 1200, height: 630 });
   });
 

@@ -12,6 +12,9 @@ import {
   buildMarketingAssuranceProfileDigest,
   type CertificationRecordBackend,
   evaluateMarketingAssurance,
+  MARKETING_CERTIFICATION_AUDIT_ARCHIVE_PREFIX,
+  MARKETING_CERTIFICATION_HOT_AUDIT_PER_RECORD,
+  MARKETING_CERTIFICATION_LEDGER_MAX_BYTES,
   MARKETING_CERTIFICATION_STORE_KEY,
   type MarketingAssuranceEvidenceBinding,
   type MarketingAssuranceProfile,
@@ -1245,7 +1248,9 @@ describe('MarketingCertificationStore', () => {
 
     await expect(
       new MarketingCertificationStore(racing, REGISTRY).ingestPacket(
-        current,
+        packet(REGISTRY[0], {
+          testsCoverage: [proof('tests_coverage', 'older-pass', 'passed')],
+        }),
         '2026-09-04T20:05:01.000Z'
       )
     ).rejects.toThrow('is not newer than the persisted packet');
@@ -1598,5 +1603,59 @@ describe('MarketingCertificationStore', () => {
         '2026-09-04T20:09:01.000Z'
       )
     ).rejects.toThrow('update lost compare-and-set repeatedly');
+  });
+
+  it('moves old audit events to append-only chunks without losing any, and keeps the ledger row small', async () => {
+    const records = new Map<string, unknown>();
+    const store = new MarketingCertificationStore(
+      memoryBackend(records),
+      REGISTRY
+    );
+    const id = REGISTRY[0].id;
+    await store.ingestPacket(packet(REGISTRY[0]), '2026-09-04T20:00:00.000Z');
+    const seeded = JSON.parse(
+      records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
+    );
+    const event = seeded.records[id].auditHistory[0];
+    expect(event).toBeDefined();
+    seeded.records[id].auditHistory = Array.from({ length: 600 }, () => event);
+    records.set(MARKETING_CERTIFICATION_STORE_KEY, JSON.stringify(seeded));
+
+    await store.ingestPacket(
+      packet(REGISTRY[0], {
+        testsCoverage: [proof('tests_coverage', 'changed', 'failed')],
+      }),
+      '2026-09-04T20:01:00.000Z'
+    );
+
+    const hot = JSON.parse(
+      records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
+    );
+    expect(hot.records[id].auditArchiveChunks).toBe(1);
+    expect(hot.records[id].auditHistory.length).toBeLessThanOrEqual(
+      MARKETING_CERTIFICATION_HOT_AUDIT_PER_RECORD + 5
+    );
+    expect(
+      records.has(`${MARKETING_CERTIFICATION_AUDIT_ARCHIVE_PREFIX}:${id}:0`)
+    ).toBe(true);
+    const full = await store.readAuditHistory(id);
+    expect(full.length).toBeGreaterThanOrEqual(601);
+    expect(
+      Buffer.byteLength(
+        records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
+      )
+    ).toBeLessThan(MARKETING_CERTIFICATION_LEDGER_MAX_BYTES);
+  });
+
+  it('does not rewrite the ledger when a re-posted packet means the same thing', async () => {
+    const records = new Map<string, unknown>();
+    const store = new MarketingCertificationStore(
+      memoryBackend(records),
+      REGISTRY
+    );
+    await store.ingestPacket(packet(REGISTRY[0]), '2026-09-04T20:00:00.000Z');
+    const before = records.get(MARKETING_CERTIFICATION_STORE_KEY);
+    await store.ingestPacket(packet(REGISTRY[0]), '2026-09-04T20:05:00.000Z');
+    expect(records.get(MARKETING_CERTIFICATION_STORE_KEY)).toBe(before);
   });
 });

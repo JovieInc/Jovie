@@ -19,6 +19,14 @@ Jovie is a modern profile and link management platform. Our core features includ
 
 We deliver Jovie through a secure web app that respects your brand and creative control.
 
+### Agent Connector
+
+Jovie has a public connector at https://jov.ie/api/mcp that connected AI assistants, such as ChatGPT, Claude, Grok, and Meta Muse, and other assistants that support MCP, may call if their users connect it. Naming an assistant does not mean it is a partner of Jovie or that Jovie is listed in its directory. Jovie does not operate or control those assistants, and your use of them is governed by their own terms.
+
+Through the connector, an assistant can look up public artist identity and public release facts and create a private, unpublished draft of an artist page, release page, and smart link without a Jovie account. A draft does not verify who owns an artist or release, does not publish anything, and does not make a purchase. A draft expires 7 days after it is created. After that it can no longer be read, changed, or claimed through the connector or its claim link, but expiry does not delete the draft record; see the [Privacy Policy](/legal/privacy) for what we store and how to ask for deletion.
+
+The connector gives the assistant a claim link for each draft. Anyone who holds the claim link can open the claim page, so keep it private. To claim a draft you must sign in to Jovie, review the preview, and confirm. Claiming does not publish anything: the profile stays private until you publish it. Claiming links the artist to your account by its Spotify artist ID. For some artists, including those above a follower threshold we set, we require additional verification before linking, and we may decline or refuse a claim. Do not claim an artist you are not authorized to represent. We limit how many requests a caller can make to the connector, and we may turn the connector off at any time.
+
 ## User Accounts
 
 ### Creation & Credentials

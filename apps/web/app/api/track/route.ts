@@ -28,6 +28,11 @@ import {
   trackingClicksLimiter,
   trackingIpClicksLimiter,
 } from '@/lib/rate-limit';
+import { resolveSyntheticPassageToken } from '@/lib/synthetic/passage-token.server';
+import {
+  classifySyntheticClick,
+  SYNTHETIC_CLICK_TAG,
+} from '@/lib/synthetic/smartlink-click';
 import { detectPlatformFromUA } from '@/lib/utils';
 import { detectBot } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
@@ -441,6 +446,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // JOV-9625: a short-lived, single-use canary passage token (scope
+    // smartlink_click) lets the production certification click a real
+    // smartlink through this normal capture path while the click is tagged
+    // synthetic and excluded from every customer metric. Absent or invalid
+    // tokens change nothing: the click is classified exactly as for any
+    // other visitor, and no error is ever surfaced for a bad token.
+    const syntheticPassage = await resolveSyntheticPassageToken(
+      request.headers,
+      'smartlink_click',
+      { consume: true }
+    );
+    const clickClassification = classifySyntheticClick(
+      botDetection,
+      syntheticPassage
+    );
+
     // Audience member enrichment is valuable, but it cannot be allowed to make
     // a public click-tracking request fail. Keep it outside the click insert
     // transaction so a DB-shape or conflict error does not poison the click write.
@@ -456,7 +477,7 @@ export async function POST(request: NextRequest) {
             utmParams,
             linkType,
             target,
-            isBot: botDetection.isBot,
+            isBot: clickClassification.isBot,
           })
         ).catch(async error => {
           await captureError('Track audience member upsert failed', error, {
@@ -481,6 +502,9 @@ export async function POST(request: NextRequest) {
         utmParams,
         linkType
       );
+      if (clickClassification.synthetic) {
+        metadata.synthetic = SYNTHETIC_CLICK_TAG;
+      }
 
       // Always record the click event (preserves link click counts),
       // but use the anonymized IP when marketing consent is absent.
@@ -497,7 +521,7 @@ export async function POST(request: NextRequest) {
           city: geoCity,
           deviceType: platformDetected,
           os: platformDetected === 'web' ? null : platformDetected,
-          isBot: botDetection.isBot,
+          isBot: clickClassification.isBot,
           metadata,
           audienceMemberId,
         })
@@ -507,7 +531,7 @@ export async function POST(request: NextRequest) {
       // /api/audience/visit did not fire (e.g. blocked scripts, token failures).
       if (
         insertedClickEvent &&
-        !botDetection.isBot &&
+        !clickClassification.isBot &&
         hasDailyProfileViewsTable
       ) {
         const now = new Date();
@@ -558,8 +582,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Update social link click count in the background
-    // Errors are captured but don't block the response
-    if (linkType === 'social' && linkId) {
+    // Errors are captured but don't block the response.
+    // Synthetic certification clicks never inflate the public click counter.
+    if (linkType === 'social' && linkId && !clickClassification.synthetic) {
       db.update(socialLinks)
         .set({
           clicks: drizzleSql`${socialLinks.clicks} + 1`,

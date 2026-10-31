@@ -1,5 +1,6 @@
 'use client';
 
+import { IconButton } from '@jovie/ui';
 import { SkipBack, SkipForward } from 'lucide-react';
 import Image from 'next/image';
 import React from 'react';
@@ -108,10 +109,11 @@ export const TabletPlayerCard = React.memo(function TabletPlayerCard({
           </div>
 
           <div className='flex items-center gap-1.5 justify-self-center'>
-            <button
+            <IconButton
+              variant='ghost'
+              size='md'
               type='button'
               onClick={onPrevious}
-              className='h-8 w-8 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
               aria-label='Previous'
             >
               <SkipBack
@@ -119,16 +121,17 @@ export const TabletPlayerCard = React.memo(function TabletPlayerCard({
                 strokeWidth={2.5}
                 fill='currentColor'
               />
-            </button>
+            </IconButton>
             <AudioPlayButton
               isPlaying={isPlaying}
               onClick={onPlay}
               size='compact'
             />
-            <button
+            <IconButton
+              variant='ghost'
+              size='md'
               type='button'
               onClick={onNext}
-              className='h-8 w-8 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
               aria-label='Next'
             >
               <SkipForward
@@ -136,7 +139,7 @@ export const TabletPlayerCard = React.memo(function TabletPlayerCard({
                 strokeWidth={2.5}
                 fill='currentColor'
               />
-            </button>
+            </IconButton>
           </div>
 
           <div className='flex items-center gap-2 min-w-0'>
