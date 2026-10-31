@@ -1,0 +1,58 @@
+name: Comparative Claims Re-measure
+run-name: Comparative Claims Re-measure (${{ github.event_name }})
+# No cron here (JOV-INV-042 freezes GitHub crons): the Gem lanes clock fires
+# repository_dispatch clock_vs_linktree_claims weekly. Re-measures the published
+# jov.ie/tim vs linktr.ee/timwhite claims (apps/web/content/comparative-claims.ts)
+# with three alternating Lighthouse mobile runs per page and fails, printing a
+# CLAIM-FLAG line, when any claim's margin falls below its floor. A run that
+# cannot measure (exit 2) is a failed run, never a silent pass.
+# clock-class: temporal-resource
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: Read-only public page loads of two public URLs on a GitHub-hosted runner; the job holds no secrets and writes nothing but a workflow artifact.
+# removal-trigger: Remove when the comparative claims are retired from /compare/linktree or an in-product benchmark owns the weekly re-measure.
+
+permissions:
+  contents: read
+
+on:
+  repository_dispatch:
+    types: [clock_vs_linktree_claims]
+  workflow_dispatch:
+
+concurrency:
+  group: vs-linktree-claims
+  cancel-in-progress: false
+
+jobs:
+  remeasure:
+    name: Re-measure comparative claims
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Prime Node toolcache
+        uses: ./.github/actions/prime-node-toolcache
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Re-measure claims
+        env:
+          NODE_OPTIONS: --disable-warning=MODULE_TYPELESS_PACKAGE_JSON
+        run: node scripts/benchmarks/vs-linktree.mjs --runs 3 --out "$RUNNER_TEMP/vs-linktree-receipt.json"
+
+      - name: Upload receipt
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vs-linktree-receipt
+          path: ${{ runner.temp }}/vs-linktree-receipt.json
+          if-no-files-found: ignore
+          retention-days: 90
