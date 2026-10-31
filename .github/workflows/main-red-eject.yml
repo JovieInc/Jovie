@@ -1,4 +1,5 @@
 name: Main Red Eject
+# github-token-budget: 4 calls/run - gate job reads the queue head (one GraphQL) and its merge-group check runs (up to three pages); the eject job uses the app token and touches github.token only as the quota-exhausted failover and failure alert
 # clock-class: upstream-advisory
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Devin
