@@ -1,7 +1,7 @@
 {
   "schema": "jovie.capacity-resources/v1",
   "description": "Every resource that can stop shipping: metric, hard limit, what happens at the limit, and the lead time to fix. Read by scripts/capacity/forecast.py. Joins ops/registry/spend.json (spend collectors) and canon/automation-registry.jsonl (collector liveness). Metadata only, no secrets.",
-  "updatedAt": "2026-10-30T00:00:00Z",
+  "updatedAt": "2026-10-31T00:00:00Z",
   "cloudCollector": "gem",
   "hostAliases": {
     "gem": ["gem"],
@@ -963,6 +963,276 @@
           "options": [],
           "default": "find the top consumer and cut it; plan upgrade is spend, Tim decides",
           "deadlineHours": 72
+        }
+      }
+    },
+    {
+      "id": "github-secrets-jovie-production",
+      "group": "github-secrets",
+      "host": "cloud",
+      "label": "GitHub Actions secrets, JovieInc/Jovie Production environment (cap 100)",
+      "unit": "count",
+      "collector": {
+        "type": "gh-env-secrets",
+        "repo": "JovieInc/Jovie",
+        "cap": 100,
+        "environment": "Production – jovie"
+      },
+      "atLimit": {
+        "effect": "deny",
+        "note": "the Doppler sync and new secrets fail to write; rotations and new integrations block"
+      },
+      "leadTimeHours": 72,
+      "mode": "level",
+      "warnFrac": 0.9,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [
+            {
+              "label": "Move non-secret config to GitHub variables; replace blanket web-to-CI mirroring with doppler run injection",
+              "cost": "none",
+              "lead": "hours"
+            }
+          ],
+          "default": "move unmasked config to GitHub variables and scope CI secrets to consumers (decisions/infra/jovie-secret-sync-cap-pruning-proposal-2026-10-31)",
+          "deadlineHours": 24
+        }
+      }
+    },
+    {
+      "id": "github-secrets-jovie-preview",
+      "group": "github-secrets",
+      "host": "cloud",
+      "label": "GitHub Actions secrets, JovieInc/Jovie Preview environment (cap 100)",
+      "unit": "count",
+      "collector": {
+        "type": "gh-env-secrets",
+        "repo": "JovieInc/Jovie",
+        "cap": 100,
+        "environment": "Preview – jovie"
+      },
+      "atLimit": {
+        "effect": "deny",
+        "note": "the Doppler sync and new secrets fail to write; rotations and new integrations block"
+      },
+      "leadTimeHours": 72,
+      "mode": "level",
+      "warnFrac": 0.9,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [
+            {
+              "label": "Move non-secret config to GitHub variables; replace blanket web-to-CI mirroring with doppler run injection",
+              "cost": "none",
+              "lead": "hours"
+            }
+          ],
+          "default": "move unmasked config to GitHub variables and scope CI secrets to consumers (decisions/infra/jovie-secret-sync-cap-pruning-proposal-2026-10-31)",
+          "deadlineHours": 24
+        }
+      }
+    },
+    {
+      "id": "github-secrets-jovie-repo",
+      "group": "github-secrets",
+      "host": "cloud",
+      "label": "GitHub Actions secrets, JovieInc/Jovie repo (cap 100)",
+      "unit": "count",
+      "collector": {
+        "type": "gh-env-secrets",
+        "repo": "JovieInc/Jovie",
+        "cap": 100
+      },
+      "atLimit": {
+        "effect": "deny",
+        "note": "the Doppler sync and new secrets fail to write; rotations and new integrations block"
+      },
+      "leadTimeHours": 72,
+      "mode": "level",
+      "warnFrac": 0.9,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [
+            {
+              "label": "Move non-secret config to GitHub variables; replace blanket web-to-CI mirroring with doppler run injection",
+              "cost": "none",
+              "lead": "hours"
+            }
+          ],
+          "default": "move unmasked config to GitHub variables and scope CI secrets to consumers (decisions/infra/jovie-secret-sync-cap-pruning-proposal-2026-10-31)",
+          "deadlineHours": 24
+        }
+      }
+    },
+    {
+      "id": "stuck-agent-procs-mac",
+      "group": "agent-liveness",
+      "host": "mac",
+      "label": "Agent processes blocked with no CPU (mac)",
+      "unit": "count",
+      "collector": {
+        "type": "stuck-procs",
+        "match": "(^|/)(codex|claude) .*\\s(exec|-p|--print)(\\s|$)",
+        "maxHours": 2,
+        "maxCpuFrac": 0.01,
+        "limit": 1
+      },
+      "atLimit": {
+        "effect": "pause",
+        "note": "the job's lane and its claimed work are held while the process waits on stdin, a prompt or a dead pipe"
+      },
+      "leadTimeHours": 1,
+      "mode": "level",
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "dispatcher kills the stuck job and re-dispatches with stdin closed (</dev/null) and a wall-clock timeout",
+          "deadlineHours": 2
+        }
+      }
+    },
+    {
+      "id": "stuck-agent-procs-gem",
+      "group": "agent-liveness",
+      "host": "gem",
+      "label": "Agent processes blocked with no CPU (gem)",
+      "unit": "count",
+      "collector": {
+        "type": "stuck-procs",
+        "match": "(^|/)(codex|claude) .*\\s(exec|-p|--print)(\\s|$)",
+        "maxHours": 2,
+        "maxCpuFrac": 0.01,
+        "limit": 1
+      },
+      "atLimit": {
+        "effect": "pause",
+        "note": "the job's lane and its claimed work are held while the process waits on stdin, a prompt or a dead pipe"
+      },
+      "leadTimeHours": 1,
+      "mode": "level",
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "dispatcher kills the stuck job and re-dispatches with stdin closed (</dev/null) and a wall-clock timeout",
+          "deadlineHours": 2
+        }
+      }
+    },
+    {
+      "id": "access-gaps-mac",
+      "group": "access",
+      "host": "mac",
+      "label": "Repeated denied reads by agents (Mac transcripts)",
+      "unit": "count",
+      "collector": {
+        "type": "access-gaps",
+        "globs": [
+          "~/.claude/projects/**/*.jsonl",
+          "~/.codex/sessions/**/*.jsonl"
+        ],
+        "windowHours": 72,
+        "minRepeats": 2,
+        "maxCards": 8,
+        "firstReadBytes": 2000000
+      },
+      "atLimit": {
+        "effect": "pause",
+        "note": "the agent cannot do the job that needs this read and works around it or shrugs"
+      },
+      "leadTimeHours": 24,
+      "mode": "level",
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "Summer investigates the least-privilege route (existing tool such as company_revenue_read over the mesh, or a read-only API); a new credential is a Tim decision with exact scope, store and user; default is don't grant",
+          "deadlineHours": 48
+        }
+      }
+    },
+    {
+      "id": "deadline-a16z-speedrun-application",
+      "group": "deadline",
+      "host": "cloud",
+      "label": "a16z speedrun application",
+      "unit": "hours",
+      "collector": {
+        "type": "deadline",
+        "dueAt": "2026-11-01T07:00:00Z",
+        "doneWhen": "Tim confirms the application is submitted (record doneAt)"
+      },
+      "atLimit": {
+        "effect": "deny",
+        "note": "the window closes; the option or service is lost"
+      },
+      "leadTimeHours": 48,
+      "mode": "level",
+      "warnFrac": 2,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "Summer puts it on Tim's card with the prepared material; record doneAt in this registry when done",
+          "deadlineHours": 12
+        }
+      }
+    },
+    {
+      "id": "deadline-google-workspace-agentic-oauth",
+      "group": "deadline",
+      "host": "cloud",
+      "label": "Google Workspace agentic OAuth marking (Gmail MCP keeps working)",
+      "unit": "hours",
+      "collector": {
+        "type": "deadline",
+        "dueAt": "2026-11-11T08:00:00Z",
+        "doneWhen": "the Gmail MCP OAuth client is marked agentic in Workspace admin, or Workspace is exited (decisions/company/email-centralization-workspace-exit-2026-10-31)"
+      },
+      "atLimit": {
+        "effect": "deny",
+        "note": "the window closes; the option or service is lost"
+      },
+      "leadTimeHours": 120,
+      "mode": "level",
+      "warnFrac": 2,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "Summer puts it on Tim's card with the prepared material; record doneAt in this registry when done",
+          "deadlineHours": 12
+        }
+      }
+    },
+    {
+      "id": "deadline-google-workspace-payment",
+      "group": "deadline",
+      "host": "cloud",
+      "label": "Google Workspace monthly payment (failed in Sep and Oct)",
+      "unit": "hours",
+      "collector": {
+        "type": "deadline",
+        "dueAt": "2026-12-01T08:00:00Z",
+        "doneWhen": "the December charge succeeds or Workspace is exited"
+      },
+      "atLimit": {
+        "effect": "deny",
+        "note": "the window closes; the option or service is lost"
+      },
+      "leadTimeHours": 168,
+      "mode": "level",
+      "warnFrac": 2,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "Summer puts it on Tim's card with the prepared material; record doneAt in this registry when done",
+          "deadlineHours": 12
         }
       }
     }
