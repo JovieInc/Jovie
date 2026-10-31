@@ -13,6 +13,7 @@ import {
   isTestProfile,
   isTestProfileCleanupProtected,
 } from '@/lib/profile/test-profile-policy';
+import { buildUnpublishTestProfilesQuery } from '@/lib/services/profile/test-profile-unpublish';
 import { TEST_PROFILE_OWNER_EMAIL_SQL_PATTERN } from '@/lib/utils/email';
 
 type SqlQuery = ReturnType<typeof drizzleSql>;
@@ -101,16 +102,7 @@ export async function runTestProfileCleanup(
     let unbound = 0;
     if (options.apply && matched.length > 0) {
       const ids = matched.map(m => m.id);
-      const updated = await tx.execute(drizzleSql`
-        UPDATE creator_profiles
-        SET is_public = false, spotify_id = NULL, spotify_url = NULL,
-            updated_at = now()
-        WHERE id::text IN (${drizzleSql.join(
-          ids.map(id => drizzleSql`${id}`),
-          drizzleSql`, `
-        )})
-        RETURNING id
-      `);
+      const updated = await tx.execute(buildUnpublishTestProfilesQuery(ids));
       unpublished = matched.filter(m => m.isPublic).length;
       unbound = matched.filter(m => m.poolBound).length;
       if (updated.rows.length !== matched.length) {
