@@ -34,7 +34,7 @@ describe('OvieInFlightBlockers', () => {
       within(group).getByRole('link', { name: '#100 Task 0' })
     ).toHaveAttribute('href', 'https://github.com/JovieInc/Jovie/pull/100');
     expect(
-      within(group).getByRole('link', { name: '+2 more on Shipping' })
+      within(group).getByRole('link', { name: '+4 more on Shipping' })
     ).toHaveAttribute('href', '/app/ov/shipping');
   });
 

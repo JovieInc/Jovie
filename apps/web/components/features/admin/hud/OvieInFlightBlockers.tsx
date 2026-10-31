@@ -7,7 +7,7 @@ import type {
 } from '@/lib/ovie/home/blockers';
 import { cn } from '@/lib/utils';
 
-const MAX_PRS = 5;
+const MAX_PRS = 3;
 
 function Disclosure({
   label,

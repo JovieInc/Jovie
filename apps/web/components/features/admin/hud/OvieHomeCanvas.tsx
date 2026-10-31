@@ -451,7 +451,7 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       doneCount={home?.mergesToday ?? null}
       doneNotice={
         home?.mergesToday != null && home.mergesToday > home.done.length
-          ? `Since midnight PT, latest ${home.done.length}`
+          ? `Day in progress (PT). 7d avg ${home.pulse.find(tile => tile.key === 'merges-day')?.value ?? 'not measured'}/day`
           : null
       }
       doneNoticeHref={APP_ROUTES.ADMIN_SHIPPING}
