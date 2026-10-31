@@ -584,6 +584,8 @@ JOVIE_MESH_HUB=0 uses legacy only):
   mesh read [--peek] [--day YYYY-MM-DD] [--as <kind>]   Unhandled messages (marked handled unless --peek); --day = that day's history
   mesh ack <id[,id]> [--as <kind>]                      Mark messages handled (DLQ escalates unhandled mail to the fallback owner)
   mesh watch [--as <kind>] [--json]                     Long-poll stream; one line per new message (for Monitor)
+  mesh relay [--as <kind>] [--install]                  Self-healing WebSocket relay: spools to ~/.jovie/mesh/<kind>/inbox.jsonl,
+                                                        answers probes, flushes the outbox; --install adds a launchd KeepAlive agent
   mesh status [--hours N] [--as <kind>]                 Agents, presence, alarms, delivery p50/p95, dead and unhandled counts
   mesh register --kind <kind> [--owner <name>]   Create this agent's token in the keychain; prints the sha256 entry
   mesh vouch --kind <kind> --sender-id <uuid> --token-sha256 <hex> [--owner <name>] [--as <kind>]
@@ -623,10 +625,14 @@ export async function runMesh(
     ]);
     return result;
   }
+  if (action === 'relay') {
+    const { hubRelay } = await import('./mesh-relay.js');
+    return hubRelay(flags, deps);
+  }
   if (action === 'status') return hub.hubStatus(flags, deps);
   if (action === 'register') return meshRegister(flags, deps);
   if (action === 'vouch') return meshVouch(flags, deps);
   throw new JovieInputError(
-    `Unknown mesh command: ${action ?? ''}. Use send, read, ack, watch, status, register, or vouch.`
+    `Unknown mesh command: ${action ?? ''}. Use send, read, ack, watch, relay, status, register, or vouch.`
   );
 }

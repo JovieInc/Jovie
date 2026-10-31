@@ -324,7 +324,7 @@ export async function hubSend(
     transport: 'hub',
     ...(queued
       ? {
-          note: 'Hub unreachable: queued in the local outbox; the next send delivers it with the same correlation id.',
+          note: 'Hub unreachable: queued in the local outbox; the next send or `jovie mesh relay` delivers it with the same correlation id.',
         }
       : {}),
     ...(legacy ? { legacy } : {}),
