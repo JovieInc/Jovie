@@ -1,3 +1,4 @@
+import applicationRoutes from './application-routes.json';
 import { isLocalDevSiblingOrigin } from './renderer-recovery';
 
 export type AppEnvironment = 'production' | 'staging' | 'local';
@@ -22,29 +23,9 @@ const AUTH_PROVIDER_ORIGINS = [
   'https://*.clerk.accounts.dev',
 ] as const;
 
-const IN_APP_ROUTE_PREFIXES = [
-  '/account',
-  '/app',
-  '/artist-selection',
-  '/billing',
-  '/desktop-auth',
-  '/hud',
-  '/onboarding',
-  '/start',
-] as const;
+const IN_APP_ROUTE_PREFIXES = applicationRoutes.application;
 
-const AUTH_CALLBACK_ROUTE_PREFIXES = [
-  '/auth/callback',
-  '/auth/native-complete',
-  '/auth/native-return',
-  '/auth/ios/complete',
-  '/app/auth/callback',
-  '/signin/sso-callback',
-  '/signup/sso-callback',
-  '/sign-in/sso-callback',
-  '/sign-up/sso-callback',
-  '/sso-callback',
-] as const;
+const AUTH_CALLBACK_ROUTE_PREFIXES = applicationRoutes.authCallback;
 
 const SAME_ORIGIN_EXTERNAL_ROUTE_PREFIXES = [
   '/a',
@@ -73,6 +54,8 @@ const SAME_ORIGIN_EXTERNAL_ROUTE_PREFIXES = [
   '/go',
   '/instant-merch',
   '/integrations',
+  '/install',
+  '/pwa',
   '/investors',
   '/launch',
   '/legal',
@@ -171,7 +154,12 @@ function hasSafePathname(pathname: string): boolean {
     return false;
   }
 
-  return !decoded.includes('\\') && !decoded.includes('//');
+  return (
+    !decoded.includes('\\') &&
+    !decoded.includes('//') &&
+    !/[\u0000-\u001f\u007f]/.test(decoded) &&
+    !/%2f|%5c/i.test(pathname)
+  );
 }
 
 function isAppOriginUrl(parsed: URL, options: UrlDispositionOptions): boolean {
