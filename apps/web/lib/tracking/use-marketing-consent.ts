@@ -24,7 +24,15 @@ export function useMarketingConsent(skip: boolean): boolean {
     if (skip) return;
     if (globalThis.window === undefined) return;
 
-    const syncConsent = () => setAllowed(isMarketingAllowed());
+    const syncConsent = () => {
+      const marketingAllowed = isMarketingAllowed();
+      // Revoke before React can unmount a conditional pixel (for example an
+      // editorial adapter). Unmounting a Script does not stop a loaded SDK.
+      if (!marketingAllowed) {
+        (globalThis.window as { fbq?: Fbq }).fbq?.('consent', 'revoke');
+      }
+      setAllowed(marketingAllowed);
+    };
     syncConsent();
     globalThis.addEventListener('storage', syncConsent);
 
@@ -32,9 +40,7 @@ export function useMarketingConsent(skip: boolean): boolean {
 
     const attach = () => {
       if (!globalThis.JVConsent) return;
-      unsubConsent = globalThis.JVConsent.onChange(() => {
-        setAllowed(isMarketingAllowed());
-      });
+      unsubConsent = globalThis.JVConsent.onChange(syncConsent);
     };
 
     if (globalThis.JVConsent) {
