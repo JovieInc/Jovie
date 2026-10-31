@@ -396,6 +396,48 @@
         }
       ]
     },
+    "detector-issue": {
+      "entityId": "Linear issue identifier and detector cycle (JOV-10167#1; a reopen starts cycle 2)",
+      "description": "One detector-filed issue (lanes doctor or capacity collector, title `Symphony doctor: <key> (<host>)`) from filing to the detector's own clear reading. Routed model-free by summer-config detector-loop.ts; SLA by class severity (P0 1h own / 4h fix, P1 4h / 24h, P2 24h / 7d). Per-class p50/p95 and the unowned and aged counts (target 0) are at https://summer.jov.ie/runtime/v1/detector-loop.json. actor = detector:<class>.",
+      "endToEnd": [["filed", "verified"], ["filed", "owned"]],
+      "stages": [
+        {
+          "id": "filed",
+          "meaning": "filed by a detector until an owner holds it (board claim, lane start, or a founder card for reserved items)",
+          "producer": "summer-config",
+          "status": "pushed",
+          "source": "summer-stage-feed"
+        },
+        {
+          "id": "owned",
+          "meaning": "owner holds it until a PR is in review, or until the fix is applied when no PR is needed",
+          "producer": "summer-config",
+          "status": "pushed",
+          "source": "summer-stage-feed"
+        },
+        {
+          "id": "pr",
+          "meaning": "PR in review or merging until it merges",
+          "producer": "summer-config",
+          "status": "pushed",
+          "source": "summer-stage-feed"
+        },
+        {
+          "id": "fixed",
+          "meaning": "fix merged or applied until the detector confirms the condition cleared (Validating; Done only on the detector's clear)",
+          "producer": "summer-config",
+          "status": "pushed",
+          "source": "summer-stage-feed"
+        },
+        {
+          "id": "verified",
+          "meaning": "terminal: completed when the detector closed it with its cleared receipt",
+          "producer": "summer-config",
+          "status": "pushed",
+          "source": "summer-stage-feed"
+        }
+      ]
+    },
     "summer-turn": {
       "entityId": "<hashed conversation>:<hashed turn> (summer-config hashes both)",
       "description": "One Summer turn from triggering event to measured outcome.",
