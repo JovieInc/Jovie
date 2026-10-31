@@ -15,7 +15,10 @@ vi.mock('@/lib/spotify', () => ({
     `https://open.spotify.com/artist/${id}`,
 }));
 
-import { routeOnboardingTurn } from '@/lib/chat/onboarding-script/route';
+import {
+  routeOnboardingTurn,
+  turnFromArtistConfirmation,
+} from '@/lib/chat/onboarding-script/route';
 import { SCRIPT_LINES } from '@/lib/chat/onboarding-script/script';
 import { ONBOARDING_WIDGET_EVENTS } from '@/lib/chat/onboarding-script/widget-events';
 import { createOnboardingTurnState } from '@/lib/chat/tools/onboarding-tool-impls';
@@ -155,4 +158,49 @@ describe('system-1 answer sets', () => {
       expect(lintVoice(text as string).violations).toEqual([]);
     }
   );
+});
+
+describe('system-1 artist confirmation (2026-10-31 golden-path walk)', () => {
+  const confirmation = {
+    writingBrief: {},
+    historyMessage: {
+      id: 'confirm',
+      role: 'assistant',
+      parts: [
+        {
+          type: 'tool-confirmSpotifyArtist',
+          toolCallId: 'c1',
+          state: 'output-available',
+          input: { spotifyArtistId: 'artist-1' },
+          output: { action: 'spotify_artist_confirmed' },
+        },
+      ],
+    },
+    chunks: [],
+  } as unknown as Parameters<typeof turnFromArtistConfirmation>[0];
+
+  it('ships the handle card the line points at, seeded with the claimed handle', () => {
+    const messages = [
+      user('I want to claim jov.ie/unmarkedcars557.'),
+      user('Selected: Unmarked Cars', { spotifyArtistId: 'artist-1' }),
+    ];
+    const state = stateFor(messages);
+    state.spotifyArtistName = 'Unmarked Cars';
+    const turn = turnFromArtistConfirmation(confirmation, state, messages);
+    expect(turn.toolEvents.map(e => e.toolName)).toEqual([
+      'confirmSpotifyArtist',
+      'checkHandle',
+    ]);
+    expect(turn.toolEvents[1]?.input.handle).toBe('unmarkedcars557');
+  });
+
+  it('falls back to the artist slug when no handle was claimed', () => {
+    const messages = [
+      user('Selected: Unmarked Cars', { spotifyArtistId: 'artist-1' }),
+    ];
+    const state = stateFor(messages);
+    state.spotifyArtistName = 'Unmarked Cars';
+    const turn = turnFromArtistConfirmation(confirmation, state, messages);
+    expect(turn.toolEvents[1]?.input.handle).toBe('unmarkedcars');
+  });
 });
