@@ -354,61 +354,37 @@ describe('MarketingHero source-backed default story', () => {
     );
   });
 
-  it('renders the unique per-route hero photo behind content-mode copy when provided', () => {
-    render(
-      <MarketingHero
-        {...MARKETING_HERO_DEFAULT_PROPS}
-        testId='photo-content-hero'
-        photo={{
-          src: '/images/marketing-hero/product.webp',
-          width: 1600,
-          height: 901,
-        }}
-      />
-    );
-
-    const hero = screen.getByTestId('photo-content-hero');
-    expect(hero).toHaveClass('relative', 'overflow-hidden');
-    const photo = hero.querySelector('.marketing-hero-photo');
-    expect(photo).not.toBeNull();
-    expect(photo?.querySelector('img')).toHaveAttribute(
-      'src',
-      expect.stringContaining('product.webp')
-    );
-    expect(photo?.querySelector('img')).toHaveAttribute('alt', '');
-  });
-
-  it('omits the hero photo layer and the relative/overflow classes without a photo prop', () => {
+  it('renders content-mode heroes on the matte page background with no photo layer', () => {
     const { container } = render(
       <MarketingHero {...MARKETING_HERO_DEFAULT_PROPS} />
     );
 
     const hero = container.querySelector('section.marketing-hero');
-    expect(hero?.querySelector('.marketing-hero-photo')).toBeNull();
+    expect(hero).not.toBeNull();
+    expect(hero?.querySelector('img')).toBeNull();
+    expect(hero?.querySelector('[class*="hero-photo"]')).toBeNull();
     expect(hero?.className).not.toContain('overflow-hidden');
   });
 
-  it('applies the requested opacity to the landing-mode hero photo', () => {
+  it('keeps landing-mode copy above the backdrop without a hero photo', () => {
     render(
       <MarketingHero
         eyebrow='Eyebrow'
-        headingId='photo-landing-heading'
+        headingId='matte-landing-heading'
         title='Landing title'
         body='Landing body'
         media={<div>Media</div>}
-        testId='photo-landing-hero'
-        photo={{
-          src: '/images/marketing-hero/ai.webp',
-          width: 1600,
-          height: 1067,
-          opacity: 0.2,
-        }}
+        testId='matte-landing-hero'
       />
     );
 
-    const hero = screen.getByTestId('photo-landing-hero');
-    const img = hero.querySelector('.marketing-hero-photo img');
-    expect(img).toHaveStyle({ opacity: '0.2' });
+    const hero = screen.getByTestId('matte-landing-hero');
+    expect(hero.querySelector('img')).toBeNull();
+    expect(hero.querySelector('[class*="hero-photo"]')).toBeNull();
+    const heading = screen.getByRole('heading', { name: 'Landing title' });
+    const container = heading.closest('.relative.z-1');
+    expect(container).not.toBeNull();
+    expect(hero.querySelector('.marketing-hero-backdrop')).not.toBeNull();
   });
 
   it('stamps a landing-mode hero when the route declares a variant', () => {
@@ -434,75 +410,13 @@ describe('MarketingHero source-backed default story', () => {
   });
 });
 
-describe('MarketingHero photo stacking', () => {
-  it('keeps hero copy above the positioned hero photo', () => {
-    // The photo layer is positioned (z-index 0); static copy after it would
-    // paint underneath, which hid the /pricing headline in production.
+describe('MarketingHero matte background', () => {
+  it('ships no hero photograph styles', () => {
     const css = readFileSync(
       resolve(__dirname, '../../app/globals.css'),
       'utf8'
     );
 
-    expect(css).toMatch(
-      /\.marketing-hero-photo ~ \*\s*\{\s*position: relative;\s*z-index: 1;/
-    );
+    expect(css).not.toContain('.marketing-hero-photo');
   });
-});
-
-vi.mock('next/link', async () => {
-  const { createElement, forwardRef } = await import('react');
-  return {
-    default: forwardRef<
-      HTMLAnchorElement,
-      import('react').ComponentProps<'a'> & { prefetch?: boolean }
-    >(function PrefetchObservedLink({ prefetch, href, ...props }, ref) {
-      return createElement('a', {
-        ...props,
-        href: href ?? '#',
-        ref,
-        'data-test-prefetch': String(prefetch),
-      });
-    }),
-  };
-});
-
-it('defers auth prefetch while preserving public hero defaults and explicit choices', () => {
-  const view = render(
-    <MarketingHero
-      headline='Release your work'
-      subtitle='Choose a destination'
-      logos={false}
-      primaryCta={{ label: 'Start', href: '/start' }}
-      secondaryCta={{ label: 'Pricing', href: '/pricing' }}
-    />
-  );
-  expect(screen.getByRole('link', { name: 'Start' })).toHaveAttribute(
-    'data-test-prefetch',
-    'false'
-  );
-  expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
-    'data-test-prefetch',
-    'undefined'
-  );
-  view.rerender(
-    <MarketingHero
-      headline='Release your work'
-      subtitle='Choose a destination'
-      logos={false}
-      primaryCta={{ label: 'Start', href: '/start', prefetch: true }}
-      secondaryCta={{ label: 'Pricing', href: '/pricing', prefetch: false }}
-    />
-  );
-  expect(screen.getByRole('link', { name: 'Start' })).toHaveAttribute(
-    'href',
-    '/start'
-  );
-  expect(screen.getByRole('link', { name: 'Start' })).toHaveAttribute(
-    'data-test-prefetch',
-    'true'
-  );
-  expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
-    'data-test-prefetch',
-    'false'
-  );
 });

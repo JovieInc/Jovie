@@ -2,6 +2,10 @@ import 'server-only';
 
 import { and, sql as drizzleSql, eq, gte } from 'drizzle-orm';
 
+import {
+  externalAccountSql,
+  internalAccountSql,
+} from '@/lib/accounts/internal-account';
 import { db, doesTableExist } from '@/lib/db';
 import { getDeepErrorMessage } from '@/lib/db/errors';
 import { users } from '@/lib/db/schema/auth';
@@ -13,7 +17,6 @@ import {
   userProfileClaims,
 } from '@/lib/db/schema/profiles';
 import { captureError, captureWarning } from '@/lib/error-tracking';
-import { INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN } from '@/lib/utils/email';
 import { getAdminStripeOverviewMetrics } from './stripe-metrics';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -21,8 +24,7 @@ const BASELINE_BURN_USD = 5_000;
 const SERPAPI_COST_PER_QUERY = 0.005;
 
 /** Null means no principal is known yet; known internal/QA principals fail. */
-const externalAccount = () =>
-  drizzleSql`(${users.email} is null or lower(${users.email}) !~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN})`;
+const externalAccount = () => externalAccountSql();
 
 /** Profiles are owned through user_profile_claims; creator_profiles.user_id is legacy. */
 const externalCreatorAccount = () => drizzleSql`not exists (
@@ -31,7 +33,7 @@ const externalCreatorAccount = () => drizzleSql`not exists (
   inner join ${users} metric_user on metric_user.id = metric_claim.user_id
   where metric_claim.creator_profile_id = ${creatorProfiles.id}
     and metric_claim.role = 'owner'
-    and lower(metric_user.email) ~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN}
+    and ${internalAccountSql(drizzleSql.raw('metric_user.email'), drizzleSql.raw('metric_user.account_class'))}
 )`;
 
 /** Extract rows from a raw db.execute() result. */
@@ -577,7 +579,7 @@ async function getActiveProfiles30d(): Promise<number | null> {
             INNER JOIN users metric_user ON metric_user.id = metric_claim.user_id
             WHERE metric_claim.creator_profile_id = cp.id
               AND metric_claim.role = 'owner'
-              AND lower(metric_user.email) ~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN}
+              AND ${internalAccountSql(drizzleSql.raw('metric_user.email'), drizzleSql.raw('metric_user.account_class'))}
           )
       `
     );
@@ -631,7 +633,7 @@ export async function getWeeklyFunnelTrend(weeks: number = 4): Promise<
         LEFT JOIN leads l ON l.id = lfe.lead_id
         LEFT JOIN users u ON u.id = l.signup_user_id
         WHERE lfe.occurred_at >= ${startDate}
-          AND (u.email IS NULL OR lower(u.email) !~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN})
+          AND ${externalAccountSql(drizzleSql.raw('u.email'), drizzleSql.raw('u.account_class'))}
         GROUP BY 1
         ORDER BY 1
       `
@@ -710,7 +712,7 @@ export async function getAllTimeFunnelTotals(): Promise<{
         FROM lead_funnel_events lfe
         LEFT JOIN leads l ON l.id = lfe.lead_id
         LEFT JOIN users u ON u.id = l.signup_user_id
-        WHERE u.email IS NULL OR lower(u.email) !~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN}
+        WHERE ${externalAccountSql(drizzleSql.raw('u.email'), drizzleSql.raw('u.account_class'))}
       `
     );
 

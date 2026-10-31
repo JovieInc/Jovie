@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
+import { OPERATOR_SEQUENCE_SHORTCUTS } from '@/lib/ovie/operator-commands';
 
 // Mock next/navigation
 const mockPush = vi.fn();
@@ -231,6 +232,48 @@ describe('useSequentialShortcuts', () => {
       fireKey('d');
     });
 
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+});
+
+describe('useSequentialShortcuts with the Ovie operator catalog', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    mockPush.mockClear();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it.each([
+    ['h', APP_ROUTES.ADMIN_NOW],
+    ['i', APP_ROUTES.ADMIN_INBOX],
+    ['s', APP_ROUTES.ADMIN_SHIPPING],
+    ['f', APP_ROUTES.ADMIN_OPERATIONS],
+    ['c', APP_ROUTES.ADMIN_COSTS],
+  ])('G then %s opens %s', (second, href) => {
+    renderHook(() =>
+      useSequentialShortcuts({ shortcuts: OPERATOR_SEQUENCE_SHORTCUTS })
+    );
+    act(() => {
+      fireKey('g');
+    });
+    act(() => {
+      fireKey(second);
+    });
+    expect(mockPush).toHaveBeenCalledWith(href);
+  });
+
+  it('G then D never reaches a customer route from the operator shell', () => {
+    renderHook(() =>
+      useSequentialShortcuts({ shortcuts: OPERATOR_SEQUENCE_SHORTCUTS })
+    );
+    act(() => {
+      fireKey('g');
+    });
+    act(() => {
+      fireKey('d');
+    });
     expect(mockPush).not.toHaveBeenCalled();
   });
 });

@@ -114,7 +114,7 @@ class FleetLedgerTest(unittest.TestCase):
             return {"identifier": f"JOV-{n}", "labels": labels, "description": desc, "stateType": state, "title": title}
         self.mirror([
             row(1, ["needs-human-decision"], "Default: ship option B\nDeadline: 2099-01-01"),
-            row(2, ["tim-hold"], "**Default:** keep flag off\n**Deadline:** 2099-01-01T12:00Z"),
+            row(2, ["hold"], "**Default:** keep flag off\n**Deadline:** 2099-01-01T12:00Z"),
             row(3, ["needs-human"], "Default: x\nDeadline: 1999-01-01"),
             row(4, ["gated"], "no decision recorded"),
             row(5, ["gated"], "Default: x", state="completed"),

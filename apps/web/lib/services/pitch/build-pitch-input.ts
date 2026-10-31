@@ -5,7 +5,7 @@
  * Used by both the pitch API route and the chat tool to avoid duplication.
  */
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   artists,
@@ -44,7 +44,8 @@ export async function buildPitchInput(
     .where(
       and(
         eq(discogReleases.id, releaseId),
-        eq(discogReleases.creatorProfileId, profileId)
+        eq(discogReleases.creatorProfileId, profileId),
+        isNull(discogReleases.deletedAt)
       )
     );
 
