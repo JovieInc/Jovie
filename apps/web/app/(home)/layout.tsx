@@ -2,10 +2,10 @@ import './home.css';
 import '../../components/marketing/MarketingSnapRail.css';
 import { WebMcpTools } from '@/components/marketing/WebMcpTools';
 import { ClientProviders } from '@/components/providers/ClientProviders';
-import { resolveMarketingHeaderPrimaryCta } from '@/components/site/MarketingHeader';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
 import { APP_ROUTES } from '@/constants/routes';
 import { resolveMarketingHeaderBrand } from '@/data/marketing/headerBrand';
+import { HOME_MARKETING_HEADER_CTA } from '@/data/marketing/headerCta';
 import { getMarketingPageContractForRouteGlob } from '@/data/marketing/pageContracts';
 import { getSiteChrome } from '@/lib/content-records/site-chrome.server';
 
@@ -16,7 +16,7 @@ export const revalidate = false;
 // the default /signup CTA and an extra footer CTA). The browser then rendered both from "/" and React
 // threw hydration error #418 on every visit. Resolve the route-owned values
 // here, once, so the server and the client render identical markup.
-const HOME_HEADER_CTA = resolveMarketingHeaderPrimaryCta(APP_ROUTES.HOME);
+const HOME_HEADER_CTA = HOME_MARKETING_HEADER_CTA;
 const HOME_HEADER_BRAND = resolveMarketingHeaderBrand(APP_ROUTES.HOME);
 const HOME_PAGE_CONTRACT =
   getMarketingPageContractForRouteGlob('(home)/page.tsx') ?? undefined;
