@@ -47,6 +47,15 @@ export interface ChatOpsDataCardProps {
 export function ChatOpsDataCard({ card, summary }: ChatOpsDataCardProps) {
   const observed = formatObservedAt(card.observedAt);
   const max = seriesMax(card);
+  // JOV-INV-046 hide treatment: the footer only renders the parts the
+  // payload actually carries, so a missing timestamp never announces
+  // itself.
+  const metaLabel = [
+    observed ? `Observed ${observed}` : null,
+    card.source ?? null,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(' · ');
 
   return (
     <ChatToolSurface>
@@ -142,12 +151,13 @@ export function ChatOpsDataCard({ card, summary }: ChatOpsDataCardProps) {
           </div>
         ) : null}
 
-        <div className='mt-3 flex items-center justify-between gap-3 border-subtle border-t pt-2'>
-          <p className='text-2xs leading-4 text-tertiary-token'>
-            {observed ? `Observed ${observed}` : 'Observation time unavailable'}
-            {card.source ? ` · ${card.source}` : ''}
-          </p>
-        </div>
+        {metaLabel ? (
+          <div className='mt-3 flex items-center justify-between gap-3 border-subtle border-t pt-2'>
+            <p className='text-2xs leading-4 text-tertiary-token'>
+              {metaLabel}
+            </p>
+          </div>
+        ) : null}
       </section>
     </ChatToolSurface>
   );

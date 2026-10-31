@@ -97,6 +97,30 @@ describe('UsageMenuItem', () => {
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
   });
 
+  it('offers a retry instead of an unavailable dead end when usage fails to load', async () => {
+    const refetch = vi.fn().mockResolvedValue({ data: baseUsage });
+    mockUseChatUsageQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new Error('offline'),
+      refetch,
+    });
+    render(<UsageMenuItem usageStatsUrl={APP_ROUTES.SETTINGS_USAGE} />);
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /usage remaining/i })
+    );
+    // JOV-9672: honest failure copy plus a working retry control.
+    expect(screen.getByText("Usage didn't load.")).toBeInTheDocument();
+    expect(
+      screen.queryByText('Usage details are unavailable right now.')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Retry Usage' })
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Retry Usage' }));
+    expect(refetch).toHaveBeenCalledOnce();
+  });
   it('labels a stale weekly snapshot without inventing another metric', async () => {
     mockUsage({ ...baseUsage, _stale: true });
     const user = userEvent.setup();

@@ -107,9 +107,11 @@ export function UsageMenuItem({
     : isStale
       ? 'Usage may be out of date'
       : '';
+  // JOV-INV-046 retryable treatment: honest failure copy; the Retry Usage
+  // control rendered below re-fetches on demand.
   const unavailableUsageLabel = isLoading
     ? 'Loading usage…'
-    : 'Usage details are unavailable right now.';
+    : "Usage didn't load.";
   const upgradeButtonLabel = isUpgradeLoading ? 'Opening…' : upgradeLabel;
   let upgradeAction: ReactNode = null;
 

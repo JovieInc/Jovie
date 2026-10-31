@@ -227,9 +227,10 @@ describe('ChatMerchDesignCarousel', () => {
       />
     );
 
-    expect(screen.getByTestId('chat-merch-mockup-failed')).toHaveTextContent(
-      'Preview unavailable'
-    );
+    expect(screen.getByTestId('chat-merch-mockup-failed')).toBeInTheDocument();
+    // JOV-9672: a failed garment renders a quiet placeholder; the design
+    // name below the tile keeps the real content.
+    expect(screen.queryByText('Preview unavailable')).toBeNull();
     expect(screen.queryByAltText(/mockup/i)).toBeNull();
   });
 });
