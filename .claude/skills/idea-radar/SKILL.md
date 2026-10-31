@@ -1,9 +1,6 @@
 ---
 name: idea-radar
-description: |
-  Event-driven external opportunity-signal producer. Normalizes public,
-  product, founder, and customer observations into the JOV-5916 canonical
-  evidence lifecycle and routes bounded validation to JOV-2966.
+description: "Event-driven producer of external opportunity signals for the JOV-5916 evidence lifecycle (validation via JOV-2966)."
 argument-hint: "[signal or pending decision] [--dry-run]"
 author: jovie-agentos
 metadata:

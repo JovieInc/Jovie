@@ -16,6 +16,20 @@ Settings information architecture. The machine-readable contract lives in
 Do not invent per-platform synonyms — "staging build", "alpha", "preview",
 "dev ring" — unless they map explicitly to one canonical channel here.
 
+## Release rings
+
+Every change reaches people in this order (moved from `CLAUDE.md` on 2026-10-29).
+
+1. PR preview builds.
+2. `staging.jov.ie` canary on machines, using the same Vercel project and
+   database as production; the release pipeline test stop.
+3. Staff and dogfooders.
+4. Opted-in early-access users, a permanent cohort via dogfooders' `early_access`
+   mode, not a merge flag.
+5. Everyone.
+
+The Mac staging app is retired; use early-access opt-in in the regular app.
+
 ## Platform mappings
 
 | Platform / adapter | Mechanism | Canonical channel |

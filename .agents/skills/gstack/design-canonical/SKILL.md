@@ -2,11 +2,7 @@
 name: design-canonical
 preamble-tier: 3
 version: 1.0.0
-description: |
-  Canonical design operating system for all Jovie agents and Ovie. Use first for
-  any UX, product design, visual audit, design system, mockup, or design-plan
-  task; legacy design skills now layer their mode-specific workflow on top of
-  this shared audit-first, anti-slop, cross-platform contract. (gstack)
+description: "Canonical design OS: use first for any UX, visual audit, design system, mockup or design plan. (gstack)"
 allowed-tools:
   - Bash
   - Read

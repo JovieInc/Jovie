@@ -23,189 +23,11 @@ accessibility a cleanup task. This contract governs behavior, not a visual
 redesign, and inherits the canonical components, tokens, and platform
 conventions in `DESIGN.md` and the frontend skill.
 
-### Feature Definition Gate
-
-Before implementation, write the following in the feature plan, issue, or PR
-description for every user-facing behavior change:
-
-1. **Primary task and direct action:** what the user is trying to finish, the
-   visible control that starts it, and the observable outcome. A frequent action
-   normally completes end-to-end within two deliberate activations, and in one
-   when the input is already complete. Starting and finishing a capture may use
-   the two-activation budget. Three or more requires one named exception:
-   review, safety, ambiguity, irreversible impact, or recovery. The exception
-   reason must be visible or documented and covered by an executable interaction
-   contract or focused behavior test when the surface has a test substrate.
-2. **Context contract:** what focus, selection, text/caret, scroll position,
-   and open context remain stable, and the explicit user action that may change
-   each one.
-3. **State contract:** idle, pending, empty, success, error, and offline or
-   recovery states when the feature can reach them. Name the user-visible
-   status and the next recovery action for each failure state.
-4. **Input matrix:** the pointer/touch path, keyboard path where the platform
-   has a hardware keyboard, and screen-reader/text-scaling/reduced-motion
-   behavior. iOS uses native input and accessibility conventions; web and Mac
-   may add power-user shortcuts. Semantic and behavioral parity matter, not
-   identical pixels or bindings.
-
-Do not hide a primary action behind hover, a gesture, a magic shortcut, or a
-second surface when a direct visible control fits. Touch and pointer controls
-remain available even when a keyboard accelerator is useful.
-
-Follow [tooltip eligibility and input](../../DESIGN.md#tooltip-eligibility-and-input):
-measure title clipping, preserve mouse/keyboard hints on hybrids, let touch
-activate immediately, and retain rail-owned interactive portals until dismissal.
-
-### Input, Shortcuts, and Discoverability
-
-- Prefer semantic native controls. Use ARIA composite roles only when the
-  interaction actually implements that pattern. For example, a filter toolbar
-  uses pressed buttons and toolbar navigation, while tabs require tab/panel
-  semantics and conventional arrow-key behavior.
-- Every interactive control has an accessible name, visible focus treatment,
-  and native keyboard activation. Custom keyboard handling must not steal
-  Enter, Space, Escape, arrows, typing, or assistive-technology behavior from
-  a focused child control or editable field.
-- Add a keyboard accelerator only when it removes repeated work. Use a stable
-  platform convention where one exists, scope it to its surface, preserve
-  browser/OS shortcuts and text editing, and provide a visible or documented
-  discovery path. Global web/Mac shortcuts belong in the canonical keyboard
-  registry and shortcuts sheet, with a tested handler and collision check.
-- Gesture input accelerates a direct action; it never becomes the only way to
-  perform it. Keep an equivalent touch-safe visible control.
-
-### Focus, Selection, and Stability
-
-- A user-triggered update keeps focus on the initiating control when it still
-  exists. If it is removed, move focus to the next logical actionable item,
-  the updated result, or the originating control group, never silently to
-  `body`.
-- Preserve selection, caret, scroll position, filters, and surrounding context
-  through refreshes, optimistic updates, and recoverable errors unless a named
-  navigation or disclosure action intentionally changes them.
-- Use roving focus only for a true composite control and test its arrow/Home/End
-  behavior. Do not turn ordinary link or button collections into custom
-  keyboard widgets without a user benefit.
-- Follow the mandatory layout-shift contract below. Pending, success, error,
-  and recovery feedback must not shift unrelated content or move a target away
-  from the user's pointer or focus.
-
-### Feedback, Recovery, and Performance
-
-- A direct action gets immediate local acknowledgement: a controlled pending
-  state, stable status slot, or canonical toast as appropriate. Do not leave a
-  user guessing whether an action registered.
-- Errors explain what failed in user terms and leave the failed work, input,
-  and recovery path available whenever it is safe to retry. Offline/degraded
-  states say what remains available and how to recover; never silently discard
-  user input.
-- Reuse canonical loading, empty, error, toast, dialog, and motion primitives.
-  Feedback may change semantic content but must preserve stable geometry unless
-  the user explicitly opened, closed, navigated, or disclosed it.
-- Treat interaction latency as a product behavior. Do not invent a generic
-  millisecond target; use the route's existing performance budget or record a
-  same-method before/after measurement. Preserve the equivalent non-motion
-  outcome under reduced motion.
-
-### Inclusion and Component Ownership
-
-- Web targets WCAG 2.2 AA. Test semantic names/roles, keyboard operation,
-  focus order, contrast, non-color state cues, text zoom, and touch targets.
-  Test native accessibility, Dynamic Type, and input conventions on iOS.
-  A 44px touch target is the **hit container**, not a larger visible control:
-  keep the visual size (`h-7` / `h-8` / `h-9` / icon) and expand the
-  invisible target (`before:absolute before:h-11 before:min-w-11`, see
-  `packages/ui/atoms/button.tsx`). Do not bump the control to `h-11` to
-  satisfy the lint.
-- Respect user text scaling and reduced-motion preferences. Never encode status
-  in color alone, rely on hover alone, or require precise pointer movement.
-- Reuse the canonical component family before composing a new control. A
-  shared correction belongs in its owner; a feature-specific interaction stays
-  local only when its behavior cannot be expressed by that owner.
-
-### Evidence and Enforcement Matrix
-
-Use the real check that can prove the rule. A green static check is not a claim
-that unautomatable behavior was manually verified.
-
-| Rule | Automated evidence when applicable | Manual/device or design-review evidence |
-|---|---|---|
-| Component ownership and changed interaction behavior | `pnpm component-ship-gate` requires a changed shared component's real test and story plus fail-closed rendered certification receipts; focused Vitest asserts the user-visible transition for shared and feature components | Confirm the component belongs to the existing family, not a fork |
-| Semantic controls, names, and keyboard behavior | Focused Testing Library/Playwright behavior tests, `apps/web/tests/utils/a11y.ts`, and `pnpm --filter @jovie/web run a11y:ci` for affected routes | Screen-reader reading/order and hardware-keyboard pass |
-| Contrast and touch alternatives | `pnpm --filter @jovie/web run lint:contrast-ratchet` and `pnpm --filter @jovie/web run lint:touch-target` | Touch target usability at device scale and non-color cue review |
-| UI-feel properties (tabular numerals, heading balance, 40px hit-area floor, concentric radii) | `pnpm --filter @jovie/web run lint:ui-feel` — repo-wide ratchet of the `@jovie/ui-feel` ESLint checks against `apps/web/ui-feel-ratchet.baseline.json`; fix violations then rerun with `-- --update` and commit the lower baseline | Judgment calls the heuristics cannot see (whether a numeral actually changes, whether a small visible control has an adequate invisible hit container) |
-| Focus, selection, layout, and state retention | Focus assertions plus the applicable Playwright bounding-box, visual, or layout-stability test | Real browser checks for scroll/caret/selection and unexpected movement |
-| Loading, error, offline, recovery, and reduced motion | Focused tests for every changed deterministic state; existing visual/performance route checks where configured | Failure/retry, offline/degraded, text scaling, and reduced-motion pass on the target platform |
-| Interaction responsiveness | Existing route performance budget or `pnpm --filter @jovie/web run perf:interactions` when the surface is in scope | Same-method before/after receipt when no route budget exists |
-
-Every UI or interaction PR records the exact focused commands and the manual
-evidence still required in the PR template. Do not claim comprehensive
-accessibility, device, performance, or release proof from an import test, a
-single screenshot, or CI alone.
-
-## Component Architecture
-
-Components follow atomic design with feature-based grouping:
-
-```
-packages/ui/atoms/          → Pure design system (Radix + CVA, NO Next.js/app imports)
-apps/web/components/
-├── atoms/                  → App-level atoms (may use Next.js, hooks)
-├── molecules/              → Composed atoms
-├── organisms/              → Complex shared widgets (includes table/ subsystem)
-├── features/               → Feature modules (dashboard, admin, home, auth, etc.)
-│   └── {feature}/          → May have internal atoms/molecules/organisms
-├── providers/              → Context providers
-├── hooks/                  → Shared hooks
-├── site/                   → Site chrome
-├── seo/                    → SEO components
-└── effects/                → Visual effects
-```
-
-**Dependency direction (strictly enforced via eslint-plugin-boundaries):**
-
-| Layer | Can import from |
-|-------|----------------|
-| `@jovie/ui` | React, Radix, CVA, Tailwind only |
-| `atoms/` | `@jovie/ui` |
-| `molecules/` | `atoms/`, `@jovie/ui` |
-| `organisms/` | `molecules/`, `atoms/`, `@jovie/ui` |
-| `features/{x}/` | `organisms/`, `molecules/`, `atoms/`, `@jovie/ui`, own internals |
-
-**Forbidden imports:**
-- `atoms/` must NOT import from `molecules/` or `organisms/`
-- `molecules/` must NOT import from `organisms/`
-- `features/{x}/` must NOT import from `features/{y}/` — if a component is needed by 2+ features, **promote it** to the shared `atoms/`, `molecules/`, or `organisms/` layer
-
-**Token reference style:** Use Tailwind-named utilities (`text-primary-token`, `bg-surface-1`, `border-subtle`), NOT CSS variable arbitrary values (`text-(--linear-text-primary)`). Arbitrary Tailwind values (`w-[327px]`, `text-[#fff]`) are tracked by shrink-only ratchets — the count may only go DOWN. Shared UI foundation: `packages/ui` via `pnpm design:shared-ui-visual-arbitrary:check`. Broader web surfaces: `apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts`. Converge to tokens; never add new arbitrary values.
-
-**Server-import isolation:** `apps/web/components/{atoms,molecules,organisms}` are shared presentation layers that must bundle for the browser. Files in these layers must not import server-only specifiers (`server-only`, `@/lib/auth/better-auth`, `drizzle-orm`, `@/lib/db/*`, `next/headers`, `/actions` modules, etc.) or contain `'use server'`. Violations are tracked by a drift ratchet (`apps/web/tests/unit/design-system/server-imports-ratchet.test.ts`) — the count may only go DOWN. Move server dependencies to a feature wrapper or API route.
-
-## New Component Pattern
-
-| Type | Location | When to use |
-|------|----------|-------------|
-| Design system atom | `packages/ui/atoms/MyComponent.tsx` | Pure UI, no Next.js/app imports |
-| App atom | `apps/web/components/atoms/MyComponent.tsx` | Small, reusable, may use Next.js hooks |
-| Molecule | `apps/web/components/molecules/MyComponent.tsx` | Composes 2+ atoms |
-| Organism | `apps/web/components/organisms/{feature}/MyComponent.tsx` | Complex shared widget |
-| Feature component | `apps/web/components/features/{feature}/MyComponent.tsx` | Feature-specific, can have internal atoms/molecules |
-
-```typescript
-'use client'; // ONLY if using hooks (useState, useEffect, etc.) — omit for server components
-
-import type { ReactNode } from 'react';
-
-interface MyComponentProps {
-  readonly title: string;        // Every prop MUST be readonly
-  readonly children?: ReactNode;
-  readonly onAction?: () => void;
-}
-
-export function MyComponent({ title, children, onAction }: MyComponentProps) {
-  return <div>{title}{children}</div>;
-}
-```
+The full contract (feature definition gate, input and shortcuts, focus and
+selection, feedback and recovery, inclusion, and the evidence and enforcement
+matrix) plus the component architecture and new-component template live in
+[docs/design-system/UI_REFERENCE.md](../../docs/design-system/UI_REFERENCE.md).
+Read it before defining a new feature, interaction or component.
 
 ## Styling
 
@@ -248,25 +70,7 @@ contrast, and more strongly behind art. The focus/link accent never rotates.
 CTAs stay neutral pills. Color never carries status alone. Full rule:
 `docs/design-system/DETAILS.md` (accent rotation rule).
 
-For Jovie-owned intentionally art-directed/generated brand imagery, use
-Scene Palette v1 from `apps/web/data/marketing/imageColorPolicy.ts`. The
-softened scene references are for set design, light, material, wardrobe, and
-prompt contracts only; they do not replace the shipped Noir Ion UI anchors.
-
-Marketing page sections and those images follow
-[Imagery and color](../../canon/MARKETING.md#imagery-and-color). One primary
-color per image, never mixed. Each section gets exactly one accent, chosen
-per section and image: Ion `#3FAFF3`, Ultra `#A789F0`, or Pulse `#EB6AC6`,
-never blended. A gradient's key color is that accent hue; other tones are
-only neutral black falloff. Fades and light reveals are strongly asymmetric:
-a lit wedge, and the rest to black. Image-generation prompt templates name
-the single hue and forbid secondary hues. Orange as a scene or cue color, and
-a literal triad, stay forbidden. The orange, red, and green rotation above
-does not apply to these marketing images or section accents. The prose
-frontend skill is not in this repo (`~/.codex/skills/frontend-skill`); this
-contract is the in-repo copy. Blocking source checks are
-`scripts/invariants/art-direction/accent.mjs` and `hue.mjs`; they ratchet
-source violations without certifying generated pixels or prompt compliance.
+Marketing imagery and section accents: [marketing-ui](marketing-ui.md#marketing-imagery-and-section-accents).
 
 ### Do not fuck with art (founder-locked 2026-08-13)
 
@@ -280,31 +84,6 @@ Hard product and marketing rules from `DESIGN.md`. Not aesthetic taste.
 5. Profile/avatar: no overlay except an approved tiny verification badge on an approved avatar component.
 6. Press photo: designed one-sheet ok only if it does not cover a face.
 7. Ad/marketing scale is not web scale. Pills and type can go larger.
-
-### Locked Marketing Geometry and Review
-
-- Marketing pill controls are visibly 28px high inside a 44px minimum target.
-- The marketing O-mark is visibly 32px and shares the control alignment.
-- Decorative icons and emoji have no border, ring, circle, or badge container.
-- Reuse one canonical component family; encode supported states as variants and
-  consume instances. Do not create route-local masters.
-- Founder review contains only canonical masters and intentional variants. Put
-  receipts, duplicates, mappings, and process copy in operator artifacts.
-- Pen is proposal/review evidence until source identity, save/readback, and
-  persistence contracts pass. Visual similarity is not source backing.
-- Marketing pages share one spine and one type ramp: sections use
-  `ArtistProfileSectionShell`, heroes use `.ap-section-container`, and type
-  uses `.marketing-type-display` / `-section` / `-lede`.
-- Marketing plan prices render only through `MarketingOfferSummary` or
-  `getPublicPriceClaim` from offer truth; never type a price into copy.
-- Marketing images and cards use a radius token. The wide cinematic corner
-  is `.marketing-rounded-frame` (`--system-b-radius-panel` / `--radius-3xl`).
-  Exempt only the full-bleed hero start (it rounds as it zooms out), logos,
-  icons, SVG marks, and already-round avatars. See MKT-D17.
-- Marketing and public pages have one boxed width (`.public-container`, via
-  `MarketingContainer` or `Container`) and one full-bleed override (`bleed`).
-  Header, hero, sections and footer share it. No other page `max-w-*`, no
-  container padding of your own. See MKT-D18.
 
 ### No Duplicate Page Titles (Breadcrumb + Toolbar)
 
@@ -336,14 +115,6 @@ absent.
 - `pnpm design:no-dead-ends:check` fails on new violations; grandfathered ones live in `packages/copy/dead-ends.baseline.json` and only shrink (`pnpm design:no-dead-ends:update` locks a shrink). If a dead end can still reach a user, call `trackDeadEndShown(surface, reason)` so Summer can find it.
 
 ## Taste Rules (Hard Invariants)
-
-### No ICP-specific language on general pages
-
-- Homepage, pricing, about, brand, and other general marketing routes stay generic. Jovie is an identity product for any creator.
-- Do not write segment copy there: music, artist, musician, DJ, producer, label, founder, investor, fan, author, or a creator-type niche. “Creator” is the generic word.
-- Dedicated audience routes may use that language. The allowlist is `scripts/invariants/icp-language/config.json`.
-- The headline “Be found. Be understood.” is locked.
-- `scripts/invariants/icp-language/check.mjs` is a blocking PR Ready check. Existing hits are a shrink-only baseline. See MKT-D16 in `docs/marketing/DESIGN_INVARIANTS.md`.
 
 ### Quiet Surfaces: Hard Bans (founder, 2026-10-28)
 
@@ -406,7 +177,6 @@ The machine-readable rule list is `docs/design-system/anti-slop-rules.json` (ASR
 - Jovie product UI must feel closer to Linear than generic AI-generated dashboards: compact, quiet, precise, and premium.
 - Default to small typography, restrained weight changes, and clean spacing before adding decorative treatment.
 - Do **NOT** use all-caps labels, eyebrow text, or section headers as a default styling move; use normal Title Case labels unless an existing canonical pattern explicitly calls for something else.
-- For marketing sections, the default composition, eyebrow rules, above-the-fold contract, AI-mockup bans, and fake-proof/founder-first bans are now owned normatively by the marketing registry (`apps/web/data/marketing/`) — see `docs/marketing/AGENT_GUIDE.md`. The rules below are retained only where they apply to non-marketing UI.
 - Do **NOT** wrap content in a Card when the parent surface (Sheet, Drawer, existing Card) already provides visual grouping; first solve hierarchy with spacing, alignment, type, and surface contrast.
 - Nested decorative carding around a phone, screenshot, or demo is banned by default. If the visual already lives inside a phone, drawer, or screenshot, do not wrap it in extra floating cards just to make it feel designed.
 - Borders are a supporting tool, not the main design language; if a border can be removed without losing meaning, remove it.
@@ -442,13 +212,6 @@ button—must compose `SidebarNavItem` or its exported
 `getSidebarNavRowClassName` and `getSidebarNavIconClassName` helpers. Active,
 focus, collapsed, nested, and density chrome belong to that primitive. Do not
 copy its class string or create route-specific sidebar row styling.
-
-**Banned patterns:**
-- `EntitySidebarShell title="X"` → child renders `<CardHeader><CardTitle>X</CardTitle></CardHeader>` (double title)
-- `Sheet` body wrapped in `Card` when Sheet already provides the surface (redundant carding)
-- Same CTA label (e.g., "Get notified") appearing in header, body, AND footer of one screen
-- Two primary pill buttons inside one `PageToolbar`
-- A shell navigation link or button with bespoke row/icon chrome instead of the `SidebarNavItem` primitive/helpers
 
 This is the subtraction principle applied specifically to container boundaries. When in doubt, remove the inner chrome.
 
@@ -507,49 +270,6 @@ Global UI elements must only render in root `app/layout.tsx`:
 
 **NEVER** render these in individual pages or nested layouts — causes duplicate overlapping UI elements. Nested layouts must not mount `CookieBannerSection`, `ToastProvider`, or other analytics/provider singletons directly.
 
-## Marketing Pages Must Be Fully Static
-
-- All marketing, blog, and legal pages **must be fully static** (`export const revalidate = false`): no `headers()`, `cookies()`, `fetch` with `no-store`, or per-request data/nonce in `app/(marketing)` and `app/(dynamic)/legal` pages/layouts.
-- Any non-`false` `revalidate` value under `app/(marketing)` is a bug unless a human explicitly documents an exception in the PR.
-- `app/layout.tsx` must not read per-request headers for marketing; theme init belongs in static `/public/theme-init.js` (no nonce).
-- Middleware (`proxy.ts`) should only issue CSP nonces for app/protected/API paths. Marketing routes must not depend on nonce or geo headers for rendering.
-- Homepage "See It In Action" must not hit the database during SSR; use static `FALLBACK_AVATARS` only.
-- Marketing copy must not invent adoption metrics, customer counts, waitlist sizes, or traction claims. If a number is not verified and current, use non-quantified launch-stage copy instead.
-- Blog and changelog pages must be fully static, reading content from filesystem at build time only.
-- Cookie banner remains client-driven (localStorage + server cookie write) without server-provided `x-show-cookie-banner` headers.
-- Structured data on marketing pages should be rendered without `biome-ignore`; use string children inside `<script type="application/ld+json">` and `safeJsonLdStringify()` whenever user-controlled content is involved.
-- Public profiles (`/[username]`) use ISR (1h revalidate) for real-time updates, with cache tag invalidation for instant profile updates.
-
-**Why:** Fully static marketing pages eliminate cold start 500 errors, reduce Vercel costs (no serverless invocations), and provide instant TTFB (<100ms from CDN).
-
-## Marketing Screenshots
-
-Marketing pages reference product screenshots through `apps/web/lib/screenshots/registry.ts` only — never via `<Image src="/product-screenshots/..." />` literals. Use `<MarketingScreenshot scenarioId>` or `<MarketingPhoneImage scenarioId>`. See `docs/CANONICAL_SURFACES.md` → "How to add a marketing screenshot". Do not build a parallel registry.
-
-## Founder / Featured Creator Identity Must Be Canonical
-
-- **NEVER** invent, substitute, or mix placeholder creator identities on the homepage or marketing demos when Tim White or a real featured creator from canonical data should be used.
-- For Tim White specifically, agents must use the canonical homepage identity source instead of hardcoded fallback assets or guessed values.
-- If Tim White appears in homepage mocks, use `TIM_WHITE_PROFILE` from `apps/web/lib/tim-white.ts` and `TIM_WHITE_SPOTIFY_ID` from `apps/web/lib/spotify/blacklist.ts`; do not duplicate or truncate the identifier.
-- Calvin Harris demo fixtures must not include `Blessings`, Clementine Douglas, or any Tim White credit. Those names create an obvious founder-identity collision and must be treated as forbidden in Calvin demo content.
-- When fixing one wrong Tim White reference, search for sibling homepage/demo references and fix all of them in the same pass.
-
-**Why:** Using the wrong founder photo or wrong Spotify identity undermines trust in the product and makes the AI experience look careless.
-
-## Artist Profiles Landing Page
-
-When building or iterating on the Artist Profiles landing page:
-
-- Keep the page premium and restrained.
-- Prefer real product renders over invented UI.
-- Do not use customization messaging, theme builders, or open-ended template language.
-- Keep one big idea per section.
-- Prefer fewer, stronger sections over more sections.
-- Keep this page distinct from generic bio-link competitors and generic creator-site tools.
-- Keep copy in data files, not inline JSX.
-- Iterate section by section in browser instead of trying to style the whole page in one pass.
-- Marketing fake-proof/founder-first rules are now owned normatively by the marketing registry (`apps/web/data/marketing/`) — see `docs/marketing/AGENT_GUIDE.md` (zero-proof path: proof/trust sections illegal without verified data).
-
 ## Lesson Guard References
 
 - Register new Tailwind v4 utility tokens in `@theme` or `@theme inline` in
@@ -561,3 +281,5 @@ When building or iterating on the Artist Profiles landing page:
 - Honor the marketing registry's above-the-fold hero contract: do not use a
   full-height hero shell that pushes the first proof element below the fold.
   Keep the opening proof in the composition without decorative inset cards.
+
+Marketing surfaces add [marketing-ui](marketing-ui.md) (geometry, static rendering, screenshots, founder identity, ICP language).
