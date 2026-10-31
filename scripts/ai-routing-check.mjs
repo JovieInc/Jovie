@@ -84,8 +84,12 @@ export async function readWorkersAiByDay(days, fetchImpl, env = process.env) {
         maxAttempts: 1,
       });
       if (res.status < 200 || res.status >= 300) continue;
+      const body =
+        /** @type {{ data?: { viewer?: { accounts?: { aiInferenceAdaptiveGroups?: unknown }[] } } } | null} */ (
+          res.json()
+        );
       const groups =
-        res.json()?.data?.viewer?.accounts?.[0]?.aiInferenceAdaptiveGroups;
+        body?.data?.viewer?.accounts?.[0]?.aiInferenceAdaptiveGroups;
       if (Array.isArray(groups)) return workersAiUsdByDay(groups);
     } catch {
       // try the next token
