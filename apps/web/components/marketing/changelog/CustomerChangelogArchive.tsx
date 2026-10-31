@@ -5,6 +5,7 @@ import { ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { NoOrphanText } from '@/components/marketing/NoOrphanText';
 import { FilterChip } from '@/components/molecules/filters/FilterChip';
 import { APP_ROUTES } from '@/constants/routes';
 import { isSafeChangelogActionHref } from '@/lib/changelog-parser';
@@ -304,7 +305,9 @@ function EntryRow({ entry }: { readonly entry: CustomerChangelogEntry }) {
                 : 'Limited availability'}
             </p>
           ) : null}
-          <h3 className='changelog-entry__title'>{entry.title}</h3>
+          <h3 className='changelog-entry__title'>
+            <NoOrphanText>{entry.title}</NoOrphanText>
+          </h3>
           {entry.media ? <EntryMedia media={entry.media} /> : null}
           {hasLevel2 ? (
             <div className='space-y-2'>
@@ -445,7 +448,7 @@ function ArchiveJumpNav({
                     {formatCustomerChangelogDate(entry.date)}
                   </span>
                   <span className='changelog-archive-nav__link-title'>
-                    {entry.title}
+                    <NoOrphanText>{entry.title}</NoOrphanText>
                     <ArrowRight
                       aria-hidden='true'
                       size={16}

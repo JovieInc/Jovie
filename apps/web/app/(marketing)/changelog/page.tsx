@@ -6,6 +6,7 @@ import {
 } from '@/components/marketing';
 import { ChangelogSubscribeColumn } from '@/components/marketing/changelog/ChangelogSubscribeColumn';
 import { CustomerChangelogArchive } from '@/components/marketing/changelog/CustomerChangelogArchive';
+import { NoOrphanText } from '@/components/marketing/NoOrphanText';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
@@ -100,7 +101,7 @@ function ReleaseJournalHero({
                         {formatTimelineDate(entry.date)}
                       </span>
                       <span className='changelog-hero__timeline-title'>
-                        {entry.title}
+                        <NoOrphanText>{entry.title}</NoOrphanText>
                       </span>
                     </Link>
                   </li>
