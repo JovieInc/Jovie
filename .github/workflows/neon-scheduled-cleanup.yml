@@ -41,7 +41,7 @@ jobs:
           neon_api_key: ${{ secrets.NEON_API_KEY }}
           neon_project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_limit: '10'
-          protected_branches: 'main,development,preview,br-main,br-production'
+          protected_branches: 'main,production,prod,development,preview,br-main,br-production'
           cleanup_threshold: ${{ github.event.inputs.cleanup_threshold || '5' }}
           minimum_branch_age_minutes: ${{ github.event.inputs.minimum_branch_age_minutes || '45' }}
 

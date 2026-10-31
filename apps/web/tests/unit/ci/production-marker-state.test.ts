@@ -1,13 +1,23 @@
-import { readFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   admitReleaseBase,
+  attachEntryHandoff,
   classifyProducerCoalescence,
   classifyProductionMarkerEvidence,
+  entryRatchetDigest as entryDigest,
   normalizeProductionJobs,
   selectNewerControllerRun,
+  validEntryRatchet,
 } from '../../../../../.github/scripts/production-marker-state.mjs';
 
 const processRunner = vi.hoisted(() => vi.fn());
@@ -25,6 +35,610 @@ const liveFixturePath = resolve(
   testDir,
   'fixtures/production-controller-run-live-shape.json'
 );
+
+// Frozen synthetic proof produced by the reviewed collector before the layer split.
+// Digests are recorded bytes, not regenerated expectations or a second decision implementation.
+const ENTRY_FIXTURE_TIME = 1793059200000;
+function entryHandoffFixture() {
+  const now = ENTRY_FIXTURE_TIME;
+  const profile = {
+    harnessSha256: 'f'.repeat(64),
+    lighthouseVersion: '13.4.1',
+    browser: 'Chrome/140',
+    device: 'mobile',
+    cpu: '4x',
+    network: 'slow4g',
+    cache: 'reset-browser-observed-server',
+    bypass: 'vercel-header',
+  };
+  const measurement = (letter: string, deploymentId: string, lcp: number) => ({
+    identity: {
+      sha: letter.repeat(40),
+      deploymentId,
+      origin: `https://jovie-${letter}-jovie.vercel.app`,
+    },
+    profileDigest:
+      '50db59db8bfb98614eb9c84b20b3351ec42b2baf535cd9f45611304f3b6f4808',
+    cohorts: [0, 1].map(ordinal => ({
+      ordinal,
+      startedAt: now - 900 + ordinal * 100,
+      completedAt: now - 850 + ordinal * 100,
+      routes: (['start', 'claim', 'claim-link'] as const).map(id => ({
+        id,
+        lcpSamples: [lcp, lcp, lcp],
+        clsSamples: [0, 0, 0],
+        serverCache: ['HIT', 'HIT', 'HIT'],
+      })),
+    })),
+  });
+  const served = measurement('b', 'dpl_served', 6000);
+  const candidate = measurement('a', 'dpl_primary123', 5000);
+  const producer = { sha, runId: controllerRun, attempt: 1 };
+  const entryRatchet = {
+    schema: 'jovie-entry-lcp-ratchet/v1',
+    budgets: [
+      { id: 'start', path: '/start', lcpMs: 4000, cls: 0.05 },
+      { id: 'claim', path: '/claim', lcpMs: 4000, cls: 0.05 },
+      { id: 'claim-link', path: '/[handle]?claim=1', lcpMs: 4000, cls: 0.05 },
+    ],
+    declaredAt: now - 1000,
+    completedAt: now,
+    policyDigest:
+      '068b88c15cbdbec8dacb803bec18c5dfd9a86ee1dc2f21efbab5ec7acae40504',
+    profile,
+    profileDigest:
+      '50db59db8bfb98614eb9c84b20b3351ec42b2baf535cd9f45611304f3b6f4808',
+    producer,
+    baseline: {
+      state: 'verified',
+      sha: served.identity.sha,
+      deploymentId: served.identity.deploymentId,
+      markerArtifactId: 10,
+      controllerRun: 5,
+      controllerAttempt: 1,
+    },
+    served,
+    candidate,
+    reference: served,
+    anchor: { measurement: candidate, producer, role: 'candidate' },
+    previousAnchor: { measurement: served, producer, role: 'served' },
+    previousAnchorDigest: null,
+    initializedFrom: 'verified-served',
+    releaseEligible: true,
+    certified: false,
+    failures: [],
+    digest: '1201edb6c4aa3042c4bd48a37cee7c7de88d7b203e1223a7ce95fb128153dde5',
+  };
+  return {
+    schema: 'jovie-entry-lcp-handoff/v1',
+    producer,
+    candidate: candidate.identity,
+    mode: 'measured',
+    entryRatchet,
+  };
+}
+
+function entryPolicyFixture(lineageSha = sha, selectedLane = 'high') {
+  return {
+    schema: 'jovie.release-risk-receipt/v1',
+    policyVersion: 'jovie.release-risk-policy/2026-10-21.1',
+    lineageSha,
+    selectedLane,
+    requiredProof:
+      selectedLane === 'high' ? ['high-confidence-runtime-proof'] : [],
+  };
+}
+
+describe('entry ratchet artifact handoff', () => {
+  beforeEach(() => {
+    vi.spyOn(Date, 'now').mockReturnValue(ENTRY_FIXTURE_TIME + 5000);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+  it('accepts the immutable pre-split proof with its recorded digest', () => {
+    const receipt = entryHandoffFixture().entryRatchet;
+    const { digest, ...body } = receipt;
+    expect(entryDigest(body)).toBe(digest);
+    expect(validEntryRatchet(receipt)).toBe(true);
+  });
+  it.each(['certification', 'regression', 'weaker-policy', 'wrong-anchor'])(
+    'independently rejects a rehashed contradictory %s decision',
+    fault => {
+      const receipt = structuredClone(entryHandoffFixture().entryRatchet);
+      if (fault === 'certification') receipt.certified = true;
+      if (fault === 'regression')
+        receipt.candidate.cohorts[0].routes[0].lcpSamples = [7000, 7000, 7000];
+      if (fault === 'weaker-policy') {
+        Object.assign(receipt.budgets[0], { lcpMs: 9000 });
+        receipt.policyDigest = entryDigest({
+          schema: receipt.schema,
+          budgets: receipt.budgets,
+          cohorts: 2,
+          samples: 3,
+          positiveRegressionAllowance: 0,
+        });
+      }
+      if (fault === 'wrong-anchor') receipt.anchor = receipt.previousAnchor;
+      const { digest: _old, ...body } = receipt;
+      receipt.digest = entryDigest(body);
+      expect(validEntryRatchet(receipt)).toBe(false);
+    }
+  );
+
+  it.each(['qualified', 'missing-status', 'foreign-source'])(
+    'binds a measured ratchet to the actual marker producer (%s)',
+    mode => {
+      const marker = primaryMarker('completed', 'success');
+      const receipt = structuredClone(entryHandoffFixture().entryRatchet);
+      if (mode === 'foreign-source') {
+        receipt.producer.runId = 999;
+        const { digest: _old, ...body } = receipt;
+        receipt.digest = entryDigest(body);
+        expect(validEntryRatchet(receipt)).toBe(true);
+      }
+      const payload = {
+        ...marker.payload,
+        releasePolicy: entryPolicyFixture(),
+        entryRatchet: receipt,
+        ...(mode === 'missing-status'
+          ? {}
+          : { entryMeasurementStatus: 'measured' }),
+      };
+      expect(
+        classifyProductionMarkerEvidence(
+          evidence({ markers: [{ ...marker, payload }] })
+        ).state
+      ).toBe(mode === 'qualified' ? 'verified' : 'manual');
+    }
+  );
+  it('serializes the actual controller and recovery marker commands before applying the original-attempt handoff', async () => {
+    const { spawnSync: nativeSpawn } =
+      await vi.importActual<typeof import('node:child_process')>(
+        'node:child_process'
+      );
+    const directory = mkdtempSync(resolve(tmpdir(), 'entry-workflow-test-'));
+    mkdirSync(resolve(directory, 'release-lineage'));
+    writeFileSync(
+      resolve(directory, 'release-lineage/fleet-admission.json'),
+      '{"scopedAdmission":{}}'
+    );
+    writeFileSync(
+      resolve(directory, 'release-risk-receipt.json'),
+      JSON.stringify(entryPolicyFixture())
+    );
+    const handoff = entryHandoffFixture();
+    try {
+      for (const workflow of [
+        'production-controller.yml',
+        'production-marker-recovery.yml',
+      ]) {
+        const source = readFileSync(
+          resolve(testDir, '../../../../../.github/workflows', workflow),
+          'utf8'
+        );
+        const lines = source.split('\n');
+        const endings = lines.flatMap((line, index) =>
+          line.includes('> "$RUNNER_TEMP/production-generation-verified.json"')
+            ? [index]
+            : []
+        );
+        expect(endings).toHaveLength(
+          workflow === 'production-controller.yml' ? 2 : 1
+        );
+        for (const end of endings) {
+          let start = end;
+          while (start >= 0 && lines[start].trim() !== 'jq -n \\') start--;
+          expect(start).toBeGreaterThanOrEqual(0);
+          const recovery = workflow === 'production-marker-recovery.yml';
+          const script = lines
+            .slice(start, end + 1)
+            .map(line => line.trimStart())
+            .join('\n')
+            .replaceAll(
+              '${{ github.run_id }}',
+              recovery ? '900' : String(controllerRun)
+            )
+            .replaceAll('${{ github.run_attempt }}', recovery ? '2' : '1');
+          writeFileSync(
+            resolve(directory, 'release-risk-receipt.json'),
+            JSON.stringify(
+              entryPolicyFixture(
+                sha,
+                script.includes('deploymentId: "not-applicable"')
+                  ? 'not_applicable'
+                  : 'high'
+              )
+            )
+          );
+          const executed = nativeSpawn(
+            'bash',
+            ['-euo', 'pipefail', '-c', script],
+            {
+              encoding: 'utf8',
+              timeout: 5000,
+              env: {
+                NODE_ENV: 'test',
+                PATH: process.env.PATH,
+                RUNNER_TEMP: directory,
+                EXPECTED_SHA: sha,
+                DEPLOYMENT_ID: handoff.candidate.deploymentId,
+                EXPECTED_DEPLOYMENT_ID: handoff.candidate.deploymentId,
+                DEPLOYED_SHA: 'b'.repeat(40),
+                WEB_EVIDENCE_SHA: sha,
+                SELECTED_LANES: 'web',
+                AUTH_SMOKE_STATUS: 'passed',
+                terminal_reason: 'promoted',
+                SOURCE_CONTROLLER_RUN: String(controllerRun),
+                SOURCE_CONTROLLER_ATTEMPT: '1',
+              },
+            }
+          );
+          expect(executed.status, executed.stderr).toBe(0);
+          const marker = JSON.parse(
+            readFileSync(
+              resolve(directory, 'production-generation-verified.json'),
+              'utf8'
+            )
+          );
+          if (marker.deploymentId === 'not-applicable') {
+            expect(marker.deploymentBaseSha).toBe('b'.repeat(40));
+          } else {
+            const attached = attachEntryHandoff(
+              marker,
+              handoff,
+              entryPolicyFixture()
+            );
+            expect(attached.entryRatchet).toEqual(handoff.entryRatchet);
+          }
+        }
+      }
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it.each(['qualified', 'legacy', 'expired', 'missing'])(
+    'executes no-web carry from a %s served marker without renewing its evidence',
+    async state => {
+      const primary = primaryMarker('completed', 'success');
+      const receipt = entryHandoffFixture().entryRatchet;
+      if (state !== 'legacy')
+        Object.assign(primary.payload, {
+          entryMeasurementStatus: 'measured',
+          entryRatchet: receipt,
+          releasePolicy: entryPolicyFixture(),
+        });
+      const directory = mkdtempSync(resolve(tmpdir(), 'entry-no-web-test-'));
+      const filename = resolve(
+        directory,
+        'production-generation-verified.json'
+      );
+      const original = JSON.stringify({
+        sha: 'c'.repeat(40),
+        deploymentId: 'not-applicable',
+        deploymentBaseSha: sha,
+        controllerRun: '900',
+        controllerAttempt: '1',
+        webEvidenceSha: 'none',
+        selectedLanes: [],
+        authSmoke: 'not-applicable',
+        releasePolicy: entryPolicyFixture('c'.repeat(40), 'not_applicable'),
+      });
+      writeFileSync(filename, original);
+      processRunner.mockImplementation((command: string, args: string[]) => {
+        const endpoint = args[1];
+        let output: string | Buffer;
+        if (command === 'unzip')
+          output =
+            args[0] === '-Z1'
+              ? 'production-generation-verified.json\n'
+              : JSON.stringify(primary.payload);
+        else if (command === 'gh' && args[0] === 'api') {
+          if (endpoint.endsWith('/zip')) output = Buffer.from('archive');
+          else if (endpoint.endsWith('/production-controller.yml'))
+            output = JSON.stringify({ id: workflowId });
+          else if (endpoint.includes('/artifacts?')) {
+            const artifacts =
+              state !== 'missing' &&
+              endpoint.includes(`name=production-generation-verified-${sha}&`)
+                ? [
+                    {
+                      ...primary.artifact,
+                      expired: state === 'expired',
+                      workflow_run: { id: controllerRun },
+                    },
+                  ]
+                : [];
+            output = JSON.stringify({
+              total_count: artifacts.length,
+              artifacts,
+            });
+          } else if (endpoint.includes('/jobs?'))
+            output = JSON.stringify({
+              total_count: primary.attemptJobs.length,
+              jobs: primary.attemptJobs,
+            });
+          else if (endpoint.endsWith('/attempts/1'))
+            output = JSON.stringify(primary.attemptRun);
+          else throw new Error(`Unexpected offline endpoint ${endpoint}`);
+        } else throw new Error(`Unexpected offline command ${command}`);
+        return { status: 0, stdout: output, stderr: '' };
+      });
+      const argv = process.argv;
+      try {
+        process.argv = [
+          process.execPath,
+          resolve(
+            testDir,
+            '../../../../../.github/scripts/production-marker-state.mjs'
+          ),
+          '--entry-carry',
+          filename,
+          '--repo',
+          repo,
+        ];
+        vi.resetModules();
+        const execute = () =>
+          import('../../../../../.github/scripts/production-marker-state.mjs');
+        if (state === 'qualified' || state === 'legacy') {
+          await execute();
+          const carried = JSON.parse(readFileSync(filename, 'utf8'));
+          expect(carried.entryMeasurementStatus).toBe(
+            state === 'legacy' ? 'uninitialized' : 'carried'
+          );
+          expect(carried.entryRatchet).toEqual(
+            state === 'legacy' ? null : receipt
+          );
+        } else {
+          await expect(execute()).rejects.toThrow();
+          expect(readFileSync(filename, 'utf8')).toBe(original);
+        }
+      } finally {
+        process.argv = argv;
+        processRunner.mockReset();
+        rmSync(directory, { recursive: true, force: true });
+      }
+    }
+  );
+  it('preserves the original measurement and anchor bytes through recovery and supersession', () => {
+    const handoff = entryHandoffFixture();
+    const primary = primaryMarker('completed', 'success').payload;
+    const recovered = {
+      ...primary,
+      controllerRun: '900',
+      controllerAttempt: '2',
+      recoveredFromControllerRun: String(controllerRun),
+      recoveredFromControllerAttempt: '1',
+    };
+    for (const marker of [
+      primary,
+      recovered,
+      { ...primary, terminalReason: 'skipped_superseded' },
+    ]) {
+      const attached = attachEntryHandoff(
+        marker,
+        handoff,
+        entryPolicyFixture()
+      );
+      expect(attached.entryRatchet).toEqual(handoff.entryRatchet);
+      expect(attached.entryRatchet.completedAt).toBe(
+        handoff.entryRatchet.completedAt
+      );
+      expect(attached.entryMeasurementStatus).toBe('measured');
+    }
+  });
+
+  it('carries an old anchor without claiming that the current SHA was measured', () => {
+    const handoff = entryHandoffFixture();
+    const carried = {
+      ...handoff,
+      mode: 'carried',
+      producer: { ...handoff.producer, sha: 'c'.repeat(40), runId: 700 },
+      candidate: {
+        ...handoff.candidate,
+        sha: 'c'.repeat(40),
+        deploymentId: 'dpl_c',
+        origin: 'https://jovie-c-jovie.vercel.app',
+      },
+    };
+    const marker = {
+      sha: carried.producer.sha,
+      deploymentId: 'dpl_c',
+      controllerRun: '700',
+      controllerAttempt: '1',
+    };
+    expect(
+      attachEntryHandoff(marker, carried, entryPolicyFixture(marker.sha, 'low'))
+    ).toMatchObject({
+      entryMeasurementStatus: 'carried',
+      entryRatchet: handoff.entryRatchet,
+    });
+    expect(() =>
+      attachEntryHandoff(
+        marker,
+        { ...carried, mode: 'measured' },
+        entryPolicyFixture(marker.sha, 'low')
+      )
+    ).toThrow(/source mismatch/);
+  });
+
+  it.each([
+    'expired',
+    'future',
+    'extra-field',
+    'digest',
+    'incomplete',
+    'invalid-sample',
+  ])('rejects %s persisted evidence', fault => {
+    const receipt = structuredClone(entryHandoffFixture().entryRatchet);
+    if (fault === 'expired') receipt.completedAt -= 31 * 86400000;
+    if (fault === 'future') receipt.completedAt += 100000;
+    if (fault === 'extra-field')
+      Object.assign(receipt, { secret: 'must-not-survive' });
+    if (fault === 'digest') receipt.digest = '0'.repeat(64);
+    if (fault === 'incomplete') receipt.anchor.measurement.cohorts.pop();
+    if (fault === 'invalid-sample')
+      receipt.candidate.cohorts[0].routes[0].lcpSamples[0] = Number.NaN;
+    expect(validEntryRatchet(receipt)).toBe(false);
+  });
+
+  it.each([
+    'exact',
+    'missing',
+    'expired',
+    'foreign-run',
+    'wrong-attempt',
+    'changed-list',
+    'unexpected-file',
+    'private-field',
+    'wrong-name',
+    'invalid-id',
+    'unknown-expiry',
+    'high-carried',
+    'high-uninitialized',
+    'low-carried',
+    'foreign-policy',
+    'missing-policy',
+  ])(
+    'executes the real artifact-to-marker CLI with %s evidence',
+    async fault => {
+      const handoff = entryHandoffFixture();
+      const policy = entryPolicyFixture(
+        fault === 'foreign-policy' ? 'f'.repeat(40) : sha,
+        fault === 'low-carried' ? 'low' : 'high'
+      );
+      if (fault === 'high-carried' || fault === 'low-carried')
+        handoff.mode = 'carried';
+      if (fault === 'high-uninitialized')
+        Object.assign(handoff, { mode: 'uninitialized', entryRatchet: null });
+      if (fault === 'wrong-attempt') handoff.producer.attempt = 2;
+      if (fault === 'private-field')
+        Object.assign(handoff.candidate, { header: 'private' });
+      const marker = {
+        ...primaryMarker('completed', 'success').payload,
+        controllerRun: '900',
+        controllerAttempt: '2',
+        recoveredFromControllerRun: String(controllerRun),
+        recoveredFromControllerAttempt: '1',
+      };
+      const directory = mkdtempSync(resolve(tmpdir(), 'entry-artifact-test-'));
+      const filename = resolve(
+        directory,
+        'production-generation-verified.json'
+      );
+      const original = `${JSON.stringify(marker)}\n`;
+      writeFileSync(filename, original);
+      let listings = 0;
+      let archive = 'entry';
+      const name = `entry-lcp-handoff-${sha}-${controllerRun}-1`;
+      processRunner.mockImplementation((command: string, args: string[]) => {
+        let output: string | Buffer;
+        if (command === 'unzip')
+          output =
+            args[0] === '-Z1'
+              ? archive === 'policy'
+                ? 'release-risk-receipt.json\nproduction-lane-range.json\nfleet-admission.json\n'
+                : fault === 'unexpected-file'
+                  ? 'entry-lcp-handoff.json\nheaders.json\n'
+                  : 'entry-lcp-handoff.json\n'
+              : JSON.stringify(archive === 'policy' ? policy : handoff);
+        else if (
+          command === 'gh' &&
+          args[0] === 'api' &&
+          args[1].endsWith('/zip')
+        ) {
+          archive = args[1].includes('/51/zip') ? 'policy' : 'entry';
+          output = Buffer.from('archive');
+        } else if (
+          command === 'gh' &&
+          args[0] === 'api' &&
+          args[1].includes('name=production-lane-range-')
+        ) {
+          const artifacts =
+            fault === 'missing-policy'
+              ? []
+              : [
+                  {
+                    id: 51,
+                    name: `production-lane-range-${sha}-1`,
+                    expired: false,
+                    workflow_run: { id: controllerRun },
+                  },
+                ];
+          output = JSON.stringify({ total_count: artifacts.length, artifacts });
+        } else if (
+          command === 'gh' &&
+          args[0] === 'api' &&
+          args[1].includes(`name=${name}`)
+        ) {
+          listings++;
+          const artifacts =
+            fault === 'missing'
+              ? []
+              : [
+                  {
+                    id:
+                      fault === 'invalid-id'
+                        ? 0
+                        : fault === 'changed-list' && listings > 1
+                          ? 42
+                          : 41,
+                    name: fault === 'wrong-name' ? 'unbound-artifact' : name,
+                    expired:
+                      fault === 'unknown-expiry'
+                        ? undefined
+                        : fault === 'expired',
+                    workflow_run: {
+                      id: fault === 'foreign-run' ? 900 : controllerRun,
+                    },
+                  },
+                ];
+          output = JSON.stringify({ total_count: artifacts.length, artifacts });
+        } else throw new Error(`Unexpected offline command ${command}`);
+        return { status: 0, stdout: output, stderr: '' };
+      });
+      const argv = process.argv;
+      try {
+        process.argv = [
+          process.execPath,
+          resolve(
+            testDir,
+            '../../../../../.github/scripts/production-marker-state.mjs'
+          ),
+          '--entry-attach',
+          filename,
+          '--repo',
+          repo,
+        ];
+        vi.resetModules();
+        const execute = () =>
+          import('../../../../../.github/scripts/production-marker-state.mjs');
+        if (fault === 'exact' || fault === 'low-carried') {
+          await execute();
+          expect(JSON.parse(readFileSync(filename, 'utf8'))).toMatchObject({
+            entryRatchet: handoff.entryRatchet,
+            entryMeasurementStatus:
+              fault === 'low-carried' ? 'carried' : 'measured',
+          });
+          expect(listings).toBe(2);
+        } else {
+          await expect(execute()).rejects.toThrow();
+          expect(readFileSync(filename, 'utf8')).toBe(original);
+        }
+        expect(
+          processRunner.mock.calls.some(call =>
+            /--method| -X /.test(String(call[1]))
+          )
+        ).toBe(false);
+      } finally {
+        process.argv = argv;
+        processRunner.mockReset();
+        rmSync(directory, { recursive: true, force: true });
+      }
+    }
+  );
+});
 
 function run(attempt: number, status: string, conclusion: string | null) {
   return {
@@ -177,6 +791,14 @@ function evidence(overrides: Record<string, unknown> = {}) {
 }
 
 describe('production marker attempt state', () => {
+  it('refuses an unknown entry ratchet version instead of silently dropping its authority', () => {
+    const marker = primaryMarker('completed', 'success');
+    Object.assign(marker.payload, { entryRatchet: { schema: 'unknown/v99' } });
+    expect(
+      classifyProductionMarkerEvidence(evidence({ markers: [marker] })).state
+    ).toBe('manual');
+  });
+
   const normalRerunMarker = () => ({
     ...recoveryMarker('completed', 'success'),
     artifact: { ...primaryMarker('completed', 'success').artifact },
@@ -839,6 +1461,41 @@ describe('production marker attempt state', () => {
         controllerAttempt: 1,
         deploymentId: 'dpl_primary123',
       });
+    });
+
+    it('stays verified when the run was cancelled during publication only', () => {
+      const jobs: Array<[string, string]> = [
+        ...run37144574062.slice(0, -1),
+        ['Publish verified customer changelog', 'cancelled'],
+      ];
+      const marker = replayMarker(jobs, sha);
+      marker.attemptRun.conclusion = 'cancelled';
+      expect(
+        classifyProductionMarkerEvidence(
+          evidence({
+            markers: [marker],
+            latestRun: run(1, 'completed', 'cancelled'),
+          })
+        )
+      ).toMatchObject({ state: 'verified' });
+    });
+
+    it('keeps a cancelled run interrupted when a deploy job was cancelled', () => {
+      const jobs = run37144574062.map(([n, c]): [string, string] =>
+        n === 'Production Release / Promote to Production'
+          ? [n, 'cancelled']
+          : [n, c]
+      );
+      const marker = replayMarker(jobs, sha);
+      marker.attemptRun.conclusion = 'cancelled';
+      expect(
+        classifyProductionMarkerEvidence(
+          evidence({
+            markers: [marker],
+            latestRun: run(1, 'completed', 'cancelled'),
+          })
+        ).state
+      ).toBe('recovery_available');
     });
 
     it('stays verified when the publication remediation filer also failed', () => {
@@ -1574,6 +2231,95 @@ describe('recovered production marker state', () => {
       state: 'manual',
       reason: 'recovery_evidence_after_verified_primary',
     });
+  });
+
+  // JOV-9971: the exact store state left by Production Marker Recovery run
+  // 40976011313 for 5cbe0cb — an interrupted primary whose producer run was
+  // cancelled during post-verification publication, plus the recovery
+  // receipt bound to that exact producer attempt. #23801 reclassified the
+  // primary as verified, which broke the interrupted-only replacement
+  // pairing and froze every later release (run 40994378769,
+  // duplicate_primary_marker). The pairing must follow the reclassification.
+  const cancelledPublicationJobs = (): Array<[string, string]> => [
+    ['Production Release / Migrate production database', 'success'],
+    ['Production Release / Promote to Production', 'success'],
+    ['Production Release / Sentry Error Gate (production)', 'success'],
+    ['Production Release / Centralized production rollback', 'skipped'],
+    ['Production Verified', 'success'],
+    ['Publish verified customer changelog', 'cancelled'],
+  ];
+
+  function cancelledPublicationPrimary() {
+    const marker = primaryMarker('completed', 'cancelled');
+    marker.attemptJobs = cancelledPublicationJobs().map(([name, conclusion]) =>
+      job(name, 1, 'completed', conclusion)
+    );
+    return marker;
+  }
+
+  function healedPair() {
+    const primary = cancelledPublicationPrimary();
+    const recovered = recoveredMarker();
+    recovered.payload.deploymentId = primary.payload.deploymentId;
+    recovered.originalRun = run(1, 'completed', 'cancelled');
+    return { primary, recovered };
+  }
+
+  it('resolves a recovery receipt bound to a cancelled-publication primary as verified', () => {
+    const { primary, recovered } = healedPair();
+    expect(
+      classifyProductionMarkerEvidence(
+        evidence({ markers: [primary, recovered], latestRun: undefined })
+      )
+    ).toMatchObject({
+      state: 'verified',
+      reason: 'exact_recovered_generation_verified',
+      controllerRun: recoveryRunId,
+      deploymentId: 'dpl_primary123',
+    });
+  });
+
+  it('still refuses a recovery receipt bound to a different source attempt', () => {
+    const { primary, recovered } = healedPair();
+    recovered.payload.recoveredFromControllerAttempt = '2';
+    recovered.originalRun = run(2, 'completed', 'cancelled');
+    recovered.originalJobs = [
+      job(
+        'Production Release / Centralized production rollback',
+        2,
+        'completed',
+        'skipped'
+      ),
+    ];
+    expect(
+      classifyProductionMarkerEvidence(
+        evidence({ markers: [primary, recovered], latestRun: undefined })
+      ).state
+    ).toBe('manual');
+  });
+
+  it('still refuses a recovery receipt beside a genuinely successful primary', () => {
+    const primary = primaryMarker('completed', 'success');
+    const recovered = recoveredMarker();
+    recovered.payload.deploymentId = primary.payload.deploymentId;
+    expect(
+      classifyProductionMarkerEvidence(
+        evidence({ markers: [primary, recovered], latestRun: undefined })
+      )
+    ).toMatchObject({
+      state: 'manual',
+      reason: 'duplicate_primary_marker',
+    });
+  });
+
+  it('still refuses a recovery receipt when the deployment binding diverges', () => {
+    const { primary, recovered } = healedPair();
+    recovered.payload.deploymentId = 'dpl_other999';
+    expect(
+      classifyProductionMarkerEvidence(
+        evidence({ markers: [primary, recovered], latestRun: undefined })
+      ).state
+    ).toBe('manual');
   });
 });
 

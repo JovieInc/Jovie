@@ -83,8 +83,9 @@ await invalidateAvatarCache(userId, usernameNormalized);
 
 **Scope:** `app/app/dashboard/actions.ts`
 
-- User-specific dashboard reads remain request-time to protect privacy and avoid cross-user bleed.
-- Mutations call `updateTag('dashboard-data')` and `revalidateTag('dashboard-data', 'max')` so any future Cache Components can safely opt in.
+- Dashboard essential/shell/core reads are cached per user (`unstable_cache` keyed by user id) under one
+  shared `dashboard-data` tag, so any user's mutation evicts every user's entry. Replacing it with a
+  per-user tag is tracked as `global-tag-revalidate` debt (scripts/data-architecture-guard.mjs).
 
 ## Release projections
 
@@ -123,8 +124,9 @@ When adding new cacheable data:
 
 2. **Create invalidation function in `lib/cache/profile.ts`**:
    - Follow the pattern of existing functions
-   - Call `updateTag()` then `revalidateTag(..., 'max')` for immediate freshness
-   - Use `revalidatePath()` for page-level invalidation
+   - Server actions call `updateTag(<record tag>)`; route handlers call `revalidateTag(<record tag>, 'max')`
+   - Do not add `revalidatePath()` or family tags (`profiles-all`, `dashboard-data`); policy lives in
+     [the data architecture ADR](architecture/data-architecture-adr-2026-10-29.md)
 
 3. **Export from `lib/cache/index.ts`**
 
