@@ -230,7 +230,10 @@ describe('POST /api/webhooks/resend', () => {
         recipientEmail: 'fan@example.com',
         status: 'delivered',
         providerMessageId: 'email_123',
-        metadata: { creatorProfileId: 'creator_123' },
+        metadata: {
+          creatorProfileId: 'creator_123',
+          senderDomain: 'example.com',
+        },
       })
     );
     expect(mockUpdate).toHaveBeenCalledTimes(1);

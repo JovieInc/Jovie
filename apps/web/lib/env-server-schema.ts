@@ -107,6 +107,13 @@ export const ServerEnvSchema = z.object({
   RESEND_REPLY_TO_EMAIL: z.string().email().optional(),
   RESEND_WEBHOOK_SECRET: z.string().optional(),
   RESEND_INBOUND_WEBHOOK_SECRET: z.string().optional(),
+  // Email stream sending domains (lib/email/streams.ts); unset keeps defaults
+  EMAIL_STREAM_TRANSACTIONAL_DOMAIN: z.string().optional(),
+  EMAIL_STREAM_LIFECYCLE_DOMAIN: z.string().optional(),
+  EMAIL_STREAM_FOUNDER_DOMAIN: z.string().optional(),
+  EMAIL_STREAM_BROADCAST_DOMAIN: z.string().optional(),
+  EMAIL_STREAM_INBOX_DOMAIN: z.string().optional(),
+  EMAIL_STREAM_COLD_DOMAIN: z.string().optional(),
 
   // Slack notifications (admin alerts for claims, signups, upgrades, waitlist)
   SLACK_WEBHOOK_URL: z.string().url().optional(),
@@ -575,6 +582,12 @@ export const ENV_KEYS = [
   'RESEND_REPLY_TO_EMAIL',
   'RESEND_WEBHOOK_SECRET',
   'RESEND_INBOUND_WEBHOOK_SECRET',
+  'EMAIL_STREAM_TRANSACTIONAL_DOMAIN',
+  'EMAIL_STREAM_LIFECYCLE_DOMAIN',
+  'EMAIL_STREAM_FOUNDER_DOMAIN',
+  'EMAIL_STREAM_BROADCAST_DOMAIN',
+  'EMAIL_STREAM_INBOX_DOMAIN',
+  'EMAIL_STREAM_COLD_DOMAIN',
   'SLACK_WEBHOOK_URL',
   'DATABASE_URL',
   'DB_POOL_MAX',

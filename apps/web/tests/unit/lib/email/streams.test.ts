@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MIN_SAMPLE,
+  summarizeDeliverability,
+} from '@/lib/email/stream-deliverability';
+import {
   CORE_DOMAIN,
   EMAIL_STREAM_REGISTRY,
   EMAIL_STREAMS,
@@ -107,5 +111,57 @@ describe('email stream registry', () => {
     expect(isCoreDomain('send.jov.ie')).toBe(true);
     expect(isCoreDomain('notjov.ie')).toBe(false);
     expect(isCoreDomain('meetjovie.com')).toBe(false);
+  });
+});
+
+describe('stream deliverability summary', () => {
+  const rows = (d: number, b: number, c: number, domain = 'send.jov.ie') => [
+    { senderDomain: domain, status: 'delivered', count: d },
+    { senderDomain: domain, status: 'bounced', count: b },
+    { senderDomain: domain, status: 'complained', count: c },
+  ];
+
+  it('does not judge a rate below the sample floor', () => {
+    const out = summarizeDeliverability(rows(10, 5, 1), {}, 7, new Date(0));
+    expect(out.domains[0]).toMatchObject({
+      status: 'insufficient-data',
+      bounceRate: null,
+    });
+    expect(out.ok).toBe(true);
+    expect(MIN_SAMPLE).toBe(50);
+  });
+
+  it('flags complaint and bounce breaches against the stream threshold', () => {
+    const out = summarizeDeliverability(rows(1000, 50, 2), {}, 7, new Date(0));
+    expect(out.domains[0]?.status).toBe('breach');
+    expect(out.domains[0]?.breaches).toHaveLength(2);
+    expect(out.ok).toBe(false);
+  });
+
+  it('passes clean traffic and reports hard violations', () => {
+    expect(
+      summarizeDeliverability(rows(1000, 5, 0), {}, 7, new Date(0)).ok
+    ).toBe(true);
+    const bad = summarizeDeliverability(
+      [],
+      { EMAIL_STREAM_COLD_DOMAIN: 'x.jov.ie' },
+      7,
+      new Date(0)
+    );
+    expect(bad.ok).toBe(false);
+    expect(bad.hardViolations[0]?.rule).toBe('cold-on-core-domain');
+  });
+
+  it('buckets events without a sender domain as unattributed', () => {
+    const out = summarizeDeliverability(
+      rows(100, 0, 0, null as unknown as string),
+      {},
+      7,
+      new Date(0)
+    );
+    expect(out.domains[0]).toMatchObject({
+      domain: 'unattributed',
+      stream: 'unknown',
+    });
   });
 });

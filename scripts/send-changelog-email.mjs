@@ -22,6 +22,9 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import emailStreamRegistry from '../apps/web/lib/email/stream-registry.json' with {
+  type: 'json',
+};
 import { isInternalEntry } from './lib/changelog-filter-rules.mjs';
 import { getLatestRelease } from './lib/changelog-parser.mjs';
 
@@ -183,8 +186,12 @@ async function main() {
       process.exit(0);
     }
 
-    const fromEmail =
-      process.env.RESEND_FROM_EMAIL || 'notifications@send.jov.ie';
+    // Opted-in changelog mail follows the canonical broadcast stream policy.
+    const broadcastPolicy = emailStreamRegistry.streams.broadcast;
+    const broadcastDomain =
+      process.env[broadcastPolicy.fromDomainEnv]?.trim() ||
+      broadcastPolicy.fromDomain;
+    const fromEmail = `Jovie <${broadcastPolicy.fromLocalPart}@${broadcastDomain}>`;
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://jov.ie';
     let sent = 0;
     let errors = 0;

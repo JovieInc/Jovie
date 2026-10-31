@@ -50,6 +50,7 @@ sibling deployments, machine publishers, or source-repository automation.
 
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
+| `/api/internal/ovie/email-deliverability` | GET | Summer OIDC (`verifySummerOidcRequest`) | Per sending domain and email stream: delivered, bounced, complained, rates against stream thresholds, hard violations and separation gaps over 7 days; no recipient data |
 | `/api/internal/ovie/pipeline-bottleneck` | GET | `admin` via `requireAdmin`, including Ovie privacy | Home/HUD projection of `summer-bottleneck/current.json` plus the hourly-loop contribution; no-store, null for unknown/stale Summer |
 | `/api/admin/batch-ingest` | POST | `admin` | Batch ingest creator profiles |
 | `/api/admin/campaigns/invites` | GET, POST | `admin` | Campaign invite management |

@@ -141,3 +141,63 @@ decision for amounts.
 - Resend Acceptable Use Policy: https://resend.com/legal/acceptable-use
 - Gmail sender guidelines: https://support.google.com/a/answer/81126
 - RFC 8058 one-click unsubscribe: https://www.rfc-editor.org/rfc/rfc8058
+
+## Original spend proposals (2026-10-29)
+
+Prices are last-known list prices; verify at checkout. Spend cards need a Summer spend-preflight receipt (`preflightReceiptId`) before filing.
+
+```json
+[
+  {
+    "idempotencyKey": "email-cold-domain-20261029",
+    "kind": "decision",
+    "product": "jov",
+    "title": "Use meetjovie.com as the cold outreach domain",
+    "body": "Cold outreach must not use jov.ie. We already own meetjovie.com (Vercel, expires 2026-12-25, renewal about $15/yr). It has Google MX and DMARC p=reject today, so first confirm no human mailbox depends on it. No new cost now; renewal is due in 58 days. Alternatives: jovie.app or jovie.dev (owned, no mail DNS).",
+    "recommendation": "Approve meetjovie.com as the sacrificial cold domain after confirming it holds no human mail.",
+    "defaultIfSilent": "Approve meetjovie.com; no purchase.",
+    "amountUsd": 0,
+    "defaultDecision": "approve"
+  },
+  {
+    "idempotencyKey": "email-cold-workspace-seats-20261029",
+    "kind": "spend",
+    "product": "jov",
+    "title": "3 Google Workspace seats for cold inboxes",
+    "body": "Three Business Starter seats on the cold domain, 15 to 20 cold sends per inbox per day (about 1,300 a month), warmed 2 to 3 weeks before the first send. About $7 to $8.40 per seat per month, $21 to $25 a month total.",
+    "recommendation": "Approve 3 seats; add more only if reply data justifies it.",
+    "amountUsd": 25,
+    "defaultDecision": "reject"
+  },
+  {
+    "idempotencyKey": "email-cold-tool-20261029",
+    "kind": "spend",
+    "product": "jov",
+    "title": "Instantly Growth plan for cold sending",
+    "body": "The existing Instantly workspace returns 402 (no active paid plan), so nothing can send. Growth is about $37 per month billed annually or $47 monthly; Smartlead Basic is about $39. Both permit cold outreach. First real send stays behind the Ovie outbound approval card and CAN-SPAM address (JOV-9648).",
+    "recommendation": "Approve Instantly Growth, monthly billing, cancel if no approved send within 60 days.",
+    "amountUsd": 47,
+    "defaultDecision": "reject"
+  },
+  {
+    "idempotencyKey": "email-dmarc-monitor-20261029",
+    "kind": "decision",
+    "product": "jov",
+    "title": "Free DMARC report parser",
+    "body": "DMARC reports go to dmarc-reports@jov.ie and land in Tim's inbox as unread XML (2 in the last 60 days). A free tier parser (Postmark DMARC digests or dmarcian) would give weekly readable summaries. Needs an account signup and a rua change on the apex, which stays untouched until Tim approves.",
+    "recommendation": "Approve a free-tier parser; Tim or Summer signs up, then rua is updated.",
+    "amountUsd": 0,
+    "defaultDecision": "reject"
+  },
+  {
+    "idempotencyKey": "email-cloudflare-workers-paid-20261029",
+    "kind": "spend",
+    "product": "jov",
+    "title": "Cloudflare Workers Paid for Email Service",
+    "body": "Only needed to send through Cloudflare Email Service ($5/mo, transactional only). Resend already covers transactional.",
+    "recommendation": "Reject. Revisit if Resend costs or deliverability become a problem.",
+    "amountUsd": 5,
+    "defaultDecision": "reject"
+  }
+]
+```
