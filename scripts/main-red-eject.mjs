@@ -319,9 +319,74 @@ async function queueEntries() {
   }));
 }
 
+const QUOTA_DEFERRED_CODE = 'dequeue_quota_deferred';
+
+/** A MergeQueueBackendError that is the installation bucket's rate-limit exhaustion. */
+function isInstallationQuotaExhaustion(error) {
+  return (
+    error?.name === 'MergeQueueBackendError' &&
+    error?.code === 'gh_command_failed' &&
+    shouldFailOver(
+      { code: 1, stderr: error.details?.stderr ?? '' },
+      process.env.GH_FALLBACK_TOKEN
+    )
+  );
+}
+
+/** Same contract as runGh's exit-75 defer: visible, retryable, not a verdict. */
+function quotaDeferredError(cause) {
+  const reason =
+    cause?.code === 'native_mutation_actor_unauthorized'
+      ? `fallback identity ${cause.details?.observedActor ?? 'unknown'} is not a trusted native queue mutation actor (mutation-actor check held)`
+      : `fallback token also exhausted: ${String(cause?.details?.stderr ?? cause?.message ?? '').slice(0, 160)}`;
+  return Object.assign(new Error(`Queue mutation deferred: ${reason}`), {
+    name: 'MergeQueueDeferError',
+    code: QUOTA_DEFERRED_CODE,
+    details: { cause: cause?.code ?? 'unknown_error' },
+  });
+}
+
 async function dequeue(number) {
-  const { dequeuePullRequest } = await import('./merge-queue-backend.mjs');
-  return dequeuePullRequest({ backend: 'native', repository: REPO, number });
+  const { createGhRunner, dequeuePullRequest } = await import(
+    './merge-queue-backend.mjs'
+  );
+  const attempt = runners =>
+    dequeuePullRequest({
+      backend: 'native',
+      repository: REPO,
+      number,
+      ...runners,
+    });
+  try {
+    return await attempt({});
+  } catch (error) {
+    // The gh()-wrapper failover above covers this script's own calls only;
+    // the backend spawns its own `gh` runners. When the Jovie Bot installation
+    // bucket is exhausted, retry the whole backend call (actor verification
+    // included) on the fallback credential.
+    if (!isInstallationQuotaExhaustion(error)) throw error;
+    const fallback = process.env.GH_FALLBACK_TOKEN;
+    if (!fallback || fallback === process.env.GH_TOKEN) throw error;
+    console.error(
+      '::warning::github-app-quota-failover: Jovie Bot installation exhausted for the queue mutation; retrying actor verification with GITHUB_TOKEN.'
+    );
+    const runner = createGhRunner({
+      env: { ...process.env, GH_TOKEN: fallback },
+    });
+    try {
+      return await attempt({ runner, mutationRunner: runner });
+    } catch (fallbackError) {
+      // A refusal here is the mutation-actor safety check working, not a bug:
+      // GITHUB_TOKEN authenticates as github-actions[bot], which is not a
+      // trusted queue writer. Defer visibly instead of crashing.
+      if (
+        fallbackError?.code === 'native_mutation_actor_unauthorized' ||
+        isInstallationQuotaExhaustion(fallbackError)
+      )
+        throw quotaDeferredError(fallbackError);
+      throw fallbackError;
+    }
+  }
 }
 
 /** Green Enroll is the only queue writer: dequeue first if already queued, then dispatch it. */
@@ -599,7 +664,36 @@ export async function stuckHead({ doApply = false, now = Date.now() } = {}) {
     return { ...verdict, recorded: true };
   }
   if (!verdict.stuck || !doApply) return verdict;
-  await dequeue(head.number);
+  let deferReason = null;
+  try {
+    await dequeue(head.number);
+  } catch (error) {
+    if (error?.code !== QUOTA_DEFERRED_CODE) throw error;
+    deferReason = error.message;
+  }
+  if (deferReason !== null) {
+    // Visible, honest deferred status (run 41227299023 crashed here): the
+    // mutation-actor check refused the fallback credential or both credential
+    // buckets are exhausted. Nothing was mutated; the next ejector wake
+    // retries once quota heals (the first-sighting marker is already on the PR).
+    const note = `Queue head #${head.number} is UNMERGEABLE since ${verdict.since} but the dequeue is deferred — ${deferReason}. Nothing was mutated (no labels, no conflict pass, no re-enqueue); the next ejector wake retries.`;
+    console.error(`::warning::queue-mutation-deferred: ${note}`);
+    await incident(
+      `unmergeable:${head.number}`,
+      `queue head #${head.number} UNMERGEABLE ${verdict.dwellMin} min (dequeue deferred)`,
+      note
+    ).catch(error =>
+      console.error(
+        `::warning::deferred dequeue incident failed: ${error.message}`
+      )
+    );
+    return {
+      ...verdict,
+      dequeued: false,
+      deferred: true,
+      reason: deferReason,
+    };
+  }
   await gh([
     'api',
     '-X',
