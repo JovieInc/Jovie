@@ -9,7 +9,6 @@ import {
 import { verifySummerOidcRequest } from '@/lib/ovie/summer-oidc.server';
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
 
 const ROUTE = '/api/internal/ovie/summer-company/default-alive';
 const MAX_BODY_BYTES = 16_384;
