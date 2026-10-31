@@ -67,6 +67,35 @@ function runTag(): string {
     : `local${Date.now().toString(36)}`;
 }
 
+/**
+ * The reply element is also the surface a quota wall or an application error
+ * renders into: run 41165214531's receipt claimed a passed first reply at
+ * 703ms while its frame showed "You have reached your weekly AI message
+ * limit". A visible reply element proves nothing on its own — the reply must
+ * carry real assistant content and must never be the rate limit or an error
+ * surface (JOV-9625).
+ */
+const PROD_REPLY_FAILURE_PATTERN =
+  /weekly AI message limit|out of messages|message limit|application error|something went wrong|internal server error/i;
+
+async function assertAssistantReply(page: Page, label: string): Promise<void> {
+  const reply = page.getByTestId('chat-message-reply').first();
+  let text = '';
+  await expect
+    .poll(
+      async () => {
+        text = (await reply.innerText()).trim();
+        return text.length;
+      },
+      { timeout: 15_000 }
+    )
+    .toBeGreaterThanOrEqual(2);
+  expect(
+    text,
+    `${label}: the reply is a quota or error surface, not an assistant response: ${text.slice(0, 200)}`
+  ).not.toMatch(PROD_REPLY_FAILURE_PATTERN);
+}
+
 function hasProdAuthCredentials(): boolean {
   return resolveProductionAuthCredentials() !== null;
 }
@@ -926,6 +955,10 @@ test.describe('Production Auth Smoke @production-smoke', () => {
           await expect(
             page.getByTestId('chat-message-reply').first()
           ).toBeVisible({ timeout: 60_000 });
+          // A visible reply element is not a useful reply: the same element
+          // renders the weekly AI quota wall (run 41165214531). The reply
+          // must carry real assistant content, never the rate limit (JOV-9625).
+          await assertAssistantReply(page, 'chat first-reply');
           const replyMs = Date.now() - sentAt;
           recordCertObservation({
             surface: 'chat',
@@ -1142,6 +1175,9 @@ test.describe('Production Auth Smoke @production-smoke', () => {
         await expect(
           page.locator("[data-testid='chat-message-reply']").first()
         ).toBeVisible({ timeout: 60_000 });
+        // The reply element is also where a quota wall renders; a visible
+        // element alone is a false pass (JOV-9625). Require real content.
+        await assertAssistantReply(page, 'fresh-user onboarding first value');
         return 'first assistant reply';
       },
       () => 'fresh user reached first value: onboarding chat first reply'
