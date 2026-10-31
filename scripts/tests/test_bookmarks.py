@@ -204,6 +204,22 @@ class MeshIntakeTests(unittest.TestCase):
             self.assertEqual((again["messages"], len(runs)), (0, 1))  # cursor advanced; nothing re-read
 
 
+class GrokBotPayloadTests(unittest.TestCase):
+    def test_snake_case_payload_maps_links_images_and_context(self):
+        payload = {"kind": "x-bookmarks", "bookmarks": [{
+            "id": "2116405414921384099", "author": "a", "created_at": "2026-10-31T05:42:26Z", "text": "post",
+            "first_reply": {"text": "link in reply"}, "quoted_post": {"text": "quoted"}, "article": None, "thread": ["t2"],
+            "links": [{"tco": "https://t.co/abc", "expanded": "https://github.com/o/r"}],
+            "images": [{"type": "photo", "url": "https://pbs.twimg.com/media/x.jpg", "description": f"a chart {CANARY}"}]}]}
+        kind, rows = B.parse_mesh_payload(json.dumps(payload))
+        rec = B.normalize(rows[0])
+        self.assertEqual(kind, "x-bookmarks")
+        self.assertEqual((rec["links"], rec["derivedLinks"], rec["images"]), (["https://t.co/abc"], ["https://github.com/o/r"], ["https://pbs.twimg.com/media/x.jpg"]))
+        self.assertEqual(rec["quotedText"], "quoted")
+        self.assertIn("link in reply", rec["derivedText"])
+        self.assertTrue(any("a chart" in d for d in rec["derivedText"]))
+
+
 class TriggerTests(unittest.TestCase):
     def test_launchd_plist_is_valid_xml_and_watches_the_spool(self):
         import plistlib

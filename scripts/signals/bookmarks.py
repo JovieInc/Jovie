@@ -703,12 +703,8 @@ def run(state_dir=DEFAULT_DIR, *, inbox=None, env=None, backfill=False, file_wor
     with locked(state_dir):
         state = load_state(state_dir)
         seen = set(state["seen"])
-        if rerun:  # re-extraction supersedes: the bookmark's earlier rows are removed before it is processed again
+        if rerun:  # re-extraction supersedes the bookmark's earlier rows, in the same save that writes the new ones
             fresh = [r for r in read_inbox(inbox) if r["id"] in rerun][: limit or None]
-            refs = {bookmark_ref(r["id"]) for r in fresh}
-            stale = frontier.Registry(state_dir)
-            stale.machine = {k: v for k, v in stale.machine.items() if (v.get("source") or {}).get("bookmarkRef") not in refs}
-            stale.save()
         else:
             fresh = [r for r in read_inbox(inbox) if r["id"] not in seen][: limit or None]
         budget = BACKFILL_BUDGET_USD if backfill else float(env.get("BOOKMARKS_DAILY_BUDGET_USD") or DAILY_BUDGET_USD)
@@ -744,6 +740,10 @@ def run(state_dir=DEFAULT_DIR, *, inbox=None, env=None, backfill=False, file_wor
                           other.cancel()
         t2 = time.time()
         registry = frontier.Registry(state_dir)
+        if rerun:  # only bookmarks whose re-extraction succeeded lose their old rows (an interrupted run loses nothing)
+            redone = {bookmark_ref(rec["id"]) for rec, scored, _ in results if scored is not None}
+            registry.machine = {k: v for k, v in registry.machine.items() if (v.get("source") or {}).get("bookmarkRef") not in redone}
+            registry.rows = {k: v for k, v in registry.rows.items() if (v.get("source") or {}).get("bookmarkRef") not in redone}
         trials_today = sum(1 for r in registry.machine.values() if (r.get("trial") or {}).get("filed", "").startswith(day)
                            and r["source"].get("origin") == "x-bookmark")
         routed = {"ideas": [], "byType": {}, "byVerdict": {}, "byStatus": {}, "duplicates": 0, "filed": [], "needsTim": [],
@@ -765,7 +765,11 @@ def run(state_dir=DEFAULT_DIR, *, inbox=None, env=None, backfill=False, file_wor
                     continue
                 status, decision, reason, wants_gate = vet(idea, verdict, trials_today=trials_today, registry=registry)
                 gate_ref = None
-                if wants_gate and (status == "trial" or (file_work and not backfill)):
+                if wants_gate and status != "rejected" and (backfill or not file_work):
+                    reason = f"gate-pending: run recheck-held ({reason})"  # gbrain lookups are ~20 s; gate them in parallel later
+                    if status == "trial":
+                        status = "candidate"
+                elif wants_gate and (status == "trial" or file_work):
                     ok, gate_ref, c = decision_gate(idea, api_key, decisions, poster)
                     gate_cost += c
                     if not ok:
@@ -849,7 +853,7 @@ def recheck_held(state_dir=DEFAULT_DIR, *, decisions=gbrain_decisions, poster=ga
     """Re-run the decision gate on rows a gate outage held (reason `gate-unavailable: ...`). Gates run in parallel
     outside the lock (each gbrain lookup takes ~20 s); results are applied under the lock in one save."""
     held = [r for r in frontier.Registry(state_dir).machine.values()
-            if str(r.get("reason") or "").startswith(("gate-unavailable", "decision gate passed"))]
+            if str(r.get("reason") or "").startswith(("gate-unavailable", "gate-pending", "decision gate passed"))]
     gate = lambda row: decision_gate({"title": row["name"], "claim": row.get("problem") or ""}, "", decisions, poster)  # noqa: E731
     with cf.ThreadPoolExecutor(max_workers=workers) as pool:
         verdicts = dict(zip([r["id"] for r in held], pool.map(gate, held)))
@@ -900,15 +904,31 @@ def parse_mesh_payload(body):
             continue
         tweet_id = str(raw.get("id") or raw.get("postId") or "")
         minted = x_grok.snowflake_ms(tweet_id)
-        stated = x_grok.parse_time(raw.get("createdAt")) if raw.get("createdAt") else None
+        created = raw.get("createdAt") or raw.get("created_at")
+        stated = x_grok.parse_time(created) if created else None
         if minted is None or (stated is not None and abs(stated - minted) > x_grok.MAX_SKEW_MS):
             continue  # an invented or mismatched post id: dropped (same provenance rule as x_grok)
-        derived = [raw.get(k) for k in ("firstReply", "article")] + list(raw.get("thread") or []) + list(raw.get("imageDescriptions") or [])
+        text_of = lambda v: (v.get("text") if isinstance(v, dict) else v) if v else None  # noqa: E731
+        links, derived_links, images, derived = [], [], [], []
+        for link in raw.get("links") or []:  # Grok Bot sends {tco, expanded}; a t.co link is what X shows (captured)
+            if isinstance(link, dict):
+                links += [link.get("tco")] if str(link.get("tco") or "").startswith("https://") else []
+                derived_links += [link.get("expanded")] if str(link.get("expanded") or "").startswith("https://") else []
+            elif isinstance(link, str):
+                links.append(link)
+        for image in raw.get("images") or []:  # {type, url, description}: the URL is read by our own OCR
+            if isinstance(image, dict):
+                images += [image.get("url")] if image.get("url") else []
+                derived += [f"Image description (from the producer): {image['description']}"] if isinstance(image.get("description"), str) else []
+            elif isinstance(image, str):
+                images.append(image)
+        derived += [text_of(raw.get(k)) for k in ("firstReply", "first_reply", "article")]
+        derived += [text_of(t) for t in list(raw.get("thread") or []) + list(raw.get("imageDescriptions") or [])]
+        quoted = text_of(raw.get("quotedText") or raw.get("quoted") or raw.get("quoted_post"))
         out.append({"id": tweet_id, "author": raw.get("author") or raw.get("handle"), "text": raw.get("text"),
-                    "quotedText": raw.get("quotedText") or raw.get("quoted"), "links": raw.get("links") or [],
-                    "images": raw.get("images") or [], "showMore": False,
-                    "createdAt": frontier.now_iso(minted / 1000), "derivedText": [d for d in derived if isinstance(d, str)],
-                    "derivedLinks": raw.get("derivedLinks") or raw.get("expandedLinks") or []})
+                    "quotedText": quoted, "links": links, "images": images, "showMore": False,
+                    "createdAt": frontier.now_iso(minted / 1000), "derivedText": [d for d in derived if isinstance(d, str) and d],
+                    "derivedLinks": derived_links + list(raw.get("derivedLinks") or raw.get("expandedLinks") or [])})
     return kind, out
 
 
