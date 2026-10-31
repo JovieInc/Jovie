@@ -3,6 +3,7 @@ import {
   INSIGHT_ACTIONS,
 } from '@/lib/creator/segment-registry';
 import type { ResolvedSegment } from '@/lib/creator/segments';
+import { resolveSafeFirstName } from '@/lib/email/templates/personalization';
 import type { InsightResponse, InsightType } from '@/types/insights';
 
 /** Home welcomes the person and offers one real next step (JOV-7150). */
@@ -14,12 +15,15 @@ export function getTimeOfDayGreeting(date: Date = new Date()): string {
   return 'Good evening';
 }
 
-/** First token of a real display name. Never invents a name. */
+/**
+ * First name only when the display name clearly reads as a person's
+ * first-and-last name (security.md "Outbound Email Personalization Must Fail
+ * Safe"). Artist and band names ("Good Dropouts") greet with no name at all.
+ */
 export function getChatEmptyStateFirstName(
   displayName: string | null | undefined
 ): string | null {
-  const first = displayName?.trim().split(/\s+/)[0];
-  return first ? first : null;
+  return resolveSafeFirstName(displayName, '');
 }
 
 export function getChatEmptyStateGreetingText(
