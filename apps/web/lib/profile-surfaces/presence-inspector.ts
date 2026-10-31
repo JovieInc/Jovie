@@ -67,7 +67,12 @@ export function derivePresenceInspector(
   providerAvailable = true
 ): PresenceInspectorModel {
   const status = getConnectionStatus(row, providerAvailable);
-  const searchUnavailable = status.label === 'Search Unavailable';
+  // JOV-9021: an outage collapses the evidence sections for every surface row
+  // (a connected identity reads Connected and carries the outage note), so
+  // detect it from the provider signal itself, not from a status label.
+  const searchUnavailable =
+    row.rowType === 'surface' &&
+    (!providerAvailable || status.label === 'Search Unavailable');
   const needsIdentityDecision =
     row.rowType === 'surface' &&
     (row.qualificationStatus === 'suggested' ||
