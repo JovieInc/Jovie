@@ -94,6 +94,22 @@ describe('OnboardingProfileRail', () => {
               input: {},
               output,
             },
+            // The confirm-artist turn always ships the handle card next to
+            // the confirm output (JOV-10168), so the preview artist has a
+            // real handle and the rail renders (JOV-10169: no fabricated
+            // jov.ie/your-handle placeholder when it is still unknown).
+            {
+              type: 'dynamic-tool',
+              toolName: 'checkHandle',
+              toolCallId: 'handle',
+              state: 'output-available',
+              input: { handle: 'testartist' },
+              output: {
+                action: 'check_handle',
+                handle: 'testartist',
+                summary: 'Checking @testartist.',
+              },
+            },
           ],
         } as UIMessage,
       ],
