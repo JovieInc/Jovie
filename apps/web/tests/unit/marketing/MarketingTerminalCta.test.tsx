@@ -6,6 +6,7 @@ import { MarketingFinalCTA } from '@/components/site/MarketingFinalCTA';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { MarketingTerminalCta } from '@/components/site/MarketingTerminalCta';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
+import { MARKETING_CTA_INTENTS } from '@/data/marketingCtaIntents';
 
 const PRIMARY_BUTTON_MASTER =
   BUTTON_PEN_CONTRACT.rootByVariantKey['button/primary/lg/idle'];
@@ -80,9 +81,14 @@ describe('Marketing terminal CTA wrappers', () => {
 
   it('defers the shared footer signup before and after keyboard focus', () => {
     render(<MarketingFooterCta />);
-    const link = screen.getByRole('link');
-    expect(link).toHaveAttribute('href', '/signup');
+    const link = screen.getByRole('link', { name: 'Claim your profile' });
+    expect(link).toHaveAttribute(
+      'href',
+      MARKETING_CTA_INTENTS.claimProfile.href
+    );
     expect(link).toHaveAttribute('data-prefetch', 'false');
+    expect(screen.queryByText(/request access/i)).toBeNull();
+    expect(screen.queryByRole('heading')).toBeNull();
     fireEvent.focus(link);
     fireEvent.mouseEnter(link);
     expect(link).toHaveAttribute('data-prefetch', 'false');
@@ -153,10 +159,9 @@ describe('Marketing terminal CTA wrappers', () => {
     expect(secondary).not.toHaveAttribute('data-pen-contract');
   });
 
-  it('keeps footer analytics and emits only one primary action by default', () => {
+  it('keeps footer analytics and renders one quiet link with no glow art', () => {
     render(
       <MarketingFooterCta
-        title='Ready to install Jovie?'
         ctaLabel='Download for Mac'
         ctaHref='/download'
         ctaAnalyticsEvent='download_mac_dmg'
@@ -175,19 +180,17 @@ describe('Marketing terminal CTA wrappers', () => {
       'data-analytics-source',
       'download_page_footer'
     );
-    expect(action).toHaveAttribute('data-variant', 'primary');
-    expect(action).toHaveAttribute('data-size', 'lg');
-    expect(action).toHaveAttribute(
-      'data-pen-contract',
-      PRIMARY_BUTTON_MASTER?.rootId
-    );
     expect(
       screen.getByTestId('marketing-footer-cta').querySelectorAll('a')
     ).toHaveLength(1);
-    const gradient = screen
-      .getByTestId('marketing-footer-cta')
-      .querySelector('[id^="marketing-footer-cta-primary-"]');
-    expect(gradient?.getAttribute('id')).not.toContain(':');
+    expect(
+      screen.getByTestId('marketing-footer-cta').querySelector('svg')
+    ).toBeNull();
+    expect(
+      screen
+        .getByTestId('marketing-footer-cta')
+        .querySelector('.homepage-final-cta-glow')
+    ).toBeNull();
   });
 
   it('keeps cinematic primary and optional secondary on the same Button family', () => {
@@ -223,14 +226,7 @@ describe('Marketing terminal CTA wrappers', () => {
   });
 
   it('joins the marketing census when a footer declares a CTA variant', () => {
-    render(
-      <MarketingFooterCta
-        title='Ready to build your Jovie profile?'
-        ctaLabel='Get started'
-        ctaHref='/signup'
-        sectionVariant='final-single-claim'
-      />
-    );
+    render(<MarketingFooterCta sectionVariant='final-single-claim' />);
 
     const section = screen.getByTestId('marketing-section-cta');
     expect(section).toHaveAttribute(
@@ -247,7 +243,6 @@ describe('Marketing terminal CTA wrappers', () => {
   it('forwards prefetch={false} to the underlying link for binary redirect targets', () => {
     render(
       <MarketingFooterCta
-        title='Ready to install Jovie?'
         ctaLabel='Download for Mac'
         ctaHref='/api/desktop/download'
         prefetch={false}

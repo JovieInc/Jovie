@@ -43,8 +43,8 @@ export default defineConfig({
       PORT: managedWebServerUrl.port,
       NEXT_PUBLIC_E2E_MODE: '1',
       E2E_USE_TEST_AUTH_BYPASS: '1',
-      NEXT_PUBLIC_CLERK_MOCK: '1',
-      NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
+      NEXT_PUBLIC_AUTH_MOCK: '1',
+      NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1',
       NEXT_DISABLE_TOOLBAR: '1',
       E2E_ALLOW_DEV_CSP: '1',
       NODE_OPTIONS:

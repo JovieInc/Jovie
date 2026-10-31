@@ -5,7 +5,12 @@ import type {
   MusicBrainzRelation,
 } from '@/lib/dsp-enrichment/types';
 import { getRegistryEntry, PROVIDER_DOMAINS } from '@/lib/dsp-registry';
-
+import {
+  deezerAlbumsByUpc,
+  deezerSearchAlbums,
+  spotifyAlbumsByUpc,
+  spotifySearchAlbums,
+} from './catalog-upc-sources';
 import {
   type ArtistCandidate,
   type CatalogAlbum,
@@ -219,8 +224,17 @@ function appleTrack(row: Record<string, unknown>): CatalogTrack | null {
   };
 }
 
+/**
+ * Apple appends a storefront format label (" - Single", " - EP") to
+ * collectionName. It is not part of the release title, and keeping it made
+ * every exact-name album search for a single or EP abstain (JOV-7822 benchmark).
+ */
+export function appleCollectionTitle(value: string | null): string | null {
+  return value?.replace(/ - (?:Single|EP)$/, '') || null;
+}
+
 function appleAlbum(row: Record<string, unknown>): CatalogAlbum | null {
-  const title = text(row.collectionName);
+  const title = appleCollectionTitle(text(row.collectionName));
   const artist = text(row.artistName);
   const href = httpsUrl(text(row.collectionViewUrl));
   const provider = href ? providerForListenUrl(href) : null;
@@ -263,6 +277,44 @@ export function createDefaultInHouseSources(
 ): InHouseSources {
   const readJson = (url: string) => readPublicJson(url, signal);
   const appleLookup = (params: string) => readAppleLookup(params, signal);
+  const albumsByUpc = async (
+    upc: string,
+    territory = 'US'
+  ): Promise<CatalogAlbum[]> => {
+    const [appleRows, musicbrainz, spotify, deezer] = await Promise.all([
+      appleLookup(
+        `upc=${encodeURIComponent(upc)}&entity=album&country=${territory.toLowerCase()}`
+      ),
+      import('@/lib/dsp-enrichment/providers/musicbrainz').then(module =>
+        module.lookupMusicBrainzReleaseByBarcode(upc).catch(() => null)
+      ),
+      spotifyAlbumsByUpc(upc, signal),
+      deezerAlbumsByUpc(upc, signal),
+    ]);
+    const apple = appleRows.flatMap(row => {
+      const album = appleAlbum(row);
+      return album ? [{ ...album, upc }] : [];
+    })[0];
+    const albums: CatalogAlbum[] = [
+      ...(apple ? [apple] : []),
+      ...spotify,
+      ...deezer,
+    ];
+    if (albums.length > 0 || !musicbrainz?.artist) return albums;
+    const rel = linksFromRelations(musicbrainz.relations)[0];
+    if (!rel) return albums;
+    return [
+      {
+        provider: rel.provider,
+        title: musicbrainz.title,
+        artist: musicbrainz.artist,
+        url: rel.url,
+        upc: musicbrainz.barcode,
+        provenance: 'musicbrainz_url_rel',
+        confidence: PROVENANCE_CONFIDENCE.musicbrainz_url_rel,
+      },
+    ];
+  };
   return {
     async trackByIsrc(isrc, territory) {
       const {
@@ -382,32 +434,9 @@ export function createDefaultInHouseSources(
       );
       return [...apple, ...deezer];
     },
+    albumsByUpc,
     async albumByUpc(upc, territory = 'US') {
-      const [appleRows, musicbrainz] = await Promise.all([
-        appleLookup(
-          `upc=${encodeURIComponent(upc)}&entity=album&country=${territory.toLowerCase()}`
-        ),
-        import('@/lib/dsp-enrichment/providers/musicbrainz').then(module =>
-          module.lookupMusicBrainzReleaseByBarcode(upc).catch(() => null)
-        ),
-      ]);
-      const apple = appleRows.flatMap(row => {
-        const album = appleAlbum(row);
-        return album ? [album] : [];
-      })[0];
-      if (apple) return { ...apple, upc };
-      if (!musicbrainz?.artist) return null;
-      const rel = linksFromRelations(musicbrainz.relations)[0];
-      if (!rel) return null;
-      return {
-        provider: rel.provider,
-        title: musicbrainz.title,
-        artist: musicbrainz.artist,
-        url: rel.url,
-        upc: musicbrainz.barcode,
-        provenance: 'musicbrainz_url_rel',
-        confidence: PROVENANCE_CONFIDENCE.musicbrainz_url_rel,
-      };
+      return (await albumsByUpc(upc, territory))[0] ?? null;
     },
     async albumByUrl(url, territory) {
       const href = httpsUrl(url);
@@ -417,10 +446,14 @@ export function createDefaultInHouseSources(
         : null;
     },
     async searchAlbums(artist, title, territory = 'US') {
-      const payload = await readJson(
-        `https://itunes.apple.com/search?term=${encodeURIComponent(`${artist} ${title}`)}&entity=album&limit=8&country=${territory.toLowerCase()}`
-      );
-      return rows(payload).flatMap(row => {
+      const [payload, spotify, deezer] = await Promise.all([
+        readJson(
+          `https://itunes.apple.com/search?term=${encodeURIComponent(`${artist} ${title}`)}&entity=album&limit=8&country=${territory.toLowerCase()}`
+        ),
+        spotifySearchAlbums(artist, title, signal),
+        deezerSearchAlbums(artist, title, signal),
+      ]);
+      const apple = rows(payload).flatMap(row => {
         const album = appleAlbum(row);
         return album
           ? [
@@ -432,6 +465,7 @@ export function createDefaultInHouseSources(
             ]
           : [];
       });
+      return [...apple, ...spotify, ...deezer];
     },
     async artistCandidates(name) {
       const { matchMusicBrainzArtistByName } = await import(

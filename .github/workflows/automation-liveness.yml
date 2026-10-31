@@ -84,6 +84,62 @@ jobs:
           done
           echo "due=$due" >> "$GITHUB_OUTPUT"
 
+  # Budget diagnostics share the existing due gate. A failed token mint must
+  # not fail Check automation heartbeats or defeat its 20-minute throttle.
+  installation-budget:
+    name: Sample installation REST budgets
+    needs: gate
+    if: needs.gate.outputs.due == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      # 2026-10-24: the shared installation REST budget ran dry and a dozen PRs
+      # went red until a manual rerun. GET /rate_limit is free; each sample is a
+      # point in the consumption series and alarms below 15% remaining. Reuses
+      # this sanctioned ~25m backstop (JOV-INV-042: no new clock).
+      - name: Mint CI App read token for budget sample
+        id: ci-app-token
+        if: ${{ always() && vars.CI_APP_ID != '' }}
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
+          permission-contents: read
+
+      - name: Sample GitHub installation budgets
+        id: installation-budget
+        if: ${{ always() }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CI_APP_TOKEN: ${{ steps.ci-app-token.outputs.token }}
+        run: node scripts/installation-budget-sentinel.mjs
+
+      - name: Send Slack Alert on Low Installation Budget
+        if: ${{ always() && (steps.installation-budget.outputs.shared_github_token_low == 'true' || steps.installation-budget.outputs.ci_app_low == 'true') }}
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
+        with:
+          status: custom
+          channel: "#alerts-production"
+          author_name: "CI Budget Sentinel"
+          custom_payload: |
+            {
+              "text": "GitHub REST budget below 15% (shared GITHUB_TOKEN: ${{ steps.installation-budget.outputs.shared_github_token_remaining }}/${{ steps.installation-budget.outputs.shared_github_token_limit }}, CI App: ${{ steps.installation-budget.outputs.ci_app_remaining }}/${{ steps.installation-budget.outputs.ci_app_limit }}). Fleet-rule gates defer (exit 75) until the reset.",
+              "attachments": [{ "color": "warning", "fields": [{ "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>", "short": false }] }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
   liveness:
     name: Check automation heartbeats
     needs: gate
@@ -117,8 +173,8 @@ jobs:
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
-          channel: '#alerts-production'
-          author_name: 'Synthetic Monitoring'
+          channel: "#alerts-production"
+          author_name: "Synthetic Monitoring"
           custom_payload: |
             {
               "text": "Production Synthetic Monitoring Failed - jov.ie",
@@ -173,6 +229,16 @@ jobs:
           )
           if [ "$FILE_ISSUES" = "true" ]; then args+=(--file); fi
           node scripts/automation-liveness.mjs "${args[@]}"
+
+      # Release-lag dead-man: a green Production Controller run proves nothing because Coalesce can
+      # skip the release as superseded. Alerts, naming the blocking step, when production has not
+      # advanced in 3h while main has.
+      # github-token-budget: 3 calls/run - names the blocking controller step, only when production lags
+      - name: Production release lag
+        if: ${{ always() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release-lag-check.mjs
 
       - name: Save alert state
         if: ${{ always() && hashFiles('liveness/state.json') != '' }}

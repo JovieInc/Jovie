@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HOMEPAGE_COPY } from '@/data/homepageCopy';
@@ -42,9 +44,25 @@ describe('HomepageHeroCanvas', () => {
     const light = screen.getByTestId('homepage-hero-light');
     expect(light).toHaveAttribute('data-renderer', 'css');
     expect(light.querySelector('canvas')).toBeNull();
+    // The proof is the template profile capture in the canonical phone
+    // frame, beside the lead and never a person (no face on `/`).
+    const proof = screen.getByTestId('homepage-hero-proof');
     expect(
-      document.querySelector('.homepage-artist-hero__phone')
+      proof.querySelector(
+        '[data-testid="product-screenshot-frame-template-profile-live-mobile"]'
+      )
     ).not.toBeNull();
+    expect(proof.querySelector('.mobile-web-screen')).not.toBeNull();
+    const shot = screen.getByRole('img', { name: hero.profile.alt });
+    expect(shot.getAttribute('src')).toMatch(
+      /^\/product-screenshots\/template-profile-live-phone\.png/
+    );
+    expect(shot).toHaveAttribute('data-priority', 'true');
+    expect(
+      document
+        .querySelector('.homepage-hero-canvas__copy')
+        ?.getAttribute('data-has-proof')
+    ).toBe('true');
   });
 
   it('keeps the canonical shell header and moves the claim into the copy column', () => {
@@ -143,7 +161,61 @@ describe('HomepageHeroCanvas', () => {
       hero.headline
     );
     expect(document.querySelector('.homepage-hero-canvas__proof')).toBeNull();
-    expect(document.querySelector('.homepage-artist-hero__phone')).toBeNull();
+    expect(screen.queryByTestId('homepage-hero-proof')).toBeNull();
+    expect(
+      document
+        .querySelector('.homepage-hero-canvas__copy')
+        ?.hasAttribute('data-has-proof')
+    ).toBe(false);
     expect(screen.queryByRole('img')).toBeNull();
+  });
+
+  it('uses product claim identities without changing the canonical proof frame', () => {
+    render(
+      <HomepageHeroCanvas
+        headingId='product-hero-heading'
+        headingTestId='product-hero-heading'
+        headline={hero.headline}
+        subhead={hero.subhead}
+        claim={hero.claim}
+        supportNote={hero.supportNote}
+        profile={hero.profile}
+        sectionOwner='apps/web/app/(marketing)/product/ProductLanding.tsx'
+        claimTestId='product-claim-card'
+        claimInputId='product-handle-input'
+        claimTestIdPrefix='product'
+        claimSubmitTestId='product-claim-cta'
+      />
+    );
+
+    expect(screen.getByTestId('product-hero-heading')).toHaveTextContent(
+      hero.headline
+    );
+    expect(screen.getByTestId('product-claim-card')).toContainElement(
+      screen.getByTestId('product-claim-cta')
+    );
+    expect(
+      screen.getByRole('textbox', { name: 'Choose Your Handle' })
+    ).toHaveAttribute('id', 'product-handle-input');
+    expect(screen.getByTestId('product-claim-form')).toHaveAttribute(
+      'action',
+      '/start'
+    );
+    expect(screen.getByTestId('homepage-hero-proof')).toContainElement(
+      screen.getByRole('img', { name: hero.profile.alt })
+    );
+    expect(screen.queryByTestId('homepage-primary-cta')).toBeNull();
+  });
+});
+
+describe('HomepageHeroCanvas proof geometry', () => {
+  it('keeps the crop aspect and never renders wider than the capture', () => {
+    const css = readFileSync(join(__dirname, 'HomepageHeroCanvas.css'), 'utf8');
+    const proof =
+      css.match(/\n\.homepage-hero-canvas__proof\s*\{([^}]*)\}/)?.[1] ?? '';
+    // The proof keeps the crop's real aspect (780x1264 capture) and never
+    // exceeds the capture's native width (390 CSS px = 24.375rem).
+    expect(proof).toContain('aspect-ratio: 780 / 1264');
+    expect(proof).toContain('max-width: 24rem');
   });
 });
