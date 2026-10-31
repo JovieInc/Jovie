@@ -1272,6 +1272,17 @@ export class MarketingCertificationStore {
     packet: CertificationReviewPacket,
     evaluatedAt = new Date().toISOString()
   ): Promise<MarketingCertificationProjectionRow> {
+    return (await this.ingestPacketWithOutcomes(packet, evaluatedAt)).row;
+  }
+
+  /** Ingest and return every entry outcome from the ledger just written (no re-read of the MB-sized ledger). */
+  async ingestPacketWithOutcomes(
+    packet: CertificationReviewPacket,
+    evaluatedAt = new Date().toISOString()
+  ): Promise<{
+    readonly row: MarketingCertificationProjectionRow;
+    readonly entryOutcomes: readonly MarketingCertificationEntryOutcome[];
+  }> {
     assertValidTimestamp(evaluatedAt, 'Packet evaluation time');
     const entry = this.entryById.get(packet.subject.id);
     if (!entry) {
@@ -1321,7 +1332,14 @@ export class MarketingCertificationStore {
       }
       return {
         ledger: nextLedger,
-        result: outcome.row,
+        result: {
+          row: outcome.row,
+          entryOutcomes: evaluateLedgerEntries(
+            nextLedger,
+            this.entries,
+            evaluatedAt
+          ),
+        },
       };
     });
   }
@@ -1591,12 +1609,15 @@ export class MarketingCertificationStore {
       readonly result: Result;
     }
   ): Promise<Result> {
-    await this.ensureLedger(initializedAt);
+    // One persisted read per attempt: the ledger is ~MBs, and a separate
+    // ensureLedger read here doubled egress on every write. Registry extension
+    // happens in parse; a missing ledger is initialized by the helper.
     return mutateCertificationRecord({
       backend: this.backend,
       key: MARKETING_CERTIFICATION_STORE_KEY,
       initialize: () => this.ensureLedger(initializedAt),
-      parse: parseLedger,
+      parse: raw =>
+        extendLedgerRegistry(parseLedger(raw), this.entries, initializedAt),
       validate: ledger =>
         assertLedgerMatchesRegistry(ledger, this.entries, initializedAt),
       update,
