@@ -951,19 +951,37 @@ def quota_failure(workflow_run: dict, sh=run, classify=None) -> str | None:
 
 
 RED_BLOCK_MARKER = "<!-- lanes:red-before-green -->"
-RED_HEADING = re.compile(r"^#{1,6}\s*red-before-green\s*$", re.I)
 ANY_HEADING = re.compile(r"^#{1,6}\s")
 JOB_URL = re.compile(r"^(https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\d*)(?:/job/\d+)?")
 RED_RUN_URL = re.compile(r"https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\d*(?:/attempts/[1-9]\d*)?")
 
 
+def evidence_section_bounds(body: str, heading: str) -> tuple[int, int] | None:
+    """Match Fleet's section boundaries without treating fenced logs as PR headings."""
+    # Keep line offsets so replacement preserves the original body and comments.
+    visible = re.sub(r"<!--[\s\S]*?-->", lambda match: "\n" * match[0].count("\n"), body or "")
+    lines = visible.split("\n")
+    start = None
+    fenced = False
+    for index, line in enumerate(lines):
+        if re.match(r"^\s*(```|~~~)", line):
+            fenced = not fenced
+        elif not fenced and ANY_HEADING.match(line):
+            if start is not None:
+                return start, index
+            if re.sub(r"^#+\s*", "", line).strip().lower() == heading.lower():
+                start = index
+    return (start, len(lines)) if start is not None else None
+
+
 def red_section_complete(body: str) -> bool:
     """Mirror of scripts/pr-fleet-rules.mjs: a Failing command plus a red-output fence or run URL."""
-    lines = re.sub(r"<!--[\s\S]*?-->", "", body or "").split("\n")
-    start = next((i for i, line in enumerate(lines) if RED_HEADING.match(line.strip())), None)
-    if start is None:
+    bounds = evidence_section_bounds(body, "Red-before-green")
+    if bounds is None:
         return False
-    end = next((i for i in range(start + 1, len(lines)) if ANY_HEADING.match(lines[i])), len(lines))
+    # Bounds use original line offsets, including multiline hidden comments.
+    lines = re.sub(r"<!--[\s\S]*?-->", lambda match: "\n" * match[0].count("\n"), body or "").split("\n")
+    start, end = bounds
     section = "\n".join(lines[start + 1:end])
     command = re.search(r"^\s*(?:-\s*)?Failing command:\s*(.+)$", section, re.I | re.M)
     run_url = re.search(r"^\s*(?:-\s*)?Failing run \(before fix\):\s*`?(https://\S+?)`?\s*$", section, re.I | re.M)
@@ -1017,10 +1035,10 @@ def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
 def with_red_section(body: str, block: str) -> str:
     """Replace an empty/placeholder Red-before-green section with the block, or append one."""
     lines = (body or "").split("\n")
-    start = next((i for i, line in enumerate(lines) if RED_HEADING.match(line.strip())), None)
-    if start is None:
+    bounds = evidence_section_bounds(body, "Red-before-green")
+    if bounds is None:
         return (body or "").rstrip("\n") + "\n\n" + block + "\n"
-    end = next((i for i in range(start + 1, len(lines)) if ANY_HEADING.match(lines[i])), len(lines))
+    start, end = bounds
     return "\n".join(lines[:start] + block.split("\n") + [""] + lines[end:])
 
 
