@@ -17,6 +17,7 @@
  *     [--title t] [--no-coverage] [--no-typecheck] [--thorough] [--no-write]
  *     [--hook] [--list] [--json]
  *
+ *   --fast      static guards only (= --no-typecheck --no-coverage)
  *   --hook      pre-push mode: honours JOVIE_PREFLIGHT_CHANGED=0, never needs a PR
  *   --thorough  also run the heavy guards deferred by default
  *   --no-write  check generators instead of writing their output
@@ -153,7 +154,10 @@ export function parseArgs(argv) {
     else if (f === '--no-coverage') a.coverage = false;
     else if (f === '--no-typecheck') a.typecheck = false;
     else if (f === '--thorough') a.thorough = true;
-    else if (f === '--no-write') a.write = false;
+    else if (f === '--fast') {
+      a.coverage = false;
+      a.typecheck = false;
+    } else if (f === '--no-write') a.write = false;
     else if (f === '--hook') a.hook = true;
     else if (f === '--list') a.list = true;
     else if (f === '--json') a.json = true;
