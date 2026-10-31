@@ -84,6 +84,7 @@ function artist(overrides: Record<string, unknown> = {}) {
 function chain() {
   const builder = {
     from: () => builder,
+    leftJoin: () => builder,
     where: () => builder,
     limit: () => Promise.resolve(rows),
   };

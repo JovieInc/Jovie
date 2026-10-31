@@ -1,7 +1,8 @@
 import { ImageResponse } from 'next/og';
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getProfileByUsername } from '@/lib/services/profile';
+import { shouldHideTestProfileFromDirectUrl } from '@/lib/profile/test-profile-policy';
+import { getProfileWithUser } from '@/lib/services/profile';
 import { buildProfileShareContext } from '@/lib/share/context';
 import { loadShareFonts, STORY_SIZE, toDataUrl } from '@/lib/share/image-utils';
 import { renderProfileStoryCard } from '@/lib/share/story-renderers';
@@ -20,8 +21,15 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const profile = await getProfileByUsername(username);
-  if (!profile?.isPublic) {
+  const profile = await getProfileWithUser(username);
+  if (
+    !profile?.isPublic ||
+    shouldHideTestProfileFromDirectUrl({
+      handle: username,
+      ownerEmail: profile.userEmail,
+      settings: profile.settings,
+    })
+  ) {
     return NextResponse.json(
       { error: 'Profile not found' },
       { status: 404, headers: { 'Cache-Control': 'no-store' } }
