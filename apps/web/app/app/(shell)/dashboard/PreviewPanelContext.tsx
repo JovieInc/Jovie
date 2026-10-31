@@ -13,6 +13,7 @@ import {
 } from 'react';
 import { useRailPreview } from '@/components/shell/useRailPreview';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
+import { recordRuntimeTrace } from '@/lib/testing/runtime-trace';
 
 export interface PreviewPanelLink {
   id: string;
@@ -117,7 +118,15 @@ export function PreviewPanelProvider({
   useEffect(() => {
     if (globalThis.window?.matchMedia === undefined) return;
 
+    recordRuntimeTrace('shell-rail', 'provider-mount', {
+      scope,
+      defaultOpen,
+      enabled,
+    });
     const mediaQuery = globalThis.window.matchMedia('(min-width: 1024px)');
+    recordRuntimeTrace('shell-rail', 'large-screen-resolved', {
+      isLargeScreen: mediaQuery.matches,
+    });
     setIsLargeScreen(mediaQuery.matches);
 
     const handleChange = (e: MediaQueryListEvent) => {
@@ -155,6 +164,12 @@ export function PreviewPanelProvider({
   const previousScopeRef = useRef(scope);
   useEffect(() => {
     if (previousScopeRef.current === scope) return;
+    recordRuntimeTrace('shell-rail', 'scope-change', {
+      from: previousScopeRef.current,
+      to: scope,
+      defaultOpen,
+      isLargeScreen,
+    });
     previousScopeRef.current = scope;
     const panel = new URLSearchParams(globalThis.location.search).get('panel');
     if (scope === 'chat' && panel === 'profile') {
@@ -175,6 +190,7 @@ export function PreviewPanelProvider({
     // empty-panel dependency never transitions when the hydration and this
     // wipe land in one flush — a wipe here would leave the reopened rail
     // stuck on its empty skeleton (Account → Back round trip).
+    recordRuntimeTrace('shell-rail', 'scope-reset-close', { scope });
     setPreviewData(null);
     setIsOpen(false);
   }, [defaultOpen, isLargeScreen, scope]);
@@ -186,8 +202,10 @@ export function PreviewPanelProvider({
   useEffect(() => {
     if (defaultOpen && isLargeScreen) {
       openedByUserRef.current = false;
+      recordRuntimeTrace('shell-rail', 'default-open-apply', { scope });
       setIsOpen(true);
     } else if (!isLargeScreen && isOpen && !openedByUserRef.current) {
+      recordRuntimeTrace('shell-rail', 'small-screen-close', { scope });
       setIsOpen(false);
     }
     // Intentionally omit isOpen to avoid re-triggering when user manually closes.
