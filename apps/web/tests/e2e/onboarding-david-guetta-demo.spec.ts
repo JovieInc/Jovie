@@ -534,8 +534,11 @@ test('records David Guetta Spotify-first onboarding demo', async ({
   await attachDemoScreenshot(page, testInfo, 'selected-artist-photo');
   await expect(page.getByText('Spotify shows 28M followers')).toBeVisible();
   const handleCard = page.getByTestId('onboarding-handle-check');
-  await expect(handleCard.getByText('@davidguetta')).toBeVisible();
+  await expect(handleCard.getByText('jov.ie/davidguetta')).toBeVisible();
   await expect(handleCard.getByText('is available')).toBeVisible();
+  // One line, one action (Pen R6As7U); editing stays one tap away.
+  await expect(handleCard.getByLabel('Edit Proposed Handle')).toHaveCount(0);
+  await handleCard.getByTestId('onboarding-edit-handle').click();
   await expect(handleCard.getByLabel('Edit Proposed Handle')).toBeVisible();
   await attachDemoScreenshot(page, testInfo, 'editable-handle');
   await attachDemoScreenshot(page, testInfo, 'profile-bento-preview');

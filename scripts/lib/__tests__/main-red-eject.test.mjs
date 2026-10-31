@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { apply } from '../../main-red-eject.mjs';
 
@@ -30,6 +33,7 @@ const CENSUS_LOG = [
 ].join('\n');
 const sig = failureSignature([CENSUS_LOG]);
 const commit = (sha, evidence) => ({ sha, evidence });
+const here = dirname(fileURLToPath(import.meta.url));
 
 describe('failureSignature', () => {
   it('names the failing test file, not the truncated command', () => {
@@ -255,5 +259,41 @@ describe('apply idle plans', () => {
   ])('keeps %s as a no-op without GitHub mutations', async reason => {
     const plan = { action: 'none', reason, trigger: null };
     await expect(apply(plan)).resolves.toEqual({ ...plan, applied: false });
+  });
+});
+
+describe('workflow dispatch inputs', () => {
+  const root = resolve(here, '../../..');
+  const dispatches = caller =>
+    [...caller.matchAll(/'run',\s*'([\w./-]+\.yml)'([\s\S]*?)\]/g)].map(m => ({
+      workflow: m[1],
+      inputs: [...m[2].matchAll(/`([\w-]+)=/g)].map(x => x[1]),
+    }));
+
+  it('passes only inputs the target workflow declares (run 41122896980: pr_numbers 422)', () => {
+    const caller = readFileSync(
+      resolve(root, 'scripts/main-red-eject.mjs'),
+      'utf8'
+    );
+    const found = dispatches(caller);
+    expect(found.map(f => f.workflow)).toEqual(
+      expect.arrayContaining([
+        'pr-remediation-swarm.yml',
+        'merge-queue-green-enroll.yml',
+      ])
+    );
+    for (const { workflow, inputs } of found) {
+      const yml = readFileSync(
+        resolve(root, '.github/workflows', workflow),
+        'utf8'
+      );
+      const start = yml.indexOf('workflow_dispatch:');
+      const block = yml.slice(
+        start,
+        start + yml.slice(start).search(/\n  [^\s#]/)
+      );
+      const declared = [...block.matchAll(/^ {6}([\w-]+):/gm)].map(m => m[1]);
+      expect(declared).toEqual(expect.arrayContaining(inputs));
+    }
   });
 });

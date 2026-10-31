@@ -1,5 +1,7 @@
 import json
 import os
+import shutil
+import subprocess
 import tempfile
 import time
 import unittest
@@ -381,6 +383,238 @@ class LoopTest(unittest.TestCase):
         self.assertTrue(pe.verify_signature("k", b"{}", sig))
         self.assertFalse(pe.verify_signature("k", b"{}", "bad"))
         self.assertFalse(pe.verify_signature("k", b"{}", ""))
+
+    def test_sandbox_binds_the_shared_api_ledger_writable(self):
+        # The units run bwrap with a read-only root; the apiclient budget ledger lives under the
+        # shared jovie-lanes state (~/.local/state/jovie-lanes/api-ledger) and is written on every
+        # API call. Without the writable bind, os.mkdir('<provider>.lock.d') dies with EROFS
+        # [Errno 30] and every watcher unit fails. The bind must survive a fresh host too
+        # (install.sh creates the ledger dir before bwrap can reference it).
+        sh = (Path(__file__).parent / "install.sh").read_text()
+        sandbox = sh.split('sandbox="')[1].split('"')[0]
+        self.assertIn("--ro-bind / /", sandbox)
+        self.assertIn("--bind $ledger $ledger", sandbox)
+        ledger_line = next(line for line in sh.splitlines() if line.startswith("ledger="))
+        self.assertIn("jovie-lanes/api-ledger", ledger_line)
+        self.assertIn('mkdir -p "$ledger"', sh)
+
+
+class TreeLayoutTest(unittest.TestCase):
+    """The live tree on gem must be a runnable repo-relative layout.
+
+    Regression pins for the 2026-10-31 incident (units jovie-prod-errors-{sweep,ci-main,deadman}
+    all failed): install.sh skipped an existing current/ (a re-install never repaired a stale or
+    mis-shaped tree), the self-update archived only scripts/prod-errors (prod_errors.py imports
+    scripts/apiclient, whose contract reads packages/api-client/providers.json two dirs up from
+    itself, so every candidate tree failed its own test gate and the loop froze on a broken tree),
+    and run.sh exec'd only the flat current/prod_errors.py, so a nested current/ died with
+    python's exit-2 file-not-found on every unit tick.
+    """
+
+    # scripts/{prod-errors,apiclient} + packages/api-client: the full runnable dependency tree.
+    trees = ("scripts/prod-errors", "scripts/apiclient", "packages/api-client")
+    repo = Path(__file__).resolve().parents[2]
+
+    def setUp(self):
+        self.home = Path(tempfile.mkdtemp())
+        self.bin = self.home / "fakebin"
+        self.bin.mkdir()
+        self.base = self.home / ".local/share/jovie-prod-errors"
+
+    def stub(self, name, body):
+        """Put a fake executable on PATH (systemctl no-op; python3 arg logger)."""
+        p = self.bin / name
+        p.write_text("#!/bin/sh\n" + body)
+        p.chmod(0o755)
+
+    def env(self, **extra):
+        env = dict(os.environ, HOME=str(self.home), PATH=f"{self.bin}:{os.environ['PATH']}")
+        env.update({k: str(v) for k, v in extra.items()})
+        return env
+
+    def run_install(self):
+        # install.sh ends with systemctl --user daemon-reload / enable --now / list-timers;
+        # tests run where no user systemd session exists, so systemctl is a no-op stub.
+        self.stub("systemctl", "exit 0")
+        return subprocess.run(
+            ["bash", str(self.repo / "scripts/prod-errors/install.sh")],
+            env=self.env(), capture_output=True, text=True, timeout=180)
+
+    def fixture_repo(self):
+        """A lanes-mirror-shaped git repo: the three trees at repo-relative paths, committed at
+        refs/remotes/origin/main so run.sh's rev-parse/archive path resolves."""
+        r = self.home / "mirror"
+        for d in self.trees:
+            dst = r / d
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(self.repo / d, dst)
+
+        def git(*args):
+            subprocess.run(["git", "-C", str(r), *args], check=True, capture_output=True)
+
+        git("init", "-q")
+        git("add", "-A")
+        git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "fixture")
+        git("update-ref", "refs/remotes/origin/main", "HEAD")
+        return r
+
+    def tree_head(self, repo, ref="origin/main"):
+        """The concatenated tree hashes run.sh stamps into current/.tree."""
+        return "".join(
+            subprocess.run(["git", "-C", str(repo), "rev-parse", "-q", "--verify", f"{ref}:{p}"],
+                           capture_output=True, text=True).stdout.strip()
+            for p in self.trees)
+
+    def seed_live(self, nested=True, tree_hash=None):
+        """Seed $base/current with a live tree: full repo-relative layout, or legacy flat."""
+        live = self.base / "current"
+        if nested:
+            for d in self.trees:
+                dst = live / d
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copytree(self.repo / d, dst)
+        else:
+            live.mkdir(parents=True)
+            shutil.copy(self.repo / "scripts/prod-errors/prod_errors.py", live / "prod_errors.py")
+        if tree_hash is not None:
+            (live / ".tree").write_text(tree_hash + "\n")
+        return live
+
+    def run_run_sh(self, repo, cmd="sweep"):
+        self.stub("python3", 'printf "%s\\n" "$*" >> "$EXEC_LOG"\nexit 0')
+        log = self.home / "exec.log"
+        r = subprocess.run(
+            ["bash", str(self.repo / "scripts/prod-errors/run.sh"), cmd],
+            env=self.env(LANES_REPO=repo, PROD_ERRORS_HOME=self.base, EXEC_LOG=log),
+            capture_output=True, text=True, timeout=180)
+        return r, log
+
+    def last_exec(self, log):
+        lines = log.read_text().strip().splitlines()
+        self.assertTrue(lines, "run.sh must exec python3")
+        return lines[-1]
+
+    def assert_runnable_tree(self, live):
+        for f in ("scripts/prod-errors/prod_errors.py", "scripts/prod-errors/test_prod_errors.py",
+                  "scripts/apiclient/contract.py", "packages/api-client/providers.json"):
+            self.assertTrue((live / f).is_file(), f"live tree missing {f}")
+
+    def test_fresh_install_stages_the_runnable_dependency_tree(self):
+        r = self.run_install()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue((self.base / "run.sh").is_file(), "install must ship run.sh")
+        self.assert_runnable_tree(self.base / "current")
+        # .tree is stamped whenever the checkout has git metadata, so a mirror at the same
+        # commit skips a redundant self-update on the first tick.
+        probe = subprocess.run(["git", "-C", str(self.repo), "rev-parse", "-q", "--verify",
+                                "HEAD:scripts/prod-errors"], capture_output=True)
+        if probe.returncode == 0:
+            self.assertTrue((self.base / "current/.tree").is_file(), "install must stamp .tree")
+
+    def test_reinstall_repairs_a_broken_nested_current_tree(self):
+        # The observed gem shape: a nested prod-errors-only tree -- no apiclient, no
+        # providers.json, no top-level prod_errors.py at the path the old run.sh exec'd.
+        nested = self.base / "current/scripts/prod-errors"
+        nested.mkdir(parents=True)
+        (nested / "prod_errors.py").write_text("# stale nested tree\n")
+        (self.base / "current/stale-marker").write_text("stale\n")
+        r = self.run_install()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        live = self.base / "current"
+        self.assert_runnable_tree(live)
+        # Replaced wholesale, not merged: the stale marker is gone from the live tree and the
+        # old tree is kept aside for forensics.
+        self.assertFalse((live / "stale-marker").exists())
+        self.assertTrue((self.base / "current.prev/stale-marker").is_file())
+
+    def test_install_copies_trees_when_git_is_unavailable(self):
+        # Installed from an extracted tree with no git metadata: the cp fallback still stages the
+        # full layout (and no .tree stamp -- run.sh's next tick self-updates and stamps it).
+        self.stub("git", "exit 1")
+        r = self.run_install()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assert_runnable_tree(self.base / "current")
+        self.assertFalse((self.base / "current/.tree").is_file())
+
+    def test_run_sh_execs_a_runnable_path_when_current_is_nested(self):
+        # Full nested live tree stamped with the legacy single-tree hash: the old run.sh treated
+        # it as fresh, exec'd the flat path (which does not exist) and every unit died with
+        # python's exit-2 file-not-found.
+        repo = self.fixture_repo()
+        legacy = subprocess.run(["git", "-C", str(repo), "rev-parse", "-q", "--verify",
+                                 "origin/main:scripts/prod-errors"],
+                                capture_output=True, text=True).stdout.strip()
+        live = self.seed_live(nested=True, tree_hash=legacy)
+        r, log = self.run_run_sh(repo)
+        exec_line = self.last_exec(log)
+        self.assertTrue(exec_line.startswith(str(live / "scripts/prod-errors/prod_errors.py")),
+                        exec_line)
+        self.assertTrue(exec_line.endswith(" sweep"), exec_line)
+
+    def test_run_sh_self_update_ships_the_dependency_tree(self):
+        # Empty live dir: the first tick must archive all three trees at the repo-relative
+        # layout (tests are faked green here; the real gate runs this very suite in CI), stamp
+        # the triple hash and exec from the nested path.
+        repo = self.fixture_repo()
+        (self.base).mkdir(parents=True, exist_ok=True)
+        r, log = self.run_run_sh(repo)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        live = self.base / "current"
+        self.assert_runnable_tree(live)
+        self.assertEqual((live / ".tree").read_text().strip(), self.tree_head(repo))
+        exec_line = self.last_exec(log)
+        self.assertTrue(exec_line.startswith(str(live / "scripts/prod-errors/prod_errors.py")),
+                        exec_line)
+
+    def test_run_sh_falls_back_to_a_legacy_flat_tree(self):
+        # An old host's flat tree keeps running until the first successful update swaps in the
+        # full tree: a matching .tree stamp means no update, and the flat path still execs.
+        repo = self.fixture_repo()
+        live = self.seed_live(nested=False, tree_hash=self.tree_head(repo))
+        r, log = self.run_run_sh(repo)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        exec_line = self.last_exec(log)
+        self.assertTrue(exec_line.startswith(str(live / "prod_errors.py")), exec_line)
+
+    def test_run_sh_names_a_clear_error_when_no_tree_is_runnable(self):
+        # Mirror unusable and no live tree at all: exit 2 (the observed unit status) but with a
+        # message that names the repair step instead of python's bare file-not-found.
+        repo = self.home / "not-a-git-repo"
+        repo.mkdir()
+        self.base.mkdir(parents=True)
+        r, log = self.run_run_sh(repo)
+        self.assertEqual(r.returncode, 2, r.stderr)
+        self.assertIn("install.sh", r.stderr)
+        self.assertFalse(log.exists(), "nothing must be exec'd when no tree is runnable")
+
+    def test_run_sh_never_promotes_a_tree_that_fails_its_own_tests(self):
+        # A red candidate tree is never swapped in: the live tree keeps serving, .tree is left
+        # untouched so the next tick retries, and nothing lands at current.prev.
+        repo = self.fixture_repo()
+        live = self.seed_live(nested=False, tree_hash="stale-does-not-match")
+        self.stub("python3", 'printf "%s\\n" "$*" >> "$EXEC_LOG"\nexit 1')
+        log = self.home / "exec.log"
+        r = subprocess.run(
+            ["bash", str(self.repo / "scripts/prod-errors/run.sh"), "sweep"],
+            env=self.env(LANES_REPO=repo, PROD_ERRORS_HOME=self.base, EXEC_LOG=log),
+            capture_output=True, text=True, timeout=180)
+        exec_line = self.last_exec(log)
+        self.assertTrue(exec_line.startswith(str(live / "prod_errors.py")), exec_line)
+        self.assertEqual((live / ".tree").read_text().strip(), "stale-does-not-match")
+        self.assertFalse((live / "scripts").exists(), "a red candidate tree must not be promoted")
+        self.assertFalse((self.base / "current.prev").exists())
+
+    def test_run_sh_ships_all_three_trees_and_execs_nested_first(self):
+        # Source probe (runs even where bash/git fixtures cannot): the archive line ships the
+        # full dependency tree, extraction preserves the repo-relative layout (no strip), and
+        # exec resolves the nested path before the legacy flat one.
+        sh = (self.repo / "scripts/prod-errors/run.sh").read_text()
+        archive = sh.split('git -C "$repo" archive')[1].split("|")[0]
+        for needed in self.trees:
+            self.assertIn(needed, archive)
+        self.assertNotIn("--strip-components", sh)
+        self.assertIn('"$live/scripts/prod-errors/prod_errors.py"', sh)
+        self.assertIn('"$live/prod_errors.py"', sh)
 
 
 if __name__ == "__main__":
