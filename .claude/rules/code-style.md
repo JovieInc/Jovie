@@ -462,27 +462,14 @@ Reference docs for common agent lookups:
 
 ## Review evidence (agents)
 
-Use the existing internal review tooling, not CodeRabbit availability, to review
-changes. Before committing, inspect the exact scoped diff for correctness,
-regression coverage, and migration/security risks; resolve actionable findings
-and record the reviewed files and findings' dispositions.
-
-On PR open or synchronize, the existing JOV-7400 workflow
-(`.github/workflows/internal-review.yml`) runs
-`node .github/scripts/internal-pr-review.mjs` against trusted base code and reads
-the PR diff as data. Record its event-head comment/run receipt and the disposition
-of any actionable findings. Verify that the reviewed diff matches the recorded
-head before claiming exact-head review: the current script stamps the event SHA
-but fetches a mutable PR diff, so that marker alone does not prove the binding.
-If review or head binding is missing, incomplete, or unavailable, record that
-outcome without claiming a clean exact-head review. It remains advisory: absence,
-latency, quota, or billing must not block commit, publication, or merge. Required
+There is no AI PR reviewer. The internal advisory reviewer and the shadow review
+kernel were retired 2026-10-28: on a 19-case replay of merged PRs that later
+needed a fix, four Workers AI models recalled 3 of 19 real bugs (16%), no two
+models agreed on a real bug, and about 96% of findings were unconfirmed.
+Before committing, inspect the exact scoped diff for correctness, regression
+coverage, and migration/security risks. Required
 CI, qualification receipts, security checks, branch protection, and native merge
-queue admission remain unchanged and own merge correctness.
-
-CodeRabbit is optional supplementary review. Do not wait for its availability,
-rate limits, credits, or billing, and do not purchase capacity to unblock work.
-If used, evaluate and resolve actionable findings just as for internal review;
-provider availability and an actual correctness finding are different evidence.
-The manual gbrain-aware Claude reviewer (`claude-review.yml`) was deleted
-2026-10-12 after 30 days with no runs.
+queue admission own merge correctness. Third-party reviewers are optional
+supplementary evidence; do not wait for them or buy capacity for them. Any
+future reviewer must beat the escape replay set
+(`docs/metrics/review-replay-cases.jsonl`) before adoption.

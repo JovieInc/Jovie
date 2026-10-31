@@ -255,10 +255,7 @@ For each **root** comment (where `in_reply_to_id` is null) from the bots above:
 A reply, from a human or an agent, is not evidence of a fix. Close a finding only
 with evidence on the current head: `fixed-and-reverified` (a regression test or
 re-review on the new head) or `dismissed-with-evidence` (code or test shows the
-claim is false). The Jovie review kernel uses the same states
-(`candidate | verified | fixed-and-reverified | dismissed-with-evidence | stale |
-not-assessed`); see [pr-review-kernel](../../docs/evaluations/pr-review-kernel.md).
-The author fixes verified findings on the same PR before requesting merge; none of
+claim is false). The author fixes verified findings on the same PR before requesting merge; none of
 these states is a merge gate.
 
 ### When flagged

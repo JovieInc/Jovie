@@ -220,22 +220,6 @@
       "notes": "Routed to the allowlisted zai/glm-5.3 (JOV-8702, #22393)."
     },
     {
-      "id": "internal-pr-review",
-      "taskType": "code-review",
-      "automation": null,
-      "currentModel": "zai/glm-5.3-flash",
-      "channel": "gateway-allowlist",
-      "sourcePath": ".github/scripts/internal-pr-review.mjs",
-      "sourceMatch": "DEFAULT_MODEL = 'zai/glm-5.3-flash'",
-      "costUsd": 0.042,
-      "costBasis": "estimate: 60k input + 20k output (model-registry review job) at $0.20/$1.50 per M",
-      "qualityMetric": "review-kernel precision on the weekly replay",
-      "evalStatus": "ready",
-      "evalRef": "docs/evaluations/pr-review-kernel.md",
-      "evalRunner": "github:jovie:pr-review-learn",
-      "screens": ["same-family-successor", "gateway-allowlisted"]
-    },
-    {
       "id": "deepsec-scan",
       "taskType": "security-review",
       "automation": "github:jovie:deepsec-native",
