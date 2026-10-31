@@ -33,6 +33,8 @@ enabled = true
 # Kinds the hub answers (read-only, Workers AI) when no real reader handled their mail within the grace.
 EXECUTOR_KINDS = "codex,grokbot,chloe,lola,muse,dots,stella,instinct,devin,aeon"
 EXECUTOR_GRACE_MS = "20000"
+# Alarm once when peer mail sits unhandled this long (ms).
+MAIL_STALE_MS = "600000"
 # summer-config #387: Summer consumes hub pushes here (HMAC with SUMMER_HUB_WEBHOOK_SECRET).
 SUMMER_HUB_WEBHOOK_URL = "https://summer.jov.ie/summer/v1/mesh/hub"
 

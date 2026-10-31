@@ -37,8 +37,9 @@ const ALERTING = new Set([
   'agent.silent',
   'agent.unreachable',
   'message.dead',
-  'webhook.rejected',
   'hub.suspect',
+  'mail.stale',
+  'executor.failed',
 ]);
 const TOUCH_DEBOUNCE_MS = 15_000;
 
