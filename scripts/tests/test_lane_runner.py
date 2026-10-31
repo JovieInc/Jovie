@@ -8077,6 +8077,7 @@ class FixRedTest(unittest.TestCase):
         prompt = lane.render_fix_prompt(dirty, "")
         self.assertIn("conflicts with main", prompt)
         self.assertIn("renumber yours", prompt)
+        self.assertIn("resolve_additive_sibling_text", prompt)
 
     def test_a_pushed_fix_records_pending_intent_without_publishing_unverified_head(self):
         real, real_excerpt = lane.sh, lane.failure_excerpt
@@ -13041,6 +13042,47 @@ class NoHumanHoldTest(unittest.TestCase):
             text,
         )
         self.assertIn('"fleet:check"', text)
+        self.assertNotIn("<<<<<<<", text)
+        after = git("rev-parse", "HEAD").stdout.strip()
+        self.assertEqual(after, git("rev-parse", "origin/feature").stdout.strip())
+        self.assertNotEqual(after, before)
+        self.assertEqual(git("merge-base", "--is-ancestor", before, after).returncode, 0)
+
+    def test_additive_sibling_conflict_unions_both_additions_and_fast_forwards(self):
+        root = Path(self.tmp.name)
+        origin = root / "origin.git"
+        work = root / "work"
+        work.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "main", str(work)], check=True)
+        subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True)
+        def git(*args, cwd=work):
+            return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True)
+        hooks = root / "hooks"
+        hooks.mkdir()
+        for key, value in (("user.name", "t"), ("user.email", "t@example.test"), ("commit.gpgsign", "false"),
+                           ("core.hooksPath", str(hooks))):
+            git("config", key, value)
+        git("remote", "add", "origin", str(origin))
+        path = work / "sweep.sh"
+        base = "daily() {\n  run_mode credentials\n}\n"
+        path.write_text(base)
+        git("add", "sweep.sh")
+        git("commit", "-qm", "base")
+        git("branch", "feature")
+        git("push", "-q", "origin", "HEAD:refs/heads/main")
+        git("checkout", "-q", "feature")
+        path.write_text(base.replace("  run_mode credentials\n", "  run_mode credentials\n  run_mode ops-health\n"))
+        git("commit", "-qam", "head adds ops-health")
+        git("push", "-q", "origin", "HEAD:refs/heads/feature")
+        git("checkout", "-q", "main")
+        path.write_text(base.replace("  run_mode credentials\n", "  run_mode credentials\n  run_mode drift\n"))
+        git("commit", "-qam", "main adds drift")
+        git("push", "-q", "origin", "HEAD:refs/heads/main")
+        git("checkout", "-q", "feature")
+        before = git("rev-parse", "HEAD").stdout.strip()
+        self.assertTrue(lane.resolve_additive_sibling_conflict(work, "feature", None))
+        text = path.read_text()
+        self.assertIn("run_mode credentials\n  run_mode drift\n  run_mode ops-health\n", text)
         self.assertNotIn("<<<<<<<", text)
         after = git("rev-parse", "HEAD").stdout.strip()
         self.assertEqual(after, git("rev-parse", "origin/feature").stdout.strip())
