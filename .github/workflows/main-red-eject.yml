@@ -60,7 +60,7 @@ jobs:
         contains(fromJSON('["success","failure","timed_out"]'), github.event.workflow_run.conclusion) &&
         (github.event.workflow_run.name != 'CI' ||
          contains(fromJSON('["merge_group","push"]'), github.event.workflow_run.event))))
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 3
     permissions:
       contents: read
