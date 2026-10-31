@@ -210,3 +210,11 @@ test('merge-tree conflict output yields the conflicting paths', () => {
     'b.ts deleted in HEAD and modified in x',
   ]);
 });
+
+test('a scripts/ .mjs-only change still runs the checkJs scripts typecheck', () => {
+  assert.deepEqual(
+    typecheckTargets([file('scripts/lib/__tests__/a.test.mjs')], process.cwd()),
+    ['scripts']
+  );
+  assert.deepEqual(typecheckTargets([file('docs/a.mjs')], process.cwd()), []);
+});

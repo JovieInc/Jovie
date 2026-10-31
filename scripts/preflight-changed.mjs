@@ -352,8 +352,11 @@ function biomeTargets(files) {
 export function typecheckTargets(files, cwd) {
   const out = new Set();
   for (const f of files) {
-    if (f.status === 'removed' || !/\.(?:tsx?|mts|cts)$/.test(f.filename))
-      continue;
+    // scripts/ is checkJs (typecheck:scripts), so .mjs/.js count there.
+    const ext = /^scripts\//.test(f.filename)
+      ? /\.(?:tsx?|mts|cts|mjs|js)$/
+      : /\.(?:tsx?|mts|cts)$/;
+    if (f.status === 'removed' || !ext.test(f.filename)) continue;
     const isTest = /\.(?:test|spec)\.[^/]+$|\/tests?\//.test(f.filename);
     const web = f.filename.startsWith('apps/web/');
     if (web) {
