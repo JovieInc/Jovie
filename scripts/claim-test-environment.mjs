@@ -2,6 +2,10 @@
 import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  probeStripeTestFixture,
+  shouldProbeLiveFixture,
+} from './lib/claim-stripe-fixture.mjs';
 import { validateClaimTestEnvironment } from './lib/claim-test-environment.mjs';
 
 const OUTBOUND_KEYS = [
@@ -77,7 +81,30 @@ if (
       ? process.env.DOGFOOD_RESOLVED_SHA
       : null,
     ...result,
+    /** @type {{ ok: boolean, failures: string[] } | undefined} */
+    stripeFixture: undefined,
   };
+  // Live check of the Stripe test fixture (revoked key, archived or edited
+  // $12 price) BEFORE migrations/build. The shape check above cannot catch
+  // these; probe only inside the dogfood workflow so unit tests with
+  // synthetic fixture ids never touch the network. A failed probe exits 1
+  // with a named ::error:: — the journey itself still gates unchanged.
+  let ok = result.ok;
+  // Live check of the Stripe test fixture (revoked key, archived or edited
+  // $12 price) BEFORE migrations/build. The shape check above cannot catch
+  // these; probe only inside the dogfood workflow so unit tests with
+  // synthetic fixture ids never touch the network. A failed probe exits 1
+  // with a named ::error:: — the journey itself still gates unchanged.
+  if (ok && shouldProbeLiveFixture(process.env)) {
+    const probe = await probeStripeTestFixture(process.env);
+    receipt.stripeFixture = { ok: probe.ok, failures: probe.failures };
+    if (!probe.ok) {
+      for (const failure of probe.failures) {
+        console.error(`::error title=claim-dogfood-stripe-fixture::${failure}`);
+      }
+      ok = false;
+    }
+  }
   if (process.env.CLAIM_ENV_RECEIPT) {
     writeFileSync(
       process.env.CLAIM_ENV_RECEIPT,
@@ -86,5 +113,5 @@ if (
     );
   }
   console.log(JSON.stringify(receipt));
-  process.exitCode = result.ok ? 0 : 1;
+  process.exitCode = ok ? 0 : 1;
 }

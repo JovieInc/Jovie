@@ -23,6 +23,9 @@ class ClassifyTest(unittest.TestCase):
             "domain-write-guard: apps/web/lib/leads/lead-claim-token.ts writes creatorProfiles directly 1x (allowed 0).": ("domain-write", "register-domain-writes"),
             "This PR conflicts with main in: scripts/preflight-changed.mjs . Resolve the conflict (lane-fix-conflict).": ("narrowed-preflight", "merge-narrowed-preflight"),
             "AssertionError: off-grid 10px/14px spacing steps (*-2.5, *-3.5) grew: 591 > baseline 590.": ("spacing-scale", "snap-spacing"),
+            "[scripts-typecheck] FAIL — 1 (file, error-code) group(s) exceed the baseline.\n"
+            "  scripts/lib/__tests__/claim-test-environment.test.mjs(445,63): error TS2322: "
+            "Type 'Promise<{ ok: any; }>' is not assignable to type 'Promise<Response>'.": ("fetch-response-stub", "repair-fetch-stub"),
             "Error: apps/web/app/(marketing)/pricing/page.tsx: source changed; renew certification evidence": ("census-certification", "sync-main"),
             "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "agent"),
             "red-before-green: include Failing command:": ("pr-body", "agent"),
@@ -147,6 +150,57 @@ class NarrowedPreflightMergeTest(unittest.TestCase):
         other = text.replace("note:", "title:", 1)
         self.assertIsNone(classes.resolve_preflight_narrowed_text(other))
         self.assertIsNone(classes.merge_narrowed_guard_command(self.OURS, self.THEIRS.replace("vitest run", "vitest watch")))
+
+
+class FetchResponseStubTest(unittest.TestCase):
+    SOURCE = (
+        "  const stripeResponse = (ok, body) => ({\n"
+        "    ok,\n"
+        "    status: ok ? 200 : 401,\n"
+        "    json: async () => body,\n"
+        "  });\n"
+    )
+    LOG = (
+        "[scripts-typecheck] FAIL — 1 (file, error-code) group(s) exceed the baseline.\n"
+        "  scripts/lib/__tests__/claim-test-environment.test.mjs(445,63): error TS2322: "
+        "Type '(input: any) => Promise<{ ok: any; }>' is not assignable to type "
+        "'(input: string | URL | Request, init?: RequestInit) => Promise<Response>'.\n"
+    )
+
+    def test_classifies_the_typecheck_diagnostic_and_cites_the_file(self):
+        got = classes.classify(pr("Source Validation"), {"Source Validation": self.LOG})
+        self.assertEqual((got["cls"], got["action"]), ("fetch-response-stub", "repair-fetch-stub"))
+        self.assertEqual(got["files"], ["scripts/lib/__tests__/claim-test-environment.test.mjs"])
+
+    def test_rewrites_only_the_plain_fetch_double(self):
+        rewritten = classes.repair_fetch_response_stub_text(self.SOURCE + "const kept = { ok: true };\n")
+        self.assertEqual(
+            rewritten,
+            "  const stripeResponse = (ok, body) => "
+            "Response.json(body, { status: ok ? 200 : 401 });\n"
+            "const kept = { ok: true };\n",
+        )
+        self.assertIsNone(classes.repair_fetch_response_stub_text("const kept = { ok: true };\n"))
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / "scripts/lib/__tests__/claim-test-environment.test.mjs"
+            path.parent.mkdir(parents=True)
+            path.write_text(self.SOURCE)
+            (root / "scripts/other.mjs").parent.mkdir(exist_ok=True)
+            (root / "scripts/other.mjs").write_text(self.SOURCE)
+            changed = classes.repair_fetch_response_stubs(root, [
+                "scripts/lib/__tests__/claim-test-environment.test.mjs",
+                "scripts/other.mjs",
+                "../etc/passwd",
+                "apps/web/app/page.tsx",
+            ])
+            self.assertEqual(changed, [
+                "scripts/lib/__tests__/claim-test-environment.test.mjs",
+                "scripts/other.mjs",
+            ])
+            self.assertIn("Response.json(body, { status: ok ? 200 : 401 })", path.read_text())
+            again = classes.repair_fetch_response_stubs(root, changed)
+            self.assertEqual(again, [])
 
 
 class AndChainMergeTest(unittest.TestCase):

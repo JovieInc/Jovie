@@ -9,6 +9,10 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import {
+  probeStripeTestFixture,
+  shouldProbeLiveFixture,
+} from '../claim-stripe-fixture.mjs';
 import { validateClaimTestEnvironment } from '../claim-test-environment.mjs';
 import { buildPreviewEnvAdmission } from '../preview-env-contract.mjs';
 
@@ -383,5 +387,130 @@ describe('runner preflight and workflow boundary', () => {
     expect(workflow).toContain(
       'CLAIM_CONNECTION_FILE: ${{ steps.neon-branch.outputs.connection_file }}'
     );
+  });
+});
+
+describe('live Stripe fixture probe', () => {
+  const realFixture = {
+    STRIPE_SECRET_KEY: 'sk_test_5f2_probeKeyNotReal',
+    STRIPE_TEST_ACCOUNT_ID: 'acct_1T1DV0ASl9B9udHv',
+    STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY:
+      'price_1USkjzASl9B9udHvEYkZLYZp',
+    STRIPE_WEBHOOK_SECRET: 'whsec_5f2_probeSecretNotReal',
+  };
+  const stripeResponse = (ok, body) =>
+    Response.json(body, { status: ok ? 200 : 401 });
+  const priceFixture = {
+    livemode: false,
+    active: true,
+    currency: 'usd',
+    unit_amount: 1200,
+    type: 'recurring',
+    recurring: { interval: 'month', interval_count: 1 },
+    metadata: {
+      offer: 'artist_visibility_pro',
+      decision: 'tim-2026-10-20-artist-profile-12',
+    },
+  };
+
+  it('is skipped outside the claim dogfood workflow so tests never hit the network', () => {
+    expect(shouldProbeLiveFixture({})).toBe(false);
+    expect(
+      shouldProbeLiveFixture({ GITHUB_WORKFLOW: 'CI', ...realFixture })
+    ).toBe(false);
+    expect(
+      shouldProbeLiveFixture({ GITHUB_WORKFLOW: 'Claim Checkout Dogfood' })
+    ).toBe(true);
+    expect(shouldProbeLiveFixture({ CLAIM_STRIPE_FIXTURE_PROBE: '1' })).toBe(
+      true
+    );
+  });
+
+  it('passes when the key, account and $12 fixture price all match', async () => {
+    const fetchImpl = async input => {
+      const path = String(input).replace('https://api.stripe.com/v1', '');
+      if (path === '/account') {
+        return stripeResponse(true, {
+          id: realFixture.STRIPE_TEST_ACCOUNT_ID,
+        });
+      }
+      expect(path).toBe(
+        `/prices/${realFixture.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY}`
+      );
+      return stripeResponse(true, priceFixture);
+    };
+    const probe = await probeStripeTestFixture(realFixture, { fetchImpl });
+    expect(probe).toMatchObject({ ok: true, failures: [] });
+  });
+
+  it('names the env var and its store when a var is missing', async () => {
+    const probe = await probeStripeTestFixture(
+      { STRIPE_SECRET_KEY: 'sk_test_x' },
+      {
+        fetchImpl: async () => {
+          throw new Error('must not be called');
+        },
+      }
+    );
+    expect(probe.ok).toBe(false);
+    expect(probe.failures.join('\n')).toContain(
+      'STRIPE_TEST_ACCOUNT_ID is not set'
+    );
+    expect(probe.failures.join('\n')).toContain('Preview - jovie');
+  });
+
+  it('fails closed on a live-looking key without calling Stripe', async () => {
+    const probe = await probeStripeTestFixture(
+      { ...realFixture, STRIPE_SECRET_KEY: 'sk_live_abc' },
+      {
+        fetchImpl: async () => {
+          throw new Error('must not be called');
+        },
+      }
+    );
+    expect(probe.ok).toBe(false);
+    expect(probe.failures.join('\n')).toContain('sk_test_');
+  });
+
+  it('names a rejected key on a 401', async () => {
+    const probe = await probeStripeTestFixture(realFixture, {
+      fetchImpl: async () =>
+        stripeResponse(false, { message: 'Invalid API key' }),
+    });
+    expect(probe.ok).toBe(false);
+    expect(probe.failures.join('\n')).toContain('STRIPE_SECRET_KEY');
+    expect(probe.failures.join('\n')).toContain('Invalid API key');
+  });
+
+  it('names every contract mismatch on an edited fixture price', async () => {
+    const fetchImpl = async input => {
+      const path = String(input).replace('https://api.stripe.com/v1', '');
+      if (path === '/account') {
+        return stripeResponse(true, {
+          id: realFixture.STRIPE_TEST_ACCOUNT_ID,
+        });
+      }
+      return stripeResponse(true, {
+        ...priceFixture,
+        unit_amount: 19900,
+        active: false,
+      });
+    };
+    const probe = await probeStripeTestFixture(realFixture, { fetchImpl });
+    expect(probe.ok).toBe(false);
+    const failures = probe.failures.join('\n');
+    expect(failures).toContain('unit_amount: expected 1200, got 19900');
+    expect(failures).toContain('active: expected true, got false');
+    expect(failures).toContain('$12/month Artist Visibility test contract');
+  });
+
+  it('never prints the secret key in output', async () => {
+    const probe = await probeStripeTestFixture(realFixture, {
+      fetchImpl: async () =>
+        stripeResponse(false, { message: 'Invalid API key' }),
+    });
+    for (const failure of probe.failures) {
+      expect(failure).not.toContain('sk_test_5f2_probeKeyNotReal');
+    }
   });
 });

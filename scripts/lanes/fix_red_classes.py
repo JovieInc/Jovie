@@ -29,11 +29,12 @@ from atomic_state import atomic_write_text
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, AGENT = (
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, REPAIR_FETCH_STUB, AGENT = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "merge-narrowed-preflight", "register-domain-writes", "agent")
+    "merge-narrowed-preflight", "register-domain-writes", "repair-fetch-stub", "agent")
 DETERMINISTIC = frozenset({
-    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN})
+    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED,
+    REGISTER_DOMAIN, REPAIR_FETCH_STUB})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -111,8 +112,23 @@ _AND_CHAIN_LINE = re.compile(
     r"""^(?P<indent>[ \t]*)(?P<prefix>(?:"[^"\n]+"\s*:\s*)?)(?P<q>['"])(?P<command>[^'"\n]*&&[^'"\n]*)(?P=q)(?P<suffix>,?)\s*$""")
 _JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
 
+# scripts-typecheck (checkJs) rejects a plain {ok,status,json} double assigned to
+# typeof fetch. The diagnostic cites the file; the repair below rewrites only that shape.
+FETCH_RESPONSE_STUB_LOG = re.compile(
+    r"\[scripts-typecheck\] FAIL[\s\S]{0,1500}?error TS2322:[\s\S]{0,500}?Promise<Response>")
+FETCH_RESPONSE_STUB_FILE = re.compile(r"(scripts/[\w./-]+\.mjs)\(\d+,\d+\): error TS2322:")
+# `({ ok, status: <expr>, json: async () => <expr> })` — the stand-in this class keeps rewriting by hand.
+FETCH_RESPONSE_STUB_OBJECT = re.compile(
+    r"\(\{\s*"
+    r"ok\s*(?::\s*[^,\n]+)?\s*,\s*"
+    r"status\s*:\s*(?P<status>[^,\n]+)\s*,\s*"
+    r"json\s*:\s*async\s*\(\s*\)\s*=>\s*(?P<body>[^,\n]+)\s*,?\s*"
+    r"\}\)",
+    re.M)
+
 # (class, pattern, action). First match wins per check; order is most specific first.
 SIGNATURES = (
+    ("fetch-response-stub", FETCH_RESPONSE_STUB_LOG, REPAIR_FETCH_STUB),
     ("narrowed-preflight", NARROWED_CONFLICT, MERGE_NARROWED),
     # Before platform-infra: a Source Validation log can carry passing-test
     # rate-limit lines beside the guard error that actually failed the job.
@@ -199,6 +215,10 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
             found = UNWIRED.search(logs.get(name) or "")
             files.extend(item.strip() for item in (found.group(1).split(",") if found else []) if item.strip())
         files = sorted(set(files))
+    elif cls == "fetch-response-stub":
+        for name in names:
+            files.extend(FETCH_RESPONSE_STUB_FILE.findall(logs.get(name) or ""))
+        files = sorted({rel for rel in files if ".." not in Path(rel).parts})
     elif cls == "domain-write":
         files = sorted(_domain_write_hits("\n".join(logs.get(name) or "" for name in names)))
     return {"schema": SCHEMA, "cls": cls, "key": fingerprint_key(cls, names, signature), "action": action,
@@ -635,6 +655,42 @@ def resolve_preflight_narrowed_text(text: str) -> str | None:
     if "<<<<<<<" in resolved or ">>>>>>>" in resolved:
         return None
     return resolved
+
+
+def repair_fetch_response_stub_text(text: str) -> str | None:
+    """Replace a plain `{ok, status, json}` fetch double with `Response.json`. None when the
+    shape is absent, so a different TS2322 stays with the model."""
+    if not isinstance(text, str):
+        return None
+
+    def repl(match: re.Match) -> str:
+        status = match.group("status").strip()
+        body = match.group("body").strip()
+        return f"Response.json({body}, {{ status: {status} }})"
+
+    repaired, count = FETCH_RESPONSE_STUB_OBJECT.subn(repl, text)
+    return repaired if count and repaired != text else None
+
+
+def repair_fetch_response_stubs(root: Path, files: list[str]) -> list[str]:
+    """Rewrite cited scripts/*.mjs fetch doubles. Returns the files written. A path outside
+    scripts/, a missing file, or a file without the stub shape is left alone."""
+    written = []
+    for rel in files or []:
+        if not isinstance(rel, str) or not re.fullmatch(r"scripts/[\w./-]+\.mjs", rel) or ".." in Path(rel).parts:
+            continue
+        path = Path(root) / rel
+        if not path.is_file():
+            continue
+        try:
+            repaired = repair_fetch_response_stub_text(path.read_text())
+        except OSError:
+            continue
+        if repaired is None:
+            continue
+        atomic_write_text(path, repaired)
+        written.append(rel)
+    return written
 
 
 def _domain_write_hits(log: str) -> dict[str, list[str]]:
