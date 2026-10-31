@@ -963,7 +963,8 @@ LAUNCHD_LABEL = "ie.jov.bookmarks-intake"
 
 def launchd_plist(python, script, spool=MESH_SPOOL, doppler_dir=Path.home() / "Jovie"):
     """Event-driven trigger: launchd runs one mesh intake whenever the relay spool changes. No poller."""
-    args = "".join(f"<string>{a}</string>" for a in ("/bin/zsh", "-lc", f"cd {doppler_dir} && doppler run -- {python} {script} mesh-intake"))
+    from xml.sax.saxutils import escape
+    args = "".join(f"<string>{escape(a)}</string>" for a in ("/bin/zsh", "-lc", f"cd {doppler_dir} && doppler run -- {python} {script} mesh-intake"))
     return (f'<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
             f'"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>'
             f"<key>Label</key><string>{LAUNCHD_LABEL}</string><key>ProgramArguments</key><array>{args}</array>"

@@ -193,5 +193,14 @@ class MeshIntakeTests(unittest.TestCase):
             self.assertEqual((again["messages"], len(runs)), (0, 1))  # cursor advanced; nothing re-read
 
 
+class TriggerTests(unittest.TestCase):
+    def test_launchd_plist_is_valid_xml_and_watches_the_spool(self):
+        import plistlib
+        plist = plistlib.loads(B.launchd_plist("/usr/bin/python3", "/x/bookmarks.py", spool=Path("/s/inbox.jsonl")).encode())
+        self.assertEqual(plist["WatchPaths"], ["/s/inbox.jsonl"])
+        self.assertIn("&& doppler run --", plist["ProgramArguments"][2])
+        self.assertTrue(plist["ProgramArguments"][2].endswith("mesh-intake"))
+
+
 if __name__ == "__main__":
     unittest.main()
