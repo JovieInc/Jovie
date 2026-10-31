@@ -342,6 +342,14 @@ export async function loadDriftPlans({
   return { plans: report.plans, warnings: report.warnings };
 }
 
+/** Current data-architecture ratchet debt, scanned in-process. */
+export async function loadDataArchitectureMetrics(root = process.cwd()) {
+  const guard = await import('./lib/data-architecture-guard.mjs');
+  const { summarize } = await import('./data-architecture-guard.mjs');
+  const { found, allowed } = guard.scanRepo(root);
+  return { metrics: summarize(found, allowed), rules: guard.RULES };
+}
+
 function warn(message) {
   console.error(message);
   if (process.env.GITHUB_ACTIONS === 'true')
@@ -364,6 +372,7 @@ async function main() {
     loadDomains: () => loadDomainRecords(),
     loadCredentials: () => loadCredentialsPlans(),
     loadDrift: () => loadDriftPlans(),
+    loadDataArchitecture: () => loadDataArchitectureMetrics(),
     vercelTokenPresent: Boolean(token),
     upsert: upsertLinearIssueByTitleFingerprint,
     apiKey: process.env.LINEAR_API_KEY,

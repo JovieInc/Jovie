@@ -32,12 +32,14 @@ export async function purgeExpiredAgentDrafts(
   );
   let deleted = 0;
   for (let i = 0; i < MAX_BATCHES; i += 1) {
+    // data-arch-allow: bounded batched purge loop, one select per batch by design
     const rows = await db
       .select({ id: agentVisibilityDrafts.id })
       .from(agentVisibilityDrafts)
       .where(lt(agentVisibilityDrafts.expiresAt, cutoff))
       .limit(BATCH);
     if (rows.length === 0) break;
+    // data-arch-allow: bounded batched purge loop, one delete per batch by design
     const gone = await db
       .delete(agentVisibilityDrafts)
       .where(

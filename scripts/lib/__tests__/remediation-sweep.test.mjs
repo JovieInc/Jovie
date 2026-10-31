@@ -392,3 +392,33 @@ describe('remediation sweep selection', () => {
     expect(workflow).toContain('run_mode summer-config');
   });
 });
+
+describe('planDataArchitectureDebt', () => {
+  it('files one owned issue per rule with remaining debt', async () => {
+    const { planDataArchitectureDebt } = await import(
+      '../remediation-sweep.mjs'
+    );
+    const plans = planDataArchitectureDebt(
+      {
+        totals: { 'router-refresh': 3, polling: 0 },
+        top: { 'router-refresh': [['apps/web/a.tsx', 3]] },
+      },
+      { 'router-refresh': 'Update the query key instead.' }
+    );
+    expect(plans).toHaveLength(1);
+    expect(plans[0].fingerprint).toBe(
+      'remediation:data-arch-debt:router-refresh'
+    );
+    expect(plans[0].title).toContain('3 router-refresh');
+    expect(plans[0].description).toContain('`apps/web/a.tsx` (3)');
+    expect(plans[0].description).toContain('Update the query key instead.');
+  });
+
+  it('files nothing when the ratchet is empty', async () => {
+    const { planDataArchitectureDebt } = await import(
+      '../remediation-sweep.mjs'
+    );
+    expect(planDataArchitectureDebt({ totals: { polling: 0 } })).toEqual([]);
+    expect(planDataArchitectureDebt(null)).toEqual([]);
+  });
+});

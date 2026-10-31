@@ -421,6 +421,18 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
+    // Canonical data architecture (docs/architecture/data-architecture-adr-
+    // 2026-10-29.md): no new revalidatePath / router.refresh / segment config /
+    // unstable_cache / fetch-in-effect / polling / second DB client, and no
+    // data library without a canon/data-architecture.json entry.
+    // Grandfathered sites only shrink. Contract test: SCRIPT_CONTRACT_VITEST_TESTS.
+    id: 'data-architecture-guard',
+    command: `node ${shellQuote(fileURLToPath(new URL('./data-architecture-guard.mjs', import.meta.url)))}`,
+    inputs:
+      /^(?:apps\/(?:web|ovie|console|docs|should-i-make)\/(?!scripts\/|drizzle\/|tests?\/).+\.(?:ts|tsx|mts|js|jsx)$|apps\/[^/]+\/package\.json$|canon\/data-architecture\.json$|scripts\/(?:lib\/)?data-architecture-guard\.)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     // Every disk-reading web unit test whose path literals name a changed
     // file (scripts/lib/web-source-read-tests.mjs). Such tests ejected ~45
     // merge groups in the 7 days to 2026-10-12 because the import-graph
@@ -1204,6 +1216,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/ai-gateway-report.test.mjs',
   'scripts/lib/__tests__/ai-call-guard.test.mjs',
   'scripts/lib/__tests__/domain-write-guard.test.mjs',
+  'scripts/lib/__tests__/data-architecture-guard.test.mjs',
   'scripts/lib/__tests__/screen-audit-receipts.test.mjs',
   'scripts/lib/__tests__/component-certificate.test.mjs',
   'scripts/lib/__tests__/verify-patched-dependencies.test.mjs',

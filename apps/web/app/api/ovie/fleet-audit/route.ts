@@ -8,8 +8,6 @@ import {
 } from '@/lib/ovie/fleet-audit.server';
 import { resolveOviePrincipal } from '@/lib/ovie/mcp/principal';
 
-export const runtime = 'nodejs';
-
 const ROUTE = '/api/ovie/fleet-audit';
 const headers = { 'Cache-Control': 'private, no-store' } as const;
 

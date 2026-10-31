@@ -13,8 +13,6 @@ import { buildContentStageEvents } from '@/lib/content-records/stage-events';
 import { getContentStageRows } from '@/lib/content-records/store.server';
 import { captureError } from '@/lib/error-tracking';
 
-export const runtime = 'nodejs';
-
 const WINDOW_MS = 28 * 24 * 60 * 60 * 1000;
 
 export async function GET() {
