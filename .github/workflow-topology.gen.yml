@@ -418,6 +418,19 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:verify
     jobCount: 2
+  - name: Findings Loop
+    path: .github/workflows/findings-loop.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - repository_dispatch
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:snapshot
+    jobCount: 2
   - name: Fixed Runner Canary
     path: .github/workflows/fixed-runner-canary.yml
     active: true
@@ -760,7 +773,8 @@ nodes:
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Findings Loop
     triggeringStateTransition:
       - push
       - workflow_dispatch
@@ -1257,7 +1271,8 @@ nodes:
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Findings Loop
     triggeringStateTransition:
       - push
       - repository_dispatch
@@ -1343,7 +1358,8 @@ nodes:
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Findings Loop
     triggeringStateTransition:
       - workflow_dispatch
       - workflow_run
@@ -1437,6 +1453,7 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
+      - Findings Loop
       - SonarCloud
     triggeringStateTransition:
       - push
@@ -1587,6 +1604,18 @@ edges:
     type: workflow_run
   - from: Production Controller
     to: desktop-release
+    type: workflow_run
+  - from: SonarCloud
+    to: Findings Loop
+    type: workflow_run
+  - from: Test Coverage Audit
+    to: Findings Loop
+    type: workflow_run
+  - from: Mutation Diff
+    to: Findings Loop
+    type: workflow_run
+  - from: Security Advisory Loop (Linear devin lane)
+    to: Findings Loop
     type: workflow_run
   - from: CI
     to: Fleet Gate Refresh
