@@ -12278,9 +12278,11 @@ class AtomicWriteRouteTest(unittest.TestCase):
         pr = {"number": 1, "headRefOid": "head", "headRefName": "feature", "isDraft": False,
               "isCrossRepository": False, "isInMergeQueue": False, "mergeStateStatus": "DIRTY"}
         calls = []
+        refuse_add = False
         def shell(args, **kwargs):
             calls.append(args)
-            return SimpleNamespace(returncode=0, stdout="main refs/heads/main\n" if "ls-remote" in args else "head\n")
+            return SimpleNamespace(returncode=int(refuse_add and args[:3] == ["git", "worktree", "add"]),
+                                   stdout="main refs/heads/main\n" if "ls-remote" in args else "head\n")
         def resolve(*args, guard, **kwargs):
             guard()
         with tempfile.TemporaryDirectory() as tmp, patch.object(lane, "sh", side_effect=shell), \
@@ -12291,6 +12293,11 @@ class AtomicWriteRouteTest(unittest.TestCase):
             host = lane.Host(state=Path(tmp), repo=Path(tmp))
             self.assertEqual(lane.deterministic_conflict_pass(host, [pr], now=1000), [1])
             self.assertEqual(json.loads((Path(tmp) / "deterministic-conflict.json").read_text())["1"]["outcome"], "target-changed")
+            (Path(tmp) / "deterministic-conflict.json").unlink()
+            with patch.object(lane, "Locked", return_value=SimpleNamespace(held=False, release=Mock())):
+                self.assertEqual(lane.deterministic_conflict_pass(host, [pr], now=1000), [])
+            refuse_add = True
+            self.assertEqual(lane.deterministic_conflict_pass(host, [pr], now=1000), [1])
         self.assertFalse(any(c[:3] == ["git", "worktree", "remove"] for c in calls))
 
     def test_verifies_and_rechecks_target_before_fast_forward_publication(self):
@@ -12423,9 +12430,10 @@ class LockfileConflictTest(unittest.TestCase):
     def test_append_only_registry_conflict_keeps_both_sides_without_a_model(self):
         """2026-10-29: canon/automation-registry.jsonl conflicted on 4 PRs; both sides' lines are the merge."""
         path = "canon/automation-registry.jsonl"
+        header = (ROOT / path).read_text().splitlines()[0] + "\n"
         with tempfile.TemporaryDirectory() as tmp:
-            origin, work = self.repo(Path(tmp), {path: '{"id":"base"}\n{"id":"pr"}\n'},
-                                     main_changes={path: '{"id":"base"}\n{"id":"main"}\n', "a.ts": "main\n"})
+            origin, work = self.repo(Path(tmp), {path: header + '{"id":"base"}\n{"id":"pr"}\n'},
+                                     main_changes={path: header + '{"id":"base"}\n{"id":"main"}\n', "a.ts": "main\n"})
             ok, calls = self.run_resolve(work)
             self.assertTrue(ok)
             merged = self.git("show", f"devin/jov-1-20260927:{path}", cwd=origin)
@@ -12440,12 +12448,13 @@ class LockfileConflictTest(unittest.TestCase):
 
     def test_registry_edits_to_the_same_id_stay_unresolved(self):
         path = "canon/automation-registry.jsonl"
+        header = (ROOT / path).read_text().splitlines()[0] + "\n"
         with tempfile.TemporaryDirectory() as tmp:
-            _, work = self.repo(Path(tmp), {path: '{"id":"base","value":"pr"}\n'},
-                                main_changes={path: '{"id":"base","value":"main"}\n'})
+            _, work = self.repo(Path(tmp), {path: header + '{"id":"base","value":"pr"}\n'},
+                                main_changes={path: header + '{"id":"base","value":"main"}\n'})
             ok, _ = self.run_resolve(work)
             self.assertFalse(ok)
-            self.assertEqual((work / path).read_text(), '{"id":"base","value":"pr"}\n')
+            self.assertEqual((work / path).read_text(), header + '{"id":"base","value":"pr"}\n')
     def test_sources_of_truth_conflict_regenerates_from_merged_source(self):
         path = "canon/SOURCES_OF_TRUTH.md"
         generator = "scripts/sources-of-truth.mjs"

@@ -6284,6 +6284,10 @@ def union_merge_file(worktree: Path, path: str, log) -> bool:
         return False
     try:
         rows = [json.loads(line) for line in merged.stdout.splitlines() if line.strip()]
+        header = json.loads(next(iter(stages[3].splitlines()), "null"))
+        if not isinstance(header, dict) or not header.get("schema") or not rows or rows[0] != header:
+            return False
+        rows = rows[1:]
         ids = [row["id"] for row in rows]
         if any(not isinstance(key, str) for key in ids) or len(set(ids)) != len(ids):
             return False

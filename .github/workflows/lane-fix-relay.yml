@@ -1,4 +1,5 @@
 name: Lane Fix Relay
+# github-token-budget: 1 calls/run - one same-repository repair dispatch per failed workflow completion, through the shared client.
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
 # capability-gap: The shipping lanes on Gem have no inbound webhook, so this hop records a PR's failed CI, merge-queue removal, conflict, review feedback or green lane draft as a lane-fix-<kind> label that the lane runner reads each pass; it never pushes, readies, merges or enqueues.
@@ -195,6 +196,6 @@ jobs:
           SHA: ${{ github.event.workflow_run.head_sha }}
           WORKFLOW: ${{ github.event.workflow_run.name }}
         run: |
-          gh api "repos/$GITHUB_REPOSITORY/dispatches" -f event_type=swarm-remediate \
+          PYTHONPATH=scripts python3 -m apiclient gh --priority repair -- api "repos/$GITHUB_REPOSITORY/dispatches" -f event_type=swarm-remediate \
             -f "client_payload[pr]=$PR" -f "client_payload[sha]=$SHA"
           echo "swarm-remediate pr=$PR sha=$SHA first_failed=$WORKFLOW at=$(date -u +%FT%TZ)"
