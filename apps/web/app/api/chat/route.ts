@@ -80,6 +80,7 @@ import {
   extractLastUserImageUrl,
   extractLastUserText,
 } from '@/lib/chat/message-text';
+import { resolveHasMusicLinks } from '@/lib/chat/music-link-presence';
 import { canUseOvChatMode, parseChatMode } from '@/lib/chat/ov-mode';
 import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
 import { buildRelatedSuggestionsFraming } from '@/lib/chat/related-recommendations';
@@ -142,6 +143,7 @@ import { wrapToolSetFailSoft } from '@/lib/chat/wrap-tool-execute';
 import { loadCustomerChatPinnedOpportunity } from '@/lib/connectors/customer-pinned-opportunity';
 import { db } from '@/lib/db';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
+import { discogReleases, providerLinks } from '@/lib/db/schema/content';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlAny } from '@/lib/db/sql-helpers';
@@ -299,6 +301,8 @@ async function fetchArtistContext(
       .select({
         totalActive: count(),
         musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ${sqlAny(DSP_PLATFORMS)})`,
+        // Release listen links render on the public profile too.
+        releaseListen: drizzleSql<number>`(select count(*) from ${providerLinks} join ${discogReleases} on ${providerLinks.releaseId} = ${discogReleases.id} where ${discogReleases.creatorProfileId} = ${profileId})`,
       })
       .from(socialLinks)
       .where(
@@ -349,7 +353,12 @@ async function fetchArtistContext(
     appleMusicUrl: result.appleMusicUrl,
     profileViews,
     hasSocialLinks: Number(linkCounts?.totalActive ?? 0) > 0,
-    hasMusicLinks: Number(linkCounts?.musicActive ?? 0) > 0,
+    hasMusicLinks: resolveHasMusicLinks({
+      dspSocialLinkCount: Number(linkCounts?.musicActive ?? 0),
+      releaseListenLinkCount: Number(linkCounts?.releaseListen ?? 0),
+      spotifyUrl: result.spotifyUrl,
+      appleMusicUrl: result.appleMusicUrl,
+    }),
     tippingStats: {
       tipClicks: Number(clickStats?.total ?? 0),
       tipsSubmitted: Number(tipTotals?.tipsSubmitted ?? 0),

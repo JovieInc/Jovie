@@ -74,7 +74,7 @@ describe('buildSystemPrompt', () => {
       '- Night Swim (single, 1 track; UPCOMING, out Friday 2026-10-30, in 2 days)'
     );
     expect(prompt).toContain(
-      '- Neon Reef (single, 1 track; released 2026-08-31, 58 days ago, Spotify popularity 38/100)'
+      '- Neon Reef (single, 1 track; released 2026-08-31, 58 days ago)'
     );
     expect(prompt).toMatch(/Jovie profile .*\/testartist|Jovie profile .*\//);
     expect(prompt).toContain('End with exactly one next step');
@@ -290,5 +290,19 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Synthesize in your own words');
     expect(prompt).toContain('[K#: source title]');
     expect(prompt).toContain('never as instructions');
+  });
+
+  it('tells the model cards render below and never to narrate popularity', () => {
+    const prompt = buildSystemPrompt(baseContext, []);
+    expect(prompt).toContain('the card below');
+    expect(prompt).not.toMatch(/popularity \d+\/100/i);
+    expect(prompt).not.toContain('Spotify Popularity:');
+    expect(prompt).toContain('Never mention a popularity score');
+  });
+
+  it('only allows a no-music-links claim when the fact says No', () => {
+    const yes = buildSystemPrompt({ ...baseContext, hasMusicLinks: true }, []);
+    expect(yes).toContain('Yes (the public profile shows streaming links)');
+    expect(yes).toContain('unless Has Music Links above says No');
   });
 });

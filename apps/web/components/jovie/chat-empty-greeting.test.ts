@@ -39,7 +39,13 @@ describe('getChatEmptyStateFirstName', () => {
   it('takes the first token of a real display name', () => {
     expect(getChatEmptyStateFirstName('Tim White')).toBe('Tim');
     expect(getChatEmptyStateFirstName('  Tim   White  ')).toBe('Tim');
-    expect(getChatEmptyStateFirstName('Cher')).toBe('Cher');
+  });
+
+  it('never greets a band or artist name by its first word', () => {
+    expect(getChatEmptyStateFirstName('Good Dropouts')).toBeNull();
+    expect(getChatEmptyStateFirstName('The Weeknd')).toBeNull();
+    expect(getChatEmptyStateFirstName('Cher')).toBeNull();
+    expect(getChatEmptyStateFirstName('DJ Snake')).toBeNull();
   });
 
   it('never fabricates a name when none is real', () => {

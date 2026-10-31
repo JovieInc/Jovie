@@ -12,6 +12,34 @@ const DISALLOWED_GREETING_TOKENS = new Set([
   'official',
 ]);
 
+// Ordinary words that lead band names ("Good Dropouts", "Black Keys") far more
+// often than they are given names. Checked on the first token only, because
+// the same words are common surnames ("Tim White", "Ana Green").
+const NON_NAME_LEADING_TOKENS = new Set([
+  'good',
+  'bad',
+  'great',
+  'happy',
+  'sad',
+  'wild',
+  'dead',
+  'lost',
+  'new',
+  'old',
+  'our',
+  'my',
+  'black',
+  'white',
+  'red',
+  'blue',
+  'green',
+  'golden',
+  'silver',
+  'sweet',
+  'free',
+  'saint',
+]);
+
 function capitalizeNamePart(part: string): string {
   const [firstCharacter = '', ...remainingCharacters] = Array.from(part);
   return `${firstCharacter.toLocaleUpperCase()}${remainingCharacters.join('')}`;
@@ -56,6 +84,7 @@ export function resolveSafeFirstName(
   const normalizedFirstToken = firstToken.toLocaleLowerCase();
   const normalizedLastToken = lastToken.toLocaleLowerCase();
   if (
+    NON_NAME_LEADING_TOKENS.has(normalizedFirstToken) ||
     DISALLOWED_GREETING_TOKENS.has(normalizedFirstToken) ||
     DISALLOWED_GREETING_TOKENS.has(normalizedLastToken)
   ) {

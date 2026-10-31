@@ -79,7 +79,7 @@ describe('buildSystemPrompt', () => {
     it('includes streaming stats', () => {
       const prompt = buildSystemPrompt(mockArtistContext, [...mockReleases]);
       expect(prompt).toContain('12,500');
-      expect(prompt).toContain('45');
+      expect(prompt).not.toContain('Spotify Popularity:');
     });
 
     it('includes profile views', () => {
