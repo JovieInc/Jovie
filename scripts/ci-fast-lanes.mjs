@@ -218,11 +218,11 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
-    // Compliance loop: privacy rules + negative controls, tracker registry
-    // shape, and no tracker component on input routes.
+    // Compliance loop: privacy rules + negative controls and tracker registry
+    // shape. The input-route tracker guard is its own source guard.
     id: 'privacy-compliance',
     command:
-      'node --test --test-isolation=none scripts/compliance/privacy-rules.test.mjs scripts/compliance/input-page-trackers.test.mjs',
+      'node --test --test-isolation=none scripts/compliance/privacy-rules.test.mjs',
     inputs:
       /^(?:apps\/web\/app\/|apps\/web\/components\/features\/tracking\/|apps\/web\/content\/legal\/|canon\/privacy\/|scripts\/compliance\/|scripts\/ci-fast-lanes\.mjs$)/u,
     prOnly: false,
