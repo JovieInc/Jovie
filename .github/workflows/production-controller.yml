@@ -909,6 +909,7 @@ jobs:
     with:
       expected_sha: ${{ needs.authorize-production.outputs.expected_sha }}
       release_mode: production
+      predecessor_sha: ${{ needs.authorize-production.outputs.deployed_sha }}
       staging_verified: ${{ needs.authorize-production.outputs.staging_verified == 'true' }}
       full_runtime_proof: ${{ needs.authorize-production.outputs.release_lane == 'high' }}
     secrets: inherit

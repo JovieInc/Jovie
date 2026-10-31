@@ -30,6 +30,11 @@ on:
         required: false
         default: true
         type: boolean
+      predecessor_sha:
+        description: SHA of the generation live in production at authorization. Migration and promotion require its verdict to be PASS.
+        required: false
+        default: ''
+        type: string
       promotion_journey_override:
         description: Optional manual recovery override receipt (JSON, jovie.promotion-recovery-override/v1) for the pre-promotion journey gate.
         required: false
@@ -764,6 +769,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+      actions: read
     outputs:
       schema_drift: ${{ steps.verify-production-schema.outcome == 'failure' }}
     steps:
@@ -771,6 +777,16 @@ jobs:
         with:
           ref: ${{ inputs.expected_sha }}
           persist-credentials: false
+      - name: Require predecessor verdict PASS before migration
+        id: predecessor-verdict
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREDECESSOR_SHA: ${{ inputs.predecessor_sha }}
+          RELEASE_SHA: ${{ inputs.expected_sha }}
+        run: >-
+          node .github/scripts/production-predecessor-verdict.mjs
+          --repo "$GITHUB_REPOSITORY" --predecessor-sha "$PREDECESSOR_SHA"
+          --release-sha "$RELEASE_SHA" --boundary migrate
       - uses: ./.github/actions/setup-node-pnpm
       - uses: ./.github/actions/setup-doppler
       - name: Require production migration credential
@@ -1486,6 +1502,21 @@ jobs:
             echo "failure_subtype=journey_gate_blocked" >> "$GITHUB_OUTPUT"
             exit 1
           fi
+
+      # No continue-on-error and no status-function override: a non-PASS verdict
+      # fails this step, and GitHub then skips every later step, including
+      # Promote, by its implicit success() condition.
+      - name: Require predecessor verdict PASS before promotion
+        id: predecessor-verdict
+        if: ${{ steps.final-current.outputs.is_current == 'true' && steps.journey-gate.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREDECESSOR_SHA: ${{ inputs.predecessor_sha }}
+          RELEASE_SHA: ${{ inputs.expected_sha }}
+        run: >-
+          node .github/scripts/production-predecessor-verdict.mjs
+          --repo "$GITHUB_REPOSITORY" --predecessor-sha "$PREDECESSOR_SHA"
+          --release-sha "$RELEASE_SHA" --boundary promote
 
       - name: Promote staged production deployment
         id: promote
