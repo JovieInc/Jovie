@@ -5,6 +5,8 @@ import {
   emptyCounts,
   emptyDurations,
   isExactSha,
+  LANE_AGENT_RE,
+  LANE_ISSUE_RE,
   measuredCount,
   measuredDuration,
   NOT_MEASURED_COUNT,
@@ -240,8 +242,6 @@ function interpretDurations(
   };
 }
 
-const LANE_ISSUE_RE = /^(?:devin|codex)\/(jov-\d+)(?:-|$)/i;
-
 /** Linear issue a lane branch (`devin/jov-123-<stamp>`) is working. */
 export function laneIssueIdentifier(headRefName: unknown): string | null {
   if (typeof headRefName !== 'string') return null;
@@ -294,7 +294,6 @@ function safeDisplayText(value: unknown): string | null {
   return normalized.length > 0 ? normalized : null;
 }
 
-const LANE_AGENT_RE = /^(devin|codex)\//i;
 const CHECK_ROLLUPS = new Set(['success', 'failure', 'pending', 'unknown']);
 const MAX_FAILING_CHECKS = 20;
 

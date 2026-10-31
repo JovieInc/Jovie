@@ -2420,40 +2420,70 @@ test('every enroll decision on a ready PR leaves a receipt (pr, head, reason)', 
   assert.ok(!script.includes('${{'));
 });
 
-test('compounding PRs jump the queue, capped at two jumped entries, and every decision leaves a receipt', async () => {
+test('compounding PRs jump the queue under the reset-safe policy and every decision leaves a receipt', async () => {
   const compounding = {
     labels: {
       pageInfo: { hasNextPage: false },
       nodes: [{ name: 'compounding' }],
     },
   };
-  const entry = number => ({
+  const iso = secondsAgo =>
+    new Date(Date.now() - secondsAgo * 1000).toISOString();
+  const entry = (number, state = 'QUEUED', secondsAgo = 3600) => ({
+    state,
+    enqueuedAt: iso(secondsAgo),
     pullRequest: { number, labels: { nodes: [{ name: 'compounding' }] } },
   });
+  const plain = (number, state, secondsAgo) => ({
+    state,
+    enqueuedAt: iso(secondsAgo),
+    pullRequest: { number, labels: { nodes: [] } },
+  });
+  const jumped = { id: 'PR_1', oid: sha, jump: true };
+  const unjumped = { id: 'PR_1', oid: sha };
   const byLabel = await fixture({ overrides: { 1: compounding } });
-  assert.deepEqual(byLabel.mutations, [{ id: 'PR_1', oid: sha, jump: true }]);
+  assert.deepEqual(byLabel.mutations, [jumped]);
   const byPaths = await fixture({
     files: [
       { filename: 'scripts/lanes/autoscale.py' },
       { filename: '.github/workflows/lane-fix-relay.yml' },
     ],
   });
-  assert.deepEqual(byPaths.mutations, [{ id: 'PR_1', oid: sha, jump: true }]);
+  assert.deepEqual(byPaths.mutations, [jumped]);
   const mixed = await fixture({
     files: [
       { filename: 'scripts/lanes/autoscale.py' },
       { filename: 'apps/web/page.tsx' },
     ],
   });
-  assert.deepEqual(mixed.mutations, [{ id: 'PR_1', oid: sha }]);
+  assert.deepEqual(mixed.mutations, [unjumped]);
   const capped = await fixture({
     overrides: { 1: compounding },
     queueEntries: [entry(8), entry(9)],
   });
-  assert.deepEqual(capped.mutations, [{ id: 'PR_1', oid: sha }]);
+  assert.deepEqual(capped.mutations, [unjumped]);
   const room = await fixture({
     overrides: { 1: compounding },
     queueEntries: [entry(8)],
   });
-  assert.deepEqual(room.mutations, [{ id: 'PR_1', oid: sha, jump: true }]);
+  assert.deepEqual(room.mutations, [jumped]);
+  // A building group that has run more than five minutes is never reset by a jump.
+  const building = await fixture({
+    overrides: { 1: compounding },
+    queueEntries: [plain(30, 'AWAITING_CHECKS', 900)],
+  });
+  assert.deepEqual(building.mutations, [unjumped]);
+  // A young building group may be reset, and the reset is logged.
+  const young = await fixture({
+    overrides: { 1: compounding },
+    queueEntries: [plain(31, 'AWAITING_CHECKS', 60)],
+  });
+  assert.deepEqual(young.mutations, [jumped]);
+  assert.ok(young.warnings.some(w => /JUMP RESET by #1.*#31/.test(w)));
+  // Jumps are batched: a compounding entry enqueued under 30 minutes ago defers the next.
+  const batched = await fixture({
+    overrides: { 1: compounding },
+    queueEntries: [entry(8, 'QUEUED', 300)],
+  });
+  assert.deepEqual(batched.mutations, [unjumped]);
 });

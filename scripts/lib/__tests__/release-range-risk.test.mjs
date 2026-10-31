@@ -12,7 +12,10 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
 import { classifyCiRisk, loadCiHarnessManifest } from '../ci-harness.mjs';
 import { planProductionLaneRange } from '../production-lane-range.mjs';
-import { journeysRequired } from '../promotion-journey-evidence.mjs';
+import {
+  evaluatePromotion,
+  journeysRequired,
+} from '../promotion-journey-evidence.mjs';
 import { gradeReleaseRange } from '../release-range-risk.mjs';
 import { buildReleaseRiskReceipt } from '../release-risk-policy.mjs';
 
@@ -277,8 +280,9 @@ describe('release range risk (2026-10-22 gate false-unknown)', () => {
    * The exact changed-path set of the 2026-10-22 promotion wave
    * a718a69..afb27ba (Production Controller run 39905042790). The gate graded
    * this range unknown because 13 path families matched no risk rule and no
-   * known-safe pattern, so a non-auth/billing range demanded journey evidence
-   * it had no way to obtain. Every family below must stay classified forever.
+   * known-safe pattern. Every family below must stay classified forever.
+   * Its public UI changes now intentionally require golden-path evidence;
+   * known classification and exemption from journey evidence are separate.
    */
   const INCIDENT_PATHS = [
     '.claude/rules/ui.md',
@@ -372,7 +376,7 @@ describe('release range risk (2026-10-22 gate false-unknown)', () => {
   const BASE = 'a718a69d29ffdd1d74851511ecfe8aefe1e1a336';
   const CANDIDATE = 'afb27ba5dc790557660cb787c72279df3b2eb24e';
 
-  it('the incident range grades known and does not require journeys', () => {
+  it('the incident range grades known and requires journeys for public UI', () => {
     const artifact = gradeReleaseRange({
       baseDeployedSha: BASE,
       candidateSha: CANDIDATE,
@@ -382,7 +386,31 @@ describe('release range risk (2026-10-22 gate false-unknown)', () => {
     expect(artifact.paths.filter(p => p.class === 'unknown')).toEqual([]);
     expect(artifact.affects.auth).toBe(false);
     expect(artifact.affects.billing).toBe(false);
-    expect(journeysRequired(artifact)).toBe(false);
+    expect(artifact.affects.publicUi).toBe(true);
+    expect(journeysRequired(artifact)).toBe(true);
+    expect(evaluatePromotion({ range: artifact }).decision).toBe('blocked');
+  });
+
+  it.each([
+    ['apps/web/data/homepageCopy.ts', true],
+    ['apps/web/proxy.ts', true],
+    ['apps/web/drizzle/0001_x.sql', true],
+    ['docs/PR_FLOW.md', false],
+    ['apps/web/tests/e2e/profile.spec.ts', false],
+    ['scripts/ci-fast-lanes.mjs', false],
+    ['.github/workflows/ci.yml', false],
+  ])('%s: classified range requires journeys = %s', (path, required) => {
+    const artifact = gradeReleaseRange({
+      baseDeployedSha: BASE,
+      candidateSha: CANDIDATE,
+      paths: [path],
+    });
+    expect(artifact.unknown).toBe(false);
+    expect(journeysRequired(artifact)).toBe(required);
+    expect(evaluatePromotion({ range: artifact })).toMatchObject({
+      required,
+      decision: required ? 'blocked' : 'pass',
+    });
   });
 
   it.each([

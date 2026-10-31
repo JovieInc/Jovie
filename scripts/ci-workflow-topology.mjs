@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dump as yamlDump, load as yamlLoad } from 'js-yaml';
+import { checkRunnerPins } from './workflow-runner-pin-check.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outputPath = path.join(root, '.github/workflow-topology.gen.yml');
@@ -146,6 +147,7 @@ function main() {
   if (process.argv.includes('--write')) fs.writeFileSync(outputPath, serialized);
   else if (!fs.existsSync(outputPath) || fs.readFileSync(outputPath, 'utf8') !== serialized)
     result.errors.push('generated workflow DAG is stale; run pnpm ci:topology:write');
+  if (!process.argv.includes('--write')) result.errors.push(...checkRunnerPins());
   if (result.errors.length) {
     console.error(result.errors.join('\n'));
     process.exitCode = 1;

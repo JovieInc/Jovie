@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -475,6 +476,53 @@ test('PR creation failure and missing receipts fail rather than reporting public
       assert.equal(f.git('rev-parse', 'origin/main'), f.source);
     });
   }
+});
+
+test('the real gh adapter absorbs a multi-megabyte open-PR listing when retiring reports', t => {
+  const f = fixture(t);
+  f.change();
+  const bin = join(f.root, 'bin');
+  mkdirSync(bin);
+  installOriginFixture(f, bin);
+  // Retirement inventories up to 1000 open PRs with full bodies; 600 ~2 KiB
+  // bodies exceed the 1 MiB child_process default that used to ship here
+  // (run 41049117742 died with spawnSync gh ENOBUFS in the retire step).
+  const entries = [];
+  for (let number = 1; number <= 600; number += 1) {
+    entries.push(
+      JSON.stringify({
+        number,
+        headRefName: `feature/large-${number}`,
+        createdAt: '2026-10-01T00:00:00Z',
+        mergeable: 'MERGEABLE',
+        isDraft: true,
+        labels: [],
+        body: `Large PR body ${number}: ${'x'.repeat(2048)}`,
+      })
+    );
+  }
+  const listing = join(bin, 'listing.json');
+  writeFileSync(listing, `[${entries.join(',\n')}]`);
+  assert.ok(
+    statSync(listing).size > 1024 * 1024,
+    'fixture listing must exceed the retired 1 MiB default'
+  );
+  // Keep the origin/attribution api cases from installOriginFixture and swap
+  // only the pr listing: real execFileSync('gh') now reads >1 MiB of output.
+  const ghPath = join(bin, 'gh');
+  const ghScript = readFileSync(ghPath, 'utf8');
+  assert.ok(ghScript.includes("pr:list) echo '[]' ;;"));
+  writeFileSync(
+    ghPath,
+    ghScript.replace("pr:list) echo '[]' ;;", `pr:list) cat '${listing}' ;;`),
+    { mode: 0o755 }
+  );
+  const result = publishCoverageReport({
+    cwd: f.cwd,
+    env: { ...f.env, PATH: `${bin}:${process.env.PATH}` },
+  });
+  assert.equal(result.status, 'published');
+  assert.equal(result.url, url);
 });
 
 test('uses the real gh command adapter and supports runners without a summary file', t => {

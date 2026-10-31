@@ -217,6 +217,20 @@ jobs:
 
           echo "is_current=true" >> "$GITHUB_OUTPUT"
           record_receipt "proceed" "exact SHA is current" "$EXPECTED_SHA" 0 "authorize exact CI evidence"
+      - name: Summarize the release decision
+        if: ${{ always() }}
+        env:
+          DECISION: ${{ steps.coalesce.outputs.decision }}
+          IS_CURRENT: ${{ steps.coalesce.outputs.is_current }}
+          REPLACEMENT: ${{ steps.coalesce.outputs.replacement_sha }}
+          EXPECTED_SHA: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}
+        run: |
+          if [ "$IS_CURRENT" = true ]; then
+            echo "### Release attempted: $EXPECTED_SHA is current, proceeding to authorize and release" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### No release attempted: superseded (decision=$DECISION, replacement=$REPLACEMENT)" >> "$GITHUB_STEP_SUMMARY"
+            echo "A green run here means nothing shipped. Production advances only when a run's Production Release job succeeds." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   fleet-promotion:
     name: Authorize fleet deployment state
@@ -238,6 +252,16 @@ jobs:
           permission-actions: read
           permission-contents: read
           permission-pull-requests: read
+      - name: Reset workspace git state (self-hosted)
+        if: runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          # Fixed runners reuse one workspace; a sparse checkout left by a merge_group gate job hides
+          # .github/scripts and .github/actions from the next full checkout (Production Controller 40893280985).
+          if [[ -d .git ]]; then
+            git sparse-checkout disable 2>/dev/null || true
+            rm -f .git/info/sparse-checkout
+          fi
       - name: Checkout exact main policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
