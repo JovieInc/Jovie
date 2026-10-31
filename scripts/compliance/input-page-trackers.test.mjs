@@ -2,7 +2,8 @@
 // people type (signin, signup, onboarding, chat/dashboard, billing, claim,
 // waitlist, release alerts). Canon: gbrain
 // decisions/company/privacy-tracking-compliance-guidelines-2026-10-31.
-// Catches the CIPA wiretap pattern (pixel + typed phone/email) before merge.
+// The live crawl (privacy-inventory.mjs) checks the same rule in production;
+// this catches it before merge.
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -33,7 +34,7 @@ export const INPUT_ROUTE_DIRS = [
 ];
 // Every file that mounts a tracker component, with why it is allowed. Shrink
 // only: a new mount fails until it is justified here and in
-
+// canon/privacy/tracker-registry.json.
 const KNOWN_MOUNTS = {
   'apps/web/app/layout.tsx':
     'GoogleAnalytics is inactive (no measurement ID). InstantlyPixel is route-allowlisted and returns null. Activating GA needs an input-route exclusion first.',
