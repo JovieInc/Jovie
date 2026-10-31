@@ -2,7 +2,9 @@
  * The research router: cache → local (gbrain, repo) → credits/free → paid,
  * judged after every tier so we stop as soon as the evidence is good enough.
  */
+
 import { extractUrls, inferFreshness, queryKey } from './normalize.ts';
+import { verifyResearchResult } from './outcome.ts';
 import type { ResearchState } from './state.ts';
 import {
   type Freshness,
@@ -131,14 +133,14 @@ export function createRouter(deps: RouterDeps) {
       run: { source: name, tier, ok: false, hits: 0, ms: 0, usd: 0, skipped },
       hits: [],
     });
-    if (!impl || !spec) return skip('not configured');
-    if (!(await impl.available())) return skip('no credential');
-    const estimate = spec.usdPerCall ?? 0;
-    if (spec.caps) {
-      const blocked = await deps.state.reserve(name, spec.caps, estimate);
-      if (blocked) return skip(`cap ${blocked}`);
-    }
     try {
+      if (!impl || !spec) return skip('not configured');
+      if (!(await impl.available())) return skip('no credential');
+      const estimate = spec.usdPerCall ?? 0;
+      if (spec.caps) {
+        const blocked = await deps.state.reserve(name, spec.caps, estimate);
+        if (blocked) return skip(`cap ${blocked}`);
+      }
       const out = await impl.run(call);
       if (!out) return skip('not applicable');
       const usd = out.usd ?? estimate;
@@ -163,7 +165,7 @@ export function createRouter(deps: RouterDeps) {
           ok: false,
           hits: 0,
           ms: now() - started,
-          usd: estimate,
+          usd: spec?.usdPerCall ?? 0,
           error: (error as Error).message.slice(0, 160),
         },
         hits: [],
@@ -230,7 +232,7 @@ export function createRouter(deps: RouterDeps) {
 
     const usd = runs.reduce((s, r) => s + r.usd, 0) + judgeTotals.usd;
     const ttl = config.freshnessTtlMs[freshness];
-    return {
+    return verifyResearchResult({
       schema: 'jovie-research-result/v1',
       query: req.query,
       key,
@@ -250,7 +252,7 @@ export function createRouter(deps: RouterDeps) {
       ms: now() - started,
       answer,
       priorDecisions: await priorPromise,
-    };
+    });
   }
 
   async function research(req: ResearchRequest): Promise<ResearchResult> {
@@ -258,7 +260,8 @@ export function createRouter(deps: RouterDeps) {
     const freshness = req.freshness ?? inferFreshness(req.query);
     const mode = req.mode ?? 'standard';
     const key = queryKey(req.query, freshness, mode, req.social);
-    const finish = async (result: ResearchResult) => {
+    const finish = async (input: ResearchResult) => {
+      const result = verifyResearchResult(input);
       await deps.state.log({
         event: 'research',
         key,
@@ -270,6 +273,8 @@ export function createRouter(deps: RouterDeps) {
         usd: result.cache === 'miss' ? result.usd : 0,
         ms: now() - started,
         hits: result.hits.length,
+        verdict: result.verdict,
+        reasons: result.reasons,
         sources: result.runs.filter(r => r.ok).map(r => r.source),
       });
       return result;
@@ -277,15 +282,17 @@ export function createRouter(deps: RouterDeps) {
 
     if (!req.refresh) {
       const local = await deps.state.getCached(key);
-      if (local) return finish({ ...local, cache: 'local' });
+      if (local && verifyResearchResult(local).verdict === 'ok')
+        return finish({ ...local, cache: 'local' });
       const similar = await deps.state.findSimilar(req.query, {
         freshness,
         mode,
         social: req.social ?? false,
       });
-      if (similar) return finish({ ...similar, cache: 'similar' });
+      if (similar && verifyResearchResult(similar).verdict === 'ok')
+        return finish({ ...similar, cache: 'similar' });
       const persisted = await deps.loadPersisted?.(key).catch(() => null);
-      if (persisted) {
+      if (persisted && verifyResearchResult(persisted).verdict === 'ok') {
         await deps.state.putCached(persisted);
         return finish({ ...persisted, cache: 'gbrain' });
       }
@@ -307,6 +314,7 @@ export function createRouter(deps: RouterDeps) {
       try {
         let result = await execute(req, key, freshness, mode);
         if (
+          result.verdict === 'ok' &&
           req.persist !== false &&
           result.stoppedAtTier > 0 &&
           result.hits.length > 0 &&
@@ -317,6 +325,8 @@ export function createRouter(deps: RouterDeps) {
             .catch(() => undefined);
           if (slug) result = { ...result, gbrainSlug: slug };
         }
+        // Publish failed outcomes too so cross-process waiters do not time out.
+        // Ordinary cache reads above reject them and retry the providers.
         await deps.state.putCached(result);
         return result;
       } finally {
