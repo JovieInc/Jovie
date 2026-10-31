@@ -69,6 +69,7 @@ export function HeaderSearchSurfaceFromContext({
         className
       )}
       aria-label={calm ? 'Search chats in Jovie' : 'Search Jovie'}
+      aria-keyshortcuts='Meta+K'
     >
       <Icon
         name='Search'
@@ -81,14 +82,17 @@ export function HeaderSearchSurfaceFromContext({
           <span className='min-w-0 flex-1 truncate'>
             {calm ? 'Search chats' : 'Search'}
           </span>
-          {/* Decorative shortcut glyph: the text is excluded from the a11y
-              tree (aria-hidden lives on the inner span because kbd itself is
-              focusable) so the trigger's visible text stays contained in its
-              accessible name (WCAG 2.5.3 Label in Name; axe
-              label-content-name-mismatch). */}
-          <kbd className='shrink-0 text-2xs text-tertiary-token'>
-            <span aria-hidden='true'>⌘K</span>
-          </kbd>
+          {/* The shortcut hint glyph renders as CSS-generated content (see
+              system-b-shell-search-trigger-kbd), never as a DOM text node:
+              axe's visible-text pass for WCAG 2.5.3 Label in Name
+              (label-content-name-mismatch) reads DOM text only, and
+              aria-hidden does NOT exclude text from that pass (verified
+              against axe-core 4.14 in Chromium). The shortcut stays
+              programmatic for AT via aria-keyshortcuts on the trigger. */}
+          <kbd
+            data-shortcut-glyph='⌘K'
+            className='system-b-shell-search-trigger-kbd shrink-0 text-2xs text-tertiary-token'
+          />
         </>
       )}
     </button>
