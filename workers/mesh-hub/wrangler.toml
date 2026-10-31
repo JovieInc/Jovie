@@ -18,6 +18,10 @@ class_name = "Registry"
 tag = "v1"
 new_sqlite_classes = ["Mailbox", "Registry"]
 
+# Hub model executor (failover for kinds with no live reader). Workers AI binding: no secret.
+[ai]
+binding = "AI"
+
 [observability]
 enabled = true
 
@@ -26,6 +30,9 @@ enabled = true
 #   SUMMER_HUB_WEBHOOK_SECRET  HMAC for pushes to Summer (optional until Summer consumes the hub)
 
 [vars]
+# Kinds the hub answers (read-only, Workers AI) when no real reader handled their mail within the grace.
+EXECUTOR_KINDS = "codex,grokbot,chloe,lola,muse,dots,stella,instinct,devin,aeon"
+EXECUTOR_GRACE_MS = "20000"
 # summer-config #387: Summer consumes hub pushes here (HMAC with SUMMER_HUB_WEBHOOK_SECRET).
 SUMMER_HUB_WEBHOOK_URL = "https://summer.jov.ie/summer/v1/mesh/hub"
 

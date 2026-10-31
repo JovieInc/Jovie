@@ -9,6 +9,15 @@ import {
   sha256Hex,
 } from './core.ts';
 import type { Env } from './env.ts';
+import {
+  allowedUrls,
+  buildPrompt,
+  executorKinds,
+  fetchEvidence,
+  isExecutable,
+  runModel,
+  validateReply,
+} from './executor.ts';
 import { backoffFor, isOpen, Outbox, type RecipientStatus } from './outbox.ts';
 
 const SWEEP_MS = 5 * 60_000;
@@ -83,6 +92,8 @@ export class Mailbox extends DurableObject<Env> {
       this.push();
       for (const wake of this.waiters) wake();
       if (this.isWebhookTarget()) this.outbox.schedule('webhook', Date.now());
+      if (this.isExecutorTarget(envelope))
+        this.outbox.schedule('exec', Date.now() + this.graceMs());
       this.outbox.schedule('sweep', Date.now() + SWEEP_MS);
       await this.arm();
     }
@@ -270,6 +281,98 @@ export class Mailbox extends DurableObject<Env> {
     }
   }
 
+  private graceMs(): number {
+    return Math.max(0, Number(this.env.EXECUTOR_GRACE_MS ?? 20_000));
+  }
+
+  private isExecutorTarget(envelope: Envelope): boolean {
+    const kind = this.config()?.kind;
+    return Boolean(
+      kind &&
+        this.env.AI &&
+        executorKinds(this.env.EXECUTOR_KINDS).has(kind) &&
+        isExecutable({ ...envelope, to: kind })
+    );
+  }
+
+  /**
+   * Failover: a message no real reader handled within the grace window is run
+   * read-only through Workers AI and answered as "hub executor". Validated before
+   * sending; failures are retried (3 attempts) then alarmed through the registry.
+   */
+  private async runExecutor(now: number) {
+    const config = this.config();
+    if (!config || !this.env.AI) return;
+    const batch = this.store.claimForExecutor(now, this.graceMs(), 120_000, 3);
+    const registry = this.env.REGISTRY.get(
+      this.env.REGISTRY.idFromName('registry')
+    );
+    for (const message of batch) {
+      if (!isExecutable({ ...message, to: config.kind })) {
+        this.store.ack([message.id], Date.now());
+        continue;
+      }
+      const attemptKey = `execAttempts:${message.id}`;
+      const attempts = Number(this.store.getMeta(attemptKey) ?? 0) + 1;
+      this.store.setMeta(attemptKey, String(attempts));
+      let reply: string | null = null;
+      try {
+        const evidence = await fetchEvidence(allowedUrls(message.body));
+        reply = await runModel(
+          this.env.AI,
+          buildPrompt(config.kind, message.from, message.body, evidence)
+        );
+      } catch {
+        reply = null;
+      }
+      reply = validateReply(reply);
+      if (!reply) {
+        if (attempts >= 3) {
+          this.store.ack([message.id], Date.now());
+          await registry.recordEvent('executor.failed', config.kind, {
+            id: message.id,
+            from: message.from,
+            attempts,
+          });
+        } else this.outbox.schedule('exec', Date.now() + 30_000 * attempts);
+        continue;
+      }
+      const body =
+        `[hub-executor:workers-ai for ${config.kind}] ${reply}`.slice(0, 3_900);
+      const correlationId =
+        `reply-${config.kind}-${message.correlationId}`.slice(0, 120);
+      const envelope: Envelope = {
+        id: `${config.kind}:${correlationId}`,
+        from: config.kind,
+        to: message.from,
+        correlationId,
+        sha256: await sha256Hex(body),
+        body,
+        refs: message.refs,
+        inReplyTo: message.id,
+        sentAt: null,
+        acceptedAt: Date.now(),
+        kind: 'message',
+      };
+      try {
+        const stub = this.env.MAILBOX.get(
+          this.env.MAILBOX.idFromName(message.from)
+        );
+        const sent = await stub.enqueue(envelope);
+        if (sent.ok || sent.status === 409) {
+          this.store.ack([message.id], Date.now());
+          await registry.recordEvent('executor.handled', config.kind, {
+            id: message.id,
+            ms: Date.now() - message.acceptedAt,
+          });
+        }
+      } catch {
+        this.outbox.schedule('exec', Date.now() + 30_000);
+      }
+    }
+    if (batch.length === 3) this.outbox.schedule('exec', Date.now() + 1_000);
+  }
+
   private isWebhookTarget(): boolean {
     return (
       this.config()?.kind === 'summer' &&
@@ -288,6 +391,7 @@ export class Mailbox extends DurableObject<Env> {
         for (const intent of this.outbox.open()) await this.fanOut(intent.id);
       if (due.includes('sweep')) await this.sweep(now);
       if (due.includes('webhook')) await this.pushWebhook(now);
+      if (due.includes('exec')) await this.runExecutor(now);
     } finally {
       // Re-arm before returning so a failing task can never stop the timers.
       await this.arm();
