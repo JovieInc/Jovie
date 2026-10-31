@@ -1,0 +1,100 @@
+{
+  "schema": "company.public-app-cert/v1",
+  "app": "jovie-web",
+  "stage": "public",
+  "dataClass": "standard",
+  "policy": "JovieInc/ci canon/PUBLIC-APP-CERTIFICATION.md (applies in full; this file is the app config)",
+  "goldenPath": {
+    "stages": [
+      {
+        "id": "homepage",
+        "kind": "entry",
+        "surface": "web",
+        "oracle": "A first-time visitor understands what Jovie does for them and sees what the paid plan adds over Free; one working next step."
+      },
+      {
+        "id": "claim",
+        "kind": "signup",
+        "surface": "web",
+        "oracle": "The canary signs up with email OTP and is signed in as itself; no waitlist wall, invite error or blank Restoring screen."
+      },
+      {
+        "id": "artist",
+        "kind": "onboarding",
+        "surface": "web",
+        "oracle": "Onboarding finds the canary's stand-in artist and shows that artist's real releases, not a placeholder; the handle chosen is the handle kept."
+      },
+      {
+        "id": "profile-live",
+        "kind": "first-value",
+        "surface": "web",
+        "oracle": "The canary's public profile is live with real releases and smart links that resolve; AI replies answer the question asked (no quota wall or error body)."
+      },
+      {
+        "id": "checkout",
+        "kind": "paid-conversion",
+        "surface": "web",
+        "oracle": "Upgrade shows the live Artist Presence price and trial, Stripe test-mode checkout completes, and the paid capabilities unlock for the canary."
+      }
+    ],
+    "flows": { "web": "scripts/golden-path-walk/flow-new-user.mjs" },
+    "accounts": {
+      "policy": "canary-only",
+      "source": "prodcert canary identities (apps/web/lib/synthetic/prodcert-identities.ts); OTP read for that address only",
+      "emailPattern": "^browse-ready\\+(?:clerk_test|synthetic-prodcert-[a-z\\d]{6,24})@jov\\.ie$"
+    }
+  },
+  "paidOutcome": {
+    "plan": "Artist Presence",
+    "price": 12,
+    "currency": "USD",
+    "interval": "month",
+    "trialDays": 14,
+    "priceSource": "apps/web/lib/config/plan-prices.ts",
+    "pricePattern": "monthlyUsd:\\s*([0-9.]+)",
+    "freeAlternative": "Jovie Free (profile, smart links, release pages, fan capture) or a free link-in-bio"
+  },
+  "buyer": {
+    "personas": "canon/certification/jovie-web-personas.json",
+    "calibration": "canon/certification/jovie-web-calibration.json",
+    "privatePersonaDir": "~/.local/state/jovie-buyer-eval/personas"
+  },
+  "privacy": {
+    "profile": "standard",
+    "registry": "canon/certification/jovie-web-tracker-registry.json",
+    "policyUrl": "https://jov.ie/legal/privacy",
+    "counselSignoff": null,
+    "crawl": [
+      { "url": "https://jov.ie/", "input": false },
+      { "url": "https://jov.ie/signin", "input": true },
+      { "url": "https://jov.ie/signup", "input": true },
+      { "url": "https://jov.ie/legal/privacy", "input": false }
+    ]
+  },
+  "customerVoice": {
+    "approval": "tim",
+    "sink": "SUMMER_BASE_URL",
+    "channels": [
+      {
+        "id": "support-email",
+        "kind": "email",
+        "route": "apps/web/app/api/webhooks/resend-inbound (support@, help@, team@, contact@) -> lib/customer-voice -> Summer",
+        "status": "pending"
+      },
+      {
+        "id": "onboarding-chat",
+        "kind": "chat",
+        "route": "apps/web/app/api/chat/onboarding-handler.ts feedback-shaped turns -> lib/customer-voice",
+        "status": "pending"
+      },
+      {
+        "id": "dashboard-feedback",
+        "kind": "in-app-feedback",
+        "route": "apps/web/lib/feedback.ts -> lib/customer-voice",
+        "status": "pending"
+      }
+    ]
+  },
+  "waste": { "appId": "jovie" },
+  "capacity": { "appId": "jovie" }
+}

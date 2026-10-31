@@ -1,0 +1,7 @@
+{
+  "schema": "company.tracker-registry/v1",
+  "canon": "gbrain decisions/company/privacy-tracking-compliance-guidelines-2026-10-31; JovieInc/ci canon/PUBLIC-APP-CERTIFICATION.md",
+  "first_party_domains": ["TODO: example.com"],
+  "notes": "Every third party a page or app loads needs an entry with a category and rationale before it ships. Categories: pixel, analytics, replay, chat-widget, ads, processor, content.",
+  "vendors": []
+}
