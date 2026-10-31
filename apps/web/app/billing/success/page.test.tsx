@@ -314,12 +314,12 @@ describe('CheckoutSuccessPage — CTAs and verification', () => {
     searchParamsMock.mockReturnValue(new URLSearchParams());
   });
 
-  it('primary Pro CTA routes to the Identity workspace', () => {
+  it('primary Pro CTA lands in the guided first-use conversation', () => {
     mockBilling('pro');
     render(<CheckoutSuccessPage />);
     expect(
-      screen.getByRole('link', { name: /open identity/i })
-    ).toHaveAttribute('href', '/app/presence');
+      screen.getByRole('link', { name: /start your first task/i })
+    ).toHaveAttribute('href', '/app/chat?from=onboarding');
   });
 
   it('sends a buyer who paid before claiming a link on to claim it', async () => {
@@ -334,7 +334,7 @@ describe('CheckoutSuccessPage — CTAs and verification', () => {
       await screen.findByRole('link', { name: /claim your link/i })
     ).toHaveAttribute('href', '/start');
     expect(
-      screen.queryByRole('link', { name: /open identity/i })
+      screen.queryByRole('link', { name: /start your first task/i })
     ).not.toBeInTheDocument();
   });
 
@@ -346,13 +346,13 @@ describe('CheckoutSuccessPage — CTAs and verification', () => {
     ).toHaveAttribute('href', '/app/releases');
   });
 
-  it('hides the secondary CTA on onboarding flow and shows "Explore your dashboard"', () => {
+  it('hides the secondary CTA on onboarding flow and lands in the guided first use', () => {
     setSearchParams('source=onboarding');
     mockBilling('pro');
     render(<CheckoutSuccessPage />);
     expect(
-      screen.getByRole('link', { name: /explore your dashboard/i })
-    ).toHaveAttribute('href', '/app');
+      screen.getByRole('link', { name: /start your first task/i })
+    ).toHaveAttribute('href', '/app/chat?from=onboarding');
     expect(
       screen.queryByRole('link', { name: /view your releases/i })
     ).not.toBeInTheDocument();

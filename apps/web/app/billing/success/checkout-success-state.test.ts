@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  GUIDED_FIRST_USE_ROUTE,
   getPaidSuccessPrimaryHref,
   getPaidSuccessPrimaryLabel,
   resolveCheckoutSuccessView,
@@ -37,7 +38,7 @@ describe('resolveCheckoutSuccessView', () => {
     ).toMatchObject({ kind: 'success', plan: 'pro' });
     expect(
       getPaidSuccessPrimaryHref({ plan: 'pro', isOnboardingUpgrade: false })
-    ).toBe(APP_ROUTES.PRESENCE);
+    ).toBe(GUIDED_FIRST_USE_ROUTE);
   });
 
   it('routes a paid buyer without a claimed profile to claim a link', () => {
@@ -48,5 +49,17 @@ describe('resolveCheckoutSuccessView', () => {
     };
     expect(getPaidSuccessPrimaryHref(input)).toBe(APP_ROUTES.START);
     expect(getPaidSuccessPrimaryLabel(input)).toBe('Claim your link');
+  });
+
+  it('lands every profile-ready paid buyer in the guided first use (JOV-9957)', () => {
+    for (const isOnboardingUpgrade of [false, true]) {
+      for (const plan of ['pro', 'trial', 'max'] as const) {
+        const input = { plan, isOnboardingUpgrade, needsProfile: false };
+        expect(getPaidSuccessPrimaryHref(input)).toBe(
+          `${APP_ROUTES.CHAT}?from=onboarding`
+        );
+        expect(getPaidSuccessPrimaryLabel(input)).toBe('Start your first task');
+      }
+    }
   });
 });

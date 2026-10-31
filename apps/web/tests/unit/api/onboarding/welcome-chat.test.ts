@@ -4,18 +4,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   mockBuildWelcomeMessage,
   mockCaptureError,
+  mockCookies,
   mockGetSessionContext,
   mockGetSessionErrorResponse,
   mockGetCurrentOnboardingSessionId,
+  mockRecordArtistOfferStage,
   mockWithDbSessionTx,
   mockGetAppFlagValue,
   mockSeedOnboardingPresenceBuild,
 } = vi.hoisted(() => ({
   mockBuildWelcomeMessage: vi.fn(),
   mockCaptureError: vi.fn(),
+  mockCookies: vi.fn(),
   mockGetSessionContext: vi.fn(),
   mockGetSessionErrorResponse: vi.fn(),
   mockGetCurrentOnboardingSessionId: vi.fn(),
+  mockRecordArtistOfferStage: vi.fn(),
   mockWithDbSessionTx: vi.fn(),
   mockGetAppFlagValue: vi.fn(),
   mockSeedOnboardingPresenceBuild: vi.fn(),
@@ -24,6 +28,14 @@ const {
 vi.mock('@/lib/auth/session', () => ({
   getSessionContext: mockGetSessionContext,
   withDbSessionTx: mockWithDbSessionTx,
+}));
+
+vi.mock('next/headers', () => ({
+  cookies: mockCookies,
+}));
+
+vi.mock('@/lib/acquisition/artist-offer-funnel.server', () => ({
+  recordArtistOfferStage: mockRecordArtistOfferStage,
 }));
 
 vi.mock('@/lib/services/onboarding/welcome-message', () => ({
@@ -110,6 +122,8 @@ function createTransaction(selectResults: unknown[] = []) {
 describe('POST /api/onboarding/welcome-chat', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockCookies.mockResolvedValue({ get: () => undefined });
+    mockRecordArtistOfferStage.mockResolvedValue(true);
     mockGetSessionContext.mockResolvedValue({
       user: { id: 'db_user_123', clerkId: 'clerk_user_123' },
       profile: { id: 'profile_123' },
@@ -244,6 +258,46 @@ describe('POST /api/onboarding/welcome-chat', () => {
       conversationId: 'conv_new',
       messageId: 'msg_welcome',
     });
+  });
+
+  it('records the JOV-9957 first-use-started stage, journey-keyed (JOV-9957)', async () => {
+    const journey = '3f2e1d0c-0b0a-4901-8203-040506070809';
+    mockCookies.mockResolvedValue({
+      get: (name: string) =>
+        name === 'jv_acquisition_id' ? { value: journey } : undefined,
+    });
+    const tx = createTransaction([
+      [],
+      [],
+      [{ value: 0 }],
+      [{ value: 0 }],
+      [{ value: 0 }],
+      [{ value: 0 }],
+      [
+        {
+          careerHighlights: null,
+          displayName: 'Artist',
+          spotifyId: null,
+          spotifyUrl: null,
+          username: 'artist',
+        },
+      ],
+    ]);
+    mockWithDbSessionTx.mockImplementationOnce(async callback => callback(tx));
+
+    const { POST } = await import('@/app/api/onboarding/welcome-chat/route');
+    const response = await POST(
+      new Request('http://localhost/api/onboarding/welcome-chat', {
+        method: 'POST',
+        body: JSON.stringify({}),
+      })
+    );
+
+    expect(response.status).toBe(201);
+    expect(mockRecordArtistOfferStage).toHaveBeenCalledWith(
+      journey,
+      'first-use-started'
+    );
   });
 
   it('skips presence-build seed when the kill-switch flag is off', async () => {

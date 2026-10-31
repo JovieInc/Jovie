@@ -70,6 +70,39 @@ export async function recordArtistOfferStage(
   }
 }
 
+/**
+ * JOV-9957 (golden-path-delight/v1): record that the journey's first guided
+ * use finished — its first completed agent turn after entering the welcome
+ * conversation. Gated on `first-use-started` so completion only ever lands
+ * on a journey that actually entered the guided first use; the
+ * `ON CONFLICT DO NOTHING` keeps it once per journey. Measurement only: it
+ * never throws and never blocks the turn that calls it.
+ */
+export async function recordFirstUseComplete(
+  acquisitionId: string | null | undefined,
+  occurredAt: Date = new Date()
+): Promise<boolean> {
+  if (!isAcquisitionJourneyId(acquisitionId)) return false;
+
+  try {
+    await db.execute(drizzleSql`
+      INSERT INTO acquisition_journey_stages (acquisition_id, stage, occurred_at)
+      SELECT s.acquisition_id, 'first-use-complete', ${occurredAt}
+      FROM acquisition_journey_stages s
+      WHERE s.acquisition_id = ${acquisitionId}::uuid
+        AND s.stage = 'first-use-started'
+      ON CONFLICT (acquisition_id, stage) DO NOTHING
+    `);
+    return true;
+  } catch (error) {
+    await captureError('Failed to record artist-offer funnel stage', error, {
+      route: 'lib/acquisition/artist-offer-funnel.server',
+      contextData: { stage: 'first-use-complete' },
+    });
+    return false;
+  }
+}
+
 interface TimelineRow extends Record<string, unknown> {
   readonly visit: string | Date | null;
   readonly sign_in: string | Date | null;
@@ -141,6 +174,8 @@ export async function getArtistOfferFunnelReport(input?: {
     'catalog-preview': toDate(row.stages?.['catalog-preview']),
     claimed: toDate(row.stages?.claimed),
     'upgrade-viewed': toDate(row.stages?.['upgrade-viewed']),
+    'first-use-started': toDate(row.stages?.['first-use-started']),
+    'first-use-complete': toDate(row.stages?.['first-use-complete']),
   }));
 
   const diagnostics = await getFunnelDiagnostics(start, end);
