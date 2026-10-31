@@ -28,4 +28,7 @@ Read in this order:
    its derived surfaces; generated from `sources-of-truth.json`. Find the owner before
    adding a fact; derive, never copy.
 
+14. [`MERGE_QUEUE_STEWARD.md`](./MERGE_QUEUE_STEWARD.md) — merge-queue steward playbook: targets, proven-culprit
+   triage, flake handling and failure-class guards. Mechanics stay in `.github/MERGE_QUEUE.md`.
+
 Operational files (`CLAUDE.md`, `.claude/rules/*`, `docs/*`, skills, scripts, workflows) implement this canon. If they conflict, update the lower-level file or escalate to Tim.
