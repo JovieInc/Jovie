@@ -27,6 +27,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
@@ -43,6 +44,26 @@ DEFAULT_MODEL = "grok-4.7-build-fast"
 TIMEOUT_S = 240
 TWITTER_EPOCH_MS = 1288834974657
 MAX_SKEW_MS = 36 * 3600 * 1000
+# The CLI has no allowlist for its server-side X tools: `--tools` only names local built-ins, and an X tool name
+# there "names no tool" and is ignored, leaving every local tool live (probed on grok 1.0.67, 2026-10-31). Post text
+# is attacker-authored, so the session must not hold shell, file, fetch or agent tools. We remove every local
+# built-in, deny the dangerous ones again as permission rules, turn off web search and subagents, and run in an
+# empty temporary directory. What remains is x_user_search, x_semantic_search, x_keyword_search, x_thread_fetch.
+LOCAL_TOOLS = ("run_terminal_command", "read_file", "search_replace", "write", "list_dir", "grep", "web_fetch",
+               "kill_command_or_subagent", "todo_write", "get_command_or_subagent_output", "spawn_subagent",
+               "scheduler_create", "scheduler_delete", "scheduler_list", "monitor", "search_tool", "use_tool",
+               "workflow", "enter_plan_mode", "exit_plan_mode", "ask_user_question", "send_feedback", "image_gen",
+               "image_edit", "image_to_video", "reference_to_video")
+DENY_RULES = ("mcp__*", "run_terminal_command", "write", "search_replace", "read_file", "web_fetch", "use_tool")
+
+
+def sandbox_args() -> list[str]:
+    args = ["--disallowed-tools", ",".join(LOCAL_TOOLS), "--disable-web-search", "--no-subagents"]
+    for rule in DENY_RULES:
+        args += ["--deny", rule]
+    return args
+
+
 POST_SCHEMA = {
     "type": "object", "required": ["posts"],
     "properties": {"posts": {"type": "array", "items": {
@@ -81,11 +102,12 @@ def build_prompt(accounts: list[str], queries: list[str], since: str, limit: int
 
 
 def default_run(argv: list[str], env: dict, timeout_s: int = TIMEOUT_S) -> tuple[int, str, str]:
-    try:
-        proc = subprocess.run(argv, env=env, capture_output=True, text=True, timeout=timeout_s,
-                              stdin=subprocess.DEVNULL, cwd=env.get("SIGNALS_GROK_CWD") or None)
-    except (OSError, subprocess.TimeoutExpired) as error:
-        return 124, "", f"{type(error).__name__}: {error}"
+    with tempfile.TemporaryDirectory(prefix="grok-x-") as empty:  # no repo or state files within reach
+        try:
+            proc = subprocess.run(argv, env=env, capture_output=True, text=True, timeout=timeout_s,
+                                  stdin=subprocess.DEVNULL, cwd=env.get("SIGNALS_GROK_CWD") or empty)
+        except (OSError, subprocess.TimeoutExpired) as error:
+            return 124, "", f"{type(error).__name__}: {error}"
     return proc.returncode, proc.stdout, proc.stderr
 
 
@@ -154,7 +176,7 @@ def search_posts(accounts: list[str], queries: list[str], since: str, *, env=Non
         log(json.dumps({"provider": PROVIDER, "deferred": decision.get("reason")}))
         return {"status": "deferred", "reason": decision.get("reason"), "posts": [], "costUsd": 0.0}
     binary = env.get("SIGNALS_GROK_BIN") or "grok"
-    argv = [binary, "-p", build_prompt(accounts, queries, since, limit), "--tools", "x_search", "--deny", "mcp__*",
+    argv = [binary, "-p", build_prompt(accounts, queries, since, limit), *sandbox_args(),
             "--max-turns", "4", "-m", env.get("SIGNALS_GROK_MODEL") or DEFAULT_MODEL,
             "--json-schema", json.dumps(POST_SCHEMA), "--no-auto-update"]
     code, stdout, stderr = run(argv, env)

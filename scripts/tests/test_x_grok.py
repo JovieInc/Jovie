@@ -68,8 +68,13 @@ class SearchPostsTests(unittest.TestCase):
         out = X.search_posts(["AnthropicAI"], [], "2026-10-19", env={}, run=run, store=store, now=Clock())
         self.assertEqual((out["status"], len(out["posts"]), out["costUsd"]), ("ok", 1, 0.07))
         argv = seen[0]
-        self.assertEqual(argv[argv.index("--tools") + 1], "x_search")
-        self.assertEqual(argv[argv.index("--deny") + 1], "mcp__*")
+        self.assertNotIn("--tools", argv)  # --tools cannot name server-side X tools; it would leave local tools live
+        removed = set(argv[argv.index("--disallowed-tools") + 1].split(","))
+        self.assertTrue({"run_terminal_command", "write", "search_replace", "read_file", "web_fetch"} <= removed)
+        denied = {argv[i + 1] for i, arg in enumerate(argv) if arg == "--deny"}
+        self.assertTrue({"mcp__*", "run_terminal_command", "write"} <= denied)
+        self.assertIn("--disable-web-search", argv)
+        self.assertIn("--no-subagents", argv)
         ledger = store.transact(X.PROVIDER, lambda led: json.loads(json.dumps(led)))
         self.assertIn(X.CREDENTIAL, json.dumps(ledger))
 
