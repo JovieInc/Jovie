@@ -329,8 +329,31 @@ export function resolvePreviewArtist(
     };
   }
   if (state.artist) return state.artist;
-  if (!state.handle || state.socialLinks.length === 0) return null;
+  // Pen R6As7U: the draft profile is present as soon as a handle is known,
+  // before any artist or link is attached.
+  if (!state.handle) return null;
   return { id: `handle-${state.handle}`, name: state.handle, url: '' };
+}
+
+/**
+ * Pen R6As7U `SDt0M`: names the panel so the phone reads as the visitor's own
+ * draft. Pen sets the eyebrow in its canonical uppercase eyebrow style.
+ */
+function OnboardingDraftProfileHeader() {
+  return (
+    <header
+      className='system-b-onboarding-draft-header'
+      data-testid='onboarding-draft-profile-header'
+    >
+      <p className='system-b-onboarding-draft-eyebrow'>
+        Your profile, taking shape
+      </p>
+      <h2 className='system-b-onboarding-draft-title'>Your Draft Profile</h2>
+      <p className='system-b-onboarding-draft-lead'>
+        A first version from your link. Shape it as we talk.
+      </p>
+    </header>
+  );
 }
 
 export function OnboardingProfileRail({
@@ -419,6 +442,7 @@ export function OnboardingProfileRail({
         )}
       >
         <div className='flex min-h-0 w-full flex-col items-center'>
+          {isInline ? null : <OnboardingDraftProfileHeader />}
           <ProfilePreviewBento
             phoneContent={
               draft?.activeRole && draft.activeRole !== 'artist' && source ? (

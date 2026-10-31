@@ -65,6 +65,38 @@
   padding-bottom: var(--space-5);
 }
 
+/* Draft profile panel header (Pen R6As7U · SDt0M). */
+:where(.system-b-onboarding-draft-header) {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-4);
+}
+
+:where(.system-b-onboarding-draft-eyebrow) {
+  color: var(--color-text-secondary-token);
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+:where(.system-b-onboarding-draft-title) {
+  color: var(--color-text-primary-token);
+  font-size: var(--text-3xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.016em;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+
+:where(.system-b-onboarding-draft-lead) {
+  color: var(--color-text-secondary-token);
+  font-size: var(--text-app);
+  line-height: 1.4;
+}
+
 :where(.system-b-onboarding-empty-state) {
   border-bottom: 1px solid
     color-mix(in oklab, var(--system-b-app-frame-seam) 58%, transparent);
