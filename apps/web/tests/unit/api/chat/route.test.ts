@@ -16,6 +16,7 @@ import {
   disableSummerTransport,
   resetSummerTransportRuntime,
 } from '@/lib/ovie/summer-transport';
+import { PRODCERT_CHAT_HEALTH_CANARY_EMAIL } from '@/lib/synthetic/prodcert-identities';
 
 const hoisted = vi.hoisted(() => ({
   tryHandleAnonymousOnboardingChatMock: vi.fn(),
@@ -450,9 +451,9 @@ describe('POST /api/chat guard wiring', () => {
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
   });
 
-  it('passes skipWeeklyQuota for the canary identity and never bypasses the limiter (JOV-9625)', async () => {
+  it('passes skipWeeklyQuota for the chat-health canary and never bypasses the limiter (JOV-9625)', async () => {
     hoisted.resolveChatAccountContextMock.mockResolvedValue(
-      makeAccountContext({ email: 'browse-ready+clerk_test@jov.ie' })
+      makeAccountContext({ email: PRODCERT_CHAT_HEALTH_CANARY_EMAIL })
     );
     hoisted.checkAiChatRateLimitForPlanMock.mockResolvedValue({
       success: true,
@@ -477,6 +478,28 @@ describe('POST /api/chat guard wiring', () => {
     expect(response.status).not.toBe(429);
     const body = await response.json().catch(() => null);
     expect(body?.errorCode).not.toBe('RATE_LIMITED');
+  });
+
+  it('keeps the returning canary metered: no weekly skip (JOV-9625)', async () => {
+    hoisted.resolveChatAccountContextMock.mockResolvedValue(
+      makeAccountContext({ email: 'browse-ready+clerk_test@jov.ie' })
+    );
+    hoisted.checkAiChatRateLimitForPlanMock.mockResolvedValue({
+      success: true,
+      limit: 30,
+      remaining: 29,
+      reset: new Date(Date.now() + 60_000),
+    });
+
+    await POST(chatRequest(validBody()));
+
+    // Only the dedicated chat-health canary skips the weekly quota; the
+    // golden-path-walk identity stays metered (#23703).
+    expect(hoisted.checkAiChatRateLimitForPlanMock).toHaveBeenCalledWith(
+      '00000000-0000-4000-8000-000000000123',
+      'pro',
+      { skipWeeklyQuota: false }
+    );
   });
 
   it('does not request the weekly skip for a non-canary identity (JOV-9625)', async () => {
