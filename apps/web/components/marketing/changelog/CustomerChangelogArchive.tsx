@@ -448,7 +448,10 @@ function ArchiveJumpNav({
                     {formatCustomerChangelogDate(entry.date)}
                   </span>
                   <span className='changelog-archive-nav__link-title'>
-                    <NoOrphanText>{entry.title}</NoOrphanText>
+                    {/* One flex item: a bare fragment would split the title into gap-separated items. */}
+                    <span>
+                      <NoOrphanText>{entry.title}</NoOrphanText>
+                    </span>
                     <ArrowRight
                       aria-hidden='true'
                       size={16}
