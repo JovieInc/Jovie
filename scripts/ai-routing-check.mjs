@@ -122,9 +122,13 @@ export async function main(
   };
   const days = Number(flag('--days')) || 2;
   const routing = JSON.parse(readFileSync(ROUTING_PATH, 'utf8'));
+  // fetchRows spans start_date = today - n through tomorrow, so n days back is
+  // n + 1 calendar days. Ask for days - 1 so the per-day rate divides the
+  // window it measured (it read a stale day and over-reported by ~50%).
+  const span = Math.max(0, days - 1);
   const [keyRows, modelRows] = await Promise.all([
-    fetchRows('api_key_name', days, apiKey, fetchImpl),
-    fetchRows('model', days, apiKey, fetchImpl),
+    fetchRows('api_key_name', span, apiKey, fetchImpl),
+    fetchRows('model', span, apiKey, fetchImpl),
   ]);
   const creditsRead = await readGatewayCredits({
     token: apiKey,
