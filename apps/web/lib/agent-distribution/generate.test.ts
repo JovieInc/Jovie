@@ -82,4 +82,31 @@ describe('agent distribution packages', () => {
     expect(issues.errors.some(e => e.includes('banned word'))).toBe(true);
     expect(issues.errors.some(e => e.includes('limit 200'))).toBe(true);
   });
+
+  it('is consistent in one pass after a tool description changes', async () => {
+    const changed = tools.map((t, i) =>
+      i === 0 ? { ...t, description: `${t.description} (changed)` } : t
+    );
+    const inputs = await readReadinessInputs(join(__dirname, '../..'));
+    // The snapshot on disk still describes the old tools; one run must not care.
+    const { files } = buildDistribution(changed, LISTING, assets, inputs, null);
+    expect(files['readiness.json']).not.toContain(
+      'rendered tool list hash does not match'
+    );
+    const snapshot = JSON.parse(files['tools-list.snapshot.json']);
+    expect(snapshot.toolsListHash).toBe(hashTools(snapshot.tools));
+    // A second pass that now reads the freshly written snapshot changes
+    // nothing, i.e. `agent-distribution:check` is clean after one generate.
+    const second = buildDistribution(
+      changed,
+      LISTING,
+      assets,
+      {
+        ...inputs,
+        docs: { ...inputs.docs, snapshotTools: snapshot.tools },
+      } as typeof inputs,
+      null
+    );
+    expect(second.files).toEqual(files);
+  });
 });

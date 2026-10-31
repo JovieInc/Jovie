@@ -97,6 +97,28 @@ const body = `## Win
 
 ## Other`;
 
+test('Win evidence ignores fenced examples and failure log headings', () => {
+  const win = '## Win\n- Claim: Real measurements\n- Area: ci\n';
+  for (const fence of ['```', '~~~']) {
+    for (const newline of ['\n', '\r\n']) {
+      const log = `${fence}text\nFAIL diagnostic\n## Win\n- Claim: Example only\n## Diagnostic\n${fence}\n`;
+      const example = log.replaceAll('\n', newline);
+      assert.deepEqual(parseWinSection(example), { present: false });
+      const parsed = parseWinSection(example + win.replaceAll('\n', newline));
+      assert.equal(parsed.claim, 'Real measurements');
+      assert.equal(parsed.area, 'ci');
+      const exampleOnly = `${fence}markdown\n${body}\n${fence}\n`;
+      assert.ok(
+        requiredWinErrors({
+          title: 'fix(ci): repair evidence',
+          labels: ['compounding'],
+          body: exampleOnly,
+        }).length > 0
+      );
+    }
+  }
+});
+
 test('PR Win section parses into a ledger record', () => {
   const win = winFromPr(
     { repo: 'JovieInc/Jovie', number: 9, mergedAt: '2026-10-29T10:00:00Z' },

@@ -301,8 +301,21 @@ export function buildDistribution(
     tools: toolSummary,
   };
 
+  // Evaluate against the tools this run writes, not the snapshot on disk, so
+  // one generate pass is already consistent (no second run after a tool change).
   const platforms = readinessInputs
-    ? evaluateAll(readinessInputs, listing, toolsListHash, null)
+    ? evaluateAll(
+        {
+          ...readinessInputs,
+          docs: readinessInputs.docs && {
+            ...readinessInputs.docs,
+            snapshotTools: served,
+          },
+        },
+        listing,
+        toolsListHash,
+        null
+      )
     : null;
   const readiness = {
     _generated: provenance('readiness'),

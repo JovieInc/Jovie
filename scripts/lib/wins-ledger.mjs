@@ -157,7 +157,18 @@ export function clusters(wins, threshold = CLUSTER_THRESHOLD) {
  * "## Win" containing only "n/a" or "none" declares no win.
  */
 export function parseWinSection(body) {
-  const clean = (body ?? '').replace(/<!--[\s\S]*?-->/g, '');
+  let fenced = false;
+  const clean = (body ?? '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .split('\n')
+    .map(line => {
+      if (/^\s*(?:```|~~~)/.test(line)) {
+        fenced = !fenced;
+        return '';
+      }
+      return fenced ? '' : line;
+    })
+    .join('\n');
   const m = clean.match(
     /^#{2,3}\s*Win\s*$([\s\S]*?)(?=^#{1,3}\s|(?![\s\S]))/im
   );

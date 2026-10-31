@@ -957,18 +957,24 @@ JOB_URL = re.compile(r"^(https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\
 RED_RUN_URL = re.compile(r"https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\d*(?:/attempts/[1-9]\d*)?")
 
 
+def visible_evidence_markdown(body: str) -> str:
+    """Mask hidden comments and fenced examples, retaining source replacement offsets."""
+    visible = re.sub(r"<!--[\s\S]*?-->", lambda match: re.sub(r"[^\n]", " ", match[0]), body)
+    fenced = False
+    lines = []
+    for line in visible.splitlines(keepends=True):
+        marker = re.match(r"^\s*(?:```|~~~)", line)
+        if marker:
+            fenced = not fenced
+        lines.append(re.sub(r"[^\n]", " ", line) if marker or fenced else line)
+    return "".join(lines)
+
+
 def red_section_bounds(lines: list[str]) -> tuple[int, int] | None:
     """Match Fleet's section boundaries: headings inside code fences are log text."""
-    # Ignore hidden Markdown while retaining source line indexes for replacement.
-    visible = re.sub(r"<!--[\s\S]*?-->", lambda match: "\n" * match.group().count("\n"), "\n".join(lines))
-    fenced = False
+    visible = visible_evidence_markdown("\n".join(lines))
     start = None
     for index, line in enumerate(visible.split("\n")):
-        if re.match(r"^\s*(?:```|~~~)", line):
-            fenced = not fenced
-            continue
-        if fenced:
-            continue
         if start is None:
             if RED_HEADING.match(line.strip()):
                 start = index
@@ -1045,11 +1051,11 @@ def with_red_section(body: str, block: str) -> str:
 
 
 def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None,
-                         locking_pr: int | None = None) -> str:
+                         locking_pr: int | None = None, win_evidence: str | None = None) -> str:
     """Complete repair metadata without replacing existing evidence or customer decisions.
 
-    The caller chooses the customer outcome and supplies any locking PR provenance;
-    never infer either from a failed check. Existing locked-area decisions are preserved.
+    The caller supplies the customer outcome, locking PR provenance and measured Win;
+    never infer them from a failed check. Preserve decisions/measurements; fill empty Win templates.
     The canonical Fleet/changelog guards still validate the resulting body.
     """
     updated = body
@@ -1072,6 +1078,19 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
         visible = re.sub(r"<!--[\s\S]*?-->", "", updated)
         if not re.search(r"^#{1,6}\s+Locked areas\s*$", visible, re.I | re.M):
             updated = updated.rstrip("\n") + f"\n\n## Locked areas\n\nLocking PR: #{locking_pr}\n"
+    if win_evidence is not None:
+        if not isinstance(win_evidence, str) or not re.match(r"\A## Win\s*\n\s*\S", win_evidence):
+            raise ValueError("win evidence requires an explicit ## Win section")
+        # Retain offsets so replacing a placeholder preserves raw failure logs
+        # and hidden customer/repair decisions in the original body.
+        visible = visible_evidence_markdown(updated)
+        win = re.search(r"^#{2,3}[ \t]*Win[ \t\r]*$([\s\S]*?)(?=^#{1,3}\s|\Z)", visible, re.I | re.M)
+        if win is None:
+            updated = updated.rstrip("\n") + "\n\n" + win_evidence.rstrip("\n") + "\n"
+        elif not win[1].strip() or re.fullmatch(r"(?:-\s*)?(?:n/?a|none|not applicable)[.!]?", win[1].strip(), re.I):
+            comments = re.findall(r"<!--[\s\S]*?-->", updated[win.start():win.end()])
+            replacement = win_evidence.rstrip("\n") + "\n" + "\n".join(comments) + "\n\n"
+            updated = updated[:win.start()] + replacement + updated[win.end():]
     return updated
 
 
@@ -1086,16 +1105,18 @@ def api_gh(args, **_):
 
 
 def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_decision: dict | None = None,
-                            locking_pr: int | None = None) -> bool:
-    """Complete repair evidence and an optional caller-selected customer decision."""
+                            locking_pr: int | None = None, win_evidence: str | None = None) -> bool:
+    """Complete repair evidence and optional caller-supplied decisions/measurements."""
     if not isinstance(pr.get("number"), int) or (
-            customer_decision is None and locking_pr is None and red_before_green_block(pr, excerpt) is None):
+            customer_decision is None and locking_pr is None and win_evidence is None
+            and red_before_green_block(pr, excerpt) is None):
         return False
     viewed = sh(["pr", "view", str(pr["number"]), "--repo", REPO, "--json", "body", "--jq", ".body"])
     if viewed.returncode != 0:
         return False
     body = viewed.stdout or ""
-    updated = repair_evidence_body(pr, body, excerpt, customer_decision=customer_decision, locking_pr=locking_pr)
+    updated = repair_evidence_body(pr, body, excerpt, customer_decision=customer_decision,
+                                   locking_pr=locking_pr, win_evidence=win_evidence)
     if updated == body:
         return False
     with tempfile.TemporaryDirectory(prefix="red-before-green-") as tmp:

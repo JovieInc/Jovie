@@ -3104,6 +3104,111 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         self.assertEqual(events.repair_evidence_body(self.PR, updated,
                                                    customer_decision={"releaseWorthy": False}), updated)
 
+    def test_explicit_measured_win_repairs_compounding_metadata_and_passes_fleet(self):
+        body = events.repair_evidence_body(self.PR, "## Summary\nKeep this.",
+                                            customer_decision={"releaseWorthy": False})
+        win = ("## Win\n\n- Claim: Generation converges in one pass\n- Area: ci\n"
+               "- Theme: merge-throughput\n"
+               "- Metric: generation passes | runs | lower | 2 | 1 | regression fixture | pnpm test\n"
+               "- Verify: https://github.com/JovieInc/Jovie/pull/23665\n")
+        updated = events.repair_evidence_body(self.PR, body, win_evidence=win)
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+const bodies = JSON.parse(readFileSync(0, 'utf8'));
+console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
+  pr: {title: 'fix(agent-mcp): single pass', body, labels: ['compounding']}, files: [],
+}).errors)));
+"""], cwd=ROOT, input=json.dumps([body, updated]), text=True, capture_output=True, check=True)
+        before, after = json.loads(checked.stdout)
+        self.assertTrue(any(error.startswith("win:") for error in before), before)
+        self.assertEqual(after, [])
+        self.assertTrue(updated.startswith(body))
+        self.assertEqual(updated.count("customer-changelog/v1"), 1)
+        self.assertEqual(updated.count("## Red-before-green"), 1)
+        self.assertEqual(events.repair_evidence_body(self.PR, updated, win_evidence=win), updated)
+        self.assertEqual(events.repair_evidence_body(self.PR, updated,
+                                                   win_evidence=win.replace("2 | 1", "3 | 1")), updated)
+        crlf = updated.replace("\n", "\r\n")
+        self.assertEqual(events.repair_evidence_body(self.PR, crlf, win_evidence=win), crlf)
+        for invalid in ("", "- Claim: missing heading", 42):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                events.repair_evidence_body(self.PR, body, win_evidence=invalid)
+
+    def test_win_repair_preserves_fenced_red_logs_and_passes_fleet(self):
+        win = ("## Win\n- Claim: Generation converges in one pass\n- Area: ci\n"
+               "- Theme: merge-throughput\n"
+               "- Metric: generation passes | runs | lower | 2 | 1 | regression fixture | pnpm test\n"
+               "- Verify: https://github.com/JovieInc/Jovie/pull/23665\n")
+        bodies = []
+        for fence in ("```", "~~~"):
+            for newline in ("\n", "\r\n"):
+                for placeholder in ("", "## Win\n\n", "## Win\n- none\n"):
+                    original = ("## Red-before-green\n- Failing command: `node probe.mjs`\n"
+                                "- Failing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/41220044050\n\n"
+                                + fence + "text\nFAIL diagnostic\n## Win\n## Diagnostic\n"
+                                + fence + "\n\n## Proof\nKeep this.\n").replace("\n", newline)
+                    with self.subTest(fence=fence, newline=newline, placeholder=placeholder):
+                        body = original + placeholder.replace("\n", newline)
+                        updated = events.repair_evidence_body(self.PR, body, win_evidence=win)
+                        self.assertTrue(updated.startswith(original))
+                        self.assertTrue(updated.rstrip().endswith(win.rstrip()))
+                        self.assertEqual(events.repair_evidence_body(self.PR, updated, win_evidence=win), updated)
+                        bodies.append(updated)
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+console.log(JSON.stringify(JSON.parse(readFileSync(0, 'utf8')).map(body => evaluateFleetRules({
+  pr: {title: 'fix(ci): preserve red logs', body, labels: ['compounding']}, files: [],
+}).errors)));
+"""], cwd=ROOT, input=json.dumps(bodies), text=True, capture_output=True, check=True, timeout=15)
+        self.assertEqual(json.loads(checked.stdout), [[] for _ in bodies])
+
+    def test_ensure_writes_explicit_win_without_a_red_run(self):
+        win = "## Win\n\n- Claim: Caller supplies measurements; canonical Fleet validates them.\n"
+        written = []
+
+        def shell(args):
+            if args[:2] == ["pr", "view"]:
+                return SimpleNamespace(returncode=0, stdout="## Summary\nKeep this.")
+            written.append(Path(args[args.index("--body-file") + 1]).read_text())
+            return SimpleNamespace(returncode=0, stdout="")
+
+        self.assertTrue(events.ensure_red_before_green({"number": 23665}, sh=shell, win_evidence=win))
+        self.assertEqual(written, ["## Summary\nKeep this.\n\n" + win])
+
+    def test_win_placeholders_are_replaced_without_losing_comments_or_following_sections(self):
+        win = ("## Win\n- Claim: Generation converges in one pass\n- Area: ci\n"
+               "- Theme: merge-throughput\n"
+               "- Metric: generation passes | runs | lower | 2 | 1 | regression fixture | pnpm test\n"
+               "- Verify: https://github.com/JovieInc/Jovie/pull/23665\n")
+        decision = '<!-- customer-changelog/v1 {"releaseWorthy":false} -->'
+        bodies = []
+        template_win = (ROOT / ".github/pull_request_template.md").read_text().split("## Win", 1)[1]
+        template_win = template_win.split("\n## ", 1)[0]
+        cases = [(placeholder, newline) for placeholder in ("", template_win, "- none", "not applicable")
+                 for newline in ("\n", "\r\n")]
+        for placeholder, newline in cases:
+            body = (events.red_before_green_block(self.PR) + "\n\n## Win\n" + placeholder +
+                    "\n" + decision + "\n\n## Next\nKeep this section.\n")
+            body = body.replace("\n", newline)
+            with self.subTest(placeholder=placeholder, newline=newline):
+                updated = events.repair_evidence_body(self.PR, body, win_evidence=win)
+                self.assertIn(win, updated)
+                self.assertEqual(updated.count("## Win"), 1)
+                self.assertEqual(updated.count(decision), 1)
+                self.assertTrue(updated.endswith("## Next" + body.split("## Next", 1)[1]))
+                self.assertEqual(events.repair_evidence_body(self.PR, updated, win_evidence=win), updated)
+                bodies.append(updated)
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+console.log(JSON.stringify(JSON.parse(readFileSync(0, 'utf8')).map(body => evaluateFleetRules({
+  pr: {title: 'fix(ci): repair metadata', body}, files: [],
+}).errors)));
+"""], cwd=ROOT, input=json.dumps(bodies), text=True, capture_output=True, check=True)
+        self.assertEqual(json.loads(checked.stdout), [[] for _ in cases])
+
     def test_repair_preserves_fenced_red_logs_accepted_by_the_canonical_gate(self):
         bodies = [
             "## Red-before-green\n- Failing command: `node probe.mjs`\n\n"
