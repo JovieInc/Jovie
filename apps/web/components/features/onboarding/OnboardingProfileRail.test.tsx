@@ -200,6 +200,8 @@ describe('OnboardingProfileRail', () => {
     expect(rail).toContainElement(strip);
     expect(phonePreview).not.toContainElement(strip);
     expect(screen.getByText(/12\.3K Spotify followers/)).toBeVisible();
+    // No pipeline words in the preview (2026-10-31 golden-path walk).
+    expect(screen.queryByText(/enrichment|\(source:/i)).toBeNull();
   });
 
   it('renders the inline rail variant at mobile widths', () => {

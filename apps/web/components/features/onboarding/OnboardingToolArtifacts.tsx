@@ -1,4 +1,5 @@
 'use client';
+// @coverage-via apps/web/tests/unit/onboarding/OnboardingToolArtifacts.test.tsx
 
 import { Button } from '@jovie/ui';
 import {

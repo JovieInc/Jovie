@@ -381,6 +381,22 @@ describe('onboarding tool artifacts', () => {
     expect(screen.queryByTestId('onboarding-attach-account')).toBeNull();
   });
 
+  it('asks for the profile URL without fan vocabulary', () => {
+    fastRender(
+      <OnboardingSocialLinkCard
+        state='output-available'
+        output={{ action: 'propose_social_link', url: null }}
+        onAttachAccount={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByText(
+        'Paste the full profile URL, like instagram.com/yourname.'
+      )
+    ).toBeDefined();
+    expect(screen.queryByText(/fans/i)).toBeNull();
+  });
+
   it('renders proposed social links with Attach Account CTA', () => {
     const onAttachAccount = vi.fn();
     fastRender(
