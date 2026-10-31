@@ -47,7 +47,7 @@ describe('Workers AI routing in the shared AI layer', () => {
       },
     ] as const;
     const routed = routeCallProvider(args, {});
-    const options = routed[0] as {
+    const options = routed[0] as unknown as {
       providerOptions: { workersAi: { reasoningEffort: string } };
     };
 
