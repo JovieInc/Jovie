@@ -7,7 +7,7 @@ export default function SettingsUsagePage() {
   return (
     <SettingsSection
       id='usage'
-      title='Usage Stats'
+      title='Usage stats'
       description='Plan limits, messages used, remaining quota, and upgrade options.'
     >
       <SettingsUsageStatsSection />
