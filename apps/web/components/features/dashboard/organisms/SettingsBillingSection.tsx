@@ -30,12 +30,15 @@ function resolveBadgeLabel(ctx: {
   billingUnavailable: boolean;
   isStale: boolean;
   isPro: boolean;
+  isTrial: boolean;
   canOpenPortal: boolean;
 }): string {
   if (ctx.billingUnavailable) return 'Unavailable';
   if (ctx.billingLoading) return 'Syncing';
   if (ctx.isStale) return 'Cached';
   if (ctx.isPro) return 'Active';
+  // A trial is not the Free plan; "Trial plan · Free" read as bad data.
+  if (ctx.isTrial) return 'Trial';
   if (ctx.canOpenPortal) return 'Manageable';
   return 'Free';
 }
@@ -53,10 +56,24 @@ function resolveBadgeVariant(ctx: {
   return 'secondary';
 }
 
+const TRIAL_END_FORMAT = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  timeZone: 'UTC',
+});
+
+function formatTrialEnd(trialEndsAt: string | null | undefined): string | null {
+  if (!trialEndsAt) return null;
+  const date = new Date(trialEndsAt);
+  return Number.isNaN(date.getTime()) ? null : TRIAL_END_FORMAT.format(date);
+}
+
 function resolveSummaryDescription(ctx: {
   billingLoading: boolean;
   billingUnavailable: boolean;
   isPro: boolean;
+  isTrial: boolean;
+  trialEndsAt: string | null | undefined;
   canOpenPortal: boolean;
 }): string {
   if (ctx.billingUnavailable) return "We couldn't load your plan. Try again.";
@@ -64,6 +81,12 @@ function resolveSummaryDescription(ctx: {
     return 'Checking your subscription and billing access.';
   if (ctx.isPro)
     return 'Open Stripe to manage invoices, payment methods, and subscription details.';
+  if (ctx.isTrial) {
+    const ends = formatTrialEnd(ctx.trialEndsAt);
+    return ends
+      ? `Your trial ends ${ends}. Compare plans to keep it after that.`
+      : 'Your trial is active. Compare plans to keep it after it ends.';
+  }
   if (ctx.canOpenPortal)
     return 'Open Stripe to review invoices, payment details, or reactivate your plan.';
   return 'Compare plans and upgrade when you are ready.';
@@ -87,13 +110,23 @@ export function SettingsBillingSection() {
   const isPro = billingData?.isPro ?? false;
   const hasStripeCustomer = billingData?.hasStripeCustomer ?? false;
   const isStale = billingData?.stale ?? false;
-  const planLabel = resolvePlanLabel(billingData?.plan, isPro);
+  // /api/billing/status reports the effective plan, which is `free` for an
+  // unpaid trial, so an active trial is read from its end date instead.
+  const trialEndsAt = billingData?.trialEndsAt ?? null;
+  const isTrial =
+    !isPro &&
+    trialEndsAt !== null &&
+    new Date(trialEndsAt).getTime() > Date.now();
+  const planLabel = isTrial
+    ? getPlanDisplayName('trial')
+    : resolvePlanLabel(billingData?.plan, isPro);
   const canOpenPortal = hasStripeCustomer;
   const badgeLabel = resolveBadgeLabel({
     billingLoading,
     billingUnavailable,
     isStale,
     isPro,
+    isTrial,
     canOpenPortal,
   });
   const badgeVariant = resolveBadgeVariant({
@@ -111,6 +144,8 @@ export function SettingsBillingSection() {
     billingLoading,
     billingUnavailable,
     isPro,
+    isTrial,
+    trialEndsAt,
     canOpenPortal,
   });
   const primaryActionLabel = billingUnavailable
