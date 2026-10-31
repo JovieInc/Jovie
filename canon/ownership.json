@@ -100,6 +100,7 @@
     {"id": "workflow:public-benchmark", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/public-benchmark.yml", "note": "Workflow header names TimWhite as accountable writer; the routine owner is the agent role here."},
     {"id": "workflow:quality-gap-finder", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/quality-gap-finder.yml"},
     {"id": "workflow:remediation-sweep", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/remediation-sweep.yml"},
+    {"id": "workflow:preflight-remote", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/preflight-remote.yml", "note": "Third pre-push gate backend (hosted runners); evidence artifact bound to sha and tree."},
     {"id": "workflow:repository-docs-shadow", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/repository-docs-shadow.yml"},
     {"id": "workflow:rolling-ci-dispatch", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/rolling-ci-dispatch.yml"},
     {"id": "workflow:runner-autoscaler-canary", "kind": "workflow", "owner": "gem-hostops", "status": "active", "ref": ".github/workflows/runner-autoscaler-canary.yml"},
