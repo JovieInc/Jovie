@@ -82,9 +82,6 @@ export const SHARED_E2E_ARTIST_POOL: readonly ProdcertArtistFixture[] = [
     url: 'https://open.spotify.com/artist/1ZlSI1juLMMN1HU8X7RViN',
   },
   {
-    spotifyId: '0T4McYgGzOzXOWzLaukIjD',
-    name: 'Unmarked Pavement',
-    url: 'https://open.spotify.com/artist/0T4McYgGzOzXOWzLaukIjD',
   },
   {
     spotifyId: '6TWG4bY1qzp0lJuxxFtl6F',
@@ -106,9 +103,22 @@ export const RETURNING_CANARY_RESERVED_ARTIST: ProdcertArtistFixture =
     url: 'https://open.spotify.com/artist/6knM2BGm18cXek6FXbWd0t',
   });
 
+/**
+ * Permanently bound to the admitted production canary
+ * (`admitted-canary-fixture.ts`). Never part of the shared pool: run-time
+ * claim journeys skip it, so its binding is never released or contested.
+ */
+export const ADMITTED_CANARY_RESERVED_ARTIST: ProdcertArtistFixture =
+  Object.freeze({
+    spotifyId: '0T4McYgGzOzXOWzLaukIjD',
+    name: 'Unmarked Pavement',
+    url: 'https://open.spotify.com/artist/0T4McYgGzOzXOWzLaukIjD',
+  });
+
 /** Spotify ids owned by permanent fixtures; selection skips every one. */
 export const RESERVED_FIXTURE_ARTIST_IDS: ReadonlySet<string> = new Set([
   RETURNING_CANARY_RESERVED_ARTIST.spotifyId,
+  ADMITTED_CANARY_RESERVED_ARTIST.spotifyId,
 ]);
 
 export function isReservedFixtureArtist(spotifyId: string): boolean {
