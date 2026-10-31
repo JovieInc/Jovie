@@ -5,7 +5,6 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { feedbackItems } from '@/lib/db/schema/feedback';
 import { captureError } from '@/lib/error-tracking';
-import { createFeedbackItem } from '@/lib/feedback';
 import { fetchSummerShadow } from '@/lib/ovie/summer-shadow-client';
 import {
   isInternalOrTestAccountEmail,
@@ -217,17 +216,25 @@ export async function captureCustomerVoice(
     if (id) {
       await writeContext(id, context);
     } else {
-      const row = await createFeedbackItem({
-        userId: input.userId ?? null,
-        message: text,
-        source: `${CUSTOMER_VOICE_SOURCE_PREFIX}${input.channel}`,
-        context: {
-          pathname: null,
-          userAgent: null,
-          timestampIso: input.receivedAt.toISOString(),
-          customerVoice: context,
-        },
-      });
+      // Direct insert (not createFeedbackItem): lib/feedback fans out to this
+      // module, so importing it back would be a cycle. These rows are outside
+      // the closed-loop classifier by design (source customer_voice_*).
+      const [row] = await db
+        .insert(feedbackItems)
+        .values({
+          userId: input.userId ?? null,
+          message: text,
+          source: `${CUSTOMER_VOICE_SOURCE_PREFIX}${input.channel}`,
+          status: 'pending',
+          context: {
+            pathname: null,
+            userAgent: null,
+            timestampIso: input.receivedAt.toISOString(),
+            customerVoice: context,
+          },
+        })
+        .returning({ id: feedbackItems.id });
+      if (!row) throw new Error('customer-voice-persist-failed');
       id = row.id;
     }
 
