@@ -1,0 +1,22 @@
+{
+  "schema": "jovie.price-literal-guard-ratchet/v1",
+  "entries": {
+    "apps/web/app/(marketing)/launch/page.tsx": 4,
+    "apps/web/app/api/chat/route.ts": 3,
+    "apps/web/app/billing/youtube-thumbnails/YoutubeThumbnailCheckoutClient.tsx": 1,
+    "apps/web/components/features/admin/agent-os/AgentOsRunsPanel.tsx": 1,
+    "apps/web/components/features/admin/agent-os/ArtifactDrawer.tsx": 1,
+    "apps/web/components/features/admin/investors/HypotheticalDilutionPreview.tsx": 1,
+    "apps/web/components/features/auth/AuthOfferSummary.tsx": 1,
+    "apps/web/components/features/demo/FounderDemoRecordingSurface.tsx": 2,
+    "apps/web/components/features/demo/mock-release-data.ts": 2,
+    "apps/web/components/features/home/HomeRelationshipPanel.tsx": 1,
+    "apps/web/components/features/home/homepage-profile-preview-fixture.ts": 1,
+    "apps/web/components/features/pay/PayLanding.tsx": 3,
+    "apps/web/components/jovie/components/ChatMerchCard.tsx": 2,
+    "apps/web/components/organisms/PaySection.tsx": 2,
+    "apps/web/components/organisms/billing/PlanComparisonSection.tsx": 1,
+    "apps/web/components/organisms/home-loop/fixtures.ts": 3,
+    "apps/web/components/organisms/table/organisms/UnifiedTable.tsx": 2
+  }
+}
