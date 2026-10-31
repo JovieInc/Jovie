@@ -10,6 +10,52 @@
 > **JOV-5852:** execution follows information, not time. A GitHub Actions cron must declare `# clock-class:` (`skip-if-unchanged` | `production-liveness` | `temporal-resource` | `upstream-advisory`). Do not add a clock when a causal event already exists.
 > **JOV-INV-042 (2026-10-11):** GitHub cron is frozen. `scripts/lib/ci-schedule-inventory.mjs` keeps `CRON_KEEP_REASONS` (since 2026-10-12 every kept clock names its time-bound external fact, calendar window, real resource limit, or owner-tracked replacement), `ADMISSION_CRON_DEBT`, and `POLLING_DEBT`; each list only shrinks. Admission and landing are event-driven or run from the Gem lanes tick; no workflow polls GitHub state.
 
+## Before creating company automation
+
+Use the canonical inventory above for recurring execution on every host. Search
+its purpose, trigger and owner first; extend the incumbent when it already covers
+the work. Preserve its ID, owner and holds. Domain records such as
+`canon/growth-loops.jsonl` describe attribution or passive product mechanisms;
+they remain in their domain ledger. An actual recurring executor has one
+identity here and can reference its domain record.
+
+Run the existing registry helper from a current Jovie checkout before creation:
+
+```bash
+node scripts/lib/automation-registry.mjs can-create --proposal /tmp/automation-entry.json
+```
+
+The proposal is one complete live registry entry with the usual audit fields and
+`identity: {"purpose": "reconcile-receipts", "scope": "summer:production"}`.
+Choose stable keys describing the outcome and concrete target; the example is a
+shape, not a new automation to install. Reuse existing keys when they describe
+the same work. Identity comparison normalizes Unicode, case and whitespace;
+it does not infer arbitrary paraphrases. A different name, owner, cadence or
+host alone does not establish a different purpose/scope. Legacy entries without
+scope fail the check when their purpose or execution source makes reuse ambiguous.
+
+Exit 0 means this snapshot has no detected conflict. Missing or invalid input,
+unreadable registry/source evidence, matching retired identities and conflicts
+exit 1 with the incumbent ID/owner where available. The command reads the
+canonical registry beside the helper regardless of working directory, prints its
+SHA-256, and never writes a registry or creates a provider resource. Keep personal
+automations and their details private.
+
+Keep intentional event/backstop triggers in one row. Distinct derived observers
+may share an observed source; Vercel endpoints and named lanes clocks have their
+own resource identities. A pending workflow-sourced lanes record can cover one
+clock. Multiple clocks need an explicit `trigger.clocks` list and `groupReason`
+on that same row; every declared clock must dispatch the named workflow.
+
+The existing registry CI suite checks declared-identity and execution collisions
+on the source and composed merge-group tree. Two callers can both pass against
+one unchanged snapshot; this is **not atomic admission**. Register through the
+existing PR/merge path, recheck the composed inventory, and leave provider
+creation and custody with its incumbent owner. Legacy rows remain valid without
+identity fields, so direct manual additions that bypass this proposal command
+are not an enforced all-new-row identity gate. Provider-side exclusion requires
+that provider owner's existing admission boundary; this helper grants none.
+
 ## Codex Workspace Automations
 
 Codex automations are heartbeats that wake one live goal thread; Codex is on-demand and is not a scheduler. The active ones are registered as `codex:*` in the registry with a migrate note (pause when the goal closes). The 2026-10-20 sweep archived 16 paused heartbeats to `~/.local/state/retired-loops/2026-10-20/codex-automations/` on the ops Mac. The `pr-comment-hardening-retro` and `weekly-agent-readiness` automations this page used to list were not installed there; their scripts (`scripts/pr-comment-retro.mjs`, `scripts/weekly-agent-readiness.mjs`) run on demand. Recurring needs go to the lanes tick, not a new Codex heartbeat.

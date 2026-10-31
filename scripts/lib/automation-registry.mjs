@@ -23,8 +23,10 @@
  * Network reads live in the hosted liveness job (scripts/automation-liveness.mjs).
  */
 
+import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, posix, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // Same detector as ci-schedule-inventory.mjs (kept dependency-free so the
 // hosted liveness job runs without installing js-yaml).
@@ -93,7 +95,12 @@ export function validateRegistry(registry) {
   const errors = [];
   if (!registry || typeof registry !== 'object')
     return ['registry must be an object'];
-  for (const message of registry.parseErrors ?? []) errors.push(message);
+  if (
+    registry.parseErrors !== undefined &&
+    !Array.isArray(registry.parseErrors)
+  )
+    errors.push('parseErrors must be an array');
+  else for (const message of registry.parseErrors ?? []) errors.push(message);
   if (registry.schema !== REGISTRY_SCHEMA)
     errors.push(`schema must be ${REGISTRY_SCHEMA}`);
   const entries = Array.isArray(registry.entries) ? registry.entries : null;
@@ -215,7 +222,212 @@ export function validateRegistry(registry) {
       }
     }
   }
+  return [...errors, ...registryConflicts(entries)];
+}
+
+// --- Pre-create check (read-only; never a reservation) --------------------------
+
+function normalized(value) {
+  return typeof value === 'string'
+    ? value.normalize('NFKC').trim().toLowerCase().replace(/\s+/gu, ' ')
+    : '';
+}
+
+function identityErrors(identity) {
+  const errors = [];
+  for (const field of ['purpose', 'scope']) {
+    // Stable, reviewed keys: an outcome (reconcile-receipts) and its
+    // target (summer:production). Names of agents and clocks are not scope.
+    const value = normalized(identity?.[field]);
+    if (
+      !/^[a-z][a-z0-9]*(?:[ .:_-][a-z0-9]+)+$/u.test(value) ||
+      /^(?:unknown|unspecified|todo|tbd|example|placeholder)(?:[ .:_-]|$)/u.test(
+        value
+      )
+    )
+      errors.push(`identity.${field} must name a concrete, qualified ${field}`);
+  }
   return errors;
+}
+
+function purposeScopeKey(entry) {
+  if (identityErrors(entry?.identity).length) return null;
+  return JSON.stringify([
+    normalized(entry.identity.purpose),
+    normalized(entry.identity.scope),
+  ]);
+}
+
+/** Physical execution, not the prose schedule or the registration's ID. */
+function executionKey(entry) {
+  const trigger = entry?.trigger ?? {};
+  if (trigger.kind === 'derived') return null; // Observations may share code.
+  const source = nonEmpty(trigger.source)
+    ? posix.normalize(trigger.source.trim())
+    : '';
+  const repo = normalized(trigger.repo);
+  let kind = trigger.kind;
+  let target = source;
+  if (kind === 'github-cron' || kind === 'github-event')
+    kind = 'github-workflow';
+  if (kind === 'vercel-cron')
+    target = nonEmpty(trigger.path)
+      ? JSON.stringify([source, posix.normalize(trigger.path.trim())])
+      : null;
+  if (kind === 'lanes-clock') {
+    // The existing central lanes scheduler owns clock names, independently
+    // of repository/host annotations on the registry row.
+    return JSON.stringify([
+      kind,
+      nonEmpty(trigger.clock) ? trigger.clock.trim() : source,
+    ]);
+  }
+  if (!nonEmpty(target) || !nonEmpty(kind)) return null;
+  // Provider definitions in a repository keep their identity across hosts.
+  return JSON.stringify([kind, repo || normalized(entry.host), target]);
+}
+
+function conflictReason(left, right) {
+  const identity = purposeScopeKey(left);
+  if (identity && identity === purposeScopeKey(right))
+    return 'same purpose/scope identity';
+  const execution = executionKey(left);
+  if (execution && execution === executionKey(right))
+    return 'same execution source';
+  // Adding/removing namespace evidence cannot establish a new resource.
+  if (Boolean(left.trigger?.repo) !== Boolean(right.trigger?.repo)) {
+    const withoutNamespace = entry =>
+      executionKey({
+        ...entry,
+        host: 'unknown',
+        trigger: { ...entry.trigger, repo: '' },
+      });
+    const resource = withoutNamespace(left);
+    if (resource && resource === withoutNamespace(right))
+      return 'same execution source with ambiguous provider scope';
+  }
+  if (
+    normalized(left.purpose) &&
+    normalized(left.purpose) === normalized(right.purpose)
+  ) {
+    if (!identity || !purposeScopeKey(right))
+      return 'same purpose with ambiguous legacy scope';
+    if (normalized(left.identity.scope) === normalized(right.identity.scope))
+      return 'same purpose and scope';
+  }
+  return null;
+}
+
+function registryConflicts(entries) {
+  const errors = [];
+  const live = entries.filter(entry => entry?.status === 'live');
+  for (const [index, entry] of entries.entries()) {
+    if (entry?.identity !== undefined) {
+      for (const error of identityErrors(entry.identity))
+        errors.push(`entries[${index}] (${entry.id}): ${error}`);
+    }
+    if (
+      entry?.trigger?.clock !== undefined &&
+      (!nonEmpty(entry.trigger.clock) ||
+        entry.trigger.clock.trim() !== entry.trigger.clock)
+    )
+      errors.push(`${entry.id}: trigger.clock must be a canonical clock name`);
+    const clocks = entry?.trigger?.clocks;
+    if (
+      clocks !== undefined &&
+      (entry.trigger.kind !== 'lanes-clock' ||
+        entry.trigger.clock ||
+        !WORKFLOW_SOURCE_RE.test(entry.trigger.source ?? '') ||
+        !Array.isArray(clocks) ||
+        clocks.length < 2 ||
+        clocks.some(clock => !nonEmpty(clock) || clock.trim() !== clock) ||
+        new Set(clocks).size !== clocks.length ||
+        !nonEmpty(entry.trigger.groupReason))
+    )
+      errors.push(
+        `${entry.id}: trigger.clocks needs distinct clock names and groupReason on a workflow-sourced lanes-clock`
+      );
+  }
+  for (let i = 0; i < live.length; i++) {
+    for (const other of live.slice(i + 1)) {
+      const reason = conflictReason(live[i], other);
+      if (reason)
+        errors.push(
+          `${live[i].id} and ${other.id}: ${reason}; reuse the existing automation identity`
+        );
+    }
+  }
+  return errors;
+}
+
+/**
+ * Check a proposed live row against this snapshot, including retired identities.
+ * A passing result cannot reserve a provider resource or prove fleet custody.
+ * Recheck the composed registry through the normal PR/merge path before creation.
+ */
+export function checkAutomationProposal(registry, proposal, discovered = null) {
+  const errors = validateRegistry(registry).map(error => `registry: ${error}`);
+  if (!registry?.entries?.length)
+    errors.push('registry: empty inventory is not admission evidence');
+  errors.push(
+    ...validateRegistry({ schema: REGISTRY_SCHEMA, entries: [proposal] }).map(
+      error => `proposal: ${error}`
+    )
+  );
+  errors.push(
+    ...identityErrors(proposal?.identity).map(error => `proposal: ${error}`)
+  );
+  if (proposal?.status !== 'live')
+    errors.push(
+      'proposal: status must be live (this command cannot reactivate retired entries)'
+    );
+  if (errors.length) return errors;
+  if (
+    ['github-cron', 'github-event', 'vercel-cron', 'eve-schedule'].includes(
+      proposal.trigger.kind
+    ) &&
+    !nonEmpty(proposal.trigger.repo)
+  )
+    errors.push('proposal: trigger.repo is required for provider scope');
+  if (
+    proposal.trigger.kind === 'lanes-clock' &&
+    !nonEmpty(proposal.trigger.clock) &&
+    !pendingClockWorkflow(proposal)
+  ) {
+    errors.push(
+      'proposal: lanes-clock needs trigger.clock or a workflow-sourced pending definition'
+    );
+  }
+  if (!executionKey(proposal) && proposal.trigger.kind !== 'derived') {
+    errors.push(
+      'proposal: execution identity is ambiguous; specify trigger.path for Vercel crons'
+    );
+  }
+  for (const entry of registry.entries) {
+    const reason =
+      entry.id === proposal.id
+        ? 'id already registered'
+        : conflictReason(entry, proposal);
+    if (reason)
+      errors.push(
+        `${entry.id} (${entry.status}, owner ${entry.owner}): ${reason}; ${entry.status === 'retired' ? 'retired identity requires incumbent review, never automatic reactivation' : 'reuse or extend this entry'}`
+      );
+  }
+  if (discovered) {
+    errors.push(...checkRegistryCoverage(registry, discovered));
+    // A new definition need not exist yet. Include only its exact proposed
+    // key so composed coverage can still detect aliases and multiple claims.
+    const proposedDiscovery = new Map(discovered);
+    const key = coverageKey(proposal);
+    if (key && !proposedDiscovery.has(key)) proposedDiscovery.set(key, {});
+    errors.push(
+      ...checkRegistryCoverage(
+        { ...registry, entries: [...registry.entries, proposal] },
+        proposedDiscovery
+      )
+    );
+  }
+  return [...new Set(errors)];
 }
 
 // --- Discovery ----------------------------------------------------------------
@@ -236,11 +448,22 @@ export function parseVercelCrons(source = '') {
   try {
     doc = JSON.parse(String(source));
   } catch {
-    return [];
+    throw new Error('unreadable schedule evidence: invalid vercel.json');
   }
-  return (Array.isArray(doc?.crons) ? doc.crons : [])
-    .filter(cron => nonEmpty(cron?.path))
-    .map(cron => ({ path: cron.path, schedule: cron.schedule ?? null }));
+  if (
+    !doc ||
+    typeof doc !== 'object' ||
+    Array.isArray(doc) ||
+    (doc.crons !== undefined &&
+      (!Array.isArray(doc.crons) ||
+        doc.crons.some(cron => !nonEmpty(cron?.path))))
+  ) {
+    throw new Error('ambiguous schedule evidence: invalid Vercel crons');
+  }
+  return (doc.crons ?? []).map(cron => ({
+    path: cron.path,
+    schedule: cron.schedule ?? null,
+  }));
 }
 
 function findVercelFiles(repoRoot) {
@@ -297,7 +520,12 @@ export function discoverScheduledAutomations(repoRoot) {
   const clockFile = join(repoRoot, 'scripts/lanes/continuity_clock.py');
   if (existsSync(clockFile)) {
     for (const clock of parseLanesClocks(readFileSync(clockFile, 'utf8'))) {
-      found.set(`lanes-clock:${clock.name}`, { workflow: clock.workflow });
+      const key = `lanes-clock:${clock.name}`;
+      if (found.has(key))
+        throw new Error(
+          `${key}: ambiguous schedule evidence; duplicate clock name`
+        );
+      found.set(key, { workflow: clock.workflow });
     }
   }
   return found;
@@ -341,18 +569,44 @@ export function checkRegistryCoverage(registry, discovered) {
       );
     covered.set(key, entry.id);
   }
-  const pendingWorkflows = new Set(
-    (registry?.entries ?? [])
-      .filter(entry => entry?.status === 'live')
-      .map(pendingClockWorkflow)
-      .filter(Boolean)
-  );
-  for (const [key, detail] of discovered) {
-    if (
-      key.startsWith('lanes-clock:') &&
-      pendingWorkflows.has(detail?.workflow)
-    )
+  for (const entry of registry?.entries ?? []) {
+    if (entry?.status !== 'live') continue;
+    const workflow = pendingClockWorkflow(entry);
+    if (!workflow) continue;
+    const matches = [...discovered].filter(
+      ([key, detail]) =>
+        key.startsWith('lanes-clock:') && detail?.workflow === workflow
+    );
+    const clocks = entry.trigger.clocks;
+    if (matches.length > 1 && !Array.isArray(clocks)) {
+      errors.push(
+        `${entry.id}: ambiguous workflow coverage for ${workflow}; register explicit trigger.clocks and groupReason on one entry, or use individual clock identities`
+      );
       continue;
+    }
+    if (Array.isArray(clocks)) {
+      for (const clock of clocks) {
+        if (discovered.get(`lanes-clock:${clock}`)?.workflow !== workflow) {
+          errors.push(
+            `${entry.id}: declared clock ${clock} is missing or dispatches a different workflow`
+          );
+        }
+      }
+    }
+    for (const [key] of matches) {
+      if (
+        Array.isArray(clocks) &&
+        !clocks.includes(key.slice('lanes-clock:'.length))
+      )
+        continue;
+      if (covered.has(key))
+        errors.push(
+          `${key}: registered twice (${covered.get(key)}, ${entry.id})`
+        );
+      covered.set(key, entry.id);
+    }
+  }
+  for (const [key] of discovered) {
     if (!covered.has(key)) {
       errors.push(
         `${key}: scheduled automation has no live entry in ${REGISTRY_PATH}; register it (owner, receipt, max staleness, kill switch) or remove the schedule`
@@ -592,4 +846,56 @@ export function parseRegistry(text = '') {
 
 export function loadRegistry(repoRoot) {
   return parseRegistry(readFileSync(join(repoRoot, REGISTRY_PATH), 'utf8'));
+}
+
+/** Supported agent pre-create surface; shares validation and CI tests above. */
+export function registryCommand(
+  args,
+  repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
+) {
+  if (
+    args.length !== 3 ||
+    args[0] !== 'can-create' ||
+    args[1] !== '--proposal' ||
+    !args[2]
+  ) {
+    return {
+      ok: false,
+      errors: [
+        'usage: node scripts/lib/automation-registry.mjs can-create --proposal <entry.json>',
+      ],
+    };
+  }
+  try {
+    const text = readFileSync(join(repoRoot, REGISTRY_PATH), 'utf8');
+    const registry = parseRegistry(text);
+    const proposal = JSON.parse(readFileSync(resolve(args[2]), 'utf8'));
+    const errors = checkAutomationProposal(
+      registry,
+      proposal,
+      discoverScheduledAutomations(repoRoot)
+    );
+    return {
+      ok: errors.length === 0,
+      registry: REGISTRY_PATH,
+      registrySha256: createHash('sha256').update(text).digest('hex'),
+      errors,
+      boundary:
+        'Snapshot preflight only; no reservation or provider creation. Recheck the composed registry through PR/merge and retain incumbent ownership.',
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      errors: [`unreadable admission evidence: ${error.message}`],
+    };
+  }
+}
+
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  const result = registryCommand(process.argv.slice(2));
+  console.log(JSON.stringify(result, null, 2));
+  process.exitCode = result.ok ? 0 : 1;
 }

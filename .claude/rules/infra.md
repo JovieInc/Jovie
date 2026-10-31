@@ -20,6 +20,14 @@ AI agents lack context about operational costs, API billing, and infrastructure 
 | 4 | **Add to existing scheduled job** | If a nightly/periodic job already exists, add your logic there instead of creating a new one. |
 | 5 | **New scheduled job** | Only if none of the above work, AND you've documented why in the PR. |
 
+Before creating any company automation, search `canon/automation-registry.jsonl`
+for its purpose, execution source and owner, then run
+`node scripts/lib/automation-registry.mjs can-create --proposal /tmp/automation-entry.json`.
+The [proposal contract](../../docs/CRON_REGISTRY.md#before-creating-company-automation)
+requires a concrete purpose/scope identity and fails closed on ambiguous evidence.
+Reuse the incumbent identity and preserve ownership/holds. This is a snapshot
+preflight, not a reservation or permission to create a schedule.
+
 ## Rules for Cron Jobs & Scheduled Tasks
 
 1. **NEVER create a new cron job without explicit approval.** Document in the PR description:
