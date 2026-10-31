@@ -5,6 +5,10 @@ import { Copyright } from '@/components/atoms/Copyright';
 import { FooterBranding } from '@/components/molecules/FooterBranding';
 import { FooterNavigation } from '@/components/molecules/FooterNavigation';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  PRIVACY_CHOICES_HREF,
+  PRIVACY_CHOICES_LABEL,
+} from '@/lib/cookies/consent-state';
 import { cn } from '@/lib/utils';
 
 /**
@@ -47,6 +51,7 @@ const FOOTER_COLUMNS = [
     links: [
       { href: APP_ROUTES.LEGAL_PRIVACY, label: 'Privacy' },
       { href: APP_ROUTES.LEGAL_TERMS, label: 'Terms' },
+      { href: PRIVACY_CHOICES_HREF, label: 'Your Privacy Choices' },
     ],
   },
 ] as const;
@@ -54,6 +59,7 @@ const FOOTER_COLUMNS = [
 const PROFILE_LEGAL_LINKS = [
   { href: APP_ROUTES.LEGAL_PRIVACY, label: 'Privacy' },
   { href: APP_ROUTES.LEGAL_TERMS, label: 'Terms' },
+  { href: PRIVACY_CHOICES_HREF, label: 'Your Privacy Choices' },
 ];
 
 import {
@@ -212,6 +218,13 @@ export function Footer({
                   Terms
                 </Link>
               </div>
+              <a
+                href={PRIVACY_CHOICES_HREF}
+                className={FOOTER_LINK_CLASS_NAME}
+                style={FOOTER_LINK_STYLE}
+              >
+                {PRIVACY_CHOICES_LABEL}
+              </a>
               <Copyright
                 variant='light'
                 className='text-2xs leading-4 font-normal tracking-tight opacity-100'
@@ -270,6 +283,13 @@ export function Footer({
                 </nav>
               )}
             </div>
+            <a
+              href={PRIVACY_CHOICES_HREF}
+              className={FOOTER_LINK_CLASS_NAME}
+              style={FOOTER_LINK_STYLE}
+            >
+              {PRIVACY_CHOICES_LABEL}
+            </a>
             <Copyright
               variant={config.colorVariant}
               className='text-2xs leading-4 font-normal tracking-tight opacity-100'
