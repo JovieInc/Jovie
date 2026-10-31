@@ -8,9 +8,9 @@ import { describe, expect, it } from 'vitest';
  * WebKit composites `backdrop-filter` on sticky table cells against the wrong
  * backdrop, so a translucent header surface lets scrolled rows bleed through
  * and overlap the column labels (Safari; Chromium shows the intended glass).
- * No CSS selector separates WebKit from Chromium, so the sticky column header
- * paints the same fully opaque app-shell content surface the sticky group
- * header uses — `.claude/rules/ui.md`: sticky shell chrome (table headers)
+ * The sticky column header paints the same fully opaque app-shell content
+ * surface the sticky group header uses — `.claude/rules/ui.md`: sticky shell
+ * chrome (table headers)
  * renders on `bg-(--app-shell-content-surface)` — and must not rely on
  * backdrop-filter glass.
  */
