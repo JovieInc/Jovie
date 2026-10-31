@@ -179,6 +179,11 @@ def load_x_config(path: Path = SOURCES_FILE) -> dict:
     """sources.json `x`: tracked accounts and search queries read through the Grok CLI."""
     x = json.loads(path.read_text()).get("x") or {}
     accounts = [str(handle).lstrip("@") for handle in x.get("accounts") or []]
+    try:  # people to follow live in frontier-topics.json (one list); union, keep order, no duplicates
+        people = json.loads((path.parent / "frontier-topics.json").read_text()).get("people") or []
+        accounts += [p["handle"] for p in people if p.get("handle") and p["handle"].lower() not in {a.lower() for a in accounts}]
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
     if any(not re.fullmatch(r"[A-Za-z0-9_]{1,15}", handle) for handle in accounts):
         raise ValueError("signal-x-account-invalid")
     return {"enabled": bool(x.get("enabled", True)) and bool(accounts or x.get("queries")),
@@ -746,9 +751,19 @@ def triage_signals(since: str, runner=None) -> dict:
 # ---------------------------------------------------------------------------------------------
 # run
 
+def frontier_ingest(state_dir: Path, rows: list, env, poster, put) -> dict:
+    """Frontier feed (scripts/signals/frontier.py) scores this run's changelog and X items for our
+    shipping stack. Opt-in (SIGNALS_FRONTIER=1) and fail-open: it never fails the watcher."""
+    import frontier
+    result = frontier.ingest(state_dir, rows, env=env, poster=poster, put=put)
+    return {key: result.get(key) for key in ("status", "scored", "patterns", "rejected", "duplicates", "costUsdToday")} | \
+        {"trials": len(result.get("trials") or []), "needsTim": len(result.get("needsTim") or [])}
+
+
 def run(state_path: Path, *, env=None, sources: list[dict] | None = None, inbox: Path = DEFAULT_INBOX,
         fetcher=fetch, poster=post_json, put=yc_corpus.gbrain_put, summer=None, now: float | None = None,
-        dry_run: bool = False, triage=triage_signals, x_config: dict | None = None, x_search=None) -> dict:
+        dry_run: bool = False, triage=triage_signals, x_config: dict | None = None, x_search=None,
+        frontier=frontier_ingest) -> dict:
     env = os.environ if env is None else env
     now = now or time.time()
     observed = now_iso(now)
@@ -871,6 +886,11 @@ def run(state_path: Path, *, env=None, sources: list[dict] | None = None, inbox:
               "jevCallsToday": budget["calls"], "failures": failures[:20], "failureCount": len(failures)}
     if stored and not dry_run:
         result["triage"] = triage(observed)
+    if judged and not dry_run and env.get("SIGNALS_FRONTIER") == "1":
+        try:
+            result["frontier"] = frontier(state_path.parent, [(item, verdict) for item, verdict in rows if item], env, poster, put)
+        except Exception as error:  # the frontier stage is additive; the watcher run stands without it
+            result["frontier"] = {"status": "failed", "error": f"{type(error).__name__}: {error}"[:200]}
     state["lastRun"] = result
     state["nextAttemptAt"] = now + (3600 if result["status"] != "ok" else REFRESH_INTERVAL_S)
     if not dry_run:

@@ -130,6 +130,16 @@
       ]
     },
     {
+      "id": "patterns",
+      "title": "Pattern library (proven outside tactics scored by our own results)",
+      "owner": {
+        "kind": "file",
+        "ref": "canon/patterns.jsonl",
+        "note": "One jovie-pattern/v1 line per pattern. Outside reports are priors; only our measured trial moves a pattern's score. The frontier feed proposes additions."
+      },
+      "derived": []
+    },
+    {
       "id": "design-tokens",
       "title": "Design tokens",
       "owner": {

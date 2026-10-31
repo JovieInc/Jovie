@@ -203,6 +203,34 @@
       "pattern": "^/blog/[a-z0-9-]+$",
       "enabled": false,
       "disabledReason": "no public blog or feed (404, 2026-10-20); monthly Idea Radar diff covers DISCO"
+    },
+    {
+      "id": "cloudflare-blog",
+      "name": "Cloudflare blog",
+      "category": "platform",
+      "kind": "feed",
+      "url": "https://blog.cloudflare.com/rss/"
+    },
+    {
+      "id": "vercel-blog",
+      "name": "Vercel blog",
+      "category": "platform",
+      "kind": "feed",
+      "url": "https://vercel.com/blog/rss.xml"
+    },
+    {
+      "id": "simon-willison",
+      "name": "Simon Willison",
+      "category": "person",
+      "kind": "feed",
+      "url": "https://simonwillison.net/atom/everything/"
+    },
+    {
+      "id": "latent-space",
+      "name": "Latent Space",
+      "category": "person",
+      "kind": "feed",
+      "url": "https://www.latent.space/feed"
     }
   ]
 }

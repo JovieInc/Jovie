@@ -86,6 +86,19 @@ the hook (`signal_watch.tick(host.state)` in `finish_dispatch`, plus `scripts/si
 publish on their own clock (`upstream-advisory`); adding a GitHub cron would grow the frozen
 JOV-INV-042 allowlist.
 
+**Proposed, not active:** the frontier feed (`scripts/signals/frontier.py`) is the daily shipping-stack
+stage on top of the market signal watcher. One run a day: a `jovie-research ask --social` (last30days,
+free sources) scan of the topics in `scripts/signals/frontier-topics.json` with a 7-day look-back, Jev scoring
+for relevance to our stack, ROI, effort and spend, dedupe against `canon/patterns.jsonl`, pattern records, and
+a daily digest at gbrain `signals/frontier/<day>`. Free and small trials are written as
+`jovie-factory-signal/v1` files for `scripts/lanes/factory_intake.py`; anything needing spend is `needs-tim`
+and never filed as work. The watcher also scores its own changelog and X items when `SIGNALS_FRONTIER=1`.
+Cost: topic scans $0, Jev about $0.00002 an item (cap `FRONTIER_JEV_DAILY_BUDGET_USD`, default $0.10), appended
+to `frontier-cost.ndjson` for the waste sweep. Like the watcher, it needs a lanes-tick hook
+(`frontier.ingest` through `signal_watch.tick`, once a day) that the `scripts/lanes/**` owner adds;
+no GitHub cron is added (frozen JOV-INV-042 allowlist). Stages `frontier-run:scan` and
+`frontier-run:score-route` are in `docs/metrics/stage-manifest.json`.
+
 ## Production Schedule
 
 Source of truth: `apps/web/vercel.json`. The Vercel project's Root Directory is set to `apps/web/` (verified via `vercel project inspect jovie`), so Vercel reads that file, not the repo-root `vercel.json`. The root-level `vercel.json` exists for historical reasons and is **not** what Vercel consumes — keep both in sync until it can be deleted (see JOV-1901 / AUTOMATION_AUDIT.md for the original deletion intent).

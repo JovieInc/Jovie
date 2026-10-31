@@ -1,0 +1,166 @@
+{
+  "schema": "jovie.frontier-topics/v1",
+  "notes": "What the frontier feed (scripts/signals/frontier.py) scans daily. Information goes stale inside a week, so every scan looks back 7 days. Topics run through last30days (free sources: Reddit, HN, GitHub, X, YouTube, web); people and vendors are read by signal_watch.py (sources.json) and scored by the same stage. Add a topic or a handle here; no code change.",
+  "lookbackDays": 7,
+  "maxTopicsPerRun": 12,
+  "topics": [
+    {
+      "id": "ci-build-times",
+      "stack": "ci-build",
+      "query": "reduce CI build time monorepo Turborepo remote cache GitHub Actions"
+    },
+    {
+      "id": "merge-queue",
+      "stack": "ci-build",
+      "query": "GitHub merge queue throughput flaky tests CI speedup"
+    },
+    {
+      "id": "agent-swarms",
+      "stack": "agent-fleet",
+      "query": "coding agent swarm parallel agents collaboration Claude Code Codex"
+    },
+    {
+      "id": "agent-verification",
+      "stack": "verification",
+      "query": "verify AI coding agent output tests evals self-verification"
+    },
+    {
+      "id": "nextjs-vercel-speed",
+      "stack": "nextjs-vercel",
+      "query": "Next.js build time deploy speed Vercel optimization"
+    },
+    {
+      "id": "neon-postgres",
+      "stack": "neon-db",
+      "query": "Neon Postgres branching preview databases migrations CI"
+    },
+    {
+      "id": "cloudflare-launches",
+      "stack": "cloudflare",
+      "query": "Cloudflare Workers new launch announcement"
+    },
+    {
+      "id": "vercel-launches",
+      "stack": "nextjs-vercel",
+      "query": "Vercel new feature launch announcement"
+    },
+    {
+      "id": "lab-launches",
+      "stack": "agent-fleet",
+      "query": "OpenAI Anthropic xAI new developer product launch Codex Claude Code"
+    },
+    {
+      "id": "replit-cursor",
+      "stack": "agent-fleet",
+      "query": "Replit Cursor agent new feature launch"
+    }
+  ],
+  "people": [
+    {
+      "handle": "bcherny",
+      "name": "Boris Cherny",
+      "note": "Claude Code lead"
+    },
+    {
+      "handle": "potetotes",
+      "name": "Lauren Tan (Poteto)",
+      "note": "React Compiler, build and agent tooling"
+    },
+    {
+      "handle": "mntruell",
+      "name": "Michael Truell",
+      "note": "Cursor"
+    },
+    {
+      "handle": "amanrsanger",
+      "name": "Aman Sanger",
+      "note": "Cursor"
+    },
+    {
+      "handle": "embirico",
+      "name": "Alexander Embiricos",
+      "note": "OpenAI Codex product lead"
+    },
+    {
+      "handle": "thsottiaux",
+      "name": "Thibault Sottiaux",
+      "note": "OpenAI Codex"
+    },
+    {
+      "handle": "nickaturley",
+      "name": "Nick Turley",
+      "note": "OpenAI ChatGPT product lead"
+    },
+    {
+      "handle": "rauchg",
+      "name": "Guillermo Rauch",
+      "note": "Vercel"
+    },
+    {
+      "handle": "amasad",
+      "name": "Amjad Masad",
+      "note": "Replit"
+    },
+    {
+      "handle": "simonw",
+      "name": "Simon Willison",
+      "note": "agent practice, writes daily"
+    }
+  ],
+  "stack": {
+    "ci-build": [
+      "turborepo",
+      "turbo",
+      "github actions",
+      "merge queue",
+      "ci",
+      "build time",
+      "remote cache",
+      "flaky",
+      "runner",
+      "pnpm",
+      "biome",
+      "vitest",
+      "playwright"
+    ],
+    "nextjs-vercel": [
+      "next.js",
+      "nextjs",
+      "vercel",
+      "turbopack",
+      "isr",
+      "edge",
+      "fluid compute",
+      "react compiler"
+    ],
+    "neon-db": ["neon", "postgres", "drizzle", "branching", "pgbouncer"],
+    "cloudflare": [
+      "cloudflare",
+      "workers",
+      "d1",
+      "r2",
+      "durable objects",
+      "workers ai"
+    ],
+    "agent-fleet": [
+      "agent",
+      "swarm",
+      "claude code",
+      "codex",
+      "subagent",
+      "mcp",
+      "cursor",
+      "worktree",
+      "orchestrat"
+    ],
+    "verification": [
+      "verification",
+      "eval",
+      "test oracle",
+      "false green",
+      "self-verify",
+      "review agent",
+      "mutation test"
+    ]
+  }
+}
