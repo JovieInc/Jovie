@@ -296,59 +296,51 @@ async function fetchArtistContext(
   startOfMonth.setUTCHours(0, 0, 0, 0);
   const startOfMonthISO = startOfMonth.toISOString();
 
-  const [linkCounts, releaseListenLinks, tipTotals, clickStats, profileViews] =
-    await Promise.all([
-      db
-        .select({
-          totalActive: count(),
-          musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ${sqlAny(DSP_PLATFORMS)})`,
-        })
-        .from(socialLinks)
-        .where(
-          and(
-            eq(socialLinks.creatorProfileId, profileId),
-            eq(socialLinks.state, 'active')
-          )
+  const [linkCounts, tipTotals, clickStats, profileViews] = await Promise.all([
+    db
+      .select({
+        totalActive: count(),
+        musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ${sqlAny(DSP_PLATFORMS)})`,
+        // Release listen links render on the public profile too.
+        releaseListen: drizzleSql<number>`(select count(*) from ${providerLinks} join ${discogReleases} on ${providerLinks.releaseId} = ${discogReleases.id} where ${discogReleases.creatorProfileId} = ${profileId})`,
+      })
+      .from(socialLinks)
+      .where(
+        and(
+          eq(socialLinks.creatorProfileId, profileId),
+          eq(socialLinks.state, 'active')
         )
-        .then(r => r[0]),
-      db
-        .select({ total: count() })
-        .from(providerLinks)
-        .innerJoin(
-          discogReleases,
-          eq(providerLinks.releaseId, discogReleases.id)
+      )
+      .then(r => r[0]),
+    db
+      .select({
+        totalReceived: drizzleSql<number>`COALESCE(SUM(${tips.amountCents}), 0)`,
+        monthReceived: drizzleSql<number>`COALESCE(SUM(CASE WHEN ${tips.createdAt} >= ${startOfMonthISO}::timestamp THEN ${tips.amountCents} ELSE 0 END), 0)`,
+        tipsSubmitted: drizzleSql<number>`COALESCE(COUNT(${tips.id}), 0)`,
+      })
+      .from(tips)
+      .where(eq(tips.creatorProfileId, profileId))
+      .then(r => r[0]),
+    db
+      .select({
+        total: drizzleSql<number>`count(*)`,
+      })
+      .from(clickEvents)
+      .where(
+        and(
+          eq(clickEvents.creatorProfileId, profileId),
+          eq(clickEvents.linkType, 'tip')
         )
-        .where(eq(discogReleases.creatorProfileId, profileId))
-        .then(r => r[0]),
-      db
-        .select({
-          totalReceived: drizzleSql<number>`COALESCE(SUM(${tips.amountCents}), 0)`,
-          monthReceived: drizzleSql<number>`COALESCE(SUM(CASE WHEN ${tips.createdAt} >= ${startOfMonthISO}::timestamp THEN ${tips.amountCents} ELSE 0 END), 0)`,
-          tipsSubmitted: drizzleSql<number>`COALESCE(COUNT(${tips.id}), 0)`,
-        })
-        .from(tips)
-        .where(eq(tips.creatorProfileId, profileId))
-        .then(r => r[0]),
-      db
-        .select({
-          total: drizzleSql<number>`count(*)`,
-        })
-        .from(clickEvents)
-        .where(
-          and(
-            eq(clickEvents.creatorProfileId, profileId),
-            eq(clickEvents.linkType, 'tip')
-          )
-        )
-        .then(r => r[0]),
-      readAuthorizedProfileViews(appUserId).catch(error => {
-        logger.warn('Authorized analytics unavailable for chat context', {
-          profileId,
-          error,
-        });
-        return 0;
-      }),
-    ]);
+      )
+      .then(r => r[0]),
+    readAuthorizedProfileViews(appUserId).catch(error => {
+      logger.warn('Authorized analytics unavailable for chat context', {
+        profileId,
+        error,
+      });
+      return 0;
+    }),
+  ]);
 
   return {
     displayName: result.displayName ?? result.username,
@@ -363,7 +355,7 @@ async function fetchArtistContext(
     hasSocialLinks: Number(linkCounts?.totalActive ?? 0) > 0,
     hasMusicLinks: resolveHasMusicLinks({
       dspSocialLinkCount: Number(linkCounts?.musicActive ?? 0),
-      releaseListenLinkCount: Number(releaseListenLinks?.total ?? 0),
+      releaseListenLinkCount: Number(linkCounts?.releaseListen ?? 0),
       spotifyUrl: result.spotifyUrl,
       appleMusicUrl: result.appleMusicUrl,
     }),
