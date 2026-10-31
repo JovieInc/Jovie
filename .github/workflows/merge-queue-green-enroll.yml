@@ -983,6 +983,7 @@ jobs:
           sparse-checkout: |
             .nvmrc
             scripts/hold-contract.mjs
+            scripts/lib/github-rate-limit.mjs
             scripts/lib/admission-hold-labels.json
             scripts/lib/admission-hold-labels.mjs
             scripts/lib/queue-deferral-receipt.mjs

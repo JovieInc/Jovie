@@ -295,6 +295,7 @@ web.public-profile|web|public-profile|apps/web/app/[username]/page.tsx,apps/web/
 web.public-profile-about|web|public-profile|apps/web/app/[username]/about/page.tsx|desktop,mobile
 web.auth|web|browser-input-assurance|apps/web/app/(auth)/,apps/web/app/@auth/,apps/web/app/auth-return/,apps/web/app/desktop-auth/,apps/web/app/mobile-auth-return/,apps/web/components/features/auth/|desktop,mobile
 web.artist-pay|web|artist-pay|apps/web/app/[username]/pay/page.tsx|desktop,mobile
+web.artist-alerts|web|artist-alerts|apps/web/app/[username]/alerts/page.tsx|desktop,mobile
 web.profile-mode-render|web|profile-mode-render|apps/web/app/[username]/profile-mode-render/|desktop,mobile
 web.release-landing|web|release-landing|apps/web/app/r/[slug]/page.tsx,apps/web/app/r/[slug]/ReleaseLandingPage.tsx|desktop,mobile
 web.smartlink-release|web|release-landing|apps/web/app/[username]/[...slug]/page.tsx,apps/web/app/[username]/[slug]/page.tsx,apps/web/app/[username]/[slug]/not-found.tsx|desktop,mobile
