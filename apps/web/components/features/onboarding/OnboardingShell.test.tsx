@@ -111,6 +111,33 @@ vi.mock('@/components/features/onboarding/useOnboardingClaim', () => ({
   },
 }));
 
+/** A restored transcript as `readOnboardingMessages` builds it. */
+function nextStepTranscript(
+  kind: 'waitlist' | 'instant_access' | 'needs_more_info'
+) {
+  return [
+    ...STARTED_CONVERSATION,
+    {
+      id: 'm2',
+      role: 'assistant' as const,
+      parts: [
+        { type: 'text' as const, text: 'Sign up below to hold your name.' },
+        {
+          type: 'dynamic-tool' as const,
+          toolName: 'proposeNextStep',
+          toolCallId: 'call-next-step',
+          state: 'output-available' as const,
+          input: {},
+          output: {
+            action: 'propose_next_step',
+            decision: { kind, rationale: 'test', score: 1 },
+          },
+        },
+      ],
+    },
+  ];
+}
+
 const STARTED_CONVERSATION = [
   {
     id: 'm1',
@@ -416,6 +443,43 @@ describe('OnboardingShell status', () => {
 
     expect(claimState.trigger).toBe(1);
     expect(claimState.enabled).toBe(true);
+  });
+
+  // Golden-path cert 2026-10-31 pm (walk-m1..m3): the OTP form hard-navigates
+  // to /start while a claim POST from the pre-navigation page is in flight.
+  // The server commits ownership, the response is lost, and the reloaded page
+  // restores an owned transcript that already ends in the waitlist decision.
+  // That restore must claim on mount (the server's idempotent alreadyClaimed
+  // recovery returns the receipt), or the visitor waits on "Saving your
+  // request…" forever.
+  it.each(['waitlist', 'instant_access'] as const)(
+    'claims on mount when a restored owned transcript already ends in a %s decision',
+    kind => {
+      render(
+        <OnboardingShell
+          sessionLabel='saved'
+          isSignedIn
+          resumeOwnedConversation
+          initialMessages={nextStepTranscript(kind)}
+        />
+      );
+
+      expect(claimState.trigger).toBe(0);
+      expect(claimState.enabled).toBe(true);
+    }
+  );
+
+  it('keeps a restored owned transcript without a terminal decision quiet until a genuine turn', () => {
+    render(
+      <OnboardingShell
+        sessionLabel='saved'
+        isSignedIn
+        resumeOwnedConversation
+        initialMessages={nextStepTranscript('needs_more_info')}
+      />
+    );
+
+    expect(claimState.enabled).toBe(false);
   });
 
   it('clears a rejected challenge token and keeps a fresh verification action available', () => {
