@@ -7,7 +7,7 @@ export const DEFAULT_LOAD_FACTOR = 1.5;
 export const EVIDENCE_MARKER = 'PREFLIGHT_REMOTE_EVIDENCE';
 
 /** 1-minute load above cores x factor means this host is saturated. */
-export function isOverloaded({ load, cores, env = {} }) {
+export function isOverloaded({ load, cores, env = process.env }) {
   const factor =
     Number.parseFloat(env.JOVIE_PREPUSH_LOAD_FACTOR ?? '') ||
     DEFAULT_LOAD_FACTOR;
@@ -15,7 +15,7 @@ export function isOverloaded({ load, cores, env = {} }) {
 }
 
 /** local | remote. JOVIE_PREPUSH_REMOTE=1 forces Gem, =0 forces local. */
-export function chooseMode({ load, cores, env = {} }) {
+export function chooseMode({ load, cores, env = process.env }) {
   if (env.JOVIE_PREPUSH_REMOTE === '1') return 'remote';
   if (
     env.JOVIE_PREPUSH_REMOTE === '0' ||
