@@ -18,6 +18,7 @@ import {
   internalAccountSql,
   isInternalAccount,
 } from '@/lib/accounts/internal-account';
+import { getAdminMercuryMetrics } from '@/lib/admin/mercury-metrics';
 import { getAdminStripeOverviewMetrics } from '@/lib/admin/stripe-metrics';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -56,10 +57,26 @@ const internalAccount = () => internalAccountSql();
 const externalAccount = () => externalAccountSql();
 
 export async function getSummerRevenue(now = new Date()) {
-  const [stripeMetrics, lyb] = await Promise.all([
+  const [stripeMetrics, lyb, mercury] = await Promise.all([
     getAdminStripeOverviewMetrics(),
     getLybDailyMrr(now).catch(() => unavailable('lyb_mrr_failed')),
+    getAdminMercuryMetrics().catch(() => null),
   ]);
+  // Cash from the read-only Mercury token (MERCURY_API_TOKEN); unavailable is never $0.
+  const cash = !mercury
+    ? unavailable('mercury_request_failed')
+    : !mercury.isConfigured
+      ? unavailable('mercury_not_configured')
+      : !mercury.isAvailable
+        ? unavailable('mercury_request_failed')
+        : {
+            balanceUsd: mercury.balanceUsd,
+            burnRateUsd: mercury.burnRateAvailable ? mercury.burnRateUsd : null,
+            burnWindowDays: mercury.burnWindowDays,
+            defaultStatus: mercury.defaultStatus,
+            observedAt: mercury.observedAtIso ?? now.toISOString(),
+            source: 'mercury' as const,
+          };
   const jovie = !stripeMetrics.isConfigured
     ? unavailable('stripe_not_configured')
     : !stripeMetrics.isAvailable
@@ -81,7 +98,7 @@ export async function getSummerRevenue(now = new Date()) {
           },
           source: 'stripe' as const,
         };
-  return { observedAt: now.toISOString(), jovie, lyb };
+  return { observedAt: now.toISOString(), jovie, lyb, cash };
 }
 
 export const summerCohortQuerySchema = z.object({
