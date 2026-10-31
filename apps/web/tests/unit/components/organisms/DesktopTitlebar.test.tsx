@@ -73,6 +73,7 @@ describe('DesktopTitlebar', () => {
     document.documentElement.removeAttribute('data-desktop-version');
     document.documentElement.removeAttribute('data-desktop-source-revision');
     document.documentElement.removeAttribute('data-desktop-built-at');
+    document.documentElement.removeAttribute('data-electron-fullscreen');
   });
 
   it('keeps the sidebar toggle outside the window drag region', () => {
@@ -105,7 +106,7 @@ describe('DesktopTitlebar', () => {
       screen.getByTestId('electron-titlebar-sidebar-cell')
     ).toContainElement(screen.getByTestId('electron-traffic-light-safe-area'));
     expect(screen.getByTestId('electron-titlebar-sidebar-cell')).toHaveClass(
-      'gap-(--app-shell-sidebar-icon-gap)'
+      'gap-(--electron-traffic-light-toggle-gap)'
     );
     expect(
       screen.getByTestId('electron-titlebar-sidebar-cell')
@@ -220,6 +221,86 @@ describe('DesktopTitlebar', () => {
     expect(
       screen.queryByTestId('electron-titlebar-main-cell')
     ).not.toBeInTheDocument();
+  });
+
+  it('mirrors native full-screen transitions onto the document root', async () => {
+    const fullScreenCallbacks: Array<(isFullScreen: boolean) => void> = [];
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        getFullScreenState: vi.fn().mockResolvedValue(true),
+        onFullScreenChanged: (callback: (isFullScreen: boolean) => void) => {
+          fullScreenCallbacks.push(callback);
+          return () => undefined;
+        },
+      },
+    });
+
+    renderTitlebar();
+
+    // The initial native snapshot collapses the traffic-light reserve.
+    await waitFor(() => {
+      expect(document.documentElement.dataset.electronFullscreen).toBe('true');
+    });
+
+    // A live leave-full-screen transition restores the reserve.
+    await act(async () => {
+      fullScreenCallbacks.at(-1)?.(false);
+    });
+    expect(document.documentElement.dataset.electronFullscreen).toBe('false');
+  });
+
+  it('keeps the reserve untouched when the bridge predates full-screen events', () => {
+    // No electronAPI: the observer unsubscribes immediately and the flag
+    // never lands on the document root.
+    renderTitlebar();
+
+    expect(document.documentElement.dataset.electronFullscreen).toBeUndefined();
+  });
+
+  it('clears the full-screen flag when the titlebar leaves the desktop runtime', async () => {
+    const fullScreenCallbacks: Array<(isFullScreen: boolean) => void> = [];
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        getFullScreenState: vi.fn().mockResolvedValue(true),
+        onFullScreenChanged: (callback: (isFullScreen: boolean) => void) => {
+          fullScreenCallbacks.push(callback);
+          return () => undefined;
+        },
+      },
+    });
+
+    const view = renderTitlebar();
+    await waitFor(() => {
+      expect(document.documentElement.dataset.electronFullscreen).toBe('true');
+    });
+
+    // Flipping out of the Electron runtime clears the stale flag so the
+    // browser shell never inherits a collapsed reserve.
+    electronRuntimeMock.isElectronRuntime = false;
+    view.rerender(
+      <SidebarContext.Provider
+        value={{
+          state: 'open',
+          open: true,
+          isPreview: false,
+          isFloating: false,
+          setOpen: vi.fn(),
+          openMobile: false,
+          setOpenMobile: vi.fn(),
+          isMobile: false,
+          toggleSidebar: vi.fn(),
+        }}
+      >
+        <TooltipProvider>
+          <DesktopTitlebar />
+          <DesktopReleaseIdentity />
+        </TooltipProvider>
+      </SidebarContext.Provider>
+    );
+
+    expect(document.documentElement.dataset.electronFullscreen).toBeUndefined();
   });
 
   it.each([{ state: 'closed' as const, open: false }, { isMobile: true }])(

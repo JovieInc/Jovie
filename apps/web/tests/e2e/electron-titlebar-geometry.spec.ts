@@ -248,17 +248,31 @@ test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignmen
       sidebarWidth: readPx('--electron-sidebar-width'),
       shellGap: readPx('--app-shell-gap'),
       collapsedSidebarWidth: readPx('--electron-sidebar-collapsed-width'),
+      trafficLightToggleGap: readPx('--electron-traffic-light-toggle-gap'),
     };
   });
 
   // If we can read the token, check the sidebar column width matches.
-  expect(tokens.titlebarHeight).toBe(40);
-  expect(tokens.trafficLightSafeWidth).toBe(70);
-  expect(tokens.trafficLightX).toBe(20);
+  // JOV-8940: the locked 44pt title row matches the unified toolbar height;
+  // the native lights lead at 12px and center on the row's icon centerline.
+  expect(tokens.titlebarHeight).toBe(44);
+  expect(tokens.trafficLightSafeWidth).toBe(58);
+  expect(tokens.trafficLightX).toBe(12);
   // JOV-8974: the titlebar band sits one shell gap below the window top, so
-  // the native lights ride down with it (native y 17 + the top gutter).
-  expect(tokens.trafficLightY).toBe(17 + (tokens.shellGap ?? 0));
+  // the native lights ride down with it (locked 15px in-band + the gutter).
+  expect(tokens.trafficLightY).toBe(15 + (tokens.shellGap ?? 0));
   expect(tokens.collapsedSidebarWidth).toBe(52);
+  // The first interactive control clears the hidden native lights by the
+  // locked toggle gap instead of hugging them.
+  expect(tokens.trafficLightToggleGap).toBeGreaterThanOrEqual(12);
+  expect(
+    Math.abs(
+      (tokens.trafficLightY ?? 0) +
+        14 / 2 -
+        ((tokens.shellGap ?? 0) + (tokens.titlebarHeight ?? 0) / 2)
+    ),
+    'traffic-light center matches the title row icon centerline'
+  ).toBeLessThanOrEqual(1);
 
   if (tokens.sidebarWidth !== null && tokens.sidebarWidth > 0) {
     const sidebarCell = page.locator(
@@ -295,6 +309,42 @@ test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignmen
       ).toBeLessThanOrEqual(tokens.sidebarWidth);
     }
   }
+});
+
+test('full-screen Electron shell collapses the native safe area while preserving the title row', async ({
+  page,
+}) => {
+  // Skip outside the explicit dev-auth E2E lane; full-screen collapse checks
+  // need a bypassed Clerk session.
+  test.skip(
+    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
+    'Requires E2E_USE_TEST_AUTH_BYPASS=1'
+  );
+  test.setTimeout(180_000);
+
+  await installElectronRuntime(page);
+  await gotoShellRoute(page);
+  await waitForSettledShell(page);
+
+  // JOV-8940: macOS hides the native lights in full screen. The renderer
+  // mirrors the native state onto the document root, so the reserve
+  // collapses to zero while the 44pt title row keeps its height.
+  await page.evaluate(() => {
+    document.documentElement.dataset.electronFullscreen = 'true';
+  });
+
+  await expect(page.getByTestId('electron-traffic-light-safe-area')).toHaveCSS(
+    'width',
+    '0px'
+  );
+  await expect(page.locator('[data-app-shell-sidebar-mount="true"]')).toHaveCSS(
+    'padding-top',
+    '44px'
+  );
+  await expect(page.getByTestId('electron-titlebar-row')).toHaveCSS(
+    'height',
+    '44px'
+  );
 });
 
 test('Electron shell keeps one control contract across chat, calendar, tasks, library, and settings routes', async ({
@@ -376,6 +426,9 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
       const sidebar = document.querySelector<HTMLElement>(
         '[data-app-shell-sidebar-mount="true"]'
       );
+      const contentColumn = document.querySelector<HTMLElement>(
+        '[data-app-shell-content-column="true"]'
+      );
       const mainPlane = document.querySelector<HTMLElement>(
         '[data-app-shell-main-plane="true"]'
       );
@@ -386,12 +439,22 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
         '[data-settings-layout-column="true"]'
       );
       const mainContent = document.querySelector<HTMLElement>('#main-content');
-      if (!titlebar || !body || !sidebar || !mainPlane) return null;
+      if (!titlebar || !body || !sidebar || !mainPlane || !contentColumn)
+        return null;
 
       const titlebarBox = titlebar.getBoundingClientRect();
       const bodyBox = body.getBoundingClientRect();
       const sidebarBox = sidebar.getBoundingClientRect();
       const mainPlaneBox = mainPlane.getBoundingClientRect();
+      const contentColumnBox = contentColumn.getBoundingClientRect();
+      const header = contentColumn.querySelector<HTMLElement>(
+        '[data-top-spacing-owner="shell-header"]'
+      );
+      const title = header?.querySelector<HTMLElement>('h1');
+      const headerInner = header?.firstElementChild as HTMLElement | null;
+      const headerPaddingLeft = headerInner
+        ? Number.parseFloat(getComputedStyle(headerInner).paddingLeft)
+        : null;
       const settingsShellBox = settingsShell?.getBoundingClientRect();
       const settingsColumnBox = settingsColumn?.getBoundingClientRect();
       const mainContentBox = mainContent?.getBoundingClientRect();
@@ -403,6 +466,16 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
         bodyTop: bodyBox.top,
         sidebarTop: sidebarBox.top,
         mainPlaneTop: mainPlaneBox.top,
+        // JOV-8940: the page title aligns with the content column's inner
+        // start — never jammed against the window-control cluster. Routes
+        // without a shell header report null and skip the assertion.
+        titleColumnStartDelta:
+          title && headerPaddingLeft !== null
+            ? Math.abs(
+                title.getBoundingClientRect().left -
+                  (contentColumnBox.left + headerPaddingLeft)
+              )
+            : null,
         mainContentRight: mainContentBox?.right ?? null,
         mainContentBottom: mainContentBox?.bottom ?? null,
         viewportWidth: window.innerWidth,
@@ -446,6 +519,12 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
       ),
       `${route} main plane aligns to the body content grid`
     ).toBeLessThanOrEqual(1);
+    if (geometry?.titleColumnStartDelta != null) {
+      expect(
+        geometry.titleColumnStartDelta,
+        `${route} title aligns with the content column start`
+      ).toBeLessThanOrEqual(1);
+    }
     // JOV-8941: the native window owns the right and bottom edges in
     // Electron, so the main panel meets the window frame instead of reading
     // as a floating card with a gutter on those edges. Fractional layout can
