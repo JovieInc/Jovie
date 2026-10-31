@@ -12,6 +12,8 @@ import {
 import {
   decideFallbackTurn,
   type FallbackTurn,
+  handleFromArtistName,
+  requestedHandleFrom,
   resolveGuardedStep,
   type ServerArtistConfirmation,
 } from './engine';
@@ -124,7 +126,8 @@ function pickerEvent(query: string) {
 /** Turn for a picker selection, built from the already-confirmed artist. */
 export function turnFromArtistConfirmation(
   confirmation: ServerArtistConfirmation,
-  state: OnboardingTurnState
+  state: OnboardingTurnState,
+  uiMessages: readonly UIMessage[]
 ): FallbackTurn {
   const hasData = state.spotifyFollowers !== null;
   const line = scriptedLine(
@@ -134,21 +137,39 @@ export function turnFromArtistConfirmation(
   const part = confirmation.historyMessage.parts[0] as unknown as
     | { input: Record<string, unknown>; output: Record<string, unknown> }
     | undefined;
+  // The line says "confirm the handle below", so the handle card ships in
+  // the same turn — mirroring the engine's artist-select turn. Without it
+  // the visitor faced the prompt with no confirm control until they typed a
+  // reply (JOV-10168, 2026-10-31 signed-out replay).
+  const handle =
+    requestedHandleFrom(uiMessages, null, true) ??
+    handleFromArtistName(state.spotifyArtistName ?? '');
   return {
     line,
     text: renderLine(line, {
       name: state.spotifyArtistName,
       followers: state.spotifyFollowers,
     }),
-    toolEvents: part
-      ? [
-          {
-            toolName: 'confirmSpotifyArtist',
-            input: part.input,
-            output: part.output,
-          },
-        ]
-      : [],
+    toolEvents: [
+      ...(part
+        ? [
+            {
+              toolName: 'confirmSpotifyArtist',
+              input: part.input,
+              output: part.output,
+            },
+          ]
+        : []),
+      {
+        toolName: 'checkHandle',
+        input: { handle },
+        output: {
+          action: 'check_handle',
+          handle,
+          summary: `Checking @${handle}.`,
+        },
+      },
+    ],
     guardedStep: 'artist_select',
   };
 }
@@ -202,7 +223,7 @@ export async function routeOnboardingTurn(
   if (artistConfirmation) {
     return {
       kind: 'script',
-      turn: turnFromArtistConfirmation(artistConfirmation, state),
+      turn: turnFromArtistConfirmation(artistConfirmation, state, uiMessages),
       classification: null,
       guardedStep: 'artist_select',
     };

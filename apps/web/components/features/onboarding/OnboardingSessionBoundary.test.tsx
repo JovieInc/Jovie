@@ -213,6 +213,47 @@ describe('onboarding identity boundary', () => {
     });
     expect(screen.getByTestId('handoff')).toHaveTextContent('');
   });
+  it('restarts in one click when the snapshot conversation id is stale (JOV-10170)', async () => {
+    // Fresh visitor: the boundary's snapshot has no conversation id; the
+    // chat mints one server-side with the first message. The first Start
+    // Over click used to 409 on the stale id, forcing a manual reload plus
+    // a second click.
+    mocks.fetch
+      .mockResolvedValueOnce(snapshot('account-a', [], false))
+      .mockResolvedValueOnce(
+        Response.json(
+          { error: 'Your conversation changed. Reload to continue.' },
+          { status: 409 }
+        )
+      )
+      .mockResolvedValueOnce(snapshot('account-a', history, true))
+      .mockResolvedValueOnce(Response.json({ success: true }))
+      .mockResolvedValueOnce(snapshot('account-a', [], false));
+    render(<OnboardingSessionBoundary sessionLabel='pending' />);
+    await waitFor(() => expect(mocks.fetch).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole('button', { name: 'Start over' }));
+    await waitFor(() => expect(mocks.fetch).toHaveBeenCalledTimes(5));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(mocks.fetch.mock.calls[1][1]).toMatchObject({
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'restart',
+        identityId: 'account-a',
+        conversationId: null,
+      }),
+    });
+    expect(mocks.fetch.mock.calls[3][1]).toMatchObject({
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'restart',
+        identityId: 'account-a',
+        conversationId: 'conversation-a',
+      }),
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('history')).toHaveTextContent('')
+    );
+  });
   it('keeps history and a retryable error when restart fails', async () => {
     mocks.fetch
       .mockResolvedValueOnce(snapshot())

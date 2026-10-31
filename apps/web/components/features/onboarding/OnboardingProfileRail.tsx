@@ -328,7 +328,15 @@ export function resolvePreviewArtist(
       tagline: draft.outcome,
     };
   }
-  if (state.artist) return state.artist;
+  if (state.artist) {
+    // JOV-10169: the artist preview must never render a fabricated
+    // jov.ie/your-handle identity. Between the artist pick and a known
+    // handle, the rail stays empty (the shell falls back to the entry
+    // preview) instead of flashing the placeholder URL and /your-handle
+    // links.
+    if (!state.handle) return null;
+    return state.artist;
+  }
   // Pen R6As7U: the draft profile is present as soon as a handle is known,
   // before any artist or link is attached.
   if (!state.handle) return null;

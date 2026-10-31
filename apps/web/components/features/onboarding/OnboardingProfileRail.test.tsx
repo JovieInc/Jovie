@@ -273,6 +273,23 @@ describe('resolvePreviewArtist', () => {
       })
     ).toEqual({ id: 'handle-djnova', name: 'djnova', url: '' });
   });
+
+  it('hides the artist preview until a handle is known (JOV-10169: no jov.ie/your-handle flash)', () => {
+    const pickedArtist = {
+      artist: {
+        id: 'sp-1',
+        name: 'Greek',
+        url: 'https://open.spotify.com/artist/sp-1',
+      },
+      artistConfirmed: true,
+      handle: null,
+      socialLinks: [],
+    };
+    expect(resolvePreviewArtist(pickedArtist)).toBeNull();
+    expect(
+      resolvePreviewArtist({ ...pickedArtist, handle: 'greek' })
+    ).toMatchObject({ id: 'sp-1' });
+  });
 });
 
 // JOV-7973: the side rail is a focusable scroll region, so it must own its
