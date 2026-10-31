@@ -45,6 +45,7 @@ export type ArtistIdentityReason =
   | 'owner_confirmed'
   | 'same_name_collision'
   | 'unverified_vendor_match'
+  | 'owner_rejected_bound_identity'
   | 'contradicting_provider_identity'
   | 'no_provider_identity';
 
@@ -106,6 +107,12 @@ export function scoreArtistIdentity(
     (entry): entry is [string, string] =>
       typeof entry[1] === 'string' && entry[1].length > 0
   );
+  const matchesBoundIdentity = (match: ArtistIdentityMatchEvidence) =>
+    bound.some(
+      ([providerId, externalArtistId]) =>
+        match.providerId === providerId &&
+        match.externalArtistId === externalArtistId
+    );
   const accepted = evidence.matches.filter(match => ACCEPTED.has(match.status));
   const unverifiedVendorMatches = accepted.filter(
     match => !isEvidencedMatch(match) && !isOwnerConfirmed(match)
@@ -129,17 +136,21 @@ export function scoreArtistIdentity(
     unverifiedVendorMatches,
     threshold: ARTIST_IDENTITY_CERTIFY_THRESHOLD,
   });
+  if (
+    evidence.matches.some(
+      match => match.status === 'rejected' && matchesBoundIdentity(match)
+    )
+  ) {
+    reasons.push('owner_rejected_bound_identity');
+    return result(0, 'conflict');
+  }
   if (contradiction) {
     reasons.push('contradicting_provider_identity');
     return result(0, 'conflict');
   }
 
   const ownerConfirmed = accepted.some(
-    match =>
-      isOwnerConfirmed(match) &&
-      typeof match.externalArtistId === 'string' &&
-      match.externalArtistId.length > 0 &&
-      match.externalArtistId === evidence.boundIds[match.providerId]
+    match => isOwnerConfirmed(match) && matchesBoundIdentity(match)
   );
   if (!bound.length && !ownerConfirmed) {
     reasons.push('no_provider_identity');

@@ -108,6 +108,24 @@ describe('scoreArtistIdentity', () => {
     expect(result.reasons).toContain('same_name_collision');
   });
 
+  it('does not certify a bound artist the owner explicitly rejected', () => {
+    const result = scoreArtistIdentity({
+      boundIds: { spotify: SPOTIFY_ID },
+      matches: [
+        match(),
+        match({
+          providerId: 'spotify',
+          externalArtistId: SPOTIFY_ID,
+          status: 'rejected',
+        }),
+      ],
+      sameNameCollisions: 0,
+    });
+    expect(result.decision).toBe('conflict');
+    expect(result.score).toBe(0);
+    expect(result.reasons).toContain('owner_rejected_bound_identity');
+  });
+
   it('certifies once the owner confirms, even with a same-name collision', () => {
     const result = scoreArtistIdentity({
       boundIds: { spotify: SPOTIFY_ID },
