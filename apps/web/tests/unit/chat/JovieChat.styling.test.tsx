@@ -101,6 +101,7 @@ const mockChatState = vi.hoisted(() => ({
   isLoading: true,
   isSubmitting: false,
   status: 'streaming' as 'ready' | 'streaming',
+  chatError: null as null | { type: string; message: string },
   collapsedSummerFailureCount: 0,
   showCollapsedSummerFailures: vi.fn(),
   messages: [{ id: 'm1', role: 'user', parts: [{ type: 'text', text: 'Hi' }] }],
@@ -143,7 +144,7 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
       draft: createComposerDraft(''),
       setInput: vi.fn(),
       messages: mockChatState.messages,
-      chatError: null,
+      chatError: mockChatState.chatError,
       isLoading: mockChatState.isLoading,
       isSubmitting: mockChatState.isSubmitting,
       hasMessages: mockChatState.hasMessages,
@@ -372,6 +373,21 @@ describe('JovieChat styling regressions', () => {
     // Verify the chat input area renders
     const chatInput = container.querySelector('[data-testid="chat-input"]');
     expect(chatInput).toBeTruthy();
+  });
+
+  it('shows the weekly plan limit once: no inline error beside the usage alert', () => {
+    mockChatState.chatError = {
+      type: 'rate_limit',
+      message:
+        'You have reached your weekly AI message limit. Upgrade to Artist Presence for 70 messages per week.',
+    };
+    try {
+      const view = renderWithQueryClient(<JovieChat profileId='profile-1' />);
+      expect(view.queryByTestId('chat-error')).toBeNull();
+      expect(view.getAllByTestId('chat-usage').length).toBeGreaterThan(0);
+    } finally {
+      mockChatState.chatError = null;
+    }
   });
 
   it('keeps the composer dock padded above mobile shell navigation', () => {
