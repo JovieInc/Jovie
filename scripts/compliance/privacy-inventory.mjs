@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-nocheck Playwright page-context DOM globals are not in the Node scripts tsconfig.
 // Privacy inventory crawler (compliance loop, stage 1).
 //
 // Loads every surface in canon/privacy/tracker-registry.json in a headless
