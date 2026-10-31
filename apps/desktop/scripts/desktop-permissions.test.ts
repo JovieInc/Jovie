@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import {
   isAudioMediaPermissionCheck,
   isAudioOnlyMediaPermissionRequest,
@@ -8,6 +8,8 @@ import {
   isScreenMediaPermissionRequest,
   isTrustedPermissionOrigin,
   isTrustedPermissionRequest,
+  type MicrophoneAccessStatus,
+  resolveMicrophoneAccess,
   shouldGrantTrustedAudioPermission,
   shouldGrantTrustedAudioPermissionCheck,
   shouldGrantTrustedHudScreenPermission,
@@ -422,4 +424,36 @@ test('empty-device display request is allowed for the current HUD document', () 
       details: { ...hudDetails, mediaTypes: [] },
     })
   ).toBe(true);
+});
+
+function mediaAccess(status: MicrophoneAccessStatus, ask = true) {
+  const askForMediaAccess = vi.fn().mockResolvedValue(ask);
+  return {
+    api: { getMediaAccessStatus: () => status, askForMediaAccess },
+    askForMediaAccess,
+  };
+}
+
+test('macOS mic access: granted passes, not-determined asks the OS, denied stays denied (JOV-9665)', async () => {
+  const granted = mediaAccess('granted');
+  expect(await resolveMicrophoneAccess('darwin', granted.api)).toBe(true);
+  expect(granted.askForMediaAccess).not.toHaveBeenCalled();
+
+  const fresh = mediaAccess('not-determined', true);
+  expect(await resolveMicrophoneAccess('darwin', fresh.api)).toBe(true);
+  expect(fresh.askForMediaAccess).toHaveBeenCalledWith('microphone');
+
+  const refused = mediaAccess('not-determined', false);
+  expect(await resolveMicrophoneAccess('darwin', refused.api)).toBe(false);
+
+  for (const status of ['denied', 'restricted'] as const) {
+    const blocked = mediaAccess(status);
+    expect(await resolveMicrophoneAccess('darwin', blocked.api)).toBe(false);
+    expect(blocked.askForMediaAccess).not.toHaveBeenCalled();
+  }
+});
+
+test('non-macOS platforms defer to Chromium for the mic', async () => {
+  const { api } = mediaAccess('denied');
+  expect(await resolveMicrophoneAccess('win32', api)).toBe(true);
 });

@@ -185,9 +185,9 @@ function dictationErrorMessage(code: TranscriberErrorCode): string {
     case 'no-speech':
       return "Didn't catch speech — try again or keep typing.";
     case 'network':
-      return 'Dictation needs a network connection. You can keep typing.';
+      return "Couldn't transcribe that. Tap the mic to try again.";
     default:
-      return 'Dictation unavailable right now. You can keep typing.';
+      return 'Something went wrong. Tap the mic to try again.';
   }
 }
 
@@ -198,21 +198,16 @@ const DICTATION_BANNER_BUTTON_CLASS =
 function DictationStatusBanner({
   isListening,
   error,
-  hint,
   onDismissError,
-  onDismissHint,
   onCancel,
 }: {
   readonly isListening: boolean;
   readonly error: TranscriberErrorCode | null;
-  /** System-dictation guidance shown after tapping an unavailable mic. */
-  readonly hint: string | null;
   readonly onDismissError: () => void;
-  readonly onDismissHint: () => void;
   /** Abort the live session and restore the pre-dictation draft. */
   readonly onCancel: () => void;
 }) {
-  if (!isListening && !error && !hint) return null;
+  if (!isListening && !error) return null;
 
   if (error) {
     return (
@@ -226,26 +221,6 @@ function DictationStatusBanner({
           variant='ghost'
           size='sm'
           onClick={onDismissError}
-          className={DICTATION_BANNER_BUTTON_CLASS}
-        >
-          Dismiss
-        </Button>
-      </div>
-    );
-  }
-
-  if (!isListening && hint) {
-    return (
-      <div
-        role='status'
-        className='flex items-center justify-between gap-3 px-3 py-2 text-xs text-tertiary-token'
-      >
-        <span className='min-w-0 flex-1'>{hint}</span>
-        <Button
-          type='button'
-          variant='ghost'
-          size='sm'
-          onClick={onDismissHint}
           className={DICTATION_BANNER_BUTTON_CLASS}
         >
           Dismiss
@@ -681,7 +656,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       isSupported: isDictationSupported,
       isListening,
       error: dictationError,
-      unavailableHint: dictationUnavailableHint,
       clearError: clearDictationError,
       start: startDictation,
       stop: stopDictation,
@@ -694,7 +668,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         );
       },
     });
-    const [showDictationHint, setShowDictationHint] = useState(false);
 
     const captureDictationBaseline = useCallback(() => {
       dictationBaselineRef.current = value;
@@ -716,18 +689,11 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       cancelDictation();
     }, [cancelDictation]);
 
-    const handleMicUnavailable = useCallback(() => {
-      setShowDictationHint(true);
-    }, []);
     const restoreDictationFocus = useCallback(() => {
       if (dictationBannerRef.current?.contains(document.activeElement)) {
         micButtonRef.current?.focus({ preventScroll: true });
       }
     }, []);
-    const dismissDictationHint = useCallback(() => {
-      restoreDictationFocus();
-      setShowDictationHint(false);
-    }, [restoreDictationFocus]);
     const dismissDictationError = useCallback(() => {
       restoreDictationFocus();
       clearDictationError();
@@ -925,10 +891,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       : surfaceMode === 'entity' && !isStacked
         ? 'relative flex justify-end'
         : 'relative flex justify-center';
-    const showDictationBanner =
-      isListening ||
-      Boolean(dictationError) ||
-      (showDictationHint && Boolean(dictationUnavailableHint));
+    const showDictationBanner = isListening || Boolean(dictationError);
     const showComposerOverlay = showInlinePicker || isPickerOpen;
     // Container the slash key listener cares about when the picker is closed.
     // (The active-listener inside SlashCommandMenu only mounts while open.)
@@ -941,17 +904,12 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       <DictationStatusBanner
         isListening={isListening}
         error={dictationError}
-        hint={showDictationHint ? dictationUnavailableHint : null}
         onDismissError={dismissDictationError}
-        onDismissHint={dismissDictationHint}
         onCancel={cancelDictationFromBanner}
       />
     );
-    // The mic slot stays mounted when the desktop can point at system
-    // dictation, so the hint has somewhere to land.
-    const hasDictationAffordance =
-      dictationEnabled &&
-      (isDictationSupported || Boolean(dictationUnavailableHint));
+    // The mic only exists when a working dictation path does.
+    const hasDictationAffordance = dictationEnabled && isDictationSupported;
     const inputRowProps = {
       containerRef,
       hiddenDivRef,
@@ -976,9 +934,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       handlePreserveFocus,
       dictationEnabled,
       isDictationSupported: dictationEnabled && isDictationSupported,
-      dictationUnavailableHint,
       isListening,
-      handleMicUnavailable,
       handleMicPushStart,
       handleMicPushEnd,
       handleMicToggle,
@@ -1227,9 +1183,7 @@ interface InputRowProps {
   ) => void;
   readonly dictationEnabled: boolean;
   readonly isDictationSupported: boolean;
-  readonly dictationUnavailableHint: string | null;
   readonly isListening: boolean;
-  readonly handleMicUnavailable: () => void;
   readonly handleMicPushStart: () => void;
   readonly handleMicPushEnd: () => void;
   readonly handleMicToggle: () => void;
@@ -1280,9 +1234,7 @@ function InputRow({
   handlePreserveFocus,
   dictationEnabled,
   isDictationSupported,
-  dictationUnavailableHint,
   isListening,
-  handleMicUnavailable,
   handleMicPushStart,
   handleMicPushEnd,
   handleMicToggle,
@@ -1432,17 +1384,14 @@ function InputRow({
           </div>
 
           <div className='flex shrink-0 items-center gap-2'>
-            {dictationEnabled ? (
+            {dictationEnabled && isDictationSupported ? (
               <ComposerMicButton
                 buttonRef={micButtonRef}
                 isListening={isListening}
-                isSupported={isDictationSupported}
-                unavailableHint={dictationUnavailableHint}
                 onPreserveFocus={handlePreserveFocus}
                 onPushStart={handleMicPushStart}
                 onPushEnd={handleMicPushEnd}
                 onToggle={handleMicToggle}
-                onUnavailable={handleMicUnavailable}
               />
             ) : null}
 
