@@ -185,12 +185,59 @@ describe('summer card store', () => {
     );
   });
 
-  it('never supersedes a spend or outbound card', async () => {
+  it.each(['spend', 'outbound'])('never supersedes a %s card', async kind => {
     hoisted.updateSet.mockClear();
-    hoisted.selectLimit.mockResolvedValue([{ value: stored() }]);
+    hoisted.selectLimit.mockResolvedValue([{ value: stored({ kind }) }]);
     expect(
       await supersedeSummerCard({ id: stored().id, reason: 'premise gone now' })
-    ).toEqual({ outcome: 'reserved', kind: 'spend' });
+    ).toEqual({ outcome: 'reserved', kind });
+    expect(hoisted.updateSet).not.toHaveBeenCalled();
+  });
+
+  it('reports a missing card without attempting to supersede it', async () => {
+    hoisted.selectLimit.mockResolvedValue([]);
+    await expect(
+      supersedeSummerCard({ id: stored().id, reason: 'premise gone now' })
+    ).resolves.toEqual({ outcome: 'not_found' });
+    expect(hoisted.updateSet).not.toHaveBeenCalled();
+  });
+
+  it('preserves a card already decided by the founder', async () => {
+    hoisted.selectLimit.mockResolvedValue([
+      { value: stored({ kind: 'decision', status: 'approved' }) },
+    ]);
+    await expect(
+      supersedeSummerCard({ id: stored().id, reason: 'premise gone now' })
+    ).resolves.toMatchObject({
+      outcome: 'already_decided',
+      card: { status: 'approved' },
+    });
+    expect(hoisted.updateSet).not.toHaveBeenCalled();
+  });
+
+  it('returns the founder decision that wins a supersede race', async () => {
+    hoisted.selectLimit
+      .mockResolvedValueOnce([{ value: stored({ kind: 'decision' }) }])
+      .mockResolvedValueOnce([{ value: stored({ kind: 'decision' }) }])
+      .mockResolvedValueOnce([
+        { value: stored({ kind: 'decision', status: 'approved' }) },
+      ]);
+    hoisted.updateReturning.mockResolvedValue([]);
+    await expect(
+      supersedeSummerCard({ id: stored().id, reason: 'premise gone now' })
+    ).resolves.toMatchObject({
+      outcome: 'already_decided',
+      card: { status: 'approved' },
+    });
+  });
+
+  it('reports a card removed while its supersede decision is being recorded', async () => {
+    hoisted.selectLimit
+      .mockResolvedValueOnce([{ value: stored({ kind: 'decision' }) }])
+      .mockResolvedValueOnce([]);
+    await expect(
+      supersedeSummerCard({ id: stored().id, reason: 'premise gone now' })
+    ).resolves.toEqual({ outcome: 'not_found' });
     expect(hoisted.updateSet).not.toHaveBeenCalled();
   });
 
