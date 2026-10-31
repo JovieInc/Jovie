@@ -1924,6 +1924,14 @@
   font-size: var(--text-3xs);
 }
 
+/* Shell search trigger shortcut hint: the glyph renders as generated content
+   so axe's visible-text pass (label-content-name-mismatch, WCAG 2.5.3) only
+   measures the control label. aria-hidden does not remove a text node from
+   that pass; CSS content is not a DOM text node, so the hint is excluded. */
+:where(.system-b-shell-search-trigger-kbd)::before {
+  content: attr(data-shortcut-glyph);
+}
+
 :where(.system-b-pill-search-chip) {
   height: calc(var(--space-5) + var(--space-0-5));
   max-width: 13.75rem;
