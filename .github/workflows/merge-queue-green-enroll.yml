@@ -697,7 +697,9 @@ jobs:
               const removalsOnHead = (pr.breakerEvents?.nodes || []).filter(event =>
                 event.__typename === 'RemovedFromMergeQueueEvent' &&
                 (!headCommittedAt || event.createdAt > headCommittedAt)).length;
-              const ejectionReenroll = Boolean(removedUnchangedHead) && !humanDequeued &&
+              const automaticRemoval = removalReason === 'failed_checks' ||
+                (removalReason === 'manual' && (removalActor?.__typename === 'Bot' || /\[bot\]$/i.test(String(removalActor?.login || ''))));
+              const ejectionReenroll = Boolean(removedUnchangedHead) && automaticRemoval && !humanDequeued &&
                 failureBeforeReenroll === 'allow' && failure.action === 'block' &&
                 ['removed-without-recovery-intent', 'no-current-admission-recovery'].includes(failure.reason) &&
                 removalsOnHead < REENROLL_MAX_REMOVALS &&
@@ -707,7 +709,7 @@ jobs:
                   (humanDequeued && failure.action === 'retry-once' &&
                    failure.reason !== 'human-failure-release') ||
                   (removedUnchangedHead && failure.action !== 'retry-once' &&
-                   failure.reason !== 'owner-hold-release' && !releasedAfterManualRemoval)) {
+                   failure.reason !== 'owner-hold-release' && !releasedAfterManualRemoval && !ejectionReenroll)) {
                 core.info(`skip #${pr.number}: head unchanged since queue removal (${removalReason}; ${failure.reason})`);
                 receipt(pr, 'skip', `head-unchanged-since-removal:${removalReason}:${failure.reason}`);
                 continue;
@@ -1007,6 +1009,7 @@ jobs:
           sparse-checkout: |
             .nvmrc
             scripts/hold-contract.mjs
+            scripts/lib/github-rate-limit.mjs
             scripts/lib/admission-hold-labels.json
             scripts/lib/admission-hold-labels.mjs
             scripts/lib/queue-deferral-receipt.mjs

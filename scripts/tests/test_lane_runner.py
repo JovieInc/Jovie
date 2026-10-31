@@ -2134,8 +2134,19 @@ class LinearRateLimitTest(unittest.TestCase):
                              "the tmp record alone still cools the credential")
 
     def test_doctor_observe_keeps_the_mirror_pool_during_a_cooldown(self):
+        # Restore the previous value, never an unconditional pop: inside a release
+        # self-test the marker was already set by selftest_env, and popping it here
+        # un-hermetics every later module in the same process (their LANES_SELFTEST
+        # guards open and the tick reaches GitHub/Linear).
+        previous_selftest = os.environ.get("LANES_SELFTEST")
         os.environ["LANES_SELFTEST"] = "1"
-        self.addCleanup(lambda: os.environ.pop("LANES_SELFTEST", None))
+
+        def restore_selftest():
+            if previous_selftest is None:
+                os.environ.pop("LANES_SELFTEST", None)
+            else:
+                os.environ["LANES_SELFTEST"] = previous_selftest
+        self.addCleanup(restore_selftest)
         with patch.object(lane.random, "random", return_value=0):
             lane.publish_linear_cooldown(self.client.key, self.headers(), now=time.time())
         host = lane.Host()
@@ -5404,11 +5415,19 @@ class DispatchTest(unittest.TestCase):
                     patch.object(lane.reason_lane, "tick", return_value={}), \
                     patch.object(lane.doctor, "run"), \
                     patch.object(lane.subprocess, "Popen") as spawn:
+                # The dispatch self-test guard must open only for this assertion; restore
+                # the marker after — inside a release self-test it was already set, and
+                # losing it would un-hermetic every later module in the same process.
+                previous_selftest = os.environ.get("LANES_SELFTEST")
                 os.environ.pop("LANES_SELFTEST", None)
-                host = lane.Host(state=Path(tmp), repo=Path(tmp))
-                self.assertEqual(lane.dispatch(host), 0)
-                self.assertEqual(spawn.call_count, 1)
-                tick = json.loads((Path(tmp) / "tick.json").read_text())
+                try:
+                    host = lane.Host(state=Path(tmp), repo=Path(tmp))
+                    self.assertEqual(lane.dispatch(host), 0)
+                    self.assertEqual(spawn.call_count, 1)
+                    tick = json.loads((Path(tmp) / "tick.json").read_text())
+                finally:
+                    if previous_selftest is not None:
+                        os.environ["LANES_SELFTEST"] = previous_selftest
                 if failure is None:
                     self.assertEqual(sync.call_args.args[:2], (host.state, client))
                     self.assertEqual(sync.call_args.args[4], ["JOV"])
@@ -9441,6 +9460,13 @@ class ManagedMeshArchiveTest(unittest.TestCase):
         if os.environ.get("LANES_SELFTEST") != "1":
             return  # Real archive verification runs inside every updater self-test.
         runtime = ROOT / "scripts/lanes/.mesh-runtime"
+        if not (runtime / "manifest.json").exists():
+            # Not inside an updater self-test either: prove_staging compiles the mesh
+            # runtime into the staged tree before this suite runs, so the archive here
+            # is always fresh and verifiable there. The LANES_SELFTEST=1 guard without
+            # the compile (the lanes-selftest-changed-tests source guard runs changed
+            # lanes tests against the plain checkout) has no archive to verify.
+            return
         proof = json.loads((runtime / "manifest.json").read_text())
         self.assertEqual(proof["schema"], "jovie.mesh-managed-runtime/v1")
         self.assertTrue(proof["isolatedImportPassed"])
@@ -12247,6 +12273,54 @@ class OnePrPerIssueTest(unittest.TestCase):
             claims.assert_not_called()
 
 
+class AtomicWriteRouteTest(unittest.TestCase):
+    def test_conflict_pass_preserves_checkout_when_target_enters_queue(self):
+        pr = {"number": 1, "headRefOid": "head", "headRefName": "feature", "isDraft": False,
+              "isCrossRepository": False, "isInMergeQueue": False, "mergeStateStatus": "DIRTY"}
+        calls = []
+        def shell(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=0, stdout="main refs/heads/main\n" if "ls-remote" in args else "head\n")
+        def resolve(*args, guard, **kwargs):
+            guard()
+        with tempfile.TemporaryDirectory() as tmp, patch.object(lane, "sh", side_effect=shell), \
+             patch.object(lane, "conflict_files", return_value=["pnpm-lock.yaml"]), \
+             patch.object(lane, "claimed_elsewhere", return_value=False), \
+             patch.object(lane, "resolve_generated_conflict", side_effect=resolve), \
+             patch.object(lane, "require_fix_target", side_effect=lane.RepairStopped("target-pr-queued", {}, "test")):
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            self.assertEqual(lane.deterministic_conflict_pass(host, [pr], now=1000), [1])
+            self.assertEqual(json.loads((Path(tmp) / "deterministic-conflict.json").read_text())["1"]["outcome"], "target-changed")
+        self.assertFalse(any(c[:3] == ["git", "worktree", "remove"] for c in calls))
+
+    def test_verifies_and_rechecks_target_before_fast_forward_publication(self):
+        calls = []
+        pr = {"number": 1, "headRefOid": "head", "headRefName": "feature"}
+        def shell(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        def target(*args, **kwargs):
+            self.assertEqual(calls[-1][:2], ["git", "commit"])
+        receipt = {}
+        with patch.object(lane, "failed_logs", return_value={"Source Validation": "ratchet"}), \
+             patch.object(lane.fix_red_classes, "repair_atomic_state_writes", return_value=["scripts/lanes/a.py"]), \
+             patch.object(lane, "require_fix_target", side_effect=target) as guard, \
+             patch.object(lane, "sh", side_effect=shell):
+            self.assertEqual(lane.atomic_state_fix(None, pr, {}, Path("/unused"), None, receipt).returncode, 0)
+        guard.assert_called_once()
+        self.assertEqual(calls[0], ["python3", "-m", "unittest", "scripts.tests.test_lanes_atomic_state"])
+        self.assertIn(["pnpm", "preflight:changed"], calls)
+        self.assertEqual(calls[-1], ["git", "push", "-q", "origin", "HEAD:feature"])
+        self.assertEqual(receipt["atomicFiles"], ["scripts/lanes/a.py"])
+
+    def test_failed_ratchet_keeps_edits_local(self):
+        with patch.object(lane, "failed_logs", return_value={"Source Validation": "ratchet"}), \
+             patch.object(lane.fix_red_classes, "repair_atomic_state_writes", return_value=["scripts/lanes/a.py"]), \
+             patch.object(lane, "sh", return_value=SimpleNamespace(returncode=1)) as shell:
+            self.assertIsNone(lane.atomic_state_fix(None, {}, {}, Path("/unused"), None, {}))
+        self.assertEqual(shell.call_count, 1)
+
+
 class LockfileConflictTest(unittest.TestCase):
     """JOV-6837/JOV-7594: a generated-file-only conflict is resolved without a model; anything else is not."""
 
@@ -12363,6 +12437,34 @@ class LockfileConflictTest(unittest.TestCase):
         self.assertEqual(lane.remediation.GENERATED_RESOLVERS["scripts/agent-context/rule-scopes.json"],
                          ("node", "scripts/agent-context/rule-scopes.mjs", "--write"))
         self.assertIn("canon/automation-registry.jsonl", lane.remediation.RESOLVABLE_CONFLICT_FILES)
+
+    def test_registry_edits_to_the_same_id_stay_unresolved(self):
+        path = "canon/automation-registry.jsonl"
+        with tempfile.TemporaryDirectory() as tmp:
+            _, work = self.repo(Path(tmp), {path: '{"id":"base","value":"pr"}\n'},
+                                main_changes={path: '{"id":"base","value":"main"}\n'})
+            ok, _ = self.run_resolve(work)
+            self.assertFalse(ok)
+            self.assertEqual((work / path).read_text(), '{"id":"base","value":"pr"}\n')
+    def test_sources_of_truth_conflict_regenerates_from_merged_source(self):
+        path = "canon/SOURCES_OF_TRUTH.md"
+        generator = "scripts/sources-of-truth.mjs"
+        source = "canon/sources-of-truth.json"
+        script = (
+            "import {readFileSync,writeFileSync} from 'node:fs';\n"
+            f"if(readFileSync('{path}','utf8') !== 'main\\n') throw Error('must restore main');\n"
+            f"writeFileSync('{path}',JSON.parse(readFileSync('{source}','utf8')).domains.join('\\n'));\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, work = self.repo(Path(tmp), {path: "pr\n", generator: script,
+                                     source: '{"domains":["engineering-wins","proof-stats"]}'},
+                                     main_changes={path: "main\n", "a.ts": "main\n"})
+            ok, calls = self.run_resolve(work)
+            self.assertTrue(ok)
+            self.assertEqual(calls.count(["node", generator, "--write"]), 1)
+            self.assertEqual(self.git("show", f"devin/jov-1-20260927:{path}", cwd=origin),
+                             "engineering-wins\nproof-stats")
+            self.assertEqual(self.git("show", "devin/jov-1-20260927:a.ts", cwd=origin), "main")
 
     def test_mixed_generated_conflicts_run_each_resolver_once(self):
         topology = ".github/workflow-topology.gen.yml"
@@ -12980,6 +13082,62 @@ class NoHumanHoldTest(unittest.TestCase):
         after = git("rev-parse", "HEAD").stdout.strip()
         remote = git("rev-parse", "origin/feature").stdout.strip()
         self.assertEqual(after, remote)
+        self.assertNotEqual(after, before)
+        self.assertEqual(git("merge-base", "--is-ancestor", before, after).returncode, 0)
+
+    def test_and_chain_conflict_unions_node_test_paths_and_fast_forwards(self):
+        root = Path(self.tmp.name)
+        origin = root / "origin.git"
+        work = root / "work"
+        work.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "main", str(work)], check=True)
+        subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True)
+        def git(*args, cwd=work):
+            return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True)
+        hooks = root / "hooks"
+        hooks.mkdir()
+        for key, value in (("user.name", "t"), ("user.email", "t@example.test"), ("commit.gpgsign", "false"),
+                           ("core.hooksPath", str(hooks))):
+            git("config", key, value)
+        git("remote", "add", "origin", str(origin))
+        path = work / "package.json"
+        base = (
+            '{\n  "scripts": {\n'
+            '    "ci:control:test": "node --test scripts/a.test.mjs && pnpm ownership:check",\n'
+            "  }\n}\n"
+        )
+        path.write_text(base)
+        git("add", "package.json")
+        git("commit", "-qm", "base")
+        git("branch", "feature")
+        git("push", "-q", "origin", "HEAD:refs/heads/main")
+        git("checkout", "-q", "feature")
+        path.write_text(base.replace(
+            "node --test scripts/a.test.mjs",
+            "node --test scripts/a.test.mjs scripts/b.test.mjs",
+        ))
+        git("commit", "-qam", "head adds a test path")
+        git("push", "-q", "origin", "HEAD:refs/heads/feature")
+        git("checkout", "-q", "main")
+        path.write_text(base.replace(
+            '    "ci:control:test": "node --test scripts/a.test.mjs && pnpm ownership:check",\n',
+            '    "ci:control:test": "node --test scripts/a.test.mjs && pnpm ownership:check && node scripts/sources-of-truth.mjs",\n'
+            '    "fleet:check": "node scripts/fleet-registry.mjs check",\n',
+        ))
+        git("commit", "-qam", "main adds a suffix and a script")
+        git("push", "-q", "origin", "HEAD:refs/heads/main")
+        git("checkout", "-q", "feature")
+        before = git("rev-parse", "HEAD").stdout.strip()
+        self.assertTrue(lane.resolve_and_chain_conflict(work, "feature", None))
+        text = path.read_text()
+        self.assertIn(
+            "node --test scripts/a.test.mjs scripts/b.test.mjs && pnpm ownership:check && node scripts/sources-of-truth.mjs",
+            text,
+        )
+        self.assertIn('"fleet:check"', text)
+        self.assertNotIn("<<<<<<<", text)
+        after = git("rev-parse", "HEAD").stdout.strip()
+        self.assertEqual(after, git("rev-parse", "origin/feature").stdout.strip())
         self.assertNotEqual(after, before)
         self.assertEqual(git("merge-base", "--is-ancestor", before, after).returncode, 0)
 

@@ -515,6 +515,9 @@ class SupplyFlowTest(unittest.TestCase):
             self.assertIn("throughput-remediation-silent", alerts)
             fresh = {**live, "silentForS": 300}
             self.assertNotIn("throughput-remediation-silent", ts.judge(obs(pushes1h={"JovieInc/Jovie|codex": 1}, supplyFlow=supply, remediation=fresh)))
+            supply["prs"]["1"]["since"] = NOW - 3600
+            empty = lambda *a, **k: SimpleNamespace(returncode=0, stdout='{"workflow_runs":[]}', stderr="")
+            self.assertEqual(ts.remediation_liveness(Path(tmp), supply, NOW, empty)["silentForS"], 3600)
 
     def test_enqueue_records_green_to_enqueue_dwell_and_supply_dwell_alarm(self):
         with tempfile.TemporaryDirectory() as tmp:

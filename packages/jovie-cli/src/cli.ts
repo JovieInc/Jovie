@@ -20,6 +20,7 @@ import { COMMANDS, type CommandSpec, findCommand } from './commands.js';
 import { installSkill } from './init.js';
 import { serveMcp } from './mcp.js';
 import {
+  MESH_BOOLEAN_FLAG_NAMES,
   MESH_FLAG_NAMES,
   MESH_USAGE,
   type MeshDependencies,
@@ -175,6 +176,13 @@ Examples:
 `;
 }
 
+function processAbortSignal(): AbortSignal {
+  const controller = new AbortController();
+  for (const name of ['SIGINT', 'SIGTERM'] as const)
+    process.once(name, () => controller.abort());
+  return controller.signal;
+}
+
 function writeLine(output: CliOutput, value: string): void {
   output.write(`${value}\n`);
 }
@@ -276,6 +284,12 @@ function parseCliArgs(argv: readonly string[]): {
       json: { type: 'boolean' },
       version: { type: 'boolean', short: 'v' },
       ...Object.fromEntries(
+        MESH_BOOLEAN_FLAG_NAMES.map(name => [
+          name,
+          { type: 'boolean' as const },
+        ])
+      ),
+      ...Object.fromEntries(
         [...COMMAND_FLAG_NAMES, ...MESH_FLAG_NAMES].map(name => [
           name,
           { type: 'string' as const },
@@ -306,12 +320,14 @@ function parseCliArgs(argv: readonly string[]): {
           name => [name, String(values[name])]
         )
       ),
-      meshFlags: Object.fromEntries(
-        MESH_FLAG_NAMES.filter(name => values[name] !== undefined).map(name => [
-          name,
-          String(values[name]),
-        ])
-      ),
+      meshFlags: Object.fromEntries([
+        ...MESH_FLAG_NAMES.filter(name => values[name] !== undefined).map(
+          name => [name, String(values[name])]
+        ),
+        ...MESH_BOOLEAN_FLAG_NAMES.filter(name => values[name] === true).map(
+          name => [name, 'true']
+        ),
+      ]),
       dir: values.dir,
       fleet: values.fleet,
       full: values.full,
@@ -341,12 +357,32 @@ async function execute(
   }
   if (first === 'mesh') {
     // Shared names (--kind) parse into both sets; only foreign ones are stray.
-    if (values.full || values.dir || strayFlags(values.flags, MESH_FLAG_NAMES))
+    if (
+      values.full ||
+      values.dir ||
+      strayFlags(values.flags, [...MESH_FLAG_NAMES, ...MESH_BOOLEAN_FLAG_NAMES])
+    )
       throw new UsageError('Unsupported option for mesh.');
-    return runMesh(positionals, values.meshFlags, {
-      userAgent: `jovie-cli/${CLI_VERSION}`,
-      ...dependencies.mesh,
-    });
+    const watching = positionals[1] === 'watch';
+    const result = await runMesh(
+      positionals,
+      watching && values.json
+        ? { ...values.meshFlags, json: 'true' }
+        : values.meshFlags,
+      {
+        userAgent: `jovie-cli/${CLI_VERSION}`,
+        // Watch streams one line per message to stdout; Ctrl-C ends it.
+        ...(watching
+          ? {
+              emit: (line: string) =>
+                writeLine(dependencies.stdout ?? process.stdout, line),
+              signal: dependencies.mesh?.signal ?? processAbortSignal(),
+            }
+          : {}),
+        ...dependencies.mesh,
+      }
+    );
+    return watching ? undefined : result;
   }
   if (strayFlags(values.meshFlags, COMMAND_FLAG_NAMES))
     throw new UsageError('Mesh options are only supported by mesh commands.');
@@ -502,7 +538,7 @@ export async function runCli(
       } else {
         writeText(stdout, result);
       }
-    } else {
+    } else if (result !== undefined) {
       writeLine(stdout, JSON.stringify(result, null, values.json ? 0 : 2));
     }
     if (

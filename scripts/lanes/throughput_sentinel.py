@@ -42,6 +42,8 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
+from atomic_state import atomic_write_text
+
 IDLE_LOG = "idle-exits.jsonl"
 IDLE_LOG_KEEP_S = 2 * 3600
 IDLE_LOG_MAX_BYTES = 512 * 1024
@@ -383,6 +385,9 @@ def remediation_liveness(state: Path, supply: dict | None, now: float, run=None,
     except (OSError, ValueError):
         pass
     newest = max([t for t in (last_swarm, last_lane) if t is not None], default=None)
+    if newest is None:
+        newest = min((r["since"] for r in (supply.get("prs") or {}).values()
+                      if r.get("bucket") in ("DIRTY", "BLOCKED") and isinstance(r.get("since"), (int, float))), default=None)
     return {"observedAt": now, "waiting": waiting, "lastSwarmRun": last_swarm, "lastLaneFix": last_lane,
             "silentForS": None if newest is None else round(now - newest)}
 
@@ -412,7 +417,7 @@ def backstop_enroll(state: Path, supply: dict | None, now: float, run=None, repo
     except (OSError, subprocess.SubprocessError) as error:
         receipt = {"at": now, "waiting": len(waits), "oldestS": round(max(waits)), "ok": False, "error": str(error)[:160]}
     try:
-        path.write_text(json.dumps(receipt, sort_keys=True))
+        atomic_write_text(path, json.dumps(receipt, sort_keys=True))
     except OSError:
         pass
     return receipt
