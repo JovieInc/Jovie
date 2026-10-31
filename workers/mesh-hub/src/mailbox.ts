@@ -347,7 +347,7 @@ export class Mailbox extends DurableObject<Env> {
     }
   }
 
-  /** Push to Summer's webhook; 2xx = received (not handled). 4xx is terminal. */
+  /** Push to Summer's webhook; 2xx = durable handoff to Summer's receiver. Only bad-message 4xx is terminal. */
   private async pushWebhook(now: number) {
     if (!this.isWebhookTarget()) return;
     const url = this.env.SUMMER_HUB_WEBHOOK_URL as string;
@@ -381,7 +381,9 @@ export class Mailbox extends DurableObject<Env> {
         status = 0;
       }
       if (status >= 200 && status < 300) {
-        this.store.receipt([message.id], Date.now());
+        // Summer answers 2xx only after a durable write into its own receiver,
+        // which owns handling (retries, catch-up) from here: a real handoff.
+        this.store.ack([message.id], Date.now());
         failures = 0;
       } else if (WEBHOOK_TERMINAL.has(status)) {
         // Poison (the message itself is unacceptable): mark received so it cannot
