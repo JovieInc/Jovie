@@ -59,7 +59,7 @@ describe('OnboardingProfileRail', () => {
     expect(
       screen.getByTestId('onboarding-profile-preview-badge')
     ).toHaveTextContent('Preview');
-    expect(screen.getByText('Preview — not claimed yet')).toBeDefined();
+    expect(screen.getByText('Preview · not claimed yet')).toBeDefined();
     expect(screen.queryByText('Manage')).toBeNull();
     expect(screen.queryByText('Live')).toBeNull();
     expect(screen.queryByTestId('onboarding-rail-progress')).toBeNull();
