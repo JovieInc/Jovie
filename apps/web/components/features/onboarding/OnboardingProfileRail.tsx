@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import { useEffect, useRef } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ProfileIdentityHeader } from '@/features/profile/ProfileIdentityHeader';
 import { ProfilePreviewBento } from '@/features/profile/ProfilePreviewBento';
@@ -201,7 +202,7 @@ function buildPreviewArtist(
     tagline:
       artist.tagline ??
       (followerLabel
-        ? `${followerLabel} Spotify followers (source: enrichment)`
+        ? `${followerLabel} Spotify followers`
         : (firstGenre ?? undefined)),
     theme: undefined,
     settings: undefined,
@@ -341,6 +342,31 @@ export function OnboardingProfileRail({
 }) {
   const artist = resolvePreviewArtist(state);
   const isInline = placement === 'inline';
+  const railRef = useRef<HTMLElement>(null);
+
+  // JOV-8844 keyboard reachability, component-owned (JOV-7973): the side rail
+  // is a focusable scroll region, so Home/End must scroll it themselves rather
+  // than relying on the browser's default keyboard scrolling, which the live
+  // chat's focus/keyboard layers can shadow mid-journey — the golden-path
+  // reachability check intermittently found the rail still resting at its
+  // bottom edge after Home, clipping the preview badge at the scrollport top.
+  // Attached imperatively: this is scroll-region behavior, not element
+  // interactivity, so it stays out of the JSX a11y handler surface.
+  const hasArtist = artist !== null;
+  useEffect(() => {
+    const rail = railRef.current;
+    if (isInline || !rail) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Home' && event.key !== 'End') return;
+      event.preventDefault();
+      rail.scrollTo({
+        top: event.key === 'Home' ? 0 : rail.scrollHeight - rail.clientHeight,
+        behavior: 'auto',
+      });
+    };
+    rail.addEventListener('keydown', onKeyDown);
+    return () => rail.removeEventListener('keydown', onKeyDown);
+  }, [isInline, hasArtist]);
 
   if (!artist) return null;
 
@@ -369,11 +395,14 @@ export function OnboardingProfileRail({
 
   return (
     <aside
+      ref={railRef}
+      aria-label='Profile Preview'
+      tabIndex={isInline ? undefined : 0}
       className={cn(
-        'overflow-hidden bg-(--app-shell-content-surface) text-primary-token transition-[opacity,transform,width,border-color] duration-cinematic ease-out',
+        'overflow-x-hidden bg-(--app-shell-content-surface) text-primary-token transition-[opacity,transform,width,border-color] duration-cinematic ease-out',
         isInline
-          ? 'relative z-0 w-full rounded-3xl lg:hidden'
-          : 'z-30 max-lg:hidden lg:relative lg:h-full lg:w-95 lg:border-l lg:border-(--app-shell-border)'
+          ? 'relative z-0 w-full overflow-y-hidden rounded-3xl lg:hidden'
+          : 'z-30 overflow-y-auto overscroll-contain max-lg:hidden lg:relative lg:h-full lg:w-95 lg:border-l lg:border-(--app-shell-border)'
       )}
       data-testid={
         isInline ? 'onboarding-profile-rail-inline' : 'onboarding-profile-rail'
@@ -385,8 +414,8 @@ export function OnboardingProfileRail({
     >
       <div
         className={cn(
-          'flex h-full min-h-0 items-center justify-center',
-          isInline ? 'px-0 py-2' : 'lg:w-95 lg:px-4 lg:py-4'
+          'flex min-h-0 items-center justify-center',
+          isInline ? 'h-full px-0 py-2' : 'min-h-full lg:w-95 lg:px-4 lg:py-4'
         )}
       >
         <div className='flex min-h-0 w-full flex-col items-center'>
@@ -449,11 +478,9 @@ export function OnboardingProfileRail({
                 Preview
               </span>
             }
-            caption={
-              state.profileDraft?.activeRole
-                ? `Draft · ${state.profileDraft.activeRole} · ${state.profileDraft.awaiting === 'review' ? 'Review' : 'In progress'}`
-                : 'Preview — not claimed yet'
-            }
+            // One caption for every path: internal draft state ("Draft · artist ·
+            // Review") is not visitor-facing (2026-10-31 golden-path walk).
+            caption='Preview — not claimed yet'
             overlay={<DspMatchStrip matches={dspMatches} />}
           />
           {previewArtist.tagline ? (

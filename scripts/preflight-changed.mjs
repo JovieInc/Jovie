@@ -358,8 +358,11 @@ export function typecheckTargets(files, cwd) {
     const web = f.filename.startsWith('apps/web/');
     if (web) {
       out.add(isTest ? 'web-tests' : 'web');
-      // Ovie compiles shared web routes/components under its own TS graph.
-      if (!isTest) out.add('pkg:@jovie/ovie');
+      if (!isTest) {
+        // Source changes also affect test consumers and Ovie's TS graph.
+        out.add('web-tests');
+        out.add('pkg:@jovie/ovie');
+      }
     } else if (/^scripts\//.test(f.filename)) out.add('scripts');
     else {
       let dir = path.dirname(f.filename);

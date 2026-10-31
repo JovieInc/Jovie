@@ -57,7 +57,12 @@ vi.mock('@/lib/db/schema/analytics', () => ({
   },
 }));
 
+const mockEnvServer = vi.hoisted(() => ({
+  E2E_TEST_MODE: undefined as string | undefined,
+}));
+
 vi.mock('@/lib/env-server', () => ({
+  env: mockEnvServer,
   isSecureEnv: vi.fn(() => false),
 }));
 
@@ -98,6 +103,7 @@ describe('/api/profile/capture-dismissal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    mockEnvServer.E2E_TEST_MODE = undefined;
     mockCookiesGet.mockReturnValue(undefined);
     mockDbLimit.mockResolvedValue([]);
     mockDbSet.mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
@@ -227,6 +233,25 @@ describe('/api/profile/capture-dismissal', () => {
     expect(response.status).toBe(429);
     expect(mockCaptureDismissalLimiterLimit).toHaveBeenCalledWith('127.0.0.1');
     expect(mockDbLimit).not.toHaveBeenCalled();
+  });
+
+  it('skips the anonymous per-IP bucket in E2E test mode', async () => {
+    // E2E Full Browser Matrix: every parallel test on a shard reaches the
+    // standalone server from 127.0.0.1, so the 20/min anonymous bucket 429s a
+    // healthy app (public-profile-smoke, matrix run 41153386766). Test mode
+    // skips the bucket, matching the auth OTP allowance.
+    mockEnvServer.E2E_TEST_MODE = '1';
+    mockCaptureDismissalLimiterLimit.mockResolvedValue({
+      success: false,
+      degraded: false,
+      unavailable: false,
+    });
+    const { GET } = await import('@/app/api/profile/capture-dismissal/route');
+
+    const response = await GET(getRequest());
+
+    expect(response.status).toBe(200);
+    expect(mockCaptureDismissalLimiterLimit).not.toHaveBeenCalled();
   });
 
   it('returns a neutral GET response without DB reads when Redis is degraded', async () => {
