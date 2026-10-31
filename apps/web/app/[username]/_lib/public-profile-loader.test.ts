@@ -32,7 +32,7 @@ const profile = () => ({
   isPublic: true,
   isClaimed: true,
   avatarUrl: 'https://example.com/artist.jpg',
-  userEmail: 'artist@example.com',
+  userEmail: 'artist@gmail.com',
   userPlan: 'free',
   userIsPro: false,
   spotifyUrl: null,
@@ -89,6 +89,48 @@ describe('public profile loading boundaries', () => {
       expect(mocks.select).not.toHaveBeenCalled();
     }
   );
+
+  it.each([
+    'gp-mo9o4852+clerk_test@test.jovie.com',
+    'qatest10+clerk_test@jovie.fm',
+    'jovie.qa.test+clerk_test@gmail.com',
+    'e2e@jov.ie',
+  ])('404s test-account profile owned by %s', async userEmail => {
+    mocks.profile.mockResolvedValue({
+      ...profile(),
+      usernameNormalized: 'tmo9o49ccvw8mlg',
+      userEmail,
+    });
+    expect(await getProfileAndLinks('tmo9o49ccvw8mlg')).toMatchObject({
+      status: 'not_found',
+      profile: null,
+    });
+  });
+
+  it('keeps exempt canary fixtures viewable by direct URL', async () => {
+    mocks.profile.mockResolvedValue({
+      ...profile(),
+      usernameNormalized: 'browse-ready-user',
+      userEmail: 'browse-ready+clerk_test@jov.ie',
+    });
+    expect(await getProfileAndLinks('browse-ready-user')).toMatchObject({
+      status: 'ok',
+    });
+    mocks.profile.mockResolvedValue({
+      ...profile(),
+      userEmail: 'gp-abc+clerk_test@test.jovie.com',
+      settings: { testProfileDirectUrlExempt: true },
+    });
+    expect(await getProfileAndLinks('testartist')).toMatchObject({
+      status: 'ok',
+    });
+  });
+
+  it('leaves a real profile unaffected', async () => {
+    expect(await getProfileAndLinks('testartist')).toMatchObject({
+      status: 'ok',
+    });
+  });
 
   it('normalizes handles and maps public data without the service no-store cache', async () => {
     mocks.profile.mockResolvedValue({

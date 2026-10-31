@@ -1,10 +1,6 @@
 import type { Metadata } from 'next';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
-import {
-  getEmailDomain,
-  isReservedTestEmailDomain,
-  normalizeEmail,
-} from '@/lib/utils/email';
+import { isTestProfileOwnerEmail } from '@/lib/utils/email';
 import { isOpaqueInternalProfileHandle } from './opaque-internal-profile-handle';
 import { isProfileSearchable } from './public-profile-access';
 import {
@@ -79,8 +75,6 @@ export function getPublicProfileIndexingExclusionReason(
  * never looks like `tmoc` + ~15 chars of base36, and real display names do not
  * end in the `+clerk test` suffix. Revisit only if a genuine collision appears.
  */
-const JOVIE_TEST_ACCOUNT_LOCAL_PART_PATTERN = /^(?:e2e|browse)(?:[-+]|$)/;
-const CLERK_TEST_EMAIL_LOCAL_PART_PATTERN = /\+clerk_test(?:\+|$)/;
 
 function getQaMachineHandleIndexingExclusionReason(
   handle: string
@@ -118,16 +112,8 @@ function isPlaceholderIdentity(handle: string, displayName: string): boolean {
 function isDiscoveryTestAccountEmail(
   email: string | null | undefined
 ): boolean {
-  if (typeof email !== 'string' || email.trim() === '') return false;
-  const normalized = normalizeEmail(email);
-  const domain = getEmailDomain(normalized);
-  if (!domain) return false;
-  if (isReservedTestEmailDomain(domain)) return true;
-  const localPart = normalized.slice(0, normalized.lastIndexOf('@'));
-  if (CLERK_TEST_EMAIL_LOCAL_PART_PATTERN.test(localPart)) return true;
-  return (
-    domain === 'jov.ie' && JOVIE_TEST_ACCOUNT_LOCAL_PART_PATTERN.test(localPart)
-  );
+  // One classifier: lib/utils/email isTestProfileOwnerEmail (see test-profile-policy).
+  return isTestProfileOwnerEmail(email);
 }
 
 export function getPublicProfileDiscoveryExclusionReason(
