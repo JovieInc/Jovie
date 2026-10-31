@@ -327,6 +327,34 @@ export class MailboxStore {
     );
   }
 
+  /**
+   * Hub executor: unhandled peer messages older than `graceMs` whose lease has
+   * lapsed, leased for `leaseMs` so two alarms never run one task twice.
+   */
+  claimForExecutor(
+    now: number,
+    graceMs: number,
+    leaseMs: number,
+    limit: number
+  ): Delivered[] {
+    const rows = this.sql
+      .exec(
+        `SELECT * FROM messages WHERE acked_at IS NULL AND kind = 'message' AND body IS NOT NULL
+           AND accepted_at <= ? AND lease_until <= ? ORDER BY seq LIMIT ?`,
+        now - graceMs,
+        now,
+        limit
+      )
+      .toArray();
+    for (const row of rows)
+      this.sql.exec(
+        'UPDATE messages SET lease_until = ? WHERE seq = ?',
+        now + leaseMs,
+        Number(row.seq)
+      );
+    return rows.map(row => toDelivered(row));
+  }
+
   /** Relay stream: everything not yet received (probes included), in seq order. */
   unreceived(now: number, limit: number = LIMITS.pageSize): Delivered[] {
     const rows = this.sql
