@@ -56,6 +56,11 @@ export function parseArgs(argv) {
   return args;
 }
 
+/**
+ * @typedef {{ id: string, tier: 'A' | 'B', brief: string, identityTokens: string[], control?: boolean }} Persona
+ * @param {string} ref archetype id or path to a Tier B persona file
+ * @returns {Persona}
+ */
 export function loadPersona(ref) {
   const archetype = ARCHETYPES.find(row => row.id === ref);
   if (archetype) return { ...archetype, tier: 'A', identityTokens: [] };
@@ -113,6 +118,7 @@ export async function evaluate(args) {
   const startedAt = Date.now();
   const persona = loadPersona(args.persona);
   const outcome = readOutcome(REPO);
+  /** @type {ReturnType<typeof ingestWalk> & { subjectId?: string | null }} */
   const walk = ingestWalk(resolve(args.walk));
   // Whose walk this is: the waitlist subject the walk was recorded for, or
   // null for the shared stand-in walk (judge is told the artist is a stand-in).
@@ -121,6 +127,7 @@ export async function evaluate(args) {
   const titles = new Map(walk.steps.map(step => [step.stepId, step.title]));
   const scrub = text => redact(text, persona.identityTokens);
 
+  /** @type {Record<string, any>} */
   const screen = await runScreen(walk.steps);
   let strong = null;
   let verdict;
