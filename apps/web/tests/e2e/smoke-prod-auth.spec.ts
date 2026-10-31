@@ -967,26 +967,45 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       'checkout',
       'checkout-entry-renders',
       async () => {
-        await page.goto(APP_ROUTES.SETTINGS_BILLING, {
-          waitUntil: 'domcontentloaded',
-          timeout: SMOKE_TIMEOUTS.NAVIGATION,
-        });
-        assertExactNavigationUrl(
-          page.url(),
-          expectedOrigin,
-          'Billing navigation'
+        // The registered checkout screen is web.onboarding-checkout
+        // (/onboarding/checkout), not billing settings: run 41165214531's
+        // receipt labeled the checkout surface while its frame showed Billing
+        // & Subscription with a Free plan (JOV-9625). Navigate with explicit
+        // paid intent (source=intent) so the once-per-artist organic-offer
+        // gate and the mid-onboarding redirect cannot steer the canary away
+        // from the checkout screen.
+        await page.goto(
+          `${APP_ROUTES.ONBOARDING_CHECKOUT}?plan=pro&interval=month&source=intent`,
+          {
+            waitUntil: 'domcontentloaded',
+            timeout: SMOKE_TIMEOUTS.NAVIGATION,
+          }
         );
+        expect(
+          new URL(page.url()).pathname,
+          'the checkout cert must land on the registered /onboarding/checkout screen'
+        ).toBe(APP_ROUTES.ONBOARDING_CHECKOUT);
         await waitForHydration(page);
-        const billingText = await waitForCheckoutEntryContent(
+        const checkoutText = await waitForCheckoutEntryContent(
           page,
           SMOKE_TIMEOUTS.VISIBILITY
         );
-        expect(billingText).not.toMatch(
+        expect(checkoutText).not.toMatch(
           /application error|something went wrong/
         );
-        expect(billingText).toMatch(/plan|upgrade|billing|pro/);
+        // The real checkout screen names the plan and renders the paid CTA
+        // with a per-interval price. The CTA is never clicked: this cert
+        // stops before payment, as before.
+        expect(
+          checkoutText,
+          'the checkout screen must present the paid plan'
+        ).toMatch(/upgrade to/i);
+        expect(checkoutText).toMatch(/\/mo/);
+        await expect(
+          page.getByRole('button', { name: /^upgrade to/i }).first()
+        ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
       },
-      () => 'billing/checkout entry rendered; stopped before payment'
+      () => 'onboarding checkout rendered; stopped before payment'
     );
     telemetry.record('checkout');
     await telemetry.capture(page, 'checkout');
