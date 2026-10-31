@@ -11,6 +11,7 @@ import {
   ProdGoldenPathPersistenceError,
   type ProdGoldenPathReceipt,
   recordProdGoldenPathRun,
+  recordQualityContractObservations,
 } from '@/lib/ovie/certifications/prod-golden-path-ledger';
 import { postgresRecordBackend } from '@/lib/ovie/mcp/postgres-backend';
 import { logger } from '@/lib/utils/logger';
@@ -84,6 +85,16 @@ const receiptSchema = z
       })
       .strict()
       .nullish(),
+    // One admin certifications-inventory readback per run, carried on the
+    // landing receipt. Evidence only: a not-viable admin fixture records
+    // 'blocked' with the exact reason and never turns a surface red.
+    adminInventoryReadback: z
+      .object({
+        status: z.enum(['passed', 'blocked', 'failed']),
+        detail: z.string().max(2_000),
+      })
+      .strict()
+      .nullish(),
   })
   .strict();
 
@@ -100,6 +111,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     handle: async data => {
       try {
         const result = await recordProdGoldenPathRun({
+          backend: postgresRecordBackend(),
+          receipts: data.receipts as unknown as ProdGoldenPathReceipt[],
+        });
+        // JOV-9625 outcome rework: fold the run's quality-contract
+        // observations into the observations ledger so the six contracts'
+        // observed values are populated from evidence.
+        await recordQualityContractObservations({
           backend: postgresRecordBackend(),
           receipts: data.receipts as unknown as ProdGoldenPathReceipt[],
         });
