@@ -29,7 +29,11 @@ const EXCLUDED_HANDLES_BY_REASON = {
     'edgecase-long',
   ],
   legacy_claim_fixture: ['testartist'],
-  production_canary: ['authqaprod'],
+  production_canary: [
+    'authqaprod',
+    'good-dropouts-canary',
+    'jovie-chat-health',
+  ],
   screen_cert_fixture: ['jovie-screen-fixture'],
   qa_auth_fixture: [
     'authiosprod',
