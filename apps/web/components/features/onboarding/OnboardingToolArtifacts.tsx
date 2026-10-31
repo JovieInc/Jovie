@@ -555,7 +555,7 @@ function OnboardingArtistProposal({
               {artist.name}
             </span>
             {followers ? (
-              <span className='block truncate text-xs leading-5 text-secondary-token'>
+              <span className='block truncate text-xs leading-5 tabular-nums text-secondary-token'>
                 {followers}
               </span>
             ) : null}
