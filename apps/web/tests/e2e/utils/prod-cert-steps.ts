@@ -19,7 +19,41 @@ export interface ProdCertStep {
   readonly summary: string;
 }
 
-function write(step: ProdCertStep): void {
+/**
+ * Every JSON-line shape the steps file carries: browser checks, per-surface
+ * telemetry/screenshot evidence, quality-contract observations and the
+ * admin inventory readback (JOV-9625 outcome rework).
+ */
+export type ProdCertStepRecord =
+  | ProdCertStep
+  | {
+      readonly kind: 'telemetry';
+      readonly surface: string;
+      readonly consoleErrors: number;
+      readonly networkErrors: number;
+    }
+  | {
+      readonly kind: 'screenshot';
+      readonly surface: string;
+      readonly format: 'jpeg';
+      readonly dataUrl: string;
+    }
+  | {
+      readonly kind: 'observation';
+      readonly surface: string;
+      readonly contractId: string;
+      readonly dimension: string;
+      readonly value: number;
+      readonly unit: string;
+      readonly sampleSize?: number;
+    }
+  | {
+      readonly kind: 'readback';
+      readonly status: 'passed' | 'blocked' | 'failed';
+      readonly detail: string;
+    };
+
+function write(step: ProdCertStepRecord): void {
   const file = process.env.PROD_CERT_STEPS_FILE;
   if (!file) return;
   try {
@@ -150,6 +184,29 @@ export function createSurfaceTelemetry(page: Page): SurfaceTelemetryCollector {
       }
     },
   };
+}
+
+/**
+ * Admin certifications-inventory readback (JOV-9625 outcome rework). One
+ * attempt per run: sign in as the documented admin fixture and read
+ * `GET /api/ovie/certifications`. Folded into the landing receipt as
+ * evidence — never a check — so a not-viable fixture records the exact
+ * blocker without turning any golden-path surface red.
+ */
+export function recordAdminReadback(result: {
+  readonly status: 'passed' | 'blocked' | 'failed';
+  readonly detail: string;
+}): void {
+  const file = process.env.PROD_CERT_STEPS_FILE;
+  if (!file) return;
+  try {
+    appendFileSync(
+      file,
+      `${JSON.stringify({ kind: 'readback', ...result })}\n`
+    );
+  } catch {
+    // Evidence is best-effort; the test result is authoritative.
+  }
 }
 
 /**
