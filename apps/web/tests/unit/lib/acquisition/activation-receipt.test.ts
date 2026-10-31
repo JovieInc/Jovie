@@ -149,6 +149,46 @@ describe('attachFirstTouchReceipt', () => {
     expect(mockCaptureError).not.toHaveBeenCalled();
   });
 
+  it('no-ops without reporting when the user already has a receipt under another journey id', async () => {
+    // Drizzle wraps the pg error: outer message is "Failed query: ...", the
+    // 23505 from the partial unique index lives on .cause.
+    const pgError = Object.assign(
+      new Error(
+        'duplicate key value violates unique constraint "acquisition_journeys_user_id_unique"'
+      ),
+      {
+        code: '23505',
+        constraint: 'acquisition_journeys_user_id_unique',
+        detail: 'Key (user_id)=(...) already exists.',
+      }
+    );
+    mockInsert.mockImplementation(() => {
+      throw new Error(
+        'Failed query: insert into "acquisition_journeys" ("id", "user_id", "first_touch", "consent_state", "captured_at", "linked_at") values (...) /*...*/',
+        { cause: pgError }
+      );
+    });
+    mockCookies.mockReturnValue(cookieStoreWith());
+
+    await expect(attachFirstTouchReceipt(USER_ID)).resolves.toBe(false);
+    expect(mockCaptureError).not.toHaveBeenCalled();
+  });
+
+  it('still reports persistence failures that are not unique violations', async () => {
+    const pgError = Object.assign(new Error('permission denied for table'), {
+      code: '42501',
+    });
+    mockInsert.mockImplementation(() => {
+      throw new Error('Failed query: insert into "acquisition_journeys" ...', {
+        cause: pgError,
+      });
+    });
+    mockCookies.mockReturnValue(cookieStoreWith());
+
+    await expect(attachFirstTouchReceipt(USER_ID)).resolves.toBe(false);
+    expect(mockCaptureError).toHaveBeenCalledTimes(1);
+  });
+
   it('swallows and reports persistence failures instead of failing activation', async () => {
     mockCookies.mockReturnValue(cookieStoreWith());
     mockInsert.mockImplementation(() => {
