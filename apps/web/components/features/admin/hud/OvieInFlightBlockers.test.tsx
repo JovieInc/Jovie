@@ -23,7 +23,7 @@ describe('OvieInFlightBlockers', () => {
       />
     );
     expect(screen.getByTestId('ovie-in-flight-blockers')).toHaveTextContent(
-      '7 stuck · 2 moving'
+      '7 stuck, 2 moving.'
     );
     const group = screen.getByTestId('ovie-blocker-group');
     expect(group).toHaveTextContent('Source Validation');

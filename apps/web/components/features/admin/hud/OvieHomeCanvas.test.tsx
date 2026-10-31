@@ -296,7 +296,7 @@ describe('OvieHomeCanvas', () => {
     };
     renderCanvas();
     expect(screen.getByTestId('ovie-in-flight-blockers')).toHaveTextContent(
-      '4 stuck · 0 moving'
+      '4 stuck, 0 moving.'
     );
     expect(screen.getByTestId('ovie-blocker-group')).toHaveTextContent('4 PRs');
     expect(screen.getByRole('link', { name: 'Open board' })).toHaveAttribute(

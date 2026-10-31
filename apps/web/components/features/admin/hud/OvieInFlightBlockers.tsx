@@ -93,11 +93,11 @@ export function OvieInFlightBlockers({
       className='flex min-h-0 flex-1 flex-col gap-2'
       data-testid='ovie-in-flight-blockers'
     >
-      <p className='text-xs text-secondary-token tabular-nums'>
-        {summary.stuck} stuck · {summary.moving} moving ·{' '}
+      <p className='text-sm text-primary-token tabular-nums'>
+        {summary.stuck} stuck, {summary.moving} moving.{' '}
         <a
           href={moreHref}
-          className='underline-offset-2 hover:text-primary-token hover:underline focus-visible:underline'
+          className='text-xs text-secondary-token underline underline-offset-2 hover:text-primary-token'
         >
           Open board
         </a>

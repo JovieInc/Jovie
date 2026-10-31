@@ -64,8 +64,9 @@ export interface HomeLoopCanvasProps {
   readonly asksHideMore?: boolean;
   /** Count shown on Done today when the list is a sample (e.g. merges today). */
   readonly doneCount?: number | null;
-  /** Where the full list behind Done lives. */
-  readonly doneMoreHref?: string;
+  /** Line over Done when the list is a sample, with a link to all of it. */
+  readonly doneNotice?: string | null;
+  readonly doneNoticeHref?: string;
   /** Caption over the pulse row, e.g. what its comparison is against. */
   readonly pulseCaption?: string | null;
   /** Generated answer for the current canvas state, under the pulse. */
@@ -115,7 +116,8 @@ export function HomeLoopCanvas({
   onAsksHiddenChange,
   asksHideMore = false,
   doneCount,
-  doneMoreHref,
+  doneNotice,
+  doneNoticeHref,
 }: HomeLoopCanvasProps) {
   const [asksHidden, setAsksHidden] = useState(0);
   const onHiddenChange = useCallback(
@@ -234,6 +236,8 @@ export function HomeLoopCanvas({
           <HomeLoopSection
             title={copy.doneTitle}
             count={doneCount ?? done.length}
+            notice={doneNotice}
+            noticeHref={doneNoticeHref}
             status={loopStatus}
             isEmpty={done.length === 0 && !doneSummary}
             emptyLabel={copy.doneEmpty}
@@ -244,13 +248,7 @@ export function HomeLoopCanvas({
             className='h-28 shrink-0 @7xl:h-auto @7xl:w-1/4'
             testId='home-loop-done-section'
           >
-            <HomeLoopDoneChips
-              items={done}
-              summary={doneSummary}
-              fit
-              total={doneCount}
-              moreHref={doneMoreHref}
-            />
+            <HomeLoopDoneChips items={done} summary={doneSummary} fit />
           </HomeLoopSection>
         </div>
       </div>

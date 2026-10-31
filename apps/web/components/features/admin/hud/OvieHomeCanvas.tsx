@@ -449,7 +449,12 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       rows={home?.rows ?? []}
       done={home?.done ?? []}
       doneCount={home?.mergesToday ?? null}
-      doneMoreHref={APP_ROUTES.ADMIN_SHIPPING}
+      doneNotice={
+        home?.mergesToday != null && home.mergesToday > home.done.length
+          ? `Since midnight PT, latest ${home.done.length}`
+          : null
+      }
+      doneNoticeHref={APP_ROUTES.ADMIN_SHIPPING}
       loopStatus={loopStatus}
       asksStatus={asksStatus}
       asksNotice={asksNotice}
