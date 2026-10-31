@@ -7,7 +7,6 @@
     "apps/web/app/ui/dropdowns/DropdownShowcase.tsx": 1,
     "apps/web/components/atoms/SegmentedDigitBox.tsx": 1,
     "apps/web/components/features/admin/design-lab/DesignProposalReviewPanel.tsx": 1,
-    "apps/web/components/features/admin/summer-cards/SummerCardReviewPanel.tsx": 1,
     "apps/web/components/features/auth/atoms/otp-input/OtpInput.tsx": 1,
     "apps/web/components/features/dashboard/atoms/CopyLinkInput.tsx": 1,
     "apps/web/components/features/dashboard/molecules/UniversalLinkInputUrlMode.tsx": 1,

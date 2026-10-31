@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { apply } from '../../main-red-eject.mjs';
 
@@ -30,6 +33,7 @@ const CENSUS_LOG = [
 ].join('\n');
 const sig = failureSignature([CENSUS_LOG]);
 const commit = (sha, evidence) => ({ sha, evidence });
+const here = dirname(fileURLToPath(import.meta.url));
 
 describe('failureSignature', () => {
   it('names the failing test file, not the truncated command', () => {
@@ -255,5 +259,89 @@ describe('apply idle plans', () => {
   ])('keeps %s as a no-op without GitHub mutations', async reason => {
     const plan = { action: 'none', reason, trigger: null };
     await expect(apply(plan)).resolves.toEqual({ ...plan, applied: false });
+  });
+});
+
+import {
+  HEAD_STUCK_ALERT_MIN,
+  headDwell,
+  shouldFailOver,
+} from '../main-red-eject.mjs';
+
+describe('app-installation rate-limit guard (2026-10-31 5 h queue stall)', () => {
+  it('fails over to GITHUB_TOKEN only when a fallback exists and the app is exhausted', () => {
+    const limited = {
+      code: 1,
+      stderr: 'gh: API rate limit already exceeded for installation ID 1',
+    };
+    expect(shouldFailOver(limited, 'tok')).toBe(true);
+    expect(shouldFailOver({ code: 75, deferred: true }, 'tok')).toBe(true);
+    expect(shouldFailOver(limited, undefined)).toBe(false);
+    expect(shouldFailOver({ code: 1, stderr: 'HTTP 404' }, 'tok')).toBe(false);
+    expect(shouldFailOver({ code: 0 }, 'tok')).toBe(false);
+  });
+
+  it('measures how long the queue head has been waiting', () => {
+    const now = Date.parse('2026-10-31T14:00:00Z');
+    const m = headDwell(
+      [
+        {
+          number: 7,
+          position: 1,
+          state: 'AWAITING_CHECKS',
+          enqueuedAt: '2026-10-31T09:00:00Z',
+        },
+      ],
+      now
+    );
+    expect(m).toMatchObject({ head: 7, stuckMin: 300 });
+    expect(m.stuckMin).toBeGreaterThan(HEAD_STUCK_ALERT_MIN);
+    expect(headDwell([], now).head).toBeNull();
+  });
+
+  it('keeps the workflow wired: failover token, write scopes, and a failure alert', () => {
+    const wf = readFileSync(
+      new URL('../../../.github/workflows/main-red-eject.yml', import.meta.url),
+      'utf8'
+    );
+    expect(wf).toContain('GH_FALLBACK_TOKEN: ${{ github.token }}');
+    expect(wf).toMatch(/pull-requests: write/);
+    expect(wf).toMatch(/if: \$\{\{ failure\(\) \}\}[\s\S]*alert-failure/);
+  });
+});
+
+describe('workflow dispatch inputs', () => {
+  const root = resolve(here, '../../..');
+  const dispatches = caller =>
+    [...caller.matchAll(/'run',\s*'([\w./-]+\.yml)'([\s\S]*?)\]/g)].map(m => ({
+      workflow: m[1],
+      inputs: [...m[2].matchAll(/`([\w-]+)=/g)].map(x => x[1]),
+    }));
+
+  it('passes only inputs the target workflow declares (run 41122896980: pr_numbers 422)', () => {
+    const caller = readFileSync(
+      resolve(root, 'scripts/main-red-eject.mjs'),
+      'utf8'
+    );
+    const found = dispatches(caller);
+    expect(found.map(f => f.workflow)).toEqual(
+      expect.arrayContaining([
+        'pr-remediation-swarm.yml',
+        'merge-queue-green-enroll.yml',
+      ])
+    );
+    for (const { workflow, inputs } of found) {
+      const yml = readFileSync(
+        resolve(root, '.github/workflows', workflow),
+        'utf8'
+      );
+      const start = yml.indexOf('workflow_dispatch:');
+      const block = yml.slice(
+        start,
+        start + yml.slice(start).search(/\n  [^\s#]/)
+      );
+      const declared = [...block.matchAll(/^ {6}([\w-]+):/gm)].map(m => m[1]);
+      expect(declared).toEqual(expect.arrayContaining(inputs));
+    }
   });
 });

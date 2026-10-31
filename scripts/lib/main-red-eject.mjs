@@ -271,3 +271,40 @@ export function detectStuckHead(
     since: seen,
   };
 }
+
+/** A queue head at position 1 longer than this is paged as an incident. */
+export const HEAD_STUCK_ALERT_MIN = 45;
+
+/**
+ * Stage metric for the merge queue head: minutes since it was enqueued (an upper
+ * bound on its time at position 1). Keyed by PR number for p50/p95 tracking.
+ * @param {Array<{number:number, position:number, state:string, enqueuedAt?:string}>} entries
+ */
+export function headDwell(entries, now = Date.now()) {
+  const head = entries.find(e => e.position === 1);
+  if (!head) return { stage: 'queue-head', head: null, stuckMin: 0 };
+  const at = Date.parse(head.enqueuedAt ?? '');
+  return {
+    stage: 'queue-head',
+    head: head.number,
+    state: head.state,
+    stuckMin: Number.isFinite(at)
+      ? Math.max(0, Math.round((now - at) / 6000) / 10)
+      : 0,
+  };
+}
+
+/**
+ * Whether a failed gh call should retry on the job's own GITHUB_TOKEN: the app
+ * installation budget is exhausted (deferred exit 75 or GitHub's rate-limit text).
+ * @param {{code:number, stderr?:string, deferred?:boolean}} result
+ * @param {string|undefined} fallbackToken
+ */
+export function shouldFailOver(result, fallbackToken) {
+  if (!fallbackToken || result.code === 0) return false;
+  return (
+    result.deferred === true ||
+    result.code === 75 ||
+    /rate limit (already )?exceeded/i.test(result.stderr ?? '')
+  );
+}
