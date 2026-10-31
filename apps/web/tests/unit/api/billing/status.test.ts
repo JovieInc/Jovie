@@ -214,6 +214,31 @@ describe('GET /api/billing/status', () => {
     expect(data.plan).toBe('free');
   });
 
+  it('reports free when a stored paid plan has no active entitlement', async () => {
+    mockAuth.mockResolvedValue({ userId: 'user_unentitled' });
+    mockGetUserBillingInfo.mockResolvedValue({
+      success: true,
+      data: {
+        userId: 'db_id',
+        email: 'unentitled@example.com',
+        isAdmin: false,
+        isPro: false,
+        plan: 'pro',
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        billingVersion: 1,
+        lastBillingEventAt: null,
+      },
+    });
+
+    const { GET } = await loadRouteModule();
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.isPro).toBe(false);
+    expect(data.plan).toBe('free');
+  });
+
   it('sets correct cache headers on success (private, 60s max-age)', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_cache' });
     mockGetUserBillingInfo.mockResolvedValue({
