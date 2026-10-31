@@ -267,6 +267,7 @@ const LABELS = [
   'Staging',
   'Production',
   'Behind Main',
+  'Merge to Prod',
   'LYB Deploy',
   'CI Green',
   'Summer',
@@ -318,6 +319,7 @@ describe('OvieShippingStateCard', () => {
     expect(metricValue('Staging')).toBe('26.9.16 a1b2c3d');
     expect(metricValue('Production')).toBe('26.9.15 ee7401f');
     expect(metricValue('Behind Main')).toBe('54');
+    expect(metricValue('Merge to Prod')).toMatch(/^Unknown/);
     expect(metricValue('LYB Deploy')).toMatch(/^Unknown/);
     expect(metricValue('CI Green')).toBe('Yes');
     expect(metricValue('Summer')).toBe('Up');
@@ -344,6 +346,16 @@ describe('OvieShippingStateCard', () => {
             deployHealth: {
               observedAt: new Date(NOW - 60_000).toISOString(),
               healthy: false,
+              lag: [
+                {
+                  repo: 'JovieInc/Jovie',
+                  p50Min: 56,
+                  p95Min: 246,
+                  samples: 187,
+                  targetP50Min: 30,
+                  targetP95Min: 90,
+                },
+              ],
               repos: [
                 {
                   repo: 'JovieInc/LogYourBody',
@@ -367,6 +379,9 @@ describe('OvieShippingStateCard', () => {
 
     await waitFor(() => {
       expect(metricValue('LYB Deploy')).toBe('Failing x15, 54 behind');
+      expect(metricValue('Merge to Prod')).toBe(
+        '56 / 246 min (target 30 / 90)'
+      );
     });
   });
 

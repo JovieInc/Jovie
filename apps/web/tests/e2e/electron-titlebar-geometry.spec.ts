@@ -43,6 +43,27 @@ async function forceElectronRuntime(page: Page): Promise<void> {
     });
     document.documentElement.dataset.desktopRuntime = 'electron';
   });
+  // JOV-8941: flipping the runtime attribute re-applies the electron padding
+  // rules, and the shell body animates gap/padding (SHELL_RAIL_FRAME_GAP,
+  // duration-cinematic). A real Electron preload sets the attribute before
+  // first paint so no transition runs there; in this simulated runtime the
+  // geometry must wait for the shell chain (body, main plane, #main-content)
+  // to reach animation rest before anything is measured.
+  await page.waitForFunction(
+    () => {
+      const shell = document.querySelector('[data-app-shell-body="true"]');
+      if (!shell) return false;
+      const targets = [
+        shell,
+        document.querySelector('[data-app-shell-main-plane="true"]'),
+        document.querySelector('#main-content'),
+      ];
+      return targets.every(
+        el => el === null || el.getAnimations().length === 0
+      );
+    },
+    { timeout: 10_000 }
+  );
 }
 
 async function gotoShellRoute(

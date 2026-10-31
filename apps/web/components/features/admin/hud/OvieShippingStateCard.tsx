@@ -148,6 +148,16 @@ function formatCertifiedHead(
   return certifiedHead.sha ? certifiedHead.sha.slice(0, 7) : null;
 }
 
+function formatProdLag(health: DeliveryLanes['deployHealth']): string | null {
+  const lag = health?.lag?.find(row => row.repo === 'JovieInc/Jovie');
+  if (!lag || lag.p50Min === null || lag.p95Min === null) return null;
+  const target =
+    lag.targetP50Min === null || lag.targetP95Min === null
+      ? ''
+      : ` (target ${lag.targetP50Min} / ${lag.targetP95Min})`;
+  return `${Math.round(lag.p50Min)} / ${Math.round(lag.p95Min)} min${target}`;
+}
+
 function formatLybDeploy(health: DeliveryLanes['deployHealth']): string | null {
   const lyb = health?.repos.find(repo => repo.repo === 'JovieInc/LogYourBody');
   if (!lyb) return null;
@@ -341,6 +351,11 @@ function ShippingStateBody({
         'Behind Main',
         'live-build-info',
         formatCount(delivery.production.behindMain),
+      ],
+      [
+        'Merge to Prod',
+        'lanes-status',
+        formatProdLag(delivery.lanes.deployHealth),
       ],
       [
         'LYB Deploy',
