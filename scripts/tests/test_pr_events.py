@@ -3146,6 +3146,35 @@ console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
         self.assertTrue(events.ensure_red_before_green({"number": 23665}, sh=shell, win_evidence=win))
         self.assertEqual(written, ["## Summary\nKeep this.\n\n" + win])
 
+    def test_win_placeholders_are_replaced_without_losing_comments_or_following_sections(self):
+        win = ("## Win\n- Claim: Generation converges in one pass\n- Area: ci\n"
+               "- Theme: merge-throughput\n"
+               "- Metric: generation passes | runs | lower | 2 | 1 | regression fixture | pnpm test\n"
+               "- Verify: https://github.com/JovieInc/Jovie/pull/23665\n")
+        decision = '<!-- customer-changelog/v1 {"releaseWorthy":false} -->'
+        bodies = []
+        template_win = (ROOT / ".github/pull_request_template.md").read_text().split("## Win", 1)[1]
+        template_win = template_win.split("\n## ", 1)[0]
+        for placeholder in ("", template_win, "- none", "not applicable"):
+            body = (events.red_before_green_block(self.PR) + "\n\n## Win\n" + placeholder +
+                    "\n" + decision + "\n\n## Next\nKeep this section.\n")
+            with self.subTest(placeholder=placeholder):
+                updated = events.repair_evidence_body(self.PR, body, win_evidence=win)
+                self.assertIn(win, updated)
+                self.assertEqual(updated.count("## Win"), 1)
+                self.assertEqual(updated.count(decision), 1)
+                self.assertIn("## Next\nKeep this section.", updated)
+                self.assertEqual(events.repair_evidence_body(self.PR, updated, win_evidence=win), updated)
+                bodies.append(updated)
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+console.log(JSON.stringify(JSON.parse(readFileSync(0, 'utf8')).map(body => evaluateFleetRules({
+  pr: {title: 'fix(ci): repair metadata', body}, files: [],
+}).errors)));
+"""], cwd=ROOT, input=json.dumps(bodies), text=True, capture_output=True, check=True)
+        self.assertEqual(json.loads(checked.stdout), [[], [], [], []])
+
     def test_explicit_locking_pr_repairs_missing_provenance_and_passes_fleet(self):
         body = events.red_before_green_block(self.PR)
         updated = events.repair_evidence_body(self.PR, body, locking_pr=23295,

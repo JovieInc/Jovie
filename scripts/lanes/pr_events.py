@@ -1029,7 +1029,7 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
     """Complete repair metadata without replacing existing evidence or customer decisions.
 
     The caller supplies the customer outcome, locking PR provenance and measured Win;
-    never infer them from a failed check. Existing decisions and measurements are preserved.
+    never infer them from a failed check. Preserve decisions/measurements; fill empty Win templates.
     The canonical Fleet/changelog guards still validate the resulting body.
     """
     updated = body
@@ -1055,9 +1055,16 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
     if win_evidence is not None:
         if not isinstance(win_evidence, str) or not re.match(r"\A## Win\s*\n\s*\S", win_evidence):
             raise ValueError("win evidence requires an explicit ## Win section")
-        visible = re.sub(r"<!--[\s\S]*?-->", "", updated)
-        if not re.search(r"^#{2,3}\s*Win\s*$", visible, re.I | re.M):
+        # Mask comments without changing offsets so a placeholder can be replaced
+        # in the original body while retaining hidden customer/repair decisions.
+        visible = re.sub(r"<!--[\s\S]*?-->", lambda m: re.sub(r"[^\n]", " ", m[0]), updated)
+        win = re.search(r"^#{2,3}[ \t]*Win[ \t]*$([\s\S]*?)(?=^#{1,3}\s|\Z)", visible, re.I | re.M)
+        if win is None:
             updated = updated.rstrip("\n") + "\n\n" + win_evidence.rstrip("\n") + "\n"
+        elif not win[1].strip() or re.fullmatch(r"(?:-\s*)?(?:n/?a|none|not applicable)[.!]?", win[1].strip(), re.I):
+            comments = re.findall(r"<!--[\s\S]*?-->", updated[win.start():win.end()])
+            replacement = win_evidence.rstrip("\n") + "\n" + "\n".join(comments) + "\n\n"
+            updated = updated[:win.start()] + replacement + updated[win.end():]
     return updated
 
 
