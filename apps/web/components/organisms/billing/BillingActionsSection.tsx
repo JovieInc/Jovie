@@ -7,7 +7,13 @@ import { BillingPortalLink } from '@/components/molecules/BillingPortalLink';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { track } from '@/lib/analytics';
+import { PRO_PLAN_DISPLAY_NAME } from '@/lib/config/plan-prices';
+import { getLimit } from '@/lib/entitlements/registry';
 import { LINEAR_EASE } from './billing-constants';
+
+const PRO_RETENTION_DAYS = getLimit('pro', 'analyticsRetentionDays');
+const FREE_RETENTION_DAYS = getLimit('free', 'analyticsRetentionDays');
+const FREE_CONTACTS_LIMIT = getLimit('free', 'contactsLimit');
 
 export function BillingActionsSection({
   cancelDialogOpen,
@@ -60,8 +66,9 @@ export function BillingActionsSection({
             body={
               <div className='space-y-3'>
                 <p>
-                  Your Pro access continues until the end of your current
-                  billing period. After that, you&apos;ll lose access to:
+                  Your {PRO_PLAN_DISPLAY_NAME} access continues until the end of
+                  your current billing period. After that, you&apos;ll lose
+                  access to:
                 </p>
                 <ul className='space-y-2'>
                   <li className='flex items-start gap-2'>
@@ -70,8 +77,8 @@ export function BillingActionsSection({
                       aria-hidden='true'
                     />
                     <span>
-                      <strong>Advanced analytics</strong> - Retention drops from
-                      90 days to 7 days
+                      <strong>Advanced analytics</strong> - Retention drops from{' '}
+                      {PRO_RETENTION_DAYS} days to {FREE_RETENTION_DAYS} days
                     </span>
                   </li>
                   <li className='flex items-start gap-2'>
@@ -90,8 +97,8 @@ export function BillingActionsSection({
                       aria-hidden='true'
                     />
                     <span>
-                      <strong>Unlimited contacts</strong> - Contact limit drops
-                      to 100
+                      <strong>Unlimited saved contacts</strong> - Saved contact
+                      limit drops to {FREE_CONTACTS_LIMIT}
                     </span>
                   </li>
                   <li className='flex items-start gap-2'>

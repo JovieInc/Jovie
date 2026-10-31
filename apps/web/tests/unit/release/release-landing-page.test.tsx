@@ -423,6 +423,30 @@ describe('@critical ReleaseLandingPage', () => {
     expect(screen.getByText('LYNX').closest('a')).toBeNull();
   });
 
+  it.each([
+    [{ name: ' DJ Nova ', handle: 'djnova' }],
+    [
+      { name: 'DJ Nova', handle: 'djnova' },
+      { name: ' DJ Nova ', handle: null },
+    ],
+    [
+      { name: 'DJ Nova', handle: 'djnova' },
+      { name: 'DJ Nova', handle: null },
+    ],
+  ])(
+    'preserves the first featured profile link after name normalization: %j',
+    (...featured) => {
+      render(
+        <ReleaseLandingPage {...defaultProps} featuredArtists={featured} />
+      );
+
+      const links = screen.getAllByRole('link', { name: 'DJ Nova' });
+      expect(links).toHaveLength(1);
+      expect(links[0]).toHaveAttribute('href', '/djnova');
+      expect(links[0]).toHaveTextContent(/^DJ Nova$/);
+    }
+  );
+
   it('featured artists line renders "feat." with linked names', () => {
     const featured = [
       { name: 'DJ Nova', handle: 'djnova' },

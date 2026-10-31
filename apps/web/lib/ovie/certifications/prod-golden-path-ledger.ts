@@ -71,6 +71,16 @@ export interface ProdGoldenPathObservation {
   readonly sampleSize: number;
 }
 
+/**
+ * Per-surface browser evidence folded into the receipt (JOV-9625 outcome
+ * rework). Optional so receipts recorded before the fields existed keep
+ * parsing; null means the surface was not browser-exercised, never a zero.
+ */
+export interface ProdGoldenPathScreenshot {
+  readonly format: 'jpeg';
+  readonly dataUrl: string;
+}
+
 export interface ProdGoldenPathReceipt {
   readonly schema: typeof PROD_GOLDEN_PATH_RECEIPT_SCHEMA;
   readonly surface: ProdGoldenPathSurfaceId;
@@ -88,6 +98,9 @@ export interface ProdGoldenPathReceipt {
   readonly blocker: string | null;
   readonly issueUrl: string | null;
   readonly observations: readonly ProdGoldenPathObservation[];
+  readonly consoleErrorCount?: number | null;
+  readonly networkErrorCount?: number | null;
+  readonly screenshot?: ProdGoldenPathScreenshot | null;
 }
 
 export interface ProdGoldenPathSurfaceRecord {

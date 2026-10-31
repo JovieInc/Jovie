@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server';
+import { connection, NextResponse } from 'next/server';
 
-export const dynamic = 'force-dynamic';
-
-export function GET() {
+/** Liveness probe: always answered by the running server, never a prerender. */
+export async function GET() {
+  await connection();
   return NextResponse.json({ status: 'ok', app: 'console' });
 }

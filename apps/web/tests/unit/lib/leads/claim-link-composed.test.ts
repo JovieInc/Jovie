@@ -47,7 +47,10 @@ vi.mock('@/lib/ingestion/session', () => ({
     (holder.db as { transaction: (f: unknown) => unknown }).transaction(fn),
 }));
 vi.mock('@/lib/env-server', () => ({
-  env: { URL_ENCRYPTION_KEY: 'test-key-test-key-test-key-test-key' },
+  env: {
+    URL_ENCRYPTION_KEY: 'test-key-test-key-test-key-test-key',
+    RESEND_API_KEY: 'test-resend-key',
+  },
   isSecureEnv: () => false,
 }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
@@ -105,6 +108,7 @@ import { users } from '@/lib/db/schema/auth';
 import { leads } from '@/lib/db/schema/leads';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { approveLead } from '@/lib/leads/approve-lead';
+import { resolveLeadClaimToken } from '@/lib/leads/lead-claim-token';
 import { outreachApprovedWhere } from '@/lib/leads/outreach-eligible-status';
 import { routeLead } from '@/lib/leads/route-lead';
 import { hashClaimToken } from '@/lib/security/claim-token';
@@ -165,9 +169,12 @@ describe('outbound claim link, composed', () => {
       .from(creatorProfiles)
       .where(eq(creatorProfiles.id, stored.creatorProfileId as string));
 
-    // One token across lead and profile.
-    expect(stored.claimToken).toBeTruthy();
-    const hash = await hashClaimToken(stored.claimToken as string);
+    // One token across lead and profile, stored hashed: the lead never holds
+    // the plaintext, which is derived on demand from the hash inputs.
+    expect(stored.claimToken).toBeNull();
+    const token = (await resolveLeadClaimToken(stored)) as string;
+    expect(token).toBeTruthy();
+    const hash = await hashClaimToken(token);
     expect(stored.claimTokenHash).toBe(hash);
     expect(profile.claimToken).toBe(hash);
     expect(profile.claimTokenExpiresAt?.getTime()).toBe(
@@ -185,8 +192,8 @@ describe('outbound claim link, composed', () => {
 
     // Follow the exact link the email carries.
     const response = await claimLinkRoute(
-      new NextRequest(`https://jov.ie/claim/${stored.claimToken}`),
-      { params: Promise.resolve({ token: stored.claimToken as string }) }
+      new NextRequest(`https://jov.ie/claim/${token}`),
+      { params: Promise.resolve({ token }) }
     );
     const location = response.headers.get('location') ?? '';
     expect(location).toContain(`/${profile.usernameNormalized}?claim=1`);
