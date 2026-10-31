@@ -1357,8 +1357,8 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       },
       ok([{ total: 3, qr: 1, link: 2 }])
     );
-    captureExceptionMock.mockImplementation(error => {
-      if (error === timeout) {
+    loggerWarnMock.mockImplementation((message: unknown) => {
+      if (typeof message === 'string' && message.includes('[avatar-quality]')) {
         expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
       }
     });
@@ -1381,24 +1381,26 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       vi.mocked(setStatementTimeout).mock.calls.filter(([, ms]) => ms === 5000)
     ).toHaveLength(1);
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
-    expect(captureExceptionMock).toHaveBeenCalledWith(
-      timeout,
-      expect.objectContaining({
-        tags: expect.objectContaining({ query: 'avatar_quality' }),
-      })
+    // (JOV-8900) A cold-start statement timeout on the fail-soft avatar read
+    // is log-only (JOV-5754 doctrine) — it may not file a Sentry issue whose
+    // title is the drizzle query wrapper.
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.stringContaining('[avatar-quality]'),
+      expect.objectContaining({ profileId: 'profile_1' })
     );
     expect(txStates.every(state => state.closed)).toBe(true);
   });
 
-  it('JOV-8580: stops after two idle setup failures and reports fallback only after cleanup', async () => {
+  it('JOV-8580/JOV-8900: stops after two idle setup failures and degrades log-only after cleanup', async () => {
     const idle = Object.assign(
       new Error('terminating connection due to idle-in-transaction timeout'),
       { code: '25P03' }
     );
     setupFailures.set(2, fail(idle));
     setupFailures.set(3, fail(idle));
-    captureExceptionMock.mockImplementation(error => {
-      if (error === idle) {
+    loggerWarnMock.mockImplementation((message: unknown) => {
+      if (typeof message === 'string' && message.includes('[avatar-quality]')) {
         expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
         expect(txStates[3]).toMatchObject({ closed: true, rolledBack: true });
       }
@@ -1418,14 +1420,104 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     expect(result.tippingStats.totalReceivedCents).toBe(100);
     expect(result.dashboardLoadError).toBeUndefined();
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
-    expect(captureExceptionMock).toHaveBeenCalledWith(
-      idle,
-      expect.objectContaining({
-        tags: expect.objectContaining({ query: 'avatar_quality' }),
-      })
+    // (JOV-8900) Two idle-in-transaction terminations on the fail-soft avatar
+    // read are an infrastructure condition, not a data bug — log-only after
+    // both transactions close (JOV-5754 doctrine). Reporting them filed a
+    // Sentry issue per drizzle query title (JOVIE-WEB-YK / Linear JOV-8900).
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.stringContaining('[avatar-quality]'),
+      expect.objectContaining({ profileId: 'profile_1' })
     );
     expect(capturedCascadeErrors()).toEqual([]);
     expect(txStates.every(state => state.closed)).toBe(true);
+  });
+
+  it('JOV-8900: avatar-quality select idle terminations on both attempts stay log-only', async () => {
+    // Prod fingerprint of Sentry issue JOVIE-WEB-YK (Linear JOV-8900): the
+    // avatar_quality profile_photos read itself fails with a Neon
+    // idle-in-transaction termination (25P03) — the drizzle wrapper names the
+    // select in the outer message and the PG termination text lives on the
+    // cause. The page still rendered (200); the handled-warning Sentry event
+    // was the entire harm. Both wrapper attempts fail here, so the retry in
+    // fetchAvatarQualityWithSession is exhausted and the caller catch must
+    // degrade log-only instead of filing another Sentry issue.
+    const idleSelectError = () =>
+      new Error(
+        'Failed query: select "width", "height" from "profile_photos"',
+        {
+          cause: Object.assign(
+            new Error(
+              'terminating connection due to idle-in-transaction timeout'
+            ),
+            { code: '25P03' }
+          ),
+        }
+      );
+    outcomes.push(
+      ok([userRow]),
+      ok([dashboardProfile]),
+      ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]),
+      ok([{ count: 0 }]),
+      ok([{ hasLinks: true, hasMusicLinks: true }]),
+      fail(idleSelectError()), // avatar attempt 1: the select itself fails
+      fail(idleSelectError()), // avatar retry on a fresh transaction
+      ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
+      ok([{ total: 3, qr: 1, link: 2 }])
+    );
+
+    const result = await getDashboardData();
+
+    expect(result.avatarQuality).toEqual({
+      status: 'unknown',
+      width: null,
+      height: null,
+    });
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(result.dashboardLoadError).toBeUndefined();
+    expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
+    expect(txStates[3]).toMatchObject({ closed: true, rolledBack: true });
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.stringContaining('[avatar-quality]'),
+      expect.objectContaining({ profileId: 'profile_1' })
+    );
+    expect(capturedCascadeErrors()).toEqual([]);
+    expect(txStates.every(state => state.closed)).toBe(true);
+  });
+
+  it('JOV-8900: avatar-quality connection-class failures degrade log-only', async () => {
+    // Transient transport failures (pool/WebSocket resets) on the fail-soft
+    // avatar read are infrastructure conditions (isRetryableError surface):
+    // log-only, no Sentry issue (JOV-5754 doctrine, JOV-8900).
+    const resetError = new Error(
+      'Failed query: select "width", "height" from "profile_photos"',
+      {
+        cause: new Error('read ECONNRESET'),
+      }
+    );
+    outcomes.push(
+      ok([userRow]),
+      ok([dashboardProfile]),
+      ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]),
+      ok([{ count: 0 }]),
+      ok([{ hasLinks: true, hasMusicLinks: true }]),
+      fail(resetError),
+      ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
+      ok([{ total: 3, qr: 1, link: 2 }])
+    );
+
+    const result = await getDashboardData();
+
+    expect(result.avatarQuality?.status).toBe('unknown');
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.stringContaining('[avatar-quality]'),
+      expect.objectContaining({ profileId: 'profile_1' })
+    );
   });
 
   it('JOV-8580: recovers code-less wrapped idle setup errors without losing query results', async () => {
