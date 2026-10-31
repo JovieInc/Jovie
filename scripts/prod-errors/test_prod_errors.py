@@ -61,7 +61,7 @@ class LoopTest(unittest.TestCase):
     def ghrun(self, n, **kw):
         base = {"databaseId": n, "workflowName": "E2E Full Browser Matrix", "conclusion": "success",
                 "status": "completed", "event": "push", "createdAt": pe.iso(self.t + n * 60),
-                "runStartedAt": pe.iso(self.t + n * 60), "headSha": f"sha{n}",
+                "startedAt": pe.iso(self.t + n * 60), "headSha": f"sha{n}",
                 "url": f"https://example.com/runs/{n}"}
         return {**base, **kw}
 
@@ -365,9 +365,9 @@ class LoopTest(unittest.TestCase):
 
     def test_ci_newest_run_stuck_past_timeout_flags_once(self):
         stuck = [self.ghrun(7, status="in_progress", conclusion=None, headSha="sha-new",
-                          createdAt=pe.iso(self.t - 3 * 3600), runStartedAt=pe.iso(self.t - 3 * 3600))]
+                          createdAt=pe.iso(self.t - 3 * 3600), startedAt=pe.iso(self.t - 3 * 3600))]
         young = [self.ghrun(8, status="in_progress", conclusion=None, headSha="sha-new2",
-                          createdAt=pe.iso(self.t - 60), runStartedAt=pe.iso(self.t - 60))]
+                          createdAt=pe.iso(self.t - 60), startedAt=pe.iso(self.t - 60))]
         self.ci_sweeps([stuck, stuck, young])
         self.assertEqual(len(self.l.created), 1)
         self.assertIn("never finished within its timeout", self.l.created[0]["title"])
@@ -576,6 +576,77 @@ class LoopTest(unittest.TestCase):
         seen = json.loads((self.dir / "ci-ledger.json").read_text())
         self.assertEqual(seen[key]["state"], "green")
         self.assertIsNone(seen[key]["linear"])  # dead link dropped; next red episode files fresh
+
+    def test_gh_json_fields_are_supported_by_the_pinned_gh_sets(self):
+        # gh 2.96.0 (gem) rejects 'runStartedAt' with 'Unknown JSON field', blinding the ci-main
+        # watcher -- and the test fixtures mirrored the source's field list, so no fake runner
+        # caught it. Every --json field the watchers request must be in the pinned gh-supported
+        # sets (verified against cli/cli v2.96.0 RunFields / PullRequestFields), whatever the
+        # fake returns.
+        asked = []
+
+        def fake(args):
+            if "--json" in args:
+                asked.append((args[0], args[args.index("--json") + 1].split(",")))
+            if args[0] == "run":
+                return [self.ghrun(1, conclusion="success")]
+            return []
+
+        class S(FakeSentry):
+            def top_issues(self_):
+                return []
+        with mock.patch.object(pe, "gh_json", side_effect=fake):
+            pe.ci_main(self.l, self.dir)
+            pe.sweep(S(), self.l, self.dir)
+        run_fields = [f for cmd, fs in asked if cmd == "run" for f in fs]
+        pr_fields = [f for cmd, fs in asked if cmd == "pr" for f in fs]
+        self.assertTrue(run_fields)
+        self.assertTrue(pr_fields)
+        self.assertNotIn("runStartedAt", run_fields)
+        for f in run_fields:
+            self.assertIn(f, pe.GH_RUN_LIST_FIELDS, f"gh run list does not support field {f!r}")
+        for f in pr_fields:
+            self.assertIn(f, pe.GH_PR_LIST_FIELDS, f"gh pr list does not support field {f!r}")
+
+    def test_sweep_deferral_is_visible_and_keeps_sweeping(self):
+        # apiclient budget deferral (exit 75, 'retry later, not a verdict'): the sweep must not
+        # exit 1. The Sentry sweep still runs, the deferral is visible in counts/stderr, and
+        # claim expiry + thread watch are SKIPPED -- with no PR list, 'no PR' cannot be told from
+        # 'did not check', so advancing claims would file false escalations.
+        led = {"101": {"sentryId": "101", "linear": "JOV-1", "status": "claimed", "flow": None, "gate": None,
+                       "title": "x", "users": 3, "lastSeen": self.t - 30,
+                       "openedAt": self.t - pe.CLAIM_S - 100, "claimExpiresAt": self.t - 10}}
+        (self.dir / "ledger.json").write_text(json.dumps(led))
+
+        def fake(args):
+            if args[0] == "pr":
+                raise pe.GhDeferred("gh pr list failed (deferred): waits past budget (budget-reserve:graphql)")
+            return []
+
+        class S(FakeSentry):
+            def top_issues(self_):
+                return [self.issue()]
+        err = StringIO()
+        with mock.patch.object(pe, "gh_json", side_effect=fake), redirect_stderr(err):
+            counts = pe.sweep(S(), self.l, self.dir)
+        self.assertIn("budget-reserve:graphql", counts.get("deferred", ""))
+        self.assertEqual(counts.get("tracked"), 1)  # the Sentry sweep still ran
+        led2 = json.loads((self.dir / "ledger.json").read_text())
+        self.assertNotIn("escalations", led2["101"])  # no FALSE claim-expiry escalation
+        self.assertFalse(any("Claim expired" in c[1] for c in self.l.comments))
+        self.assertEqual(self.l.created, [])  # thread watch skipped
+        self.assertIn("deferred gh lists", err.getvalue())
+
+    def test_ci_main_deferral_is_visible_not_fatal(self):
+        # Same class on the ci-main watcher: a deferred run list skips the tick visibly instead
+        # of exiting 1 and tripping the dead-man's error streak.
+        def fake(args):
+            raise pe.GhDeferred("gh run list failed (deferred): waits past budget (budget-reserve:graphql)")
+        err = StringIO()
+        with mock.patch.object(pe, "gh_json", side_effect=fake), redirect_stderr(err):
+            r = pe.ci_main(self.l, self.dir)
+        self.assertIn("budget-reserve:graphql", r.get("deferred", ""))
+        self.assertIn("ci-main deferred this tick", err.getvalue())
 
     def test_sandbox_binds_the_shared_api_ledger_writable(self):
         # The units run bwrap with a read-only root; the apiclient budget ledger lives under the

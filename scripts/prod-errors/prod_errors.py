@@ -41,6 +41,11 @@ class MissingConfig(RuntimeError):
 class LinearIssueMissing(RuntimeError):
     """The Linear issue id the ledger holds is deleted, or not visible to this API key (moved
     team/project, rotated key). The loop relinks -- files a fresh issue -- instead of crashing."""
+
+
+class GhDeferred(RuntimeError):
+    """apiclient deferred the gh call (exit 75, budget-reserve: 'retry later, not a verdict').
+    A deferral is a visible skip-this-tick status, never a watcher failure."""
 STATE = Path(os.environ.get("PROD_ERRORS_STATE", Path.home() / ".local/state/jovie-prod-errors"))
 # Hosts come from the shared provider contract; every call goes through scripts/apiclient.
 SENTRY_API = os.environ.get("SENTRY_API", f"https://{provider_spec('sentry')['hosts'][0]}/api/0")
@@ -76,6 +81,20 @@ WORKFLOWS = json.loads(os.environ.get("PROD_ERRORS_WORKFLOWS", "null")) or [
     "CI", "Production Synthetic Monitoring", "Canary Health Gate", "E2E Full Browser Matrix", "Visual & A11y Tests",
     "Golden Path Nightly", "M2 Revenue-Path Canary", "Nightly Testing Agent"]
 # Scheduled watchers: a missed run (no completed main run within 2x schedule) alerts.
+# gh --json field sets, pinned against gh 2.96.0 (gem's CLI) source: run list supports exactly
+# pkg/cmd/run/shared.RunFields -- 'startedAt', NOT the REST wire name 'runStartedAt' -- and pr
+# list supports api.PullRequestFields. Requesting an unsupported field kills the whole call
+# ('Unknown JSON field: ...'), blinding the watcher; tests assert every requested field is here.
+GH_RUN_LIST_FIELDS = frozenset(
+    "attempt conclusion createdAt databaseId displayTitle event headBranch headSha name number "
+    "startedAt status updatedAt url workflowDatabaseId workflowName".split())
+GH_PR_LIST_FIELDS = frozenset(
+    "additions assignees author autoMergeRequest baseRefName baseRefOid body changedFiles closed "
+    "closedAt closingIssuesReferences comments commits createdAt deletions files fullDatabaseId "
+    "headRefName headRefOid headRepository headRepositoryOwner id isCrossRepository isDraft labels "
+    "latestReviews maintainerCanModify mergeCommit mergeStateStatus mergeable mergedAt mergedBy "
+    "milestone number potentialMergeCommit projectCards projectItems reactionGroups reviewDecision "
+    "reviewRequests reviews state statusCheckRollup title updatedAt url".split())
 EXPECTED_RUNS = {"Production Synthetic Monitoring": 6 * 3600, "Golden Path Nightly": 86400,
                  "M2 Revenue-Path Canary": 86400}
 
@@ -334,8 +353,9 @@ class Linear:
 def gh_json(args: list[str]):
     res = run_gh(args)
     if res["code"] != 0:
-        kind = "deferred" if res.get("deferred") else f"exit {res['code']}"
-        raise RuntimeError(f"gh {' '.join(args[:2])} failed ({kind}): {res['stderr'][:300]}")
+        if res.get("deferred"):  # budget-reserve: retry later, not a verdict on this change
+            raise GhDeferred(f"gh {' '.join(args[:2])} failed (deferred): {res['stderr'][:300]}")
+        raise RuntimeError(f"gh {' '.join(args[:2])} failed (exit {res['code']}): {res['stderr'][:300]}")
     return json.loads(res["stdout"] or "null")
 
 
@@ -630,10 +650,21 @@ def sweep(sentry: Sentry, linear: Linear, state: Path = STATE) -> dict:
         sid = str(read_json(f, {}).get("issueId") or "")
         if sid and sid not in issues:
             issues[sid] = sentry.issue(sid)
-    merges = gh_json(["pr", "list", "-R", REPO, "--state", "merged", "--limit", "60",
-                      "--json", "number,mergedAt,title"]) or []
-    prs = gh_json(["pr", "list", "-R", REPO, "--state", "all", "--search", "Sentry in:body", "--limit", "100",
-                   "--json", "number,title,body,headRefName,mergedAt"]) or []
+    merges: list[dict] = []
+    prs: list[dict] = []
+    deferred = ""
+    try:
+        merges = gh_json(["pr", "list", "-R", REPO, "--state", "merged", "--limit", "60",
+                          "--json", "number,mergedAt,title"]) or []
+        prs = gh_json(["pr", "list", "-R", REPO, "--state", "all", "--search", "Sentry in:body", "--limit", "100",
+                       "--json", "number,title,body,headRefName,mergedAt"]) or []
+    except GhDeferred as exc:
+        # Budget deferral (exit 75: 'retry later, not a verdict'): the Sentry sweep still runs, but
+        # PR matching, claim expiry and the thread watch are SKIPPED -- with no PR list, 'no PR'
+        # cannot be told from 'did not check', so advancing claims would file false escalations.
+        deferred = str(exc)[:200]
+        print(f"prod-errors: sweep deferred gh lists this tick ({deferred}); PR matching, claim expiry "
+              "and thread watch skipped", file=sys.stderr)
     counts: dict[str, int] = {}
     groups: dict[tuple, str] = {}  # same project+title, no Linear link yet -> ONE rolled-up Linear issue
     totals: dict[tuple, int] = {}
@@ -649,15 +680,19 @@ def sweep(sentry: Sentry, linear: Linear, state: Path = STATE) -> dict:
         if ledger.get(sid, {}).get("linear") and not linked_linear(issue):
             groups.setdefault(key, ledger[sid]["linear"])
         counts[r] = counts.get(r, 0) + 1
-    stale = advance(ledger, linear, sentry, prs, at, state)
-    if stale:
-        counts["stale-link"] = stale  # visible in the sweep result + heartbeat, never silent
+    if deferred:
+        counts["deferred"] = deferred  # visible in the sweep result + heartbeat, never a failure exit
+    else:
+        stale = advance(ledger, linear, sentry, prs, at, state)
+        if stale:
+            counts["stale-link"] = stale  # visible in the sweep result + heartbeat, never silent
     write_json(state / "ledger.json", ledger)
     record_metrics(ledger, list(issues.values()), at, state)
-    try:
-        counts.update(bot_threads(linear, state))
-    except Exception as e:  # never let the thread watcher break the Sentry sweep
-        counts["threads-error"] = str(e)[:80]
+    if not deferred:
+        try:
+            counts.update(bot_threads(linear, state))
+        except Exception as e:  # never let the thread watcher break the Sentry sweep
+            counts["threads-error"] = str(e)[:80]
     for f in inbox:
         f.unlink(missing_ok=True)
     return counts
@@ -667,8 +702,12 @@ def ci_main(linear: Linear, state: Path = STATE) -> dict:
     latest: dict[str, dict] = {}
     runs_by_wf: dict[str, list[dict]] = {}
     for wf in WORKFLOWS:
-        runs = gh_json(["run", "list", "-R", REPO, "--branch", "main", "--workflow", wf, "--limit", "5",
-                        "--json", "databaseId,workflowName,conclusion,status,event,createdAt,runStartedAt,headSha,url"]) or []
+        try:
+            runs = gh_json(["run", "list", "-R", REPO, "--branch", "main", "--workflow", wf, "--limit", "5",
+                            "--json", "databaseId,workflowName,conclusion,status,event,createdAt,startedAt,headSha,url"]) or []
+        except GhDeferred as exc:  # budget deferral: skip this tick visibly, never crash the watcher
+            print(f"prod-errors: ci-main deferred this tick ({exc}); run watching skipped", file=sys.stderr)
+            return {"deferred": str(exc)[:200]}
         runs_by_wf[wf] = runs
         done = [r for r in runs if r.get("status") == "completed"]
         if done:
@@ -680,7 +719,7 @@ def ci_main(linear: Linear, state: Path = STATE) -> dict:
         entry = seen.setdefault(key, {"workflow": wf})
         newest = runs[0] if runs else None
         if newest and newest.get("status") != "completed":
-            started = parse_ts(newest.get("runStartedAt") or newest.get("createdAt"))
+            started = parse_ts(newest.get("startedAt") or newest.get("createdAt"))
             if (started and now() - started > RUN_TIMEOUT_S
                     and entry.get("hangRunId") != newest.get("databaseId")):
                 entry["hangRunId"] = newest.get("databaseId")  # one hang alert per run, not per sweep
