@@ -106,6 +106,7 @@ const prBody = (extra = {}) => ({
   merge_commit_sha: 'm'.repeat(40),
   ...extra,
 });
+/** @param {any} [opts] */
 const fakeGh =
   ({ pr = prBody(), mainSha = 'a'.repeat(40), parents } = {}) =>
   async args => {
@@ -196,8 +197,11 @@ test('enroll waits for the precheck and never executes PR code itself', () => {
   });
   // PR-authored code: one step, in the `merged` checkout, with no secret in env.
   const guards = job.steps.find(step => step.id === 'guards');
-  assert.equal(guards['working-directory'], 'merged');
-  assert.equal(guards['continue-on-error'], true);
+  assert.match(
+    guards.run,
+    /node merged\/scripts\/queue-drift-precheck\.mjs --root merged/
+  );
+  assert.match(guards.run, /\|\| echo "failed=true" >> "\$GITHUB_OUTPUT"/);
   assert.equal(guards.env, undefined);
   const mergedCheckout = job.steps.find(step => step.with?.path === 'merged');
   assert.equal(mergedCheckout.with['persist-credentials'], false);

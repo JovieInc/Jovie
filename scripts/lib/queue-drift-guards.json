@@ -150,6 +150,12 @@
       "command": ["node", "scripts/invariants/copy-leak/check.mjs"],
       "requires": ["scripts/invariants/copy-leak/check.mjs"],
       "remediation": "Remove the leaked internal copy; the baseline only shrinks."
+    },
+    {
+      "id": "shell-ia",
+      "command": ["node", "scripts/invariants/shell-ia.mjs"],
+      "requires": ["scripts/invariants/shell-ia.mjs"],
+      "remediation": "Render navigation through the registered shell chrome; the raw nav/aside baseline only shrinks (JOV-INV-047)."
     }
   ],
   "exempt": [

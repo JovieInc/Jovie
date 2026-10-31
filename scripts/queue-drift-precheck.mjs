@@ -159,7 +159,10 @@ async function main(argv) {
     flag('--manifest') ?? resolve(here, 'lib/queue-drift-guards.json');
   const out = flag('--out');
   const started = Date.now();
-  const results = await runGuardsParallel({ guards: loadGuards(manifest) });
+  const results = await runGuardsParallel({
+    guards: loadGuards(manifest),
+    root: resolve(flag('--root') ?? process.cwd()),
+  });
   console.log(
     `queue-drift: ${results.length} guards in ${((Date.now() - started) / 1000).toFixed(1)}s`
   );

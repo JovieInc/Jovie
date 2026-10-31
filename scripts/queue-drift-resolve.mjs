@@ -25,7 +25,7 @@ async function ghJson(gh, path) {
   return JSON.parse(result.stdout);
 }
 
-/** @returns {Promise<{run: false, why: string} | {run: true, number: number, head: string, mergeSha: string}>} */
+/** @returns {Promise<{run: boolean, why?: string, number?: number, head?: string, mergeSha?: string}>} */
 export async function resolveCandidate({
   number,
   repository,

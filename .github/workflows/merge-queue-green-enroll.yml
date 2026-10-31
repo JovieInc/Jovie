@@ -247,29 +247,29 @@ jobs:
       # tree, then link it in; a failed install makes those guards fail open.
       - name: Provide the TypeScript compiler to the guards
         if: steps.resolve.outputs.run == 'true'
-        continue-on-error: true
         run: |
           version="$(node -p "require('./package.json').devDependencies.typescript")"
-          npm install --prefix "$RUNNER_TEMP/ts" --no-audit --no-fund --ignore-scripts "typescript@${version}"
-          ln -s "$RUNNER_TEMP/ts/node_modules" merged/node_modules
+          if npm install --prefix "$RUNNER_TEMP/ts" --no-audit --no-fund --ignore-scripts "typescript@${version}"; then
+            ln -s "$RUNNER_TEMP/ts/node_modules" merged/node_modules
+          else
+            echo "::warning::typescript install failed; guards that parse TypeScript fail open"
+          fi
 
       - name: Run drift-prone guards against the test merge
         id: guards
         if: steps.resolve.outputs.run == 'true'
-        continue-on-error: true
-        working-directory: merged
         run: |
-          if [ ! -f scripts/queue-drift-precheck.mjs ]; then
+          if [ ! -f merged/scripts/queue-drift-precheck.mjs ]; then
             echo "queue-drift: precheck script not on the merged tree yet; skipping"
             exit 0
           fi
-          node scripts/queue-drift-precheck.mjs --out "$RUNNER_TEMP/queue-drift-report.txt"
+          node merged/scripts/queue-drift-precheck.mjs --root merged --out "$RUNNER_TEMP/queue-drift-report.txt" || echo "failed=true" >> "$GITHUB_OUTPUT"
 
       - name: Publish the verdict
         id: publish
         if: always() && steps.resolve.outputs.run == 'true'
         env:
-          GUARDS_OUTCOME: ${{ steps.guards.outcome }}
+          GUARDS_OUTCOME: ${{ steps.guards.outputs.failed == 'true' && 'failure' || steps.guards.outcome }}
           PR_NUMBER: ${{ steps.resolve.outputs.number }}
           PR_HEAD: ${{ steps.resolve.outputs.head }}
           REPORT_FILE: ${{ runner.temp }}/queue-drift-report.txt
