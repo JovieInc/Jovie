@@ -13,6 +13,7 @@ import {
   isGatewayBudgetExceededError,
   isGatewayInsufficientFundsError,
 } from '@/lib/ai/gateway-errors';
+import { isStreamStallError } from '@/lib/ai/stream-stall-guard';
 
 export type AiProviderName = 'gateway' | 'workers-ai';
 
@@ -148,7 +149,9 @@ export function createCreditFailoverModel<MODEL extends FailoverCapableModel>(
   const now = input.now ?? Date.now;
   const shouldFailover =
     input.shouldFailover ??
-    ((error: unknown) => isProviderCreditError(error) && !isAbortError(error));
+    ((error: unknown) =>
+      (isProviderCreditError(error) || isStreamStallError(error)) &&
+      !isAbortError(error));
   const emit = input.onFailover ?? logFailover;
 
   async function run<RESULT>(

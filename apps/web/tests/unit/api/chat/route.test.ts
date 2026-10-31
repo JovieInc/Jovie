@@ -474,7 +474,8 @@ describe('POST /api/chat guard wiring', () => {
     // from the entitlement resolver, not values from the request body.
     expect(hoisted.checkAiChatRateLimitForPlanMock).toHaveBeenCalledWith(
       '00000000-0000-4000-8000-000000000123',
-      'pro'
+      'pro',
+      { skipWeeklyQuota: false }
     );
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
     expect(hoisted.reserveChatTurnMock).not.toHaveBeenCalled();
@@ -503,7 +504,8 @@ describe('POST /api/chat guard wiring', () => {
     expect(body.message).toMatch(/billing/i);
     expect(hoisted.checkAiChatRateLimitForPlanMock).toHaveBeenCalledWith(
       '00000000-0000-4000-8000-000000000123',
-      'free'
+      'free',
+      { skipWeeklyQuota: false }
     );
   });
 

@@ -12,11 +12,17 @@ import { useState } from 'react';
 import { SettingsActionRow } from '@/components/molecules/settings/SettingsActionRow';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { APP_ROUTES } from '@/constants/routes';
-import { getPlanDisplayName } from '@/lib/entitlements/registry';
+import {
+  getEffectivePlan,
+  getPlanDisplayName,
+} from '@/lib/entitlements/registry';
 import { useBillingStatusQuery, usePortalMutation } from '@/lib/queries';
 
-function resolvePlanLabel(plan: string | null | undefined): string {
-  return getPlanDisplayName(plan);
+function resolvePlanLabel(
+  plan: string | null | undefined,
+  isPro: boolean
+): string {
+  return getPlanDisplayName(getEffectivePlan(plan, isPro));
 }
 
 function resolveBadgeLabel(ctx: {
@@ -81,7 +87,7 @@ export function SettingsBillingSection() {
   const isPro = billingData?.isPro ?? false;
   const hasStripeCustomer = billingData?.hasStripeCustomer ?? false;
   const isStale = billingData?.stale ?? false;
-  const planLabel = resolvePlanLabel(billingData?.plan);
+  const planLabel = resolvePlanLabel(billingData?.plan, isPro);
   const canOpenPortal = hasStripeCustomer;
   const badgeLabel = resolveBadgeLabel({
     billingLoading,

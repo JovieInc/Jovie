@@ -319,7 +319,7 @@ describe('POST /api/webhooks/resend-inbound', () => {
 
     // Should have fetched full email from Resend
     expect(mockFetch).toHaveBeenCalledWith(
-      'https://api.resend.com/emails/email-123',
+      'https://api.resend.com/emails/receiving/email-123',
       expect.objectContaining({
         headers: { Authorization: 'Bearer test-key' },
       })
