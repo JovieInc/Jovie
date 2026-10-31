@@ -302,7 +302,7 @@ describe('main release readiness', () => {
         join(root, 'git'),
         `#!/bin/sh
 case "$*" in
-  *ls-remote*) printf '%s\\n' "${SHA}" ;;
+  *ls-remote*) printf '%s\\trefs/heads/main\\n' "${SHA}" ;;
   *) echo "unexpected git" >&2; exit 2 ;;
 esac
 `
