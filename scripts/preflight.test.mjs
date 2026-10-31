@@ -158,57 +158,6 @@ test('set -e is neutralised and || exit is contained', () => {
   assert.match(prepareStatement('if x; then\n exit 0\nfi'), /^\( if/);
 });
 
-test('local history fetch preserves shallow-clone flags and fetch failures', () => {
-  const dir = mkdtempSync(path.join(tmpdir(), 'pf-fetch-'));
-  const argsFile = path.join(dir, 'fetch-args');
-  writeFileSync(
-    path.join(dir, 'git'),
-    `#!/bin/bash
-if [ "$1" = rev-parse ]; then echo "$PREFLIGHT_SHALLOW"; exit 0; fi
-printf '%s\\n' "$@" > "$PREFLIGHT_FETCH_ARGS"
-if [ "$PREFLIGHT_SHALLOW" = false ] && [[ " $* " == *" --unshallow "* ]]; then exit 128; fi
-exit "$PREFLIGHT_FETCH_STATUS"
-`,
-    { mode: 0o700 }
-  );
-  try {
-    for (const [shallow, fetchStatus] of [
-      ['false', 0],
-      ['true', 0],
-      ['false', 43],
-    ]) {
-      const result = spawnSync(
-        'bash',
-        [
-          '-c',
-          prepareStatement(
-            'git fetch --no-tags --unshallow --filter=blob:none origin main'
-          ),
-        ],
-        {
-          encoding: 'utf8',
-          env: {
-            ...process.env,
-            PATH: `${dir}:${process.env.PATH}`,
-            PREFLIGHT_SHALLOW: String(shallow),
-            PREFLIGHT_FETCH_STATUS: String(fetchStatus),
-            PREFLIGHT_FETCH_ARGS: argsFile,
-          },
-        }
-      );
-      assert.equal(result.status, fetchStatus, result.stderr);
-      const args = readFileSync(argsFile, 'utf8').trim().split('\n');
-      assert.equal(args.includes('--unshallow'), shallow === 'true');
-      assert.deepEqual(
-        args.filter(arg => arg !== '--unshallow'),
-        ['fetch', '--no-tags', '--filter=blob:none', 'origin', 'main']
-      );
-    }
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
 test('substitute reports expressions with no local value', () => {
   const { text, unresolved } = substitute('a ${{ x.y }} ${{ k }}', { k: 'v' });
   assert.equal(text, 'a  v');

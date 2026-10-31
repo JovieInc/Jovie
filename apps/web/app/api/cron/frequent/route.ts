@@ -12,7 +12,6 @@
  * - Redis write/read operability canary: hourly
  * - Daily acquisition-canary receipt freshness alarm: hourly
  * - Summer company-state reconciliation: every invocation
- * - Proof stats (public counts) refresh + freshness withdrawal: hourly
  *
  * Each sub-job runs in an independent try-catch so one failure
  * doesn't block the others.
@@ -63,7 +62,6 @@ import { processLeadBatch } from '@/lib/leads/process-batch';
 import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
 import { refreshCompanyStateCache } from '@/lib/ovie/company-state.server';
 import { applySummerCardDefaults } from '@/lib/ovie/summer-cards.server';
-import { refreshProofStats } from '@/lib/proof-stats/publish.server';
 import {
   probeRedisOperability,
   RedisOperabilityError,
@@ -196,17 +194,6 @@ export async function GET(request: Request) {
             new Date()
           );
         })
-      : { success: true, skipped: true };
-
-  // Proof stats: hourly slot, four indexed counts plus one content-record
-  // version when a value or a publishable state changed. A stat that went
-  // stale is withdrawn here, which expires the cache tag so cached pages drop
-  // the number. No new schedule.
-  results.proofStats =
-    minute < 15
-      ? await runSubJob('proofStats', async () => ({
-          ...(await refreshProofStats(new Date())),
-        }))
       : { success: true, skipped: true };
 
   // JOV-7880: product truth every run; shipping and Linear hourly. Reads use the snapshot.

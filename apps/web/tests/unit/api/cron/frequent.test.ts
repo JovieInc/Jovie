@@ -27,7 +27,6 @@ const {
   mockGetPublicProfileCanaryStatus,
   mockRefreshCompanyStateCache,
   mockApplySummerCardDefaults,
-  mockRefreshProofStats,
   mockRunReleaseEmailCanary,
   mockGetReleaseEmailCanaryStatus,
 } = vi.hoisted(() => ({
@@ -59,7 +58,6 @@ const {
   mockGetPublicProfileCanaryStatus: vi.fn(),
   mockRefreshCompanyStateCache: vi.fn(),
   mockApplySummerCardDefaults: vi.fn(),
-  mockRefreshProofStats: vi.fn(),
 }));
 
 vi.mock('@/lib/admin/ops-queries', () => ({
@@ -78,10 +76,6 @@ vi.mock('@/lib/acquisition/eligibility.server', () => ({
 
 vi.mock('@/lib/ovie/company-state.server', () => ({
   refreshCompanyStateCache: mockRefreshCompanyStateCache,
-}));
-
-vi.mock('@/lib/proof-stats/publish.server', () => ({
-  refreshProofStats: mockRefreshProofStats,
 }));
 
 vi.mock('@/lib/ovie/summer-cards.server', () => ({
@@ -514,35 +508,6 @@ describe('GET /api/cron/frequent', () => {
     );
 
     expect(mockProcessOutreachBatch).toHaveBeenCalledWith(10);
-  });
-
-  it('refreshes proof stats in the hourly slot only', async () => {
-    mockRefreshProofStats.mockResolvedValue({
-      measured: 4,
-      failed: [],
-      written: true,
-      events: 2,
-    });
-    const { GET } = await import('@/app/api/cron/frequent/route');
-    const call = () =>
-      GET(
-        new Request('http://localhost/api/cron/frequent', {
-          headers: { Authorization: 'Bearer test-secret' },
-        })
-      );
-
-    vi.setSystemTime(new Date('2026-03-24T10:00:00.000Z'));
-    const hourly = await (await call()).json();
-    expect(hourly.results.proofStats).toEqual({
-      success: true,
-      data: { measured: 4, failed: [], written: true, events: 2 },
-    });
-    expect(mockRefreshProofStats).toHaveBeenCalledOnce();
-
-    vi.setSystemTime(new Date('2026-03-24T10:30:00.000Z'));
-    const later = await (await call()).json();
-    expect(later.results.proofStats).toEqual({ success: true, skipped: true });
-    expect(mockRefreshProofStats).toHaveBeenCalledOnce();
   });
 
   it('returns 207 and classifies an exhausted Redis quota as a failed canary', async () => {

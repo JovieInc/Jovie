@@ -309,7 +309,6 @@
       },
       "derived": [
         "apps/web/lib/proof-stats/registry.ts",
-        "apps/web/lib/proof-stats/format.ts",
         "scripts/invariants/stat-claims/check.mjs",
         "docs/proof/STATS.md"
       ],

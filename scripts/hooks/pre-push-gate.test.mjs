@@ -231,7 +231,6 @@ test('publication rejects committed formatter drift and accepts the formatted re
     write('scripts/ci-branching-guard.mjs', 'export {};\n');
     write('scripts/component-ship-gate.mjs', 'export {};\n');
     write('scripts/lib/policy-gate-liveness.mjs', 'export {};\n');
-    write('scripts/preflight-changed.mjs', 'export {};\n');
     write('scripts/security/scan-secrets.sh', 'exit 0\n');
     write('scripts/hooks/pre-push-gate.test.mjs', 'export {};\n');
     write('.gitignore', 'node_modules/\n');
@@ -312,7 +311,6 @@ test('publication blocks missing component stories and tests before publishing',
       `import { writeFileSync } from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'done');\n`
     );
     write('scripts/hooks/pre-push-gate.test.mjs', 'export {};\n');
-    write('scripts/preflight-changed.mjs', 'export {};\n');
     const checker = pathToFileURL(
       path.join(repoRoot, 'scripts/component-ship-gate.mjs')
     ).href;

@@ -2,6 +2,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CookieActions } from '@/components/molecules/CookieActions';
 import { CookieModal } from '@/components/organisms/CookieModal';
@@ -12,7 +13,6 @@ import {
 } from '@/lib/cookies/banner-visibility';
 import { saveConsent } from '@/lib/cookies/consent';
 import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
-import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
 import { setConsentState } from '@/lib/tracking/consent';
 
 const CONSENT_SAVE_ERROR =
@@ -43,7 +43,7 @@ export function CookieBannerSection({
    */
   initialVisible?: boolean;
 }>) {
-  const pathname = usePublicPathname();
+  const pathname = usePathname();
   const effectivePathname =
     process.env.NEXT_PUBLIC_E2E_MODE === '1' && testOnlyPathname
       ? testOnlyPathname

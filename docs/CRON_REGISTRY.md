@@ -136,7 +136,6 @@ Source of truth: `apps/web/vercel.json`. The Vercel project's Root Directory is 
 | 13 | billingSyncRemediation | Every invocation | JOV-7558: reads the billing audit log and unprocessed Stripe rows. Files one Linear issue labeled `remediation:billing-sync-stale` or `remediation:billing-webhooks-stuck` when the last reconciliation heartbeat is older than 48 hours or a webhook is stuck. Does not call `/api/billing/health`. |
 | 14 | canaryReceiptFreshness | Hourly (`minute < 15`) | Reads the two daily acquisition-canary reports; missing, invalid, future or 26-hour-old receipts fail the sub-job with Sentry `canary_receipt_stale`, even when acquisition is disabled. Two Redis reads/run; no new schedule (JOV-7895). |
 | 15 | summerCardDefaults | Every invocation | Default-plus-deadline contract: records each overdue pending Summer card's declared default (`approve`/`reject`; `reject` when none was declared) with `decidedBy: default-on-expiry`, so no founder ask waits forever. One KV list read, at most 100 compare-and-set writes; a concurrent founder decision wins. |
-| 16 | proofStats | Hourly (`minute < 15`) | Measures the production proof stats (`apps/web/data/proof-stats/registry.json`, source kind `production`) with internal/test/synthetic accounts excluded, publishes a `proof-stats/observations` content-record version when a value or a publishable state changed, and records milestone, published and withdrawn events for Summer. Four counts and at most one version write per run; no new schedule. |
 
 Source: `apps/web/app/api/cron/frequent/route.ts`
 
