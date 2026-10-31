@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MetaPixel } from '@/components/features/tracking/MetaPixel';
 import { ProfileNavButton } from '@/components/molecules/ProfileNavButton';
+import { useMarketingConsent } from '@/lib/tracking/use-marketing-consent';
 import { CookieBannerMount } from './CookieBannerMount';
 
 vi.mock('@/hooks/useClerkSafe', () => ({
@@ -212,5 +213,24 @@ describe('Your Privacy Choices', () => {
     expect(
       await screen.findByRole('switch', {}, { timeout: 5000 })
     ).toBeVisible();
+  });
+  it('revokes the loaded SDK before a conditional pixel is unmounted', async () => {
+    function ConditionalPixel() {
+      const allowed = useMarketingConsent(false);
+      return allowed ? <MetaPixel pixelIds={['123']} /> : null;
+    }
+    render(
+      <>
+        <CookieBannerMount />
+        <ConditionalPixel />
+      </>
+    );
+    await screen.findByTestId('ad-pixel');
+    const fbq = vi.fn();
+    Object.assign(window, { fbq });
+    localStorage.setItem('jovie_tracking_consent', 'rejected');
+    act(() => globalThis.JVConsent?._emit({ marketing: false }));
+    expect(screen.queryByTestId('ad-pixel')).toBeNull();
+    expect(fbq).toHaveBeenCalledWith('consent', 'revoke');
   });
 });
