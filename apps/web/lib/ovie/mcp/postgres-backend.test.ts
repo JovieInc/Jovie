@@ -83,7 +83,7 @@ describe('postgresRecordBackend', () => {
     const big = 'x'.repeat(OVIE_OPERATING_KV_ROW_BUDGET_BYTES + 1);
 
     await expect(
-      backend.setIfAbsent('jovie:cert:ledger:row:1', big)
+      backend.setIfAbsent('jovie:cert:ledger:row:1', big, 120)
     ).resolves.toBe(true);
     await expect(
       backend.compareAndSet('jovie:cert:ledger:row:1', 'old', { blob: big })
@@ -106,7 +106,8 @@ describe('postgresRecordBackend', () => {
 
     await backend.setIfAbsent(
       'small-key',
-      'x'.repeat(OVIE_OPERATING_KV_ROW_BUDGET_BYTES)
+      'x'.repeat(OVIE_OPERATING_KV_ROW_BUDGET_BYTES),
+      120
     );
 
     expect(mocks.captureWarning).not.toHaveBeenCalled();
