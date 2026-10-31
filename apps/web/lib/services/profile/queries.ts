@@ -704,7 +704,6 @@ export async function getProfileSummary(
       displayName: creatorProfiles.displayName,
       avatarUrl: creatorProfiles.avatarUrl,
       isPublic: creatorProfiles.isPublic,
-      youngAudience: creatorProfiles.youngAudience,
       isClaimed: creatorProfiles.isClaimed,
       claimToken: creatorProfiles.claimToken,
       isVerified: creatorProfiles.isVerified,

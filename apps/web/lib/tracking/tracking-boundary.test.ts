@@ -21,15 +21,6 @@ function violations(path: string, source: string): string[] {
   const failures: string[] = [];
   const adapter = browserAdapters.has(path);
   const transport = transports.has(path);
-  if (
-    !adapter &&
-    path !== dispatcher &&
-    path !== 'lib/analytics.ts' &&
-    !/fbq|gtag|forwardTo|forwarding\/|facebook\.net|google-analytics\.com|tiktok\.com|graph\.facebook\.com/.test(
-      source
-    )
-  )
-    return [];
   const syntax = ts.createSourceFile(
     path,
     source,

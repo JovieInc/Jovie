@@ -25,7 +25,6 @@ export type ProfileSummary = Pick<
   | 'displayName'
   | 'avatarUrl'
   | 'isPublic'
-  | 'youngAudience'
   | 'isClaimed'
   | 'claimToken'
   | 'isVerified'

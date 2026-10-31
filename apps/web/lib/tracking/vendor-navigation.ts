@@ -1,8 +1,19 @@
+import { isReservedUsername } from '@/lib/validation/username-core';
+
 /**
  * Third-party SDKs retain history listeners after React unmounts. Once one is
  * loaded, use document navigation so it cannot observe the next artist before
  * that artist's fresh eligibility decision. Installed before vendor scripts.
  */
+function crossesArtistBoundary(target: URL): boolean {
+  const isArtist = (path: string) =>
+    Boolean(path.split('/')[1] && !isReservedUsername(path.split('/')[1]));
+  return (
+    target.pathname !== location.pathname &&
+    (isArtist(target.pathname) || isArtist(location.pathname))
+  );
+}
+
 let installed = false;
 export function isolateTrackingDocument(): void {
   if (installed || typeof window === 'undefined') return;
@@ -29,10 +40,7 @@ export function isolateTrackingDocument(): void {
       )
         return;
       const target = new URL(anchor.href, location.href);
-      if (
-        target.origin !== location.origin ||
-        target.pathname === location.pathname
-      )
+      if (target.origin !== location.origin || !crossesArtistBoundary(target))
         return;
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -45,7 +53,7 @@ export function isolateTrackingDocument(): void {
     history[method] = (data, unused, url) => {
       if (url != null) {
         const target = new URL(url, location.href);
-        if (target.pathname !== location.pathname) {
+        if (crossesArtistBoundary(target)) {
           if (method === 'replaceState') location.replace(target.href);
           else location.assign(target.href);
           return;

@@ -45,6 +45,9 @@ describe('opaque SDK document isolation', () => {
       window.removeEventListener('popstate', vendorHistoryListener);
       resetTrackingDocument();
       expect(navigation.reload).toHaveBeenCalledTimes(2);
+      navigation.pathname = '/app/dashboard';
+      history.pushState({}, '', '/app/settings');
+      expect(originalPush).toHaveBeenCalledTimes(2);
     } finally {
       vi.unstubAllGlobals();
     }

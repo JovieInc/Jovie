@@ -1,45 +1,11 @@
-# Young-audience tracking boundary (JOV-10083)
+# Young-audience tracking (JOV-10083)
 
-Decision, 2026-10-31: **extend** the existing profile model, SettingsToggleRow,
-consent inputs and profile-cache invalidator. No new vendor, SDK, job or service.
-The product-specific gap is one artist-aware privacy decision shared by browser
-loaders and conversion delivery. `lib/tracking/eligibility.ts` owns that decision.
+Decision, 2026-10-31: **extend** existing consent, profile, SettingsToggleRow and cache primitives. No new vendor/service. `lib/tracking/eligibility.ts` owns third-party policy; `creator_profiles.young_audience` owns the persistent flag.
 
-`creator_profiles.young_audience` defaults to false. The authenticated profile
-update endpoint accepts only booleans, uses existing profile authorization and
-hard-expires profile/Redis/ISR caches when this field changes. The public profile
-mapper includes the flag in cached payloads. Settings uses the existing optimistic
-save/rollback/status pattern and refreshes server state after a successful save.
+Profile payloads include the flag; authenticated saves hard-expire profile/Redis/ISR caches. Cached HTML/RSC cannot authorize tracking: browser loaders start denied and check uncached authority on every mount/navigation. Unknown artists, invalid responses, failed lookups and missing required consent fail closed.
 
-Cached HTML and the browser Router Cache are not permission authorities. Browser
-loaders start denied and fetch `/api/tracking/eligibility` with `no-store` on every
-mount/navigation. The endpoint reads the current flag without caching, resolves
-all artist subroutes and applies server privacy signals. The browser intersects
-that decision with the same policy applied to its current consent/GPC/opt-out.
-Unknown artist, malformed response, lookup failure and unresolved consent fail
-closed. A cached true flag can deny early; a cached false flag cannot authorize.
+Meta, GA, Vercel, editorial retargeting and direct GA events consume the shared decision. Loaded opaque SDKs require a fresh document across artist routes and on consent revocation; platform-to-platform navigation remains unchanged. Server conversion delivery, retries, subscription confirmation and dashboard test events reread the flag through one dispatcher. Intake persists visitor denial for retries.
 
-Meta, GA, Vercel Analytics, editorial retargeting and direct GA event dispatch
-consume this policy. Once an opaque vendor SDK is loaded, navigation to another
-path uses a new document; React unmount alone cannot remove vendor history
-listeners. Consent changes discard that document too. SDK-free documents retain
-client navigation. Subscription confirmation, inline pixel forwarding, retries,
-and the dashboard test-event action use the single server dispatcher, which
-re-reads the flag immediately before every vendor transport call. Intake stores
-visitor denial so retry cannot turn a rejected event into a consented one.
+JOV-10082 supplies the separate sale/sharing choice via `TrackingVisitor.optOut`; legacy rejection already feeds it. `under16` is an explicit input without age collection. First-party metrics are separate. Regression tests cover stale payloads, retries, consent, settings rollback, invalidation and deliberately seeded bypasses.
 
-JOV-10082 owns the separate visitor sale/sharing opt-out UX. Feed its verified
-choice into `TrackingVisitor.optOut`; existing legacy rejection already maps to
-that input. `under16` is also an explicit input, without collecting ages here.
-First-party metrics remain separate from third-party ad/analytics delivery.
-
-Regression coverage includes warm stale payloads, flag changes before retry,
-GPC, region consent, malformed/failed authority, toggle rollback and a source
-boundary scan. Seeded direct pixel calls and aliased/dynamic transport imports
-must be rejected. The scan permits only policy adapters, vendor transport
-implementations and inert CSP configuration. Run it with the normal Vitest path.
-
-Ship now: additive flag and shared boundary after required tests and CI pass.
-Re-evaluate when: a new vendor, public route identity, consent source or navigation
-mechanism is added. Then: extend the same policy/adapters and seed a bypass before
-accepting the new path. No production flag or migration is applied by local tests.
+Ship after required tests/CI. Re-evaluate when a vendor, route identity or consent source changes; extend this policy and seed a bypass. Local tests apply no production migration and certify no deployed runtime.
