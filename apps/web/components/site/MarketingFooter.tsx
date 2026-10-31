@@ -2,6 +2,7 @@
 
 import './MarketingFooter.css';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
@@ -15,7 +16,6 @@ import {
 } from '@/data/marketingNavigation';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { isEditorialFooterCtaPath } from '@/lib/marketing/editorial-content-routes';
-import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
 import { isThemeRoute } from '@/lib/theme/route-policy';
 import { cn } from '@/lib/utils';
 import { MarketingFooterControls } from './MarketingFooterControls';
@@ -202,7 +202,7 @@ export function MarketingFooter({
   columns,
   legalLinks,
 }: Readonly<MarketingFooterProps>) {
-  const pathname = usePublicPathname();
+  const pathname = usePathname();
   const resolvedVariant = resolveFooterVariant(variant, pathname);
   const isMinimal = resolvedVariant === 'minimal';
   const pageOwnsFinalCta =

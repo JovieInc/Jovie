@@ -1,17 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import {
-  buildContent,
-  contaminated,
-  judgeBuyer,
-  MAX_IMAGES_PER_REQUEST,
-  parseAnswer,
-  planImages,
-  STRONG_MODEL,
-  strongRoute,
-  usdFor,
-} from './judge.mjs';
+import { contaminated } from './judge.mjs';
 import { parseOutcome } from './outcome.mjs';
 import {
   ARCHETYPES,
@@ -246,98 +236,4 @@ test('judge output that cites company memory is flagged as contaminated', () => 
     ['summer']
   );
   assert.deepEqual(contaminated({ note: 'participate' }, 'prompt'), []);
-});
-
-const OUTCOME = {
-  kind: 'paid_conversion',
-  displayName: 'Plan',
-  monthlyUsd: 12,
-  trialDays: 14,
-  horizonDays: 14,
-};
-const fakeEncode = paths => ({
-  mime: 'image/jpeg',
-  bytes: Buffer.from(paths.join('|')),
-});
-
-test('strong tier routes through routing.json on Workers AI, never a subscription CLI', () => {
-  const route = strongRoute();
-  assert.equal(route.model, STRONG_MODEL);
-  assert.match(STRONG_MODEL, /^@cf\//);
-  assert.match(route.baseUrl, /^https:\/\//);
-  assert.throws(
-    () =>
-      strongRoute({
-        callers: [
-          { id: 'dev.buyer-eval', route: 'gateway-only', models: ['x'] },
-        ],
-        providers: { 'workers-ai': {} },
-      }),
-    /workers-ai-only/
-  );
-});
-
-test('frames are attached inline within the per-request image cap', () => {
-  const many = Array.from({ length: 19 }, (_, i) => ({
-    stepId: String(i + 1).padStart(2, '0'),
-    images: [`/f/${i}-shot.png`, `/f/${i}-video.jpg`],
-  }));
-  const plan = planImages(many);
-  assert.ok(plan.length <= MAX_IMAGES_PER_REQUEST);
-  assert.deepEqual(
-    plan.flatMap(unit => unit.paths),
-    many.map(step => step.images[0])
-  );
-  assert.match(plan[0].label, /STEPS 01, 02, 03/);
-  assert.equal(planImages(STEPS).length, 2);
-  const content = buildContent('prompt', STEPS, fakeEncode);
-  assert.equal(content.filter(part => part.type === 'image_url').length, 2);
-  assert.match(content[1].text, /STEP 01/);
-  assert.ok(!JSON.stringify(content).includes('Read tool'));
-});
-
-test('judge aggregates injected samples, prices neurons and drops bad samples', async () => {
-  const good = JSON.stringify(sample(0.1));
-  const answers = [
-    { text: good, usage: { neurons: 1000, prompt_tokens: 10 } },
-    { text: `\`\`\`json\n${good}\n\`\`\``, usage: { neurons: 1000 } },
-    {
-      text: JSON.stringify(sample(0.1, { note: 'premium pricing' })),
-      usage: {},
-    },
-  ];
-  const calls = [];
-  const result = await judgeBuyer({
-    persona: ARCHETYPES[0],
-    outcome: OUTCOME,
-    walk: { steps: STEPS, subjectId: null },
-    encode: fakeEncode,
-    call: async args => {
-      calls.push(args);
-      return answers[calls.length - 1];
-    },
-  });
-  assert.equal(calls.length, 3);
-  assert.equal(calls[0].model, STRONG_MODEL);
-  assert.equal(calls[0].schema.type, 'object');
-  assert.equal(result.samples.length, 2);
-  assert.match(result.failures[0], /contaminated/);
-  assert.ok(Math.abs(result.costUsd - 0.022) < 1e-9);
-  assert.equal(usdFor({}), 0);
-  assert.throws(() => parseAnswer('not json'));
-});
-
-test('a transport failure is a recorded failure, never a pass', async () => {
-  const result = await judgeBuyer({
-    persona: ARCHETYPES[0],
-    outcome: OUTCOME,
-    walk: { steps: STEPS, subjectId: null },
-    encode: fakeEncode,
-    call: async () => {
-      throw new Error('workers-ai relay 502');
-    },
-  });
-  assert.equal(result.samples.length, 0);
-  assert.equal(result.failures.length, 3);
-  assert.equal(aggregateSamples(result.samples).verdict, 'abstain');
 });

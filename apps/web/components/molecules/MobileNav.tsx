@@ -2,6 +2,7 @@
 
 import { ArrowRight, Menu, X } from 'lucide-react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import {
   type CSSProperties,
   type ReactNode,
@@ -11,11 +12,11 @@ import {
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
+
 import { AnimatedIconSwap } from '@/components/atoms/AnimatedIconSwap';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
-import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
 import { cn } from '@/lib/utils';
 
 type NavLink = { href: string; label: string };
@@ -119,7 +120,7 @@ export function MobileNav({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
-  const pathname = usePublicPathname();
+  const pathname = usePathname();
   const isAuthed = useIsAuthenticated();
   const { isSignedIn: clerkSignedIn } = useAuthSafe();
   const showAuthenticatedAction = !!(isAuthed && clerkSignedIn);

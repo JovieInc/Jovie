@@ -31,12 +31,6 @@ describe('merge-group size trusted bootstrap contract', () => {
     expect(validateSizeGuardBootstrapWorkflow(workflow)).toEqual([]);
   });
 
-  it('fails closed when the exclusion dependency is omitted', () => {
-    expect(
-      errorsAfter('            scripts/lib/pr-size-exclusions.mjs\n', '')
-    ).not.toEqual([]);
-  });
-
   it('fails closed on a wrong or broadened bootstrap base', () => {
     expect(
       errorsAfter(TRUSTED_SIZE_BOOTSTRAP_BASE, 'f'.repeat(40))

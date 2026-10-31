@@ -105,16 +105,16 @@ doppler run --project jovie-web --config dev -- <your-command>
 The CI workflow uses Doppler service tokens to inject secrets at runtime.
 
 **Required GitHub Secrets:**
+- `DOPPLER_TOKEN_DEV` - Service token for `dev` config (PR builds)
 - `DOPPLER_TOKEN_STG` - Service token for `stg` config (preview deploys)
 - `DOPPLER_TOKEN_PRD` - Service token for `prd` config (production deploys)
-
-> `DOPPLER_TOKEN_DEV` is NOT required: no workflow references it (audited
-> 2026-10-31, JOV-10165/JOV-10166). PR builds resolve secrets at runtime via
-> the staging/production service tokens or the synthetic-secrets resolver.
 
 **How to generate service tokens:**
 
 ```bash
+# For development/PR builds
+doppler configs tokens create github-actions-dev --project jovie-web --config dev
+
 # For staging
 doppler configs tokens create github-actions-stg --project jovie-web --config stg
 
@@ -124,6 +124,7 @@ doppler configs tokens create github-actions-prd --project jovie-web --config pr
 
 Add these tokens to GitHub:
 ```bash
+gh secret set DOPPLER_TOKEN_DEV
 gh secret set DOPPLER_TOKEN_STG
 gh secret set DOPPLER_TOKEN_PRD
 ```

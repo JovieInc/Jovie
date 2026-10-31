@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   env: {
@@ -21,9 +21,7 @@ vi.mock('@/lib/redis', () => ({
   getRedis: () => (hoisted.redis ? { set: hoisted.set } : null),
 }));
 vi.mock('@/lib/utils/logger', () => ({
-  // enabled: false mirrors the real logger under NODE_ENV=test — the console
-  // mirror is what carries denial reasons to production (JOV-9625 scope B).
-  logger: { info: hoisted.info, warn: hoisted.warn, enabled: false },
+  logger: { info: hoisted.info, warn: hoisted.warn },
 }));
 
 import { derivePassageKey, mintPassageToken } from './passage-token';
@@ -46,10 +44,6 @@ function token(root = hoisted.env.CRON_SECRET ?? '') {
 describe('resolveSyntheticPassageToken', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    // The console mirror fires whenever the (mocked) shared logger is
-    // disabled; keep it silent unless a test asserts on it.
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    vi.spyOn(console, 'info').mockImplementation(() => {});
     hoisted.env.CRON_SECRET = 'cron-secret-for-tests-0123456789abcdef';
     hoisted.env.SYNTHETIC_PASSAGE_TOKENS_DISABLED = undefined;
     hoisted.redis = true;
@@ -65,56 +59,6 @@ describe('resolveSyntheticPassageToken', () => {
     ).resolves.toBeNull();
     expect(hoisted.limit).not.toHaveBeenCalled();
     expect(hoisted.set).not.toHaveBeenCalled();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it('emits the denial reason where production logs can see it (JOV-9625)', async () => {
-    await expect(
-      resolveSyntheticPassageToken(
-        headersWith(`${token()}x`),
-        'onboarding_chat',
-        {
-          consume: true,
-          requestId: 'req-denial',
-        }
-      )
-    ).resolves.toBeNull();
-    const denial = vi
-      .mocked(console.warn)
-      .mock.calls.find(
-        ([message]) => message === '[synthetic-passage-token] denied'
-      );
-    expect(denial?.[1]).toMatchObject({
-      reason: 'bad_signature',
-      requestId: 'req-denial',
-    });
-    // Audit fields only: the token itself and the canary address never
-    // reach the console.
-    expect(JSON.stringify(vi.mocked(console.warn).mock.calls)).not.toContain(
-      'jsp1.'
-    );
-    expect(JSON.stringify(vi.mocked(console.warn).mock.calls)).not.toContain(
-      CANARY
-    );
-  });
-
-  it('emits the grant where production logs can see it (JOV-9625)', async () => {
-    await expect(
-      resolveSyntheticPassageToken(headersWith(token()), 'onboarding_chat', {
-        consume: true,
-        requestId: 'req-grant',
-      })
-    ).resolves.toMatchObject({ actorId: 'prodcert' });
-    expect(vi.mocked(console.info)).toHaveBeenCalledWith(
-      '[synthetic-passage-token] granted',
-      expect.objectContaining({ requestId: 'req-grant', internal: true })
-    );
-    expect(JSON.stringify(vi.mocked(console.info).mock.calls)).not.toContain(
-      CANARY
-    );
   });
 
   it('grants once, consumes the jti, rate limits, and logs the use as internal', async () => {

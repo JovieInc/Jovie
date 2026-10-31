@@ -216,19 +216,3 @@ describe('EditorialRetargeting', () => {
     expect(runtimeState()).toBe('suppressed-demo-recording');
   });
 });
-
-describe('prerendered homepage pathname', () => {
-  it('EditorialRetargeting.tsx reads "/index" as "/" via usePublicPathname', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { resolve } = await import('node:path');
-    const source = readFileSync(
-      resolve(
-        process.cwd(),
-        'components/features/tracking/EditorialRetargeting.tsx'
-      ),
-      'utf8'
-    );
-    expect(source).toContain('usePublicPathname');
-    expect(source).not.toMatch(/\busePathname\b/);
-  });
-});

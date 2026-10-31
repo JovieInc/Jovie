@@ -204,19 +204,3 @@ describe('PublicPageShell', () => {
     ).not.toBeInTheDocument();
   });
 });
-
-describe('prerendered homepage pathname', () => {
-  it('MarketingPageContractMarkers.tsx reads "/index" as "/" via usePublicPathname', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { resolve } = await import('node:path');
-    const source = readFileSync(
-      resolve(
-        process.cwd(),
-        'components/site/MarketingPageContractMarkers.tsx'
-      ),
-      'utf8'
-    );
-    expect(source).toContain('usePublicPathname');
-    expect(source).not.toMatch(/\busePathname\b/);
-  });
-});

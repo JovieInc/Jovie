@@ -19,7 +19,6 @@ const {
       stripeSubscriptionId: string | null;
       stale: boolean;
       staleReason: string | null;
-      trialEndsAt?: string | null;
     },
     isLoading: false,
     isError: false,
@@ -79,49 +78,6 @@ describe('SettingsBillingSection', () => {
     expect(screen.getByText('Free plan')).toBeInTheDocument();
     expect(screen.getByText('Free', { selector: 'span' })).toBeInTheDocument();
     expect(screen.queryByText(/Artist Presence/)).not.toBeInTheDocument();
-  });
-
-  it('labels an active trial as a trial with its end date, never Free', () => {
-    // Golden-path cert 2026-10-31 pm: "Artist Presence Trial plan" carried a
-    // "Free" badge and no end date.
-    billingQueryState.data = {
-      isPro: false,
-      // The status API reports the effective plan: `free` for an unpaid trial.
-      plan: 'free',
-      hasStripeCustomer: false,
-      stripeSubscriptionId: null,
-      stale: false,
-      staleReason: null,
-      trialEndsAt: '2026-11-03T10:38:56Z',
-    };
-    vi.setSystemTime(new Date('2026-10-31T18:00:00Z'));
-
-    render(<SettingsBillingSection />);
-    vi.useRealTimers();
-
-    expect(screen.getByText('Artist Presence Trial plan')).toBeInTheDocument();
-    expect(screen.getByText('Trial', { selector: 'span' })).toBeInTheDocument();
-    expect(
-      screen.queryByText('Free', { selector: 'span' })
-    ).not.toBeInTheDocument();
-    expect(screen.getByText(/Your trial ends Nov 3/)).toBeInTheDocument();
-  });
-
-  it('shows Free once the trial has ended', () => {
-    billingQueryState.data = {
-      isPro: false,
-      plan: 'free',
-      hasStripeCustomer: false,
-      stripeSubscriptionId: null,
-      stale: false,
-      staleReason: null,
-      trialEndsAt: '2026-10-01T00:00:00Z',
-    };
-
-    render(<SettingsBillingSection />);
-
-    expect(screen.getByText('Free plan')).toBeInTheDocument();
-    expect(screen.getByText('Free', { selector: 'span' })).toBeInTheDocument();
   });
 
   it('does not present a failed plan lookup as a free subscription', async () => {

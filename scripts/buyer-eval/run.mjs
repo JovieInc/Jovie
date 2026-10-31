@@ -143,9 +143,6 @@ export async function evaluate(args) {
     });
     strong = {
       model: judged.model,
-      route: judged.route,
-      inputTokens: judged.inputTokens,
-      outputTokens: judged.outputTokens,
       failures: judged.failures,
       costUsd: judged.costUsd,
       ...aggregateSamples(judged.samples),
@@ -210,9 +207,6 @@ export async function evaluate(args) {
         : { status: screen.status, error: screen.error, usd: screen.usd },
     strong: strong && {
       model: strong.model,
-      route: strong.route,
-      inputTokens: strong.inputTokens,
-      outputTokens: strong.outputTokens,
       pPay: strong.pPay,
       spread: strong.spread,
       reason: strong.reason,

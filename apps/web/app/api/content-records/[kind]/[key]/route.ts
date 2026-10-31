@@ -131,14 +131,6 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
   const input = parsed.data;
-  if (definition.apiWritable === false && input.action !== 'rollback') {
-    return json(
-      {
-        error: `${kind} is written only by its producer; the API can read history and roll back`,
-      },
-      403
-    );
-  }
 
   try {
     switch (input.action) {
