@@ -15,6 +15,10 @@ vi.mock('@/lib/ovie/summer-cards.server', () => ({
   getSummerCard: hoisted.getCard,
 }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: hoisted.captureError }));
+vi.mock('@/lib/claim/claim-verification-review.server', () => ({
+  profileIdFromClaimCardKey: (key: string | undefined) =>
+    key?.startsWith('claim-verification_') ? 'profile-1' : null,
+}));
 
 const decision = await import(
   '@/app/api/internal/ovie/summer-cards/[id]/decision/route'
@@ -196,5 +200,37 @@ describe('fleet supersede route', () => {
         )
       ).status
     ).toBe(200);
+  });
+});
+
+describe('claim-verification cards stay with Ovie', () => {
+  const claimCard = {
+    ...card('pending'),
+    idempotencyKey: 'claim-verification_profile-1',
+  };
+
+  it('the iMessage decision route refuses them with 409 and records nothing', async () => {
+    hoisted.getCard.mockResolvedValue(claimCard);
+    const res = await decision.POST(
+      post('decision', { decision: 'approve', receipt }),
+      ctx()
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: 'claim_verification_requires_ovie',
+    });
+    expect(hoisted.decide).not.toHaveBeenCalled();
+  });
+
+  it('the fleet supersede route refuses them too, reject included', async () => {
+    hoisted.getCard.mockResolvedValue(claimCard);
+    for (const decisionValue of ['reject', 'approve']) {
+      const res = await supersede.POST(
+        post('supersede', { reason: 'premise gone', decision: decisionValue }),
+        ctx()
+      );
+      expect(res.status).toBe(409);
+    }
+    expect(hoisted.decide).not.toHaveBeenCalled();
   });
 });

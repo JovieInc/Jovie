@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { profileIdFromClaimCardKey } from '@/lib/claim/claim-verification-review.server';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
-import { decideSummerCard } from '@/lib/ovie/summer-cards.server';
+import {
+  decideSummerCard,
+  getSummerCard,
+} from '@/lib/ovie/summer-cards.server';
 import { verifySummerOidcRequest } from '@/lib/ovie/summer-oidc.server';
 
 export const runtime = 'nodejs';
@@ -35,6 +39,20 @@ function json(body: Readonly<Record<string, unknown>>, status: number) {
   return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
 }
 
+/**
+ * Claim-verification cards (`claim-verification_<profileId>`) carry side effects Jovie applies
+ * itself (link the artist, or refund and cancel) behind a privileged step-up in Ovie. Neither
+ * Summer path may close them: they would skip those effects. 409, and Summer keeps them out of
+ * its iMessage queue.
+ */
+async function claimVerificationGuard(id: string) {
+  const card = await getSummerCard(id);
+  return card?.status === 'pending' &&
+    profileIdFromClaimCardKey(card.idempotencyKey)
+    ? json({ error: 'claim_verification_requires_ovie' }, 409)
+    : null;
+}
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> }
@@ -54,6 +72,8 @@ export async function POST(
   if (!input.success) return json({ error: 'invalid_body' }, 400);
 
   try {
+    const claimGuard = await claimVerificationGuard(id);
+    if (claimGuard) return claimGuard;
     const { decision, receipt, comment } = input.data;
     const result = await decideSummerCard({
       id,
