@@ -313,19 +313,19 @@ struct AppShellTabBarTests {
       chatEnabled: true,
       audienceEnabled: true
     )
-    #expect(destinations == [.chat, .profile, .library, .inbox, .calendar, .audience])
+    #expect(destinations == [.inbox, .profile, .library, .calendar, .audience, .chat])
     #expect(
       AppShellPanePolicy.sidebarDestinations(chatEnabled: false, audienceEnabled: false)
-        == [.profile, .library, .inbox, .calendar]
+        == [.inbox, .profile, .library, .calendar]
     )
   }
 
   @Test func rootOntologyAndChildOwnershipAreStableAcrossGates() {
     #expect(AppShellPanePolicy.rootDestinations(chatEnabled: true, audienceEnabled: true)
-      == [.chat, .profile, .library, .audience])
+      == [.inbox, .profile, .library, .audience])
     #expect(AppShellPanePolicy.rootDestinations(chatEnabled: false, audienceEnabled: false)
-      == [.profile, .library])
-    #expect(AppShellPanePolicy.childDestinations(of: .library) == [.inbox, .calendar])
+      == [.inbox, .profile, .library])
+    #expect(AppShellPanePolicy.childDestinations(of: .library) == [.calendar])
     for root in [AppShellTab.chat, .profile, .audience, .inbox, .calendar] {
       #expect(AppShellPanePolicy.childDestinations(of: root).isEmpty)
     }
@@ -337,6 +337,12 @@ struct AppShellTabBarTests {
         #expect(Set(destinations).count == destinations.count)
         #expect(destinations.contains(.chat) == chatEnabled)
         #expect(destinations.contains(.audience) == audienceEnabled)
+        let roots = AppShellPanePolicy.rootDestinations(
+          chatEnabled: chatEnabled, audienceEnabled: audienceEnabled
+        )
+        #expect(roots.first == .inbox)
+        #expect(!roots.contains(.chat))
+        #expect(roots.contains(.audience) == audienceEnabled)
       }
     }
     #expect(AppShellTab.chat.title == "Home")
@@ -385,6 +391,8 @@ struct SharedPressFeedbackStyleTests {
     #expect(JovieIconButtonStyle.pressedOpacity == 0.72)
     #expect(JovieIconButtonStyle.targetSize == 44)
     #expect(JoviePressFeedbackButtonStyle.defaultPressedOpacity == 0.72)
+    #expect(JoviePressFeedbackButtonStyle().allowsScale)
+    #expect(!JoviePressFeedbackButtonStyle(allowsScale: false).allowsScale)
   }
 }
 

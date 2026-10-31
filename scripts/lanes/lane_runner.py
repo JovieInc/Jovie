@@ -6914,6 +6914,25 @@ def register_domain_writes_fix(host: Host, pr: dict, route: dict, worktree: Path
     return types.SimpleNamespace(returncode=0)
 
 
+def register_screens_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """The no-model fix for an unregistered iOS feature screen: add the registry row, commit and push.
+    Returns a finished-agent stand-in, or None when the edit does not apply."""
+    added = fix_red_classes.register_unregistered_screens(worktree, route.get("files") or [])
+    if not added:
+        return None
+    message = "fix(ios): register " + ", ".join(Path(name).stem for name in added)
+    if len(message) > 100:
+        message = "fix(ios): register changed in-scope screens"
+    steps = [["git", "add", "--", "scripts/invariants/screen-certification.mjs"],
+             ["git", "commit", "-q", "-m", message],
+             ["git", "push", "-q", "origin", f"HEAD:{pr['headRefName']}"]]
+    for step in steps:
+        if sh(step, cwd=worktree, log=log, timeout=900).returncode:
+            return None
+    receipt.update(resolution="registered-screens", registeredScreens=added)
+    return types.SimpleNamespace(returncode=0)
+
+
 def wire_ci_fast_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
     """The no-model fix for an unwired script test: list it in ci-fast-lanes.mjs, commit, push. Returns a
     finished-agent stand-in, or None when the edit does not apply (the model then gets the head)."""
@@ -7986,7 +8005,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                          fix_red_classes.RENUMBER: renumber_migrations_fix,
                          fix_red_classes.SNAP_SPACING: snap_spacing_fix,
                          fix_red_classes.MERGE_NARROWED: merge_narrowed_preflight_fix,
-                         fix_red_classes.REGISTER_DOMAIN: register_domain_writes_fix}.get((route or {}).get("action"))
+                         fix_red_classes.REGISTER_DOMAIN: register_domain_writes_fix,
+                         fix_red_classes.REGISTER_SCREENS: register_screens_fix}.get((route or {}).get("action"))
                 agent = fixer(host, pr, route, worktree, log, receipt) if fixer else None
                 agent = agent or run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree),

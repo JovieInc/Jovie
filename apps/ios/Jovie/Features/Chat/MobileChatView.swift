@@ -126,7 +126,7 @@ struct MobileChatView: View {
 
   var body: some View {
     ZStack {
-      JovieColor.backgroundBase.ignoresSafeArea()
+      JovieColor.surface1.ignoresSafeArea()
 
       Group {
         if repository.timeline.isEmpty {
@@ -345,7 +345,7 @@ struct MobileChatView: View {
       .padding(.horizontal, JovieSpacing.large)
       .padding(.bottom, JovieSpacing.medium)
     }
-    .background(JovieColor.backgroundBase)
+    .background(JovieColor.surface1)
   }
 
   private func scrollToBottomIfPinned(using proxy: ScrollViewProxy) {

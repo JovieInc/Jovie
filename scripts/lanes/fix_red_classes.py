@@ -29,11 +29,12 @@ from atomic_state import atomic_write_text
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, AGENT = (
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN, REGISTER_SCREENS, AGENT = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "merge-narrowed-preflight", "register-domain-writes", "agent")
+    "merge-narrowed-preflight", "register-domain-writes", "register-screens", "agent")
 DETERMINISTIC = frozenset({
-    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, REGISTER_DOMAIN})
+    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED,
+    REGISTER_DOMAIN, REGISTER_SCREENS})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -90,6 +91,19 @@ NARROWED_CONFLICT = re.compile(
 DOMAIN_WRITE = re.compile(
     r"domain-write-guard: (?P<path>apps/web/(?:app|lib|components)/[\w./-]+\.(?:ts|tsx)) "
     r"writes (?P<table>[A-Za-z_][A-Za-z0-9_]*) directly \d+x \(allowed 0\)")
+# JOV-INV-018 names each changed in-scope screen that has no registry row.
+# Only an iOS feature View/Screen/Sheet is auto-registered. Web screens and
+# excluded lanes stay with the model.
+SCREEN_REGISTRATION = re.compile(
+    r"missing registration for changed in-scope screen (?P<path>\S+)")
+_SCREEN_REGISTRY = "scripts/invariants/screen-certification.mjs"
+_SCREEN_ROW = re.compile(
+    r"^(?P<id>[A-Za-z0-9_.-]+)\|(?P<platform>web|macos-electron|ios)\|(?P<owner>[A-Za-z0-9_.-]+)\|"
+    r"(?P<sources>[^|\n]+)\|(?P<viewports>[^|\n]+)(?:\|(?P<flag>x)\|(?P<reason>[^|\n]*))?$")
+_IOS_SCREEN = re.compile(
+    r"^apps/ios/Jovie/Features/(?P<feature>[A-Z][A-Za-z0-9]*)/(?:[A-Za-z0-9_]+/)*"
+    r"(?P<stem>[A-Za-z][A-Za-z0-9]*)(?P<kind>View|Screen|Sheet)\.swift$")
+_IOS_WIDGET = re.compile(r"(?:Card|Placeholder|Options|ToolCard)View\.swift$")
 _DOMAIN_REGISTRY = "apps/web/lib/domain/write-registry.json"
 _EXPORT_START = re.compile(
     r"(?m)^export\s+(?:async\s+)?(?:function|const)\s+([A-Za-z_][A-Za-z0-9_]*)\b")
@@ -127,6 +141,9 @@ SIGNATURES = (
     # and `\b5\d\d\b` would otherwise treat that count as an HTTP 5xx.
     ("spacing-scale", SPACING_RATCHET_TEXT, SNAP_SPACING),
     ("census-certification", CENSUS_CERTIFICATION, SYNC_MAIN),
+    # Before quota-deferred and platform-infra: a Source Validation log carries
+    # passing-test rate-limit lines beside the screen that failed the gate.
+    ("screen-registration", SCREEN_REGISTRATION, REGISTER_SCREENS),
     ("quota-deferred", QUOTA_TEXT, RERUN),
     ("platform-infra", PLATFORM_TEXT, RERUN),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
@@ -206,6 +223,9 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         files = sorted(set(files))
     elif cls == "domain-write":
         files = sorted(_domain_write_hits("\n".join(logs.get(name) or "" for name in names)))
+    elif cls == "screen-registration":
+        files = sorted(set(SCREEN_REGISTRATION.findall(
+            "\n".join(logs.get(name) or "" for name in names))))
     return {"schema": SCHEMA, "cls": cls, "key": fingerprint_key(cls, names, signature), "action": action,
             "checks": names, "signature": signature, "files": files}
 
@@ -931,6 +951,121 @@ def register_direct_domain_writes(root: Path, log: str) -> list[str]:
         return []
     atomic_write_text(registry_path, updated if updated.endswith("\n") else updated + "\n")
     return added
+
+
+def _ios_screen_feature(path: str) -> str | None:
+    """Top feature folder for a safe iOS screen file, else None."""
+    rel = str(path or "").replace("\\", "/").strip()
+    if not rel or rel.startswith("/") or ".." in Path(rel).parts or _IOS_WIDGET.search(rel):
+        return None
+    match = _IOS_SCREEN.fullmatch(rel)
+    return match.group("feature") if match else None
+
+
+def _screen_source_covers(source: str, path: str) -> bool:
+    """Same prefix rule as screen-certification.mjs matchesSource."""
+    if source == path:
+        return True
+    prefix = source if source.endswith("/") else f"{source}/"
+    return path.startswith(prefix)
+
+
+def _parse_screen_rows(text: str) -> list[dict]:
+    rows = []
+    for index, line in enumerate(text.splitlines()):
+        match = _SCREEN_ROW.match(line)
+        if not match:
+            continue
+        rows.append({
+            "index": index,
+            "id": match.group("id"),
+            "platform": match.group("platform"),
+            "sources": match.group("sources").split(","),
+            "excluded": match.group("flag") == "x",
+        })
+    return rows
+
+
+def register_unregistered_screens(root: Path, paths: list[str]) -> list[str]:
+    """Add a registry row for each safe unregistered iOS feature screen. Returns paths added.
+
+    One unsafe path (web, widget, missing file, unknown shape, or an id already
+    owned by an excluded row) writes nothing. A path an excluded row already
+    covers stays excluded. An existing gated `ios.<feature>` row gains the
+    source in place. New rows land after the last gated iOS row. A second call
+    is a no-op.
+    """
+    wanted = sorted({str(path).replace("\\", "/").strip() for path in paths or [] if str(path).strip()})
+    if not wanted:
+        return []
+    registry_path = Path(root) / _SCREEN_REGISTRY
+    try:
+        text = registry_path.read_text()
+    except OSError:
+        return []
+    rows = _parse_screen_rows(text)
+    if not rows:
+        return []
+
+    def covering(path: str) -> list[dict]:
+        return [row for row in rows if any(_screen_source_covers(source, path) for source in row["sources"])]
+
+    planned: list[tuple[str, str]] = []
+    for path in wanted:
+        feature = _ios_screen_feature(path)
+        if feature is None or not (Path(root) / path).is_file():
+            return []
+        covers = covering(path)
+        if covers:
+            continue
+        screen_id = f"ios.{feature.lower()}"
+        existing = next((row for row in rows if row["id"] == screen_id), None)
+        if existing is not None and (existing["excluded"] or existing["platform"] != "ios"):
+            return []
+        planned.append((path, feature))
+    if not planned:
+        return []
+
+    by_feature: dict[str, list[str]] = {}
+    for path, feature in planned:
+        by_feature.setdefault(feature, []).append(path)
+    lines = text.splitlines()
+    added: list[str] = []
+    inserts: list[str] = []
+    for feature in sorted(by_feature):
+        feature_paths = sorted(dict.fromkeys(by_feature[feature]))
+        screen_id = f"ios.{feature.lower()}"
+        existing = next((row for row in rows if row["id"] == screen_id), None)
+        if existing is not None:
+            sources = list(existing["sources"])
+            for path in feature_paths:
+                if path not in sources:
+                    sources.append(path)
+                    added.append(path)
+            if sources == existing["sources"]:
+                continue
+            parts = lines[existing["index"]].split("|")
+            parts[3] = ",".join(sources)
+            lines[existing["index"]] = "|".join(parts)
+            continue
+        inserts.append(
+            f"{screen_id}|ios|ios-{feature.lower()}|{','.join(feature_paths)}|compact")
+        added.extend(feature_paths)
+    if not added:
+        return []
+    if inserts:
+        anchor = max(
+            (row["index"] for row in rows
+             if row["platform"] == "ios" and row["id"].startswith("ios.") and not row["excluded"]),
+            default=None)
+        if anchor is None:
+            return []
+        lines[anchor + 1:anchor + 1] = inserts
+    updated = "\n".join(lines) + ("\n" if text.endswith("\n") else "")
+    if updated == text:
+        return []
+    atomic_write_text(registry_path, updated)
+    return sorted(added)
 
 
 def wire_ci_fast(root: Path, files: list[str]) -> list[str]:

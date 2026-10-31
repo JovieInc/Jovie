@@ -9,7 +9,7 @@ struct MobileChatPlaceholderView: View {
 
   var body: some View {
     ZStack {
-      JovieColor.backgroundBase.ignoresSafeArea()
+      JovieColor.surface1.ignoresSafeArea()
 
       VStack(spacing: 0) {
         Spacer(minLength: 0)
@@ -22,7 +22,7 @@ struct MobileChatPlaceholderView: View {
         ChatComposerPreview(draft: $draft)
           .padding(.horizontal, JovieSpacing.large)
           .padding(.bottom, JovieSpacing.medium)
-          .background(JovieColor.backgroundBase)
+          .background(JovieColor.surface1)
       }
     }
     .accessibilityElement(children: .contain)

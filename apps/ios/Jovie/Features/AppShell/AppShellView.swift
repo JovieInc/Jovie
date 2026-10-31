@@ -297,6 +297,7 @@ struct AppShellView<
           AppShellLeftDrawer(
             isPresented: isDrawerPresented,
             profile: profile,
+            workspaceName: workspaceMode.displayName,
             chatEnabled: chatEnabled,
             audienceEnabled: audienceEnabled,
             selectedTab: selectedTab,
@@ -470,7 +471,7 @@ struct AppShellView<
       }
       .navigationBarHidden(true)
     }
-    .background(JovieColor.backgroundBase)
+    .background(JovieColor.surface0)
     .sheet(item: $entityContext) { item in
       EntityContextSheet(
         item: item,
@@ -596,7 +597,7 @@ struct AppShellView<
 
     return ZStack {
       ZStack {
-        JovieColor.backgroundBase.ignoresSafeArea()
+        JovieColor.surface1.ignoresSafeArea()
 
         pagedContent
           .transition(pageTransition)
@@ -617,11 +618,11 @@ struct AppShellView<
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(JovieColor.backgroundBase)
+    .background(JovieColor.surface1)
     .clipShape(shellContentClipShape(isElevated: isElevated))
     .background {
       if !isElevated {
-        JovieColor.backgroundBase.ignoresSafeArea(edges: .bottom)
+        JovieColor.surface1.ignoresSafeArea(edges: .bottom)
       }
     }
     .overlay(alignment: .leading) {
@@ -1238,7 +1239,7 @@ struct AppShellView<
     }
     .padding(.horizontal, JovieSpacing.large)
     .padding(.vertical, JovieSpacing.small)
-    .background(JovieColor.backgroundBase.opacity(0.96))
+    .background(JovieColor.surface1)
   }
 }
 

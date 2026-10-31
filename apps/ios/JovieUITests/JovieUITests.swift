@@ -546,7 +546,7 @@ final class JovieUITests: XCTestCase {
       "Drawer surface switcher is hittable with drawer closed.\n\(app.debugDescription)"
     )
     XCTAssertFalse(
-      app.staticTexts["Start a conversation to see recent conversations here."].isHittable,
+      app.staticTexts["No chats yet"].isHittable,
       "Drawer empty-threads copy is hittable under content with drawer closed.\n\(app.debugDescription)"
     )
     attachScreenshot(named: "drawer-base-plane-occluded-closed", app: app)
@@ -605,13 +605,21 @@ final class JovieUITests: XCTestCase {
     let audience = app.buttons["shell-drawer-surface-shell-tab-audience"]
     XCTAssertEqual(home.label, "Home")
     XCTAssertEqual(identity.label, "Identity")
-    let rows = [home, identity, work, inbox, calendar, audience]
+    let rows = [home, inbox, identity, work, calendar, audience]
     for (above, below) in zip(rows, rows.dropFirst()) {
       XCTAssertLessThan(above.frame.maxY, below.frame.maxY)
       XCTAssertGreaterThanOrEqual(below.frame.height, 44)
     }
-    XCTAssertGreaterThan(inbox.frame.minX, work.frame.minX)
-    XCTAssertEqual(inbox.frame.minX, calendar.frame.minX, accuracy: 1)
+    XCTAssertEqual(inbox.frame.minX, work.frame.minX, accuracy: 1)
+    XCTAssertGreaterThan(calendar.frame.minX, work.frame.minX)
+    XCTAssertFalse(app.staticTexts["Your workspace"].exists)
+    let newChat = app.buttons["shell-drawer-new-chat"]
+    let talk = app.buttons["shell-drawer-talk"]
+    XCTAssertTrue(newChat.isHittable)
+    XCTAssertTrue(talk.isHittable)
+    XCTAssertEqual(newChat.frame.midY, talk.frame.midY, accuracy: 1)
+    XCTAssertGreaterThanOrEqual(newChat.frame.width, 44)
+    XCTAssertGreaterThanOrEqual(talk.frame.width, 44)
     attachScreenshot(named: "ios-canonical-information-architecture", app: app)
 
     inbox.tap()
@@ -624,6 +632,29 @@ final class JovieUITests: XCTestCase {
     XCTAssertTrue(waitForHittable(identity, timeout: 3))
     identity.tap()
     XCTAssertTrue(app.buttons["Copy URL"].waitForExistence(timeout: 3))
+  }
+
+  func testDrawerAccountControlsStayFixedWhileNavigationScrolls() {
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "chat composer") {
+      $0.textFields["chat-composer-input"]
+    }
+    app.buttons["Open navigation drawer"].tap()
+    let settings = app.buttons["shell-drawer-settings"]
+    let account = app.buttons["shell-drawer-account"]
+    XCTAssertTrue(waitForHittable(settings, timeout: 3))
+    XCTAssertTrue(account.isHittable)
+    let settingsFrame = settings.frame
+    let accountFrame = account.frame
+    let work = app.buttons["shell-drawer-surface-shell-tab-library"]
+    work.swipeUp()
+    XCTAssertTrue(settings.isHittable)
+    XCTAssertTrue(account.isHittable)
+    XCTAssertEqual(settings.frame.minY, settingsFrame.minY, accuracy: 1)
+    XCTAssertEqual(account.frame.minY, accountFrame.minY, accuracy: 1)
+    XCTAssertGreaterThanOrEqual(settings.frame.width, 44)
+    XCTAssertGreaterThanOrEqual(settings.frame.height, 44)
+    settings.tap()
+    XCTAssertTrue(app.buttons["Close Settings"].waitForExistence(timeout: 3))
   }
 
   func testOfflineStatusReservesToolbarGeometry() {
@@ -847,9 +878,10 @@ final class JovieUITests: XCTestCase {
       app.descendants(matching: .any)["shell-drawer"].waitForExistence(timeout: 3),
       "Shell navigation did not reveal the left drawer.\n\(app.debugDescription)"
     )
-    XCTAssertTrue(
-      app.staticTexts["@tim"].exists,
-      "Drawer account subtitle should keep the @handle while offline.\n\(app.debugDescription)"
+    XCTAssertEqual(
+      app.buttons["shell-drawer-account"].value as? String,
+      "@tim",
+      "Drawer account should expose the @handle to accessibility while offline.\n\(app.debugDescription)"
     )
     XCTAssertEqual(
       app.staticTexts.matching(offlineStatusPredicate).count,
@@ -1829,7 +1861,7 @@ final class JovieUITests: XCTestCase {
       "Shell navigation did not reveal the left drawer.\n\(app.debugDescription)"
     )
     XCTAssertTrue(
-      app.staticTexts["Start a conversation to see recent conversations here."].exists,
+      app.staticTexts["No chats yet"].exists,
       "Shell drawer did not show the empty recent conversations state.\n\(app.debugDescription)"
     )
     XCTAssertTrue(app.buttons["New chat"].exists)
