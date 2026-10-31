@@ -1,0 +1,284 @@
+{
+  "schema": "jovie.tracker-registry/v1",
+  "owner": "summer",
+  "canon": "gbrain decisions/company/privacy-tracking-compliance-guidelines-2026-10-31",
+  "notes": "Approved third parties a page may load, and the surfaces the privacy inventory crawls. Behaviour config: a new tracker, SDK, pixel or data flow needs an entry with a rationale before it ships. Categories: pixel (ads/retargeting), analytics (third-party measurement), replay (session replay), chat-widget, ads, processor (needed to deliver a feature, e.g. payments, bot checks, error reporting), content (images, audio, fonts, embeds). Pixel, analytics, replay, chat-widget and ads categories are banned on input pages.",
+  "first_party_domains": ["jov.ie", "logyourbody.com"],
+  "policies": {
+    "jovie-privacy": "https://jov.ie/legal/privacy",
+    "jovie-cookies": "https://jov.ie/legal/cookies",
+    "lyb-privacy": "https://www.logyourbody.com/privacy"
+  },
+  "banned_claims": [
+    "we (do not|don't|never) track",
+    "no third[- ]party tracking scripts",
+    "we never share",
+    "we (do not|don't|never) share (your )?(data|information)",
+    "never (sold|sell|selling)"
+  ],
+  "vendors": [
+    {
+      "id": "meta",
+      "category": "pixel",
+      "products": ["jovie"],
+      "hosts": ["facebook.net", "facebook.com"],
+      "policy_names": ["Meta", "Facebook"],
+      "status": "live",
+      "approved": "2026-10-31",
+      "approved_by": "tim (privacy guideline 2026-10-31)",
+      "rationale": "Browser Meta pixel on public artist profiles and approved editorial pages; builds the retargeting audience (JOV-5078). Opt-out model in the US, consent bar in EU/UK. Never on input pages.",
+      "code": ["apps/web/components/features/tracking/MetaPixel.tsx"]
+    },
+    {
+      "id": "google-analytics",
+      "category": "analytics",
+      "products": ["jovie"],
+      "hosts": [
+        "googletagmanager.com",
+        "google-analytics.com",
+        "analytics.google.com"
+      ],
+      "policy_names": ["Google Analytics"],
+      "status": "inactive",
+      "approved": "2026-10-31",
+      "approved_by": "pre-existing (JOV-3664)",
+      "rationale": "gtag with Consent Mode in the root layout. Inactive in production (no measurement ID; no request observed 2026-10-31). Re-activating needs an input-page exclusion first: the root layout covers signin, signup and chat.",
+      "code": ["apps/web/components/providers/GoogleAnalytics.tsx"]
+    },
+    {
+      "id": "instantly-leadsy",
+      "category": "pixel",
+      "products": ["jovie"],
+      "hosts": [
+        "leadsy.ai",
+        "instantly.ai",
+        "trovo-tag.com",
+        "ddwl4m2hdecbv.cloudfront.net"
+      ],
+      "policy_names": ["Instantly", "Leadsy"],
+      "status": "disabled",
+      "approved": "2026-10-31",
+      "approved_by": "pre-existing; disabled fail-closed",
+      "rationale": "Website visitor-identification pixel. Component returns null in all states. Visitor de-anonymisation is the highest-risk class; re-enabling needs counsel sign-off (open question in the counsel brief). CSP entries should be removed.",
+      "code": ["apps/web/components/providers/InstantlyPixel.tsx"]
+    },
+    {
+      "id": "qrserver",
+      "category": "content",
+      "products": ["jovie"],
+      "hosts": ["api.qrserver.com"],
+      "policy_names": ["goQR", "QR Server"],
+      "status": "live",
+      "approved": "2026-10-31",
+      "approved_by": "retroactive registration 2026-10-31",
+      "rationale": "QR code images on artist profiles. Sends the visitor IP and referrer to goQR.me. Prefer first-party QR generation (open follow-up)."
+    },
+    {
+      "id": "stripe",
+      "category": "processor",
+      "products": ["jovie", "lyb"],
+      "hosts": ["stripe.com", "stripe.network"],
+      "policy_names": ["Stripe"],
+      "status": "live",
+      "approved": "2026-10-31",
+      "approved_by": "pre-existing",
+      "allowed_on_input_pages": true,
+      "rationale": "Payments. PCI requires Stripe.js on the payment page."
+    },
+    {
+      "id": "cloudflare-turnstile",
+      "category": "processor",
+      "products": ["jovie"],
+      "hosts": ["challenges.cloudflare.com"],
+      "policy_names": ["Cloudflare"],
+      "status": "live",
+      "approved": "2026-10-31",
+      "approved_by": "pre-existing",
+      "allowed_on_input_pages": true,
+      "rationale": "Bot check on signup and onboarding."
+    },
+    {
+      "id": "sentry",
+      "category": "processor",
+      "products": ["jovie", "lyb"],
+      "hosts": ["sentry.io"],
+      "policy_names": ["Sentry"],
+      "status": "live",
+      "approved": "2026-10-31",
+      "approved_by": "pre-existing",
+      "allowed_on_input_pages": true,
+      "rationale": "Error reporting only. Session Replay is off in production (client-full.ts enableReplay defaults to development). Turning Replay on is a separate replay-category entry and is banned on input pages."
+    },
+    {
+      "id": "statsig",
+      "category": "processor",
+      "products": ["jovie", "lyb"],
+      "hosts": [
+        "statsig.com",
+        "statsigapi.net",
+        "featureassets.org",
+        "prodregistryv2.org"
+      ],
+      "policy_names": ["Statsig"],
+      "status": "live",
+      "approved": "2026-10-31",
+      "approved_by": "pre-existing",
+      "allowed_on_input_pages": true,
+      "rationale": "Feature flags and experiments as a contracted service provider. No autocapture or session-replay plugin (checked 2026-10-31). Stores a stable ID in localStorage. Whether a contracted analytics SDK on input pages is CIPA exposure is a counsel question."
+    },
+    {
+      "id": "google-oauth",
+      "category": "processor",
+      "products": ["jovie"],
+      "hosts": ["accounts.google.com", "googleapis.com"],
+      "policy_names": ["Google"],
+      "status": "live",
+      "approved": "2026-10-31",
+      "approved_by": "pre-existing",
+      "allowed_on_input_pages": true,
+      "rationale": "Sign in with Google and Google API connections the user starts."
+    },
+    {
+      "id": "google-fonts",
+      "category": "content",
+      "products": ["jovie", "lyb"],
+      "hosts": ["fonts.googleapis.com", "fonts.gstatic.com"],
+      "policy_names": ["Google"],
+      "status": "live",
+      "approved": "2026-10-31",
+      "approved_by": "pre-existing",
+      "allowed_on_input_pages": true,
+      "rationale": "Web fonts. Self-hosting removes the IP transfer (EU courts have fined Google Fonts IP transfer)."
+    },
+    {
+      "id": "vercel",
+      "category": "processor",
+      "products": ["jovie", "lyb"],
+      "hosts": [
+        "vercel-scripts.com",
+        "vercel-insights.com",
+        "vercel.live",
+        "vercel.com"
+      ],
+      "policy_names": ["Vercel"],
+      "status": "live",
+      "approved": "2026-10-31",
+      "approved_by": "pre-existing",
+      "allowed_on_input_pages": true,
+      "rationale": "Hosting and first-party cookieless web analytics."
+    },
+    {
+      "id": "music-artwork-cdns",
+      "category": "content",
+      "products": ["jovie"],
+      "hosts": [
+        "scdn.co",
+        "mzstatic.com",
+        "dzcdn.net",
+        "ytimg.com",
+        "ggpht.com",
+        "googleusercontent.com",
+        "sndcdn.com"
+      ],
+      "policy_names": ["Spotify", "Apple"],
+      "status": "live",
+      "approved": "2026-10-31",
+      "approved_by": "pre-existing (cdn-domains.ts)",
+      "allowed_on_input_pages": true,
+      "rationale": "Cover art and avatars from music platforms; the canonical list is apps/web/constants/platforms/cdn-domains.ts."
+    }
+  ],
+  "surfaces": [
+    {
+      "id": "jovie-home",
+      "product": "jovie",
+      "url": "https://jov.ie/",
+      "inputs": []
+    },
+    {
+      "id": "jovie-pricing",
+      "product": "jovie",
+      "url": "https://jov.ie/pricing",
+      "inputs": []
+    },
+    {
+      "id": "jovie-blog-post",
+      "product": "jovie",
+      "url": "https://jov.ie/blog/the-contact-problem",
+      "inputs": []
+    },
+    {
+      "id": "jovie-privacy",
+      "product": "jovie",
+      "url": "https://jov.ie/legal/privacy",
+      "inputs": []
+    },
+    {
+      "id": "jovie-profile",
+      "product": "jovie",
+      "url": "https://jov.ie/tim",
+      "inputs": [],
+      "note": "Fan-subscribe form opens in a drawer on this page, so the load-state crawl sees no input. Pixel vs drawer is counsel brief Q3."
+    },
+    {
+      "id": "jovie-profile-alerts",
+      "product": "jovie",
+      "url": "https://jov.ie/tim/alerts",
+      "inputs": ["fan-subscribe"]
+    },
+    {
+      "id": "jovie-release",
+      "product": "jovie",
+      "url": "https://jov.ie/tim/the-sound",
+      "inputs": []
+    },
+    {
+      "id": "jovie-signin",
+      "product": "jovie",
+      "url": "https://jov.ie/signin",
+      "inputs": ["auth"]
+    },
+    {
+      "id": "jovie-signup",
+      "product": "jovie",
+      "url": "https://jov.ie/signup",
+      "inputs": ["auth"]
+    },
+    {
+      "id": "jovie-start",
+      "product": "jovie",
+      "url": "https://jov.ie/start",
+      "inputs": ["signup"]
+    },
+    {
+      "id": "jovie-pay",
+      "product": "jovie",
+      "url": "https://jov.ie/pay",
+      "inputs": []
+    },
+    {
+      "id": "jovie-support",
+      "product": "jovie",
+      "url": "https://jov.ie/support",
+      "inputs": []
+    },
+    {
+      "id": "lyb-home",
+      "product": "lyb",
+      "url": "https://www.logyourbody.com/",
+      "inputs": []
+    },
+    {
+      "id": "lyb-privacy",
+      "product": "lyb",
+      "url": "https://www.logyourbody.com/privacy",
+      "inputs": []
+    },
+    {
+      "id": "lyb-signin",
+      "product": "lyb",
+      "url": "https://www.logyourbody.com/signin",
+      "inputs": ["auth"]
+    }
+  ]
+}
