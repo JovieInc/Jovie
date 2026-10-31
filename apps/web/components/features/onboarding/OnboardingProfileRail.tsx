@@ -506,7 +506,7 @@ export function OnboardingProfileRail({
             }
             // One caption for every path: internal draft state ("Draft · artist ·
             // Review") is not visitor-facing (2026-10-31 golden-path walk).
-            caption='Preview — not claimed yet'
+            caption='Preview · not claimed yet'
             overlay={<DspMatchStrip matches={dspMatches} />}
           />
           {previewArtist.tagline ? (
