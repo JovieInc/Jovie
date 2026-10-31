@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDeployedBuildInfo } from '@/lib/observability/build-info';
 import { getOpsHealthEnvelope } from '@/lib/observability/ops-health';
 import { getWorktreeIdentity } from '@/lib/observability/worktree-runtime';
+import { recordShippedFixDeploys } from '@/lib/recovery/probes.server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,8 @@ export const BUILD_INFO_CACHE_HEADERS = {
 export async function GET() {
   const worktree = getWorktreeIdentity();
   const build = await getDeployedBuildInfo();
+  // Release event hook for recovery emails: stamps shipped fixes' deploy time.
+  void recordShippedFixDeploys().catch(() => undefined);
   // ops.health/v1 envelope (canon/OPS_HEALTH.md) first; the legacy fields below
   // stay for existing consumers (buildId drives the web update pill).
   const ops = await getOpsHealthEnvelope();

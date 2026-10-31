@@ -34,6 +34,7 @@ const MODES = new Set([
   'credentials',
   'domains',
   'drafts',
+  'drift',
   'exhausted',
   'holds',
   'ops-health',
@@ -512,6 +513,7 @@ export async function fileRemediationPlans(plans, { dryRun, upsert, apiKey }) {
  * @param {() => Promise<any>} [options.loadDeployments]
  * @param {() => Promise<any[]>} [options.loadDomains]
  * @param {() => Promise<{ plans: any[], warnings?: string[] }>} [options.loadCredentials]
+ * @param {() => Promise<{ plans: any[], warnings?: string[] }>} [options.loadDrift]
  * @param {() => Promise<any[]>} [options.loadOpsHealth]
  * @param {boolean} [options.vercelTokenPresent]
  * @param {(args: any) => Promise<any>} [options.upsert]
@@ -527,6 +529,7 @@ export async function runRemediationSweep({
   loadDeployments,
   loadDomains,
   loadCredentials,
+  loadDrift,
   loadOpsHealth,
   vercelTokenPresent = false,
   upsert,
@@ -613,6 +616,17 @@ export async function runRemediationSweep({
       const credentials = await loadCredentials();
       warnings.push(...(credentials.warnings ?? []));
       plans.push(...credentials.plans);
+    }
+  }
+  if (includesMode(mode, 'drift')) {
+    // Source-of-truth drift (canon/sources-of-truth.json liveChecks): Stripe
+    // prices, email DNS, production build against their owners.
+    if (!loadDrift) {
+      warnings.push('Source drift loader not wired; not judged');
+    } else {
+      const drift = await loadDrift();
+      warnings.push(...(drift.warnings ?? []));
+      plans.push(...drift.plans);
     }
   }
   const issues = await fileRemediationPlans(plans, { dryRun, upsert, apiKey });

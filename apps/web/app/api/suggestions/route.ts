@@ -28,8 +28,12 @@ import {
   or,
 } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-
 import { getCachedAuth } from '@/lib/auth/cached';
+import {
+  explicitSegmentFromSettings,
+  inferSegment,
+  type ResolvedSegment,
+} from '@/lib/creator/segments';
 import { db } from '@/lib/db';
 import { chatConversations } from '@/lib/db/schema/chat';
 import { discogReleases } from '@/lib/db/schema/content';
@@ -43,6 +47,7 @@ import {
 } from '@/lib/db/schema/profiles';
 import { getDspArtistImageUrl } from '@/lib/dsp-enrichment/artist-image';
 import { captureError } from '@/lib/error-tracking';
+import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import {
   getConfirmedFeaturedPlaylistFallback,
   getFeaturedPlaylistFallbackCandidate,
@@ -61,7 +66,8 @@ export interface ProfileSuggestion {
     | 'social_link'
     | 'avatar'
     | 'playlist_fallback'
-    | 'profile_ready';
+    | 'profile_ready'
+    | 'profile_nudge';
   platform: string;
   platformLabel: string;
   title: string;
@@ -72,11 +78,24 @@ export interface ProfileSuggestion {
 }
 
 export interface SuggestionsStarterContext {
+  /** Resolved creator segment (JOV-9679) for gating starter chips. */
+  segment: ResolvedSegment;
   latestReleaseTitle: string | null;
   pendingArtistMatches: number;
   pendingLinkSuggestions: number;
   isRecentlyOnboarded: boolean;
   conversationCount: number;
+  /** Server-computed essentials readiness (JOV-8137). The client never guesses liveness. */
+  profileReadiness: ProfileReadiness;
+}
+
+export interface ProfileReadiness {
+  hasPhoto: boolean;
+  hasName: boolean;
+  hasHandle: boolean;
+  hasMusicDsp: boolean;
+  /** All four essentials set: photo, name, handle, and at least one music DSP. */
+  isComplete: boolean;
 }
 
 // ============================================================================
@@ -112,6 +131,14 @@ export async function GET(request: Request) {
         avatarLockedByUser: creatorProfiles.avatarLockedByUser,
         onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
         settings: creatorProfiles.settings,
+        username: creatorProfiles.username,
+        displayName: creatorProfiles.displayName,
+        spotifyUrl: creatorProfiles.spotifyUrl,
+        appleMusicUrl: creatorProfiles.appleMusicUrl,
+        youtubeUrl: creatorProfiles.youtubeUrl,
+        spotifyId: creatorProfiles.spotifyId,
+        appleMusicId: creatorProfiles.appleMusicId,
+        youtubeMusicId: creatorProfiles.youtubeMusicId,
       })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.id, profileId))
@@ -324,11 +351,16 @@ export async function GET(request: Request) {
     const conversationCountValue = conversationCountResult[0]?.value ?? 0;
 
     const starterContext: SuggestionsStarterContext = {
+      segment: inferSegment({
+        explicit: explicitSegmentFromSettings(profile.settings),
+        hasMusicCatalog: latestRelease.length > 0 || dspMatches.length > 0,
+      }).segment,
       latestReleaseTitle: latestRelease[0]?.title ?? null,
       pendingArtistMatches: dspMatches.length,
       pendingLinkSuggestions: socialSuggestions.length,
       isRecentlyOnboarded,
       conversationCount: conversationCountValue,
+      profileReadiness: buildProfileReadiness(profile),
     };
 
     return NextResponse.json({ success: true, suggestions, starterContext });
@@ -350,6 +382,47 @@ export async function GET(request: Request) {
 // ============================================================================
 // Helpers
 // ============================================================================
+
+function hasText(value: string | null | undefined): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+/**
+ * Server-computed essentials readiness (JOV-8137). A profile counts as live
+ * only when photo, name, handle, and at least one music DSP are all set.
+ */
+function buildProfileReadiness(profile: {
+  avatarUrl: string | null;
+  displayName: string | null;
+  username: string | null;
+  spotifyUrl: string | null;
+  appleMusicUrl: string | null;
+  youtubeUrl: string | null;
+  spotifyId: string | null;
+  appleMusicId: string | null;
+  youtubeMusicId: string | null;
+}): ProfileReadiness {
+  const completion = calculateRequiredProfileCompletion({
+    displayName: profile.displayName,
+    avatarUrl: profile.avatarUrl,
+    handle: profile.username,
+    hasMusicLinks:
+      hasText(profile.spotifyUrl) ||
+      hasText(profile.appleMusicUrl) ||
+      hasText(profile.youtubeUrl) ||
+      hasText(profile.spotifyId) ||
+      hasText(profile.appleMusicId) ||
+      hasText(profile.youtubeMusicId),
+  });
+
+  return {
+    hasPhoto: completion.hasAvatar,
+    hasName: completion.hasName,
+    hasHandle: completion.hasHandle,
+    hasMusicDsp: completion.hasMusicLinks,
+    isComplete: completion.isComplete,
+  };
+}
 
 const PROVIDER_LABELS: Record<string, string> = {
   spotify: 'Spotify',

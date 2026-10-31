@@ -36,7 +36,13 @@ case "$SCOPE" in
       echo "[automation-verify] Cannot list scripts/ changes since ${SCRIPTS_DIFF_BASE}" >&2
       exit 1
     fi
-    if [[ -n "$SCRIPTS_CHANGED" ]]; then
+    # Include the index, working tree and untracked files for verification
+    # before commit, while retaining selection for every committed change.
+    if ! SCRIPTS_DIRTY="$(git status --porcelain --untracked-files=all -- scripts/)"; then
+      echo "[automation-verify] Cannot list scripts/ working tree changes" >&2
+      exit 1
+    fi
+    if [[ -n "$SCRIPTS_CHANGED" || -n "$SCRIPTS_DIRTY" ]]; then
       echo "[automation-verify] scripts/ changed: running the scripts typecheck ratchet"
       node scripts/typecheck-scripts.mjs
     else

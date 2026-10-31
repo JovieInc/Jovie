@@ -21,4 +21,26 @@ describe('SuggestedPrompts', () => {
       screen.getByRole('button', { name: 'Plan a Release' })
     ).toBeInTheDocument();
   });
+
+  it('hides release and album art chips for a comedian (JOV-9679)', () => {
+    render(<SuggestedPrompts onSelect={vi.fn()} segment='comedian' />);
+
+    expect(
+      screen.queryByRole('button', { name: 'Plan a Release' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Generate Album Art' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Review Signals' })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps release chips for a musician (JOV-9679)', () => {
+    render(<SuggestedPrompts onSelect={vi.fn()} segment='musician' />);
+
+    expect(
+      screen.getByRole('button', { name: 'Plan a Release' })
+    ).toBeInTheDocument();
+  });
 });
