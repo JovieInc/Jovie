@@ -9,11 +9,17 @@
  * critical finding. --record appends the per-provider $/day snapshot (measure
  * everything) to a JSONL ledger. Reads AI_GATEWAY_API_KEY from the environment
  * and never prints it.
+ *
+ * api-budget: ai-gateway 16/hr - cost-gate tick every 15 min, 2 report reads and 1 credits read per run
+ * api-budget: cloudflare-api 8/hr - one Workers AI analytics query per cost-gate tick
  */
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createApiClient } from '../packages/api-client/client.ts';
+import { providerSpec } from '../packages/api-client/contract.ts';
+import { hashCredential } from '../packages/api-client/store.ts';
 import { fetchRows } from './ai-gateway-report.mjs';
 import { evaluateRouting, workersAiUsdByDay } from './lib/ai-routing-drift.mjs';
 import { readGatewayCredits } from './lib/credentials-live-reads.mjs';
@@ -60,21 +66,26 @@ export async function readWorkersAiByDay(days, fetchImpl, env = process.env) {
   // A scoped API token may lack analytics access; fall through to the next one.
   for (const token of tokens) {
     try {
-      const res = await fetchImpl(
-        'https://api.cloudflare.com/client/v4/graphql',
-        {
-          method: 'POST',
-          headers: {
-            authorization: `Bearer ${token}`,
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify({ query }),
-          signal: AbortSignal.timeout(20_000),
-        }
-      );
-      if (!res.ok) continue;
-      const groups = (await res.json())?.data?.viewer?.accounts?.[0]
-        ?.aiInferenceAdaptiveGroups;
+      // Through the shared client layer (budget, retry, ledger), like every provider call.
+      const client = createApiClient({
+        provider: 'cloudflare',
+        credential: hashCredential('cloudflare', token),
+        fetch: fetchImpl,
+      });
+      const res = await client.request({
+        url: `https://${providerSpec('cloudflare').hosts[0]}/client/v4/graphql`,
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${token}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ query }),
+        priority: 'report',
+        maxAttempts: 1,
+      });
+      if (res.status < 200 || res.status >= 300) continue;
+      const groups =
+        res.json()?.data?.viewer?.accounts?.[0]?.aiInferenceAdaptiveGroups;
       if (Array.isArray(groups)) return workersAiUsdByDay(groups);
     } catch {
       // try the next token

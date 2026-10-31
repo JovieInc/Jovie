@@ -388,9 +388,14 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             .node-version
+            .github/actions/prime-node-toolcache/
             apps/web/lib/ai/routing.json
             scripts/
             packages/api-client/
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        uses: ./.github/actions/prime-node-toolcache
+        with:
+          node-version-file: .node-version
       - name: Setup Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
         with:
