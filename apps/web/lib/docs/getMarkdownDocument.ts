@@ -6,10 +6,6 @@ import remarkGfm from 'remark-gfm';
 import remarkHtml from 'remark-html';
 import { visit } from 'unist-util-visit';
 import { LEGAL_ENTITY_NAME } from '@/constants/app';
-import {
-  CHAT_RETENTION_DAYS,
-  DEFAULT_RETENTION_DAYS,
-} from '@/lib/analytics/retention-windows';
 import { resolveAppContentPath } from '@/lib/filesystem-paths';
 import { sanitizeServerHtml } from '@/lib/html/sanitize';
 import type { MarkdownDocument, TocEntry } from '@/types/docs';
@@ -74,23 +70,8 @@ function enrichTableForAccessibility(node: TableNode): void {
   node.data = data;
 }
 
-const RETENTION_WINDOWS: Readonly<Record<string, number>> = {
-  CHAT_RETENTION_DAYS,
-  DEFAULT_RETENTION_DAYS,
-};
-
-function expandRetentionToken(match: string, name: string): string {
-  const days = RETENTION_WINDOWS[name];
-  return days === undefined ? match : String(days);
-}
-
 export const applyMarkdownTemplate = (raw: string): string => {
-  return raw
-    .replaceAll(/\{\{\s*LEGAL_ENTITY_NAME\s*\}\}/g, LEGAL_ENTITY_NAME)
-    .replaceAll(
-      /\{\{\s*([A-Z0-9_]*RETENTION_DAYS)\s*\}\}/g,
-      expandRetentionToken
-    );
+  return raw.replaceAll(/\{\{\s*LEGAL_ENTITY_NAME\s*\}\}/g, LEGAL_ENTITY_NAME);
 };
 
 export async function getMarkdownDocument(
