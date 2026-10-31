@@ -148,7 +148,7 @@ jobs:
     name: Emit Agent Report
     needs: [context, deterministic, candidate-validation]
     if: ${{ always() }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'

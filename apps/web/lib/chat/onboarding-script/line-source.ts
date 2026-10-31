@@ -1,5 +1,7 @@
 import 'server-only';
 import { eq } from 'drizzle-orm';
+import { excludeOtherSegments } from '@/lib/creator/segment-registry';
+import type { ResolvedSegment } from '@/lib/creator/segments';
 import { db } from '@/lib/db';
 import { onboardingScriptLines } from '@/lib/db/schema/onboarding-script';
 import { logger } from '@/lib/utils/logger';
@@ -118,9 +120,17 @@ export async function loadScriptBank(): Promise<ScriptBank> {
 export function pickFromBank(
   bank: ScriptBank,
   stepId: ScriptStepId,
-  sessionId: string
+  sessionId: string,
+  segment?: ResolvedSegment
 ): ScriptLine {
-  const bankEntries = bank.get(stepId) ?? [];
+  // Segment gate (JOV-9679): when a segment is resolved, lines scoped to other
+  // segments are never candidates. If that empties the step, fall back to the
+  // unfiltered bank rather than leave the visitor without a reply.
+  const allEntries = bank.get(stepId) ?? [];
+  const scoped = allEntries.filter(
+    entry => excludeOtherSegments([entry.line], segment).length > 0
+  );
+  const bankEntries = scoped.length > 0 ? scoped : allEntries;
   // Holdout arm: stable excluded group that only ever sees seed lines, so
   // promoted copy can be measured against an unexposed control.
   const entries = isHoldoutSession(sessionId)
@@ -132,7 +142,9 @@ export function pickFromBank(
   );
   if (entries.length === 0 || total <= 0) {
     // Bank rows exhausted or all zero-weight — seeds are the floor.
-    const seeds = linesForStep(stepId);
+    const allSeeds = linesForStep(stepId);
+    const gated = excludeOtherSegments(allSeeds, segment);
+    const seeds = gated.length > 0 ? gated : allSeeds;
     const seed = seeds[hashSessionId(sessionId) % Math.max(seeds.length, 1)];
     if (!seed) throw new Error(`No script lines defined for step ${stepId}`);
     return seed;

@@ -3058,6 +3058,35 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
     def test_no_red_check_means_no_block(self):
         self.assertIsNone(events.red_before_green_block({"statusCheckRollup": [{"name": "x", "conclusion": "SUCCESS"}]}))
 
+    def test_conflict_only_repair_records_observed_merge_failure_and_preserves_decision(self):
+        pr = {"number": 23520, "headRefOid": "a" * 40, "mergeable": "CONFLICTING"}
+        excerpt = (
+            "Auto-merging apps/web/lib/chat/system-prompt.ts\n"
+            "CONFLICT (content): Merge conflict in apps/web/lib/chat/system-prompt.ts\n"
+            "Automatic merge failed; fix conflicts and then commit the result.\n"
+        )
+        body = 'Registry\n<!-- customer-changelog/v1 {"releaseWorthy":false} -->\n'
+        updated = events.repair_evidence_body(pr, body, excerpt, customer_decision={"releaseWorthy": False})
+        self.assertTrue(events.red_section_complete(updated))
+        self.assertIn("Failing command: `git merge origin/main --no-edit`", updated)
+        self.assertIn("CONFLICT (content): Merge conflict in apps/web/lib/chat/system-prompt.ts", updated)
+        self.assertNotIn("Failing run (before fix):", updated)
+        self.assertEqual(updated.count("customer-changelog/v1"), 1)
+        self.assertEqual(events.repair_evidence_body(pr, updated, excerpt), updated)
+        self.assertIsNotNone(events.red_before_green_block({"mergeStateStatus": "DIRTY"}, excerpt))
+
+    def test_conflict_state_without_observed_merge_failure_never_fabricates_red(self):
+        conflict = "CONFLICT (content): Merge conflict in file.ts\n"
+        failure = "Automatic merge failed; fix conflicts and then commit the result.\n"
+        for pr, excerpt in (
+            ({"mergeable": "CONFLICTING"}, ""),
+            ({"mergeable": "CONFLICTING"}, conflict),
+            ({"mergeable": "CONFLICTING"}, failure),
+            ({"mergeable": "MERGEABLE"}, conflict + failure),
+        ):
+            with self.subTest(pr=pr, excerpt=excerpt):
+                self.assertIsNone(events.red_before_green_block(pr, excerpt))
+
     def test_placeholder_section_is_replaced_and_complete_one_is_untouched(self):
         block = events.red_before_green_block(self.PR, "FAIL x")
         body = "## Summary\nx\n\n## Red-before-green\n\nFailing command:\n\n## Blast radius\ny\n"

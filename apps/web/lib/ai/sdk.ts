@@ -117,6 +117,33 @@ function tagFirstArg<ARGS extends readonly [unknown, ...unknown[]]>(
   ] as unknown as ARGS;
 }
 
+/**
+ * Non-chat generate calls (classifiers, extractors, crons) default to low
+ * reasoning: on glm-5.3-flash the provider default spent ~2.4k reasoning
+ * tokens per request on Jovie_Production background jobs. A caller that sets
+ * `reasoning` keeps it; chat-tagged calls are left on the provider default.
+ */
+export const BACKGROUND_REASONING_DEFAULT = 'low' as const;
+
+function withBackgroundReasoning<ARGS extends readonly [unknown, ...unknown[]]>(
+  args: ARGS
+): ARGS {
+  const [options, ...rest] = args;
+  const call = options as GatewayTaggableOptions & { reasoning?: unknown };
+  if (call.reasoning !== undefined) return args;
+  const functionId = call.experimental_telemetry?.functionId ?? '';
+  const tags = (call.providerOptions?.gateway as { tags?: unknown } | undefined)
+    ?.tags;
+  const isChat =
+    /chat/iu.test(functionId) ||
+    (Array.isArray(tags) && tags.some(tag => /chat/iu.test(String(tag))));
+  if (isChat) return args;
+  return [
+    { ...(options as object), reasoning: BACKGROUND_REASONING_DEFAULT },
+    ...rest,
+  ] as unknown as ARGS;
+}
+
 function functionIdOf(options: unknown): string | undefined {
   return (options as GatewayTaggableOptions | undefined)?.experimental_telemetry
     ?.functionId;
@@ -133,7 +160,9 @@ function recordReceipt(
 }
 
 export const generateText: typeof ai.generateText = async (...args) => {
-  const result = await getWrapped().generateText(...tagFirstArg(args));
+  const result = await getWrapped().generateText(
+    ...withBackgroundReasoning(tagFirstArg(args))
+  );
   recordReceipt(functionIdOf(args[0]), result.totalUsage);
   if (!isLeakGuardEnabled()) {
     return result;
@@ -162,7 +191,9 @@ export const streamText: typeof ai.streamText = ((...args) => {
 }) as typeof ai.streamText;
 
 export const generateObject: typeof ai.generateObject = async (...args) => {
-  const result = await getWrapped().generateObject(...tagFirstArg(args));
+  const result = await getWrapped().generateObject(
+    ...withBackgroundReasoning(tagFirstArg(args))
+  );
   if (!isLeakGuardEnabled()) {
     return result;
   }
