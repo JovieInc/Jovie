@@ -10,10 +10,14 @@ import {
   livenessDecisions,
   livenessFingerprint,
   loadRegistry,
+  loadSchedulers,
   parseLanesClocks,
+  parseWranglerCrons,
   REGISTRY_SCHEMA,
   runStageEvents,
+  runsPerDay,
   validateRegistry,
+  validateScheduling,
 } from '../automation-registry.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -254,5 +258,74 @@ describe('run receipts', () => {
         sourceReceipt: 'u',
       })
     ).toEqual([]);
+  });
+});
+
+describe('shared scheduling', () => {
+  const schedulers = loadSchedulers(repoRoot);
+  const bare = { ...schedulers, grandfathered: [] };
+  const timer = overrides => ({
+    id: 'gem:new-poller',
+    status: 'live',
+    host: 'gem',
+    trigger: {
+      kind: 'systemd-timer',
+      source: 'x.timer',
+      schedule: 'every 5 min',
+    },
+    ...overrides,
+  });
+
+  it('holds for the committed registry', () => {
+    expect(validateScheduling(registry, schedulers)).toEqual([]);
+  });
+
+  it('fails a new timer that skips the shared scheduler or the event question', () => {
+    const errors = validateScheduling({ entries: [timer()] }, bare);
+    expect(errors.join('\n')).toMatch(/clock\.scheduler must be one of/);
+    expect(errors.join('\n')).toMatch(/clock\.whyNotEvent/);
+  });
+
+  it('accepts a new timer that registers and says why no event exists', () => {
+    const entry = timer({
+      clock: {
+        scheduler: 'gem:lanes-tick',
+        whyNotEvent: 'The upstream provider sends no webhook for this state.',
+      },
+    });
+    expect(validateScheduling({ entries: [entry] }, bare)).toEqual([]);
+  });
+
+  it('ratchets: a grandfathered id that complies or vanished must leave the list', () => {
+    const entry = timer({
+      clock: {
+        scheduler: 'gem:lanes-tick',
+        whyNotEvent: 'The upstream provider sends no webhook for this state.',
+      },
+    });
+    const withList = { ...schedulers, grandfathered: [entry.id, 'gone:id'] };
+    const errors = validateScheduling({ entries: [entry] }, withList);
+    expect(errors.some(e => e.includes('complies now'))).toBe(true);
+    expect(errors.some(e => e.includes('gone:id'))).toBe(true);
+  });
+
+  it('discovers wrangler crons and systemd timers so they cannot hide', () => {
+    expect(
+      parseWranglerCrons('[triggers]\ncrons = ["* * * * *", "17 5 * * *"]')
+    ).toEqual(['* * * * *', '17 5 * * *']);
+    const keys = [...discoverScheduledAutomations(repoRoot).keys()];
+    expect(keys.some(key => key.startsWith('cloudflare-cron:workers/'))).toBe(
+      true
+    );
+    expect(keys.some(key => key.startsWith('systemd-timer:'))).toBe(true);
+  });
+
+  it('derives runs per day from cron, interval and calendar phrases', () => {
+    expect(runsPerDay('*/5 * * * *')).toBe(288);
+    expect(runsPerDay('every 15 min')).toBe(96);
+    expect(runsPerDay('OnCalendar *:00/5')).toBe(288);
+    expect(runsPerDay('FREQ=MINUTELY;INTERVAL=30')).toBe(48);
+    expect(runsPerDay('17 */6 * * *; 47 7 * * *')).toBe(5);
+    expect(runsPerDay('continuous')).toBeNull();
   });
 });
