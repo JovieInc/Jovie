@@ -9,6 +9,7 @@ type Env = {
   TARGETS?: string;
   FAILURES_TO_PAGE?: string;
   PAGE_URLS?: string;
+  CRON_HUB_SECRET?: string;
 };
 type KVNamespace = {
   get(k: string): Promise<string | null>;
@@ -248,6 +249,16 @@ export default {
     await run(env);
   },
   async fetch(req: Request, env: Env) {
+    // Cron-hub dispatch (workers/cron-hub): same run as the cron trigger, authenticated.
+    if (req.method === 'POST' && new URL(req.url).pathname === '/__cron') {
+      const secret = env.CRON_HUB_SECRET;
+      if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`)
+        return new Response('unauthorized', { status: 401 });
+      const out = await run(env);
+      return new Response(JSON.stringify({ ok: true, page: out.page }), {
+        headers: { 'content-type': 'application/json' },
+      });
+    }
     if (req.method === 'POST' && new URL(req.url).pathname === '/test-page') {
       const ok =
         env.SUMMER_LIVENESS_SECRET &&
