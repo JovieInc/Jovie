@@ -99,5 +99,24 @@ class Wins(unittest.TestCase):
         self.assertEqual(w.store_put("a/b.json", {}, True, env={}), "store not configured")
 
 
+class FirstPushGates(unittest.TestCase):
+    @staticmethod
+    def pr(*conclusions):
+        names = w.GATE_CHECKS
+        nodes = [{"__typename": "CheckRun", "name": n, "conclusion": c} for n, c in zip(names, conclusions)]
+        return {"commits": {"nodes": [{"commit": {"statusCheckRollup": {"contexts": {"nodes": nodes}}}}]}}
+
+    def test_share_counts_only_finished_prs_and_any_red_gate(self):
+        ok = self.pr("SUCCESS", "SUCCESS", "SUCCESS", "SUCCESS")
+        red = self.pr("SUCCESS", "SUCCESS", "FAILURE", "FAILURE")
+        running = self.pr("SUCCESS", "SUCCESS", None, None)
+        none = {"commits": {"nodes": [{"commit": {"statusCheckRollup": None}}]}}
+        self.assertEqual(w.first_push_failure_share([ok, red, running, none, ok, ok]), (0.25, 4))
+        self.assertEqual(w.first_push_failure_share([]), (None, 0))
+
+    def test_metric_is_registered_with_a_ceiling(self):
+        self.assertEqual(SPECS["pr.first_push_gate_failure_rate"]["detector"]["kind"], "ceiling")
+
+
 if __name__ == "__main__":
     unittest.main()
