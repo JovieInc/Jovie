@@ -25,6 +25,8 @@ import {
   detectStuckHead,
   FIX_RED_LABEL,
   failureSignature,
+  HEAD_STUCK_ALERT_MIN,
+  headDwell,
   INCIDENT_LABEL,
   INCIDENT_SCHEMA,
   MAX_LOOKBACK_COMMITS,
@@ -34,6 +36,7 @@ import {
   REOPEN_LABEL,
   REVERT_LABEL,
   readMarker,
+  shouldFailOver,
   titles,
   verifyJump,
 } from './lib/main-red-eject.mjs';
@@ -47,7 +50,19 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
  * @param {import('../packages/api-client/contract.ts').PriorityName} priority
  */
 async function gh(args, priority = 'repair') {
-  const r = await runGh(args, { priority });
+  let r = await runGh(args, { priority });
+  // The Jovie Bot installation shares one hourly budget with every other workflow
+  // (2026-10-31: exhausted for 5 h, queue head stuck). Fail over to the job's own
+  // GITHUB_TOKEN bucket instead of dying; the ledger keys buckets by credential.
+  if (r.code !== 0 && shouldFailOver(r, process.env.GH_FALLBACK_TOKEN)) {
+    console.error(
+      '::warning::github-app-quota-failover: Jovie Bot installation exhausted; retrying with GITHUB_TOKEN.'
+    );
+    r = await runGh(args, {
+      priority,
+      env: { ...process.env, GH_TOKEN: process.env.GH_FALLBACK_TOKEN },
+    });
+  }
   if (r.code !== 0)
     throw new Error(
       `gh ${args.slice(0, 3).join(' ')}: ${r.stderr.trim().slice(0, 300)}`
@@ -549,6 +564,17 @@ export async function stuckHead({ doApply = false, now = Date.now() } = {}) {
   const entries = await queueEntries();
   const head = entries.find(e => e.position === 1);
   if (!head) return { stuck: false };
+  // Stage metric (stable id = head PR): how long the queue head has sat at position 1.
+  const metric = headDwell(entries, now);
+  console.log(`stage-metric ${JSON.stringify(metric)}`);
+  if (doApply && metric.stuckMin > HEAD_STUCK_ALERT_MIN)
+    await incident(
+      `queue-head-stuck:${head.number}`,
+      `queue head #${head.number} stuck ${metric.stuckMin} min (${head.state})`,
+      `Queue head #${head.number} has been at position 1 for ${metric.stuckMin} min in state ${head.state} (alert threshold ${HEAD_STUCK_ALERT_MIN} min). Dequeue it if it is red.`
+    );
+  // Only an UNMERGEABLE head needs the first-sighting comment read: skip the call otherwise.
+  if (head.state !== 'UNMERGEABLE') return { stuck: false, metric };
   // First sighting is recorded on the PR (durable across runs); GitHub exposes no state-change time.
   const comments = await api(
     `repos/${REPO}/issues/${head.number}/comments?per_page=100`,
@@ -612,6 +638,30 @@ export async function stuckHead({ doApply = false, now = Date.now() } = {}) {
   return { ...verdict, dequeued: true };
 }
 
+// ---- failure alert ---------------------------------------------------------
+
+/** The ejector must never fail silently: open/refresh an incident and ping Slack. */
+export async function alertFailure() {
+  const run = `https://github.com/${REPO}/actions/runs/${process.env.GITHUB_RUN_ID ?? ''}`;
+  const text = `Main Red Eject failed (${process.env.GITHUB_EVENT_NAME ?? 'unknown'}): ${run}. The queue head is not being watched until it recovers.`;
+  const out = { alerted: [] };
+  try {
+    await incident('ejector-failed', 'Main Red Eject workflow failing', text);
+    out.alerted.push('incident');
+  } catch (error) {
+    out.incidentError = String(error.message).slice(0, 200);
+  }
+  if (process.env.SLACK_WEBHOOK_URL) {
+    const res = await fetch(process.env.SLACK_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text }),
+    }).catch(() => null);
+    if (res?.ok) out.alerted.push('slack');
+  }
+  return out;
+}
+
 // ---- cli -------------------------------------------------------------------
 
 if (process.argv[1] === import.meta.filename) {
@@ -637,6 +687,7 @@ if (process.argv[1] === import.meta.filename) {
     result = await stuckHead({
       doApply: values.apply === true && mode === 'apply',
     });
+  else if (cmd === 'alert-failure') result = await alertFailure();
   else throw new Error(`unknown command: ${cmd}`);
   const text = JSON.stringify(result, null, 2);
   if (values.out) writeFileSync(values.out, `${text}\n`);
