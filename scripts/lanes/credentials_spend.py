@@ -138,8 +138,12 @@ def tick(state_dir: Path, release: Path, run=subprocess.run, now: float | None =
         if done.returncode != 0:
             raise RuntimeError(f"exit {done.returncode}")
         result = {"status": "ok", **summarize(done.stdout), "filing": "linear-app" if access else "unavailable"}
-        env.pop("LINEAR_ACCESS_TOKEN", None)
-        result["headroom"] = publish_headroom(state_dir, release, env, run)
+        # Headroom never needs the Linear app token. Hand publish_headroom a copy
+        # without it instead of popping in place: env is also held by the caller
+        # (release self-tests assert the child DID get the token — merge group
+        # 41154614683), and mutating a borrowed dict fails them with KeyError.
+        headroom_env = {key: value for key, value in env.items() if key != "LINEAR_ACCESS_TOKEN"}
+        result["headroom"] = publish_headroom(state_dir, release, headroom_env, run)
         state["nextAttemptAt"] = now + INTERVAL_S
     except (OSError, subprocess.SubprocessError, RuntimeError, ValueError, TypeError) as error:
         # Output can carry provider details; keep only the error class.
