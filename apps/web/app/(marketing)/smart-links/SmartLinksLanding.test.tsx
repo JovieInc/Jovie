@@ -27,8 +27,10 @@ describe('SmartLinksLanding', () => {
       })
     ).toBeInTheDocument();
     const demo = screen.getByTestId('smart-links-demo');
-    expect(demo.parentElement).toHaveClass('items-start');
-    expect(demo.parentElement).not.toHaveClass('items-center');
+    // Copy and demo share one optical centre line: no top-left text block
+    // over dead space (Tim, 2026-10-29). The demo's height is fixed (square
+    // art + min-h dial), so centring cannot shift on release switches.
+    expect(demo.parentElement).toHaveClass('items-center');
     const art = screen.getByRole('img', { name: 'Never Say A Word cover art' });
     expect(art.parentElement).toHaveClass(
       'relative',

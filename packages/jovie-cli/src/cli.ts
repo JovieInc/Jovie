@@ -163,6 +163,7 @@ Options:
   -v, --version          Show the installed CLI version
 
 Environment:
+  FLEET_AUDIT_READ_TOKEN  Read token for jovie audit (FLEET_AUDIT_URL overrides jovie-fleet-audit worker)
   JOVIE_TIMEOUT_MS       Request deadline in ms, retries included (default 30000)
 
 Examples:
@@ -172,6 +173,13 @@ Examples:
   jovie artist get <username> --json
   npx -y @jovie/cli mcp
 `;
+}
+
+function processAbortSignal(): AbortSignal {
+  const controller = new AbortController();
+  for (const name of ['SIGINT', 'SIGTERM'] as const)
+    process.once(name, () => controller.abort());
+  return controller.signal;
 }
 
 function writeLine(output: CliOutput, value: string): void {
@@ -342,10 +350,26 @@ async function execute(
     // Shared names (--kind) parse into both sets; only foreign ones are stray.
     if (values.full || values.dir || strayFlags(values.flags, MESH_FLAG_NAMES))
       throw new UsageError('Unsupported option for mesh.');
-    return runMesh(positionals, values.meshFlags, {
-      userAgent: `jovie-cli/${CLI_VERSION}`,
-      ...dependencies.mesh,
-    });
+    const watching = positionals[1] === 'watch';
+    const result = await runMesh(
+      positionals,
+      watching && values.json
+        ? { ...values.meshFlags, json: 'true' }
+        : values.meshFlags,
+      {
+        userAgent: `jovie-cli/${CLI_VERSION}`,
+        // Watch streams one line per message to stdout; Ctrl-C ends it.
+        ...(watching
+          ? {
+              emit: (line: string) =>
+                writeLine(dependencies.stdout ?? process.stdout, line),
+              signal: dependencies.mesh?.signal ?? processAbortSignal(),
+            }
+          : {}),
+        ...dependencies.mesh,
+      }
+    );
+    return watching ? undefined : result;
   }
   if (strayFlags(values.meshFlags, COMMAND_FLAG_NAMES))
     throw new UsageError('Mesh options are only supported by mesh commands.');
@@ -400,6 +424,7 @@ async function execute(
     {
       arg: positionals[2],
       full: values.full === true,
+      json: values.json === true,
       flags: values.flags,
       meta: { channel: 'cli', version: CLI_VERSION },
     },
@@ -500,7 +525,7 @@ export async function runCli(
       } else {
         writeText(stdout, result);
       }
-    } else {
+    } else if (result !== undefined) {
       writeLine(stdout, JSON.stringify(result, null, values.json ? 0 : 2));
     }
     if (

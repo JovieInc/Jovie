@@ -94,7 +94,6 @@ jobs:
       - name: Trace escapes to the PRs that introduced them
         # Post-merge fix/revert commits traced to their origin PR and labelled
         # with the layer that should have caught them. Deterministic, git only.
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
@@ -103,6 +102,14 @@ jobs:
           git -c "http.https://github.com/.extraheader=$AUTH" fetch --no-tags --filter=blob:none \
             --shallow-since="35 days ago" origin main
           node scripts/review-escapes.mjs report --days 30 --write-latest
+
+      # Sampled hosted queue wait + control-plane spend; exit 2 = p95 > 120s
+      # alarm, which is surfaced in the report instead of failing the SLO run.
+      - name: Sample hosted runner capacity
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/ci-capacity-slo.mjs --minutes 15 --max-runs 120 >> "$GITHUB_STEP_SUMMARY" || true
 
       - name: Measure and evaluate
         id: slo

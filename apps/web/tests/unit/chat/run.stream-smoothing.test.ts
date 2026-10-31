@@ -104,7 +104,7 @@ describe('executeChatTurn — stream smoothing (JOV-3525)', () => {
     });
   });
 
-  it('passes the smoothStream transform to streamText as experimental_transform', async () => {
+  it('passes the copy-floor repair then smoothStream as experimental_transform', async () => {
     const turn = await executeChatTurn({
       ...baseInput,
       uiMessages: [userMessage('hello')],
@@ -116,9 +116,12 @@ describe('executeChatTurn — stream smoothing (JOV-3525)', () => {
         __opts: { experimental_transform?: unknown };
       }
     ).__opts;
-    expect(opts.experimental_transform).toBe(
-      smoothStreamMock.sentinelTransform
-    );
+    // Copy floor runs first so dashes are rewritten before word pacing.
+    expect(Array.isArray(opts.experimental_transform)).toBe(true);
+    const transforms = opts.experimental_transform as unknown[];
+    expect(transforms).toHaveLength(2);
+    expect(typeof transforms[0]).toBe('function');
+    expect(transforms[1]).toBe(smoothStreamMock.sentinelTransform);
   });
 
   it('smoothed stream still produces a WHATWG SSE response through the #14540 normalization boundary', async () => {

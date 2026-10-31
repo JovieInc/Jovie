@@ -16,7 +16,7 @@ import {
 export const runtime = 'nodejs';
 // An old image URL must check current publication, including after revocation.
 export const revalidate = 0;
-export const alt = 'Public profile preview';
+export const alt = 'Artist profile card on Jovie with photo and name';
 export const size = OG_SIZE;
 export const contentType = 'image/png';
 
