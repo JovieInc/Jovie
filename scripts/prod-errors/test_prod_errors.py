@@ -604,9 +604,9 @@ class LoopTest(unittest.TestCase):
         self.assertTrue(pr_fields)
         self.assertNotIn("runStartedAt", run_fields)
         for f in run_fields:
-            self.assertIn(f, pe.GH_RUN_LIST_FIELDS, f"gh run list does not support field {f!r}")
+            self.assertIn(f, pe.GH_RUN_LIST_FIELDS, f"run list does not support field {f!r}")
         for f in pr_fields:
-            self.assertIn(f, pe.GH_PR_LIST_FIELDS, f"gh pr list does not support field {f!r}")
+            self.assertIn(f, pe.GH_PR_LIST_FIELDS, f"pr list does not support field {f!r}")
 
     def test_sweep_deferral_is_visible_and_keeps_sweeping(self):
         # apiclient budget deferral (exit 75, 'retry later, not a verdict'): the sweep must not
@@ -620,7 +620,7 @@ class LoopTest(unittest.TestCase):
 
         def fake(args):
             if args[0] == "pr":
-                raise pe.GhDeferred("gh pr list failed (deferred): waits past budget (budget-reserve:graphql)")
+                raise pe.GhDeferred("pr list deferred: waits past budget (budget-reserve:graphql)")
             return []
 
         class S(FakeSentry):
@@ -641,7 +641,7 @@ class LoopTest(unittest.TestCase):
         # Same class on the ci-main watcher: a deferred run list skips the tick visibly instead
         # of exiting 1 and tripping the dead-man's error streak.
         def fake(args):
-            raise pe.GhDeferred("gh run list failed (deferred): waits past budget (budget-reserve:graphql)")
+            raise pe.GhDeferred("run list deferred: waits past budget (budget-reserve:graphql)")
         err = StringIO()
         with mock.patch.object(pe, "gh_json", side_effect=fake), redirect_stderr(err):
             r = pe.ci_main(self.l, self.dir)
