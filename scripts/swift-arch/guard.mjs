@@ -495,6 +495,7 @@ export function compare(current, baseline) {
 }
 
 export function totals(counts) {
+  /** @type {Record<string, number>} */
   const byRule = {};
   let total = 0;
   for (const [rule, files] of Object.entries(counts)) {
