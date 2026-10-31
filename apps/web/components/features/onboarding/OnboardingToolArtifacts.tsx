@@ -578,7 +578,6 @@ function OnboardingArtistProposal({
           onClick={() => {
             if (artist) onConfirm(artist);
           }}
-          className='h-9 rounded-full px-3.5 text-app font-semibold'
         >
           That&apos;s Me
         </Button>
