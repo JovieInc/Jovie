@@ -92,6 +92,11 @@ run_publication() {
   bash scripts/security/scan-secrets.sh publication origin/main
   node scripts/lib/policy-gate-liveness.mjs
   node --test scripts/hooks/pre-push-gate.test.mjs
+  # Same path-scoped Source Validation guards CI runs (one manifest:
+  # scripts/lib/source-validation-manifest.mjs), static only. Typecheck and
+  # coverage stay in CI. JOVIE_PREFLIGHT_CHANGED=0 skips it.
+  echo "[pre-push-gate] running preflight:changed (fast)"
+  node scripts/preflight-changed.mjs --hook --no-typecheck --no-coverage
 }
 
 run_format() {
