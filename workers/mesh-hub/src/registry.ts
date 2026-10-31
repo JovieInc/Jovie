@@ -15,6 +15,7 @@ import {
   type AgentState,
   evaluatePresence,
   evaluateProbe,
+  lastConsumerAlive,
   PROBE,
 } from './presence.ts';
 
@@ -293,7 +294,18 @@ export class Registry extends DurableObject<Env> {
           },
         });
       if (Number(agent.probe))
-        await this.probe(kind, live, Number(agent.probe_misses), now, pending);
+        await this.probe(
+          kind,
+          live,
+          Number(agent.probe_misses),
+          now,
+          pending,
+          lastConsumerAlive({
+            lastSeenAt:
+              agent.last_seen_at === null ? null : Number(agent.last_seen_at),
+            lastActivityAt: live.lastActivityAt,
+          })
+        );
     }
     // Storm guard: many agents going silent at once is a hub/network fault, not N outages.
     const silenced = pending.filter(event => event.type === 'agent.silent');
@@ -324,10 +336,12 @@ export class Registry extends DurableObject<Env> {
     live: Liveness,
     misses: number,
     now: number,
-    pending: { type: string; kind: string; detail: Detail }[]
+    pending: { type: string; kind: string; detail: Detail }[],
+    lastAliveAt: number | null
   ) {
     const result = evaluateProbe({
       now,
+      lastAliveAt,
       lastProbeAt: live.lastProbe?.acceptedAt ?? null,
       lastProbeAckAt: live.lastProbe?.receivedAt ?? null,
       misses,
