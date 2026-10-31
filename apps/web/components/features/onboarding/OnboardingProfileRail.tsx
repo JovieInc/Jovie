@@ -348,7 +348,9 @@ function OnboardingDraftProfileHeader() {
       <p className='system-b-onboarding-draft-eyebrow'>
         Your profile, taking shape
       </p>
-      <h2 className='system-b-onboarding-draft-title'>Your Draft Profile</h2>
+      <h2 className='system-b-onboarding-draft-title text-balance'>
+        Your Draft Profile
+      </h2>
       <p className='system-b-onboarding-draft-lead'>
         A first version from your link. Shape it as we talk.
       </p>
