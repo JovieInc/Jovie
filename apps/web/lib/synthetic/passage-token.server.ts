@@ -24,6 +24,16 @@ import {
  * sitekey. A test-mode widget grants nothing on its own: /api/chat
  * re-verifies and consumes the token before accepting a test-mode Turnstile
  * token.
+ *
+ * Every deny/grant site pairs the environment-gated `logger` call with a
+ * raw `console` mirror of the same message and payload. The shared logger
+ * no-ops on production builds (lib/utils/logger.ts), which left denial
+ * reasons invisible exactly when they matter: diagnosing a prod cert red
+ * (`/api/chat` 403 `siteverify_failed`, JOV-9625) remotely, from the
+ * requestId the 403 body already carries. The mirror is what Vercel Runtime
+ * Logs capture. Payloads are audit fields only — scope, hashed subject,
+ * jti, run id, requestId — never the token, the raw claims, or any secret
+ * value. Keep each mirror's message byte-identical to its logger call.
  */
 
 const JTI_KEY_PREFIX = 'synthetic-passage:jti:';
@@ -35,28 +45,6 @@ export interface SyntheticPassageGrant {
 
 function subjectRef(sub: string): string {
   return createHash('sha256').update(sub).digest('hex').slice(0, 12);
-}
-
-/**
- * Emit a passage outcome to the logs production actually captures.
- *
- * The shared `logger` no-ops on production builds (lib/utils/logger.ts),
- * which left denial reasons invisible exactly when they matter: diagnosing a
- * prod cert red (`/api/chat` 403 `siteverify_failed`, JOV-9625) remotely,
- * from the requestId the 403 body already carries. When the dev/preview
- * logger is off, mirror the event to `console` so Vercel Runtime Logs carry
- * the reason. Payloads are audit fields only — scope, hashed subject, jti,
- * run id, requestId — never the token, the raw claims, or any secret value.
- */
-function logPassageEvent(
-  level: 'info' | 'warn',
-  message: string,
-  payload: Record<string, unknown>
-): void {
-  logger[level](message, payload);
-  if (!logger.enabled) {
-    (level === 'warn' ? console.warn : console.info)(message, payload);
-  }
 }
 
 function passageKey(): Buffer | null {
@@ -77,16 +65,23 @@ export async function resolveSyntheticPassageToken(
 
   const key = passageKey();
   if (!key) {
-    logPassageEvent('warn', '[synthetic-passage-token] denied: disabled', base);
+    logger.warn('[synthetic-passage-token] denied: disabled', base);
+    if (!logger.enabled)
+      console.warn('[synthetic-passage-token] denied: disabled', base);
     return null;
   }
 
   const verdict = verifyPassageToken(token, key, scope);
   if (!verdict.ok) {
-    logPassageEvent('warn', '[synthetic-passage-token] denied', {
+    logger.warn('[synthetic-passage-token] denied', {
       ...base,
       reason: verdict.reason,
     });
+    if (!logger.enabled)
+      console.warn('[synthetic-passage-token] denied', {
+        ...base,
+        reason: verdict.reason,
+      });
     return null;
   }
   const { claims } = verdict;
@@ -105,20 +100,16 @@ export async function resolveSyntheticPassageToken(
   try {
     const rate = await syntheticPassageTokenLimiter.limit(scope);
     if (!rate.success) {
-      logPassageEvent(
-        'warn',
-        '[synthetic-passage-token] denied: rate limit',
-        audit
-      );
+      logger.warn('[synthetic-passage-token] denied: rate limit', audit);
+      if (!logger.enabled)
+        console.warn('[synthetic-passage-token] denied: rate limit', audit);
       return null;
     }
     const redis = getRedis();
     if (!redis) {
-      logPassageEvent(
-        'warn',
-        '[synthetic-passage-token] denied: no redis',
-        audit
-      );
+      logger.warn('[synthetic-passage-token] denied: no redis', audit);
+      if (!logger.enabled)
+        console.warn('[synthetic-passage-token] denied: no redis', audit);
       return null;
     }
     const ttl = Math.max(60, claims.exp - Math.floor(Date.now() / 1000) + 60);
@@ -127,21 +118,25 @@ export async function resolveSyntheticPassageToken(
       ex: ttl,
     });
     if (claimed !== 'OK') {
-      logPassageEvent(
-        'warn',
-        '[synthetic-passage-token] denied: replay',
-        audit
-      );
+      logger.warn('[synthetic-passage-token] denied: replay', audit);
+      if (!logger.enabled)
+        console.warn('[synthetic-passage-token] denied: replay', audit);
       return null;
     }
   } catch (error) {
-    logPassageEvent('warn', '[synthetic-passage-token] denied: store error', {
+    logger.warn('[synthetic-passage-token] denied: store error', {
       ...audit,
       error: error instanceof Error ? error.message : String(error),
     });
+    if (!logger.enabled)
+      console.warn('[synthetic-passage-token] denied: store error', {
+        ...audit,
+        error: error instanceof Error ? error.message : String(error),
+      });
     return null;
   }
 
-  logPassageEvent('info', '[synthetic-passage-token] granted', audit);
+  logger.info('[synthetic-passage-token] granted', audit);
+  if (!logger.enabled) console.info('[synthetic-passage-token] granted', audit);
   return { actorId: 'prodcert', claims };
 }
