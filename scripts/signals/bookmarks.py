@@ -64,6 +64,7 @@ GROK_BATCH = 8
 MAX_TRIALS_PER_DAY = 1     # bookmark-sourced; frontier's own cap is separate and both count from one registry
 MAX_OPEN_TRIALS = 3        # WIP across every source in the registry
 MIN_RELEVANCE, MIN_ROI = 0.45, 0.35
+PIVOT_FLOOR = 0.2  # pivots surface to Tim at a lower bar (feedback_pivot_signals)
 IDEA_TYPES = ("copy-tactic", "buy", "borrow", "steal", "ethos", "stack-change", "pivot-signal", "none")
 TARGETS = ("internal", "product", "company", "none")
 PRODUCTS = ("jovie", "ovie", "lyb", "summer", "company-wide", "none")
@@ -482,14 +483,16 @@ def vet(idea, verdict, *, trials_today, registry):
     """-> (status, verdict, reason, wants_gate). Deterministic routing on the typed classification."""
     kind = verdict["ideaType"]
     decision = VERDICT[kind]
+    if kind == "pivot-signal":  # checked before the generic bars: a pivot signal is never dropped as "low relevance"
+        if verdict["relevance"] >= PIVOT_FLOOR:
+            return "needs-tim", decision, "pivot signal: Tim and Summer decide, never acted on silently", False
+        return "rejected", "reject", f"pivot signal below floor (relevance {verdict['relevance']:.2f} < {PIVOT_FLOOR}); listed in digest", False
     if kind == "none" or verdict["target"] == "none":
         return "rejected", "reject", "not useful to us", False
     if verdict["relevance"] < MIN_RELEVANCE:
         return "rejected", "reject", f"relevance {verdict['relevance']:.2f} < {MIN_RELEVANCE}", False
     if verdict["roi"] < MIN_ROI:
         return "rejected", "reject", f"roi {verdict['roi']:.2f} < {MIN_ROI}", False
-    if kind == "pivot-signal":
-        return "needs-tim", decision, "pivot signal: Tim and Summer decide, never acted on silently", False
     if kind in ("buy", "stack-change") or verdict["spend"] == "paid":
         return "needs-tim", decision, "spend or stack change: Tim decides", True
     if kind == "ethos":

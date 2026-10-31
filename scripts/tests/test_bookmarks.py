@@ -106,6 +106,8 @@ class GateAndRoutingTests(unittest.TestCase):
             route = lambda **kw: B.vet(idea(), {**VERDICT, **kw}, trials_today=0, registry=reg)[:2]  # noqa: E731
             self.assertEqual(route(), ("trial", "steal"))
             self.assertEqual(route(ideaType="pivot-signal"), ("needs-tim", "pivot"))
+            self.assertEqual(route(ideaType="pivot-signal", relevance=0.25, roi=0.1), ("needs-tim", "pivot"))
+            self.assertEqual(route(ideaType="pivot-signal", relevance=0.1)[0], "rejected")
             self.assertEqual(route(ideaType="buy"), ("needs-tim", "buy"))
             self.assertEqual(route(ideaType="ethos"), ("candidate", "invariant"))
             self.assertEqual(route(relevance=0.2), ("rejected", "reject"))
