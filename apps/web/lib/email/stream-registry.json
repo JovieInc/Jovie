@@ -19,7 +19,14 @@
         "broadcast",
         "inbox"
       ],
-      "note": "Resend's acceptable-use policy forbids unsolicited mail, so cold never runs on this account."
+      "note": "Resend's acceptable-use policy forbids unsolicited mail, so cold never runs on this account.",
+      "quota": {
+        "plan": "free",
+        "daily": 100,
+        "monthly": 3000,
+        "warnAt": 0.8,
+        "source": "resend.com/pricing (2026-10-31): Free 100/day, 3,000/month; Pro $20/50k has no daily cap. Plan inferred from Resend's 80%-of-daily-quota notices (daily quota exists only on Free). Used counts come from x-resend-daily-quota and x-resend-monthly-quota on each send. Update plan and limits here when the plan changes."
+      }
     },
     "instantly": {
       "status": "not-approved",
