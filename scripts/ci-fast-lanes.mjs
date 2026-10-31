@@ -175,6 +175,11 @@ export const LANES_SELFTEST_CHANGED_TESTS_SCRIPT = [
   'lanes_py=0; for f in $files; do case "$f" in scripts/lanes/*.py) lanes_py=1;; esac; done',
   'extra=""',
   'if [ "$lanes_py" = 1 ]; then case " $tests " in *" scripts/tests/test_lanes_atomic_state.py "*) ;; *) tests="$tests scripts/tests/test_lanes_atomic_state.py";; esac; extra="scripts.tests.test_lane_runner.UpdateTest"; fi',
+  // A changed release test also runs inside the staged release bundle (UpdateTest). Tests that read repo
+  // files outside LANE_TESTS/RELEASE_EXTRAS (canon/automation-registry.jsonl in #23706, .github/pull_request_template.md
+  // in a group ahead of #23665) pass here and in the checkout, then fail only in the merge group and eject
+  // unrelated PRs. Deterministic, not a flake: shift it left so the author sees it on the PR.
+  'if [ -n "${tests// /}" ]; then case " $tests $extra " in *" scripts/tests/test_lane_runner.py "*|*" scripts.tests.test_lane_runner.UpdateTest "*) ;; *) extra="$extra scripts.tests.test_lane_runner.UpdateTest";; esac; fi',
   // Read the one release inventory as data, never execute lane_runner just to select tests.
   // Shipped JS/TS edits otherwise skip this guard and first fail inside the native queue.
   `release_closure="$(python3 -c ${shellQuote(
@@ -893,6 +898,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/lib/__tests__/spend-guard.test.mjs',
   'scripts/lib/__tests__/wins-ledger.test.mjs',
   'scripts/lib/__tests__/wins-store.test.mjs',
   'scripts/pr-open.test.mjs',
@@ -1211,6 +1217,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/workflow-triggers.test.mjs',
   'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
   'scripts/lib/__tests__/external-api-guard.test.mjs',
+  'scripts/lib/__tests__/source-validation-manifest.test.mjs',
   'scripts/lib/__tests__/model-id-guard.test.mjs',
   'scripts/lib/__tests__/ai-gateway-report.test.mjs',
   'scripts/lib/__tests__/ai-call-guard.test.mjs',
