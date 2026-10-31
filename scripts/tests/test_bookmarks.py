@@ -37,6 +37,13 @@ class GroundingTests(unittest.TestCase):
                                   {frontier.canonical_url("https://example.com/tool")})
         self.assertEqual((kept[0]["links"], drops), (["https://example.com/tool"], 0))
 
+    def test_tco_links_count_in_both_forms(self):
+        rec = {**REC, "links": ["https://t.co/abc"]}
+        keys = B.ground_link_set(rec, lambda url: {"status": 200, "final": "https://github.com/vercel/turborepo"})
+        self.assertIn(frontier.canonical_url("https://github.com/vercel/turborepo"), keys)
+        self.assertIn(frontier.canonical_url("https://t.co/abc"), keys)
+        self.assertEqual(B.ground_link_set(rec, lambda url: None), {frontier.canonical_url("https://t.co/abc")})
+
     def test_thread_text_must_extend_the_captured_prefix_and_share_the_author(self):
         root = {"postId": REC["id"], "handle": "someone", "text": REC["text"] + " and much more"}
         forged = {"postId": REC["id"], "handle": "someone", "text": "totally different invented text"}

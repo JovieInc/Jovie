@@ -271,6 +271,21 @@ def resolve_link(url, run=run_gh, opener=None):
         return None
 
 
+def ground_link_set(rec, resolver):
+    """Captured links are ground truth. X captures them as t.co short links while post text and the extractor use
+    the expanded URL, so each t.co link is resolved once and both forms count (2026-10-31 backfill: 67 real links
+    were dropped before this)."""
+    keys = set()
+    for url in rec["links"]:
+        keys.add(frontier.canonical_url(url))
+        if url.startswith("https://t.co/"):
+            hit = resolver(url)
+            final = hit.get("final") if isinstance(hit, dict) else None
+            if isinstance(final, str) and final.startswith("http"):
+                keys.add(frontier.canonical_url(final))
+    return keys
+
+
 def chat(messages, api_key, poster=gateway_post, max_tokens=1800):
     status, body = poster(GATEWAY_CHAT, {"model": EXTRACT_MODEL, "messages": messages, "max_tokens": max_tokens,
                                          "temperature": 0, "response_format": {"type": "json_object"}},
@@ -569,7 +584,7 @@ def process_grok(recs, threads, *, resolver, grok_run=None, env=None):
                     results.append((rec, None, {"cost": 0.0, "calls": 0, "dropped": 0, "linkDrops": 0, "failures": ["grok: bookmark missing from answer"]}))
                     continue
                 full, follow, derived_links, _ = contexts[rec["id"]]
-                ground_links = {frontier.canonical_url(u) for u in rec["links"]}
+                ground_links = ground_link_set(rec, resolver)
                 resolved = {frontier.canonical_url(u) for u in derived_links if frontier.canonical_url(u) not in ground_links and resolver(u)}
                 raw = got[rec["id"]]
                 ideas, dropped, link_drops = ground(raw, " ".join([rec["text"], rec["quotedText"], rec["card"]]),
@@ -596,7 +611,7 @@ def process(rec, api_key, *, threads, poster, resolver):
     """Expand -> OCR -> extract -> ground -> classify one bookmark. Returns (ideas+verdicts, stats)."""
     stats = {"cost": 0.0, "calls": 0, "dropped": 0, "linkDrops": 0, "failures": []}
     full, follow, derived_links = verify_thread(rec, threads.get(rec["id"], [])) if rec["id"] in threads else (None, [], [])
-    ground_links = {frontier.canonical_url(u) for u in rec["links"]}
+    ground_links = ground_link_set(rec, resolver)
     resolved = {frontier.canonical_url(u) for u in derived_links if frontier.canonical_url(u) not in ground_links and resolver(u)}
     try:
         ocr_text, c = ocr(rec, api_key, poster)
