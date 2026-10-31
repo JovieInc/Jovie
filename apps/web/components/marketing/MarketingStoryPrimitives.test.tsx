@@ -72,4 +72,18 @@ describe('MarketingStoryPrimitives', () => {
     render(<ArtistProfileCaptureVisual capture={capture} />);
     expect(screen.getByText('Example activity, not real people')).toBeVisible();
   });
+
+  it.each(ARTIST_NOTIFICATIONS_COPY.hero.floatingCards)(
+    'draws the $kind card icon bare and hidden from assistive tech',
+    card => {
+      const { container } = render(
+        <ArtistNotificationFloatingCardView card={card} />
+      );
+
+      const icon = container.querySelector('svg');
+      expect(icon).not.toBeNull();
+      expect(icon).toHaveAttribute('aria-hidden', 'true');
+      expect(icon?.parentElement?.className).not.toContain('bg-white');
+    }
+  );
 });

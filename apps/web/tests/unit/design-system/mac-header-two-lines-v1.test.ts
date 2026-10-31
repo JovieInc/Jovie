@@ -78,6 +78,9 @@ const FULL_TITLE_HEADING_FILES: ReadonlySet<string> = new Set([
   // copy at desktop and 390px (route DOM clipped-heading, JOV-7713).
   'apps/web/app/(marketing)/launch/page.tsx',
   'apps/web/app/(marketing)/download/page.tsx',
+  // Page-spec section titles are authored value propositions (title is capped
+  // at 80 characters in the schema); a clamp would truncate published copy.
+  'apps/web/components/marketing/page-spec/PageSpecSections.tsx',
 ]);
 
 function hasEditorialTitleContract(

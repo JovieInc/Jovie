@@ -56,6 +56,17 @@ describe('sendEmailOtp', () => {
     infoSpy.mockRestore();
   });
 
+  it.each([
+    'browse-ready+synthetic-prodcert-run12345@jov.ie',
+    'browse-ready+clerk_test@jov.ie',
+  ])('never sends mail to the synthetic canary %s', async email => {
+    await expect(
+      sendEmailOtp({ email, type: 'sign-in', otp: '123456' })
+    ).resolves.toBeUndefined();
+
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
   it('sends the code and logs a redacted sent outcome', async () => {
     mockSendEmail.mockResolvedValueOnce({ success: true, messageId: 'msg_1' });
 

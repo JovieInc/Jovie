@@ -1,4 +1,5 @@
 'use client';
+// @coverage-via apps/web/tests/unit/onboarding/OnboardingToolArtifacts.test.tsx
 
 import { Button } from '@jovie/ui';
 import {
@@ -452,7 +453,7 @@ export function OnboardingSpotifyArtistPickerCard({
 
         {!isSearching && !hasQuery ? (
           <div className='px-2 py-3 text-xs leading-5 text-secondary-token'>
-            Start with the artist name fans see on Spotify.
+            Start with the artist name as it appears on Spotify.
           </div>
         ) : null}
 
@@ -505,12 +506,9 @@ function ArtistResultRow({
     { source: 'spotify_search' }
   );
   const followers = formatFollowers(getDisplaySpotifyFollowers(metrics));
-  const meta = [
-    followers,
-    artist.popularity ? `Pop ${artist.popularity}` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  // Followers only: Spotify's internal "popularity" score ("Pop 60") means
+  // nothing to an artist (2026-10-31 golden-path walk).
+  const meta = followers;
 
   return (
     <button
@@ -870,7 +868,9 @@ export function OnboardingSocialLinkCard({
             />
           </OnboardingToolField>
           <p className='mt-1.5 text-xs leading-5 text-secondary-token'>
-            {parseHint ?? host ?? 'Paste the full URL fans already use.'}
+            {parseHint ??
+              host ??
+              'Paste the full profile URL, like instagram.com/yourname.'}
           </p>
           {onAttachAccount ? (
             <Button

@@ -4,7 +4,11 @@ import { HudBottlenecksCard } from '@/components/features/admin/hud/HudBottlenec
 import { HudCompanyMetricCards } from '@/components/features/admin/hud/HudCompanyMetricCards';
 import { HudExceptionsStrip } from '@/components/features/admin/hud/HudExceptionsStrip';
 import { HudShippingStrip } from '@/components/features/admin/hud/HudShippingStrip';
-import { cockpitMetrics, cockpitShipping } from '@/tests/fixtures/hud-cockpit';
+import {
+  cockpitMetrics,
+  cockpitShipping,
+  cockpitShippingWithDeployHealth,
+} from '@/tests/fixtures/hud-cockpit';
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -45,34 +49,57 @@ describe('Ops cockpit sections', () => {
   });
 
   it('shows LogYourBody production as failing and how far behind main it is', () => {
-    const view = {
-      ...cockpitShipping,
-      delivery: {
-        ...cockpitShipping.delivery,
-        lanes: {
-          ...cockpitShipping.delivery.lanes,
-          deployHealth: {
-            observedAt: '2026-10-25T06:40:00.000Z',
-            healthy: false,
-            repos: [
-              {
-                repo: 'JovieInc/LogYourBody',
-                status: 'failing' as const,
-                failedStreak: 15,
-                behindMain: 54,
-                oldestUnshippedAgeSeconds: 140083,
-                lastSuccessAt: '2026-10-23T16:03:00.000Z',
-              },
-            ],
-          },
+    const view = cockpitShippingWithDeployHealth({
+      observedAt: '2026-10-25T06:40:00.000Z',
+      healthy: false,
+      repos: [
+        {
+          repo: 'JovieInc/LogYourBody',
+          status: 'failing',
+          failedStreak: 15,
+          behindMain: 54,
+          oldestUnshippedAgeSeconds: 140083,
+          lastSuccessAt: '2026-10-23T16:03:00.000Z',
         },
-      },
-    };
+      ],
+    });
     render(<HudShippingStrip view={view} />);
 
     expect(
       screen.getByTestId('hud-shipping-chip-lyb-behind')
     ).toHaveTextContent('Failing, 54 behind');
+  });
+
+  it('shows Jovie merge-to-production p95 lag against its target, bad when over', () => {
+    const view = cockpitShippingWithDeployHealth({
+      observedAt: '2026-10-25T06:40:00.000Z',
+      healthy: true,
+      repos: [],
+      lag: [
+        {
+          repo: 'JovieInc/Jovie',
+          p50Min: 56,
+          p95Min: 246,
+          samples: 187,
+          targetP50Min: 30,
+          targetP95Min: 90,
+        },
+      ],
+    });
+    render(<HudShippingStrip view={view} />);
+
+    expect(screen.getByTestId('hud-shipping-chip-prod-lag')).toHaveTextContent(
+      'p95 246m / 90m'
+    );
+    expect(screen.getByTestId('hud-shipping-chip-prod-lag')).toHaveClass(
+      'text-error'
+    );
+    expect(screen.getByTestId('hud-shipping-chip-queue')).toHaveTextContent(
+      '2'
+    );
+    expect(
+      screen.getByTestId('hud-shipping-chip-merged-7-days')
+    ).toHaveTextContent('12 (+20%)');
   });
 
   it('shows LogYourBody behind main as not measured until the feed publishes it', () => {
