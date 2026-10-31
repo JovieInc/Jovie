@@ -5,7 +5,7 @@
 // script's own calls. The failover must reach the actor-verify call, and the
 // mutation-actor safety check must stay meaningful when the fallback identity
 // is not a trusted queue writer (defer honestly, never bypass).
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const ghCalls = [];
 const backendCalls = [];
@@ -57,6 +57,18 @@ vi.mock('../../merge-queue-backend.mjs', async importOriginal => {
 
 const { stuckHead } = await import('../../main-red-eject.mjs');
 const { marker } = await import('../main-red-eject.mjs');
+
+const ORIGINAL_ENV = {
+  GH_TOKEN: process.env.GH_TOKEN,
+  GH_FALLBACK_TOKEN: process.env.GH_FALLBACK_TOKEN,
+  GITHUB_REPOSITORY: process.env.GITHUB_REPOSITORY,
+};
+const restoreEnv = () => {
+  for (const [key, value] of Object.entries(ORIGINAL_ENV)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+};
 
 const NOW = Date.parse('2026-10-31T18:06:00Z');
 const HEAD_PR = 24000;
@@ -163,6 +175,8 @@ beforeEach(() => {
   wireHappyBackend();
   wireHappyGh();
 });
+
+afterEach(restoreEnv);
 
 describe('stuck-head dequeue under installation quota exhaustion (run 41227299023)', () => {
   it('simulates installation-403 on the actor-verify call and completes the dequeue on the fallback token when its identity is a trusted mutation actor', async () => {
