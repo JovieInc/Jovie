@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "note": "Golden Path assurance ratchets. Every value moves one way: rowsFloor and realFloor only rise, missingCeiling and pendingBaseline only shrink. Edit via a PR that improves the measurement; scripts/golden-path-assurance.mjs measure prints the current numbers.",
+  "map": {
+    "rowsFloor": 92,
+    "realFloor": 30,
+    "missingCeiling": 19
+  },
+  "mutation": {
+    "pendingBaseline": [
+      "app/[username]/[slug]/_lib/data.ts",
+      "app/[username]/_lib/alias-collision-decision.ts",
+      "app/[username]/_lib/public-profile-loader.ts",
+      "app/[username]/claim/route.ts",
+      "app/[username]/s/[platform]/route.ts",
+      "app/claim/[token]/route.ts",
+      "app/claim/start/route.ts",
+      "app/go/[id]/route.ts",
+      "app/r/isrc/[isrc]/route.ts",
+      "lib/analytics/smart-link-admission.ts",
+      "lib/auth/email-otp-sender.ts",
+      "lib/auth/oauth-provider-error-return.ts",
+      "lib/auth/profile-access.ts",
+      "lib/auth/proxy-state.ts",
+      "lib/auth/request-session.ts",
+      "lib/billing/offer-truth.ts",
+      "lib/claim/claim-verification.ts",
+      "lib/claim/finalize.ts",
+      "lib/db/billing-status.ts",
+      "lib/entitlements/creator-plan.ts",
+      "lib/music-resolver/smart-link.ts",
+      "lib/onboarding/claim-profile.ts",
+      "lib/onboarding/ownership-gate.ts",
+      "lib/profile/public-profile-indexing-policy.ts",
+      "lib/security/claim-token.ts",
+      "lib/stripe/customer-sync/update-status.ts",
+      "lib/stripe/price-contract.ts",
+      "lib/stripe/webhooks/handlers/charge-handler.ts",
+      "lib/stripe/webhooks/handlers/checkout-handler.ts",
+      "lib/stripe/webhooks/handlers/subscription-handler.ts",
+      "lib/stripe/webhooks/utils.ts",
+      "lib/utils/bot-detection.ts",
+      "lib/waitlist/golden-path-admission.ts"
+    ]
+  }
+}

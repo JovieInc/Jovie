@@ -40,6 +40,16 @@ on:
       - 'apps/web/lib/idempotency.ts'
       - 'apps/web/lib/stripe/**'
       - 'apps/web/proxy.ts'
+      - 'apps/web/app/claim/**'
+      - 'apps/web/app/go/**'
+      - 'apps/web/app/r/isrc/**'
+      - 'apps/web/lib/analytics/smart-link-admission.ts'
+      - 'apps/web/lib/db/billing-status.ts'
+      - 'apps/web/lib/music-resolver/smart-link.ts'
+      - 'apps/web/lib/onboarding/claim-profile.ts'
+      - 'apps/web/lib/onboarding/ownership-gate.ts'
+      - 'apps/web/lib/security/claim-token.ts'
+      - 'apps/web/lib/waitlist/golden-path-admission.ts'
   # Event-driven incremental sweep: after main CI settles, re-score every
   # module whose source changed since it was last scored. The sweep checks out
   # `main` itself, so a fork branch named main cannot supply code.
@@ -185,6 +195,7 @@ jobs:
           flock -n 9 || { echo "Another sweep holds the state lock; skipping."; exit 0; }
           nice -n 19 node scripts/mutation-sweep.mjs \
             --state "$state_dir/sweep-state.json" \
+            --priority scripts/golden-path-assurance.json \
             --mode "$MODE" --max-files "$MAX_FILES" --max-minutes 90 \
             --summary "$GITHUB_STEP_SUMMARY" \
             --github-output "$GITHUB_OUTPUT" \

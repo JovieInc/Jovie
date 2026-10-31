@@ -45,9 +45,19 @@
     "functions",
     "statements",
     "score",
-    "target"
+    "target",
+    "floor",
+    "realFloor",
+    "rowsFloor"
   ],
-  "higherIsLooser": ["threshold", "violations", "cls", "latency", "bundle"],
+  "higherIsLooser": [
+    "threshold",
+    "violations",
+    "cls",
+    "latency",
+    "bundle",
+    "missingCeiling"
+  ],
   "prReadyJob": "ci-pr-ready",
   "prReadyPath": ".github/workflows/ci.yml",
   "sourceValidationPath": ".github/workflows/source-validation.yml",
