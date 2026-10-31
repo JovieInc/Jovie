@@ -8192,6 +8192,10 @@ class FixRedTest(unittest.TestCase):
         prompt = lane.render_fix_prompt(self.pr(), excerpt)
         self.assertIn("Do not open a new PR", prompt)
         self.assertIn("devin/jov-1", prompt)
+        self.assertIn("PR base repair", prompt)
+        self.assertIn("request state, headRefOid, isInMergeQueue and baseRefName", prompt)
+        self.assertIn("gh pr edit 5 --repo JovieInc/Jovie --base main", prompt)
+        self.assertIn("Merge origin/main", prompt)
 
     def test_claims_are_visible_across_hosts_through_the_pr(self):
         real = lane.sh

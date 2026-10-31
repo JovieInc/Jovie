@@ -28,6 +28,7 @@ Machine-readable map: [`sources-of-truth.json`](./sources-of-truth.json). Rule f
 | Release channels and rings | file | `packages/release-channel-contracts` | `canon/RELEASE_CHANNELS.md` | - |
 | Environment variable names and production build | external | Vercel project env and the production build (mirror: `apps/web/lib/env-server-schema.ts`) | `apps/web/lib/env-public.ts`<br>`apps/web/lib/observability/build-info.ts`<br>`apps/web/app/api/health/build-info/route.ts` | Vercel env names and production build-info |
 | Binding invariants | file | `canon/invariants.jsonl` | `scripts/invariants/registry.mjs` | - |
+| Public numbers and proof stats (counts, speed, benchmarks, milestones) | file | `apps/web/data/proof-stats/registry.json` | `apps/web/lib/proof-stats/registry.ts`<br>`apps/web/lib/proof-stats/format.ts`<br>`scripts/invariants/stat-claims/check.mjs`<br>`docs/proof/STATS.md` | production database (counts), Public Profile Benchmark receipts (speed, agent score), founder-approved Summer cards (comparative claims) |
 | Engineering wins and the numbers in engineering posts | file | `canon/wins/wins.jsonl` | `apps/web/content/engineering/`<br>`docs/metrics/wins-latest.json` | the measurement source named in each metric, re-run after deploy |
 
 - **Models and prices per access path.** Model ids, access paths (subscription, gateway, API) and per-path price. The model-registry-sync worker (branch opus/model-registry-sync) adds scripts/model-id-guard.mjs and its ratchet; this map does not duplicate that guard.
@@ -50,4 +51,5 @@ Machine-readable map: [`sources-of-truth.json`](./sources-of-truth.json). Rule f
 - **Release channels and rings.** Machine-readable channel contract (Stable, Beta, Nightly).
 - **Environment variable names and production build.** The schema names every env var the app reads; Vercel holds the values; /api/health/build-info reports the running commit.
 - **Binding invariants.** Binding and adopted company invariants; enforcement consumers name the checks.
+- **Public numbers and proof stats (counts, speed, benchmarks, milestones).** Definition of every stat: template, rounding, threshold, freshness SLA, fallback, methodology, legal class, visibility. Measured values are the proof-stats/observations content record, written only by apps/web/lib/proof-stats (hourly production refresh and /api/internal/proof-stats intake). Copy binds with {stat:<id>}; scripts/invariants/stat-claims fails hand-written numeric claims.
 - **Engineering wins and the numbers in engineering posts.** One record per measured engineering win with before/after, source, query, PRs and post-deploy receipts. Status is computed (scripts/lib/wins-ledger.mjs), never stored.
