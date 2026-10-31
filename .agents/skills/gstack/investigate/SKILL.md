@@ -559,6 +559,17 @@ Once root cause is confirmed:
 
 ## Phase 5: Verification & Report
 
+## Verify the outcome, not the action
+
+A check is green only when it proves the RIGHT thing happened. None of these is success on its own: HTTP 200, a page or element rendered, exit code 0, a non-empty reply, a screenshot taken, "no new console errors".
+
+1. **Oracle first.** Name the expected outcome before checking, then assert it: this artist's name and real releases on the profile, the word the probe asked for, the deployed SHA in build-info.
+2. **Failure surfaces fail.** Error copy, quota or limit walls, "temporarily unavailable" or paused, empty states, stuck spinners, placeholder or template text, and a 200 whose body is an error. Jovie catalog: \`scripts/lib/outcome-verifier.mjs\` (\`assertOutcome\`, \`detectFailureSurface\`).
+3. **Red before green.** Before trusting a new or changed check, show it fails on known-bad input (\`acceptedNegativeControls(check)\` returns \`[]\`, or a seeded-bug run goes red).
+4. **Strict fold.** Pass needs at least one check and every check passed. Skipped, blocked, unknown or nothing-ran is BLOCKED, never green. Never mark something healthy without a passing re-run.
+
+Report expected vs observed and the negative control you ran.
+
 **Fresh verification:** Reproduce the original bug scenario and confirm it's fixed. This is not optional.
 
 Run the test suite and paste the output.
