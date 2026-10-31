@@ -543,6 +543,7 @@ jobs:
       run_test: ${{ steps.detect.outputs.run_test || 'false' }}
       run_test_performance: ${{ steps.detect.outputs.run_test_performance || 'false' }}
       run_storybook_a11y: ${{ steps.detect.outputs.run_storybook_a11y || 'false' }}
+      run_storybook_surfaces: ${{ steps.storybook-surfaces.outputs.run_storybook_surfaces || 'false' }}
       run_public_lighthouse: ${{ steps.detect.outputs.run_public_lighthouse || 'false' }}
       run_dashboard_lighthouse: ${{ steps.detect.outputs.run_dashboard_lighthouse || 'false' }}
       run_onboarding_lighthouse: ${{ steps.detect.outputs.run_onboarding_lighthouse || 'false' }}
@@ -1014,6 +1015,21 @@ jobs:
           fi
 
           emit_ci_lanes
+
+      # Storybook Surface Matrix on the source PR (queue ejections 2026-10-31:
+      # a stories/spec change passed PR checks, then failed the merge group).
+      # A separate step because the detect run block is at GitHub's 21000-char
+      # limit. Reads the changed-path list that block already wrote.
+      - name: Detect Storybook surface changes
+        id: storybook-surfaces
+        run: |
+          changed="$RUNNER_TEMP/product-lane-classification/changed-paths.txt"
+          pattern='(\.stories\.tsx$|^apps/web/tests/e2e/storybook-|^apps/web/\.storybook/|^apps/web/playwright\.config\.storybook\.ts$|^apps/web/components/|^packages/ui/|^apps/web/styles/|^apps/web/app/globals\.css$|^apps/web/(tailwind|postcss)\.config\.|^scripts/component-merge-group-storybook-cert\.mjs$|^\.github/workflows/ci\.yml$)'
+          if [ -s "$changed" ] && grep -v -E '\.(md|txt)$' "$changed" | grep -q -E "$pattern"; then
+            echo "run_storybook_surfaces=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_storybook_surfaces=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Classify blog qualification and seal intake receipts
         id: blog-detect
@@ -3583,6 +3599,12 @@ jobs:
           github.event_name == 'push' &&
           github.ref == 'refs/heads/main' &&
           needs.ci-path-changes.outputs.run_web == 'true'
+        ) ||
+        (
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.base.ref == 'main' &&
+          needs.ci-path-changes.outputs.run_storybook_surfaces == 'true' &&
+          needs.ci-path-changes.outputs.blog_content_only != 'true'
         )
       )
     runs-on: ubuntu-24.04
@@ -7892,9 +7914,9 @@ jobs:
     # parallel with the fast lanes, while build/layout integration stays on the
     # merge-group head. Migration Guard, Fork PR Gate, and PR Size Guard remain
     # separately required ruleset contexts.
-    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare, ci-slop-guard]
+    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare, ci-slop-guard, ci-storybook-surfaces]
     if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
       - name: Evaluate deterministic source PR checks
@@ -7915,6 +7937,8 @@ jobs:
           VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"
           BLOG_CONTENT_ONLY="${{ needs.ci-path-changes.outputs.blog_content_only }}"
           RUN_MARKETING_DOM="${{ needs.ci-path-changes.outputs.run_marketing_dom }}"
+          RUN_STORYBOOK_SURFACES="${{ needs.ci-path-changes.outputs.run_storybook_surfaces }}"
+          STORYBOOK_SURFACES_RESULT="${{ needs.ci-storybook-surfaces.result }}"
 
           {
             echo "### PR Ready"
@@ -7930,6 +7954,7 @@ jobs:
             echo "| Secret Scan | $SECRET_SCAN_RESULT | \`./scripts/security/scan-secrets.sh ci-pr origin/main\` |"
             echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT | \`node scripts/golden-path-lock.mjs merge-gate\` |"
             echo "| Slop Guard (size, pass-through, dead code, duplication) | $SLOP_RESULT | \`node ../ci/actions/slop-guard/slop-guard.mjs --policy <ci>/policy/JovieInc__Jovie/policy.json\` |"
+            echo "| Storybook Surface Matrix (stories/spec/component PRs) | $STORYBOOK_SURFACES_RESULT | \`pnpm --filter @jovie/web exec playwright test --config=playwright.config.storybook.ts\` |"
             echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
             echo "| Visual Snapshot Compare (homepage + marketing DOM PRs) | $VISUAL_COMPARE_RESULT | \`node scripts/visual-snapshot-compare.mjs compare\` |"
             echo
@@ -7983,6 +8008,13 @@ jobs:
           fi
           if [[ "$RUN_MARKETING_DOM" == "true" && "$VISUAL_COMPARE_RESULT" != "success" ]]; then
             echo "❌ Marketing DOM invariant certification did not pass on a marketing PR; skipped is not green (result: $VISUAL_COMPARE_RESULT)"
+            exit 1
+          fi
+
+          # Storybook gate moved to the source PR (it was queue-only and poisoned
+          # merge groups). Relevant PRs must see it succeed; skipped is not green.
+          if [[ "$RUN_STORYBOOK_SURFACES" == "true" && "$STORYBOOK_SURFACES_RESULT" != "success" ]]; then
+            echo "❌ Storybook Surface Matrix did not pass on a stories/component PR; skipped is not green (result: $STORYBOOK_SURFACES_RESULT)"
             exit 1
           fi
 

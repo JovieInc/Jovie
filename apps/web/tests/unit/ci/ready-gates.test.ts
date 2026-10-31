@@ -125,7 +125,6 @@ describe('ci-pr-ready source lane', () => {
       'ci-build-layout',
       'ci-build-ovie',
       'ci-typecheck-ovie',
-      'ci-storybook-surfaces',
     ])
       expect(ci.jobs['ci-pr-ready']?.needs, heavy).not.toContain(heavy);
   });

@@ -162,9 +162,122 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: node scripts/merge-group-failure-hold.mjs --event-path "$GITHUB_EVENT_PATH"
 
+  # Queue drift precheck (2026-10-31: ~12 PRs ejected, 3 merged). Count and
+  # ratchet guards (doc-freshness, token budget, external-api, data-architecture)
+  # pass on the PR head, then fail once main moves under the queued PR and poison
+  # the merge group. Before the enroll job may enqueue a PR, run those guards,
+  # listed in scripts/lib/queue-drift-guards.json, against GitHub's test merge of
+  # the PR with the latest main. Seconds, not minutes: one depth-1 checkout and
+  # node-only guards.
+  #
+  # Trust boundary: the guards run PR-authored code, so this job holds no secret
+  # and no write scope (the checkout persists no credential); it only reports
+  # pass or fail for the one PR it resolved itself. The enroll job, which holds
+  # the app token, never executes that code. Everything undecidable (stale merge
+  # ref, guard cannot load, crash) fails open: the merge group stays the
+  # authoritative gate.
+  drift-precheck:
+    name: Queue drift precheck
+    # Read-only and enqueues nothing, so it needs no QUEUE_FREEZE gate; the
+    # enroll job that consumes it is gated.
+    if: >-
+      (
+        (github.event_name == 'workflow_dispatch' && inputs.pr_number != '') ||
+        (github.event_name == 'pull_request_target' &&
+         github.event.action != 'labeled' &&
+         github.event.pull_request.draft == false) ||
+        (github.event_name == 'workflow_run' &&
+         github.event.workflow_run.conclusion == 'success' &&
+         (github.event.workflow_run.event == 'pull_request' ||
+          github.event.workflow_run.event == 'pull_request_target'))
+      )
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      failed_pr: ${{ steps.publish.outputs.failed_pr }}
+      failed_head: ${{ steps.publish.outputs.failed_head }}
+      passed_pr: ${{ steps.publish.outputs.passed_pr }}
+      report: ${{ steps.publish.outputs.report }}
+    steps:
+      # Trusted code (default branch) resolves the candidate and publishes the
+      # verdict; PR-authored code only ever runs in the guards step below.
+      - name: Checkout trusted precheck policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            package.json
+            packages/api-client
+            scripts/queue-drift-resolve.mjs
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
+          sparse-checkout-cone-mode: false
+
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Resolve the candidate and its fresh test merge with main
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || '' }}
+        run: node scripts/queue-drift-resolve.mjs resolve
+
+      - name: Check out the test merge (no credentials persisted)
+        if: steps.resolve.outputs.run == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.resolve.outputs.merge_sha }}
+          path: merged
+          fetch-depth: 1
+          persist-credentials: false
+
+      # Four guards parse TypeScript. Install only the compiler (trusted
+      # version from the default branch, no lifecycle scripts) outside the PR
+      # tree, then link it in; a failed install makes those guards fail open.
+      - name: Provide the TypeScript compiler to the guards
+        if: steps.resolve.outputs.run == 'true'
+        run: |
+          version="$(node -p "require('./package.json').devDependencies.typescript")"
+          if npm install --prefix "$RUNNER_TEMP/ts" --no-audit --no-fund --ignore-scripts "typescript@${version}"; then
+            ln -s "$RUNNER_TEMP/ts/node_modules" merged/node_modules
+          else
+            echo "::warning::typescript install failed; guards that parse TypeScript fail open"
+          fi
+
+      - name: Run drift-prone guards against the test merge
+        id: guards
+        if: steps.resolve.outputs.run == 'true'
+        run: |
+          if [ ! -f merged/scripts/queue-drift-precheck.mjs ]; then
+            echo "queue-drift: precheck script not on the merged tree yet; skipping"
+            exit 0
+          fi
+          node merged/scripts/queue-drift-precheck.mjs --root merged --out "$RUNNER_TEMP/queue-drift-report.txt" || echo "failed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the verdict
+        id: publish
+        if: always() && steps.resolve.outputs.run == 'true'
+        env:
+          GUARDS_OUTCOME: ${{ steps.guards.outputs.failed == 'true' && 'failure' || steps.guards.outcome }}
+          PR_NUMBER: ${{ steps.resolve.outputs.number }}
+          PR_HEAD: ${{ steps.resolve.outputs.head }}
+          REPORT_FILE: ${{ runner.temp }}/queue-drift-report.txt
+        run: node scripts/queue-drift-resolve.mjs publish
+
   enroll:
     name: Enqueue green PRs
-    needs: [hold-failed-revision]
+    needs: [hold-failed-revision, drift-precheck]
     # QUEUE_FREEZE=1 (repo variable) admits nothing; holds and dequeues still run.
     if: >-
       always() &&
@@ -270,6 +383,10 @@ jobs:
           MERGE_STATE_RETRY_MS: '3000'
           FAILURE_HOLD_RECEIPT: ${{ needs.hold-failed-revision.outputs.failure_receipt || '' }}
           ADMISSION_RECOVERY_RECEIPT: ${{ needs.hold-failed-revision.outputs.admission_recovery_receipt || '' }}
+          DRIFT_FAILED_PR: ${{ needs.drift-precheck.outputs.failed_pr || '' }}
+          DRIFT_FAILED_HEAD: ${{ needs.drift-precheck.outputs.failed_head || '' }}
+          DRIFT_PASSED_PR: ${{ needs.drift-precheck.outputs.passed_pr || '' }}
+          DRIFT_REPORT: ${{ needs.drift-precheck.outputs.report || '' }}
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
@@ -289,6 +406,7 @@ jobs:
               ...holdLabels.machineBlockLabels,
             ]);
             const BREAKER_LABEL = 'queue-breaker';
+            const DRIFT_LABEL = 'queue-drift';
             const COMPOUNDING_LABEL = 'compounding', MAX_JUMPED = 2, JUMP_MAX_BUILD_S = 300, JUMP_BATCH_S = 1800;
             const COMPOUNDING_PATHS = [
               /^\.github\/(workflows|actions|ci-harness|scripts|runner-host|runner-image)\//,
@@ -691,6 +809,37 @@ jobs:
               if (process.env.DRY_RUN === 'true') {
                 core.notice(`[dry run] would enqueue #${pr.number}`);
                 continue;
+              }
+              // Queue drift precheck (drift-precheck job): the PR's test merge with
+              // the latest main fails a count or ratchet guard that passed on its
+              // head. Enqueueing it would only poison a merge group, so comment
+              // once per head, label, and let the owner or fleet fix it. The
+              // exact-head match keeps a moved head on the normal path.
+              if (process.env.DRIFT_FAILED_PR && Number(process.env.DRIFT_FAILED_PR) === pr.number &&
+                  process.env.DRIFT_FAILED_HEAD === pr.headRefOid) {
+                const driftMarker = `<!-- queue-drift-precheck:${pr.headRefOid} -->`;
+                try {
+                  const comments = await github.paginate(github.rest.issues.listComments,
+                    { owner, repo, issue_number: pr.number, per_page: 100 });
+                  if (!comments.some(comment => comment.body?.includes(driftMarker))) {
+                    await github.rest.issues.createComment({ owner, repo, issue_number: pr.number,
+                      body: `${driftMarker}\nNot enqueued: drift-prone guards fail on this PR merged with the latest \`main\`, so its merge group would have been ejected.\n\n~~~\n${process.env.DRIFT_REPORT}\n~~~\nMerge or rebase \`main\`, fix the guard above, and push; enrollment resumes on the next green wake.` });
+                  }
+                  await github.rest.issues.addLabels({ owner, repo, issue_number: pr.number, labels: [DRIFT_LABEL] });
+                } catch (error) {
+                  core.warning(`#${pr.number} drift notice failed: ${error.message}`);
+                }
+                core.notice(`DRIFT-HELD #${pr.number}: not enqueued (drift-prone guard fails against latest main)`);
+                receipt(pr, 'drift-held', 'queue-drift-precheck');
+                continue;
+              }
+              if (process.env.DRIFT_PASSED_PR && Number(process.env.DRIFT_PASSED_PR) === pr.number &&
+                  pr.labels.nodes.some(label => label.name === DRIFT_LABEL)) {
+                try {
+                  await github.rest.issues.removeLabel({ owner, repo, issue_number: pr.number, name: DRIFT_LABEL });
+                } catch (error) {
+                  core.warning(`#${pr.number} ${DRIFT_LABEL} not cleared: ${error.message}`);
+                }
               }
               const admissionRecovery = failure.reason === 'bounded-admission-recovery';
               const ownerReleaseStillCurrent = async () => {

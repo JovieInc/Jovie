@@ -1,0 +1,212 @@
+{
+  "$comment": "Cheap guards whose verdict depends on main: a committed baseline, count, census or digest compared against the tree. Run in parallel by scripts/queue-drift-precheck.mjs against a test merge of the PR with the latest main before Merge Queue Green Enroll enqueues it. A guard here must run with node plus the typescript package only (no pnpm install, no git history), in seconds. A guard whose `requires` paths are absent is skipped, so a guard can be listed before it lands. Every baseline-class script (scripts/queue-drift-precheck.test.mjs finds them) must be a guard or appear in `exempt` with a reason.",
+  "guards": [
+    {
+      "id": "doc-freshness",
+      "command": ["node", "scripts/doc-freshness-lint.mjs"],
+      "requires": ["scripts/doc-freshness-lint.mjs"],
+      "remediation": "Run `pnpm doc:freshness:check` after merging main and fix the drift it names."
+    },
+    {
+      "id": "data-architecture-guard",
+      "command": ["node", "scripts/data-architecture-guard.mjs"],
+      "requires": ["scripts/data-architecture-guard.mjs"],
+      "remediation": "Run `node scripts/data-architecture-guard.mjs` after merging main; shrink the ratchet, never raise it."
+    },
+    {
+      "id": "workflow-token-budget",
+      "command": ["node", "scripts/workflow-token-budget-guard.mjs"],
+      "requires": ["scripts/workflow-token-budget-guard.mjs"],
+      "remediation": "Run `node scripts/workflow-token-budget-guard.mjs` after merging main and reconcile the GITHUB_TOKEN ratchet."
+    },
+    {
+      "id": "external-api-guard",
+      "command": ["node", "scripts/external-api-guard.mjs"],
+      "requires": ["scripts/external-api-guard.mjs"],
+      "remediation": "Run `node scripts/external-api-guard.mjs` after merging main and route new provider calls through packages/api-client."
+    },
+    {
+      "id": "offer-claims",
+      "command": ["node", "scripts/invariants/offer-claims/check.mjs"],
+      "requires": ["scripts/invariants/offer-claims/check.mjs"],
+      "remediation": "Route price, trial or billing copy through apps/web/lib/billing/offer; run `node scripts/invariants/offer-claims/check.mjs`."
+    },
+    {
+      "id": "design-surface-census",
+      "command": ["node", "scripts/design-surface-census.mjs", "--no-base"],
+      "requires": ["scripts/design-surface-census.mjs"],
+      "remediation": "Renew the changed surface's certification evidence in the design surface census after merging main."
+    },
+    {
+      "id": "stat-claims",
+      "command": ["node", "scripts/invariants/stat-claims/check.mjs"],
+      "requires": ["scripts/invariants/stat-claims/check.mjs"],
+      "remediation": "Bind the numeric claim to its source or update the baseline downward."
+    },
+    {
+      "id": "icp-language",
+      "command": ["node", "scripts/invariants/icp-language/check.mjs"],
+      "requires": ["scripts/invariants/icp-language/check.mjs"],
+      "remediation": "Remove the new ICP-language hit; the baseline only shrinks."
+    },
+    {
+      "id": "duplicate-literals",
+      "command": ["node", "scripts/invariants/duplicate-literals.mjs"],
+      "requires": ["scripts/invariants/duplicate-literals.mjs"],
+      "remediation": "Reuse the existing literal; the duplicate-literals ledger never grows."
+    },
+    {
+      "id": "overlay-layer-contract",
+      "command": ["node", "scripts/invariants/overlay-layer-contract.mjs"],
+      "requires": ["scripts/invariants/overlay-layer-contract.mjs"],
+      "remediation": "Use an overlay layer token instead of a raw z-index; the ratchet only shrinks."
+    },
+    {
+      "id": "anti-slop",
+      "command": ["node", "scripts/anti-slop/run.mjs", "validate"],
+      "requires": ["scripts/anti-slop/run.mjs"],
+      "remediation": "Remove the copied code; the legacy-copies ratchet only shrinks."
+    },
+    {
+      "id": "model-id-guard",
+      "command": ["node", "scripts/model-id-guard.mjs"],
+      "requires": ["scripts/model-id-guard.mjs"],
+      "remediation": "Reference models through the registry, not literal ids."
+    },
+    {
+      "id": "ai-call-guard",
+      "command": ["node", "scripts/ai-call-guard.mjs"],
+      "requires": ["scripts/ai-call-guard.mjs"],
+      "remediation": "Route AI calls through the gateway wrapper; the ratchet only shrinks."
+    },
+    {
+      "id": "shared-ui-visual-arbitrary",
+      "command": ["node", "scripts/shared-ui-visual-arbitrary-audit.mjs"],
+      "requires": ["scripts/shared-ui-visual-arbitrary-audit.mjs"],
+      "remediation": "Replace arbitrary visual values with tokens; the baseline only shrinks."
+    },
+    {
+      "id": "domain-write-guard",
+      "command": ["node", "scripts/domain-write-guard.mjs"],
+      "requires": ["scripts/domain-write-guard.mjs"],
+      "remediation": "Route the direct write through a domain function."
+    },
+    {
+      "id": "design-authority",
+      "command": ["node", "scripts/design-authority-guard.mjs"],
+      "requires": ["scripts/design-authority-guard.mjs"],
+      "remediation": "Remove the raw control or serif usage; debt only shrinks."
+    },
+    {
+      "id": "story-coverage-ratchet",
+      "command": ["node", "scripts/story-coverage-ratchet.mjs"],
+      "requires": ["scripts/story-coverage-ratchet.mjs"],
+      "remediation": "Add the missing stories; coverage never drops below baseline."
+    },
+    {
+      "id": "design-conformance",
+      "command": ["node", "scripts/design-conformance-check.mjs"],
+      "requires": ["scripts/design-conformance-check.mjs"],
+      "remediation": "Bind the new component to a design contract or ratchet it explicitly."
+    },
+    {
+      "id": "contrast-ratchet",
+      "command": ["node", "apps/web/scripts/lint-contrast-ratchet.mjs"],
+      "requires": ["apps/web/scripts/lint-contrast-ratchet.mjs"],
+      "remediation": "Fix the contrast failure; the baseline only shrinks."
+    },
+    {
+      "id": "seo-ratchet",
+      "command": ["node", "apps/web/scripts/seo-ratchet-guard.mjs"],
+      "requires": ["apps/web/scripts/seo-ratchet-guard.mjs"],
+      "remediation": "Restore the required SEO metadata on the registered route."
+    },
+    {
+      "id": "composite-field",
+      "command": ["node", "apps/web/scripts/lint-composite-field.mjs"],
+      "requires": ["apps/web/scripts/lint-composite-field.mjs"],
+      "remediation": "Use the composite field primitive; the baseline only shrinks."
+    },
+    {
+      "id": "design-noise",
+      "command": ["node", "apps/web/scripts/lint-design-noise.mjs"],
+      "requires": ["apps/web/scripts/lint-design-noise.mjs"],
+      "remediation": "Remove the design noise; the baseline only shrinks."
+    },
+    {
+      "id": "pen-token-parity",
+      "command": ["node", "scripts/invariants/pen-token-parity.mjs"],
+      "requires": ["scripts/invariants/pen-token-parity.mjs"],
+      "remediation": "Bring the Pen token in line with code tokens."
+    },
+    {
+      "id": "native-spacing-scale",
+      "command": ["node", "scripts/invariants/native-spacing-scale.mjs"],
+      "requires": ["scripts/invariants/native-spacing-scale.mjs"],
+      "remediation": "Use the native spacing scale."
+    },
+    {
+      "id": "copy-leak",
+      "command": ["node", "scripts/invariants/copy-leak/check.mjs"],
+      "requires": ["scripts/invariants/copy-leak/check.mjs"],
+      "remediation": "Remove the leaked internal copy; the baseline only shrinks."
+    },
+    {
+      "id": "shell-ia",
+      "command": ["node", "scripts/invariants/shell-ia.mjs"],
+      "requires": ["scripts/invariants/shell-ia.mjs"],
+      "remediation": "Render navigation through the registered shell chrome; the raw nav/aside baseline only shrinks (JOV-INV-047)."
+    }
+  ],
+  "exempt": [
+    {
+      "paths": [
+        "scripts/design-exception-registry.mjs",
+        "scripts/design-system-source-ratchet.mjs",
+        "scripts/repo-hygiene-guard.mjs",
+        "scripts/ci-duration-ratchet.mjs",
+        "scripts/secrets-metadata-lint.mjs"
+      ],
+      "reason": "History or network: needs git history, a base ref or live providers, which the shallow precheck checkout lacks."
+    },
+    {
+      "paths": [
+        "scripts/typecheck-scripts.mjs",
+        "scripts/typecheck-web-stories.mjs",
+        "scripts/typecheck-web-tests.mjs",
+        "scripts/workflow-runner-pin-check.mjs",
+        "apps/web/scripts/lint-ui-feel.mjs"
+      ],
+      "reason": "Needs a full pnpm install (web workspace dependencies); the merge group runs it."
+    },
+    {
+      "paths": [
+        "scripts/backlog-orchestrator/shipping-lead-gate.mjs",
+        "scripts/backlog-orchestrator/summer-shipping-lead-contract.mjs",
+        "scripts/capability-benchmark/capability-reconciliation.mjs",
+        "scripts/design-conformance-paths.mjs",
+        "scripts/dev-loop-latency.mjs",
+        "scripts/evals/management-judgment.mjs",
+        "scripts/invariant-stewardship/audit.mjs",
+        "scripts/invariants/art-direction/accent.mjs",
+        "scripts/invariants/art-direction/hero-scroll.mjs",
+        "scripts/invariants/art-direction/hue.mjs",
+        "scripts/invariants/art-direction/images.mjs",
+        "scripts/invariants/art-direction/surface-media.mjs",
+        "scripts/invariants/icp-language/match.mjs",
+        "scripts/invariants/latency-sensitive-execution-paths.mjs",
+        "scripts/lanes/mesh-current-wire.mjs",
+        "scripts/mutation-diff.mjs",
+        "scripts/mutation-sweep.mjs",
+        "scripts/run-affected-tests.mjs",
+        "scripts/shipping-slo-intake.mjs",
+        "scripts/shipping-slo-report.mjs",
+        "scripts/ui-story-coverage-policy.mjs",
+        "scripts/visual-quality-metrics.mjs",
+        "scripts/web-test-surface-receipt.mjs",
+        ".github/scripts/check-flaky-ratchet.js"
+      ],
+      "reason": "Library, or a telemetry/report CLI that reads live data rather than gating a committed baseline against the tree; its verdict is covered by its own unit tests in invariants:check or ci-fast."
+    }
+  ]
+}

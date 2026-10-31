@@ -326,15 +326,12 @@ export function checkCensus(root = process.cwd(), baseRef = 'origin/main') {
   const git = args =>
     execFileSync('git', args, { cwd: root, encoding: 'utf8' });
   // An absent file on the base is the initial census, not a Git/auth failure.
-  const previous = git([
-    'ls-tree',
-    '--name-only',
-    baseRef,
-    '--',
-    CENSUS_PATH,
-  ]).trim()
-    ? JSON.parse(git(['show', `${baseRef}:${CENSUS_PATH}`]))
-    : null;
+  // baseRef null skips the history comparison (shallow queue-drift checkout).
+  const previous =
+    baseRef &&
+    git(['ls-tree', '--name-only', baseRef, '--', CENSUS_PATH]).trim()
+      ? JSON.parse(git(['show', `${baseRef}:${CENSUS_PATH}`]))
+      : null;
   const rows = validateCensus(census, discoverPages(root), previous);
   for (const row of rows) {
     for (const owner of row.expectedOwners) {
@@ -356,7 +353,10 @@ export function checkCensus(root = process.cwd(), baseRef = 'origin/main') {
 if (process.argv[1] === import.meta.filename) {
   const result = checkCensus(
     process.cwd(),
-    process.argv.slice(2).find(arg => !arg.startsWith('--')) || 'origin/main'
+    process.argv.includes('--no-base')
+      ? null
+      : process.argv.slice(2).find(arg => !arg.startsWith('--')) ||
+          'origin/main'
   );
   console.log(
     JSON.stringify(
