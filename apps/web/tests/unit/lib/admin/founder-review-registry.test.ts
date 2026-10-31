@@ -41,6 +41,15 @@ function packetWithMachineReceiptFixtures(): CertificationReviewPacket {
     ...packet,
     invariantEvaluation: [fixture('invariant_evaluation')],
     testsCoverage: [fixture('tests_coverage')],
+    visualProof: [
+      ...packet.visualProof,
+      {
+        ...fixture('tests_coverage'),
+        id: 'dogfood-judge:unit-fixture',
+        tier: 'visual_proof' as const,
+        ref: 'dogfood-judge:unit-fixture@sha256:' + 'a'.repeat(32),
+      },
+    ],
   };
 }
 

@@ -58,7 +58,7 @@ function packet(
       title: `Subject ${subjectId}`,
     },
     testsCoverage: [receipt('tests_coverage', `${subjectId}-tests`)],
-    visualProof: [receipt('visual_proof', `${subjectId}-visual`)],
+    visualProof: [receipt('visual_proof', `dogfood-judge:${subjectId}`)],
     ...overrides,
   };
 }
