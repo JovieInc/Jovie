@@ -4,6 +4,7 @@ import {
   DELIVERY_MERGE_REPOS,
   type DeliverySummary,
   emptyDeliverySummary,
+  LANE_BRANCH_PREFIXES,
   OBSERVATION_STATES,
   OPERATIONAL_TASK_SYNC_STATES,
   OPERATIONAL_TASK_WORKFLOW_STATES,
@@ -58,7 +59,10 @@ const operationalTaskSchema = z.object({
       number: z.number().int().positive(),
       url: z.string().url().startsWith('https://').nullable(),
       branch: z.string().max(160).nullable(),
-      agent: z.enum(['devin', 'codex']).nullable(),
+      // A lane added on the server before this client ships reads as no
+      // owner; it must never reject the projection (2026-10-31: glm/grok PRs
+      // failed this enum and blanked Home's In Flight and Done Today).
+      agent: z.enum(LANE_BRANCH_PREFIXES).nullable().catch(null),
       isDraft: z.boolean(),
       checks: z.object({
         rollup: z.enum(['success', 'failure', 'pending', 'unknown']),
@@ -72,6 +76,27 @@ const operationalTaskSchema = z.object({
     .optional(),
 });
 
+const operationalTaskDeltaSchema = z.object({
+  taskId: operationalTaskIdSchema,
+  kind: z.enum(['added', 'updated', 'removed']),
+  fromState: operationalTaskWorkflowStateSchema.nullable(),
+  toState: operationalTaskWorkflowStateSchema.nullable(),
+  sequence: z.number().int().nonnegative(),
+});
+
+/**
+ * Keep the items that parse and drop the rest. One malformed task must cost
+ * one row, not the whole projection: a strict array turned a single unknown
+ * field value into "Shipping data could not load" for every Home panel.
+ */
+function validItems<T>(schema: z.ZodType<T>) {
+  return (items: readonly unknown[]): T[] =>
+    items.flatMap(item => {
+      const parsed = schema.safeParse(item);
+      return parsed.success ? [parsed.data] : [];
+    });
+}
+
 const operationalTaskFeedSchema = z.object({
   canonicalSource: z.literal('linear'),
   cacheMode: z.literal('local-reconciled'),
@@ -80,16 +105,10 @@ const operationalTaskFeedSchema = z.object({
   observedAt: z.string().nullable(),
   lastSyncedAt: z.string().nullable(),
   freshnessDeadline: z.string().nullable(),
-  tasks: z.array(operationalTaskSchema),
-  deltas: z.array(
-    z.object({
-      taskId: operationalTaskIdSchema,
-      kind: z.enum(['added', 'updated', 'removed']),
-      fromState: operationalTaskWorkflowStateSchema.nullable(),
-      toState: operationalTaskWorkflowStateSchema.nullable(),
-      sequence: z.number().int().nonnegative(),
-    })
-  ),
+  tasks: z.array(z.unknown()).transform(validItems(operationalTaskSchema)),
+  deltas: z
+    .array(z.unknown())
+    .transform(validItems(operationalTaskDeltaSchema)),
 });
 
 const sourceObservationSchema = z.object({
@@ -379,6 +398,19 @@ export const shippingCockpitProjectionSchema = z.object({
 export type ShippingCockpitProjection = z.infer<
   typeof shippingCockpitProjectionSchema
 >;
+
+/**
+ * Where a projection first fails the client contract ("operationalTasks.
+ * feedState: Invalid option"), or null when it parses. Home reports this to
+ * Sentry so producer/consumer drift alerts instead of blanking panels.
+ */
+export function shippingCockpitProjectionIssue(value: unknown): string | null {
+  const parsed = shippingCockpitProjectionSchema.safeParse(value);
+  if (parsed.success) return null;
+  const issue = parsed.error.issues[0];
+  if (!issue) return 'unknown';
+  return `${issue.path.join('.') || '(root)'}: ${issue.message}`.slice(0, 200);
+}
 
 export function parseShippingCockpitProjection(
   value: unknown
