@@ -101,7 +101,7 @@ test('PR body lint names every missing section and prints a filled template', ()
   });
   const ids = r.errors.map(e => e.id);
   assert.ok(ids.includes('red-before-green'));
-  assert.ok(ids.includes('blast-radius'));
+  assert.ok(r.warnings.some(w => w.id === 'blast-radius'));
   assert.ok(ids.includes('locked-areas'));
   assert.ok(ids.includes('changelog-marker'));
   assert.match(r.template, /## Red-before-green/);

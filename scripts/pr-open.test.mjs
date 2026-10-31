@@ -1,6 +1,22 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
-import { draftBody, gate, lockedCitation } from './pr-open.mjs';
+import { evaluateFleetRules } from './pr-fleet-rules.mjs';
+import {
+  CUSTOMER_MARKER,
+  commonDirectories,
+  deriveEvidence,
+  diffGates,
+  draftBody,
+  gate,
+  lockedCitation,
+  main,
+  redOutput,
+  refreshBodyChecks,
+} from './pr-open.mjs';
 
 const file = (filename, status = 'modified') => ({
   filename,
@@ -95,4 +111,534 @@ test('unfilled <placeholders> with spaces are rejected, real HTML tags are not',
   const errors = gate({ title: 'chore: a', body, files }).errors;
   assert.ok(errors.some(e => e.includes('<what changed and why>')));
   assert.ok(!errors.some(e => e.includes('<details open>')));
+});
+
+test('placeholder lint ignores inline and fenced code but still rejects prose', () => {
+  const files = [file('scripts/x.test.mjs', 'added')];
+  const body = `${draftBody({ title: 'chore: docs', files })}\nUse \`<kind>\` and \`\`code \` <type>\`\`.\n\`\`\`ts\nconst x = '<placeholder>';\n\`\`\`\n~~~text\n<another placeholder>\n~~~\n<real missing fact>`;
+  const errors = gate({ title: 'chore: docs', body, files }).errors;
+  assert.deepEqual(errors, [
+    'placeholder: replace <real missing fact> with real content',
+  ]);
+});
+
+test('Blast radius uses precisely the CI severity and accepts prose', () => {
+  const files = [file('scripts/x.test.mjs', 'added')];
+  for (const blast of [
+    '',
+    '## Blast radius\nQueue callers can regress; node --test scripts/x.test.mjs proves admission remains correct.',
+  ]) {
+    const body = `${CUSTOMER_MARKER}\n## Win\nn/a\n${blast}`;
+    const ci = evaluateFleetRules({ pr: { title: 'chore: x', body }, files });
+    const local = gate({ title: 'chore: x', body, files });
+    assert.deepEqual(local.errors, ci.errors);
+    assert.deepEqual(local.warnings, ci.warnings);
+  }
+});
+
+test('blast paths retain deep common directories and use at most three', () => {
+  assert.deepEqual(
+    commonDirectories(['apps/web/lib/auth/a.ts', 'apps/web/lib/auth/b.ts']),
+    ['apps/web/lib/auth']
+  );
+  assert.deepEqual(
+    commonDirectories([
+      'apps/web/lib/auth/a.ts',
+      'apps/web/lib/accounts/a.ts',
+      'apps/web/lib/billing/a.ts',
+      'scripts/x.mjs',
+    ]),
+    ['apps/web/lib', 'scripts']
+  );
+  assert.deepEqual(commonDirectories(['a/x', 'b/x', 'c/x', 'd/x']), ['.']);
+});
+
+test('draft reports all missing evidence together and emits no placeholders', async () => {
+  const { repo, cleanup } = localRepo();
+  try {
+    const out = [],
+      diagnostics = [];
+    const code = await main(
+      ['draft', '--repo', repo, '--title', 'fix(ci): evidence'],
+      x => out.push(x),
+      {
+        github: () => ({
+          status: 1,
+          stdout: '',
+          stderr: 'no pull requests found',
+        }),
+        diagnose: x => diagnostics.push(x),
+      }
+    );
+    assert.equal(code, 1);
+    assert.equal(diagnostics.length, 1);
+    assert.match(diagnostics[0], /--metric/);
+    assert.match(diagnostics[0], /--failing-command/);
+    assert.match(diagnostics[0], /--failing-run/);
+    assert.match(diagnostics[0], /Blast radius proof/);
+    // The self URL is filled automatically after open, and is gate-exempt.
+    assert.doesNotMatch(
+      out.join('\n').replace('<PR URL, set after open>', ''),
+      /<[^!][^>]*>/
+    );
+  } finally {
+    cleanup();
+  }
+});
+
+test('derives last failed CI URL and measured before-value from PR or linked issue', async () => {
+  const body = draftBody({
+    title: 'perf(ci): x',
+    files: [],
+    metric,
+    summary: 's',
+  });
+  const pr = targetPr(42, { body, closingIssuesReferences: [{ number: 8 }] });
+  const github = (_cwd, args) => {
+    if (args[0] === 'issue') return ok({ body });
+    return ok([
+      {
+        workflowName: 'CI',
+        event: 'pull_request',
+        createdAt: '2026-10-30T20:00:00Z',
+        url: 'https://github.com/JovieInc/Jovie/actions/runs/10',
+      },
+      {
+        workflowName: 'Unrelated nightly',
+        event: 'schedule',
+        createdAt: '2026-10-31T20:00:00Z',
+        url: 'https://github.com/JovieInc/Jovie/actions/runs/11',
+      },
+      {
+        workflowName: 'Source Validation',
+        event: 'pull_request',
+        createdAt: '2026-10-31T18:00:00Z',
+        url: 'https://github.com/JovieInc/Jovie/actions/runs/12',
+      },
+    ]);
+  };
+  for (const p of [pr, { ...pr, body: 'Fixes #8' }]) {
+    const found = await deriveEvidence('.', p, github);
+    assert.equal(found.metric, metric);
+    assert.equal(
+      found.failingRun,
+      'https://github.com/JovieInc/Jovie/actions/runs/12'
+    );
+  }
+  assert.deepEqual(
+    await deriveEvidence(
+      '.',
+      { ...pr, body: 'https://github.com/JovieInc/Jovie/pull/99' },
+      github
+    ),
+    {}
+  );
+});
+
+test('Vitest logs become literal FAIL evidence accepted by Fleet Rules', () => {
+  const log =
+    '\x1b[31m ❯ scripts/thing.test.ts (3 tests | 1 failed)\x1b[0m\nAssertionError: expected 0 to be 1\n Test Files  1 failed (1)';
+  const files = [file('scripts/x.test.mjs', 'added')];
+  const body = draftBody({
+    title: 'fix(web): regression',
+    files,
+    failingCommand: 'pnpm exec vitest run',
+    failingLog: log,
+  });
+  assert.match(body, /```text\nFAIL ❯ scripts\/thing.test.ts/);
+  assert.deepEqual(
+    gate({ title: 'fix(web): regression', body, files }).errors,
+    []
+  );
+  assert.throws(() => redOutput('All 3 tests passed'), /no failure evidence/);
+});
+
+test('check executes main classifier even when the checkout classifier is stale', () => {
+  const calls = [];
+  const execute = (command, args) => {
+    calls.push([command, ...args]);
+    if (command === 'git' && args[0] === 'merge-base') return okText('base');
+    if (command === 'git' && args[0] === 'show')
+      return okText('// trusted main classifier');
+    if (args.includes('--files-from')) {
+      assert.equal(readFileSync(args[0], 'utf8'), '// trusted main classifier');
+      return okText('');
+    }
+    return ok({ applicable: false });
+  };
+  assert.deepEqual(diffGates('.', 'main', [], { execute }), {
+    errors: [],
+    pending: [],
+  });
+  assert.ok(
+    calls.some(c =>
+      c.includes('origin/main:scripts/lib/product-lane-classifier.mjs')
+    )
+  );
+  const waiting = diffGates('.', 'main', [], {
+    execute: (command, args) =>
+      args.includes('--files-from')
+        ? {
+            status: 1,
+            stdout: '',
+            stderr: 'Unmapped changed paths: packages/new/a.ts',
+          }
+        : execute(command, args),
+  });
+  assert.deepEqual(waiting.errors, []);
+  assert.match(waiting.pending[0], /pending main's lane map/);
+});
+
+test('refresh forces two edits and confirms new runs, never stale reruns', async () => {
+  const pr = targetPr(42);
+  const edits = [],
+    output = [];
+  let reads = 0;
+  const github = (_cwd, args) => {
+    if (args[0] === 'api')
+      return ok({
+        workflow_runs: reads++ < 2 ? freshRuns(pr, 1) : freshRuns(pr, 3),
+      });
+    assert.deepEqual(args.slice(0, 3), ['pr', 'edit', '42']);
+    edits.push(readFileSync(args[args.indexOf('--body-file') + 1], 'utf8'));
+    return okText('');
+  };
+  await refreshBodyChecks('.', pr, 'final body', pr.title, {
+    github,
+    pause: async () => {},
+    log: x => output.push(x),
+  });
+  assert.match(edits[0], /pr-open-refresh/);
+  assert.equal(edits[1], 'final body');
+  assert.equal(output.length, 2);
+  assert.match(output[0], /runs\/3/);
+  await assert.rejects(
+    refreshBodyChecks('.', pr, 'final body', pr.title, {
+      github: (_cwd, args) =>
+        args[0] === 'api'
+          ? ok({ workflow_runs: freshRuns(pr, 1) })
+          : okText(''),
+      pause: async () => {},
+    }),
+    /not confirmed/
+  );
+});
+
+test('update N always drafts from PR N diff and title, even in another checkout', async () => {
+  const edits = [],
+    out = [];
+  const pr = targetPr(42);
+  let runReads = 0;
+  const github = (_cwd, args) => {
+    if (args[0] === 'pr' && args[1] === 'view') return ok(pr);
+    if (args.some(a => a.includes('/files?')))
+      return ok([[file('apps/web/lib/target/own.test.ts', 'added')]]);
+    if (args[0] === 'run') return ok([]);
+    if (args[0] === 'api')
+      return ok({
+        workflow_runs: runReads++ ? freshRuns(pr, 3) : freshRuns(pr, 1),
+      });
+    if (args[0] === 'pr' && args[1] === 'edit') {
+      edits.push(readFileSync(args[args.indexOf('--body-file') + 1], 'utf8'));
+      return okText('');
+    }
+    throw new Error(`unexpected ${args.join(' ')}`);
+  };
+  const code = await main(['update', '42'], x => out.push(x), {
+    github,
+    execute: fakeDiffRunner,
+    diagnose: () => {},
+    pause: async () => {},
+  });
+  assert.equal(code, 0, out.join('\n'));
+  assert.equal(edits.length, 2);
+  assert.match(edits[1], /Changes: apps\/web\/lib\/target/);
+  assert.match(edits[1], /pr-open-target: JovieInc\/Jovie#42/);
+  assert.doesNotMatch(edits[1], /unrelated checkout|pull\/99/);
+});
+
+test('update rejects swapped bodies and missing identity before any edit', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'pr-open-body-test-'));
+  try {
+    for (const bad of [
+      'https://github.com/JovieInc/Jovie/pull/99',
+      'PR #99',
+      '<!-- pr-open-target: JovieInc/Jovie#99 -->',
+      'no identity at all',
+    ]) {
+      const filename = path.join(dir, 'body.md');
+      writeFileSync(filename, `${CUSTOMER_MARKER}\n${bad}`);
+      const calls = [],
+        out = [];
+      const github = (_cwd, args) => {
+        calls.push(args);
+        return args[0] === 'pr'
+          ? ok(targetPr(42))
+          : ok([[file('scripts/target.test.mjs', 'added')]]);
+      };
+      const result = await main(
+        ['update', '42', '--body-file', filename],
+        x => out.push(x),
+        { github, execute: fakeDiffRunner }
+      );
+      assert.equal(result, 1);
+      assert.match(out.join('\n'), /target:/);
+      assert.ok(!calls.some(args => args[1] === 'edit'));
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('update refuses moving heads, incomplete diffs and failed target lookups', async () => {
+  for (const mode of ['moved', 'incomplete', 'unreadable']) {
+    let views = 0;
+    const out = [],
+      calls = [];
+    const github = (_cwd, args) => {
+      calls.push(args);
+      if (args[1] === 'view') {
+        if (mode === 'unreadable')
+          return { status: 1, stdout: '', stderr: 'not found' };
+        return ok(
+          targetPr(
+            42,
+            views++ && mode === 'moved' ? { headRefOid: 'c'.repeat(40) } : {}
+          )
+        );
+      }
+      if (args[0] === 'run') return ok([]);
+      return ok(
+        mode === 'incomplete'
+          ? [[]]
+          : [[file('scripts/target.test.mjs', 'added')]]
+      );
+    };
+    assert.equal(
+      await main(['update', '42'], x => out.push(x), {
+        github,
+        execute: fakeDiffRunner,
+        diagnose: () => {},
+      }),
+      1
+    );
+    assert.ok(!calls.some(args => args[1] === 'edit'));
+    assert.match(
+      out.join('\n'),
+      /changed during|incomplete PR diff|unable to read/
+    );
+  }
+});
+
+function ok(data) {
+  return okText(JSON.stringify(data));
+}
+function okText(stdout) {
+  return { status: 0, stdout, stderr: '' };
+}
+function targetPr(number, overrides = {}) {
+  return {
+    number,
+    title: 'chore: target PR',
+    body: 'Original target body',
+    labels: [],
+    headRefName: 'target-branch',
+    headRefOid: 'a'.repeat(40),
+    baseRefOid: 'b'.repeat(40),
+    baseRefName: 'main',
+    url: `https://github.com/JovieInc/Jovie/pull/${number}`,
+    changedFiles: 1,
+    ...overrides,
+  };
+}
+function freshRuns(pr, id) {
+  return ['PR Fleet Rules', 'Source Validation'].map((name, i) => ({
+    id: id + i,
+    name,
+    event: 'pull_request',
+    head_sha: pr.headRefOid,
+    head_branch: pr.headRefName,
+    pull_requests: [{ number: pr.number }],
+    html_url: `https://github.com/JovieInc/Jovie/actions/runs/${id + i}`,
+  }));
+}
+function fakeDiffRunner(command, args) {
+  if (command === 'git' && args[0] === 'show') return okText('// trusted');
+  if (command === 'git' && args[0] === 'merge-base') return okText('base');
+  if (command === 'git' && args[0] === 'log')
+    throw new Error('must never read unrelated checkout subjects');
+  return args.includes('--plan') ? ok({ applicable: false }) : okText('');
+}
+function localRepo() {
+  const repo = mkdtempSync(path.join(tmpdir(), 'pr-open-repo-'));
+  const git = args => execFileSync('git', args, { cwd: repo, stdio: 'ignore' });
+  git(['init']);
+  git(['config', 'user.email', 'test@example.com']);
+  git(['config', 'user.name', 'Test']);
+  writeFileSync(path.join(repo, 'base.txt'), 'base');
+  git(['add', '.']);
+  git(['-c', 'core.hooksPath=/dev/null', 'commit', '-m', 'base']);
+  git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  writeFileSync(path.join(repo, 'new.txt'), 'new');
+  git(['add', '.']);
+  git(['-c', 'core.hooksPath=/dev/null', 'commit', '-m', 'chore: change']);
+  return {
+    repo,
+    cleanup: () => rmSync(repo, { recursive: true, force: true }),
+  };
+}
+
+test('check reports lane-map waiting as pending without a failure', async () => {
+  const pr = targetPr(42);
+  const output = [];
+  const github = (_cwd, args) =>
+    args[0] === 'pr'
+      ? ok(pr)
+      : args[0] === 'run'
+        ? ok([])
+        : ok([[file('scripts/target.test.mjs', 'added')]]);
+  const execute = (command, args) =>
+    args.includes('--files-from')
+      ? {
+          status: 1,
+          stdout: '',
+          stderr: 'Unmapped changed paths: packages/pending/x.ts',
+        }
+      : fakeDiffRunner(command, args);
+  const result = await main(['check', '42'], x => output.push(x), {
+    github,
+    execute,
+    diagnose: () => {},
+  });
+  assert.equal(result, 0, output.join('\n'));
+  assert.match(output.join('\n'), /pending.*lane-classifier/);
+  assert.doesNotMatch(output.join('\n'), /FAIL/);
+  const publish = await main(['update', '42'], () => {}, {
+    github,
+    execute,
+    diagnose: () => {},
+  });
+  assert.equal(publish, 75);
+});
+
+test('classifier faults and coverage failures remain real failures', () => {
+  for (const mode of [
+    'classifier',
+    'plan',
+    'invalid-plan',
+    'no-tests',
+    'no-base',
+    'no-policy',
+  ]) {
+    const execute = (command, args) => {
+      if (mode === 'no-base' && args[0] === 'merge-base')
+        return { status: 1, stdout: '', stderr: 'no base' };
+      if (mode === 'no-policy' && args[0] === 'show')
+        return { status: 1, stdout: '', stderr: 'no policy' };
+      if (mode === 'classifier' && args.includes('--files-from'))
+        return { status: 1, stdout: '', stderr: 'SyntaxError: bad policy' };
+      if (args.includes('--plan')) {
+        if (mode === 'plan')
+          return { status: 1, stdout: '', stderr: 'no plan' };
+        if (mode === 'invalid-plan') return okText('broken JSON');
+        if (mode === 'no-tests')
+          return ok({ applicable: true, relatedTests: [] });
+      }
+      return fakeDiffRunner(command, args);
+    };
+    const result = diffGates('.', 'main', [file('apps/web/lib/a.ts')], {
+      execute,
+    });
+    if (mode === 'no-policy') assert.equal(result.pending.length, 1);
+    else assert.equal(result.errors.length, 1, mode);
+  }
+});
+
+test('open gates a supplied body, pushes normally and fills the new PR URL', async () => {
+  const { repo, cleanup } = localRepo();
+  const filename = path.join(repo, 'body.md');
+  writeFileSync(
+    filename,
+    draftBody({
+      title: 'perf(ci): cheaper',
+      files: [file('scripts/x.test.mjs', 'added')],
+      metric,
+      summary: 'Cheaper checks.',
+    })
+  );
+  try {
+    const calls = [],
+      edited = [];
+    const execute = (command, args) => {
+      calls.push([command, ...args]);
+      return args[0] === 'log'
+        ? okText('perf(ci): cheaper')
+        : fakeDiffRunner(command, args);
+    };
+    const github = (_cwd, args) => {
+      calls.push(args);
+      if (args[1] === 'create')
+        return okText('https://github.com/JovieInc/Jovie/pull/42');
+      edited.push(readFileSync(args[args.indexOf('--body-file') + 1], 'utf8'));
+      return okText('');
+    };
+    assert.equal(
+      await main(
+        [
+          'open',
+          '--repo',
+          repo,
+          '--body-file',
+          filename,
+          '--draft',
+          '--label',
+          'compounding',
+        ],
+        () => {},
+        { github, execute }
+      ),
+      0
+    );
+    assert.ok(calls.some(c => c[0] === 'git' && c[1] === 'push'));
+    assert.ok(
+      calls.some(
+        c => c[0] === 'pr' && c[1] === 'create' && c.includes('--draft')
+      )
+    );
+    assert.match(
+      edited[0],
+      /Verify: https:\/\/github.com\/JovieInc\/Jovie\/pull\/42/
+    );
+    assert.doesNotMatch(edited[0], /<PR URL/);
+  } finally {
+    cleanup();
+  }
+});
+
+test('invalid commands and PR numbers cannot mutate GitHub', async () => {
+  const github = () => {
+    throw new Error('should not call GitHub');
+  };
+  for (const argv of [
+    [],
+    ['wat'],
+    ['update'],
+    ['update', 'nope'],
+    ['update', '-1'],
+  ])
+    assert.equal(await main(argv, () => {}, { github }), 2);
+});
+
+test('a referenced Linear issue can supply the measured before-value', async () => {
+  const issueBody = draftBody({ title: 'perf(ci): x', files: [], metric });
+  const found = await deriveEvidence(
+    '.',
+    targetPr(42, { title: 'perf(ci): x (JOV-1234)' }),
+    () => ok([]),
+    async id => {
+      assert.equal(id, 'JOV-1234');
+      return issueBody;
+    }
+  );
+  assert.equal(found.metric, metric);
 });

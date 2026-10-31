@@ -135,12 +135,16 @@ from `SOURCE_GUARDS` or mark it advisory.
 ## Open PRs with `pnpm pr:open`
 
 `pnpm pr:open open` is the one way to open a PR (`update N` repairs a body, `draft` prints
-it, `check --body-file f` gates one). It drafts the body from the diff (changelog marker, Win
-as Pending with your measured `--metric` before value, Blast radius from the changed paths,
-Locked areas from the ownership map, Red-before-green from `--failing-command/--failing-run`),
-runs the Fleet Rules, changelog, lane-classifier and coverage-plan gates locally, and refuses to
-open a failing PR. Unknown facts stay `<placeholders>` that the gate rejects; nothing is
-invented. Each run appends a verdict row to `~/.local/state/jovie-lanes/pr-open.jsonl`; the
+it, `draft N` uses a specific PR, `check --body-file f` gates one). Drafting reuses measured
+Win inputs from the PR or linked issue and the last failed CI run URL, then lists remaining
+evidence in one prompt on stderr. Supply `--metric`, `--failing-command`, and either
+`--failing-run` or `--failing-log PATH` when needed; measurements are never invented.
+Blast radius warnings have the same severity as CI. Lane classification uses main's policy;
+unmapped paths report pending and block publication until the lane map lands.
+`update N` reads N's own diff and metadata, rejects mismatched body references, and confirms
+fresh PR Fleet Rules and Source Validation runs after two actual body edits. A supplied
+body file must identify N with its PR URL or `<!-- pr-open-target: JovieInc/Jovie#N -->`.
+Each check appends a verdict row to `~/.local/state/jovie-lanes/pr-open.jsonl`; the
 waste-registry metric `pr.first_push_gate_failure_rate` tracks the CI-side rate.
 
 ## Preflight before every push
