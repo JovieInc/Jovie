@@ -250,8 +250,8 @@ export type SummerCardSupersedeResult =
 /**
  * Closes a pending ask whose premise is gone (a human hold that no longer exists, a decision another
  * decision replaced). The system records the close with a reason; nobody decides on the founder's
- * behalf, nothing is approved, and no action follows. Spend and outbound cards are never superseded
- * this way: they end only by the founder or their declared default.
+ * behalf, nothing is approved, and no action follows. Spend, outbound and cards that explicitly
+ * require a founder decision are never superseded this way.
  */
 export async function supersedeSummerCard(
   input: { readonly id: string; readonly reason: string },
@@ -262,7 +262,11 @@ export async function supersedeSummerCard(
   if (current.card.status !== 'pending') {
     return { outcome: 'already_decided', card: toCard(current.card) };
   }
-  if (current.card.kind === 'spend' || current.card.kind === 'outbound') {
+  if (
+    current.card.kind === 'spend' ||
+    current.card.kind === 'outbound' ||
+    current.card.defaultDecision === 'none'
+  ) {
     return { outcome: 'reserved', kind: current.card.kind };
   }
   const result = await decideSummerCard(

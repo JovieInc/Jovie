@@ -21,7 +21,7 @@ function json(body: Readonly<Record<string, unknown>>, status: number) {
 
 /**
  * Summer reports that a pending ask's premise is gone. Jovie, not Summer, closes it: a recorded
- * reject with the reason, no action taken. Spend and outbound cards are refused.
+ * reject with the reason, no action taken. Spend, outbound and founder-required cards are refused.
  */
 export async function POST(
   request: Request,

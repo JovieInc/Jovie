@@ -110,7 +110,7 @@ describe('POST summer card supersede', () => {
     expect(await response.json()).toEqual({ error: 'not_found' });
   });
 
-  it.each(['spend', 'outbound'])(
+  it.each(['spend', 'outbound', 'decision', 'taste'])(
     'returns 409 for reserved %s cards',
     async kind => {
       mocks.supersede.mockResolvedValue({ outcome: 'reserved', kind });

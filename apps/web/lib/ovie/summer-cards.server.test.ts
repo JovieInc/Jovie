@@ -202,6 +202,20 @@ describe('summer card store', () => {
     expect(hoisted.updateSet).not.toHaveBeenCalled();
   });
 
+  it.each(['decision', 'taste'])(
+    'preserves %s cards that require an explicit founder decision',
+    async kind => {
+      hoisted.updateReturning.mockResolvedValue([{ key: 'k' }]);
+      hoisted.selectLimit.mockResolvedValue([
+        { value: stored({ kind, defaultDecision: 'none' }) },
+      ]);
+      await expect(
+        supersedeSummerCard({ id: stored().id, reason: 'premise gone now' })
+      ).resolves.toEqual({ outcome: 'reserved', kind });
+      expect(hoisted.updateSet).not.toHaveBeenCalled();
+    }
+  );
+
   it('preserves a card already decided by the founder', async () => {
     hoisted.selectLimit.mockResolvedValue([
       { value: stored({ kind: 'decision', status: 'approved' }) },
