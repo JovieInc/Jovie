@@ -381,18 +381,23 @@ describe('DashboardNav', () => {
       refetch: vi.fn(),
     });
 
-    const { container, getByRole } = renderDashboardNav({
+    const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
     });
 
-    expect(getByRole('link', { name: 'Unread answer' })).toHaveClass(
-      'text-primary-token'
+    const unread = getByRole('link', { name: 'Unread answer' });
+    const running = getByRole('link', { name: 'Running task' });
+    expect(unread).toHaveClass('text-primary-token');
+    expect(unread).toHaveAccessibleDescription('Unread');
+    expect(unread.querySelector('.animate-spin')).not.toBeInTheDocument();
+    expect(running).toHaveAttribute('href', `${APP_ROUTES.CHAT}/conv-running`);
+    expect(running).toHaveAccessibleDescription('Working');
+    const spinner = running.querySelector('.animate-spin');
+    expect(spinner).toHaveClass('motion-reduce:animate-none');
+    expect(spinner?.querySelector('svg')).toHaveAttribute(
+      'aria-hidden',
+      'true'
     );
-    expect(getByRole('link', { name: 'Running task' })).toHaveAttribute(
-      'href',
-      `${APP_ROUTES.CHAT}/conv-running`
-    );
-    expect(container.querySelector('.anim-calm-breath')).toBeTruthy();
   });
 
   it('handles collapsed state without changing the canonical rows', () => {

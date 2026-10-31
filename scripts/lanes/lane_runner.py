@@ -6098,6 +6098,8 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
                    "conflict keeping both sides' intent. If both sides added a migration with the same",
                    "number, renumber yours after main's and regenerate its snapshot/journal entry.",
                    "For a pnpm-lock.yaml conflict take main's lockfile and run `pnpm install --lockfile-only`.",
+                   "For additive single named imports, use `git checkout --conflict=diff3 -- <file>` then",
+                   "`python3 scripts/lanes/fix_red_classes.py resolve-imports --path <file>`; it requires an empty base hunk.",
                    "Never hand-merge generated files: take main's generated copy, then run its canonical",
                    "generator (`pnpm ci:topology:write` for workflow topology or",
                    "`pnpm --filter @jovie/web drizzle:generate` for migration metadata).",

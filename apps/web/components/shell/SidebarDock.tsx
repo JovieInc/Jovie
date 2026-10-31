@@ -1,12 +1,19 @@
 'use client';
 
-import { Button, IconButton } from '@jovie/ui';
+import {
+  Button,
+  IconButton,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@jovie/ui';
 import {
   ArrowUp,
   AudioLines,
-  ChevronDown,
-  ChevronUp,
+  CircleAlert,
   Download,
+  RotateCw,
+  Sparkles,
   X,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -23,7 +30,6 @@ import { APP_ROUTES } from '@/constants/routes';
 import type { DesktopUpdateViewState } from '@/lib/desktop/desktop-updates';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import type { WhatsNewEntry } from '@/lib/whats-new';
-import { InstallBanner } from './InstallBanner';
 import { SidebarBottomNowPlaying } from './SidebarBottomNowPlaying';
 
 export interface SidebarDockStatus {
@@ -69,7 +75,6 @@ export function SidebarDock({
   const [seen, setSeen] = useState<{ key: string; id: string | null } | null>(
     null
   );
-  const [compactUpdate, setCompactUpdate] = useState(false);
   const [dismissedUpdate, setDismissedUpdate] = useState<string | null>(null);
   const key = sidebarDockSeenKey(userId);
 
@@ -192,17 +197,39 @@ export function SidebarDock({
     positions.current = next;
   });
 
-  const returnFocus = () => {
+  const returnFocus = (fromPopover = false) => {
     const region = regionRef.current;
-    if (!region?.contains(document.activeElement)) return;
+    if (!region || (!fromPopover && !region.contains(document.activeElement)))
+      return;
     requestAnimationFrame(() => {
+      // A dismissal can also focus an outside control (for example the rail
+      // toggle). Recover removed focus without overriding that live target.
+      const active = document.activeElement;
+      if (
+        active?.isConnected &&
+        active !== document.body &&
+        !region.contains(active)
+      )
+        return;
       const target =
-        region.querySelector<HTMLElement>('a[href],button:not(:disabled)') ??
+        [
+          ...region.querySelectorAll<HTMLElement>(
+            'a[href],button:not(:disabled)'
+          ),
+        ].find(
+          element => !element.closest('[inert],[hidden],[aria-hidden="true"]')
+        ) ??
         region.parentElement?.querySelector<HTMLElement>(
           '[data-slot="common-dropdown-trigger"]'
         );
       target?.focus({ preventScroll: true });
     });
+  };
+  const restoreNoticeFocus = (event: Event, kind: string) => {
+    if (!regionRef.current?.querySelector(`[data-dock-card="${kind}"]`)) {
+      event.preventDefault();
+      returnFocus(true);
+    }
   };
   const markSeen = () => {
     if (!release) return;
@@ -214,6 +241,28 @@ export function SidebarDock({
     }
   };
 
+  const UpdateIcon =
+    update?.state === 'error'
+      ? CircleAlert
+      : update?.state === 'downloading'
+        ? Download
+        : update?.state === 'ready'
+          ? RotateCw
+          : ArrowUp;
+  const StatusIcon = showUpdate
+    ? UpdateIcon
+    : showAudio
+      ? AudioLines
+      : install
+        ? Download
+        : Sparkles;
+  const primaryStatus = showUpdate
+    ? 'update'
+    : showAudio
+      ? 'audio'
+      : install
+        ? 'install'
+        : 'whats-new';
   const badgeStatus =
     collapsed && statusLabels.length
       ? {
@@ -222,22 +271,17 @@ export function SidebarDock({
             <span
               aria-hidden='true'
               data-dock-badges
-              className='pointer-events-none absolute -right-1 -top-1 flex items-center rounded-full bg-sidebar text-primary-token ring-1 ring-sidebar-border'
+              className='pointer-events-none absolute -right-1 -top-1 flex size-3.5 items-center justify-center rounded-full bg-sidebar text-primary-token ring-1 ring-sidebar-border'
             >
-              {showUpdate ? (
-                <ArrowUp data-dock-badge='update' className='size-2.5' />
-              ) : null}
-              {showRelease ? (
+              <StatusIcon
+                data-dock-badge={primaryStatus}
+                className='size-2.5'
+              />
+              {showRelease && primaryStatus !== 'whats-new' ? (
                 <span
-                  data-dock-badge='whats-new'
-                  className='size-1.5 rounded-full bg-primary'
+                  data-dock-unread
+                  className='absolute -right-0.5 -top-0.5 size-1 rounded-full bg-accent'
                 />
-              ) : null}
-              {showAudio ? (
-                <AudioLines data-dock-badge='audio' className='size-2.5' />
-              ) : null}
-              {install ? (
-                <Download data-dock-badge='install' className='size-2.5' />
               ) : null}
             </span>
           ),
@@ -252,33 +296,27 @@ export function SidebarDock({
         aria-label='Sidebar Dock'
         className='flex shrink-0 flex-col gap-1 overflow-visible px-2'
       >
-        {!collapsed && showUpdate && selected('update') ? (
-          <section
-            data-dock-card='update'
-            aria-label='App Update'
-            className='rounded-md border border-subtle bg-sidebar p-2'
-          >
-            <div className='flex min-w-0 items-center gap-1'>
+        <div data-dock-notice-slot className='min-h-7'>
+          {!collapsed && showUpdate && selected('update') ? (
+            <section
+              data-dock-card='update'
+              aria-label='App Update'
+              className='flex min-w-0 items-center gap-1'
+            >
               <Button
                 size='sm'
                 variant='ghost'
                 onClick={onUpdate}
                 className='min-w-0 flex-1 justify-start'
               >
-                <span className='tabular-nums'>{updateLabel}</span>
+                <span className='flex min-w-0 items-center gap-2'>
+                  <UpdateIcon
+                    aria-hidden='true'
+                    className='size-3.5 shrink-0'
+                  />
+                  <span className='truncate tabular-nums'>{updateLabel}</span>
+                </span>
               </Button>
-              <IconButton
-                size='sm'
-                ariaLabel={compactUpdate ? 'Expand update' : 'Collapse update'}
-                aria-expanded={!compactUpdate}
-                onClick={() => setCompactUpdate(value => !value)}
-              >
-                {compactUpdate ? (
-                  <ChevronUp className='size-3' />
-                ) : (
-                  <ChevronDown className='size-3' />
-                )}
-              </IconButton>
               {update?.state === 'available' ? (
                 <IconButton
                   size='sm'
@@ -291,45 +329,134 @@ export function SidebarDock({
                   <X className='size-3' />
                 </IconButton>
               ) : null}
+            </section>
+          ) : !collapsed && showRelease && release && selected('release') ? (
+            <div data-dock-card='whats-new'>
+              <Popover key={release.id}>
+                <PopoverTrigger asChild>
+                  <Button
+                    size='sm'
+                    variant='ghost'
+                    className='w-full justify-start'
+                  >
+                    <span className='flex items-center gap-2'>
+                      <Sparkles
+                        aria-hidden='true'
+                        className='size-3.5 shrink-0'
+                      />
+                      What&apos;s New
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  side='top'
+                  align='start'
+                  className='w-64'
+                  aria-label="What's New"
+                  onCloseAutoFocus={event =>
+                    restoreNoticeFocus(event, 'whats-new')
+                  }
+                >
+                  <div className='p-2'>
+                    <div className='flex items-start gap-2'>
+                      <div className='min-w-0 flex-1'>
+                        <p className='text-xs font-medium text-primary-token'>
+                          {release.title}
+                        </p>
+                        {release.summary ? (
+                          <p className='mt-1 text-2xs text-secondary-token'>
+                            {release.summary}
+                          </p>
+                        ) : null}
+                      </div>
+                      <IconButton
+                        size='sm'
+                        ariaLabel="Dismiss what's new"
+                        onClick={() => {
+                          returnFocus(true);
+                          markSeen();
+                        }}
+                      >
+                        <X className='size-3' />
+                      </IconButton>
+                    </div>
+                    <Button
+                      asChild
+                      size='sm'
+                      variant='secondary'
+                      className='mt-3'
+                    >
+                      <Link
+                        href={APP_ROUTES.CHANGELOG}
+                        prefetch={false}
+                        onClick={markSeen}
+                      >
+                        View Changes
+                      </Link>
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
-            {!compactUpdate ? (
-              <p className='text-2xs text-secondary-token'>
-                {update?.state === 'error'
-                  ? 'Open update details to try again.'
-                  : 'Open update details.'}
-              </p>
-            ) : null}
-          </section>
-        ) : null}
-        {!collapsed && showRelease && release && selected('release') ? (
-          <section
-            data-dock-card='whats-new'
-            aria-label="What's New"
-            className='flex items-center gap-1 rounded-md border border-subtle bg-sidebar p-2'
-          >
-            <Link
-              href={APP_ROUTES.CHANGELOG}
-              prefetch={false}
-              onClick={markSeen}
-              className='min-w-0 flex-1 rounded-sm text-xs text-primary-token focus-ring-themed'
-            >
-              <span className='block font-medium'>What&apos;s new</span>
-              <span className='block truncate text-2xs text-secondary-token'>
-                {release.title}
-              </span>
-            </Link>
-            <IconButton
-              size='sm'
-              ariaLabel="Dismiss what's new"
-              onClick={() => {
-                returnFocus();
-                markSeen();
-              }}
-            >
-              <X className='size-3' />
-            </IconButton>
-          </section>
-        ) : null}
+          ) : !collapsed && install && selected('install') ? (
+            <div data-dock-card='install'>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    size='sm'
+                    variant='ghost'
+                    className='w-full justify-start'
+                  >
+                    <span className='flex items-center gap-2'>
+                      <Download
+                        aria-hidden='true'
+                        className='size-3.5 shrink-0'
+                      />
+                      Install Jovie
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  side='top'
+                  align='start'
+                  className='w-64'
+                  aria-label='Install Jovie'
+                  onCloseAutoFocus={event =>
+                    restoreNoticeFocus(event, 'install')
+                  }
+                >
+                  <div className='p-2'>
+                    <div className='flex items-start gap-2'>
+                      <p className='min-w-0 flex-1 text-xs text-secondary-token'>
+                        {install.isIOS
+                          ? 'In Safari, tap Share, then Add to Home Screen.'
+                          : 'Open Jovie from your home screen.'}
+                      </p>
+                      <IconButton
+                        size='sm'
+                        ariaLabel='Dismiss install prompt'
+                        onClick={() => {
+                          returnFocus(true);
+                          install.onDismiss();
+                        }}
+                      >
+                        <X className='size-3' />
+                      </IconButton>
+                    </div>
+                    <Button
+                      size='sm'
+                      variant='secondary'
+                      className='mt-3'
+                      onClick={install.onInstall}
+                    >
+                      {install.isIOS ? 'Got it' : 'Install'}
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          ) : null}
+        </div>
         {!collapsed && showAudio && audio ? (
           <div
             data-dock-card='now-playing'
@@ -344,25 +471,6 @@ export function SidebarDock({
                 returnFocus();
                 audio.onDismiss?.();
               }}
-            />
-          </div>
-        ) : null}
-        {!collapsed && install && selected('install') ? (
-          <div data-dock-card='install'>
-            <InstallBanner
-              open
-              onDismiss={() => {
-                returnFocus();
-                install.onDismiss();
-              }}
-              onCta={install.onInstall}
-              title='Install Jovie'
-              description={
-                install.isIOS
-                  ? 'In Safari, tap Share, then Add to Home Screen.'
-                  : 'Open Jovie from your home screen.'
-              }
-              ctaLabel={install.isIOS ? 'Got it' : 'Install'}
             />
           </div>
         ) : null}

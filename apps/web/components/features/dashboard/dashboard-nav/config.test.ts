@@ -7,6 +7,7 @@ import {
   canonicalSidebarNavigation,
   desktopMoreNavigation,
   desktopPrimaryNavigation,
+  inboxNavItem,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
   partitionCustomerNavigation,
@@ -50,6 +51,10 @@ describe('canonical customer shell navigation', () => {
       CANONICAL_NAVIGATION
     );
     expect(primaryNavigation.every(item => item.tier === 'core')).toBe(true);
+    expect(primaryNavigation[0]).toMatchObject({
+      icon: inboxNavItem.icon,
+      iconName: 'Inbox',
+    });
   });
 
   it('detects missing and reordered canonical destinations', () => {

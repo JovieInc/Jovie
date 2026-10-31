@@ -149,6 +149,45 @@ class NarrowedPreflightMergeTest(unittest.TestCase):
         self.assertIsNone(classes.merge_narrowed_guard_command(self.OURS, self.THEIRS.replace("vitest run", "vitest watch")))
 
 
+class AdditiveImportMergeTest(unittest.TestCase):
+    TEXT = (
+        "'use client';\n<<<<<<< HEAD\n"
+        "import { useIsomorphicLayoutEffect } from '@/hooks/useIsomorphicLayoutEffect';\n"
+        "||||||| base\n=======\n"
+        "import { ProfileCompletionCard } from '@/features/dashboard/molecules/ProfileCompletionCard';\n"
+        ">>>>>>> origin/main\nexport const unchanged = true;\n"
+    )
+
+    def test_cli_preserves_both_additions_and_surrounding_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "Sidebar.tsx"
+            path.write_text(self.TEXT)
+            self.assertEqual(classes.main(["resolve-imports", "--path", str(path)]), 0)
+            self.assertEqual(path.read_text(), (
+                "'use client';\n"
+                "import { ProfileCompletionCard } from '@/features/dashboard/molecules/ProfileCompletionCard';\n"
+                "import { useIsomorphicLayoutEffect } from '@/hooks/useIsomorphicLayoutEffect';\n"
+                "export const unchanged = true;\n"
+            ))
+
+    def test_unknown_or_nonadditive_conflicts_leave_file_untouched(self):
+        cases = [
+            self.TEXT.replace("||||||| base\n", "||||||| base\nimport { Old } from '@/old';\n"),
+            self.TEXT.replace("ProfileCompletionCard }", "useIsomorphicLayoutEffect }"),
+            self.TEXT.replace("@/features/dashboard/molecules/ProfileCompletionCard", "@/hooks/useIsomorphicLayoutEffect"),
+            self.TEXT.replace("ProfileCompletionCard }", "ProfileCompletionCard as Card }"),
+            self.TEXT + "<<<<<<< HEAD\nconst a = 1;\n=======\nconst a = 2;\n>>>>>>> origin/main\n",
+            self.TEXT + "import { ProfileCompletionCard } from '@/duplicate';\n",
+            self.TEXT.replace("||||||| base\n", ""),
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "Sidebar.tsx"
+            for source in cases:
+                path.write_text(source)
+                self.assertEqual(classes.main(["resolve-imports", "--path", str(path)]), 1)
+                self.assertEqual(path.read_text(), source)
+
+
 class AndChainMergeTest(unittest.TestCase):
     OURS = (
         "node scripts/run-affected-tests.mjs --control && "

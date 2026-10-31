@@ -98,7 +98,8 @@ it('queues the newest release behind the updater while preserving audio actions'
   expect(mocks.stop).toHaveBeenCalledOnce();
   mocks.update = { state: 'unsupported' };
   rerender(<SidebarDockBridge {...props} />);
-  expect(await screen.findByRole('link')).toHaveAttribute('href', '/changelog');
+  fireEvent.click(await screen.findByRole('button', { name: "What's New" }));
+  expect(screen.getByRole('link')).toHaveAttribute('href', '/changelog');
   expect(
     screen.queryByRole('button', { name: 'Restart to update' })
   ).toBeNull();
@@ -139,14 +140,19 @@ function installEvent() {
 describe('PWA install within the shared dock', () => {
   it('persists dismissal through the existing PWA store across remounts', async () => {
     const first = render(<SidebarDockBridge {...props} />);
-    await screen.findByRole('link');
+    fireEvent.click(await screen.findByRole('button', { name: "What's New" }));
     act(() => {
       window.dispatchEvent(installEvent());
     });
     expect(screen.queryByRole('button', { name: 'Install' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: "Dismiss what's new" }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Install Jovie' })
+    );
     await screen.findByRole('button', { name: 'Install' });
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss Prompt' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Dismiss install prompt' })
+    );
     expect(localStorage.getItem('jv_pwa_dismissed')).toBeTruthy();
     first.unmount();
     render(<SidebarDockBridge {...props} />);
@@ -158,14 +164,17 @@ describe('PWA install within the shared dock', () => {
 
   it('invokes the browser install prompt and removes the installed card', async () => {
     render(<SidebarDockBridge {...props} />);
-    await screen.findByRole('link');
+    fireEvent.click(await screen.findByRole('button', { name: "What's New" }));
     const event = installEvent();
     act(() => {
       window.dispatchEvent(event);
     });
     expect(screen.queryByRole('button', { name: 'Install' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: "Dismiss what's new" }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Install' }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Install Jovie' })
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Install' }));
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: 'Install' })).toBeNull()
     );

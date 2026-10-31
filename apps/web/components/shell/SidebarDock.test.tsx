@@ -5,7 +5,8 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
-import { type ComponentPropsWithoutRef, forwardRef } from 'react';
+import userEvent from '@testing-library/user-event';
+import { type ComponentPropsWithoutRef, forwardRef, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BannerViewport } from '@/components/feedback/BannerViewport';
 import { banner } from '@/components/feedback/banner-store';
@@ -51,6 +52,21 @@ const audio = {
   onDismiss: vi.fn(),
 };
 const install = { onInstall: vi.fn(), onDismiss: vi.fn() };
+function CollapsibleDockFixture() {
+  const [collapsed, setCollapsed] = useState(false);
+  return (
+    <div>
+      <button type='button' onClick={() => setCollapsed(true)}>
+        Collapse sidebar
+      </button>
+      <SidebarDock userId='one' release={release} collapsed={collapsed} />
+      <button type='button' data-slot='common-dropdown-trigger'>
+        Account
+      </button>
+    </div>
+  );
+}
+
 const cards = (container: HTMLElement) =>
   [...container.querySelectorAll('[data-dock-card]')].map(card =>
     card.getAttribute('data-dock-card')
@@ -84,7 +100,7 @@ describe('SidebarDock', () => {
     }
   );
 
-  it('puts install last and routes all actions', () => {
+  it('keeps one compact notice above playback and routes every disclosed action', () => {
     const onUpdate = vi.fn();
     const { container } = render(
       <SidebarDock
@@ -101,13 +117,17 @@ describe('SidebarDock', () => {
     expect(onUpdate).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss update' }));
     expect(cards(container)).toEqual(['whats-new', 'now-playing']);
+    fireEvent.click(screen.getByRole('button', { name: "What's New" }));
     fireEvent.click(screen.getByRole('button', { name: "Dismiss what's new" }));
-    expect(cards(container)).toEqual(['now-playing', 'install']);
+    expect(cards(container)).toEqual(['install', 'now-playing']);
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss Player' }));
     expect(audio.onDismiss).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('button', { name: 'Install Jovie' }));
     fireEvent.click(screen.getByRole('button', { name: 'Install' }));
     expect(install.onInstall).toHaveBeenCalledOnce();
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss Prompt' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Dismiss install prompt' })
+    );
     expect(install.onDismiss).toHaveBeenCalledOnce();
   });
 
@@ -143,10 +163,12 @@ describe('SidebarDock', () => {
     const { rerender, unmount } = render(
       <SidebarDock userId='one' release={release} />
     );
+    fireEvent.click(screen.getByRole('button', { name: "What's New" }));
     fireEvent.click(screen.getByRole('button', { name: "Dismiss what's new" }));
     expect(localStorage.getItem(sidebarDockSeenKey('one'))).toBe(release.id);
     expect(screen.queryByRole('link')).toBeNull();
     rerender(<SidebarDock userId='two' release={release} />);
+    fireEvent.click(screen.getByRole('button', { name: "What's New" }));
     expect(screen.getByRole('link')).toHaveAttribute('href', '/changelog');
     expect(screen.getByRole('link')).toHaveAttribute('data-prefetch', 'false');
     rerender(<SidebarDock userId='one' release={release} />);
@@ -157,6 +179,7 @@ describe('SidebarDock', () => {
     next.rerender(
       <SidebarDock userId='one' release={{ ...release, id: 'newer' }} />
     );
+    fireEvent.click(screen.getByRole('button', { name: "What's New" }));
     fireEvent.click(screen.getByRole('link'));
     expect(localStorage.getItem(sidebarDockSeenKey('one'))).toBe('newer');
   });
@@ -170,30 +193,20 @@ describe('SidebarDock', () => {
       bytesPerSecond: 1,
     },
     { state: 'ready', version: '2' },
-  ])(
-    'keeps $state undismissable, including in the one-line row',
-    updateState => {
-      render(<SidebarDock userId='one' update={updateState} />);
-      expect(
-        screen.queryByRole('button', { name: 'Dismiss update' })
-      ).toBeNull();
-      expect(
-        screen.getByText(
-          updateState.state === 'ready'
-            ? 'Restart to update'
-            : 'Downloading 42%'
-        )
-      ).toBeVisible();
-      fireEvent.click(screen.getByRole('button', { name: 'Collapse update' }));
-      expect(
-        screen.getByRole('button', { name: 'Expand update' })
-      ).toHaveAttribute('aria-expanded', 'false');
-      expect(screen.queryByText('Open update details.')).toBeNull();
-      expect(
-        screen.queryByRole('button', { name: 'Dismiss update' })
-      ).toBeNull();
-    }
-  );
+  ])('keeps $state undismissable in one quiet row', updateState => {
+    render(<SidebarDock userId='one' update={updateState} />);
+    expect(screen.queryByRole('button', { name: 'Dismiss update' })).toBeNull();
+    expect(
+      screen.getByText(
+        updateState.state === 'ready' ? 'Restart to update' : 'Downloading 42%'
+      )
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: /Collapse update|Expand update/ })
+    ).toBeNull();
+    expect(screen.queryByText('Open update details.')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Dismiss update' })).toBeNull();
+  });
 
   it('allows available-version dismissal without hiding a downloading update', () => {
     const { rerender } = render(<SidebarDock userId='one' update={update} />);
@@ -235,10 +248,11 @@ describe('SidebarDock', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Update failed' }));
     expect(onUpdate).toHaveBeenCalledOnce();
-    expect(screen.getByText('Open update details to try again.')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Update failed' })).toBeVisible();
+    expect(screen.queryByText('Open update details to try again.')).toBeNull();
   });
 
-  it('collapses cards to named user-button badges', () => {
+  it('combines collapsed status into one priority symbol with unread detail', () => {
     const { container, rerender } = render(
       <SidebarDock
         userId='one'
@@ -260,7 +274,8 @@ describe('SidebarDock', () => {
       [...container.querySelectorAll('[data-dock-badge]')].map(node =>
         node.getAttribute('data-dock-badge')
       )
-    ).toEqual(['update', 'whats-new', 'audio', 'install']);
+    ).toEqual(['update']);
+    expect(container.querySelector('[data-dock-unread]')).not.toBeNull();
     expect(screen.getByRole('button')).toHaveAccessibleName(
       "Update available · What's new: Your latest releases · Playing: Never Say A Word · Install Jovie"
     );
@@ -272,6 +287,74 @@ describe('SidebarDock', () => {
     expect(container.querySelector('[data-dock-badges]')).toBeNull();
   });
 
+  it('reveals release details without marking them read and closes with Escape', async () => {
+    render(
+      <SidebarDock
+        userId='one'
+        release={{ ...release, summary: 'A quieter workspace.' }}
+      />
+    );
+    const trigger = screen.getByRole('button', {
+      name: "What's New",
+    });
+    expect(screen.queryByText(release.title)).toBeNull();
+    expect(screen.queryByRole('link')).toBeNull();
+    trigger.focus();
+    fireEvent.click(trigger);
+    expect(screen.getByRole('dialog', { name: "What's New" })).toBeVisible();
+    expect(screen.getByText('A quieter workspace.')).toBeVisible();
+    expect(localStorage.getItem(sidebarDockSeenKey('one'))).toBeNull();
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it('moves focus to recovery when a priority update replaces open release details', async () => {
+    const { rerender } = render(<SidebarDock userId='one' release={release} />);
+    fireEvent.click(screen.getByRole('button', { name: "What's New" }));
+    screen.getByRole('link', { name: 'View Changes' }).focus();
+    rerender(
+      <SidebarDock
+        userId='one'
+        release={release}
+        update={{ state: 'error', message: 'Offline', retryable: true }}
+      />
+    );
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Update failed' })
+      ).toHaveFocus()
+    );
+  });
+
+  it.each(['pointer', 'same-task'] as const)(
+    'preserves deliberate outside focus when %s input removes the popover trigger',
+    async input => {
+      const user = userEvent.setup();
+      render(<CollapsibleDockFixture />);
+      await user.click(screen.getByRole('button', { name: "What's New" }));
+      expect(screen.getByRole('dialog', { name: "What's New" })).toBeVisible();
+      const outside = screen.getByRole('button', { name: 'Collapse sidebar' });
+      if (input === 'pointer') {
+        await user.click(outside);
+      } else {
+        act(() => {
+          outside.focus();
+          outside.click();
+        });
+      }
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      // Flush deferred focus recovery before asserting the outside target.
+      await act(async () => {
+        await new Promise<void>(resolve =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        );
+      });
+      expect(outside).toHaveFocus();
+    }
+  );
+
   it('reserves the audio slot without a duplicate transport while the full player is visible', () => {
     const { container } = render(
       <SidebarDock userId='one' audio={{ ...audio, reserved: true }} />
@@ -282,22 +365,32 @@ describe('SidebarDock', () => {
     expect(screen.queryByRole('button', { name: 'Pause' })).toBeNull();
   });
 
-  it('returns keyboard focus after dismissing a card', async () => {
-    render(
-      <div>
-        <SidebarDock userId='one' release={release} />
-        <button type='button' data-slot='common-dropdown-trigger'>
-          Account
-        </button>
-      </div>
-    );
-    const dismiss = screen.getByRole('button', { name: "Dismiss what's new" });
-    dismiss.focus();
-    fireEvent.click(dismiss);
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Account' })).toHaveFocus()
-    );
-  });
+  it.each([false, true])(
+    'returns keyboard focus after dismissal with reserved audio=%s',
+    async reservedAudio => {
+      render(
+        <div>
+          <SidebarDock
+            userId='one'
+            release={release}
+            audio={reservedAudio ? { ...audio, reserved: true } : undefined}
+          />
+          <button type='button' data-slot='common-dropdown-trigger'>
+            Account
+          </button>
+        </div>
+      );
+      fireEvent.click(screen.getByRole('button', { name: "What's New" }));
+      const dismiss = screen.getByRole('button', {
+        name: "Dismiss what's new",
+      });
+      dismiss.focus();
+      fireEvent.click(dismiss);
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Account' })).toHaveFocus()
+      );
+    }
+  );
 
   it('dismisses in memory when browser storage is unavailable', () => {
     const get = vi
@@ -311,6 +404,7 @@ describe('SidebarDock', () => {
         throw new Error('blocked');
       });
     render(<SidebarDock userId='one' release={release} />);
+    fireEvent.click(screen.getByRole('button', { name: "What's New" }));
     fireEvent.click(screen.getByRole('button', { name: "Dismiss what's new" }));
     expect(screen.queryByRole('link')).toBeNull();
     get.mockRestore();

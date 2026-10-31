@@ -637,6 +637,38 @@ def resolve_preflight_narrowed_text(text: str) -> str | None:
     return resolved
 
 
+def resolve_additive_import_text(text: str) -> str | None:
+    """Union independent single named imports only when diff3 proves an empty base.
+
+    Replacements, aliases, side effects and unknown hunks remain unresolved.
+    This prepares source for normal verification; it never stages or publishes.
+    """
+    hunk = re.compile(r"^<<<<<<< [^\n]+\n(.*?)^\|\|\|\|\|\|\| [^\n]+\n(.*?)^=======\n(.*?)^>>>>>>> [^\n]+\n",
+                      re.M | re.S)
+    declaration = re.compile(r"import \{ ([A-Za-z_$][\w$]*) \} from '(@/[\w/.-]+)';\n")
+    matches = list(hunk.finditer(text))
+    if not matches:
+        return None
+    result, end = [], 0
+    for match in matches:
+        ours, base, theirs = match.groups()
+        left, right = declaration.fullmatch(ours), declaration.fullmatch(theirs)
+        if base or not left or not right or left[1] == right[1] or left[2] == right[2]:
+            return None
+        # Refuse a binding already imported elsewhere (including another hunk).
+        for binding in (left[1], right[1]):
+            imports = re.findall(r"^import[^;]*;", text, re.M)
+            if sum(bool(re.search(rf"\b{re.escape(binding)}\b", line)) for line in imports) != 1:
+                return None
+        result.extend((text[end:match.start()], *sorted((ours, theirs))))
+        end = match.end()
+    result.append(text[end:])
+    resolved = "".join(result)
+    if re.search(r"^(?:<<<<<<<|\|\|\|\|\|\|\||=======|>>>>>>>)", resolved, re.M):
+        return None
+    return resolved
+
+
 def _domain_write_hits(log: str) -> dict[str, list[str]]:
     """Allowed-0 guard lines, in file order. A positive cap is not a hit."""
     hits: dict[str, list[str]] = {}
@@ -933,11 +965,20 @@ def costs_from_metrics(state: Path) -> dict:
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("command", choices=["measure"])
+    parser.add_argument("command", choices=["measure", "resolve-imports"])
+    parser.add_argument("--path", type=Path)
     parser.add_argument("--state", default=str(Path.home() / ".local/state/jovie-lanes"))
     parser.add_argument("--days", type=int, default=5)
     parser.add_argument("--now", type=float, default=None)
     args = parser.parse_args(argv)
+    if args.command == "resolve-imports":
+        if args.path is None:
+            parser.error("resolve-imports requires --path (a diff3 conflict file)")
+        resolved = resolve_additive_import_text(args.path.read_text())
+        if resolved is None:
+            return 1
+        atomic_write_text(args.path, resolved)
+        return 0
     now = args.now or datetime.now(timezone.utc).timestamp()
     print(json.dumps(measure(read_ledger(Path(args.state)), now, args.days, costs_from_metrics(Path(args.state))), indent=1))
     return 0
