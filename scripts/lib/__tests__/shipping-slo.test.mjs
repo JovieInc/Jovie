@@ -75,7 +75,12 @@ const DAY = 86_400_000;
 const ago = days => new Date(NOW - days * DAY).toISOString();
 
 describe('escape trace workflow failure propagation', () => {
-  const job = Object.values(parseYaml(WORKFLOW).jobs).find(job =>
+  /** @typedef {{ name?: string, run?: string, 'continue-on-error'?: boolean }} TraceStep */
+  /** @typedef {{ steps: TraceStep[], 'continue-on-error'?: boolean }} TraceJob */
+  const workflow = /** @type {{ jobs: Record<string, TraceJob> }} */ (
+    parseYaml(WORKFLOW)
+  );
+  const job = Object.values(workflow.jobs).find(job =>
     job.steps.some(
       step => step.name === 'Trace escapes to the PRs that introduced them'
     )
@@ -94,10 +99,10 @@ describe('escape trace workflow failure propagation', () => {
       const root = mkdtempSync(resolve(tmpdir(), 'escape-trace-'));
       const callsPath = resolve(root, 'calls');
       try {
-        for (const [command, code] of [
-          ['git', gitExit],
-          ['node', nodeExit],
-        ]) {
+        for (const [command, code] of Object.entries({
+          git: gitExit,
+          node: nodeExit,
+        })) {
           const path = resolve(root, command);
           writeFileSync(
             path,

@@ -141,6 +141,7 @@ function git(args, cwd) {
   });
 }
 
+/** @param {{ days?: number, cwd?: string, run?: typeof git }} [options] */
 export function readCommits({ days, cwd = process.cwd(), run = git } = {}) {
   const logArgs = [
     'log',
