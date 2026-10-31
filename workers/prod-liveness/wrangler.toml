@@ -1,0 +1,20 @@
+# Recovered from the deployed Worker (source map sourcesContent) 2026-10-31; was deployed with no source in git.
+name = "jovie-prod-liveness"
+main = "src/index.ts"
+compatibility_date = "2026-10-15"
+workers_dev = true
+# Dashboard-set vars (EMAIL_TO, PAGE_URLS, EMAIL_FROM) and secrets (RESEND_API_KEY, SUMMER_LIVENESS_SECRET) survive deploys.
+keep_vars = true
+
+[vars]
+TARGETS = "https://jov.ie/,https://summer.jov.ie/runtime/v1/health"
+FAILURES_TO_PAGE = "2"
+SUMMER_PAGE_URL = "https://summer.jov.ie/summer/v1/events/liveness"
+
+[[kv_namespaces]]
+binding = "STATE"
+id = "0282eb9b15e8474da733c8d97736c047"
+
+[triggers]
+# Time-to-detect budget: 2 consecutive failing minutes. Registered in canon/automation-registry.jsonl.
+crons = ["* * * * *"]
