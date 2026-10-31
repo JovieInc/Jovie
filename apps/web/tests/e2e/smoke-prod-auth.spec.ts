@@ -13,6 +13,7 @@ import {
   mintPassageToken,
   PASSAGE_TOKEN_HEADER,
 } from '@/lib/synthetic/passage-token';
+import { PRODCERT_ADMIN_READBACK_EMAIL } from '@/lib/synthetic/prodcert-identities';
 import { fillControlledInputUntilEnabled } from '../helpers/auth';
 import {
   assertExactNavigationUrl,
@@ -25,12 +26,12 @@ import {
   certStep,
   certStepBlocked,
   createSurfaceTelemetry,
+  recordAdminReadback,
   recordCertObservation,
 } from './utils/prod-cert-steps';
 import { resolveProductionAuthCredentials } from './utils/production-auth-credentials';
 import {
   prepareProductionAuthEmailForm,
-  waitForCheckoutEntryContent,
   waitForProductionDashboardContent,
 } from './utils/production-auth-interaction';
 import {
@@ -505,7 +506,7 @@ test.describe('Production Auth Smoke @production-smoke', () => {
   });
 
   test('sign-in works and dashboard loads', async ({ page }, testInfo) => {
-    test.setTimeout(240_000);
+    test.setTimeout(300_000);
     const credentials = getProdCredentials();
     const expectedOrigin = exactOriginForTest(testInfo);
     // JOV-9625 outcome receipt: per-surface console/network error counts and
@@ -902,7 +903,24 @@ test.describe('Production Auth Smoke @production-smoke', () => {
           });
           await composer.fill(probe);
           const sentAt = Date.now();
+          const chatResponse = page.waitForResponse(
+            candidate =>
+              candidate.request().method() === 'POST' &&
+              new URL(candidate.url()).pathname === '/api/chat',
+            { timeout: 60_000 }
+          );
           await page.getByRole('button', { name: /send message/i }).click();
+          const response = await chatResponse;
+          // The weekly-AI-quota path returns HTTP 200 with the limit text
+          // streamed as an assistant message, so a rendered reply element
+          // alone is a false pass. A terminal failure names itself in a
+          // header; assert it absent before trusting any reply.
+          const terminalFailure = response.headers()['x-chat-terminal-failure'];
+          if (terminalFailure) {
+            throw new Error(
+              `chat turn ended in a terminal failure state: ${terminalFailure}`
+            );
+          }
           // conversation.active-state: the turn must enter an explicit
           // active/streaming state (thinking indicator or streamed reply).
           await expect(
@@ -923,10 +941,20 @@ test.describe('Production Auth Smoke @production-smoke', () => {
             timeout: SMOKE_TIMEOUTS.VISIBILITY,
           });
           const echoMs = Date.now() - sentAt;
-          await expect(
-            page.getByTestId('chat-message-reply').first()
-          ).toBeVisible({ timeout: 60_000 });
+          const reply = page.getByTestId('chat-message-reply').first();
+          await expect(reply).toBeVisible({ timeout: 60_000 });
           const replyMs = Date.now() - sentAt;
+          // A real assistant reply, not the quota/limit copy: the exhausted
+          // weekly-AI-quota state streams its notice as an assistant message
+          // and would otherwise satisfy the reply selector (JOV-10066).
+          const replyText = (await reply.innerText()).toLowerCase();
+          const quotaOrError =
+            /reached your chat limit|out of messages|weekly (ai )?(message|chat) limit|could not verify your billing|temporarily limited|try again later/u;
+          if (quotaOrError.test(replyText)) {
+            throw new Error(
+              `chat reply is a quota/error notice, not an assistant reply: ${replyText.slice(0, 160)}`
+            );
+          }
           recordCertObservation({
             surface: 'chat',
             contractId: 'conversation.message-echo',
@@ -967,29 +995,123 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       'checkout',
       'checkout-entry-renders',
       async () => {
-        await page.goto(APP_ROUTES.SETTINGS_BILLING, {
-          waitUntil: 'domcontentloaded',
-          timeout: SMOKE_TIMEOUTS.NAVIGATION,
-        });
+        // JOV-10066: the checkout entry is the real /onboarding/checkout
+        // surface (explicit paid intent, so the organic-offer gates cannot
+        // redirect), not the billing settings page. The step stops before
+        // the Stripe handoff — it asserts the upgrade entry rendered.
+        await page.goto(
+          `${expectedOrigin}/onboarding/checkout?source=intent&plan=pro`,
+          {
+            waitUntil: 'domcontentloaded',
+            timeout: SMOKE_TIMEOUTS.NAVIGATION,
+          }
+        );
         assertExactNavigationUrl(
           page.url(),
           expectedOrigin,
-          'Billing navigation'
+          'Onboarding checkout navigation'
         );
         await waitForHydration(page);
-        const billingText = await waitForCheckoutEntryContent(
-          page,
-          SMOKE_TIMEOUTS.VISIBILITY
-        );
-        expect(billingText).not.toMatch(
+        await expect(
+          page.getByRole('heading', { name: /upgrade to/i }).first()
+        ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+        const upgradeButton = page.getByRole('button', {
+          name: /upgrade to pro/i,
+        });
+        await expect(upgradeButton).toBeVisible({
+          timeout: SMOKE_TIMEOUTS.VISIBILITY,
+        });
+        await expect(upgradeButton).toBeEnabled();
+        const checkoutText = (
+          await page.locator('main').first().innerText()
+        ).toLowerCase();
+        expect(checkoutText).not.toMatch(
           /application error|something went wrong/
         );
-        expect(billingText).toMatch(/plan|upgrade|billing|pro/);
+        expect(checkoutText).toMatch(/pro/);
       },
-      () => 'billing/checkout entry rendered; stopped before payment'
+      () =>
+        'onboarding/checkout entry rendered the upgrade CTA; stopped before payment'
     );
     telemetry.record('checkout');
     await telemetry.capture(page, 'checkout');
+
+    // JOV-9625 outcome rework: one admin certifications-inventory readback
+    // attempt per run, as the documented CI admin fixture
+    // (browse-admin+clerk_test@jov.ie). Recorded as receipt evidence on the
+    // landing surface — never a check — so a not-viable fixture records the
+    // exact blocker without turning any golden-path surface red.
+    {
+      const adminEmail = PRODCERT_ADMIN_READBACK_EMAIL;
+      const adminContext = await page.context().browser()?.newContext();
+      try {
+        if (!adminContext) throw new Error('no browser context available');
+        const adminPage = await adminContext.newPage();
+        await adminPage.goto(APP_ROUTES.SIGNIN, {
+          waitUntil: 'domcontentloaded',
+          timeout: SMOKE_TIMEOUTS.NAVIGATION,
+        });
+        const { submitButton } = await prepareProductionAuthEmailForm(
+          adminPage,
+          adminEmail
+        );
+        const otpRequestedAtMs = Date.now();
+        await submitButton.click();
+        const codeInput = adminPage
+          .locator(
+            'form[data-auth-email-code-step="code"] [data-testid="otp-autofill-input"], form[data-auth-email-code-step="code"] input[name="code"], form[data-auth-email-code-step="code"] input[autocomplete="one-time-code"], form[data-auth-email-code-step="code"] input[inputmode="numeric"]'
+          )
+          .first();
+        await expect(codeInput).toBeVisible({ timeout: 15_000 });
+        const adminCode = await waitForProductionAuthOtp({
+          email: adminEmail,
+          startedAtMs: otpRequestedAtMs,
+        }).catch(error => {
+          throw Object.assign(
+            new Error(
+              `admin fixture not viable: no fresh sign-in code for ${adminEmail} (${String(
+                (error as Error)?.message ?? error
+              ).slice(
+                0,
+                120
+              )}) — the fixture is likely absent from the production Better Auth database`
+            ),
+            { recorded: true }
+          );
+        });
+        await codeInput.fill(adminCode);
+        await adminPage.waitForURL(
+          url =>
+            url.origin === expectedOrigin && url.pathname.startsWith('/app'),
+          { timeout: 30_000 }
+        );
+        const inventoryResponse = await adminContext.request.get(
+          `${expectedOrigin}/api/ovie/certifications`
+        );
+        if (inventoryResponse.status() === 200) {
+          const inventory = (await inventoryResponse.json()) as {
+            counts?: { total?: number };
+          };
+          recordAdminReadback({
+            status: 'passed',
+            detail: `admin certifications inventory read back as ${adminEmail}: ${inventory?.counts?.total ?? 0} rows`,
+          });
+        } else {
+          recordAdminReadback({
+            status: 'blocked',
+            detail: `GET /api/ovie/certifications returned HTTP ${inventoryResponse.status()} for ${adminEmail} — the fixture is not an admin (users.isAdmin) in production`,
+          });
+        }
+      } catch (error) {
+        const recorded = error as { recorded?: boolean };
+        recordAdminReadback({
+          status: recorded.recorded ? 'blocked' : 'failed',
+          detail: String((error as Error)?.message ?? error).slice(0, 1_900),
+        });
+      } finally {
+        await adminContext?.close().catch(() => undefined);
+      }
+    }
 
     const performanceAuthStatePath =
       process.env.PERFORMANCE_AUTH_STATE_PATH?.trim();
