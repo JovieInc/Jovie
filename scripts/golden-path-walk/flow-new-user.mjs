@@ -40,7 +40,11 @@ export default async function flow({
   const ctx = arguments[0];
   const btn = ctx.page.getByTestId('onboarding-confirm-handle').last();
   if (await btn.isDisabled().catch(() => true)) {
-    const f = ctx.page.getByLabel('Edit Proposed Handle').last();
+    const change = ctx.page
+      .getByRole('button', { name: /change handle/i })
+      .last();
+    if (await change.isVisible().catch(() => false)) await change.click();
+    const f = ctx.page.getByLabel(/edit (proposed )?handle/i).last();
     await f.fill('');
     await f.pressSequentially(process.env.REPLY1 ?? 'unmarkedpave', {
       delay: 60,
