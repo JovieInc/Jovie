@@ -13,7 +13,10 @@ let _measurementId: string | undefined = 'G-TMY7Z8HK47';
 let _isTest = false;
 let _isE2E = false;
 let _isDemo = false;
-const privacy = vi.hoisted(() => ({ allowed: true }));
+const { privacy, gtag } = vi.hoisted(() => ({
+  privacy: { allowed: true },
+  gtag: vi.fn(),
+}));
 vi.mock('@/lib/tracking/use-tracking-eligibility', () => ({
   useTrackingEligibility: () => ({ ga: privacy.allowed }),
 }));
@@ -74,7 +77,8 @@ describe('GoogleAnalytics', () => {
     _isE2E = false;
     _isDemo = false;
     globalThis.JVConsent = undefined;
-    globalThis.gtag = vi.fn();
+    gtag.mockReset();
+    vi.stubGlobal('gtag', gtag);
   });
 
   afterEach(() => {
@@ -90,15 +94,15 @@ describe('GoogleAnalytics', () => {
     expect(scripts[0]?.getAttribute('src')).toBe(
       'https://www.googletagmanager.com/gtag/js?id=G-TMY7Z8HK47'
     );
-    expect(globalThis.gtag).toHaveBeenCalledWith('js', expect.any(Date));
-    expect(globalThis.gtag).toHaveBeenCalledWith('config', 'G-TMY7Z8HK47');
+    expect(gtag).toHaveBeenCalledWith('js', expect.any(Date));
+    expect(gtag).toHaveBeenCalledWith('config', 'G-TMY7Z8HK47');
   });
 
   it('suppresses a configured loader and direct config when policy denies tracking', () => {
     privacy.allowed = false;
     const { container } = render(<GoogleAnalytics />);
     expect(getScripts(container)).toHaveLength(0);
-    expect(globalThis.gtag).not.toHaveBeenCalled();
+    expect(gtag).not.toHaveBeenCalled();
   });
 
   it('returns null when measurement ID is missing', () => {
@@ -146,7 +150,7 @@ describe('GoogleAnalytics', () => {
       marketing: false,
     });
 
-    expect(globalThis.gtag).toHaveBeenCalledWith('consent', 'update', {
+    expect(gtag).toHaveBeenCalledWith('consent', 'update', {
       analytics_storage: 'granted',
       ad_storage: 'denied',
       ad_user_data: 'denied',
