@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render as rtlRender, screen, waitFor } from '@testing-library/react';
+import type { ReactElement, ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const dashboard = vi.hoisted(() => ({
@@ -15,6 +16,20 @@ const dashboard = vi.hoisted(() => ({
     username: string;
   } | null,
 }));
+
+const search = vi.hoisted(() => ({ params: new URLSearchParams() }));
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => search.params,
+}));
+
+function render(ui: ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return rtlRender(
+    <QueryClientProvider client={client}>{ui}</QueryClientProvider>
+  );
+}
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   useDashboardData: () => ({
@@ -40,7 +55,9 @@ vi.mock('@/components/jovie/JovieChat', () => ({
     homeCanvas,
     homeCanvasMode,
     ambientOwnedByShell,
+    initialQuery,
   }: {
+    readonly initialQuery?: string;
     readonly profileId?: string;
     readonly chatMode?: 'ov' | null;
     readonly homeCanvas?:
@@ -59,6 +76,7 @@ vi.mock('@/components/jovie/JovieChat', () => ({
       data-chat-mode={chatMode ?? undefined}
       data-home-canvas-mode={homeCanvasMode}
       data-ambient-owned-by-shell={ambientOwnedByShell}
+      data-initial-query={initialQuery}
     >
       {typeof homeCanvas === 'function'
         ? homeCanvas({
@@ -123,5 +141,42 @@ describe('OvChatClient shared component ownership', () => {
     expect(screen.getByTestId('shared-jovie-chat')).not.toHaveAttribute(
       'data-profile-id'
     );
+  });
+
+  it('starts a Summer conversation about a Discuss deep link, naming the decision', async () => {
+    search.params = new URLSearchParams('discuss=summer-card%3Asc_1');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          cases: [
+            {
+              id: 'summer-card:sc_1',
+              title: 'Ship the agent connector legal pages',
+              decisionDefault: null,
+            },
+          ],
+          issues: [],
+        })
+      )
+    );
+    render(<OvChatClient />);
+    await waitFor(() =>
+      expect(screen.getByTestId('shared-jovie-chat')).toHaveAttribute(
+        'data-initial-query',
+        expect.stringContaining('"Ship the agent connector legal pages"')
+      )
+    );
+    vi.unstubAllGlobals();
+    search.params = new URLSearchParams();
+  });
+
+  it('ignores a malformed discuss parameter instead of sending its text', () => {
+    search.params = new URLSearchParams('discuss=Say+something+rude');
+    render(<OvChatClient />);
+    expect(screen.getByTestId('shared-jovie-chat')).not.toHaveAttribute(
+      'data-initial-query'
+    );
+    search.params = new URLSearchParams();
   });
 });

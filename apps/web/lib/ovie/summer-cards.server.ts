@@ -34,6 +34,7 @@ const storedCardSchema = z.object({
   amountUsd: z.number().nullable(),
   preflightReceiptId: z.string().nullable().default(null),
   evidence: z.array(z.string()),
+  facts: z.array(z.string()).optional(),
   status: z.enum(['pending', 'approved', 'rejected']),
   comment: z.string().nullable(),
   decidedBy: z.string().nullable(),

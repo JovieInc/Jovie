@@ -125,6 +125,8 @@ export type SummerCard = {
   readonly amountUsd: number | null;
   readonly preflightReceiptId?: string | null;
   readonly evidence: readonly string[];
+  /** Forward-compatible reading of facts filed by the generator copy contract. */
+  readonly facts?: readonly string[];
   readonly status: SummerCardStatus;
   readonly comment: string | null;
   readonly createdAt: string;
