@@ -150,6 +150,14 @@ export function withStreamStallGuard<MODEL extends StreamingModel>(
     firstChunkMs: options.firstChunkMs ?? STREAM_FIRST_CHUNK_TIMEOUT_MS,
     idleMs: options.idleMs ?? STREAM_IDLE_TIMEOUT_MS,
   };
+  // Not a streaming model object (e.g. a bare model id string): nothing to bound.
+  if (
+    typeof model !== 'object' ||
+    model === null ||
+    typeof model.doStream !== 'function'
+  ) {
+    return model;
+  }
   const wrapped = Object.create(model) as MODEL;
   // Configurable + writable: the AI SDK may wrap a v3 model in a Proxy, which
   // rejects a non-configurable own property that it does not return as-is.
