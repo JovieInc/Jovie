@@ -34,9 +34,11 @@ export function OvieInFlightBlockers({
         <p className='text-sm text-secondary-token'>Nothing is stuck.</p>
       ) : (
         <ul className='flex min-h-0 flex-col gap-1.5 overflow-hidden'>
-          {summary.groups.map(group => (
+          {summary.groups.map((group, index) => (
             <li key={group.reason}>
               <details
+                // The biggest reason starts open so its PRs read at a glance.
+                open={index === 0}
                 className='group rounded-lg bg-surface-1'
                 data-testid='ovie-blocker-group'
               >

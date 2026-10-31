@@ -275,7 +275,7 @@ describe('OvieHomeCanvas', () => {
     expect(screen.queryByTestId('home-loop-stage-strip')).toBeNull();
     // In Flight names why work is stuck instead of listing every card.
     expect(screen.getByTestId('ovie-blocker-group')).toHaveTextContent(
-      'Blocked, no failing check named'
+      'Blocked in Linear, checks pending'
     );
     expect(screen.queryByTestId('home-loop-kanban-card')).toBeNull();
   });

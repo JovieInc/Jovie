@@ -39,11 +39,16 @@ function task(
 
 describe('blockerReason', () => {
   it('collapses shards and per-run ids into one readable reason', () => {
-    expect(blockerReason('Affected Unit Tests (3/4)')).toBe('Unit tests');
-    expect(blockerReason('jovie-execution/e502e4ea63abb5bc')).toBe(
-      'Agent execution check'
+    expect(blockerReason('Affected Unit Tests (3/4)')).toBe(
+      'Unit tests failing'
     );
-    expect(blockerReason('Source Validation')).toBe('Source Validation');
+    expect(blockerReason('jovie-execution/e502e4ea63abb5bc')).toBe(
+      'Agent run failed'
+    );
+    expect(blockerReason('Source Validation')).toBe(
+      'Source validation failing'
+    );
+    expect(blockerReason('Some New Check')).toBe('Some New Check');
   });
 });
 
@@ -64,9 +69,9 @@ describe('buildInFlightSummary', () => {
     expect(summary).toMatchObject({ total: 6, stuck: 4, moving: 2 });
     // One group per PR: the groups always sum to the stuck count.
     expect(summary.groups.map(g => [g.reason, g.count])).toEqual([
-      ['Source Validation', 2],
-      ['Blocked, no failing check named', 1],
-      ['Unit tests', 1],
+      ['Source validation failing', 2],
+      ['Blocked in Linear, checks pending', 1],
+      ['Unit tests failing', 1],
     ]);
     expect(summary.groups.reduce((n, g) => n + g.count, 0)).toBe(summary.stuck);
     expect(summary.groups[0]?.prs[0]).toEqual({

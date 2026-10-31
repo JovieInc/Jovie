@@ -108,17 +108,26 @@ function writeLastVisit(
   }
 }
 
-/** One baseline for the whole page: Tim's last visit. */
-function sinceLabel(row: string, at: number | null, now: number): string {
-  if (at === null) return row;
+/** One baseline for the whole page: Tim's last visit, named on each "Was". */
+function sinceAgo(at: number | null, now: number): string | null {
+  if (at === null) return null;
   const minutes = Math.max(0, Math.round((now - at) / 60_000));
-  const ago =
-    minutes < 60
-      ? `${minutes}m`
-      : minutes < 48 * 60
-        ? `${Math.round(minutes / 60)}h`
-        : `${Math.round(minutes / 1440)}d`;
-  return `${row} · "Was" is your last visit, ${ago} ago`;
+  return minutes < 60
+    ? `${minutes}m ago`
+    : minutes < 48 * 60
+      ? `${Math.round(minutes / 60)}h ago`
+      : `${Math.round(minutes / 1440)}d ago`;
+}
+
+function withVisitAge<T extends { readonly was: string | null }>(
+  tiles: readonly T[],
+  ago: string | null
+): readonly T[] {
+  return ago
+    ? tiles.map(tile =>
+        tile.was ? { ...tile, was: `${tile.was}, ${ago}` } : tile
+      )
+    : tiles;
 }
 
 async function fetchJson<T>(url: string, signal: AbortSignal): Promise<T> {
@@ -165,6 +174,7 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
 
   const [lastVisit] = useState<OvieLastVisit>(readLastVisit);
   const [mountedAt] = useState(() => Date.now());
+  const visitAgo = sinceAgo(lastVisit.at, mountedAt);
   const company = useQuery({
     queryKey: ['ovie', 'home', 'company'],
     queryFn: async ({ signal }) => {
@@ -441,7 +451,7 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       copy={OVIE_HOME_COPY}
       stages={activeStages}
       constraint={constraint}
-      pulse={home?.pulse ?? []}
+      pulse={withVisitAge(home?.pulse ?? [], visitAgo)}
       asks={asks}
       rows={home?.rows ?? []}
       done={home?.done ?? []}
@@ -457,10 +467,10 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       onRetryLoop={() => void shipping.refetch()}
       onRetryAsks={() => void inbox.refetch()}
       asksMoreHref={APP_ROUTES.ADMIN_INBOX}
-      company={companyTiles}
+      company={withVisitAge(companyTiles, visitAgo)}
       companyLoading={company.isPending}
-      companyCaption={sinceLabel('Company', lastVisit.at, mountedAt)}
-      pulseCaption={sinceLabel('Shipping', lastVisit.at, mountedAt)}
+      companyCaption='Company'
+      pulseCaption='Shipping'
       onAsksHiddenChange={setAsksHidden}
       asksHideMore
       inFlightMoreHref={APP_ROUTES.ADMIN_SHIPPING}

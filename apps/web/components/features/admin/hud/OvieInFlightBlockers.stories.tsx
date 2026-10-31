@@ -21,7 +21,7 @@ const meta = {
       moving: 5,
       groups: [
         {
-          reason: 'Source Validation',
+          reason: 'Source validation failing',
           count: 13,
           prs: [
             pr(23801, 'feat(onboarding): gate access'),
@@ -29,17 +29,17 @@ const meta = {
           ],
         },
         {
-          reason: 'Fleet Rules Evidence',
+          reason: 'PR body lacks fleet evidence',
           count: 12,
           prs: [pr(23803, 'fix(symphony): honor priority')],
         },
         {
-          reason: 'PR Ready',
+          reason: 'Not marked ready',
           count: 6,
           prs: [pr(23804, 'feat(agents): attest routes')],
         },
         {
-          reason: 'Agent execution check',
+          reason: 'Agent run failed',
           count: 3,
           prs: [pr(23805, 'fix(profile): canonical launch')],
         },

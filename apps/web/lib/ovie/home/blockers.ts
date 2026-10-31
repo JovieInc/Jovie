@@ -31,13 +31,23 @@ export interface OvieInFlightSummary {
   readonly groups: readonly OvieBlockerGroup[];
 }
 
+/** Plain reasons for the checks that hold most PRs; others keep their name. */
+const PLAIN_REASONS: Readonly<Record<string, string>> = {
+  'Fleet Rules Evidence': 'PR body lacks fleet evidence',
+  'PR Fleet Rules': 'PR body breaks fleet rules',
+  'Source Validation': 'Source validation failing',
+  'PR Ready': 'Not marked ready',
+  'Design gate': 'Design gate failing',
+};
+
 /** Collapse sharded and per-run check names into the reason a person reads. */
 export function blockerReason(check: string): string {
   const name = check.trim();
-  if (/^jovie-execution\//i.test(name)) return 'Agent execution check';
-  if (/^Affected Unit Tests\b/i.test(name)) return 'Unit tests';
-  if (/^Private data guard\b/i.test(name)) return 'Private data guard';
-  return name.replace(/\s*\(\d+\/\d+\)\s*$/, '') || 'Unknown check';
+  if (/^jovie-execution\//i.test(name)) return 'Agent run failed';
+  if (/^Affected Unit Tests\b/i.test(name)) return 'Unit tests failing';
+  if (/^Private data guard\b/i.test(name)) return 'Private data guard failing';
+  const base = name.replace(/\s*\(\d+\/\d+\)\s*$/, '');
+  return PLAIN_REASONS[base] ?? (base || 'Unknown check');
 }
 
 function isStuck(task: OperationalTask): boolean {
@@ -53,7 +63,7 @@ function reasonsFor(task: OperationalTask): readonly string[] {
   const reasons = [...new Set(failing.map(blockerReason))];
   if (reasons.length > 0) return reasons;
   if (task.workflowState === 'retrying') return ['Retrying'];
-  return ['Blocked, no failing check named'];
+  return ['Blocked in Linear, checks pending'];
 }
 
 /**

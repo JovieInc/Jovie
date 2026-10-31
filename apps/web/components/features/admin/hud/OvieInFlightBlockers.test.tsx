@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { OvieInFlightBlockers } from './OvieInFlightBlockers';
 
@@ -27,7 +27,8 @@ describe('OvieInFlightBlockers', () => {
     const group = screen.getByTestId('ovie-blocker-group');
     expect(group).toHaveTextContent('Source Validation');
     expect(group).toHaveTextContent('7 PRs');
-    fireEvent.click(within(group).getByText('Source Validation'));
+    // The biggest reason starts open.
+    expect(group).toHaveAttribute('open');
     expect(
       within(group).getByRole('link', { name: '#100 Task 0' })
     ).toHaveAttribute('href', 'https://github.com/JovieInc/Jovie/pull/100');

@@ -349,7 +349,7 @@ function rawPulse(
         behind === null
           ? 'neutral'
           : toneAtMost(behind, TARGETS.productionBehindMain, 20),
-      target: 'Target current',
+      target: 'Target 0',
       href: shipping,
     },
     {
@@ -358,7 +358,7 @@ function rawPulse(
       value: lyb.value,
       measured: lyb.measured,
       tone: lyb.tone,
-      target: 'Target current',
+      target: 'Target 0',
       href: fleet,
     },
     {
