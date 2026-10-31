@@ -28,6 +28,7 @@ import { OperationalTasksPanel } from '@/components/features/admin/hud/Operation
 import { OvieInbox } from '@/components/features/admin/hud/OvieInbox';
 import { OvieLauncherRail } from '@/components/features/admin/hud/OvieLauncherRail';
 import { OvieShippingStateCard } from '@/components/features/admin/hud/OvieShippingStateCard';
+import { TimeLeverageCard } from '@/components/features/admin/hud/TimeLeverageCard';
 import type { DailyBucket } from '@/components/features/admin/ShippingVelocityChart';
 import { PipelineBottleneckBanner } from '@/components/features/home/PipelineBottleneckBanner';
 import { toast } from '@/components/feedback';
@@ -818,6 +819,9 @@ export function HudDashboardClient({
               <div className='h-20'>
                 <PipelineBottleneckBanner isAdmin />
               </div>
+            ) : null}
+            {metrics.accessMode === 'admin' ? (
+              <TimeLeverageCard isAdmin />
             ) : null}
             <FounderFunnelBand initialFunnel={initialFunnel} />
           </div>
