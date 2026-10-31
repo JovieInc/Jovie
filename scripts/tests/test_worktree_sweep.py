@@ -154,7 +154,7 @@ class SweepTest(unittest.TestCase):
         path = self.worktree("clean")
         report = self.sweep()
         self.assertFalse(path.exists())
-        self.assertEqual(report["removed"], [{"path": str(path), "reason": "idle"}])
+        self.assertEqual(report["removed"], [{"path": str(path), "reason": "clean-idle"}])
         self.assertEqual(self.remote_snapshots(), [])
 
     def test_dirty_and_unpushed_work_is_backed_up_before_removal(self):
@@ -814,3 +814,53 @@ class StandaloneAndHeadroomTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CleanIdleSweepTest(SweepTest):
+    """JOV-10172: a clean, fully pushed checkout retires after CLEAN_IDLE_S (default 3h)
+    instead of waiting the full 12h; dirty or unpushed work never uses that tier."""
+
+    def test_clean_pushed_checkout_retires_early_with_the_clean_idle_reason(self):
+        path = self.worktree("early")
+        report = self.sweep(now=time.time() + 4 * 3600)  # past 3h, short of 12h
+        self.assertFalse(path.exists())
+        self.assertEqual(report["removed"], [{"path": str(path), "reason": "clean-idle"}])
+        self.assertEqual(self.remote_snapshots(), [], "nothing to preserve: no snapshot")
+
+    def test_dirty_checkout_waits_for_the_full_window_and_snapshot_path(self):
+        path = self.worktree("dirty-early")
+        (path / "untracked.txt").write_text("unsaved\n")
+        report = self.sweep(now=time.time() + 4 * 3600)
+        self.assertTrue(path.exists(), "dirty work is never clean-idle retired")
+        self.assertEqual(report["removed"], [])
+        self.assertEqual(report["kept"], 1)
+        report = self.sweep(now=time.time() + 2 * DAY)
+        self.assertFalse(path.exists())
+        self.assertEqual(report["removed"][0]["reason"], "idle")
+        self.assertTrue(self.remote_snapshots(), "the 12h tier still snapshots it")
+
+    def test_unpushed_checkout_waits_for_the_full_window(self):
+        path = self.worktree("unpushed-early")
+        (path / "c.txt").write_text("committed but unpushed\n")
+        git(path, "add", "c.txt")
+        git(path, "commit", "-qm", "local only")
+        report = self.sweep(now=time.time() + 4 * 3600)
+        self.assertTrue(path.exists(), "unpushed work is never clean-idle retired")
+        self.assertEqual(report["removed"], [])
+
+    def test_the_tier_can_be_turned_off_and_returns_to_the_full_window(self):
+        path = self.worktree("off")
+        report = self.sweep(now=time.time() + 4 * 3600, clean_idle_s=None)
+        self.assertTrue(path.exists())
+        self.assertEqual(report["kept"], 1)
+        report = self.sweep(now=time.time() + 13 * 3600, clean_idle_s=None)
+        self.assertFalse(path.exists())
+        self.assertEqual(report["removed"][0]["reason"], "idle")
+
+    def test_default_threshold_is_three_hours(self):
+        self.assertEqual(sweeper.CLEAN_IDLE_S, 3 * 3600)
+        # A checkout idle between the closed-PR grace and the clean threshold stays.
+        path = self.worktree("grace")
+        report = self.sweep(now=time.time() + 2 * 3600)
+        self.assertTrue(path.exists())
+        self.assertEqual(report["kept"], 1)

@@ -10,7 +10,9 @@ It covers lanes, Codex, Conductor, Claude-scratch and manual `jovie-wt-*` checko
   process inventory removes nothing.
 - A checkout retires when its branch's PR closed or merged (after a short grace), or when it
   has been idle for `idle_s`. Idle is the newest reflog entry or dirty-file mtime, never the
-  directory mtime (git status and maintenance bump those).
+  directory mtime (git status and maintenance bump those). A clean, fully pushed checkout
+  retires earlier, after `clean_idle_s` (JOV-10172, default 3h): there is nothing to preserve.
+  Dirty or unpushed work never uses that tier and keeps the full window plus snapshot path.
 - Dirty or unpushed state is first committed off-index (`commit-tree`, no hooks, the
   checkout is untouched) and pushed as `refs/jovie-preserved/sweep/<host>/<name>-<date>-<snapshot>`
   (never a branch). A snapshot that is not proven secret-free is not published and the
@@ -49,6 +51,10 @@ from atomic_state import atomic_write_text  # noqa: E402
 
 PRESERVED_REPAIR = ".jovie-preserved-repair.json"
 IDLE_S = 12 * 3600
+# A clean, fully published checkout retires earlier (JOV-10172): there is nothing to
+# preserve, so the only cost of waiting is the disk it holds. Dirty or unpushed work
+# never uses this tier — it keeps the full IDLE_S window plus the snapshot path below.
+CLEAN_IDLE_S = float(os.environ.get("LANES_SWEEP_CLEAN_IDLE_S", str(3 * 3600)))
 CLOSED_GRACE_S = 3600
 PRESERVED_TTL_S = 3 * 86400
 INTERVAL_S = 3600
@@ -301,7 +307,7 @@ def cleanup_preserved(path: Path) -> bool:
 
 
 def decide(path: Path, branch: str | None, info: dict, now: float, closed: set[str], *,
-           idle_s: float, preserved_ttl_s: float) -> str | None:
+           idle_s: float, preserved_ttl_s: float, clean_idle_s: float | None = CLEAN_IDLE_S) -> str | None:
     """Why this checkout may retire now, or None to keep it."""
     idle = now - info["activity"]
     age = preserved_age(path, now)
@@ -316,11 +322,16 @@ def decide(path: Path, branch: str | None, info: dict, now: float, closed: set[s
         return "preserved-expired" if age >= preserved_ttl_s and idle >= idle_s else None
     if closed_pr and idle >= CLOSED_GRACE_S:
         return "pr-closed"
+    if (clean_idle_s is not None and idle >= clean_idle_s
+            and info["dirty"] == 0 and info["unpushed"] == "0"):
+        # Clean and fully pushed: nothing to back up, so retire at the shorter threshold.
+        return "clean-idle"
     return "idle" if idle >= idle_s else None
 
 
 def retire(repo: Path, path: Path, branch: str | None, live: set[Path], report: dict, *, run, now: float,
-           closed: set[str], idle_s: float, preserved_ttl_s: float, prefix: str, date: str) -> None:
+           closed: set[str], idle_s: float, preserved_ttl_s: float, prefix: str, date: str,
+           clean_idle_s: float | None = CLEAN_IDLE_S) -> None:
     if busy(path, live) or (path / ".sweep-keep").exists():
         report["kept"] += 1
         return
@@ -328,7 +339,8 @@ def retire(repo: Path, path: Path, branch: str | None, live: set[Path], report: 
     if info is None:
         report["kept"] += 1
         return
-    reason = decide(path, branch, info, now, closed, idle_s=idle_s, preserved_ttl_s=preserved_ttl_s)
+    reason = decide(path, branch, info, now, closed, idle_s=idle_s, preserved_ttl_s=preserved_ttl_s,
+                    clean_idle_s=clean_idle_s)
     if reason is None:
         report["kept"] += 1
         return
@@ -357,7 +369,8 @@ def retire(repo: Path, path: Path, branch: str | None, live: set[Path], report: 
 def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecycle.run,
           now: float | None = None, closed: dict[Path, set[str]] | None = None, idle_s: float = IDLE_S,
           preserved_ttl_s: float = PRESERVED_TTL_S, prefix: str = "sweep/mac",
-          date: str | None = None, state: Path | None = None) -> dict:
+          date: str | None = None, state: Path | None = None,
+          clean_idle_s: float | None = CLEAN_IDLE_S) -> dict:
     now = time.time() if now is None else now
     date = date or datetime.fromtimestamp(now, timezone.utc).strftime("%Y%m%d")
     closed = closed or {}
@@ -392,7 +405,8 @@ def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecy
                 continue
             try:
                 retire(repo, path, branch, live, report, run=run, now=now, closed=closed.get(repo, set()),
-                       idle_s=idle_s, preserved_ttl_s=preserved_ttl_s, prefix=prefix, date=date)
+                       idle_s=idle_s, preserved_ttl_s=preserved_ttl_s, prefix=prefix, date=date,
+                       clean_idle_s=clean_idle_s)
             except (OSError, subprocess.SubprocessError) as error:
                 # One slow or broken checkout (e.g. `git add` timing out under load) must not end
                 # the sweep; it stays in place and is retried next interval.
