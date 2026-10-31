@@ -106,6 +106,12 @@ describe('test profile route policy', () => {
     ).toBe(false);
     expect(
       shouldHideTestProfileFromDirectUrl({
+        handle: 'good-dropouts-canary',
+        ownerEmail: 'browse-ready+chat-health@jov.ie',
+      })
+    ).toBe(false);
+    expect(
+      shouldHideTestProfileFromDirectUrl({
         handle: 'whatever',
         ownerEmail: 'gp-1+e2e@test.jovie.com',
         settings: { testProfileDirectUrlExempt: true },

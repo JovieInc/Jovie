@@ -40,6 +40,7 @@ export const TEST_PROFILE_DIRECT_URL_EXEMPT_OWNER_EMAILS: readonly string[] =
   Object.freeze([
     'browse-ready+clerk_test@jov.ie',
     'browse-ready+canary-admitted@jov.ie',
+    'browse-ready+chat-health@jov.ie',
     'auth-surface-qa+prod@test.jovie.com',
     'auth-surface-qa+staging@test.jovie.com',
     'auth-surface-qa+ios-prod@test.jovie.com',
