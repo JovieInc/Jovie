@@ -69,6 +69,21 @@ export {
 } from './scheduler';
 
 /**
+ * Job types whose processors own their own short transaction phases (via
+ * executeIngestionJob) and must NOT be wrapped in a spanning transaction by
+ * callers: their external HTTP must never run inside an open transaction
+ * (JOV-10139). All other job types (DSP enrichment, email) keep the caller's
+ * withSystemIngestionSession transaction.
+ */
+export const SELF_MANAGED_JOB_TYPES = new Set([
+  'import_beacons',
+  'import_laylo',
+  'import_tiktok',
+  'import_twitter',
+  'import_youtube',
+]);
+
+/**
  * Process a job based on its type.
  * Routes to the appropriate platform-specific processor.
  *

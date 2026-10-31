@@ -20,6 +20,7 @@ import {
   claimPendingJobs,
   handleIngestionJobFailure,
   processJob,
+  SELF_MANAGED_JOB_TYPES,
   succeedJob,
 } from '@/lib/ingestion/processor';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
@@ -54,12 +55,17 @@ export async function GET(request: Request) {
       job: (typeof claimed)[number]
     ): Promise<boolean> => {
       try {
-        // No transaction wraps processJob: its processors await external HTTP
-        // (platform scrapes, MusicFetch, Resend). Holding BEGIN across those
-        // awaits leaves the Postgres session idle-in-transaction until Neon's
-        // idle_in_transaction_session_timeout terminates the connection
-        // (JOV-10139). Processors manage their own short DB-only phases.
-        await processJob(db, job);
+        // Self-managed processors (social imports) own their own short
+        // DB-only transaction phases and must NOT be wrapped: holding BEGIN
+        // across their external fetches leaves the Postgres session
+        // idle-in-transaction until Neon terminates it (JOV-10139).
+        // DSP/email processors keep the ingestion-session transaction for
+        // RLS identity and multi-statement atomicity.
+        if (SELF_MANAGED_JOB_TYPES.has(job.jobType)) {
+          await processJob(db, job);
+        } else {
+          await withSystemIngestionSession(tx => processJob(tx, job));
+        }
         await withSystemIngestionSession(tx => succeedJob(tx, job));
         return true;
       } catch (error) {

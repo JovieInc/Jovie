@@ -51,6 +51,7 @@ import {
   claimPendingJobs,
   handleIngestionJobFailure,
   processJob,
+  SELF_MANAGED_JOB_TYPES,
   succeedJob,
 } from '@/lib/ingestion/processor';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
@@ -439,9 +440,15 @@ export async function GET(request: Request) {
         let processed = 0;
         for (const job of claimed) {
           try {
-            // No transaction wraps processJob — see JOV-10139: processors
-            // await external HTTP and must never hold BEGIN across it.
-            await processJob(db, job);
+            // Self-managed social processors own their short DB-only
+            // phases and must not run inside a spanning transaction
+            // (JOV-10139); DSP/email processors keep the ingestion-session
+            // transaction for RLS identity and atomicity.
+            if (SELF_MANAGED_JOB_TYPES.has(job.jobType)) {
+              await processJob(db, job);
+            } else {
+              await withSystemIngestionSession(tx => processJob(tx, job));
+            }
             await withSystemIngestionSession(tx => succeedJob(tx, job));
             processed++;
           } catch (error) {
