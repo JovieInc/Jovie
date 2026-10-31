@@ -297,7 +297,10 @@ describe('app-installation rate-limit guard (2026-10-31 5 h queue stall)', () =>
   });
 
   it('keeps the workflow wired: failover token, write scopes, and a failure alert', () => {
-    const wf = readFileSync('../.github/workflows/main-red-eject.yml', 'utf8');
+    const wf = readFileSync(
+      new URL('../../../.github/workflows/main-red-eject.yml', import.meta.url),
+      'utf8'
+    );
     expect(wf).toContain('GH_FALLBACK_TOKEN: ${{ github.token }}');
     expect(wf).toMatch(/pull-requests: write/);
     expect(wf).toMatch(/if: \$\{\{ failure\(\) \}\}[\s\S]*alert-failure/);
