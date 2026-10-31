@@ -1,0 +1,60 @@
+2026-10-31T20:06:56.4656052Z [ci-fast] structural: failure (439.7s)
+2026-10-31T20:06:56.4657212Z Structural command 33/61 failed (exit 1). Command: node --test --experimental-test-coverage --test-coverage-include=scripts/pr-ope…
+2026-10-31T20:06:56.4657860Z expected: 0,
+2026-10-31T20:06:56.4658118Z expected: [],
+2026-10-31T20:06:56.4658552Z AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+2026-10-31T20:06:56.4659011Z + actual - expected
+2026-10-31T20:06:56.4659366Z expected: [ 'serial-layer-discovery' ],
+2026-10-31T20:06:56.4659569Z
+2026-10-31T20:06:56.4659733Z …equal:
+2026-10-31T20:06:56.4660004Z   + actual - expected
+2026-10-31T20:06:56.4660263Z
+2026-10-31T20:06:56.4660494Z     [
+2026-10-31T20:06:56.4660786Z   +   'evidence-forgery-or-staleness',
+2026-10-31T20:06:56.4661136Z       'serial-layer-discovery',
+2026-10-31T20:06:56.4661443Z   +   'unowned-incident'
+2026-10-31T20:06:56.4661716Z     ]
+2026-10-31T20:06:56.4661939Z
+2026-10-31T20:06:56.4653777Z ##[error]Structural command 33/61 failed (exit 1). Command: node --test --experimental-test-coverage --test-coverage-include=scripts/pr-ope… | expected: 0, | expected: [], | AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal: | + actual - expected | expected: [ 'serial-layer-discovery' ],
+2026-10-31T20:06:56.4655619Z [ci-fast] 1 lane(s) failed: structural
+2026-10-31T20:06:56.4656052Z [ci-fast] structural: failure (439.7s)
+2026-10-31T20:06:56.4657212Z Structural command 33/61 failed (exit 1). Command: node --test --experimental-test-coverage --test-coverage-include=scripts/pr-ope…
+2026-10-31T20:06:56.4657860Z expected: 0,
+2026-10-31T20:06:56.4658118Z expected: [],
+2026-10-31T20:06:56.4658552Z AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+2026-10-31T20:06:56.4659011Z + actual - expected
+2026-10-31T20:06:56.4659366Z expected: [ 'serial-layer-discovery' ],
+2026-10-31T20:06:56.4659569Z
+2026-10-31T20:06:56.4659733Z …equal:
+2026-10-31T20:06:56.4660004Z   + actual - expected
+2026-10-31T20:06:56.4660263Z
+2026-10-31T20:06:56.4660494Z     [
+2026-10-31T20:06:56.4660786Z   +   'evidence-forgery-or-staleness',
+2026-10-31T20:06:56.4661136Z       'serial-layer-discovery',
+2026-10-31T20:06:56.4661443Z   +   'unowned-incident'
+2026-10-31T20:06:56.4661716Z     ]
+2026-10-31T20:06:56.4661939Z
+2026-10-31T20:06:56.4662523Z       at TestContext.<anonymous> (file:///home/runner/work/Jovie/Jovie/scripts/postmortem-review.test.mjs:314:10)
+2026-10-31T20:06:56.4663165Z       at Test.runInAsyncScope (node:async_hooks:227:14)
+2026-10-31T20:06:56.4663587Z       at Test.run (node:internal/test_runner/test:1402:25)
+2026-10-31T20:06:56.4664081Z       at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+2026-10-31T20:06:56.4664585Z       at Test.postRun (node:internal/test_runner/test:1542:19)
+2026-10-31T20:06:56.4665021Z       at Test.run (node:internal/test_runner/test:1467:12)
+2026-10-31T20:06:56.4665553Z       at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+2026-10-31T20:06:56.4666014Z     generatedMessage: true,
+2026-10-31T20:06:56.4666293Z     code: 'ERR_ASSERTION',
+2026-10-31T20:06:56.4666934Z     actual: [ 'evidence-forgery-or-staleness', 'serial-layer-discovery', 'unowned-incident' ],
+2026-10-31T20:06:56.4667728Z     expected: [ 'serial-layer-discovery' ],
+2026-10-31T20:06:56.4668077Z     operator: 'deepStrictEqual',
+2026-10-31T20:06:56.4668367Z     diff: 'simple'
+2026-10-31T20:06:56.4668604Z   }
+2026-10-31T20:06:56.4668734Z
+2026-10-31T20:06:56.4669006Z #### Structural command timings (wall 439.6s, sum 1029.7s, 41 commands)
+2026-10-31T20:06:56.4669285Z
+2026-10-31T20:06:56.4669436Z | # | Time | Result | Command |
+2026-10-31T20:06:56.4669736Z | --- | --- | --- | --- |
+2026-10-31T20:06:56.4670452Z | 61 | 439.6s | pass | `if python3 -c "import coverage, pytest, xdist" 2>/dev/null; then { lanes_retry() { lr_id="$1"; lr_r…` |
+2026-10-31T20:06:56.4671429Z | 34 | 253.0s | pass | `pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/merge-group-failure-ho…` |
+2026-10-31T20:06:56.4672530Z | 33 | 138.3s | exit 1 | `node --test --experimental-test-coverage --test-coverage-include=scripts/pr-open.mjs --test-coverag…` |
+2026-10-31T20:06:56.4673506Z | 1 | 53.3s | pass | `pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs…` |
+2026-10-31T20:06:56.4674446Z | 35 | 19.3s | pass | `pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/validation-lifecycle.t…` |

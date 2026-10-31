@@ -3,8 +3,10 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   attributeAgainstAheadRun,
+  attributeAgainstPeerRuns,
   normalizeCommandLabel,
   parseCiFastLog,
+  parseFailedSignals,
 } from '../merge-group-ahead-attribution.mjs';
 
 const fixture = name =>
@@ -251,5 +253,109 @@ describe('attributeAgainstAheadRun', () => {
         currentCiFastLog: POISON_LOG,
       }).reason
     ).toBe('job-not-a-failure:ci-fast (remaining)');
+  });
+});
+
+describe('peer recurrence (shadow evidence)', () => {
+  // 2026-10-31: one ci-fast-lanes timeout failed #23938's group (run
+  // 41243949300) and #23706's (run 41244978915), groups with no shared entry.
+  // #23987's group (run 41236630875) failed a different signal.
+  const MAC_TIMEOUT_23938 = fixture('peer-23938-mac-lane-timeout.txt');
+  const MAC_TIMEOUT_23706 = fixture('peer-23706-mac-lane-timeout.txt');
+  const POSTMORTEM_23987 = fixture('peer-23987-postmortem-class.txt');
+  const structuralOnly = [
+    { name: 'ci-fast (remaining)', conclusion: 'failure' },
+    { name: 'ci-fast', conclusion: 'failure' },
+    { name: 'Product Lane Receipt', conclusion: 'failure' },
+    { name: 'PR Ready', conclusion: 'failure' },
+    { name: 'Unit Tests (1/14)', conclusion: 'success' },
+  ];
+  const peer = (log, containsPr, runId = 41243949300) => ({
+    runId,
+    conclusion: 'failure',
+    containsPr,
+    ciFastLog: log,
+  });
+
+  it('parses the failing tests of each failed structural command', () => {
+    const [vitest] = parseFailedSignals(MAC_TIMEOUT_23706);
+    expect([...vitest.tests]).toEqual([
+      'lib/__tests__/ci-fast-lanes.test.mjs > runStructural screenshot contract discovery > selects installed-identity coverage only for the Mac lane (mac)',
+    ]);
+    const [nodeTest] = parseFailedSignals(POSTMORTEM_23987);
+    expect([...nodeTest.tests]).toEqual([
+      'scripts/postmortem-review.test.mjs:314',
+    ]);
+  });
+
+  it('marks a signal recurring when a group without the PR failed the same test', () => {
+    expect(
+      attributeAgainstPeerRuns({
+        currentJobs: structuralOnly,
+        currentCiFastLog: MAC_TIMEOUT_23706,
+        peers: [
+          peer(POSTMORTEM_23987, false, 41236630875),
+          peer(MAC_TIMEOUT_23938, false),
+        ],
+      })
+    ).toEqual({
+      recurring: true,
+      reason: 'failing-signals-recurred-without-pr',
+      signals: [
+        'lib/__tests__/ci-fast-lanes.test.mjs > runStructural screenshot contract discovery > selects installed-identity coverage only for the Mac lane (mac)',
+      ],
+      peerRunIds: [41243949300],
+    });
+  });
+
+  it('proves nothing from peers that contain the PR or whose membership is unknown', () => {
+    for (const containsPr of [true, null, undefined]) {
+      expect(
+        attributeAgainstPeerRuns({
+          currentJobs: structuralOnly,
+          currentCiFastLog: MAC_TIMEOUT_23706,
+          peers: [peer(MAC_TIMEOUT_23938, containsPr)],
+        }).recurring
+      ).toBe(false);
+    }
+  });
+
+  it('keeps a different signal attributable', () => {
+    const verdict = attributeAgainstPeerRuns({
+      currentJobs: structuralOnly,
+      currentCiFastLog: POSTMORTEM_23987,
+      peers: [
+        peer(MAC_TIMEOUT_23938, false),
+        peer(MAC_TIMEOUT_23706, false, 41244978915),
+      ],
+    });
+    expect(verdict).toEqual({
+      recurring: false,
+      reason:
+        'signal-not-seen-without-pr:scripts/postmortem-review.test.mjs:314',
+    });
+  });
+
+  it('proves nothing when another job also failed or the log is missing', () => {
+    expect(
+      attributeAgainstPeerRuns({
+        currentJobs: [
+          ...structuralOnly,
+          { name: 'Visual Snapshot Compare', conclusion: 'failure' },
+        ],
+        currentCiFastLog: MAC_TIMEOUT_23706,
+        peers: [peer(MAC_TIMEOUT_23938, false)],
+      })
+    ).toEqual({
+      recurring: false,
+      reason: 'not-structural-only:ci-fast (remaining),Visual Snapshot Compare',
+    });
+    expect(
+      attributeAgainstPeerRuns({
+        currentJobs: structuralOnly,
+        currentCiFastLog: null,
+        peers: [peer(MAC_TIMEOUT_23938, false)],
+      }).reason
+    ).toBe('ci-fast-log-missing');
   });
 });
