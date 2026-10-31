@@ -425,6 +425,16 @@ describe('EmailCodeAuthForm page alignment', () => {
     return document.querySelector('[data-auth-email-code-step="code"]');
   }
 
+  it('renders the email address as one unbreakable truncating token with a full-address title', async () => {
+    const step = await reachCodeStepWithAlign('left');
+    const address = step?.querySelector('[data-auth-email-address]');
+    expect(address?.textContent).toBe('artist@example.com');
+    expect(address?.getAttribute('title')).toBe('artist@example.com');
+    expect(address?.className).toContain('whitespace-nowrap');
+    expect(address?.className).toContain('truncate');
+    expect(address?.className).not.toContain('break-all');
+  });
+
   it('left-aligns the code step on full-page shells', async () => {
     const step = await reachCodeStepWithAlign('left');
     const intro = step?.querySelector('p');

@@ -72,6 +72,24 @@ function fakeRelease(
 }
 
 describe('ShellReleaseRow audio affordance', () => {
+  it('renders multi-artist credits through the canonical conjunction formatter', () => {
+    render(
+      <ShellReleaseRow
+        release={fakeRelease({
+          id: 'r-credits',
+          title: 'Neon Hearts',
+          artistNames: ['Vigel', 'Tim White'],
+        })}
+        isSelected={false}
+        onSelect={vi.fn()}
+      />
+    );
+
+    // ds-cert:credit-format: the release row never joins artist names
+    // locally — "Vigel and Tim White", matching the release drawer.
+    expect(screen.getByText('Vigel and Tim White')).toBeInTheDocument();
+  });
+
   it('opens the smart link without prefetching or selecting the row', async () => {
     const onSelect = vi.fn();
     render(

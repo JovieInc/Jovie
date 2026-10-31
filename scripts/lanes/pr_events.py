@@ -980,7 +980,8 @@ def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
     the failed jobs' error lines the fixer is shown. Preserve a command that exits nonzero
     for the failed run: `gh run view --log-failed` only displays logs and exits successfully.
     Repair PRs require this evidence; agents forget it (45 of 138 Fleet Rules failures on
-    2026-10-25) and the lane already has it. None when no red check names a run."""
+    2026-10-25) and the lane already has it. Conflict-only repairs use observed git merge
+    failure output instead. None without a red run or an observed merge failure."""
     for check in pr.get("statusCheckRollup") or []:
         if str(check.get("conclusion") or "").lower() not in RED_CONCLUSIONS:
             continue
@@ -998,6 +999,18 @@ def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
             f"- Failing command: `gh run watch {run_url.rsplit('/', 1)[-1]} --repo {REPO} --exit-status`",
             f"- Failing run (before fix): {run_url}", "",
             "```text", *lines, "```", "", RED_BLOCK_MARKER])
+    # Conflict-only repairs have no failed CI run. Require both the observed
+    # git merge failure and a conflicting PR state; a label alone is not red proof.
+    observed = str(excerpt or "").splitlines()
+    conflicts = [line for line in observed if re.fullmatch(r"CONFLICT \([^)]+\): .+", line)]
+    if (pr.get("mergeable") == "CONFLICTING" or pr.get("mergeStateStatus") == "DIRTY") and conflicts and (
+            "Automatic merge failed; fix conflicts and then commit the result." in observed):
+        return "\n".join([
+            "## Red-before-green", "",
+            "- Failing command: `git merge origin/main --no-edit`", "",
+            "```text", *conflicts[:25],
+            "Automatic merge failed; fix conflicts and then commit the result.",
+            "```", "", RED_BLOCK_MARKER])
     return None
 
 
@@ -1011,10 +1024,12 @@ def with_red_section(body: str, block: str) -> str:
     return "\n".join(lines[:start] + block.split("\n") + [""] + lines[end:])
 
 
-def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None) -> str:
+def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None,
+                         locking_pr: int | None = None) -> str:
     """Complete repair metadata without replacing existing evidence or customer decisions.
 
-    The caller chooses the customer outcome; never infer it from a failed check.
+    The caller chooses the customer outcome and supplies any locking PR provenance;
+    never infer either from a failed check. Existing locked-area decisions are preserved.
     The canonical Fleet/changelog guards still validate the resulting body.
     """
     updated = body
@@ -1031,6 +1046,23 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
         else:
             note = json.dumps(customer_decision, separators=(",", ":")).replace("<", "\\u003c").replace(">", "\\u003e")
             updated = updated.rstrip("\n") + "\n<!-- customer-changelog/v1 " + note + " -->\n"
+    if locking_pr is not None:
+        if type(locking_pr) is not int or locking_pr < 1:
+            raise ValueError("locking PR requires an explicit positive PR number")
+        # Keep line positions when masking comments so the explicit provenance
+        # can replace a template placeholder without losing surrounding evidence.
+        visible = re.sub(r"<!--[\s\S]*?-->", lambda m: "\n" * m[0].count("\n"), updated).split("\n")
+        start = next((i for i, line in enumerate(visible)
+                      if re.fullmatch(r"#{1,6}\s+Locked areas\s*", line, re.I)), None)
+        if start is None:
+            updated = updated.rstrip("\n") + f"\n\n## Locked areas\n\nLocking PR: #{locking_pr}\n"
+        else:
+            end = next((i for i in range(start + 1, len(visible)) if ANY_HEADING.match(visible[i])), len(visible))
+            placeholder = re.compile(r"\s*(?:[-*]\s*)?(?:none(?: touched)?|n/?a|not applicable|todo|tbd)?[.!]?\s*", re.I)
+            if placeholder.fullmatch("\n".join(visible[start + 1:end])):
+                lines = updated.split("\n")
+                notes = [line for line in lines[start + 1:end] if not placeholder.fullmatch(line)]
+                updated = "\n".join(lines[:start + 1] + ["", f"Locking PR: #{locking_pr}", *notes, ""] + lines[end:])
     return updated
 
 
@@ -1044,16 +1076,17 @@ def api_gh(args, **_):
     return subprocess.CompletedProcess(args, done["code"], done["stdout"], done["stderr"])
 
 
-def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_decision: dict | None = None) -> bool:
+def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_decision: dict | None = None,
+                            locking_pr: int | None = None) -> bool:
     """Complete repair evidence and an optional caller-selected customer decision."""
     if not isinstance(pr.get("number"), int) or (
-            customer_decision is None and red_before_green_block(pr, excerpt) is None):
+            customer_decision is None and locking_pr is None and red_before_green_block(pr, excerpt) is None):
         return False
     viewed = sh(["pr", "view", str(pr["number"]), "--repo", REPO, "--json", "body", "--jq", ".body"])
     if viewed.returncode != 0:
         return False
     body = viewed.stdout or ""
-    updated = repair_evidence_body(pr, body, excerpt, customer_decision=customer_decision)
+    updated = repair_evidence_body(pr, body, excerpt, customer_decision=customer_decision, locking_pr=locking_pr)
     if updated == body:
         return False
     with tempfile.TemporaryDirectory(prefix="red-before-green-") as tmp:

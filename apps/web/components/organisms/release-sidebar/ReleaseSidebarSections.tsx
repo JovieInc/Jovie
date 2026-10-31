@@ -14,6 +14,7 @@ import {
 import type { ComponentType, ReactNode } from 'react';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { Icon } from '@/components/atoms/Icon';
+import { CreditList } from '@/components/molecules/CreditList';
 import {
   DrawerAsyncToggle,
   DrawerFormGridRow,
@@ -92,60 +93,30 @@ interface ReleaseEntityHeaderProps {
   readonly footer?: ReactNode;
 }
 
-const releaseArtistListFormatter = new Intl.ListFormat('en', {
-  style: 'long',
-  type: 'conjunction',
-});
-
 function renderArtistLine(
   artistNames: string[] | undefined,
   fallbackArtistName: string | null | undefined,
   onArtistClick: ((artistName: string) => void) | undefined
 ): ReactNode {
-  const normalizedNames = (artistNames ?? [])
-    .map(name => name.trim())
-    .filter(Boolean);
-
-  if (normalizedNames.length === 0) {
-    const fallback = fallbackArtistName?.trim();
-    if (!fallback) return null;
-    if (!onArtistClick) return fallback;
-    return (
-      <button
-        type='button'
-        onClick={() => onArtistClick(fallback)}
-        className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
-      >
-        {fallback}
-      </button>
-    );
-  }
-
-  if (!onArtistClick) {
-    return releaseArtistListFormatter.format(normalizedNames);
-  }
-
-  const partKeyCounts = new Map<string, number>();
-
-  return releaseArtistListFormatter.formatToParts(normalizedNames).map(part => {
-    const keyBase = `${part.type}:${part.value}`;
-    const occurrence = (partKeyCounts.get(keyBase) ?? 0) + 1;
-    partKeyCounts.set(keyBase, occurrence);
-    const key = `${keyBase}:${occurrence}`;
-
-    return part.type === 'element' ? (
-      <button
-        key={key}
-        type='button'
-        onClick={() => onArtistClick(part.value)}
-        className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
-      >
-        {part.value}
-      </button>
-    ) : (
-      <span key={key}>{part.value}</span>
-    );
-  });
+  return (
+    <CreditList
+      names={artistNames}
+      fallback={fallbackArtistName}
+      renderName={
+        onArtistClick
+          ? name => (
+              <button
+                type='button'
+                onClick={() => onArtistClick(name)}
+                className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
+              >
+                {name}
+              </button>
+            )
+          : undefined
+      }
+    />
+  );
 }
 
 function getReleaseTypeLabel(releaseType: string | undefined): string | null {

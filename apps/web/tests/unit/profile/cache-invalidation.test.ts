@@ -63,7 +63,11 @@ describe('Profile Cache Invalidation', () => {
         'max'
       );
       expect(mockRevalidatePath).toHaveBeenCalledWith('/testartist');
-      expect(mockRevalidateTag).toHaveBeenCalledWith('profiles-all', 'max');
+      // Per-handle tag only: one artist's edit must not evict every profile.
+      expect(mockRevalidateTag).not.toHaveBeenCalledWith(
+        'profiles-all',
+        expect.anything()
+      );
       expect(mockInvalidateProfileEdgeCache).toHaveBeenCalledWith('testartist');
     });
 
@@ -71,7 +75,10 @@ describe('Profile Cache Invalidation', () => {
       const { invalidateProfileCache } = await import('@/lib/cache/profile');
       await invalidateProfileCache('testartist');
 
-      expect(mockRevalidateTag).toHaveBeenCalledWith('profiles-all', 'max');
+      expect(mockRevalidateTag).toHaveBeenCalledWith(
+        'profile:testartist',
+        'max'
+      );
       expect(mockRevalidateTag).toHaveBeenCalledWith('sitemap-catalog', 'max');
       expect(mockRevalidateTag).toHaveBeenCalledWith(
         'featured-creators',

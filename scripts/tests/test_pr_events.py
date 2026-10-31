@@ -3058,6 +3058,35 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
     def test_no_red_check_means_no_block(self):
         self.assertIsNone(events.red_before_green_block({"statusCheckRollup": [{"name": "x", "conclusion": "SUCCESS"}]}))
 
+    def test_conflict_only_repair_records_observed_merge_failure_and_preserves_decision(self):
+        pr = {"number": 23520, "headRefOid": "a" * 40, "mergeable": "CONFLICTING"}
+        excerpt = (
+            "Auto-merging apps/web/lib/chat/system-prompt.ts\n"
+            "CONFLICT (content): Merge conflict in apps/web/lib/chat/system-prompt.ts\n"
+            "Automatic merge failed; fix conflicts and then commit the result.\n"
+        )
+        body = 'Registry\n<!-- customer-changelog/v1 {"releaseWorthy":false} -->\n'
+        updated = events.repair_evidence_body(pr, body, excerpt, customer_decision={"releaseWorthy": False})
+        self.assertTrue(events.red_section_complete(updated))
+        self.assertIn("Failing command: `git merge origin/main --no-edit`", updated)
+        self.assertIn("CONFLICT (content): Merge conflict in apps/web/lib/chat/system-prompt.ts", updated)
+        self.assertNotIn("Failing run (before fix):", updated)
+        self.assertEqual(updated.count("customer-changelog/v1"), 1)
+        self.assertEqual(events.repair_evidence_body(pr, updated, excerpt), updated)
+        self.assertIsNotNone(events.red_before_green_block({"mergeStateStatus": "DIRTY"}, excerpt))
+
+    def test_conflict_state_without_observed_merge_failure_never_fabricates_red(self):
+        conflict = "CONFLICT (content): Merge conflict in file.ts\n"
+        failure = "Automatic merge failed; fix conflicts and then commit the result.\n"
+        for pr, excerpt in (
+            ({"mergeable": "CONFLICTING"}, ""),
+            ({"mergeable": "CONFLICTING"}, conflict),
+            ({"mergeable": "CONFLICTING"}, failure),
+            ({"mergeable": "MERGEABLE"}, conflict + failure),
+        ):
+            with self.subTest(pr=pr, excerpt=excerpt):
+                self.assertIsNone(events.red_before_green_block(pr, excerpt))
+
     def test_placeholder_section_is_replaced_and_complete_one_is_untouched(self):
         block = events.red_before_green_block(self.PR, "FAIL x")
         body = "## Summary\nx\n\n## Red-before-green\n\nFailing command:\n\n## Blast radius\ny\n"
@@ -3074,6 +3103,63 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         self.assertIn('<!-- customer-changelog/v1 {"releaseWorthy":false} -->', updated)
         self.assertEqual(events.repair_evidence_body(self.PR, updated,
                                                    customer_decision={"releaseWorthy": False}), updated)
+
+    def test_explicit_locking_pr_repairs_missing_provenance_and_passes_fleet(self):
+        body = events.red_before_green_block(self.PR)
+        updated = events.repair_evidence_body(self.PR, body, locking_pr=23295,
+                                              customer_decision={"releaseWorthy": False})
+        checked = subprocess.run(
+            ["node", "--input-type=module", "-e", r"""
+                import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+                import { readFileSync } from 'node:fs';
+                const body = readFileSync(0, 'utf8');
+                const check = body => evaluateFleetRules({
+                    pr: { title: 'fix: repair secret metadata evidence', body },
+                    files: [{ filename: 'ops/registry/secrets-lint-baseline.json', status: 'added' }],
+                }).errors;
+                process.stdout.write(JSON.stringify({ repaired: check(body),
+                    missing: check(body.replace(/## Locked areas[\s\S]*/, '')) }));
+            """], cwd=ROOT, input=updated, text=True, capture_output=True, check=True,
+        )
+        result = json.loads(checked.stdout)
+        self.assertEqual(result["repaired"], [])
+        self.assertTrue(any(error.startswith("locked-areas:") for error in result["missing"]))
+        self.assertEqual(events.repair_evidence_body(self.PR, updated, locking_pr=23295), updated)
+        self.assertEqual(updated.count("customer-changelog/v1"), 1)
+
+    def test_explicit_locking_pr_repairs_placeholder_sections_without_losing_other_evidence(self):
+        for placeholder in ("", "None touched.", "- None", "N/A", "Not applicable.", "TODO", "TBD"):
+            with self.subTest(placeholder=placeholder):
+                body = (events.red_before_green_block(self.PR) + "\n## Locked areas\n\n" + placeholder
+                        + "\n<!-- keep this note -->\n\n## Blast radius\nKeep this proof.\n")
+                updated = events.repair_evidence_body(self.PR, body, locking_pr=23667)
+                checked = subprocess.run(
+                    ["node", "--input-type=module", "-e", """
+                        import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+                        import { readFileSync } from 'node:fs';
+                        const body = readFileSync(0, 'utf8');
+                        process.stdout.write(JSON.stringify(evaluateFleetRules({
+                            pr: { title: 'fix: repair Swift guard evidence', body },
+                            files: [{ filename: 'scripts/swift-arch/baseline.json', status: 'modified' }],
+                        }).errors));
+                    """], cwd=ROOT, input=updated, text=True, capture_output=True, check=True,
+                )
+                self.assertEqual(json.loads(checked.stdout), [])
+                self.assertEqual(updated.count("## Locked areas"), 1)
+                self.assertIn("<!-- keep this note -->", updated)
+                self.assertIn("## Blast radius\nKeep this proof.", updated)
+                self.assertEqual(events.repair_evidence_body(self.PR, updated, locking_pr=23667), updated)
+                self.assertEqual(events.repair_evidence_body(self.PR, body), body)
+
+    def test_locking_reference_is_explicit_validated_and_never_overwrites_authority(self):
+        body = events.red_before_green_block(self.PR)
+        self.assertNotIn("## Locked areas", events.repair_evidence_body(self.PR, body))
+        for reference in ("GBrain: security/secrets-audit", "Locking PR: #123", "GBrain: <slug>"):
+            original = body + "\n## Locked areas\n" + reference + "\n"
+            self.assertEqual(events.repair_evidence_body(self.PR, original, locking_pr=23295), original)
+        for invalid in (0, -1, True, "23295"):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                events.repair_evidence_body(self.PR, body, locking_pr=invalid)
 
     def test_public_decision_round_trips_without_comment_injection(self):
         decision = {"releaseWorthy": True, "text": "Choose a link --> continue"}
@@ -3111,6 +3197,18 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         self.assertTrue(events.red_section_complete(written[0]))
         self.assertIn('<!-- customer-changelog/v1 {"releaseWorthy":false} -->', written[0])
 
+    def test_ensure_writes_explicit_locking_provenance_without_a_red_run(self):
+        written = []
+
+        def shell(args):
+            if args[:2] == ["pr", "view"]:
+                return SimpleNamespace(returncode=0, stdout="Summary")
+            written.append(Path(args[args.index("--body-file") + 1]).read_text())
+            return SimpleNamespace(returncode=0, stdout="")
+
+        self.assertTrue(events.ensure_red_before_green({"number": 23295}, sh=shell, locking_pr=23295))
+        self.assertEqual(written, ["Summary\n\n## Locked areas\n\nLocking PR: #23295\n"])
+
     def test_ensure_edits_only_an_incomplete_body(self):
         for body, edits in (("## Summary\nx", 1), (events.red_before_green_block(self.PR), 0)):
             shell = Shell({("pr", "view"): (0, body), ("pr", "edit"): (0, "")})
@@ -3123,10 +3221,22 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
                  ("...", run_url), ("node --test", "https://example.com/red"),
                  ("node --test", run_url + "/job/456")]
         bodies = []
+        # 'fix(ci): ...' is compounding/throughput work, so since the wins ledger (2026-10-29)
+        # fleet rules also demand a measured Win section — the pull-request template ships one.
+        # The bodies carry a valid measured Win so the only expected before-error is the
+        # red-before-green one and the repaired body evaluates clean end to end.
+        win_section = (
+            "\n## Win\n\n- Claim: repair-evidence edits stopped failing the fleet-rules consumer\n"
+            "- Area: ci\n- Theme: merge-throughput\n"
+            "- Metric: fleet-rules-rejects | count | lower | 3 | 0 | fleet-rules-evidence workflow log | "
+            "gh run list --workflow=fleet-rules-evidence.yml\n"
+            "- Verify: https://github.com/JovieInc/Jovie/actions/runs/123\n"
+        )
         for command, url in cases:
             body = (f"## Summary\nKeep this.\n\n## Red-before-green\n"
                     f"- Failing command: `{command}`\n- Failing run (before fix): {url}\n"
-                    "\n## Blast radius\nWhat could break: repair evidence.\nProof: regression tests.\n")
+                    "\n## Blast radius\nWhat could break: repair evidence.\nProof: regression tests.\n"
+                    + win_section)
             written = []
             def edit(args):
                 written.append(Path(args[-1]).read_text())
@@ -3137,6 +3247,7 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
                 self.assertEqual(len(written), 1)
                 self.assertIn("## Summary\nKeep this.", written[0])
                 self.assertIn("## Blast radius\nWhat could break: repair evidence.", written[0])
+                self.assertIn(win_section, written[0])
                 bodies.extend([body, written[0]])
         # Exercise the actual consumer, rather than trusting the Python mirror.
         checked = subprocess.run(["node", "--input-type=module", "-e", """

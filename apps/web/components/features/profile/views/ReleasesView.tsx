@@ -9,6 +9,7 @@ import {
 } from '@/components/atoms/ArtworkFrame';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { track } from '@/lib/analytics';
+import { formatReleaseArtistLine } from '@/lib/discography/formatting';
 import type { PublicRelease } from '../releases/types';
 
 const YEAR_HEADER_THRESHOLD = 15;
@@ -108,7 +109,7 @@ export function ReleasesView({
       : null;
 
     return [
-      collaborators.length > 0 ? collaborators.join(', ') : null,
+      collaborators.length > 0 ? formatReleaseArtistLine(collaborators) : null,
       formatReleaseType(release.releaseType),
       year,
     ]
