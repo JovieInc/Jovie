@@ -143,6 +143,24 @@ describe('passage token', () => {
     });
   });
 
+  it('accepts a smartlink_click token only for the smartlink click scope', () => {
+    const token = mint({ scp: 'smartlink_click' });
+    expect(
+      verifyPassageToken(token, KEY, 'smartlink_click', NOW + 5)
+    ).toMatchObject({
+      ok: true,
+      claims: { sub: CANARY, scp: 'smartlink_click' },
+    });
+    // An onboarding_chat passage can never tag a smartlink click synthetic.
+    expect(verifyPassageToken(mint(), KEY, 'smartlink_click', NOW + 5)).toEqual(
+      { ok: false, reason: 'wrong_scope' }
+    );
+    expect(verifyPassageToken(token, KEY, 'onboarding_chat', NOW + 5)).toEqual({
+      ok: false,
+      reason: 'wrong_scope',
+    });
+  });
+
   it.each([
     ['empty', ''],
     ['no prefix', 'abc.def.ghi'],

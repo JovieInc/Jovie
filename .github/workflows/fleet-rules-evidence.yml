@@ -75,6 +75,7 @@ jobs:
             .nvmrc
             .github/dependency-review-config.yml
             scripts/pr-fleet-rules.mjs
+            scripts/lib/wins-ledger.mjs
             packages/api-client
             .github/scripts/fleet-rules-verdict.sh
             .github/scripts/fleet-rules-rerun.sh

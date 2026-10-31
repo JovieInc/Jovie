@@ -52,6 +52,19 @@ describe('stat-claims patterns', () => {
       ['accounts_total', 'profile_ttfb_ms']
     );
   });
+
+  it('does not let a binding hide another hand-written claim', () => {
+    assert.ok(
+      hits('Trusted by {stat:accounts_total} artists and 500 teams').includes(
+        'count_claim'
+      )
+    );
+    assert.ok(
+      hits('Trusted by {stat:invalid-id} and 500 artists').includes(
+        'count_claim'
+      )
+    );
+  });
 });
 
 describe('stat-claims scan', () => {

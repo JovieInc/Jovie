@@ -45,6 +45,7 @@ import {
   parseMergeConflicts,
 } from './lib/preflight-changed.mjs';
 import { checkInstallMatchesLockfile } from './lib/preflight-install.mjs';
+import { remoteHint } from './lib/remote-hint.mjs';
 
 const SELF = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HEAP_MB = process.env.JOVIE_PREFLIGHT_HEAP_MB || '4096';
@@ -231,6 +232,19 @@ export function changedFiles(cwd, base) {
   return { mergeBase: mb, files: rows };
 }
 
+/** Run changed invariant contracts locally even when the full suite is deferred. */
+export function invariantTestFiles(files, repo) {
+  const tests = new Set();
+  for (const file of files) {
+    for (const source of [file.filename, file.previous_filename]) {
+      if (!/^scripts\/invariants\/.+\.mjs$/.test(source ?? '')) continue;
+      const candidate = source.replace(/(?:\.test)?\.mjs$/, '.test.mjs');
+      if (existsSync(path.join(repo, candidate))) tests.add(candidate);
+    }
+  }
+  return [...tests].sort();
+}
+
 /** GitHub reads go through the shared budgeted client (external-apis rule). */
 function ghClient(cwd, ghArgs) {
   return spawnSync(
@@ -351,14 +365,23 @@ function biomeTargets(files) {
 export function typecheckTargets(files, cwd) {
   const out = new Set();
   for (const f of files) {
-    if (f.status === 'removed' || !/\.(?:tsx?|mts|cts)$/.test(f.filename))
+    if (
+      f.status === 'removed' ||
+      !(
+        /\.(?:tsx?|mts|cts)$/.test(f.filename) ||
+        /^scripts\/.*\.mjs$/.test(f.filename)
+      )
+    )
       continue;
     const isTest = /\.(?:test|spec)\.[^/]+$|\/tests?\//.test(f.filename);
     const web = f.filename.startsWith('apps/web/');
     if (web) {
       out.add(isTest ? 'web-tests' : 'web');
-      // Ovie compiles shared web routes/components under its own TS graph.
-      if (!isTest) out.add('pkg:@jovie/ovie');
+      if (!isTest) {
+        // Source changes also affect test consumers and Ovie's TS graph.
+        out.add('web-tests');
+        out.add('pkg:@jovie/ovie');
+      }
     } else if (/^scripts\//.test(f.filename)) out.add('scripts');
     else {
       let dir = path.dirname(f.filename);
@@ -397,6 +420,8 @@ export async function main({
     return 0;
   }
   const cwd = args.repo;
+  const hint = remoteHint({ env });
+  if (hint) log(hint);
   // Fail fast before any check runs against an install this worktree did not make.
   const install = checkInstallMatchesLockfile({ repo: cwd });
   if (!install.ok) {
@@ -480,6 +505,14 @@ export async function main({
       narrow ? narrow.command : guard.command
     );
   }
+
+  const invariantTests = invariantTestFiles(files, cwd);
+  if (invariantTests.length)
+    cmd(
+      'invariant-tests',
+      `changed invariant contracts (${invariantTests.length} files)`,
+      `node --test ${invariantTests.map(f => `'${f.replaceAll("'", "'\\''")}'`).join(' ')}`
+    );
 
   const any = re => paths.some(p => re.test(p));
   if (any(/^\.github\/(?:workflows|actions)\//)) {

@@ -2257,6 +2257,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/content-records/stage-events/route.ts",
+      "kind": "handler",
+      "route": "/api/content-records/stage-events",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/create-tip-intent/route.ts",
       "kind": "handler",
       "route": "/api/create-tip-intent",
@@ -4001,6 +4009,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/ovie/fleet-audit/route.ts",
+      "kind": "handler",
+      "route": "/api/ovie/fleet-audit",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/ovie/inbox/route.ts",
       "kind": "handler",
       "route": "/api/ovie/inbox",
@@ -4029,6 +4045,14 @@
       "kind": "handler",
       "route": "/api/ovie/mcp",
       "methods": ["GET", "OPTIONS", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/ovie/music-resolver/route.ts",
+      "kind": "handler",
+      "route": "/api/ovie/music-resolver",
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6915,6 +6939,21 @@
       "methods": ["GET"],
       "surface": "claim",
       "classification": "B"
+    },
+    {
+      "source": "apps/web/app/claim/agent/[draftId]/actions.ts",
+      "kind": "action",
+      "export": "claimAgentDraftAction",
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/claim/agent/[draftId]/page.tsx",
+      "kind": "page",
+      "route": "/claim/agent/[draftId]",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
     },
     {
       "source": "apps/web/app/claim/page.tsx",

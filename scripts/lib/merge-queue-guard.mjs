@@ -57,16 +57,17 @@ export function isPendingNativeCohortCutoverField(field) {
 }
 
 export const NATIVE_QUEUE_POLICY = Object.freeze({
-  // Synced to live ruleset 10512119 on 2026-10-21 (.github/MERGE_QUEUE.md
-  // tuning log, Tim-approved): ten groups build at once and up to ten green
-  // entries land per push. Every lower live build count stays supported for
-  // rollback. Group CI spends repo GITHUB_TOKEN quota and the org's five hosted
-  // macOS slots, so raise this and the live ruleset together. Preserve ALLGREEN.
-  // A 20-minute check response budget ejects a stuck check instead of holding
-  // the queue head for an hour.
-  check_response_timeout_minutes: 20,
-  grouping_strategy: 'ALLGREEN',
-  max_entries_to_build: 10,
+  // Synced to live ruleset 10512119 on 2026-10-31 (.github/MERGE_QUEUE.md
+  // tuning log, Tim-approved): HEADGREEN grouping, four groups build at once,
+  // up to ten green entries land per push. Every lower live build count stays
+  // supported for rollback. Group CI spends repo GITHUB_TOKEN quota, so raise
+  // this and the live ruleset together. Preserve HEADGREEN: only the group
+  // head's build gates the merge, so a one-off intermediate failure does not
+  // eject green entries. A 30-minute check response budget ejects a stuck check
+  // instead of holding the queue head for an hour.
+  check_response_timeout_minutes: 30,
+  grouping_strategy: 'HEADGREEN',
+  max_entries_to_build: 4,
   max_entries_to_merge: 10,
   merge_method: 'SQUASH',
   min_entries_to_merge: NATIVE_QUEUE_COHORT_POLICY.minEntriesToMerge,
@@ -74,10 +75,13 @@ export const NATIVE_QUEUE_POLICY = Object.freeze({
     NATIVE_QUEUE_COHORT_POLICY.minEntriesToMergeWaitMinutes,
 });
 
-/** Exact previous value (60, before the 2026-10-21 tightening to 20) stays
- * readable for rollback; no broad drift. */
+/** Exact previous values (60 before the 2026-10-21 tightening to 20, 20 before
+ * the live 30 of 2026-10-29) stay readable for rollback; no broad drift. */
 export function isPendingNativeCheckTimeoutCutover(field, observed) {
-  return field === 'check_response_timeout_minutes' && observed === 60;
+  return (
+    field === 'check_response_timeout_minutes' &&
+    (observed === 60 || observed === 20)
+  );
 }
 
 /**
@@ -270,7 +274,7 @@ export function buildNativeQueuePolicyReadback(observed = {}) {
 /**
  * Auto-eject a parked native UNMERGEABLE entry. Unknown evidence never
  * mutates. A MERGEABLE source PR in an UNMERGEABLE group is a group
- * collision (CHANGELOG under ALLGREEN is the measured case), not a source
+ * collision (CHANGELOG under ALLGREEN, the grouping before 2026-10-29, is the measured case), not a source
  * conflict.
  *
  * @param {{

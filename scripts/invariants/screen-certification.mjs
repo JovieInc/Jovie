@@ -295,6 +295,7 @@ web.public-profile|web|public-profile|apps/web/app/[username]/page.tsx,apps/web/
 web.public-profile-about|web|public-profile|apps/web/app/[username]/about/page.tsx|desktop,mobile
 web.auth|web|browser-input-assurance|apps/web/app/(auth)/,apps/web/app/@auth/,apps/web/app/auth-return/,apps/web/app/desktop-auth/,apps/web/app/mobile-auth-return/,apps/web/components/features/auth/|desktop,mobile
 web.artist-pay|web|artist-pay|apps/web/app/[username]/pay/page.tsx|desktop,mobile
+web.artist-alerts|web|artist-alerts|apps/web/app/[username]/alerts/page.tsx|desktop,mobile
 web.profile-mode-render|web|profile-mode-render|apps/web/app/[username]/profile-mode-render/|desktop,mobile
 web.release-landing|web|release-landing|apps/web/app/r/[slug]/page.tsx,apps/web/app/r/[slug]/ReleaseLandingPage.tsx|desktop,mobile
 web.smartlink-release|web|release-landing|apps/web/app/[username]/[...slug]/page.tsx,apps/web/app/[username]/[slug]/page.tsx,apps/web/app/[username]/[slug]/not-found.tsx|desktop,mobile
@@ -324,7 +325,8 @@ web.ov-chat|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat/page.tsx,apps
 web.ov-inbox|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/inbox/page.tsx|desktop,mobile
 web.ov-integrations|web|settings-connectors|apps/web/app/app/(shell)/admin/integrations/page.tsx|desktop,mobile
 web.admin-chat-playground|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat-playground/page.tsx,apps/web/app/app/(shell)/admin/chat-playground/layout.tsx|desktop,mobile
-web.ov-founder-cockpit|web|ovie-founder-cockpit|apps/web/app/app/(shell)/admin/activity/page.tsx,apps/web/app/app/(shell)/admin/growth/page.tsx,apps/web/app/app/(shell)/admin/operations/page.tsx,apps/web/app/app/(shell)/admin/product/page.tsx|desktop,mobile
+web.ov-founder-cockpit|web|ovie-founder-cockpit|apps/web/app/app/(shell)/admin/activity/page.tsx,apps/web/app/app/(shell)/admin/activity/loading.tsx,apps/web/app/app/(shell)/admin/growth/page.tsx,apps/web/app/app/(shell)/admin/operations/page.tsx,apps/web/app/app/(shell)/admin/product/page.tsx|desktop,mobile
+web.ov-agents|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/system/page.tsx|desktop,mobile
 web.ov-company-presence|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/presence/page.tsx|desktop,mobile
 web.admin-costs|web|admin-costs|apps/web/app/app/(shell)/admin/costs/page.tsx|desktop,mobile
 web.admin-capacity|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/capacity/page.tsx|desktop,mobile
@@ -359,7 +361,7 @@ web.billing-success|web|billing-success|apps/web/app/billing/success/page.tsx|de
 web.billing-youtube-thumbnails|web|billing-youtube-thumbnails|apps/web/app/billing/youtube-thumbnails/page.tsx|desktop,mobile
 web.billing-youtube-thumbnails-success|web|billing-youtube-thumbnails-success|apps/web/app/billing/youtube-thumbnails/success/page.tsx|desktop,mobile
 web.billing-shell|web|billing-shell|apps/web/app/billing/layout.tsx|desktop,mobile
-web.claim|web|artist-claim-checkout|apps/web/app/claim/page.tsx,apps/web/app/claim/ClaimArtistSearch.tsx|desktop,mobile
+web.claim|web|artist-claim-checkout|apps/web/app/claim/page.tsx,apps/web/app/claim/ClaimArtistSearch.tsx,apps/web/app/claim/agent/[draftId]/page.tsx,apps/web/app/claim/agent/[draftId]/AgentClaimScreen.tsx|desktop,mobile
 web.account-shell|web|account-shell|apps/web/app/account/layout.tsx|desktop,mobile
 web.account-creation-recovery|web|account-creation-recovery|apps/web/app/error/user-creation-failed/page.tsx,apps/web/app/error/user-creation-failed/loading.tsx|desktop,mobile
 web.root-error-boundary|web|screen.errors.root|apps/web/app/error.tsx,apps/web/app/global-error.tsx|desktop,mobile
