@@ -13,6 +13,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import {
   consumeHomepageIntent,
   readHomepageIntent,
@@ -427,7 +428,7 @@ function renderOnboardingTools({
   }
 
   return (
-    <div className={cn('space-y-3 pl-9', hasMessageText && 'mt-3')}>
+    <div className={cn('space-y-3', hasMessageText && 'mt-3')}>
       {cards}
       {genericParts.length > 0 ? (
         <ToolPartsRenderer
@@ -436,6 +437,18 @@ function renderOnboardingTools({
           hasMessageText={false}
         />
       ) : null}
+    </div>
+  );
+}
+
+function OnboardingSpeakerRow() {
+  return (
+    <div
+      className='system-b-onboarding-speaker-row'
+      data-testid='onboarding-speaker-row'
+    >
+      <BrandLogo size='chrome' aria-hidden />
+      <span>Jovie</span>
     </div>
   );
 }
@@ -478,18 +491,24 @@ function OnboardingMessageList({
 
   return (
     <div className='flex flex-col pb-4'>
-      {displayMessages.map(message => {
+      {displayMessages.map((message, index) => {
         const text = getMessageText(message);
         const toolParts = getToolParts(message);
         const isThinking = message.id === THINKING_PLACEHOLDER_ID;
         const shouldRenderMessage =
           isThinking || Boolean(text) || toolParts.length === 0;
+        // Pen R6As7U: one Jovie speaker row opens each agent turn; a run of
+        // assistant messages is one turn and keeps a single row.
+        const startsAgentTurn =
+          message.role === 'assistant' &&
+          displayMessages[index - 1]?.role !== 'assistant';
 
         return (
           <div
             key={message.id}
             className='pb-5 transition-opacity duration-fast'
           >
+            {startsAgentTurn ? <OnboardingSpeakerRow /> : null}
             {shouldRenderMessage ? (
               <ChatMessage
                 id={message.id}
@@ -500,6 +519,7 @@ function OnboardingMessageList({
                   isStreaming && message.id === lastAssistantMessageId
                 }
                 renderTools={false}
+                showAssistantActions={false}
               />
             ) : null}
             {!isThinking
@@ -1295,7 +1315,7 @@ export function OnboardingChat({
 
   return (
     <section
-      className='relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-(--app-shell-content-surface)'
+      className='system-b-onboarding-chat relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-(--app-shell-content-surface)'
       aria-label='Jovie Onboarding Chat'
       data-testid='onboarding-chat'
       data-picker-open={composerPickerOpen ? 'true' : undefined}

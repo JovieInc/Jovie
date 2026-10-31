@@ -146,7 +146,53 @@ export function validateSpendLedger(ledger) {
     if (entry.cap && !(entry.cap.amountUsd > 0))
       errors.push(`${entry.id}: cap.amountUsd must be positive`);
   }
+  // funding says who pays: `cash`, or `credits` drawn from another entry (the credit pool).
+  // Summer reads it to report net cash spend; an entry without it is reported as unknown.
+  for (const entry of ledger?.providers ?? []) {
+    const funding = entry.funding;
+    if (funding === undefined) continue;
+    if (funding?.source === 'credits') {
+      if (!ids.has(funding.creditPoolId))
+        errors.push(
+          `${entry.id}: funding.creditPoolId ${funding.creditPoolId} is not a spend entry`
+        );
+    } else if (funding?.source !== 'cash') {
+      errors.push(`${entry.id}: funding.source must be cash or credits`);
+    }
+  }
   return errors;
+}
+
+// A selected slice is valid only together with the credit pools it draws from.
+// Walk those pool ids through `providers` and return the closure in ledger
+// order. A pool id absent from `providers` stays unresolved so validation
+// still fails closed. Entries in `selected` that are not in the ledger are
+// kept at the end, unchanged.
+export function closeSpendFunding(providers, selected) {
+  const all = providers ?? [];
+  const byId = new Map();
+  for (const entry of all) if (entry?.id) byId.set(entry.id, entry);
+  const want = new Set();
+  const queue = [];
+  for (const entry of selected ?? []) {
+    if (!entry?.id || want.has(entry.id)) continue;
+    want.add(entry.id);
+    queue.push(entry.id);
+  }
+  while (queue.length > 0) {
+    const entry = byId.get(queue.pop());
+    const pool =
+      entry?.funding?.source === 'credits' ? entry.funding.creditPoolId : null;
+    if (typeof pool === 'string' && pool && !want.has(pool) && byId.has(pool)) {
+      want.add(pool);
+      queue.push(pool);
+    }
+  }
+  const extras = [];
+  for (const entry of selected ?? []) {
+    if (entry?.id && !byId.has(entry.id)) extras.push(entry);
+  }
+  return [...all.filter(entry => want.has(entry.id)), ...extras];
 }
 
 export function evaluateCredentials(registry, nowMs, thresholds = {}) {

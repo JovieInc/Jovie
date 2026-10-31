@@ -34,9 +34,10 @@ describe('lib/ai/sdk gateway routing', () => {
 
     expect(mockCreateGateway).toHaveBeenCalledWith({ apiKey: 'gateway-key' });
     expect(mockGatewayModel).toHaveBeenCalledWith('zai/glm-5.3');
-    expect(model).toEqual({
-      __model: 'zai/glm-5.3',
-    });
+    // Wrapped in the stream-stall guard; the underlying model is untouched.
+    expect((model as unknown as { __model: string }).__model).toBe(
+      'zai/glm-5.3'
+    );
   });
 
   it('fails fast on banned openai/anthropic model ids (JOV-7119)', async () => {
