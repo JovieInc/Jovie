@@ -956,7 +956,12 @@ test.describe('Production Auth Smoke @production-smoke', () => {
     test.setTimeout(180_000);
     const expectedOrigin = exactOriginForTest(testInfo);
     if (!signedInStatePath) {
-      test.skip(true, 'No signed-in session was saved by the sign-in test');
+      // The sign-in test failed before saving a session, so the run is
+      // already red through it. Record the chat steps blocked for the
+      // receipt and stop without a second failure.
+      const why = 'no signed-in session was saved by the sign-in test';
+      certStepBlocked('chat', 'composer-ready', why);
+      certStepBlocked('chat', 'first-reply', why);
       return;
     }
     const context = await browser.newContext({
