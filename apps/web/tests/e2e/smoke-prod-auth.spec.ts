@@ -837,14 +837,75 @@ test.describe('Production Auth Smoke @production-smoke', () => {
     }
 
     // Chat: same session (a second OTP request would invalidate this one).
-    // The identity is the tagged canary (+clerk_test), so its thread is
-    // excluded from customer metrics; the thread is deleted at the end.
+    // The identity is the tagged canary (+clerk_test). No chat turn runs on
+    // this session — the decoupled chat cert owns turns on the dedicated
+    // chat-health canary — so the local toolbar contracts below send
+    // nothing and create no thread.
     await page.goto(APP_ROUTES.CHAT, {
       waitUntil: 'domcontentloaded',
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
     });
     assertExactNavigationUrl(page.url(), expectedOrigin, 'Chat navigation');
     await waitForHydration(page);
+
+    // JOV-9367: the attach-toolbar contracts need the full chat composer,
+    // which only an onboarded session reaches — /app/chat redirects a
+    // needsOnboarding visitor to /start, whose OnboardingChat composer wires
+    // no attach handlers. This returning-creator session is the prod surface
+    // where the toolbar contracts are measurable, so they run here (the
+    // 2026-10-31T18:01Z controller wave ran this same block green here).
+    const returningChatComposer = page.getByRole('textbox', {
+      name: /chat message input/i,
+    });
+    await certStep(
+      'chat',
+      'chat-toolbar-ready',
+      async () => {
+        await expect(returningChatComposer).toBeVisible({
+          timeout: SMOKE_TIMEOUTS.VISIBILITY,
+        });
+        await expect(returningChatComposer).toBeEditable();
+
+        // JOV-9625 outcome cert: the two local toolbar contracts, measured on
+        // the composer's own attach toolbar — press feedback (button state
+        // flips) and the local selector opening (palette becomes visible).
+        const attach = page.getByRole('button', { name: 'Attachment options' });
+        await expect(attach).toBeVisible({
+          timeout: SMOKE_TIMEOUTS.VISIBILITY,
+        });
+        const pressStart = Date.now();
+        await attach.click();
+        await expect(attach).toHaveAttribute('aria-expanded', 'true', {
+          timeout: 5_000,
+        });
+        const feedbackMs = Date.now() - pressStart;
+        recordCertObservation({
+          surface: 'chat',
+          contractId: 'selection-press-navigation.feedback',
+          dimension: 'responsiveness',
+          value: feedbackMs,
+          unit: 'ms',
+        });
+        await expect(
+          page
+            .locator('[data-testid="shared-command-palette"], [role="listbox"]')
+            .first()
+        ).toBeVisible({ timeout: 5_000 });
+        const openMs = Date.now() - pressStart;
+        recordCertObservation({
+          surface: 'chat',
+          contractId: 'toolbar-context-menu.open',
+          dimension: 'responsiveness',
+          value: openMs,
+          unit: 'ms',
+        });
+        await page.keyboard.press('Escape');
+        await expect(attach).toHaveAttribute('aria-expanded', 'false', {
+          timeout: 5_000,
+        });
+      },
+      () => 'returning-creator chat composer; attach toolbar opened locally'
+    );
 
     await certStep(
       'checkout',
@@ -1039,9 +1100,12 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       { timeout: 30_000 }
     );
     // Navigate to the real chat surface: /app is the Opportunity Inbox whose
-    // shell composer has no attach toolbar, so the attach-button contracts
-    // below must run on /app/chat (the round-1 in-setup flow navigated here
-    // explicitly; the decoupling lost the navigation — JOV-10150).
+    // shell composer has no attach toolbar (the round-1 in-setup flow
+    // navigated here explicitly; the decoupling lost the navigation —
+    // JOV-10150). A needsOnboarding visitor is also redirected off /app/chat
+    // to /start (ChatPageClient), and this dedicated chat-health canary is
+    // intentionally pre-onboarding, so settle on whichever chat surface the
+    // product actually serves before asserting surface-specific contracts.
     await page.goto(APP_ROUTES.CHAT, {
       waitUntil: 'domcontentloaded',
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
@@ -1049,6 +1113,23 @@ test.describe('Production Auth Smoke @production-smoke', () => {
     assertExactNavigationUrl(page.url(), expectedOrigin, 'Chat navigation');
     await waitForHydration(page);
     const telemetry = createSurfaceTelemetry(page);
+    // The OnboardingChat composer wires no attach handlers, and ChatInput
+    // renders the attach toolbar only when onFileAttach/onAudioAttach exist,
+    // so the attach-button contracts can never hold on /start — they run on
+    // the returning-creator session in the sign-in cert above instead
+    // (JOV-9367). Everything past the composer is surface-agnostic: both
+    // composers stream a POST to /api/chat and render chat-message-reply.
+    const settledChatSurface = await Promise.race([
+      page
+        .getByTestId('onboarding-chat')
+        .waitFor({ state: 'visible', timeout: SMOKE_TIMEOUTS.NAVIGATION })
+        .then(() => 'onboarding' as const),
+      page
+        .getByRole('button', { name: 'Attachment options' })
+        .waitFor({ state: 'visible', timeout: SMOKE_TIMEOUTS.NAVIGATION })
+        .then(() => 'full-chat' as const),
+    ]).catch(() => 'full-chat' as const);
+    const onOnboardingChat = settledChatSurface === 'onboarding';
     const composer = page.getByRole('textbox', { name: /chat message input/i });
     await certStep(
       'chat',
@@ -1058,6 +1139,12 @@ test.describe('Production Auth Smoke @production-smoke', () => {
           timeout: SMOKE_TIMEOUTS.VISIBILITY,
         });
         await expect(composer).toBeEditable();
+        if (onOnboardingChat) {
+          // Fresh-user onboarding composer: this surface's promise is the
+          // editable chat input on /start (lib/qa/product-promises.ts
+          // 'onboarding-chat'); it intentionally has no attach toolbar.
+          return 'onboarding chat composer visible and editable';
+        }
 
         // JOV-10150: pin the registered screen by pathname. Every chat shell
         // route (including /app/chat) server-redirects to /start for a
@@ -1120,11 +1207,64 @@ test.describe('Production Auth Smoke @production-smoke', () => {
         await expect(attach).toHaveAttribute('aria-expanded', 'false', {
           timeout: 5_000,
         });
+        return 'chat composer visible and editable; attach toolbar opened locally';
       },
-      () => 'chat composer visible and editable; attach toolbar opened locally'
+      summary => summary
     );
 
+    // The onboarding chat requires Turnstile on a first message; the same
+    // canary passage-token scheme the signup cert uses verifies it in test
+    // mode for this canary's first onboarding touch (JOV-9367). The full
+    // chat surface needs no token.
+    if (onOnboardingChat) {
+      const passageKey = process.env.SYNTHETIC_PASSAGE_KEY ?? '';
+      const expectedCertSha = process.env.EXPECTED_COMMIT_SHA ?? '';
+      if (!passageKey || !/^[0-9a-f]{40}$/u.test(expectedCertSha)) {
+        certStepBlocked(
+          'chat',
+          'first-reply',
+          !passageKey
+            ? 'SYNTHETIC_PASSAGE_KEY is not provided to this run'
+            : 'EXPECTED_COMMIT_SHA is not provided to this run'
+        );
+        telemetry.record('chat');
+        await telemetry.capture(page, 'chat');
+        await context.close();
+        return;
+      }
+      const onboardingToken = mintPassageToken(
+        Buffer.from(passageKey, 'base64url'),
+        {
+          sub: PRODCERT_CHAT_HEALTH_CANARY_EMAIL,
+          scp: 'onboarding_chat',
+          run: runTag().slice(0, 64),
+          ttlSeconds: 300,
+        }
+      );
+      recordPlaywrightSensitiveValues([onboardingToken]);
+      await page.route('**/*', async route => {
+        const request = route.request();
+        if (new URL(request.url()).origin !== expectedOrigin) {
+          await route.continue();
+          return;
+        }
+        await route.continue({
+          headers: {
+            ...request.headers(),
+            [PASSAGE_TOKEN_HEADER]: onboardingToken,
+            'x-synthetic-monitoring': 'prod-cert',
+          },
+        });
+      });
+    }
+
     const probe = 'prodcert synthetic check: reply with the single word ok';
+    // The onboarding conversation persists on this canary identity across
+    // runs, so the fresh reply is the LAST rendered one there; a full-chat
+    // thread is deleted in the finally below, leaving exactly one reply.
+    const replyLocator = onOnboardingChat
+      ? page.getByTestId('chat-message-reply').last()
+      : page.getByTestId('chat-message-reply').first();
     const chatStartedAt = Date.now();
     let conversationId: string | null = null;
     try {
@@ -1208,7 +1348,7 @@ test.describe('Production Auth Smoke @production-smoke', () => {
             timeout: SMOKE_TIMEOUTS.VISIBILITY,
           });
           const echoMs = Date.now() - sentAt;
-          const reply = page.getByTestId('chat-message-reply').first();
+          const reply = replyLocator;
           await expect(reply).toBeVisible({ timeout: 60_000 });
           const replyMs = Date.now() - sentAt;
           // A real assistant reply, not the quota/limit copy: the exhausted
