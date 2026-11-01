@@ -333,9 +333,9 @@ web.dashboard-presence|web|dashboard-presence|apps/web/app/app/(shell)/dashboard
 web.dashboard-contacts|web|dashboard-contacts|apps/web/app/app/(shell)/dashboard/contacts/|desktop,mobile
 web.contacts|web|contacts|apps/web/app/app/(shell)/contacts/page.tsx,apps/web/app/api/dashboard/contacts/route.ts,apps/web/app/api/dashboard/contacts/_lib/screen-cert-fixture.ts,apps/web/lib/screen-cert/app-shell-fixture-gate.ts|desktop,mobile
 web.tasks|web|tasks|apps/web/app/app/(shell)/tasks/page.tsx,apps/web/app/app/(shell)/tasks/TasksRoute.tsx,apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts,apps/web/app/app/(shell)/dashboard/tasks/_lib/screen-cert-fixture.ts,apps/web/lib/screen-cert/app-shell-fixture-gate.ts|desktop,mobile
-web.presence|web|presence|apps/web/app/app/(shell)/presence/page.tsx|desktop,mobile
+web.presence|web|presence|apps/web/app/app/(shell)/presence/page.tsx,apps/web/app/app/(shell)/presence/loading.tsx|desktop,mobile
 web.profiles|web|profiles|apps/web/app/app/(shell)/profiles/page.tsx|desktop,mobile
-web.library|web|library|apps/web/app/app/(shell)/library/page.tsx|desktop,mobile
+web.library|web|library|apps/web/app/app/(shell)/library/page.tsx,apps/web/app/app/(shell)/library/loading.tsx|desktop,mobile
 web.links|web|links|apps/web/app/app/(shell)/links/page.tsx,apps/web/app/app/(shell)/dashboard/links/page.tsx|desktop,mobile
 web.library-private-share|web|library-asset-share|apps/web/app/p/[token]/|desktop,mobile
 web.settings-admin-redirect|web|settings-admin-redirect|apps/web/app/app/(shell)/settings/admin/page.tsx|desktop,mobile
