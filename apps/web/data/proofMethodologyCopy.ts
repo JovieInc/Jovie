@@ -4,7 +4,7 @@ export const PROOF_METHODOLOGY_COPY = {
     heading: 'Rules For Every Number',
     items: [
       'Team, test and automated accounts never count.',
-      'Counts round down and times round up, so a number is never better than the measurement.',
+      'Counts round down and times round up, so a published number never overstates the measurement.',
       'A number appears only while it is current and past its threshold. Otherwise it is removed.',
       'Comparisons with other platforms use public pages only and appear after human review.',
     ],
