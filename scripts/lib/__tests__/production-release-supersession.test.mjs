@@ -401,13 +401,16 @@ describe('public-profile alias graduation policy', () => {
     ['production', 'certified'],
     ['production', 'uncertified'],
     ['production', 'unreadable'],
-    ['staging', 'n/a'],
+    ['staging', 'certified'],
+    ['staging', 'uncertified'],
+    ['staging', 'unreadable'],
   ])(
     'executes the %s guard with the measured enforcement decision (%s ledger)',
     (surface, ledgerState) => {
       const staging = surface === 'staging';
-      // Production blocks only while public-profile is certified in the ledger.
-      const certified = !staging && ledgerState === 'certified';
+      // Both lanes block only while public-profile is certified in the ledger
+      // (Tim 2026-10-31); uncertified or unreadable ledgers warn.
+      const certified = ledgerState === 'certified';
       const job = getJobBlock(
         RELEASE_WORKFLOW,
         staging ? 'promote-production' : 'production-public-profile-alias-gate'
@@ -440,6 +443,12 @@ describe('public-profile alias graduation policy', () => {
                   : ['landing'],
               });
         writeFileSync(join(fixture.root, 'ledger.json'), ledgerBody);
+        // The staged lane reads CRON_SECRET through Doppler; pass through.
+        stubCommand(
+          fixture.bin,
+          'doppler',
+          '#!/bin/sh\nwhile [ "$1" != "--" ]; do shift; done\nshift\nexec "$@"\n'
+        );
         stubCommand(
           fixture.bin,
           'curl',
@@ -450,24 +459,29 @@ describe('public-profile alias graduation policy', () => {
           CRON_SECRET: 'fixture-cron-secret',
           ALIAS_GUARD_ARGUMENTS: join(fixture.root, 'arguments'),
           ALIAS_GUARD_EXIT: String(exit),
-          DOPPLER_TOKEN: '',
+          DOPPLER_TOKEN: staging ? 'fixture-doppler' : '',
+          // Never let a developer's real key file a ticket from this test.
+          LINEAR_API_KEY: '',
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: 'fixture-bypass',
           PRODUCTION_DEPLOYMENT_URL_B64:
             Buffer.from(DEPLOYMENT_URL).toString('base64'),
         });
         const decision =
           PUBLIC_PROFILE_ALIAS_GRADUATION.windows[surface].decision;
-        const blocks = staging
-          ? decision === 'block'
-          : certified && decision === 'block';
+        const blocks = certified && decision === 'block';
         expect(result.status).toBe(exit && blocks ? 1 : 0);
         const outputs = parseOutputs(fixture.output);
         if (!exit) expect(outputs.performance_status).toBe('passed');
-        else if (staging)
+        else if (staging && blocks)
           expect(outputs).toMatchObject({
             failure_subtype: 'exact_build_performance_failed',
           });
-        else
+        else if (staging) {
+          expect(outputs.failure_subtype).toBeUndefined();
+          expect(result.stdout).toContain(
+            '::warning::Exact staged-build public-profile alias budgets missed on uncertified pages'
+          );
+        } else
           expect(outputs.performance_status).toBe(blocks ? 'failed' : 'warn');
         const calls = readFileSync(join(fixture.root, 'arguments'), 'utf8')
           .split('--invocation-end--\n')
