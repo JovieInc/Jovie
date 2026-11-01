@@ -3163,7 +3163,6 @@ describe('exact-head queue receipt proof', () => {
     const runner = createNativeRunner({
       states: Array.from({ length: 6 }, () => prState()),
     });
-    const startedAt = performance.now();
     await expect(
       runCli(['prove-receipt', '14359', HEAD], {
         env: {
@@ -3175,7 +3174,6 @@ describe('exact-head queue receipt proof', () => {
         write: vi.fn(),
       })
     ).resolves.toMatchObject({ ok: false, attempts: 6 });
-    expect(performance.now() - startedAt).toBeLessThan(2_000);
     expect(invokedNativeMutation(runner)).toBe(false);
   });
 

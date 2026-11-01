@@ -22,6 +22,38 @@ const run = new AsyncFunction(
   'require',
   script
 );
+/**
+ * Deterministic stand-ins for wall-clock time (JOV-10086). Tests must never
+ * assert on how long a run took: a loaded runner turns that into a flake.
+ * `recordTimers` captures every delay the script under test asks for, so a
+ * "must not sleep" check asserts on the requested delay, not elapsed time.
+ * `withFakeClock` freezes Date.now so a budget is spent by advancing it.
+ */
+async function recordTimers(fn) {
+  const realSetTimeout = globalThis.setTimeout;
+  const delays = [];
+  globalThis.setTimeout = (callback, ms, ...args) => {
+    delays.push(Number(ms) || 0);
+    return realSetTimeout(callback, ms, ...args);
+  };
+  try {
+    return { value: await fn(), delays };
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+  }
+}
+async function withFakeClock(fn) {
+  const realNow = Date.now;
+  let now = realNow();
+  Date.now = () => now;
+  try {
+    return await fn(ms => {
+      now += ms;
+    });
+  } finally {
+    Date.now = realNow;
+  }
+}
 const sha = 'a'.repeat(40);
 const mainSha = 'c'.repeat(40);
 test('all native queue mutation clients request repository contents write', () => {
@@ -665,15 +697,20 @@ test('a required-green BLOCKED recheck stops at four follow-ups and ignores draf
   );
   assert.deepEqual(held.result.reads, [1]);
   assert.deepEqual(held.calls, []);
-  const started = Date.now();
-  const sweep = await withFetch(() =>
-    fixture({
-      eventName: 'push',
-      env: { MERGE_STATE_RETRY_MS: '5000', RECHECK_TOKEN: 'ghs_test' },
-      overrides: blockedGreen(),
-    })
+  const { value: sweep, delays } = await recordTimers(() =>
+    withFetch(() =>
+      fixture({
+        eventName: 'push',
+        env: { MERGE_STATE_RETRY_MS: '5000', RECHECK_TOKEN: 'ghs_test' },
+        overrides: blockedGreen(),
+      })
+    )
   );
-  assert.ok(Date.now() - started < 1000, 'a sweep must not sleep on BLOCKED');
+  assert.deepEqual(
+    delays.filter(ms => ms >= 1000),
+    [],
+    'a sweep must not sleep on BLOCKED'
+  );
   assert.deepEqual(sweep.result.reads, [1]);
   assert.deepEqual(sweep.result.mutations, []);
   assert.deepEqual(sweep.calls, []);
@@ -727,32 +764,35 @@ test('a 70-PR sweep with UNKNOWN entries reads in parallel, never sleeps, and st
   }));
   let inFlight = 0;
   let peak = 0;
-  const started = Date.now();
-  const result = await fixture({
-    roster,
-    eventName: 'push',
-    // A sleep would block the test far past its own timeout.
-    env: { MERGE_STATE_RETRY_MS: '600000' },
-    readCurrentSnapshot: async (number, readCount) => {
-      inFlight += 1;
-      peak = Math.max(peak, inFlight);
-      await new Promise(resolve => setTimeout(resolve, 20));
-      inFlight -= 1;
-      // Every PR reads UNKNOWN first (main just moved); a third stay BLOCKED,
-      // a third settle CLEAN on the second read, a third stay UNKNOWN.
-      const firstRead = readCount <= 70;
-      const state =
-        number % 3 === 0
-          ? 'BLOCKED'
-          : firstRead || number % 3 === 2
-            ? 'UNKNOWN'
-            : 'CLEAN';
-      return { ...current(number), mergeStateStatus: state };
-    },
-  });
-  assert.ok(
-    Date.now() - started < 20 * 70,
-    'reads overlap instead of running serially'
+  const { value: result, delays: sweepDelays } = await recordTimers(() =>
+    fixture({
+      roster,
+      eventName: 'push',
+      // A sleep would request a 600 s timer; asserted below via the delays.
+      env: { MERGE_STATE_RETRY_MS: '600000' },
+      readCurrentSnapshot: async (number, readCount) => {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        // Yield to the event loop so reads can overlap, without a timer.
+        await new Promise(resolve => setImmediate(resolve));
+        inFlight -= 1;
+        // Every PR reads UNKNOWN first (main just moved); a third stay BLOCKED,
+        // a third settle CLEAN on the second read, a third stay UNKNOWN.
+        const firstRead = readCount <= 70;
+        const state =
+          number % 3 === 0
+            ? 'BLOCKED'
+            : firstRead || number % 3 === 2
+              ? 'UNKNOWN'
+              : 'CLEAN';
+        return { ...current(number), mergeStateStatus: state };
+      },
+    })
+  );
+  assert.deepEqual(
+    sweepDelays.filter(ms => ms >= 1000),
+    [],
+    'a sweep must never sleep on UNKNOWN or BLOCKED'
   );
   assert.ok(peak > 1 && peak <= 6, `prefetch concurrency ${peak}`);
   // One prefetch per PR plus one fresh read per UNKNOWN; no retry loop.
@@ -775,15 +815,19 @@ test('a sweep goes longest-waiting first and stops at its budget', async () => {
     ordered.mutations.map(m => m.id),
     ['PR_1', 'PR_2', 'PR_3']
   );
-  const spent = await fixture({
-    roster,
-    eventName: 'push',
-    env: { SWEEP_BUDGET_MS: '1000', SWEEP_READ_CONCURRENCY: '1' },
-    readCurrentSnapshot: async number => {
-      await new Promise(resolve => setTimeout(resolve, 600));
-      return current(number);
-    },
-  });
+  // Each read "takes" 600 ms of fake time, so the budget is spent
+  // deterministically regardless of runner load.
+  const spent = await withFakeClock(advance =>
+    fixture({
+      roster,
+      eventName: 'push',
+      env: { SWEEP_BUDGET_MS: '1000', SWEEP_READ_CONCURRENCY: '1' },
+      readCurrentSnapshot: async number => {
+        advance(600);
+        return current(number);
+      },
+    })
+  );
   // Prefetch stops at half the budget; the loop reads PR 2 itself, then stops.
   assert.deepEqual(
     spent.mutations.map(m => m.id),
