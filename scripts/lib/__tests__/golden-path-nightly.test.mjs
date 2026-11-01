@@ -76,8 +76,10 @@ describe('Golden Path nightly dispatches and exits (JOV-INV-042)', () => {
     expect(reportJob.if).toContain("github.event_name == 'workflow_dispatch'");
     expect(reportJob.if).toContain("github.ref == 'refs/heads/main'");
     const step = reportJob.steps.at(-1);
+    // A main push runs the lane continue-on-error, so the job result reads
+    // success on a red journey; the step outcomes decide (JOV-7998).
     expect(step.env.GOLDEN_PATH_RESULT).toBe(
-      '${{ needs.ci-golden-path.result }}'
+      "${{ (needs.ci-golden-path.outputs.journey_outcome == 'failure' || needs.ci-golden-path.outputs.certification_outcome == 'failure') && 'failure' || needs.ci-golden-path.result }}"
     );
 
     // Execute the step with the job result rendered as a red lane.

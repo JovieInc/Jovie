@@ -1,0 +1,71 @@
+name: Golden Path PR
+
+# clock-class: event-driven
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: A pull_request event dispatches the existing manual real-auth + Stripe test-mode Golden Path lane in ci.yml on the PR head branch (actions: write only) and exits. It holds no Stripe, auth, database or deploy credentials and never checks out PR code.
+# removal-trigger: Remove when ci.yml runs the Golden Path lane on pull_request itself.
+#
+# JOV-7998: main's Golden Path was red for three pushes (#23277) because the lane
+# only ran on main pushes and dispatch, and a red push run does not fail CI. A PR
+# that touches the claim, auth, billing, onboarding or public-profile contract now
+# runs the lane before it can merge. Path-filtered, so unrelated PRs never start
+# it. The dispatched run attaches its `Golden Path (manual)` check to the PR head.
+# One dispatch per head SHA; fork PRs are skipped because they have no secrets.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'apps/web/app/claim/**'
+      - 'apps/web/app/*username*/claim/**'
+      - 'apps/web/app/api/onboarding/**'
+      - 'apps/web/app/api/stripe/**'
+      - 'apps/web/app/api/billing/**'
+      - 'apps/web/app/api/webhooks/**'
+      - 'apps/web/app/onboarding/**'
+      - 'apps/web/app/start/**'
+      - 'apps/web/app/signin/**'
+      - 'apps/web/app/signup/**'
+      - 'apps/web/lib/auth/**'
+      - 'apps/web/lib/billing/**'
+      - 'apps/web/lib/claim/**'
+      - 'apps/web/lib/entitlements/**'
+      - 'apps/web/lib/onboarding/**'
+      - 'apps/web/lib/security/claim-token.ts'
+      - 'apps/web/lib/stripe/**'
+      - 'apps/web/lib/waitlist/**'
+      - 'apps/web/tests/e2e/golden-path*.ts'
+      - 'apps/web/tests/e2e/helpers/golden-path*.ts'
+      - 'apps/web/drizzle/migrations/**'
+
+permissions: {}
+
+concurrency:
+  group: golden-path-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  dispatch:
+    name: Dispatch the Golden Path lane for this PR
+    if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Dispatch once per head SHA
+        run: |
+          set -euo pipefail
+          existing="$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?event=workflow_dispatch&head_sha=$HEAD_SHA&per_page=5" --jq '.workflow_runs | length')"
+          if [ "$existing" != "0" ]; then
+            echo "Golden Path already dispatched for $HEAD_SHA; skipping."
+            exit 0
+          fi
+          gh workflow run ci.yml --repo "$REPO" --ref "$HEAD_REF"

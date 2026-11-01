@@ -27,6 +27,7 @@ import {
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import { priorityWeights, rankModules } from './lib/golden-path-assurance.mjs';
 import {
   createTestSelector,
   readModuleSource,
@@ -64,6 +65,8 @@ const { values } = parseArgs({
     include: { type: 'string', default: 'lib/,app/api/' },
     'max-loc': { type: 'string', default: '700' },
     files: { type: 'string' },
+    priority: { type: 'string' },
+    'stage-counts': { type: 'string' },
     sha: { type: 'string' },
     summary: { type: 'string' },
     'github-output': { type: 'string' },
@@ -170,9 +173,27 @@ const readModule = readModuleSource(webRoot);
 const includes = values.include.split(',').filter(Boolean);
 const maxLoc = num('max-loc');
 const explicit = values.files?.split(/[\s,]+/u).filter(Boolean);
+// --priority <manifest>: Golden Path contract modules are always candidates
+// and run first, ordered by stage volume x risk (--stage-counts overrides the
+// manifest's volume snapshot with live funnel counts).
+const priority = values.priority
+  ? priorityWeights(
+      rankModules(
+        JSON.parse(readFileSync(resolve(values.priority), 'utf8')),
+        values['stage-counts']
+          ? JSON.parse(readFileSync(resolve(values['stage-counts']), 'utf8'))
+          : {}
+      )
+    )
+  : new Map();
 const sources = selectHighRiskSources(explicit ?? tracked, readModule, {
   prefixes: null,
-}).filter(file => explicit || includes.some(prefix => file.startsWith(prefix)));
+}).filter(
+  file =>
+    explicit ||
+    priority.has(file) ||
+    includes.some(prefix => file.startsWith(prefix))
+);
 const selectTests = createTestSelector(readTestSources(webRoot), readModule);
 // Test selection costs ~1.3s per source (import-graph walk), so it runs lazily
 // on the ranked batch only. Modules with a same-named test rank first.
@@ -232,6 +253,7 @@ else {
   const maxFiles = num('max-files');
   for (const file of pickBatch(state, pool, {
     max: Number.POSITIVE_INFINITY,
+    priority,
   })) {
     if (batch.length >= maxFiles) break;
     if (selectTests(file).length > 0) {

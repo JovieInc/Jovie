@@ -6946,10 +6946,12 @@ jobs:
   ci-golden-path-report:
     name: Golden Path Report
     # JOV-6920 revenue gate: the dispatched main run reports its own Golden
-    # Path result, so golden-path-nightly.yml dispatches and exits instead of
+    # Path result (JOV-7998: and so does a main push, whose lane is
+    # continue-on-error so needs.result reads success even when the journey or
+    # certification step failed; the step outcomes below are the truth), so golden-path-nightly.yml dispatches and exits instead of
     # holding a runner for the whole lane (JOV-INV-042).
     needs: [ci-golden-path]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    if: ${{ always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -6970,7 +6972,7 @@ jobs:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
           CERT_DIR: ${{ runner.temp }}/canonical-artist-site-certification
-          PRODUCER_RESULT: ${{ needs.ci-golden-path.result }}
+          PRODUCER_RESULT: ${{ (needs.ci-golden-path.outputs.journey_outcome == 'failure' || needs.ci-golden-path.outputs.certification_outcome == 'failure') && 'failure' || needs.ci-golden-path.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
         run: |
@@ -6982,7 +6984,7 @@ jobs:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
           # A certification failure is a failure; never remap it to success.
-          GOLDEN_PATH_RESULT: ${{ needs.ci-golden-path.result }}
+          GOLDEN_PATH_RESULT: ${{ (needs.ci-golden-path.outputs.journey_outcome == 'failure' || needs.ci-golden-path.outputs.certification_outcome == 'failure') && 'failure' || needs.ci-golden-path.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           MAIN_SHA: ${{ github.sha }}
         run: node scripts/golden-path-nightly-intake.mjs
