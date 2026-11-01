@@ -158,6 +158,29 @@ test('wait: a throwing reader is UNREADABLE, never PASS', async () => {
   assert.equal(result.verdict, 'UNREADABLE');
 });
 
+test('wait: a rejected reader is UNREADABLE, never PASS', async () => {
+  const result = await waitForVerdict({
+    readMarker: () => Promise.reject(new Error('boom')),
+    ...ctx,
+    budgetSeconds: 60,
+    intervalSeconds: 20,
+    sleep: async () => {},
+  });
+  assert.equal(result.verdict, 'UNREADABLE');
+});
+
+test('GitHub reads go through runGh, not a gh subprocess', () => {
+  const source = readFileSync(
+    new URL('./production-predecessor-verdict.mjs', import.meta.url),
+    'utf8'
+  );
+  assert.match(source, /from '\.\.\/\.\.\/packages\/api-client\/gh\.ts'/);
+  assert.match(source, /await runGh\(args, \{ priority: 'deploy' \}\)/);
+  assert.match(source, /run\.deferred \|\| run\.code !== 0/);
+  assert.doesNotMatch(source, /spawnSync\(\s*'gh'/);
+  assert.match(source, /spawnSync\(\s*process\.execPath/);
+});
+
 // Workflow wiring: both production mutation boundaries are gated, in order.
 const release = readFileSync(
   new URL('../workflows/production-release.yml', import.meta.url),

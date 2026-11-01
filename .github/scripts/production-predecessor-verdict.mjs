@@ -17,6 +17,8 @@
 import { spawnSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+
+import { runGh } from '../../packages/api-client/gh.ts';
 import { admitReleaseBase } from './production-marker-state.mjs';
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
@@ -118,7 +120,7 @@ export async function waitForVerdict({
   for (;;) {
     let marker;
     try {
-      marker = readMarker();
+      marker = await readMarker();
     } catch (error) {
       marker = {
         state: 'manual',
@@ -154,15 +156,20 @@ function parseArgs(argv) {
   return values;
 }
 
-function gh(args) {
-  const run = spawnSync('gh', args, { encoding: 'utf8' });
-  if (run.status !== 0) throw new Error(run.stderr || 'gh failed');
+async function gh(args) {
+  const run = await runGh(args, { priority: 'deploy' });
+  if (run.deferred || run.code !== 0) {
+    throw new Error(run.stderr || 'gh failed');
+  }
   return run.stdout;
 }
 
-function resolveControllerWorkflowId(repo) {
+async function resolveControllerWorkflowId(repo) {
   const workflow = JSON.parse(
-    gh(['api', `repos/${repo}/actions/workflows/production-controller.yml`])
+    await gh([
+      'api',
+      `repos/${repo}/actions/workflows/production-controller.yml`,
+    ])
   );
   if (workflow.path !== CONTROLLER_PATH || workflow.state !== 'active') {
     throw new Error('Production Controller workflow identity is not canonical');
@@ -170,10 +177,10 @@ function resolveControllerWorkflowId(repo) {
   return String(workflow.id);
 }
 
-function readActiveRuns({ repo, currentRunId }) {
+async function readActiveRuns({ repo, currentRunId }) {
   if (!currentRunId) return [];
   const runs = JSON.parse(
-    gh([
+    await gh([
       'api',
       `repos/${repo}/actions/workflows/production-controller.yml/runs?per_page=50&branch=main`,
     ])
@@ -181,7 +188,12 @@ function readActiveRuns({ repo, currentRunId }) {
   return earlierActiveRuns(runs, currentRunId);
 }
 
-function readMarkerOnline({ repo, predecessorSha, workflowId, currentRunId }) {
+async function readMarkerOnline({
+  repo,
+  predecessorSha,
+  workflowId,
+  currentRunId,
+}) {
   const run = spawnSync(
     process.execPath,
     [
@@ -200,7 +212,7 @@ function readMarkerOnline({ repo, predecessorSha, workflowId, currentRunId }) {
   const marker = JSON.parse(run.stdout.trim().split('\n').pop() ?? '');
   return applyInFlightOverride(
     marker,
-    marker?.state === 'none' ? readActiveRuns({ repo, currentRunId }) : []
+    marker?.state === 'none' ? await readActiveRuns({ repo, currentRunId }) : []
   );
 }
 
@@ -212,7 +224,7 @@ async function main() {
   const interval = Number(args['interval-seconds'] ?? 20);
   let result;
   try {
-    const workflowId = resolveControllerWorkflowId(repo);
+    const workflowId = await resolveControllerWorkflowId(repo);
     result = await waitForVerdict({
       readMarker: () =>
         readMarkerOnline({
