@@ -3,9 +3,11 @@ import { notFound, permanentRedirect } from 'next/navigation';
 import { loadPublicReleaseCredits } from '@/app/[username]/[slug]/_lib/data';
 import { isScreenCertSmartLinkProfileRequest } from '@/app/[username]/[slug]/_lib/screen-cert-fixture';
 
-// Read current publication for every profile request without changing release-route caching.
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// One-hour ISR. Publication is not decided by this cached render: the proxy
+// asks /api/profile-publication on every request and refuses to serve this
+// body when the handle is not published right now (JOV-8629 §6.2,
+// lib/routing/profile-publication-edge.ts).
+export const revalidate = 3600;
 
 import { AskJovieWidget } from '@/components/features/ask-jovie/AskJovieWidget';
 import { AliasCollisionRecovery } from '@/components/features/profile/AliasCollisionRecovery';

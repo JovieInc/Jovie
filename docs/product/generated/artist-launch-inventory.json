@@ -4225,6 +4225,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/profile-publication/route.ts",
+      "kind": "handler",
+      "route": "/api/profile-publication",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/profile-surfaces/[id]/qualification/route.ts",
       "kind": "handler",
       "route": "/api/profile-surfaces/[id]/qualification",

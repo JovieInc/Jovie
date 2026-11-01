@@ -1014,9 +1014,18 @@ describe('Public Profile Page Logic', () => {
     // exercised against the real loader in its colocated behavior suite.
     sourceTest.each([
       'app/[username]/page.tsx',
+      'app/[username]/profile-mode-render/[profileMode]/[marker]/page.tsx',
+    ])('serves %s from ISR only behind the proxy publication gate', route => {
+      const source = readFileSync(path.join(WEB_ROOT, route), 'utf8');
+      expect(source).toMatch(/export const revalidate\s*=\s*3600\s*;/);
+      expect(source).not.toMatch(/export const dynamic\s*=/);
+      const proxy = readFileSync(path.join(WEB_ROOT, 'proxy.ts'), 'utf8');
+      expect(proxy).toMatch(/await gateProfilePublicationAtEdge\(/);
+    });
+
+    sourceTest.each([
       'app/[username]/alerts/page.tsx',
       'app/[username]/shop/page.tsx',
-      'app/[username]/profile-mode-render/[profileMode]/[marker]/page.tsx',
       'app/[username]/opengraph-image.tsx',
     ])('requires a fresh render for %s', route => {
       const source = readFileSync(path.join(WEB_ROOT, route), 'utf8');

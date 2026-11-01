@@ -478,9 +478,17 @@ ISR decision; separately published release and asset authority remains unchanged
    `cache()` deduplicates within one request. Authoritative profile and OG
    readers propagate storage failures rather than treating them as absent rows;
    missing/private profiles disclose no profile body.
-2. Profile pages and their rewritten modes use native `force-dynamic` and
-   `revalidate = 0`. The shared username layout keeps its default behavior so
-   release descendants retain their own caching and publication rules.
+2. The canonical profile page and its rewritten modes are ISR (`revalidate =
+   3600`), and the cached body is never the access decision. On every request
+   to `/<username>`, the proxy (`lib/routing/profile-publication-edge.ts`) asks
+   the uncached `/api/profile-publication` endpoint for a storage read of
+   publication. Missing, withdrawn, deleted and renamed-away handles get a
+   no-store 404, and a failed or slow decision gets a no-store 503, before any
+   cached body is served. RSC, prefetch and `?mode=` requests share the path
+   and pass through the same gate. Real top-level routes are excluded by
+   `STATIC_TOP_LEVEL_ROUTE_SEGMENTS`, which a guard test keeps equal to `app/`
+   and `public/`. The shared username layout keeps its default behavior, so
+   release descendants keep their own caching and publication rules.
 3. Profile text, feeds, calendars and OG responses cannot reuse an old public
    body after withdrawal. Feed/calendar responses use `no-store`.
 4. Existing cache invalidation still refreshes other facts; invalidation success
@@ -492,7 +500,9 @@ Shipped 2026-11-01: profile latency regressed once every request re-read the
 full body (staged-build alias budgets: median 822-1068ms and p95 up to 2.3s,
 every canonical document a cache MISS, against a 490-590ms median before), so
 non-authority facts are now cached behind the fresh publication decision
-described in item 1. The staged
+described in item 1. Caching the body alone didn't recover the budget (the
+cost was the per-request uncached render, not the body query), so the
+document is ISR-cached again behind the per-request proxy gate in item 2. The staged
 field-policy parser does not enable a field setting or change audience authority;
 complete privacy acceptance remains tracked by JOV-8629.
 

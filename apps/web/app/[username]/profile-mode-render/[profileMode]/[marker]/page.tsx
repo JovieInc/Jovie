@@ -10,9 +10,9 @@ import {
   RENDER_FIXTURE_METADATA,
 } from '@/lib/render-fixture-policy';
 
-// Rewritten profile modes share the canonical page's fresh publication decision.
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// Rewritten profile modes share the canonical page's one-hour ISR cadence and
+// its per-request proxy publication gate (the proxy sees `/<username>`).
+export const revalidate = 3600;
 
 export function generateStaticParams() {
   return getProfileModeRenderStaticParams();
