@@ -44,6 +44,5 @@ export const DSP_LINKS_COPY = {
     { href: APP_ROUTES.PRODUCT, label: 'Product' },
     { href: APP_ROUTES.SMART_LINKS, label: 'Smart Links' },
     { href: APP_ROUTES.PRICING, label: 'Pricing' },
-    { href: APP_ROUTES.CARD, label: 'Jovie Card' },
   ],
 } as const;
