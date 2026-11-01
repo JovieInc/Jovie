@@ -349,6 +349,26 @@ class Linear:
         self.gql("mutation($i:String!,$s:String!){issueUpdate(id:$i,input:{stateId:$s}){success}}",
                  {"i": d["issue"]["id"], "s": sid})
 
+    def state_type(self, ident: str) -> str | None:
+        d = self.gql("query($i:String!){issue(id:$i){state{type}}}", {"i": ident})
+        return (d["issue"].get("state") or {}).get("type")
+
+
+def fetch_prs() -> list[dict]:
+    """PR list a claim can bind to, deduped across two searches. 'Sentry in:body' alone excluded
+    merged fix PRs whose body references the Linear identifier but never says 'Sentry' -- e.g.
+    #21394 ('Refs JOV-8073') -- so those claims expired forever, re-firing claim-expired alerts
+    on Done issues every cycle (JOV-10213). Fetch the issue-reference convention too."""
+    prs: list[dict] = []
+    seen: set[int] = set()
+    for term in ("Sentry in:body", "JOV in:body"):
+        for p in gh_json(["pr", "list", "-R", REPO, "--state", "all", "--search", term, "--limit", "100",
+                          "--json", "number,title,body,headRefName,mergedAt"]) or []:
+            if p["number"] not in seen:
+                seen.add(p["number"])
+                prs.append(p)
+    return prs
+
 
 def gh_json(args: list[str]):
     res = run_gh(args)
@@ -502,6 +522,24 @@ def advance(ledger: dict, linear: Linear, sentry: Sentry, prs: list[dict], at: f
             elif pr:
                 e.update(pr=pr["number"], prOpenedAt=e.get("prOpenedAt") or at)
             elif at > e["claimExpiresAt"] and not e.get("gate"):
+                try:
+                    linked_state = linear.state_type(e["linear"]) or ""
+                except LinearIssueMissing:
+                    linked_state = ""  # fall through: escalation's own refile handles a dead link
+                if linked_state in ("completed", "canceled"):
+                    # The linked issue was completed/canceled externally (e.g. closed with
+                    # receipts while this claim was live, and the merged fix PR sits outside
+                    # the PR fetch window). Respect it and stand the claim down: escalating
+                    # here re-files a duplicate claim-expired alert on a DONE issue every
+                    # cycle (JOV-10213).
+                    e.update(status="closed", closedAt=at)
+                    try:
+                        linear.comment(e["linear"], "prod-errors loop: the linked issue is already "
+                                       "completed/canceled -- standing the claim down, no further "
+                                       f"claim-expired alerts (Sentry {sid}).")
+                    except LinearIssueMissing:
+                        pass
+                    continue
                 e["claimExpiresAt"] = at + CLAIM_S
                 e["escalations"] = e.get("escalations", 0) + 1
                 try:
@@ -656,8 +694,7 @@ def sweep(sentry: Sentry, linear: Linear, state: Path = STATE) -> dict:
     try:
         merges = gh_json(["pr", "list", "-R", REPO, "--state", "merged", "--limit", "60",
                           "--json", "number,mergedAt,title"]) or []
-        prs = gh_json(["pr", "list", "-R", REPO, "--state", "all", "--search", "Sentry in:body", "--limit", "100",
-                       "--json", "number,title,body,headRefName,mergedAt"]) or []
+        prs = fetch_prs()
     except GhDeferred as exc:
         # Budget deferral (exit 75: 'retry later, not a verdict'): the Sentry sweep still runs, but
         # PR matching, claim expiry and the thread watch are SKIPPED -- with no PR list, 'no PR'
