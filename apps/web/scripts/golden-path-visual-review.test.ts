@@ -18,6 +18,7 @@ import {
   readManifest,
   reviewLayout,
   reviewWithModel,
+  workersAiRoute,
 } from './golden-path-visual-review';
 
 function record(
@@ -194,6 +195,123 @@ describe('golden path visual review', () => {
       'text',
     ]);
     expect(body?.providerOptions?.gateway).toMatchObject({ caching: 'auto' });
+  });
+
+  it('derives the workers-first route from routing.json for this caller', () => {
+    expect(workersAiRoute()).toEqual({
+      baseUrl: 'https://jovie-workers-ai.tim-fd8.workers.dev/v1',
+      model: '@cf/zai-org/glm-5.3-flash',
+    });
+  });
+
+  it('refuses the workers route when the caller is not workers-first, the twin is unmapped or the relay is undeclared', () => {
+    const routing = {
+      providers: { 'workers-ai': { relayBaseUrl: 'https://relay.test/v1' } },
+      callers: [{ id: 'ci.golden-path-review', route: 'workers-first' }],
+    };
+    expect(
+      workersAiRoute({
+        ...routing,
+        callers: [{ id: 'ci.golden-path-review', route: 'gateway-only' }],
+      })
+    ).toBeNull();
+    expect(
+      workersAiRoute({
+        ...routing,
+        callers: [{ id: 'other.caller', route: 'workers-first' }],
+      })
+    ).toBeNull();
+    expect(workersAiRoute({ callers: routing.callers })).toBeNull();
+  });
+
+  it('asks the Workers AI relay first and never touches the Gateway when it answers', async () => {
+    const calls: string[] = [];
+    let relayBody: Record<string, unknown> | undefined;
+    const result = await reviewWithModel({
+      png: Buffer.from('png-bytes'),
+      stepId: 'home',
+      path: '/',
+      apiKey: 'gw-key',
+      baseUrl: 'https://gw.test/v1',
+      workersAi: {
+        baseUrl: 'https://relay.test/v1',
+        model: '@cf/zai-org/glm-5.3-flash',
+        token: 'cf-token',
+      },
+      fetchImpl: async (url, init) => {
+        calls.push(String(url));
+        if (String(url).startsWith('https://relay.test/'))
+          relayBody = JSON.parse(String(init?.body));
+        return Response.json({
+          choices: [
+            {
+              message: { content: '{"verdict":"pass","findings":[]}' },
+            },
+          ],
+        });
+      },
+    });
+    expect(result).toEqual({ verdict: 'pass', findings: [] });
+    expect(calls).toEqual(['https://relay.test/v1/chat/completions']);
+    expect(relayBody?.model).toBe('@cf/zai-org/glm-5.3-flash');
+    // The relay is not the Gateway: no gateway providerOptions on its body.
+    expect(relayBody && 'providerOptions' in relayBody).toBe(false);
+  });
+
+  it('falls back to the Gateway when the relay transport fails', async () => {
+    const calls: string[] = [];
+    const result = await reviewWithModel({
+      png: Buffer.from('png-bytes'),
+      stepId: 'home',
+      path: '/',
+      apiKey: 'gw-key',
+      baseUrl: 'https://gw.test/v1',
+      workersAi: {
+        baseUrl: 'https://relay.test/v1',
+        model: '@cf/zai-org/glm-5.3-flash',
+        token: 'cf-token',
+      },
+      fetchImpl: async url => {
+        calls.push(String(url));
+        if (String(url).startsWith('https://relay.test/'))
+          return new Response('down', { status: 503 });
+        return Response.json({
+          choices: [
+            {
+              message: {
+                content: '{"verdict":"blocker","findings":["layout: clipped"]}',
+              },
+            },
+          ],
+        });
+      },
+    });
+    expect(result).toEqual({
+      verdict: 'blocker',
+      findings: ['layout: clipped'],
+    });
+    expect(calls).toEqual([
+      'https://relay.test/v1/chat/completions',
+      'https://gw.test/v1/chat/completions',
+    ]);
+  });
+
+  it('reports the relay failure as unknown when there is no Gateway key to fall back to', async () => {
+    await expect(
+      reviewWithModel({
+        png: Buffer.from('png-bytes'),
+        stepId: 'home',
+        path: '/',
+        apiKey: undefined,
+        baseUrl: 'https://gw.test/v1',
+        workersAi: {
+          baseUrl: 'https://relay.test/v1',
+          model: '@cf/zai-org/glm-5.3-flash',
+          token: 'cf-token',
+        },
+        fetchImpl: async () => new Response('down', { status: 503 }),
+      })
+    ).resolves.toMatchObject({ verdict: 'unknown', reason: 'workers-ai 503' });
   });
 
   it('confirms a blocker only when the replay flags the same keyframe', () => {
@@ -417,6 +535,58 @@ describe('golden path visual review', () => {
       await expect(
         main(['--dir', dir, '--out', join(dir, 'v.json')], {})
       ).rejects.toThrow('no keyframes recorded');
+    });
+
+    it('routes every keyframe review through the workers-first relay when configured', async () => {
+      const dir = setupDir(record());
+      const out = join(dir, 'verdict.json');
+      const urls: string[] = [];
+      await main(
+        ['--dir', dir, '--out', out],
+        { AI_GATEWAY_API_KEY: 'gw', WORKERS_AI_TOKEN: 'cf' },
+        async (url, init) => {
+          urls.push(String(url));
+          expect(JSON.parse(String(init?.body)).model).toBe(
+            '@cf/zai-org/glm-5.3-flash'
+          );
+          return Response.json({
+            choices: [
+              { message: { content: '{"verdict":"pass","findings":[]}' } },
+            ],
+          });
+        }
+      );
+      expect(urls).toHaveLength(1);
+      expect(urls[0]).toBe(
+        'https://jovie-workers-ai.tim-fd8.workers.dev/v1/chat/completions'
+      );
+      const written = JSON.parse(readFileSync(out, 'utf8'));
+      expect(written.reviewers.workersAiModel).toBe(
+        '@cf/zai-org/glm-5.3-flash'
+      );
+    });
+
+    it('stays Gateway-only when no relay token is configured (WORKERS_AI_TOKEN absent)', async () => {
+      const dir = setupDir(record());
+      const out = join(dir, 'verdict.json');
+      const urls: string[] = [];
+      await main(
+        ['--dir', dir, '--out', out],
+        { AI_GATEWAY_API_KEY: 'gw' },
+        async url => {
+          urls.push(String(url));
+          return Response.json({
+            choices: [
+              { message: { content: '{"verdict":"pass","findings":[]}' } },
+            ],
+          });
+        }
+      );
+      expect(urls).toEqual([
+        'https://ai-gateway.vercel.sh/v1/chat/completions',
+      ]);
+      const written = JSON.parse(readFileSync(out, 'utf8'));
+      expect(written.reviewers.workersAiModel).toBeUndefined();
     });
 
     it('writes a first-phase verdict file from layout + model reviews', async () => {
