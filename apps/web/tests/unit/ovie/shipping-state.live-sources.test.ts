@@ -358,7 +358,14 @@ describe('lanes-status (symphony-lanes-status/v1 gist)', () => {
   it('reads flow health from prs, slo, admission and ownership', () => {
     expect(
       parseLaneFlow({
-        prs: { open: 94, red: 20, dirty: 7, cleanNotQueued: 6, exhausted: 11 },
+        prs: {
+          open: 94,
+          red: 20,
+          dirty: 7,
+          cleanNotQueued: 6,
+          exhausted: 11,
+          wip: { ageP95Hours: 151.5, overCap: ['codex', 'hyperagent'] },
+        },
         slo: {
           at: '2026-09-27T01:50:00Z',
           queueEjectionRate: 0.72,
@@ -383,6 +390,8 @@ describe('lanes-status (symphony-lanes-status/v1 gist)', () => {
       eligiblePool: 0,
       candidatePool: 28,
       ownerless: 2,
+      openPrAgeP95Hours: 151.5,
+      overWipProducers: 2,
       regressions: ['merge_queue.ejection_rate'],
       at: '2026-09-27T01:50:00.000Z',
     });
@@ -395,6 +404,8 @@ describe('lanes-status (symphony-lanes-status/v1 gist)', () => {
       slo: { queueEjectionRate: 4 },
     });
     expect(flow?.openPrs).toBeNull();
+    expect(flow?.openPrAgeP95Hours).toBeNull();
+    expect(flow?.overWipProducers).toBeNull();
     expect(flow?.queueEjectionRate).toBeNull();
     expect(flow?.mergesPerHour).toBeNull();
   });
