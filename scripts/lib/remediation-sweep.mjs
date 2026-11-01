@@ -260,6 +260,20 @@ export function planExhaustedConflicts(pulls, nowMs) {
   for (const pull of pulls ?? []) {
     if (!labelNames(pull).some(name => name.toLowerCase() === EXHAUSTED_LABEL))
       continue;
+    // A hold parks the PR: no lane may repair or sync it while the hold
+    // stands, so its exhausted marker is not actionable at any age and
+    // planIdleHolds owns the disposition. PR #22809 carried lane-fix-exhausted
+    // under tim-hold and the sweep kept filing conflict cards no lane could
+    // discharge (JOV-9100).
+    const holds = labelNames(pull).filter(name =>
+      HOLD_LABELS.has(name.toLowerCase())
+    );
+    if (holds.length > 0) {
+      warnings.push(
+        `#${pull.number} carries ${EXHAUSTED_LABEL} but is held (${holds.join(', ')}); the hold nag owns its disposition; not filing`
+      );
+      continue;
+    }
     const age = ageMs(pull.exhaustedSince, nowMs);
     if (age == null) {
       warnings.push(

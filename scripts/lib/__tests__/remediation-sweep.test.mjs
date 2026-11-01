@@ -230,6 +230,49 @@ describe('remediation sweep selection', () => {
     ).toEqual([]);
   });
 
+  it('does not file exhausted conflict cards for PRs a hold parks', () => {
+    const held = planExhaustedConflicts(
+      [
+        pull({
+          number: 22809,
+          labels: ['lane-fix-exhausted', 'tim-hold'],
+          exhaustedSince: ago(DAY_MS + 1),
+        }),
+      ],
+      NOW
+    );
+    expect(held.plans).toEqual([]);
+    expect(held.warnings).toHaveLength(1);
+    expect(held.warnings[0]).toContain('#22809');
+    expect(held.warnings[0]).toContain('tim-hold');
+    // The hold nag, not the conflict card, owns a held PR's disposition.
+    expect(
+      planIdleHolds(
+        [
+          pull({
+            number: 22809,
+            labels: ['lane-fix-exhausted', 'tim-hold'],
+            updatedAt: ago(7 * DAY_MS + 1),
+          }),
+        ],
+        NOW
+      )[0].fingerprint
+    ).toBe('remediation:pr-22809-hold');
+    // An unheld exhausted PR past the deadline still files its conflict card.
+    expect(
+      planExhaustedConflicts(
+        [
+          pull({
+            number: 22810,
+            labels: ['lane-fix-exhausted'],
+            exhaustedSince: ago(DAY_MS + 1),
+          }),
+        ],
+        NOW
+      ).plans[0].fingerprint
+    ).toBe('remediation:pr-22810-conflict');
+  });
+
   it('files Summer receipts per provider on age, not on commissioning', () => {
     const health = (ages, extra = {}) => ({
       commissioned: false,
