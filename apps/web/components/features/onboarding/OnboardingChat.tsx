@@ -4,6 +4,7 @@
 
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
+import dynamic from 'next/dynamic';
 import type { ReactNode } from 'react';
 import {
   useCallback,
@@ -22,14 +23,12 @@ import {
 import {
   ChatEmptyStateComposerRegion,
   ChatInput,
-  ChatMessage,
 } from '@/components/jovie/components';
 import { useChatJankMonitor, useStickToBottom } from '@/components/jovie/hooks';
 import {
   composeMessage,
   useChipTray,
 } from '@/components/jovie/hooks/useChipTray';
-import { ToolPartsRenderer } from '@/components/jovie/tool-ui';
 import type { ChatError, MessagePart } from '@/components/jovie/types';
 import {
   extractErrorMetadata,
@@ -51,8 +50,6 @@ import {
   type StartEntryProfile,
 } from '@/lib/onboarding/start-entry-profile';
 import { cn } from '@/lib/utils';
-import { ChatProposeCheckoutCard } from './ChatProposeCheckoutCard';
-import { ChatProposeNextStepCard } from './ChatProposeNextStepCard';
 import {
   OnboardingChatEmptyIntro,
   OnboardingComposerAmbientMark,
@@ -91,6 +88,53 @@ import {
   THINKING_PLACEHOLDER_ID,
   type ToolPart,
 } from './onboardingChatHelpers';
+
+/**
+ * /start LCP (JOV-9611): the empty state paints only the intro heading and the
+ * composer. Everything that renders a conversation (markdown/streamdown message
+ * bodies, tool UI, proposal cards) is split out of the entry bundle so the
+ * first paint is not starved behind its evaluation on slow mobile CPUs.
+ * `preloadOnboardingConversationChunks` warms them once the page is idle, so
+ * the first assistant reply never waits on a network fetch.
+ * Guard: tests/unit/onboarding/OnboardingChat.entry-bundle.test.ts
+ */
+const loadChatMessage = () =>
+  import('@/components/jovie/components').then(mod => mod.ChatMessage);
+const loadToolPartsRenderer = () =>
+  import('@/components/jovie/tool-ui').then(mod => mod.ToolPartsRenderer);
+const loadChatProposeCheckoutCard = () =>
+  import('./ChatProposeCheckoutCard').then(mod => mod.ChatProposeCheckoutCard);
+const loadChatProposeNextStepCard = () =>
+  import('./ChatProposeNextStepCard').then(mod => mod.ChatProposeNextStepCard);
+
+const ChatMessage = dynamic(loadChatMessage);
+const ToolPartsRenderer = dynamic(loadToolPartsRenderer);
+const ChatProposeCheckoutCard = dynamic(loadChatProposeCheckoutCard);
+const ChatProposeNextStepCard = dynamic(loadChatProposeNextStepCard);
+
+function preloadOnboardingConversationChunks() {
+  void Promise.all([
+    loadChatMessage(),
+    loadToolPartsRenderer(),
+    loadChatProposeCheckoutCard(),
+    loadChatProposeNextStepCard(),
+  ]).catch(() => undefined);
+}
+
+function scheduleOnboardingConversationPreload(): () => void {
+  if (typeof globalThis.requestIdleCallback === 'function') {
+    const handle = globalThis.requestIdleCallback(
+      preloadOnboardingConversationChunks,
+      { timeout: 4000 }
+    );
+    return () => globalThis.cancelIdleCallback?.(handle);
+  }
+  const handle = globalThis.setTimeout(
+    preloadOnboardingConversationChunks,
+    1500
+  );
+  return () => globalThis.clearTimeout(handle);
+}
 
 const STARTER_VERIFICATION_INSTRUCTION = 'One quick check before we send';
 
@@ -822,6 +866,8 @@ export function OnboardingChat({
   const latestInputRef = useRef(initialDraft);
   const composerInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [hasSentFirst, setHasSentFirst] = useState(initialMessages.length > 0);
+
+  useEffect(() => scheduleOnboardingConversationPreload(), []);
   const [verificationRequested, setVerificationRequested] = useState(false);
   const [chatError, setChatError] = useState<ChatError | null>(null);
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
