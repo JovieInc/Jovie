@@ -327,7 +327,7 @@ test.describe('current-state essential actions (JOV-7771)', () => {
     });
   });
 
-  test('delayed interactive verification and its failure retain reachable draft and recovery', async ({
+  test('delayed interactive verification and its failure retain a reachable draft without a dead end', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -347,8 +347,9 @@ test.describe('current-state essential actions (JOV-7771)', () => {
     const recoveryAlert = page.locator(
       '[data-onboarding-session] [role="alert"]'
     );
-    await expect(recoveryAlert).toHaveCount(1);
-    await expect(recoveryAlert).toBeVisible();
+    // JOV-10194: a hard widget failure fails open (the send goes out on the
+    // unverified budget), so the shell shows no dead-end alert.
+    await expect(recoveryAlert).toHaveCount(0);
     await expectEssentials(page);
     await expect(
       page.getByRole('textbox', { name: 'Chat message input', exact: false })
