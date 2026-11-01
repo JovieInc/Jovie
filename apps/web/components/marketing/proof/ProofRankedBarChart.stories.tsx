@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { HIDDEN_FIXTURE, resolvedFixture } from './fixtures/proof-fixtures';
 import { ProofRankedBarChart } from './ProofRankedBarChart';
-import { HIDDEN_FIXTURE, resolvedFixture } from './proof-fixtures';
 
 const COMPARATIVE = resolvedFixture({
   id: 'profile_lcp_rank',

@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { HIDDEN_FIXTURE, resolvedFixture } from './fixtures/proof-fixtures';
 import { ProofMetricCard, ProofMetricGrid } from './ProofMetricGrid';
-import { HIDDEN_FIXTURE, resolvedFixture } from './proof-fixtures';
 
 describe('ProofMetricGrid', () => {
   it('drops unpublishable stats and keeps the rest', () => {

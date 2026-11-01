@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { HIDDEN_FIXTURE, resolvedFixture } from './fixtures/proof-fixtures';
 import { ProofRankedBarChart } from './ProofRankedBarChart';
-import { HIDDEN_FIXTURE, resolvedFixture } from './proof-fixtures';
 
 describe('ProofRankedBarChart', () => {
   const entries = [

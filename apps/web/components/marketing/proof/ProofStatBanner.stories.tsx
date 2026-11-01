@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { HIDDEN_FIXTURE, resolvedFixture } from './fixtures/proof-fixtures';
 import { ProofStatBanner } from './ProofStatBanner';
-import { HIDDEN_FIXTURE, resolvedFixture } from './proof-fixtures';
 
 const meta = {
   title: 'Marketing/Proof/ProofStatBanner',
