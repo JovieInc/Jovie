@@ -5,6 +5,7 @@ import importlib.util
 import os
 import sys
 import unittest
+from copy import deepcopy
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -524,6 +525,95 @@ class RouterLadderTest(unittest.TestCase):
                              reviewThreads=[{"author": "reviewer", "resolved": False, "body": text}])
                 self.assertEqual(ask_classify(subject)["cls"],
                                  "needs-human-decision")
+
+    def test_missing_delivery_credentials_are_an_availability_assurance(self):
+        # Exact affected paragraph from #23146. The complete observed body is
+        # also replayed during qualification; the next action is conflict repair.
+        body = (
+            "The workflow runs on the existing `jovie-fixed` pool, installs only TypeScript, "
+            "records the triggering revision, passes available rolling mutation state, uploads "
+            "reports for 30 days, and renders totals in the job summary. Uncertified components "
+            "are informational; script failures remain failures. Ovie delivery uses the existing "
+            "scoped secret resolver, skips when credentials or the route are absent, and preserves "
+            "warning behavior for other delivery failures. No cron or PR execution is added."
+        )
+        for assurance in (
+            body,
+            "Delivery skips if credentials are missing.",
+            "Delivery is skipped when the credential is unavailable.",
+            "Delivery remains disabled if credentials are not configured.",
+            "Summary\r\nDelivery skips if credentials are missing.\r\nWarning behavior is unchanged.",
+        ):
+            with self.subTest(assurance=assurance):
+                target = pr(number=23146, body=assurance, mergeStateStatus="DIRTY")
+                classified = remediation.classify_blocker(target)
+                self.assertEqual((classified["cls"], classified["next_action"]),
+                                 ("needs-rebase", "update-branch"))
+                self.assertNotIn("strategy/pricing/credential/taste content", classified["evidence"])
+
+    def test_availability_assurance_preserves_authority_requests(self):
+        assurance = "Delivery skips when credentials or the route are absent"
+        requests = (
+            "rotate the production credential",
+            "grant the credentials write access",
+            "request security approval for the credentials",
+            "rotate them before publication",
+            "grant write access to them",
+            "approve their use",
+            "we need you to replace those",
+            "please synchronize them with the new provider",
+            "synchronize credentials with the new provider",
+        )
+        for request in requests:
+            for separator in (", ", "; ", " and ", ". ", "\n", "\r\n"):
+                for body in (assurance + separator + request, request + separator + assurance):
+                    with self.subTest(body=body):
+                        self.assertEqual(remediation.classify_blocker(pr(body=body))["cls"],
+                                         "needs-human-decision")
+            for title, body in ((request, assurance), (assurance, request)):
+                with self.subTest(title=title, body=body):
+                    self.assertEqual(remediation.classify_blocker(pr(title=title, body=body))["cls"],
+                                     "needs-human-decision")
+        for body in (
+            "Skip security approval when credentials are absent.",
+            "Credentials are missing, so generate them.",
+            "Delivery skips when credentials need rotation.",
+            "Delivery skips when credentials are missing write access.",
+            "Delivery skips when credentials are absent but no one may rotate them.",
+        ):
+            with self.subTest(body=body):
+                self.assertEqual(remediation.classify_blocker(pr(body=body))["cls"],
+                                 "needs-human-decision")
+
+    def test_availability_assurance_keeps_human_stops_and_retry_records(self):
+        assurance = "Delivery skips when credentials are absent."
+        for extra in (
+            *({"labels": [label]} for label in ("do-not-merge", "tim-hold", "tim:hold", "hold:tim")),
+            {"files": ["scripts/credential-store.py"]},
+            {"codeownersBlocked": True},
+            {"reviewDecision": "CHANGES_REQUESTED", "reviewThreads": [
+                {"author": "itstimwhite", "body": "Grant workflows:write permission to the GitHub App."}]},
+        ):
+            with self.subTest(extra=extra):
+                self.assertEqual(remediation.classify_blocker(
+                    pr(body=assurance, mergeStateStatus="DIRTY", **extra))["cls"],
+                    "needs-human-decision")
+        attempts = {"sha": HEAD, "count": 3, "lane": "codex", "escalations": [
+            {"head": HEAD, "kind": "deterministic", "rung": "update-branch"},
+            {"head": HEAD, "kind": "model", "lane": "devin", "at": NOW - 10},
+            {"head": HEAD, "kind": "model", "lane": "codex", "at": NOW - 10},
+        ]}
+        before = deepcopy(attempts)
+        held = {"sha": HEAD, "reason": "fix-exhausted", "evidence": ["existing repair exhausted"]}
+        target = pr(body=assurance, mergeStateStatus="DIRTY", labels=["lane-fix-exhausted"])
+        classified = remediation.classify_blocker(target, held, attempts)
+        plan = remediation.plan_ladder(classified, attempts, providers(), NOW, HEAD,
+            healthy=lambda *_: self.fail("exhausted repair queried a model provider"))
+        self.assertEqual((plan["action"], plan["reason"]), ("surface", "ladder-exhausted"))
+        self.assertEqual(attempts, before)
+        self.assertEqual(held, {"sha": HEAD, "reason": "fix-exhausted",
+                                "evidence": ["existing repair exhausted"]})
+        self.assertEqual(target["labels"], ["lane-fix-exhausted"])
 
     def test_current_direct_credential_requests_keep_authority_gate(self):
         for body in (

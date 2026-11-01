@@ -140,6 +140,28 @@ _CREDENTIAL_ASSURANCE = re.compile(
     r"|\bscreenshot/(?P<testref>credentials?)\s+tests?\b",
     re.IGNORECASE,
 )
+# An absent secret disabling delivery describes a runtime boundary, not an ask
+# to supply it. Require both the non-action and the missing-input condition.
+_CREDENTIAL_AVAILABILITY = re.compile(
+    r"\b(?:skips?|(?:is|are)\s+skipped|(?:is|are|remains?)\s+disabled)\s+"
+    r"(?:when|if)\s+(?:the\s+)?(?P<credential>credentials?)"
+    r"(?:\s+or\s+(?:the\s+)?(?:route|endpoint))?\s+(?:is|are)\s+"
+    r"(?:absent|missing|unavailable|not\s+configured)"
+    r"(?=\s*(?:$|[,;.!?]|(?:and|but)\b))",
+    re.IGNORECASE,
+)
+# Keep the noun when a request could refer back to it ("rotate them"), even
+# across title/body or sentence boundaries. This conservative veto applies only
+# to the new availability assurance; independent credential mentions stay input.
+_CREDENTIAL_AVAILABILITY_REQUEST = re.compile(
+    r"\b(?:please|rotat(?:e[sd]?|ing|ion)|grant(?:s|ed|ing)?|approv(?:e[sd]?|ing|al))\b"
+    r"|\b(?:creat(?:e[sd]?|ing)|generat(?:e[sd]?|ing)|issu(?:e[sd]?|ing)|"
+    r"elevat(?:e[sd]?|ing)|expand(?:s|ed|ing)?|increas(?:e[sd]?|ing)|add(?:s|ed|ing)?|"
+    r"enabl(?:e[sd]?|ing)|install(?:s|ed|ing)?|set(?:s|ting)?|stor(?:e[sd]?|ing)|"
+    r"writ(?:e[sd]?|ing)|chang(?:e[sd]?|ing)|updat(?:e[sd]?|ing)|replac(?:e[sd]?|ing)|"
+    r"authori[sz](?:e[sd]?|ing))\b[^.!?;,\n]*\b(?:it|them|these|those|their|its|access|permissions?|scopes?)\b",
+    re.IGNORECASE,
+)
 # URL validation rejects embedded authentication; it does not request access to
 # a provider credential. Recognize only a URL-property rejection list, and only
 # remove its credential item. A following rotation/copy request stays visible.
@@ -287,7 +309,7 @@ def _actionable(text: str) -> bool:
     return bool(text and ACTIONABLE_FIX.search(text))
 
 
-def _strip_negated_policy(text: str) -> str:
+def _strip_negated_policy(text: str, *, allow_availability: bool) -> str:
     """Remove assurance-only credential mentions, one sentence at a time."""
     text = _TASTE_EVIDENCE_HEADING.sub(r"\1", text)
     pieces = re.split(r"([.!\n])", text)
@@ -301,6 +323,9 @@ def _strip_negated_policy(text: str) -> str:
             piece = _BARE_LIST_CREDENTIAL.sub("", piece)
         piece = _CREDENTIAL_ASSURANCE.sub(
             lambda match: match[0].replace(match[match.lastgroup], "", 1), piece)
+        if allow_availability:
+            piece = _CREDENTIAL_AVAILABILITY.sub(
+                lambda match: match[0].replace(match["credential"], "", 1), piece)
         piece = _URL_CREDENTIAL_REJECTION.sub(
             lambda match: match[0][:match.start("credential") - match.start()], piece)
         stripped.append(piece)
@@ -321,8 +346,10 @@ def _strategy(pr: dict) -> bool:
         return True
     # Remove only the negated credential mention. A pricing/taste/strategy ask
     # in the same sentence or a separate title still requires authority.
-    return any(STRATEGY_TEXT.search(_strip_negated_policy(text))
-               for text in (pr.get("title") or "", pr.get("body") or ""))
+    texts = (pr.get("title") or "", pr.get("body") or "")
+    allow_availability = not _CREDENTIAL_AVAILABILITY_REQUEST.search("\n".join(texts))
+    return any(STRATEGY_TEXT.search(_strip_negated_policy(text, allow_availability=allow_availability))
+               for text in texts)
 
 
 def _held_reason(pr: dict, held: dict | None) -> str | None:
