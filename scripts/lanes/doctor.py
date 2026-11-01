@@ -515,8 +515,15 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
     stranded_claims = fleet_ledger.stranded(state, now)
     if not os.environ.get("LANES_SELFTEST"):
         fleet_ledger.record_ready(state, now, capacity_by_provider, eligible_by_provider)
+    # Evidence age is measured from when the observation COMPLETED, not when the pass started:
+    # a heavy pass (2026-10-31 gem: ~7 min observe, ~12 min total) used to stamp every report with
+    # its start time, so the ops-report contract (MAX_EVIDENCE_AGE_MS, JOV-8308) rejected every
+    # alert as stale-evidence and filed content-free "Root cause: UNKNOWN" stubs (JOV-10197..199).
+    observed_done = sample_clock()
     return {
         "now": now, "tick": tick, "tickAge": age_s(tick.get("at"), now),
+        "observationCompletedAt": observed_done,
+        "observationSeconds": round(observed_done - now, 1),
         "gateTimeouts24h": sum(1 for r in receipts if r.get("verdict") == "gate-timeout"),
         # Per-PR seat-queue time from run receipts: the measured input for gate-capacity
         # decisions (more seats vs a second host), not an assumption.
@@ -1323,10 +1330,17 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
 
 
 def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_name: str) -> dict[str, dict]:
-    """Typed, generation-deduped evidence for every actionable doctor condition."""
+    """Typed, generation-deduped evidence for every actionable doctor condition.
+
+    Evidence timestamps use the observation COMPLETION stamp (obs['observationCompletedAt'])
+    so a report's freshness is its delivery lag, not the pass's own runtime."""
     prior = previous.get("conditions") or {}
     receipts: dict[str, dict] = {}
     now = float(obs["now"])
+    # Reports carry the completion stamp: the moment this pass finished gathering evidence and the
+    # alerts were confirmed. Filing follows within seconds, so the ops-report freshness contract
+    # (JOV-8308, MAX_EVIDENCE_AGE_MS) measures real delivery lag instead of the pass's own runtime.
+    observed_at = float(obs.get("observationCompletedAt") or now)
     critical = ("tick-error", "linear-down", "spawn-exit", "no-landing", "disk-critical", "delivery-stalled")
     actions = {
         "tick-error": "retry-dispatch-tick",
@@ -1359,7 +1373,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         generation = int(old.get("generation") or 0) + (0 if continuing else 1)
         provider = key.split(":", 1)[1] if ":" in key else None
         first = (float(old["firstObservedEpoch"]) if continuing and old.get("firstObservedEpoch") is not None
-                 else float((previous.get("providerIdleSince") or {}).get(provider, now)))
+                 else float((previous.get("providerIdleSince") or {}).get(provider, observed_at)))
         source_status = "unknown" if key == "linear-down" else "stale" if key == "hud-stale" else "degraded"
         if key == "delivery-stalled" and (obs.get("delivery") or {}).get("state") in ("unknown", "controller-held"):
             source_status = "unknown"
@@ -1394,7 +1408,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
             "firstObservedAt": epoch_iso(first),
             "firstObservedEpoch": first,
             "source": {"producer": "scripts/lanes/doctor.py", "status": source_status,
-                       "observedAt": epoch_iso(now), "freshnessSeconds": freshness},
+                       "observedAt": epoch_iso(observed_at), "freshnessSeconds": freshness},
             "deadlineAt": epoch_iso(first + ESCALATION_S),
             "recovery": {"action": action, "outcome": "failed" if key.startswith("provider-idle:") or key == "spawn-exit" else "retrying"},
             "nextAction": "wake-summer-via-linear-or-independent-status-feed",
@@ -1406,7 +1420,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
             if key not in receipts:
                 receipts[key] = old
             continue
-        receipts[key] = {**old, "state": "resolved", "resolvedAt": epoch_iso(now),
+        receipts[key] = {**old, "state": "resolved", "resolvedAt": epoch_iso(observed_at),
                          "nextAction": "none", "terminalOutcome": "health-proven"}
         if key == "delivery-stalled":
             delivery = obs.get("delivery") or {}
@@ -1419,8 +1433,8 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
                   "workers-without-completions": ("busy", "lastWorkAge", "leaseAgesComplete", "oldestLeaseAge")}
         if key in fields:
             receipts[key]["source"] = {**old.get("source", {}), "status": "healthy",
-                                       "observedAt": epoch_iso(now), "freshnessSeconds": 0}
-            receipts[key]["recoveryEvidence"] = {"observedAt": epoch_iso(now),
+                                       "observedAt": epoch_iso(observed_at), "freshnessSeconds": 0}
+            receipts[key]["recoveryEvidence"] = {"observedAt": epoch_iso(observed_at),
                                                   **{field: obs.get(field) for field in fields[key]}}
     return receipts
 

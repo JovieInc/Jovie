@@ -933,6 +933,23 @@ class ConditionReceiptTest(unittest.TestCase):
         self.assertEqual(state["conditions"]["provider-idle:devin"]["generation"], 2)
         self.assertEqual(len(tracker.contradicted), 2)
 
+    def test_report_evidence_is_stamped_at_observation_completion_not_pass_start(self):
+        # JOV-10197/10198/10199 (2026-10-31): a heavy gem pass (7+ min observe, 12 min total)
+        # stamped every report with its start time, so the ops-report contract (JOV-8308,
+        # MAX_EVIDENCE_AGE_MS = 5 min) rejected every alert as stale-evidence and the issues
+        # landed as content-free "Root cause: UNKNOWN" stubs. Evidence must carry the moment
+        # the observation completed and the alerts were confirmed.
+        observed = obs(now=1_000_000.0, observationCompletedAt=1_000_420.0)
+        receipts = doctor.condition_receipts({"failed-runs": "12 harness-failed runs in 24h"},
+                                              {}, observed, "gem")
+        self.assertEqual(receipts["failed-runs"]["source"]["observedAt"], doctor.epoch_iso(1_000_420.0))
+        self.assertEqual(receipts["failed-runs"]["firstObservedAt"], doctor.epoch_iso(1_000_420.0))
+
+    def test_receipts_fall_back_to_the_pass_clock_without_a_completion_stamp(self):
+        observed = obs(now=1_000_000.0)
+        receipts = doctor.condition_receipts({"failed-runs": "x"}, {}, observed, "gem")
+        self.assertEqual(receipts["failed-runs"]["source"]["observedAt"], doctor.epoch_iso(observed["now"]))
+
 
 class ReconcileTest(unittest.TestCase):
     def test_dirty_checkout_cannot_be_claimed_as_exact_source_proof(self):
@@ -1421,6 +1438,27 @@ class OpsReportDeliveryTest(unittest.TestCase):
             self.assertEqual(result["review"]["reviewStatus"], "emergency-reviewer-unavailable")
         self.assertNotIn("4% free", json.dumps(prepared["review"]))
 
+    def test_slow_pass_evidence_stays_fresh_so_the_real_blocker_is_filed(self):
+        # Live incident 2026-10-31 (JOV-10197/10198/10199): evidence observed 23:39:33Z, issues
+        # filed 23:46:43Z. The pre-fix start-time stamp (420 s older than the observation's
+        # completion) failed the JOV-8308 five-minute contract, so the filed description was the
+        # review-queue stub ("Blocker: stale-evidence", "Root cause: UNKNOWN") and the real
+        # blocker text never reached Linear. Completion-stamped evidence must deliver it.
+        completed = doctor.time.time() - 30
+        blocker = "12 harness-failed runs in 24h; read runs/ledger.jsonl reasons"
+        fresh = {**self.condition, "source": {**self.condition["source"],
+                                              "observedAt": doctor.epoch_iso(completed)}}
+        prepared = doctor.prepare_ops_report("failed-runs", blocker, fresh, "test-host",
+                                             "Symphony doctor: failed-runs (test-host)")
+        self.assertIn(blocker, prepared["message"])
+        self.assertNotIn("stale-evidence", prepared["message"])
+        stale = {**self.condition, "source": {**self.condition["source"],
+                                              "observedAt": doctor.epoch_iso(completed - 420)}}
+        rejected = doctor.prepare_ops_report("failed-runs", blocker, stale, "test-host",
+                                             "Symphony doctor: failed-runs (test-host)")
+        self.assertIn("stale-evidence", rejected["message"])
+        self.assertNotIn(blocker, rejected["message"])
+
     def test_reviewer_outage_keeps_preapproved_emergency_notice_available(self):
         with mock.patch.object(doctor.subprocess, "run", side_effect=subprocess.TimeoutExpired("node", 20)) as run:
             prepared = doctor.prepare_ops_report("disk-low", "4% free", self.condition, "test-host", self.target)
@@ -1861,6 +1899,11 @@ class RunnablePoolTest(unittest.TestCase):
                     mock.patch.object(lane, "read_new_issue_budget", side_effect=lambda name, slots: lane.new_issue_budget(name, slots, [])), \
                     mock.patch.object(lane, "graphql_budget", return_value=None):
                 observed = doctor.observe(host, lane, SimpleNamespace(status=lambda: {}), now=10000)
+                # Observation completion stamp (evidence age for reports, JOV-8308 seam):
+                # under a fixed clock it equals the pass clock; live it is the moment the
+                # last evidence read finished, so report freshness is delivery lag, not runtime.
+                self.assertEqual(observed["observationCompletedAt"], 10000)
+                self.assertEqual(observed["observationSeconds"], 0)
                 self.assertEqual(observed["pool"], 2)
                 self.assertEqual(observed["candidatePool"], 6)
                 self.assertEqual(observed["qualifiedJobsByProvider"], {
@@ -2072,11 +2115,15 @@ class AccountAttributionTest(unittest.TestCase):
                 report = {"generatedAt": doctor.epoch_iso(generated), "count": 1,
                           "accounts": {"a": {"available": True, "leased": True}}}
                 with mock.patch.dict(os.environ, {"LANES_SELFTEST": "1"}), \
-                        mock.patch.object(doctor.time, "time", side_effect=[1000.9, 1001.2]):
+                        mock.patch.object(doctor.time, "time", side_effect=[1000.9, 1001.2, 1001.2]):
                     observation = doctor.observe(host, lane, SimpleNamespace(status=lambda: report))
                 self.assertEqual(observation["codexAttribution"]["state"], expected)
                 self.assertIsNone(observation["pool"])
                 self.assertIn("SystemExit: LINEAR_API_KEY missing", observation["linearError"])
+                # The completion stamp is the pass's final sample-clock read: report evidence
+                # age (JOV-8308 seam) is measured from here, not from the pass's first read.
+                self.assertEqual(observation["observationCompletedAt"], 1001.2)
+                self.assertEqual(observation["observationSeconds"], 0.3)
 
 
 class AdmissionBackpressureTest(unittest.TestCase):
