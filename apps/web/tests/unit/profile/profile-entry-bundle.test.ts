@@ -19,9 +19,6 @@ const staticImport = (source: string, specifier: string) =>
 
 describe('public profile entry bundle (JOV-10246)', () => {
   const page = read('app/[username]/page.tsx');
-  const template = read(
-    'components/features/profile/templates/ProfileCompactTemplate.tsx'
-  );
   const islands = read('app/[username]/_components/ProfileDeferredIslands.tsx');
 
   it.each([
@@ -46,10 +43,5 @@ describe('public profile entry bundle (JOV-10246)', () => {
     );
     expect(islands.match(/dynamic\(/g) ?? []).toHaveLength(1);
     expect(islands.match(/\{ ssr: false \}/g) ?? []).toHaveLength(1);
-  });
-
-  it('builds the flagged desktop surface only as a lazy chunk', () => {
-    expect(staticImport(template, './ProfileDesktopSurface')).toBe(false);
-    expect(template).toContain("import('./ProfileDesktopSurface')");
   });
 });

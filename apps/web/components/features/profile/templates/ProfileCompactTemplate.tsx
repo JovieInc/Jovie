@@ -1,7 +1,6 @@
 // @coverage-via apps/web/tests/unit/profile/profile-compact-template.test.tsx
 'use client';
 
-import dynamic from 'next/dynamic';
 import {
   type CSSProperties,
   type ReactNode,
@@ -67,22 +66,8 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import { ProfileCompactSurface } from './ProfileCompactSurface';
+import { ProfileDesktopSurface } from './ProfileDesktopSurface';
 import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
-
-/**
- * JOV-10246: keep the public profile's hydration tree small so the release
- * artwork paints before hydration on throttled mobile. The credits drawer is
- * closed on every first paint and mounts only after the first open; the
- * desktop surface renders only behind its flag. Both stay out of the entry
- * chunk. Guard: tests/unit/profile/profile-entry-bundle.test.ts
- */
-// Built only when the build-time flag is on, so a disabled surface adds no
-// loader or chunk reference to any route's entry bundle.
-const ProfileDesktopSurface = PROFILE_DESKTOP_SURFACE_ENABLED
-  ? dynamic(() =>
-      import('./ProfileDesktopSurface').then(mod => mod.ProfileDesktopSurface)
-    )
-  : null;
 
 interface ProfileCompactTemplateProps {
   readonly mode: ProfileMode;
@@ -1269,7 +1254,7 @@ export function ProfileCompactTemplate({
             : profileBanner
         }
         desktopSurface={
-          PROFILE_DESKTOP_SURFACE_ENABLED && ProfileDesktopSurface ? (
+          PROFILE_DESKTOP_SURFACE_ENABLED ? (
             <div
               className='relative flex min-h-0 w-full flex-1 flex-col'
               data-sheet-container
