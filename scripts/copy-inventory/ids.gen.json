@@ -1527,6 +1527,7 @@
     "apps/web/data/utmLinksCopy.ts#A tracked link keeps the same destination and adds source, medium, campaign, term, and content.": "UTM-2",
     "apps/web/data/utmLinksCopy.ts#A tracked link keeps the same destination and adds source, medium, campaign, term, and content.#2": "UTM-4",
     "apps/web/data/utmLinksCopy.ts#Jovie Card": "UTM-8",
+    "apps/web/data/utmLinksCopy.ts#Link analytics": "UTM-17",
     "apps/web/data/utmLinksCopy.ts#Pricing": "UTM-7",
     "apps/web/data/utmLinksCopy.ts#Product": "UTM-5",
     "apps/web/data/utmLinksCopy.ts#Smart Links": "UTM-6",

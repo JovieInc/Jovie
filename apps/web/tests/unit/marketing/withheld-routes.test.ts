@@ -3,7 +3,8 @@ import sitemap from '@/app/sitemap';
 import { APP_ROUTES } from '@/constants/routes';
 import { WITHHELD_MARKETING_ROUTES } from '@/data/marketing/withheldRoutes';
 import {
-  getMarketingFooterColumns,
+  getMarketingToolsFlyoutLinks,
+  getPublicCommercialFooterLinks,
   MARKETING_FOOTER_COLUMNS,
   MARKETING_NAV_LINKS,
   MARKETING_TOOLS_FLYOUT_LINKS,
@@ -28,15 +29,13 @@ const PAGE_LOADERS: Record<string, () => Promise<{ metadata?: unknown }>> = {
 const withheld = new Set(WITHHELD_MARKETING_ROUTES.map(entry => entry.route));
 
 function allNavHrefs(): string[] {
-  const columns = [
-    ...MARKETING_FOOTER_COLUMNS,
-    ...getMarketingFooterColumns(true),
-  ];
   return [
     ...MARKETING_NAV_LINKS,
     ...MARKETING_TOOLS_FLYOUT_LINKS,
+    ...getMarketingToolsFlyoutLinks(true),
     ...PUBLIC_COMMERCIAL_FOOTER_LINKS,
-    ...columns.flatMap(column => column.links),
+    ...getPublicCommercialFooterLinks(true),
+    ...MARKETING_FOOTER_COLUMNS.flatMap(column => column.links),
   ].map(link => sitemapPathname(link.href));
 }
 
