@@ -23,6 +23,7 @@ import {
 import { htmlText } from './render.mjs';
 import {
   aggregateIntent,
+  applyEdits,
   buildIntentPrompt,
   PRESETS,
   parseIntentSample,
@@ -127,7 +128,13 @@ test('the loop fixes the top issue, re-evaluates until pass and records every pa
   let judged = 0;
   const call = async ({ schemaName }) => {
     if (schemaName === 'artifact_revision')
-      return reply({ revised: '4:12 PM', what_changed: 'one clock' });
+      return reply({
+        edits: [
+          { find: '50 clocks', replace: '4:12 PM' },
+          { find: 'nope', replace: 'x' },
+        ],
+        what_changed: 'one clock',
+      });
     judged += 1;
     return reply(
       judged === 1
@@ -148,7 +155,7 @@ test('the loop fixes the top issue, re-evaluates until pass and records every pa
   });
   assert.equal(receipt.verdict, 'pass');
   assert.equal(receipt.passCount, 2);
-  assert.equal(receipt.passes[0].fix, 'one clock');
+  assert.match(receipt.passes[0].fix, /^one clock \(1 edit\(s\) did not match/);
   assert.equal(readFileSync(receipt.final.path, 'utf8'), '4:12 PM');
   assert.equal(
     readFileSync(artifact, 'utf8'),
@@ -184,7 +191,7 @@ test('out of budget the loop stops and reports what is left; a dead judge abstai
     call: async ({ schemaName }) =>
       reply(
         schemaName === 'artifact_revision'
-          ? { revised: 'y', what_changed: 'c' }
+          ? { edits: [{ find: 'x', replace: 'y' }], what_changed: 'c' }
           : answer()
       ),
   });
@@ -226,7 +233,10 @@ test('reviser falls back to the second model and receives gate violations', asyn
         prompts.push(content[0].text);
         if (model === '@cf/zai-org/glm-5.3')
           throw new Error('judge answer truncated (finish_reason length)');
-        return reply({ revised: 'Hello, world', what_changed: 'comma' });
+        return reply({
+          edits: [{ find: ' \u2014 ', replace: ', ' }],
+          what_changed: 'comma',
+        });
       }
       judged += 1;
       return reply(
@@ -400,5 +410,20 @@ test('html text extraction drops scripts and styles', () => {
       '<style>x{}</style><h1>4:12&nbsp;PM</h1><script>a()</script><p>LA</p>'
     ),
     '4:12 PM\n LA'
+  );
+});
+
+test('edits apply only when the passage matches exactly once', () => {
+  assert.deepEqual(
+    applyEdits('a b a', [
+      { find: 'a', replace: 'x' },
+      { find: 'b', replace: 'y' },
+      { find: '', replace: 'z' },
+    ]),
+    {
+      body: 'a y a',
+      applied: 1,
+      skipped: ['a', ''],
+    }
   );
 });

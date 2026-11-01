@@ -158,6 +158,7 @@ export async function callRelay({
   schema,
   schemaName = 'audience_judgement',
   timeoutMs = 300_000,
+  maxTokens = MAX_OUTPUT_TOKENS,
   baseUrl,
   env = process.env,
   createClient = createApiClient,
@@ -182,7 +183,7 @@ export async function callRelay({
     headers: { 'Content-Type': 'application/json' },
     body: {
       model,
-      max_tokens: MAX_OUTPUT_TOKENS,
+      max_tokens: maxTokens,
       response_format: {
         type: 'json_schema',
         json_schema: { name: schemaName, strict: true, schema },
@@ -227,10 +228,11 @@ export async function sampleJudge({
   call = callRelay,
   timeoutMs,
   schemaName,
+  maxTokens,
 }) {
   const settled = await Promise.allSettled(
     Array.from({ length: samples }, () =>
-      call({ model, content, schema, timeoutMs, schemaName })
+      call({ model, content, schema, timeoutMs, schemaName, maxTokens })
     )
   );
   const parsed = [];

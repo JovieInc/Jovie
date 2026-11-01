@@ -222,9 +222,9 @@ export function buildFixPrompt({
     violations.length
       ? `Also fix these brand, design-system and data rule violations: ${violations.join('; ')}`
       : '',
-    `Rules: keep every true fact and number unless it was flagged; never add a number, name or claim that is not already in the artifact; keep the same format (${type === 'html' ? 'a complete HTML document; keep the CSS custom properties and dark-mode tokens' : 'plain text'}); no filler, no em dashes.`,
+    `Rules: keep every true fact and number unless it was flagged; never add a number, name or claim that is not already in the artifact; keep the same format (${type === 'html' ? 'HTML; keep CSS custom properties and dark-mode tokens' : 'plain text'}); no filler, no em dashes.`,
     `ARTIFACT:\n<<<ARTIFACT\n${body}\nARTIFACT>>>`,
-    'Return only the JSON object the schema asks for: the full revised artifact and one line on what changed.',
+    'Return only the JSON object the schema asks for: a list of edits, each replacing one exact passage of the artifact (find must be copied verbatim and appear exactly once; keep each find short but unique), plus one line on what changed. Do not return the whole artifact.',
   ]
     .filter(Boolean)
     .join('\n\n');
@@ -233,6 +233,41 @@ export function buildFixPrompt({
 export const FIX_SCHEMA = Object.freeze({
   type: 'object',
   additionalProperties: false,
-  required: ['revised', 'what_changed'],
-  properties: { revised: { type: 'string' }, what_changed: { type: 'string' } },
+  required: ['edits', 'what_changed'],
+  properties: {
+    edits: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['find', 'replace'],
+        properties: { find: { type: 'string' }, replace: { type: 'string' } },
+      },
+    },
+    what_changed: { type: 'string' },
+  },
 });
+
+/**
+ * Apply the reviser's edits. An edit whose `find` is missing or ambiguous is
+ * skipped and reported; zero applied edits means the revision failed.
+ */
+export function applyEdits(body, edits = []) {
+  let out = body;
+  const skipped = [];
+  let applied = 0;
+  for (const edit of edits) {
+    const find = String(edit?.find ?? '');
+    const first = find ? out.indexOf(find) : -1;
+    if (first < 0 || out.indexOf(find, first + 1) >= 0) {
+      skipped.push(find.slice(0, 60));
+      continue;
+    }
+    out =
+      out.slice(0, first) +
+      String(edit.replace ?? '') +
+      out.slice(first + find.length);
+    applied += 1;
+  }
+  return { body: out, applied, skipped };
+}

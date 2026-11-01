@@ -37,6 +37,7 @@ import {
 import { renderArtifact } from './render.mjs';
 import {
   aggregateIntent,
+  applyEdits,
   buildFixPrompt,
   buildIntentPrompt,
   FIX_SCHEMA,
@@ -188,17 +189,26 @@ export async function autoFix({
       schema: FIX_SCHEMA,
       schemaName: 'artifact_revision',
       samples: 1,
+      maxTokens: 16_000,
       ...(call ? { call } : {}),
     });
     costUsd += result.costUsd;
     const revision = result.samples[0];
-    if (revision?.revised?.trim())
+    const {
+      body: revised,
+      applied,
+      skipped,
+    } = applyEdits(body, revision?.edits);
+    if (applied > 0)
       return {
-        body: revision.revised,
-        whatChanged: String(revision.what_changed ?? ''),
+        body: revised,
+        whatChanged: `${String(revision.what_changed ?? '')}${skipped.length ? ` (${skipped.length} edit(s) did not match and were skipped)` : ''}`,
         costUsd,
       };
-    failures.push(...result.failures.map(f => `${model}: ${f}`));
+    failures.push(
+      ...result.failures.map(f => `${model}: ${f}`),
+      ...(revision ? [`${model}: no edit matched the artifact`] : [])
+    );
   }
   throw new Error(`reviser returned nothing: ${failures.join('; ')}`);
 }
