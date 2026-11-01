@@ -12,10 +12,9 @@ import { logger } from '@/lib/utils/logger';
  * profile document is ISR-cached; this endpoint is the per-request authority
  * that decides whether that cached body may be served. It is never cacheable:
  * every answer reads storage, and any failure is a 503 the proxy fails closed
- * on.
+ * on. GET handlers that read the request are uncached by default, and the
+ * response is no-store.
  */
-export const dynamic = 'force-dynamic';
-
 const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
 
 export async function GET(req: Request) {
