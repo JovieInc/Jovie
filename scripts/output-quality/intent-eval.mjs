@@ -150,6 +150,7 @@ export async function autoFix({
   mission,
   audience,
   judgement,
+  violations,
   stakes,
   routing,
   call,
@@ -164,24 +165,42 @@ export async function autoFix({
       'artifact too large for --fix auto (40k chars); use --fix cmd:<shell>'
     );
   const route = planRoute(stakes, false, routing);
-  const prompt = buildFixPrompt({ mission, audience, type, body, judgement });
-  const result = await sampleJudge({
-    model: route.fixModel,
-    prompt,
-    content: contentFor(prompt),
-    schema: FIX_SCHEMA,
-    schemaName: 'artifact_revision',
-    samples: 1,
-    ...(call ? { call } : {}),
+  const prompt = buildFixPrompt({
+    mission,
+    audience,
+    type,
+    body,
+    judgement,
+    violations,
   });
-  const revision = result.samples[0];
-  if (!revision?.revised?.trim())
-    throw new Error(`reviser returned nothing: ${result.failures.join('; ')}`);
-  return {
-    body: revision.revised,
-    whatChanged: String(revision.what_changed ?? ''),
-    costUsd: result.costUsd,
-  };
+  // The reasoning text model can spend its whole output budget thinking on a
+  // long artifact (measured 2026-11-01: truncated on a 7 KB HTML sheet), so
+  // fall back to the other model on the same route before giving up.
+  const failures = [];
+  let costUsd = 0;
+  for (const model of [route.fixModel, route.model].filter(
+    (m, i, all) => all.indexOf(m) === i
+  )) {
+    const result = await sampleJudge({
+      model,
+      prompt,
+      content: contentFor(prompt),
+      schema: FIX_SCHEMA,
+      schemaName: 'artifact_revision',
+      samples: 1,
+      ...(call ? { call } : {}),
+    });
+    costUsd += result.costUsd;
+    const revision = result.samples[0];
+    if (revision?.revised?.trim())
+      return {
+        body: revision.revised,
+        whatChanged: String(revision.what_changed ?? ''),
+        costUsd,
+      };
+    failures.push(...result.failures.map(f => `${model}: ${f}`));
+  }
+  throw new Error(`reviser returned nothing: ${failures.join('; ')}`);
 }
 
 /** External fixer: a shell command that edits the artifact in place, or writes INTENT_EVAL_OUT. */
@@ -221,6 +240,7 @@ export async function runIntentLoop({
   preset,
   stakes: requestedStakes,
   fix = 'none',
+  violationsFor = async () => [],
   maxPasses = DEFAULT_MAX_PASSES,
   viewports = ['desktop'],
   state = STATE,
@@ -300,11 +320,18 @@ export async function runIntentLoop({
     });
     if (judgement.verdict !== 'fail' || n === maxPasses || fix === 'none')
       break;
+    // Deterministic gate violations on this version ride along with the
+    // judge's single change, so one revision fixes both.
+    const violations = await violationsFor(rendered);
     const nextPath = join(runDir, `pass-${n + 1}${extname(current) || '.txt'}`);
     const feedbackPath = join(runDir, `pass-${n}-feedback.json`);
     writeFileSync(
       feedbackPath,
-      JSON.stringify({ mission: goal, audience: who, ...judgement }, null, 2)
+      JSON.stringify(
+        { mission: goal, audience: who, ...judgement, violations },
+        null,
+        2
+      )
     );
     try {
       const revised =
@@ -315,6 +342,7 @@ export async function runIntentLoop({
               mission: goal,
               audience: who,
               judgement,
+              violations,
               stakes,
               routing,
               call,

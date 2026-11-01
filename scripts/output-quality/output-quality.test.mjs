@@ -13,7 +13,13 @@ import {
   runGates,
 } from './gates.mjs';
 import { planRoute, receiptLine, runIntentLoop } from './intent-eval.mjs';
-import { checkLine, outputCheck, POLICY, verdictFor } from './output-check.mjs';
+import {
+  blockingFindings,
+  checkLine,
+  outputCheck,
+  POLICY,
+  verdictFor,
+} from './output-check.mjs';
 import { htmlText } from './render.mjs';
 import {
   aggregateIntent,
@@ -200,6 +206,48 @@ test('out of budget the loop stops and reports what is left; a dead judge abstai
   await assert.rejects(
     runIntentLoop({ audience: 'a', text: 'x', state, render: textRender }),
     /--mission is required/
+  );
+});
+
+test('reviser falls back to the second model and receives gate violations', async () => {
+  const state = tmp();
+  const prompts = [];
+  let judged = 0;
+  const receipt = await runIntentLoop({
+    mission: 'm',
+    audience: 'a',
+    text: 'Hello — world',
+    fix: 'auto',
+    state,
+    render: textRender,
+    violationsFor: async () => ['em-dash: No em or en dashes [—]'],
+    call: async ({ schemaName, model, content }) => {
+      if (schemaName === 'artifact_revision') {
+        prompts.push(content[0].text);
+        if (model === '@cf/zai-org/glm-5.3')
+          throw new Error('judge answer truncated (finish_reason length)');
+        return reply({ revised: 'Hello, world', what_changed: 'comma' });
+      }
+      judged += 1;
+      return reply(
+        judged === 1 ? answer() : answer({ mission_achieved: true, score: 90 })
+      );
+    },
+  });
+  assert.equal(receipt.verdict, 'pass');
+  assert.equal(prompts.length, 2, 'retried on the second model');
+  assert.match(prompts[0], /rule violations: em-dash/);
+  assert.deepEqual(
+    blockingFindings([
+      {
+        findings: [
+          { severity: 'block', message: 'x', match: 'y' },
+          { severity: 'warn', message: 'z' },
+        ],
+      },
+      { findings: [{ severity: 'block', message: 'x', match: 'y' }] },
+    ]),
+    ['x [y]']
   );
 });
 

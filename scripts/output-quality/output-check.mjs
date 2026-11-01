@@ -44,6 +44,19 @@ export function verdictFor(gates, intent) {
   return 'pass';
 }
 
+/** Block findings as one-line instructions for the reviser (deduplicated). */
+export function blockingFindings(gateResults) {
+  return [
+    ...new Set(
+      gateResults.flatMap(gate =>
+        gate.findings
+          .filter(f => f.severity === 'block')
+          .map(f => `${f.message}${f.match ? ` [${f.match}]` : ''}`)
+      )
+    ),
+  ];
+}
+
 export async function outputCheck({
   artifact,
   text,
@@ -80,6 +93,10 @@ export async function outputCheck({
         maxPasses,
         viewports,
         state,
+        violationsFor: async rendered =>
+          blockingFindings(
+            await gates({ rendered, kind, register, screenshots })
+          ),
       })
     : null;
   const id =

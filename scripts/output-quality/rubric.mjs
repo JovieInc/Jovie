@@ -199,7 +199,14 @@ export function aggregateIntent(
 }
 
 /** Prompt for the built-in reviser: apply one change, keep every fact. */
-export function buildFixPrompt({ mission, audience, type, body, judgement }) {
+export function buildFixPrompt({
+  mission,
+  audience,
+  type,
+  body,
+  judgement,
+  violations = [],
+}) {
   return [
     `You are revising an artifact so it achieves its mission for its audience.`,
     `AUDIENCE: ${audience}`,
@@ -211,6 +218,9 @@ export function buildFixPrompt({ mission, audience, type, body, judgement }) {
       : '',
     judgement.harm?.length
       ? `Remove this risk: ${judgement.harm.join('; ')}`
+      : '',
+    violations.length
+      ? `Also fix these brand, design-system and data rule violations: ${violations.join('; ')}`
       : '',
     `Rules: keep every true fact and number unless it was flagged; never add a number, name or claim that is not already in the artifact; keep the same format (${type === 'html' ? 'a complete HTML document; keep the CSS custom properties and dark-mode tokens' : 'plain text'}); no filler, no em dashes.`,
     `ARTIFACT:\n<<<ARTIFACT\n${body}\nARTIFACT>>>`,
