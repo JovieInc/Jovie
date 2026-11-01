@@ -311,6 +311,7 @@ function ProfileMusicEmptyState({
 }>) {
   const action =
     renderMode === 'preview' ? (
+      // dead-end-ok: faithful static preview of the interactive opt-in (JOV-9673)
       <Button
         type='button'
         variant='primary'

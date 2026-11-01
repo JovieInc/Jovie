@@ -112,7 +112,7 @@ function getPlaybackAnnouncement(params: {
   isPlaying: boolean;
 }): string {
   if (params.playbackStatus === 'error') {
-    return 'Preview unavailable.';
+    return 'Preview did not load. Try again.';
   }
 
   if (!params.title || !params.isActiveTrack) {
@@ -270,11 +270,11 @@ export function TrackSidebar({
       if (!track || playbackState.activeTrackId !== track.id) return;
 
       if (reason === 'missing_source') {
-        toast.error('Preview unavailable');
+        toast.error('Preview did not load. Try again.');
         return;
       }
 
-      toast.error('Preview unavailable');
+      toast.error('Preview did not load. Try again.');
     });
   }, [onError, playbackState.activeTrackId, track]);
 
@@ -474,7 +474,7 @@ export function TrackSidebar({
                 </p>
               ) : null}
               {track.previewVerification === 'unknown' ? (
-                <p>Preview unavailable. Verify on streaming platforms.</p>
+                <p>Preview not verified. Listen on the DSPs linked below.</p>
               ) : null}
             </div>
 

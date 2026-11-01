@@ -211,6 +211,21 @@ describe('ProfilePrimaryTabPanel', () => {
     expect(about).toHaveAttribute('data-contacts', 'contact-1');
   });
 
+  it('renders a disabled Music alerts placeholder in previews (JOV-INV-046)', () => {
+    renderPanel({ mode: 'listen', renderMode: 'preview' });
+
+    expect(
+      screen.getByTestId('profile-primary-tab-music-empty')
+    ).toBeInTheDocument();
+    const placeholder = screen.getByRole('button', {
+      name: 'Turn On Music Alerts',
+    });
+    expect(placeholder).toBeDisabled();
+    expect(screen.queryByTestId('mock-artist-notifications-cta')).toBeNull();
+    // A faithful static preview stays quiet: no dead-end copy.
+    expect(screen.queryByText(/unavailable|not available/i)).toBeNull();
+  });
+
   it('keeps the subscribe panel mounted as the subscribe destination', () => {
     renderPanel({ mode: 'subscribe', modeCardAccents: PEN_ACCENTS });
 

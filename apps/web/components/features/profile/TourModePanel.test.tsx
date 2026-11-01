@@ -174,9 +174,13 @@ describe('TourEventAlertsAction', () => {
       />
     );
 
-    expect(
-      screen.getByRole('button', { name: 'Turn On Event Alerts' })
-    ).toBeDisabled();
+    const placeholder = screen.getByRole('button', {
+      name: 'Turn On Event Alerts',
+    });
+    expect(placeholder).toBeDisabled();
     expect(screen.queryByTestId('mock-event-alerts-cta')).toBeNull();
+    // A faithful static preview stays quiet: it never explains its own
+    // absence with dead-end copy (JOV-INV-046).
+    expect(screen.queryByText(/unavailable|not available/i)).toBeNull();
   });
 });

@@ -189,6 +189,7 @@ export function TourEventAlertsAction({
 }>) {
   if (renderMode === 'preview') {
     return (
+      // dead-end-ok: faithful static preview of the interactive opt-in (JOV-9673)
       <Button
         type='button'
         variant='primary'

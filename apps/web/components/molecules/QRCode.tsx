@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/QRCode.test.tsx
+
 import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -62,7 +64,9 @@ export function QRCode({
         )}
         style={{ width: size, height: size }}
       >
-        <span className='text-xs'>QR code unavailable</span>
+        <span className='text-xs'>
+          QR code failed to load. Refresh to try again.
+        </span>
       </div>
     );
   }

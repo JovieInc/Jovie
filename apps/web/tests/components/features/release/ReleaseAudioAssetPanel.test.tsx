@@ -221,7 +221,7 @@ describe('ReleaseAudioAssetPanel', () => {
     expect(blobUploadMock).toHaveBeenCalledTimes(1);
   });
 
-  it('shows "Audio preview unavailable" with retry when preview fetch fails', async () => {
+  it('shows the failed preview with retry when the preview fetch fails', async () => {
     decodeWaveformPeaksMock.mockRejectedValueOnce(
       new AudioPreviewError('network')
     );
@@ -232,7 +232,7 @@ describe('ReleaseAudioAssetPanel', () => {
     expect(screen.getByTestId('release-audio-ready')).toBeInTheDocument();
     expect(screen.queryByTestId('release-audio-dropzone')).toBeNull();
     expect(screen.queryByText(/Failed to fetch/)).toBeNull();
-    expect(screen.getByText('Audio preview unavailable')).toBeInTheDocument();
+    expect(screen.getByText('Preview did not load')).toBeInTheDocument();
 
     decodeWaveformPeaksMock.mockResolvedValueOnce({
       peaks: [0.2, 0.8],
@@ -260,4 +260,11 @@ describe('ReleaseAudioAssetPanel', () => {
       expect(screen.queryByTestId('audio-preview-retry')).toBeNull();
     }
   );
+
+  it('renders nothing when the editor has no audio URL (JOV-INV-046)', () => {
+    const { container } = render(<AudioWaveformEditor audioUrl={null} />);
+    expect(container.firstChild).toBeNull();
+    expect(screen.queryByTestId('audio-waveform-editor')).toBeNull();
+    expect(decodeWaveformPeaksMock).not.toHaveBeenCalled();
+  });
 });

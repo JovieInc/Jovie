@@ -434,6 +434,8 @@ export function ProfileDesktopSurface({
           onManageNotifications={() => onModeSelect('subscribe')}
         />
       ) : (
+        // dead-end-ok: resolving placeholder; swaps to the working CTA once the
+        // visitor assignment resolves (JOV-9673)
         <Button
           type='button'
           variant='primary'

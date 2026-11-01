@@ -244,6 +244,18 @@ describe('PersistentAudioBar', () => {
     expect(screen.queryByTestId('player-visibility-toggle')).toBeNull();
   });
 
+  it('keeps the transport actionable after a preview error instead of dead-ending', () => {
+    setPlaying({ playbackStatus: 'error', isPlaying: false });
+    render(<PersistentAudioBar />);
+
+    // The play control stays mounted so the failure is retryable, and the
+    // surface never renders dead-end copy (JOV-INV-046).
+    expect(getPlayerVisibilityToggle()).toBeInTheDocument();
+    expect(
+      screen.queryByText(/unavailable|not available|not supported/i)
+    ).toBeNull();
+  });
+
   it('keeps compact playback artwork contained instead of cropping it', async () => {
     setPlaying({ artworkUrl: 'https://x.invalid/art.jpg' });
     render(<PersistentAudioBar />);

@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/profile/ProfileShell.notifications.test.tsx
+
 import {
   Calendar,
   DollarSign,
@@ -43,6 +45,7 @@ const ProfileNotificationsMenu = dynamic(
       <ProfileNotificationsButton
         hasActiveSubscriptions
         notificationsState='idle'
+        // dead-end-ok: transient loading placeholder while the menu streams in
         onClick={() => {}}
       />
     ),
