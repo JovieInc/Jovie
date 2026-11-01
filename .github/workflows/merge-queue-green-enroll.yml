@@ -483,6 +483,7 @@ jobs:
             // job summary and one machine line, so a non-enroll is never silent (event-driven dwell).
             const receipts = [];
             const receipt = (pr, decision, reason) => receipts.push({ pr: pr?.number, head: String(pr?.headRefOid ?? '').slice(0, 12), decision, reason, at: new Date().toISOString() });
+            const relabelJumpCandidates = [];
             const QUEUE_ENTRIES_QUERY = `
               query($owner: String!, $repo: String!) {
                 repository(owner: $owner, name: $repo) {
@@ -608,57 +609,7 @@ jobs:
                   !pr.labels.pageInfo.hasNextPage &&
                   pr.labels.nodes.some(l => l.name.toLowerCase() === COMPOUNDING_LABEL) &&
                   !pr.labels.nodes.some(l => BLOCKING.has(l.name.toLowerCase()))) {
-                try {
-                  const queue = await github.graphql(QUEUE_ENTRIES_QUERY, { owner, repo });
-                  const all = queue.repository.mergeQueue?.entries?.nodes ?? [];
-                  const self = all.find(e => e.pullRequest.number === pr.number);
-                  if (!self) {
-                    receipt(pr, 'skip', 'relabel-jump:entry-not-in-first-50');
-                  } else if (all.filter(e => e.position < self.position).every(isCompoundingEntry)) {
-                    receipt(pr, 'skip', `relabel-jump:already-ahead position=${self.position}`);
-                  } else {
-                    const others = all.filter(e => e.pullRequest.number !== pr.number);
-                    const { jumped, building, deferred } = jumpPolicy(others);
-                    if (deferred !== null) {
-                      receipt(pr, 'jump-deferred', `relabel-jump ${deferred}`);
-                      core.notice(`RELABEL-JUMP #${pr.number} deferred (${deferred})`);
-                    } else if (process.env.DRY_RUN === 'true') {
-                      core.notice(`[dry run] would relabel-jump #${pr.number}`);
-                    } else {
-                      await github.graphql(
-                        `mutation($id: ID!) { dequeuePullRequest(input: { id: $id }) { clientMutationId } }`,
-                        { id: pr.id }
-                      );
-                      const reenqueue = withJump => github.graphql(`
-                        mutation($id: ID!, $oid: GitObjectID!) {
-                          enqueuePullRequest(input: { pullRequestId: $id, expectedHeadOid: $oid${withJump ? ', jump: true' : ''} }) {
-                            mergeQueueEntry { position }
-                          }
-                        }`, { id: pr.id, oid: pr.headRefOid });
-                      let jumpedAgain = true, r;
-                      try {
-                        r = await reenqueue(true);
-                      } catch (error) {
-                        // The dequeue already happened: land the PR plainly rather than leave it out.
-                        if (/head|stale|changed/i.test(String(error.message))) throw error;
-                        core.warning(`#${pr.number} relabel jump rejected (${error.message}); plain enqueue`);
-                        receipt(pr, 'jump-rejected', String(error.message).slice(0, 120));
-                        jumpedAgain = false;
-                        r = await reenqueue(false);
-                      }
-                      enqueued += 1;
-                      core.notice(`RELABEL-JUMP #${pr.number} from position ${self.position} to ${r.enqueuePullRequest.mergeQueueEntry.position}`);
-                      receipt(pr, 'relabel-jump', `from=${self.position};to=${r.enqueuePullRequest.mergeQueueEntry.position};jump=${jumpedAgain};queued=${jumped}/${MAX_JUMPED}`);
-                      if (building.length > 0) {
-                        receipt(pr, 'jump-reset', `restarts building groups ${building.map(e => '#' + e.pullRequest.number).join(',')}`);
-                        core.warning(`JUMP RESET by #${pr.number}: restarts building merge groups ${building.map(e => '#' + e.pullRequest.number).join(',')}`);
-                      }
-                    }
-                  }
-                } catch (error) {
-                  core.warning(`#${pr.number} relabel-jump failed: ${error.message}`);
-                  receipt(pr, 'error', `relabel-jump:${String(error.message).slice(0, 180)}`);
-                }
+                relabelJumpCandidates.push({ pr });
                 continue;
               }
               if (!eligible(pr)) {
@@ -981,6 +932,82 @@ jobs:
                 }
                 core.warning(`#${pr.number} not enqueued: ${error.message}`);
                 receipt(pr, 'error', String(error.message).slice(0, 200));
+              }
+            }
+            // Relabel-jump pass (2026-11-01). Runs after the enrollment loop so the exact-head
+            // failure hold is always evaluated first: a head whose merge group failed is never
+            // dequeued and re-enqueued here, and the hold receipt below is read before any mutation.
+            for (const { pr } of relabelJumpCandidates) {
+              const statuses = await github.paginate(
+                github.rest.repos.listCommitStatusesForRef,
+                { owner, repo, ref: pr.headRefOid, per_page: 100 }
+              );
+              const directHold = failurePolicy.failureReceiptStatus(
+                process.env.FAILURE_HOLD_RECEIPT,
+                { repository: `${owner}/${repo}`, prNumber: pr.number, headSha: pr.headRefOid }
+              );
+              if (directHold) statuses.unshift(directHold);
+              const sourceFailure = failurePolicy.revisionFailureDisposition({
+                statuses,
+                repository: `${owner}/${repo}`,
+                currentMainSha: statuses.some(status => status?.context === failurePolicy.FAILURE_HOLD_CONTEXT)
+                  ? await readMainSha()
+                  : undefined,
+              });
+              if (sourceFailure.action !== 'allow') {
+                receipt(pr, 'held', `relabel-jump:${sourceFailure.reason ?? sourceFailure.action}`);
+                continue;
+              }
+              try {
+                const queue = await github.graphql(QUEUE_ENTRIES_QUERY, { owner, repo });
+                const all = queue.repository.mergeQueue?.entries?.nodes ?? [];
+                const self = all.find(e => e.pullRequest.number === pr.number);
+                if (!self) {
+                  receipt(pr, 'skip', 'relabel-jump:entry-not-in-first-50');
+                } else if (all.filter(e => e.position < self.position).every(isCompoundingEntry)) {
+                  receipt(pr, 'skip', `relabel-jump:already-ahead position=${self.position}`);
+                } else {
+                  const others = all.filter(e => e.pullRequest.number !== pr.number);
+                  const { jumped, building, deferred } = jumpPolicy(others);
+                  if (deferred !== null) {
+                    receipt(pr, 'jump-deferred', `relabel-jump ${deferred}`);
+                    core.notice(`RELABEL-JUMP #${pr.number} deferred (${deferred})`);
+                  } else if (process.env.DRY_RUN === 'true') {
+                    core.notice(`[dry run] would relabel-jump #${pr.number}`);
+                  } else {
+                    await github.graphql(
+                      `mutation($id: ID!) { dequeuePullRequest(input: { id: $id }) { clientMutationId } }`,
+                      { id: pr.id }
+                    );
+                    const reenqueue = withJump => github.graphql(`
+                      mutation($id: ID!, $oid: GitObjectID!) {
+                        enqueuePullRequest(input: { pullRequestId: $id, expectedHeadOid: $oid${withJump ? ', jump: true' : ''} }) {
+                          mergeQueueEntry { position }
+                        }
+                      }`, { id: pr.id, oid: pr.headRefOid });
+                    let jumpedAgain = true, r;
+                    try {
+                      r = await reenqueue(true);
+                    } catch (error) {
+                      // The dequeue already happened: land the PR plainly rather than leave it out.
+                      if (/head|stale|changed/i.test(String(error.message))) throw error;
+                      core.warning(`#${pr.number} relabel jump rejected (${error.message}); plain enqueue`);
+                      receipt(pr, 'jump-rejected', String(error.message).slice(0, 120));
+                      jumpedAgain = false;
+                      r = await reenqueue(false);
+                    }
+                    enqueued += 1;
+                    core.notice(`RELABEL-JUMP #${pr.number} from position ${self.position} to ${r.enqueuePullRequest.mergeQueueEntry.position}`);
+                    receipt(pr, 'relabel-jump', `from=${self.position};to=${r.enqueuePullRequest.mergeQueueEntry.position};jump=${jumpedAgain};queued=${jumped}/${MAX_JUMPED}`);
+                    if (building.length > 0) {
+                      receipt(pr, 'jump-reset', `restarts building groups ${building.map(e => '#' + e.pullRequest.number).join(',')}`);
+                      core.warning(`JUMP RESET by #${pr.number}: restarts building merge groups ${building.map(e => '#' + e.pullRequest.number).join(',')}`);
+                    }
+                  }
+                }
+              } catch (error) {
+                core.warning(`#${pr.number} relabel-jump failed: ${error.message}`);
+                receipt(pr, 'error', `relabel-jump:${String(error.message).slice(0, 180)}`);
               }
             }
             core.info(`enqueued=${enqueued}`);
