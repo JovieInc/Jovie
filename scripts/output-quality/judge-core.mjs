@@ -10,6 +10,8 @@
 // (Cloudflare credits, no new spend). Calls go through the shared api-client
 // (budget, breaker, retries). Frames are sent inline, so the judge sees the
 // prompt and the artifact and nothing else: no tools, files or memory.
+//
+// api-budget: cloudflare-api 60/hr - on-demand audience judging (buyer, investor and intent evals); one intent pass = 1-3 judge calls + up to 2 reviser calls, run by agents per output
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
