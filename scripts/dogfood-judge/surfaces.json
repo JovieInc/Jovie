@@ -1,0 +1,315 @@
+{
+  "schema": "jovie.dogfood-judge-surfaces/v1",
+  "description": "Inventory of surfaces the LLM dogfood judge watches. Coverage = surfaces with a current passing receipt / all surfaces here. Summer owns the expansion queue: when every judged surface is green, the next queued surface by ROI score is promoted (node scripts/dogfood-judge/cli.mjs coverage --next). Model bindings name where each surface's model id lives so a model change invalidates exactly the receipts it affects.",
+  "judge": {
+    "tiers": {
+      "screen": "claude-sonnet-5-5",
+      "confirm": "claude-opus-5-5"
+    },
+    "transport": "claude CLI (subscription lane); no gateway or raw API key path",
+    "maxReceiptAgeDays": 7
+  },
+  "roiWeights": {
+    "goldenPath": 30,
+    "revenue": 2,
+    "traffic": 1
+  },
+  "bindingSources": {
+    "chat": {
+      "kind": "ts-const",
+      "file": "apps/web/lib/constants/ai-models.ts",
+      "name": "CHAT_MODEL"
+    },
+    "chat-light": {
+      "kind": "ts-const",
+      "file": "apps/web/lib/constants/ai-models.ts",
+      "name": "CHAT_MODEL_LIGHT"
+    },
+    "insight": {
+      "kind": "ts-const",
+      "file": "apps/web/lib/constants/ai-models.ts",
+      "name": "INSIGHT_MODEL"
+    },
+    "pitch": {
+      "kind": "ts-const",
+      "file": "apps/web/lib/constants/ai-models.ts",
+      "name": "PITCH_MODEL"
+    },
+    "title": {
+      "kind": "ts-const",
+      "file": "apps/web/lib/constants/ai-models.ts",
+      "name": "TITLE_MODEL"
+    },
+    "album-art": {
+      "kind": "ts-const",
+      "file": "apps/web/lib/constants/ai-models.ts",
+      "name": "ALBUM_ART_GATEWAY_IMAGE_MODEL"
+    },
+    "summer-planner": {
+      "kind": "capacity-role",
+      "role": "planner"
+    },
+    "drafting-terra": {
+      "kind": "capacity-family",
+      "family": "openai:terra"
+    },
+    "drafting-sol": {
+      "kind": "capacity-family",
+      "family": "openai:sol"
+    },
+    "judge-screen": {
+      "kind": "judge-tier",
+      "tier": "screen"
+    },
+    "judge-confirm": {
+      "kind": "judge-tier",
+      "tier": "confirm"
+    }
+  },
+  "surfaces": [
+    {
+      "id": "waitlist-signup-to-waitlisted",
+      "title": "Waitlist: signup, OTP, onboarding chat, waitlisted receipt",
+      "status": "judged",
+      "roi": {
+        "goldenPath": true,
+        "revenue": 9,
+        "traffic": 9
+      },
+      "models": ["chat", "chat-light"],
+      "gates": ["waitlist-auto-accept", "outreach"],
+      "recorder": "~/.local/state/jovie-waitlist-audit/video (canary walk, waitlist cert worker)",
+      "penRefs": [
+        {
+          "id": "HRx8s",
+          "title": "Auth sign-in column (canonical)",
+          "path": "docs/screenshots/dogfood-judge/pen-refs/HRx8s.png",
+          "steps": ["1a", "1b", "2a", "2b"]
+        },
+        {
+          "id": "J33Hzl",
+          "title": "Auth verification step (canonical)",
+          "path": "docs/screenshots/dogfood-judge/pen-refs/J33Hzl.png",
+          "steps": ["1c", "2c", "2d"]
+        },
+        {
+          "id": "R6As7U",
+          "title": "/waitlist chat and live profile, desktop",
+          "path": "docs/screenshots/dogfood-judge/pen-refs/R6As7U.png",
+          "steps": ["1d", "4a", "4b", "4c", "4d", "4e"]
+        },
+        {
+          "id": "hGHPE",
+          "title": "Claim flow 1: qualify chat (canonical, Tim-approved 2026-09-29)",
+          "path": "docs/screenshots/dogfood-judge/pen-refs/hGHPE.png",
+          "steps": ["1d", "4a", "4b"]
+        },
+        {
+          "id": "p1IJJ",
+          "title": "Claim flow 3a: reserved, waitlisted (canonical)",
+          "path": "docs/screenshots/dogfood-judge/pen-refs/p1IJJ.png",
+          "steps": ["4e"]
+        }
+      ]
+    },
+    {
+      "id": "golden-path-claim-to-live",
+      "title": "Golden path: claim, profile live, first action",
+      "status": "queued",
+      "roi": {
+        "goldenPath": true,
+        "revenue": 10,
+        "traffic": 8
+      },
+      "models": ["chat", "chat-light", "insight"],
+      "gates": ["certification", "outreach"],
+      "recorder": "pnpm --filter @jovie/web exec tsx scripts/agent-path-cert.ts",
+      "penRefs": [
+        {
+          "id": "fNQFx",
+          "title": "SOL golden path: claim to live profile"
+        }
+      ]
+    },
+    {
+      "id": "per-profile-certification",
+      "title": "Per-profile walk on the applicant's own data",
+      "status": "queued",
+      "roi": {
+        "goldenPath": true,
+        "revenue": 9,
+        "traffic": 6
+      },
+      "models": ["chat", "chat-light"],
+      "gates": ["waitlist-auto-accept", "certification"],
+      "recorder": "POST /api/internal/waitlist/profile-certification (evidence.video)",
+      "penRefs": [
+        {
+          "id": "D9kdx",
+          "title": "Public profile desktop canonical"
+        },
+        {
+          "id": "WyQJb",
+          "title": "Public profile phone, Listen"
+        }
+      ],
+      "perSubject": true
+    },
+    {
+      "id": "public-profile",
+      "title": "Public artist profile (jov.ie/<handle>)",
+      "status": "queued",
+      "roi": {
+        "goldenPath": true,
+        "revenue": 7,
+        "traffic": 10
+      },
+      "models": [],
+      "gates": ["certification"],
+      "recorder": "pnpm --filter @jovie/web exec tsx scripts/certify-artist-profile.ts",
+      "penRefs": [
+        {
+          "id": "D9kdx",
+          "title": "Public profile desktop canonical"
+        }
+      ]
+    },
+    {
+      "id": "outbound-review-cards",
+      "title": "Outbound engine review cards (what a prospect will see)",
+      "status": "queued",
+      "roi": {
+        "goldenPath": false,
+        "revenue": 9,
+        "traffic": 5
+      },
+      "models": ["drafting-terra", "drafting-sol", "pitch"],
+      "gates": ["outreach"],
+      "recorder": "outbound engine preview capture",
+      "penRefs": []
+    },
+    {
+      "id": "homepage",
+      "title": "Homepage /",
+      "status": "queued",
+      "roi": {
+        "goldenPath": false,
+        "revenue": 6,
+        "traffic": 10
+      },
+      "models": [],
+      "gates": ["pr-ui-evidence"],
+      "recorder": "node scripts/funnel-judge/capture.mjs",
+      "penRefs": [
+        {
+          "id": "oHJCI",
+          "title": "Homepage 1440 dark canonical"
+        }
+      ]
+    },
+    {
+      "id": "pricing",
+      "title": "Pricing",
+      "status": "queued",
+      "roi": {
+        "goldenPath": false,
+        "revenue": 8,
+        "traffic": 6
+      },
+      "models": [],
+      "gates": ["pr-ui-evidence"],
+      "recorder": "node scripts/funnel-judge/capture.mjs",
+      "penRefs": [
+        {
+          "id": "uPdLV",
+          "title": "Pricing canonical page"
+        }
+      ]
+    },
+    {
+      "id": "app-shell",
+      "title": "App shell: home, inbox, audience, insights, work",
+      "status": "queued",
+      "roi": {
+        "goldenPath": false,
+        "revenue": 5,
+        "traffic": 7
+      },
+      "models": ["chat", "insight"],
+      "gates": ["pr-ui-evidence"],
+      "recorder": "app-shell before/after capture",
+      "penRefs": [
+        {
+          "id": "JwsdW",
+          "title": "Canonical App Shell runtime"
+        }
+      ]
+    },
+    {
+      "id": "jovie-chat",
+      "title": "Jovie chat (artist assistant)",
+      "status": "queued",
+      "roi": {
+        "goldenPath": false,
+        "revenue": 6,
+        "traffic": 6
+      },
+      "models": ["chat", "chat-light", "title"],
+      "gates": ["certification"],
+      "recorder": "pnpm --filter @jovie/web exec tsx scripts/agent-path-cert.ts",
+      "penRefs": [
+        {
+          "id": "hkkdJ",
+          "title": "New chat, greeting plus one insight (canonical)"
+        }
+      ]
+    },
+    {
+      "id": "product-shots",
+      "title": "Product shots used in marketing",
+      "status": "queued",
+      "roi": {
+        "goldenPath": false,
+        "revenue": 5,
+        "traffic": 8
+      },
+      "models": ["album-art"],
+      "gates": ["pr-ui-evidence"],
+      "recorder": "product-shots generator",
+      "penRefs": []
+    },
+    {
+      "id": "ovie-taste-cards",
+      "title": "Ovie decision and taste cards",
+      "status": "queued",
+      "roi": {
+        "goldenPath": false,
+        "revenue": 2,
+        "traffic": 3
+      },
+      "models": ["summer-planner"],
+      "gates": ["screenshot-to-tim"],
+      "recorder": "Storybook capture of DecisionCard states",
+      "penRefs": []
+    },
+    {
+      "id": "summer-briefs",
+      "title": "Summer iMessage cards and briefs",
+      "status": "queued",
+      "roi": {
+        "goldenPath": false,
+        "revenue": 1,
+        "traffic": 2
+      },
+      "models": ["summer-planner"],
+      "gates": ["screenshot-to-tim"],
+      "recorder": "Summer PNG card renderer",
+      "penRefs": [
+        {
+          "id": "pO0dh",
+          "title": "Summer shipping iMessage card"
+        }
+      ]
+    }
+  ]
+}
