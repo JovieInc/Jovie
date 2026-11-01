@@ -1,0 +1,57 @@
+{
+  "schema": "jovie.intent-eval.calibration/v1",
+  "note": "Known-good and known-bad outputs. The gate flips from warn to blocking only after every case lands on its expected verdict (node scripts/output-quality/calibrate.mjs). Tim's 2026-11-01 time-zone example is the anchor must-fail case.",
+  "cases": [
+    {
+      "id": "clock-every-timezone",
+      "artifact": "clock-every-timezone.html",
+      "kind": "ui",
+      "preset": "tim",
+      "mission": "Help Tim tell the time as quickly as possible.",
+      "expect": "fail",
+      "mustFail": true
+    },
+    {
+      "id": "clock-local-time",
+      "artifact": "clock-local-time.html",
+      "kind": "ui",
+      "preset": "tim",
+      "mission": "Help Tim tell the time as quickly as possible.",
+      "expect": "pass"
+    },
+    {
+      "id": "vendor-thanks-slop",
+      "artifact": "vendor-thanks-slop.txt",
+      "kind": "email",
+      "preset": "vendor",
+      "mission": "Thank Maya at the backline rental company for delivering the stage monitors two days early, so she feels the specific gratitude and wants to keep working with us.",
+      "expect": "fail",
+      "mustFail": true
+    },
+    {
+      "id": "vendor-thanks-good",
+      "artifact": "vendor-thanks-good.txt",
+      "kind": "email",
+      "preset": "vendor",
+      "mission": "Thank Maya at the backline rental company for delivering the stage monitors two days early, so she feels the specific gratitude and wants to keep working with us.",
+      "expect": "pass"
+    },
+    {
+      "id": "summer-text-dump",
+      "artifact": "summer-text-bad.txt",
+      "kind": "sms",
+      "preset": "tim",
+      "mission": "Tell Tim the one thing that needs him today and exactly what to reply, readable in five seconds on his phone.",
+      "expect": "fail",
+      "mustFail": true
+    },
+    {
+      "id": "summer-text-one-ask",
+      "artifact": "summer-text-good.txt",
+      "kind": "sms",
+      "preset": "tim",
+      "mission": "Tell Tim the one thing that needs him today and exactly what to reply, readable in five seconds on his phone.",
+      "expect": "pass"
+    }
+  ]
+}

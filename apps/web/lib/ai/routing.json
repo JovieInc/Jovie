@@ -71,15 +71,24 @@
       "note": "Through the Workers AI relay (WORKERS_AI_TOKEN). Flash is the vision model: @cf/zai-org/glm-5.3 on Workers AI drops image parts (measured 2026-10-31, JOV-10091). Replaced the claude -p subscription route."
     },
     {
-      "id": "hermes.agent",
-      "label": "Hermes agent (outside this repo; model glm-5.2 is off the web allowlist)",
-      "repo": "hermes",
-      "route": "gateway-only",
+      "id": "dev.intent-eval",
+      "label": "Audience-intent eval, routine outputs (system-1 judge that role-plays the audience; canon OUTPUT-QUALITY-LOOP)",
+      "repo": "JovieInc/Jovie",
+      "route": "workers-ai-only",
       "fallback": null,
-      "models": ["zai/glm-5.2"],
-      "gatewayKey": "hermes-agent-glm-5.2",
-      "gatewayUsdPerDayMax": 0.2,
-      "note": "Follow-up: Workers AI hosts @cf/zai-org/glm-5.2 at the same list price; move Hermes to workers-first."
+      "models": ["@cf/zai-org/glm-5.3-flash", "@cf/zai-org/glm-5.3"],
+      "gatewayKey": null,
+      "note": "scripts/output-quality/intent-eval.mjs through the Workers AI relay. Flash judges (vision); glm-5.3 revises text."
+    },
+    {
+      "id": "dev.intent-eval-strong",
+      "label": "Audience-intent eval, high-stakes outputs (investor, legal, public launch): 3 samples, all must pass",
+      "repo": "JovieInc/Jovie",
+      "route": "workers-ai-only",
+      "fallback": null,
+      "models": ["@cf/zai-org/glm-5.3", "@cf/zai-org/glm-5.3-flash"],
+      "gatewayKey": null,
+      "note": "glm-5.3 judges text-only artifacts; flash judges rendered images (glm-5.3 drops image parts, JOV-10091). No paid escalation: a stronger paid model is new spend and needs Tim."
     },
     {
       "id": "summer.agent-turns",
