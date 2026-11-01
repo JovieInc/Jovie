@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WaitlistEntryRow } from '@/lib/admin/types';
+import { mockTableViewport } from '@/tests/utils/table-viewport';
 import { AdminWaitlistTableWithViews } from './AdminWaitlistTableWithViews';
 
 vi.mock('@/lib/queries', () => ({
@@ -42,6 +43,8 @@ const entries: WaitlistEntryRow[] = [
     updatedAt: new Date('2026-01-10T00:00:00.000Z'),
   } as WaitlistEntryRow,
 ];
+
+mockTableViewport();
 
 describe('AdminWaitlistTableWithViews', () => {
   beforeEach(() => localStorage.clear());

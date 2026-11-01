@@ -7,6 +7,7 @@ import {
 } from '@testing-library/react';
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { mockTableViewport } from '@/tests/utils/table-viewport';
 
 const captureQuery = vi.hoisted(() => ({ value: '' }));
 
@@ -229,6 +230,8 @@ async function openReleaseDrawer(
     );
   });
 }
+
+mockTableViewport();
 
 describe('DemoReleasesExperience', () => {
   afterEach(() => {

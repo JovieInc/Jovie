@@ -2,10 +2,13 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { mockTableViewport } from '@/tests/utils/table-viewport';
 import {
   ActivityTableSkeleton,
   ActivityTableUnified,
 } from './ActivityTableUnified';
+
+mockTableViewport();
 
 describe('ActivityTableUnified', () => {
   it('uses the canonical table empty state when no activity exists', () => {

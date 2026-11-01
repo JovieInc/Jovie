@@ -23,6 +23,7 @@ import type {
   OvieCertificationRow,
 } from '@/lib/ovie/certifications/types';
 import { founderReviewItemFixture } from '@/tests/fixtures/founder-review-item';
+import { mockTableViewport } from '@/tests/utils/table-viewport';
 
 vi.mock('@/hooks/useBreakpoint', () => ({
   useBreakpointDown: () => false,
@@ -147,6 +148,8 @@ function renderRegistry() {
     </HeaderActionsProvider>
   );
 }
+
+mockTableViewport();
 
 describe('FounderReviewRegistry', () => {
   afterEach(() => {
