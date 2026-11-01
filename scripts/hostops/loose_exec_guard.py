@@ -66,6 +66,17 @@ MANAGED_PREFIXES = (
     ".composio/",
 )
 JOVIE_REMOTE = re.compile(r"github\.com[:/]JovieInc/", re.I)
+# Compiled executables (ELF, Mach-O, universal) are vendor builds, not
+# hand-written scripts; the rule is about scripts.
+BINARY_MAGIC = (b"\x7fELF", b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"\xca\xfe\xba\xbe")
+
+
+def is_compiled(path: Path) -> bool:
+    try:
+        with path.open("rb") as fh:
+            return fh.read(4) in BINARY_MAGIC
+    except OSError:
+        return False
 
 
 def sha256(path: Path) -> str:
@@ -129,7 +140,7 @@ def classify(path: Path, receipt: dict) -> str | None:
         rel = real.relative_to(HOME).as_posix()
     except ValueError:
         return None
-    if any(rel.startswith(prefix) for prefix in MANAGED_PREFIXES):
+    if any(rel.startswith(prefix) for prefix in MANAGED_PREFIXES) or is_compiled(real):
         return None
     entry = receipt.get(str(real))
     if entry:

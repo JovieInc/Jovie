@@ -138,3 +138,13 @@ def test_cli_strict_exit_and_report_ledger(tmp_path: Path) -> None:
     assert json.loads(report_path.read_text())["violationCount"] >= 1
     ledger = (tmp_path / "state/ledger.jsonl").read_text().splitlines()
     assert json.loads(ledger[-1])["violationCount"] >= 1
+
+
+def test_compiled_vendor_binary_is_not_a_script(guard, tmp_path: Path) -> None:
+    binary = tmp_path / ".local/bin/vendor-tool"
+    binary.parent.mkdir(parents=True)
+    binary.write_bytes(b"\x7fELF" + b"\x00" * 60)
+    binary.chmod(0o755)
+    script(tmp_path / ".local/bin/handmade.sh")
+    report = guard.scan(path_env=str(tmp_path / ".local/bin"), cron_text="")
+    assert report["violations"][0]["files"] == ["handmade.sh"]
