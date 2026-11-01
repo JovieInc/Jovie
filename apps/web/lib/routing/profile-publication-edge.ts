@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { readProfilePublished } from '@/lib/profile/publication-read';
 import {
   isReservedUsername,
   USERNAME_MAX_LENGTH,
@@ -12,9 +13,10 @@ import { STATIC_TOP_LEVEL_ROUTE_SEGMENTS } from './static-top-level-route-segmen
  *
  * `/<username>` (and its `?mode=` rewrites, RSC and prefetch requests, which
  * share the path) is served from the one-hour ISR cache. Before any of those
- * responses can leave the CDN, the proxy asks the uncached
- * /api/profile-publication endpoint whether the handle is published right
- * now. Missing, withdrawn, renamed-away and deleted handles get a 404 without
+ * responses can leave the CDN, the proxy reads the handle's publication from
+ * storage right now (one Neon HTTP query, no function hop: the earlier
+ * same-origin /api/profile-publication subrequest added ~140ms median and
+ * ~550ms tails to every profile document). Missing, withdrawn, renamed-away and deleted handles get a 404 without
  * the cached body; a failed or slow decision gets a 503. A cached success can
  * therefore never authorize a later request.
  *
@@ -22,9 +24,6 @@ import { STATIC_TOP_LEVEL_ROUTE_SEGMENTS } from './static-top-level-route-segmen
  * real top-level route are gated (STATIC_TOP_LEVEL_ROUTE_SEGMENTS is held equal
  * to the app directory by its guard test).
  */
-
-export const PROFILE_PUBLICATION_DECISION_PATH = '/api/profile-publication';
-const PROFILE_PUBLICATION_DECISION_TIMEOUT_MS = 2_500;
 
 /**
  * Handles `app/[username]/page.tsx` renders from a built-in fixture without
@@ -92,25 +91,14 @@ function notPublishedResponse(): NextResponse {
  * served, or null when the handle is published (or the path is not a
  * profile).
  */
-function decisionRequestHeaders(
-  cookieHeader: string | null,
-  bypassHeader: string | null
-): Record<string, string> {
-  const headers: Record<string, string> = {};
-  // Forwarded so protected deployments let the same-origin subrequest
-  // through; the endpoint itself reads no visitor state.
-  if (cookieHeader) headers.cookie = cookieHeader;
-  const bypass =
-    process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim() || bypassHeader;
-  if (bypass) headers['x-vercel-protection-bypass'] = bypass;
-  return headers;
-}
-
+/**
+ * Returns a terminal response when the cached profile body must not be
+ * served, or null when the handle is published (or the path is not a
+ * profile).
+ */
 export async function gateProfilePublicationAtEdge(
   pathname: string,
-  origin: string,
-  cookieHeader: string | null,
-  bypassHeader: string | null = null
+  readPublished: (handle: string) => Promise<boolean> = readProfilePublished
 ): Promise<NextResponse | null> {
   if (
     process.env.NODE_ENV === 'test' ||
@@ -121,20 +109,8 @@ export async function gateProfilePublicationAtEdge(
   const handle = getGatedProfileHandle(pathname);
   if (!handle) return null;
   if (FIXTURE_RENDERED_HANDLES.has(handle) && isFixtureRuntime()) return null;
-
-  const decisionUrl = new URL(PROFILE_PUBLICATION_DECISION_PATH, origin);
-  decisionUrl.searchParams.set('username', handle);
   try {
-    const response = await fetch(decisionUrl, {
-      cache: 'no-store',
-      headers: decisionRequestHeaders(cookieHeader, bypassHeader),
-      signal: AbortSignal.timeout(PROFILE_PUBLICATION_DECISION_TIMEOUT_MS),
-    });
-    if (!response.ok) return unavailableResponse();
-    const payload = (await response.json()) as { published?: unknown };
-    if (payload?.published === true) return null;
-    if (payload?.published === false) return notPublishedResponse();
-    return unavailableResponse();
+    return (await readPublished(handle)) ? null : notPublishedResponse();
   } catch {
     return unavailableResponse();
   }

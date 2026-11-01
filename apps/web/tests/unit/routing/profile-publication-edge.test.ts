@@ -4,23 +4,13 @@ import {
   getGatedProfileHandle,
 } from '@/lib/routing/profile-publication-edge';
 
-const ORIGIN = 'https://jov.ie';
-const fetchMock = vi.fn();
+const readPublished = vi.fn<(handle: string) => Promise<boolean>>();
 
 beforeEach(() => {
   vi.stubEnv('NODE_ENV', 'production');
-  vi.stubGlobal('fetch', fetchMock);
-  fetchMock.mockReset();
+  readPublished.mockReset();
 });
-afterEach(() => {
-  vi.unstubAllEnvs();
-  vi.unstubAllGlobals();
-});
-
-const decision = (body: unknown, status = 200) =>
-  fetchMock.mockResolvedValueOnce(
-    new Response(JSON.stringify(body), { status })
-  );
+afterEach(() => vi.unstubAllEnvs());
 
 describe('profile publication gate scope', () => {
   it.each(['/dualipa', '/DuaLipa', '/dj.snake', '/dua%6Cipa'])(
@@ -48,55 +38,39 @@ describe('profile publication gate scope', () => {
 });
 
 describe('profile publication gate decisions', () => {
-  it('serves the cached body only when the handle is published now', async () => {
-    decision({ published: true });
+  it('serves the cached body only when storage says the handle is published now', async () => {
+    readPublished.mockResolvedValueOnce(true);
     expect(
-      await gateProfilePublicationAtEdge('/DuaLipa', ORIGIN, 'a=b')
+      await gateProfilePublicationAtEdge('/DuaLipa', readPublished)
     ).toBeNull();
-    const [url, init] = fetchMock.mock.calls[0] ?? [];
-    expect(String(url)).toBe(
-      'https://jov.ie/api/profile-publication?username=dualipa'
-    );
-    expect(init).toMatchObject({
-      cache: 'no-store',
-      headers: { cookie: 'a=b' },
-    });
+    expect(readPublished).toHaveBeenCalledExactlyOnceWith('dualipa');
   });
 
   it('404s withdrawn, deleted and renamed-away handles without the body', async () => {
-    decision({ published: false });
+    readPublished.mockResolvedValueOnce(false);
     const response = await gateProfilePublicationAtEdge(
       '/dualipa',
-      ORIGIN,
-      null
+      readPublished
     );
     expect(response?.status).toBe(404);
     expect(response?.headers.get('cache-control')).toContain('no-store');
   });
 
-  it.each([
-    ['a 503 decision', () => decision({ error: 'unavailable' }, 503)],
-    ['a malformed decision', () => decision({ published: 'yes' })],
-    [
-      'a network failure',
-      () => fetchMock.mockRejectedValueOnce(new Error('x')),
-    ],
-  ])('fails closed with 503 on %s', async (_label, arrange) => {
-    arrange();
+  it('fails closed with 503 when the storage read fails or times out', async () => {
+    readPublished.mockRejectedValueOnce(new Error('timeout'));
     const response = await gateProfilePublicationAtEdge(
       '/dualipa',
-      ORIGIN,
-      null
+      readPublished
     );
     expect(response?.status).toBe(503);
     expect(response?.headers.get('cache-control')).toContain('no-store');
   });
 
-  it('does not call the decision endpoint for real routes', async () => {
+  it('never reads storage for real routes', async () => {
     expect(
-      await gateProfilePublicationAtEdge('/start', ORIGIN, null)
+      await gateProfilePublicationAtEdge('/start', readPublished)
     ).toBeNull();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(readPublished).not.toHaveBeenCalled();
   });
 });
 
@@ -105,9 +79,11 @@ describe('fixture handles', () => {
     vi.stubEnv('PUBLIC_NOAUTH_SMOKE', '1');
     vi.stubEnv('VERCEL_ENV', '');
     for (const path of ['/unfazed', '/Unfazed', '/jovie-screen-fixture']) {
-      expect(await gateProfilePublicationAtEdge(path, ORIGIN, null)).toBeNull();
+      expect(
+        await gateProfilePublicationAtEdge(path, readPublished)
+      ).toBeNull();
     }
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(readPublished).not.toHaveBeenCalled();
   });
 
   it.each(['/unfazed', '/jovie-screen-fixture'])(
@@ -116,9 +92,9 @@ describe('fixture handles', () => {
       vi.stubEnv('PUBLIC_NOAUTH_SMOKE', '1');
       vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
       vi.stubEnv('VERCEL_ENV', 'production');
-      decision({ published: false });
-      const res = await gateProfilePublicationAtEdge(path, ORIGIN, null);
-      expect(fetchMock).toHaveBeenCalledTimes(1);
+      readPublished.mockResolvedValueOnce(false);
+      const res = await gateProfilePublicationAtEdge(path, readPublished);
+      expect(readPublished).toHaveBeenCalledTimes(1);
       expect(res?.status).toBe(404);
     }
   );
@@ -126,8 +102,8 @@ describe('fixture handles', () => {
   it('still gates fixture handles when no fixture runtime flag is set', async () => {
     vi.stubEnv('PUBLIC_NOAUTH_SMOKE', '');
     vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '');
-    decision({ published: false });
-    const res = await gateProfilePublicationAtEdge('/unfazed', ORIGIN, null);
+    readPublished.mockResolvedValueOnce(false);
+    const res = await gateProfilePublicationAtEdge('/unfazed', readPublished);
     expect(res?.status).toBe(404);
   });
 });

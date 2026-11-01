@@ -480,9 +480,9 @@ ISR decision; separately published release and asset authority remains unchanged
    missing/private profiles disclose no profile body.
 2. The canonical profile page and its rewritten modes are ISR (`revalidate =
    3600`), and the cached body is never the access decision. On every request
-   to `/<username>`, the proxy (`lib/routing/profile-publication-edge.ts`) asks
-   the uncached `/api/profile-publication` endpoint for a storage read of
-   publication. Missing, withdrawn, deleted and renamed-away handles get a
+   to `/<username>`, the proxy (`lib/routing/profile-publication-edge.ts`)
+   reads publication from storage in-process (`lib/profile/publication-read.ts`:
+   one Neon HTTP query, 1.5s timeout, no function hop). Missing, withdrawn, deleted and renamed-away handles get a
    no-store 404, and a failed or slow decision gets a no-store 503, before any
    cached body is served. RSC, prefetch and `?mode=` requests share the path
    and pass through the same gate. Real top-level routes are excluded by

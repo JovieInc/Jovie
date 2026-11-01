@@ -1,10 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { limitMock } = vi.hoisted(() => ({ limitMock: vi.fn() }));
-vi.mock('@/lib/db', () => ({
-  db: {
-    select: () => ({ from: () => ({ where: () => ({ limit: limitMock }) }) }),
-  },
+const { readMock } = vi.hoisted(() => ({ readMock: vi.fn() }));
+vi.mock('@/lib/profile/publication-read', () => ({
+  readProfilePublished: readMock,
 }));
 vi.mock('@/lib/utils/logger', () => ({ logger: { error: vi.fn() } }));
 
@@ -17,25 +15,20 @@ const call = (username: string) =>
     )
   );
 
-beforeEach(() => limitMock.mockReset());
+beforeEach(() => readMock.mockReset());
 
 describe('GET /api/profile-publication', () => {
-  it.each([
-    [[{ isPublic: true }], true],
-    [[{ isPublic: 't' }], true],
-    [[{ isPublic: false }], false],
-    [[{ isPublic: null }], false],
-    [[], false],
-  ])('reads publication fresh: %j -> %s', async (rows, published) => {
-    limitMock.mockResolvedValueOnce(rows);
+  it.each([true, false])('reports the fresh decision %s', async published => {
+    readMock.mockResolvedValueOnce(published);
     const response = await call('DuaLipa');
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ published });
+    expect(readMock).toHaveBeenCalledWith('dualipa');
     expect(response.headers.get('cache-control')).toContain('no-store');
   });
 
   it('returns an uncacheable 503 when storage fails', async () => {
-    limitMock.mockRejectedValueOnce(new Error('neon down'));
+    readMock.mockRejectedValueOnce(new Error('neon down'));
     const response = await call('dualipa');
     expect(response.status).toBe(503);
     expect(response.headers.get('cache-control')).toContain('no-store');
@@ -44,6 +37,6 @@ describe('GET /api/profile-publication', () => {
   it('rejects non-profile handles without reading storage', async () => {
     const response = await call('start');
     expect(response.status).toBe(400);
-    expect(limitMock).not.toHaveBeenCalled();
+    expect(readMock).not.toHaveBeenCalled();
   });
 });
