@@ -154,6 +154,8 @@ class ReadStale(unittest.TestCase):
     def test_a_failed_evidence_read_does_not_look_fresh(self):
         self.assertEqual(release_evidence.judge({"evidenceReadAt": 1000.0}, 1000.0 + 600), {})
         self.assertIn("release-evidence-stale", release_evidence.judge({"evidenceReadAt": 1000.0}, 1000.0 + 1801))
+        # Cold start whose reads keep failing: no evidenceReadAt yet, measured from the first observation.
+        self.assertIn("release-evidence-stale", release_evidence.judge({"evidenceReadAt": None, "firstObservedAt": 1000.0}, 1000.0 + 1801))
 
 
 class BuildStale(unittest.TestCase):

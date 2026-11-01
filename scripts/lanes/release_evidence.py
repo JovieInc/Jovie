@@ -148,7 +148,8 @@ def sample(state_dir: Path, now: float, run=None, version=read_version) -> tuple
     gh = lambda p: sentinel._gh_json(run, p)  # noqa: E731
     errors: list[str] = []
     jobs_cache: dict[str, list] = dict(cached.get("jobsCache") or {})
-    out = {"observedAt": now, "evidenceReadAt": cached.get("evidenceReadAt"), "streaks": {}, "build": cached.get("build") or {}, "jobsCache": {}}
+    out = {"observedAt": now, "evidenceReadAt": cached.get("evidenceReadAt"), "firstObservedAt": cached.get("firstObservedAt") or now,
+           "streaks": {}, "build": cached.get("build") or {}, "jobsCache": {}}
     try:
         runs = gh(f"repos/{REPO}/actions/workflows/ci.yml/runs?branch=main&event=push&status=completed"
                   f"&per_page={RUNS_READ}").get("workflow_runs") or []
@@ -204,7 +205,8 @@ def judge(sample_: dict | None, now: float) -> dict[str, str]:
     alerts: dict[str, str] = {}
     if not sample_:
         return alerts
-    read_at = sample_.get("evidenceReadAt")
+    # Never read since the sampler started (cold start or lost state) counts from its first observation.
+    read_at = sample_.get("evidenceReadAt") or sample_.get("firstObservedAt")
     if isinstance(read_at, (int, float)) and now - read_at > READ_STALE_S:
         alerts["release-evidence-stale"] = (f"main CI release evidence was last read {int((now - read_at) // 60)} min ago "
                                             f"(limit {READ_STALE_S // 60}); a red Golden Path would go unnoticed")
