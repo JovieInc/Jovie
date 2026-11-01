@@ -1,19 +1,12 @@
-import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { isPublicProfilePublished } from '@/lib/profile/public-profile-access';
+import { readProfilePublished } from '@/lib/profile/publication-read';
 import { isProfilePublicationCandidate } from '@/lib/routing/profile-publication-edge';
 import { logger } from '@/lib/utils/logger';
 
 /**
- * Fresh publication decision for the proxy's profile gate
- * (lib/routing/profile-publication-edge.ts, JOV-8629 §6.2). The canonical
- * profile document is ISR-cached; this endpoint is the per-request authority
- * that decides whether that cached body may be served. It is never cacheable:
- * every answer reads storage, and any failure is a 503 the proxy fails closed
- * on. GET handlers that read the request are uncached by default, and the
- * response is no-store.
+ * Diagnostic view of the fresh publication decision the proxy's profile gate
+ * makes in-process (lib/routing/profile-publication-edge.ts, JOV-8629 §6.2).
+ * Every answer reads storage and is no-store; a storage failure is a 503.
  */
 const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
 
@@ -29,13 +22,8 @@ export async function GET(req: Request) {
   }
 
   try {
-    const [row] = await db
-      .select({ isPublic: creatorProfiles.isPublic })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.usernameNormalized, username))
-      .limit(1);
     return NextResponse.json(
-      { published: Boolean(row) && isPublicProfilePublished(row?.isPublic) },
+      { published: await readProfilePublished(username) },
       { headers: NO_STORE }
     );
   } catch (error) {

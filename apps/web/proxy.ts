@@ -195,10 +195,7 @@ export default async function middleware(
   // ========================================================================
   if (req.method !== 'OPTIONS') {
     const profilePublicationResponse = await gateProfilePublicationAtEdge(
-      req.nextUrl.pathname,
-      req.nextUrl.origin,
-      req.headers.get('cookie'),
-      req.headers.get('x-vercel-protection-bypass')
+      req.nextUrl.pathname
     );
     if (profilePublicationResponse) return profilePublicationResponse;
   }
