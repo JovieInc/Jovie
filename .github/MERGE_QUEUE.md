@@ -177,6 +177,11 @@ GitHub owns queue membership, combined-head checks, and merge ordering. A
 one-shot `gh pr merge --auto --match-head-commit` request is not a queue receipt;
 read `mergeQueueEntry` before claiming admission.
 
+Never dequeue to re-prioritize; label `compounding` and let green-enroll re-route.
+A queued `compounding` PR with a non-compounding entry ahead of it is dequeued and
+re-enqueued with `jump` by Merge Queue Green Enroll (receipt `relabel-jump`), under
+the same caps as a fresh enqueue: `MAX_JUMPED`, `JUMP_MAX_BUILD_S`, `JUMP_BATCH_S`.
+
 `drain-pr-queue.sh` remains a guarded manual maintenance tool. Its legacy
 source-admission and rebase path has no automatic caller. Hard-gate labels block
 the agent finishing request; required GitHub checks govern landing. Pending,
