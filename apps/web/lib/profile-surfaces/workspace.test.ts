@@ -65,17 +65,88 @@ describe('connections workspace helpers', () => {
     vi.useRealTimers();
   });
 
-  it('does not claim healthy monitoring during an unavailable search provider', () => {
+  it('keeps a connected identity Connected while the search provider is unavailable (JOV-9021)', () => {
     expect(getConnectionStatus(surface(), false)).toMatchObject({
-      label: 'Search Unavailable',
-      tone: 'neutral',
+      label: 'Connected',
+      tone: 'success',
       needsAttention: false,
     });
+    expect(getConnectionStatus(surface(), false).nextAction).toContain(
+      'Search checks are unavailable'
+    );
     expect(
       getConnectionStatus(surface({ qualificationStatus: 'suggested' }), false)
         .label
     ).toBe('Needs Qualification');
     expect(getConnectionStatus(connector(), false).label).toBe('Active');
+  });
+
+  it('gives every connection status a label and one next action (JOV-9021)', () => {
+    const monitoringStates = [
+      'active',
+      'paused',
+      'locked',
+      'unavailable',
+    ] as const;
+    const rows = monitoringStates.flatMap(monitoringState =>
+      (['qualified', 'suggested', 'conflicting', 'rejected'] as const).flatMap(
+        qualificationStatus => [
+          surface({
+            id: `${qualificationStatus}-${monitoringState}`,
+            qualificationStatus,
+            monitoringState,
+          }),
+          surface({
+            id: `${qualificationStatus}-${monitoringState}-unmeasured`,
+            qualificationStatus,
+            monitoringState,
+            rank: null,
+            previousRank: null,
+            lastObservedAt: null,
+          }),
+          surface({
+            id: `${qualificationStatus}-${monitoringState}-stale`,
+            qualificationStatus,
+            monitoringState,
+            lastObservedAt: new Date(
+              Date.now() - PRESENCE_STALE_AFTER_MS - 1
+            ).toISOString(),
+          }),
+        ]
+      )
+    );
+    const connectorRows = (
+      [
+        'connected',
+        'syncing',
+        'needs_reauth',
+        'error',
+        'not_connected',
+        'disabled',
+      ] as const
+    ).map(status => connector({ id: `connector-${status}`, status }));
+
+    for (const row of [...rows, ...connectorRows]) {
+      for (const providerAvailable of [true, false]) {
+        const status = getConnectionStatus(row, providerAvailable);
+        expect(status.label.trim(), `${row.id}/${providerAvailable}`).not.toBe(
+          ''
+        );
+        expect(
+          status.nextAction.trim(),
+          `${row.id}/${providerAvailable}`
+        ).not.toBe('');
+      }
+    }
+
+    // A state that needs the person carries exactly one leading action verb.
+    expect(
+      getConnectionStatus(surface({ qualificationStatus: 'suggested' }))
+        .nextAction
+    ).toMatch(/^Qualify /);
+    expect(
+      getConnectionStatus(surface({ monitoringState: 'locked' })).nextAction
+    ).toMatch(/^Upgrade /);
   });
 
   it('selects only persisted identity work, independent of monitoring and provider state', () => {
@@ -304,7 +375,7 @@ describe('connections workspace helpers', () => {
   });
 
   it.each([
-    [PRESENCE_STALE_AFTER_MS, 'Active', false],
+    [PRESENCE_STALE_AFTER_MS, 'Connected', false],
     [PRESENCE_STALE_AFTER_MS + 1, 'Stale', true],
   ] as const)(
     'preserves monitoring freshness at observation age %i milliseconds',

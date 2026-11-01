@@ -102,9 +102,27 @@ describe('presence inspector content (JOV-8106)', () => {
   });
 
   it('collapses to actions plus diagnostics metadata when search is unavailable', () => {
-    const keys = sectionKeys(surface(), false);
-
-    expect(keys).toEqual(['source_identity', 'actions', 'monitoring_details']);
+    expect(sectionKeys(surface(), false)).toEqual([
+      'source_identity',
+      'actions',
+      'monitoring_details',
+    ]);
+    // JOV-9021: identity-decision rows keep the identity question during an
+    // outage and still drop the evidence sections for the failed lookup.
+    expect(
+      sectionKeys(
+        surface({
+          qualificationStatus: 'suggested',
+          monitoringState: 'locked',
+        }),
+        false
+      )
+    ).toEqual([
+      'source_identity',
+      'identity_check',
+      'actions',
+      'monitoring_details',
+    ]);
   });
 
   it('exposes the resolved status, signals, and primary action for the rail', () => {

@@ -139,7 +139,8 @@ export function getConnectionStatus(
       tone: 'warning',
       needsAttention: true,
       sortPriority: 0,
-      nextAction: 'Confirm whether this public identity belongs to the artist.',
+      nextAction:
+        'Qualify this identity: confirm the public profile belongs to the artist.',
     };
   }
   if (row.qualificationStatus === 'rejected') {
@@ -159,6 +160,20 @@ export function getConnectionStatus(
       needsAttention: true,
       sortPriority: 1,
       nextAction: 'Upgrade the monitoring limit to track this page.',
+    };
+  }
+  // JOV-9021: a search-provider outage never masks the artist-owned
+  // connection. A qualified surface stays Connected; the outage is carried
+  // by the next action and the inspector's monitoring details instead of
+  // relabeling the row Unknown.
+  if (row.qualificationStatus === 'qualified' && !providerAvailable) {
+    return {
+      label: 'Connected',
+      tone: 'success',
+      needsAttention: false,
+      sortPriority: 2,
+      nextAction:
+        'Search checks are unavailable; this connection is unaffected.',
     };
   }
   if (!providerAvailable) {
@@ -209,8 +224,10 @@ export function getConnectionStatus(
         : 'No action needed until the first monitoring run completes.',
     };
   }
+  // JOV-9021: a resolved, measured identity is Connected — the artist owns
+  // the connection; rank and verification are reported alongside it.
   return {
-    label: 'Active',
+    label: 'Connected',
     tone: 'success',
     needsAttention: false,
     sortPriority: 2,
