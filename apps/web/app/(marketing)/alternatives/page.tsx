@@ -7,10 +7,12 @@ import { getAlternative, getAlternativeSlugs } from '@/content/alternatives';
 import { marketingOgImage } from '@/data/marketingOgCards';
 import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
 import { documentTitle } from '@/lib/seo/document-title';
+import { NOINDEX_FOLLOW_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const revalidate = false;
 
 export const metadata: Metadata = {
+  robots: NOINDEX_FOLLOW_ROBOTS,
   title: documentTitle(`Alternatives — ${APP_NAME}`),
   description:
     'Find a musician-first alternative to generic link-in-bio tools, with smart links and release workflows instead of a list of links.',

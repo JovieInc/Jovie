@@ -1834,4 +1834,8 @@ describe('artist-profile audience wording', () => {
       expect(read(name)).not.toMatch(/Actual Fans|Fan Outcomes|Fan Opts In/u);
     }
   });
+
+  it('does not number the artist profile how-it-works steps', () => {
+    expect(read('ArtistProfileHowItWorks')).not.toMatch(/padStart\(2,/u);
+  });
 });
