@@ -177,6 +177,10 @@ test('GitHub reads go through runGh, not a gh subprocess', () => {
   assert.match(source, /from '\.\.\/\.\.\/packages\/api-client\/gh\.ts'/);
   assert.match(source, /await runGh\(args, \{ priority: 'deploy' \}\)/);
   assert.match(source, /run\.deferred \|\| run\.code !== 0/);
+  assert.match(
+    source,
+    /api-budget: github-actions-token 182\/hr - one serialized release/
+  );
   assert.doesNotMatch(source, /spawnSync\(\s*'gh'/);
   assert.match(source, /spawnSync\(\s*process\.execPath/);
 });

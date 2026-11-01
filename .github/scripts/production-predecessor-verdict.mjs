@@ -14,6 +14,7 @@
 // While the controller lease still serializes releases a predecessor is never
 // PENDING here, so the wait is a no-op. It becomes load-bearing when the
 // verification tail leaves the lease.
+// api-budget: github-actions-token 182/hr - one serialized release, two gates; each gate one workflow read plus up to 90 active-run reads while the marker stays none for the full 30 minute poll
 import { spawnSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';

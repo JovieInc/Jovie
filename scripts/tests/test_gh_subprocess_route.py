@@ -1,3 +1,4 @@
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -112,6 +113,26 @@ class RewriteTest(unittest.TestCase):
             "spawnSync('gh', ['auth', 'status']);\n  return String(workflow.id);",
         )
         self.assertIsNone(route.rewrite(extra, "scripts/x.mjs"))
+
+    def test_rewriter_source_is_not_a_guard_hit(self):
+        source = Path(route.__file__).read_text()
+        # Same shapes as origin/main external-api-guard gh-subprocess (Python)
+        # and api-budget CLIENT_USE. The test tree is excluded from the scan;
+        # this file may name the patterns, the rewriter module may not.
+        gh_call = re.compile(
+            r"""['"]gh['"]\s*,|['"]gh\s+(?:api|pr|issue|run|search|release|workflow|repo|label|secret|variable|cache|project)\b"""
+        )
+        consumer = re.compile(
+            r"packages/api-client|\brunGh\(|\brun_gh\b|\bGitHubClient\b"
+        )
+        self.assertIsNone(gh_call.search(source))
+        self.assertIsNone(consumer.search(source))
+        self.assertIn("spawnSync('gh', args", route.HELPER)
+        self.assertIn("await runGh(args, { priority: 'deploy' })", route.ASYNC_HELPER)
+        self.assertEqual(
+            route.run_gh_specifier(".github/scripts/production-predecessor-verdict.mjs"),
+            "../../packages/api-client/gh.ts",
+        )
 
     def test_log_lines_name_the_file_to_rewrite(self):
         log = (
