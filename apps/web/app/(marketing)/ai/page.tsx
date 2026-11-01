@@ -64,7 +64,7 @@ export default function AiPage() {
         <section className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
           <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
             {/* ui-casing-allow: marketing display headline */}
-            <h2 className='text-lg font-semibold line-clamp-2'>1. Identify</h2>
+            <h2 className='text-lg font-semibold line-clamp-2'>Identify</h2>
             <p className='mt-3 text-sm leading-7 text-secondary-token'>
               Recognize known visitors, captured contacts, and anonymous
               browsers with enough signal to personalize the page in real time.
@@ -72,7 +72,7 @@ export default function AiPage() {
           </article>
           <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
             {/* ui-casing-allow: marketing display headline */}
-            <h2 className='text-lg font-semibold line-clamp-2'>2. Decide</h2>
+            <h2 className='text-lg font-semibold line-clamp-2'>Decide</h2>
             <p className='mt-3 text-sm leading-7 text-secondary-token'>
               Route each visit toward the highest-value next action, whether
               that is listening, subscribing, tipping, merch, or tickets.
@@ -80,7 +80,7 @@ export default function AiPage() {
           </article>
           <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
             {/* ui-casing-allow: marketing display headline */}
-            <h2 className='text-lg font-semibold line-clamp-2'>3. Measure</h2>
+            <h2 className='text-lg font-semibold line-clamp-2'>Measure</h2>
             <p className='mt-3 text-sm leading-7 text-secondary-token'>
               Capture impressions, clicks, and downstream value events so
               creators can see what turns traffic into real relationships.
@@ -88,7 +88,7 @@ export default function AiPage() {
           </article>
           <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
             {/* ui-casing-allow: marketing display headline */}
-            <h2 className='text-lg font-semibold line-clamp-2'>4. Learn</h2>
+            <h2 className='text-lg font-semibold line-clamp-2'>Learn</h2>
             <p className='mt-3 text-sm leading-7 text-secondary-token'>
               Use those outcomes to improve routing, segmentation, and follow-up
               automation across future visits.

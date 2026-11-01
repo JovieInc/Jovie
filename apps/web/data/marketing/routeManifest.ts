@@ -1290,11 +1290,6 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       ),
       approvedVariantBinding(
         'apps/web/app/(marketing)/launch/page.tsx',
-        'stats',
-        '3-stat-band'
-      ),
-      approvedVariantBinding(
-        'apps/web/app/(marketing)/launch/page.tsx',
         'comparison',
         'feature-matrix'
       ),
@@ -1308,7 +1303,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     bindingEvidence: {
       status: 'verified',
       source:
-        'mounted stamps 2026-10-15: profile-stage hero, platform strip, pillar grid, editorial splits, deeplink grid, three-stat band, dual-path close',
+        'mounted stamps 2026-10-15: profile-stage hero, platform strip, pillar grid, editorial splits, deeplink grid, dual-path close',
     },
     status: 'active',
     specVersion: '1.0.0',
