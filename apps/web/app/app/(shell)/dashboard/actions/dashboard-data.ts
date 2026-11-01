@@ -1020,13 +1020,37 @@ async function fetchDashboardCoreWithSession(
       clerkUserId,
       selected.id
     ).catch((error: unknown) => {
-      Sentry.captureException(error, {
-        level: 'warning',
-        tags: {
-          query: 'avatar_quality',
-          context: 'dashboard_data_settled',
-        },
-      });
+      // (JOV-8900) Transient Neon conditions on this fail-soft supplementary
+      // read are log-only, matching the Inbox count doctrine (JOV-5754):
+      // idle-in-transaction terminations, cold-start statement timeouts, JS
+      // query timeouts, and connection-class failures are infrastructure
+      // conditions, not data bugs, and the read is designed to fail open to
+      // UNKNOWN. Drizzle names the failing statement in the wrapper message,
+      // so reporting them files a Sentry issue per query title (JOVIE-WEB-YK)
+      // for a degradation this catch already handles. Unexpected failures
+      // are still reported so real data bugs stay visible.
+      if (
+        isIdleTransactionTermination(error) ||
+        isQueryTimeoutError(error) ||
+        isPostgresTimeoutError(error) ||
+        isRetryableError(error)
+      ) {
+        logger.warn(
+          '[avatar-quality] transient DB condition after retry; degrading to unknown quality',
+          {
+            profileId: selected.id,
+            error: getDeepErrorMessage(error),
+          }
+        );
+      } else {
+        Sentry.captureException(error, {
+          level: 'warning',
+          tags: {
+            query: 'avatar_quality',
+            context: 'dashboard_data_settled',
+          },
+        });
+      }
       return UNKNOWN_AVATAR_QUALITY;
     });
 
