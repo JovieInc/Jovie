@@ -1,3 +1,4 @@
+import { PROOF_METHODOLOGY_COPY } from '@/data/proofMethodologyCopy';
 import type { ProofStatDefinition } from '@/lib/proof-stats/registry';
 import { cn } from '@/lib/utils';
 
@@ -71,41 +72,25 @@ export function ProofMethodology({ stats, className }: ProofMethodologyProps) {
     <div className={cn('flex flex-col gap-12', className)}>
       <section className='flex flex-col gap-3'>
         <h2 className='text-lg font-medium text-primary-token text-balance'>
-          Rules For Every Number
+          {PROOF_METHODOLOGY_COPY.rules.heading}
         </h2>
         <ul className='flex list-disc flex-col gap-2 pl-5 text-sm leading-6 text-secondary-token'>
-          <li>Team, test and automated accounts never count.</li>
-          <li>
-            Counts round down and times round up, so a number is never better
-            than the measurement.
-          </li>
-          <li>
-            A number appears only while it is current and past its threshold.
-            Otherwise it is removed.
-          </li>
-          <li>
-            Comparisons with other platforms use public pages only and appear
-            after human review.
-          </li>
+          {PROOF_METHODOLOGY_COPY.rules.items.map(item => (
+            <li key={item}>{item}</li>
+          ))}
         </ul>
       </section>
       <section className='flex flex-col gap-3'>
         <h2 className='text-lg font-medium text-primary-token text-balance'>
-          Benchmark Conditions
+          {PROOF_METHODOLOGY_COPY.benchmark.heading}
         </h2>
         <p className='max-w-2xl text-sm leading-6 text-secondary-token text-pretty'>
-          Every week a hosted runner loads one public profile per platform five
-          times: Lighthouse with its default mobile profile and simulated
-          throttling, plus a rendered browser load. We report the median,
-          respect each site&apos;s robots.txt, identify our crawler by name and
-          load nothing beyond a normal page view. If Jovie is slower on a
-          metric, the benchmark records it and we work on it rather than drop
-          it.
+          {PROOF_METHODOLOGY_COPY.benchmark.body}
         </p>
       </section>
       <section className='flex flex-col gap-6'>
         <h2 className='text-lg font-medium text-primary-token text-balance'>
-          What Each Number Means
+          {PROOF_METHODOLOGY_COPY.meanings.heading}
         </h2>
         <dl className='flex flex-col'>
           {visible.map(stat => (
@@ -121,10 +106,12 @@ export function ProofMethodology({ stats, className }: ProofMethodologyProps) {
                 {stat.publicMethod}
               </dd>
               <dd className='flex flex-wrap gap-x-4 gap-y-1 text-xs text-tertiary-token'>
-                <span>{CADENCE[stat.refreshCadence]}</span>
-                <span>{roundingText(stat)}</span>
-                <span>{shownWhenText(stat)}</span>
-                <span>{freshnessText(stat)}</span>
+                <span className='tabular-nums'>
+                  {CADENCE[stat.refreshCadence]}
+                </span>
+                <span className='tabular-nums'>{roundingText(stat)}</span>
+                <span className='tabular-nums'>{shownWhenText(stat)}</span>
+                <span className='tabular-nums'>{freshnessText(stat)}</span>
               </dd>
             </div>
           ))}
