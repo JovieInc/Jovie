@@ -1635,10 +1635,6 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
   margin-top: 0;
 }
 
-:where(.system-b-pricing-section--plans) {
-  padding-top: var(--space-12);
-}
-
 :where(.system-b-pricing-page .marketing-pricing-plans) {
   gap: var(--space-px);
   overflow: hidden;
@@ -2794,4 +2790,10 @@ body:has(.system-b-brand-page) .marketing-glass-header__cta:focus-visible {
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--tracking-normal);
   line-height: 1;
+}
+
+/* Plans sit closer to the hero than other sections. Declared last so it wins
+   over the section padding-block at every breakpoint (same zero specificity). */
+:where(.system-b-pricing-section--plans) {
+  padding-top: var(--space-12);
 }
