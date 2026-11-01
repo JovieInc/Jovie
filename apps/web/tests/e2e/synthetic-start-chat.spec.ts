@@ -26,6 +26,14 @@ async function startChat(page: Page) {
   await page.goto('/start', { waitUntil: 'domcontentloaded' });
   const composer = page.getByRole('textbox').first();
   await expect(composer).toBeVisible();
+  // The server renders the composer before React attaches its handlers, and an
+  // Enter pressed in that window is dropped (no POST ever leaves). Wait for
+  // hydration so the probe measures the bot check, not that race.
+  await page.waitForFunction(() =>
+    Object.keys(
+      document.querySelector('[role="textbox"], textarea') ?? {}
+    ).some(key => key.startsWith('__reactProps$'))
+  );
   const chatResponse = page.waitForResponse(
     response =>
       new URL(response.url()).pathname === '/api/chat' &&
