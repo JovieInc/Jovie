@@ -178,11 +178,14 @@ def sample(state_dir: Path, now: float, run=None, version=read_version) -> tuple
         out["streaks"] = streaks
         keys = {f"{r['id']}:{r.get('run_attempt') or 1}" for r in runs[:RUNS_READ]}
         out["jobsCache"] = {k: v for k, v in jobs_cache.items() if k in keys}
-        main_sha = (gh(f"repos/{REPO}/commits/main") or {}).get("sha")
     except Exception as error:  # noqa: BLE001
         errors.append(f"ci evidence: {type(error).__name__}: {str(error)[:80]}")
         out["streaks"] = cached.get("streaks") or {}
         out["jobsCache"] = jobs_cache  # keep what was read: a transient error must not force a full refetch
+    try:  # separate from the evidence read: a failed main lookup never discards fresh streaks
+        main_sha = (gh(f"repos/{REPO}/commits/main") or {}).get("sha")
+    except Exception as error:  # noqa: BLE001
+        errors.append(f"main head: {type(error).__name__}: {str(error)[:80]}")
         main_sha = (cached.get("build") or {}).get("mainSha")
     out["build"] = build_staleness(cached.get("build") or {}, version(), main_sha, now)
     atomic_write_text(path, json.dumps(out))
