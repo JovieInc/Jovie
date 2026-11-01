@@ -2,19 +2,21 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ARTIST_VISIBILITY_OFFER_CONTRACT_ID } from '@/lib/billing/offer-truth';
 import {
-  getPublicPricingComparison,
-  isPublicPricingFeature,
-} from '@/lib/billing/public-pricing-comparison';
-import { getPaidPlanAdditionNames } from '@/lib/billing/public-pricing-features';
+  getPaidPlanAdditionNames,
+  PUBLIC_PRICING_COMPARISON,
+} from '@/lib/billing/public-pricing-features';
 import { PRICING_COMPARISON } from '@/lib/entitlements/registry';
 import { PricingComparisonChart } from './PricingComparisonChart';
 
-const COMPARISON = getPublicPricingComparison();
+const COMPARISON = PUBLIC_PRICING_COMPARISON;
+const PUBLIC_NAMES = new Set(
+  COMPARISON.flatMap(category => category.features.map(f => f.name))
+);
 const PUBLIC_ROWS = COMPARISON.flatMap(category => category.features);
 
 describe('PricingComparisonChart', () => {
   it('renders every public registry row on desktop, by registry category', () => {
-    render(<PricingComparisonChart categories={COMPARISON} />);
+    render(<PricingComparisonChart />);
     const desktopTable = screen.getByRole('table', {
       name: 'Feature comparison by plan',
     });
@@ -37,12 +39,10 @@ describe('PricingComparisonChart', () => {
   });
 
   it('keeps roadmap, Max-only and unproven registry rows off public pricing', () => {
-    const { container } = render(
-      <PricingComparisonChart categories={COMPARISON} />
-    );
+    const { container } = render(<PricingComparisonChart />);
     const hidden = PRICING_COMPARISON.flatMap(
       category => category.features
-    ).filter(feature => !isPublicPricingFeature(feature));
+    ).filter(feature => !PUBLIC_NAMES.has(feature.name));
 
     expect(hidden.length).toBeGreaterThan(0);
     for (const feature of hidden) {
@@ -53,9 +53,7 @@ describe('PricingComparisonChart', () => {
   });
 
   it('names the profile feature as a Jovie profile, not an artist profile', () => {
-    const { container } = render(
-      <PricingComparisonChart categories={COMPARISON} />
-    );
+    const { container } = render(<PricingComparisonChart />);
 
     expect(
       screen.getAllByText('Public Jovie profile page').length
@@ -64,9 +62,7 @@ describe('PricingComparisonChart', () => {
   });
 
   it('renders named comparison tables from monthly-only public offer truth', () => {
-    const { container } = render(
-      <PricingComparisonChart categories={COMPARISON} />
-    );
+    const { container } = render(<PricingComparisonChart />);
 
     const desktopTable = screen.getByRole('table', {
       name: 'Feature comparison by plan',
@@ -160,7 +156,7 @@ describe('PricingComparisonChart', () => {
   });
 
   it('renders every paid-plan addition the pricing card lists', () => {
-    render(<PricingComparisonChart categories={COMPARISON} />);
+    render(<PricingComparisonChart />);
     for (const name of getPaidPlanAdditionNames()) {
       expect(screen.getAllByText(name).length).toBeGreaterThan(0);
     }

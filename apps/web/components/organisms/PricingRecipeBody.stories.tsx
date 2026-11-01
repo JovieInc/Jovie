@@ -2,13 +2,9 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
 import { PricingComparisonChart } from '@/features/pricing/PricingComparisonChart';
 import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
-import { getPublicPricingComparison } from '@/lib/billing/public-pricing-comparison';
 import { PricingRecipeBody } from './PricingRecipeBody';
 
 const proClaim = getPublicPriceClaim('pro');
-const publicComparisonChart = (
-  <PricingComparisonChart categories={getPublicPricingComparison()} />
-);
 export const PRICING_RECIPE_STORY_REQUEST_ACCESS_COPY = `${proClaim.displayName} is ${proClaim.priceLabel}/month. Claim your profile.`;
 
 const meta = {
@@ -44,7 +40,7 @@ const meta = {
       plans={
         <MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />
       }
-      comparisonChart={publicComparisonChart}
+      comparisonChart={<PricingComparisonChart />}
     />
   ),
 } satisfies Meta<typeof PricingRecipeBody>;

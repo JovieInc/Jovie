@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { getPublicPricingComparison } from '@/lib/billing/public-pricing-comparison';
 import { PricingComparisonChart } from './PricingComparisonChart';
 
 const meta = {
@@ -8,19 +7,16 @@ const meta = {
   parameters: {
     layout: 'fullscreen',
   },
-  args: {
-    categories: getPublicPricingComparison(),
-  },
 } satisfies Meta<typeof PricingComparisonChart>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Comparison: Story = {
-  render: args => (
+  render: () => (
     <div className='min-h-dvh bg-page px-4 py-10 md:px-8'>
       <div className='mx-auto max-w-6xl'>
-        <PricingComparisonChart {...args} />
+        <PricingComparisonChart />
       </div>
     </div>
   ),

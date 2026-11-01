@@ -9,17 +9,12 @@ import {
 } from '@/data/marketingPricingPlans';
 import { PricingComparisonChart } from '@/features/pricing/PricingComparisonChart';
 import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
-import { getPublicPricingComparison } from '@/lib/billing/public-pricing-comparison';
 import { documentTitle } from '@/lib/seo/document-title';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
 export const revalidate = false;
 
 const VISIBLE_PRICING_PLANS = getVisibleMarketingPricingPlans();
-/** Registry rows a buyer can rely on today (server-side projection). */
-const publicComparisonChart = (
-  <PricingComparisonChart categories={getPublicPricingComparison()} />
-);
 const PRO_MONTHLY_PRICE = `${getPublicPriceClaim('pro').priceLabel}/month`;
 const PRICING_OG_IMAGE = `${BASE_URL}/og/default.png`;
 const PRICING_TITLE = `Pricing | ${APP_NAME}`;
@@ -133,7 +128,7 @@ export default function PricingPage() {
         <MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />
       }
       auditOffer={<VisibilityAuditOffer />}
-      comparisonChart={publicComparisonChart}
+      comparisonChart={<PricingComparisonChart />}
     />
   );
 }

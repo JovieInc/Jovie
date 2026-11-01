@@ -7,13 +7,11 @@ import {
   formatPublicPriceDisplay,
   getPublicPriceClaim,
 } from '@/lib/billing/offer-truth';
-import type { PublicComparisonPlan } from '@/lib/billing/public-pricing-comparison';
-import type {
-  ComparisonFeature,
-  PricingCategory,
-} from '@/lib/entitlements/registry';
+import { PUBLIC_PRICING_COMPARISON } from '@/lib/billing/public-pricing-features';
+import type { ComparisonFeature } from '@/lib/entitlements/registry';
 
-type PlanColumn = PublicComparisonPlan;
+/** Plans the public comparison shows (Max is legacy-only, not sold). */
+type PlanColumn = 'free' | 'pro';
 
 function CellValue({ value }: { readonly value: boolean | string }) {
   if (typeof value === 'string') {
@@ -82,17 +80,7 @@ function DesktopFeatureRow({
   );
 }
 
-export interface PricingComparisonChartProps {
-  /**
-   * Rows to compare, from `getPublicPricingComparison()` (server-side
-   * projection of the entitlement registry).
-   */
-  readonly categories: readonly PricingCategory[];
-}
-
-export function PricingComparisonChart({
-  categories,
-}: PricingComparisonChartProps) {
+export function PricingComparisonChart() {
   const [selectedPlan, setSelectedPlan] = useState<PlanColumn>('pro');
 
   const freeClaim = getPublicPriceClaim('free');
@@ -175,7 +163,7 @@ export function PricingComparisonChart({
           </thead>
 
           <tbody>
-            {categories.map(category => (
+            {PUBLIC_PRICING_COMPARISON.map(category => (
               <Fragment key={`cat-${category.category}`}>
                 <tr className='system-b-pricing-category-row'>
                   <td colSpan={3} className='system-b-pricing-category-cell'>
@@ -225,7 +213,7 @@ export function PricingComparisonChart({
           </thead>
 
           <tbody>
-            {categories.map(category => (
+            {PUBLIC_PRICING_COMPARISON.map(category => (
               <Fragment key={`mcat-${category.category}`}>
                 <tr className='system-b-pricing-category-row'>
                   <td colSpan={2} className='system-b-pricing-category-cell'>

@@ -475,7 +475,7 @@ const SECTION_RESOLUTIONS = {
         delegatedProofs: [
           {
             source: 'apps/web/app/(marketing)/pricing/page.tsx',
-            binding: 'comparisonChart={publicComparisonChart}',
+            binding: 'comparisonChart={<PricingComparisonChart />}',
             occurrences: 1,
             kind: 'source',
           },
