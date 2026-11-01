@@ -52,6 +52,7 @@ IDLE_S = 12 * 3600
 CLOSED_GRACE_S = 3600
 PRESERVED_TTL_S = 3 * 86400
 INTERVAL_S = 3600
+LINKED_SWEEP_BUDGET_S = 20 * 60  # linked-worktree phase; the standalone reclaim runs after it, always
 LOW_INTERVAL_S = 600
 # Regenerable output, plus per-checkout pnpm stores (never the shared store, which lives outside checkouts).
 BUILD_DIRS = frozenset({"node_modules", ".next", ".turbo", "test-results", ".build", "DerivedData",
@@ -357,8 +358,10 @@ def retire(repo: Path, path: Path, branch: str | None, live: set[Path], report: 
 def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecycle.run,
           now: float | None = None, closed: dict[Path, set[str]] | None = None, idle_s: float = IDLE_S,
           preserved_ttl_s: float = PRESERVED_TTL_S, prefix: str = "sweep/mac",
-          date: str | None = None, state: Path | None = None) -> dict:
+          date: str | None = None, state: Path | None = None, budget_s: float | None = None,
+          clock=time.monotonic) -> dict:
     now = time.time() if now is None else now
+    deadline = None if budget_s is None else clock() + budget_s
     date = date or datetime.fromtimestamp(now, timezone.utc).strftime("%Y%m%d")
     closed = closed or {}
     report = {"at": datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -366,6 +369,13 @@ def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecy
     def yield_to_drain():
         if state is not None and lifecycle.draining(state):
             report["drained"] = True
+            return True
+        if deadline is not None and clock() > deadline:
+            # Retention starved 2026-10-25..11-01: this phase backs up and secret-scans dirty checkouts
+            # one by one (up to the gate timeout each) and ran for hours, so the standalone-clone
+            # reclaim, headroom alarm and daily report after it never ran. A spent budget ends the
+            # phase; the next interval resumes where it stopped.
+            report["budgetSpent"] = True
             return True
         return False
 
@@ -739,8 +749,10 @@ def guarded_main(args) -> int:
                 break
             closed[repo] = closed_branches(repo, subprocess.run)
         prefix = sweep_prefix()
+        # Alarm input first: it is a few statvfs calls and must not wait behind hours of cleanup.
+        publish_headroom(args.state, headroom(volumes(home, args.state)), time.time())
         report = sweep(repos, default_roots(home, args.state), default_never(home),
-                       closed=closed, prefix=prefix, state=args.state)
+                       closed=closed, prefix=prefix, state=args.state, budget_s=LINKED_SWEEP_BUDGET_S)
         if not report.get("drained") and not lifecycle.draining(args.state):
             report["standalone"] = sweep_standalone(home, args.state, repos, default_never(home))
             now = time.time()

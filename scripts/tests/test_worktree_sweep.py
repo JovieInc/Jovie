@@ -150,6 +150,17 @@ class SweepTest(unittest.TestCase):
         self.assertTrue(first.exists())
         self.assertEqual(report["removed"], [])
 
+    def test_spent_budget_ends_the_phase_without_marking_a_drain(self):
+        # 2026-11-01: one unbounded phase starved the standalone reclaim, headroom alarm and report.
+        first = self.worktree("first")
+        state = self.base / "state"
+        state.mkdir()
+        clock = iter([0.0, 10_000.0, 10_001.0, 10_002.0, 10_003.0])
+        report = self.sweep(state=state, run=no_processes, budget_s=60, clock=lambda: next(clock))
+        self.assertTrue(report["budgetSpent"])
+        self.assertNotIn("drained", report)
+        self.assertTrue(first.exists())
+
     def test_clean_pushed_idle_worktree_is_removed_without_backup(self):
         path = self.worktree("clean")
         report = self.sweep()
