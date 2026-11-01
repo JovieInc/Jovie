@@ -21,6 +21,15 @@ export const HARNESS_POLICY_OWNER = 'Summer';
 export const HARNESS_RECEIPT_COMMAND =
   'node scripts/invariants/validate.mjs --harness-json';
 export const HARNESS_STATUSES = Object.freeze(['enforced', 'partial']);
+// An exception inside this window warns (and the lanes doctor files a Linear
+// issue routed to its owner) before it can expire.
+export const HARNESS_EXPIRY_WARNING_DAYS = 3;
+// Files that are in scope for every principle: changing the contract itself
+// requires every expired exception to be closed or renewed first.
+export const HARNESS_CONTRACT_SCOPE_PATHS = Object.freeze([
+  'scripts/invariants/harness-contract.mjs',
+]);
+const DAY_MS = 86_400_000;
 
 const DEFAULT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -87,6 +96,32 @@ export function harnessContractInvariant(registry) {
  * tests never touch the real tree.
  */
 export function validateHarnessContract(registry, options = {}) {
+  return evaluateHarnessContract(registry, options).errors;
+}
+
+/**
+ * True when a change touches the principle's enforcement scope: its gate path
+ * or the harness contract validator. `changedPaths` null means unknown.
+ */
+export function principleInScope(principle, changedPaths) {
+  if (!Array.isArray(changedPaths)) return false;
+  const scope = new Set(HARNESS_CONTRACT_SCOPE_PATHS);
+  if (hasText(principle?.gate?.path)) scope.add(principle.gate.path.trim());
+  return changedPaths.some(path => scope.has(path));
+}
+
+/**
+ * Same checks as validateHarnessContract, plus nonblocking warnings.
+ * An exception expiring within HARNESS_EXPIRY_WARNING_DAYS warns. An expired
+ * exception blocks only a change inside that principle's scope
+ * (options.changedPaths); elsewhere, or when the changed paths are unknown, it
+ * warns, so a calendar date never turns every PR and merge group red at once.
+ */
+export function evaluateHarnessContract(registry, options = {}) {
+  const changedPaths = Array.isArray(options.changedPaths)
+    ? options.changedPaths
+    : null;
+  const warnings = [];
   const repoRoot = options.repoRoot ?? DEFAULT_ROOT;
   const now = utcDay(options.now ?? new Date()) ?? new Date();
   const fileExists =
@@ -97,9 +132,12 @@ export function validateHarnessContract(registry, options = {}) {
   const errors = [];
   const invariant = harnessContractInvariant(registry);
   if (!invariant) {
-    return [
-      `harness-contract-missing: ${HARNESS_CONTRACT_INVARIANT_ID} is absent from canon/invariants.jsonl`,
-    ];
+    return {
+      errors: [
+        `harness-contract-missing: ${HARNESS_CONTRACT_INVARIANT_ID} is absent from canon/invariants.jsonl`,
+      ],
+      warnings,
+    };
   }
   if (invariant.lifecycle?.state !== 'adopted') {
     errors.push(
@@ -235,44 +273,29 @@ export function validateHarnessContract(registry, options = {}) {
               `harness-exception-expiry-format:${id}: expires must be YYYY-MM-DD`
             );
           } else if (now.getTime() > expiry.getTime()) {
-            errors.push(
-              `harness-exception-expired:${id}: ${exception.id} expired on ${exception.expires}; ${HARNESS_POLICY_OWNER} must close or renew it`
+            const message = `${exception.id} expired on ${exception.expires}; ${HARNESS_POLICY_OWNER} must close or renew it`;
+            if (principleInScope(principle, changedPaths)) {
+              errors.push(`harness-exception-expired:${id}: ${message}`);
+            } else {
+              warnings.push(
+                `harness-exception-expired-out-of-scope:${id}: ${message} (blocks only changes to ${principle?.gate?.path ?? 'its gate'} or the harness contract)`
+              );
+            }
+          } else {
+            const daysLeft = Math.round(
+              (expiry.getTime() - now.getTime()) / DAY_MS
             );
+            if (daysLeft < HARNESS_EXPIRY_WARNING_DAYS) {
+              warnings.push(
+                `harness-exception-expiring:${id}: ${exception.id} expires on ${exception.expires} (${daysLeft}d left); ${HARNESS_POLICY_OWNER} must close or renew it`
+              );
+            }
           }
         }
       }
     }
   }
-  return errors;
-}
-
-/**
- * Exceptions expiring within `withinHours` (default 48). Non-blocking: validate.mjs prints them as
- * warnings so an expiry is renewed or closed before it turns every PR's Source Validation red
- * (2026-11-01: six exceptions expired at 00:00Z and blocked all Jovie PRs).
- */
-export function harnessExpiringExceptions(registry, options = {}) {
-  const now = options.now ?? new Date();
-  const withinMs = (options.withinHours ?? 48) * 3_600_000;
-  const principles =
-    harnessContractInvariant(registry)?.policy?.value?.principles ?? [];
-  return principles
-    .filter(
-      principle => principle?.exception && hasText(principle.exception.expires)
-    )
-    .map(principle => ({
-      principle: principle.id,
-      exception: principle.exception.id,
-      expires: principle.exception.expires,
-      day: utcDay(principle.exception.expires),
-    }))
-    .filter(
-      entry =>
-        entry.day &&
-        entry.day.getTime() >= now.getTime() - 86_400_000 &&
-        entry.day.getTime() - now.getTime() <= withinMs
-    )
-    .map(({ day: _day, ...entry }) => entry);
+  return { errors, warnings };
 }
 
 /**
