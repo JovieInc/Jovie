@@ -52,7 +52,20 @@ export const WithCanonicalHeader: Story = {
       footerVariant='expanded'
       logoSize='sm'
     >
-      <HomepageHeroCanvas {...args} />
+      {/* Storybook vitest runner determinism: scroll(root) resolves against
+          the already-scrolled embedded preview scroller, so the scroll-linked
+          hero fade starts at progress 1 and the copy renders opacity 0 before
+          the play assertions run. Pin the resting state (scroll 0) for the
+          catalog; the scroll fade itself is covered by
+          tests/e2e/homepage-hero-canvas-scroll.spec.ts. */}
+      <style>
+        {
+          '[data-homepage-hero-canvas-story] .homepage-hero-canvas__copy { opacity: 1 !important; }'
+        }
+      </style>
+      <div data-homepage-hero-canvas-story='true'>
+        <HomepageHeroCanvas {...args} />
+      </div>
     </PublicPageShell>
   ),
   play: async ({ canvasElement }) => {
