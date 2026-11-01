@@ -47,6 +47,25 @@ To use a screenshot on a marketing page:
 
 Do not write `<Image src="/product-screenshots/..." />` in marketing pages. The wrappers resolve URL + retina dimensions from the registry so renames are caught by typescript and so a renamed PNG never silently breaks a marketing page.
 
+### Product shots (preferred for marketing sections)
+
+A product shot is one product moment, not a viewport. Declare it in
+[apps/web/lib/screenshots/product-shots.ts](../apps/web/lib/screenshots/product-shots.ts):
+a demo route rendering the real component with canary data, the `crop`
+selectors whose union is the moment, `padding`, `frame` (`bare`, `window`,
+`phone`; drawn in CSS by `<ProductShot>`, never baked), `displayWidth`, and the
+`sources` whose change makes it stale. Then:
+
+1. Start a demo-mode server (`pnpm --filter @jovie/web run dev:local:playwright`
+   or the screenshot workflow's production build).
+2. `pnpm --filter @jovie/web shots:render --only <id> --base-url <url>` writes
+   `public/product-shots/<id>.{avif,webp}` (2x, at most 120 KB each) and the
+   source hash in `product-shots.manifest.json`.
+3. Render it with `<ProductShot id="<id>" sizes="..." />`.
+
+`scripts/invariants/art-direction/product-shots.mjs` fails a PR whose shot
+source changed after its render; `--stale` re-renders only those.
+
 Dashboard page captures that declare `playerTimestamp` opt into
 `/demo?capturePlayer=1&playerTimestamp=M:SS`. The demo harness uses the
 canonical Tim White profile and release fixtures, including real artwork,

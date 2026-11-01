@@ -131,92 +131,33 @@
   left: 24%;
 }
 
-.ap-how-it-works__product-window {
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-card);
-}
-
-.ap-how-it-works__window-bar span[aria-hidden="true"] {
-  width: 0.4rem;
-  height: 0.4rem;
-  border-radius: var(--radius-pill);
-  background: var(--color-border-default);
-}
-
-.ap-how-it-works__setup-flow {
+/* How it works: three registry shots (lib/screenshots/product-shots.ts),
+   each already cropped to its moment and staged in a matte card. Claim gets
+   the full row so the handle reads near 1:1; at 80rem and up Connect and
+   Share share the second row at equal heights (staged cards stretch). */
+.ap-how-it-works__shots {
   display: grid;
-  gap: 1px;
-  padding: 1px;
-  background: var(--color-border-subtle);
+  gap: var(--space-4);
 }
 
-.ap-how-it-works__setup-stage {
+.ap-how-it-works__shot {
+  display: flex;
   min-width: 0;
-  background: var(--color-bg-surface-0);
 }
 
-.ap-how-it-works__setup-stage-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-3);
-  align-items: baseline;
-  padding: var(--space-3) var(--space-4);
+.ap-how-it-works__shot > .product-shot {
+  flex: 1;
 }
 
-.ap-how-it-works__setup-media {
-  position: relative;
-  aspect-ratio: 2.7 / 1;
-  overflow: hidden;
-  border-top: 1px solid var(--color-border-subtle);
-  background: var(--color-bg-base);
-}
-
-.ap-how-it-works__setup-image {
-  object-fit: cover;
-}
-
-.ap-how-it-works__setup-image--claim {
-  object-position: center 13%;
-  transform: translateX(4%) scale(1.75);
-  transform-origin: center top;
-}
-
-.ap-how-it-works__setup-image--connect {
-  object-position: center 50%;
-  transform: scale(1.8);
-}
-
-.ap-how-it-works__setup-image--share {
-  object-fit: contain;
-  object-position: center top;
-  transform: scale(1.08);
-  transform-origin: center top;
-}
-
-@media (min-width: 64rem) {
-  .ap-how-it-works__setup-flow {
+/* Two columns only where Connect keeps about 0.7x scale; below that the
+   cards stack and each reads larger. */
+@media (min-width: 80rem) {
+  .ap-how-it-works__shots {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .ap-how-it-works__setup-stage--share {
+  .ap-how-it-works__shot--claim {
     grid-column: 1 / -1;
-  }
-
-  .ap-how-it-works__setup-stage--claim .ap-how-it-works__setup-media,
-  .ap-how-it-works__setup-stage--connect .ap-how-it-works__setup-media {
-    aspect-ratio: 1.55 / 1;
-  }
-
-  .ap-how-it-works__setup-stage--share .ap-how-it-works__setup-media {
-    aspect-ratio: 2.2 / 1;
-  }
-
-  .ap-how-it-works__setup-image--claim {
-    transform: translateX(4%) scale(2.2);
-  }
-
-  .ap-how-it-works__setup-image--connect {
-    transform: scale(1.8);
   }
 }
 
@@ -239,28 +180,6 @@
 
   .ap-annotated-truth__marker--navigation {
     left: 15%;
-  }
-
-  .ap-how-it-works__setup-media {
-    aspect-ratio: 2.15 / 1;
-  }
-}
-
-@media (max-width: 47.99rem) {
-  .ap-how-it-works__setup-stage-header {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .ap-how-it-works__setup-stage-detail {
-    grid-column: 1;
-  }
-
-  .ap-how-it-works__setup-media {
-    aspect-ratio: 1.8 / 1;
-  }
-
-  .ap-how-it-works__setup-stage--share .ap-how-it-works__setup-media {
-    aspect-ratio: 1.25 / 1;
   }
 }
 

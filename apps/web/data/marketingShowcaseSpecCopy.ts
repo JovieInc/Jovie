@@ -1,3 +1,4 @@
+import type { ProductShotId } from '@/lib/screenshots/product-shots';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
@@ -17,16 +18,33 @@ export interface ProfileStateTile {
   readonly alt: string;
 }
 
-export interface PlatformSpecTile {
+interface PlatformSpecTileBase {
   readonly id: string;
   readonly title: string;
   readonly body: string;
   readonly accent: JovieMarketingAccent;
-  readonly scenarioId: string;
-  readonly alt: string;
   readonly layoutClassName: string;
   readonly kind: 'phone' | 'desktop';
 }
+
+/**
+ * A tile shows either a registry product shot (preferred: cropped to one
+ * moment, `lib/screenshots/product-shots.ts`) or a legacy catalog scenario.
+ */
+export type PlatformSpecTile = PlatformSpecTileBase &
+  (
+    | {
+        /** Alt text comes from the shot spec. */
+        readonly shot: ProductShotId;
+        readonly scenarioId?: never;
+        readonly alt?: never;
+      }
+    | {
+        readonly scenarioId: string;
+        readonly alt: string;
+        readonly shot?: never;
+      }
+  );
 
 const LIVE_PROFILE_HREF = TIM_WHITE_PROFILE.publicProfilePath;
 
@@ -72,8 +90,7 @@ export const PLATFORM_SPEC_TILES: readonly PlatformSpecTile[] = [
     title: 'One Adaptive Profile',
     body: 'The same artist site puts the right action first as the release moment changes.',
     accent: 'purple',
-    scenarioId: 'tim-white-profile-live-desktop',
-    alt: "Demo of Tim White's Jovie artist profile on desktop.",
+    shot: 'profile-hero-desktop',
     layoutClassName: 'xl:col-span-8 xl:row-span-2',
     kind: 'desktop',
   },
