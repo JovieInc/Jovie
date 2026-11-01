@@ -4795,8 +4795,12 @@ def escalate_exhausted(host: Host, prs: list[dict], linear, *, model_only=False,
     data = load_escalation(host)
     now = time.time()
 
-    def healthy(_name, spec):
-        return provider_healthy(spec)
+    health_seen = {}  # one probe per provider per pass: a per-PR probe cost ~460 `grok models` calls (~400s) per tick
+
+    def healthy(name, spec):
+        if name not in health_seen:
+            health_seen[name] = provider_healthy(spec)
+        return health_seen[name]
 
     def plan_next(classified, record, now, head):
         if routing_context is REPAIR_ROUTING_UNSET:
@@ -5628,8 +5632,12 @@ def claim_remediation_events(host: Host, linear) -> dict:
     providers = load_providers()
     cooled = {name for name in providers if cooling(host, name)}
 
-    def healthy(_name, spec):
-        return provider_healthy(spec)
+    health_seen = {}  # one probe per provider per pass: a per-PR probe cost ~460 `grok models` calls (~400s) per tick
+
+    def healthy(name, spec):
+        if name not in health_seen:
+            health_seen[name] = provider_healthy(spec)
+        return health_seen[name]
 
     delivery_lock = Locked(host.state / "event-delivery.lock", blocking=False)
     if not delivery_lock.held:

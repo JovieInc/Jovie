@@ -8446,6 +8446,24 @@ class FixRedTest(unittest.TestCase):
         self.assertEqual(linear.moves, [])
         self.assertEqual(linear.comments, [])
 
+    def test_escalation_probes_each_provider_health_once_per_pass(self):
+        prs = [{**self.pr(number=n), "mergeStateStatus": "DIRTY"} for n in (7, 8, 9)]
+        attempts = {str(n): {"sha": "h1", "count": lane.MAX_FIX_ATTEMPTS, "lane": "devin", "at": 1, "endedAt": 2}
+                    for n in (7, 8, 9)}
+        providers = {"devin": {"enabled": True, "tier": 0}, "codex": {"enabled": True, "tier": 1}}
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.dict(os.environ, {"LANES_ESCALATION": "1", "LANES_ESCALATION_STUCK_PRS": "1"}), \
+                patch.object(lane, "load_providers", return_value=providers), \
+                patch.object(lane, "provider_healthy", return_value=True) as healthy, \
+                patch.object(lane, "sh", side_effect=AssertionError("unexpected external mutation")), \
+                patch.object(lane.pr_events, "add_label", return_value=True), \
+                patch.object(lane.pr_events, "sync_main", return_value="sync-failed"):
+            host = lane.Host(state=Path(tmp))
+            (host.state / "fix-attempts.json").write_text(json.dumps(attempts))
+            lane.escalate_exhausted(host, prs, FakeLinear([]))
+        probed = [call.args[0] for call in healthy.call_args_list]
+        self.assertLessEqual(len(probed), len(providers), f"one probe per provider per pass, got {len(probed)}")
+
     def test_unknown_merge_state_waits_then_rebases_before_stronger_lane(self):
         stuck = {**self.pr(number=7), "mergeStateStatus": "UNKNOWN"}
         attempts = {"7": {"sha": "h1", "count": lane.MAX_FIX_ATTEMPTS,
