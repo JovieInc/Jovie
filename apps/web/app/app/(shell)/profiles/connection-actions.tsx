@@ -6,6 +6,7 @@ import {
   Eye,
   Link2,
   RefreshCw,
+  Wrench,
 } from 'lucide-react';
 import type { ContextMenuItemType } from '@/components/organisms/table';
 import type { ConnectionPrimaryAction } from '@/lib/profile-surfaces/workspace';
@@ -15,6 +16,8 @@ export interface BuildConnectionActionsCallbacks {
   readonly onViewDetails: (row: ProfileWorkspaceRow) => void;
   readonly onOpen: (row: ProfileWorkspaceRow) => void;
   readonly onPrimaryAction: (row: ProfileWorkspaceRow) => void;
+  /** Present only when the row has a fixable issue (never a dead end). */
+  readonly onFix?: (row: ProfileWorkspaceRow) => void;
 }
 
 const PRIMARY_ACTION_COPY: Record<
@@ -70,6 +73,16 @@ export function buildConnectionActions(
         onClick: () => callbacks.onPrimaryAction(row),
       }
     );
+  }
+
+  if (callbacks.onFix) {
+    const { onFix } = callbacks;
+    items.push({
+      id: 'connection-fix',
+      label: 'Fix With Jovie',
+      icon: <Wrench className='h-3.5 w-3.5' aria-hidden />,
+      onClick: () => onFix(row),
+    });
   }
 
   return items;

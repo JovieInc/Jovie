@@ -52,6 +52,7 @@ IDLE_S = 12 * 3600
 CLOSED_GRACE_S = 3600
 PRESERVED_TTL_S = 3 * 86400
 INTERVAL_S = 3600
+LINKED_SWEEP_BUDGET_S = 20 * 60  # linked-worktree phase; the standalone reclaim runs after it, always
 LOW_INTERVAL_S = 600
 # Regenerable output, plus per-checkout pnpm stores (never the shared store, which lives outside checkouts).
 BUILD_DIRS = frozenset({"node_modules", ".next", ".turbo", "test-results", ".build", "DerivedData",
@@ -357,8 +358,10 @@ def retire(repo: Path, path: Path, branch: str | None, live: set[Path], report: 
 def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecycle.run,
           now: float | None = None, closed: dict[Path, set[str]] | None = None, idle_s: float = IDLE_S,
           preserved_ttl_s: float = PRESERVED_TTL_S, prefix: str = "sweep/mac",
-          date: str | None = None, state: Path | None = None) -> dict:
+          date: str | None = None, state: Path | None = None, budget_s: float | None = None,
+          clock=time.monotonic) -> dict:
     now = time.time() if now is None else now
+    deadline = None if budget_s is None else clock() + budget_s
     date = date or datetime.fromtimestamp(now, timezone.utc).strftime("%Y%m%d")
     closed = closed or {}
     report = {"at": datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -366,6 +369,13 @@ def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecy
     def yield_to_drain():
         if state is not None and lifecycle.draining(state):
             report["drained"] = True
+            return True
+        if deadline is not None and clock() > deadline:
+            # Retention starved 2026-10-25..11-01: this phase backs up and secret-scans dirty checkouts
+            # one by one (up to the gate timeout each) and ran for hours, so the standalone-clone
+            # reclaim, headroom alarm and daily report after it never ran. A spent budget ends the
+            # phase; the next interval resumes where it stopped.
+            report["budgetSpent"] = True
             return True
         return False
 
@@ -451,6 +461,10 @@ def maybe_spawn(state: Path, repo: Path, free_pct: float | None, *, now: float |
 # any branch, no stash, no linked worktrees, no live process, idle for STANDALONE_IDLE_S.
 STANDALONE_IDLE_S = 7 * 86400
 KEEP_MARKER = ".sweep-keep"
+ARTIFACT_IDLE_S = 24 * 3600
+# Retired lane roots: nothing dispatches there any more, so build output is dead weight even
+# when the clone itself cannot be deleted yet (unpublished work awaiting archive).
+RETIRED_ROOT_GLOBS = ("grok-ship-workspaces/*/*", "codex-ship-workspaces/*/*", "grok-wt/*")
 HEADROOM_WARN_PCT = 70
 HEADROOM_CRIT_PCT = 85
 REPORT_INTERVAL_S = 86400
@@ -573,6 +587,29 @@ def tree_kib(path: Path, run) -> int | None:
         return None
 
 
+def retired_root(home: Path, path: Path) -> bool:
+    return any(path in home.glob(pattern) for pattern in RETIRED_ROOT_GLOBS)
+
+
+def prune_artifacts(path: Path) -> int:
+    """Remove regenerable build output from a kept clone; tracked and untracked sources stay. Returns KiB freed."""
+    freed = 0
+    for root, dirs, _files in os.walk(path):
+        keep = []
+        for name in dirs:
+            if name in BUILD_DIRS:
+                target = Path(root) / name
+                try:
+                    freed += sum(f.stat().st_size for f in target.rglob("*") if f.is_file() and not f.is_symlink()) // 1024
+                except OSError:
+                    pass
+                shutil.rmtree(target, ignore_errors=True)
+            elif name != ".git":
+                keep.append(name)
+        dirs[:] = keep
+    return freed
+
+
 def sweep_standalone(home: Path, state: Path, repos: list[Path], never: list[Path], *, run=lifecycle.run,
                      now: float | None = None, idle_s: float = STANDALONE_IDLE_S,
                      remove=shutil.rmtree) -> dict:
@@ -594,6 +631,11 @@ def sweep_standalone(home: Path, state: Path, repos: list[Path], never: list[Pat
             verdict = standalone_verdict(path, live, run, now, state, idle_s)
             if verdict:
                 report["kept"][verdict] = report["kept"].get(verdict, 0) + 1
+                if verdict not in {"busy", "keep-marker", "state-referenced"} and retired_root(home, path) \
+                        and now - newest_touch(path) >= ARTIFACT_IDLE_S:
+                    freed = prune_artifacts(path)
+                    if freed:
+                        report["artifactsFreedKiB"] = report.get("artifactsFreedKiB", 0) + freed
                 continue
             size = tree_kib(path, run)
             entry = {"at": datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -707,8 +749,10 @@ def guarded_main(args) -> int:
                 break
             closed[repo] = closed_branches(repo, subprocess.run)
         prefix = sweep_prefix()
+        # Alarm input first: it is a few statvfs calls and must not wait behind hours of cleanup.
+        publish_headroom(args.state, headroom(volumes(home, args.state)), time.time())
         report = sweep(repos, default_roots(home, args.state), default_never(home),
-                       closed=closed, prefix=prefix, state=args.state)
+                       closed=closed, prefix=prefix, state=args.state, budget_s=LINKED_SWEEP_BUDGET_S)
         if not report.get("drained") and not lifecycle.draining(args.state):
             report["standalone"] = sweep_standalone(home, args.state, repos, default_never(home))
             now = time.time()

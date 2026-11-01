@@ -1,3 +1,4 @@
+import '../../../styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { expect, within } from 'storybook/test';
 import { OnboardingShell } from './OnboardingShell';
@@ -37,4 +38,15 @@ export const SignedIn: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.queryByRole('link', { name: 'Sign in' })).toBeNull();
   },
+};
+
+/**
+ * `/start?handle=timwhite` for an open name (Pen R6As7U): the draft profile
+ * panel is present from the first paint, seeded with the claimed handle.
+ */
+export const ClaimHandleEntry: Story = {
+  args: {
+    entryProfile: { status: 'available', handle: 'timwhite' },
+  },
+  parameters: { chromatic: { viewports: [1440] } },
 };

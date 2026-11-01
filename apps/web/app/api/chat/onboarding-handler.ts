@@ -86,6 +86,12 @@ import { isLocalDevelopmentAutomationHostname } from '@/lib/security/development
 import { resolveSyntheticPassage } from '@/lib/synthetic/passage.server';
 import { resolveSyntheticPassageToken } from '@/lib/synthetic/passage-token.server';
 import {
+  admitUnverifiedOnboardingStart,
+  type OnboardingBotCheckOutcome,
+  recordOnboardingBotCheck,
+} from '@/lib/turnstile/onboarding-bot-check.server';
+import { parseUnverifiedTurnstileToken } from '@/lib/turnstile/unverified-token';
+import {
   isTurnstileConfigured,
   verifyTurnstileTestModeToken,
   verifyTurnstileToken,
@@ -481,18 +487,14 @@ export async function tryHandleAnonymousOnboardingChat(
     }
 
     if (!shouldBypassTurnstile) {
-      // Approved synthetic principals (JOV-7697) verify in Cloudflare's test
-      // mode. Passage needs a verified session on the controlled canary
-      // mailbox plus a roster grant and a default-off gate. Anonymous
-      // visitors and every other account still verify against the real key.
+      // Approved synthetic principals (JOV-7697: verified canary session;
+      // JOV-9625: single-use CI passage token) verify in Cloudflare's test
+      // mode. Everyone else verifies against the real key.
       const syntheticPrincipal = await resolveSyntheticPassage(
         signedInSession,
         'onboarding_chat',
         { requestId }
       );
-      // Anonymous production certification (JOV-9625): a short-lived,
-      // single-use canary token minted in CI selects the same test mode.
-      // Absent or invalid tokens fall through to the real verification.
       const passageToken = syntheticPrincipal
         ? null
         : await resolveSyntheticPassageToken(req.headers, 'onboarding_chat', {
@@ -504,14 +506,34 @@ export async function tryHandleAnonymousOnboardingChat(
       if (syntheticActorId) {
         Sentry.setTag('synthetic_principal', syntheticActorId);
       }
-      const verify = syntheticActorId
-        ? await verifyTurnstileTestModeToken(parsed.data.turnstileToken, ip)
-        : await verifyTurnstileToken(
-            parsed.data.turnstileToken,
-            ip,
-            extractRequestHostname(req)
-          );
+      const token = parsed.data.turnstileToken;
+      // Fail open for humans: a widget that could not mint a token sends a
+      // marker instead, which skips siteverify and draws on the unverified
+      // budget. Abuse is bounded by that budget and the limits below.
+      const clientStatus = parseUnverifiedTurnstileToken(token);
+      const hostname = extractRequestHostname(req);
+      let verify: { success: boolean; reason?: string };
+      if (syntheticActorId) {
+        verify = await verifyTurnstileTestModeToken(token, ip);
+      } else if (clientStatus) {
+        verify = { success: false, reason: `client_${clientStatus}` };
+      } else verify = await verifyTurnstileToken(token, ip, hostname);
+      const userAgent = req.headers.get('user-agent');
+      let outcome: OnboardingBotCheckOutcome = syntheticActorId
+        ? 'synthetic'
+        : 'verified';
+      let reason = verify.reason;
       if (!verify.success) {
+        const admission = syntheticActorId
+          ? { admitted: false, reason: 'synthetic_failed' }
+          : await admitUnverifiedOnboardingStart(ip);
+        outcome = admission.admitted ? 'degraded' : 'denied';
+        reason = admission.admitted
+          ? verify.reason
+          : `${verify.reason ?? 'unverified'}:${admission.reason}`;
+      }
+      recordOnboardingBotCheck({ outcome, reason, clientStatus, userAgent });
+      if (outcome === 'denied') {
         return NextResponse.json(
           {
             error: 'Bot challenge failed',
@@ -521,10 +543,7 @@ export async function tryHandleAnonymousOnboardingChat(
           },
           {
             status: 403,
-            headers: {
-              ...corsHeaders,
-              'x-request-id': requestId,
-            },
+            headers: { ...corsHeaders, 'x-request-id': requestId },
           }
         );
       }
@@ -542,7 +561,7 @@ export async function tryHandleAnonymousOnboardingChat(
     env.E2E_TEST_MODE === '1' && env.VERCEL_ENV !== 'production';
   if (!skipAnonymousChatRateLimit) {
     // `!existingSessionId` means this request minted a fresh session: the
-    // visitor's first message. It already cleared Turnstile, so it draws on
+    // visitor's first message. It already passed the bot check, so it draws on
     // the dedicated first-touch budget instead of the shared IP/ASN pools
     // that carrier NATs and corporate egress routinely exhaust (JOV-6114).
     const rate = signedInSession?.user.id

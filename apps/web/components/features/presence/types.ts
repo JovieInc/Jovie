@@ -27,6 +27,8 @@ export interface ProfileWorkspaceSurfaceRow {
   readonly rank: number | null;
   readonly previousRank: number | null;
   readonly lastObservedAt: string | null;
+  /** Jovie page links out to this surface; undefined = not observed. */
+  readonly linksOut?: boolean;
   readonly identityEvidence?: {
     readonly sourceCount: number;
     readonly sourceTypes: readonly string[];

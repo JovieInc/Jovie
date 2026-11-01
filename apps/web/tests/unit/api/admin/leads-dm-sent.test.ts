@@ -57,6 +57,10 @@ vi.mock('@/lib/error-tracking', () => ({
   getSafeErrorMessage: () => 'safe-error',
 }));
 
+vi.mock('@/lib/leads/lead-claim-token', () => ({
+  resolveLeadClaimToken: vi.fn().mockResolvedValue('tok'),
+}));
+
 vi.mock('@/lib/leads/funnel-events', () => ({
   recordLeadFunnelEvent: mockRecordLeadFunnelEvent,
 }));

@@ -230,6 +230,16 @@ jobs:
           if [ "$FILE_ISSUES" = "true" ]; then args+=(--file); fi
           node scripts/automation-liveness.mjs "${args[@]}"
 
+      # Release-lag dead-man: a green Production Controller run proves nothing because Coalesce can
+      # skip the release as superseded. Alerts, naming the blocking step, when production has not
+      # advanced in 3h while main has.
+      # github-token-budget: 3 calls/run - names the blocking controller step, only when production lags
+      - name: Production release lag
+        if: ${{ always() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release-lag-check.mjs
+
       - name: Save alert state
         if: ${{ always() && hashFiles('liveness/state.json') != '' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

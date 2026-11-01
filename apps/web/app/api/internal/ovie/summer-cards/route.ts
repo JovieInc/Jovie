@@ -1,8 +1,14 @@
 import { isDeepStrictEqual } from 'node:util';
 import { NextResponse } from 'next/server';
+import { getAdminMercuryMetrics } from '@/lib/admin/mercury-metrics';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import {
+  DECISION_CARD_COPY_CONTRACT,
+  decisionCardCopyErrors,
+  lintDecisionCardCopy,
+} from '@/lib/ovie/decision-card-copy';
 import {
   buildHumanServiceCaseBinding,
   buildHumanServiceOutcomeReceipt,
@@ -36,6 +42,22 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const ROUTE = '/api/internal/ovie/summer-cards';
+
+/** Mercury cash for the capital gate (read-only MERCURY_API_TOKEN); any failure is unknown, never abundant. */
+async function readCashPosition() {
+  try {
+    const m = await getAdminMercuryMetrics();
+    if (!m.isConfigured || !m.isAvailable) return null;
+    return {
+      balanceUsd: m.balanceUsd,
+      burnUsdPer30d: m.burnRateAvailable
+        ? (m.burnRateUsd * 30) / Math.max(1, m.burnWindowDays)
+        : null,
+    };
+  } catch {
+    return null;
+  }
+}
 
 async function recordReceipt(key: string, receipt: Readonly<{ id: string }>) {
   const backend = postgresRecordBackend();
@@ -170,7 +192,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (spendIntent.success || spendOutcome.success) {
     try {
       const receipt = spendIntent.success
-        ? evaluateSpendIntent(spendIntent.data)
+        ? evaluateSpendIntent(spendIntent.data, await readCashPosition())
         : buildSpendOutcomeReceipt(spendOutcome.data!);
       const recorded = await recordReceipt(
         `spend-receipt:${receipt.id}`,
@@ -209,6 +231,20 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (parsed.data.kind === 'spend') {
     return json({ error: 'spend_preflight_required' }, 422);
   }
+  // Cards are born clean: copy errors are refused with the reasons so the
+  // writer can fix and refile; warnings ride along on the receipt.
+  const copy = lintDecisionCardCopy(parsed.data);
+  const copyErrors = decisionCardCopyErrors(copy);
+  if (copyErrors.length > 0) {
+    return json(
+      {
+        error: 'card_copy_lint',
+        contract: DECISION_CARD_COPY_CONTRACT,
+        violations: copyErrors,
+      },
+      422
+    );
+  }
 
   try {
     const result = await submitSummerCard(parsed.data);
@@ -216,7 +252,9 @@ export async function POST(request: Request): Promise<NextResponse> {
       return json({ error: 'idempotency_key_conflict' }, 409);
     }
     return json(
-      { card: result.card },
+      copy.length > 0
+        ? { card: result.card, copyWarnings: copy }
+        : { card: result.card },
       result.outcome === 'created' ? 201 : 200
     );
   } catch (error) {

@@ -1290,11 +1290,6 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       ),
       approvedVariantBinding(
         'apps/web/app/(marketing)/launch/page.tsx',
-        'stats',
-        '3-stat-band'
-      ),
-      approvedVariantBinding(
-        'apps/web/app/(marketing)/launch/page.tsx',
         'comparison',
         'feature-matrix'
       ),
@@ -1308,7 +1303,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     bindingEvidence: {
       status: 'verified',
       source:
-        'mounted stamps 2026-10-15: profile-stage hero, platform strip, pillar grid, editorial splits, deeplink grid, three-stat band, dual-path close',
+        'mounted stamps 2026-10-15: profile-stage hero, platform strip, pillar grid, editorial splits, deeplink grid, dual-path close',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -1330,11 +1325,6 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       ),
       approvedVariantBinding(
         'apps/web/components/organisms/AboutPageContent.tsx',
-        'feature-grid',
-        'two-column-text'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/marketing/FaqSection.tsx',
         'faq',
         'objection-handler'
       ),
@@ -1348,7 +1338,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     bindingEvidence: {
       status: 'verified',
       source:
-        'AboutPageContent mounts left-none, article-body, two-column-text, objection-handler, and the footer final-single-claim (2026-10-15)',
+        'AboutPageContent mounts left-none, article-body, objection-handler, and the footer final-single-claim; the plain-company page change (#23332) removed the feature grid (2026-10-30)',
     },
     status: 'active',
     specVersion: '1.0.0',

@@ -14,6 +14,13 @@ const hoisted = vi.hoisted(() => {
     .fn()
     .mockResolvedValue(undefined);
   const captureErrorMock = vi.fn();
+  const getArtistIdentityConfidenceMock = vi.fn().mockResolvedValue({
+    profileId: 'profile_123',
+    decision: 'needs_confirmation',
+  });
+  const requestArtistIdentityConfirmationMock = vi
+    .fn()
+    .mockResolvedValue('requested');
   const eqMock = vi.fn();
   const attributeLeadSignupMock = vi.fn().mockResolvedValue(undefined);
   const getCachedAuthMock = vi.fn().mockResolvedValue({ userId: 'clerk_123' });
@@ -74,6 +81,8 @@ const hoisted = vi.hoisted(() => {
 
   return {
     captureErrorMock,
+    getArtistIdentityConfidenceMock,
+    requestArtistIdentityConfirmationMock,
     eqMock,
     attributeLeadSignupMock,
     getCachedAuthMock,
@@ -209,6 +218,12 @@ vi.mock('@/lib/dsp-enrichment/jobs', () => ({
   processDspArtistDiscoveryJobStandalone:
     hoisted.processDspArtistDiscoveryJobStandaloneMock,
   processMusicFetchEnrichmentJob: hoisted.processMusicFetchEnrichmentJobMock,
+}));
+
+vi.mock('@/lib/music-resolver/artist-identity-confidence.server', () => ({
+  getArtistIdentityConfidence: hoisted.getArtistIdentityConfidenceMock,
+  requestArtistIdentityConfirmation:
+    hoisted.requestArtistIdentityConfirmationMock,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -417,6 +432,13 @@ describe('connectOnboardingSpotifyArtist', () => {
       hoisted.processDspArtistDiscoveryJobStandaloneMock
     ).toHaveBeenCalledOnce();
     expect(hoisted.processMusicFetchEnrichmentJobMock).toHaveBeenCalledOnce();
+    // Right-artist gate runs after discovery and asks the owner to confirm.
+    expect(hoisted.getArtistIdentityConfidenceMock).toHaveBeenCalledWith(
+      'profile_123'
+    );
+    expect(hoisted.requestArtistIdentityConfirmationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ decision: 'needs_confirmation' })
+    );
     expect(
       hoisted.refreshFeaturedPlaylistFallbackCandidateMock
     ).toHaveBeenCalledWith({

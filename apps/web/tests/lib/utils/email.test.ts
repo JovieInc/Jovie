@@ -33,6 +33,13 @@ describe('email utils', () => {
       'reserved for testing'
     );
     expect(getEmailSendBlockReason('person@real-domain.com')).toBeNull();
+    expect(
+      getEmailSendBlockReason('browse-ready+synthetic-prodcert-abc123@jov.ie')
+    ).toContain('synthetic canary');
+    expect(getEmailSendBlockReason('browse-ready+clerk_test@jov.ie')).toContain(
+      'synthetic canary'
+    );
+    expect(getEmailSendBlockReason('tim@jov.ie')).toBeNull();
   });
 });
 

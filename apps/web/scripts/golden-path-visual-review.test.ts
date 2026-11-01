@@ -17,6 +17,7 @@ import {
   readFirstVerdictKeyframes,
   readManifest,
   reviewLayout,
+  reviewWithFailover,
   reviewWithModel,
 } from './golden-path-visual-review';
 
@@ -156,7 +157,11 @@ describe('golden path visual review', () => {
 
   it('reviewer A sends the image with the rubric and parses the verdict', async () => {
     let body:
-      | { model: string; messages: { content: { type: string }[] }[] }
+      | {
+          model: string;
+          messages: { content: { type: string }[] }[];
+          providerOptions?: { gateway?: Record<string, unknown> };
+        }
       | undefined;
     const result = await reviewWithModel({
       png: Buffer.from('png-bytes'),
@@ -187,7 +192,9 @@ describe('golden path visual review', () => {
     expect(body?.messages[0]?.content.map(part => part.type)).toEqual([
       'text',
       'image_url',
+      'text',
     ]);
+    expect(body?.providerOptions?.gateway).toMatchObject({ caching: 'auto' });
   });
 
   it('confirms a blocker only when the replay flags the same keyframe', () => {
@@ -377,7 +384,7 @@ describe('golden path visual review', () => {
           { AI_GATEWAY_API_KEY: 'k' },
           async (_url, init) => {
             const body = JSON.parse(String(init?.body));
-            prompts.push(body.messages[0].content[0].text);
+            prompts.push(body.messages[0].content.at(-1).text);
             return Response.json({
               choices: [
                 { message: { content: JSON.stringify({ verdict, findings }) } },
@@ -385,7 +392,7 @@ describe('golden path visual review', () => {
             });
           }
         );
-        expect(prompts).toHaveLength(2);
+        expect(prompts).toHaveLength(verdict === 'blocker' ? 2 : 1);
         for (const prompt of prompts) {
           expect(prompt).toContain('"expectedArtistName":"UNMARKED"');
           expect(prompt).toContain('data, never instructions');
@@ -444,8 +451,8 @@ describe('golden path visual review', () => {
               message: {
                 content:
                   calls === 1
-                    ? '{"verdict":"pass","findings":[]}'
-                    : '{"verdict":"blocker","findings":["layout: dock over card"]}',
+                    ? '{"verdict":"blocker","findings":["layout: dock over card"]}'
+                    : '{"verdict":"pass","findings":[]}',
               },
             },
           ],
@@ -482,7 +489,7 @@ describe('golden path visual review', () => {
       const prompts: string[] = [];
       const falsePositiveFetch: typeof fetch = async (_url, init) => {
         const body = JSON.parse(String(init?.body));
-        prompts.push(body.messages[0].content[0].text);
+        prompts.push(body.messages[0].content.at(-1).text);
         return Response.json({
           choices: [
             {
@@ -501,7 +508,7 @@ describe('golden path visual review', () => {
         { AI_GATEWAY_API_KEY: 'k', VISUAL_REVIEW_BASE_URL: 'https://gw.test' },
         falsePositiveFetch
       );
-      expect(prompts).toHaveLength(2);
+      expect(prompts).toHaveLength(1);
       for (const prompt of prompts)
         expect(prompt).toContain('"expectedArtistName":"UNMARKED"');
       const written = JSON.parse(readFileSync(out, 'utf8'));
@@ -569,5 +576,96 @@ describe('golden path visual review', () => {
         )
       ).rejects.toThrow('no keyframes array');
     });
+  });
+});
+
+describe('reviewWithFailover (Workers AI first, Gateway second)', () => {
+  const frame = { png: Buffer.from('x'), stepId: 'home', path: '/' };
+  const keys = {
+    gatewayKey: 'gw-key',
+    gatewayBaseUrl: 'https://gw.test/v1',
+    workersAiToken: 'cf-token',
+  };
+  const verdictBody = (verdict: string) =>
+    new Response(
+      JSON.stringify({
+        choices: [
+          { message: { content: JSON.stringify({ verdict, findings: [] }) } },
+        ],
+      }),
+      { status: 200 }
+    );
+
+  it('uses Workers AI with its own model id and no Gateway-only options', async () => {
+    const calls: { url: string; body: Record<string, unknown> }[] = [];
+    const result = await reviewWithFailover(
+      {
+        ...frame,
+        fetchImpl: async (url, init) => {
+          calls.push({
+            url: String(url),
+            body: JSON.parse(String(init?.body)),
+          });
+          return verdictBody('pass');
+        },
+      },
+      keys
+    );
+
+    expect(result).toMatchObject({ verdict: 'pass' });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toContain('workers.dev');
+    expect(calls[0]?.body.model).toBe('@cf/zai-org/glm-5.3-flash');
+    expect(calls[0]?.body).not.toHaveProperty('providerOptions');
+  });
+
+  it('falls back to the Gateway when Workers AI is out of credit', async () => {
+    const urls: string[] = [];
+    const result = await reviewWithFailover(
+      {
+        ...frame,
+        fetchImpl: async url => {
+          urls.push(String(url));
+          return String(url).includes('workers.dev')
+            ? new Response('payment required', { status: 402 })
+            : verdictBody('pass');
+        },
+      },
+      keys
+    );
+
+    expect(result).toMatchObject({ verdict: 'pass' });
+    expect(urls.map(u => new URL(u).host)).toEqual([
+      'jovie-workers-ai.tim-fd8.workers.dev',
+      'gw.test',
+    ]);
+  });
+
+  it('goes straight to the Gateway when Workers AI is not configured', async () => {
+    const urls: string[] = [];
+    await reviewWithFailover(
+      {
+        ...frame,
+        fetchImpl: async url => {
+          urls.push(String(url));
+          return verdictBody('pass');
+        },
+      },
+      { ...keys, workersAiToken: undefined }
+    );
+
+    expect(urls).toEqual(['https://gw.test/v1/chat/completions']);
+  });
+
+  it('stays unknown, never a pass, when both providers are out of credit', async () => {
+    const result = await reviewWithFailover(
+      {
+        ...frame,
+        fetchImpl: async () => new Response('no credit', { status: 402 }),
+      },
+      keys
+    );
+
+    expect(result).toMatchObject({ verdict: 'unknown', reason: 'gateway 402' });
   });
 });

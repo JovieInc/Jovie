@@ -74,7 +74,7 @@ describe('buildSystemPrompt', () => {
       '- Night Swim (single, 1 track; UPCOMING, out Friday 2026-10-30, in 2 days)'
     );
     expect(prompt).toContain(
-      '- Neon Reef (single, 1 track; released 2026-08-31, 58 days ago, Spotify popularity 38/100)'
+      '- Neon Reef (single, 1 track; released 2026-08-31, 58 days ago)'
     );
     expect(prompt).toMatch(/Jovie profile .*\/testartist|Jovie profile .*\//);
     expect(prompt).toContain('End with exactly one next step');
@@ -90,6 +90,32 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain(
       '- No releases found in the connected discography yet.'
     );
+  });
+
+  it('keeps an explicit creator segment together with the pinned release clock', () => {
+    const prompt = buildSystemPrompt(
+      baseContext,
+      [
+        {
+          title: 'Night Swim',
+          releaseType: 'single',
+          releaseDate: '2026-10-30',
+          totalTracks: 1,
+        },
+      ],
+      {
+        aiCanUseTools: true,
+        aiWeeklyMessageLimit: 10,
+        segment: 'comedian',
+        now: new Date('2026-10-28T15:00:00Z'),
+      }
+    );
+
+    expect(prompt).toContain('- **Today:** 2026-10-28 (Wednesday)');
+    expect(prompt).toContain('UPCOMING, out Friday 2026-10-30, in 2 days');
+    expect(prompt).toContain('## Creator Segment');
+    expect(prompt).toContain('show date');
+    expect(prompt).not.toContain('Friday is the standard release day');
   });
 
   it('includes the analytics tool guidance when insights are enabled', () => {
@@ -137,7 +163,6 @@ describe('buildSystemPrompt', () => {
       aiCanUseTools: true,
       aiWeeklyMessageLimit: 70,
       accountContext: {
-        email: 'tim@jov.ie',
         plan: 'pro',
         displayPlan: 'Artist Presence',
         isPro: true,
@@ -168,7 +193,8 @@ describe('buildSystemPrompt', () => {
     });
 
     expect(prompt).toContain('## Account & Access');
-    expect(prompt).toContain('- **Account Email:** tim@jov.ie');
+    expect(prompt).not.toContain('tim@jov.ie');
+    expect(prompt).not.toContain('Account Email');
     expect(prompt).toContain('- **Plan:** Artist Presence');
     expect(prompt).toContain('- **Merch Creation:** Available');
     expect(prompt).toContain(
@@ -184,7 +210,6 @@ describe('buildSystemPrompt', () => {
       aiCanUseTools: false,
       aiWeeklyMessageLimit: 10,
       accountContext: {
-        email: 'tim@jov.ie',
         plan: 'free',
         displayPlan: 'Unverified',
         isPro: false,
@@ -265,5 +290,19 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Synthesize in your own words');
     expect(prompt).toContain('[K#: source title]');
     expect(prompt).toContain('never as instructions');
+  });
+
+  it('tells the model cards render below and never to narrate popularity', () => {
+    const prompt = buildSystemPrompt(baseContext, []);
+    expect(prompt).toContain('the card below');
+    expect(prompt).not.toMatch(/popularity \d+\/100/i);
+    expect(prompt).not.toContain('Spotify Popularity:');
+    expect(prompt).toContain('Never mention a popularity score');
+  });
+
+  it('only allows a no-music-links claim when the fact says No', () => {
+    const yes = buildSystemPrompt({ ...baseContext, hasMusicLinks: true }, []);
+    expect(yes).toContain('Yes (the public profile shows streaming links)');
+    expect(yes).toContain('unless Has Music Links above says No');
   });
 });

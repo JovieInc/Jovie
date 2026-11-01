@@ -73,6 +73,26 @@ class ThroughputSentinelTest(unittest.TestCase):
                  releaseFlow={"mergeGroupRuns": 1, "mergeGroupJobs": 2, "mergeGroupStartP50Min": 30, "leaseHeldMin": 44.9})
         self.assertEqual(ts.judge(ok), {})
 
+    def test_merge_gate_pool_alarm_names_the_faster_pool(self):
+        def flow(pools):
+            return obs(pushes1h={"JovieInc/Jovie|codex": 1},
+                       releaseFlow={"mergeGroupRuns": 3, "mergeGroupJobs": 40, "mergeGroupStartP50Min": 0.1,
+                                    "mergeGroupStartByPool": pools})
+        hosted = {"n": 40, "p50S": 3.0, "p95S": 33.0}
+        slow_fixed = {"n": 13, "p50S": 120.0, "p95S": 451.0}
+        alert = ts.judge(flow({"hosted": hosted, "self-hosted": slow_fixed}))["throughput-merge-gate-pool"]
+        self.assertIn("self-hosted p50 120.0s", alert)
+        self.assertIn("deleting repo variable MERGE_GATE_POOL", alert)
+        # Within the margin, or too few self-hosted jobs: no alarm.
+        self.assertNotIn("throughput-merge-gate-pool", ts.judge(flow({"hosted": hosted, "self-hosted": {"n": 13, "p50S": 30.0, "p95S": 60.0}})))
+        self.assertNotIn("throughput-merge-gate-pool", ts.judge(flow({"hosted": hosted, "self-hosted": {"n": 2, "p50S": 900.0, "p95S": 900.0}})))
+        # Hosted saturated with nothing on the gem pool: suggest the fallback.
+        saturated = ts.judge(flow({"hosted": {"n": 20, "p50S": 141.0, "p95S": 167.0}}))["throughput-merge-gate-pool"]
+        self.assertIn("MERGE_GATE_POOL=fixed", saturated)
+        self.assertEqual(ts.runner_pool(["self-hosted", "jovie-fixed"]), "self-hosted")
+        self.assertEqual(ts.runner_pool(["ubuntu-latest"]), "hosted")
+        self.assertEqual(ts.runner_pool(None), "hosted")
+
     def test_one_dominant_idle_reason_alarms_only_with_demand_and_volume(self):
         busy = obs(pushes1h={"JovieInc/Jovie|codex": 1}, idleExits1h={"repair-inventory-oversize": 7, "linear-rate-limited": 3})
         self.assertIn("70%", ts.judge(busy)["throughput-idle-dominant"])
@@ -128,7 +148,8 @@ class ThroughputSentinelTest(unittest.TestCase):
             if "/jobs" in args[-1]:
                 run_id = int(args[-1].split("/runs/")[1].split("/")[0])
                 wait = {10: 120, 11: 600, 12: 900}[run_id]
-                jobs = [{"created_at": iso(NOW - 500), "started_at": iso(NOW - 500 + wait)}]
+                jobs = [{"created_at": iso(NOW - 500), "started_at": iso(NOW - 500 + wait),
+                         "labels": ["self-hosted", "Linux", "X64", "jovie-fixed"] if run_id == 12 else ["ubuntu-latest"]}]
                 return SimpleNamespace(returncode=0, stdout=json.dumps({"jobs": jobs}), stderr="")
             return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps(
                 {"workflow_runs": [{"id": 7, "run_started_at": iso(NOW - 50 * 60)}]}))
@@ -138,6 +159,9 @@ class ThroughputSentinelTest(unittest.TestCase):
             self.assertIsNone(error)
             self.assertEqual((signal["mergeGroupRuns"], signal["mergeGroupStartP50Min"], signal["leaseHeldMin"]),
                              (3, 10.0, 50.0))  # skipped run ignored, three jobs sampled
+            self.assertEqual(signal["mergeGroupStartByPool"],
+                             {"hosted": {"n": 2, "p50S": 360.0, "p95S": 600.0},
+                              "self-hosted": {"n": 1, "p50S": 900.0, "p95S": 900.0}})
             again, _ = ts.sample_release_flow(Path(raw), NOW + 10, run)
             self.assertEqual(len(calls), 6)  # 1 runs + 3 jobs + 1 lease + 1 queued count; cached for five minutes
             self.assertEqual(again["leaseRunIds"], [7])
@@ -224,6 +248,8 @@ class QueueBreakerTest(unittest.TestCase):
             calls.append(args)
             path = args[-1] if args[0] == "api" else ""
             flat = " ".join(args)
+            if "branch=main" in flat:
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"workflow_runs": []}))
             if "workflows/ci.yml/runs" in flat:
                 rows = [{"id": 11, "head_branch": "gh-readonly-queue/main/pr-23471-abc", "conclusion": "failure", "updated_at": iso(NOW - 600), "head_sha": "s1"},
                         {"id": 12, "head_branch": "gh-readonly-queue/main/pr-23471-def", "conclusion": "failure", "updated_at": iso(NOW - 3000), "head_sha": "s2"},
@@ -301,6 +327,233 @@ class QueueBreakerTest(unittest.TestCase):
             pushed_at = NOW - 3000
             again = qb.sweep(Path(raw), run, NOW)
             self.assertEqual(again["tripped"], [23570])
+
+    BRAND = "tests/unit/brand/agent-display-name.test.ts brand guard finds the forbidden wording"
+
+    def _breaker(self):
+        qb = importlib.util.module_from_spec(importlib.util.spec_from_file_location("queue_breaker", ROOT / "scripts/lanes/queue_breaker.py"))
+        qb.__spec__.loader.exec_module(qb)
+        return qb
+
+    def _attribution_world(self, calls, *, peer_line=None, peer_contains=False, main_line=None,
+                           with_own_failures=True, with_peer=True):
+        """Fake gh world for attribution: PR #24111 queued on head a*40 with two own merge-group
+        failures on `Unit Tests (7/14)` and the brand-guard error line; an optional peer group
+        failure for #24105 (same signal by default, group without #24111) and an optional
+        main-branch red. Jobs and logs are keyed by run and job id."""
+        brand = self.BRAND
+        peer_line = brand if peer_line is None else peer_line
+
+        def run(args, **kwargs):
+            calls.append(args)
+            flat = " ".join(args)
+            path = args[-1] if args and args[0] == "api" else ""
+            if "branch=main" in flat:
+                rows = [{"id": 77, "updated_at": iso(NOW - 1500)}] if main_line is not None else []
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"workflow_runs": rows}))
+            if "workflows/ci.yml/runs" in flat:
+                rows = []
+                if with_own_failures:
+                    rows += [{"id": 31, "head_branch": "gh-readonly-queue/main/pr-24111-aaa", "conclusion": "failure",
+                              "created_at": iso(NOW - 700), "updated_at": iso(NOW - 600), "head_sha": "p" * 40},
+                             {"id": 32, "head_branch": "gh-readonly-queue/main/pr-24111-bbb", "conclusion": "failure",
+                              "created_at": iso(NOW - 1300), "updated_at": iso(NOW - 1200), "head_sha": "q" * 40}]
+                if with_peer:
+                    rows.append({"id": 33, "head_branch": "gh-readonly-queue/main/pr-24105-ccc", "conclusion": "failure",
+                                 "created_at": iso(NOW - 1000), "updated_at": iso(NOW - 900), "head_sha": "e" * 40})
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"workflow_runs": rows}))
+            if "mergeQueue" in flat:
+                nodes = [{"state": "AWAITING_CHECKS", "headCommit": {"oid": "z" * 40},
+                          "pullRequest": {"id": "PR_V", "number": 24111, "headRefOid": "a" * 40}}]
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"data": {"repository": {"mergeQueue": {"entries": {"nodes": nodes}}}}}))
+            if "/compare/" in flat:
+                commits = [{"commit": {"message": "peer entry (#24105)"}}]
+                if peer_contains:
+                    commits.append({"commit": {"message": "this group carries the tripped PR (#24111)"}})
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"commits": commits}))
+            if path.endswith("/jobs?per_page=100"):
+                run_id = int(path.split("/runs/")[1].split("/")[0])
+                job_id = {31: 91, 32: 92, 33: 93, 77: 97}[run_id]
+                jobs = [{"id": job_id, "name": "Unit Tests (7/14)", "conclusion": "failure",
+                         "steps": [{"name": "Run unit tests", "conclusion": "failure"}]}]
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"jobs": jobs}))
+            if path.endswith("/logs"):
+                job_id = int(path.split("/jobs/")[1].split("/")[0])
+                line = peer_line if job_id == 93 else (main_line if job_id == 97 else brand)
+                return SimpleNamespace(returncode=0, stderr="", stdout=f"setup\n##[error]{line}\n")
+            if "/pulls/24111" in flat:
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"state": "open", "head": {"sha": "a" * 40}, "labels": []}))
+            return SimpleNamespace(returncode=0, stderr="", stdout="{}")
+
+        return run
+
+    def test_a_shared_peer_failure_skips_the_trip(self):
+        """2026-11-01: main's brand-guard break failed every group whatever PR it carried, so a
+        green queued PR whose own head checks pass must not be tripped, dequeued or labeled."""
+        calls = []
+        qb = self._breaker()
+        run = self._attribution_world(calls)
+        with tempfile.TemporaryDirectory() as raw:
+            out = qb.sweep(Path(raw), run, NOW)
+            flat = "\n".join(" ".join(c) for c in calls)
+            log = (Path(raw) / qb.LOG_FILE).read_text()
+            state = json.loads((Path(raw) / qb.STATE_FILE).read_text())
+        self.assertEqual(out["tripped"], [])
+        self.assertEqual(out.get("skipped-shared"), [24111])
+        self.assertNotIn("dequeuePullRequest", flat)
+        self.assertNotIn("issues/24111/labels", flat)
+        self.assertIn("/compare/main...", flat)  # containment was actually checked
+        self.assertIn("skipped-shared-failure", log)
+        self.assertIn('"kind": "peer"', log)
+        self.assertEqual(state, {})
+
+    def test_a_peer_group_containing_the_pr_is_not_shared_evidence(self):
+        calls = []
+        qb = self._breaker()
+        run = self._attribution_world(calls, peer_contains=True)
+        with tempfile.TemporaryDirectory() as raw:
+            out = qb.sweep(Path(raw), run, NOW)
+            flat = "\n".join(" ".join(c) for c in calls)
+        self.assertEqual(out["tripped"], [24111])
+        self.assertNotIn("skipped-shared", out)
+        self.assertIn("dequeuePullRequest", flat)
+
+    def test_a_peer_failing_a_different_signal_still_trips(self):
+        """Genuine red detection is not weakened: a peer failing something else is not evidence."""
+        calls = []
+        qb = self._breaker()
+        run = self._attribution_world(calls, peer_line="OwnBreak failed: 1 != 0")
+        with tempfile.TemporaryDirectory() as raw:
+            out = qb.sweep(Path(raw), run, NOW)
+            flat = "\n".join(" ".join(c) for c in calls)
+        self.assertEqual(out["tripped"], [24111])
+        self.assertNotIn("skipped-shared", out)
+        self.assertIn("dequeuePullRequest", flat)
+
+    def test_a_main_branch_red_skips_the_single_pr_trip(self):
+        """With no other queued PR, a main-branch CI red on the same signal is the evidence."""
+        calls = []
+        qb = self._breaker()
+        run = self._attribution_world(calls, with_peer=False, main_line=self.BRAND)
+        with tempfile.TemporaryDirectory() as raw:
+            out = qb.sweep(Path(raw), run, NOW)
+            flat = "\n".join(" ".join(c) for c in calls)
+            log = (Path(raw) / qb.LOG_FILE).read_text()
+        self.assertEqual(out["tripped"], [])
+        self.assertEqual(out.get("skipped-shared"), [24111])
+        self.assertNotIn("dequeuePullRequest", flat)
+        self.assertIn('"kind": "main"', log)
+
+    def test_a_shared_failure_hold_is_released_instead_of_reblocked(self):
+        """The relay cleared the label on a required-green head; a shared failure must not put it
+        back (each re-application wakes dequeue-held and churns the green queued PR again)."""
+        calls = []
+        qb = self._breaker()
+        run = self._attribution_world(calls, with_own_failures=False)
+        with tempfile.TemporaryDirectory() as raw:
+            (Path(raw) / qb.STATE_FILE).write_text(json.dumps(
+                {"24111": {"head": "a" * 40, "at": NOW - 2000,
+                           "check": {"job": "Unit Tests (7/14)", "step": "Run unit tests", "line": self.BRAND}}}))
+            out = qb.sweep(Path(raw), run, NOW)
+            flat = "\n".join(" ".join(c) for c in calls)
+            log = (Path(raw) / qb.LOG_FILE).read_text()
+            state = json.loads((Path(raw) / qb.STATE_FILE).read_text())
+        self.assertEqual(out.get("released-shared"), [24111])
+        self.assertEqual(out["reblocked"], [])
+        self.assertNotIn("issues/24111/labels", flat)
+        self.assertIn("released-shared-failure", log)
+        self.assertEqual(state, {})
+
+    def _cluster_world(self, calls, *, peers=(24105, 24106), peer_test="tests/unit/brand/agent-display-name.test.ts",
+                       labels=(), removed=None):
+        """Peers whose groups all CONTAIN #24111 (so the peer rule can say nothing) and whose first error line is the
+        generic exit-code line: only the shared top failing test links them (2026-11-01 routing.json poison)."""
+        removed = [] if removed is None else removed
+        runs = [{"id": 31, "head_branch": "gh-readonly-queue/main/pr-24111-aaa", "conclusion": "failure",
+                 "created_at": iso(NOW - 700), "updated_at": iso(NOW - 600), "head_sha": "p" * 40},
+                {"id": 32, "head_branch": "gh-readonly-queue/main/pr-24111-bbb", "conclusion": "failure",
+                 "created_at": iso(NOW - 1300), "updated_at": iso(NOW - 1200), "head_sha": "q" * 40}]
+        runs += [{"id": 40 + i, "head_branch": f"gh-readonly-queue/main/pr-{pr}-ccc", "conclusion": "failure",
+                  "created_at": iso(NOW - 1000), "updated_at": iso(NOW - 900 - i), "head_sha": "e" * 40} for i, pr in enumerate(peers)]
+
+        def run(args, **kwargs):
+            calls.append(args)
+            flat = " ".join(args)
+            path = args[-1] if args and args[0] == "api" else ""
+            if "branch=main" in flat:
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"workflow_runs": []}))
+            if "workflows/ci.yml/runs" in flat:
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"workflow_runs": runs}))
+            if "mergeQueue" in flat:
+                nodes = [{"state": "AWAITING_CHECKS", "headCommit": {"oid": "z" * 40},
+                          "pullRequest": {"id": "PR_V", "number": 24111, "headRefOid": "a" * 40}}]
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"data": {"repository": {"mergeQueue": {"entries": {"nodes": nodes}}}}}))
+            if "/compare/" in flat:
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"commits": [{"commit": {"message": "carries (#24111)"}}]}))
+            if path.endswith("/jobs?per_page=100"):
+                run_id = int(path.split("/runs/")[1].split("/")[0])
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"jobs": [
+                    {"id": run_id, "name": "Unit Tests (7/14)", "conclusion": "failure", "steps": [{"name": "Run unit tests", "conclusion": "failure"}]}]}))
+            if path.endswith("/logs"):
+                job_id = int(path.split("/jobs/")[1].split("/")[0])
+                test = peer_test if job_id >= 40 else "tests/unit/brand/agent-display-name.test.ts"
+                return SimpleNamespace(returncode=0, stderr="", stdout=f"\x1b[31m FAIL \x1b[0m unit {test} > brand\n##[error]Process completed with exit code {job_id}.\n")
+            if "-X" in args and "DELETE" in args:
+                removed.append(flat)
+                return SimpleNamespace(returncode=0, stderr="", stdout="[]")
+            if "/pulls/24111" in flat:
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"state": "open", "head": {"sha": "a" * 40},
+                                                                                   "labels": [{"name": n} for n in labels]}))
+            return SimpleNamespace(returncode=0, stderr="", stdout="{}")
+
+        return run
+
+    def test_three_pr_groups_failing_the_same_top_test_skip_the_trip(self):
+        calls = []
+        qb = self._breaker()
+        run = self._cluster_world(calls)
+        with tempfile.TemporaryDirectory() as raw:
+            out = qb.sweep(Path(raw), run, NOW)
+            log = (Path(raw) / qb.LOG_FILE).read_text()
+        flat = "\n".join(" ".join(c) for c in calls)
+        self.assertEqual((out["tripped"], out.get("skipped-shared")), ([], [24111]))
+        self.assertNotIn("dequeuePullRequest", flat)
+        self.assertIn('"kind": "cluster"', log)
+        self.assertIn("agent-display-name.test.ts", log)
+
+    def test_two_pr_groups_on_one_test_is_not_a_cluster(self):
+        calls = []
+        qb = self._breaker()
+        run = self._cluster_world(calls, peers=(24105,))
+        with tempfile.TemporaryDirectory() as raw:
+            out = qb.sweep(Path(raw), run, NOW)
+        self.assertEqual(out["tripped"], [24111])
+
+    def test_peers_failing_other_tests_do_not_make_a_cluster(self):
+        calls = []
+        qb = self._breaker()
+        run = self._cluster_world(calls, peer_test="tests/unit/other.test.ts")
+        with tempfile.TemporaryDirectory() as raw:
+            out = qb.sweep(Path(raw), run, NOW)
+        self.assertEqual(out["tripped"], [24111])
+
+    def test_a_held_pr_with_a_shared_signature_loses_its_label_and_gets_a_receipt(self):
+        calls, removed = [], []
+        qb = self._breaker()
+        run = self._cluster_world(calls, labels=("lane-fix-red",), removed=removed)
+        with tempfile.TemporaryDirectory() as raw:
+            (Path(raw) / qb.STATE_FILE).write_text(json.dumps(
+                {"24111": {"head": "a" * 40, "at": NOW - 2000, "check": {"job": "Unit Tests (7/14)", "line": "x",
+                                                                        "test": "tests/unit/brand/agent-display-name.test.ts"}}}))
+            out = qb.sweep(Path(raw), run, NOW)
+            log = [json.loads(l) for l in (Path(raw) / qb.LOG_FILE).read_text().splitlines()]
+            state = json.loads((Path(raw) / qb.STATE_FILE).read_text())
+        self.assertEqual(out.get("released-shared"), [24111])
+        self.assertEqual(len(removed), 1)
+        self.assertIn("issues/24111/labels/lane-fix-red", removed[0])
+        self.assertEqual((log[-1]["action"], log[-1]["label_removed"], log[-1]["shared"]["kind"]), ("released-shared-failure", True, "cluster"))
+        self.assertEqual(state, {})
+
 
 class QueueTimingsTest(unittest.TestCase):
     def test_queue_timings_report_group_ci_and_enqueue_to_merge(self):
@@ -432,6 +685,79 @@ class mock_max:
 
     def __exit__(self, *exc):
         self.module.IDLE_LOG_MAX_BYTES = self.old
+
+
+
+class SupplyFlowTest(unittest.TestCase):
+    def graphql(self, nodes, depth):
+        body = {"data": {"repository": {"mergeQueue": {"entries": {"totalCount": depth}},
+                                         "pullRequests": {"pageInfo": {"hasNextPage": False, "endCursor": None},
+                                                          "nodes": nodes}}}}
+        return lambda args, **_: SimpleNamespace(returncode=0, stdout=json.dumps(body), stderr="")
+
+    def pr(self, number, status="CLEAN", queued=False, labels=(), draft=False):
+        return {"number": number, "isDraft": draft, "isInMergeQueue": queued, "isCrossRepository": False,
+                "mergeStateStatus": status, "createdAt": iso(NOW), "headRefOid": "a" * 40,
+                "labels": {"nodes": [{"name": name} for name in labels]}}
+
+    def test_queue_starved_alarm_needs_ten_minutes_of_clean_unqueued_with_depth_at_most_one(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            nodes = [self.pr(1), self.pr(2, "DIRTY"), self.pr(3, labels=["hold"]), self.pr(4, draft=True),
+                     self.pr(5, "CLEAN", queued=True), self.pr(6, "BLOCKED")]
+            first, error = ts.sample_supply_flow(Path(tmp), NOW, self.graphql(nodes, 1))
+            self.assertIsNone(error)
+            self.assertEqual(first["counts"], {"BLOCKED": 1, "CLEAN-unqueued": 1, "DIRTY": 1, "held": 1, "queued": 1})
+            self.assertEqual(first["cleanUnqueued"], [1])
+            self.assertEqual(ts.judge(obs(pushes1h={"JovieInc/Jovie|codex": 1}, supplyFlow=first)), {})
+            later, _ = ts.sample_supply_flow(Path(tmp), NOW + 700, self.graphql(nodes, 1))
+            self.assertGreater(later["starvedForS"], 600)
+            alerts = ts.judge({**obs(pushes1h={"JovieInc/Jovie|codex": 1}, supplyFlow=later), "now": NOW + 700})
+            self.assertIn("throughput-queue-starved", alerts)
+            self.assertIn("#1", alerts["throughput-queue-starved"])
+            deep, _ = ts.sample_supply_flow(Path(tmp), NOW + 1500, self.graphql(nodes, 6))
+            self.assertEqual(deep["starvedForS"], 0)
+
+    def test_lanes_tick_dispatches_the_enroll_sweep_after_ten_minutes_once_per_window(self):
+        calls = []
+
+        def run(args, **_):
+            calls.append(args)
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        with tempfile.TemporaryDirectory() as tmp:
+            first, _ = ts.sample_supply_flow(Path(tmp), NOW, self.graphql([self.pr(1)], 1))
+            self.assertIsNone(ts.backstop_enroll(Path(tmp), first, NOW + 60, run))
+            later, _ = ts.sample_supply_flow(Path(tmp), NOW + 700, self.graphql([self.pr(1)], 1))
+            receipt = ts.backstop_enroll(Path(tmp), later, NOW + 700, run)
+            self.assertTrue(receipt["ok"])
+            self.assertEqual(calls, [["workflow", "run", "merge-queue-green-enroll.yml", "-R", "JovieInc/Jovie", "--ref", "main"]])
+            ts.backstop_enroll(Path(tmp), later, NOW + 800, run)
+            self.assertEqual(len(calls), 1)
+
+    def test_remediation_dead_man_alarms_after_thirty_silent_minutes_with_waiting_prs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            supply, _ = ts.sample_supply_flow(Path(tmp), NOW, self.graphql([self.pr(1, "DIRTY"), self.pr(2, "BLOCKED")], 3))
+            old = iso(NOW - 3600)
+            run = lambda args, **_: SimpleNamespace(returncode=0, stdout=json.dumps({"workflow_runs": [{"created_at": old}]}), stderr="")
+            live = ts.remediation_liveness(Path(tmp), supply, NOW, run)
+            self.assertEqual((live["waiting"], live["silentForS"]), (2, 3600))
+            alerts = ts.judge(obs(pushes1h={"JovieInc/Jovie|codex": 1}, supplyFlow=supply, remediation=live))
+            self.assertIn("throughput-remediation-silent", alerts)
+            fresh = {**live, "silentForS": 300}
+            self.assertNotIn("throughput-remediation-silent", ts.judge(obs(pushes1h={"JovieInc/Jovie|codex": 1}, supplyFlow=supply, remediation=fresh)))
+            supply["prs"]["1"]["since"] = NOW - 3600
+            empty = lambda *a, **k: SimpleNamespace(returncode=0, stdout='{"workflow_runs":[]}', stderr="")
+            self.assertEqual(ts.remediation_liveness(Path(tmp), supply, NOW, empty)["silentForS"], 3600)
+
+    def test_enqueue_records_green_to_enqueue_dwell_and_supply_dwell_alarm(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ts.sample_supply_flow(Path(tmp), NOW, self.graphql([self.pr(1)], 4))
+            after, _ = ts.sample_supply_flow(Path(tmp), NOW + 130, self.graphql([self.pr(1, queued=True)], 5))
+            self.assertEqual(after["greenToEnqueueS"], [130.0])
+            dirty = [self.pr(n, "DIRTY") for n in range(10, 14)]
+            ts.sample_supply_flow(Path(tmp), NOW + 300, self.graphql(dirty, 5))
+            late, _ = ts.sample_supply_flow(Path(tmp), NOW + 300 + 7 * 3600, self.graphql(dirty, 5))
+            alerts = ts.judge({**obs(pushes1h={"JovieInc/Jovie|codex": 1}, supplyFlow=late), "now": NOW + 300 + 7 * 3600})
+            self.assertIn("throughput-supply-dwell:DIRTY", alerts)
 
 
 if __name__ == "__main__":

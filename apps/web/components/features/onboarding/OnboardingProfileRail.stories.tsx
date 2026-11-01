@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import '@/styles/system-b-app.css';
 import {
   advanceOnboardingProfileDraft,
   emptyOnboardingProfileDraft,
@@ -40,26 +41,8 @@ export const Default: Story = {
   },
 };
 
-/**
- * Golden-path desktop rail at 1280×720: the app shell's right rail is ~692px
- * tall there (measured from the 2026-10-03 keyframe). The DSP strip must stay
- * clear of the phone's Listen now CTA.
- */
-export const SideClearance: Story = {
-  args: {
-    placement: 'side',
-    state: CONFIRMED_ARTIST_STATE,
-  },
-  render: () => (
-    <div
-      data-testid='onboarding-rail-clearance-fixture'
-      style={{ height: 692, width: 380 }}
-    >
-      <OnboardingProfileRail placement='side' state={CONFIRMED_ARTIST_STATE} />
-    </div>
-  ),
-};
-
+// The clearance stories need a real release: with streaming destinations
+// alone the home rail shows no featured card and no Listen now (#23966).
 const CATALOG_ARTIST_STATE: OnboardingProfileBuilderState = {
   ...CONFIRMED_ARTIST_STATE,
   artist: {
@@ -91,6 +74,25 @@ const CATALOG_ARTIST_STATE: OnboardingProfileBuilderState = {
 };
 
 /**
+ * Golden-path desktop rail with the app shell's vertical inset. Keep the
+ * fixture constrained by the viewport so short windows exercise scrolling.
+ */
+export const SideClearance: Story = {
+  args: {
+    placement: 'side',
+    state: CATALOG_ARTIST_STATE,
+  },
+  render: () => (
+    <div
+      data-testid='onboarding-rail-clearance-fixture'
+      style={{ height: 'calc(100dvh - 28px)', width: '23.75rem' }}
+    >
+      <OnboardingProfileRail placement='side' state={CATALOG_ARTIST_STATE} />
+    </div>
+  ),
+};
+
+/**
  * JOV-9758: the matched artist's real catalog renders on the preview before
  * any pricing step (latest release on the home rail).
  */
@@ -110,14 +112,11 @@ export const WithRealCatalog: Story = {
 export const InlineClearance: Story = {
   args: {
     placement: 'inline',
-    state: CONFIRMED_ARTIST_STATE,
+    state: CATALOG_ARTIST_STATE,
   },
   render: () => (
     <div data-testid='onboarding-rail-clearance-fixture' style={{ width: 360 }}>
-      <OnboardingProfileRail
-        placement='inline'
-        state={CONFIRMED_ARTIST_STATE}
-      />
+      <OnboardingProfileRail placement='inline' state={CATALOG_ARTIST_STATE} />
     </div>
   ),
 };

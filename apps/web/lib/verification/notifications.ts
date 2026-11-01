@@ -8,10 +8,6 @@ import {
   type SlackNotificationResult,
   sendSlackMessage,
 } from '@/lib/notifications/providers/slack';
-import {
-  formatFounderSender,
-  getSenderPolicy,
-} from '@/lib/notifications/sender-policy';
 import { logger } from '@/lib/utils/logger';
 
 interface VerificationRequestPayload {
@@ -64,7 +60,6 @@ function getSafeGreetingName(firstName: string): string | null {
 export async function sendVerificationApprovedEmail(
   payload: VerificationApprovedPayload
 ): Promise<void> {
-  const founderSender = getSenderPolicy('founder');
   const greetingName = getSafeGreetingName(payload.firstName) ?? 'Hey there';
   const safeGreetingName = escapeHtml(greetingName);
   const message =
@@ -98,9 +93,10 @@ export async function sendVerificationApprovedEmail(
 </html>`;
 
   const result = await sendEmail({
+    stream: 'founder',
+    purpose: 'verification-decision',
+    consent: 'existing-relationship',
     to: payload.to,
-    from: formatFounderSender(),
-    replyTo: founderSender.replyToEmail,
     subject: 'Quick update from Tim',
     text: message,
     html,

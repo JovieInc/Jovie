@@ -1058,6 +1058,27 @@
       "when": 1793245772336,
       "tag": "0151_internal_account_class",
       "breakpoints": true
+    },
+    {
+      "idx": 151,
+      "version": "7",
+      "when": 1793245772337,
+      "tag": "0160_hash_lead_claim_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 152,
+      "version": "7",
+      "when": 1793394813634,
+      "tag": "0161_investor_portal_content",
+      "breakpoints": true
+    },
+    {
+      "idx": 153,
+      "version": "7",
+      "when": 1793514205708,
+      "tag": "0162_lead_build_hold",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,68 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: Re-runs the required PR Ready job after a Fleet Rules Evidence run has COMPLETED, using only main's scripts and the CI App read token; no PR code or PR-controlled value reaches a shell (the run title is validated by regex).
+# removal-trigger: Remove when PR Ready itself waits on or is triggered by the evidence run.
+name: Fleet Rules Ready Re-run
+# #24184 (2026-11-01): PR Ready promised "re-runs automatically when the evidence
+# run finishes" but only Source Validation completion triggered a hop, and the
+# in-job re-run in fleet-rules-verdict.sh fires while the evidence run is still
+# in_progress. This hop fires on the evidence run's completion. It is a separate
+# workflow because a workflow cannot be a workflow_run trigger of itself.
+on:
+  workflow_run:
+    workflows: [Fleet Rules Evidence]
+    branches-ignore: ['gh-readonly-queue/**']
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  group: fleet-rules-ready-rerun-${{ github.event.workflow_run.id }}
+
+jobs:
+  rerun-ready:
+    name: Re-run PR Ready after evidence completes
+    # The evidence run is complete here (unlike the step inside it), so PR Ready
+    # reads a final verdict. Only PR-event runs: the workflow_run twins of this
+    # workflow are excluded, which also rules out a loop.
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request_target' && github.event.workflow_run.path == '.github/workflows/fleet-rules-evidence.yml' && (github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Mint CI App read token for the re-run lookups
+        id: fleet-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
+          permission-actions: read
+          permission-pull-requests: read
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            packages/api-client
+            .github/scripts/fleet-rules-rerun.sh
+            .github/scripts/fleet-rules-rerun-ready.sh
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
+          sparse-checkout-cone-mode: false
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Re-run PR Ready for the PR this evidence run belongs to
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_READ_TOKEN: ${{ steps.fleet-token.outputs.token }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_TITLE: ${{ github.event.workflow_run.display_title }}
+        run: bash .github/scripts/fleet-rules-rerun-ready.sh

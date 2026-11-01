@@ -1,8 +1,8 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { cn } from '@/lib/utils';
 
 /**
  * ActionPill — primary semantic CTA pill used in shell headers.
@@ -33,16 +33,15 @@ export function ActionPill({
   readonly className?: string;
 }) {
   return (
-    <button
+    <Button
+      variant='primary'
+      size='sm'
       type={type}
       onClick={onClick}
-      className={cn(
-        'inline-flex items-center gap-1.5 h-7 px-3.5 rounded-full bg-btn-primary text-btn-primary-foreground text-xs font-medium hover:bg-btn-primary-hover transition-colors duration-subtle ease-subtle',
-        className
-      )}
+      className={className}
     >
       {Icon ? <Icon className='h-3.5 w-3.5' strokeWidth={2.5} /> : null}
       {label}
-    </button>
+    </Button>
   );
 }

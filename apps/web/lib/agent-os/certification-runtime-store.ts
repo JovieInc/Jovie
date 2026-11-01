@@ -23,9 +23,11 @@ export async function ingestMarketingCertificationPacket(
   evaluatedAt?: string
 ) {
   const store = getMarketingCertificationStore();
-  const row = await store.ingestPacket(packet, evaluatedAt);
-  const projection = await store.inspectLedger(evaluatedAt);
-  return { entries: projection.entryOutcomes, row };
+  const { row, entryOutcomes } = await store.ingestPacketWithOutcomes(
+    packet,
+    evaluatedAt
+  );
+  return { entries: entryOutcomes, row };
 }
 
 export async function projectMarketingReviewReady(input: {

@@ -163,6 +163,37 @@ export function OnboardingSessionBoundary({
   ) {
     const failed =
       failure?.identity === identity && failure.revision === revision;
+    // Sign-up inside this tab (anonymous -> account): keep the conversation
+    // the visitor is looking at, frozen, while the linked copy loads. It is
+    // the same person's in-tab history, so nothing new is exposed; unmounting
+    // it flashed a blank "Restoring your conversation…" screen right after
+    // the code was entered (2026-10-31 golden-path walk). Account-to-account
+    // switches still hide history immediately.
+    if (
+      !failed &&
+      identity &&
+      identity !== 'anonymous' &&
+      loaded?.identity === 'anonymous' &&
+      loaded.revision === revision
+    ) {
+      return (
+        <OnboardingShell
+          {...props}
+          key={`anonymous:${revision}:${loaded.snapshot.conversationId ?? 'new'}`}
+          isSignedIn={false}
+          intentId={loaded.allowHandoff ? props.intentId : undefined}
+          starterHandoff={loaded.allowHandoff ? props.starterHandoff : null}
+          entryProfile={loaded.allowHandoff ? props.entryProfile : null}
+          initialMessages={loaded.snapshot.messages}
+          conversationId={loaded.snapshot.conversationId}
+          resumeOwnedConversation={loaded.snapshot.owned}
+          onBusyChange={setChatBusy}
+          controlsDisabled
+          actionPending
+          actionError={null}
+        />
+      );
+    }
     return (
       <div
         className='flex min-h-0 flex-1 flex-col items-center justify-center gap-3'

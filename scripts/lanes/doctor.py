@@ -29,6 +29,7 @@ import lifecycle  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import autoscale  # noqa: E402  (sibling module of the release)
+import disk_guard  # noqa: E402  (lowest free % across every lanes mount)
 import pr_events  # noqa: E402  (sibling module of the release)
 import design_gate  # noqa: E402  (design-brief admission census)
 import gh_app_token  # noqa: E402  (canonical GitHub read-budget floor)
@@ -47,8 +48,11 @@ import stage_events  # noqa: E402  (jovie-stage-event/v1 rows for the stage coll
 import ledger_archive  # noqa: E402  (bounded runs/ledger.jsonl)
 import throughput_sentinel  # noqa: E402
 import deploy_health  # noqa: E402  (production deploy failure and lag incidents, Jovie + LogYourBody)
+import release_evidence  # noqa: E402  (release-evidence job red on main; production build stale)
 
 COOL_OFF_S = 6 * 3600
+# High (P1), not Urgent, though under an Urgent prefix: a stale build is a lag signal, not an outage.
+P1_KEYS = frozenset({"production-deploy:build-stale"})
 NO_LANDING_S = 6 * 3600
 # Workers spawning but no agent run starting or ending: the 2026-09-28 spawn-exit deadlock
 # (every worker exited on claim), which looked busy to every other rule.
@@ -254,6 +258,59 @@ def automation_registry(repo: Path, run=subprocess.run) -> list[dict] | None:
     return rows
 
 
+INVARIANT_REGISTRY = "canon/invariants.jsonl"
+HARNESS_INVARIANT_ID = "JOV-INV-024"
+HARNESS_EXPIRY_WARNING_S = 72 * 3600
+
+
+def harness_exceptions(repo: Path, run=subprocess.run) -> list[dict] | None:
+    """JOV-INV-024 partial-principle exceptions as merged on origin/main, or None when unreadable."""
+    try:
+        shown = run(["git", "-C", str(repo), "show", f"origin/main:{INVARIANT_REGISTRY}"],
+                    capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if getattr(shown, "returncode", 1) != 0:
+        return None
+    for line in (shown.stdout or "").splitlines():
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(row, dict) or row.get("id") != HARNESS_INVARIANT_ID:
+            continue
+        principles = (((row.get("policy") or {}).get("value") or {}).get("principles")) or []
+        return [{"principle": item.get("id"), **item["exception"]} for item in principles
+                if isinstance(item, dict) and isinstance(item.get("exception"), dict)]
+    return None
+
+
+def harness_exception_alerts(rows: list[dict] | None, now: float) -> dict[str, str]:
+    """An exception within 72h of expiry, or past it, opens one issue routed to its owner.
+
+    The validator only warns outside the principle's scope, so this issue is what makes
+    someone close or renew it before (not after) it can block a change (2026-11-01).
+    """
+    alerts = {}
+    for row in rows or []:
+        try:
+            expires = datetime.strptime(str(row.get("expires")), "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+        # Valid through the whole expiry day (the validator compares UTC days).
+        left = expires.timestamp() + 86400 - now
+        if left > HARNESS_EXPIRY_WARNING_S:
+            continue
+        when = (f"expired on {row.get('expires')}" if left <= 0
+                else f"expires {row.get('expires')} ({int(left // 3600)}h left)")
+        alerts[f"harness-exception-expiring:{row.get('id')}"] = (
+            f"harness exception {row.get('id')} ({row.get('principle')}) {when}; owner {row.get('owner')} "
+            f"must close or renew it in canon/invariants.jsonl"
+            + (f" (tracking {row['linearIssue']})" if row.get("linearIssue") else "")
+            + f"; next: {str(row.get('nextAction') or '')[:160]}")
+    return alerts
+
+
 TEAM_RECEIPT = re.compile(r"^[A-Z][A-Z0-9]*$")
 
 
@@ -334,7 +391,11 @@ def automation_observation(host, lane, now: float) -> dict:
         liveness = automation_liveness(lane, now)
     except Exception as error:
         liveness = {"installed": None, "error": type(error).__name__}
-    return {"automation": watch, "automationLiveness": liveness}
+    try:
+        exceptions = harness_exceptions(host.repo)
+    except Exception:
+        exceptions = None
+    return {"automation": watch, "automationLiveness": liveness, "harnessExceptions": exceptions}
 
 
 def qualified_pool(host, lane, capacity: dict, now: float) -> tuple[dict, int, dict, dict, dict]:
@@ -504,7 +565,10 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
     held = read_json(state / "held.json", {})
     failures = read_json(state / "failures.json", {})
     idle_exit = read_json(state / "worker-idle.json", {})
-    disk = shutil.disk_usage("/")
+    disk_pct, disk_mounts = disk_guard.lanes_free(state)
+    root = shutil.disk_usage("/")
+    # JOV-10233: the lowest lanes mount decides, not "/": worktrees live on a separate disk.
+    disk_pct = round(100 * root.free / root.total, 1) if disk_pct is None else min(disk_pct, round(100 * root.free / root.total, 1))
     hud_beat = None
     try:
         hud_beat = now - (state / "hud.heartbeat").stat().st_mtime
@@ -557,6 +621,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         **automation_observation(host, lane, now),
         "outcomeQueue": read_json(state / "outcome-queue.json", {}),
         "deployHealth": deploy_health.sample(state, now)[0] if not os.environ.get("LANES_SELFTEST") else None,
+        "releaseEvidence": release_evidence.sample(state, now)[0] if not os.environ.get("LANES_SELFTEST") else None,
         "sentinel": throughput_sentinel.observe(
             state, now, receipts,
             {"inventoryBytes": getattr(lane, "REPAIR_INVENTORY_MAX_BYTES", 16 * 1024 * 1024)},
@@ -573,7 +638,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "mergeThroughput": merge_throughput, "mergeThroughputError": merge_throughput_error,
         "autoscale": _autoscale_block(host),
         "mergedWindow": ({k: v for k, v in merged_window.items() if k != "prs"} if merged_window else None),
-        "diskFreePct": round(100 * disk.free / disk.total, 1),
+        "diskFreePct": disk_pct,
+        "diskMounts": disk_mounts,
         "sweepSecretHeld": [row for row in (read_json(state / "worktree-sweep.json", {}).get("secretHeld") or [])
                             if isinstance(row, dict) and row.get("path") and Path(row["path"]).exists()],
         "hudExpected": (state / "hud.expected").exists(), "hudBeatAge": hud_beat,
@@ -887,6 +953,11 @@ def provider_idle_with_qualified_work(obs: dict, provider: str) -> bool:
                 and provider in (tick.get("spawned") or []) and provider not in (tick.get("unhealthy") or []))
 
 
+def _lowest_mount(obs: dict) -> str:
+    rows = [row for row in obs.get("diskMounts") or [] if isinstance(row, dict) and "freePct" in row]
+    return f"lowest mount {min(rows, key=lambda row: row['freePct'])['path']}" if rows else "root"
+
+
 def disk_held(obs: dict) -> bool:
     free = obs.get("diskFreePct")
     return free is not None and free <= autoscale.DISK_INCREASE_MIN
@@ -996,6 +1067,10 @@ def admission_repair_holds(obs: dict) -> list[str] | None:
 
 # Measured on Gem (59 releases since 2026-10-23): install lag p50 22 min, p80 85, p95 215. Alert past p80.
 INSTALL_LAG_ALERT_S = 90 * 60
+# SLO: a lane-affecting main commit is installed on Gem within 2h. Past it with the updater refusing
+# or backing off the cause is a defect, not a wait, so it is critical and owned (2026-10-26 to 10-29:
+# Gem sat three days on one release while `install-lag` stayed a degraded alert nobody acted on).
+INSTALL_LAG_P0_S = 2 * 3600
 
 
 def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
@@ -1108,6 +1183,12 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["install-lag"] = (f"main's lane bundle {str(lag.get('behindCommit'))[:8]} is {round(lag['behindS'] / 60)}m "
                                  f"from installed (alert past {INSTALL_LAG_ALERT_S // 60}m); "
                                  f"last update: {lag.get('error') or 'waiting on a free gate seat or drain'}")
+    if (isinstance(lag.get("behindS"), (int, float)) and lag["behindS"] > INSTALL_LAG_P0_S and lag.get("error")):
+        alerts["install-lag-refused"] = (
+            f"P0 install SLO breached: Gem is {round(lag['behindS'] / 3600, 1)}h behind main's lane bundle "
+            f"{str(lag.get('behindCommit'))[:8]} (SLO {INSTALL_LAG_P0_S // 3600}h) and the updater is refusing: "
+            f"{lag.get('error')}; owner gem-lanes updater (scripts/lanes/lane_runner.py install_release); "
+            "runbook: update-refused.json holds the tree and reason, ensure_dependency_pool refills an aged pool")
     if obs.get("linearAppCredential") is False:
         alerts["linear-app-credential-missing"] = (
             "no Jovie Lanes Linear app credential (~/.config/jovie-lanes/linear-app.env); lanes Linear "
@@ -1124,6 +1205,7 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
             "no Gem host-local automation receipt is being watched")
     alerts.update(throughput_sentinel.judge(obs))
     alerts.update(deploy_health.judge(obs.get("deployHealth"), obs.get("now") or time.time()))
+    alerts.update(release_evidence.judge(obs.get("releaseEvidence"), obs.get("now") or time.time()))
     # Closed loop, last hop: Validating issues owing an `outcome` receipt wait on the outcome
     # lane. Its daily budget exhausted (or the drain gone silent) with owed receipts older than
     # OUTCOME_OWED_MAX_S used to stall in silence for the rest of the UTC day.
@@ -1249,16 +1331,16 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
             f"worktree sweep did not publish a snapshot of {row.get('path')}: {row.get('reason')}; "
             "the checkout is kept untouched until its owner reviews it")
     if obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_CRIT_PCT:
-        alerts["disk-critical"] = (f"root disk {obs['diskFreePct']}% free even after the disk-pressure "
+        alerts["disk-critical"] = (f"lanes disk {obs['diskFreePct']}% free ({_lowest_mount(obs)}) even after the disk-pressure "
                                  f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")
     elif obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_MIN_PCT:
-        alerts["disk-low"] = f"root disk {obs['diskFreePct']}% free; worktrees and installs will start failing"
+        alerts["disk-low"] = f"lanes disk {obs['diskFreePct']}% free ({_lowest_mount(obs)}); worktrees and installs will start failing"
     held_since = (previous or {}).get("diskHeldSince")
     if disk_held(obs) and isinstance(held_since, (int, float)) and obs["now"] - held_since >= DISK_HELD_S:
         top = obs.get("diskTop") or (previous or {}).get("diskTop") or []
         named = ", ".join(f"{row['path']} {row['gib']} GiB" for row in top) or "consumers not yet measured"
         alerts["disk-capacity-held"] = (
-            f"root disk {obs['diskFreePct']}% free (growth floor {autoscale.DISK_INCREASE_MIN}%) for "
+            f"lanes disk {obs['diskFreePct']}% free ({_lowest_mount(obs)}; growth floor {autoscale.DISK_INCREASE_MIN}%) for "
             f"{int((obs['now'] - held_since) // 60)}m: lane capacity is held below base. Top consumers: {named}")
     if github_reads_held:
         alerts["github-quota"] = (f"GitHub GraphQL budget {obs['githubRemaining']} left this hour; read-only polling "
@@ -1319,6 +1401,8 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     if obs.get("hudExpected") and (obs.get("hudBeatAge") is None or obs["hudBeatAge"] > HUD_STALE_S):
         beat = "never" if obs.get("hudBeatAge") is None else f"{int(obs['hudBeatAge'])}s ago"
         alerts["hud-stale"] = f"tty1 HUD heartbeat {beat}; the console is not showing current truth"
+    if obs.get("now"):
+        alerts.update(harness_exception_alerts(obs.get("harnessExceptions"), obs["now"]))
     return alerts
 
 
@@ -1327,7 +1411,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
     prior = previous.get("conditions") or {}
     receipts: dict[str, dict] = {}
     now = float(obs["now"])
-    critical = ("tick-error", "linear-down", "spawn-exit", "no-landing", "disk-critical", "delivery-stalled")
+    critical = ("tick-error", "linear-down", "spawn-exit", "no-landing", "disk-critical", "delivery-stalled", "install-lag-refused")
     actions = {
         "tick-error": "retry-dispatch-tick",
         "linear-down": "retry-linear-read-and-publish-independent-receipt",
@@ -1342,6 +1426,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         "disk-capacity-held": "reclaim-top-disk-consumers-then-restore-lane-seats",
         "delivery-stalled": "investigate-repair-and-verify-native-delivery",
         "remediation-delivery": "repair-and-read-back-existing-event-delivery",
+        "install-lag-refused": "repair-updater-refusal-and-install-current-main",
     }
     resources = {
         "linear-down": ["linear", "pool"],
@@ -1388,7 +1473,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
             "generation": generation,
             "state": "active",
             "severity": "critical" if key in critical or key.startswith(("provider-idle:", "provider-down:")) else "degraded",
-            "owner": "symphony-lanes-doctor",
+            "owner": "gem-lanes-updater" if key == "install-lag-refused" else "symphony-lanes-doctor",
             "owningInvariant": "JOV-6004",
             "affectedResources": affected,
             "firstObservedAt": epoch_iso(first),
@@ -1674,8 +1759,8 @@ class Tracker:
         if found is None and getattr(self, "existing_error", None):
             self.last_error = f"lookup-failed:{self.existing_error}"
         try:
-            priority = 1 if key.startswith(("provider-idle:", "provider-down:", "pr-inventory-unavailable:", "production-deploy:")) or key in (
-                "linear-down", "spawn-exit", "tick-error", "delivery-stalled") else 2
+            priority = 1 if (key.startswith(("provider-idle:", "provider-down:", "pr-inventory-unavailable:", "production-deploy:")) or key in (
+                "linear-down", "spawn-exit", "tick-error", "delivery-stalled")) and key not in P1_KEYS else 2
             team = self._team()
             triage = next(s["id"] for s in team["states"]["nodes"] if s["name"] == "Triage")
             labels = [l["id"] for l in team["labels"]["nodes"] if l["name"] == "symphony"]

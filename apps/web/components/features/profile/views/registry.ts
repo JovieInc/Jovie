@@ -161,7 +161,7 @@ export const PROFILE_VIEW_REGISTRY: Record<
   share: {
     key: 'share',
     title: 'Share Profile',
-    subtitle: 'Share this profile',
+    subtitle: 'Copy the link or post it anywhere.',
     icon: Share2,
     menuOrder: 8,
     analyticsEvent: 'share_drawer_open',

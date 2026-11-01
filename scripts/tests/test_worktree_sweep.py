@@ -150,6 +150,17 @@ class SweepTest(unittest.TestCase):
         self.assertTrue(first.exists())
         self.assertEqual(report["removed"], [])
 
+    def test_spent_budget_ends_the_phase_without_marking_a_drain(self):
+        # 2026-11-01: one unbounded phase starved the standalone reclaim, headroom alarm and report.
+        first = self.worktree("first")
+        state = self.base / "state"
+        state.mkdir()
+        clock = iter([0.0, 10_000.0, 10_001.0, 10_002.0, 10_003.0])
+        report = self.sweep(state=state, run=no_processes, budget_s=60, clock=lambda: next(clock))
+        self.assertTrue(report["budgetSpent"])
+        self.assertNotIn("drained", report)
+        self.assertTrue(first.exists())
+
     def test_clean_pushed_idle_worktree_is_removed_without_backup(self):
         path = self.worktree("clean")
         report = self.sweep()
@@ -672,6 +683,27 @@ class StandaloneAndHeadroomTest(unittest.TestCase):
         self.assertEqual(report["removed"], [])
         self.assertEqual(set(report["kept"]), {"dirty", "1-unpublished", "stash", "linked-worktrees",
                                               "keep-marker", "state-referenced", "busy"})
+
+    def test_unpublished_retired_clone_loses_build_output_but_keeps_work(self):
+        path = self.clone("grok-ship-workspaces/JOV/JOV-9")
+        (path / "b.txt").write_text("b\n")
+        git(path, "add", ".")
+        git(path, "commit", "-qm", "local only")
+        (path / "node_modules/x").mkdir(parents=True)
+        (path / "node_modules/x/big.bin").write_bytes(b"0" * 4096)
+        report = sweeper.sweep_standalone(self.home, self.state, [], [], now=self.now, run=no_processes)
+        self.assertTrue(path.exists())
+        self.assertTrue((path / "b.txt").exists())
+        self.assertFalse((path / "node_modules").exists())
+        self.assertGreater(report["artifactsFreedKiB"], 0)
+
+    def test_archive_branch_counts_as_published(self):
+        path = self.clone("grok-wt/archived")
+        (path / "c.txt").write_text("c\n")
+        git(path, "add", ".")
+        git(path, "commit", "-qm", "work")
+        git(path, "push", "-q", "origin", "HEAD:refs/heads/archive/grok-ship/archived")
+        self.assertEqual(self.sweep()["removed"], [str(path)])
 
     def test_recent_clone_and_unreadable_process_inventory_keep_everything(self):
         path = self.clone("wt-fresh")

@@ -91,6 +91,9 @@ async function sendVerificationEmail(
 ): Promise<void> {
   const emailContent = getChangelogVerifyEmail({ verificationToken });
   await sendEmail({
+    stream: 'transactional',
+    purpose: 'changelog-subscribe-verify',
+    consent: 'opt-in',
     to: email,
     subject: emailContent.subject,
     text: emailContent.text,

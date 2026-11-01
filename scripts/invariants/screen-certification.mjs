@@ -44,9 +44,21 @@ export const CLS_INTERACTION_BUDGET = 0.05;
 // screens, or marketing pages not yet in either registry) are intentionally
 // left unmapped: JOV-INV-018 has no producer for them on this workflow, and
 // mapping them to the wrong route would silently accept unrelated evidence.
+//
+// This precondition is enforced, not assumed: every bound route must be a live
+// MARKETING_EXACT_PUBLIC_ROUTE_TARGETS entry, so the shared marketing artifact
+// provably contains the screen's receipt pair. A binding to a route outside
+// that set is unsatisfiable — the producer can never emit its receipt — and
+// every certification invocation (each exporting SCREEN_CERT_ARTIFACT_ID)
+// reports the shared artifact as unacceptable. That incident (JOV-INV-018,
+// 2026-10-30, run 41106813919) came from binding web.engineering-preview to
+// /engineering/preview, a production-blocked noindex route the capture set
+// excludes (healthCheck expected 'not-found'); deprecated-redirect routes
+// (/new, /artist-profile) and render-fixture routes (/renders,
+// /renders/profile-admission) are excluded from the capture set for the same
+// reason. See apps/web/tests/unit/ci/screen-marketing-route-bindings.test.ts.
 export const SCREEN_MARKETING_ROUTES = Object.freeze({
   'web.homepage': '/',
-  'web.marketing-new': '/new',
   'web.marketing-pricing': '/pricing',
   'web.marketing-download': '/download',
   'web.marketing-pay': '/pay',
@@ -69,10 +81,14 @@ export const SCREEN_MARKETING_ROUTES = Object.freeze({
   'web.cli-landing': '/cli',
   // JOV-7110: web.engineering-publication used to cover both engineering
   // routes as one screen, but the schema binds one route per screen. Split
-  // into the index (this binding) and preview (below) screens so each keeps
-  // its own exact-head proof instead of extending the schema to N routes.
+  // into the index (this binding) and preview (below) screens; only the
+  // index is bound here — /engineering/preview is production-blocked
+  // (lib/security/production-blocked-routes.ts) and noindex, so it renders
+  // not-found in this workflow's production build and is excluded from
+  // MARKETING_EXACT_PUBLIC_ROUTE_TARGETS. web.engineering-preview keeps its
+  // registry row (source changes still demand proof) but has no producer on
+  // this workflow until one exists.
   'web.engineering-publication': '/engineering',
-  'web.engineering-preview': '/engineering/preview',
   'web.marketing-ai': '/ai',
   'web.marketing-compare': '/compare',
   'web.marketing-alternatives': '/alternatives',
@@ -89,8 +105,10 @@ export const SCREEN_MARKETING_ROUTES = Object.freeze({
   // apps/web/tests/contracts/global-page-contract.test.ts's filesystem
   // scan), so it needs its own SCREEN_PROOF_ROUTES-style producer — see
   // JOV-7110 follow-up.
+  // web.artist-profile is intentionally NOT here either: the /artist-profile
+  // manifest entry is deprecated with a redirect healthCheck, so it is not a
+  // live capture target.
   'web.artist-profiles': '/artist-profiles',
-  'web.artist-profile': '/artist-profile',
   'web.artist-notifications': '/artist-notifications',
   'web.voice': '/voice',
   'web.instant-merch': '/instant-merch',
@@ -98,11 +116,13 @@ export const SCREEN_MARKETING_ROUTES = Object.freeze({
   'web.demo-video': '/demo/video',
   'web.demovideo': '/demovideo',
   'web.waitlist-invite': '/waitlist/invite',
-  // JOV-8170: both routes are active MARKETING_ROUTE_MANIFEST entries already
-  // captured every run; the screens were registered but never bound, so the
-  // nightly audit could never see their evidence.
-  'web.marketing-renders': '/renders',
-  'web.profile-admission': '/renders/profile-admission',
+  // JOV-8170: web.marketing-renders and web.profile-admission are active
+  // MARKETING_ROUTE_MANIFEST entries, but /renders* are render-fixture routes
+  // (lib/render-fixture-policy.ts RENDER_FIXTURE_ROUTE_GLOBS), so
+  // MARKETING_EXACT_PUBLIC_ROUTE_TARGETS excludes them and the marketing
+  // producer can never carry their evidence. They stay registered
+  // (source changes still demand proof) but intentionally unmapped here.
+  // See apps/web/tests/unit/ci/screen-marketing-route-bindings.test.ts.
 });
 export const SCREEN_PROOF_ROUTES = Object.freeze({
   'web.public-profile': '/unfazed',
@@ -293,8 +313,12 @@ web.exp-library-v1|web|exp-library-v1|apps/web/app/exp/library-v1/page.tsx|deskt
 web.exp-right-rail-shotgun|web|exp-right-rail-shotgun|apps/web/app/exp/right-rail-shotgun/page.tsx|desktop,mobile
 web.public-profile|web|public-profile|apps/web/app/[username]/page.tsx,apps/web/app/[username]/layout.tsx,apps/web/components/features/profile/artist-notifications-cta/,apps/web/components/features/profile/subscribe/|desktop,mobile
 web.public-profile-about|web|public-profile|apps/web/app/[username]/about/page.tsx|desktop,mobile
+web.public-profile-alerts|web|public-profile|apps/web/app/[username]/alerts/page.tsx|desktop,mobile
+web.public-profile-notifications|web|public-profile|apps/web/app/[username]/notifications/page.tsx|desktop,mobile
+web.public-profile-shop|web|public-profile|apps/web/app/[username]/shop/page.tsx|desktop,mobile
 web.auth|web|browser-input-assurance|apps/web/app/(auth)/,apps/web/app/@auth/,apps/web/app/auth-return/,apps/web/app/desktop-auth/,apps/web/app/mobile-auth-return/,apps/web/components/features/auth/|desktop,mobile
 web.artist-pay|web|artist-pay|apps/web/app/[username]/pay/page.tsx|desktop,mobile
+web.artist-alerts|web|artist-alerts|apps/web/app/[username]/alerts/page.tsx|desktop,mobile
 web.profile-mode-render|web|profile-mode-render|apps/web/app/[username]/profile-mode-render/|desktop,mobile
 web.release-landing|web|release-landing|apps/web/app/r/[slug]/page.tsx,apps/web/app/r/[slug]/ReleaseLandingPage.tsx|desktop,mobile
 web.smartlink-release|web|release-landing|apps/web/app/[username]/[...slug]/page.tsx,apps/web/app/[username]/[slug]/page.tsx,apps/web/app/[username]/[slug]/not-found.tsx|desktop,mobile
@@ -324,7 +348,8 @@ web.ov-chat|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat/page.tsx,apps
 web.ov-inbox|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/inbox/page.tsx|desktop,mobile
 web.ov-integrations|web|settings-connectors|apps/web/app/app/(shell)/admin/integrations/page.tsx|desktop,mobile
 web.admin-chat-playground|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat-playground/page.tsx,apps/web/app/app/(shell)/admin/chat-playground/layout.tsx|desktop,mobile
-web.ov-founder-cockpit|web|ovie-founder-cockpit|apps/web/app/app/(shell)/admin/activity/page.tsx,apps/web/app/app/(shell)/admin/growth/page.tsx,apps/web/app/app/(shell)/admin/operations/page.tsx,apps/web/app/app/(shell)/admin/product/page.tsx|desktop,mobile
+web.ov-founder-cockpit|web|ovie-founder-cockpit|apps/web/app/app/(shell)/admin/activity/page.tsx,apps/web/app/app/(shell)/admin/activity/loading.tsx,apps/web/app/app/(shell)/admin/growth/page.tsx,apps/web/app/app/(shell)/admin/operations/page.tsx,apps/web/app/app/(shell)/admin/product/page.tsx|desktop,mobile
+web.ov-agents|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/system/page.tsx|desktop,mobile
 web.ov-company-presence|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/presence/page.tsx|desktop,mobile
 web.admin-costs|web|admin-costs|apps/web/app/app/(shell)/admin/costs/page.tsx|desktop,mobile
 web.admin-capacity|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/capacity/page.tsx|desktop,mobile

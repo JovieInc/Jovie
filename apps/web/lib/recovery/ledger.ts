@@ -105,10 +105,20 @@ export function createLedger(backend: RecordBackend) {
       return (await backend.get(`${TEMPLATE}${templateClass}`)) !== null;
     },
 
-    async approveTemplate(templateClass: string, now: Date) {
+    /** Records the approval and the card that granted it (the gateway re-checks that card). */
+    async approveTemplate(templateClass: string, now: Date, cardKey?: string) {
       await backend.set(`${TEMPLATE}${templateClass}`, {
         approvedAt: now.toISOString(),
+        ...(cardKey && { cardKey }),
       });
+    },
+
+    /** Idempotency key of the Ovie card that approved this template class. */
+    async templateApprovalKey(templateClass: string): Promise<string | null> {
+      const row = (await backend.get(`${TEMPLATE}${templateClass}`)) as {
+        cardKey?: string;
+      } | null;
+      return row?.cardKey ?? null;
     },
 
     async listRecords(): Promise<RecoveryRecord[]> {

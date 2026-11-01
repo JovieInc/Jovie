@@ -80,10 +80,7 @@ export function lintPrBody({
   };
   for (const message of fleet.errors) errors.push(classify(message));
   for (const message of fleet.warnings) {
-    // Blast radius is a Fleet Rules warning but CI rounds start on it, and a
-    // two-line section is cheap: treat a missing one as an error here.
-    if (message.startsWith('blast-radius:')) errors.push(classify(message));
-    else warnings.push({ id: message.split(':')[0], message });
+    warnings.push(classify(message));
   }
   const verdict = evaluateCustomerNoteContract({
     files: paths,

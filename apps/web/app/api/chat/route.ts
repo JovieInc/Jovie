@@ -80,9 +80,11 @@ import {
   extractLastUserImageUrl,
   extractLastUserText,
 } from '@/lib/chat/message-text';
+import { resolveHasMusicLinks } from '@/lib/chat/music-link-presence';
 import { canUseOvChatMode, parseChatMode } from '@/lib/chat/ov-mode';
 import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
 import { buildRelatedSuggestionsFraming } from '@/lib/chat/related-recommendations';
+import { countVisibleReleaseListenLinks } from '@/lib/chat/release-listen-links';
 import {
   updateOwnedReleaseGeneratedPitches,
   updateOwnedReleaseMetadata,
@@ -229,6 +231,7 @@ import {
 } from '@/lib/services/pitch';
 import { isRetouchConfigured } from '@/lib/services/retouching/provider-gemini';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
+import { isWeeklyQuotaExemptCanaryEmail } from '@/lib/synthetic/prodcert-identities';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 
@@ -293,6 +296,8 @@ async function fetchArtistContext(
   startOfMonth.setUTCHours(0, 0, 0, 0);
   const startOfMonthISO = startOfMonth.toISOString();
 
+  // Release listen links render on the public profile too.
+  const releaseListenCount = countVisibleReleaseListenLinks(profileId);
   const [linkCounts, tipTotals, clickStats, profileViews] = await Promise.all([
     db
       .select({
@@ -348,7 +353,12 @@ async function fetchArtistContext(
     appleMusicUrl: result.appleMusicUrl,
     profileViews,
     hasSocialLinks: Number(linkCounts?.totalActive ?? 0) > 0,
-    hasMusicLinks: Number(linkCounts?.musicActive ?? 0) > 0,
+    hasMusicLinks: resolveHasMusicLinks({
+      dspSocialLinkCount: Number(linkCounts?.musicActive ?? 0),
+      releaseListenLinkCount: await releaseListenCount,
+      spotifyUrl: result.spotifyUrl,
+      appleMusicUrl: result.appleMusicUrl,
+    }),
     tippingStats: {
       tipClicks: Number(clickStats?.total ?? 0),
       tipsSubmitted: Number(tipTotals?.tipsSubmitted ?? 0),
@@ -2873,7 +2883,9 @@ export async function POST(req: Request) {
 
   // Rate limiting - plan-aware weekly quota + burst protection. For clients
   // that send clientTurnId, reservation/replay happens before quota charging.
-  const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan);
+  const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan, {
+    skipWeeklyQuota: isWeeklyQuotaExemptCanaryEmail(accountContext.email),
+  });
   if (!rateLimitResult.success) {
     const rateLimitMessage =
       accountContext.billingVerification === 'unavailable'
@@ -3097,7 +3109,7 @@ export async function POST(req: Request) {
       const failure = classifyChatStreamFailure(error);
       await markChatTurnTerminal({
         turnId: reservedTurn.turnId,
-        status: 'failed_model_error',
+        status: failure.terminalStatus,
         errorCode: failure.errorCode,
         errorMessage: failure.errorMessage,
       });
@@ -3321,7 +3333,7 @@ export async function POST(req: Request) {
       const failure = classifyChatStreamFailure(error);
       await markChatTurnTerminal({
         turnId: reservedTurn.turnId,
-        status: 'failed_model_error',
+        status: failure.terminalStatus,
         errorCode: failure.errorCode,
         errorMessage: failure.errorMessage,
       }).catch(() => null);

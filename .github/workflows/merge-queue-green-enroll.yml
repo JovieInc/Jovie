@@ -59,6 +59,11 @@ on:
   # `reconcile` concurrency slot.
   push:
     branches: [main]
+  # No cron here (JOV-INV-042: admission never runs from a schedule). The backstop
+  # for a lost wake is the Gem lanes tick: scripts/lanes/throughput_sentinel.py
+  # dispatches this workflow (an unnamed dispatch is the roster sweep) when a
+  # CLEAN unqueued PR has waited 10 minutes, and alarms `queue starved` and
+  # per-state supply dwell when the SLO is still missed.
   workflow_dispatch:
     inputs:
       dry_run:
@@ -478,6 +483,34 @@ jobs:
             // job summary and one machine line, so a non-enroll is never silent (event-driven dwell).
             const receipts = [];
             const receipt = (pr, decision, reason) => receipts.push({ pr: pr?.number, head: String(pr?.headRefOid ?? '').slice(0, 12), decision, reason, at: new Date().toISOString() });
+            const relabelJumpCandidates = [];
+            const QUEUE_ENTRIES_QUERY = `
+              query($owner: String!, $repo: String!) {
+                repository(owner: $owner, name: $repo) {
+                  mergeQueue(branch: "main") {
+                    entries(first: 50) { nodes { state position enqueuedAt pullRequest { number labels(first: 30) { nodes { name } } } } }
+                  }
+                }
+              }`;
+            const isCompoundingEntry = e => e.pullRequest.labels.nodes.some(l => l.name.toLowerCase() === COMPOUNDING_LABEL);
+            // One reset-safe jump policy for a fresh enqueue and for a relabel re-route. A jump
+            // invalidates every merge group already building and restarts its CI (10-20 min;
+            // the 04:00Z jump of #23554 reset three groups and nothing merged for 90 min). So jump only
+            // while no building group has had time to make progress: AWAITING_CHECKS entries enqueued
+            // under JUMP_MAX_BUILD_S ago (enqueuedAt bounds the build start from above), at most one jump per
+            // JUMP_BATCH_S, and at most MAX_JUMPED compounding entries queued.
+            const jumpPolicy = entries => {
+              const ageS = e => (Date.now() - Date.parse(e.enqueuedAt)) / 1000;
+              const jumped = entries.filter(isCompoundingEntry).length;
+              const building = entries.filter(e => e.state === 'AWAITING_CHECKS');
+              const stale = building.filter(e => !(ageS(e) < JUMP_MAX_BUILD_S));
+              const recent = entries.filter(e => isCompoundingEntry(e) && ageS(e) < JUMP_BATCH_S);
+              let deferred = null;
+              if (jumped >= MAX_JUMPED) deferred = `cap ${jumped}/${MAX_JUMPED}`;
+              else if (stale.length > 0) deferred = `building groups older than ${JUMP_MAX_BUILD_S}s: ${stale.map(e => '#' + e.pullRequest.number).join(',')}`;
+              else if (recent.length > 0) deferred = `batch window: ${recent.map(e => '#' + e.pullRequest.number).join(',')} jumped under ${JUMP_BATCH_S}s ago`;
+              return { jumped, building, deferred };
+            };
             for (const [index, candidate] of prs.entries()) {
               if (overBudget()) {
                 core.warning(`sweep budget spent after ${index}/${prs.length} PRs; the rest wait for their own events or the next sweep`);
@@ -563,6 +596,20 @@ jobs:
                     receipt(pr, 'error', 'blocked-recheck-dispatch-failed');
                   }
                 }
+                continue;
+              }
+              // Relabel-jump (2026-11-01): the jump decision used to be taken only at enroll time, so a
+              // PR already queued behind others ignored a later `compounding` label (#24141 sat at
+              // position 30 while main was red). A queued compounding PR with a non-compounding entry
+              // ahead of it is dequeued and enqueued again with jump under the same caps. Both
+              // mutations run in this step, so the bot's own dequeue never reaches the
+              // manual-removal block below. Never dequeue by hand to re-prioritize; label instead.
+              if (pr && pr.state === 'OPEN' && pr.isInMergeQueue && !pr.isDraft && !pr.isCrossRepository &&
+                  pr.baseRefName === 'main' && pr.headRefOid === candidate.head.sha &&
+                  !pr.labels.pageInfo.hasNextPage &&
+                  pr.labels.nodes.some(l => l.name.toLowerCase() === COMPOUNDING_LABEL) &&
+                  !pr.labels.nodes.some(l => BLOCKING.has(l.name.toLowerCase()))) {
+                relabelJumpCandidates.push({ pr });
                 continue;
               }
               if (!eligible(pr)) {
@@ -666,6 +713,7 @@ jobs:
               const ownerHoldRelease = failurePolicy.ownerHoldReleaseIntent({
                 eventName: context.eventName, event: context.payload,
               });
+              const failureBeforeReenroll = failure.action;
               if (!releasedAfterManualRemoval) {
                 failure = failurePolicy.reenrollmentDisposition({
                   failure, statuses, repository: `${owner}/${repo}`, prNumber: pr.number, lastRemoval, headCommittedAt,
@@ -679,11 +727,31 @@ jobs:
               const removalActor = pr.timelineItems.nodes[0]?.actor;
               const humanDequeued = Boolean(removedUnchangedHead) && removalReason === 'manual' &&
                 removalActor?.__typename === 'User' && !/\[bot\]$/i.test(String(removalActor?.login || ''));
+              // Ejection re-enroll (2026-10-29): a head GitHub or a bot removed from
+              // the queue with no revision-failure hold on record (failure was
+              // 'allow' before the recovery-intent check) is still green and
+              // CLEAN, so it is admitted again instead of waiting for a human.
+              // Bounded: never a human dequeue, at most REENROLL_MAX_REMOVALS
+              // removals on this head, and REENROLL_DWELL_MS after the last
+              // removal. A merge-group failure at the head writes a failure
+              // hold, which still blocks above (JOV-6620 is untouched).
+              const REENROLL_MAX_REMOVALS = 3, REENROLL_DWELL_MS = 5 * 60 * 1000;
+              const removalsOnHead = (pr.breakerEvents?.nodes || []).filter(event =>
+                event.__typename === 'RemovedFromMergeQueueEvent' &&
+                (!headCommittedAt || event.createdAt > headCommittedAt)).length;
+              const automaticRemoval = removalReason === 'failed_checks' ||
+                (removalReason === 'manual' && (removalActor?.__typename === 'Bot' || /\[bot\]$/i.test(String(removalActor?.login || ''))));
+              const ejectionReenroll = Boolean(removedUnchangedHead) && automaticRemoval && !humanDequeued &&
+                failureBeforeReenroll === 'allow' && failure.action === 'block' &&
+                ['removed-without-recovery-intent', 'no-current-admission-recovery'].includes(failure.reason) &&
+                removalsOnHead < REENROLL_MAX_REMOVALS &&
+                Date.now() - Date.parse(lastRemoval) >= REENROLL_DWELL_MS;
+              if (ejectionReenroll) failure = { action: 'allow', reason: 'ejection-reenroll' };
               if (failure.action === 'block' ||
                   (humanDequeued && failure.action === 'retry-once' &&
                    failure.reason !== 'human-failure-release') ||
                   (removedUnchangedHead && failure.action !== 'retry-once' &&
-                   failure.reason !== 'owner-hold-release' && !releasedAfterManualRemoval)) {
+                   failure.reason !== 'owner-hold-release' && !releasedAfterManualRemoval && !ejectionReenroll)) {
                 core.info(`skip #${pr.number}: head unchanged since queue removal (${removalReason}; ${failure.reason})`);
                 receipt(pr, 'skip', `head-unchanged-since-removal:${removalReason}:${failure.reason}`);
                 continue;
@@ -814,30 +882,9 @@ jobs:
                     basis = 'paths';
                   }
                   if (compounding) {
-                    const queue = await github.graphql(`
-                      query($owner: String!, $repo: String!) {
-                        repository(owner: $owner, name: $repo) {
-                          mergeQueue(branch: "main") {
-                            entries(first: 50) { nodes { state enqueuedAt pullRequest { number labels(first: 30) { nodes { name } } } } }
-                          }
-                        }
-                      }`, { owner, repo });
+                    const queue = await github.graphql(QUEUE_ENTRIES_QUERY, { owner, repo });
                     const entries = (queue.repository.mergeQueue?.entries?.nodes ?? []).filter(e => e.pullRequest.number !== pr.number);
-                    const isCompounding = e => e.pullRequest.labels.nodes.some(l => l.name.toLowerCase() === COMPOUNDING_LABEL);
-                    const ageS = e => (Date.now() - Date.parse(e.enqueuedAt)) / 1000;
-                    // A jump invalidates every merge group already building and restarts its CI (10-20 min;
-                    // the 04:00Z jump of #23554 reset three groups and nothing merged for 90 min). So jump only
-                    // while no building group has had time to make progress: AWAITING_CHECKS entries enqueued
-                    // under JUMP_MAX_BUILD_S ago (enqueuedAt bounds the build start from above), at most one jump per
-                    // JUMP_BATCH_S, and at most MAX_JUMPED compounding entries queued.
-                    const jumped = entries.filter(isCompounding).length;
-                    const building = entries.filter(e => e.state === 'AWAITING_CHECKS');
-                    const stale = building.filter(e => !(ageS(e) < JUMP_MAX_BUILD_S));
-                    const recent = entries.filter(e => isCompounding(e) && ageS(e) < JUMP_BATCH_S);
-                    let deferred = null;
-                    if (jumped >= MAX_JUMPED) deferred = `cap ${jumped}/${MAX_JUMPED}`;
-                    else if (stale.length > 0) deferred = `building groups older than ${JUMP_MAX_BUILD_S}s: ${stale.map(e => '#' + e.pullRequest.number).join(',')}`;
-                    else if (recent.length > 0) deferred = `batch window: ${recent.map(e => '#' + e.pullRequest.number).join(',')} jumped under ${JUMP_BATCH_S}s ago`;
+                    const { jumped, building, deferred } = jumpPolicy(entries);
                     jump = deferred === null;
                     receipt(pr, jump ? 'jump' : 'jump-deferred', `compounding(${basis}) ${deferred ?? `queued=${jumped}/${MAX_JUMPED}`}`);
                     core.notice(`COMPOUNDING #${pr.number} ${jump ? 'jumps' : 'deferred'} (${basis}; ${deferred ?? 'clear'})`);
@@ -870,7 +917,7 @@ jobs:
                 }
                 enqueued += 1;
                 core.notice(`ENQUEUED #${pr.number} at position ${r.enqueuePullRequest.mergeQueueEntry.position}`);
-                receipt(pr, jump ? 'enqueued-jump' : 'enqueued', `position=${r.enqueuePullRequest.mergeQueueEntry.position}`);
+                receipt(pr, jump ? 'enqueued-jump' : 'enqueued', `position=${r.enqueuePullRequest.mergeQueueEntry.position};basis=${failure.reason}`);
                 if (breakerMarked && !breakerRestore) {
                   await github.rest.issues.removeLabel({
                     owner, repo, issue_number: pr.number, name: BREAKER_LABEL,
@@ -885,6 +932,82 @@ jobs:
                 }
                 core.warning(`#${pr.number} not enqueued: ${error.message}`);
                 receipt(pr, 'error', String(error.message).slice(0, 200));
+              }
+            }
+            // Relabel-jump pass (2026-11-01). Runs after the enrollment loop so the exact-head
+            // failure hold is always evaluated first: a head whose merge group failed is never
+            // dequeued and re-enqueued here, and the hold receipt below is read before any mutation.
+            for (const { pr } of relabelJumpCandidates) {
+              const statuses = await github.paginate(
+                github.rest.repos.listCommitStatusesForRef,
+                { owner, repo, ref: pr.headRefOid, per_page: 100 }
+              );
+              const directHold = failurePolicy.failureReceiptStatus(
+                process.env.FAILURE_HOLD_RECEIPT,
+                { repository: `${owner}/${repo}`, prNumber: pr.number, headSha: pr.headRefOid }
+              );
+              if (directHold) statuses.unshift(directHold);
+              const sourceFailure = failurePolicy.revisionFailureDisposition({
+                statuses,
+                repository: `${owner}/${repo}`,
+                currentMainSha: statuses.some(status => status?.context === failurePolicy.FAILURE_HOLD_CONTEXT)
+                  ? await readMainSha()
+                  : undefined,
+              });
+              if (sourceFailure.action !== 'allow') {
+                receipt(pr, 'held', `relabel-jump:${sourceFailure.reason ?? sourceFailure.action}`);
+                continue;
+              }
+              try {
+                const queue = await github.graphql(QUEUE_ENTRIES_QUERY, { owner, repo });
+                const all = queue.repository.mergeQueue?.entries?.nodes ?? [];
+                const self = all.find(e => e.pullRequest.number === pr.number);
+                if (!self) {
+                  receipt(pr, 'skip', 'relabel-jump:entry-not-in-first-50');
+                } else if (all.filter(e => e.position < self.position).every(isCompoundingEntry)) {
+                  receipt(pr, 'skip', `relabel-jump:already-ahead position=${self.position}`);
+                } else {
+                  const others = all.filter(e => e.pullRequest.number !== pr.number);
+                  const { jumped, building, deferred } = jumpPolicy(others);
+                  if (deferred !== null) {
+                    receipt(pr, 'jump-deferred', `relabel-jump ${deferred}`);
+                    core.notice(`RELABEL-JUMP #${pr.number} deferred (${deferred})`);
+                  } else if (process.env.DRY_RUN === 'true') {
+                    core.notice(`[dry run] would relabel-jump #${pr.number}`);
+                  } else {
+                    await github.graphql(
+                      `mutation($id: ID!) { dequeuePullRequest(input: { id: $id }) { clientMutationId } }`,
+                      { id: pr.id }
+                    );
+                    const reenqueue = withJump => github.graphql(`
+                      mutation($id: ID!, $oid: GitObjectID!) {
+                        enqueuePullRequest(input: { pullRequestId: $id, expectedHeadOid: $oid${withJump ? ', jump: true' : ''} }) {
+                          mergeQueueEntry { position }
+                        }
+                      }`, { id: pr.id, oid: pr.headRefOid });
+                    let jumpedAgain = true, r;
+                    try {
+                      r = await reenqueue(true);
+                    } catch (error) {
+                      // The dequeue already happened: land the PR plainly rather than leave it out.
+                      if (/head|stale|changed/i.test(String(error.message))) throw error;
+                      core.warning(`#${pr.number} relabel jump rejected (${error.message}); plain enqueue`);
+                      receipt(pr, 'jump-rejected', String(error.message).slice(0, 120));
+                      jumpedAgain = false;
+                      r = await reenqueue(false);
+                    }
+                    enqueued += 1;
+                    core.notice(`RELABEL-JUMP #${pr.number} from position ${self.position} to ${r.enqueuePullRequest.mergeQueueEntry.position}`);
+                    receipt(pr, 'relabel-jump', `from=${self.position};to=${r.enqueuePullRequest.mergeQueueEntry.position};jump=${jumpedAgain};queued=${jumped}/${MAX_JUMPED}`);
+                    if (building.length > 0) {
+                      receipt(pr, 'jump-reset', `restarts building groups ${building.map(e => '#' + e.pullRequest.number).join(',')}`);
+                      core.warning(`JUMP RESET by #${pr.number}: restarts building merge groups ${building.map(e => '#' + e.pullRequest.number).join(',')}`);
+                    }
+                  }
+                }
+              } catch (error) {
+                core.warning(`#${pr.number} relabel-jump failed: ${error.message}`);
+                receipt(pr, 'error', `relabel-jump:${String(error.message).slice(0, 180)}`);
               }
             }
             core.info(`enqueued=${enqueued}`);
@@ -983,6 +1106,7 @@ jobs:
           sparse-checkout: |
             .nvmrc
             scripts/hold-contract.mjs
+            scripts/lib/github-rate-limit.mjs
             scripts/lib/admission-hold-labels.json
             scripts/lib/admission-hold-labels.mjs
             scripts/lib/queue-deferral-receipt.mjs
@@ -1124,6 +1248,7 @@ jobs:
           sparse-checkout: |
             .nvmrc
             scripts/merge-group-victim-rearm.mjs
+            scripts/lib/merge-group-ahead-attribution.mjs
             scripts/lib/admission-hold-labels.json
             scripts/lib/admission-hold-labels.mjs
             .github/actions/prime-node-toolcache/action.yml

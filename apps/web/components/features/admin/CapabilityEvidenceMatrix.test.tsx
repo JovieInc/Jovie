@@ -96,9 +96,13 @@ describe('CapabilityEvidenceMatrix', () => {
 
     const matrix = screen.getByTestId('capability-evidence-matrix');
     expect(matrix).toHaveAttribute('data-stage', 'failure');
-    expect(matrix).toHaveTextContent('Observed Exposure: source error');
-    expect(matrix).toHaveTextContent('Observed Outcome: n/a');
-    expect(matrix).toHaveTextContent('Certified: n/a');
+    // Unknowns name their source and reason instead of a bare "n/a".
+    expect(matrix).not.toHaveTextContent(/n\/a/i);
+    expect(
+      matrix.querySelector('[data-measured="unknown"][title*="source error"]')
+    ).not.toBeNull();
+    expect(matrix).toHaveTextContent(/Certified: Unknown\s*Feature registry/);
+    expect(matrix).toHaveTextContent(/Observed Outcome: Unknown\s*Analytics/);
     expect(
       screen.getByRole('link', { name: 'Registry source →' })
     ).toHaveAttribute(
@@ -136,7 +140,8 @@ describe('CapabilityEvidenceMatrix', () => {
     expect(matrix).toHaveAttribute('data-stage', 'stale-client');
     expect(matrix).toHaveTextContent('Deployed Build: bbbbbbb');
     expect(matrix).toHaveTextContent('Running Client: ccccccc');
-    expect(matrix).toHaveTextContent('Observed Exposure: 0 in 7d · stale');
+    expect(matrix).toHaveTextContent(/Observed Exposure: 0 in 7d\s*stale/);
+    expect(matrix.querySelector('[data-measured="stale"]')).not.toBeNull();
   });
 
   it('renders the joined evidence and never claims a client build', async () => {
@@ -150,7 +155,9 @@ describe('CapabilityEvidenceMatrix', () => {
     expect(matrix).toHaveTextContent('Public profile pages');
     expect(matrix).toHaveTextContent('1.2.3 bbbbbbb (production)');
     expect(matrix).toHaveTextContent('128 in 7d');
-    expect(matrix).toHaveTextContent('Running Client: unknown');
+    expect(matrix).toHaveTextContent(
+      /Running Client: Unknown\s*Client telemetry/
+    );
     expect(
       screen.getByRole('link', { name: 'Deployed commit →' })
     ).toHaveAttribute(
