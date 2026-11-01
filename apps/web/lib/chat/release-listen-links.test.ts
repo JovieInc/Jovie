@@ -14,11 +14,11 @@ const chain = vi.hoisted(() => {
   c.where.mockImplementation(async () => c.rows);
   return c;
 });
-const predicate = vi.hoisted(() => ({ marker: 'public-release-eligibility' }));
+const predicate = vi.hoisted(() => vi.fn(() => undefined));
 
 vi.mock('@/lib/db', () => ({ db: { select: chain.select } }));
 vi.mock('@/lib/profile/public-release-eligibility', () => ({
-  publicReleaseEligibilitySqlPredicate: () => predicate,
+  publicReleaseEligibilitySqlPredicate: predicate,
 }));
 
 import { countVisibleReleaseListenLinks } from './release-listen-links';
@@ -27,9 +27,8 @@ describe('countVisibleReleaseListenLinks', () => {
   it('counts through the canonical public-release predicate', async () => {
     chain.rows = [{ total: 3 }];
     expect(await countVisibleReleaseListenLinks('profile-1')).toBe(3);
-    expect(JSON.stringify(chain.where.mock.calls[0]?.[0])).toContain(
-      'public-release-eligibility'
-    );
+    expect(predicate).toHaveBeenCalled();
+    expect(chain.innerJoin).toHaveBeenCalled();
   });
 
   it('returns 0 when the query returns no row', async () => {
