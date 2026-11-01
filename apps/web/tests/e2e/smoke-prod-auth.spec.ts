@@ -77,6 +77,36 @@ function runTag(): string {
     : `local${Date.now().toString(36)}`;
 }
 
+/**
+ * The reply element is also the surface a quota wall or an application error
+ * renders into: run 41165214531's receipt claimed a passed first reply at
+ * 703ms while its frame showed "You have reached your weekly AI message
+ * limit". A visible reply element proves nothing on its own — the reply must
+ * carry real assistant content and must never be the rate limit or an error
+ * surface (JOV-9625). This intentionally extends the chat cert's inline quota
+ * pattern (#24014) with the generic error surfaces.
+ */
+const PROD_REPLY_FAILURE_PATTERN =
+  /reached your chat limit|out of messages|weekly (ai )?(message|chat) limit|message limit|application error|something went wrong|internal server error|could not verify your billing|temporarily limited|try again later/u;
+
+async function assertAssistantReply(page: Page, label: string): Promise<void> {
+  const reply = page.getByTestId('chat-message-reply').first();
+  let text = '';
+  await expect
+    .poll(
+      async () => {
+        text = (await reply.innerText()).trim();
+        return text.length;
+      },
+      { timeout: 15_000 }
+    )
+    .toBeGreaterThanOrEqual(2);
+  expect(
+    text,
+    `${label}: the reply is a quota or error surface, not an assistant response: ${text.slice(0, 200)}`
+  ).not.toMatch(PROD_REPLY_FAILURE_PATTERN);
+}
+
 function hasProdAuthCredentials(): boolean {
   return resolveProductionAuthCredentials() !== null;
 }
@@ -1029,6 +1059,30 @@ test.describe('Production Auth Smoke @production-smoke', () => {
         });
         await expect(composer).toBeEditable();
 
+        // JOV-10150: pin the registered screen by pathname. Every chat shell
+        // route (including /app/chat) server-redirects to /start for a
+        // session without a publishable profile (DashboardShellContent →
+        // needsOnboarding → shouldRedirectToOnboarding), and the redirect
+        // commits inside the shell's Suspense boundary — the origin-only
+        // navigation assert above passes while these contracts run against
+        // /start's onboarding composer, which renders the same 'Chat Message
+        // Input' textarea with no attach toolbar (run 41246664514: 3/3
+        // 'Attachment options' timeouts on prod bd2ec7d0 even after #24066
+        // added this navigation). Fail here naming the surface the session
+        // actually landed on instead of surfacing as an element timeout.
+        const chatCertPath = new URL(page.url()).pathname;
+        if (chatCertPath !== APP_ROUTES.CHAT) {
+          throw new Error(
+            `chat cert landed on ${chatCertPath}, not the registered ${APP_ROUTES.CHAT} screen — ` +
+              'the chat-health canary session never rendered the chat surface. ' +
+              'A /start landing means the canary has no publishable profile ' +
+              '(needsOnboarding redirect): apply the canary seed with ' +
+              '`cd apps/web && npx tsx --import ../../scripts/ops/canary-seed/shim-preload.mjs ' +
+              '../../scripts/ops/canary-seed/seed-returning-canary.ts --apply` ' +
+              '(CHAT_HEALTH_CANARY_SEED, apps/web/lib/synthetic/returning-canary-seed-spec.ts).'
+          );
+        }
+
         // JOV-9625 outcome cert: the two local toolbar contracts, measured on
         // the composer's own attach toolbar — press feedback (button state
         // flips) and the local selector opening (palette becomes visible).
@@ -1351,6 +1405,10 @@ test.describe('Production Auth Smoke @production-smoke', () => {
         await expect(
           page.locator("[data-testid='chat-message-reply']").first()
         ).toBeVisible({ timeout: 60_000 });
+        // The reply element is also where a quota wall renders (the weekly
+        // limit streams its notice as an assistant message); a visible
+        // element alone is a false pass (JOV-9625). Require real content.
+        await assertAssistantReply(page, 'fresh-user onboarding first value');
         return 'first assistant reply';
       },
       () => 'fresh user reached first value: onboarding chat first reply'
