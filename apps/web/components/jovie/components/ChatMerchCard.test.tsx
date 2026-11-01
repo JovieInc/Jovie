@@ -280,9 +280,10 @@ describe('ChatMerchCard', () => {
       />
     );
 
-    expect(screen.getByTestId('chat-merch-mockup-failed')).toHaveTextContent(
-      'Preview unavailable'
-    );
+    expect(screen.getByTestId('chat-merch-mockup-failed')).toBeInTheDocument();
+    // JOV-9672: a failed mockup is a quiet placeholder; the sellability
+    // line below the card carries the real reason.
+    expect(screen.queryByText('Preview unavailable')).toBeNull();
     expect(screen.queryByAltText('Signal Tee mockup')).toBeNull();
   });
 });

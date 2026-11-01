@@ -39,12 +39,16 @@ export function getChatUsageCopy(data: ChatUsageData): ChatUsageCopy {
   const state = getChatUsageState(data);
 
   if (state === 'unavailable') {
+    // JOV-INV-046: the balance could not be verified, so the copy names that
+    // state and points at the refresh path instead of announcing an
+    // unavailable feature.
     return {
       state,
       planLabel: PLAN_LABELS[data.plan],
-      statusLabel: 'Usage Unavailable',
-      headerLabel: 'Usage unavailable',
-      headerAriaLabel: 'AI message usage is unavailable right now.',
+      statusLabel: 'Usage Not Verified',
+      headerLabel: 'Usage not verified',
+      headerAriaLabel:
+        'AI message usage could not be verified. Refresh to see the latest balance.',
       summaryTitle: 'Usage is temporarily unavailable',
       summaryDescription:
         'We could not verify the current message balance. Refresh before relying on this quota.',

@@ -25,7 +25,9 @@ describe('TokenizedText', () => {
     );
 
     const chip = screen.getByTestId('entity-chip');
-    expect(chip).toHaveTextContent('Unavailable reference');
+    // JOV-9672: an unresolved entity falls back to the kind's generic name
+    // instead of announcing an unavailable reference.
+    expect(chip).toHaveTextContent('Release');
     expect(screen.queryByText('Take Me Over')).toBeNull();
     expect(chip).toHaveAttribute('data-entity-kind', 'release');
     expect(chip).toHaveAttribute('data-entity-tone', 'onDark');

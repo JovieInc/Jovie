@@ -118,9 +118,16 @@ interface AssistantEntityMentionProps {
   readonly label: string;
 }
 
-function AssistantEntityMention({ kind, id }: AssistantEntityMentionProps) {
+function AssistantEntityMention({
+  kind,
+  id,
+  label: tokenLabel,
+}: AssistantEntityMentionProps) {
   const { ref: resolved } = useEntityResolution(kind, id);
-  const label = resolved?.label ?? 'Unavailable reference';
+  // JOV-INV-046 fallback treatment: the mention's own wire label is real
+  // message content, so an unresolved lookup falls back to it instead of
+  // explaining the miss.
+  const label = resolved?.label ?? tokenLabel;
 
   return (
     <EntityChipPopover kind={kind} id={id} label={label} entity={resolved}>

@@ -40,7 +40,9 @@ describe('AssistantMessageText', () => {
     );
 
     const span = screen.getByTestId('entity-chip-popover-trigger');
-    expect(span).toHaveTextContent('Unavailable reference');
+    // JOV-9672: the unresolved mention falls back to the entity kind's
+    // generic name instead of announcing an unavailable reference.
+    expect(span).toHaveTextContent('Release');
     expect(span).toHaveClass('system-b-entity-chip-trigger');
     const markdownSegments = screen.getAllByTestId('chat-markdown');
     expect(markdownSegments[0]).toHaveTextContent('Listen to');
@@ -54,7 +56,7 @@ describe('AssistantMessageText', () => {
     await user.click(screen.getByTestId('entity-chip-popover-trigger'));
     const content = await screen.findByTestId('entity-chip-popover-content');
     expect(content).toHaveAttribute('data-entity-kind', 'release');
-    expect(content.textContent).toContain('Unavailable reference');
+    expect(content.textContent).toContain('Release');
   });
 
   it('keeps structured markdown on the normal block renderer', () => {

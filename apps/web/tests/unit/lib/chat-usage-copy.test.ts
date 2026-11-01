@@ -58,6 +58,22 @@ describe('getChatUsageCopy', () => {
     expect(copy.state).toBe('healthy');
   });
 
+  it('describes an unverifiable balance without an unavailable dead end', () => {
+    const copy = getChatUsageCopy({
+      ...baseUsage,
+      weeklyLimit: -1,
+      remaining: 0,
+      isNearLimit: false,
+    });
+
+    // JOV-9672: the copy names the unverified state and its refresh path
+    // instead of announcing an unavailable feature.
+    expect(copy.state).toBe('unavailable');
+    expect(copy.statusLabel).toBe('Usage Not Verified');
+    expect(copy.headerLabel).toBe('Usage not verified');
+    expect(copy.headerAriaLabel).not.toMatch(/unavailable/i);
+    expect(copy.headerAriaLabel).toContain('Refresh');
+  });
   it('returns exhausted copy for free plans', () => {
     const copy = getChatUsageCopy({
       ...baseUsage,

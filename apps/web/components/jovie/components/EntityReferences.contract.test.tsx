@@ -106,14 +106,15 @@ describe('entity reference contract (JOV-8019 deliberate-red fixtures)', () => {
       expect(screen.queryByText('Other account secret')).toBeNull();
       expect(
         screen.getAllByRole('button', {
-          name: 'Release: Unavailable reference',
+          name: 'Release: Release',
         })
       ).toHaveLength(2);
       await userEvent.click(
         screen.getAllByTestId('entity-chip-popover-trigger')[0]
       );
+      // JOV-9672: unresolved entities fall back to the kind's generic name.
       expect(
-        await screen.findByRole('heading', { name: 'Unavailable reference' })
+        await screen.findByRole('heading', { name: 'Release' })
       ).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Open Release' })).toBeNull();
     }
@@ -154,7 +155,7 @@ describe('entity reference contract (JOV-8019 deliberate-red fixtures)', () => {
     expect(screen.queryByText('Private title')).toBeNull();
     await userEvent.click(screen.getByTestId('entity-chip-popover-trigger'));
     expect(
-      await screen.findByRole('heading', { name: 'Unavailable reference' })
+      await screen.findByRole('heading', { name: 'Release' })
     ).toBeInTheDocument();
     expect(screen.queryByText('Other private title')).toBeNull();
     expect(screen.queryByRole('img')).toBeNull();
