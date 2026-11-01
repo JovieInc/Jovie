@@ -199,9 +199,10 @@ describe('ChatComposerSurface accessibility states', () => {
     );
 
     const dictate = screen.getByRole('button', {
-      name: 'Dictation unavailable',
+      name: 'Hold to dictate',
     });
-    expect(dictate).toBeDisabled();
+    expect(dictate).toBeEnabled();
+    expect(dictate).toHaveClass('h-9', 'w-9');
     expect(dictate).toHaveAttribute('aria-pressed', 'false');
   });
 

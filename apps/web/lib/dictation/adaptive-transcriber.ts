@@ -8,6 +8,7 @@ import {
   INITIAL_GATEWAY_STATE,
   resolveFailureLadder,
 } from '@/lib/voice-gateway/realtime-session';
+import { DictationError } from './errors';
 import { createDictationRegistry } from './registry';
 import {
   DICTATION_MIC_CONSTRAINTS,
@@ -186,10 +187,13 @@ export function createAdaptiveTranscriber(
       });
     } catch (error) {
       fail(
-        error instanceof DOMException &&
-          (error.name === 'NotAllowedError' || error.name === 'SecurityError')
-          ? 'not-allowed'
-          : 'network'
+        error instanceof DictationError
+          ? error.code
+          : error instanceof DOMException &&
+              (error.name === 'NotAllowedError' ||
+                error.name === 'SecurityError')
+            ? 'not-allowed'
+            : 'network'
       );
     }
   };

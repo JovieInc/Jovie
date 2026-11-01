@@ -2865,6 +2865,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/dictation/token/route.ts",
+      "kind": "handler",
+      "route": "/api/dictation/token",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/dsp/bio-sync/route.ts",
       "kind": "handler",
       "route": "/api/dsp/bio-sync",

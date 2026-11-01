@@ -26,6 +26,15 @@
     "staleCredentialMs": 7200000
   },
   "providers": {
+    "elevenlabs": {
+      "hosts": ["api.elevenlabs.io"],
+      "defaultResource": "scribe",
+      "primaryText": [],
+      "secondaryText": [],
+      "budgetHeaders": [],
+      "conditionalGet": false,
+      "minWriteIntervalMs": 0
+    },
     "github": {
       "hosts": ["api.github.com", "uploads.github.com"],
       "defaultResource": "core",
