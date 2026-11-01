@@ -7,22 +7,8 @@ import {
   formatPublicPriceDisplay,
   getPublicPriceClaim,
 } from '@/lib/billing/offer-truth';
-import {
-  type ComparisonFeature,
-  PRICING_COMPARISON,
-} from '@/lib/entitlements/registry';
-
-const PUBLIC_PRICING_FEATURE_NAMES = new Set([
-  'Public Jovie profile page',
-  'Contact / subscriber capture',
-]);
-
-const PUBLIC_PRICING_COMPARISON = PRICING_COMPARISON.map(category => ({
-  ...category,
-  features: category.features.filter(feature =>
-    PUBLIC_PRICING_FEATURE_NAMES.has(feature.name)
-  ),
-})).filter(category => category.features.length > 0);
+import { PUBLIC_PRICING_COMPARISON } from '@/lib/billing/public-pricing-features';
+import type { ComparisonFeature } from '@/lib/entitlements/registry';
 
 type PlanColumn = 'free' | 'pro';
 

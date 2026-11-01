@@ -44,6 +44,7 @@ describe('HomepageHeroLight', () => {
     const light = screen.getByTestId('homepage-hero-light');
 
     expect(light).toHaveAttribute('aria-hidden', 'true');
+    expect(light).toHaveAttribute('data-animate', 'false');
     expect(light).toHaveAttribute('data-renderer', 'css');
     expect(light).toHaveAttribute('data-live', 'false');
     expect(light.querySelector('canvas')).toBeNull();
@@ -52,13 +53,29 @@ describe('HomepageHeroLight', () => {
     expect(light).toHaveTextContent('');
   });
 
+  it('stays a static poster on a capable device unless the budget enables it', () => {
+    const idle = vi.fn();
+    vi.stubGlobal('requestIdleCallback', idle);
+    stubMotion(false);
+    vi.stubGlobal('WebGL2RenderingContext', function WebGL2() {});
+
+    render(<HomepageHeroLight />);
+
+    const light = screen.getByTestId('homepage-hero-light');
+    expect(light).toHaveAttribute('data-animate', 'false');
+    expect(light).toHaveAttribute('data-renderer', 'css');
+    expect(light.querySelector('canvas')).toBeNull();
+    expect(idle).not.toHaveBeenCalled();
+    expect(startHeroLight).not.toHaveBeenCalled();
+  });
+
   it('does not create a canvas when reduced motion is on', () => {
     const idle = vi.fn();
     vi.stubGlobal('requestIdleCallback', idle);
     stubMotion(true);
     vi.stubGlobal('WebGL2RenderingContext', function WebGL2() {});
 
-    render(<HomepageHeroLight />);
+    render(<HomepageHeroLight animate />);
 
     expect(
       screen.getByTestId('homepage-hero-light').querySelector('canvas')
@@ -67,7 +84,7 @@ describe('HomepageHeroLight', () => {
     expect(startHeroLight).not.toHaveBeenCalled();
   });
 
-  it('loads the GL chunk after idle on a capable device', async () => {
+  it('loads the GL chunk after idle on a capable device when enabled', async () => {
     let idleCallback: (() => void) | undefined;
     vi.stubGlobal('WebGL2RenderingContext', function WebGL2() {});
     stubMotion(false);
@@ -85,7 +102,7 @@ describe('HomepageHeroLight', () => {
     });
     vi.stubGlobal('cancelIdleCallback', vi.fn());
 
-    render(<HomepageHeroLight />);
+    render(<HomepageHeroLight animate />);
     expect(startHeroLight).not.toHaveBeenCalled();
     expect(
       screen.getByTestId('homepage-hero-light').querySelector('canvas')

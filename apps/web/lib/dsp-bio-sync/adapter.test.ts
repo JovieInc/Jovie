@@ -271,6 +271,9 @@ describe('bio submission adapter', () => {
     });
     expect(load).toHaveBeenCalledTimes(1);
     expect(send).toHaveBeenCalledExactlyOnceWith({
+      stream: 'transactional',
+      purpose: 'dsp-bio-update',
+      consent: 'artist-request',
       to: 'support@example.test',
       subject: expect.stringContaining('Example Artist'),
       text: expect.stringContaining(BIO),

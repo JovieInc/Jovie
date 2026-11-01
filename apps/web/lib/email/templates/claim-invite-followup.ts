@@ -10,6 +10,10 @@
 import { APP_NAME } from '@/constants/app';
 import { BASE_URL } from '@/constants/domains';
 import {
+  getEmailPostalFooterHtml,
+  getEmailPostalFooterText,
+} from '@/lib/email/legal-footer';
+import {
   buildClickTrackingUrl,
   buildOpenTrackingUrl,
   type TrackingTokenPayload,
@@ -122,7 +126,7 @@ Claim it here: ${claimUrl}
 If you try it, let me know what you think. If you claim it and message me, I'll get it verified.
 
 Cheers,
-Tim${unsubscribeSection}`,
+Tim${unsubscribeSection}${getEmailPostalFooterText()}`,
 
     2: `${salutation}
 
@@ -133,7 +137,7 @@ Claim it here: ${claimUrl}
 Even if you don't end up using it, a quick reply on what turned you off would be super helpful.
 
 Cheers,
-Tim${unsubscribeSection}`,
+Tim${unsubscribeSection}${getEmailPostalFooterText()}`,
 
     3: `${salutation}
 
@@ -146,7 +150,7 @@ If you want the profile, grab it here. If you claim it and message me, I'll get 
 This is the last email I'll send about it.
 
 Cheers,
-Tim${unsubscribeSection}`,
+Tim${unsubscribeSection}${getEmailPostalFooterText()}`,
   };
 
   return messages[followUpNumber];
@@ -248,6 +252,7 @@ export function getFollowUpHtml(data: FollowUpTemplateData): string {
                 You received this because we created a profile for you based on your public music presence.
               </p>
               ${unsubscribeSection}
+              ${getEmailPostalFooterHtml()}
             </td>
           </tr>
         </table>

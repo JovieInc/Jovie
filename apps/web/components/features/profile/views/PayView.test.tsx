@@ -29,9 +29,11 @@ describe('PayView', () => {
     expect(
       await screen.findByRole('button', { name: 'Continue with Venmo' })
     ).toBeInTheDocument();
+    // Plain, specific hint: the amount to send, not an instruction to retype.
+    expect(screen.getByText(/^Send \$\d+ in Venmo\.$/)).toBeInTheDocument();
     expect(
-      screen.getByText('Enter the amount in Venmo before sending.')
-    ).toBeInTheDocument();
+      screen.queryByText(/Enter the amount in Venmo/)
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole('group', { name: 'Choose a payment method' })
     ).toBeInTheDocument();

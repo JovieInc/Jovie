@@ -17,8 +17,9 @@ import './HomepageAtmosphere.css';
 const OWNER = 'apps/web/components/homepage/HomepageArtistProfile.tsx';
 
 /**
- * Hero: the claim and the headline share one cinematic field. The decorative
- * light is a CSS poster that may upgrade to WebGL. It takes no flow space.
+ * Hero: the claim and the headline share one matte field with the real
+ * product beside them: the template profile capture (no person on `/`).
+ * The decorative light is a static CSS poster. It takes no flow space.
  */
 export function HomepageArtistHero({
   copy = HOMEPAGE_COPY.hero,
@@ -34,6 +35,7 @@ export function HomepageArtistHero({
       subhead={copy.subhead}
       claim={copy.claim}
       supportNote={copy.supportNote}
+      profile={copy.profile}
       sectionOwner={OWNER}
       sectionVariant='split-claim-card'
     />

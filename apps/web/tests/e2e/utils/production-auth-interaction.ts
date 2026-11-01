@@ -95,3 +95,17 @@ export async function waitForProductionDashboardContent(
 
   return contentHandle.jsonValue() as Promise<string>;
 }
+
+/**
+ * Settings > Billing mounts its heading client-side, so `main` is empty at
+ * DOMContentLoaded and right after the generic hydration wait. Poll for the
+ * first meaningful text instead of sampling `innerText` once (the 2026-10-29
+ * 05:06Z promotion failed on exactly that single sample returning "").
+ */
+export async function waitForCheckoutEntryContent(
+  page: Page,
+  timeoutMs = 15_000
+): Promise<string> {
+  const text = await waitForProductionDashboardContent(page, timeoutMs, 5);
+  return text.toLowerCase();
+}

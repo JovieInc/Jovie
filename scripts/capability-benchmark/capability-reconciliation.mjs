@@ -547,7 +547,12 @@ export function assertStackPatternRatchet(root, maximumLegacyFiles = 245) {
     surface => surface.evidence === 'legacy route-segment cache export'
   );
   if (legacy.length > maximumLegacyFiles)
-    throw new Error(`legacy Cache Components surface grew to ${legacy.length}`);
+    throw new Error(
+      `legacy Cache Components surface grew to ${legacy.length} (maximum ${maximumLegacyFiles}):\n${legacy
+        .map(surface => `  ${surface.id}`)
+        .sort()
+        .join('\n')}`
+    );
   return { legacyFiles: legacy.length };
 }
 

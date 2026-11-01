@@ -15,9 +15,6 @@ export type {
   AdminAssetType,
 } from './assets';
 
-// bragging-rights
-export type { AdminBraggingRights } from './bragging-rights';
-
 // creator-profiles
 export type {
   AdminCreatorProfileRow,

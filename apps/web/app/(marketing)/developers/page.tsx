@@ -61,6 +61,12 @@ const RESOURCE_LINKS = [
       'Anonymous `jovie` commands for agents: read public profile data and create claimable profiles.',
   },
   {
+    href: APP_ROUTES.DEVELOPERS_AGENTS,
+    label: 'Agent Connector',
+    description:
+      'The connector for assistants: tools, authentication, limits and draft expiry.',
+  },
+  {
     href: '/api-versioning',
     // ui-casing-allow: sentence-case labels per marketing plan phase 1
     label: 'API versioning and deprecation policy',

@@ -3,15 +3,18 @@ import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 export type JovieMarketingAccent = 'blue' | 'pink' | 'purple';
 
-export interface ShippedSiteTile {
+/**
+ * One profile state per tile. The shot is the real component that changes
+ * in that state, captured by the screenshot catalog (`profile-state-*`), so
+ * the differentiating UI is the whole crop. Titles say what the artist gets;
+ * the identity header is not repeated in every tile.
+ */
+export interface ProfileStateTile {
   readonly id: string;
-  readonly name: string;
-  readonly handle: string;
-  readonly href?: string;
-  readonly label: string;
+  readonly title: string;
+  readonly body: string;
   readonly scenarioId: string;
   readonly alt: string;
-  readonly kind: 'phone' | 'desktop';
 }
 
 export interface PlatformSpecTile {
@@ -29,7 +32,9 @@ const LIVE_PROFILE_HREF = TIM_WHITE_PROFILE.publicProfilePath;
 
 export const SHIPPED_SITES_SHOWCASE_COPY = {
   headline: 'The profile in action.',
-  body: 'Demonstration profiles and product views. Open Tim White’s public profile to see what is live now.',
+  body: 'One profile, shown with demo data. Open Tim White’s profile to see it live.',
+  liveProfileHref: LIVE_PROFILE_HREF,
+  liveProfileLabel: 'Open the live profile',
 } as const;
 
 export const PLATFORM_SPEC_BENTO_COPY = {
@@ -37,75 +42,27 @@ export const PLATFORM_SPEC_BENTO_COPY = {
   body: 'Profiles, capture, routing, and audience signal.',
 } as const;
 
-export const SHIPPED_SITE_TILES: readonly ShippedSiteTile[] = [
+export const PROFILE_STATE_TILES: readonly ProfileStateTile[] = [
   {
-    id: 'live-release',
-    name: TIM_WHITE_PROFILE.name,
-    handle: TIM_WHITE_PROFILE.publicProfileDisplay,
-    href: LIVE_PROFILE_HREF,
-    label: 'Latest Release',
-    scenarioId: 'tim-white-profile-live-mobile',
-    alt: "Demo of Tim White's Jovie artist profile with a release first.",
-    kind: 'phone',
+    id: 'shows',
+    title: 'Shows lead when you tour.',
+    body: 'Upcoming dates come first, each with its ticket link.',
+    scenarioId: 'profile-state-shows-mobile',
+    alt: 'Jovie profile events card listing upcoming shows with ticket buttons.',
   },
   {
-    id: 'tour',
-    name: TIM_WHITE_PROFILE.name,
-    handle: TIM_WHITE_PROFILE.publicProfileDisplay,
-    href: LIVE_PROFILE_HREF,
-    label: 'Nearby Shows',
-    scenarioId: 'tim-white-profile-tour-mobile',
-    alt: "Tim White's Jovie artist profile showing nearby tour dates.",
-    kind: 'phone',
+    id: 'release',
+    title: 'New music leads on release day.',
+    body: 'Your latest release is the first thing a visitor sees.',
+    scenarioId: 'profile-state-release-mobile',
+    alt: 'Jovie profile featured release card with a Listen now button.',
   },
   {
-    id: 'pay',
-    name: TIM_WHITE_PROFILE.name,
-    handle: TIM_WHITE_PROFILE.publicProfileDisplay,
-    href: LIVE_PROFILE_HREF,
-    label: 'Direct Support',
-    scenarioId: 'tim-white-profile-pay-mobile',
-    alt: "Tim White's Jovie artist profile with native support options.",
-    kind: 'phone',
-  },
-  {
-    id: 'subscribe',
-    name: TIM_WHITE_PROFILE.name,
-    handle: TIM_WHITE_PROFILE.publicProfileDisplay,
-    href: LIVE_PROFILE_HREF,
-    label: 'Audience capture',
-    scenarioId: 'tim-white-profile-subscribe-mobile',
-    alt: "Tim White's Jovie artist profile collecting release alerts.",
-    kind: 'phone',
-  },
-  {
-    id: 'listen',
-    name: TIM_WHITE_PROFILE.name,
-    handle: TIM_WHITE_PROFILE.publicProfileDisplay,
-    href: LIVE_PROFILE_HREF,
-    label: 'Listen Path',
-    scenarioId: 'tim-white-profile-listen-mobile',
-    alt: "Tim White's Jovie artist profile routing listeners to listen.",
-    kind: 'phone',
-  },
-  {
-    id: 'public-desktop',
-    name: TIM_WHITE_PROFILE.name,
-    handle: TIM_WHITE_PROFILE.publicProfileDisplay,
-    href: LIVE_PROFILE_HREF,
-    label: 'Desktop Site',
-    scenarioId: 'tim-white-profile-live-desktop',
-    alt: "Demo of Tim White's Jovie artist profile on desktop.",
-    kind: 'desktop',
-  },
-  {
-    id: 'deep-end-release',
-    name: 'The Deep End',
-    handle: 'Release page',
-    label: 'Presave',
-    scenarioId: 'release-presave-mobile',
-    alt: 'Jovie release page for The Deep End with a presave countdown.',
-    kind: 'phone',
+    id: 'capture',
+    title: 'Visits turn into your list.',
+    body: 'One step turns a visit into an email or text you can reach.',
+    scenarioId: 'profile-state-capture-mobile',
+    alt: 'Jovie profile signup card collecting an email address for new music.',
   },
 ] as const;
 

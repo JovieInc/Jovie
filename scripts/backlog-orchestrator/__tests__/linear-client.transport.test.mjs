@@ -34,14 +34,25 @@ function graphql(query, variables, options) {
 function withKey(key, fn) {
   const previous = process.env.LINEAR_API_KEY;
   const previousDir = process.env.LINEAR_BACKOFF_STATE_DIR;
+  const previousFallback = process.env.LINEAR_COOLDOWN_FALLBACK_DIR;
   const directory = fs.mkdtempSync(join(tmpdir(), 'linear-backoff-test-'));
+  // A failed publication keeps its deadline in the per-uid tmp fallback
+  // root, which LINEAR_BACKOFF_STATE_DIR does not isolate: a replay inside
+  // the deadline window reads the earlier run's fallback record and never
+  // reaches the failure under test. Each test owns its fallback root.
+  const fallback = fs.mkdtempSync(join(tmpdir(), 'linear-fallback-test-'));
   process.env.LINEAR_BACKOFF_STATE_DIR = directory;
+  process.env.LINEAR_COOLDOWN_FALLBACK_DIR = fallback;
   clock = Date.now();
   process.env.LINEAR_API_KEY = key;
   return Promise.resolve(fn()).finally(() => {
     fs.rmSync(directory, { recursive: true, force: true });
+    fs.rmSync(fallback, { recursive: true, force: true });
     if (previousDir === undefined) delete process.env.LINEAR_BACKOFF_STATE_DIR;
     else process.env.LINEAR_BACKOFF_STATE_DIR = previousDir;
+    if (previousFallback === undefined)
+      delete process.env.LINEAR_COOLDOWN_FALLBACK_DIR;
+    else process.env.LINEAR_COOLDOWN_FALLBACK_DIR = previousFallback;
     if (previous === undefined) delete process.env.LINEAR_API_KEY;
     else process.env.LINEAR_API_KEY = previous;
   });

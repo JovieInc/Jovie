@@ -168,6 +168,21 @@
   margin: 0;
 }
 
+/* Copy always wraps inside its column at every width (320 to 1920). A flex
+   item defaults to min-width:auto, which lets a long unbroken run push past
+   the container; the field clips it, so it reads as text cut off at the edge
+   instead of a scrollbar. Cap and wrap explicitly. */
+.homepage-hero-canvas__copy > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.homepage-hero-canvas__headline,
+.homepage-hero-canvas__subhead,
+.homepage-hero-canvas__support {
+  overflow-wrap: break-word;
+}
+
 /* Each sentence beat paints on its own line: the last painted line keeps
    at least two words at every width, on every browser's balance engine. */
 .homepage-hero-canvas__headline-beat {
@@ -181,30 +196,67 @@
 
 .homepage-hero-canvas__subhead,
 .homepage-hero-canvas__support {
-  max-width: 36rem;
+  max-width: min(36rem, 100%);
   margin: var(--space-3, 0.75rem) 0 0;
 }
 
-.homepage-hero-canvas__proof {
-  position: absolute;
-  z-index: 1;
-  right: var(--hero-canvas-chrome);
-  bottom: var(--space-4, 1rem);
-  width: 13rem;
-  pointer-events: none;
-}
-
-/* The shared phone class is 21.25rem in the old two-column hero. Inside this
-   field it has to follow the proof box, or it covers the headline. */
-.homepage-hero-canvas__proof .homepage-artist-hero__phone {
+/* The lead holds headline, subhead, and the claim: the one primary action. */
+.homepage-hero-canvas__lead {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  /* Fill the copy column. As a flex item of the align-start column it would
+     otherwise size to its max-content width and push the subhead and the
+     claim button past a phone viewport. */
+  align-self: stretch;
   width: 100%;
+  min-width: 0;
 }
 
-/* Phone-width field: the proof phone joins the field's flow under the
-   copy. Preserve the copy's natural height, including the claim form's
-   reserved status line; short viewports grow the field instead of
-   shrinking the headline or clipping the conversion control. The phone
-   keeps the real screen aspect and yields space before the field grows. */
+/* Real product shot: the template profile capture, a locator crop of the
+   top of the screen (identity, links, featured release) at 2x of 390 CSS
+   px. The box keeps the crop's real aspect and never renders wider than
+   the capture's native width, so the shot stays crisp. */
+.homepage-hero-canvas__proof {
+  position: relative;
+  aspect-ratio: 780 / 1264;
+  width: min(80vw, 20rem);
+  max-width: 24rem;
+  flex: none;
+  margin: var(--space-12, 3rem) auto 0;
+}
+
+/* The canonical phone screen defaults to a full-screen aspect; this shot is
+   a crop, so the frame takes the crop's aspect (no letterbox band). */
+.homepage-hero-canvas__shot {
+  aspect-ratio: 780 / 1264;
+}
+
+/* Desktop: a balanced two-column field. Lead left, shot right, both
+   centered on the spine. The shot's width follows the viewport height
+   (0.617 = 780 / 1264) so the whole crop stays inside the first viewport. */
+@media (min-width: 64rem) {
+  .homepage-hero-canvas__copy[data-has-proof="true"] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--space-16, 4rem);
+  }
+
+  .homepage-hero-canvas__copy[data-has-proof="true"]
+    .homepage-hero-canvas__proof {
+    justify-self: center;
+    width: min(
+      24rem,
+      calc((100svh - var(--hero-canvas-bar) - var(--space-32, 8rem)) * 0.617)
+    );
+    min-width: 18rem;
+    margin: 0;
+  }
+}
+
+/* Phone-width field: the copy grows to its natural height and the shot
+   follows the claim in flow, never layered over the headline. */
 @media (max-width: 63.99rem) {
   .homepage-hero-canvas__field {
     display: flex;
@@ -215,22 +267,17 @@
     flex: 1 0 auto;
     min-height: 0;
     height: auto;
-    overflow: hidden;
+    /* No clipping here: text wraps (see the width rules above), and a
+       clipping box would cut the composite field's focus ring, which draws
+       outside the pill edge. */
+    overflow: visible;
     justify-content: flex-start;
-    padding-bottom: var(--space-4, 1rem);
+    padding-top: var(--space-12, 3rem);
+    padding-bottom: var(--space-12, 3rem);
   }
 
   .homepage-hero-canvas__proof {
-    position: relative;
-    right: auto;
-    bottom: auto;
-    width: auto;
-    flex: 0 1 auto;
     align-self: center;
-    height: min(30svh, 15.75rem, calc(100svh - var(--hero-canvas-bar) - 20rem));
-    min-height: 7rem;
-    aspect-ratio: 402 / 874;
-    margin: 0 0 var(--space-4, 1rem);
   }
 }
 

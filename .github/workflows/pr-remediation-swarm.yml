@@ -1,0 +1,260 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: A hosted, per-PR remediator reads one red same-repository PR's failed logs with the Jovie Bot App token, applies a deterministic fix or a bounded cheap-model edit in a credential-free step, and a trusted step pushes one lease-guarded commit only after the diff guard and the local repro pass.
+# removal-trigger: Remove when the lanes fix-red ladder pushes at least as many first-attempt greens as this swarm on hosted runners, or when Codex fix-red moves to hosted runners.
+name: PR Remediation Swarm
+
+# Tim 2026-10-28: many cheap remediators, each owning one PR, on free
+# GitHub-hosted runners. A run with nothing to fix costs $0: the deterministic
+# gate (no failing check, CI still running, no concrete error, already handled
+# this head, sensitive paths, closed model budget) skips before any claim or
+# model call. Only a model-fixable class with a concrete error extract reaches
+# the model, with the extract plus the files it names (about 20k tokens).
+# Event-driven: repository_dispatch `swarm-remediate` {pr, sha} from Lane Fix
+# Relay (the one topology-approved remediation dispatcher; wired after #23537).
+# workflow_dispatch stays the manual path and the paced `behind` batch. All API
+# traffic uses the Jovie Bot App installation token so the repo's Actions
+# GITHUB_TOKEN quota is not touched. Fan-out is SWARM_MAX_PARALLEL (default 20).
+# The lanes claim comment ("lane claim kind=fix") is the shared lease.
+
+on:
+  # Event wake: Lane Fix Relay (the one topology-approved remediation dispatcher) sends
+  # `swarm-remediate` with {pr, sha} when a required check fails on a same-repo PR head.
+  repository_dispatch:
+    types: [swarm-remediate]
+  workflow_dispatch:
+    inputs:
+      prs:
+        description: Comma-separated PR numbers (empty = every lane-fix-red PR, plus lane-fix-conflict PRs for sync-main, plus up to 10 clean BEHIND PRs for update-branch)
+        required: false
+        default: ''
+      modes:
+        description: 'Which PRs to select when prs is empty: all, or a comma list of red, conflict, behind'
+        required: false
+        default: all
+      limit:
+        description: Max PRs this run
+        required: false
+        default: '30'
+
+permissions: {}
+
+env:
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  select:
+    name: Select red PRs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+      reason: ${{ steps.pick.outputs.reason }}
+    steps:
+      - name: Checkout trusted main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Mint App token (read)
+        id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-pull-requests: read
+          permission-issues: read
+      - name: Smoke the log path (gh version, one real job log, fails loudly if empty)
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: python3 scripts/swarm/pr_remediation_swarm.py smoke
+      - name: Quota-aware selection
+        id: pick
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          PR: ${{ inputs.prs || github.event.client_payload.pr }}
+          LIMIT: ${{ inputs.limit || '1' }}
+          MODES: ${{ inputs.modes || 'red' }}
+          DAILY_CAP: ${{ vars.SWARM_DAILY_USD_CAP || '5' }}
+          ATTEMPT_CAP: ${{ vars.SWARM_ATTEMPT_USD_CAP || '0.10' }}
+          LEDGER_ISSUE: ${{ vars.SWARM_LEDGER_ISSUE }}
+          SWARM_API_KEY: ${{ secrets.SWARM_WORKERS_AI_TOKEN }}
+          SWARM_BASE_URL: ${{ vars.SWARM_BASE_URL }}
+          SWARM_CREDIT_PROBE: ${{ vars.SWARM_CREDIT_PROBE }}
+        run: python3 scripts/swarm/pr_remediation_swarm.py select --pr "$PR" --limit "$LIMIT" --daily-cap-usd "$DAILY_CAP" --attempt-cap-usd "$ATTEMPT_CAP" --ledger-issue "$LEDGER_ISSUE" --modes "${MODES:-all}"
+
+  remediate:
+    name: Remediate #${{ matrix.pr }}
+    needs: select
+    if: needs.select.outputs.matrix != '[]' && needs.select.outputs.matrix != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ fromJSON(vars.SWARM_MAX_PARALLEL || '20') }}
+      matrix:
+        include: ${{ fromJSON(needs.select.outputs.matrix) }}
+    concurrency:
+      group: pr-remediation-swarm-${{ matrix.pr }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout trusted main (scripts, actions)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Attempt file paths
+        run: |
+          {
+            echo "PLAN=$RUNNER_TEMP/plan.json"
+            echo "LOG=$RUNNER_TEMP/failed.log"
+            echo "META=$RUNNER_TEMP/agent.json"
+            echo "METRICS=$RUNNER_TEMP/metrics.jsonl"
+          } >> "$GITHUB_ENV"
+      - name: Mint App token (write)
+        id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+          permission-actions: write
+          permission-checks: read
+      - name: Gate, claim, fetch failing logs once, classify
+        id: prep
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: python3 scripts/swarm/pr_remediation_swarm.py prepare --pr "${{ matrix.pr }}" --mode "${{ matrix.mode || 'red' }}" --agent "${{ matrix.agent }}" --plan "$PLAN" --log "$LOG"
+      - name: Checkout PR head (no persisted credentials)
+        if: steps.prep.outputs.action != 'none'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.prep.outputs.sha }}
+          path: pr
+          fetch-depth: 200
+          persist-credentials: false
+      - name: Point origin at the branch
+        if: steps.prep.outputs.action != 'none'
+        working-directory: pr
+        run: git checkout -B "swarm-work" && git fetch --no-tags origin main --depth=200
+      - name: Deterministic fix (no model)
+        if: steps.prep.outputs.action == 'sync-main' || steps.prep.outputs.action == 'wire-ci-fast'
+        run: python3 scripts/swarm/pr_remediation_swarm.py fix --plan "$PLAN" --cwd pr
+      - name: Prime Node toolcache
+        if: steps.prep.outputs.action == 'agent' || steps.prep.outputs.action == 'regen'
+        uses: ./.github/actions/prime-node-toolcache
+        with:
+          node-version-file: .nvmrc
+      - name: Setup Node
+        if: steps.prep.outputs.action == 'agent' || steps.prep.outputs.action == 'regen'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Install dependencies for the allowlisted regeneration (no secrets in env)
+        if: steps.prep.outputs.action == 'regen'
+        working-directory: pr
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile --prefer-offline --ignore-scripts
+      - name: Regenerate with an allowlisted command (no model)
+        if: steps.prep.outputs.action == 'regen'
+        run: python3 scripts/swarm/pr_remediation_swarm.py regen --plan "$PLAN" --cwd pr
+      - name: Stage provider key outside the checkout (no repo code runs here)
+        if: steps.prep.outputs.action == 'agent'
+        env:
+          SWARM_API_KEY: ${{ secrets.SWARM_WORKERS_AI_TOKEN }}
+        run: |
+          umask 077
+          printf '%s' "$SWARM_API_KEY" > "$RUNNER_TEMP/swarm-key"
+      - name: Cheap agent (no shell, no key or GitHub token in env, hard cost stop)
+        if: steps.prep.outputs.action == 'agent'
+        env:
+          SWARM_BASE_URL: ${{ vars.SWARM_BASE_URL }}
+          SWARM_MODELS: ${{ vars.SWARM_MODELS || '@cf/zai-org/glm-5.3-flash' }}
+          SWARM_ATTEMPT_USD_CAP: ${{ vars.SWARM_ATTEMPT_USD_CAP || '0.10' }}
+        run: python3 scripts/swarm/pr_remediation_swarm.py agent --plan "$PLAN" --cwd pr --log "$LOG" --meta "$META" --key-file "$RUNNER_TEMP/swarm-key" --max-steps 8 --timeout 600
+      - name: Remove staged key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/swarm-key"
+      - name: Diff guard
+        id: guard
+        if: steps.prep.outputs.action != 'none'
+        run: python3 scripts/swarm/pr_remediation_swarm.py guard --plan "$PLAN" --cwd pr
+      - name: Install dependencies for the repro
+        id: install
+        if: steps.prep.outputs.action == 'agent' && steps.guard.outputs.guard == 'ok'
+        working-directory: pr
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile --prefer-offline --ignore-scripts
+      - name: Local repro (push gate)
+        id: repro
+        if: steps.prep.outputs.action == 'agent' && steps.guard.outputs.guard == 'ok'
+        working-directory: pr
+        run: |
+          if pnpm preflight; then echo "result=ok" >> "$GITHUB_OUTPUT"; else echo "result=fail" >> "$GITHUB_OUTPUT"; fi
+      - name: Push one commit if the gate held, receipt, release claim
+        if: always() && steps.prep.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GUARD: ${{ steps.guard.outputs.guard || 'fail' }}
+          REPRO: ${{ steps.prep.outputs.action == 'agent' && (steps.repro.outputs.result == 'ok' && 'ok' || 'fail') || 'n/a' }}
+        run: python3 scripts/swarm/pr_remediation_swarm.py finalize --plan "$PLAN" --cwd pr --guard "$GUARD" --repro "$REPRO" --agent-meta "$META" --metrics "$METRICS"
+      - name: Upload attempt metrics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: swarm-attempt-${{ matrix.pr }}
+          retention-days: 2
+          path: ${{ runner.temp }}/metrics.jsonl
+          if-no-files-found: ignore
+
+  report:
+    name: Metrics and ledger
+    needs: [select, remediate]
+    if: always() && needs.remediate.result != 'skipped'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout trusted main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Download attempt metrics
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: swarm-attempt-*
+          path: ${{ runner.temp }}/attempts
+      - name: Summarize
+        id: sum
+        run: |
+          python3 scripts/swarm/pr_remediation_swarm.py summarize --dir "$RUNNER_TEMP/attempts" --out "$RUNNER_TEMP/summary.md"
+          cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          mkdir -p "$RUNNER_TEMP/out" && cat "$RUNNER_TEMP/attempts"/*/metrics.jsonl > "$RUNNER_TEMP/out/swarm-metrics.jsonl" 2>/dev/null || true
+      - name: Upload JSONL (Summer/Ovie read this)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: swarm-metrics-${{ github.run_id }}
+          path: ${{ runner.temp }}/out/swarm-metrics.jsonl
+          if-no-files-found: ignore
+      - name: Mint App token (ledger write)
+        id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-issues: write
+      - name: Append spend to the ledger issue
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: python3 scripts/swarm/pr_remediation_swarm.py ledger --issue "${{ vars.SWARM_LEDGER_ISSUE }}" --run "${{ github.run_id }}" --cents "${{ steps.sum.outputs.cents }}"

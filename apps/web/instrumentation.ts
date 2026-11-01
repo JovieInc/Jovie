@@ -79,19 +79,7 @@ function shouldReportToSentry(issues: string[]): boolean {
     return false;
   }
 
-  // Filter out issues that are warnings in disguise or expected in certain contexts
-  const trulyBlockingIssues = issues.filter(issue => {
-    if (
-      issue.includes('CLERK') &&
-      (process.env.NEXT_PUBLIC_AUTH_MOCK === '1' ||
-        process.env.NEXT_PUBLIC_CLERK_MOCK === '1')
-    ) {
-      return false;
-    }
-    return true;
-  });
-
-  return trulyBlockingIssues.length > 0;
+  return issues.length > 0;
 }
 
 /**
@@ -178,6 +166,19 @@ async function runEnvironmentValidationWithRetry() {
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
+    // JOV-9959: staging/preview must never boot against the production DB.
+    // Throws (crashing boot loudly) on a host collision; warns when the prod
+    // host reference is not yet provisioned so the gap stays visible.
+    try {
+      const { assertStagingDatabaseIsolation } = await import(
+        '@/lib/startup/db-host-guard'
+      );
+      assertStagingDatabaseIsolation(process.env);
+    } catch (error) {
+      console.error('[STARTUP] DB host isolation guard failed:', error);
+      throw error;
+    }
+
     const { musicResolverCutoverReceipt } = await import(
       '@/lib/music-resolver/musicfetch-gate'
     );

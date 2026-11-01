@@ -19,6 +19,7 @@ import {
   buildPreflightEnv,
   deriveSteps,
   JOB_ID,
+  lintBody,
   main,
   prepareStatement,
   splitStatements,
@@ -27,6 +28,84 @@ import {
 } from './preflight.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+async function lintRepairDiff(
+  before,
+  after,
+  filename = 'feedback.test.ts',
+  marker = '<!-- customer-changelog/v1 {"releaseWorthy":false} -->'
+) {
+  const cwd = mkdtempSync(path.join(tmpdir(), 'pf-body-'));
+  const env = buildPreflightEnv();
+  const git = (...args) => {
+    const result = spawnSync('git', args, { cwd, env, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+  };
+  try {
+    git('init', '-q', '-b', 'main');
+    git('config', 'user.name', 'Preflight fixture');
+    git('config', 'user.email', 'fixture@example.com');
+    mkdirSync(path.dirname(path.join(cwd, filename)), { recursive: true });
+    writeFileSync(path.join(cwd, filename), before);
+    git('add', '.');
+    git('-c', 'commit.gpgsign=false', 'commit', '-qm', 'base');
+    git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+    writeFileSync(path.join(cwd, filename), after);
+    git('add', '.');
+    git('-c', 'commit.gpgsign=false', 'commit', '-qm', 'repair');
+    const bodyFile = path.join(cwd, 'body.md');
+    writeFileSync(
+      bodyFile,
+      `${marker}\n` +
+        '## Red-before-green\n- Failing command: node --test feedback.test.ts\n' +
+        '```text\nFAIL feedback regression\n```\n'
+    );
+    return await lintBody({
+      bodyFile,
+      title: 'fix: feedback',
+      base: 'main',
+      cwd,
+      env,
+    });
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+test('body preflight rejects a repair that only weakens an assertion', async () => {
+  const result = await lintRepairDiff(
+    'expect(feedback).toBe("Copied!");\n',
+    'expect(feedback).toBeTruthy();\n'
+  );
+  assert.ok(result.errors.some(error => error.startsWith('assertions:')));
+});
+
+test('body preflight accepts a specific regression assertion and canonical JSON marker', async () => {
+  const result = await lintRepairDiff(
+    'expect(feedback).toBeTruthy();\n',
+    'expect(feedback).toBe("Copied!");\n'
+  );
+  assert.deepEqual(result.errors, []);
+});
+
+test('body preflight applies the hosted customer-note contract to changed UI', async () => {
+  const result = await lintRepairDiff(
+    'export const feedback = "Copy";\n',
+    'export const feedback = "Copied!";\n',
+    'apps/web/components/features/feedback.tsx'
+  );
+  assert.deepEqual(result.errors, []);
+});
+
+test('body preflight rejects a malformed customer-note marker on changed UI', async () => {
+  const result = await lintRepairDiff(
+    'export const feedback = "Copy";\n',
+    'export const feedback = "Copied!";\n',
+    'apps/web/components/features/feedback.tsx',
+    '<!-- customer-changelog/v1 {"releaseWorthy":"false"} -->'
+  );
+  assert.ok(result.errors.some(error => error.startsWith('changelog-marker:')));
+});
 
 const workflow = extra => `
 name: fixture
@@ -77,6 +156,57 @@ test('set -e is neutralised and || exit is contained', () => {
   assert.equal(prepareStatement('set -euo pipefail'), 'set -uo pipefail');
   assert.match(prepareStatement('test 1 -eq 2 || exit 7'), /^\( test/);
   assert.match(prepareStatement('if x; then\n exit 0\nfi'), /^\( if/);
+});
+
+test('local history fetch preserves shallow-clone flags and fetch failures', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'pf-fetch-'));
+  const argsFile = path.join(dir, 'fetch-args');
+  writeFileSync(
+    path.join(dir, 'git'),
+    `#!/bin/bash
+if [ "$1" = rev-parse ]; then echo "$PREFLIGHT_SHALLOW"; exit 0; fi
+printf '%s\\n' "$@" > "$PREFLIGHT_FETCH_ARGS"
+if [ "$PREFLIGHT_SHALLOW" = false ] && [[ " $* " == *" --unshallow "* ]]; then exit 128; fi
+exit "$PREFLIGHT_FETCH_STATUS"
+`,
+    { mode: 0o700 }
+  );
+  try {
+    for (const [shallow, fetchStatus] of [
+      ['false', 0],
+      ['true', 0],
+      ['false', 43],
+    ]) {
+      const result = spawnSync(
+        'bash',
+        [
+          '-c',
+          prepareStatement(
+            'git fetch --no-tags --unshallow --filter=blob:none origin main'
+          ),
+        ],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${dir}:${process.env.PATH}`,
+            PREFLIGHT_SHALLOW: String(shallow),
+            PREFLIGHT_FETCH_STATUS: String(fetchStatus),
+            PREFLIGHT_FETCH_ARGS: argsFile,
+          },
+        }
+      );
+      assert.equal(result.status, fetchStatus, result.stderr);
+      const args = readFileSync(argsFile, 'utf8').trim().split('\n');
+      assert.equal(args.includes('--unshallow'), shallow === 'true');
+      assert.deepEqual(
+        args.filter(arg => arg !== '--unshallow'),
+        ['fetch', '--no-tags', '--filter=blob:none', 'origin', 'main']
+      );
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('substitute reports expressions with no local value', () => {
@@ -413,4 +543,43 @@ jobs:
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('body preflight supplies a valid internal-work repair only for a missing decision', async () => {
+  const before = 'export const operator = false;\n';
+  const after = 'export const operator = true;\n';
+  const filename = 'apps/web/lib/ovie/operator.ts';
+  for (const missing of ['', 'releaseWorthy:false', '## Release note']) {
+    const red = await lintRepairDiff(before, after, filename, missing);
+    assert.ok(red.errors.some(error => error.includes('missing-metadata')));
+    assert.equal(
+      red.template,
+      '<!-- customer-changelog/v1 {"releaseWorthy":false} -->'
+    );
+    const green = await lintRepairDiff(before, after, filename, red.template);
+    assert.deepEqual(green.errors, []);
+    assert.equal(green.template, '');
+  }
+  for (const invalid of [
+    '<!-- customer-changelog/v1 nope -->',
+    '<!-- customer-changelog/v1 {"releaseWorthy":false} -->\n<!-- customer-changelog/v1 {"releaseWorthy":false} -->',
+  ]) {
+    const result = await lintRepairDiff(before, after, filename, invalid);
+    assert.ok(
+      result.errors.some(error => error.startsWith('changelog-marker:'))
+    );
+    assert.equal(
+      result.template,
+      '',
+      'never append another decision to invalid or ambiguous metadata'
+    );
+  }
+  const internal = await lintRepairDiff(
+    before,
+    after,
+    'scripts/operator.mjs',
+    ''
+  );
+  assert.deepEqual(internal.errors, []);
+  assert.equal(internal.template, '');
 });

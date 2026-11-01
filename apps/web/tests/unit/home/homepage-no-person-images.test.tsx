@@ -10,6 +10,20 @@ import { describe, expect, it, vi } from 'vitest';
  * per-route allowlist never lists `/`; people.mjs enforces that half.
  */
 vi.mock('@/lib/analytics', () => ({ track: vi.fn(), page: vi.fn() }));
+vi.mock('@/lib/content-records/store.server', async () => {
+  const { MARKETING_PAGE_KIND } = await import(
+    '@/lib/content-records/marketing-page'
+  );
+  return {
+    getLiveContent: async () => ({
+      data: MARKETING_PAGE_KIND.defaultRecord('home'),
+      source: 'default',
+      versionId: null,
+      version: null,
+      publishedAt: null,
+    }),
+  };
+});
 vi.mock('next/navigation', async importOriginal => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => ({ push: vi.fn() }),
@@ -44,7 +58,7 @@ describe('homepage shows no real person', () => {
 
   it('renders no registered person image or Tim capture', async () => {
     const { default: HomePage } = await import('@/app/(home)/page');
-    const { container } = render(HomePage());
+    const { container } = render(await HomePage());
     const sources = [...container.querySelectorAll('img, source')].flatMap(
       node => [node.getAttribute('src'), node.getAttribute('srcset')]
     );

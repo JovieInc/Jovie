@@ -200,6 +200,8 @@ export function evaluateAccessSignal(
 }
 
 export interface OnboardingAccessInput {
+  /** Undefined is legacy state; null is an explicitly unresolved role. */
+  readonly activeRole?: string | null;
   readonly accessControlled: boolean;
   readonly spotifyArtistId: string | null;
   /** Any public profile link (propose_social_link); qualifies non-artists. */
@@ -231,12 +233,20 @@ export interface OnboardingAccessInput {
 export function decideOnboardingAccess(
   input: OnboardingAccessInput
 ): AccessDecision {
+  if (input.activeRole === null)
+    return {
+      kind: 'needs_more_info',
+      rationale: 'role_priority_required',
+      score: 0,
+    };
+  const musicJob =
+    input.activeRole === undefined || input.activeRole === 'artist';
   if (input.accessControlled) {
     // Tim 2026-10-25: admit when the golden path is green. A server-resolved,
     // non-high-profile artist is admitted instead of waitlisted; the claim
     // path reserves the capacity slot and records the same reason.
     const admission = decideGoldenPathAdmission({
-      spotifyArtistId: input.spotifyArtistId,
+      spotifyArtistId: musicJob ? input.spotifyArtistId : null,
       reach: getDisplaySpotifyFollowers(
         input.metrics ??
           normalizeArtistMetrics(
@@ -259,7 +269,7 @@ export function decideOnboardingAccess(
     // Artists are admitted first; everyone else reserves their name (Tim
     // 2026-09-29, JOV-3379). Either a confirmed Spotify artist or any public
     // profile link is enough evidence to save the reservation.
-    if (!input.spotifyArtistId && !input.publicProfileUrl) {
+    if (!(musicJob && input.spotifyArtistId) && !input.publicProfileUrl) {
       return {
         kind: 'needs_more_info',
         rationale: 'public_profile_required_for_waitlist',
@@ -280,8 +290,8 @@ export function decideOnboardingAccess(
   }
   return evaluateAccessSignal({
     signal: collapseInterviewSignals(signals),
-    spotifyFollowers: input.spotifyFollowers,
-    metrics: input.metrics,
+    spotifyFollowers: musicJob ? input.spotifyFollowers : null,
+    metrics: musicJob ? input.metrics : null,
     turnCount: input.turnCount,
   });
 }

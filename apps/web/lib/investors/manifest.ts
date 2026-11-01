@@ -1,6 +1,8 @@
-import { promises as fs } from 'node:fs';
 import { captureError } from '@/lib/error-tracking';
-import { resolveAppContentPath } from '@/lib/filesystem-paths';
+import { readInvestorPrivateText } from '@/lib/investors/private-content';
+
+/** Path of the manifest inside the private investor store. */
+export const INVESTOR_MANIFEST_PATH = 'content/investors/manifest.json';
 
 export interface InvestorPage {
   slug: string;
@@ -45,9 +47,9 @@ export async function getInvestorManifest(): Promise<InvestorManifest> {
     return cachedManifest;
   }
 
-  const manifestPath = resolveAppContentPath('investors/manifest.json');
+  const manifestPath = INVESTOR_MANIFEST_PATH;
   try {
-    const raw = await fs.readFile(manifestPath, 'utf-8');
+    const raw = await readInvestorPrivateText(manifestPath);
     cachedManifest = JSON.parse(raw) as InvestorManifest;
     return cachedManifest;
   } catch (error) {

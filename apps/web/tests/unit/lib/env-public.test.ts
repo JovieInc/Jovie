@@ -17,12 +17,14 @@ describe('env-public', () => {
     expect(publicEnv.NEXT_PUBLIC_AUTH_MOCK).toBe('1');
   });
 
-  it('reads retired Clerk mock env as AUTH_MOCK fallback', async () => {
+  it('ignores the retired Clerk mock and proxy env aliases', async () => {
     vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+    vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_DISABLED', '1');
 
     const { publicEnv } = await import('@/lib/env-public');
 
-    expect(publicEnv.NEXT_PUBLIC_AUTH_MOCK).toBe('1');
+    expect(publicEnv.NEXT_PUBLIC_AUTH_MOCK).toBeUndefined();
+    expect(publicEnv.NEXT_PUBLIC_AUTH_PROXY_DISABLED).toBeUndefined();
   });
 
   it('reads auth proxy disabling from the runtime html dataset', async () => {

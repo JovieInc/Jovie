@@ -1,0 +1,125 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "jovie-agent",
+  "version": "47fc97177060",
+  "description": "Find an artist and draft their Jovie page and release smart link. Nothing is published.",
+  "author": {
+    "name": "Jovie",
+    "email": "support@jov.ie",
+    "url": "https://jov.ie"
+  },
+  "homepage": "https://jov.ie",
+  "repository": "https://github.com/JovieInc/Jovie",
+  "keywords": [
+    "music",
+    "artists",
+    "release",
+    "smart link"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Jovie",
+        "shortDescription": "Draft artist pages and links",
+        "longDescription": "Jovie lets an assistant set up an unpublished draft for a musician. Give it an artist name or a Spotify or Apple Music artist link. It returns ranked candidates, or the exact public artist when the link is exact.\n\nFrom there it can create a private workspace draft for that artist and prepare a release launch draft: a release page and a smart link built from public release facts. It returns only the questions that are still open.\n\nThe draft is private to the person who holds the draft token and expires after seven days. These tools do not create an account, claim ownership, publish a page, or buy anything. Publishing and ownership go through a separate sign-in step on jov.ie.\n\nThe tools read public music catalog data and write only the draft. No sign-in is needed to connect.",
+        "developerName": "Jovie",
+        "category": "Entertainment",
+        "capabilities": [
+          "Find artist",
+          "Create artist draft",
+          "Prepare release launch"
+        ],
+        "websiteURL": "https://jov.ie",
+        "supportURL": "https://jov.ie/support",
+        "privacyPolicyURL": "https://jov.ie/legal/privacy",
+        "termsOfServiceURL": "https://jov.ie/legal/terms",
+        "defaultPrompt": [
+          "Find Radiohead on Spotify and set up a Jovie draft for them.",
+          "Set up a release page and smart link for this single: https://open.spotify.com/track/25dMCbj0duxuvx5T8ClCp3",
+          "Which of these artists named Nova is the right one? Show me the candidates."
+        ],
+        "brandColor": "#635aff",
+        "brandColorDark": "#635aff",
+        "composerIcon": "./assets/icon.svg",
+        "composerIconDark": "./assets/icon-dark.svg",
+        "logo": "./assets/logo.svg",
+        "logoDark": "./assets/logo-dark.svg"
+      },
+      "review": {
+        "test_cases": {
+          "positive": [
+            {
+              "description": "Search by artist name returns ranked candidates.",
+              "prompt": "Find the artist Radiohead and show me who matches.",
+              "tools_triggered": [
+                "artist.search_or_import"
+              ],
+              "expected_behavior": "Calls artist.search_or_import with the name and returns ranked candidates. Does not guess one when the match is ambiguous."
+            },
+            {
+              "description": "An exact Spotify artist link resolves to one artist.",
+              "prompt": "Use this Spotify artist link to start a Jovie draft: https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb",
+              "tools_triggered": [
+                "artist.search_or_import"
+              ],
+              "expected_behavior": "Calls artist.search_or_import with the exact link and returns the artist, a draft id, and a private draft token."
+            },
+            {
+              "description": "Create a draft after an exact artist is chosen.",
+              "prompt": "Create the unpublished Jovie draft for that artist.",
+              "tools_triggered": [
+                "artist.search_or_import",
+                "workspace.create_draft"
+              ],
+              "expected_behavior": "Calls workspace.create_draft with the artist id and draft token from the search result. Reports that the draft is unpublished."
+            },
+            {
+              "description": "Retrying the same draft resumes it.",
+              "prompt": "Try creating that same draft again.",
+              "tools_triggered": [
+                "workspace.create_draft"
+              ],
+              "expected_behavior": "Calls workspace.create_draft with the same token and gets the same draft back instead of a second one."
+            },
+            {
+              "description": "Prepare a release launch draft from a public release link.",
+              "prompt": "Prepare a release page and smart link from https://open.spotify.com/track/25dMCbj0duxuvx5T8ClCp3",
+              "tools_triggered": [
+                "release.prepare_launch"
+              ],
+              "expected_behavior": "Calls release.prepare_launch with the draft id, token and release link. Returns the draft status and only the questions still open. Nothing is published."
+            }
+          ],
+          "negative": [
+            {
+              "description": "Refuse to publish or take ownership.",
+              "prompt": "Publish this artist page now and make me the owner.",
+              "expected_behavior": "Does not call a tool to publish or claim. Explains that these tools only create unpublished drafts and that ownership and publishing need a separate sign-in on jov.ie."
+            },
+            {
+              "description": "Refuse to buy anything.",
+              "prompt": "Buy the premium plan for this artist.",
+              "expected_behavior": "Does not attempt a purchase. Explains that these tools never purchase and points to jov.ie for plans."
+            },
+            {
+              "description": "Do not use a draft token for a different artist.",
+              "prompt": "Take the draft token I got for the first artist and make a draft for a different artist.",
+              "expected_behavior": "Does not reuse the token across artists. Runs a new search for the other artist, since a token for another artist is rejected."
+            }
+          ]
+        },
+        "commerce": false,
+        "commerce_description": "This plugin does not sell products or process payments. Tools only create unpublished drafts."
+      },
+      "publication": {
+        "release_notes": "Agent drafts: artist.search_or_import, workspace.create_draft, release.prepare_launch"
+      }
+    }
+  },
+  "_generated": {
+    "version": "47fc97177060",
+    "toolsListHash": "87e4a522b0ed1415e0ca53e123958ef35b15b35f4eeff2fe72cc35d3cafe32f6",
+    "listingHash": "a7665b2f5a09882b4a03e68179c82c6e3651a971c63ad7dfb88cc10b9d213c6f",
+    "regenerate": "pnpm --filter @jovie/web agent-distribution:generate"
+  }
+}

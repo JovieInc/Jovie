@@ -92,6 +92,9 @@ test.beforeEach(async ({ page }) => {
   );
   await expect(page.locator('[data-app-shell-frame]')).toBeVisible();
   await waitForHydration(page);
+  // JOV-8973 (#23006) discloses the inbox Notes on demand, so open the
+  // disclosure first: the Notes box stays this spec's settle/draft anchor.
+  await page.getByRole('button', { name: 'Add Notes' }).click();
   await expect(
     page.getByRole('textbox', { name: 'Notes', exact: true })
   ).toBeVisible();

@@ -54,6 +54,11 @@ const mocks = vi.hoisted(() => ({
   ),
   sanitizeRedirectUrl: vi.fn().mockImplementation((url: string | null) => url),
   fetch: vi.fn(),
+  investorTokenLimit: vi.fn(),
+}));
+
+vi.mock('@/lib/rate-limit', () => ({
+  investorPortalTokenLimiter: { limit: mocks.investorTokenLimit },
 }));
 
 vi.mock('@/lib/auth/proxy-state', () => ({
@@ -1240,11 +1245,12 @@ describe('proxy.ts middleware', () => {
   });
 
   describe('path-based investor portal (proxy investor early returns)', () => {
-    it('lets investor response links bypass Clerk without stripping token params', async () => {
+    it('rate-limits valid investor response links without redirecting to sign-in', async () => {
+      mocks.investorTokenLimit.mockResolvedValue({ success: true });
       const req = createUnauthenticatedRequest({
         pathname: '/investor-portal/respond',
         searchParams: {
-          t: 'token-123',
+          t: 'a'.repeat(43),
           action: 'interested',
         },
       });
@@ -1254,6 +1260,9 @@ describe('proxy.ts middleware', () => {
       expect(res.headers.get('location')).toBeNull();
       expect(res.headers.get('X-Robots-Tag')).toContain('noindex');
       expect(res.headers.get('Cache-Control')).toBe('private, no-store');
+      expect(mocks.investorTokenLimit).toHaveBeenCalledWith(
+        'investor-portal:token:unknown'
+      );
       expect(mocks.clerkMiddleware).not.toHaveBeenCalled();
     });
   });

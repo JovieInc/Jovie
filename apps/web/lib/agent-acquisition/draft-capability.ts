@@ -15,13 +15,22 @@ import {
   draftCapabilitySchema,
 } from './draft-contract';
 
-function signature(body: string): Buffer {
+/**
+ * Domain-separated HMAC for agent-acquisition artifacts. Each artifact kind
+ * (draft capability, claim handoff) uses its own domain so one can never be
+ * replayed as the other.
+ */
+export function agentArtifactSignature(domain: string, body: string): Buffer {
   if (!env.URL_ENCRYPTION_KEY)
-    throw new Error('Draft capability signing is unavailable');
+    throw new Error('Agent artifact signing is unavailable');
   return createHmac('sha256', env.URL_ENCRYPTION_KEY)
-    .update('jovie-agent-draft/v1\0')
+    .update(`${domain}\0`)
     .update(body)
     .digest();
+}
+
+function signature(body: string): Buffer {
+  return agentArtifactSignature('jovie-agent-draft/v1', body);
 }
 
 export function draftTokenHash(token: string): string {

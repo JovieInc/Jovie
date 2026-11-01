@@ -5,8 +5,8 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 /**
  * /download access (JOV-7864 follow-up). The Mac download is the desktop
- * app, actions keep visible names, and the iPhone status is text — never a
- * disabled control that looks available.
+ * app, actions keep visible names, and the page offers only what can be
+ * downloaded: no iPhone dead end and no disabled control that looks available.
  */
 test.describe('download page access', () => {
   test.beforeEach(async ({ page }) => {
@@ -41,17 +41,12 @@ test.describe('download page access', () => {
     await expect(releases).toHaveCount(1);
   });
 
-  test('states the iPhone app as text, not a disabled control', async ({
-    page,
-  }) => {
-    // The (marketing) layout renders the sitewide email signup, whose sr-only
-    // success live region is also role='status'. Scope to the iPhone section.
-    await expect(page.locator('#iphone').getByRole('status')).toHaveText(
-      'Not a public download'
-    );
+  test('offers only what can be downloaded', async ({ page }) => {
+    await expect(page.locator('#iphone')).toHaveCount(0);
+    await expect(page.getByText('Not a public download')).toHaveCount(0);
     await expect(page.locator('button[disabled]')).toHaveCount(0);
     await expect(
       page.getByRole('link', { name: 'See iPhone status' })
-    ).toHaveAttribute('href', '#iphone');
+    ).toHaveCount(0);
   });
 });

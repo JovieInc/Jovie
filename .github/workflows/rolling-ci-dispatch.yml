@@ -654,9 +654,6 @@ jobs:
       # This binds the trusted runner output and tree; PR tests and their assertions remain untrusted test data, not a malicious-test attestation.
       - name: Run exact-head changed-line coverage when applicable
         working-directory: candidate
-        env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
-          CLERK_SECRET_KEY: sk_test_dummy_secret_for_coverage_run_only
         run: |
           set -euo pipefail
           unset GH_TOKEN GITHUB_TOKEN STATUS_TOKEN AI_GATEWAY_API_KEY CURSOR_API_KEY
@@ -842,6 +839,7 @@ jobs:
             scripts/lib/ci-repo-lanes.mjs
             scripts/lib/merge-queue-guard.mjs
             scripts/lib/merge-group-member-policy.mjs
+            scripts/lib/pr-size-exclusions.mjs
             scripts/lib/native-queue-policy-evidence.mjs
             scripts/lib/pre-land-changelog.mjs
             scripts/lib/pr-size-guard-policy.mjs

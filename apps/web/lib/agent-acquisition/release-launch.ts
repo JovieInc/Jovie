@@ -2,8 +2,10 @@ import 'server-only';
 
 import { createHash } from 'node:crypto';
 import { BASE_URL } from '@/constants/app';
+import { agentClaimUrl } from './claim-handoff';
 import {
   type AgentAcquisition,
+  invalidInputError,
   type PrepareReleaseLaunchInput,
   prepareReleaseLaunchSchema,
 } from './draft-contract';
@@ -31,14 +33,15 @@ export interface ReleaseFactConflict {
 
 export interface ReleaseLaunchResult {
   readonly status: 'launch_draft_ready' | 'draft_needs_input';
-  readonly next_action: 'review_draft' | 'provide_release_facts';
+  readonly next_action: 'send_user_claim_url' | 'provide_release_facts';
   readonly draft_id: string;
   readonly receipt_id: string;
   readonly status_url: string;
   readonly expires_at: string;
   readonly ownership: 'unverified';
   readonly published_url: null;
-  readonly claim_url: null;
+  /** Person-facing handoff (never the draft_token); see claim-handoff.ts. */
+  readonly claim_url: string;
   readonly acquisition: AgentAcquisition & { readonly draft_id: string };
   readonly goal: string;
   readonly release: {
@@ -321,14 +324,14 @@ function draftResult(
   const headline = title && artistName ? `${title} by ${artistName}` : null;
   return {
     status: needsInput ? 'draft_needs_input' : 'launch_draft_ready',
-    next_action: needsInput ? 'provide_release_facts' : 'review_draft',
+    next_action: needsInput ? 'provide_release_facts' : 'send_user_claim_url',
     draft_id: row.id,
     receipt_id: row.id,
     status_url: `${BASE_URL}/api/agents/drafts/${row.id}`,
     expires_at: row.expiresAt.toISOString(),
     ownership: 'unverified',
     published_url: null,
-    claim_url: null,
+    claim_url: agentClaimUrl(row),
     acquisition: { ...row.acquisition, draft_id: row.id },
     goal: input.goal,
     release: {
@@ -364,10 +367,25 @@ function draftResult(
     conflicts,
     questions,
     warnings: [
-      'This draft is unpublished. Human ownership verification and approval are required before publication.',
+      'This draft is unpublished. Show claim_url to the user: they sign in on Jovie, the artist is matched to its Spotify identity (well-known artists go through verification), and nothing is public until they publish it.',
     ],
     retryable: false,
   };
+}
+
+/**
+ * Stored launches predate claim handoffs (claim_url was null); the handoff is
+ * derived from the row at read time so replays always carry the current URL.
+ */
+function withClaimUrl(
+  row: NonNullable<Awaited<ReturnType<typeof loadAgentDraftForMutation>>>,
+  result: ReleaseLaunchResult
+): ReleaseLaunchResult {
+  const nextAction: ReleaseLaunchResult['next_action'] =
+    result.questions.length > 0
+      ? 'provide_release_facts'
+      : 'send_user_claim_url';
+  return { ...result, next_action: nextAction, claim_url: agentClaimUrl(row) };
 }
 
 function canonical(value: unknown): string {
@@ -396,13 +414,7 @@ const unavailable = () => ({
 
 export async function prepareReleaseLaunch(input: unknown) {
   const parsed = prepareReleaseLaunchSchema.safeParse(input);
-  if (!parsed.success)
-    return {
-      status: 'error' as const,
-      code: 'INVALID_INPUT' as const,
-      next_action: 'correct_input' as const,
-      retryable: false,
-    };
+  if (!parsed.success) return invalidInputError(parsed.error);
   const value = parsed.data;
   const inputFingerprint = fingerprint(value);
   const row = await loadAgentDraftForMutation(
@@ -411,7 +423,7 @@ export async function prepareReleaseLaunch(input: unknown) {
   );
   if (!row) return unavailable();
   if (row.preview.launch?.inputFingerprint === inputFingerprint) {
-    return row.preview.launch.result;
+    return withClaimUrl(row, row.preview.launch.result);
   }
   const resolution = await resolveAgentRelease(value);
   if (resolution.status === 'error') {
@@ -432,7 +444,7 @@ export async function prepareReleaseLaunch(input: unknown) {
   );
   if (!persisted) return unavailable();
   if (persisted.preview.launch?.inputFingerprint === inputFingerprint) {
-    return persisted.preview.launch.result;
+    return withClaimUrl(persisted, persisted.preview.launch.result);
   }
   return {
     status: 'error' as const,

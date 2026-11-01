@@ -341,6 +341,15 @@ export {
   type TrackArtist,
   trackArtists,
 } from './content';
+// Versioned content records (content as data)
+export {
+  type ContentRecordEventRow,
+  type ContentRecordLiveRow,
+  type ContentRecordVersionRow,
+  contentRecordEvents,
+  contentRecordLive,
+  contentRecordVersions,
+} from './content-records';
 // Conversation Insights (JOV-6784)
 export {
   type ConversationObjection,
@@ -695,6 +704,7 @@ export {
   insertInvestorUpdateFinalApprovalSchema,
   insertInvestorViewSchema,
   investorLinks,
+  investorPortalContent,
   investorSettings,
   investorStageEnum,
   investorStakeholderRecords,

@@ -47,6 +47,21 @@ function renderSheet(isAdmin: boolean, pathname = '/app') {
 }
 
 describe('KeyboardShortcutsSheet', () => {
+  it('shows active operator sequences instead of customer sequences on Ovie', () => {
+    const customer = renderSheet(true, '/app');
+    expect(screen.getByText('Go to contacts')).toBeInTheDocument();
+    customer.unmount();
+
+    renderSheet(true, '/app/ov/ops');
+    expect(screen.getByText('Go to home')).toBeInTheDocument();
+    expect(screen.getByText('Go to inbox')).toBeInTheDocument();
+    expect(screen.getByText('Go to shipping')).toBeInTheDocument();
+    expect(screen.getByText('Go to fleet')).toBeInTheDocument();
+    expect(screen.getByText('Go to capacity')).toBeInTheDocument();
+    expect(screen.queryByText('Go to contacts')).not.toBeInTheDocument();
+    expect(screen.getByText('Open command menu')).toBeInTheDocument();
+  });
+
   it('lists Toggle Ovie / Jovie for entitled users only', () => {
     const entitled = renderSheet(true);
     expect(entitled.getByText('Toggle Ovie / Jovie')).toBeInTheDocument();

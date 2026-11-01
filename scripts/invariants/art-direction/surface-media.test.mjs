@@ -26,10 +26,32 @@ const HAS_TS = (() => {
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, '../../..');
 const MOTION = 'apps/web/components/marketing/motion/';
-const MATTE = `${MOTION}matte-field-gl.ts`;
 const ZOOM = `${MOTION}hero-shell-zoom.ts`;
 const read = file => readFileSync(join(REPO, file), 'utf8');
 const entry = file => ({ file, source: read(file) });
+// Synthetic GL effect: the shipped marketing roots have no always-on GL
+// background left to use as a fixture (2026-10-29), so the deliberate-red
+// cases run against an in-memory registry entry.
+const FIXTURE = `${MOTION}fixture-field-gl.ts`;
+const FIXTURE_SOURCE = [
+  '// static fallback: the poster stays when this returns null',
+  "if (matchMedia('(prefers-reduced-motion: reduce)').matches) return null;",
+  "const gl = canvas.getContext('webgl2');",
+  'const observer = new IntersectionObserver(() => {});',
+  'const FRAME_INTERVAL = 1000 / 30;',
+].join('\n');
+const fixtureRegistry = () => {
+  const registry = structuredClone(loadEffects());
+  registry.effects.push({
+    id: 'fixture-field',
+    summary: 'Synthetic GL fixture.',
+    files: [FIXTURE],
+    fallback: 'static fallback',
+    reducedMotion: { marker: 'prefers-reduced-motion', requiredIn: [FIXTURE] },
+    budget: { gzipBytes: 2048, fpsCap: 30, pausesOffscreen: true },
+  });
+  return registry;
+};
 
 describe('surface media', () => {
   it('records unscoped canvas, WebGL, and video', () => {
@@ -82,12 +104,7 @@ describe('surface media', () => {
     assert.equal(source.includes('flag-default'), false);
     const result = checkSurface();
     assert.deepEqual(result.failures, []);
-    assert.ok(
-      result.ids.every(
-        id =>
-          !id.includes('hero-light') && !id.includes('MarketingAmbientField')
-      )
-    );
+    assert.ok(result.ids.every(id => !id.includes('hero-light')));
     assert.deepEqual(result.ids, [
       'video:apps/web/app/(marketing)/solutions/[audience]/sections.tsx',
       'video:apps/web/components/marketing/changelog/CustomerChangelogArchive.tsx',
@@ -99,10 +116,10 @@ describe('surface media', () => {
     assert.deepEqual(registryProblems(registry), []);
     assert.deepEqual(
       registry.effects.map(effect => effect.id),
-      ['homepage-hero', 'marketing-ambient-field', 'marketing-matte-motion']
+      ['homepage-hero', 'marketing-hero-zoom']
     );
-    assert.equal(scopeIdFor(MATTE), 'marketing-matte-motion');
-    assert.equal(scopeIdFor(ZOOM), 'marketing-matte-motion');
+    assert.equal(scopeIdFor(ZOOM), 'marketing-hero-zoom');
+    assert.equal(scopeIdFor(`${MOTION}matte-field-gl.ts`), null);
     assert.equal(
       scopeIdFor(`${HERO_SCOPE_PREFIX}anything.css`),
       'homepage-hero'
@@ -118,49 +135,50 @@ describe('surface media', () => {
   });
 
   it('fails an effect whose file drops prefers-reduced-motion (deliberate red)', () => {
+    const registry = fixtureRegistry();
+    assert.deepEqual(
+      effectViolations([{ file: FIXTURE, source: FIXTURE_SOURCE }], registry),
+      []
+    );
     const stripped = {
-      file: MATTE,
-      source: read(MATTE).replaceAll('prefers-reduced-motion', 'always-on'),
+      file: FIXTURE,
+      source: FIXTURE_SOURCE.replaceAll('prefers-reduced-motion', 'always-on'),
     };
-    assert.deepEqual(effectViolations([stripped, entry(ZOOM)]), [
-      `scope:marketing-matte-motion:missing-reduced-motion-in:${MATTE}`,
+    assert.deepEqual(effectViolations([stripped], registry), [
+      `scope:fixture-field:missing-reduced-motion-in:${FIXTURE}`,
     ]);
   });
 
   it('fails a GL file with no offscreen pause or no frame cap', () => {
-    const gl = read(MATTE)
-      .replace(/IntersectionObserver|visibilitychange/g, 'x')
-      .replace(/fpsCap|FRAME_INTERVAL|1000\s*\/\s*\d+/g, 'y');
-    const out = effectViolations([{ file: MATTE, source: gl }, entry(ZOOM)]);
-    assert.ok(
-      out.includes(
-        `scope:marketing-matte-motion:missing-offscreen-pause:${MATTE}`
-      )
+    const gl = FIXTURE_SOURCE.replace(
+      /IntersectionObserver|visibilitychange/g,
+      'x'
+    ).replace(/fpsCap|FRAME_INTERVAL|1000\s*\/\s*\d+/g, 'y');
+    const out = effectViolations(
+      [{ file: FIXTURE, source: gl }],
+      fixtureRegistry()
     );
     assert.ok(
-      out.includes(`scope:marketing-matte-motion:missing-fps-cap:${MATTE}`)
+      out.includes(`scope:fixture-field:missing-offscreen-pause:${FIXTURE}`)
     );
+    assert.ok(out.includes(`scope:fixture-field:missing-fps-cap:${FIXTURE}`));
   });
 
   it('fails an effect over its transpiled gzip budget', {
     skip: !HAS_TS,
   }, () => {
     const registry = structuredClone(loadEffects());
-    const effect = registry.effects.find(
-      e => e.id === 'marketing-matte-motion'
-    );
+    const effect = registry.effects.find(e => e.id === 'marketing-hero-zoom');
     effect.budget.gzipBytes = 100;
     effect.budget.perFileGzipBytes[ZOOM] = 100;
-    const out = effectViolations([entry(MATTE), entry(ZOOM)], registry);
+    const out = effectViolations([entry(ZOOM)], registry);
     assert.ok(
       out.some(f =>
-        f.startsWith(`scope:marketing-matte-motion:over-budget:${ZOOM}:`)
+        f.startsWith(`scope:marketing-hero-zoom:over-budget:${ZOOM}:`)
       )
     );
     assert.ok(
-      out.some(f =>
-        /^scope:marketing-matte-motion:over-budget:\d+>100$/.test(f)
-      )
+      out.some(f => /^scope:marketing-hero-zoom:over-budget:\d+>100$/.test(f))
     );
   });
 

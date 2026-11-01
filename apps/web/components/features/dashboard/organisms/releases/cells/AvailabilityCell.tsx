@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/components/features/dashboard/organisms/releases/cells/AvailabilityCell.test.tsx
+
 import { Input, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import {
   type FormEvent,
@@ -74,9 +76,6 @@ export const AvailabilityCell = memo(function AvailabilityCell({
   const [validationError, setValidationError] = useState('');
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  // Ref for urlInput to avoid recreating handleAddUrl on every keystroke
-  const urlInputRef = useRef(urlInput);
-  urlInputRef.current = urlInput;
 
   // Create provider Map for O(1) lookups instead of O(n) .find() operations
   const providerMap = useMemo(() => {
@@ -132,7 +131,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
       e.preventDefault();
       if (!addingProvider || !onAddUrl) return;
 
-      const trimmed = urlInputRef.current.trim();
+      const trimmed = urlInput.trim();
       if (!trimmed) return;
 
       // Validate URL format
@@ -169,7 +168,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
         // Error toast is shown by parent
       }
     },
-    [addingProvider, onAddUrl, release.id]
+    [addingProvider, onAddUrl, release.id, urlInput]
   );
 
   // Get status for a provider
@@ -282,7 +281,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                     <span
                       className={cn(
                         'relative h-2.5 w-2.5 rounded-full',
-                        status === 'manual' && 'ring-2 ring-amber-400/30'
+                        status === 'manual' && 'ring-2 ring-quaternary-token/40'
                       )}
                       style={{ backgroundColor: config.accent }}
                       aria-hidden='true'
@@ -335,7 +334,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                           onClick={createCopyHandler(providerKey, testId)}
                           className={cn(
                             'rounded-full p-1.5 text-tertiary-token transition-[background-color,color] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-ring',
-                            isCopied && 'text-emerald-600 dark:text-emerald-400'
+                            isCopied && 'text-success'
                           )}
                         >
                           <Icon

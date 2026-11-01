@@ -897,4 +897,82 @@ describe('rate-limiter.ts', () => {
       expect(mockCreateRedisRateLimiter).not.toHaveBeenCalled();
     });
   });
+
+  // ── 11. Redis backend recovery (JOV-6743) ─────────────────────────
+  describe('redis backend recovery', () => {
+    it('re-resolves the Redis backend after construction-time unavailability', async () => {
+      mockCreateRedisRateLimiter
+        .mockReturnValueOnce(null) // cold start: Redis not yet resolvable
+        .mockReturnValue(mockRedisLimiter); // request-path retry succeeds
+      mockRedisLimiter.limit.mockResolvedValue({
+        success: true,
+        limit: 10,
+        remaining: 9,
+        reset: Date.now() + 60_000,
+      });
+
+      const limiter = new RateLimiter(baseConfig, { warnOnFallback: false });
+      expect(limiter.isRedisActive()).toBe(false);
+
+      const result = await limiter.limit('user-1');
+
+      expect(result.backend).toBe('redis');
+      expect(result.degraded).toBeUndefined();
+      expect(limiter.isRedisActive()).toBe(true);
+      expect(mockCreateRedisRateLimiter).toHaveBeenCalledTimes(2);
+      expect(mockMemoryInstance.limit).not.toHaveBeenCalled();
+
+      // Recovery sticks: no further factory probes on later requests
+      mockCreateRedisRateLimiter.mockClear();
+      await limiter.limit('user-1');
+      expect(mockCreateRedisRateLimiter).not.toHaveBeenCalled();
+    });
+
+    it('keeps mandatory limiters fail-closed while Redis stays unavailable, then recovers', async () => {
+      mockCreateRedisRateLimiter.mockReturnValue(null);
+      const limiter = new RateLimiter(
+        { ...baseConfig, requireRedis: true },
+        { warnOnFallback: false }
+      );
+
+      const blocked = await limiter.limit('user-1');
+      expect(blocked).toMatchObject({
+        success: false,
+        backend: 'unavailable',
+        unavailable: true,
+      });
+      expect(mockMemoryInstance.limit).not.toHaveBeenCalled();
+
+      // Redis recovers — the same instance must pick the backend back up
+      // instead of pinning the process to unavailable responses.
+      mockCreateRedisRateLimiter.mockReturnValue(mockRedisLimiter);
+      mockRedisLimiter.limit.mockResolvedValue({
+        success: true,
+        limit: 10,
+        remaining: 9,
+        reset: Date.now() + 60_000,
+      });
+      const recovered = await limiter.limit('user-1');
+      expect(recovered).toMatchObject({ success: true, backend: 'redis' });
+      expect(mockMemoryInstance.limit).not.toHaveBeenCalled();
+    });
+
+    it('readStatus retries the Redis backend after construction-time unavailability', async () => {
+      mockCreateRedisRateLimiter
+        .mockReturnValueOnce(null)
+        .mockReturnValue(mockRedisLimiter);
+      mockRedisLimiter.getRemaining.mockResolvedValue({
+        limit: 10,
+        remaining: 3,
+        reset: Date.now() + 60_000,
+      });
+
+      const limiter = new RateLimiter(baseConfig, { warnOnFallback: false });
+      expect(await limiter.readStatus('user-1')).toMatchObject({
+        available: true,
+        backend: 'redis',
+        remaining: 3,
+      });
+    });
+  });
 });

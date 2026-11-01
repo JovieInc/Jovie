@@ -1,7 +1,9 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/dashboard/organisms/releases/cells/ProviderCell.interaction.test.tsx
+
+import { Button } from '@jovie/ui';
 import { Icon } from '@/components/atoms/Icon';
-import { DrawerButton } from '@/components/molecules/drawer';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 
@@ -40,23 +42,23 @@ export function ProviderCopyButton({
   const buttonLabel = getButtonLabel();
 
   return (
-    <DrawerButton
+    <Button
       data-testid={testId}
       data-url={path ? `${getBaseUrl()}${path}` : undefined}
       onClick={() => {
         if (!path) return;
         void onCopy(path, `${releaseTitle} – ${providerLabel}`, testId);
       }}
-      tone={isCopied ? 'secondary' : 'ghost'}
+      variant={isCopied ? 'secondary' : 'ghost'}
       size='sm'
-      className={cn(
-        'group/btn h-7 gap-1.5 rounded-full px-2.5 text-2xs font-normal',
-        isCopied
-          ? 'border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-          : 'text-secondary-token'
-      )}
+      className='group/btn'
     >
-      <span className='relative flex h-3.5 w-3.5 items-center justify-center'>
+      <span
+        className={cn(
+          'relative flex h-3.5 w-3.5 items-center justify-center',
+          isCopied ? 'text-success' : undefined
+        )}
+      >
         <Icon
           name='Copy'
           className={cn(
@@ -76,7 +78,11 @@ export function ProviderCopyButton({
           aria-hidden='true'
         />
       </span>
-      <span className='line-clamp-1'>{buttonLabel}</span>
-    </DrawerButton>
+      <span
+        className={cn('line-clamp-1', isCopied ? 'text-success' : undefined)}
+      >
+        {buttonLabel}
+      </span>
+    </Button>
   );
 }

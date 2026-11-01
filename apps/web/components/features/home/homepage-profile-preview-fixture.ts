@@ -15,6 +15,24 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 
 const CREATED_AT = '2026-01-10T00:00:00.000Z';
 
+const DAY_MS = 86_400_000;
+
+/**
+ * Demo show dates stay upcoming: each is a fixed number of days after the
+ * Monday (UTC) of the current week, at 03:00 UTC (an evening show in US time
+ * zones). Hardcoded dates went stale and showed past shows as "Upcoming" in
+ * marketing captures. Anchoring to the week keeps server render, hydration,
+ * and screenshot captures (`fixedNow: 'capture-week'`) on the same dates.
+ */
+function upcomingShowDate(daysAfterMonday: number): string {
+  const today = Math.floor(Date.now() / DAY_MS);
+  // 1970-01-01 was a Thursday; (day + 3) % 7 is days since Monday.
+  const monday = today - ((today + 3) % 7);
+  return new Date(
+    (monday + daysAfterMonday) * DAY_MS + 3 * 3_600_000
+  ).toISOString();
+}
+
 type HomepageContactInput = {
   readonly id: string;
   readonly role: PublicContact['role'];
@@ -327,7 +345,7 @@ export const HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES: readonly TourDateViewModel[] =
       confirmationStatus: 'confirmed',
       reviewedAt: CREATED_AT,
       title: 'The Deep End Tour',
-      startDate: '2026-09-18T03:00:00.000Z',
+      startDate: upcomingShowDate(9),
       startTime: '20:00',
       timezone: 'America/Los_Angeles',
       venueName: 'The Novo',
@@ -351,7 +369,7 @@ export const HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES: readonly TourDateViewModel[] =
       confirmationStatus: 'confirmed',
       reviewedAt: CREATED_AT,
       title: 'The Deep End Tour',
-      startDate: '2026-09-24T03:00:00.000Z',
+      startDate: upcomingShowDate(15),
       startTime: '21:00',
       timezone: 'America/Chicago',
       venueName: 'Radius',
@@ -375,7 +393,7 @@ export const HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES: readonly TourDateViewModel[] =
       confirmationStatus: 'confirmed',
       reviewedAt: CREATED_AT,
       title: 'The Deep End Tour',
-      startDate: '2026-10-07T03:00:00.000Z',
+      startDate: upcomingShowDate(25),
       startTime: '20:00',
       timezone: 'America/New_York',
       venueName: 'Brooklyn Steel',
@@ -399,7 +417,7 @@ export const HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES: readonly TourDateViewModel[] =
       confirmationStatus: 'confirmed',
       reviewedAt: CREATED_AT,
       title: 'The Deep End Tour',
-      startDate: '2026-10-14T03:00:00.000Z',
+      startDate: upcomingShowDate(32),
       startTime: '20:00',
       timezone: 'America/Toronto',
       venueName: 'The Danforth',
@@ -423,7 +441,7 @@ export const HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES: readonly TourDateViewModel[] =
       confirmationStatus: 'confirmed',
       reviewedAt: CREATED_AT,
       title: 'The Deep End Tour',
-      startDate: '2026-10-21T03:00:00.000Z',
+      startDate: upcomingShowDate(39),
       startTime: '20:00',
       timezone: 'America/Los_Angeles',
       venueName: 'The Echo',
@@ -447,7 +465,7 @@ export const HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES: readonly TourDateViewModel[] =
       confirmationStatus: 'confirmed',
       reviewedAt: CREATED_AT,
       title: 'The Deep End Tour',
-      startDate: '2026-10-28T03:00:00.000Z',
+      startDate: upcomingShowDate(46),
       startTime: '20:00',
       timezone: 'America/Los_Angeles',
       venueName: 'Rickshaw Stop',
@@ -471,7 +489,7 @@ export const HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES: readonly TourDateViewModel[] =
       confirmationStatus: 'confirmed',
       reviewedAt: CREATED_AT,
       title: 'The Deep End Tour',
-      startDate: '2026-11-05T03:00:00.000Z',
+      startDate: upcomingShowDate(54),
       startTime: '20:00',
       timezone: 'America/Los_Angeles',
       venueName: 'Holocene',
@@ -495,7 +513,7 @@ export const HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES: readonly TourDateViewModel[] =
       confirmationStatus: 'confirmed',
       reviewedAt: CREATED_AT,
       title: 'The Deep End Tour',
-      startDate: '2026-11-11T03:00:00.000Z',
+      startDate: upcomingShowDate(57),
       startTime: '20:00',
       timezone: 'America/Los_Angeles',
       venueName: 'Barboza',
@@ -919,4 +937,80 @@ export function getPreviewActiveMode(
     default:
       return 'profile';
   }
+}
+
+/**
+ * Template identity for the homepage hero capture (`template-profile-live-mobile`).
+ * No real person on `/` (Tim, 2026-10-26) and no real third-party act: the
+ * profile is the visitor's own, `jov.ie/you`, matching the hero's claim field.
+ * The avatar falls back to the product's monogram (no `image_url`), and the
+ * release art is an abstract mark with no face and no lettering.
+ */
+export const HOMEPAGE_TEMPLATE_PROFILE_ARTIST: Artist = {
+  id: 'homepage-template-profile',
+  owner_user_id: 'homepage-template-owner',
+  handle: 'you',
+  spotify_id: '',
+  name: 'Your Name',
+  image_url: undefined,
+  tagline: '',
+  settings: {},
+  theme: {
+    profileAccent: {
+      version: 1,
+      primaryHex: '#3faff3',
+      sourceUrl: '',
+    },
+  },
+  location: null,
+  hometown: null,
+  active_since_year: null,
+  genres: null,
+  career_highlights: null,
+  target_playlists: null,
+  published: true,
+  is_verified: false,
+  is_featured: false,
+  marketing_opt_out: false,
+  created_at: CREATED_AT,
+};
+
+export const HOMEPAGE_TEMPLATE_PROFILE_SOCIAL_LINKS: readonly LegacySocialLink[] =
+  [
+    {
+      id: 'homepage-template-instagram',
+      artist_id: HOMEPAGE_TEMPLATE_PROFILE_ARTIST.id,
+      platform: 'instagram',
+      url: 'https://instagram.com/',
+      clicks: 0,
+      created_at: CREATED_AT,
+      is_visible: true,
+    },
+    {
+      id: 'homepage-template-youtube',
+      artist_id: HOMEPAGE_TEMPLATE_PROFILE_ARTIST.id,
+      platform: 'youtube',
+      url: 'https://www.youtube.com/',
+      clicks: 0,
+      created_at: CREATED_AT,
+      is_visible: true,
+    },
+  ] as const;
+
+/** Days before the capture clock that the template's latest release came out. */
+export const HOMEPAGE_TEMPLATE_RELEASE_AGE_DAYS = 12;
+
+export const HOMEPAGE_TEMPLATE_PROFILE_RELEASE = {
+  title: 'First Light',
+  slug: 'first-light',
+  artworkUrl: '/img/releases/first-light.jpg',
+  releaseType: 'single',
+} as const;
+
+/** Release date relative to the capture clock, so the release is always recent. */
+export function homepageTemplateReleaseDate(nowMs: number): string {
+  const day = 24 * 60 * 60 * 1000;
+  const date = new Date(nowMs - HOMEPAGE_TEMPLATE_RELEASE_AGE_DAYS * day);
+  date.setUTCHours(7, 0, 0, 0);
+  return date.toISOString();
 }

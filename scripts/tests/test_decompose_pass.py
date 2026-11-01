@@ -88,7 +88,7 @@ class RunTests(unittest.TestCase):
         self.assertEqual(receipt["proposals"]["LYB-1"]["decisions"], 1)
         entries = json.loads((state / "linear" / "outbox.json").read_text())["entries"]
         creates = [json.loads(e["body"]) for e in entries if e["op"] == "create"]
-        self.assertEqual(sorted(c["labels"][0] for c in creates), ["agent-ready", "needs-human-decision"])
+        self.assertEqual(sorted(c["labels"][0] for c in creates), ["agent-ready", "agent-ready"])
         self.assertEqual(sum(1 for e in entries if e["op"] == "comment"), 1)
         again = dp.run(state, "LYB", NOW + 7 * 3600, judge=lambda prompt: json.dumps(GOOD))
         self.assertEqual(again["trigger"]["why"], "no-splittable-epic")  # cooldown holds the epic

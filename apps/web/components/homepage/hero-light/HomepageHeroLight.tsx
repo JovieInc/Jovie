@@ -4,6 +4,7 @@
 // only. See docs/design/night-dj-harmony-v1.md and the exception record in
 // docs/performance/performance-invariants-v1.md.
 import { useEffect, useRef, useState } from 'react';
+import { isAnimatedBackgroundEnabled } from '@/data/marketing/animatedBackgroundBudget';
 import {
   HERO_LIGHT_PERF,
   isLowPowerBattery,
@@ -17,20 +18,32 @@ interface HeroLightHandle {
 
 /**
  * Decorative hero light. No text, no controls. Pointer events stay on the
- * hero. The CSS poster is always the layout. A canvas is created only after
- * a client capability check, and it crossfades in. Reduced motion, save-data,
- * low-power, missing WebGL, a refused context, and context loss leave the
- * poster in place.
+ * hero. The static CSS poster is the default and the layout (Tim,
+ * 2026-10-29: matte, static marketing heroes). The WebGL path runs only when
+ * the `homepage-hero-light` entry in the animated-background budget
+ * (`data/marketing/animatedBackgroundBudget.ts`) enables it. Even then a
+ * canvas is created only after a client capability check, and it crossfades
+ * in. Reduced motion (`prefers-reduced-motion`), save-data, low-power,
+ * missing WebGL, a refused context, and context loss leave the static poster
+ * in place.
  */
-export function HomepageHeroLight() {
+export interface HomepageHeroLightProps {
+  /** Overrides the registered budget's default. Static unless enabled. */
+  readonly animate?: boolean;
+}
+
+export function HomepageHeroLight({
+  animate = isAnimatedBackgroundEnabled('homepage-hero-light'),
+}: HomepageHeroLightProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [mountCanvas, setMountCanvas] = useState(false);
   const [live, setLive] = useState(false);
 
   useEffect(() => {
+    if (!animate) return;
     if (!shouldRunHeroLightWebGL()) return;
     setMountCanvas(true);
-  }, []);
+  }, [animate]);
 
   useEffect(() => {
     if (!mountCanvas) return;
@@ -100,6 +113,7 @@ export function HomepageHeroLight() {
     <div
       aria-hidden='true'
       className='homepage-hero-light'
+      data-animate={animate ? 'true' : 'false'}
       data-live={live ? 'true' : 'false'}
       data-renderer={live ? 'webgl' : 'css'}
       data-testid='homepage-hero-light'

@@ -5,7 +5,6 @@
     "orange:apps/web/components/marketing/MarketingSnapRail.css:named:orange",
     "orange:apps/web/components/marketing/artist-profile/ArtistProfileSpecWall.css:named:orange",
     "orange:apps/web/components/marketing/artist-profile/captureShared.css:named:orange",
-    "orange:apps/web/components/marketing/motion/MarketingAmbientField.css:named:orange",
     "orange:design.tokens.json:#ff7800",
     "triad:apps/web/components/marketing/MarketingSnapRail.css:87"
   ]

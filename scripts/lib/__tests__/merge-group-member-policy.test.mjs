@@ -20,7 +20,7 @@ import {
   parseTrackedRegularTree,
   readBoundedResponseText,
   resolveMergeGroupMembers,
-  runPolicy,
+  runPolicy as runPolicyWithCheckout,
 } from '../merge-group-member-policy.mjs';
 import { HYGIENE_LIMITS } from '../repo-hygiene-limits.mjs';
 
@@ -29,6 +29,13 @@ const FIRST = '2'.repeat(40);
 const HEAD = '3'.repeat(40);
 const SOURCE_101 = 'a'.repeat(40);
 const TREE = '4'.repeat(40);
+
+// API fixtures use synthetic SHAs; never probe this host's partial clone.
+// Tests supplying local evidence override this boundary explicitly.
+/** @param {Parameters<typeof runPolicyWithCheckout>[0]} options */
+function runPolicy(options) {
+  return runPolicyWithCheckout({ readLocal: async () => null, ...options });
+}
 
 function treeEntry(mode, type, size, path, sha = 'f'.repeat(40)) {
   return {
@@ -750,10 +757,10 @@ describe('merge-group hold labels (JOV-6843)', () => {
   });
 
   it('fails a member that carries any hold label, case-insensitively', () => {
-    expect(evaluateHoldMemberPolicy(heldPr(['ci', 'Do-Not-Merge']))).toEqual({
+    expect(evaluateHoldMemberPolicy(heldPr(['ci', 'Queue-Deferred']))).toEqual({
       passed: false,
       policy: 'hold',
-      reason: 'carries the Do-Not-Merge label',
+      reason: 'carries the Queue-Deferred label',
     });
     expect(evaluateHoldMemberPolicy(heldPr(['ci', 'big-pr']))).toBeNull();
     for (const label of HOLD_LABELS) {

@@ -343,7 +343,7 @@ export function ProfileUnifiedDrawer({
     <ProfileDrawerShell
       open={open}
       onOpenChange={handleOpenChange}
-      title={meta.title}
+      title={renderedView === 'pay' ? `Pay ${artist.name}` : meta.title}
       subtitle={'subtitle' in meta ? meta.subtitle : undefined}
       onBack={isSubView ? () => navigateTo('menu') : undefined}
       navigationLevel={isSubView ? 'secondary' : 'root'}
@@ -498,17 +498,6 @@ export function ProfileUnifiedDrawer({
             <div data-testid='profile-mode-drawer-pay'>
               {hasValidVenmoLink ? (
                 <>
-                  <div
-                    className='mb-4 text-center'
-                    data-testid='profile-pay-recipient'
-                  >
-                    <p className='text-sm font-semibold text-primary-token'>
-                      Pay {artist.name}
-                    </p>
-                    <p className='mt-1 text-xs text-tertiary-token'>
-                      @{artist.handle}
-                    </p>
-                  </div>
                   <PayView
                     profileId={artist.id}
                     artistHandle={artist.handle}

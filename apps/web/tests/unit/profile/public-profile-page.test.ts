@@ -655,7 +655,10 @@ describe('Public Profile Page Logic', () => {
         mockLinks
       );
       const musicGroup2 = findInGraph(data2, 'MusicGroup')!;
-      expect(musicGroup2.description).toBe('Music by Test Artist');
+      // Bioless artists with genres reuse the page meta description.
+      expect(musicGroup2.description).toContain(
+        'rock, indie, alternative artist. Stream Test Artist'
+      );
     });
 
     it('only includes recognized social platforms in sameAs', () => {

@@ -43,6 +43,16 @@ export const LinkedRow: Story = {
   },
 };
 
+export const LinkedRowWithUrl: Story = {
+  args: { showUrl: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole('link', { name: 'Spotify' })
+    ).toHaveTextContent('open.spotify.com/album/example');
+  },
+};
+
 export const MissingWithFind: Story = {
   args: { href: null },
   play: async ({ canvasElement, args }) => {

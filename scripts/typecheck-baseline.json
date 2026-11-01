@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "tool": "scripts/typecheck-scripts.mjs",
   "generatedAt": "2026-10-20T19:15:13.794Z",
-  "totalErrors": 101,
+  "totalErrors": 99,
   "files": {
     "apps/web/scripts/generate-brand-assets.ts": {
       "TS1470": 2,
@@ -22,9 +22,6 @@
     },
     "scripts/browse-auth.ts": {
       "TS1470": 1
-    },
-    "scripts/ci/neon-orphan-reaper.mjs": {
-      "TS2339": 2
     },
     "scripts/doc-freshness-lint.mjs": {
       "TS2339": 10

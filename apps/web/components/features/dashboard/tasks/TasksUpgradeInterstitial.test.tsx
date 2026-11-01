@@ -34,7 +34,7 @@ describe('TasksUpgradeInterstitial', () => {
     render(<ReleasePlanUpgradeInterstitial releaseTitle='Skyline Dreams' />);
 
     expect(
-      screen.getByText(/Skyline Dreams into a step-by-step plan/)
+      screen.getByText(/track the tasks for Skyline Dreams/)
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Upgrade to Artist Presence' })

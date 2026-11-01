@@ -51,4 +51,4 @@ and `docs/company/PRICING-STRATEGY.md` — strategy/pricing docs that are alread
 world-readable. Worth a separate decision on whether they belong in a public
 tree.
 
-> Update 2026-10-28: `CAPITAL-STRATEGY.md` and other investor, fundraising and strategy material moved to the private `JovieInc/Ops` repo (`jovie-private/`).
+> Update 2026-10-28: `CAPITAL-STRATEGY.md` and other investor, fundraising and strategy material moved to the private `JovieInc/Ops` repo (`jovie-private/`). Follow-up the same day: the pricing strategy, pricing philosophy, pricing trends digest and LYB launch offer moved too (public stubs remain), as did the investor-portal content, now served from private Blob storage.

@@ -297,8 +297,6 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_GIT_COMMIT_SHA: ${{ inputs.expected_sha }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
       - name: Hash fixed staging build subject for isolated attestation
         id: build-subject
         run: |
@@ -418,8 +416,6 @@ jobs:
           # The in-job prebuilt artifact is the thing canary verifies. A source
           # fallback would silently discard it and repeat the slow server build.
           VERCEL_ENABLE_SOURCE_FALLBACK: 'false'
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
 
       - name: Wait for staging deployment readiness
         id: inspect-deployment
@@ -1256,6 +1252,14 @@ jobs:
           export EXPECTED_VERCEL_ENVIRONMENT=production
 
           cd apps/web
+
+          # Lead-time: the three budget families below are independent reads of
+          # the same immutable staged deployment, so they run as two concurrent
+          # lanes (authenticated routes -> entry-route Lighthouse, and the
+          # public-profile alias budgets) instead of one ~10 min serial chain.
+          # Every guard keeps its own budgets, run counts and fail-closed
+          # handling; the step still fails unless every lane exits 0.
+          authenticated_budget_lane() {
           if [ "$auth_performance_configured" = "true" ]; then
             auth_state="$RUNNER_TEMP/uas-performance-auth-${GITHUB_RUN_ID}.json"
             dynamic_secrets_file="$RUNNER_TEMP/uas-performance-dynamic-secrets-${GITHUB_RUN_ID}"
@@ -1309,12 +1313,15 @@ jobs:
             fi
           fi
 
+          }
+
+          public_profile_budget_lane() {
           # Staging policy is independent from the canonical production-alias
           # policy below. Only exact immutable staged-build executions count
           # here; a production streak can never graduate staging. Its own
-          # 2026-10-21 receipt qualifies 14/14 five-sample nearest-rank p95
+          # 2026-10-31 receipt qualifies 14/14 twenty-sample nearest-rank p95
           # executions <=1500ms: enforce this budget closed (JOV-8338).
-          # Recheck by 2026-10-28 under JOV-8737; evidence is in
+          # Recheck by 2026-11-07 under JOV-8737; evidence is in
           # docs/performance/public-profile-alias-graduation.json.
           if ! CI=true pnpm exec tsx scripts/performance-budgets-guard.ts \
             --base-url "$deployment_url" \
@@ -1328,6 +1335,9 @@ jobs:
             fail_performance_gate "Exact staged-build public-profile alias budgets failed."
           fi
 
+          }
+
+          entry_route_lighthouse_lane() {
           # Throttled-mobile LCP for the artist entry routes (/start, /claim and
           # the claim-link landing). The Playwright guard above is unthrottled
           # and warm, so it passed /start at 1.3s while Lighthouse mobile read
@@ -1341,6 +1351,27 @@ jobs:
             --runs 3 \
             --lcp-report-only; then
             fail_performance_gate "Throttled-mobile entry-route CLS or measurement failed on the exact staged build."
+          fi
+          }
+
+          lane_dir="$(mktemp -d)"
+          ( authenticated_budget_lane && entry_route_lighthouse_lane ) \
+            > "$lane_dir/authenticated-and-entry.log" 2>&1 &
+          authenticated_lane_pid=$!
+          ( public_profile_budget_lane ) > "$lane_dir/public-profile.log" 2>&1 &
+          public_lane_pid=$!
+          authenticated_lane_status=0
+          public_lane_status=0
+          wait "$authenticated_lane_pid" || authenticated_lane_status=$?
+          wait "$public_lane_pid" || public_lane_status=$?
+          for lane_log in authenticated-and-entry public-profile; do
+            echo "::group::exact-build performance lane: $lane_log"
+            cat "$lane_dir/$lane_log.log"
+            echo "::endgroup::"
+          done
+          rm -rf "$lane_dir"
+          if [ "$authenticated_lane_status" -ne 0 ] || [ "$public_lane_status" -ne 0 ]; then
+            fail_performance_gate "Exact staged-build performance lane failed (authenticated/entry exit $authenticated_lane_status, public-profile exit $public_lane_status)."
           fi
           echo "performance_status=passed" >> "$GITHUB_OUTPUT"
 
@@ -1802,11 +1833,12 @@ jobs:
     permissions:
       contents: read
     # Production canonical-alias policy is measured independently from staging.
-    # Ship now: WARN; the 2026-10-21 receipt has 11/14 qualifying runs and a
-    # current streak of 0/14 after tail misses at 1626.2, 2083.1 and 2431.6ms.
-    # Re-evaluate when: 14 eligible canonical-alias executions are consecutive,
-    # and no later than 2026-10-28 (JOV-8737). Then: hard-fail this gate when all
-    # six routes' five-sample nearest-rank p95 values are <=1500ms. Evidence:
+    # Ship now: BLOCK; the 2026-10-31 receipt has 14/14 qualifying runs and a
+    # current streak of 14/14 (worst twenty-sample nearest-rank p95 1268.4ms
+    # against 1500ms), which met the 2026-10-21 receipt's graduation rule.
+    # Re-evaluate when: any selected run misses, and
+    # no later than 2026-11-07 (JOV-8737). Then: refresh the receipt; return
+    # this gate to WARN only if the refreshed window no longer qualifies. Evidence:
     # docs/performance/public-profile-alias-graduation.json.
     outputs:
       performance_status: ${{ steps.alias-perf.outputs.performance_status }}
@@ -1824,8 +1856,8 @@ jobs:
           CI: 'true'
         run: |
           set -euo pipefail
-          # The checked-in 14-run receipt does not yet authorize fail-closed
-          # enforcement. Keep measuring; JOV-8737 owns the dated recheck.
+          # The checked-in 14-run receipt graduated canonical-alias budgets
+          # (14/14 on 2026-10-31): a miss fails closed. JOV-8737 owns the recheck.
           if ! pnpm exec tsx scripts/performance-budgets-guard.ts \
             --base-url https://jov.ie \
             --runs 5 \
@@ -1835,11 +1867,11 @@ jobs:
             --route-id public-profile-tip \
             --route-id public-profile-tour \
             --route-id public-profile-releases; then
-            echo "::warning::Production public-profile alias budgets failed on jov.ie. Latest receipt: 11/14 qualifying, current streak 0/14, measured 2026-10-21; review by 2026-10-28 (JOV-8737)."
-            echo "performance_status=warn" >> "$GITHUB_OUTPUT"
-          else
-            echo "performance_status=passed" >> "$GITHUB_OUTPUT"
+            echo "::error::Production public-profile alias budgets failed on jov.ie. Receipt 2026-10-31: 14/14 qualifying, streak 14/14; review by 2026-11-07 (JOV-8737)."
+            echo "performance_status=failed" >> "$GITHUB_OUTPUT"
+            exit 1
           fi
+          echo "performance_status=passed" >> "$GITHUB_OUTPUT"
 
   sentry-error-gate:
     name: Sentry Error Gate (production)

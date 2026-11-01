@@ -8,8 +8,7 @@
 Read this execution contract before UI work. Load only the relevant section of
 [design details](docs/design-system/DETAILS.md) for the component or surface being changed.
 Token values come from the source registries below. Historical decisions describe
-past state; the newest founder-locked decision governs. For instruction-only edits,
-verify policy preservation and links; screenshots apply when rendered UI changes.
+past state; the newest founder-locked decision governs.
 
 Current direction: one System B token foundation, compact product and editorial
 marketing languages. Inter is the body/UI face; Satoshi is the approved display
@@ -107,6 +106,10 @@ Follow [the Ovie guardrail](docs/design-system/DETAILS.md#ovie-ops-cockpit-guard
 
 Read [the subtraction principle reference](docs/design-system/DETAILS.md#subtraction-principle) when changing this area.
 
+## No Dead Ends (JOV-INV-046)
+
+Read [no dead ends](docs/design-system/DETAILS.md#no-dead-ends) before UI work.
+
 ## Use Tokens, Not Raw Colors
 
 Raw Tailwind color utilities (`text-black`, `bg-white`, `text-[#fff]`) are the root cause of black-on-black / white-on-white contrast failures when the app renders across light and dark themes. **Always use System B semantic tokens** so values adapt automatically.
@@ -164,7 +167,7 @@ unless linked below.
 | `spacing-scale (conservative)` | `error` | S + G | Yes | 590; armed=true; marketing=46; packages/ui=11; web-other=290; web-shell=243 |
 | `spacing-scale (strict)` | `warn` | S + G | No | 2190; armed=false; marketing=143; packages/ui=60; web-other=1126; web-shell=837 |
 | `touch-target` | `error` | D | Yes | 153 |
-| `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=259; missingTabularNums=71; nonConcentricRadius=0; undersizedHitArea=71 |
+| `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=255; missingTabularNums=71; nonConcentricRadius=0; undersizedHitArea=71 |
 
 The [raw-color baseline](apps/web/contrast-ratchet.baseline.json) and
 [computed pair config](apps/web/contrast-pairs.config.json) cover separate

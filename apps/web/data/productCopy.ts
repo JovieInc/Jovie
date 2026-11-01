@@ -16,6 +16,10 @@ export const PRODUCT_COPY = {
     headline: 'Your living identity on the internet.',
     support:
       'Your work, your links, your next chapter. Together in your Jovie profile.',
+    profile: {
+      scenarioId: 'tim-white-profile-live-mobile',
+      alt: 'A Jovie profile with the latest release first.',
+    },
   },
   claimCard: {
     status: 'UNCLAIMED',

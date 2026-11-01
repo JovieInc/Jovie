@@ -57,6 +57,7 @@ import {
   useUnsubscribeNotificationsMutation,
   useUpdateContentPreferencesMutation,
 } from '@/lib/queries/useNotificationStatusQuery';
+import { recordRuntimeTrace } from '@/lib/testing/runtime-trace';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import { isDefaultAvatarUrl } from '@/lib/utils/dsp-images';
@@ -354,6 +355,8 @@ export function ProfileCompactTemplate({
   const [requestedMode, setRequestedMode] = useState<ProfileMode>(() =>
     getInitialModeFromLocation(mode, false)
   );
+  // Strip detector wake for the history effect below (see the effect).
+  const [historyWakeTick, setHistoryWakeTick] = useState(0);
   const revealNotificationsRef = useRef<(() => void) | null>(null);
   const closeResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const drawerOpenRef = useRef(initialDrawerView !== null);
@@ -399,6 +402,12 @@ export function ProfileCompactTemplate({
     profileHistoryDepthRef.current = readPublicProfileHistoryDepth(
       globalThis.history.state
     );
+    recordRuntimeTrace('profile-history', 'arrival', {
+      pathname: globalThis.location.pathname,
+      search: globalThis.location.search,
+      historyLength: globalThis.history.length,
+      depth: profileHistoryDepthRef.current,
+    });
   }, []);
 
   useEffect(() => clearCloseResetTimer, [clearCloseResetTimer]);
@@ -501,7 +510,7 @@ export function ProfileCompactTemplate({
     [artist.theme]
   );
 
-  // Hydration-safe ?source= capture: reading location.search during the
+  // Hydration-safe entry-query capture: reading location.search during the
   // first client render (e.g. a window-guarded useMemo) makes the identity
   // link href differ from the SSR'd markup whenever a source param is present
   // (/testartist vs /testartist?source=qr — React hydration mismatch, and the
@@ -511,10 +520,13 @@ export function ProfileCompactTemplate({
   // sourceOverride falls through to useProfileShell's own hydration-safe
   // locationSource (useSyncExternalStore) while this is null.
   const [initialSource, setInitialSource] = useState<string | null>(null);
+  const [initialClaimIntent, setInitialClaimIntent] = useState<boolean | null>(
+    null
+  );
   useEffect(() => {
-    setInitialSource(
-      new URLSearchParams(globalThis.location.search).get('source')
-    );
+    const params = new URLSearchParams(globalThis.location.search);
+    setInitialSource(params.get('source'));
+    setInitialClaimIntent(params.get('claim') === '1');
   }, []);
 
   const { notificationsContextValue, notificationsController, locationMode } =
@@ -620,12 +632,15 @@ export function ProfileCompactTemplate({
   ]);
 
   const searchSuffix = useMemo(() => {
-    if (!initialSource) {
-      return '';
-    }
-
-    return `source=${encodeURIComponent(initialSource)}`;
-  }, [initialSource]);
+    // Preserve the public claim-entry marker across profile navigation, never
+    // arbitrary incoming query fields (which may contain private tokens).
+    return [
+      initialSource ? `source=${encodeURIComponent(initialSource)}` : '',
+      initialClaimIntent ? 'claim=1' : '',
+    ]
+      .filter(Boolean)
+      .join('&');
+  }, [initialSource, initialClaimIntent]);
 
   const resolveInitialView = useCallback(
     (nextMode: ProfileMode) =>
@@ -650,6 +665,12 @@ export function ProfileCompactTemplate({
         suppressNextHistorySyncRef.current = true;
         initialLocationModeAlignedRef.current = false;
       }
+      recordRuntimeTrace('profile-history', 'requested-mode-sync', {
+        from: lastSyncedModeRef.current,
+        to: nextMode,
+        pathname: globalThis.location.pathname,
+        search: globalThis.location.search,
+      });
       setRequestedMode(nextMode);
     },
     [mode]
@@ -673,6 +694,45 @@ export function ProfileCompactTemplate({
       );
     }
   }, [requestedMode]);
+
+  // Next's own entry updater can strip the landed ?mode=… entry back to the
+  // bare profile path with a replaceState that never wakes React. When the
+  // strip lands after the history effect's last run, no dep changes, so the
+  // stripped-landing correction below never re-evaluates and the deep-link
+  // mode URL stays bare (profile-admission mode-history legs red). The first
+  // fix (#23867) used three fixed wake ticks (200/600/1400ms); verify run
+  // 41097577290 proved the strip lands LATER than that on the standalone E2E
+  // server. This detector instead polls the cheap ref/URL conditions every
+  // 250ms for 8s after mount and only then ticks the effect — zero re-renders
+  // on hosts where no strip happens (prod), and the correction still runs
+  // through the effect's full guard chain (landed-mode match, hydration
+  // readiness, the Link-navigation discriminator) before any replaceState.
+  useEffect(() => {
+    const startedAt = Date.now();
+    const interval = globalThis.setInterval(() => {
+      if (Date.now() - startedAt > 8000) {
+        globalThis.clearInterval(interval);
+        return;
+      }
+      if (
+        landedHistoryModeRef.current !== null &&
+        landedHistoryModeRef.current !== 'profile' &&
+        globalThis.location.pathname === mountedPathnameRef.current &&
+        new URLSearchParams(globalThis.location.search).get('mode') === null &&
+        profileHistoryDepthRef.current === 0 &&
+        globalThis.history.length ===
+          (arrivalHistoryLengthRef.current ?? globalThis.history.length)
+      ) {
+        recordRuntimeTrace('profile-history', 'strip-detector-tick', {
+          pathname: globalThis.location.pathname,
+          search: globalThis.location.search,
+          historyLength: globalThis.history.length,
+        });
+        setHistoryWakeTick(tick => tick + 1);
+      }
+    }, 250);
+    return () => globalThis.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (
@@ -781,13 +841,14 @@ export function ProfileCompactTemplate({
       return;
     }
 
-    // Skip until initialSource has hydrated if the URL carries a source param.
+    // Wait for entry-query hydration before reconstructing a profile URL.
     // Without this guard the effect fires on the first render cycle with
     // searchSuffix = '' and pushes a source-less URL before the initialSource
     // useEffect (which reads location.search post-mount) has a chance to run.
     if (
-      initialSource === null &&
-      new URLSearchParams(globalThis.location.search).has('source')
+      initialClaimIntent === null ||
+      (initialSource === null &&
+        new URLSearchParams(globalThis.location.search).has('source'))
     ) {
       return;
     }
@@ -798,6 +859,12 @@ export function ProfileCompactTemplate({
         : activeMode === requestedMode;
 
     if (!isHistoryModeSettled) {
+      recordRuntimeTrace('profile-history', 'sync-skip', {
+        reason: 'not-settled',
+        requestedMode,
+        activeMode,
+        href: currentHref,
+      });
       return;
     }
 
@@ -820,6 +887,12 @@ export function ProfileCompactTemplate({
       globalThis.location.pathname !== `/${artist.handle}` &&
       globalThis.location.pathname !== mountedPathnameRef.current
     ) {
+      recordRuntimeTrace('profile-history', 'sync-skip', {
+        reason: 'ownership-left-profile',
+        pathname: globalThis.location.pathname,
+        mountedPathname: mountedPathnameRef.current,
+        href: currentHref,
+      });
       return;
     }
 
@@ -840,6 +913,10 @@ export function ProfileCompactTemplate({
       globalThis.history.length ===
         (arrivalHistoryLengthRef.current ?? globalThis.history.length);
     if (correctingStrippedLanding) {
+      recordRuntimeTrace('profile-history', 'strip-correction-replace', {
+        from: currentHref,
+        to: href,
+      });
       globalThis.history.replaceState(
         withPublicProfileHistoryDepth(globalThis.history.state, 0),
         '',
@@ -861,11 +938,23 @@ export function ProfileCompactTemplate({
       previousSync.href !== currentHref &&
       previousSync.mode === activeMode
     ) {
+      recordRuntimeTrace('profile-history', 'sync-skip', {
+        reason: 'link-navigation-discriminator',
+        previousHref: previousSync.href,
+        href: currentHref,
+        mode: activeMode,
+      });
       return;
     }
 
     const nextDepth = profileHistoryDepthRef.current + 1;
     profileHistoryDepthRef.current = nextDepth;
+    recordRuntimeTrace('profile-history', 'mode-push', {
+      from: currentHref,
+      to: href,
+      depth: nextDepth,
+      historyLength: globalThis.history.length,
+    });
     globalThis.history.pushState(
       withPublicProfileHistoryDepth(globalThis.history.state, nextDepth),
       '',
@@ -879,6 +968,8 @@ export function ProfileCompactTemplate({
     artist.handle,
     searchSuffix,
     initialSource,
+    initialClaimIntent,
+    historyWakeTick,
   ]);
 
   const profileHref = useMemo(

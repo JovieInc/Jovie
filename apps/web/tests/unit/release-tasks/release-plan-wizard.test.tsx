@@ -106,12 +106,17 @@ describe('ReleasePlanWizard', () => {
     );
   });
 
-  it('shows the Pro gate when canGenerateReleasePlans is false', () => {
+  it('explains release plans are not included and offers no dead-end upgrade', () => {
     render(
       <ReleasePlanWizard {...baseProps} canGenerateReleasePlans={false} />
     );
-    expect(screen.getByText(/Artist Presence feature/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Upgrade' })).toBeInTheDocument();
+    expect(
+      screen.getByText(/included in Artist Presence yet/i)
+    ).toBeInTheDocument();
+    // No self-serve plan grants release plans (JOV-INV-046 no dead ends).
+    expect(
+      screen.queryByRole('button', { name: 'Upgrade' })
+    ).not.toBeInTheDocument();
   });
 
   it('uses Title Case for the dialog title and choice labels', () => {
@@ -147,7 +152,7 @@ describe('ReleasePlanWizard', () => {
     expect(choice.className).not.toContain('text-background');
   });
 
-  it('offers a Title Case dismiss action on the Pro gate', () => {
+  it('offers a Title Case dismiss action on the not-included gate', () => {
     const onClose = vi.fn();
     render(
       <ReleasePlanWizard
@@ -156,7 +161,7 @@ describe('ReleasePlanWizard', () => {
         onClose={onClose}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Maybe Later' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Got It' }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 

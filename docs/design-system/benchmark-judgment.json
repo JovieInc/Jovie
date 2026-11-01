@@ -1,0 +1,431 @@
+{
+  "schema": "jovie.benchmark-judgment/v1",
+  "judge": "claude-opus-5-5",
+  "date": "2026-10-25",
+  "library": "gem:~/ds-cert-dispatch/benchmark-library.json v1",
+  "base": "origin/main 765937512d",
+  "sources_note": "leader behavior from prior product knowledge; jovie-research MCP down; not pixel-verified",
+  "globalRules": [
+    "motion uses existing duration/easing tokens only",
+    "reduced motion replaces transform with 100ms opacity cross-fade, never a 0ms layout jump",
+    "peak <=1.2s, non-blocking, never modal, once per event id (server-side)",
+    "one app-level LiveAnnouncer polite region + alert channel; components never mount own live regions",
+    "focus lands on next action, never body",
+    "keyboard-initiated actions skip decorative motion; no confetti",
+    "CLS 0 on every swap"
+  ],
+  "moments": [
+    {
+      "id": "checkout-success",
+      "leaders": ["Stripe Checkout", "Linear"],
+      "gaps": [
+        {
+          "gap": "button geometry jumps on pending",
+          "decision": "adopt",
+          "reason": "extend button-morph test to pay button"
+        },
+        {
+          "gap": "acknowledge success before redirect",
+          "decision": "adopt",
+          "reason": "silent redirect reads as crash"
+        },
+        {
+          "gap": "land on unlocked feature",
+          "decision": "adopt",
+          "reason": "return_url to triggering feature"
+        },
+        {
+          "gap": "hosted success page",
+          "decision": "skip",
+          "reason": "we only own the return state"
+        },
+        {
+          "gap": "confetti",
+          "decision": "skip",
+          "reason": "payment is a transaction, not an achievement"
+        }
+      ],
+      "motion": {
+        "enter": "label->spinner fade 100ms ease-in-out; check stroke 250ms ease-out + scale 0.9->1 ease-spring; hold 600ms",
+        "totalMaxMs": 1000,
+        "reducedMotion": "static check, 100ms opacity, same hold"
+      },
+      "a11y": {
+        "live": "polite 'Payment complete. Pro is active.'",
+        "focus": "h1 of landing feature; on error first invalid field + role=alert"
+      },
+      "assertions": [
+        "pay button bbox equal +-0.5px across idle/pending/success",
+        "exactly 1 announcer message",
+        "return route != /billing when ?from set",
+        "no transform under reduced motion",
+        "error preserves input values"
+      ]
+    },
+    {
+      "id": "first-release-live",
+      "leaders": ["Frame.io", "Things"],
+      "gaps": [
+        {
+          "gap": "list re-render jump",
+          "decision": "adopt",
+          "reason": "EmptyToFilled reserved slot"
+        },
+        {
+          "gap": "share action in place",
+          "decision": "adopt",
+          "reason": "next job is sharing"
+        },
+        {
+          "gap": "upload progress+ETA",
+          "decision": "adapt",
+          "reason": "determinate only for artwork upload"
+        },
+        {
+          "gap": "celebration",
+          "decision": "adapt",
+          "reason": "check + row highlight; confetti only first-ever, pointer-initiated"
+        }
+      ],
+      "motion": {
+        "enter": "row opacity + y4->0 250ms ease-out; highlight fade 420ms; empty exit 100ms",
+        "reducedMotion": "opacity 100ms, no highlight sweep"
+      },
+      "a11y": {
+        "live": "polite 'Release <title> created.'",
+        "focus": "new row Share button"
+      },
+      "assertions": [
+        "swap CLS 0",
+        "activeElement is new row share control",
+        "release_first_created fires <=1 per artist (server flag)",
+        "empty-state node removed"
+      ]
+    },
+    {
+      "id": "profile-claimed",
+      "leaders": ["Stripe Dashboard", "Apple HIG Feedback"],
+      "gaps": [
+        {
+          "gap": "View live profile as primary",
+          "decision": "adopt",
+          "reason": "payoff is seeing it"
+        },
+        {
+          "gap": "inline copy link",
+          "decision": "adopt",
+          "reason": "second job is sharing"
+        },
+        {
+          "gap": "full-screen takeover",
+          "decision": "skip",
+          "reason": "blocks dashboard"
+        },
+        {
+          "gap": "confetti",
+          "decision": "adapt",
+          "reason": "once, pointer-initiated, skippable, <=1.2s"
+        }
+      ],
+      "motion": {
+        "enter": "card via EmptyToFilled 250ms ease-out; confetti 1 burst <=900ms pointer-events none",
+        "reducedMotion": "no confetti, 100ms fade"
+      },
+      "a11y": {
+        "live": "polite 'Your profile is live at jov.ie/<handle>.'",
+        "focus": "View live profile"
+      },
+      "assertions": [
+        "confetti canvas pointer-events none, removed <=1500ms",
+        "fire count <=1 per artist",
+        "Confetti not mounted under reduced motion",
+        "primary href == public profile URL"
+      ]
+    },
+    {
+      "id": "first-fan-subscribed",
+      "leaders": ["Stripe Dashboard", "Raycast HUD"],
+      "gaps": [
+        {
+          "gap": "name the source",
+          "decision": "adopt",
+          "reason": "specificity is the delight"
+        },
+        {
+          "gap": "toast not modal",
+          "decision": "adopt",
+          "reason": "async event"
+        },
+        {
+          "gap": "realtime push",
+          "decision": "adapt",
+          "reason": "show on next load if missed; never replay"
+        },
+        {
+          "gap": "confetti",
+          "decision": "skip",
+          "reason": "async must not hijack screen"
+        }
+      ],
+      "motion": {
+        "enter": "toast y8->0 + opacity 160ms ease-out; dwell 5s, pause on hover/focus; exit 100ms",
+        "reducedMotion": "opacity only"
+      },
+      "a11y": {
+        "live": "polite 'First fan: <name>, via <source>'",
+        "focus": "never moved"
+      },
+      "assertions": [
+        "toast never takes focus",
+        "first_fan fires <=1 per artist",
+        "source string non-empty",
+        "dwell pauses on hover/focus-within"
+      ]
+    },
+    {
+      "id": "spotify-connect",
+      "leaders": ["Linear integrations", "Stripe Connect"],
+      "gaps": [
+        {
+          "gap": "search shown when already connected (DG-001)",
+          "decision": "adopt",
+          "reason": "prove, don't ask"
+        },
+        {
+          "gap": "primary enabled with no selection (DG-005)",
+          "decision": "adopt",
+          "reason": "label carries selection"
+        },
+        {
+          "gap": "nested bordered surfaces (DG-003)",
+          "decision": "adopt",
+          "reason": "one surface"
+        },
+        {
+          "gap": "redundant copy (DG-004)",
+          "decision": "adopt",
+          "reason": "title + one sentence"
+        },
+        {
+          "gap": "success then close",
+          "decision": "adapt",
+          "reason": "600ms check in button, rows fill in place"
+        }
+      ],
+      "motion": {
+        "enter": "check 250ms; dialog close 160ms; rows stagger 30ms capped 8 rows / 400ms",
+        "reducedMotion": "no stagger, single 100ms fade"
+      },
+      "a11y": {
+        "live": "polite 'Connected Tim White. N releases imported.'; results count polite",
+        "focus": "search input (or Done when connected); on close first matrix row or trigger"
+      },
+      "assertions": ["see connectSpotify.assertions"]
+    },
+    {
+      "id": "destructive-undo",
+      "leaders": ["Linear", "Apple HIG Alerts"],
+      "gaps": [
+        {
+          "gap": "confirm dialog before reversible remove",
+          "decision": "skip",
+          "reason": "confirm + undo is double friction"
+        },
+        {
+          "gap": "optimistic remove + Undo toast",
+          "decision": "adopt",
+          "reason": "soft delete until toast expiry"
+        },
+        {
+          "gap": "Cmd/Ctrl+Z undo",
+          "decision": "adopt",
+          "reason": "keyboard parity via registry"
+        },
+        {
+          "gap": "rollback keeps focus",
+          "decision": "adopt",
+          "reason": "restore row, focus it, role=alert"
+        },
+        {
+          "gap": "irreversible purge",
+          "decision": "adapt",
+          "reason": "AlertDialog, typed confirm, focus Cancel"
+        }
+      ],
+      "motion": {
+        "enter": "row collapse height+opacity 160ms ease-in-out; undo reverses; toast dwell 8s",
+        "reducedMotion": "opacity then height snap"
+      },
+      "a11y": {
+        "live": "polite 'Spotify removed. Press Command Z to undo.'",
+        "focus": "next row, else previous, else section heading; Undo first in toast"
+      },
+      "assertions": [
+        "no hard DELETE before toast expiry (network mock)",
+        "undo restores deep-equal row",
+        "Cmd+Z registered with no collision",
+        "activeElement != body after remove",
+        "undo unavailable after expiry"
+      ]
+    },
+    {
+      "id": "empty-to-filled",
+      "leaders": ["Linear empty views", "Vercel skeletons"],
+      "gaps": [
+        {
+          "gap": "shared EmptyToFilled primitive",
+          "decision": "adopt",
+          "reason": "used by 3 moments"
+        },
+        {
+          "gap": "reserved min-height",
+          "decision": "adopt",
+          "reason": "removes jump at source"
+        },
+        {
+          "gap": "null between empty and filled",
+          "decision": "skip",
+          "reason": "forbidden; skeleton of final geometry"
+        },
+        {
+          "gap": "animated empty illustration",
+          "decision": "skip",
+          "reason": "competes with the one action"
+        }
+      ],
+      "motion": {
+        "enter": "empty out 100ms; content fade + y4 250ms ease-out, 50ms overlap",
+        "reducedMotion": "100ms opacity cross-fade"
+      },
+      "a11y": {
+        "live": "caller announces exactly once; container aria-busy during swap",
+        "focus": "if in empty CTA, move to first new item"
+      },
+      "assertions": [
+        "container height delta 0 at 50%/100%/settle",
+        "no null frame (rAF sampling)",
+        "aria-busy toggles exactly once"
+      ]
+    }
+  ],
+  "shareMenu": {
+    "decision": "restructure",
+    "maxTopLevelItems": 7,
+    "maxNestingDepth": 1,
+    "searchWhenItemsGt": 8,
+    "groups": [
+      {
+        "name": "Link",
+        "items": [
+          "Copy link (default focus)",
+          "Copy smart link",
+          "Show QR code"
+        ]
+      },
+      {
+        "name": "Share to",
+        "items": [
+          "3 most recently used platforms (fallback Instagram, TikTok, X)",
+          "More platforms... (inline expand)"
+        ]
+      },
+      {
+        "name": "Embed and files",
+        "items": ["Copy embed code", "Download artwork"]
+      }
+    ],
+    "searchRanking": ["prefix", "substring", "recently used"],
+    "motion": {
+      "enter": "opacity + scale 0.98->1 100ms ease-out from trigger; expand height 160ms",
+      "reducedMotion": "opacity only",
+      "keyboardOpened": "no scale"
+    },
+    "a11y": {
+      "roles": "menu/menuitem idle; combobox + aria-activedescendant when filtering; groups role=group aria-labelledby",
+      "live": "polite 'Link copied'; label swaps to Copied 1.5s, width stable"
+    },
+    "assertions": [
+      "top-level menuitem count <=7",
+      "nesting depth <=1",
+      "search input present when total >8",
+      "query 'tik' ranks TikTok first",
+      "copy item bbox stable",
+      "popover within viewport at 390px"
+    ]
+  },
+  "connectSpotify": {
+    "states": [
+      "resolving",
+      "connected",
+      "searching",
+      "loading",
+      "results",
+      "empty",
+      "error",
+      "offline",
+      "selected",
+      "connecting",
+      "success",
+      "closed"
+    ],
+    "transitions": [
+      ["resolving", "conn exists", "connected"],
+      ["resolving", "no conn", "searching"],
+      ["resolving", "fetch fail", "error"],
+      ["searching", "type (debounce 200ms)", "loading"],
+      ["loading", "ok n>0", "results"],
+      ["loading", "ok n=0", "empty"],
+      ["loading", "fail", "error"],
+      ["*", "offline", "offline"],
+      ["offline", "online", "previous (rerun last query)"],
+      ["results", "select row", "selected"],
+      ["selected", "primary", "connecting"],
+      ["connecting", "ok", "success"],
+      ["success", "600ms", "closed"],
+      ["connecting", "fail", "selected + inline error"],
+      ["connected", "Change artist", "searching (query=current name)"]
+    ],
+    "primaryLabel": {
+      "noSelection": "Connect (disabled)",
+      "selected": "Connect {artistName}",
+      "connected": "Done",
+      "offline": "You're offline (disabled)"
+    },
+    "pasteLinkEscapeHatch": "only in empty and error states",
+    "loading": "3 skeleton rows at final height; spinner only after 300ms; input stays editable",
+    "ranking": {
+      "normalize": "NFKD, lowercase, strip diacritics/punctuation, collapse whitespace",
+      "tiers": [
+        "T0 exact full name",
+        "T1 all query tokens prefix distinct name tokens in order",
+        "T2 same, any order",
+        "T3 all tokens substring",
+        "T4 partial token match",
+        "T5 rest"
+      ],
+      "boosts": [
+        "matches claimed profile display name or existing Jovie link",
+        "log followers",
+        "Spotify popularity"
+      ],
+      "recall": "if last token <4 chars also fetch query without last token; union, dedupe by id; rerank Spotify top 50"
+    },
+    "assertions": [
+      "already connected: no search input, primary 'Done' (DG-001)",
+      "'tim whi' over [Watt White, Tim McGraw, Waves Of Time, Tim White] -> Tim White index 0; Tim McGraw above Waves Of Time (DG-002)",
+      "primary disabled 'Connect' until selection, then 'Connect Tim White' (DG-005)",
+      "bordered surface depth <=1 (DG-003)",
+      "typing during loading never resets input",
+      "offline->online reruns last query, query preserved",
+      "connect failure keeps selection, role=alert present",
+      "zero artists renders empty not error"
+    ]
+  },
+  "libraryActions": [
+    "add entries destructive-undo, share-menu, spotify-connect, empty-to-filled (peak)",
+    "build LiveAnnouncer primitive",
+    "add token --duration-peak-hold: 600ms",
+    "Celebration: no mount under reduced motion or keyboard-initiated events",
+    "undo contract: server soft delete with deadline = toast dwell"
+  ]
+}

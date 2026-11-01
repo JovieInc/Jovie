@@ -51,6 +51,29 @@ describe('recordFunnelStep', () => {
     });
   });
 
+  it('records sane step timings and drops hostile ones', async () => {
+    await recordFunnelStep({
+      funnel: 'artist_signup',
+      step: 'chat_started',
+      stepMs: 4_200.4,
+      entryMs: 9_000,
+    });
+    expect(mocks.trackServerEvent).toHaveBeenLastCalledWith(
+      'funnel_step',
+      expect.objectContaining({ step_ms: 4_200, entry_ms: 9_000 })
+    );
+    await recordFunnelStep({
+      funnel: 'artist_signup',
+      step: 'chat_started',
+      stepMs: -5,
+      entryMs: Number.NaN,
+    });
+    expect(mocks.trackServerEvent).toHaveBeenLastCalledWith(
+      'funnel_step',
+      expect.objectContaining({ step_ms: undefined, entry_ms: undefined })
+    );
+  });
+
   it('keeps a normalized reason only for error and dropped outcomes', async () => {
     await recordFunnelStep({
       funnel: 'fan_subscribe',
@@ -221,5 +244,42 @@ describe('buildSummerFunnelResponse', () => {
     expect(count(response.unattributed.windows, '7d')).toBe(8);
     expect(count(response.rawWindows, '7d')).toBe(14);
     expect(count(response.windows, '24h')).toBe(1);
+  });
+});
+
+describe('step timing percentiles in the Summer report', () => {
+  it('attaches 7d p50/p95 per step and cohort, none to the 24h window', () => {
+    const report = buildSummerFunnelResponse(
+      [row('artist_signup', 'chat_started', 30)],
+      NOW,
+      [
+        {
+          cohort: 'customer',
+          funnelId: 'artist_signup',
+          step: 'chat_started',
+          samples: 25,
+          p50Ms: 4_000,
+          p95Ms: 21_000,
+        },
+        {
+          cohort: 'synthetic',
+          funnelId: 'artist_signup',
+          step: 'chat_started',
+          samples: 3,
+          p50Ms: 1,
+          p95Ms: 2,
+        },
+      ]
+    );
+    const step = (window: '24h' | '7d') =>
+      report.windows[window].funnels
+        .find(funnel => funnel.funnelId === 'artist_signup')
+        ?.steps.find(item => item.step === 'chat_started');
+    expect(step('7d')).toMatchObject({
+      stepMsP50: 4_000,
+      stepMsP95: 21_000,
+      stepMsSamples: 25,
+    });
+    expect(step('24h')).toMatchObject({ stepMsP50: null, stepMsSamples: 0 });
   });
 });

@@ -38,6 +38,12 @@ on:
     workflows: [Production Controller]
     types: [completed]
     branches: [main]
+  # JOV-9822: the Gem lanes clock fires this every 12 h so the production
+  # golden-path certification stays fresh when nothing deploys. It runs the
+  # certification only (auth smoke browser steps + receipts), not smoke or
+  # Lighthouse.
+  repository_dispatch:
+    types: [clock_prod_golden_path_cert]
   workflow_dispatch:
 
 permissions:
@@ -60,6 +66,10 @@ jobs:
       # probes or page production. Commit identity is resolved with git,
       # outside that REST quota (JOV-8495).
       should_probe: ${{ steps.trigger.outputs.should_probe == 'true' && steps.trigger.outputs.quota_deferred != 'true' }}
+      # JOV-9822: certify the golden path after every Production Verified
+      # promotion, on the 12 h clock, on manual dispatch, and whenever the
+      # read-only probes run. A superset of should_probe.
+      should_certify: ${{ (steps.trigger.outputs.should_probe == 'true' || steps.trigger.outputs.should_certify == 'true') && steps.trigger.outputs.quota_deferred != 'true' }}
       quota_deferred: ${{ steps.trigger.outputs.quota_deferred == 'true' }}
       deployment_id: ${{ steps.target.outputs.deployment_id }}
       deployment_url_b64: ${{ steps.target.outputs.deployment_url_b64 }}
@@ -90,10 +100,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          echo "should_certify=false" >> "$GITHUB_OUTPUT"
           echo "should_probe=false" >> "$GITHUB_OUTPUT"
           # shellcheck source=scripts/ci/gh-api-or-defer.sh
           source scripts/ci/gh-api-or-defer.sh
 
+          if [ "$EVENT_NAME" = "repository_dispatch" ]; then
+            echo "should_certify=true" >> "$GITHUB_OUTPUT"
+            echo "Clock dispatch: certifying the golden path on landed production."
+            exit 0
+          fi
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             echo "should_probe=true" >> "$GITHUB_OUTPUT"
             echo "Manual dispatch: probing the landed production deployment."
@@ -204,6 +220,30 @@ jobs:
             ]
             | length
           ' <<<"$jobs_json")"
+          # JOV-9822: a promotion that reached Production Verified is certified
+          # on production regardless of whether in-lease probes ran.
+          verified_count="$(jq \
+            --arg sha "$TRIGGER_HEAD_SHA" \
+            --argjson run_id "$TRIGGER_RUN_ID" \
+            --argjson run_attempt "$TRIGGER_RUN_ATTEMPT" '
+            [
+              .jobs[]
+              | select(
+                  .name == "Production Verified" and
+                  .run_id == $run_id and
+                  .run_attempt == $run_attempt and
+                  .head_sha == $sha and
+                  .status == "completed" and
+                  .conclusion == "success"
+                )
+            ]
+            | length
+          ' <<<"$jobs_json")"
+          if [ "$verified_count" = "1" ]; then
+            echo "should_certify=true" >> "$GITHUB_OUTPUT"
+            echo "Controller attempt $TRIGGER_RUN_ID/$TRIGGER_RUN_ATTEMPT reached Production Verified; certifying the golden path."
+          fi
+
           case "$probe_evidence_count" in
             0)
               echo "should_probe=true" >> "$GITHUB_OUTPUT"
@@ -220,7 +260,7 @@ jobs:
 
       - name: Resolve exact canonical production deployment
         id: target
-        if: ${{ steps.trigger.outputs.should_probe == 'true' }}
+        if: ${{ steps.trigger.outputs.should_probe == 'true' || steps.trigger.outputs.should_certify == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
@@ -426,7 +466,7 @@ jobs:
   auth-smoke:
     name: Post-Deploy Auth Smoke (Landed Production)
     needs: [resolve-target]
-    if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_probe == 'true' }}
+    if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_certify == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -434,6 +474,7 @@ jobs:
     outputs:
       credentials_configured: ${{ steps.check-creds.outputs.credentials_configured }}
       auth_smoke_status: ${{ steps.auth-result.outputs.auth_smoke_status || steps.check-creds.outputs.auth_smoke_status }}
+      cert_steps_uploaded: ${{ steps.upload-cert-steps.outcome == 'success' }}
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -476,6 +517,25 @@ jobs:
         if: steps.check-creds.outputs.skip != 'true'
         uses: ./.github/actions/setup-playwright
 
+      # JOV-9822: derive the single-purpose canary passage key from
+      # CRON_SECRET (HKDF, own label) so the /start spec can mint a 5-minute,
+      # single-use token. The spec never sees CRON_SECRET itself.
+      - name: Derive the canary passage key
+        if: steps.check-creds.outputs.skip != 'true'
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+        run: |
+          set -euo pipefail
+          # The job checks out the landed production SHA; a build from before
+          # JOV-9822 has no key script and no /start spec, so skip cleanly.
+          if [ ! -f scripts/synthetic-passage-key.mjs ]; then
+            echo "::notice::Landed build predates the canary passage key; /start certification is skipped for it."
+            exit 0
+          fi
+          doppler run --project jovie-web --config prd \
+            --only-secrets=CRON_SECRET --no-fallback -- \
+            env -u DOPPLER_TOKEN node scripts/synthetic-passage-key.mjs
+
       - name: Run production auth smoke tests
         id: auth-result
         if: steps.check-creds.outputs.skip != 'true'
@@ -491,6 +551,8 @@ jobs:
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
           test -n "$PRODUCTION_BASE_URL"
+          specs=(tests/e2e/smoke-prod-auth.spec.ts)
+          [ -f tests/e2e/prod-cert-start-chat.spec.ts ] && specs+=(tests/e2e/prod-cert-start-chat.spec.ts)
           doppler run --project jovie-web --config prd \
             --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
             --no-fallback -- env -u DOPPLER_TOKEN \
@@ -500,14 +562,39 @@ jobs:
               EXPECTED_VERCEL_ENVIRONMENT=production \
               PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$RUNNER_TEMP/playwright-dynamic-cookie-values" \
                 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-                  pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line
+                  pnpm exec playwright test "${specs[@]}" --project=chromium --reporter=line
           echo "auth_smoke_status=passed" >> "$GITHUB_OUTPUT"
         env:
           EXPECTED_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
+          # JOV-9625: browser steps for the golden-path certification receipts.
+          PROD_CERT_STEPS_FILE: ${{ runner.temp }}/prod-cert-steps.jsonl
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           PRODUCTION_BASE_URL_B64: ${{ needs.resolve-target.outputs.deployment_url_b64 }}
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+
+      # Step names, timestamps and one-line summaries only; no cookies, codes
+      # or addresses (the step helper never records them).
+      - name: Check golden-path certification steps
+        id: check-cert-steps
+        if: ${{ always() && steps.check-creds.outputs.skip != 'true' }}
+        env:
+          PROD_CERT_STEPS_FILE: ${{ runner.temp }}/prod-cert-steps.jsonl
+        run: |
+          if [ -s "$PROD_CERT_STEPS_FILE" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload golden-path certification steps
+        id: upload-cert-steps
+        if: ${{ always() && steps.check-cert-steps.outputs.available == 'true' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: prod-cert-steps-${{ github.run_id }}
+          path: ${{ runner.temp }}/prod-cert-steps.jsonl
+          retention-days: 3
 
       - name: Upload Playwright Artifacts on Failure
         if: ${{ failure() && steps.check-creds.outputs.skip != 'true' && hashFiles('apps/web/test-results/**') != '' }}
@@ -607,6 +694,73 @@ jobs:
       - name: Remove Lighthouse sensitive probe state
         if: ${{ always() }}
         run: rm -f "$RUNNER_TEMP/lighthouse-sensitive-values"
+
+  # JOV-9625: after every landed production promotion, certify the golden path
+  # on https://jov.ie. Scripts come from this workflow's ref; the evidence is
+  # bound to the exact SHA the production build-info endpoint serves. Posts one
+  # receipt per surface to the Ovie certification ledger and files or closes
+  # one owned Linear issue per failing surface. Read-only against production
+  # apart from the sanctioned synthetic identity's own sign-in.
+  golden-path-cert:
+    name: Golden Path Certification (Landed Production)
+    needs: [resolve-target, auth-smoke]
+    if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_certify == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-doppler
+
+      - name: Download golden-path certification steps
+        if: ${{ needs.auth-smoke.outputs.cert_steps_uploaded == 'true' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: prod-cert-steps-${{ github.run_id }}
+          path: ${{ runner.temp }}/prod-cert
+
+      - name: Resolve CRON_SECRET for the Ovie ledger
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: node .github/scripts/resolve-synthetic-secrets.mjs --name CRON_SECRET
+
+      - name: Certify the golden path on production
+        env:
+          AUTH_SMOKE_STATUS: ${{ needs.auth-smoke.outputs.auth_smoke_status || (needs.auth-smoke.result == 'success' && 'passed') || 'failed' }}
+          EXPECTED_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+        run: |
+          set -euo pipefail
+          steps_file="${RUNNER_TEMP}/prod-cert/prod-cert-steps.jsonl"
+          steps_json="${RUNNER_TEMP}/prod-cert-steps.json"
+          if [ -s "$steps_file" ]; then
+            jq -s '.' "$steps_file" > "$steps_json"
+          else
+            echo '[]' > "$steps_json"
+          fi
+          node scripts/prod-cert.mjs \
+            --origin https://jov.ie \
+            --steps "$steps_json" \
+            --out "${RUNNER_TEMP}/prod-cert-receipts.json" \
+            --post --file-issues
+
+      - name: Upload certification receipts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: prod-cert-receipts-${{ github.run_id }}
+          path: ${{ runner.temp }}/prod-cert-receipts.json
+          retention-days: 30
+          if-no-files-found: ignore
 
   remediation:
     name: File post-deploy probe remediation

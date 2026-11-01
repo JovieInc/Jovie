@@ -58,6 +58,9 @@ describe('TipSection', () => {
     expect(
       screen.getByText('Choose an amount and a payment method')
     ).toBeDefined();
+    // The Venmo hint names the amount to send; no retype instruction.
+    expect(screen.getByText(/^Send \$\d+ in Venmo\.$/)).toBeInTheDocument();
+    expect(screen.queryByText(/Enter the amount in Venmo/)).toBeNull();
   });
 
   it('starts Stripe checkout only after Pay and does not claim payment completed', async () => {

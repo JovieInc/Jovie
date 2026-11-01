@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import {
+  CONTRACT_LABELS,
   evaluateHold,
   HOLD_LABEL,
   MAX_HOLD_MS,
@@ -257,104 +258,39 @@ function runHoldSweep(pr, now) {
   }
 }
 
-/** @type {Array<[number, string, string, string]>} */
-const historicalHumanHolds = [
-  [
-    22407,
-    '2026-10-24T22:03:14Z',
-    '2026-10-24T22:03:51Z',
-    '2026-10-25T22:05:26Z',
-  ],
-  [
-    22444,
-    '2026-10-24T22:03:18Z',
-    '2026-10-24T22:03:57Z',
-    '2026-10-25T22:05:23Z',
-  ],
-];
-for (const [
-  number,
-  labeledAt,
-  commentedAt,
-  removedAt,
-] of historicalHumanHolds) {
-  test(`preserves the explicit human disposition recorded on #${number}`, () => {
-    // Complete GitHub histories show itstimwhite applying tim-hold, then
-    // jovie-bot removing it after 24h despite this unexpired instruction.
+// EVENT 2026-10-28: no stop label is human-owned. The retired labels are not in
+// the contract vocabulary, so the sweep neither honours nor touches them.
+for (const label of ['tim-hold', 'tim:hold', 'hold:tim', 'do-not-merge']) {
+  test(`${label} is retired: not a stop label and never preserved`, () => {
+    assert.ok(!CONTRACT_LABELS.includes(label));
     const pr = {
-      number,
       state: 'OPEN',
       headRefOid: HEAD,
-      labels: { nodes: [{ name: 'tim-hold' }] },
+      labels: { nodes: [{ name: label }] },
       timelineItems: {
-        nodes: [
-          {
-            createdAt: labeledAt,
-            actor: { login: 'itstimwhite' },
-            label: { name: 'tim-hold' },
-          },
-        ],
+        nodes: [{ createdAt: LABELED, label: { name: label } }],
       },
-      comments: {
-        nodes: [
-          {
-            createdAt: commentedAt,
-            author: { login: 'itstimwhite' },
-            body: 'Preserve this hold until its authorized disposition is explicitly resolved.',
-          },
-        ],
-      },
+      comments: { nodes: [] },
     };
-    const { results, writes } = runHoldSweep(pr, Date.parse(removedAt));
+    const { results, writes } = runHoldSweep(pr, T0 + MAX_HOLD_MS + HOUR);
+    assert.deepEqual(results, []);
     assert.deepEqual(writes, []);
-    assert.deepEqual(
-      results.map(row => [row.label, row.action]),
-      [['tim-hold', 'keep']]
-    );
   });
 }
 
-for (const label of ['tim-hold', 'tim:hold', 'hold:tim', 'do-not-merge']) {
-  for (const mode of ['ownerless', 'expired', 'head-changed']) {
-    test(`${label} remains human-owned after ${mode} machine release conditions`, () => {
-      const pr = {
-        state: 'OPEN',
-        headRefOid: mode === 'head-changed' ? 'b'.repeat(40) : HEAD,
-        labels: { nodes: [{ name: label }] },
-        timelineItems: {
-          nodes: [{ createdAt: LABELED, label: { name: label } }],
-        },
-        comments: {
-          nodes:
-            mode === 'ownerless' ? [] : [comment({ owner: 'gem', head: HEAD })],
-        },
-      };
-      const now =
-        T0 + (mode === 'head-changed' ? 2 * HOUR : MAX_HOLD_MS + HOUR);
-      const { results, writes } = runHoldSweep(pr, now);
-      assert.deepEqual(writes, []);
-      assert.equal(results[0].action, 'keep');
-    });
-  }
-}
-
-test('a human hold preserves coexisting stops even when its timeline evidence is missing', () => {
-  const labels = ['hold', 'gated', 'incident', 'tim-hold', 'queue-deferred'];
+test('a machine hold alongside a retired human label still follows the contract', () => {
   const pr = {
     state: 'OPEN',
     headRefOid: 'b'.repeat(40),
-    labels: { nodes: labels.map(name => ({ name })) },
-    timelineItems: {
-      nodes: labels
-        .filter(name => name !== 'tim-hold')
-        .map(name => ({ createdAt: LABELED, label: { name } })),
-    },
+    labels: { nodes: [{ name: 'hold' }, { name: 'tim-hold' }] },
+    timelineItems: { nodes: [{ createdAt: LABELED, label: { name: 'hold' } }] },
     comments: { nodes: [comment({ owner: 'gem', head: HEAD })] },
   };
-  const { results, writes } = runHoldSweep(pr, T0 + MAX_HOLD_MS + HOUR);
-  assert.deepEqual(writes, []);
-  assert.equal(results.length, labels.length);
-  assert.ok(results.every(row => row.action === 'keep'));
+  const { results } = runHoldSweep(pr, T0 + MAX_HOLD_MS + HOUR);
+  assert.deepEqual(
+    results.map(row => [row.label, row.action]),
+    [['hold', 'release']]
+  );
 });
 
 test('machine stop labels follow their own labeled time', () => {

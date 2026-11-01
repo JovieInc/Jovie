@@ -44,7 +44,7 @@ describe('public CLI publication metadata', () => {
         provenance: true,
         registry: 'https://registry.npmjs.org',
       },
-      bin: { jovie: './dist/cli.js' },
+      bin: { jovie: 'dist/cli.js' },
       engines: { node: '>=24.22.1' },
     });
     expect(manifest.files).toEqual(

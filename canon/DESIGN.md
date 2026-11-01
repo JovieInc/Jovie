@@ -2,7 +2,7 @@
 
 Status: Canon
 Inherits: [`OPERATING_SYSTEM.md`](./OPERATING_SYSTEM.md)
-Last updated: 2026-10-23
+Last updated: 2026-10-29
 
 Design exists to increase customer throughput: make the next correct action obvious, trustworthy, and valuable.
 
@@ -67,6 +67,18 @@ Design work is justified when evidence shows one of these is limiting throughput
 
 ---
 
+## Shell, IA and the living canvas
+
+**EVENT:** Tim White, 2026-10-29 ([JOV-9748](https://linear.app/jovie/issue/JOV-9748)):
+the main content area is a living canvas, a cinematic window into the user's
+world. Jovie is a circle that becomes the composer and compacts back to a circle
+for voice. Chrome recedes; one motion grammar (circle, composer, voice) carries
+presence. Every surface (app, Ovie, public, marketing) uses one shell and IA:
+[`docs/design-system/shell-ia.md`](../docs/design-system/shell-ia.md), enforced by
+`JOV-INV-047`.
+
+---
+
 ## Anti-Goals
 
 Do not spend design effort on:
@@ -95,6 +107,7 @@ UI judge calibration set: [`docs/screenshots/ui-escape-holdout/holdout.json`](..
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-10-29 | Living-canvas north star; one shell and IA across all surfaces (JOV-INV-047). | Tim White (JOV-9748) |
 | 2026-10-23 | Scoped an art-directed marketing exception to smallest-change guidance. Product UI rules are unchanged. | Homepage art-direction brief; founder wording review |
 | 2026-08-21 | Canonized scene-first color harmony for Jovie-owned generated brand imagery. | Tim White approval |
 | 2026-07-17 | Created as domain canon under `/canon`. | Tim White |

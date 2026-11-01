@@ -96,7 +96,7 @@ describe('AudienceFanCell', () => {
     expect(screen.queryByText('tim@example.com')).not.toBeInTheDocument();
   });
 
-  it('renders Anonymous Fan when displayName, email, and phone are all empty', () => {
+  it('renders Anonymous visitor when displayName, email, and phone are all empty', () => {
     render(
       <AudienceFanCell
         member={{
@@ -107,7 +107,7 @@ describe('AudienceFanCell', () => {
         }}
       />
     );
-    expect(screen.getByText('Anonymous Fan')).toBeInTheDocument();
+    expect(screen.getByText('Anonymous visitor')).toBeInTheDocument();
     // A neutral face, not initials that read as a real person ("AF").
     expect(
       document.querySelector('[data-slot="app-avatar"]')?.textContent
@@ -141,7 +141,7 @@ describe('AudienceFanCell', () => {
         }}
       />
     );
-    expect(screen.getByText('Anonymous Fan')).toBeInTheDocument();
+    expect(screen.getByText('Anonymous visitor')).toBeInTheDocument();
     expect(screen.queryByText('hidden@example.com')).not.toBeInTheDocument();
   });
 

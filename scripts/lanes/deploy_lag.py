@@ -109,9 +109,28 @@ def limits_or_seed(store: dict, seed_commits: int, seed_age_s: int) -> dict:
     return {"commits": seed_commits, "ageS": seed_age_s, "computedAt": None, "n": 0, "source": "seed"}
 
 
+def record_release(store: dict, row: dict, now: float) -> dict:
+    """Append one observed release (build-info SHA change) with its merge->production lead time; dedupe by SHA."""
+    releases = [r for r in store.get("releases") or [] if now - r.get("at", 0) <= KEEP_S and r.get("id") != row["id"]]
+    store["releases"] = [*releases, row]
+    return store
+
+
+def release_lead_times(store: dict, now: float) -> dict:
+    """Per-release merge->production lead time (newest commit, and oldest commit in the batch) over 7 days."""
+    rows = [r for r in store.get("releases") or [] if now - r.get("at", 0) <= WEEK_S and isinstance(r.get("leadTimeS"), int)]
+    lead = [r["leadTimeS"] / 60 for r in rows]
+    oldest = [r["oldestLeadTimeS"] / 60 for r in rows if isinstance(r.get("oldestLeadTimeS"), int)]
+    rnd = lambda v: None if v is None else round(v)  # noqa: E731
+    return {"n": len(rows), "p50Min": rnd(pct(lead, 0.5)), "p95Min": rnd(pct(lead, 0.95)),
+            "oldestP50Min": rnd(pct(oldest, 0.5)), "oldestP95Min": rnd(pct(oldest, 0.95)),
+            "last": rows[-1] if rows else None}
+
+
 def lag_summary(store: dict, now: float) -> dict:
     rows = window(store, now)
     ages = [r["ageS"] / 60 for r in rows]
     p50, p95 = pct(ages, 0.5), pct(ages, 0.95)
     return {"p50Min": None if p50 is None else round(p50), "p95Min": None if p95 is None else round(p95), "n": len(rows),
-            "targetP50Min": TARGETS["p50Min"], "targetP95Min": TARGETS["p95Min"]}
+            "targetP50Min": TARGETS["p50Min"], "targetP95Min": TARGETS["p95Min"],
+            "releaseLeadTime": release_lead_times(store, now)}

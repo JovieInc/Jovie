@@ -30,7 +30,7 @@ jobs:
       # Bootstrap only the existing, dependency-free client from the trusted base.
       - &quota-client
         name: Checkout the trusted quota client
-        if: ${{ github.event.action == 'edited' && !github.event.changes.base }}
+        if: ${{ (github.event.action == 'edited' && !github.event.changes.base) || github.event.action == 'labeled' || github.event.action == 'unlabeled' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.base.sha }}
@@ -45,7 +45,7 @@ jobs:
       # (run 40176111773, 2026-10-25): one REST manifest call each.
       - &quota-prime
         name: Prime Node toolcache (no GitHub API manifest call)
-        if: ${{ github.event.action == 'edited' && !github.event.changes.base && hashFiles('.source-validation-client/.github/actions/prime-node-toolcache/action.yml') != '' }}
+        if: ${{ ((github.event.action == 'edited' && !github.event.changes.base) || github.event.action == 'labeled' || github.event.action == 'unlabeled') && hashFiles('.source-validation-client/.github/actions/prime-node-toolcache/action.yml') != '' }}
         # A run step, not `uses:`: the client checkout path does not exist when
         # workflow references are validated, so a local action there is rejected.
         env:
@@ -53,11 +53,11 @@ jobs:
         run: bash .source-validation-client/.github/actions/prime-node-toolcache/prime.sh
       - &quota-runtime
         name: Setup the quota client runtime
-        if: ${{ github.event.action == 'edited' && !github.event.changes.base }}
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: ${{ (github.event.action == 'edited' && !github.event.changes.base) || github.event.action == 'labeled' || github.event.action == 'unlabeled' }}
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .source-validation-client/.nvmrc
-      # A PR body/title edit re-runs this workflow at an unchanged head and
+      # A PR body/title edit or a label change (fleet bots relabel every PR) re-runs this workflow at an unchanged head and
       # base. 262 of 303 same-head reruns on 2026-10-03 were body edits. When
       # the newest completed earlier run for this exact head and branch
       # succeeded, its proof still holds: only body-dependent decisions (the
@@ -66,7 +66,7 @@ jobs:
       - &proof-reuse
         name: Reuse exact-head proof for a metadata-only edit
         id: reuse
-        if: ${{ github.event.action == 'edited' && !github.event.changes.base }}
+        if: ${{ (github.event.action == 'edited' && !github.event.changes.base) || github.event.action == 'labeled' || github.event.action == 'unlabeled' }}
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -594,16 +594,21 @@ jobs:
       # A contents:read Jovie Bot installation token returns 200. Severity
       # and the GPL/AGPL denylist stay blocking. The minted token is
       # contents:read only; an empty key fails the mint closed.
+      # Dependabot main PRs use the identical pinned review in the trusted
+      # Fleet Rules Evidence job, where the CI App credential is available.
+      # PR Ready already requires that exact-head job and its event-driven
+      # rerun path; no status publication, polling or secret copy is needed.
+      # Non-main bases retain this check because they have no fleet evidence.
       - name: Mint dependency review read token
         id: dependency-review-token
-        if: steps.reuse.outputs.reuse != 'true'
+        if: steps.reuse.outputs.reuse != 'true' && (github.event.pull_request.user.login != 'dependabot[bot]' || github.event.pull_request.base.ref != 'main')
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
           permission-contents: read
       - name: Review added and upgraded dependencies
-        if: steps.reuse.outputs.reuse != 'true'
+        if: steps.reuse.outputs.reuse != 'true' && (github.event.pull_request.user.login != 'dependabot[bot]' || github.event.pull_request.base.ref != 'main')
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           repo-token: ${{ steps.dependency-review-token.outputs.token }}
@@ -751,11 +756,10 @@ jobs:
           TURBO_CACHE: local:r
           # Same public mock environment as the merge group's Build + Layout,
           # so both measure identical bundles without secrets.
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
           NEXT_PUBLIC_APP_URL: http://localhost:3230
           NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3230
-          NEXT_PUBLIC_CLERK_MOCK: '1'
-          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_AUTH_MOCK: '1'
+          NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
           NEXT_PUBLIC_E2E_MODE: '1'
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'

@@ -3,12 +3,12 @@ import {
   type DecisionHudView,
 } from '@/lib/hud/decision-signals';
 import type { LybDailyMrr } from '@/lib/ovie/lyb-mrr';
+import { LANE_BRANCH_RE } from '@/lib/ovie/shipping-state/contract';
 
 export const YC_EXCEPTIONAL_GROWTH = 0.1;
 export const YC_GOOD_GROWTH_MIN = 0.05;
 export const OVIE_MAC_HUD_IN_FLIGHT_PR_LIMIT = 8;
 /** Lane-owned heads. Dependabot and human branches are not in flight. */
-const LANE_BRANCH_RE = /^(?:devin|codex)\//;
 
 export type OvieMacHudStatus = 'alive' | 'dead' | 'unknown';
 export type OvieMacHudGrowthSource = 'revenue' | 'active-users';

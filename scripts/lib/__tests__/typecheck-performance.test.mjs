@@ -71,41 +71,51 @@ describe('typecheck performance', () => {
 });
 
 describe('product typecheck memory', () => {
-  it('passes a bounded 8 GiB heap through the actual singleflight launcher', () => {
-    const manifest = JSON.parse(
-      readFileSync(join(ROOT, 'apps/web/package.json'), 'utf8')
-    );
-    const [launcher, compiler, extra] =
-      manifest.scripts.typecheck.split(' -- ');
-    expect(extra).toBeUndefined();
-    expect(compiler).toBe(
-      'tsc -p tsconfig.typecheck.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo'
-    );
-    const directory = mkdtempSync(join(tmpdir(), 'jovie-typecheck-heap-'));
-    try {
-      const result = spawnSync(
-        '/bin/sh',
-        [
-          '-c',
-          `${launcher} -- node -e 'console.log("HEAP=" + require("node:v8").getHeapStatistics().heap_size_limit)'`,
-        ],
-        {
-          cwd: join(ROOT, 'apps/web'),
-          env: {
-            ...process.env,
-            NODE_OPTIONS: '',
-            TYPECHECK_SINGLEFLIGHT_DIR: directory,
-          },
-          encoding: 'utf8',
-          timeout: 10000,
-        }
+  it.each(process.platform === 'linux' ? ['', '1'] : [''])(
+    'passes a bounded 8 GiB heap through the actual launcher chain (GEM_TYPECHECK_SLOTS=%j)',
+    slots => {
+      const manifest = JSON.parse(
+        readFileSync(join(ROOT, 'apps/web/package.json'), 'utf8')
       );
-      expect(result.status, result.stderr).toBe(0);
-      const heap = Number(result.stdout.match(/HEAP=(\d+)/)?.[1]);
-      expect(heap).toBeGreaterThanOrEqual(8 * 1024 ** 3);
-      expect(heap).toBeLessThan(9 * 1024 ** 3);
-    } finally {
-      rmSync(directory, { recursive: true, force: true });
+      const launchers = manifest.scripts.typecheck.split(' -- ');
+      const compiler = launchers.pop();
+      const launcher = launchers.join(' -- ');
+      expect(launchers.length).toBeGreaterThan(0);
+      expect(compiler).toBe(
+        'tsc -p tsconfig.typecheck.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo'
+      );
+      const directory = mkdtempSync(join(tmpdir(), 'jovie-typecheck-heap-'));
+      try {
+        const result = spawnSync(
+          '/bin/sh',
+          [
+            '-c',
+            `${launcher} -- node -e 'console.log("HEAP=" + require("node:v8").getHeapStatistics().heap_size_limit)'`,
+          ],
+          {
+            cwd: join(ROOT, 'apps/web'),
+            env: {
+              ...process.env,
+              NODE_OPTIONS: '',
+              GEM_TYPECHECK_SLOTS: slots,
+              GEM_TYPECHECK_LOCK_DIR: join(directory, 'slots'),
+              TYPECHECK_SINGLEFLIGHT_DIR: directory,
+            },
+            encoding: 'utf8',
+            // Harness slack only: on loaded merge-queue runners the launcher chain
+            // (pnpm/turbo boot) can exceed 10s before the heap probe runs, killing the
+            // spawn (status null) and failing this test nondeterministically. The
+            // assertions on the propagated heap bound are unchanged.
+            timeout: 60000,
+          }
+        );
+        expect(result.status, result.stderr).toBe(0);
+        const heap = Number(result.stdout.match(/HEAP=(\d+)/)?.[1]);
+        expect(heap).toBeGreaterThanOrEqual(8 * 1024 ** 3);
+        expect(heap).toBeLessThan(9 * 1024 ** 3);
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
     }
-  });
+  );
 });

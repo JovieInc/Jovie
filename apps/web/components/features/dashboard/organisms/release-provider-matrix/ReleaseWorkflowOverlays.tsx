@@ -13,18 +13,23 @@ import {
   SpotifyConnectDialog,
 } from './release-lazy-components';
 
+type AppleMusicConnectHandler = (
+  artist: AppleMusicArtistSelection
+) => void | Promise<void>;
+type SpotifyConnectedHandler = (
+  releases: ReleaseViewModel[],
+  artistName: string
+) => void;
+
 interface ReleaseWorkflowOverlaysProps {
   readonly amPaletteOpen: boolean;
   readonly setAmPaletteOpen: (open: boolean) => void;
   readonly spotifySearchOpen: boolean;
   readonly setSpotifySearchOpen: (open: boolean) => void;
-  readonly onAppleMusicConnect: (
-    artist: AppleMusicArtistSelection
-  ) => void | Promise<void>;
-  readonly onSpotifyConnected: (
-    releases: ReleaseViewModel[],
-    artistName: string
-  ) => void;
+  readonly spotifyConnected?: boolean;
+  readonly spotifyArtistName?: string | null;
+  readonly onAppleMusicConnect: AppleMusicConnectHandler;
+  readonly onSpotifyConnected: SpotifyConnectedHandler;
   readonly onSpotifyImportStart: (artistName: string) => void;
   readonly postCreateRelease: ReleaseViewModel | null;
   readonly isPostCreatePlanModalOpen: boolean;
@@ -46,6 +51,8 @@ export function ReleaseWorkflowOverlays({
   setAmPaletteOpen,
   spotifySearchOpen,
   setSpotifySearchOpen,
+  spotifyConnected = false,
+  spotifyArtistName = null,
   onAppleMusicConnect,
   onSpotifyConnected,
   onSpotifyImportStart,
@@ -100,6 +107,8 @@ export function ReleaseWorkflowOverlays({
         <SpotifyConnectDialog
           open={spotifySearchOpen}
           onOpenChange={setSpotifySearchOpen}
+          connected={spotifyConnected}
+          connectedArtistName={spotifyArtistName}
           onConnected={onSpotifyConnected}
           onImportStart={onSpotifyImportStart}
         />

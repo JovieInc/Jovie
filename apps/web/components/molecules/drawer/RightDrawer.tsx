@@ -362,7 +362,7 @@ export function RightDrawer({
     // above this modal. React context and the existing focus boundary survive
     // the portal; dialogs opened from the sheet retain their higher layer.
     return createPortal(
-      <aside
+      <section
         {...rest}
         ref={asideRef}
         aria-hidden={!isOpen || !isActiveMobileDrawer}
@@ -387,7 +387,7 @@ export function RightDrawer({
         )}
       >
         {content}
-      </aside>,
+      </section>,
       document.body
     );
   }

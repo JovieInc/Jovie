@@ -55,6 +55,19 @@ describe('IdentityPageClient', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('links the signup disclosures to the canonical legal pages', () => {
+    render(<IdentityPageClient />);
+
+    expect(screen.getByRole('link', { name: 'Terms' })).toHaveAttribute(
+      'href',
+      '/legal/terms'
+    );
+    expect(
+      screen.getByRole('link', { name: 'Privacy Policy' })
+    ).toHaveAttribute('href', '/legal/privacy');
+    expect(signInSocial).not.toHaveBeenCalled();
+  });
+
   it('starts Apple through Better Auth', async () => {
     render(<IdentityPageClient />);
     fireEvent.click(

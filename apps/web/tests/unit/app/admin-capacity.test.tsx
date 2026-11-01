@@ -166,9 +166,9 @@ describe('access paths and roles', () => {
     );
     const luna = within(paths)
       .getAllByRole('listitem')
-      .filter(r => r.textContent?.includes('gpt-5.6-luna'));
+      .filter(r => r.textContent?.includes('gpt-6-luna'));
     const text = luna.map(r => r.textContent).join(' ');
-    expect(text).toMatch(/API.*0\.2 \/ 1\.2.*list price, cash/);
+    expect(text).toMatch(/API.*0\.1 \/ 0\.5.*list price, cash/);
     expect(text).toMatch(
       /Subscription seat \(openai-codex\).*lyb-pro: ahead of pace: rising toward API/
     );

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ARTIST_VISIBILITY_OFFER_CONTRACT_ID } from '@/lib/billing/offer-truth';
+import { getPaidPlanAdditionNames } from '@/lib/billing/public-pricing-features';
 import { PricingComparisonChart } from './PricingComparisonChart';
 
 describe('PricingComparisonChart', () => {
@@ -35,7 +36,7 @@ describe('PricingComparisonChart', () => {
     }
 
     const feature = within(mobileTable).getByRole('rowheader', {
-      name: 'Contact / subscriber capture',
+      name: 'Audience email capture',
     });
     expect(feature).toHaveAttribute('scope', 'row');
     expect(feature).toHaveAttribute('data-wrap', 'feature-label');
@@ -50,8 +51,8 @@ describe('PricingComparisonChart', () => {
     expect(
       within(mobileTable).getByText('Artist Presence')
     ).toBeInTheDocument();
-    expect(within(desktopTable).getAllByText('Included')).toHaveLength(2);
-    expect(within(mobileTable).getAllByText('Included')).toHaveLength(1);
+    expect(within(desktopTable).getAllByText('Included')).toHaveLength(4);
+    expect(within(mobileTable).getAllByText('Included')).toHaveLength(3);
     expect(desktopTable.querySelector('svg')).toBeNull();
     expect(mobileTable.querySelector('svg')).toBeNull();
     expect(
@@ -80,7 +81,8 @@ describe('PricingComparisonChart', () => {
     expect(selector).toHaveValue('free');
     expect(within(mobileTable).getByText('Free')).toBeInTheDocument();
     expect(within(mobileTable).getByText('$0')).toBeInTheDocument();
-    expect(within(mobileTable).getByText('Up to 100')).toBeInTheDocument();
+    expect(within(mobileTable).getByText('Unlimited')).toBeInTheDocument();
+    expect(within(mobileTable).getAllByText('Not included')).toHaveLength(2);
     expect(within(mobileTable).queryByText('/mo')).not.toBeInTheDocument();
 
     fireEvent.change(selector, { target: { value: 'unknown-plan' } });
@@ -95,5 +97,12 @@ describe('PricingComparisonChart', () => {
     expect(within(mobileTable).getByText('$12')).toBeInTheDocument();
     expect(within(mobileTable).getByText('/mo')).toBeInTheDocument();
     expect(within(mobileTable).getByText('Unlimited')).toBeInTheDocument();
+  });
+
+  it('renders every paid-plan addition the pricing card lists', () => {
+    render(<PricingComparisonChart />);
+    for (const name of getPaidPlanAdditionNames()) {
+      expect(screen.getAllByText(name).length).toBeGreaterThan(0);
+    }
   });
 });

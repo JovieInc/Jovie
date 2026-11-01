@@ -1,6 +1,7 @@
 import { APP_ROUTES } from '@/constants/routes';
-import { ARTIST_VISIBILITY_OFFER } from '@/lib/config/plan-prices';
+import { PRO_PLAN_DISPLAY_NAME } from '@/lib/config/plan-prices';
 import {
+  getLimit,
   getPlanDisplayName,
   type PlanId,
   resolveCanonicalPlanId,
@@ -30,35 +31,44 @@ export const CHECKOUT_RECOVERY_COPY = {
     'This session is missing, expired, or still processing. We have not marked a paid plan as active.',
 } as const;
 
+/**
+ * Post-checkout copy names only what the paid plan turns on today
+ * (registry-gated and certified). Monitoring, opportunities and agentic fixes
+ * are internal-only (PROFILE_SEARCH_MONITORING off), so they are not promised.
+ */
+const PRO_ANALYTICS_DAYS = getLimit('pro', 'analyticsRetentionDays');
+
 export const ARTIST_VISIBILITY_ACTIVATION_COPY = {
-  status: 'Artist Visibility is starting',
-  next: 'We will monitor your presence, surface issues, wait for your approval, then fix.',
+  status: `${PRO_PLAN_DISPLAY_NAME} is active`,
+  next: 'Included with your plan.',
 } as const;
 
 export const ARTIST_VISIBILITY_ACTIVATION_STEPS = [
   {
-    key: 'monitor',
-    title: 'Monitor',
-    description: ARTIST_VISIBILITY_OFFER.pro.outcomes[0],
-    status: 'Starting',
+    key: 'notify',
+    title: 'Release emails',
+    description:
+      'When a new release reaches Spotify, Jovie emails your verified subscribers.',
+    status: 'On for your next release',
   },
   {
-    key: 'surface',
-    title: 'Surface',
-    description: 'Prioritized opportunities land here for you to review.',
-    status: 'Waiting for first findings',
+    key: 'prerelease',
+    title: 'Pre-release pages',
+    description:
+      'Countdown and pre-release pages stay live through release day.',
+    status: 'Unlocked',
   },
   {
-    key: 'approve',
-    title: 'Approve',
-    description: 'Nothing changes on a live surface until you approve.',
-    status: 'You review before we act',
+    key: 'analytics',
+    title: 'Analytics',
+    description: `${PRO_ANALYTICS_DAYS} days of history, geographic insights and contact export.`,
+    status: 'Unlocked',
   },
   {
-    key: 'fix',
-    title: 'Fix',
-    description: ARTIST_VISIBILITY_OFFER.pro.outcomes[2],
-    status: 'Ready after you approve',
+    key: 'verify',
+    title: 'Verification',
+    description: 'Request a verified badge. Our team reviews each request.',
+    status: 'Available to request',
   },
 ] as const;
 
@@ -149,9 +159,7 @@ export function getPaidSuccessPrimaryLabel(input: {
 }): string {
   if (input.isOnboardingUpgrade) return 'Explore your dashboard';
   if (input.needsProfile) return 'Claim your link';
-  return isArtistVisibilityPlan(input.plan)
-    ? 'Open Artist Visibility'
-    : 'Go to chat';
+  return isArtistVisibilityPlan(input.plan) ? 'Open Identity' : 'Go to chat';
 }
 
 export function shouldCelebratePaidSuccess(

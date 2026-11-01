@@ -210,7 +210,7 @@ describe('Chat session context: null/missing field handling', () => {
     const prompt = buildSystemPrompt(mockArtistContext, releasesWithNull);
     expect(prompt).toContain('Undated Single');
     // No date should appear in the release line
-    expect(prompt).toContain('(single, 1 track)');
+    expect(prompt).toContain('(single, 1 track; date not set)');
   });
 });
 

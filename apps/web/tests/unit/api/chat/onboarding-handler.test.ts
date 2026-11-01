@@ -27,6 +27,24 @@ const hoisted = vi.hoisted(() => ({
   dbOnConflictDoUpdateMock: vi.fn(),
 }));
 
+function expectOnlyDraftPersisted() {
+  expect(hoisted.dbOnConflictDoUpdateMock).toHaveBeenCalledTimes(1);
+  expect(hoisted.dbOnConflictDoUpdateMock.mock.calls[0]?.[0].set).toMatchObject(
+    {
+      content: '',
+      scriptLineKey: null,
+      toolCalls: [
+        {
+          output: {
+            action: 'profile_draft_recorded',
+            publicEvidenceOnly: true,
+          },
+        },
+      ],
+    }
+  );
+}
+
 vi.mock('@/lib/waitlist/golden-path-admission.server', () => ({
   readGoldenPathTurnContext: async () => ({ verdict: null, holdReason: null }),
 }));
@@ -40,6 +58,12 @@ vi.mock('@/lib/spotify', () => ({
   getSpotifyArtist: hoisted.getSpotifyArtistMock,
   buildSpotifyArtistUrl: (id: string) =>
     `https://open.spotify.com/artist/${id}`,
+}));
+
+// JOV-9625: anonymous canary passage tokens. Defaults to no token.
+const passageTokenMock = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/synthetic/passage-token.server', () => ({
+  resolveSyntheticPassageToken: passageTokenMock,
 }));
 
 vi.mock('@/lib/flags/server', () => ({
@@ -800,7 +824,10 @@ describe('tryHandleAnonymousOnboardingChat', () => {
 
     expect(result?.status).toBe(200);
     expect(result?.headers.get('x-onboarding-fallback')).toMatch(
-      /^get_artist:/
+      /^greet:adaptive-role-/
+    );
+    expect(await result?.text()).not.toMatch(
+      /open_artist_picker|I'll remember this chat/
     );
   });
 
@@ -828,7 +855,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
         set: expect.objectContaining({
           assistantSource: 'script',
           content: expect.any(String),
-          scriptLineKey: expect.stringMatching(/^greet:v\d+$/),
+          scriptLineKey: expect.stringMatching(/^greet:/),
         }),
       })
     );
@@ -913,7 +940,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     await finishPromise;
 
     expect(result?.status).toBe(200);
-    expect(hoisted.dbOnConflictDoUpdateMock).not.toHaveBeenCalled();
+    expectOnlyDraftPersisted();
   });
 
   it('uses safe unavailable copy when insufficient funds arrive mid-stream', async () => {
@@ -1003,7 +1030,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     await finishPromise;
 
     expect(result?.status).toBe(200);
-    expect(hoisted.dbOnConflictDoUpdateMock).not.toHaveBeenCalled();
+    expectOnlyDraftPersisted();
   });
 
   it('ignores the injection header on production deploys even with the env flag', async () => {
@@ -1187,7 +1214,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     vi.resetModules();
     stubRuntimeEnv({ nodeEnv: 'test' });
     vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
-    vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
     hoisted.checkGateForUserMock.mockResolvedValue(true);
     hoisted.isTurnstileConfiguredMock.mockReturnValue(false);
     hoisted.executeChatTurnMock.mockResolvedValue({
@@ -1298,7 +1325,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     vi.resetModules();
     stubRuntimeEnv({ nodeEnv: 'production', vercelEnv: 'preview' });
     vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
-    vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
     vi.stubEnv('PUBLIC_NOAUTH_SMOKE', '1');
     hoisted.checkGateForUserMock.mockResolvedValue(false);
     hoisted.isTurnstileConfiguredMock.mockReturnValue(false);
@@ -1400,8 +1427,33 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       );
     });
 
+    it('verifies an anonymous canary passage token in test mode, consuming it (JOV-9625)', async () => {
+      arrangeProduction();
+      passageTokenMock.mockResolvedValueOnce({ actorId: 'prodcert' });
+
+      const result = await firstTurn('req-passage-token');
+
+      expect(result?.status).toBe(200);
+      expect(passageTokenMock).toHaveBeenCalledWith(
+        expect.anything(),
+        'onboarding_chat',
+        { consume: true, requestId: 'req-passage-token' }
+      );
+      expect(hoisted.verifyTurnstileTestModeTokenMock).toHaveBeenCalledWith(
+        DUMMY_TOKEN,
+        '203.0.113.5'
+      );
+      expect(hoisted.verifyTurnstileTokenMock).not.toHaveBeenCalled();
+      expect(hoisted.checkAnonymousChatRateLimitMock).toHaveBeenCalled();
+      expect(hoisted.setTagMock).toHaveBeenCalledWith(
+        'synthetic_principal',
+        'prodcert'
+      );
+    });
+
     it('still challenges an anonymous visitor who sends the dummy token', async () => {
       arrangeProduction();
+      passageTokenMock.mockResolvedValueOnce(null);
 
       const result = await firstTurn('req-anon-dummy');
 
@@ -1674,7 +1726,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
         errorCode: 'SPOTIFY_IDENTITY_LOOKUP_FAILED',
       });
       expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
-      expect(hoisted.dbOnConflictDoUpdateMock).not.toHaveBeenCalled();
+      expectOnlyDraftPersisted();
     });
 
     it('does not escape conflict recovery when its persistence fails', async () => {
@@ -1976,7 +2028,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       stubRuntimeEnv({ nodeEnv: 'test' });
       vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
       vi.stubEnv('E2E_REQUIRE_TURNSTILE_GATE', '1');
-      vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+      vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
     }
 
     it('disarms the E2E bypass so an anonymous first message reaches the Turnstile gate', async () => {
@@ -2011,7 +2063,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       stubRuntimeEnv({ nodeEnv: 'test' });
       vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
       vi.stubEnv('E2E_REQUIRE_TURNSTILE_GATE', '');
-      vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+      vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
       hoisted.isTurnstileConfiguredMock.mockReturnValue(true);
       hoisted.verifyTurnstileTokenMock.mockResolvedValue({
         success: false,
@@ -2067,7 +2119,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       vi.resetModules();
       stubRuntimeEnv({ nodeEnv: 'test' });
       vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
-      vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+      vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
       hoisted.checkGateForUserMock.mockResolvedValue(true);
       hoisted.executeChatTurnMock.mockResolvedValue({
         streamResult: {
@@ -2106,7 +2158,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       stubRuntimeEnv({ nodeEnv: 'test', vercelEnv: 'preview' });
       vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
       vi.stubEnv('E2E_REQUIRE_TURNSTILE_GATE', '1');
-      vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+      vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
       hoisted.isTurnstileConfiguredMock.mockReturnValue(true);
       hoisted.verifyTurnstileTokenMock.mockResolvedValue({
         success: false,

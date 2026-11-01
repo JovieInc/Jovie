@@ -1,6 +1,10 @@
 /*
- * Framer-like shipped-sites gallery. Tokens only.
- * Accent is reserved for the platform spec bento titles.
+ * Profile-state gallery. Tokens only. Each card is one real component crop
+ * at its own aspect ratio (ProductScreenshotFrame sizes to the capture), so
+ * nothing is letterboxed, clipped, or cropped mid-element.
+ *
+ * Desktop: the tall shows card leads in the left column across two rows; the
+ * release and capture cards stack on the right.
  */
 
 .m-shipped-sites {
@@ -10,27 +14,34 @@
 .m-shipped-sites__grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: var(--space-3);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.m-shipped-sites__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  /* Captures are 358 CSS px wide at 2x; cap near native so text stays crisp. */
+  width: 100%;
+  max-width: 24rem;
 }
 
 .m-shipped-sites__frame {
-  aspect-ratio: 4 / 5;
-  background: var(--color-bg-surface-0);
+  width: 100%;
 }
 
-.m-shipped-sites__frame--desktop {
-  aspect-ratio: 4 / 5;
-}
-
-@media (min-width: 640px) {
+@media (min-width: 768px) {
   .m-shipped-sites__grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* Two native-width columns on the section's left edge (the headline's
+       grid line), not centered in half-width tracks. */
+    grid-template-columns: repeat(2, minmax(0, 24rem));
+    justify-content: start;
+    column-gap: var(--space-12);
+    row-gap: var(--space-10);
   }
-}
 
-@media (min-width: 1280px) {
-  .m-shipped-sites__grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--space-4);
+  .m-shipped-sites__lead {
+    grid-row: span 2;
   }
 }

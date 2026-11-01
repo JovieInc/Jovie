@@ -81,11 +81,14 @@ describe('VoicePageContent source contract', () => {
     expect(container.textContent).not.toMatch(/PR #?\d{3,}/);
   });
 
-  it('docks the hero over its own abstract photo', () => {
+  it('docks the hero on the matte page background with no photo', () => {
     const { container } = render(<VoicePageContent />);
-    const photo = container.querySelector('.marketing-hero-photo img');
-    expect(photo?.getAttribute('src')).toContain('marketing-hero%2Fvoice.webp');
-    expect(photo).toHaveAttribute('alt', '');
+    const hero = container.querySelector(
+      '[data-testid="marketing-section-hero"]'
+    );
+    expect(hero).not.toBeNull();
+    expect(hero?.querySelector('[class*="hero-photo"]')).toBeNull();
+    expect(container.innerHTML).not.toContain('marketing-hero%2F');
   });
 
   it('binds the route and Storybook to the one shared body', () => {

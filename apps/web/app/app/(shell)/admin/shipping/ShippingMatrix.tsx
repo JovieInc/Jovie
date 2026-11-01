@@ -16,6 +16,7 @@ import {
 import { EmptyState } from '@/components/molecules/EmptyState';
 import { AdminDetailRail } from '@/features/admin/layout/AdminDetailRail';
 import { type ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
+import type { LaneAgent } from '@/lib/ovie/shipping-state/contract';
 import { shippingStateQueryOptions } from '@/lib/queries/shipping-state';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
@@ -53,7 +54,7 @@ export type MatrixRow = {
   readonly prUrl: string | null;
   readonly linearUrl: string | null;
   readonly branch: string | null;
-  readonly agent: 'devin' | 'codex' | null;
+  readonly agent: LaneAgent | null;
   readonly checksRollup: 'success' | 'failure' | 'pending' | 'unknown';
   readonly failingChecks: readonly string[];
   readonly queuePosition: number | null;

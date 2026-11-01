@@ -1,12 +1,11 @@
 'use client';
 
 import { ReleaseCountdown } from '@/components/features/release/ReleaseCountdown';
-import { PRE_SAVE_FIXTURE } from '@/data/preSaveCopy';
-
-const RELEASE_DATE = new Date(PRE_SAVE_FIXTURE.releaseAt);
+import { getPreSaveReleaseAt, PRE_SAVE_FIXTURE } from '@/data/preSaveCopy';
 
 /** Client island: the shipped countdown keeps its own clock. */
 export function PreSaveCountdown() {
+  const releaseDate = new Date(getPreSaveReleaseAt());
   return (
     <div
       data-testid='pre-save-countdown'
@@ -15,7 +14,7 @@ export function PreSaveCountdown() {
       <p className='text-sm font-medium text-primary-token'>
         {PRE_SAVE_FIXTURE.releaseTitle}
       </p>
-      <ReleaseCountdown releaseDate={RELEASE_DATE} compact />
+      <ReleaseCountdown releaseDate={releaseDate} compact />
     </div>
   );
 }

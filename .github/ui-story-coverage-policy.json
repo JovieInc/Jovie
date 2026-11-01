@@ -278,10 +278,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/dashboard/organisms/release-provider-matrix/NewReleaseHeaderAction.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleasesExperience.tsx",
       "linearIssue": "JOV-8847"
     },
@@ -294,10 +290,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseWorkflowOverlays.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/dashboard/organisms/release-provider-matrix/utils/release-context-actions.tsx",
       "linearIssue": "JOV-8847"
     },
@@ -306,23 +298,11 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/dashboard/organisms/releases/cells/AvailabilityCell.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/dashboard/organisms/releases/cells/PopularityCell.tsx",
       "linearIssue": "JOV-8847"
     },
     {
       "path": "apps/web/components/features/dashboard/organisms/releases/cells/ProviderCell.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/features/dashboard/organisms/releases/components/NotFoundCopyButton.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/features/dashboard/organisms/releases/components/ProviderCopyButton.tsx",
       "linearIssue": "JOV-8847"
     },
     {
@@ -414,10 +394,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/demo/DemoReleaseTrackedLinksSurface.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/demo/DemoVideoPlayer.tsx",
       "linearIssue": "JOV-8847"
     },
@@ -450,10 +426,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/home/ProfileMockup.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/library-asset-share/LibraryAssetShareUrlCell.tsx",
       "linearIssue": "JOV-8847"
     },
@@ -467,10 +439,6 @@
     },
     {
       "path": "apps/web/components/features/onboarding/fixtures/onboarding-tool-field-raw-focus.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/features/opportunity-inbox/OpportunityInboxTourDateRow.tsx",
       "linearIssue": "JOV-8847"
     },
     {

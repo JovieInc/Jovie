@@ -19,9 +19,21 @@ export const HYGIENE_LIMITS = Object.freeze({
   // Raised 180 -> 198 MiB (+10%, the documented per-raise cap) under JOV-6635:
   // origin/main measured 178.14 MiB (99.0% of budget), blocking every PR that
   // adds tracked bytes. Measurements in docs/ci/repository-health.md.
+  // ratchet: do not raise this again. 2026-10-29 pruned drizzle snapshots to
+  // the newest one (-10.29 MiB, 197.49 -> 187.20 MiB, ~10.8 MiB headroom)
+  // instead of raising the budget. Free headroom by deleting regenerable or
+  // dead bytes; the clean line of repo-hygiene-guard reports remaining headroom.
   maxTrackedBytes: 198 * MiB,
   maxTrackedBinaryBytes: 96 * MiB,
 });
+
+// Generated `*.gen.json` files over this size fail the hygiene guard unless
+// the path is listed in GEN_JSON_SIZE_ALLOWLIST (reviewed edit, with reason).
+export const MAX_GEN_JSON_BYTES = 1 * MiB;
+export const GEN_JSON_SIZE_ALLOWLIST = Object.freeze([]);
+
+// Drizzle keeps ~1.2 MiB full-schema snapshots; only the newest is read.
+export const MAX_RETAINED_DRIZZLE_SNAPSHOTS = 3;
 
 // Early-warning threshold for the combined-tree tracked-bytes budget. The
 // merge_group check ejects every queued PR once main + member crosses the

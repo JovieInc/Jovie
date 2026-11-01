@@ -46,6 +46,10 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'Sub-tool reached from Investors workspace actions',
   '/app/ov/investors/updates':
     'Sub-tool reached from Investors workspace actions',
+  [APP_ROUTES.ADMIN_PRODUCT]:
+    'Shipping view (Product) reached from the Shipping views control and Home details links',
+  [APP_ROUTES.ADMIN_ACTIVITY]:
+    'Shipping view (Timeline) reached from the Shipping tabs and HUD drilldowns',
   [APP_ROUTES.ADMIN_FEATURE_REGISTRY]:
     'Compatibility entry renders the canonical Certifications workspace filtered to capabilities',
   [APP_ROUTES.ADMIN_FEATURES]:

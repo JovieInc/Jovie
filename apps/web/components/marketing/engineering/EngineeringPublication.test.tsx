@@ -38,6 +38,7 @@ describe('EngineeringPublication', () => {
         'No founder-approved engineering stories are public yet.'
       )
     ).toBeVisible();
+    expect(screen.getByText(/only ever lists finished work/)).toBeVisible();
   });
 
   it('renders the unique docked hero photo on the public index only', () => {

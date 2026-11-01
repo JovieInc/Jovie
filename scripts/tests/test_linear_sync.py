@@ -88,6 +88,18 @@ class MirrorSyncTest(Base):
         self.assertEqual(linear.calls[0][1]["since"], "2026-10-11T00:00:00.000Z")
         self.assertEqual(ls.read_mirror(self.state, "JOV")["cursor"], "2026-10-11T09:00:00.000Z")
 
+    def test_incremental_asks_newest_first_and_logs_freshness_stage(self):
+        ls.apply(self.state, "JOV", [node(1)])
+        with ls._mutating(ls.mirror_path(self.state, "JOV"), ls.MIRROR) as data:
+            data.update(cursor="2026-10-11T00:00:00.000Z", syncedAt=1.0)
+        linear = FakeLinear([page([node(2, updated="2026-10-11T09:00:00.000Z"), node(3, updated="2026-10-11T08:00:00.000Z")])])
+        self.assertEqual(self.sync(linear)["outcome"], "synced")
+        self.assertIn("orderBy:updatedAt", ls.SYNC_QUERY)
+        import stage_events
+        rows = [r for r in stage_events.mirror_events(self.state, time.time()) if r["stage"] == "stale"]
+        self.assertEqual((rows[0]["entityId"], rows[0]["enteredAt"]), ("JOV", "2026-10-11T08:00:00Z"))
+        self.assertEqual({r["stage"] for r in stage_events.mirror_events(self.state, time.time())}, {"stale", "mirrored"})
+
     def test_budget_and_rate_limits_skip_the_read_and_keep_the_mirror(self):
         ls.apply(self.state, "JOV", [node(1)])
         linear = FakeLinear([])

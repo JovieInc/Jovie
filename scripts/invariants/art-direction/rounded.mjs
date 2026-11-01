@@ -31,7 +31,7 @@ const HTML = new Set(
   )
 );
 const FULL_BLEED =
-  /^(?:homepage-editorial-hero(?:__backdrop|__light-well)?|marketing-editorial-hero-photo(?:__img)?|marketing-hero-photo(?:__img)?|marketing-hero-dock|marketing-route-hero__media)$/;
+  /^(?:homepage-editorial-hero(?:__backdrop|__light-well)?|marketing-editorial-hero-photo(?:__img)?|marketing-hero-dock|marketing-route-hero__media)$/;
 const CLIPPING = new Set([
   'ArtistProfilePhoneFrame',
   'HomePhoneFrame',

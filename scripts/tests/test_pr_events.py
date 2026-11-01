@@ -2361,7 +2361,7 @@ class NativeQueueClaimTest(unittest.TestCase):
                     elif change == "head":live["headRefOid"] = "external"
                     elif change == "branch":live["headRefName"] = "external/branch"
                     elif change == "fork":live["isCrossRepository"] = True
-                    elif change == "remote-hold":live["labels"] = [{"name": "tim-hold"}]
+                    elif change == "remote-hold":live["labels"] = [{"name": "hold"}]
                     else:(host.state / "held.json").write_text(json.dumps({"5": events.held_record("h1", ["secret-like-file-changed"])}))
                     return "failed merge group"
                 with patch.object(events, "queue_failure", side_effect=failure):
@@ -2654,258 +2654,6 @@ class TargetFileWitnessTest(unittest.TestCase):
                 self.assertIsNone(events.target_issue_files({**valid, key: value}, witnesses, NOW))
 
 
-class MachineHoldReassessmentTest(unittest.TestCase):
-    def setUp(self):
-        self.head = 'a' * 40
-        self.pr = {"number": 7, "headRefOid": self.head, "baseRefOid": "f" * 40, "state": "OPEN", "isCrossRepository": False, "isInMergeQueue": False,
-                   "title": "feat: engineering work", "body": "## Taste (risk x confidence)\nTile order ships.",
-                   "labels": [{"name": "tim-hold"}, {"name": "lane-fix-exhausted"}],
-                   "filesComplete": True, "files": [{"path": "apps/web/lib/example.ts"}],
-                   "reviewAuthorityDigest": 'b' * 64, "mergeStateStatus": "DIRTY"}
-        self.row = {"pr": 7, "head": self.head, "cls": "needs-human-decision",
-                    "reason": "needs-human-decision", "holdApplied": True}
-        self.source = {"sourceCommit": 'c' * 40, "bundleDigest": 'd' * 64,
-                       "classifierBlob": events.NARRATIVE_CLASSIFIER_BLOB,
-                       "correctionCommit": events.NARRATIVE_CLASSIFIER_COMMIT}
-        self.bot = {"__typename": "Bot", "login": "jovie-bot[bot]"}
-        self.classified = {"cls": "needs-human-decision", "subtype": "human-gate",
-                           "evidence": ["strategy/pricing/credential/taste content"], "next_action": "tim-decides"}
-        self.note = {"id": "comment-1", "createdAt": "2026-10-26T15:05:54Z", "updatedAt": "2026-10-26T15:05:54Z",
-                     "author": self.bot, "body": events.remediation.surface_body(self.pr, self.classified, "needs-human-decision")}
-        self.event = {"id": "label-1", "__typename": "LabeledEvent", "createdAt": "2026-10-26T15:05:56Z",
-                      "label": {"name": "tim-hold"}, "actor": self.bot}
-        self.context = {"state": "OPEN", "headRefOid": self.head, "baseRefOid": "f" * 40, "isCrossRepository": False,
-                        "timelineItems": {"pageInfo": {"hasPreviousPage": False}, "nodes": [self.event]},
-                        "comments": {"pageInfo": {"hasPreviousPage": False}, "nodes": [self.note]}}
-        self.attempts = {"count": 3, "sha": self.head, "escalated": True}
-
-    def assess(self, **changes):
-        return events.assess_machine_hold(changes.get("pr", self.pr), changes.get("context", self.context),
-            changes.get("surfaced", [self.row]), changes.get("source", self.source), self.attempts, {},
-            active=changes.get("active", False))
-
-    def test_same_head_false_positive_is_visible_without_releasing_terminal_custody(self):
-        before = json.dumps([self.pr, self.attempts, self.row], sort_keys=True)
-        result = self.assess()
-        self.assertEqual(result["status"], "reassessed")
-        self.assertTrue(result["holdRetained"])
-        self.assertEqual(result["attemptsPreserved"], 3)
-        self.assertEqual(result["source"]["classifierBlob"], events.NARRATIVE_CLASSIFIER_BLOB)
-        self.assertEqual(result["surfaceId"], "comment-1")
-        self.assertEqual(before, json.dumps([self.pr, self.attempts, self.row], sort_keys=True))
-        self.assertEqual(events.human_holds(self.pr), ["tim-hold"])
-        self.assertEqual(events.auto_unhold_labels(self.pr), [])
-
-    def test_missing_source_proof_and_active_custody_remain_pending(self):
-        for changes, reason in [({"source": None}, "qualified-classifier-unavailable"),
-                                ({"active": True}, "active-custody"),
-                                ({"context": None}, "current-provenance-unavailable"),
-                                ({"pr": {**self.pr, "filesComplete": False}}, "complete-authority-inputs-unavailable")]:
-            with self.subTest(reason=reason):
-                self.assertEqual(self.assess(**changes)["reason"], reason)
-
-    def test_human_labels_notes_and_other_stop_labels_keep_authority(self):
-        human = {"__typename": "User", "login": "itstimwhite"}
-        self.event["actor"] = human
-        self.assertEqual(self.assess()["reason"], "human-or-unknown-hold-writer")
-        self.event["actor"] = self.bot
-        self.context["comments"]["nodes"].append({**self.note, "author": human, "body": "Do not merge until I approve."})
-        self.assertEqual(self.assess()["reason"], "human-stop-note")
-        self.context["comments"]["nodes"].pop()
-        self.pr["labels"].append({"name": "do-not-merge"})
-        self.assertEqual(self.assess()["reason"], "independent-stop")
-
-    def test_copied_marker_unknown_writer_and_missing_owner_record_are_not_proof(self):
-        for change in ["copied", "unknown", "missing", "edited"]:
-            with self.subTest(change=change):
-                self.setUp()
-                if change == "copied": self.note["author"] = {"__typename": "User", "login": "contributor"}
-                if change == "unknown": self.event["actor"] = {"__typename": "Bot", "login": "other[bot]"}
-                if change == "missing": self.row["holdApplied"] = False
-                if change == "edited": self.note["updatedAt"] = "2026-10-26T16:00:00Z"
-                self.assertEqual(self.assess()["status"], "pending")
-
-    def test_partial_history_changed_head_and_malformed_provenance_fail_closed(self):
-        self.context["comments"]["pageInfo"]["hasPreviousPage"] = True
-        self.assertEqual(self.assess()["reason"], "incomplete-provenance")
-        self.context["comments"]["pageInfo"]["hasPreviousPage"] = False
-        self.context["headRefOid"] = 'e' * 40
-        self.assertEqual(self.assess()["reason"], "current-provenance-unavailable")
-        self.context["headRefOid"] = self.head
-        del self.event["actor"]
-        self.assertEqual(self.assess()["reason"], "malformed-provenance")
-
-    def test_stale_surface_and_real_authority_remain_pending(self):
-        self.row["head"] = 'e' * 40
-        self.note["body"] = events.remediation.surface_body({**self.pr, "headRefOid": self.row["head"]}, self.classified, "needs-human-decision")
-        self.assertEqual(self.assess()["reason"], "surface-head-ancestry-required")
-        self.setUp()
-        self.pr["files"] = [{"path": "apps/web/lib/stripe/billing.ts"}]
-        self.pr["body"] = "Please approve new pricing before shipping."
-        self.assertEqual(self.assess()["reason"], "current-human-decision")
-
-    def test_recovery_adapter_uses_the_shared_api_budget_client(self):
-        with patch.object(events, 'api_gh') as shared:
-            events.machine_hold_gh(['gh', 'api', '-X', 'DELETE', 'repos/example/label'], timeout=30)
-        shared.assert_called_once_with(['api', '-X', 'DELETE', 'repos/example/label'], timeout=30)
-
-    def test_context_reader_rejects_api_errors_and_partial_connections(self):
-        payload = {"data": {"repository": {"pullRequest": self.context}}}
-        shell = Shell({("api", "graphql"): payload})
-        self.assertEqual(events.machine_hold_context(7, shell)["headRefOid"], self.head)
-        self.context["timelineItems"]["pageInfo"]["hasPreviousPage"] = True
-        self.assertIsNone(events.machine_hold_context(7, shell))
-        self.assertIsNone(events.machine_hold_context(7, Shell({("api", "graphql"): (1, "{}")})))
-
-    def reconcile_case(self, mode):
-        with tempfile.TemporaryDirectory() as directory:
-            host = SimpleNamespace(state=Path(directory))
-            (host.state / 'escalation.json').write_text(json.dumps({'surfaced': [self.row]}))
-            original = json.dumps({'7': self.attempts})
-            (host.state / 'fix-attempts.json').write_text(original)
-            before = json.loads(json.dumps(self.context))
-            after = json.loads(json.dumps(before))
-            removal = {**self.event, 'id': 'removal-1', '__typename': 'UnlabeledEvent'}
-            after['timelineItems']['nodes'].append(removal)
-            post = {**self.pr, 'labels': [{'name': 'lane-fix-exhausted'}]}
-            if mode in ('human-race', 'restore-failure'):
-                after['timelineItems']['nodes'].append({**self.event, 'id': 'human-event',
-                    'actor': {'__typename': 'User', 'login': 'itstimwhite'}})
-                post = self.pr
-            calls = []
-            def shell(args, **kwargs):
-                calls.append(args)
-                if '-X' in args and 'DELETE' in args:
-                    state = json.loads((host.state / 'escalation.json').read_text())
-                    self.assertTrue(any(row.get('machineHoldRecovery') and row.get('holdPending') for row in state['surfaced']))
-                    if mode == 'interrupted-delete': raise SystemExit('process interrupted after DELETE')
-                    return SimpleNamespace(returncode=1 if mode == 'delete-failure' else 0, stdout='')
-                return SimpleNamespace(returncode=1 if mode == 'restore-failure' else 0, stdout='')
-            lane = fake_lane(shell)
-            repair = SimpleNamespace(held=mode != 'local-repair', release=Mock())
-            gate = SimpleNamespace(lock=SimpleNamespace(release=Mock()))
-            lane.Locked = Mock(return_value=repair)
-            lane.reserve_gate = Mock(return_value=None if mode == 'local-gate' else gate)
-            final = {**self.pr, 'headRefOid': 'f' * 40} if mode == 'head-race' else self.pr
-            if mode == 'body-race': final = {**self.pr, 'body': 'Hold off until I approve.'}
-            if mode == 'review-race': final = {**self.pr, 'reviewAuthorityDigest': 'e' * 64}
-            if mode == 'label-race': final = {**self.pr, 'labels': self.pr['labels'] + [{'name': 'do-not-merge'}]}
-            lane.reconcile_fix_target = Mock(side_effect=[self.pr, final, post])
-            claim_reads = iter([False, mode == "claim-race"])
-            with patch.object(events, 'machine_hold_source_proof', return_value=self.source), \
-                    patch.object(events, 'machine_hold_context', side_effect=[before, before, after]), \
-                    patch.object(events, 'claim_active', side_effect=lambda *a, **k: next(claim_reads)):
-                if mode == 'interrupted-delete':
-                    with self.assertRaises(SystemExit):
-                        events.reassess_machine_holds(host, lane, [self.pr], {'7': self.attempts}, {}, NOW, sh=lane.sh)
-                    result = {'status': 'pending'}
-                else:
-                    result = events.reassess_machine_holds(host, lane, [self.pr], {'7': self.attempts}, {}, NOW, sh=lane.sh)[0]
-            if lane.Locked.called:
-                repair.release.assert_called_once()
-            if lane.reserve_gate.called and mode != 'local-gate':
-                gate.lock.release.assert_called_once()
-            self.assertEqual((host.state / 'fix-attempts.json').read_text(), original)
-            self.assertFalse(any('lane-fix-exhausted' in part for call in calls for part in call), 'terminal fence is never removed')
-            self.assertFalse(any('merge' in call or 'workflow' in call for call in calls), 'no queue admission is manufactured')
-            state = json.loads((host.state / 'escalation.json').read_text())
-            if mode in ('restore-failure', 'interrupted-delete'):
-                self.assertTrue(events.unconfirmed_human_hold(host, self.pr))
-                self.assertTrue(events.unconfirmed_human_hold(host, {**post, 'headRefOid': '9' * 40}))
-                # Recover a process crash/failed restore even if the label is now absent.
-                retry = fake_lane(Shell())
-                retry_result = events.reassess_machine_holds(host, retry, [{**post, "headRefOid": "9" * 40}], {'7': self.attempts}, {}, NOW + 1, sh=retry.sh)
-                self.assertEqual(retry_result[0]['reason'], 'restoration-confirmed')
-                self.assertFalse(events.unconfirmed_human_hold(host, self.pr))
-            return result, calls, state
-
-    def test_owner_withdrawal_keeps_exhaustion_and_attempts_and_is_durably_fenced(self):
-        result, calls, state = self.reconcile_case('success')
-        self.assertEqual(result['status'], 'withdrawn')
-        self.assertFalse(result['holdRetained'])
-        self.assertEqual(len([call for call in calls if 'DELETE' in call]), 1)
-        self.assertTrue(state['surfaced'][0]['holdApplied'], 'original owner receipt stays intact')
-        self.assertFalse(state['surfaced'][-1]['holdPending'])
-
-    def test_head_or_claim_changes_prevent_the_withdrawal(self):
-        for mode in ('head-race', 'claim-race', 'body-race', 'review-race', 'label-race'):
-            with self.subTest(mode=mode):
-                result, calls, _ = self.reconcile_case(mode)
-                self.assertEqual(result['reason'], 'ownership-or-provenance-changed')
-                self.assertFalse(any('DELETE' in call for call in calls))
-
-    def test_failed_delete_or_new_human_intent_restores_and_persists_pending(self):
-        for mode in ('delete-failure', 'human-race', 'restore-failure'):
-            with self.subTest(mode=mode):
-                result, calls, _ = self.reconcile_case(mode)
-                self.assertEqual(result['status'], 'pending')
-                self.assertEqual(result['reason'], 'withdrawal-unconfirmed-or-new-intent')
-                self.assertTrue(any('POST' in call for call in calls))
-
-    def test_local_repair_and_gate_owners_prevent_withdrawal(self):
-        for mode in ('local-repair', 'local-gate'):
-            with self.subTest(mode=mode):
-                result, calls, _ = self.reconcile_case(mode)
-                self.assertEqual(result['reason'], 'active-' + mode)
-                self.assertFalse(any('DELETE' in call for call in calls))
-
-    def test_interrupted_delete_stays_pr_owned_until_restored_on_new_head(self):
-        result, calls, state = self.reconcile_case('interrupted-delete')
-        self.assertEqual(result['status'], 'pending')
-        self.assertTrue(state['surfaced'][-1]['holdPending'])
-
-    def test_all_host_fix_and_adoption_gate_claims_prevent_assessment(self):
-        at = datetime.fromtimestamp(NOW - 1, timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-        for kind in ('fix', 'gate', 'adopt'):
-            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as directory:
-                host = SimpleNamespace(state=Path(directory))
-                (host.state / 'escalation.json').write_text(json.dumps({'surfaced': [self.row]}))
-                shell = Shell({('gh', 'api', '--paginate'):
-                    f'🤖 lane claim kind={kind} sha={self.head} host={runner.HOST} at={at}\n'})
-                lane = fake_lane(shell)
-                with patch.object(events, 'machine_hold_source_proof', return_value=self.source), \
-                        patch.object(events, 'etag_cache_dir', return_value=None):
-                    result = events.reassess_machine_holds(host, lane, [self.pr], {'7': self.attempts}, {}, NOW, sh=lane.sh)[0]
-                self.assertEqual(result['reason'], 'active-custody')
-                self.assertFalse(any('DELETE' in call for call in shell.calls))
-
-    def test_queued_pr_and_unclassified_human_response_remain_held(self):
-        self.assertEqual(self.assess(pr={**self.pr, 'isInMergeQueue': True})['status'], 'pending')
-        for body in ('Hold off.', 'Keep this draft.', 'Agreed with that disposition.'):
-            with self.subTest(body=body):
-                self.context['comments']['nodes'] = [self.note, {**self.note,
-                    'author': {'__typename': 'User', 'login': 'itstimwhite'}, 'body': body,
-                    'createdAt': '2026-10-26T15:06:00Z', 'updatedAt': '2026-10-26T15:06:00Z'}]
-                self.assertEqual(self.assess()['status'], 'pending')
-
-    def test_moved_head_requires_real_ancestor_compare_evidence(self):
-        before = 'e' * 40
-        self.row['head'] = before
-        self.note['body'] = events.remediation.surface_body({**self.pr, 'headRefOid': before}, self.classified, 'needs-human-decision')
-        shell = Shell({('api',): {'status': 'ahead', 'base_commit': {'sha': before}, 'merge_base_commit': {'sha': before}}})
-        ancestry = events.machine_hold_ancestry(before, self.head, shell)
-        result = events.assess_machine_hold(self.pr, self.context, [self.row], self.source, self.attempts, {}, ancestry=ancestry)
-        self.assertEqual(result['status'], 'reassessed')
-        self.assertIsNone(events.machine_hold_ancestry(before, self.head, Shell({('api',): {'status': 'diverged'}})))
-        self.assertIsNone(events.machine_hold_ancestry('bad', self.head, shell))
-
-    def test_installed_classifier_requires_validated_release_and_exact_bytes(self):
-        with patch.object(events.lifecycle, "_read_regular", side_effect=OSError("uninstalled")):
-            self.assertIsNone(events.machine_hold_source_proof())
-        manifest = {"sourceCommit": 'c' * 40, "bundleDigest": 'd' * 64}
-        source = (ROOT / "scripts/lanes/remediation.py").read_bytes()
-        with patch.object(events.lifecycle, "_read_regular", side_effect=[(b'{}', None), (source, None)]), \
-                patch.object(events.lifecycle, "validate_release", return_value=manifest) as validate:
-            proof = events.machine_hold_source_proof()
-        self.assertEqual(proof["classifierBlob"], events.NARRATIVE_CLASSIFIER_BLOB)
-        validate.assert_called_once()
-        with patch.object(events.lifecycle, "_read_regular", side_effect=[(b'{}', None), (b'changed', None)]), \
-                patch.object(events.lifecycle, "validate_release", return_value=manifest):
-            self.assertIsNone(events.machine_hold_source_proof())
-
-if __name__ == "__main__":
-    unittest.main()
-
 class TerminalPreservationTest(unittest.TestCase):
     def test_external_head_waits_for_active_old_owner_before_event_or_worker_reentry(self):
         now = time.time()
@@ -3004,7 +2752,7 @@ class TerminalPreservationTest(unittest.TestCase):
 
     def test_tick_cannot_ready_close_or_sync_terminal_or_explicitly_held_work(self):
         for labels, record in [(['lane-fix-exhausted'], {}), ([], {'sha':'h1','count':2}),
-                               (['Tim:Hold'], {}), ([], {'sha':'h1','count':1,'at':NOW-1})]:
+                               (['Hold'], {}), ([], {'sha':'h1','count':1,'at':NOW-1})]:
             with self.subTest(labels=labels,record=record):
                 self.state('fix-attempts.json', {'5': record})
                 target = pr(branch='claude/jov-1-20260926t0900', draft=True, merge='CLEAN',
@@ -3128,7 +2876,7 @@ class TerminalPreservationTest(unittest.TestCase):
         target=pr(sha='cached-h1',merge='DIRTY',kinds=['conflict'],labels=['lane-fix-exhausted'])
         history={'5':{'sha':'current-h2','count':2,'endedAt':NOW-1}}
         for observed in [None,{**target,'state':'OPEN','headRefOid':'current-h2'},
-                         {**target,'state':'CLOSED'},{**target,'state':'OPEN','labels':[{'name':'Tim:Hold'}]}]:
+                         {**target,'state':'CLOSED'},{**target,'state':'OPEN','labels':[{'name':'Hold'}]}]:
             with self.subTest(observed=observed):
                 self.state('fix-attempts.json',history)
                 shell=Shell();lane=fake_lane(shell);lane.reconcile_fix_target=lambda pr:observed
@@ -3270,14 +3018,130 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         {"name": "Source Validation", "conclusion": "FAILURE",
          "detailsUrl": "https://github.com/JovieInc/Jovie/actions/runs/123/job/456"}]}
 
+    WIN = ("## Win\n\n- Claim: Complete measured repair evidence.\n- Area: quality\n"
+           "- Theme: repair-evidence\n"
+           "- Metric: missing evidence fields | count | lower | 1 | 0 | Fleet policy | node --test\n"
+           "- Verify: https://github.com/JovieInc/Jovie/actions/runs/123\n")
+
+    def test_explicit_measured_win_repairs_compounding_body_and_passes_fleet(self):
+        body = events.red_before_green_block(self.PR)
+        updated = events.repair_evidence_body(self.PR, body, win_section=self.WIN,
+                                              customer_decision={"releaseWorthy": False})
+        self.assertIn(body, updated)
+        self.assertIn(self.WIN, updated)
+        self.assertEqual(events.repair_evidence_body(self.PR, updated, win_section=self.WIN), updated)
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+const bodies = JSON.parse(readFileSync(0, 'utf8'));
+console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
+  pr: {title: 'fix(music-resolver): repair certification', body, labels: ['compounding']}, files: [],
+}).errors)));
+"""], cwd=ROOT, input=json.dumps([body, updated]), text=True, capture_output=True, check=True)
+        before, after = json.loads(checked.stdout)
+        self.assertTrue(any(error.startswith("win:") for error in before), before)
+        self.assertEqual(after, [])
+
+    def test_measured_win_is_explicit_and_preserves_existing_decisions(self):
+        body = events.red_before_green_block(self.PR)
+        self.assertNotIn("## Win", events.repair_evidence_body(self.PR, body))
+        for existing in ("## Win\n\nnone\n", self.WIN, "### Win\n\n- Claim: incomplete\n"):
+            with self.subTest(existing=existing):
+                original = body + "\n" + existing
+                self.assertEqual(events.repair_evidence_body(self.PR, original, win_section=self.WIN), original)
+        # A template in a comment or failure log is not the author's Win section.
+        template = "\n<!--\n## Win\n-->\n```text\n## Win\n```\n"
+        updated = events.repair_evidence_body(self.PR, body + template, win_section=self.WIN)
+        self.assertTrue(updated.endswith(self.WIN))
+
+    def test_ensure_can_write_measured_win_without_a_red_run(self):
+        written = []
+        def shell(args):
+            if args[:2] == ["pr", "view"]:
+                return SimpleNamespace(returncode=0, stdout="Summary")
+            written.append(Path(args[args.index("--body-file") + 1]).read_text())
+            return SimpleNamespace(returncode=0, stdout="")
+        self.assertTrue(events.ensure_red_before_green({"number": 7}, sh=shell, win_section=self.WIN))
+        self.assertEqual(written, ["Summary\n\n" + self.WIN])
+
+    def test_explicit_invalid_win_is_rejected_instead_of_silently_omitted(self):
+        for invalid in (0, False, [], {}, "- Metric: incomplete"):
+            with self.subTest(invalid=invalid):
+                with self.assertRaisesRegex(ValueError, "complete ## Win section"):
+                    events.repair_evidence_body(self.PR, "Summary", win_section=invalid)
+
+    def test_empty_optional_win_keeps_existing_caller_contract(self):
+        body = events.repair_evidence_body(self.PR, "Summary")
+        self.assertEqual(events.repair_evidence_body(self.PR, "Summary", win_section=""), body)
+
     def test_block_carries_the_failing_run_and_red_output_and_passes_the_parser_shape(self):
         block = events.red_before_green_block(self.PR, "### Source Validation\n# not a heading\nAssertionError: x")
         self.assertIn("Failing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/123", block)
         self.assertTrue(events.red_section_complete("Intro\n\n" + block + "\n\n## Next\nx"))
         self.assertNotIn("\n# not a heading", block, "a log line must not end the section")
 
+    def test_failing_command_returns_the_run_failure_status(self):
+        block = events.red_before_green_block(self.PR)
+        self.assertIn(
+            "- Failing command: `gh run watch 123 --repo JovieInc/Jovie --exit-status`",
+            block,
+        )
+        self.assertIn(
+            "- Failing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/123",
+            block,
+        )
+
+    def test_generated_block_passes_the_canonical_fleet_gate(self):
+        block = events.red_before_green_block(self.PR, "### Failed step\nAssertionError: expected 200")
+        checked = subprocess.run(
+            ["node", "--input-type=module", "-e", """
+                import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+                import { readFileSync } from 'node:fs';
+                const body = readFileSync(0, 'utf8');
+                const check = body => evaluateFleetRules({
+                    pr: { title: 'fix(db): recover avatar reads', body }, files: [],
+                }).errors;
+                process.stdout.write(JSON.stringify({
+                    generated: check(body), missing: check(''),
+                }));
+            """],
+            cwd=ROOT, input=block, text=True, capture_output=True, check=True,
+        )
+        result = json.loads(checked.stdout)
+        self.assertEqual(result["generated"], [])
+        self.assertTrue(any(error.startswith("red-before-green:") for error in result["missing"]))
+
     def test_no_red_check_means_no_block(self):
         self.assertIsNone(events.red_before_green_block({"statusCheckRollup": [{"name": "x", "conclusion": "SUCCESS"}]}))
+
+    def test_conflict_only_repair_records_observed_merge_failure_and_preserves_decision(self):
+        pr = {"number": 23520, "headRefOid": "a" * 40, "mergeable": "CONFLICTING"}
+        excerpt = (
+            "Auto-merging apps/web/lib/chat/system-prompt.ts\n"
+            "CONFLICT (content): Merge conflict in apps/web/lib/chat/system-prompt.ts\n"
+            "Automatic merge failed; fix conflicts and then commit the result.\n"
+        )
+        body = 'Registry\n<!-- customer-changelog/v1 {"releaseWorthy":false} -->\n'
+        updated = events.repair_evidence_body(pr, body, excerpt, customer_decision={"releaseWorthy": False})
+        self.assertTrue(events.red_section_complete(updated))
+        self.assertIn("Failing command: `git merge origin/main --no-edit`", updated)
+        self.assertIn("CONFLICT (content): Merge conflict in apps/web/lib/chat/system-prompt.ts", updated)
+        self.assertNotIn("Failing run (before fix):", updated)
+        self.assertEqual(updated.count("customer-changelog/v1"), 1)
+        self.assertEqual(events.repair_evidence_body(pr, updated, excerpt), updated)
+        self.assertIsNotNone(events.red_before_green_block({"mergeStateStatus": "DIRTY"}, excerpt))
+
+    def test_conflict_state_without_observed_merge_failure_never_fabricates_red(self):
+        conflict = "CONFLICT (content): Merge conflict in file.ts\n"
+        failure = "Automatic merge failed; fix conflicts and then commit the result.\n"
+        for pr, excerpt in (
+            ({"mergeable": "CONFLICTING"}, ""),
+            ({"mergeable": "CONFLICTING"}, conflict),
+            ({"mergeable": "CONFLICTING"}, failure),
+            ({"mergeable": "MERGEABLE"}, conflict + failure),
+        ):
+            with self.subTest(pr=pr, excerpt=excerpt):
+                self.assertIsNone(events.red_before_green_block(pr, excerpt))
 
     def test_placeholder_section_is_replaced_and_complete_one_is_untouched(self):
         block = events.red_before_green_block(self.PR, "FAIL x")
@@ -3288,8 +3152,194 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         self.assertEqual(updated.count("## Red-before-green"), 1)
         self.assertFalse(events.red_section_complete(body))
 
+    def test_repair_body_keeps_existing_red_and_adds_an_explicit_customer_decision(self):
+        body = "## Summary\nx\n\n" + events.red_before_green_block(self.PR)
+        updated = events.repair_evidence_body(self.PR, body, customer_decision={"releaseWorthy": False})
+        self.assertTrue(updated.startswith(body))
+        self.assertIn('<!-- customer-changelog/v1 {"releaseWorthy":false} -->', updated)
+        self.assertEqual(events.repair_evidence_body(self.PR, updated,
+                                                   customer_decision={"releaseWorthy": False}), updated)
+
+    def test_repair_preserves_fenced_red_logs_accepted_by_the_canonical_gate(self):
+        bodies = [
+            "## Red-before-green\n- Failing command: `node probe.mjs`\n\n"
+            "```text\n# launcher probe\nFAIL status null\n```\n",
+            "~~~markdown\n## Red-before-green\nExample only.\n~~~\n\n"
+            "## Red-before-green\n- Failing command: `node probe.mjs`\n\n"
+            "```text\n### heap diagnostic\nError: launcher timed out\n```\n",
+        ]
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+console.log(JSON.stringify(JSON.parse(readFileSync(0, 'utf8')).map(body =>
+  evaluateFleetRules({pr: {title: 'fix: preserve red logs', body}, files: []}).errors
+)));
+"""], cwd=ROOT, input=json.dumps(bodies), text=True, capture_output=True, check=True, timeout=15)
+        self.assertEqual(json.loads(checked.stdout), [[], []])
+        for body in bodies:
+            with self.subTest(body=body):
+                self.assertTrue(events.red_section_complete(body))
+                updated = events.repair_evidence_body(self.PR, body, "FAIL newer run",
+                                                      customer_decision={"releaseWorthy": False})
+                self.assertTrue(updated.startswith(body))
+                self.assertNotIn("FAIL newer run", updated)
+                self.assertEqual(updated.count("customer-changelog/v1"), 1)
+                self.assertEqual(events.repair_evidence_body(self.PR, updated), updated)
+
+    def test_replacement_ignores_fenced_headings_and_preserves_the_next_section(self):
+        example = "```markdown\n## Red-before-green\nExample only.\n```\n\n"
+        following = "## Blast radius\nKeep existing proof.\n"
+        body = (example + "## Red-before-green\n- Failing command: `<cmd>`\n\n"
+                "```text\n# diagnostic\nFAIL incomplete command\n```\n\n" + following)
+        block = events.red_before_green_block(self.PR, "FAIL real run")
+        updated = events.with_red_section(body, block)
+        self.assertTrue(updated.startswith(example + block))
+        self.assertTrue(updated.endswith(following))
+        self.assertNotIn("FAIL incomplete command", updated)
+        self.assertTrue(events.red_section_complete(updated))
+        self.assertTrue(events.with_red_section(example + following, block).startswith(example + following))
+
+    def test_replacement_ignores_comment_fences_without_deleting_following_proof(self):
+        following = "## Blast radius\nPreserve existing proof.\n\n## Review\nPreserve verdict.\n"
+        body = ("## Red-before-green\n- Failing command: <cmd>\n\n"
+                "<!-- reviewer scratch\n```text\n-->\n\n" + following)
+        updated = events.repair_evidence_body(self.PR, body, "FAIL real run")
+        self.assertTrue(events.red_section_complete(updated))
+        self.assertTrue(updated.endswith(following))
+
+    def test_explicit_locking_pr_repairs_missing_provenance_and_passes_fleet(self):
+        body = events.red_before_green_block(self.PR)
+        updated = events.repair_evidence_body(self.PR, body, locking_pr=23295,
+                                              customer_decision={"releaseWorthy": False})
+        checked = subprocess.run(
+            ["node", "--input-type=module", "-e", r"""
+                import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+                import { readFileSync } from 'node:fs';
+                const body = readFileSync(0, 'utf8');
+                const check = body => evaluateFleetRules({
+                    pr: { title: 'fix: repair secret metadata evidence', body },
+                    files: [{ filename: 'ops/registry/secrets-lint-baseline.json', status: 'added' }],
+                }).errors;
+                process.stdout.write(JSON.stringify({ repaired: check(body),
+                    missing: check(body.replace(/## Locked areas[\s\S]*/, '')) }));
+            """], cwd=ROOT, input=updated, text=True, capture_output=True, check=True,
+        )
+        result = json.loads(checked.stdout)
+        self.assertEqual(result["repaired"], [])
+        self.assertTrue(any(error.startswith("locked-areas:") for error in result["missing"]))
+        self.assertEqual(events.repair_evidence_body(self.PR, updated, locking_pr=23295), updated)
+        self.assertEqual(updated.count("customer-changelog/v1"), 1)
+
+    def test_locking_reference_is_explicit_validated_and_never_overwrites_authority(self):
+        body = events.red_before_green_block(self.PR)
+        self.assertNotIn("## Locked areas", events.repair_evidence_body(self.PR, body))
+        for reference in ("GBrain: security/secrets-audit", "Locking PR: #123", "GBrain: <slug>"):
+            original = body + "\n## Locked areas\n" + reference + "\n"
+            self.assertEqual(events.repair_evidence_body(self.PR, original, locking_pr=23295), original)
+        for invalid in (0, -1, True, "23295"):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                events.repair_evidence_body(self.PR, body, locking_pr=invalid)
+
+    def test_public_decision_round_trips_without_comment_injection(self):
+        decision = {"releaseWorthy": True, "text": "Choose a link --> continue"}
+        updated = events.repair_evidence_body(self.PR, "Summary", customer_decision=decision)
+        marker = updated.split("<!-- customer-changelog/v1 ", 1)[1].split(" -->", 1)[0]
+        self.assertEqual(json.loads(marker), decision)
+        self.assertNotIn("Choose a link -->", updated)
+
+    def test_repair_body_never_infers_or_overwrites_a_customer_decision(self):
+        body = "## Summary\nx"
+        self.assertNotIn("customer-changelog/v1", events.repair_evidence_body(self.PR, body))
+        for existing in ('{"releaseWorthy":true}', 'malformed'):
+            with self.subTest(existing=existing):
+                original = body + "\n<!-- customer-changelog/v1 " + existing + " -->"
+                updated = events.repair_evidence_body(self.PR, original,
+                                                      customer_decision={"releaseWorthy": False})
+                self.assertIn("<!-- customer-changelog/v1 " + existing + " -->", updated)
+                self.assertEqual(updated.count("customer-changelog/v1"), 1)
+        with self.assertRaises(ValueError):
+            events.repair_evidence_body(self.PR, body, customer_decision={"releaseWorthy": "false"})
+
+    def test_ensure_can_repair_customer_metadata_when_red_evidence_is_already_complete(self):
+        body = events.red_before_green_block(self.PR)
+        written = []
+
+        def shell(args):
+            if args[:2] == ["pr", "view"]:
+                return SimpleNamespace(returncode=0, stdout=body)
+            written.append(Path(args[args.index("--body-file") + 1]).read_text())
+            return SimpleNamespace(returncode=0, stdout="")
+
+        self.assertTrue(events.ensure_red_before_green(self.PR, sh=shell,
+                                                      customer_decision={"releaseWorthy": False}))
+        self.assertEqual(len(written), 1)
+        self.assertTrue(events.red_section_complete(written[0]))
+        self.assertIn('<!-- customer-changelog/v1 {"releaseWorthy":false} -->', written[0])
+
+    def test_ensure_writes_explicit_locking_provenance_without_a_red_run(self):
+        written = []
+
+        def shell(args):
+            if args[:2] == ["pr", "view"]:
+                return SimpleNamespace(returncode=0, stdout="Summary")
+            written.append(Path(args[args.index("--body-file") + 1]).read_text())
+            return SimpleNamespace(returncode=0, stdout="")
+
+        self.assertTrue(events.ensure_red_before_green({"number": 23295}, sh=shell, locking_pr=23295))
+        self.assertEqual(written, ["Summary\n\n## Locked areas\n\nLocking PR: #23295\n"])
+
     def test_ensure_edits_only_an_incomplete_body(self):
         for body, edits in (("## Summary\nx", 1), (events.red_before_green_block(self.PR), 0)):
             shell = Shell({("pr", "view"): (0, body), ("pr", "edit"): (0, "")})
             events.ensure_red_before_green(self.PR, "FAIL x", shell)
             self.assertEqual(len(shell.made("pr", "edit")), edits)
+
+    def test_ensure_repairs_evidence_rejected_by_fleet_rules(self):
+        run_url = "https://github.com/JovieInc/Jovie/actions/runs/123"
+        cases = [("<cmd>", run_url), ("not applicable", run_url),
+                 ("...", run_url), ("node --test", "https://example.com/red"),
+                 ("node --test", run_url + "/job/456")]
+        bodies = []
+        # 'fix(ci): ...' is compounding/throughput work, so since the wins ledger (2026-10-29)
+        # fleet rules also demand a measured Win section — the pull-request template ships one.
+        # The bodies carry a valid measured Win so the only expected before-error is the
+        # red-before-green one and the repaired body evaluates clean end to end.
+        win_section = (
+            "\n## Win\n\n- Claim: repair-evidence edits stopped failing the fleet-rules consumer\n"
+            "- Area: ci\n- Theme: merge-throughput\n"
+            "- Metric: fleet-rules-rejects | count | lower | 3 | 0 | fleet-rules-evidence workflow log | "
+            "gh run list --workflow=fleet-rules-evidence.yml\n"
+            "- Verify: https://github.com/JovieInc/Jovie/actions/runs/123\n"
+        )
+        for command, url in cases:
+            body = (f"## Summary\nKeep this.\n\n## Red-before-green\n"
+                    f"- Failing command: `{command}`\n- Failing run (before fix): {url}\n"
+                    "\n## Blast radius\nWhat could break: repair evidence.\nProof: regression tests.\n"
+                    + win_section)
+            written = []
+            def edit(args):
+                written.append(Path(args[-1]).read_text())
+                return (0, "")
+            shell = Shell({("pr", "view"): (0, body), ("pr", "edit"): edit})
+            with self.subTest(command=command, url=url):
+                self.assertTrue(events.ensure_red_before_green(self.PR, sh=shell))
+                self.assertEqual(len(written), 1)
+                self.assertIn("## Summary\nKeep this.", written[0])
+                self.assertIn("## Blast radius\nWhat could break: repair evidence.", written[0])
+                self.assertIn(win_section, written[0])
+                bodies.extend([body, written[0]])
+        # Exercise the actual consumer, rather than trusting the Python mirror.
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+const bodies = JSON.parse(readFileSync(0, 'utf8'));
+console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
+  pr: {title: 'fix(ci): repair evidence', body, labels: []}, files: [],
+}).errors)));
+"""], cwd=ROOT, input=json.dumps(bodies), text=True, capture_output=True, timeout=15)
+        self.assertEqual(checked.returncode, 0, checked.stderr)
+        verdicts = json.loads(checked.stdout)
+        self.assertEqual(len(verdicts), len(cases) * 2)
+        for before, after in zip(verdicts[::2], verdicts[1::2]):
+            self.assertTrue(any(error.startswith("red-before-green:") for error in before), before)
+            self.assertEqual(after, [])

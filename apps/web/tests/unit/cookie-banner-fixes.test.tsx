@@ -778,3 +778,16 @@ describe('CookieBannerMount global preferences controller', () => {
     });
   });
 });
+
+describe('prerendered homepage pathname', () => {
+  it('CookieBannerSection.tsx reads "/index" as "/" via usePublicPathname', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(
+      resolve(process.cwd(), 'components/organisms/CookieBannerSection.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('usePublicPathname');
+    expect(source).not.toMatch(/\busePathname\b/);
+  });
+});

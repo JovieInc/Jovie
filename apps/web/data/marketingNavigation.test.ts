@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  getMarketingFooterColumns,
   getMarketingToolsFlyoutLinks,
   getPublicCommercialFooterLinks,
   MARKETING_CUSTOMERS_FLYOUT,
@@ -40,19 +39,7 @@ describe('public marketing navigation', () => {
     expect(labels).not.toContain('Pitch');
   });
 
-  it('links the AI public brief from the Resources footer', () => {
-    const resources = MARKETING_FOOTER_COLUMNS.find(
-      column => column.title === 'Resources'
-    );
-
-    expect(resources?.links).toContainEqual({
-      href: '/ai',
-      label: 'AI Operating System',
-    });
-  });
-
-  it('keeps the Music footer and fan labels until the generic creator flag is on', () => {
-    expect(getMarketingFooterColumns(false)).toBe(MARKETING_FOOTER_COLUMNS);
+  it('keeps the tools flyout and commercial links stable until the generic creator flag is on', () => {
     expect(getMarketingToolsFlyoutLinks(false)).toBe(
       MARKETING_TOOLS_FLYOUT_LINKS
     );
@@ -60,56 +47,13 @@ describe('public marketing navigation', () => {
       PUBLIC_COMMERCIAL_FOOTER_LINKS
     );
 
-    const music = MARKETING_FOOTER_COLUMNS.find(
-      column => column.title === 'Music'
-    );
-    expect(music?.links.map(link => link.label)).toEqual([
-      'Artist Profiles',
-      'Music Smart Links',
-      'Notifications',
-      'Pay',
-      'Audience capture',
-      'Audience reactivation',
-      'Product Demo',
-      'Release System',
-    ]);
     expect(MARKETING_TOOLS_FLYOUT_LINKS[0]).toMatchObject({
       label: 'Music Smart Links',
       description: 'One release link with a remembered streaming choice.',
     });
   });
 
-  it('uses a Customers column and audience wording when generic creator nav is on', () => {
-    const customers = getMarketingFooterColumns(true).find(
-      column => column.title === 'Customers'
-    );
-    expect(
-      getMarketingFooterColumns(true).some(column => column.title === 'Music')
-    ).toBe(false);
-    expect(customers?.links.map(link => link.label)).toEqual([
-      'Artists',
-      'Artist Profiles',
-      'Smart Links',
-      'Notifications',
-      'Pay',
-      'Audience Capture',
-      'Audience Reactivation',
-      'Product Demo',
-      'Release System',
-    ]);
-    expect(customers?.links[0]).toMatchObject({
-      href: '/solutions/artists',
-      label: 'Artists',
-    });
-    expect(customers?.links[2]?.href).toBe('/smart-links');
-    expect(
-      customers?.links.find(link => link.label === 'Audience Capture')?.href
-    ).toBe('/artist-profiles#capture-every-fan');
-    expect(
-      customers?.links.find(link => link.label === 'Audience Reactivation')
-        ?.href
-    ).toBe('/artist-profiles#bring-them-back-automatically');
-
+  it('uses audience wording in flyout and commercial links when generic creator nav is on', () => {
     expect(getMarketingToolsFlyoutLinks(true)[0]).toMatchObject({
       href: '/smart-links',
       label: 'Smart Links',
@@ -130,12 +74,13 @@ describe('public marketing navigation', () => {
     ).toBe(false);
   });
 
-  it('links the engineering publication from the footer', () => {
+  it('keeps internal, developer and dead-end items out of the footer', () => {
     const hrefs = MARKETING_FOOTER_COLUMNS.flatMap(column =>
       column.links.map(link => link.href)
     );
 
-    expect(hrefs).toContain('/engineering');
-    expect(hrefs).not.toContain('/engineering/preview');
+    for (const href of ['/engineering', '/ai', '/cli', '/card', '/compare']) {
+      expect(hrefs).not.toContain(href);
+    }
   });
 });

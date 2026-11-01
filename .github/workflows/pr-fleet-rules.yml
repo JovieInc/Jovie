@@ -14,10 +14,22 @@ concurrency:
 jobs:
   fleet:
     name: PR Fleet Rules
-    runs-on: ubuntu-latest
-    # 3 min of work plus one bounded quota-reset hold (FLEET_RULES_QUOTA_HOLD_SECONDS, 120s).
+    runs-on: ${{ github.event_name == 'merge_group' && vars.MERGE_GATE_POOL == 'fixed' && fromJSON('["self-hosted","Linux","X64","jovie-fixed"]') || 'ubuntu-latest' }}
+    # 3 min of work plus bounded quota holds (FLEET_RULES_QUOTA_HOLD_SECONDS, 120s).
     timeout-minutes: 6
     steps:
+      - name: Reset workspace git state (self-hosted)
+        if: runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          # Fixed runners reuse one workspace; a sparse checkout left by an earlier job hides files
+          # (.nvmrc, .github/scripts) from this full checkout (PR Fleet Rules merge_group 40908938908).
+          if [[ -d .git ]]; then
+            git sparse-checkout disable 2>/dev/null || true
+            git config --local --unset-all core.sparseCheckout 2>/dev/null || true
+            git config --local --unset-all core.sparseCheckoutCone 2>/dev/null || true
+            rm -f .git/info/sparse-checkout
+          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -40,9 +52,14 @@ jobs:
         run: node --test --experimental-test-coverage --test-coverage-include=scripts/pr-fleet-rules.mjs --test-coverage-lines=95 --test-coverage-functions=100 --test-coverage-branches=90 scripts/pr-fleet-rules.test.mjs
       # One evidence read prints the blast-radius warnings and enforces the
       # blocking rules. Two reads doubled this workflow's installation-budget
-      # spend on every PR event. Quota or outage exits 75 with a
-      # github-quota-deferred marker that the lane relay re-runs, never repairs.
+      # spend on every PR event. --advisory: this pull_request copy duplicates
+      # the authoritative Fleet Rules Evidence verdict (CI App budget, read by
+      # PR Ready), and the App key never enters a pull_request workflow. It reads
+      # the PR from the event payload (files are the only API call), holds with
+      # backoff up to 120s, and a quota/outage answer that outlasts that is an
+      # "Infrastructure, not a verdict" warning (github-quota-deferred), never
+      # red. Policy reds still fail.
       - name: Enforce receipts, red-before-green and locked areas
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/pr-fleet-rules.mjs --with-warnings
+        run: node scripts/pr-fleet-rules.mjs --with-warnings --advisory

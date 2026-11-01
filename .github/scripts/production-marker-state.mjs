@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   closeSync,
   mkdtempSync,
@@ -57,6 +58,270 @@ function positiveInteger(value) {
 
 function exactString(value) {
   return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function canonicalEntry(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalEntry).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    return `{${Object.entries(value)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalEntry(item)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+export function entryRatchetDigest(value) {
+  return createHash('sha256').update(canonicalEntry(value)).digest('hex');
+}
+
+/** Bounded, secret-free marker state; it never upgrades an absent legacy measurement. */
+export function validEntryRatchet(value, now = Date.now()) {
+  const keys = (row, names) =>
+    row &&
+    typeof row === 'object' &&
+    !Array.isArray(row) &&
+    Object.keys(row).sort().join(',') === names.split(',').sort().join(',');
+  const finite = n => typeof n === 'number' && Number.isFinite(n) && n >= 0;
+  const digest = n => typeof n === 'string' && /^[a-f0-9]{64}$/.test(n);
+  const identity = row =>
+    keys(row, 'sha,deploymentId,origin') &&
+    SHA_PATTERN.test(row.sha) &&
+    /^dpl_[A-Za-z0-9]+$/.test(row.deploymentId) &&
+    /^https:\/\/jovie-[a-z0-9-]+-jovie\.vercel\.app$/.test(row.origin);
+  const producer = row =>
+    keys(row, 'sha,runId,attempt') &&
+    SHA_PATTERN.test(row.sha) &&
+    positiveInteger(row.runId) === row.runId &&
+    positiveInteger(row.attempt) === row.attempt;
+  if (
+    !keys(
+      value,
+      'schema,budgets,declaredAt,completedAt,policyDigest,profile,profileDigest,producer,baseline,served,candidate,reference,anchor,previousAnchor,previousAnchorDigest,initializedFrom,releaseEligible,certified,failures,digest'
+    ) ||
+    value.schema !== 'jovie-entry-lcp-ratchet/v1' ||
+    value.releaseEligible !== true ||
+    typeof value.certified !== 'boolean' ||
+    !Array.isArray(value.failures) ||
+    value.failures.length !== 0 ||
+    !digest(value.policyDigest) ||
+    !digest(value.profileDigest) ||
+    !digest(value.digest) ||
+    !finite(value.declaredAt) ||
+    !finite(value.completedAt) ||
+    value.completedAt < value.declaredAt ||
+    value.completedAt - value.declaredAt > 20 * 60 * 1000 ||
+    value.completedAt > now ||
+    now - value.completedAt > 30 * 24 * 60 * 60 * 1000 ||
+    !producer(value.producer) ||
+    !['verified-served', 'retained'].includes(value.initializedFrom) ||
+    !(value.previousAnchorDigest === null || digest(value.previousAnchorDigest))
+  )
+    return false;
+  const paths = {
+    start: '/start',
+    claim: '/claim',
+    'claim-link': '/[handle]?claim=1',
+  };
+  if (
+    !Array.isArray(value.budgets) ||
+    value.budgets.length !== 3 ||
+    !Object.entries(paths).every(([id, path]) => {
+      const rows = value.budgets.filter(row => row?.id === id);
+      return (
+        rows.length === 1 &&
+        keys(rows[0], 'id,path,lcpMs,cls') &&
+        rows[0].path === path &&
+        finite(rows[0].lcpMs) &&
+        rows[0].lcpMs > 0 &&
+        rows[0].lcpMs <= 4000 &&
+        finite(rows[0].cls) &&
+        rows[0].cls <= 0.05
+      );
+    }) ||
+    entryRatchetDigest({
+      schema: value.schema,
+      budgets: value.budgets,
+      cohorts: 2,
+      samples: 3,
+      positiveRegressionAllowance: 0,
+    }) !== value.policyDigest
+  )
+    return false;
+  const profile = value.profile;
+  const anchor = row =>
+    keys(row, 'measurement,producer,role') &&
+    measurement(row.measurement, now - 30 * 24 * 60 * 60 * 1000) &&
+    producer(row.producer) &&
+    ['served', 'candidate'].includes(row.role) &&
+    (row.role === 'candidate'
+      ? row.producer.sha === row.measurement.identity.sha
+      : row.producer.sha !== row.measurement.identity.sha);
+  if (
+    !keys(
+      profile,
+      'harnessSha256,lighthouseVersion,browser,device,cpu,network,cache,bypass'
+    ) ||
+    !digest(profile.harnessSha256) ||
+    !/^\d+(?:\.\d+){1,3}$/.test(profile.lighthouseVersion) ||
+    !['browser', 'device', 'cpu', 'network'].every(
+      key =>
+        typeof profile[key] === 'string' &&
+        profile[key].length > 0 &&
+        profile[key].length <= 1000
+    ) ||
+    profile.cache !== 'reset-browser-observed-server' ||
+    profile.bypass !== 'vercel-header' ||
+    entryRatchetDigest(profile) !== value.profileDigest
+  )
+    return false;
+  const measurement = (row, since = value.declaredAt) => {
+    if (
+      !keys(row, 'identity,profileDigest,cohorts') ||
+      !identity(row.identity) ||
+      row.profileDigest !== value.profileDigest ||
+      !Array.isArray(row.cohorts) ||
+      row.cohorts.length !== 2
+    )
+      return false;
+    let previous = since;
+    for (const [ordinal, cohort] of row.cohorts.entries()) {
+      if (
+        !keys(cohort, 'ordinal,startedAt,completedAt,routes') ||
+        cohort.ordinal !== ordinal ||
+        !finite(cohort.startedAt) ||
+        !finite(cohort.completedAt) ||
+        cohort.startedAt < previous ||
+        cohort.completedAt < cohort.startedAt ||
+        cohort.completedAt > value.completedAt ||
+        !Array.isArray(cohort.routes) ||
+        cohort.routes.length !== 3
+      )
+        return false;
+      previous = cohort.completedAt;
+      for (const id of ['start', 'claim', 'claim-link']) {
+        const matches = cohort.routes.filter(route => route?.id === id);
+        if (matches.length !== 1) return false;
+        const route = matches[0];
+        if (
+          !keys(route, 'id,lcpSamples,clsSamples,serverCache') ||
+          ![route.lcpSamples, route.clsSamples, route.serverCache].every(
+            samples => Array.isArray(samples) && samples.length === 3
+          ) ||
+          ![...route.lcpSamples, ...route.clsSamples].every(finite) ||
+          !route.serverCache.every(cache =>
+            ['HIT', 'MISS', 'STALE', 'BYPASS'].includes(cache)
+          )
+        )
+          return false;
+      }
+    }
+    return true;
+  };
+  if (
+    ![value.served, value.candidate, value.reference].every(row =>
+      measurement(row)
+    ) ||
+    !anchor(value.anchor) ||
+    !anchor(value.previousAnchor) ||
+    value.producer.sha !== value.candidate.identity.sha ||
+    !keys(
+      value.baseline,
+      'state,sha,deploymentId,markerArtifactId,controllerRun,controllerAttempt'
+    ) ||
+    value.baseline.state !== 'verified' ||
+    value.baseline.sha !== value.served.identity.sha ||
+    value.baseline.deploymentId !== value.served.identity.deploymentId ||
+    !['markerArtifactId', 'controllerRun', 'controllerAttempt'].every(
+      key => positiveInteger(value.baseline[key]) === value.baseline[key]
+    ) ||
+    value.candidate.identity.sha === value.served.identity.sha ||
+    value.candidate.identity.deploymentId ===
+      value.served.identity.deploymentId ||
+    value.candidate.identity.origin === value.served.identity.origin ||
+    canonicalEntry(value.reference.identity) !==
+      canonicalEntry(value.previousAnchor.measurement.identity)
+  )
+    return false;
+  if (value.initializedFrom === 'verified-served') {
+    if (
+      value.previousAnchorDigest !== null ||
+      canonicalEntry(value.previousAnchor) !==
+        canonicalEntry({
+          measurement: value.served,
+          producer: value.producer,
+          role: 'served',
+        })
+    )
+      return false;
+  } else if (
+    value.previousAnchorDigest !== entryRatchetDigest(value.previousAnchor)
+  )
+    return false;
+  const medians = (row, id, metric) =>
+    row.cohorts.map(
+      cohort =>
+        [...cohort.routes.find(route => route.id === id)[metric]].sort(
+          (a, b) => a - b
+        )[1]
+    );
+  let improved = false;
+  let certified = true;
+  for (const budget of value.budgets) {
+    const rows = [
+      value.served,
+      value.candidate,
+      value.reference,
+      value.previousAnchor.measurement,
+    ];
+    const states = rows.flatMap(row =>
+      row.cohorts.map(
+        cohort =>
+          cohort.routes.find(route => route.id === budget.id).serverCache
+      )
+    );
+    if (
+      !states.every(
+        state => canonicalEntry(state) === canonicalEntry(states[0])
+      )
+    )
+      return false;
+    const observed = Math.max(
+      ...medians(value.candidate, budget.id, 'lcpSamples')
+    );
+    const old = Math.min(
+      ...medians(value.previousAnchor.measurement, budget.id, 'lcpSamples')
+    );
+    const limit = Math.min(
+      old,
+      ...medians(value.served, budget.id, 'lcpSamples'),
+      ...medians(value.reference, budget.id, 'lcpSamples')
+    );
+    const cls = Math.max(...medians(value.candidate, budget.id, 'clsSamples'));
+    if (observed > limit || cls > budget.cls) return false;
+    if (observed > budget.lcpMs) certified = false;
+    const noise = Math.max(
+      ...rows.slice(0, 3).map(row => {
+        const values = medians(row, budget.id, 'lcpSamples');
+        return Math.max(...values) - Math.min(...values);
+      })
+    );
+    if (old - observed > noise) improved = true;
+  }
+  const expectedAnchor = improved
+    ? {
+        measurement: value.candidate,
+        producer: value.producer,
+        role: 'candidate',
+      }
+    : value.previousAnchor;
+  if (
+    value.certified !== certified ||
+    canonicalEntry(value.anchor) !== canonicalEntry(expectedAnchor)
+  )
+    return false;
+  const { digest: ignored, ...body } = value;
+  return entryRatchetDigest(body) === ignored;
 }
 
 function sameInteger(left, right) {
@@ -124,6 +389,53 @@ function validateMarkerPayload(payload, context, artifact) {
     sameInteger(payload.controllerRun, artifact.workflowRunId) &&
     positiveInteger(payload.controllerAttempt) !== null;
   if (!identityMatches) return false;
+  if (
+    payload.entryMeasurementStatus !== undefined &&
+    !entryPolicyAllows(
+      payload,
+      payload.releasePolicy,
+      payload.entryMeasurementStatus
+    )
+  )
+    return false;
+  if (
+    payload.entryRatchet != null &&
+    (!['measured', 'carried'].includes(payload.entryMeasurementStatus) ||
+      !validEntryRatchet(payload.entryRatchet))
+  )
+    return false;
+  if (
+    payload.entryMeasurementStatus !== undefined &&
+    !['measured', 'carried', 'uninitialized'].includes(
+      payload.entryMeasurementStatus
+    )
+  )
+    return false;
+  if (
+    payload.entryMeasurementStatus === 'uninitialized' &&
+    payload.entryRatchet != null
+  )
+    return false;
+  if (
+    ['measured', 'carried'].includes(payload.entryMeasurementStatus) &&
+    !payload.entryRatchet
+  )
+    return false;
+  if (
+    payload.entryMeasurementStatus === 'measured' &&
+    (payload.entryRatchet.producer.sha !== payload.sha ||
+      payload.entryRatchet.candidate.identity.deploymentId !==
+        payload.deploymentId ||
+      !sameInteger(
+        payload.entryRatchet.producer.runId,
+        payload.recoveredFromControllerRun ?? payload.controllerRun
+      ) ||
+      !sameInteger(
+        payload.entryRatchet.producer.attempt,
+        payload.recoveredFromControllerAttempt ?? payload.controllerAttempt
+      ))
+  )
+    return false;
   if (/^dpl_[A-Za-z0-9]+$/.test(payload.deploymentId)) return true;
   return (
     payload.deploymentId === 'not-applicable' &&
@@ -404,7 +716,11 @@ function classifyMarkerEntry(entry, context) {
   }
   if (
     status === 'completed' &&
-    conclusion === 'failure' &&
+    // A cancelled run (e.g. concurrency cancelling the changelog publication)
+    // is judged by the same job-level proof: Production Verified succeeded,
+    // rollback skipped, only publication jobs unsuccessful. Run 40932269374
+    // (5cbe0cb) froze every release for 3h by being classified interrupted.
+    (conclusion === 'failure' || conclusion === 'cancelled') &&
     verifiedBeforePublicationFailure(entry.attemptJobs, markerContext, attempt)
   ) {
     return {
@@ -414,6 +730,11 @@ function classifyMarkerEntry(entry, context) {
       deploymentId: entry.payload.deploymentId,
       markerContext,
       normalRerun,
+      // The producer run itself still ended in an interrupted conclusion, so
+      // a recovery receipt bound to this exact attempt replaces this receipt
+      // (same strict pairing as the interrupted-primary case below) instead
+      // of reading as a competing primary.
+      producerConclusion: conclusion,
     };
   }
   if (ACTIVE_STATUSES.has(status)) {
@@ -489,9 +810,10 @@ export function classifyProductionMarkerEvidence(evidence) {
       return { state: 'none', reason: 'no_marker' };
     }
     if (evidence.markers.length > 2) return manual('multiple_markers');
-    const classified = evidence.markers.map(entry =>
-      classifyMarkerEntry(entry, context)
-    );
+    const classified = evidence.markers.map(entry => ({
+      ...classifyMarkerEntry(entry, context),
+      entryDigest: entry.payload?.entryRatchet?.digest ?? null,
+    }));
     const invalid = classified.find(entry => entry.error);
     if (invalid) return manual(invalid.error);
     // Attempts are scoped to their producer run: recovery and controller runs
@@ -516,6 +838,7 @@ export function classifyProductionMarkerEvidence(evidence) {
       recovered.sourceAttempt === 1 &&
       INTERRUPTED_CONCLUSIONS.has(recovered.sourceConclusion) &&
       recovered.deploymentId === retry.deploymentId &&
+      recovered.entryDigest === retry.entryDigest &&
       evidence.markers[0].artifact.id !== evidence.markers[1].artifact.id;
     const primaryCandidates = classified.filter(
       entry => entry.attempt === 1 || entry.normalRerun || entry.recovered
@@ -524,17 +847,26 @@ export function classifyProductionMarkerEvidence(evidence) {
     // attempt and the same exact deployment replaces that receipt: the
     // bounded recovery re-proved the identical canonical binding rather than
     // competing for primary authority. Any other pairing is a duplicate.
-    const interruptedPrimary = primaryCandidates.find(
-      entry => entry.kind === 'interrupted'
+    // The replaceable primary is an interrupted entry, or a verified entry
+    // whose producer run still ended in an interrupted conclusion (the
+    // cancelled/failure publication-proof shape above). A genuinely
+    // successful primary is never replaceable: a recovery receipt beside
+    // one stays duplicate_primary_marker.
+    const replacedPrimary = primaryCandidates.find(
+      entry =>
+        !entry.recovered &&
+        (entry.kind === 'interrupted' ||
+          INTERRUPTED_CONCLUSIONS.has(entry.producerConclusion))
     );
     const replacedInterrupted =
       classified.length === 2 &&
       recovered?.kind === 'verified' &&
-      interruptedPrimary !== undefined &&
-      recovered.sourceRun === interruptedPrimary.controllerRun &&
-      recovered.sourceAttempt === interruptedPrimary.attempt &&
+      replacedPrimary !== undefined &&
+      recovered.sourceRun === replacedPrimary.controllerRun &&
+      recovered.sourceAttempt === replacedPrimary.attempt &&
       INTERRUPTED_CONCLUSIONS.has(recovered.sourceConclusion) &&
-      recovered.deploymentId === interruptedPrimary.deploymentId;
+      recovered.deploymentId === replacedPrimary.deploymentId &&
+      recovered.entryDigest === replacedPrimary.entryDigest;
     if (primaryCandidates.length > 1 && !converged && !replacedInterrupted) {
       return manual('duplicate_primary_marker');
     }
@@ -1082,7 +1414,7 @@ function parseArgs(argv) {
   return values;
 }
 
-function inspectOnline(args) {
+export function inspectOnline(args) {
   const sha = args.sha;
   const repo = args.repo;
   const controllerWorkflowId = positiveInteger(args['controller-workflow-id']);
@@ -1254,7 +1586,192 @@ function inspectOnline(args) {
         return manual('artifact_snapshot_changed');
     }
   }
+  if (result.state === 'verified') {
+    const selected = evidence.markers.find(
+      marker =>
+        sameInteger(marker.payload.controllerRun, result.controllerRun) &&
+        sameInteger(marker.payload.controllerAttempt, result.controllerAttempt)
+    );
+    if (!selected) return manual('missing_selected_marker');
+    result.markerArtifactId = selected.artifact.id;
+    result.sha = sha;
+    result.entryRatchet = selected.payload.entryRatchet ?? null;
+  }
   return withProducerActivationEvidence(args, result);
+}
+
+/** One authenticated, completely classified served marker; never a candidate fallback. */
+export function readEntryBaseline(sha, repo) {
+  const workflow = ghJson(
+    `repos/${repo}/actions/workflows/production-controller.yml`
+  );
+  const result = inspectOnline({
+    sha,
+    repo,
+    'controller-workflow-id': workflow.id,
+  });
+  if (
+    result.state !== 'verified' ||
+    !/^dpl_[A-Za-z0-9]+$/.test(result.deploymentId) ||
+    !positiveInteger(result.markerArtifactId)
+  )
+    throw new Error('entry served marker unavailable');
+  return {
+    state: 'verified',
+    sha,
+    deploymentId: result.deploymentId,
+    markerArtifactId: result.markerArtifactId,
+    controllerRun: result.controllerRun,
+    controllerAttempt: result.controllerAttempt,
+    ...(result.entryRatchet ? { entryRatchet: result.entryRatchet } : {}),
+  };
+}
+
+export function validateEntryHandoff(value, context) {
+  if (
+    !value ||
+    Object.keys(value).sort().join(',') !==
+      'candidate,entryRatchet,mode,producer,schema' ||
+    value.schema !== 'jovie-entry-lcp-handoff/v1' ||
+    !['measured', 'carried', 'uninitialized'].includes(value.mode) ||
+    !value.producer ||
+    Object.keys(value.producer).sort().join(',') !== 'attempt,runId,sha' ||
+    !value.candidate ||
+    Object.keys(value.candidate).sort().join(',') !==
+      'deploymentId,origin,sha' ||
+    !SHA_PATTERN.test(value.producer.sha) ||
+    !/^dpl_[A-Za-z0-9]+$/.test(value.candidate.deploymentId) ||
+    positiveInteger(value.producer.runId) !== value.producer.runId ||
+    positiveInteger(value.producer.attempt) !== value.producer.attempt ||
+    value.producer?.sha !== context.sha ||
+    !sameInteger(value.producer?.runId, context.runId) ||
+    !sameInteger(value.producer?.attempt, context.attempt) ||
+    value.candidate?.sha !== context.sha ||
+    value.candidate?.deploymentId !== context.deploymentId ||
+    !/^https:\/\/jovie-[a-z0-9-]+-jovie\.vercel\.app$/.test(
+      value.candidate?.origin ?? ''
+    )
+  )
+    return false;
+  if (value.mode === 'uninitialized') return value.entryRatchet === null;
+  if (!validEntryRatchet(value.entryRatchet)) return false;
+  return (
+    value.mode !== 'measured' ||
+    (value.entryRatchet.producer.sha === context.sha &&
+      sameInteger(value.entryRatchet.producer.runId, context.runId) &&
+      sameInteger(value.entryRatchet.producer.attempt, context.attempt) &&
+      canonicalEntry(value.entryRatchet.candidate.identity) ===
+        canonicalEntry(value.candidate))
+  );
+}
+
+function entryPolicyAllows(marker, policy, mode) {
+  if (
+    policy?.schema !== 'jovie.release-risk-receipt/v1' ||
+    policy.lineageSha !== marker.sha ||
+    typeof policy.policyVersion !== 'string' ||
+    !policy.policyVersion.startsWith('jovie.release-risk-policy/') ||
+    !Array.isArray(policy.requiredProof) ||
+    !policy.requiredProof.every(value => typeof value === 'string')
+  )
+    return false;
+  if (policy.selectedLane === 'high')
+    return (
+      mode === 'measured' &&
+      policy.requiredProof.includes('high-confidence-runtime-proof')
+    );
+  if (policy.selectedLane === 'not_applicable')
+    return (
+      marker.deploymentId === 'not-applicable' &&
+      ['carried', 'uninitialized'].includes(mode)
+    );
+  return (
+    ['low', 'medium'].includes(policy.selectedLane) &&
+    ['measured', 'carried', 'uninitialized'].includes(mode)
+  );
+}
+
+/** The caller supplies the authenticated original-attempt policy artifact, never a lane switch. */
+export function attachEntryHandoff(marker, handoff, sealedPolicy) {
+  const context = {
+    sha: marker.sha,
+    deploymentId: marker.deploymentId,
+    runId: marker.recoveredFromControllerRun ?? marker.controllerRun,
+    attempt: marker.recoveredFromControllerAttempt ?? marker.controllerAttempt,
+  };
+  if (!validateEntryHandoff(handoff, context))
+    throw new Error('entry artifact source mismatch');
+  const policyBinding = policy => ({
+    schema: policy?.schema,
+    policyVersion: policy?.policyVersion,
+    lineageSha: policy?.lineageSha,
+    selectedLane: policy?.selectedLane,
+    requiredProof: policy?.requiredProof,
+  });
+  if (
+    !entryPolicyAllows(marker, sealedPolicy, handoff.mode) ||
+    (marker.releasePolicy &&
+      canonicalEntry(policyBinding(marker.releasePolicy)) !==
+        canonicalEntry(policyBinding(sealedPolicy)))
+  )
+    throw new Error('entry proof does not satisfy sealed release policy');
+  return {
+    ...marker,
+    releasePolicy: marker.releasePolicy ?? sealedPolicy,
+    entryMeasurementStatus: handoff.mode,
+    entryRatchet: handoff.entryRatchet,
+  };
+}
+
+function readExactEntryArtifact(context, name, file, companions = []) {
+  const listing = () =>
+    normalizeArtifacts(
+      ghJson(
+        `repos/${context.repo}/actions/artifacts?name=${encodeURIComponent(name)}&per_page=100`
+      ),
+      name
+    );
+  const before = listing();
+  const selected = before.filter(artifact =>
+    sameInteger(artifact.workflowRunId, context.runId)
+  );
+  if (
+    !before.every(artifact => validateArtifact(artifact, name)) ||
+    new Set(before.map(artifact => artifact.id)).size !== before.length ||
+    selected.length !== 1 ||
+    selected[0].expired
+  )
+    throw new Error('entry artifact absent, expired or ambiguous');
+  const receipt = downloadJsonArtifact(
+    context.repo,
+    selected[0].id,
+    file,
+    companions
+  );
+  if (canonicalEntry(before) !== canonicalEntry(listing()))
+    throw new Error('entry artifact changed or invalid');
+  return receipt;
+}
+
+function readEntryHandoff(context) {
+  const name = `entry-lcp-handoff-${context.sha}-${context.runId}-${context.attempt}`;
+  const receipt = readExactEntryArtifact(
+    context,
+    name,
+    'entry-lcp-handoff.json'
+  );
+  if (!validateEntryHandoff(receipt, context))
+    throw new Error('entry artifact changed or invalid');
+  return receipt;
+}
+
+function readEntryReleasePolicy(context) {
+  return readExactEntryArtifact(
+    context,
+    `production-lane-range-${context.sha}-${context.attempt}`,
+    RELEASE_RISK_FILE,
+    ['production-lane-range.json', 'fleet-admission.json']
+  );
 }
 
 function annotationDetail(result) {
@@ -1300,6 +1817,51 @@ export function admitReleaseBase(result, deployedSha, releaseSha) {
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
+  if (args['entry-baseline']) {
+    process.stdout.write(
+      `${JSON.stringify(readEntryBaseline(args['entry-baseline'], args.repo))}\n`
+    );
+    return;
+  }
+  if (args['entry-attach'] || args['entry-carry']) {
+    const filename = args['entry-attach'] ?? args['entry-carry'];
+    const marker = JSON.parse(readFileSync(filename, 'utf8'));
+    let output;
+    if (args['entry-carry']) {
+      const baseline = readEntryBaseline(marker.deploymentBaseSha, args.repo);
+      output = {
+        ...marker,
+        entryRatchet: baseline.entryRatchet ?? null,
+        entryMeasurementStatus: baseline.entryRatchet
+          ? 'carried'
+          : 'uninitialized',
+      };
+      if (
+        !entryPolicyAllows(
+          output,
+          marker.releasePolicy,
+          output.entryMeasurementStatus
+        )
+      )
+        throw new Error('entry carry does not satisfy sealed release policy');
+    } else {
+      const context = {
+        repo: args.repo,
+        sha: marker.sha,
+        deploymentId: marker.deploymentId,
+        runId: marker.recoveredFromControllerRun ?? marker.controllerRun,
+        attempt:
+          marker.recoveredFromControllerAttempt ?? marker.controllerAttempt,
+      };
+      output = attachEntryHandoff(
+        marker,
+        readEntryHandoff(context),
+        readEntryReleasePolicy(context)
+      );
+    }
+    writeFileSync(filename, `${JSON.stringify(output)}\n`, { mode: 0o600 });
+    return;
+  }
   let result;
   if (args.fixture) {
     result = classifyProductionMarkerEvidence(

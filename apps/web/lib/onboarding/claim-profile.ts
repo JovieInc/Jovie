@@ -27,6 +27,7 @@ import { captureError } from '@/lib/error-tracking';
 import { isHandleUniqueViolation } from '@/lib/errors/onboarding';
 import { isMusicfetchVendorUnavailable } from '@/lib/musicfetch/errors';
 import { captureRevenueSpineFailure } from '@/lib/observability/revenue-spine';
+import { scheduleOnboardingCatalogImport } from '@/lib/onboarding/catalog-import.server';
 import {
   type ClaimedOnboardingState,
   deriveClaimedOnboardingStateFromMessageRows,
@@ -118,7 +119,7 @@ async function reserveFallbackProfileHandle(
 ): Promise<string> {
   // Fail closed: handle reservation success requires verified ownership.
   return reserveOnboardingHandle(
-    state.artist?.name ?? cleanedProposedHandle ?? 'artist',
+    state.artist?.name ?? cleanedProposedHandle ?? 'profile',
     userId
   );
 }
@@ -142,6 +143,7 @@ function buildOnboardingSettings(
       selectedSpotifyArtistName: state.artist?.name ?? null,
       socialLinks: [...state.socialLinks],
       interviewSignalCount: state.interviewSignals.length,
+      profileDraft: state.profileDraft ?? null,
     },
   };
 }
@@ -269,6 +271,7 @@ function buildImportedProfileFields({
 }
 
 interface PersistClaimedProfileInput {
+  readonly creatorType: CreatorProfile['creatorType'];
   readonly tx: DbOrTransaction;
   readonly userId: string;
   readonly handle: string;
@@ -284,6 +287,7 @@ interface PersistClaimedProfileInput {
 }
 
 async function persistClaimedProfileRow({
+  creatorType,
   tx,
   userId,
   handle,
@@ -347,7 +351,7 @@ async function persistClaimedProfileRow({
     .values({
       userId,
       waitlistEntryId,
-      creatorType: 'artist',
+      creatorType,
       username: handle,
       usernameNormalized: handle,
       displayName,
@@ -438,6 +442,13 @@ async function persistClaimedProfileWithHandleRetry({
             );
           }
           return persistClaimedProfileRow({
+            creatorType: state.profileDraft?.activeRole
+              ? state.profileDraft.activeRole === 'artist'
+                ? 'artist'
+                : 'creator'
+              : state.artist
+                ? 'artist'
+                : 'creator',
             tx,
             userId,
             handle,
@@ -563,6 +574,19 @@ async function materializeProfile({
       unproven,
       waitlistEntryId,
     });
+
+  // JOV-9758: import the matched artist's real catalog (releases, artwork,
+  // release smartlinks, DSP links) for every materialized identity,
+  // including reserved waitlist holds, so the page is never an empty shell.
+  // A held high-reach identity has no artist here and imports on approval.
+  if (state.artist?.id && profileId) {
+    scheduleOnboardingCatalogImport({
+      profileId,
+      spotifyArtistId: state.artist.id,
+      spotifyArtistUrl: state.artist.url,
+      userId: verifiedUserId,
+    });
+  }
 
   if (verification) {
     await requestClaimVerification({

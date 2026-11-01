@@ -10,6 +10,7 @@ import {
 import { publicEnv } from '@/lib/env-public';
 import {
   checkBetterAuthSecretPolicy,
+  checkPIIEncryptionKeyPolicy,
   checkStripeSecretFormatPolicy,
   checkUrlEncryptionKeyPolicy,
 } from './env-configuration-policy';
@@ -171,6 +172,20 @@ const checkUrlEncryptionKey: ValidationRule = ({ server, vercelEnv }) =>
   checkUrlEncryptionKeyPolicy({ key: server.URL_ENCRYPTION_KEY, vercelEnv });
 
 /**
+ * Validation rule: Warn when PII_ENCRYPTION_KEY is missing in production/preview.
+ *
+ * JOV-9038: the key is required — encryptPII/decryptPII fail closed on the
+ * first PII write/read without it — but the gap must surface to operators
+ * instead of being discovered through user-facing 500s. Warning (not
+ * critical, mirroring checkAlbumArtGateway) because /api/health/deploy
+ * returns 503 on critical issues and the Gem fleet gate observes that
+ * endpoint as production liveness — a missing PII key must not halt
+ * fleet-wide shipping while the key is being provisioned.
+ */
+const checkPIIEncryptionKey: ValidationRule = ({ server, vercelEnv }) =>
+  checkPIIEncryptionKeyPolicy({ key: server.PII_ENCRYPTION_KEY, vercelEnv });
+
+/**
  * Validation rule: Warn when album art cannot authenticate to the AI Gateway.
  *
  * On Vercel, OIDC covers Gateway auth, so a missing AI_GATEWAY_API_KEY is not
@@ -203,6 +218,9 @@ export const RUNTIME_VALIDATION_RULES: ValidationRule[] = [
   checkStripePublishableFormat,
   checkStripePairConsistency,
   checkUrlEncryptionKey,
+  // PII encryption warns only when the key is missing in production/preview;
+  // critical would 503 /api/health/deploy and stop the Gem fleet gate cold.
+  checkPIIEncryptionKey,
   // Album art warns only when Gateway auth is missing. On Vercel, OIDC is
   // injected at runtime and satisfies this check without AI_GATEWAY_API_KEY.
   checkAlbumArtGateway,

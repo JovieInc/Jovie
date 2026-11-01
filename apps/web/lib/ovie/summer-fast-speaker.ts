@@ -107,11 +107,24 @@ export async function* parseSseFrames(
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+  let finished = false;
+  let skipLf = false;
   try {
     for (;;) {
       const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
+      finished = done;
+      // CR terminates a line immediately; swallow its optional LF even across
+      // empty chunks, without delaying a complete lone-CR frame.
+      for (const char of decoder.decode(value, { stream: !done })) {
+        if (skipLf) {
+          skipLf = false;
+          if (char === '\n') continue;
+        }
+        if (char === '\r') {
+          buffer += '\n';
+          skipLf = true;
+        } else buffer += char;
+      }
       let index = buffer.indexOf('\n\n');
       while (index >= 0) {
         const block = buffer.slice(0, index);
@@ -120,24 +133,35 @@ export async function* parseSseFrames(
         if (frame) yield frame;
         index = buffer.indexOf('\n\n');
       }
+      if (done) {
+        const frame = parseBlock(buffer);
+        if (frame) yield frame;
+        break;
+      }
     }
   } finally {
+    if (!finished) void reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }
 }
 
 function parseBlock(block: string): Frame | null {
   let event = '';
-  let data = '';
+  const data: string[] = [];
   for (const line of block.split('\n')) {
-    if (line.startsWith('event: ')) event = line.slice(7).trim();
-    else if (line.startsWith('data: ')) data += line.slice(6);
+    if (line.startsWith('event:')) event = line.slice(6).trim();
+    else if (line.startsWith('data:'))
+      data.push(line.slice(5).replace(/^ /, ''));
   }
   if (!event) return null;
+  const malformed = event === 'error' ? { event, data: {} } : null;
   try {
-    return { event, data: JSON.parse(data || '{}') as Record<string, unknown> };
+    const payload: unknown = JSON.parse(data.join('\n') || '{}');
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload))
+      return malformed;
+    return { event, data: payload as Record<string, unknown> };
   } catch {
-    return null;
+    return malformed;
   }
 }
 

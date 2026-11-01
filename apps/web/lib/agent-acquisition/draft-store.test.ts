@@ -89,8 +89,11 @@ describe('capability-bound draft persistence', () => {
       receipt_id: g.row.id,
       artist,
       ownership: 'unverified',
+      next_action: 'send_user_claim_url',
       published_url: null,
-      claim_url: null,
+      claim_url: expect.stringMatching(
+        new RegExp(`/claim/agent/${g.row.id}\\?h=[A-Za-z0-9_-]{43}$`)
+      ),
       missing_fields: ['bio', 'image_url'],
       acquisition: { ...acquisition, draft_id: g.row.id },
     });
@@ -140,9 +143,15 @@ describe('capability-bound draft persistence', () => {
   });
   it('denies artist substitution, unrelated receipt IDs, expiry and malformed inputs before DB access', async () => {
     const g = grant();
-    expect(await createAgentDraft({ ...g.input, publish: true })).toMatchObject(
-      { code: 'INVALID_INPUT' }
+    const invalid = await createAgentDraft({ ...g.input, publish: true });
+    expect(invalid).toMatchObject({
+      code: 'INVALID_INPUT',
+      next_action: 'correct_input',
+    });
+    expect((invalid as unknown as { message: string }).message).toContain(
+      'publish'
     );
+    expect(JSON.stringify(invalid)).not.toContain(g.token);
     expect(
       await createAgentDraft({ ...g.input, artist_id: 'apple_music:657515' })
     ).toMatchObject({ code: 'DRAFT_UNAVAILABLE' });

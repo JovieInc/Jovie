@@ -89,6 +89,7 @@ vi.mock('drizzle-orm', () => ({
   sql: vi.fn((strings: TemplateStringsArray, ..._vals: unknown[]) => strings),
   eq: vi.fn((a: unknown, b: unknown) => [a, b]),
   gte: vi.fn((a: unknown, b: unknown) => [a, b]),
+  isNull: vi.fn((a: unknown) => [a, null]),
 }));
 
 // ---------------------------------------------------------------------------

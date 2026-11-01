@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Deliberate red</title>
+<style>
+  body { margin: 0; background: #08090a; color: #e6e6e6; font: 16px/1.5 sans-serif; }
+  .wallpaper { width: 100%; height: 520px; background: linear-gradient(120deg, rgb(40, 90, 255), rgb(170, 60, 240)); }
+  .eyebrow { font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; }
+  .tile { width: 40px; height: 40px; border-radius: 10px; background: rgb(30, 40, 60); display: flex; align-items: center; justify-content: center; }
+  .field { border-radius: 16px; border: 1px solid #333; padding: 8px; width: 320px; }
+  .field input { border: 0; border-radius: 0; background: transparent; color: inherit; width: 100%; }
+  .field input:focus-visible { outline: 2px solid rgb(60, 160, 255); }
+  .gap { height: 1400px; }
+  .cookie { position: fixed; left: 0; right: 0; bottom: 0; height: 200px; background: #111; }
+  canvas { display: block; width: 100%; height: 600px; }
+</style>
+</head>
+<body>
+<main>
+  <section class="wallpaper">
+    <div>
+      <p class="eyebrow">Smart links</p>
+      <h1>One link for every release</h1>
+    </div>
+  </section>
+  <section>
+    <h2>How it works</h2>
+    <div><p>Step 1</p><p>Paste a link.</p></div>
+    <div><p>0<!-- -->2</p><p>Pick a look.</p></div>
+    <div><p>03</p><p>Share it.</p></div>
+    <p>Try the dial. Supported devices give a light haptic tick.</p>
+    <p>Wallet passes: coming soon.</p>
+  </section>
+  <section>
+    <div><div class="tile"><svg width="16" height="16"><circle cx="8" cy="8" r="6" fill="#999"/></svg></div><p>Fast</p></div>
+    <div><div class="tile"><svg width="16" height="16"><circle cx="8" cy="8" r="6" fill="#999"/></svg></div><p>Quiet</p></div>
+    <div><div class="tile"><svg width="16" height="16"><circle cx="8" cy="8" r="6" fill="#999"/></svg></div><p>Precise</p></div>
+  </section>
+  <section>
+    <h2>How it works</h2>
+    <div class="field"><input type="search" placeholder="Search"></div>
+  </section>
+  <canvas width="1440" height="600"></canvas>
+  <div class="gap"></div>
+  <p>The end of the page.</p>
+</main>
+<aside class="cookie"><p>We use cookies to measure the site.</p><button>Accept</button></aside>
+</body>
+</html>

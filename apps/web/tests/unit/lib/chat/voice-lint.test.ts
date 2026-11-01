@@ -71,6 +71,18 @@ describe('gateAssistantReply (JOV-6616)', () => {
     );
   });
 
+  it('rewrites dashes instead of discarding an otherwise good reply', () => {
+    // Before the repair, 24 of 25 helpfulness-eval replies were persisted as
+    // the fallback because the model wrote an em dash (2026-10-28).
+    const result = gateAssistantReply(
+      'Night Swim drops Friday — put the pre-save in your bio today.'
+    );
+    expect(result.text).toBe(
+      'Night Swim drops Friday, put the pre-save in your bio today.'
+    );
+    expect(result.violations).toEqual([]);
+  });
+
   it('keeps the fallback lint-clean', () => {
     expect(lintVoice(ASSISTANT_REPLY_FALLBACK).ok).toBe(true);
   });

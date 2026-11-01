@@ -7,6 +7,7 @@
  * Credential and mutation endpoints remain durably rate-limited below.
  */
 import { env } from '@/lib/env-server';
+import { isProdcertCanaryEmail } from '@/lib/synthetic/prodcert-identities';
 
 /**
  * Canonical deterministic E2E test-email shapes (`…+e2e…@` / `…+clerk_test…@`,
@@ -78,6 +79,26 @@ async function readOtpRequestEmail(request: Request): Promise<string | null> {
 }
 
 /**
+ * Raised (still bounded) OTP budget for the production certification canaries
+ * (JOV-9625 / JOV-10063).
+ *
+ * The deterministic test OTP above is intentionally refused in production, so
+ * the production golden-path smoke authenticates two real canary identities
+ * (the seeded returning canary and a per-run `+synthetic-prodcert-` address,
+ * both on the Jovie-controlled jov.ie mailbox base) through the default
+ * 3-per-60s-per-IP bucket. One smoke run's sign-in and signup attempts plus
+ * retries exceed that budget, Better Auth 429s the send, the auth form never
+ * advances to the code step, and the certification goes red on a healthy
+ * deployment (run 41147485889; JOV-9835 / JOV-10063).
+ *
+ * Only the exact canary shapes from `isProdcertCanaryEmail` qualify — real
+ * emails (and `+e2e`/`+clerk_test` shapes without the E2E guard) keep the
+ * 3/60s window. Bounded, not unlimited: a worst-case smoke run needs at most
+ * 6 sends per OTP path (sign-in + signup × 3 attempts).
+ */
+const PRODCERT_CANARY_OTP_RULE = { window: 60, max: 10 } as const;
+
+/**
  * Function form (better-auth@1.6.23 resolves `(request, currentRule)`;
  * returning `false` disables limiting for that request).
  *
@@ -89,7 +110,8 @@ async function readOtpRequestEmail(request: Request): Promise<string | null> {
  *
  * Applied to both send + sign-in: Golden Path failed on
  * `/sign-in/email-otp` 429 after only send was exempted (PR #14456 run
- * 29629642549).
+ * 29629642549). The production certification canaries keep a bounded raised
+ * budget instead (see PRODCERT_CANARY_OTP_RULE).
  */
 async function deterministicTestOtpRule(
   request: Request
@@ -103,6 +125,9 @@ async function deterministicTestOtpRule(
       })}`
     );
     return false;
+  }
+  if (email && isProdcertCanaryEmail(email)) {
+    return PRODCERT_CANARY_OTP_RULE;
   }
   return { window: 60, max: 3 };
 }

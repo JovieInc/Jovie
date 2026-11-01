@@ -5,8 +5,10 @@
  * performance-invariants-v1 (`docs/performance/performance-invariants-v1.md`)
  * keep glow and glass on CSS tokens and disallow canvas, WebGL, and video on
  * a surface. The standing sentence is unchanged. The scoped exception below
- * applies only to this hero's decorative layer. The hero ships enabled.
- * There is no feature flag.
+ * applies only to this hero's decorative layer. The static CSS poster is
+ * the default: WebGL runs only when the `homepage-hero-light` entry in
+ * `data/marketing/animatedBackgroundBudget.ts` enables it. There is no
+ * feature flag.
  *
  * gbrain-unavailable: the CLI was not installed here. The repo contracts are
  * the copies this check reads. No Linear issue — ad-hoc.

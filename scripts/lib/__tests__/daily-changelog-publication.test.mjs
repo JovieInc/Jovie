@@ -1,4 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 import { parseChangelog } from '../changelog-parser.mjs';
@@ -570,7 +573,7 @@ describe('production candidate collection', () => {
 describe('publication transport', () => {
   it('runs only after exact production verification and preserves the release DAG', () => {
     const workflow =
-      /** @type {{ jobs: Record<string, {needs: string[], if: string, steps: Array<{name?: string, run?: string}>}> }} */ (
+      /** @type {{ jobs: Record<string, {needs: string[], if: string, steps: Array<{id?: string, name?: string, run?: string}>}> }} */ (
         load(
           readFileSync(
             new URL(
@@ -595,13 +598,85 @@ describe('publication transport', () => {
     expect(publishStep.run).toContain(
       'repos/$GITHUB_REPOSITORY/pulls?state=open&base=main&per_page=100'
     );
-    expect(workflow.jobs['coalesce-production'].steps.at(-1).run).toContain(
+    const coalesce = workflow.jobs['coalesce-production'].steps.find(
+      step => step.id === 'coalesce'
+    );
+    expect(coalesce?.run).toContain(
       'record_receipt "proceed" "exact SHA is current"'
     );
     expect(workflow.jobs['production-verified'].needs).not.toContain(
       'publish-customer-changelog'
     );
   });
+
+  it.each([
+    { current: 'true', decision: 'proceed', expected: 'Release attempted:' },
+    {
+      current: '',
+      decision: 'superseded',
+      expected: 'No release attempted: superseded',
+    },
+  ])(
+    'writes the $decision release summary',
+    ({ current, decision, expected }) => {
+      const workflow =
+        /** @type {{ jobs: Record<string, {steps: Array<{name?: string, if?: string, env?: Record<string, string>, run?: string}>}> }} */ (
+          load(
+            readFileSync(
+              new URL(
+                '../../../.github/workflows/production-controller.yml',
+                import.meta.url
+              ),
+              'utf8'
+            )
+          )
+        );
+      const step = workflow.jobs['coalesce-production'].steps.find(
+        step => step.name === 'Summarize the release decision'
+      );
+      expect(step.if).toBe('${{ always() }}');
+      expect(step.env.IS_CURRENT).toBe(
+        '${{ steps.coalesce.outputs.is_current }}'
+      );
+      expect(step.env.DECISION).toBe('${{ steps.coalesce.outputs.decision }}');
+      expect(step.env.REPLACEMENT).toBe(
+        '${{ steps.coalesce.outputs.replacement_sha }}'
+      );
+      const root = mkdtempSync(join(tmpdir(), 'release-summary-'));
+      const summaryPath = join(root, 'summary.md');
+      try {
+        const result = spawnSync(
+          'bash',
+          ['-e', '-o', 'pipefail', '-c', step.run],
+          {
+            env: {
+              ...process.env,
+              IS_CURRENT: current,
+              DECISION: decision,
+              EXPECTED_SHA: HEAD,
+              REPLACEMENT: MERGE,
+              GITHUB_STEP_SUMMARY: summaryPath,
+            },
+            encoding: 'utf8',
+          }
+        );
+        expect(result.status, result.stderr).toBe(0);
+        const summary = readFileSync(summaryPath, 'utf8');
+        expect(summary).toContain(expected);
+        if (decision === 'proceed') {
+          expect(summary).toContain(HEAD);
+          expect(summary).not.toContain('No release attempted');
+        } else {
+          expect(summary).toContain(
+            `decision=superseded, replacement=${MERGE}`
+          );
+          expect(summary).toContain('nothing shipped');
+        }
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
+  );
 });
 
 describe('controller run trust', () => {

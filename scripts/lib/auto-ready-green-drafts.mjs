@@ -27,12 +27,6 @@ export const GREEN_SOURCE_PROTECTED_PRS = Object.freeze([
   17156, // HOLD — waitlist-first revert; never undraft/enroll
 ]);
 
-export const TIM_HOLD_LABELS = Object.freeze([
-  'tim-hold',
-  'tim:hold',
-  'hold:tim',
-]);
-
 const MACHINE_BLOCKS = new Set(MACHINE_BLOCK_LABELS);
 
 // Stop labels and queue-poison park a draft: undrafting them only wakes work
@@ -41,7 +35,6 @@ const MACHINE_BLOCKS = new Set(MACHINE_BLOCK_LABELS);
 export const GREEN_SOURCE_HOLD_LABELS = Object.freeze([
   ...new Set([
     ...WRITER_PROMOTION_HOLD_LABELS,
-    ...TIM_HOLD_LABELS,
     ...ADMISSION_BLOCKING_LABELS.filter(label => !MACHINE_BLOCKS.has(label)),
   ]),
 ]);

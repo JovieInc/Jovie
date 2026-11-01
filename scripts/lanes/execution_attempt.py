@@ -14,8 +14,22 @@ def digest(value) -> str: return hashlib.sha256(json.dumps(value, sort_keys=True
 def identity(domain: str, work: dict, generation) -> dict:
     work_key, generation = f"{domain}:{digest(work)}", digest(generation)
     return {"workKey": work_key, "executionGeneration": generation, "identityDigest": digest({"workKey": work_key, "generation": generation})}
+def _mirror_rows(text: str) -> list[dict]:
+    """A crash or full disk can tear the last append. The local file mirrors the GitHub ledger,
+    so a torn final line (no newline) is dropped, never fatal: one torn line failed every
+    fix-red claim on Gem from 2026-10-26 07:30Z. Interior corruption still raises."""
+    lines = text.split("\n")
+    if lines[-1] == "": lines.pop()
+    else:
+        try: json.loads(lines[-1])
+        except json.JSONDecodeError: lines.pop()
+    return [json.loads(line) for line in lines if line]
+def _ends_open(path: Path) -> bool:
+    if not path.exists() or not path.stat().st_size: return False
+    with open(path, "rb") as handle:
+        handle.seek(-1, os.SEEK_END); return handle.read(1) != b"\n"
 def _rows(path: Path) -> list[dict]:
-    rows = [] if not path.exists() else [json.loads(line) for line in path.read_text().splitlines()]
+    rows = [] if not path.exists() else _mirror_rows(path.read_text())
     if any(row.get("schema") != SCHEMA or not row.get("identityDigest") for row in rows): raise RuntimeError("execution-ledger-malformed")
     return rows
 def _file_locked(path: Path, fn):
@@ -24,6 +38,8 @@ def _file_locked(path: Path, fn):
         fcntl.flock(lock, fcntl.LOCK_EX)
         result, additions = fn(_rows(path))
         if additions:
+            if _ends_open(path):
+                data = path.read_bytes(); path.write_bytes(data[:data.rfind(b"\n") + 1])
             with open(path, "a") as ledger:
                 ledger.writelines(json.dumps(row, sort_keys=True) + "\n" for row in additions)
                 ledger.flush(); os.fsync(ledger.fileno())

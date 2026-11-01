@@ -1,0 +1,28 @@
+
+   • turbo 2.11.9
+   • Packages in scope: @jovie/web
+   • Running build in 1 package
+   • Remote caching disabled
+
+@jovie/web:build: cache miss, executing b297308b364e7c57
+@jovie/web:build:
+@jovie/web:build: > @jovie/web@26.10.16 build /workspace/Jovie/apps/web
+@jovie/web:build: > node scripts/stage-runtime-data.mjs && NODE_OPTIONS=--max-old-space-size=8192 NEXT_IGNORE_TYPECHECK=1 next build --turbopack
+@jovie/web:build:
+@jovie/web:build: [stage-runtime-data] staged 5 files
+@jovie/web:build: ✓ Compiled successfully in 2.2min
+@jovie/web:build: Turbopack build encountered 6 warnings:
+@jovie/web:build: Warning: The file pattern (<dynamic> '/' <dynamic> | 'null/' <dynamic> | <dynamic> | 'null' <dynamic>) matches 25809 files in [project]/apps/web
+@jovie/web:build: Warning: The file pattern (<dynamic> '/' <dynamic> | 'null/' <dynamic> | <dynamic> | 'null' <dynamic>) matches 25809 files in [project]/apps/web
+@jovie/web:build: [33m[1m>[0m [90m220 |[0m         [36mawait[0m readFile([90m/* turbopackIgnore: true */[0m join(root, entry), [32m'utf8'[0m)
+@jovie/web:build: Warning: The file pattern (<dynamic> | <dynamic> '/.hermes/state/what_shipped.json' | <dynamic> '.hermes/state/what_shipped.json') matches 12938 files in [project]/apps/web
+@jovie/web:build: Warning: Dynamic filesystem access causes tracing of the whole project
+@jovie/web:build: - opt out by adding an ignore comment to the highlighted call: fs.readFile(/*turbopackIgnore: true*/ ...), or
+@jovie/web:build: Warning: Dynamic filesystem access causes tracing of the whole project
+@jovie/web:build: - opt out by adding an ignore comment to the highlighted call: path.join(/*turbopackIgnore: true*/ ...), or
+@jovie/web:build: Warning: Dynamic filesystem access causes tracing of the whole project
+@jovie/web:build: [33m[1m>[0m [90m220 |[0m         [36mawait[0m readFile([90m/* turbopackIgnore: true */[0m join(root, entry), [32m'utf8'[0m)
+@jovie/web:build: - opt out by adding an ignore comment to the highlighted call: path.join(/*turbopackIgnore: true*/ ...), or
+ Tasks:    1 successful, 1 total
+Cached:    0 cached, 1 total
+  Time:    2m52.631s

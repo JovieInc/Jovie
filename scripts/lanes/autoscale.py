@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Adaptive per-lane slots on the minute dispatch tick. Default mode is apply. Kill switch: SYMPHONY_AUTOSCALE=0. decide() is pure and does no I/O at import."""
 from __future__ import annotations
-import json; import math; import os; import stat; import re; import time; from datetime import datetime, timezone; from pathlib import Path; SCHEMA = "symphony-lanes-autoscale/v1"
+import json; import math; import os; import sys; import stat; import re; import time; from datetime import datetime, timezone; from pathlib import Path; SCHEMA = "symphony-lanes-autoscale/v1"; sys.path.insert(0, str(Path(__file__).resolve().parent)); import stage_timings  # noqa: E402
 # Tim 2026-10-12: no arbitrary timers. Seats follow proven demand every tick; only measured limits
 # (host load/memory/PSI/disk, provider credits and leases, GitHub quota, current failure rate on
 # this release) hold or shrink them. HOST_SETTLE_S is the measurement lag of the signal itself:
@@ -14,6 +14,17 @@ LINEAR_INCREASE_RATIO, LINEAR_DECREASE_RATIO = 0.25, 0.10; LOAD_INCREASE_MAX, LO
 PSI_CPU_OK, PSI_MEM_OK, PSI_IO_OK, PSI_CPU_SEVERE, PSI_MEM_SEVERE, PSI_IO_SEVERE = 20, 2, 10, 40, 5, 20
 DISK_INCREASE_MIN, DISK_SOFT, DISK_HARD = 15, 10, 5
 MERGE_QUEUE_WAIT_BRAKE_MIN = 30
+# Marginal yield (2026-10-28): a seat only earns another seat while recent attempts still convert to
+# pushed work. Conversion over the trailing window is the fast proxy for merged-per-attempt; below the
+# floor the lane gives one seat back per host settle instead of adding workers to failing runs.
+YIELD_WINDOW_S, YIELD_MIN_ATTEMPTS, YIELD_FLOOR = 7200, 6, 0.12
+_CONVERTED = frozenset({"pushed", "fix-pushed", "pr-opened", "landing", "decomposed"})
+_ATTEMPTED = _CONVERTED | frozenset({"failed", "fix-no-change", "provider-error", "not-shippable"})
+# WIP cap (2026-10-28): finish before starting. Above this many open PRs, new-issue intake stops; fix-red,
+# conflict and other remediation seats keep running, so inventory converges instead of piling up.
+WIP_MAX_DEFAULT, SWARM_CLAIM_STALE_S = 80, 1800
+# Hosted-runner backlog (throughput_sentinel release-flow.json): push admission pauses, remediation does not.
+CI_QUEUED_RUNS_BRAKE, CI_QUEUED_OLDEST_BRAKE_MIN, CI_SIGNAL_STALE_S = 400, 15, 900
 # A census is stamped with its source rows' age (up to 3 x 60 s cache TTLs), read on the next minute tick.
 MAINTENANCE_DEMAND_STALE_S = 240
 # A saturated lane keeps its last positive census this long (one lane agent timeout, 5400 s).
@@ -95,7 +106,9 @@ def load_config(env=None, config=None) -> dict:
         provider, parsed = str(key)[len(prefix):].strip().lower(), _from_env_or_file(env, file_vals, key)
         if provider and parsed is not None:
             maxima[provider] = parsed
-    return {"mode": mode(env, config), "max": maxima, "hostMax": _from_env_or_file(env, file_vals, "SYMPHONY_AUTOSCALE_HOST_MAX")}
+    wip = _from_env_or_file(env, file_vals, "SYMPHONY_AUTOSCALE_WIP_MAX")
+    return {"mode": mode(env, config), "max": maxima, "hostMax": _from_env_or_file(env, file_vals, "SYMPHONY_AUTOSCALE_HOST_MAX"),
+            "wipMax": WIP_MAX_DEFAULT if wip is None else wip}
 def _pressure_avg(path: Path, label: str) -> float | None:
     try:
         for line in path.read_text().splitlines():
@@ -200,7 +213,52 @@ def _failures_current(obs: dict) -> bool:
     row = _obj(obs.get("currentRunFailures"))
     failed, runs = _count(row.get("failed")), _count(row.get("runs"))
     return bool(runs) and failed is not None and failed >= FAILURE_RATE_MIN_COUNT and failed / runs >= FAILURE_RATE_MIN
-def collect(state_dir: Path, tick: dict, now: float) -> dict:
+def provider_yield(state_dir: Path, now: float) -> dict:
+    """Per provider: attempts and converted (pushed or PR opened) over the trailing window, from the
+    ledger tail. Remote-held and skipped rows are not attempts. Empty when the ledger is unreadable."""
+    try:
+        with open(Path(state_dir) / "runs" / "ledger.jsonl", "rb") as handle:
+            handle.seek(0, os.SEEK_END); size = handle.tell(); handle.seek(max(0, size - LEDGER_TAIL_BYTES))
+            lines = handle.read().decode(errors="replace").splitlines()[1 if size > LEDGER_TAIL_BYTES else 0:]
+    except OSError:
+        return {}
+    found = {}
+    for line in lines:
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        verdict, provider = (row.get("verdict"), row.get("provider")) if isinstance(row, dict) else (None, None)
+        began = _epoch(row.get("startedAt")) if isinstance(row, dict) else None
+        if verdict not in _ATTEMPTED or not isinstance(provider, str) or began is None or not 0 <= now - began <= YIELD_WINDOW_S:
+            continue
+        slot = found.setdefault(provider, {"attempts": 0, "converted": 0}); slot["attempts"] += 1; slot["converted"] += verdict in _CONVERTED
+    return found
+def _low_yield(name: str, obs: dict) -> bool:
+    row = _obj(_obj(obs.get("yieldByProvider")).get(name)); attempts, converted = _count(row.get("attempts")), _count(row.get("converted"))
+    return bool(attempts) and attempts >= YIELD_MIN_ATTEMPTS and converted is not None and converted / attempts < YIELD_FLOOR
+def swarm_claims(state_dir: Path, now: float) -> int:
+    """Fresh PR claims held by the GitHub-hosted remediation swarm (second remediation pool). The file is
+    written by the swarm claimer: {"claims": [{"pr": N, "at": epoch|iso}, ...]} or {"claims": {"N": {"at": ...}}}."""
+    claims = _obj(_read_json(Path(state_dir) / "swarm-claims.json", max_bytes=1048576)).get("claims")
+    rows = list(claims.values()) if isinstance(claims, dict) else claims if isinstance(claims, list) else []
+    return sum(1 for row in rows if (at := _epoch(_obj(row).get("at"))) is not None and 0 <= now - at <= SWARM_CLAIM_STALE_S)
+def _pctl(values: list, q: float) -> float | None:
+    values = sorted(values); return round(values[min(len(values) - 1, int(len(values) * q))], 1) if values else None
+def flow_metrics(observed: dict, yields: dict, swarm: int, wip_max: int, now: float) -> dict:
+    """Numbers Summer and Ovie read: throughput, merged-per-attempt, cycle time, WIP, backlog, burn-down ETA."""
+    merged = [row for row in (observed.get("merged24h") or []) if isinstance(row, dict)]
+    cycle = [(m - c) / 60 for row in merged if (m := _epoch(row.get("mergedAt"))) is not None and (c := _epoch(row.get("createdAt"))) is not None]
+    attempts = sum(_count(row.get("attempts")) or 0 for row in yields.values()); converted = sum(_count(row.get("converted")) or 0 for row in yields.values())
+    pool = [v for v in _obj(observed.get("eligiblePoolByProvider")).values() if isinstance(v, int)]
+    backlog = max(pool) if pool else None
+    merged_day = len(merged) if _obj(observed.get("mergedWindow")).get("complete") else None
+    return {"mergedPerDay": merged_day, "convertedPerAttempt": round(converted / attempts, 3) if attempts else None, "attempts2h": attempts,
+            "cycleMinutesP50": _pctl(cycle, .5), "cycleMinutesP95": _pctl(cycle, .95), "openPrWip": _count(observed.get("openPRCount")),
+            "wipMax": wip_max, "backlog": backlog, "swarmClaims": swarm,
+            "burnDownEtaDays": round(backlog / merged_day, 1) if backlog is not None and merged_day else None,
+            "targets": {"mergedPerDay": 100, "mergedPerAttempt": 0.6, "openPrWip": 80, "burnDownEtaDays": 14}}
+def collect(state_dir: Path, tick: dict, now: float, wip_max: int = WIP_MAX_DEFAULT) -> dict:
     """Local files only: no GitHub or Linear calls."""
     root, doctor = Path(state_dir), _obj(_read_json(Path(state_dir) / "doctor.json")); observed = _obj(doctor.get("observed"))
     stamp = _num(observed.get("now"))
@@ -234,7 +292,16 @@ def collect(state_dir: Path, tick: dict, now: float) -> dict:
         maintenance = {name: _count(_obj(row).get("pending")) for name, row in _obj(census.get("lanes")).items()
                        if (at := _num(_obj(row).get("observedAt"))) is not None and 0 <= now - at <= MAINTENANCE_DEMAND_STALE_S}
     merge = _obj(observed.get("mergeThroughput")); merge_at = _num(merge.get("observedAt"))
+    yields, swarm = provider_yield(root, now), swarm_claims(root, now)
+    flow = _obj(_read_json(root / "release-flow.json", max_bytes=65536)); flow_at = _num(flow.get("observedAt"))
+    ci_fresh = flow_at is not None and 0 <= now - flow_at <= CI_SIGNAL_STALE_S
+    quota = observed.get("quotaDeferredHeads"); quota = quota.get("value") if isinstance(quota, dict) else quota
     return {"doctorFresh": stamp is not None and 0 <= now - stamp <= STALE_S,
+            "yieldByProvider": yields, "swarmClaims": swarm, "openPRCount": _count(observed.get("openPRCount")),
+            "quotaDeferredHeads": _count(quota), "wipMax": wip_max,
+            "ciQueue": {"queuedRuns": _count(flow.get("queuedRuns")), "oldestMin": _num(flow.get("queuedOldestMin")), "fresh": ci_fresh},
+            "stageTimings": {**stage_timings.cached(root, now), "queue": _obj(_read_json(root / "queue-timings.json", max_bytes=65536))},
+            "flowMetrics": flow_metrics(observed, yields, swarm, wip_max, now),
             "eligiblePoolByProvider": _obj(observed.get("eligiblePoolByProvider")),
             "newIssueBudgetByProvider": _obj(observed.get("newIssueBudgetByProvider")),
             "maintenanceQueueByProvider": maintenance if isinstance(maintenance, dict) else {},
@@ -335,6 +402,20 @@ def _throughput_brake(previous: dict, obs: dict, now: float) -> dict:
             "heldForS": max(0, now - since) if since is not None else 0,
             "signal": {"queueDepth": depth, "queueWaitP50Minutes": wait, "mergedPerHour": merged,
                        "openedPerHour": opened, "ejectionRate": ejections}}
+def _intake_gates(obs: dict, brake: dict) -> list[str]:
+    """Push admission, not remediation fan-out: new issues become new PRs that spend CI, merge-queue and
+    GitHub quota, so they stop on WIP, CI queue wait or quota deferral. Fix-red seats are untouched."""
+    gates, wip, wip_max = [], _count(obs.get("openPRCount")), _count(obs.get("wipMax"))
+    if wip is not None and wip_max and wip > wip_max:
+        gates.append("wip-cap")
+    if "queue-wait" in (brake.get("reasons") or []):
+        gates.append("ci-queue-wait")
+    ci = _obj(obs.get("ciQueue"))
+    if ci.get("fresh") and ((_count(ci.get("queuedRuns")) or 0) >= CI_QUEUED_RUNS_BRAKE or (_num(ci.get("oldestMin")) or 0) >= CI_QUEUED_OLDEST_BRAKE_MIN):
+        gates.append("ci-runner-backlog")
+    if (_count(obs.get("quotaDeferredHeads")) or 0) > 0:
+        gates.append("github-quota-deferred")
+    return gates
 def _increase_blockers(name, obs, sample, now, running, demand) -> list[str]:
     """Only measured limits and unknown measurements. No streaks, budgets or trailing averages."""
     reason = _obj(_obj(obs.get("newIssueBudgetByProvider")).get(name)).get("reason")
@@ -352,6 +433,7 @@ def _increase_blockers(name, obs, sample, now, running, demand) -> list[str]:
         (name == "codex" and (unleased is None or unleased < 1), "codex-unleased"),
         (running is None or running < 0, "unknown-running"),
         (_failures_current(obs), "gate-pressure"),
+        (_low_yield(name, obs), "low-yield"),
         (load is None or load >= LOAD_INCREASE_MAX, "high-load"),
         (mem is None or _num(mem) is None or mem < MEM_HEADROOM_BYTES, "low-mem"),
         (psi is not None and (not _psi_known(psi) or any(psi[key] > limit for key, limit in zip(_PSI, (PSI_CPU_OK, PSI_MEM_OK, PSI_IO_OK)))), "psi-high"),
@@ -439,6 +521,8 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
         remote = name in _remote_names(config)
         lane_obs, lane_sample = (_remote_obs(obs), _REMOTE_HOST) if remote else (obs, sample)
         multi, additive = _multi_reason(name, lane_obs, lane_sample, now, changed), _additive_reason(lane_obs, lane_sample)
+        if not multi and not additive and _low_yield(name, obs):
+            additive = "low-yield"
         effective, reason, blockers, step_to = current, "hold:steady", [], None
         if multi:
             effective, reason, blockers = max(0 if current == 0 else MIN_SLOTS, math.ceil(current / 2)), multi, [multi]
@@ -505,6 +589,7 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
             intake_blockers.append("unhealthy")
         if name in set(obs.get("cooling") or []):
             intake_blockers.append("cooling")
+        intake_blockers += _intake_gates(obs, brake)
         row.update(intakeEffective=0 if intake_blockers else row["effective"], intakeBlockers=intake_blockers)
         before = _int(_obj(prev_lanes.get(name)).get("effective")); before = base if before is None else before
         if row["effective"] != before:
@@ -514,6 +599,9 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
     return {"schema": SCHEMA, "mode": config.get("mode") or "apply", "observedAt": now,
             "host": {"lastChangeAt": host_last, "ceiling": host_cap, "cpuCount": cpu}, "lanes": rows, "hostSample": host_sample,
             "throughputBrake": brake,
+            "metrics": {**_obj(obs.get("flowMetrics")), "stages": _obj(obs.get("stageTimings")),
+                        "busyTotal": {name: {"busy": row.get("running"), "total": row["effective"]} for name, row in rows.items() if row["base"] > 0}},
+            "swarm": {"claims": _count(obs.get("swarmClaims")) or 0},
             "apiBudget": {"githubRemaining": _int(obs.get("githubRemaining")), "linearRemaining": _int(obs.get("linearRemaining")),
                           "linearLimit": _int(obs.get("linearLimit")), "linearRateLimitedAt": _num(obs.get("linearRateLimitedAt")),
                           "linearBudgetFresh": obs.get("linearBudgetFresh") is True,
@@ -572,7 +660,7 @@ def host_ceiling(state_dir: Path, now: float | None = None) -> int | None:
 
 def apply_tick(state_dir, tick: dict, bases: dict, now: float | None = None, host_sample: dict | None = None, config: dict | None = None) -> dict:
     now, config = time.time() if now is None else now, config or load_config(); previous = _read_json(Path(state_dir) / "autoscale.json")
-    state = decide(previous if _valid_state(previous) else None, collect(state_dir, tick, now),
+    state = decide(previous if _valid_state(previous) else None, collect(state_dir, tick, now, _int(config.get("wipMax")) or 0),
                    sample_host() if host_sample is None else host_sample, bases, config, now)
     write_state(state_dir, state)
     return {"mode": config["mode"], "lanes": {name: {"base": row["base"], "effective": row["effective"], "intakeEffective": row["intakeEffective"], "reason": row["lastReason"]}
@@ -587,4 +675,5 @@ def public_block(state_dir) -> dict:
              for name, row in state["lanes"].items() if isinstance(row, dict)}
     history = state.get("history") if isinstance(state.get("history"), list) else []
     return {"mode": state.get("mode") or mode(), "lanes": lanes, "history": history[-10:],
-            "throughputBrake": _obj(state.get("throughputBrake"))}
+            "throughputBrake": _obj(state.get("throughputBrake")),
+            "metrics": _obj(state.get("metrics")), "swarm": _obj(state.get("swarm"))}

@@ -120,12 +120,16 @@ describe('release.prepare_launch', () => {
     const result = await prepareReleaseLaunch(input);
     expect(result).toMatchObject({
       status: 'launch_draft_ready',
-      next_action: 'review_draft',
+      next_action: 'send_user_claim_url',
       draft_id: draftId,
       receipt_id: draftId,
       ownership: 'unverified',
       published_url: null,
-      claim_url: null,
+      claim_url: expect.stringMatching(
+        new RegExp(
+          `^https://[^/]+/claim/agent/${draftId}\\?h=[A-Za-z0-9_-]{43}$`
+        )
+      ),
       acquisition: { ...row.acquisition, draft_id: draftId },
       release: {
         title: 'Signal Fire',
@@ -178,6 +182,24 @@ describe('release.prepare_launch', () => {
     expect(second).toEqual(first);
     expect(mocks.resolve).toHaveBeenCalledOnce();
     expect(mocks.store).toHaveBeenCalledOnce();
+  });
+
+  it('upgrades a launch stored before claim handoffs with a claim_url on replay', async () => {
+    const first = await prepareReleaseLaunch(input);
+    const stored = row.preview.launch as {
+      result: Record<string, unknown>;
+    };
+    stored.result = {
+      ...stored.result,
+      claim_url: null,
+      next_action: 'review_draft',
+    };
+    const replay = await prepareReleaseLaunch(input);
+    expect(replay).toMatchObject({
+      claim_url: (first as { claim_url: string }).claim_url,
+      next_action: 'send_user_claim_url',
+    });
+    expect(JSON.stringify(replay)).not.toContain(input.draft_token);
   });
 
   it('asks only for facts that remain missing', async () => {
@@ -490,5 +512,21 @@ describe('release.prepare_launch', () => {
     expect(mocks.load).not.toHaveBeenCalled();
     expect(mocks.resolve).not.toHaveBeenCalled();
     expect(mocks.store).not.toHaveBeenCalled();
+  });
+  it('explains which fields to correct on INVALID_INPUT', async () => {
+    const result = await prepareReleaseLaunch({
+      draft_id: '9efebd98-39b7-4a77-8965-04b5aafad9ad',
+      draft_token: 'private-token',
+      goal: 'Launch',
+    });
+    expect(result).toMatchObject({
+      code: 'INVALID_INPUT',
+      next_action: 'correct_input',
+      retryable: false,
+    });
+    const body = result as { message: string; fields: { message: string }[] };
+    expect(body.message).toContain('release URL, UPC, or release metadata');
+    expect(body.fields[0]!.message).toContain('release URL');
+    expect(JSON.stringify(result)).not.toContain('private-token');
   });
 });

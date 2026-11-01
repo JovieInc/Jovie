@@ -1050,47 +1050,6 @@ body {
       display: none;
     }
   }
-  /* Unique per-route hero photograph (marketing-routes-code-spec,
-     2026-09-26). Lives behind hero copy inside the existing
-     `.relative overflow-hidden` hero wrapper. The scrim guarantees
-     header + headline legibility no matter how bright the source
-     photo is; `MarketingHeroPhoto`'s `opacity` prop tunes overall
-     image strength for specific routes (/ai, /download). */
-  .marketing-hero-photo {
-    z-index: 0;
-  }
-  /* The photo is positioned; static hero copy would paint underneath it
-     (the /pricing headline rendered invisible). Lift every later sibling. */
-  .marketing-hero-photo ~ * {
-    position: relative;
-    z-index: 1;
-  }
-  .marketing-hero-photo__img {
-    object-fit: cover;
-    object-position: right center;
-  }
-  .marketing-hero-photo__scrim {
-    background:
-      linear-gradient(
-        180deg,
-        color-mix(in oklab, var(--system-b-cinematic-black) 55%, transparent),
-        transparent 18%
-      ),
-      linear-gradient(
-        90deg,
-        var(--system-b-cinematic-black) 0%,
-        color-mix(in oklab, var(--system-b-cinematic-black) 68%, transparent)
-          34%,
-        color-mix(in oklab, var(--system-b-cinematic-black) 14%, transparent)
-          62%,
-        transparent 82%
-      );
-  }
-  @media (prefers-contrast: more) {
-    .marketing-hero-photo {
-      display: none;
-    }
-  }
   /* System B marketing type (2026-10-20). One class per role, bound to the
      --ds-marketing-* ramp in design-system.css. New marketing pages use these
      instead of the retired marketing-*-linear classes or page-local clamps:
@@ -1766,6 +1725,18 @@ body {
     }
   }
 
+  /* Link's opt-in label uses the real control's font and box model. The
+     opening tag reserves its width before streamed children arrive. */
+  [data-variant="link"][data-reserved-label]::after {
+    content: attr(data-reserved-label);
+    visibility: hidden;
+    grid-area: 1 / 1;
+  }
+
+  [data-variant="link"][data-reserved-label] > span {
+    grid-area: 1 / 1;
+  }
+
   .btn-linear-login {
     background-color: transparent;
     border-color: transparent;
@@ -2143,6 +2114,49 @@ body {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
     --tw-ring-color: var(--color-focus-ring);
     --tw-ring-offset-color: var(--color-bg-page);
+  }
+
+  /* CompositeField (packages/ui/atoms/composite-field): the container owns the
+     focus ring so it follows the field's radius. Keyed to a focus-visible text
+     control (same as :focus-within while typing) so clicking an inner button
+     does not light the whole field. The inner control paints no ring of its own. */
+  /* sm keeps the shell search field's 10px inline inset (8px + 2px), on-grid. */
+  .composite-field[data-size="sm"] {
+    padding-inline: calc(var(--space-2) + var(--space-0-5, 2px));
+  }
+  .composite-field[data-surface="page"] {
+    border: 1px solid transparent;
+    background: var(--color-bg-page);
+  }
+  .composite-field[data-surface="field"] {
+    border: 1px solid var(--color-border-subtle);
+    background: var(--color-bg-surface-1);
+  }
+  .composite-field[data-surface="shell"] {
+    color: var(--color-text-primary-token);
+    border: 1px solid var(--app-shell-frame-seam);
+    background: var(--app-shell-content-surface);
+  }
+  .composite-field[data-surface="shell"]:hover {
+    background: var(--color-bg-surface-1);
+  }
+  .composite-field[data-surface="shell"]:focus-within {
+    border-color: var(--linear-border-focus);
+    background: var(--color-bg-surface-0);
+  }
+  .composite-field:has(:is(input, textarea, select):focus-visible) {
+    --tw-ring-color: var(--color-focus-ring);
+    --tw-ring-offset-color: var(--color-bg-page);
+    --tw-ring-offset-width: 2px;
+    --tw-ring-offset-shadow: 0 0 0 var(--tw-ring-offset-width)
+      var(--tw-ring-offset-color);
+    --tw-ring-shadow: 0 0 0 calc(2px + var(--tw-ring-offset-width))
+      var(--tw-ring-color);
+    box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow);
+  }
+  .composite-field :is(input, textarea, select):is(:focus, :focus-visible) {
+    outline: none;
+    box-shadow: none;
   }
 }
 

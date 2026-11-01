@@ -30,7 +30,6 @@ function customerStrings(value: unknown, out: string[] = []): string[] {
 const headlines = [
   DOWNLOAD_COPY.headline,
   DOWNLOAD_COPY.platforms.mac.title,
-  DOWNLOAD_COPY.platforms.iphone.title,
   DOWNLOAD_COPY.workflowTitle,
   DOWNLOAD_COPY.installTitle,
   DOWNLOAD_COPY.footerTitle,
@@ -63,5 +62,12 @@ describe('download copy', () => {
     expect(pageSource).toContain("from '@/data/downloadCopy'");
     expect(pageSource).not.toContain('ios-alpha');
     expect(pageSource).not.toContain('disabled');
+  });
+
+  it('lists only platforms that can be downloaded', () => {
+    expect(Object.keys(DOWNLOAD_COPY.platforms)).toEqual(['mac']);
+    expect(customerStrings(DOWNLOAD_COPY).join('\n')).not.toMatch(
+      /not a public download|not available/i
+    );
   });
 });

@@ -120,6 +120,25 @@ class FactoryStayUpWatchdogTest(unittest.TestCase):
             self.assertEqual(result["reasons"], ["factory-tick-in-progress"])
             recovery.assert_not_called()
 
+    def test_three_consecutive_admission_denied_ticks_alert_without_restart(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            streaks = []
+            for n in range(4):
+                tick = {"at": f"2026-10-30T00:0{n}:00Z", "admissionDenied": "disk-critical"}
+                streaks.append(factory_watchdog.admission_streak(state, tick))
+                factory_watchdog.admission_streak(state, tick)  # same tick observed twice counts once
+            self.assertEqual(streaks, [1, 2, 3, 4])
+            self.assertEqual(factory_watchdog.admission_streak(state, {"at": "2026-10-30T00:09:00Z"}), 0)
+        base = dict(tickEpoch=300, tickAgeSeconds=60, runningWorkers=0, admissionDenied="disk-critical",
+                    eligibleWork=4, openPullRequests=1, demandKnown=True, demand=5)
+        short = factory_watchdog.assess(factory_observation(admissionDeniedStreak=2, **base))
+        self.assertNotIn("admission-denied", short["reasons"])
+        self.assertNotIn("zero-worker", short["reasons"])
+        denied = factory_watchdog.assess(factory_observation(admissionDeniedStreak=3, **base))
+        self.assertIn("admission-denied", denied["reasons"])
+        self.assertTrue(denied["decisionRequired"])
+
     def assess_tick(self, age_s, heartbeat):
         obs = factory_observation(tickEpoch=300, tickAgeSeconds=700, runningWorkers=0,
                                   service={"active": True, "ageSeconds": age_s, "manager": "systemd"},
@@ -1711,11 +1730,19 @@ class StatusFeedTest(unittest.TestCase):
                                      "load_github_env": staticmethod(lambda: None), "graphql_budget": staticmethod(lambda: None),
                                      "provider_throughput": staticmethod(throughput_stub), "HOST": "gem"})
             codex = type("Codex", (), {"status": staticmethod(lambda: {})})
+            # Restore, never unconditionally pop: inside a release self-test the marker was
+            # already set by selftest_env, popping it here leaves every later module
+            # in the same process un-hermetic (their LANES_SELFTEST guards then open —
+            # e.g. dispatch ran macos_pool's GitHub probe and broke test_autoscale).
+            previous_selftest = os.environ.get("LANES_SELFTEST")
             os.environ["LANES_SELFTEST"] = "1"  # no open-PR read from a unit test
             try:
                 observed = doctor.observe(host, lane, codex)
             finally:
-                os.environ.pop("LANES_SELFTEST", None)
+                if previous_selftest is None:
+                    os.environ.pop("LANES_SELFTEST", None)
+                else:
+                    os.environ["LANES_SELFTEST"] = previous_selftest
             (state / "slots").mkdir()
             feed = doctor.status_feed(host, lane, observed, {}, {})
         self.assertEqual(feed["held_by_reason"], {"gate-timeout": 1, "missing-test": 1})
@@ -1743,12 +1770,16 @@ class StatusFeedTest(unittest.TestCase):
                                      "load_github_env": staticmethod(lambda: None), "graphql_budget": staticmethod(lambda: None),
                                      "provider_throughput": staticmethod(throughput_stub), "HOST": "gem"})
             codex = type("Codex", (), {"status": staticmethod(lambda: {})})
+            previous_selftest = os.environ.get("LANES_SELFTEST")
             os.environ["LANES_SELFTEST"] = "1"  # no open-PR read from a unit test
             try:
                 observed = doctor.observe(host, lane, codex, now=now)
                 feed = doctor.status_feed(host, lane, observed, {}, {})
             finally:
-                os.environ.pop("LANES_SELFTEST", None)
+                if previous_selftest is None:
+                    os.environ.pop("LANES_SELFTEST", None)
+                else:
+                    os.environ["LANES_SELFTEST"] = previous_selftest
         self.assertEqual(observed["gateWaits24h"], 2)
         self.assertEqual(observed["noWorkRepairs24h"], {"preserved-head-superseded": 1, "worktree-unavailable": 1})
         self.assertEqual(observed["gateWaitMedianS24h"], 210)
@@ -2683,6 +2714,45 @@ class DeliveryTest(unittest.TestCase):
         self.assertEqual(receipt["terminalOutcome"], "merge-proven")
         self.assertEqual(receipt["recoveryEvidence"]["lastDeliveredMerge"]["runId"], "gem-codex-repair")
 
+    def test_positive_exact_head_observation_can_resolve_without_population_certainty(self):
+        first = self.observation()
+        events, alerts = self.evaluate(first, {"deliveryDemandSince": 990000})
+        prior = {"alerts": alerts, "conditions": events, "deliveryDemandSince": 990000}
+        now = first["now"] + 60
+        row = {**self.merge(mergedAt=doctor.epoch_iso(now - 1)), "title": "repair",
+               "headRefName": "fix/work", "baseRefName": "main",
+               "createdAt": doctor.epoch_iso(980000), "updatedAt": doctor.epoch_iso(now - 1)}
+        evidence = doctor.merge_evidence.collect("JovieInc/Jovie", now - 86400, now,
+            fetch_page=lambda lo, hi: {"issueCount": 1, "nodes": [row]})
+        observed = self.observation(now=now, _allReceipts=[self.coding()], merged24h=evidence["prs"],
+            mergedWindow={k: v for k, v in evidence.items() if k != "prs"},
+            mergedAttributionError="merged-pr-evidence:" + doctor.merge_evidence.SEARCH_COVERAGE_REASON)
+        resolved, _ = self.evaluate(observed, prior)
+        self.assertFalse(observed["delivery"]["mergeEvidenceComplete"])
+        self.assertEqual(observed["delivery"]["state"], "unknown")
+        self.assertEqual(resolved["delivery-stalled"]["terminalOutcome"], "merge-proven")
+        self.assertEqual(resolved["delivery-stalled"]["recoveryEvidence"]["lastDeliveredMerge"]["headSha"], self.HEAD)
+        self.assertIsNone(observed["delivery"]["deployedVerification"])
+        # No missing event or unrelated/stale/malformed observation authorizes recovery.
+        for mutation in ("wrong-head", "wrong-repository", "stale", "unfinished", "missing-witness", "contradictory-witness"):
+            candidate = json.loads(json.dumps(observed))
+            if mutation == "wrong-head":
+                candidate["merged24h"][0]["headRefOid"] = "d" * 40
+            elif mutation == "wrong-repository":
+                candidate["mergedWindow"]["source"]["repository"] = "JovieInc/LogYourBody"
+            elif mutation == "stale":
+                candidate["now"] += 4000
+            elif mutation == "unfinished":
+                candidate["mergedWindow"]["providerEnumerationComplete"] = False
+            elif mutation == "contradictory-witness":
+                candidate["mergedWindow"]["enumeratedSlices"][0].update(providerCount=0, returnedCount=0)
+            else:
+                candidate["mergedWindow"]["enumeratedSlices"] = []
+            with self.subTest(mutation=mutation):
+                carried, _ = self.evaluate(candidate, prior)
+                self.assertEqual(carried["delivery-stalled"]["state"], "active")
+                self.assertIsNone(candidate["delivery"]["lastDeliveredMerge"])
+
     def test_unknown_drain_cannot_resolve_an_alarm(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = Path(tmp)
@@ -2880,6 +2950,229 @@ class DoctorLockTest(unittest.TestCase):
         self.assertTrue(opened[0].closed)
 
 
+class SearchPopulationCoverageTest(unittest.TestCase):
+    """Search can omit a known merge even when issueCount equals returned rows."""
+    START = doctor.merge_evidence._epoch("2026-10-26T14:30:00Z")
+    END = doctor.merge_evidence._epoch("2026-10-27T00:23:00Z")
+
+    def row(self, number=23424):
+        return {"number": number, "title": "observed merge", "headRefName": "fix/example",
+                "baseRefName": "main", "createdAt": "2026-10-25T00:00:00Z",
+                "updatedAt": "2026-10-27T00:20:32Z", "mergedAt": "2026-10-27T00:20:32Z",
+                "headRefOid": "a" * 40, "mergeCommit": {"oid": "b" * 40}}
+
+    def evidence(self, rows):
+        return doctor.merge_evidence.collect("JovieInc/Jovie", self.START, self.END,
+            fetch_page=lambda lo, hi: {"issueCount": len(rows), "nodes": rows})
+
+    def test_sparse_origin_emitter_does_not_import_the_merge_reader(self):
+        # Existing automation checkouts copy only these two files. Reporting's
+        # optional merge reader must not expand the origin emitter dependency set.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for relative in ("scripts/shipping_origin.py", "scripts/lanes/shipping_attribution.py"):
+                target = root / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes((ROOT / relative).read_bytes())
+            result = subprocess.run([sys.executable, "scripts/shipping_origin.py", "--help"],
+                cwd=root, text=True, capture_output=True, timeout=10,
+                env={**os.environ, "PYTHONPATH": ""})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("emit-automation", result.stdout)
+
+    def test_observe_preserves_events_while_propagating_unknown_population(self):
+        evidence = self.evidence([self.row()])
+        lane = SimpleNamespace(REPO_SLUG="JovieInc/Jovie", HOST="test",
+            Linear=mock.Mock(side_effect=OSError("offline")), load_github_env=lambda: None,
+            graphql_budget=lambda: (4000,), provider_throughput=throughput_stub)
+        with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.dict(os.environ, {"LANES_SELFTEST": ""}), \
+                mock.patch.object(doctor, "host_capacity", return_value={}), \
+                mock.patch.object(doctor, "qualified_pool", side_effect=OSError("offline")), \
+                mock.patch.object(doctor.merge_evidence, "collect_shared", return_value=evidence) as collect, \
+                mock.patch.object(doctor.shipping_attribution, "PROJECTS", [{"repository": lane.REPO_SLUG}]), \
+                mock.patch.object(doctor, "sample_merge_throughput", return_value=(None, "unavailable")), \
+                mock.patch.object(doctor, "sample_quota_deferred_heads", return_value=(None, "unavailable")), \
+                mock.patch.object(doctor, "sample_quota_drain", return_value=(None, "unavailable")), \
+                mock.patch.object(doctor, "open_pr_numbers", return_value=None), \
+                mock.patch.object(doctor, "automation_observation", return_value={}), \
+                mock.patch.object(doctor.fleet_ledger, "record_ready"), \
+                mock.patch.object(doctor.deploy_health, "sample", return_value=(None, None)), \
+                mock.patch.object(doctor.throughput_sentinel, "observe", return_value={}):
+            host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "absent")
+            observed = doctor.observe(host, lane, SimpleNamespace(status=lambda: {}), now=self.END)
+        collect.assert_called_once()
+        self.assertEqual(observed["merged24h"], [self.row()])
+        self.assertEqual(observed["mergedAttributionError"], "merged-pr-evidence:" + evidence["reason"])
+        self.assertFalse(observed["mergedWindow"]["complete"])
+        self.assertIsNone(observed["mergedWindow"]["populationCount"])
+        self.assertEqual(observed["_mergeEvidenceByRepository"][lane.REPO_SLUG], evidence)
+
+    def test_known_22413_omission_cannot_certify_a_population(self):
+        # Exact GET: #22413 merged at 23:21:28, SHA 828288651b830f7514aaeee4f7fa4622acf63e14.
+        # Search omitted it with a matching count and no pagination remaining.
+        direct_merged_at = doctor.merge_evidence._epoch("2026-10-26T23:21:28Z")
+        self.assertTrue(self.START <= direct_merged_at < self.END)
+        evidence = self.evidence([self.row()])
+        self.assertFalse(evidence["complete"])
+        self.assertTrue(evidence["providerEnumerationComplete"])
+        self.assertEqual(evidence["populationCoverage"], "unknown")
+        self.assertIsNone(evidence["populationCount"])
+        self.assertEqual(evidence["observedCount"], 1)
+        self.assertEqual([r["number"] for r in evidence["prs"]], [23424])
+        with self.assertRaises(doctor.merge_evidence.IncompleteMergeEvidence):
+            doctor.merge_evidence.require_complete(evidence)
+
+    def test_empty_search_is_zero_observations_not_zero_population(self):
+        evidence = self.evidence([])
+        self.assertFalse(evidence["complete"])
+        self.assertTrue(evidence["providerEnumerationComplete"])
+        self.assertEqual(evidence["observedCount"], 0)
+        self.assertIsNone(evidence["populationCount"])
+
+    def test_legacy_complete_cache_does_not_resurrect_the_false_claim(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "merge-window.json"
+            legacy = {"complete": True, "reason": None, "prs": [self.row()],
+                      "window": {"since": self.START, "until": self.END}}
+            cache.write_text(json.dumps({"repository": "JovieInc/Jovie", "evidence": legacy}))
+            fetch = mock.Mock(return_value=self.evidence([self.row()]))
+            result = doctor.merge_evidence.collect_shared("JovieInc/Jovie", self.START,
+                self.END + 10, cache, collect_fn=fetch)
+            fetch.assert_called_once()
+            self.assertFalse(result["complete"])
+
+    def test_attribution_keeps_observed_events_without_an_exact_denominator(self):
+        evidence = self.evidence([self.row()])
+        report = doctor.shipping_attribution.project_report(
+            {"channel": "Jovie", "repository": "JovieInc/Jovie", "instrumented": True},
+            evidence, {"complete": True, "rows": []}, self.END)
+        self.assertFalse(report["denominatorComplete"])
+        self.assertIsNone(report["mergeCount"])
+        self.assertIsNone(report["coverage"])
+        self.assertEqual(report["observedMergeCount"], 1)
+        self.assertEqual([r["prNumber"] for r in report["pullRequests"]], [23424])
+
+    def test_invalid_cached_rows_or_slice_witnesses_are_not_reused(self):
+        for mutation in ("outside-window", "duplicate", "bad-time", "slice-gap", "slice-count"):
+            stale = self.evidence([self.row()])
+            if mutation == "outside-window":
+                stale["prs"][0]["mergedAt"] = "2026-10-26T14:29:59Z"
+            elif mutation == "duplicate":
+                stale["prs"].append(dict(stale["prs"][0])); stale["observedCount"] = 2
+            elif mutation == "bad-time":
+                stale["prs"][0]["mergedAt"] = "not-a-time"
+            elif mutation == "slice-gap":
+                stale["enumeratedSlices"][0]["sinceInclusive"] += 1
+            else:
+                stale["enumeratedSlices"][0]["providerCount"] += 1
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as tmp:
+                cache = Path(tmp) / "merge-window.json"
+                cache.write_text(json.dumps({"repository": "JovieInc/Jovie", "evidence": stale}))
+                fetch = mock.Mock(return_value=self.evidence([]))
+                result = doctor.merge_evidence.collect_shared("JovieInc/Jovie", self.START,
+                    self.END + 10, cache, collect_fn=fetch)
+                fetch.assert_called_once()
+                self.assertFalse(result["complete"])
+
+    def test_observed_events_survive_a_later_page_failure_without_a_total(self):
+        calls = []
+        def fetch(lo, hi):
+            calls.append((lo, hi))
+            if len(calls) == 1:
+                return {"issueCount": 101, "nodes": []}
+            if len(calls) == 2:
+                return {"issueCount": 1, "nodes": [self.row()]}
+            raise OSError("offline")
+        result = doctor.merge_evidence.collect("JovieInc/Jovie", self.START, self.END, fetch_page=fetch)
+        self.assertFalse(result["complete"])
+        self.assertFalse(result["providerEnumerationComplete"])
+        self.assertEqual(result["reason"], "fetch_failed")
+        self.assertEqual(result["observedCount"], 1)
+        self.assertEqual(result["prs"], [self.row()])
+        self.assertIsNone(result["populationCount"])
+
+    def test_retained_events_cannot_exceed_their_slice_witness(self):
+        evidence = self.evidence([self.row()])
+        # The overall returned count can still match: a different slice must not
+        # lend its witness count to the slice containing the retained event.
+        split = int(self.START + 3600)
+        evidence["enumeratedSlices"] = [
+            {"sinceInclusive": int(self.START), "untilInclusive": split, "providerCount": 1, "returnedCount": 1},
+            {"sinceInclusive": split + 1, "untilInclusive": int(self.END), "providerCount": 0, "returnedCount": 0}]
+        self.assertFalse(doctor.merge_evidence.search_observations(evidence, "JovieInc/Jovie"))
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "merge-window.json"
+            cache.write_text(json.dumps({"repository": "JovieInc/Jovie", "evidence": evidence}))
+            fetch = mock.Mock(return_value=self.evidence([]))
+            doctor.merge_evidence.collect_shared("JovieInc/Jovie", self.START, self.END + 1,
+                                                 cache, collect_fn=fetch)
+            fetch.assert_called_once()
+
+    def test_rows_outside_the_returned_search_slice_are_rejected(self):
+        result = doctor.merge_evidence.collect("JovieInc/Jovie", self.START, self.START + 10,
+            fetch_page=lambda lo, hi: {"issueCount": 1, "nodes": [self.row()]})
+        self.assertFalse(result["providerEnumerationComplete"])
+        self.assertEqual(result["reason"], "malformed_pr")
+        self.assertEqual(result["observedCount"], 0)
+
+    def test_real_shared_reader_reuses_honest_coverage_without_extra_requests(self):
+        response = SimpleNamespace(returncode=0, stdout=json.dumps({"data": {
+            "search": {"issueCount": 1, "nodes": [self.row()]}}}))
+        with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.object(doctor.merge_evidence.subprocess, "run", return_value=response) as run:
+            cache = Path(tmp) / "merge-window.json"
+            first = doctor.merge_evidence.collect_shared("JovieInc/Jovie", self.START, self.END, cache)
+            second = doctor.merge_evidence.collect_shared("JovieInc/Jovie", self.START + 1,
+                                                          self.END + 60, cache)
+            self.assertEqual(run.call_count, 1, "unknown population does not disable the existing five-minute cache")
+            self.assertFalse(second["complete"])
+            self.assertEqual(second["source"], first["source"])
+            self.assertEqual(second["window"]["until"], self.END, "cache read cannot renew source time")
+            doctor.merge_evidence.collect_shared("JovieInc/Jovie", self.START,
+                self.END + doctor.merge_evidence.SHARED_TTL_S, cache)
+            self.assertEqual(run.call_count, 2, "expiry triggers one bounded refresh, not a new retry loop")
+            for call in run.call_args_list:
+                self.assertEqual(call.args[0][:3], ["gh", "api", "graphql"])
+                self.assertGreater(call.kwargs["timeout"], 0)
+                self.assertLessEqual(call.kwargs["timeout"], 60)
+
+    def test_fractional_adjacent_windows_filter_exactly_without_double_counting(self):
+        rows = [{**self.row(n), "createdAt": doctor.epoch_iso(90),
+                 "mergedAt": doctor.epoch_iso(n), "updatedAt": doctor.epoch_iso(n)}
+                for n in range(100, 105)]
+        def fetch(lo, hi):
+            hits = [r for r in rows if lo <= doctor.merge_evidence._epoch(r["mergedAt"]) <= hi]
+            return {"issueCount": len(hits), "nodes": hits}
+        first = doctor.merge_evidence.collect("JovieInc/Jovie", 100.5, 102.5, fetch_page=fetch)
+        second = doctor.merge_evidence.collect("JovieInc/Jovie", 102.5, 104.0, fetch_page=fetch)
+        self.assertEqual([r["number"] for r in first["prs"]], [101, 102])
+        self.assertEqual([r["number"] for r in second["prs"]], [103])
+        self.assertEqual(first["window"], {"since": 100.5, "until": 102.5})
+        self.assertTrue(first["providerEnumerationComplete"])
+        self.assertFalse(first["complete"])
+        self.assertIsNone(second["populationCount"])
+
+    def test_status_feed_preserves_zero_observations_as_unknown_totals(self):
+        evidence = self.evidence([])
+        observed = obs(mergedAttributionError="merged-pr-evidence:" + evidence["reason"],
+            mergedWindow={k: v for k, v in evidence.items() if k != "prs"},
+            _mergeEvidenceByRepository={"JovieInc/Jovie": evidence},
+            _ledgerEvidence={"complete": True, "rows": []})
+        lane = SimpleNamespace(HOST="gem", provider_throughput=lambda *a, **k: {
+            "providers": {"codex": {"landedOutput": 0, "issueToMergeSecondsP50": 0}},
+            "landedByAttribution": {}, "landedByOrigin": {}})
+        with tempfile.TemporaryDirectory() as tmp:
+            feed = doctor.status_feed(SimpleNamespace(state=Path(tmp)), lane, observed, {}, {})
+        self.assertEqual(feed["mergedWindow"]["observedCount"], 0)
+        self.assertIsNone(feed["mergedWindow"]["populationCount"])
+        self.assertIsNone(feed["throughput"]["providers"]["codex"]["landedOutput"])
+        project = feed["shippingAttribution"]["projects"][0]
+        self.assertEqual(project["observedMergeCount"], 0)
+        self.assertIsNone(project["mergeCount"])
+        self.assertFalse(project["denominatorComplete"])
+
+
 class MergeWindowTest(unittest.TestCase):
     NOW = 1_800_000_000
 
@@ -2903,16 +3196,18 @@ class MergeWindowTest(unittest.TestCase):
     def test_more_than_100_and_exact_half_open_boundaries(self):
         rows = [self.row(i + 1, i) for i in range(206)]
         result = self.collect(self.pages(rows))
-        self.assertTrue(result["complete"])
+        self.assertTrue(result["providerEnumerationComplete"])
+        self.assertFalse(result["complete"])
         self.assertGreater(result["pages"], 1, "a window over one page is split, never paged by cursor")
         self.assertEqual([r["number"] for r in result["prs"]], list(range(2, 202)))
 
-    def test_lagging_updated_order_no_longer_makes_the_window_unknown(self):
+    def test_lagging_updated_order_does_not_lose_search_observations(self):
         # 2026-10-13: the connection listed #21435 (22:41Z) ahead of #21430 (23:19Z).
         late = self.row(2, 5)
         late["updatedAt"] = doctor.epoch_iso(self.NOW - 1)
         result = self.collect(self.pages([self.row(1, 3), late, self.row(3, 1)]))
-        self.assertTrue(result["complete"])
+        self.assertTrue(result["providerEnumerationComplete"])
+        self.assertFalse(result["complete"])
         self.assertEqual([r["number"] for r in result["prs"]], [1, 2, 3])
 
     def test_old_merge_updated_recently_does_not_count(self):
@@ -2944,7 +3239,7 @@ class MergeWindowTest(unittest.TestCase):
     def test_page_limit(self):
         source = self.pages([self.row(i + 1, i + 1) for i in range(102)])
         self.assertEqual(self.collect(source, max_pages=1)["reason"], "max_pages_reached")
-        self.assertTrue(self.collect(source)["complete"])
+        self.assertTrue(self.collect(source)["providerEnumerationComplete"])
 
     def test_read_failure_deadline_and_invalid_options(self):
         with mock.patch.object(doctor.merge_evidence.subprocess, "run", side_effect=OSError("offline")):
@@ -2966,7 +3261,8 @@ class MergeWindowTest(unittest.TestCase):
             return SimpleNamespace(returncode=0, stdout=json.dumps({"data": {"search": page}}))
         with mock.patch.object(doctor.merge_evidence.subprocess, "run", side_effect=run):
             result = doctor.merge_evidence.collect("JovieInc/Jovie", self.NOW - 200, self.NOW)
-        self.assertTrue(result["complete"])
+        self.assertTrue(result["providerEnumerationComplete"])
+        self.assertFalse(result["complete"])
         self.assertEqual(len(result["prs"]), 120)
         self.assertEqual(result["pages"], len(calls))
         self.assertGreater(len(calls), 1)
@@ -3007,11 +3303,9 @@ class MergeWindowTest(unittest.TestCase):
         bad["updatedAt"] = doctor.epoch_iso(self.NOW - 2)
         self.assertEqual(self.collect(self.pages([bad]))["reason"], "malformed_pr")
 
-    def test_shared_reader_reuses_one_complete_read_within_ttl(self):
+    def test_shared_reader_reuses_provider_enumeration_without_claiming_population(self):
         rows = [self.row(1, 50), self.row(2, 150)]
-        collect = mock.Mock(return_value={"schema": "jovie-merge-window/v1", "complete": True, "reason": None,
-                                          "window": {"since": self.NOW - 200, "until": self.NOW},
-                                          "pages": 1, "scans": 2, "prs": rows})
+        collect = mock.Mock(return_value=self.collect(self.pages(rows)))
         shared = doctor.merge_evidence.collect_shared
         with tempfile.TemporaryDirectory() as tmp:
             cache = Path(tmp) / "merge-window.json"
@@ -3022,7 +3316,10 @@ class MergeWindowTest(unittest.TestCase):
             # The reused read keeps its own `until` and only the rows inside the new `since`.
             self.assertEqual(later["window"], {"since": self.NOW - 100, "until": self.NOW})
             self.assertEqual([r["number"] for r in later["prs"]], [1])
-            self.assertTrue(later["complete"])
+            self.assertFalse(later["complete"])
+            self.assertTrue(later["providerEnumerationComplete"])
+            self.assertEqual(later["observedCount"], 1)
+            self.assertIsNone(later["populationCount"])
             shared("JovieInc/Jovie", self.NOW - 200, self.NOW + 300, cache, collect_fn=collect)
             self.assertEqual(collect.call_count, 2)
             shared("JovieInc/Other", self.NOW - 200, self.NOW + 300, cache, collect_fn=collect)

@@ -491,6 +491,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
   it('registers every founder cockpit route for changed-surface certification', () => {
     const sources = [
       'apps/web/app/app/(shell)/admin/activity/page.tsx',
+      'apps/web/app/app/(shell)/admin/activity/loading.tsx',
       'apps/web/app/app/(shell)/admin/growth/page.tsx',
       'apps/web/app/app/(shell)/admin/operations/page.tsx',
       'apps/web/app/app/(shell)/admin/product/page.tsx',
@@ -506,7 +507,21 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       sources,
       viewports: ['desktop', 'mobile'],
     });
-    for (const source of sources) assert.equal(kindOf(source), 'registered');
+    for (const source of sources) {
+      assert.equal(kindOf(source), 'registered');
+      const result = evaluateChangedScreens({
+        changedFiles: [{ path: source, status: 'M' }],
+        headSha: HEAD,
+      });
+      assert.deepEqual(result.issues, []);
+      assert.deepEqual(result.changedScreens, [
+        {
+          id: 'web.ov-founder-cockpit',
+          verdict: 'evidence-required',
+          findings: [],
+        },
+      ]);
+    }
   });
 
   it('registers the public artists directory for changed-surface certification', () => {
@@ -1783,10 +1798,8 @@ if (p.endsWith('/zip')) {
         producerRunAttempt: 3,
         producerJobId: 99,
         environment: 'local-production-build',
-        sourcePaths: [
-          'apps/web/app/(home)/page.tsx',
-          'apps/web/app/(home)/layout.tsx',
-        ],
+        // The producer emits the registered screen sources (screen-proof-emit).
+        sourcePaths: [...home().sources],
         capturedAt: iso(-60_000),
         artifactDigest: `sha256:${'0'.repeat(64)}`,
         activeFlow: { disclosure: false },
@@ -2354,10 +2367,8 @@ if (p.endsWith('/zip')) {
         producerRunAttempt: 3,
         producerJobId: 99,
         environment: 'local-production-build',
-        sourcePaths: [
-          'apps/web/app/(home)/page.tsx',
-          'apps/web/app/(home)/layout.tsx',
-        ],
+        // The producer emits the registered screen sources (screen-proof-emit).
+        sourcePaths: [...home().sources],
         capturedAt: iso(-60_000),
         artifactDigest: `sha256:${'0'.repeat(64)}`,
         activeFlow: { disclosure: false },
@@ -2664,10 +2675,7 @@ if (p.endsWith('/zip')) {
         context: {
           headSha: head,
           screenId: 'web.homepage',
-          sourcePaths: [
-            'apps/web/app/(home)/page.tsx',
-            'apps/web/app/(home)/layout.tsx',
-          ],
+          sourcePaths: [...home().sources],
           viewports: home().viewports,
           marketingRoute: '/',
         },

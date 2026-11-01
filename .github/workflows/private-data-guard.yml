@@ -7,8 +7,9 @@ name: Private Data Guard
 
 on:
   pull_request:
+  merge_group:
   push:
-    branches: [main]
+    branches: [main, master]
 
 permissions: {}
 
@@ -32,6 +33,13 @@ jobs:
         ^ops/registry/third-party-grants\.jsonl$
         ^docs/marcdoc/investor-memo
         ^docs/screenshots/pitch-v1/
+        ^apps/web/content/investors/
+        ^apps/web/assets/investor-deck/
+        ^docs/company/pricing-trends-summary\.md$
       extra-content-patterns: |
         "senderId"\s*:
         "tokenBinding"\s*:
+        under three months of\s+runway
+        \$0\.12 per successfully delivered
+        30-Day \$5k MRR Plan
+        Self-Guided\*\*\s*\|\s*\$79

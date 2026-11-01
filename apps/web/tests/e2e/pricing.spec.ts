@@ -120,7 +120,7 @@ test.describe('Pricing Page', () => {
       'Self-serve'
     );
     await expect(page.getByTestId('marketing-pricing-plan-pro')).toContainText(
-      'Claim your profile'
+      'Start Artist Presence, $12/mo'
     );
     await expect(
       page.getByTestId('marketing-pricing-plan-enterprise')
@@ -213,10 +213,18 @@ test.describe('Pricing Page', () => {
           ).toContainText('$0');
           await expect(
             table
-              .getByRole('rowheader', { name: 'Contact / subscriber capture' })
+              .getByRole('rowheader', { name: 'Audience email capture' })
               .locator('..')
               .getByRole('cell')
-          ).toHaveText('Up to 100');
+          ).toHaveText('Unlimited');
+          await expect(
+            table
+              .getByRole('rowheader', {
+                name: 'Release notifications (email to your audience)',
+              })
+              .locator('..')
+              .getByRole('cell')
+          ).toHaveText('Not included');
           await assertReadableCells();
           await selector.focus();
           await selector.press('a');
@@ -227,10 +235,18 @@ test.describe('Pricing Page', () => {
           ).toContainText('$12/mo');
           await expect(
             table
-              .getByRole('rowheader', { name: 'Contact / subscriber capture' })
+              .getByRole('rowheader', { name: 'Audience email capture' })
               .locator('..')
               .getByRole('cell')
           ).toHaveText('Unlimited');
+          await expect(
+            table
+              .getByRole('rowheader', {
+                name: 'Release notifications (email to your audience)',
+              })
+              .locator('..')
+              .getByRole('cell')
+          ).toHaveText('Included');
           await assertReadableCells();
           await selector.press('Tab');
           await expect(page.locator(':focus')).toHaveText(
@@ -246,10 +262,18 @@ test.describe('Pricing Page', () => {
           ).toContainText('$0');
           await expect(
             table
-              .getByRole('rowheader', { name: 'Contact / subscriber capture' })
+              .getByRole('rowheader', { name: 'Audience email capture' })
               .locator('..')
               .getByRole('cell')
-          ).toHaveText('Up to 100');
+          ).toHaveText('Unlimited');
+          await expect(
+            table
+              .getByRole('rowheader', {
+                name: 'Release notifications (email to your audience)',
+              })
+              .locator('..')
+              .getByRole('cell')
+          ).toHaveText('Not included');
           await assertReadableCells();
           await selector.press('Tab');
           await expect(page.locator(':focus')).toHaveText(
@@ -265,10 +289,18 @@ test.describe('Pricing Page', () => {
           ).toContainText('$12/mo');
           await expect(
             table
-              .getByRole('rowheader', { name: 'Contact / subscriber capture' })
+              .getByRole('rowheader', { name: 'Audience email capture' })
               .locator('..')
               .getByRole('cell')
           ).toHaveText('Unlimited');
+          await expect(
+            table
+              .getByRole('rowheader', {
+                name: 'Release notifications (email to your audience)',
+              })
+              .locator('..')
+              .getByRole('cell')
+          ).toHaveText('Included');
           await selector.press('Tab');
           await expect(selector).not.toBeFocused();
           await expect(page.locator(':focus')).toHaveText(
@@ -358,7 +390,7 @@ test.describe('Pricing Page', () => {
     await expect(freeTierCta).toHaveAttribute('href', /\/signup\?plan=free/);
     await expect(
       page.getByTestId('marketing-pricing-plan-pro').getByRole('link', {
-        name: 'Claim your profile',
+        name: 'Start Artist Presence, $12/mo',
       })
     ).toHaveAttribute('href', '/claim?plan=pro');
     await expect(

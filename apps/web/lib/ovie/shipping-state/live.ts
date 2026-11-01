@@ -8,7 +8,10 @@ import {
   type DeliveryMergeRepo,
   type DeployHealth,
   type DeployHealthRepo,
+  type DeployLag,
   isExactSha,
+  LANE_BRANCH_PREFIXES,
+  LANE_BRANCH_RE,
   measuredCount,
   NOT_MEASURED_COUNT,
   type PipelineTiming,
@@ -49,7 +52,7 @@ export const NAMED_AUTHORITY_URLS = {
  */
 export const SOURCE_CACHE_TTL_MS = {
   'lanes-status': 10_000,
-  'lane-pull-requests': 15_000,
+  'lane-pull-requests': 30_000,
   'github-merges': 60_000,
   'live-build-info': 30_000,
   'staging-build-info': 30_000,
@@ -60,9 +63,7 @@ const PUBLIC_SOURCE_TIMEOUT_MS = 3_000;
 const GITHUB_TIMEOUT_MS = 2_500;
 /** Search with `mergeable` computes merge state per PR; it runs ~2.5s. */
 const LANE_SEARCH_TIMEOUT_MS = 6_000;
-const LANE_BRANCH_PREFIXES = ['devin', 'codex'] as const;
 const LANES_STATUS_SCHEMA = 'symphony-lanes-status/v1';
-const LANE_BRANCH_RE = /^(?:devin|codex)\//;
 const DAY_MS = 24 * 60 * 60_000;
 
 const MERGE_QUEUE_QUERY =
@@ -976,10 +977,28 @@ export function parseDeployHealth(value: unknown): DeployHealth | null {
       lastSuccessAt: parseTimestamp(row.lastSuccessAt),
     });
   }
+  const lag: DeployLag[] = [];
+  if (isRecord(value.lag)) {
+    const minutes = (raw: unknown) =>
+      typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? raw : null;
+    for (const [name, row] of Object.entries(value.lag).slice(0, 8)) {
+      if (!/^[\w.-]{1,48}\/[\w.-]{1,48}$/.test(name) || !isRecord(row))
+        continue;
+      lag.push({
+        repo: name,
+        p50Min: minutes(row.p50Min),
+        p95Min: minutes(row.p95Min),
+        samples: nullableInt(row.n) ?? 0,
+        targetP50Min: minutes(row.targetP50Min),
+        targetP95Min: minutes(row.targetP95Min),
+      });
+    }
+  }
   return {
     observedAt: parseTimestamp(value.observedAt),
     healthy: value.healthy,
     repos,
+    lag,
   };
 }
 
@@ -1221,7 +1240,7 @@ function laneChecksSummary(node: Record<string, unknown>): {
 }
 
 /**
- * Open lane PRs (`devin/`, `codex/` heads) via one search request per poll.
+ * Open lane PRs (every prefix in LANE_BRANCH_PREFIXES) via one search per lane.
  * Dependabot and human branches are excluded by construction.
  */
 export async function readLanePullRequests(io: LiveIo): Promise<AuthorityRead> {
@@ -1241,6 +1260,7 @@ export async function readLanePullRequests(io: LiveIo): Promise<AuthorityRead> {
       )
     );
     const pullRequests: Record<string, unknown>[] = [];
+    const seenNumbers = new Set<number>();
     let truncated = false;
     let firstFailure: AuthorityRead | null = null;
     let succeeded = 0;
@@ -1275,6 +1295,9 @@ export async function readLanePullRequests(io: LiveIo): Promise<AuthorityRead> {
         }
         // Search matches `head:` loosely; the branch prefix is the contract.
         if (!LANE_BRANCH_RE.test(node.headRefName)) continue;
+        // A PR belongs to exactly one lane; never count it twice across searches.
+        if (seenNumbers.has(node.number as number)) continue;
+        seenNumbers.add(node.number as number);
         const queueEntry = isRecord(node.mergeQueueEntry)
           ? node.mergeQueueEntry
           : null;

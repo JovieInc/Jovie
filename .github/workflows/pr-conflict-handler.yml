@@ -642,6 +642,7 @@ jobs:
                   "Attempt: $ATTEMPT/$MAX_ATTEMPTS" \
                   "Conflicting files: $(jq -r 'join(", ")' <<<"$conflict_files")" \
                   'Preserve the objective behavior of both sides and add only directly required tests.' \
+                  "For navigation registries, retain base-added destinations, preserve the PR's explicit retirements, and keep current base labels unless the PR intentionally changes them. Reconcile desktop and mobile navigation and their tests against the combined registry, including active routes and deep links." \
                   'Do not commit, push, edit controller policy, weaken tests, add a hold, change PR state, or access credentials.' \
                   'Terminal, network, MCP, deletion, rename, and non-conflict edits are denied by trusted profile policy.' \
                   'Subjective taste is not a shipping gate; leave optional taste changes for a separate follow-up.' \

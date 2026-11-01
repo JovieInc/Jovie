@@ -1326,4 +1326,27 @@ class ExecutionAttemptCliLifecycleTest(unittest.TestCase):
         finally:
             os.close(fd)
 
+
+
+class TornTailTest(unittest.TestCase):
+    def test_torn_final_line_is_dropped_and_next_append_is_clean(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "attempts.jsonl"
+            good = {"schema": attempt.SCHEMA, "identityDigest": "a"}
+            path.write_text(json.dumps(good) + "\n" + '{"schema": "jovie-execution-attempt/v1", "iden')
+            self.assertEqual(attempt._rows(path), [good])
+            attempt._file_locked(path, lambda rows: (None, [{**good, "identityDigest": "b"}]))
+            self.assertEqual([r["identityDigest"] for r in attempt._rows(path)], ["a", "b"])
+            self.assertEqual(len(path.read_text().splitlines()), 2)
+
+    def test_interior_corruption_still_raises(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "attempts.jsonl"
+            path.write_text('{"bad\n{"schema": "x"}\n')
+            with self.assertRaises(json.JSONDecodeError):
+                attempt._rows(path)
+
+
 if __name__ == "__main__": unittest.main()

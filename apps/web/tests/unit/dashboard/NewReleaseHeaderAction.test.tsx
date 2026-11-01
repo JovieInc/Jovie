@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { NewReleaseHeaderAction } from '@/features/dashboard/organisms/release-provider-matrix/NewReleaseHeaderAction';
 
+let lastSelectEvent: Event | null = null;
+
 // Radix portals its content by default; flatten the primitives for testing.
 vi.mock('@jovie/ui', async importOriginal => {
   const actual = await importOriginal<typeof import('@jovie/ui')>();
@@ -31,7 +33,11 @@ vi.mock('@jovie/ui', async importOriginal => {
         data-testid={testId}
         disabled={disabled}
         data-disabled={disabled ? '' : undefined}
-        onClick={() => onSelect?.(new Event('select'))}
+        onClick={() => {
+          const event = new Event('select', { cancelable: true });
+          onSelect?.(event);
+          lastSelectEvent = event;
+        }}
       >
         {children}
       </button>
@@ -53,7 +59,7 @@ describe('NewReleaseHeaderAction', () => {
     );
 
     const button = screen.getByRole('button', {
-      name: 'Sync releases from Spotify',
+      name: 'Sync from Spotify',
     });
     expect(button).toBeInTheDocument();
     fireEvent.click(button);
@@ -74,6 +80,24 @@ describe('NewReleaseHeaderAction', () => {
       screen.getByRole('button', { name: 'Create A New Release' })
     ).toBeInTheDocument();
     expect(screen.getByText('New release')).toBeInTheDocument();
+  });
+
+  it('names and disables the Spotify-only button while syncing', () => {
+    const onSyncSpotify = vi.fn();
+    render(
+      <NewReleaseHeaderAction
+        canCreateManualReleases={false}
+        isSyncing
+        onSyncSpotify={onSyncSpotify}
+        onCreateManual={vi.fn()}
+      />
+    );
+
+    const button = screen.getByRole('button', { name: 'Syncing...' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveTextContent('Syncing...');
+    fireEvent.click(button);
+    expect(onSyncSpotify).not.toHaveBeenCalled();
   });
 
   it('fires onSyncSpotify when "Sync from Spotify" is chosen', () => {
@@ -106,6 +130,8 @@ describe('NewReleaseHeaderAction', () => {
     );
 
     fireEvent.click(screen.getByTestId('new-release-add-manually'));
+    // A prevented select keeps the dropdown open over the add-release drawer.
+    expect(lastSelectEvent?.defaultPrevented).toBe(false);
     expect(onCreateManual).toHaveBeenCalledTimes(1);
     expect(onSyncSpotify).not.toHaveBeenCalled();
   });

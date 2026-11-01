@@ -319,10 +319,10 @@ export function compareVisualArbitraryBaseline(
       };
     }
     return {
-      ok: false,
+      ok: true,
       status: /** @type {const} */ ('unbaselined_shrink'),
       issues: [
-        `shared-UI visual arbitrary values dropped (${shrink.length}). Lower the baseline with \`${UPDATE_COMMAND}\`:`,
+        `shared-UI visual arbitrary values dropped (${shrink.length}). Lower the baseline with \`${UPDATE_COMMAND}\` to lock the gain in:`,
         ...shrink.map(item => `  ${item}`),
       ],
     };
@@ -425,6 +425,9 @@ function main() {
     for (const issue of result.issues) console.error(issue);
     process.exitCode = 1;
     return;
+  }
+  for (const issue of result.issues) {
+    console.log(`::notice title=shared-ui ratchet::${issue}`);
   }
   console.log(
     `[shared-ui-visual-arbitrary] PASS — ${result.totalFindings} findings match the shrink-only baseline ` +

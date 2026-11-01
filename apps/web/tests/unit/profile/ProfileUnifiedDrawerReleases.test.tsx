@@ -281,7 +281,9 @@ describe('ProfileUnifiedDrawer — Releases', () => {
 
     render(<ProfileUnifiedDrawer {...defaultProps} releases={releases} />);
 
-    expect(screen.getByText(/DJ Snake, Lil Jon/)).toBeDefined();
+    expect(
+      screen.getByText(/^DJ Snake and Lil Jon • Single • 2024$/)
+    ).toBeInTheDocument();
     // The owner name "Test Artist" should not appear as a collaborator
     const container = screen.getByTestId('profile-mode-drawer-releases');
     const secondaryText = container.querySelectorAll('.text-2xs');

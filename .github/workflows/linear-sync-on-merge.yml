@@ -37,6 +37,7 @@ jobs:
     name: Project merge and deploy evidence onto Linear
     if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
+    # Quota holds share this existing window with evaluation and cache saves.
     timeout-minutes: 15
     # Full sweeps coalesce globally; receipt wakes coalesce per issue so a
     # pending sweep or another issue cannot replace their only causal wake.
@@ -64,6 +65,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             .nvmrc
+            .github/scripts/gh-api-hold.sh
             .github/ci-harness/manifest.json
             .github/scripts/production-marker-state.mjs
             scripts/lib/linear-sync-on-merge.mjs
@@ -134,38 +136,57 @@ jobs:
           key: linear-sync-cursor-v1-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: linear-sync-cursor-v1-
 
+      # The Production Controller sets run-name, which makes workflow_run.name the
+      # run title ("Production Controller <sha> from CI ..."); matching the name
+      # kept this step skipped on every release, so no screen-audit receipt was
+      # ever written and issues waited in Validating (2026-10-24). Match the path.
       # Machine screen-audit receipts (JOV-7713) for the verified production
       # build, written before this run's sweep reads them, so the 98 issues
       # that owed one have an exit without a clock (2026-10-21). The producer
       # proves the screenshots render that exact build; otherwise it skips.
       # A failure here never blocks the lifecycle evaluation below.
       - name: Record screen-audit receipts for the production build
-        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Production Controller')
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.path == '.github/workflows/production-controller.yml')
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           REPO: ${{ github.repository }}
+          GH_API_HOLD_BUDGET_SECONDS: '60'
+          GH_API_HOLD_LABEL: screen-audit-quota-hold
         run: |
-          set -euo pipefail
-          sha="$(curl -fsS --max-time 10 https://jov.ie/api/health/build-info | jq -r '.commitSha // empty')"
-          if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::warning::production build sha unreadable; no screen-audit receipts"
-            exit 0
-          fi
-          run="$(node packages/api-client/cli.ts gh --priority default -- run list -R "$REPO" --workflow screenshots.yml --branch main --event push --status success --limit 1 --json databaseId,headSha --jq '.[0] | "\(.databaseId) \(.headSha)"')"
-          read -r run_id screens_sha <<<"$run"
-          if [ -z "${run_id:-}" ]; then
-            echo "::warning::no successful Product Screenshots run on main"
-            exit 0
-          fi
-          dir="$RUNNER_TEMP/screen-evidence"
-          node packages/api-client/cli.ts gh --priority default -- run download "$run_id" -R "$REPO" -D "$dir" \
-            -p 'route-dom-certification-*' -p 'screen-browser-proof*'
-          node scripts/lib/screen-audit-receipts.mjs --artifacts "$dir" --sha "$sha" \
-            --screens-sha "$screens_sha" \
-            --run-url "https://github.com/$REPO/actions/runs/$run_id" \
-            --out "$RUNNER_TEMP/screen-audit-receipts.json"
+          set -uo pipefail
+          # The first live backfill (2026-10-24 23:45Z) died on the shared GITHUB_TOKEN
+          # quota ("github exhausted: GET .../compare"). Probe through the hold helper
+          # first (sleeps to the reset when it is within 60s), and attempt twice.
+          attempt() {
+            set -e
+            sha="$(curl -fsS --max-time 10 https://jov.ie/api/health/build-info | jq -r '.commitSha // empty')"
+            if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::warning::production build sha unreadable; no screen-audit receipts"
+              return 0
+            fi
+            run="$(node packages/api-client/cli.ts gh --priority default -- run list -R "$REPO" --workflow screenshots.yml --branch main --event push --status success --limit 1 --json databaseId,headSha --jq '.[0] | "\(.databaseId) \(.headSha)"')"
+            read -r run_id screens_sha <<<"$run"
+            if [ -z "${run_id:-}" ]; then
+              echo "::warning::no successful Product Screenshots run on main"
+              return 0
+            fi
+            dir="$RUNNER_TEMP/screen-evidence"
+            node packages/api-client/cli.ts gh --priority default -- run download "$run_id" -R "$REPO" -D "$dir" \
+              -p 'route-dom-certification-*' -p 'screen-browser-proof*'
+            node scripts/lib/screen-audit-receipts.mjs --artifacts "$dir" --sha "$sha" \
+              --screens-sha "$screens_sha" \
+              --run-url "https://github.com/$REPO/actions/runs/$run_id" \
+              --out "$RUNNER_TEMP/screen-audit-receipts.json"
+          }
+          for try in 1 2; do
+            .github/scripts/gh-api-hold.sh api "repos/$REPO/pulls?per_page=1&state=open" --silent || true
+            if (attempt); then exit 0; fi
+            echo "::warning::screen-audit receipts attempt $try failed (see above); retrying after the quota hold"
+          done
+          echo "::error::screen-audit receipts were not recorded after two attempts"
+          exit 1
 
       - name: Evaluate the validation lifecycle
         id: evaluate
@@ -181,6 +202,43 @@ jobs:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           LINEAR_VALIDATION_ISSUE: ${{ github.event.client_payload.issue_identifier }}
         run: node scripts/lib/linear-sync-on-merge.mjs
+
+      # An installation-quota 403 is not a verdict, so the evaluator exits 0 and
+      # flags `quota_deferred`. That used to end as a green run that did nothing
+      # (2026-10-24: 22:43Z and 23:01Z). Hold until the quota resets (bounded to
+      # 5 minutes; a later reset fails this step and the job visibly), then run
+      # the same evaluation once more; a second deferral fails the job.
+      - name: Hold for the GitHub quota reset
+        id: quota_hold
+        if: ${{ steps.evaluate.outputs.quota_deferred == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '300'
+          GH_API_HOLD_LABEL: linear-sync-quota-hold
+          REPO: ${{ github.repository }}
+        run: .github/scripts/gh-api-hold.sh api "repos/$REPO/pulls?per_page=1&state=open" --silent
+
+      - name: Evaluate the validation lifecycle (retry after quota reset)
+        id: evaluate_retry
+        if: ${{ steps.quota_hold.outcome == 'success' }}
+        env:
+          LINEAR_SYNC_GITHUB_CACHE_DIR: .linear-sync-github-cache
+          LINEAR_SYNC_CURSOR_DIR: ${{ (github.event_name != 'repository_dispatch' || !github.event.client_payload.issue_identifier) && '.linear-sync-cursor' || '' }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          LIFECYCLE_MODE: ${{ github.event_name == 'pull_request' && 'merge' || 'sweep' }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          LINEAR_VALIDATION_ISSUE: ${{ github.event.client_payload.issue_identifier }}
+        run: node scripts/lib/linear-sync-on-merge.mjs
+
+      - name: Fail visibly when the sync stayed deferred
+        if: ${{ steps.evaluate_retry.outputs.quota_deferred == 'true' }}
+        run: |
+          echo "::error::Linear sync deferred twice on the GitHub installation quota; no lifecycle evaluation completed in this run. The next sweep resumes from the cursor."
+          exit 1
 
       # Full sweeps own shared cache publication. Merge and targeted receipt
       # runs may restore immutable reads but never replace the shared cache.

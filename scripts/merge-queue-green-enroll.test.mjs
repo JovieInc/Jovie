@@ -77,6 +77,8 @@ async function fixture(
     readCurrentSnapshot,
     effectSink,
     env = {},
+    queueEntries = [],
+    files = [{ filename: 'apps/web/page.tsx' }],
   } = {}
 ) {
   const mutations = [];
@@ -115,6 +117,7 @@ async function fixture(
       },
       pulls: {
         list: Symbol('pulls.list'),
+        listFiles: Symbol('pulls.listFiles'),
         get: async params => {
           gets.push(params.pull_number);
           return {
@@ -144,6 +147,7 @@ async function fixture(
       },
     },
     paginate: async (endpoint, params) => {
+      if (endpoint === github.rest.pulls.listFiles) return files;
       if (endpoint === github.rest.repos.listCommitStatusesForRef) {
         if (beforeStatusResponse) await beforeStatusResponse();
         return statuses;
@@ -169,8 +173,15 @@ async function fixture(
       return roster;
     },
     graphql: async (query, params) => {
+      if (query.includes('mergeQueue(branch')) {
+        return {
+          repository: { mergeQueue: { entries: { nodes: queueEntries } } },
+        };
+      }
       if (query.includes('enqueuePullRequest')) {
-        mutations.push(params);
+        mutations.push(
+          query.includes('jump: true') ? { ...params, jump: true } : params
+        );
         if (mutationError) throw mutationError;
         if (failMutation) throw new Error('head changed');
         return { enqueuePullRequest: { mergeQueueEntry: { position: 1 } } };
@@ -868,12 +879,21 @@ test('a queue-breaker dequeue is re-admitted after the freeze and its marker rem
   );
   const failed = await fixture({
     overrides: { 1: breaker('FAILED_CHECKS') },
+    statuses: [
+      {
+        context: 'jovie-queue-failure-hold/v1',
+        state: 'success',
+        creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+        description: 'class=deterministic-source;n=1;run=456;try=1',
+        target_url: 'https://github.com/JovieInc/Jovie/actions/runs/456',
+      },
+    ],
     eventName: 'push',
   });
   assert.deepEqual(
     failed.mutations,
     [],
-    'the marker never re-admits a failed_checks removal'
+    'the marker never bypasses a recorded source failure'
   );
   const notGreen = await fixture({
     overrides: { 1: { ...breaker('MANUAL'), mergeStateStatus: 'BLOCKED' } },
@@ -1053,7 +1073,7 @@ test('enrolls a required-green head once lane-fix-red is gone', async () => {
   assert.deepEqual(result.mutations, [{ id: 'PR_1', oid: sha }]);
 });
 
-test('a hold released after a manual dequeue re-enrolls the same head; check failures never do', async () => {
+test('a released manual dequeue and unheld automatic ejection re-enroll; source failure holds block', async () => {
   const removal = reason => ({
     timelineItems: { nodes: [{ createdAt: '2026-10-02T13:00:00Z', reason }] },
   });
@@ -1077,7 +1097,7 @@ test('a hold released after a manual dequeue re-enrolls the same head; check fai
   );
   assert.equal(
     await enqueued({ ...removal('FAILED_CHECKS'), ...release('lane-fix-red') }),
-    0
+    1
   );
   assert.equal(
     await enqueued({
@@ -1088,7 +1108,7 @@ test('a hold released after a manual dequeue re-enrolls the same head; check fai
   );
   assert.equal(
     await enqueued({ ...removal('FAILED_CHECKS'), ...release('hold') }),
-    0
+    1
   );
   assert.equal(
     await enqueued({ ...removal(undefined), ...release('hold') }),
@@ -1106,6 +1126,41 @@ test('a hold released after a manual dequeue re-enrolls the same head; check fai
     overrides: { 1: { ...removal('manual'), ...release('hold') } },
   });
   assert.deepEqual(held.mutations, []);
+});
+
+test('ejection re-enrollment admits bots within bounds and preserves human dequeues', async () => {
+  const removal = {
+    createdAt: new Date(Date.now() - 600_000).toISOString(),
+    reason: 'manual',
+    actor: { __typename: 'Bot', login: 'jovie-bot[bot]' },
+  };
+  /** @type {Array<[typeof removal, number, number]>} */
+  const cases = [
+    [removal, 1, 1],
+    [{ ...removal, actor: { __typename: 'User', login: 'tim' } }, 1, 0],
+    [removal, 3, 0],
+    [{ ...removal, createdAt: new Date().toISOString() }, 1, 0],
+  ];
+  for (const [event, count, expected] of cases) {
+    const result = await fixture({
+      overrides: {
+        1: {
+          timelineItems: { nodes: [event] },
+          breakerEvents: {
+            nodes: Array.from({ length: count }, () => ({
+              ...event,
+              __typename: 'RemovedFromMergeQueueEvent',
+            })),
+          },
+        },
+      },
+    });
+    assert.equal(
+      result.mutations.length,
+      expected,
+      JSON.stringify({ event, count })
+    );
+  }
 });
 
 test('main is read only to resolve a held candidate, never on an ineligible wake', async () => {
@@ -1187,7 +1242,6 @@ test('a blocking label on a queued PR dequeues only that PR', () => {
     'hold',
     'gated',
     'incident',
-    'do-not-merge',
     'queue-poison',
     'lane-fix-red',
   ]) {
@@ -2017,7 +2071,6 @@ for (const label of [
   'hold',
   'gated',
   'incident',
-  'do-not-merge',
   'queue-poison',
   'lane-fix-red',
 ]) {
@@ -2399,7 +2452,7 @@ test('every enroll decision on a ready PR leaves a receipt (pr, head, reason)', 
     "receipt(pr, 'recheck', `blocked-recheck=",
     "receipt(pr, 'held', failure.reason)",
     "receipt(pr, 'skip', `head-unchanged-since-removal:",
-    "receipt(pr, 'enqueued',",
+    "receipt(pr, jump ? 'enqueued-jump' : 'enqueued',",
     "receipt(pr, 'error',",
   ])
     assert.ok(script.includes(decision), decision);
@@ -2409,4 +2462,72 @@ test('every enroll decision on a ready PR leaves a receipt (pr, head, reason)', 
   assert.ok(script.includes("addHeading('Enroll decisions', 3)"));
   // The receipt script carries no expressions, so it never counts toward the 21k expression budget.
   assert.ok(!script.includes('${{'));
+});
+
+test('compounding PRs jump the queue under the reset-safe policy and every decision leaves a receipt', async () => {
+  const compounding = {
+    labels: {
+      pageInfo: { hasNextPage: false },
+      nodes: [{ name: 'compounding' }],
+    },
+  };
+  const iso = secondsAgo =>
+    new Date(Date.now() - secondsAgo * 1000).toISOString();
+  const entry = (number, state = 'QUEUED', secondsAgo = 3600) => ({
+    state,
+    enqueuedAt: iso(secondsAgo),
+    pullRequest: { number, labels: { nodes: [{ name: 'compounding' }] } },
+  });
+  const plain = (number, state, secondsAgo) => ({
+    state,
+    enqueuedAt: iso(secondsAgo),
+    pullRequest: { number, labels: { nodes: [] } },
+  });
+  const jumped = { id: 'PR_1', oid: sha, jump: true };
+  const unjumped = { id: 'PR_1', oid: sha };
+  const byLabel = await fixture({ overrides: { 1: compounding } });
+  assert.deepEqual(byLabel.mutations, [jumped]);
+  const byPaths = await fixture({
+    files: [
+      { filename: 'scripts/lanes/autoscale.py' },
+      { filename: '.github/workflows/lane-fix-relay.yml' },
+    ],
+  });
+  assert.deepEqual(byPaths.mutations, [jumped]);
+  const mixed = await fixture({
+    files: [
+      { filename: 'scripts/lanes/autoscale.py' },
+      { filename: 'apps/web/page.tsx' },
+    ],
+  });
+  assert.deepEqual(mixed.mutations, [unjumped]);
+  const capped = await fixture({
+    overrides: { 1: compounding },
+    queueEntries: [entry(8), entry(9)],
+  });
+  assert.deepEqual(capped.mutations, [unjumped]);
+  const room = await fixture({
+    overrides: { 1: compounding },
+    queueEntries: [entry(8)],
+  });
+  assert.deepEqual(room.mutations, [jumped]);
+  // A building group that has run more than five minutes is never reset by a jump.
+  const building = await fixture({
+    overrides: { 1: compounding },
+    queueEntries: [plain(30, 'AWAITING_CHECKS', 900)],
+  });
+  assert.deepEqual(building.mutations, [unjumped]);
+  // A young building group may be reset, and the reset is logged.
+  const young = await fixture({
+    overrides: { 1: compounding },
+    queueEntries: [plain(31, 'AWAITING_CHECKS', 60)],
+  });
+  assert.deepEqual(young.mutations, [jumped]);
+  assert.ok(young.warnings.some(w => /JUMP RESET by #1.*#31/.test(w)));
+  // Jumps are batched: a compounding entry enqueued under 30 minutes ago defers the next.
+  const batched = await fixture({
+    overrides: { 1: compounding },
+    queueEntries: [entry(8, 'QUEUED', 300)],
+  });
+  assert.deepEqual(batched.mutations, [unjumped]);
 });

@@ -198,6 +198,14 @@ needs an auditable PR-body marker line — `api-breaking: <reason>`.
 |-------|---------|------|-------------|
 | `/api/create-tip-intent` | POST | `public` | Create Stripe payment intent for tip |
 
+### Content Records
+
+| Route | Methods | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/content-records/stage-events` | GET | public (rows carry only kind/key@version and timestamps) | NDJSON `marketing-change` stage feed (data-edit, data-live; rolling 28 d) read by the shipping SLO collector. |
+| `/api/content-records/[kind]/[key]` | GET, POST | `admin` or `CONTENT_PUBLISH_SECRET` bearer + `x-content-actor` | Versioned content-as-data store: history (GET); validate, draft (returns signed preview URL), publish, rollback (POST). Every publish/rollback writes an audit row. See `lib/content-records/`. |
+| `/api/internal/proof-stats` | GET, POST | `admin` or `CONTENT_PUBLISH_SECRET` bearer + `x-content-actor` | Proof-stat feed for Summer (GET: resolved stats, loop metrics, milestone/published/withdrawn events) and intake for stats measured outside the web app (POST: benchmark, wins ledger, security, engineering). Production counts are refused (measured by the hourly refresh); approvals must be founder-approved Summer cards. See `lib/proof-stats/`. |
+
 ### Creator
 
 | Route | Methods | Auth | Description |
@@ -329,6 +337,7 @@ needs an auditable PR-body marker line — `api-breaking: <reason>`.
 | `/api/health/homepage` | GET | `public` liveness; detail is admin or `CRON_SECRET` | Anonymous is `{healthy:true,timestamp}` and does not fetch featured creators |
 | `/api/health/keys` | GET | `public` liveness; detail is admin or `CRON_SECRET` | Anonymous is `{healthy,timestamp}` (503 when a required key is missing) with no key labels |
 | `/api/health/redis` | GET | `admin` or `CRON_SECRET` | Redis write/read operability (protected to prevent quota burn) |
+| `/api/health/revenue-spine` | GET | `public` | Runtime receipt for the revenue-spine failure contract (JOV-8249). Executes the real contract builder for all nine stages in the serving process; no user attribution, no Sentry probe emission, never cached |
 
 ### HUD
 

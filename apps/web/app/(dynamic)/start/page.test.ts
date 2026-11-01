@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   isWaitlistGateEnabled: vi.fn(),
   getSession: vi.fn(),
   resolveSyntheticPassage: vi.fn().mockResolvedValue(null),
+  resolveSyntheticPassageToken: vi.fn().mockResolvedValue(null),
   resolveStartEntryProfile: vi.fn().mockResolvedValue(null),
   getCurrentOnboardingSessionId: vi.fn().mockResolvedValue(null),
 }));
@@ -29,6 +30,10 @@ vi.mock('@/lib/auth/better-auth', () => ({
 
 vi.mock('@/lib/synthetic/passage.server', () => ({
   resolveSyntheticPassage: mocks.resolveSyntheticPassage,
+}));
+
+vi.mock('@/lib/synthetic/passage-token.server', () => ({
+  resolveSyntheticPassageToken: mocks.resolveSyntheticPassageToken,
 }));
 
 vi.mock('@/lib/onboarding/start-entry-profile.server', () => ({
@@ -233,6 +238,30 @@ describe('StartPage', () => {
 
       expect(result.props.turnstileTestMode).toBe(false);
       expect(mocks.getSession).not.toHaveBeenCalled();
+    });
+
+    it('mounts the test sitekey for an anonymous canary passage token without consuming it (JOV-9625)', async () => {
+      mocks.getSession.mockClear();
+      mocks.resolveSyntheticPassageToken.mockResolvedValueOnce({
+        actorId: 'prodcert',
+      });
+      const result = await StartPage({ searchParams: Promise.resolve({}) });
+
+      expect(result.props.turnstileTestMode).toBe(true);
+      expect(mocks.resolveSyntheticPassageToken).toHaveBeenLastCalledWith(
+        expect.anything(),
+        'onboarding_chat',
+        { consume: false }
+      );
+      expect(mocks.getSession).not.toHaveBeenCalled();
+    });
+
+    it('keeps the production widget when the passage token check throws', async () => {
+      mocks.resolveSyntheticPassageToken.mockRejectedValueOnce(
+        new Error('bad')
+      );
+      const result = await StartPage({ searchParams: Promise.resolve({}) });
+      expect(result.props.turnstileTestMode).toBe(false);
     });
 
     it('keeps a signed-in account without passage on the production widget', async () => {

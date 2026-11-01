@@ -154,6 +154,54 @@ function MainPlaneReopenHarness() {
 }
 
 describe('CmdKPalette', () => {
+  it('filters and commits operator rows while excluding customer commands', () => {
+    const onAdditionalSelect = vi.fn();
+    const onOpenChange = vi.fn();
+    pushMock.mockClear();
+    render(
+      <CmdKPalette
+        profileId='profile-1'
+        open
+        operatorMode
+        onOpenChange={onOpenChange}
+        onAdditionalSelect={onAdditionalSelect}
+        additionalSectionsAfter={[
+          {
+            id: 'ovie-go',
+            label: 'Go To',
+            items: [
+              {
+                kind: 'nav',
+                nav: {
+                  kind: 'nav',
+                  id: 'ovie-go:home',
+                  label: 'Operator Home',
+                  description: 'Company overview',
+                  iconName: 'ArrowRight',
+                  surfaces: ['cmdk'],
+                  href: APP_ROUTES.ADMIN_NOW,
+                },
+              },
+            ],
+          },
+        ]}
+      />
+    );
+    expect(screen.getAllByRole('option')).toHaveLength(1);
+    const input = screen.getByRole('combobox');
+    fireEvent.change(input, { target: { value: 'Contacts' } });
+    expect(screen.queryAllByRole('option')).toHaveLength(0);
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(pushMock).not.toHaveBeenCalled();
+    expect(onAdditionalSelect).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: 'Operator Home' } });
+    expect(screen.getAllByRole('option')).toHaveLength(1);
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onAdditionalSelect).toHaveBeenCalledExactlyOnceWith('ovie-go:home');
+    expect(onOpenChange).toHaveBeenCalledExactlyOnceWith(false);
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
   it('constrains dialog search to the compact presentation column', () => {
     render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
 

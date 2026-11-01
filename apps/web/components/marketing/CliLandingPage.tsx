@@ -130,11 +130,6 @@ export function CliLandingPage() {
           href: APP_ROUTES.DEVELOPERS,
           testId: 'cli-hero-developers',
         }}
-        photo={{
-          src: '/images/marketing-hero/cli.webp',
-          width: 1600,
-          height: 901,
-        }}
         logos={false}
         align='center'
         testId='marketing-section-hero'
@@ -253,8 +248,6 @@ export function CliLandingPage() {
 
       <MarketingFooterCta
         sectionVariant='final-single-claim'
-        title='Jovie, for your agents.'
-        body='Install the Jovie CLI and give a creator a profile from their Spotify link.'
         ctaLabel={CLI_PRIMARY_CTA_LABEL}
         ctaHref='#install'
         ctaAnalyticsEvent='cli_install_cta'

@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { DspQuietRow } from './DspQuietRow';
+import { DspQuietRow, displayDspUrl } from './DspQuietRow';
 
 describe('DspQuietRow', () => {
   it('renders a quiet name plus outbound control for a linked DSP', () => {
@@ -47,5 +47,23 @@ describe('DspQuietRow', () => {
     expect(screen.queryByText('Not found')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Find' }));
     expect(onFind).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the saved URL and a visible outbound mark when showUrl is set', () => {
+    render(
+      <DspQuietRow
+        label='Tidal'
+        icon={<span aria-hidden='true'>T</span>}
+        href='https://www.tidal.com/browse/track/77611316'
+        showUrl
+      />
+    );
+
+    const row = screen.getByRole('link', { name: /Tidal/ });
+    expect(row).toHaveTextContent('tidal.com/browse/track/77611316');
+    expect(row.querySelector('svg')).not.toHaveClass('opacity-0');
+    expect(displayDspUrl('https://open.spotify.com/track/abc/')).toBe(
+      'open.spotify.com/track/abc'
+    );
   });
 });

@@ -69,6 +69,7 @@ import {
   detectAlbumArtGenerationIntent,
   resolveAlbumArtCapability,
 } from '@/lib/chat/album-art-capability';
+import { fetchCatalogTrackTitlesForChat } from '@/lib/chat/catalog-titles';
 import { assertChatToolsRegistered } from '@/lib/chat/chat-tool-inventory';
 import {
   buildLockedToolPromptInfo,
@@ -99,6 +100,7 @@ import {
 import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
 import { isShowTopInsightsTurnRelevant } from '@/lib/chat/show-top-insights-relevance';
 import { chatToolSchema } from '@/lib/chat/strict-schema';
+import { resolveSummerHandoff } from '@/lib/chat/summer-summon';
 import {
   canUsePaidChatTools,
   resolveChatTurnPlanLimits,
@@ -227,6 +229,7 @@ import {
 } from '@/lib/services/pitch';
 import { isRetouchConfigured } from '@/lib/services/retouching/provider-gemini';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
+import { isChatHealthCanaryEmail } from '@/lib/synthetic/prodcert-identities';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 
@@ -2458,7 +2461,14 @@ export async function POST(req: Request) {
       { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
     );
   }
-  const chatMode = chatModeResult.chatMode;
+  // Typing "Summer" (any spelling, @summer) in the founder's chat hands the
+  // operator account to Summer instead of the artist agent (Tim, 2026-10-25).
+  const chatMode = resolveSummerHandoff({
+    chatMode: chatModeResult.chatMode,
+    text: extractLastUserText(uiMessages),
+    founderAuthorized: authorizeFounderSummerUser(userId) === 'authorized',
+    transportEnabled: isSummerTransportEnabled(),
+  });
   if (chatMode === 'ov' && !(await canUseOvChatMode(userId))) {
     return NextResponse.json(
       { error: 'Admin role required for OV chat mode', requestId },
@@ -2864,7 +2874,9 @@ export async function POST(req: Request) {
 
   // Rate limiting - plan-aware weekly quota + burst protection. For clients
   // that send clientTurnId, reservation/replay happens before quota charging.
-  const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan);
+  const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan, {
+    skipWeeklyQuota: isChatHealthCanaryEmail(accountContext.email),
+  });
   if (!rateLimitResult.success) {
     const rateLimitMessage =
       accountContext.billingVerification === 'unavailable'
@@ -2974,6 +2986,9 @@ export async function POST(req: Request) {
   const artistContext = contextResult.context;
 
   const releases = await fetchOptionalReleases(resolvedProfileId);
+  const catalogTrackTitles = resolvedProfileId
+    ? await fetchCatalogTrackTitlesForChat(resolvedProfileId)
+    : null;
   const dispatchConversationId =
     reservedTurn?.conversationId ?? resolvedConversationId;
 
@@ -3085,7 +3100,7 @@ export async function POST(req: Request) {
       const failure = classifyChatStreamFailure(error);
       await markChatTurnTerminal({
         turnId: reservedTurn.turnId,
-        status: 'failed_model_error',
+        status: failure.terminalStatus,
         errorCode: failure.errorCode,
         errorMessage: failure.errorMessage,
       });
@@ -3142,6 +3157,7 @@ export async function POST(req: Request) {
       uiMessages,
       artistContext,
       releases,
+      catalogTrackTitles,
       resolvedProfileId,
       resolvedConversationId: dispatchConversationId,
       userId,
@@ -3308,7 +3324,7 @@ export async function POST(req: Request) {
       const failure = classifyChatStreamFailure(error);
       await markChatTurnTerminal({
         turnId: reservedTurn.turnId,
-        status: 'failed_model_error',
+        status: failure.terminalStatus,
         errorCode: failure.errorCode,
         errorMessage: failure.errorMessage,
       }).catch(() => null);

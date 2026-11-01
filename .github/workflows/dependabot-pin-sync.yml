@@ -22,6 +22,9 @@ name: Dependabot Pin Sync
 on:
   workflow_run:
     workflows: ['Source Validation']
+    # Only Dependabot npm heads can pass the job guard below; every other Source
+    # Validation completion was an all-skipped run (323 of 326 in 6 h, 2026-10-31).
+    branches: ['dependabot/npm_and_yarn/**']
     types: [completed]
 
 permissions: {}

@@ -1232,14 +1232,6 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
     gap: var(--space-6);
   }
 
-  :where(.system-b-launch-profile-stage) {
-    max-height: calc(var(--space-16) + var(--space-12));
-    overflow: hidden;
-    border: 1px solid
-      color-mix(in oklab, var(--system-b-text-primary) 8%, transparent);
-    border-radius: var(--radius-xl);
-  }
-
   :where(.system-b-launch-section) {
     padding-block: var(--space-16);
   }
@@ -2740,49 +2732,15 @@ body:has(.system-b-brand-page) .marketing-glass-header__cta:focus-visible {
   min-width: 0;
 }
 
+/* Straight, aligned stack on one grid edge: no tilt, no floating offsets,
+   nothing pushed under the header. */
 @media (min-width: 1024px) {
   :where(.system-b-artist-notifications-card-stage) {
-    display: block;
-    height: calc(var(--space-16) * 8);
-  }
-
-  :where(.system-b-artist-notifications-card-position) {
-    position: absolute;
-  }
-
-  :where(.system-b-artist-notifications-card-capture) {
-    top: 2%;
-    left: 2%;
-    width: 17rem;
-    transform: rotate(-2deg);
-  }
-
-  :where(.system-b-artist-notifications-card-subscribe) {
-    top: 18%;
-    right: 4%;
-    width: 16rem;
-    transform: rotate(1.5deg);
-  }
-
-  :where(.system-b-artist-notifications-card-email) {
-    top: 40%;
-    left: 8%;
-    width: 18rem;
-    transform: rotate(1deg);
-  }
-
-  :where(.system-b-artist-notifications-card-click) {
-    top: 58%;
-    right: 6%;
-    width: 16rem;
-    transform: rotate(-1.5deg);
-  }
-
-  :where(.system-b-artist-notifications-card-outcome) {
-    bottom: 2%;
-    left: 14%;
-    width: 17rem;
-    transform: rotate(2deg);
+    justify-self: end;
+    width: min(100%, 26rem);
+    /* The dock pads only the header height; clear it so the first card
+       never sits against the nav. */
+    padding-block-start: var(--space-12);
   }
 }
 

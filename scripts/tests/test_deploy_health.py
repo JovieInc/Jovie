@@ -262,3 +262,100 @@ class SamplerTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SupersessionStarvationAlarmTest(unittest.TestCase):
+    """2026-10-29: production sat on 836f596a while superseded Production Controller runs concluded `success`."""
+
+    NOW = epoch("2026-10-29T06:00:00Z")
+    LIVE = "8" * 40
+    SUPERSEDED = "6" * 40
+    NEWER = "9" * 40
+
+    def compare(self, behind, oldest_age, newest_age=None):
+        stamp = lambda age: datetime.fromtimestamp(self.NOW - age, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")  # noqa: E731
+        commits = [{"commit": {"committer": {"date": stamp(oldest_age)}}}]
+        if newest_age is not None:
+            commits.append({"commit": {"committer": {"date": stamp(newest_age)}}})
+        return {"ahead_by": behind, "commits": commits}
+
+    def judge_jovie(self, behind, oldest_age, limit_commits=40, limit_age=6 * 3600):
+        runs = [{"created_at": "2026-10-29T05:45:27Z", "conclusion": "success", "head_sha": self.SUPERSEDED}]
+        state = {**dh.evaluate(JOVIE, runs, self.compare(behind, oldest_age), self.NOW),
+                 "limitCommits": limit_commits, "limitAgeS": limit_age}
+        return dh.judge({"observedAt": self.NOW, "repos": {JOVIE: state}}, self.NOW)
+
+    def test_caps_page_at_sixty_minutes_or_fifteen_commits_even_when_measured_p95_drifted_higher(self):
+        self.assertEqual(self.judge_jovie(5, 59 * 60), {})
+        self.assertIn("16 commits behind main (limit 15)", self.judge_jovie(16, 600)["production-deploy:jovie"])
+        self.assertIn("(limit 60)", self.judge_jovie(3, 61 * 60)["production-deploy:jovie"])
+
+    def runner(self, calls):
+        def run(args, **_):
+            path = args[1]
+            calls.append(path)
+            if "/compare/" in path:
+                base = path.split("/compare/")[1].split("...")[0]
+                if base == self.LIVE and path.endswith("...main"):
+                    body = self.compare(17, 70 * 60)
+                elif path.endswith(f"...{self.LIVE}"):
+                    body = self.compare(4, 50 * 60, newest_age=30 * 60)
+                else:
+                    body = {"ahead_by": 0, "commits": []}
+                return SimpleNamespace(returncode=0, stdout=json.dumps(body), stderr="")
+            runs = [{"id": 2, "created_at": "2026-10-29T05:45:27Z", "updated_at": "2026-10-29T05:47:24Z",
+                     "conclusion": "success", "head_sha": self.SUPERSEDED}]
+            return SimpleNamespace(returncode=0, stdout=json.dumps({"workflow_runs": runs}), stderr="")
+        return run
+
+    def test_deliberate_red_measures_from_the_served_sha_not_the_last_green_controller_run(self):
+        repos = {JOVIE: dh.REPOS[JOVIE]}
+        with tempfile.TemporaryDirectory() as raw:
+            calls = []
+            # Old behaviour: the superseded `success` run reads as current production; nothing alarms.
+            blind, _ = dh.sample(Path(raw), self.NOW, self.runner(calls), repos, build_info=lambda url: None)
+            self.assertEqual(blind["repos"][JOVIE]["measuredFrom"], "controller-run")
+            self.assertEqual(dh.judge(blind, self.NOW), {})
+        with tempfile.TemporaryDirectory() as raw:
+            calls = []
+            live = {"sha": self.LIVE, "deployedAt": self.NOW - 3600}
+            data, error = dh.sample(Path(raw), self.NOW, self.runner(calls), repos, build_info=lambda url: live)
+            self.assertIsNone(error)
+            self.assertIn(f"repos/{JOVIE}/compare/{self.LIVE}...main", calls)
+            alert = dh.judge(data, self.NOW)["production-deploy:jovie"]
+            self.assertIn("17 commits behind main", alert)
+            self.assertIn("70 min old (limit 60)", alert)
+
+    def test_each_release_records_merge_to_production_lead_time_into_the_stage_feed(self):
+        import stage_timings
+        repos = {JOVIE: dh.REPOS[JOVIE]}
+        with tempfile.TemporaryDirectory() as raw:
+            calls = []
+            old = {"sha": self.SUPERSEDED, "deployedAt": self.NOW - 7200}
+            dh.sample(Path(raw), self.NOW - 600, self.runner(calls), repos, build_info=lambda url: old)
+            new = {"sha": self.LIVE, "deployedAt": self.NOW - 60}
+            data, error = dh.sample(Path(raw), self.NOW, self.runner(calls), repos, build_info=lambda url: new)
+            self.assertIsNone(error)
+            self.assertIn(f"repos/{JOVIE}/compare/{self.SUPERSEDED}...{self.LIVE}", calls)
+            lead = data["lag"][JOVIE]["releaseLeadTime"]
+            self.assertEqual((lead["n"], lead["p50Min"], lead["oldestP50Min"]), (1, 29, 49))
+            stage = stage_timings.compute(raw, self.NOW)["stages"][stage_timings.RELEASE_STAGE]
+            self.assertEqual((stage["count"], stage["p50S"]), (1, 1740.0))
+
+    def test_unreadable_build_info_is_none_not_a_guess(self):
+        class Body:
+            def __init__(self, text):
+                self.text = text
+            def __enter__(self):
+                return self
+            def __exit__(self, *a):
+                return False
+            def read(self, _n):
+                return self.text
+        good = json.dumps({"commitSha": self.LIVE, "deployedAt": 1793253557390}).encode()
+        self.assertEqual(dh.read_build_info("https://jov.ie/x", opener=lambda r, timeout: Body(good)),
+                         {"sha": self.LIVE, "deployedAt": 1793253557.39})
+        self.assertIsNone(dh.read_build_info("https://jov.ie/x", opener=lambda r, timeout: Body(b'{"commitSha":"main"}')))
+        def boom(r, timeout):
+            raise OSError("down")
+        self.assertIsNone(dh.read_build_info("https://jov.ie/x", opener=boom))

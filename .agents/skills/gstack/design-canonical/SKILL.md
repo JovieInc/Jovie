@@ -505,6 +505,15 @@ work even when they are internal or generated.
    `scripts/invariants/icp-language/check.mjs` enforce this. The baseline only
    shrinks.
 
+### Taste Rule: Quiet Surfaces, Hard Bans (founder, 2026-10-28)
+
+- **No bordered or filled containers around icons or emoji.** Show the bare icon at the right size and colour token, aligned to the text grid. `IconBadge`, `IconTile` and `IconGlyphFrame` are retired. `apps/web/scripts/lint-design-noise.mjs` (`icon-tile`) ratchets existing debt; new sites fail.
+- **Cards carry at most title + body + one optional bare visual.** Labels that restate structure ("Step 1", "Feature") are never visible text. Order comes from an `<ol>`; keep the count `sr-only`, or art-direct an oversized faded numeral.
+- **One email-capture control: `InlineSubscribe`** (`@jovie/ui/atoms/inline-subscribe`, built on `CompositeField`). One short title, one attached field and button, at most one microcopy line. No visible label (aria-label), no subtitle, no helper that restates the title or CTA.
+- **A primary button is never grey-disabled by field validity.** Validate on submit. Disable only for a genuinely unavailable service.
+- **Composite fields (prefix/suffix, search pill, composer) use `CompositeField`**, which owns the radius-following focus ring. Never a raw `outline`/`ring-0` on the inner input (`lint-composite-field.mjs`).
+- Rendered counterpart: `tests/e2e/marketing-noise-budget.spec.ts` (text-layer budget, icon tiles, "Step N") with deliberate-red cases for the vision critic.
+
 ### Taste Rule: Copy Is the Message, Never the Brief
 
 Reject AI instructions, editing rules, and unfinished text in every user-visible string, including metadata, accessibility labels, emails, errors, empty states, and demos. Use the copy system.

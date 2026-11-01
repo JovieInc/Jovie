@@ -61,8 +61,8 @@ jobs:
         if: steps.sanitize.outputs.skip != 'true'
         run: |
           NAME="${{ steps.sanitize.outputs.name }}"
-          case "$NAME" in
-            main)
+          case "$(echo "$NAME" | tr '[:upper:]' '[:lower:]')" in
+            main|master|production|prod|br-main|br-production|backup|backup-*|backup_*|backup.*)
               echo "Protected Neon branch '$NAME'; skipping delete." >&2
               echo "skip=true" >> "$GITHUB_OUTPUT"
               ;;
@@ -108,6 +108,10 @@ jobs:
           : > "$DELETED_FILE"
           DELETED_COUNT=0
           for branch in $MATCHING_BRANCHES; do
+            if ! node scripts/ci/neon-orphan-reaper.mjs --assert-deletable "$branch"; then
+              echo "Keeping $branch: default, protected, reserved, or unverifiable."
+              continue
+            fi
             echo "Deleting Neon branch: $branch"
             if pnpm dlx neonctl branches delete "$branch" --project-id "$NEON_PROJECT_ID" 2>/dev/null; then
               echo "  Deleted successfully"
@@ -117,6 +121,11 @@ jobs:
               echo "  Failed to delete (may already be deleted)"
             fi
           done
+
+          if [ -n "$EXACT_MATCH" ] && ! node scripts/ci/neon-orphan-reaper.mjs --assert-deletable "$EXACT_MATCH"; then
+            echo "Keeping $EXACT_MATCH: default, protected, reserved, or unverifiable."
+            EXACT_MATCH=""
+          fi
 
           if [ -n "$EXACT_MATCH" ]; then
             echo "Deleting exactly-matching Neon branch: $EXACT_MATCH"

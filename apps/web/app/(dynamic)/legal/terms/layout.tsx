@@ -2,16 +2,19 @@ import Image from 'next/image';
 import '@/components/marketing/MarketingRouteHero.css';
 import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
+import { getSiteChrome } from '@/lib/content-records/site-chrome.server';
 
 export const revalidate = false;
 
-export default function TermsLegalLayout({
+export default async function TermsLegalLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const chrome = await getSiteChrome();
   return (
     <PublicPageShell
+      chrome={chrome}
       className='public-legal-shell bg-base text-primary-token'
       footerVariant='expanded'
       logoSize='sm'

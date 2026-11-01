@@ -1,9 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { AvailabilityCell } from '@/features/dashboard/organisms/releases/cells/AvailabilityCell';
 import { ProviderCell } from '@/features/dashboard/organisms/releases/cells/ProviderCell';
+import { NotFoundCopyButton } from '@/features/dashboard/organisms/releases/components/NotFoundCopyButton';
+import { ProviderCopyButton } from '@/features/dashboard/organisms/releases/components/ProviderCopyButton';
+import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 
 vi.mock('@/lib/utils/platform-detection', () => ({
@@ -15,6 +20,7 @@ describe('ProviderCell actions', () => {
     profileId: 'profile-1',
     id: 'release-1',
     title: 'Midnight Signal',
+    status: 'released',
     releaseDate: '2026-01-01',
     artworkUrl: 'https://example.com/art.jpg',
     slug: 'midnight-signal',
@@ -78,6 +84,7 @@ describe('ProviderCell actions', () => {
     const sourceFiles = [
       'components/features/dashboard/organisms/releases/cells/ProviderCell.tsx',
       'components/features/dashboard/organisms/releases/components/ProviderCopyButton.tsx',
+      'components/features/dashboard/organisms/releases/components/NotFoundCopyButton.tsx',
     ];
 
     for (const sourceFile of sourceFiles) {
@@ -86,6 +93,222 @@ describe('ProviderCell actions', () => {
       expect(source).not.toMatch(/\btransition-all\b/);
       expect(source).not.toMatch(/\bscale-(?:50|95|100|105|110|125)\b/);
       expect(source).toContain('transition-opacity');
+      // Ion tokens only: the copied feedback wears the success token, never
+      // a raw emerald/amber palette color.
+      expect(source).not.toMatch(/emerald-|amber-|orange-|cyan-/);
     }
+
+    // Explicit per-file token reads for the coverage-via receipts on the two
+    // copy buttons (statically resolvable paths).
+    expect(
+      readFileSync(
+        resolve(
+          process.cwd(),
+          'components/features/dashboard/organisms/releases/components/ProviderCopyButton.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain("isCopied ? 'text-success' : undefined");
+    expect(
+      readFileSync(
+        resolve(
+          process.cwd(),
+          'components/features/dashboard/organisms/releases/components/NotFoundCopyButton.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain("isCopied ? 'text-success' : undefined");
+  });
+});
+
+describe('Ion-token feedback on availability surfaces', () => {
+  it('submits the latest edited provider URL', async () => {
+    const user = userEvent.setup();
+    const onAddUrl = vi.fn().mockResolvedValue(undefined);
+    const release: ReleaseViewModel = {
+      id: 'release-1',
+      profileId: 'profile-1',
+      title: 'Midnight Signal',
+      status: 'released',
+      slug: 'midnight-signal',
+      smartLinkPath: '/r/midnight-signal',
+      releaseType: 'single',
+      isExplicit: false,
+      totalTracks: 1,
+      providers: [],
+    };
+    render(
+      <TooltipProvider>
+        <AvailabilityCell
+          release={release}
+          allProviders={['spotify']}
+          providerConfig={PROVIDER_CONFIG}
+          onCopy={vi.fn().mockResolvedValue('copied')}
+          onAddUrl={onAddUrl}
+        />
+      </TooltipProvider>
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Show Provider Availability Details' })
+    );
+    await user.click(screen.getByRole('button', { name: '+ Add link' }));
+    const input = screen.getByPlaceholderText('Paste URL...');
+    await user.type(input, 'https://open.spotify.com/track/first');
+    await user.clear(input);
+    await user.type(input, 'https://open.spotify.com/track/latest');
+    await user.click(screen.getByRole('button', { name: 'Confirm URL' }));
+    await waitFor(() =>
+      expect(onAddUrl).toHaveBeenCalledExactlyOnceWith(
+        'release-1',
+        'spotify',
+        'https://open.spotify.com/track/latest'
+      )
+    );
+  });
+
+  it.each([false, true])(
+    'copies a provider link with manual=%s',
+    async isManual => {
+      const onCopy = vi.fn().mockResolvedValue(undefined);
+      render(
+        <ProviderCopyButton
+          testId='copy-provider'
+          path='/r/midnight-signal'
+          releaseTitle='Midnight Signal'
+          providerLabel='Spotify'
+          isCopied={false}
+          isManual={isManual}
+          onCopy={onCopy}
+        />
+      );
+      await userEvent.click(
+        screen.getByRole('button', { name: isManual ? 'Custom' : 'Detected' })
+      );
+      expect(onCopy).toHaveBeenCalledWith(
+        '/r/midnight-signal',
+        'Midnight Signal – Spotify',
+        'copy-provider'
+      );
+    }
+  );
+
+  it('renders copied provider feedback on the success token', () => {
+    render(
+      <ProviderCopyButton
+        testId='copy-provider'
+        path='/r/midnight-signal'
+        releaseTitle='Midnight Signal'
+        providerLabel='Spotify'
+        isCopied
+        isManual={false}
+        onCopy={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+    const button = screen.getByRole('button', { name: 'Copied!' });
+    expect(button).toHaveAttribute('data-variant', 'secondary');
+    expect(button).toHaveAttribute('data-size', 'sm');
+    expect(screen.getByText('Copied!')).toHaveClass('text-success');
+    expect(button.querySelector('svg')?.parentElement).toHaveClass(
+      'text-success'
+    );
+    expect(button.className).not.toMatch(/emerald|amber/);
+  });
+
+  it('does not copy a provider without a link', async () => {
+    const onCopy = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ProviderCopyButton
+        testId='copy-provider'
+        path={undefined}
+        releaseTitle='Midnight Signal'
+        providerLabel='Spotify'
+        isCopied={false}
+        isManual={false}
+        onCopy={onCopy}
+      />
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Detected' }));
+    expect(onCopy).not.toHaveBeenCalled();
+  });
+
+  it('renders the manual-status ring and copied feedback on tokens inside the availability popover', async () => {
+    const user = userEvent.setup();
+    const onCopy = vi.fn().mockResolvedValue('copied');
+    const manualRelease: ReleaseViewModel = {
+      profileId: 'profile-1',
+      id: 'release-1',
+      title: 'Midnight Signal',
+      status: 'released',
+      releaseDate: '2026-01-01',
+      artworkUrl: 'https://example.com/art.jpg',
+      slug: 'midnight-signal',
+      smartLinkPath: '/r/midnight-signal',
+      providers: [
+        {
+          key: 'spotify' as ProviderKey,
+          url: 'https://open.spotify.com/track/abc',
+          path: '/r/midnight-signal?utm_source=spotify',
+          label: 'Spotify',
+          isPrimary: true,
+          source: 'manual',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+      releaseType: 'single',
+      isExplicit: false,
+      totalTracks: 1,
+    };
+
+    const providerConfig = {
+      spotify: { label: 'Spotify', accent: '#1DB954' },
+    } as Parameters<typeof AvailabilityCell>[0]['providerConfig'];
+
+    render(
+      <TooltipProvider>
+        <AvailabilityCell
+          release={manualRelease}
+          allProviders={['spotify']}
+          providerConfig={providerConfig}
+          onCopy={onCopy}
+        />
+      </TooltipProvider>
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Show Provider Availability Details' })
+    );
+
+    const statusDot = document.querySelector('span.ring-2');
+    expect(statusDot).not.toBeNull();
+    expect(statusDot?.className).toContain('ring-quaternary-token/40');
+    expect(statusDot?.className).not.toContain('amber');
+
+    await user.click(screen.getByRole('button', { name: 'Copy Spotify link' }));
+    await waitFor(() => {
+      const copied = screen.getByRole('button', {
+        name: 'Copied Spotify link',
+      });
+      expect(copied.className).toContain('text-success');
+      expect(copied.className).not.toMatch(/emerald|amber/);
+    });
+  });
+
+  it('renders the not-found copy feedback on the success token when copied', () => {
+    render(
+      <NotFoundCopyButton
+        testId='copy-not-found-release-1'
+        releaseTitle='Midnight Signal'
+        smartLinkPath='/r/midnight-signal'
+        isCopied
+        onCopy={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    const button = screen.getByRole('button');
+    expect(button).toHaveAttribute('data-variant', 'secondary');
+    expect(button).toHaveAttribute('data-size', 'sm');
+    expect(screen.getByText('Copied!')).toHaveClass('text-success');
+    expect(button.querySelector('svg')).toHaveClass('text-success');
+    expect(button.className).not.toMatch(/emerald|amber/);
   });
 });

@@ -6,6 +6,7 @@ import { db } from '@/lib/db';
 import { contactEvidenceReviews } from '@/lib/db/schema/contacts';
 import { leadFunnelEvents, leads } from '@/lib/db/schema/leads';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { resolveLeadClaimToken } from '@/lib/leads/lead-claim-token';
 import { outboundTargetFromLead, readOutboundLedger } from './ledger.server';
 import {
   buildOutboundRow,
@@ -15,7 +16,7 @@ import {
 } from './queue';
 import type { OutboundQueue } from './types';
 
-/** Reply events, once a provider webhook records them (none exist yet). */
+/** Reply milestones recorded by provider webhooks, including Instantly. */
 const REPLY_EVENT_TYPES = ['replied', 'email_replied', 'dm_replied'];
 
 /** Admin-scale bound; the whole outbound inventory is far below this. */
@@ -76,7 +77,7 @@ async function readEvidenceClasses(
 export async function getOutboundQueue(
   now = new Date()
 ): Promise<OutboundQueue> {
-  const leadRows = await db
+  const rawLeadRows = await db
     .select({
       id: leads.id,
       linktreeHandle: leads.linktreeHandle,
@@ -91,7 +92,8 @@ export async function getOutboundQueue(
       outreachRoute: leads.outreachRoute,
       outreachStatus: leads.outreachStatus,
       dmCopy: leads.dmCopy,
-      claimToken: leads.claimToken,
+      claimTokenHash: leads.claimTokenHash,
+      claimTokenExpiresAt: leads.claimTokenExpiresAt,
       fitScore: leads.fitScore,
       fitScoreBreakdown: leads.fitScoreBreakdown,
       priorityScore: leads.priorityScore,
@@ -111,6 +113,19 @@ export async function getOutboundQueue(
     .leftJoin(creatorProfiles, eq(creatorProfiles.id, leads.creatorProfileId))
     .where(notInArray(leads.status, ['discovered', 'disqualified']))
     .limit(OUTBOUND_SCAN_LIMIT);
+
+  const leadRows = await Promise.all(
+    rawLeadRows.map(
+      async ({ claimTokenHash, claimTokenExpiresAt, ...row }) => ({
+        ...row,
+        claimToken: await resolveLeadClaimToken({
+          id: row.id,
+          claimTokenHash,
+          claimTokenExpiresAt,
+        }),
+      })
+    )
+  );
 
   const leadIds = leadRows.map(row => row.id);
   const dedupeKeys = new Map(

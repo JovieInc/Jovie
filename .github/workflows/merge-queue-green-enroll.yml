@@ -59,6 +59,11 @@ on:
   # `reconcile` concurrency slot.
   push:
     branches: [main]
+  # No cron here (JOV-INV-042: admission never runs from a schedule). The backstop
+  # for a lost wake is the Gem lanes tick: scripts/lanes/throughput_sentinel.py
+  # dispatches this workflow (an unnamed dispatch is the roster sweep) when a
+  # CLEAN unqueued PR has waited 10 minutes, and alarms `queue starved` and
+  # per-state supply dwell when the SLO is still missed.
   workflow_dispatch:
     inputs:
       dry_run:
@@ -289,6 +294,13 @@ jobs:
               ...holdLabels.machineBlockLabels,
             ]);
             const BREAKER_LABEL = 'queue-breaker';
+            const COMPOUNDING_LABEL = 'compounding', MAX_JUMPED = 2, JUMP_MAX_BUILD_S = 300, JUMP_BATCH_S = 1800;
+            const COMPOUNDING_PATHS = [
+              /^\.github\/(workflows|actions|ci-harness|scripts|runner-host|runner-image)\//,
+              /^scripts\/(lanes|swarm|hermes)\//,
+              /^scripts\/(ci-|merge-|pr-|fleet-|quota-)[^/]*$/,
+              /^scripts\/tests\/test_[a-z_]*(lane|autoscale|sentinel|execution|codex|stage)[a-z_]*\.py$/,
+            ];
             if (BLOCKING.size < 2) throw new Error('admission hold labels are unreadable');
             // Required checks green and no conflicts. UNSTABLE only adds a
             // non-required pending/red context (e.g. lane execution receipts).
@@ -659,6 +671,7 @@ jobs:
               const ownerHoldRelease = failurePolicy.ownerHoldReleaseIntent({
                 eventName: context.eventName, event: context.payload,
               });
+              const failureBeforeReenroll = failure.action;
               if (!releasedAfterManualRemoval) {
                 failure = failurePolicy.reenrollmentDisposition({
                   failure, statuses, repository: `${owner}/${repo}`, prNumber: pr.number, lastRemoval, headCommittedAt,
@@ -672,11 +685,31 @@ jobs:
               const removalActor = pr.timelineItems.nodes[0]?.actor;
               const humanDequeued = Boolean(removedUnchangedHead) && removalReason === 'manual' &&
                 removalActor?.__typename === 'User' && !/\[bot\]$/i.test(String(removalActor?.login || ''));
+              // Ejection re-enroll (2026-10-29): a head GitHub or a bot removed from
+              // the queue with no revision-failure hold on record (failure was
+              // 'allow' before the recovery-intent check) is still green and
+              // CLEAN, so it is admitted again instead of waiting for a human.
+              // Bounded: never a human dequeue, at most REENROLL_MAX_REMOVALS
+              // removals on this head, and REENROLL_DWELL_MS after the last
+              // removal. A merge-group failure at the head writes a failure
+              // hold, which still blocks above (JOV-6620 is untouched).
+              const REENROLL_MAX_REMOVALS = 3, REENROLL_DWELL_MS = 5 * 60 * 1000;
+              const removalsOnHead = (pr.breakerEvents?.nodes || []).filter(event =>
+                event.__typename === 'RemovedFromMergeQueueEvent' &&
+                (!headCommittedAt || event.createdAt > headCommittedAt)).length;
+              const automaticRemoval = removalReason === 'failed_checks' ||
+                (removalReason === 'manual' && (removalActor?.__typename === 'Bot' || /\[bot\]$/i.test(String(removalActor?.login || ''))));
+              const ejectionReenroll = Boolean(removedUnchangedHead) && automaticRemoval && !humanDequeued &&
+                failureBeforeReenroll === 'allow' && failure.action === 'block' &&
+                ['removed-without-recovery-intent', 'no-current-admission-recovery'].includes(failure.reason) &&
+                removalsOnHead < REENROLL_MAX_REMOVALS &&
+                Date.now() - Date.parse(lastRemoval) >= REENROLL_DWELL_MS;
+              if (ejectionReenroll) failure = { action: 'allow', reason: 'ejection-reenroll' };
               if (failure.action === 'block' ||
                   (humanDequeued && failure.action === 'retry-once' &&
                    failure.reason !== 'human-failure-release') ||
                   (removedUnchangedHead && failure.action !== 'retry-once' &&
-                   failure.reason !== 'owner-hold-release' && !releasedAfterManualRemoval)) {
+                   failure.reason !== 'owner-hold-release' && !releasedAfterManualRemoval && !ejectionReenroll)) {
                 core.info(`skip #${pr.number}: head unchanged since queue removal (${removalReason}; ${failure.reason})`);
                 receipt(pr, 'skip', `head-unchanged-since-removal:${removalReason}:${failure.reason}`);
                 continue;
@@ -790,16 +823,80 @@ jobs:
                   }
                   if (!await breakerReleaseStillCurrent(false)) continue;
                 }
+                // Tim 2026-10-28: compounding work (infra that speeds up all other work) jumps
+                // the queue, at most MAX_JUMPED entries at once. A PR is compounding when it carries the
+                // label or every touched file is lanes/swarm/CI/controller infrastructure. Every decision
+                // is logged as a receipt. Any failure here falls back to a plain enqueue.
+                let jump = false;
+                try {
+                  let compounding = pr.labels.nodes.some(l => l.name.toLowerCase() === COMPOUNDING_LABEL);
+                  let basis = 'label';
+                  if (!compounding) {
+                    const files = await github.paginate(github.rest.pulls.listFiles, {
+                      owner, repo, pull_number: pr.number, per_page: 100,
+                    });
+                    compounding = files.length > 0 && files.length <= 100 &&
+                      files.every(f => COMPOUNDING_PATHS.some(re => re.test(f.filename)));
+                    basis = 'paths';
+                  }
+                  if (compounding) {
+                    const queue = await github.graphql(`
+                      query($owner: String!, $repo: String!) {
+                        repository(owner: $owner, name: $repo) {
+                          mergeQueue(branch: "main") {
+                            entries(first: 50) { nodes { state enqueuedAt pullRequest { number labels(first: 30) { nodes { name } } } } }
+                          }
+                        }
+                      }`, { owner, repo });
+                    const entries = (queue.repository.mergeQueue?.entries?.nodes ?? []).filter(e => e.pullRequest.number !== pr.number);
+                    const isCompounding = e => e.pullRequest.labels.nodes.some(l => l.name.toLowerCase() === COMPOUNDING_LABEL);
+                    const ageS = e => (Date.now() - Date.parse(e.enqueuedAt)) / 1000;
+                    // A jump invalidates every merge group already building and restarts its CI (10-20 min;
+                    // the 04:00Z jump of #23554 reset three groups and nothing merged for 90 min). So jump only
+                    // while no building group has had time to make progress: AWAITING_CHECKS entries enqueued
+                    // under JUMP_MAX_BUILD_S ago (enqueuedAt bounds the build start from above), at most one jump per
+                    // JUMP_BATCH_S, and at most MAX_JUMPED compounding entries queued.
+                    const jumped = entries.filter(isCompounding).length;
+                    const building = entries.filter(e => e.state === 'AWAITING_CHECKS');
+                    const stale = building.filter(e => !(ageS(e) < JUMP_MAX_BUILD_S));
+                    const recent = entries.filter(e => isCompounding(e) && ageS(e) < JUMP_BATCH_S);
+                    let deferred = null;
+                    if (jumped >= MAX_JUMPED) deferred = `cap ${jumped}/${MAX_JUMPED}`;
+                    else if (stale.length > 0) deferred = `building groups older than ${JUMP_MAX_BUILD_S}s: ${stale.map(e => '#' + e.pullRequest.number).join(',')}`;
+                    else if (recent.length > 0) deferred = `batch window: ${recent.map(e => '#' + e.pullRequest.number).join(',')} jumped under ${JUMP_BATCH_S}s ago`;
+                    jump = deferred === null;
+                    receipt(pr, jump ? 'jump' : 'jump-deferred', `compounding(${basis}) ${deferred ?? `queued=${jumped}/${MAX_JUMPED}`}`);
+                    core.notice(`COMPOUNDING #${pr.number} ${jump ? 'jumps' : 'deferred'} (${basis}; ${deferred ?? 'clear'})`);
+                    if (jump && building.length > 0) {
+                      // Every reset a jump causes is logged with the groups it restarts.
+                      receipt(pr, 'jump-reset', `restarts building groups ${building.map(e => '#' + e.pullRequest.number).join(',')}`);
+                      core.warning(`JUMP RESET by #${pr.number}: restarts building merge groups ${building.map(e => '#' + e.pullRequest.number).join(',')}`);
+                    }
+                  }
+                } catch (error) {
+                  core.warning(`#${pr.number} compounding check failed, plain enqueue: ${error.message}`);
+                }
                 enqueueAttempted = true;
-                const r = await github.graphql(`
+                const enqueue = withJump => github.graphql(`
                   mutation($id: ID!, $oid: GitObjectID!) {
-                    enqueuePullRequest(input: { pullRequestId: $id, expectedHeadOid: $oid }) {
+                    enqueuePullRequest(input: { pullRequestId: $id, expectedHeadOid: $oid${withJump ? ', jump: true' : ''} }) {
                       mergeQueueEntry { position }
                     }
                   }`, { id: pr.id, oid: pr.headRefOid });
+                let r;
+                try {
+                  r = await enqueue(jump);
+                } catch (error) {
+                  // A token without maintain/admin cannot jump; a plain enqueue still lands the PR.
+                  if (!jump || /head|stale|changed/i.test(String(error.message))) throw error;
+                  core.warning(`#${pr.number} jump rejected (${error.message}); plain enqueue`);
+                  receipt(pr, 'jump-rejected', String(error.message).slice(0, 120));
+                  jump = false;
+                  r = await enqueue(false);
+                }
                 enqueued += 1;
                 core.notice(`ENQUEUED #${pr.number} at position ${r.enqueuePullRequest.mergeQueueEntry.position}`);
-                receipt(pr, 'enqueued', `position=${r.enqueuePullRequest.mergeQueueEntry.position}`);
+                receipt(pr, jump ? 'enqueued-jump' : 'enqueued', `position=${r.enqueuePullRequest.mergeQueueEntry.position};basis=${failure.reason}`);
                 if (breakerMarked && !breakerRestore) {
                   await github.rest.issues.removeLabel({
                     owner, repo, issue_number: pr.number, name: BREAKER_LABEL,
@@ -885,10 +982,10 @@ jobs:
           })));
           NODE
 
-  # Human-owned tim-hold variants and do-not-merge require authorized
-  # disposition; this sweep never expires them or their coexisting stops.
-  # Other stop labels use the hold contract (scripts/hold-contract.mjs,
-  # jovie-hold/v1): a receipt names an owner and an expiry or head-change release.
+  # No stop label is human-owned (tim-hold, tim:hold, hold:tim and do-not-merge
+  # are retired, 2026-10-28). Every stop label uses the hold contract
+  # (scripts/hold-contract.mjs, jovie-hold/v1): a receipt names an owner and an
+  # expiry or head-change release.
   # Ownerless machine holds past their grace period and expired receipts
   # are removed with one comment. The Jovie Bot unlabel event then wakes the
   # enroll job above; required checks still gate admission. Expiry is checked
@@ -912,6 +1009,7 @@ jobs:
           sparse-checkout: |
             .nvmrc
             scripts/hold-contract.mjs
+            scripts/lib/github-rate-limit.mjs
             scripts/lib/admission-hold-labels.json
             scripts/lib/admission-hold-labels.mjs
             scripts/lib/queue-deferral-receipt.mjs
@@ -952,7 +1050,7 @@ jobs:
     if: >-
       github.event_name == 'pull_request_target' &&
       github.event.action == 'labeled' &&
-      contains(fromJSON('["hold","gated","incident","do-not-merge","tim-hold","tim:hold","hold:tim","queue-deferred","queue-poison","lane-fix-red"]'), github.event.label.name)
+      contains(fromJSON('["hold","gated","incident","queue-deferred","queue-poison","lane-fix-red"]'), github.event.label.name)
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions: {}
@@ -976,7 +1074,7 @@ jobs:
             const sourceHead = context.payload.pull_request?.head?.sha;
             const rawLabel = context.payload.label?.name;
             const label = typeof rawLabel === 'string' ? rawLabel.toLowerCase() : null;
-            const blocking = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'tim-hold', 'tim:hold', 'hold:tim', 'queue-deferred', 'queue-poison', 'lane-fix-red']);
+            const blocking = new Set(['hold', 'gated', 'incident', 'queue-deferred', 'queue-poison', 'lane-fix-red']);
             if (!Number.isSafeInteger(number) || number <= 0 ||
                 typeof sourceHead !== 'string' || !/^[a-f0-9]{40}$/.test(sourceHead) || !blocking.has(label)) {
               core.info('Ignoring an incomplete blocking-label event');
@@ -1025,7 +1123,9 @@ jobs:
   # another member of the group, or by the base branch, is enqueued again on
   # that same SHA via enqueuePullRequest (no --auto, no --squash). A token
   # that still cannot enqueue names the PR with ::error:: and the step
-  # summary. Two rearms per SHA; the enroll job is not involved.
+  # summary. Two rearms per SHA; the enroll job is not involved. A failure with
+  # no implicated path (a flake) re-enqueues a green head that github-merge-queue[bot]
+  # removed within 30 minutes, tagged why=unattributed in the receipt (#23562: 24 min lag).
   rearm-green-victims:
     name: Rearm green merge-group victims
     needs: [hold-failed-revision]
@@ -1051,6 +1151,7 @@ jobs:
           sparse-checkout: |
             .nvmrc
             scripts/merge-group-victim-rearm.mjs
+            scripts/lib/merge-group-ahead-attribution.mjs
             scripts/lib/admission-hold-labels.json
             scripts/lib/admission-hold-labels.mjs
             .github/actions/prime-node-toolcache/action.yml

@@ -11,6 +11,7 @@ import {
   hasUnparseableTscFailure,
   isSupportedTypecheckNode,
   parseTscOutput,
+  unknownJsonPropertyRepair,
 } from '../../typecheck-scripts.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -47,6 +48,35 @@ describe('scripts-typecheck: parseTscOutput', () => {
     const { counts: parsed, globalErrors } = parseTscOutput('');
     expect(parsed.size).toBe(0);
     expect(globalErrors).toHaveLength(0);
+  });
+});
+
+describe('scripts-typecheck: unknown JSON property repair', () => {
+  it('names the checkJs json() repair only for TS2339 on unknown', () => {
+    expect(
+      unknownJsonPropertyRepair([
+        "scripts/ci/neon-orphan-reaper.mjs(174,24): error TS2339: Property 'branches' does not exist on type 'unknown'.",
+      ])
+    ).toContain('response.json()');
+    expect(
+      unknownJsonPropertyRepair([
+        "scripts/a.mjs(1,1): error TS2339: Property 'x' does not exist on type 'Foo'.",
+      ])
+    ).toBeNull();
+    expect(unknownJsonPropertyRepair([])).toBeNull();
+  });
+
+  it('names the envelope mock repair for TS2322 against NeonJsonEnvelope', () => {
+    expect(
+      unknownJsonPropertyRepair([
+        "apps/web/tests/unit/ci/neon-branch-guard.test.ts(232,7): error TS2322: Type 'Mock<...>' is not assignable to type '((url: string) => Promise<NeonJsonEnvelope | null>) | undefined'.",
+      ])
+    ).toContain('unknown[]');
+    expect(
+      unknownJsonPropertyRepair([
+        "apps/web/tests/unit/ci/neon-branch-guard.test.ts(1,1): error TS2322: Type 'string' is not assignable to type 'number'.",
+      ])
+    ).toBeNull();
   });
 });
 
@@ -144,7 +174,7 @@ describe('scripts-typecheck: compareWithBaseline', () => {
     ]);
   });
 
-  it('fails when the baseline is stale (shrink-only: errors fixed but baseline not regenerated)', () => {
+  it('passes with stale entries reported when errors shrink below the baseline', () => {
     const current = counts({ 'scripts/a.mjs': { TS2305: 1 } });
     const baseline = {
       files: {
@@ -153,7 +183,8 @@ describe('scripts-typecheck: compareWithBaseline', () => {
       },
     };
     const result = compareWithBaseline(current, baseline);
-    expect(result.ok).toBe(false);
+    expect(result.ok).toBe(true);
+    expect(result.newErrors).toHaveLength(0);
     expect(result.staleEntries).toEqual([
       { file: 'scripts/fixed.mjs', code: 'TS2339', count: 0, baseline: 3 },
     ]);
@@ -373,6 +404,115 @@ describe('scripts-typecheck: fail closed before baseline write (JOV-5450)', () =
     expect(JSON.parse(readFileSync(baselineFile, 'utf8'))).toEqual(
       sentinelBaseline
     );
+  });
+
+  it('prints the unknown-json repair when TS2339 on unknown exceeds the baseline', () => {
+    const { directory, baselineFile } = makeBaselineDir();
+    writeFileSync(
+      baselineFile,
+      `${JSON.stringify({
+        schemaVersion: BASELINE_SCHEMA_VERSION,
+        tool: 'scripts/typecheck-scripts.mjs',
+        generatedAt: '2026-01-01T00:00:00.000Z',
+        totalErrors: 0,
+        files: {},
+      })}\n`
+    );
+    const result = captureEvaluate({
+      directory,
+      baselineFile,
+      updateMode: false,
+      runTsc: () => ({
+        status: 2,
+        output:
+          "scripts/ci/neon-orphan-reaper.mjs(174,24): error TS2339: Property 'branches' does not exist on type 'unknown'.\n",
+      }),
+    });
+    expect(result.exits).toEqual([1]);
+    expect(result.errors).toContain('response.json()');
+    expect(result.errors).toContain(
+      'Do not grow scripts/typecheck-baseline.json'
+    );
+  });
+
+  it('diagnoses mixed table rows and accepts a tuple annotation with the real compiler', () => {
+    const { directory, baselineFile } = makeBaselineDir();
+    const baseline = JSON.stringify({
+      schemaVersion: BASELINE_SCHEMA_VERSION,
+      totalErrors: 0,
+      files: {},
+    });
+    writeFileSync(baselineFile, baseline);
+    writeFileSync(
+      resolve(directory, 'tsconfig.json'),
+      JSON.stringify({
+        compilerOptions: {
+          allowJs: true,
+          checkJs: true,
+          noEmit: true,
+          skipLibCheck: true,
+          target: 'es2022',
+          types: [],
+        },
+        files: ['table.mjs'],
+      })
+    );
+    const fixture = resolve(directory, 'table.mjs');
+    const rows = `const event = { reason: 'manual' };
+const cases = [[event, 1], [event, 3]];
+for (const [event, count] of cases) {
+  Array.from({ length: count }, () => ({ ...event }));
+}
+`;
+    writeFileSync(fixture, rows);
+    const red = captureEvaluate({ directory, baselineFile, updateMode: false });
+    expect(red.exits).toEqual([1]);
+    expect(red.errors).toContain('TS2769');
+    expect(red.errors).toContain('TS2698');
+    expect(red.errors).toContain('JSDoc tuple');
+    expect(readFileSync(baselineFile, 'utf8')).toBe(baseline);
+    vi.restoreAllMocks();
+
+    writeFileSync(
+      fixture,
+      rows.replace(
+        'const cases =',
+        '/** @type {Array<[typeof event, number]>} */\nconst cases ='
+      )
+    );
+    const green = captureEvaluate({
+      directory,
+      baselineFile,
+      updateMode: false,
+    });
+    expect(green.exits).toEqual([0]);
+    expect(green.errors).toBe('');
+    expect(readFileSync(baselineFile, 'utf8')).toBe(baseline);
+  });
+
+  it.each([
+    [
+      'TS2769 alone',
+      'scripts/a.mjs(1,1): error TS2769: No overload matches this call.',
+    ],
+    [
+      'TS2698 alone',
+      'scripts/a.mjs(1,1): error TS2698: Spread types may only be created from object types.',
+    ],
+    [
+      'unrelated files',
+      'scripts/a.mjs(1,1): error TS2769: No overload matches this call.\nscripts/b.mjs(2,1): error TS2698: Spread types may only be created from object types.',
+    ],
+  ])('does not suggest a tuple repair for %s', (_name, output) => {
+    const { directory, baselineFile } = makeBaselineDir();
+    const result = captureEvaluate({
+      directory,
+      baselineFile,
+      updateMode: false,
+      runTsc: () => ({ status: 2, output }),
+    });
+    expect(result.exits).toEqual([1]);
+    expect(result.errors).not.toContain('JSDoc tuple');
   });
 
   it('writes a shrink only after a real compiler produces parseable diagnostics', () => {

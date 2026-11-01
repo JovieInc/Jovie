@@ -35,6 +35,7 @@ import {
   headerRetryMs,
   immutableGithubCache,
   rateLimitWaitMs,
+  readClosedPullSnapshot,
   reconcileValidation,
 } from './validation-sync.mjs';
 
@@ -118,6 +119,18 @@ export const COMMISSIONING_PARENT_ALLOWLIST = new Set([
   'JOV-6004',
 ]);
 
+/**
+ * Lifecycle candidates are evaluated ahead of the active backlog so a rate
+ * limit that kills a sweep partway can never starve them (2026-10-30, run
+ * 41157880216: ~70 issues in oldest-touched order starved a Merging issue
+ * for every sweep while the cursor could not be saved).
+ */
+/** @type {readonly string[]} */
+export const SWEEP_LIFECYCLE_FIRST_STATES = [
+  LIFECYCLE_STATES.merging,
+  LIFECYCLE_STATES.validating,
+];
+
 const IDENTIFIER_RE = /^JOV-(\d+)$/i;
 // Prerequisites can belong to another Linear team; only Jovie issues are
 // eligible for this writer's transitions (see IDENTIFIER_RE above).
@@ -164,6 +177,47 @@ export function writeSweepCursor(dir, nextIdentifier) {
       savedAt: new Date().toISOString(),
     })}\n`
   );
+}
+
+/**
+ * Sweep order: Merging and Validating first (the states whose issues wait
+ * on this writer to progress), then In Progress / In Review / Rework, each
+ * tier oldest-touched first. A persisted cursor rotates only the tier it
+ * points into: a cursor inside the lifecycle tier resumes there, and a
+ * cursor inside the active tier still runs the whole lifecycle tier ahead of
+ * it, because issues move into Merging between sweeps and must not wait for
+ * a full pass of the backlog. An unknown cursor (issue left the lifecycle
+ * states) starts a fresh pass.
+ *
+ * @param {readonly { identifier: string, updatedAt: string, stateName?: string }[]} found
+ * @param {string} [cursorNextIdentifier]
+ * @returns {string[]}
+ */
+export function orderSweepLookups(found, cursorNextIdentifier = '') {
+  const oldestFirst = (left, right) =>
+    (Date.parse(left.updatedAt) || 0) - (Date.parse(right.updatedAt) || 0);
+  const isLifecycle = entry =>
+    SWEEP_LIFECYCLE_FIRST_STATES.includes(String(entry.stateName ?? ''));
+  const lifecycle = found.filter(isLifecycle).sort(oldestFirst);
+  const active = found.filter(entry => !isLifecycle(entry)).sort(oldestFirst);
+  const cursor = String(cursorNextIdentifier ?? '').toUpperCase();
+  if (cursor) {
+    const lifecycleStart = lifecycle.findIndex(
+      entry => entry.identifier === cursor
+    );
+    if (lifecycleStart > 0) {
+      return [...lifecycle.slice(lifecycleStart), ...active].map(
+        entry => entry.identifier
+      );
+    }
+    const activeStart = active.findIndex(entry => entry.identifier === cursor);
+    if (activeStart > 0) {
+      return [...lifecycle, ...active.slice(activeStart)].map(
+        entry => entry.identifier
+      );
+    }
+  }
+  return [...lifecycle, ...active].map(entry => entry.identifier);
 }
 
 /**
@@ -1163,6 +1217,7 @@ function lifecyclePreimage(issue) {
  *   readonly assuranceMatrix: unknown,
  *   readonly allowlist?: ReadonlySet<string>,
  *   readonly eventPull?: { number: number },
+ *   readonly closedPulls?: ReadonlyMap<number, import('./validation-sync.mjs').ClosedPullSnapshotEntry>,
  *   readonly dryRun?: boolean,
  *   readonly issue?: Awaited<ReturnType<typeof readLifecycleIssue>>,
  *   readonly log: (message: string) => void,
@@ -1240,6 +1295,13 @@ export async function reconcileIssueLifecycle(ctx) {
     harnessManifest: ctx.harnessManifest,
     assuranceMatrix: ctx.assuranceMatrix,
     eventPull: ctx.eventPull,
+    closedPulls: ctx.closedPulls,
+    openPullNumbers:
+      ctx.openPulls.complete && ctx.openPulls.pulls.length > 0
+        ? new Set(
+            ctx.openPulls.pulls.map(pull => normalizePullRequest(pull).number)
+          )
+        : undefined,
     dryRun: ctx.dryRun,
     log: ctx.log,
     linear: {
@@ -1449,7 +1511,7 @@ async function runSync(options) {
     // Read exactly its canonical record; the evaluator still owns admission.
     lookups.push(receiptIssue);
   } else if (sweep) {
-    /** @type {{ identifier: string, updatedAt: string }[]} */
+    /** @type {{ identifier: string, updatedAt: string, stateName: string }[]} */
     const found = [];
     let after = null;
     for (let page = 0; page < MAX_SWEEP_PAGES; page += 1) {
@@ -1486,27 +1548,66 @@ async function runSync(options) {
           found.push({
             identifier: node.identifier,
             updatedAt: String(node.updatedAt ?? ''),
+            stateName: String(node.state?.name ?? ''),
           });
         }
       }
       if (data.issues?.pageInfo?.hasNextPage !== true) break;
       after = data.issues.pageInfo.endCursor;
     }
-    // Least recently touched first. A persisted cursor rotates the list so a
-    // rate limit resumes at the issue that did not finish, instead of
-    // re-reading the same prefix until the quota is gone again.
-    found.sort(
-      (left, right) =>
-        (Date.parse(left.updatedAt) || 0) - (Date.parse(right.updatedAt) || 0)
-    );
-    const ordered = found.map(entry => entry.identifier);
+    // Merging and Validating run before the active backlog, oldest-touched
+    // first inside each tier, so a rate limit that stops the sweep partway
+    // can never starve a lifecycle candidate behind the backlog (run
+    // 41157880216). A persisted cursor rotates only the tier it points into
+    // (see orderSweepLookups).
     const cursor = readSweepCursor(env.LINEAR_SYNC_CURSOR_DIR);
-    const start = cursor?.nextIdentifier
-      ? ordered.indexOf(cursor.nextIdentifier)
-      : -1;
-    lookups.push(...(start > 0 ? ordered.slice(start) : ordered));
+    lookups.push(...orderSweepLookups(found, cursor?.nextIdentifier ?? ''));
   } else {
     lookups.push(ref.issueId || ref.identifier);
+  }
+
+  // One batched closed-pull snapshot answers "is this linked pull merged"
+  // for the whole sweep without a per-issue GitHub read. Only full sweeps
+  // pay for it: merge events and targeted receipt wakes evaluate one issue,
+  // where the per-pull read is cheaper than the listing.
+  let closedPulls;
+  if (sweep && !receiptIssue && lookups.length > 0) {
+    try {
+      closedPulls = await readClosedPullSnapshot({
+        fetchImpl,
+        token,
+        repository,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const flagged =
+        /** @type {{ rateLimited?: boolean, forbidden?: boolean }} */ (error);
+      if (flagged.rateLimited) {
+        // Same rationale as the open scan: the quota is already spent, so
+        // evaluating issues would 403 the first linked pull and mislabel it.
+        // Leave the cursor where it is and defer visibly.
+        if (isInstallationQuota403(message)) {
+          log(installationQuotaLog('Linear Sync'));
+        }
+        log(`Closed pull request snapshot deferred: ${message}`);
+        return {
+          action: 'deferred',
+          comment: '',
+          identifier: ref.identifier,
+          results: [],
+          deferred: 0,
+        };
+      }
+      if (flagged.forbidden) {
+        throw new Error(
+          `Closed pull request snapshot refused (${message}). This is a token permission gap; permissions and tokens were not changed.`
+        );
+      }
+      log(
+        `Closed pull request snapshot failed: ${message}; falling back to per-pull reads`
+      );
+      closedPulls = undefined;
+    }
   }
 
   const eventPull = sweep ? undefined : { number: Number(env.PR_NUMBER) };
@@ -1576,6 +1677,7 @@ async function runSync(options) {
             assuranceMatrix,
             allowlist: options.allowlist,
             eventPull,
+            closedPulls,
             dryRun: env.LIFECYCLE_DRY_RUN === '1',
             issue,
             log,
@@ -1697,6 +1799,62 @@ export async function recordValidationReceipt(args, options = {}) {
   return body;
 }
 
+/**
+ * Make a quota deferral visible: step output for the workflow's hold-and-retry
+ * and a summary line. Exit stays 0 (the 403 is not a verdict on any issue).
+ * @param {{ softFailed: boolean }} disposition
+ * @param {NodeJS.ProcessEnv} [env]
+ */
+export function reportQuotaDeferral(disposition, env = process.env) {
+  if (!disposition?.softFailed) return false;
+  try {
+    if (env.GITHUB_OUTPUT)
+      appendFileSync(env.GITHUB_OUTPUT, 'quota_deferred=true\n');
+    if (env.GITHUB_STEP_SUMMARY)
+      appendFileSync(
+        env.GITHUB_STEP_SUMMARY,
+        '- Linear sync DEFERRED: GitHub installation quota 403; no lifecycle evaluation completed.\n'
+      );
+  } catch {
+    // Visibility must never turn a deferral into a crash.
+  }
+  return true;
+}
+
+/**
+ * A sweep that RESOLVED with a deferral must drive the same hold-and-retry
+ * as a thrown installation 403: the quota stopped the open scan, the
+ * closed-pull snapshot, or the evaluation partway, and the run still exits
+ * 0 (a rate limit is not a verdict on any issue). Without this flag the
+ * hold and retry steps skipped and the run went green having evaluated
+ * nothing or half the queue (run 41157880216: 194 issues deferred, no
+ * quota_deferred, no hold, and the Merging candidate was starved). The
+ * workflow's retry resumes from the persisted cursor; a sweep that is still
+ * deferred after the retry fails visibly.
+ *
+ * @param {{ action?: string, deferred?: number } | null | undefined} result
+ * @param {NodeJS.ProcessEnv} [env]
+ */
+export function reportSweepDeferral(result, env = process.env) {
+  if (!result || result.action !== 'deferred') return false;
+  const detail =
+    result.deferred && result.deferred > 0
+      ? `${result.deferred} issue(s) deferred to the next sweep by the rate limit; the retry resumes from the cursor`
+      : 'the rate limit stopped the sweep before any lifecycle evaluation';
+  try {
+    if (env.GITHUB_OUTPUT)
+      appendFileSync(env.GITHUB_OUTPUT, 'quota_deferred=true\n');
+    if (env.GITHUB_STEP_SUMMARY)
+      appendFileSync(
+        env.GITHUB_STEP_SUMMARY,
+        `- Linear sync DEFERRED: ${detail}.\n`
+      );
+  } catch {
+    // Visibility must never turn a deferral into a crash.
+  }
+  return true;
+}
+
 const isDirectRun =
   process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 
@@ -1705,11 +1863,18 @@ if (isDirectRun) {
   const run =
     command === 'receipt'
       ? recordValidationReceipt(rest).then(body => console.log(body))
-      : syncLinearIssueOnMerge();
+      : syncLinearIssueOnMerge().then(result => {
+          // A resolved deferral (open scan, snapshot, or partway through the
+          // queue) is as deferred as a thrown 403: flag it so the workflow's
+          // hold-and-retry runs instead of ending green with work undone.
+          reportSweepDeferral(result);
+          return result;
+        });
   run
     .catch(error => {
       const disposition = failureDisposition('Linear Sync', error);
       console.error(disposition.log);
+      reportQuotaDeferral(disposition);
       if (!disposition.softFailed) process.exitCode = disposition.code;
     })
     .finally(() => {

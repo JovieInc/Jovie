@@ -15,7 +15,7 @@ export interface ArtistsDirectoryProfile {
 
 export interface ArtistsDirectoryProps {
   readonly profiles: readonly ArtistsDirectoryProfile[];
-  /** Total claimed public profiles; falls back to the current page size. */
+  /** Accepted for callers; the page no longer prints a count. */
   readonly total?: number | null;
   /** Opaque cursor for the next page; null on the last page. */
   readonly nextCursor?: string | null;
@@ -36,68 +36,17 @@ export function getArtistsDirectoryAvatarUrl(
 
 export function ArtistsDirectory({
   profiles,
-  total,
   nextCursor = null,
   isFirstPage = true,
 }: Readonly<ArtistsDirectoryProps>) {
-  const totalCount = total ?? profiles.length;
   return (
     <StandaloneProductPage width='xl'>
       <div className='space-y-6' data-testid='artists-directory'>
-        <ContentSurfaceCard surface='details'>
-          <ContentSectionHeader
-            density='compact'
-            headingLevel='h1'
-            title='All artists'
-            subtitle='Discover public creator profiles across Jovie.'
-          />
-          <div className='grid grid-cols-1 gap-3 p-3 pt-0 sm:grid-cols-3 sm:p-4 sm:pt-0'>
-            <ContentSurfaceCard surface='nested'>
-              <div className='space-y-1 p-4'>
-                <p className='text-2xl font-semibold tracking-[-0.03em] text-primary-token'>
-                  {totalCount}
-                </p>
-                <p className='text-xs font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
-                  Public profiles
-                </p>
-                <p className='text-app leading-5 text-secondary-token'>
-                  Creator pages currently available to browse.
-                </p>
-              </div>
-            </ContentSurfaceCard>
-            <ContentSurfaceCard surface='nested'>
-              <div className='space-y-1 p-4'>
-                <p className='text-app font-semibold text-primary-token'>
-                  Discover artists
-                </p>
-                <p className='text-app leading-5 text-secondary-token'>
-                  Browse creator pages, profile themes, and public fan
-                  experiences.
-                </p>
-              </div>
-            </ContentSurfaceCard>
-            <ContentSurfaceCard surface='nested'>
-              <div className='space-y-1 p-4'>
-                <p className='text-app font-semibold text-primary-token'>
-                  Jump straight in
-                </p>
-                <p className='text-app leading-5 text-secondary-token'>
-                  Every card opens the artist&apos;s public profile in one
-                  click.
-                </p>
-              </div>
-            </ContentSurfaceCard>
-          </div>
-        </ContentSurfaceCard>
-
-        {totalCount > profiles.length ? (
-          <p
-            className='text-xs text-tertiary-token'
-            data-testid='artists-directory-page-note'
-          >
-            Showing {profiles.length} of {totalCount} public profiles.
-          </p>
-        ) : null}
+        <ContentSectionHeader
+          density='compact'
+          headingLevel='h1'
+          title='Artists'
+        />
 
         {profiles.length > 0 ? (
           <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
@@ -126,36 +75,19 @@ export function ArtistsDirectory({
                     <h2 className='text-mid font-semibold text-primary-token transition-colors group-hover:text-secondary-token'>
                       {profile.displayName || profile.username}
                     </h2>
+                    {/* The real bio, or nothing. Never a filler line. */}
                     {profile.bio ? (
                       <p className='line-clamp-3 text-app leading-5 text-secondary-token'>
                         {profile.bio}
                       </p>
-                    ) : (
-                      <p className='text-app leading-5 text-tertiary-token'>
-                        Public creator profile on Jovie.
-                      </p>
-                    )}
+                    ) : null}
                   </div>
-
-                  <span className='inline-flex items-center gap-1 text-xs font-semibold text-tertiary-token transition-colors group-hover:text-primary-token'>
-                    View profile
-                    <Icon name='ChevronRight' className='h-4 w-4' />
-                  </span>
                 </Link>
               </ContentSurfaceCard>
             ))}
           </div>
         ) : (
-          <ContentSurfaceCard surface='details'>
-            <div className='px-5 py-8 text-center sm:px-6'>
-              <p className='text-mid font-semibold text-primary-token'>
-                No profiles found
-              </p>
-              <p className='mt-2 text-app leading-5 text-secondary-token'>
-                Check back later for new creator profiles.
-              </p>
-            </div>
-          </ContentSurfaceCard>
+          <p className='text-app text-secondary-token'>No profiles yet.</p>
         )}
 
         {nextCursor || !isFirstPage ? (

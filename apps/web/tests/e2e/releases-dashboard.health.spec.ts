@@ -122,7 +122,9 @@ function collectSameOriginApiFailures(
 }
 
 async function assertAccessible(page: import('@playwright/test').Page) {
-  // Quarantine lives in a11y-allowlist.json (releases-dashboard, JOV-8781).
+  // Disabled rules flow through a11y-allowlist.json. The releases-dashboard
+  // entries were removed when JOV-8781 shipped, so this scan runs every
+  // WCAG 2.2 AA rule armed.
   const results = await new AxeBuilder({ page })
     .options(wcag22AaAxeOptions(disabledRuleIds('releases-dashboard')))
     .analyze();

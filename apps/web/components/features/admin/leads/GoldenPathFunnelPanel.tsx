@@ -20,8 +20,9 @@ const COHORT_LABELS: Record<GoldenPathCohortReport['cohort'], string> = {
   claim_link: 'Opened a claim link',
 };
 
+/** Null means the stage before had no journeys, so there is no rate yet. */
 function pct(value: number | null): string {
-  return value === null ? 'n/a' : `${(value * 100).toFixed(1)}%`;
+  return value === null ? 'No base' : `${(value * 100).toFixed(1)}%`;
 }
 
 function seconds(duration: DurationSummary): string {

@@ -146,7 +146,7 @@ const PRO_FEATURES: readonly string[] = [
   'Advanced analytics & geographic insights',
   'Traffic quality filtering',
   'AI-powered insights',
-  'Unlimited contacts',
+  'Unlimited saved contacts',
   'Contact export',
   'Fan CRM',
   'Tips & payments',
@@ -158,7 +158,6 @@ const PRO_FEATURES: readonly string[] = [
   'AI assistant (70 messages/week)',
   'Unlimited chat file uploads',
   'AI pitch generation (5 per release)',
-  'Priority support',
 ];
 
 // ---------------------------------------------------------------------------
@@ -230,7 +229,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
         'Click & visit tracking',
         'Basic analytics (30 days)',
         'Audience intelligence',
-        'Up to 100 contacts',
+        'Up to 100 saved contacts',
         'AI assistant (15 messages/week)',
         '1 AI pitch generation per release',
         'Chat file uploads (5 files/batch)',
@@ -491,13 +490,21 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
     category: 'Audience & Growth',
     features: [
       {
-        name: 'Contact / subscriber capture',
+        // Fan email capture is uncapped on every plan; contactsLimit only
+        // applies to saved team/press/booking contacts (creatorContactPeople).
+        name: 'Audience email capture',
+        free: 'Unlimited',
+        pro: 'Unlimited',
+        max: 'Unlimited',
+      },
+      {
+        name: 'Saved contacts (team, press, booking)',
         free: 'Up to 100',
         pro: 'Unlimited',
         max: 'Unlimited',
       },
       {
-        name: 'Release notifications (email to fans)',
+        name: 'Release notifications (email to your audience)',
         free: false,
         pro: true,
         max: true,
@@ -549,10 +556,7 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
   },
   {
     category: 'Platform',
-    features: [
-      { name: 'Email support', free: true, pro: true, max: true },
-      { name: 'Priority support', free: false, pro: true, max: true },
-    ],
+    features: [{ name: 'Email support', free: true, pro: true, max: true }],
   },
 ] as const;
 
@@ -628,6 +632,18 @@ export function hasAdvancedFeatures(plan: string | null | undefined): boolean {
 /** Display name for UI. */
 export function getPlanDisplayName(plan: string | null | undefined): string {
   return getEntitlements(plan).marketing.displayName;
+}
+
+/**
+ * The plan a user is actually entitled to right now. A stored paid `plan`
+ * without an active entitlement (`isPro` false) is Free, so no surface can
+ * print a paid plan name next to a Free state.
+ */
+export function getEffectivePlan(
+  plan: string | null | undefined,
+  isPro: boolean
+): string {
+  return isPro && plan ? plan : 'free';
 }
 
 /** All valid plan IDs. */

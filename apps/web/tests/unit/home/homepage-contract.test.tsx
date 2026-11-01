@@ -32,6 +32,20 @@ vi.mock('@/lib/flags/marketing-static', async importOriginal => {
   };
 });
 vi.mock('@/lib/analytics', () => ({ track: vi.fn(), page: vi.fn() }));
+vi.mock('@/lib/content-records/store.server', async () => {
+  const { MARKETING_PAGE_KIND } = await import(
+    '@/lib/content-records/marketing-page'
+  );
+  return {
+    getLiveContent: async () => ({
+      data: MARKETING_PAGE_KIND.defaultRecord('home'),
+      source: 'default',
+      versionId: null,
+      version: null,
+      publishedAt: null,
+    }),
+  };
+});
 vi.mock('next/navigation', async importOriginal => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => ({ push: vi.fn() }),
@@ -53,7 +67,7 @@ const read = (path: string) =>
 
 async function renderHomePage() {
   const { default: HomePage } = await import('@/app/(home)/page');
-  return render(HomePage());
+  return render(await HomePage());
 }
 
 async function loadCopy() {
@@ -215,10 +229,23 @@ describe('homepage contract', { timeout: 60_000 }, () => {
   it('shows no person capture on the homepage (Tim, 2026-10-26)', async () => {
     const { container } = await renderHomePage();
     const images = [...container.querySelectorAll('main img, section img')];
+    const sources = images.map(image => image.getAttribute('src') ?? '');
 
-    expect(images.map(image => image.getAttribute('src'))).toEqual([]);
+    // One image on `/`: the hero's real product shot, the template profile
+    // capture (jov.ie/you, monogram avatar, abstract release art).
+    expect(sources).toHaveLength(1);
+    expect(sources[0]).toMatch(
+      /^\/product-screenshots\/template-profile-live-phone\.png(\?v=\w+)?$/
+    );
+    const hero = container.querySelector(
+      '[data-testid="marketing-section-hero"]'
+    );
+    expect(hero?.querySelector('[data-testid="homepage-hero-proof"] img')).toBe(
+      images[0]
+    );
+    // No person capture is wired anywhere in the homepage sources.
     for (const path of HOMEPAGE_SOURCES) {
-      expect(read(path), path).not.toContain('/product-screenshots/');
+      expect(read(path), path).not.toMatch(/tim-white|tim-profile/iu);
     }
   });
 

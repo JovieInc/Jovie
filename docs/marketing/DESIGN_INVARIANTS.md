@@ -346,7 +346,7 @@ another task supplies no design requirement or action authority here.
   clipping ancestor. A card needs its own radius.
 - **Exemptions:** full-bleed hero at its 100vh start
   (`.homepage-editorial-hero`, `.marketing-editorial-hero-photo`,
-  `.marketing-hero-photo`, `.marketing-hero-dock`,
+  `.marketing-hero-dock`,
   `.marketing-route-hero__media`), which rounds as it zooms out; logos,
   icons, SVG marks, and the iPhone bezel; already-round avatars; film-grain
   data URIs. Docked header chrome is not a card.

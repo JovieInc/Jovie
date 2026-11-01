@@ -20,7 +20,9 @@ import {
   findJank,
   findRawColors,
   findRawElements,
+  renderAgentSpec,
   statesCovered,
+  summarizeGuards,
 } from '../component-certificate.mjs';
 import { moduleKey } from '../mutation-sweep.mjs';
 
@@ -273,6 +275,9 @@ export function Drawer({ open }) {
     });
     assert.equal(report.totals.components, 1);
     assert.equal(report.totals.certified, 0);
+    const spec = renderAgentSpec(cert);
+    assert.match(spec, /Missing criteria/);
+    assert.match(spec, /component-certificate\.mjs --component/);
   });
 
   it('nested bordered surfaces: three levels flagged, flat surface is not', () => {
@@ -284,6 +289,26 @@ export function Drawer({ open }) {
     assert.ok(
       !findJank(flat, 'a.tsx').some(f => f.rule === 'surface:nested-bordered')
     );
+  });
+
+  it('defect-guard registry: every defect needs a guard; weekly human vs guard counts', () => {
+    const defects = [
+      ['human', '2026-10-25', 'lint-ast-rule', 'landed'],
+      ['guard', '2026-10-26', 'search-relevance-fixture', 'planned'],
+    ].map(([foundBy, foundAt, type, status], i) => ({
+      id: `D${i}`,
+      class: 'surface',
+      foundBy,
+      foundAt,
+      guard: { type, ref: 'x', status },
+    }));
+    const ok = summarizeGuards({ defects });
+    assert.deepEqual(ok.errors, []);
+    assert.equal(ok.guardsLanded, 1);
+    assert.deepEqual(ok.weeks['2026-W43'], { human: 1, guard: 0, agent: 0 });
+    assert.equal(ok.weeks['2026-W44'].guard, 1);
+    delete defects[0].guard;
+    assert.equal(summarizeGuards({ defects }).errors.length, 1);
   });
 });
 

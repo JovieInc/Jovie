@@ -1074,7 +1074,11 @@ def run(args) -> int:
     if subscription_pool_mode():
         reconcile()
     last = Path(args.cwd or ".") / ".codex-last-message.txt"
-    base = [cli(), "exec", "--ignore-user-config", "--skip-git-repo-check", "--ephemeral",
+    # Lane runs need no connectors: the curated Stripe plugin MCP answered AuthRequired on every
+    # run and a lane fix-red run failed on it. Disable the plugin/apps surfaces instead of
+    # giving them credentials.
+    base = [cli(), "exec", "--ignore-user-config", "--disable", "plugins", "--disable", "remote_plugin",
+            "--disable", "apps", "--skip-git-repo-check", "--ephemeral",
             "--dangerously-bypass-approvals-and-sandbox", "--color", "never", "-o", str(last)]
     if current_login_mode():
         base.remove("--dangerously-bypass-approvals-and-sandbox")

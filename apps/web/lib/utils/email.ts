@@ -56,7 +56,22 @@ export function isReservedTestEmailDomain(domain: string): boolean {
   );
 }
 
+/**
+ * Synthetic canary mailboxes on jov.ie (`browse-ready+...`) have no inbox: sends
+ * bounce, burn the transactional quota and hurt sender reputation. The canaries
+ * read their sign-in code from the verification table, never from mail.
+ */
+const SYNTHETIC_CANARY_RECIPIENT = /^browse-ready\+[^@]+@jov\.ie$/u;
+
+export function isSyntheticCanaryRecipient(email: string): boolean {
+  return SYNTHETIC_CANARY_RECIPIENT.test(normalizeEmail(email));
+}
+
 export function getEmailSendBlockReason(email: string): string | null {
+  if (isSyntheticCanaryRecipient(email)) {
+    return 'Recipient is a synthetic canary mailbox with no inbox';
+  }
+
   const domain = getEmailDomain(email);
 
   if (!domain) {
@@ -89,6 +104,8 @@ export function getEmailSendBlockReason(email: string): string | null {
  */
 const INTERNAL_ACCOUNT_EMAIL_DOMAINS = [
   'jov.ie',
+  // The founder's personal domain: his dogfood creator accounts are not customers.
+  'timwhite.co',
   (process.env.NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN || 'jov.ie').trim().toLowerCase(),
 ] as const;
 
@@ -102,6 +119,24 @@ const DOGFOOD_ACCOUNT_EMAIL_DOMAINS = ['test.jovie.com'] as const;
 
 /** Clerk test-address tag, e.g. browse+clerk_test@jov.ie */
 const CLERK_TEST_TAG_PATTERN = /\+clerk_test(\+|$)/;
+
+/**
+ * Generic provisioning tags for accounts created by harnesses and agents:
+ * `+canary`, `+e2e`, `+prodcert`, `+dogfood` (optionally followed by a
+ * `-`/`.`/`_`/`+` suffix such as `+e2e-run42`). A harness that can choose its
+ * address should use one of these; one that cannot sends the
+ * `x-jovie-account-class` header (see `lib/accounts/internal-account.ts`).
+ */
+export const INTERNAL_ACCOUNT_EMAIL_TAGS = [
+  'canary',
+  'e2e',
+  'prodcert',
+  'dogfood',
+] as const;
+const INTERNAL_TAG_ALTERNATION = INTERNAL_ACCOUNT_EMAIL_TAGS.join('|');
+const INTERNAL_TAG_PATTERN = new RegExp(
+  `\\+(?:${INTERNAL_TAG_ALTERNATION})(?:[-+._]|$)`
+);
 
 /**
  * Synthetic dogfood principal tag (JOV-7697), e.g.
@@ -137,6 +172,8 @@ export const INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN = [
   // Synthetic dogfood principal tag anywhere in the local part (JOV-7697)
   '^[^@]*\\+synthetic-([a-z0-9])[^@]*@',
   '^[^@]*\\+jovie-prod-waitlist-canary@',
+  // Generic harness/agent provisioning tags (+canary, +e2e, +prodcert, +dogfood)
+  `^[^@]*\\+(${INTERNAL_TAG_ALTERNATION})([-+._][^@]*)?@`,
 ].join('|');
 
 /**
@@ -170,7 +207,8 @@ export function isInternalOrTestAccountEmail(
 
   return (
     CLERK_TEST_TAG_PATTERN.test(localPart) ||
-    SYNTHETIC_PRINCIPAL_TAG_PATTERN.test(localPart)
+    SYNTHETIC_PRINCIPAL_TAG_PATTERN.test(localPart) ||
+    INTERNAL_TAG_PATTERN.test(localPart)
   );
 }
 

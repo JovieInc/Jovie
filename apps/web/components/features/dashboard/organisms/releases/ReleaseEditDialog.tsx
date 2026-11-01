@@ -141,7 +141,7 @@ export function ReleaseEditDialog({
                       {existing?.source === 'manual' ? (
                         <Badge
                           variant='secondary'
-                          className='rounded-md border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-3xs text-amber-700 dark:text-amber-300'
+                          className='rounded-md px-1.5 py-0.5 text-3xs'
                         >
                           Manual
                         </Badge>

@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
-import {
-  COMMERCE_DECISION_PROJECTION_CONTRACT,
-  unknownCommerceDecisionProjection,
-} from '@/lib/acquisition/commerce-decision';
+import { unknownCommerceDecisionProjection } from '@/lib/acquisition/commerce-decision';
 import { unknownAcquisitionEligibility } from '@/lib/acquisition/eligibility';
 import { getAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
+import { revalidateAcquisitionEligibilityReport } from '@/lib/acquisition/eligibility-cache';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { readCompanyStateCache } from '@/lib/ovie/company-state.server';
@@ -31,16 +29,12 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
   const fresh = new URL(request.url).searchParams.get('fresh') === '1';
   try {
-    const report = fresh
+    const source = fresh
       ? await getAcquisitionEligibility({ fresh: true })
       : (await readCompanyStateCache())?.snapshot.sourcePayloads
           .acquisitionEligibility;
-    if (
-      !report ||
-      report.commerce?.contract !== COMMERCE_DECISION_PROJECTION_CONTRACT
-    ) {
-      throw new Error('company_state_cache_miss');
-    }
+    const report = revalidateAcquisitionEligibilityReport(source, new Date());
+    if (!report) throw new Error('company_state_cache_miss');
     return NextResponse.json(report, {
       headers: NO_STORE_HEADERS,
     });

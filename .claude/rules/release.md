@@ -135,7 +135,7 @@ Labels are part of the CI control plane, not just project organization. Apply in
   deterministic combined-head evidence for only the selected product lanes.
 - `testing`, `deep-ci`, `launch-candidate`, and `deploy-preview` are metadata only. They have no CI fan-out semantics.
 
-- Do not use `needs-human` as a PR enrollment hold. If completion requires a
+- Do not use `needs-human`, `tim-hold` or `do-not-merge` as a PR enrollment hold; they are retired and a scrub deletes them (EVENT 2026-10-28). If completion requires a
   physical action only a human can perform (sign an agreement, rotate a key,
   flip a dashboard toggle), ship the code path disabled or keep the external
   action unsubmitted and track that authority gate separately.
@@ -191,6 +191,13 @@ When evidence is incomplete, keep remediation running until the relevant machine
    A PR the queue ejected for failed checks must not be re-enqueued at the same
    head: push a repair first. Re-enqueuing a rejected head poisons and rebuilds
    every merge group behind it (JOV-6620).
+   Never pass `jump: true` to `enqueuePullRequest`, and never dequeue and
+   re-enqueue to change a PR's position. A jump restarts every merge group
+   already building, so its CI starts over. On 2026-10-31, agents jumped 8
+   `compounding` PRs in 24 minutes and no group finished in that window. Only
+   `merge-queue-green-enroll.yml` jumps, under its `MAX_JUMPED` and
+   `JUMP_BATCH_S` limits. If a fix has to land first, ask the queue owner;
+   do not jump it yourself.
    Do not wait for the retired Auto-Enroll controller. GitHub owns required
    checks, native queue groups, and final merge; do not bypass them.
    Do not add, read, or retain the retired `merge-queue` label; authoritative
@@ -349,7 +356,7 @@ pnpm version:check        # validate consistency
 
 **Implementation PRs must not add or edit `CHANGELOG.md`.** The file is
 release state, not branch state. Branch-local Unreleased notes collide in
-native ALLGREEN merge groups (GitHub's server merge ignores local
+native merge groups (ALLGREEN until 2026-10-29, HEADGREEN now; GitHub's server merge ignores local
 `merge=union`). A user-visible change earns exactly one What's New bullet only
 after land/runtime proof, written through the existing release/UI receipt path
 (`apps/web/components/jovie/feature-intro-catalog.ts` plus the post-land

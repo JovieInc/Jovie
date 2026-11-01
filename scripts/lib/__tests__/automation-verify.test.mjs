@@ -2139,17 +2139,12 @@ describe('automation-verify affected scope', () => {
   describe('scripts typecheck selection', () => {
     // The affected bundle runs the scripts/ ratchet only when scripts/ changed
     // since the merge-base; execute that exact block against a temp repo.
-    const selection = script
-      .slice(
-        script.indexOf('if ! SCRIPTS_DIFF_BASE='),
-        script.indexOf('node scripts/turbo-local.mjs lint --affected')
-      )
-      .replace(
-        'node scripts/typecheck-scripts.mjs',
-        'echo RAN_SCRIPTS_TYPECHECK'
-      );
+    const selection = script.slice(
+      script.indexOf('if ! SCRIPTS_DIFF_BASE='),
+      script.indexOf('node scripts/turbo-local.mjs lint --affected')
+    );
 
-    function runSelection(changedPath) {
+    function runSelection(changedPath, state = 'committed', status = 0) {
       const repo = mkdtempSync(resolve(tmpdir(), 'scripts-typecheck-select-'));
       const git = args => {
         const result = spawnSync('git', args, {
@@ -2168,13 +2163,19 @@ describe('automation-verify affected scope', () => {
         git(['config', 'user.email', 'test@example.com']);
         git(['config', 'user.name', 'test']);
         writeFileSync(resolve(repo, 'README.md'), 'base\n');
+        mkdirSync(resolve(repo, 'scripts/lib'), { recursive: true });
+        writeFileSync(resolve(repo, 'scripts/lib/example.mjs'), 'base\n');
+        writeFileSync(
+          resolve(repo, 'scripts/typecheck-scripts.mjs'),
+          `console.log('RAN_SCRIPTS_TYPECHECK'); process.exit(${status});\n`
+        );
         git(['add', '.']);
         git(['commit', '-q', '-m', 'base']);
         git(['switch', '-q', '-c', 'feature']);
         mkdirSync(dirname(resolve(repo, changedPath)), { recursive: true });
         writeFileSync(resolve(repo, changedPath), 'change\n');
-        git(['add', '.']);
-        git(['commit', '-q', '-m', 'change']);
+        if (state === 'committed' || state === 'staged') git(['add', '.']);
+        if (state === 'committed') git(['commit', '-q', '-m', 'change']);
         return spawnSync(
           'bash',
           ['-c', `set -euo pipefail\nBASE_REF=main\n${selection}`],
@@ -2188,6 +2189,22 @@ describe('automation-verify affected scope', () => {
     it('runs the ratchet when scripts/ changed', () => {
       const result = runSelection('scripts/lib/example.mjs');
       expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain('RAN_SCRIPTS_TYPECHECK');
+    });
+
+    it.each([
+      ['staged', 'scripts/lib/example.mjs'],
+      ['unstaged', 'scripts/lib/example.mjs'],
+      ['untracked', 'scripts/lib/new.mjs'],
+    ])('runs the ratchet for %s scripts before commit', (state, path) => {
+      const result = runSelection(path, state);
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain('RAN_SCRIPTS_TYPECHECK');
+    });
+
+    it('propagates a failing compiler status', () => {
+      const result = runSelection('scripts/lib/example.mjs', 'committed', 73);
+      expect(result.status, result.stderr).toBe(73);
       expect(result.stdout).toContain('RAN_SCRIPTS_TYPECHECK');
     });
 

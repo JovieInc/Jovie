@@ -7,7 +7,24 @@ import {
   type OvieCertificationTier,
 } from '@/lib/ovie/certifications/types';
 
-export type CertificationStateFilter = OvieCertificationState | 'all';
+/**
+ * `needs_evidence` is a view of `review_ready` rows Tim cannot decide yet (no
+ * available decision or evidence digest). They are not in Inbox either, so
+ * counting them as Review Ready promised 24 decisions that did not exist.
+ */
+export type CertificationStateFilter =
+  | OvieCertificationState
+  | 'needs_evidence'
+  | 'all';
+
+export function certificationNeedsEvidence(row: OvieCertificationRow): boolean {
+  return (
+    row.state === 'review_ready' &&
+    !(row.decision.available && row.decision.evidenceDigest)
+  );
+}
+
+export const CERTIFICATION_NEEDS_EVIDENCE_LABEL = 'Needs Evidence';
 export type CertificationDomainFilter = OvieCertificationDomainId | 'all';
 export type CertificationFreshnessFilter =
   | 'all'
@@ -38,7 +55,15 @@ export function certificationEvidenceFreshness(row: OvieCertificationRow) {
 
 /** The review queue leads; certified work trails. */
 export const CERTIFICATION_STATE_FILTERS: readonly CertificationStateFilter[] =
-  ['all', 'review_ready', 'working', 'founder_locked', 'shipped', 'monitored'];
+  [
+    'all',
+    'review_ready',
+    'needs_evidence',
+    'working',
+    'founder_locked',
+    'shipped',
+    'monitored',
+  ];
 
 /** Data older than this is labelled stale even when the last fetch succeeded. */
 export const CERTIFICATION_STALE_AFTER_MS = 5 * 60 * 1000;
@@ -60,7 +85,14 @@ export function filterCertificationRows(
   const query = filters.query?.trim().toLowerCase() ?? '';
   return rows.filter(
     row =>
-      (filters.state === 'all' || row.state === filters.state) &&
+      (filters.state === 'all' ||
+        (filters.state === 'needs_evidence'
+          ? certificationNeedsEvidence(row)
+          : row.state === filters.state &&
+            !(
+              filters.state === 'review_ready' &&
+              certificationNeedsEvidence(row)
+            ))) &&
       (filters.domain === 'all' || row.domain === filters.domain) &&
       (!filters.owner ||
         filters.owner === 'all' ||
@@ -88,8 +120,15 @@ export function countRowsByState(
   const counts = Object.fromEntries(
     OVIE_CERTIFICATION_STATES.map(state => [state, 0])
   ) as Record<OvieCertificationState, number>;
-  for (const row of rows) counts[row.state] += 1;
-  return { ...counts, all: rows.length };
+  let needsEvidence = 0;
+  for (const row of rows) {
+    if (certificationNeedsEvidence(row)) {
+      needsEvidence += 1;
+      continue;
+    }
+    counts[row.state] += 1;
+  }
+  return { ...counts, needs_evidence: needsEvidence, all: rows.length };
 }
 
 /** Rank used by the sortable State column: review queue first. */

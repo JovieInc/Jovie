@@ -5,6 +5,7 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest } from 'next/server';
+import { SYNTHETIC_TRAFFIC_HEADER } from '@/lib/acquisition/synthetic-traffic';
 
 export interface BotDetectionResult {
   isBot: boolean;
@@ -179,7 +180,20 @@ export function detectBot(
     options.memberConversions !== undefined &&
     isHighVelocityZeroClickBot(options.memberVisits, options.memberConversions);
 
-  const isBot = isMeta || isKnownCrawler || isDatacenter || isVelocityBot;
+  // Probes that declare themselves (synthetic Playwright monitors and the
+  // production certification run, JOV-9822) are classified as bots so their
+  // events never enter customer analytics. A client can only use this to
+  // exclude its own traffic, never to inflate anything.
+  const isSelfDeclaredSynthetic = Boolean(
+    request.headers.get(SYNTHETIC_TRAFFIC_HEADER)
+  );
+
+  const isBot =
+    isMeta ||
+    isKnownCrawler ||
+    isDatacenter ||
+    isVelocityBot ||
+    isSelfDeclaredSynthetic;
 
   // Determine blocking strategy based on endpoint
   let shouldBlock = false;
@@ -198,6 +212,8 @@ export function detectBot(
     reason = 'datacenter_asn';
   } else if (isVelocityBot) {
     reason = 'high_velocity_zero_click';
+  } else if (isSelfDeclaredSynthetic) {
+    reason = 'self_declared_synthetic';
   }
 
   return {

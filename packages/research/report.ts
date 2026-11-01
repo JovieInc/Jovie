@@ -1,8 +1,10 @@
 /** Human/agent-facing renderings. Bounded on purpose: research output is context cost. */
+import { verifyResearchResult } from './outcome.ts';
 import type { ResearchState } from './state.ts';
 import { type ResearchResult, SOURCES } from './types.ts';
 
 export function renderResult(r: ResearchResult, maxHits = 8): string {
+  r = verifyResearchResult(r);
   const sources =
     [
       ...new Set(r.runs.filter(x => x.ok && x.hits > 0).map(x => x.source)),
@@ -10,6 +12,7 @@ export function renderResult(r: ResearchResult, maxHits = 8): string {
   const lines = [
     `research ${r.key} | cache=${r.cache} tier=${r.stoppedAtTier} sources=${sources} judge=${r.judge.model ?? 'none'} usd=${r.usd.toFixed(4)} ms=${r.ms} valid-until=${r.expiresAt.slice(0, 10)}${r.gbrainSlug ? ` page=${r.gbrainSlug}` : ''}`,
   ];
+  if (r.verdict === 'degraded') lines.push(`DEGRADED: ${r.reasons.join('; ')}`);
   if (r.priorDecisions.length) {
     lines.push('PRIOR DECISIONS (read before acting; do not silently undo):');
     for (const d of r.priorDecisions) lines.push(`  - ${d.slug}: ${d.title}`);
@@ -23,7 +26,7 @@ export function renderResult(r: ResearchResult, maxHits = 8): string {
     if (h.snippet) lines.push(`   ${h.snippet.slice(0, 240)}`);
   });
   if (r.hits.length === 0)
-    lines.push('No relevant results. Consider --mode deep or rephrasing.');
+    lines.push('No verified external evidence. Research is degraded.');
   const skipped = r.runs
     .filter(x => x.skipped || x.error)
     .map(x => `${x.source}:${x.skipped ?? x.error}`);

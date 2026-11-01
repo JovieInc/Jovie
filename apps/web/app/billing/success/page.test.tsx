@@ -265,7 +265,7 @@ describe('CheckoutSuccessPage — unlock tiles', () => {
     searchParamsMock.mockReturnValue(new URLSearchParams());
   });
 
-  it('shows Artist Visibility activation instead of legacy Pro unlock tiles', async () => {
+  it('shows the certified Artist Presence unlocks instead of legacy Pro tiles', async () => {
     setSearchParams('session_id=cs_test&plan_id=pro');
     mockValidatedSessionPlan('pro');
     mockBilling('pro');
@@ -273,8 +273,11 @@ describe('CheckoutSuccessPage — unlock tiles', () => {
     expect(
       await screen.findByTestId('artist-visibility-activation')
     ).toBeInTheDocument();
-    expect(screen.getByText('Monitor')).toBeInTheDocument();
-    expect(screen.getByText('Approve')).toBeInTheDocument();
+    expect(screen.getByText('Release emails')).toBeInTheDocument();
+    expect(screen.getByText('Verification')).toBeInTheDocument();
+    // Internal-only monitoring is never promised to a paying customer.
+    expect(screen.queryByText('Monitor')).not.toBeInTheDocument();
+    expect(screen.queryByText(/agentic fixes/i)).not.toBeInTheDocument();
     expect(screen.queryByText('Release Notifications')).not.toBeInTheDocument();
     expect(screen.queryByText('Contact Export')).not.toBeInTheDocument();
   });
@@ -311,11 +314,11 @@ describe('CheckoutSuccessPage — CTAs and verification', () => {
     searchParamsMock.mockReturnValue(new URLSearchParams());
   });
 
-  it('primary Pro CTA routes to Artist Visibility', () => {
+  it('primary Pro CTA routes to the Identity workspace', () => {
     mockBilling('pro');
     render(<CheckoutSuccessPage />);
     expect(
-      screen.getByRole('link', { name: /open artist visibility/i })
+      screen.getByRole('link', { name: /open identity/i })
     ).toHaveAttribute('href', '/app/presence');
   });
 
@@ -331,7 +334,7 @@ describe('CheckoutSuccessPage — CTAs and verification', () => {
       await screen.findByRole('link', { name: /claim your link/i })
     ).toHaveAttribute('href', '/start');
     expect(
-      screen.queryByRole('link', { name: /open artist visibility/i })
+      screen.queryByRole('link', { name: /open identity/i })
     ).not.toBeInTheDocument();
   });
 

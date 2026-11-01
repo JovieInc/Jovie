@@ -79,7 +79,6 @@ import { useViewMode } from '@/components/organisms/table/utils/useViewMode';
 import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import type { FilterPill } from '@/components/shell/pill-search.types';
 import { APP_ROUTES } from '@/constants/routes';
-import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useIsomorphicLayoutEffect } from '@/hooks/useIsomorphicLayoutEffect';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
@@ -139,7 +138,7 @@ import {
   TASK_PRIORITY_OPTIONS,
   TASK_STATUS_OPTIONS,
 } from './task-action-registry';
-import { distinctTaskTitles, taskSearchFromPills } from './task-header-search';
+import { taskSearchFromPills } from './task-header-search';
 import {
   getTaskAssigneeVisual,
   getTaskPriorityVisual,
@@ -2131,37 +2130,6 @@ export function TasksPageClient() {
     )
   ) : null;
   useRegisterRightPanel(sidebarPanel);
-
-  const taskTitleOptions = useMemo(
-    () => distinctTaskTitles(taskSubviewBaseTasks),
-    [taskSubviewBaseTasks]
-  );
-
-  const headerSearchAdapter = useMemo(
-    () =>
-      taskSubviewBaseTasks.length === 0
-        ? null
-        : {
-            key: 'tasks',
-            pills,
-            onPillsChange: setPills,
-            artistOptions: [],
-            titleOptions: taskTitleOptions,
-            albumOptions: [],
-            totalCount: taskSubviewBaseTasks.length,
-            visibleCount: tasks.length,
-            triggerLabel:
-              pills.length > 0
-                ? `Filter Tasks (${pills.length})`
-                : 'Filter Tasks',
-            ariaLabel: 'Filter Tasks',
-            placeholder: 'Search tasks',
-            allowedFields: ['title'] as const,
-          },
-    [pills, taskSubviewBaseTasks.length, taskTitleOptions, tasks.length]
-  );
-
-  useRegisterHeaderSearch(headerSearchAdapter);
 
   const showAssigneeInListRows = assigneeFilter === 'all';
   const hideSelectedRowDue = showTaskDocumentPane && Boolean(selectedTask);

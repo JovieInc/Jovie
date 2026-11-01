@@ -1,4 +1,4 @@
-import { and, sql as drizzleSql, eq, gte } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, gte, isNull } from 'drizzle-orm';
 import {
   computeCaptureRate,
   computeRatePercent,
@@ -727,7 +727,12 @@ async function aggregateReleases(
       releaseDate: discogReleases.releaseDate,
     })
     .from(discogReleases)
-    .where(eq(discogReleases.creatorProfileId, profileId))
+    .where(
+      and(
+        eq(discogReleases.creatorProfileId, profileId),
+        isNull(discogReleases.deletedAt)
+      )
+    )
     .orderBy(discogReleases.releaseDate)
     .limit(10);
 

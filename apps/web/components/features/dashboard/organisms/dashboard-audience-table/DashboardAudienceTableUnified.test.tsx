@@ -123,6 +123,9 @@ describe('DashboardAudienceTableUnified', () => {
     ).toBeInTheDocument();
     expect(screen.getAllByText('Grow Your Audience').length).toBeGreaterThan(0);
     expect(
+      screen.getByText('Track visitors and grow your audience')
+    ).toHaveClass('sr-only');
+    expect(
       screen.getAllByRole('link', { name: 'Open Profile Settings' })[0]
     ).toHaveAttribute('href', '/app/settings/profile');
     const headerLabels = screen
@@ -131,7 +134,7 @@ describe('DashboardAudienceTableUnified', () => {
       .filter(Boolean);
     expect(headerLabels).toEqual(
       expect.arrayContaining([
-        'Fan',
+        'Member',
         'State',
         'Alerts',
         'Engagement',
@@ -139,6 +142,9 @@ describe('DashboardAudienceTableUnified', () => {
         'Action',
       ])
     );
+    expect(
+      screen.queryByRole('columnheader', { name: /\bfans?\b/i })
+    ).toBeNull();
   });
 
   it('renders members on the 32px dense people row with a face', () => {

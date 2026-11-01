@@ -1,11 +1,19 @@
 'use client';
 
+import { Button } from '@jovie/ui';
+import { useEffect, useRef } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { ProfileIdentityHeader } from '@/features/profile/ProfileIdentityHeader';
 import { ProfilePreviewBento } from '@/features/profile/ProfilePreviewBento';
 import {
   type CanonicalArtistMetrics,
   getDisplaySpotifyFollowers,
 } from '@/lib/onboarding/canonical-metrics';
+import {
+  type OnboardingCatalogPreview,
+  toPreviewPublicReleases,
+} from '@/lib/onboarding/catalog-preview';
+import type { OnboardingProfileDraft } from '@/lib/onboarding/profile-draft';
 import { cn } from '@/lib/utils';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import {
@@ -16,6 +24,7 @@ import {
 } from './OnboardingToolArtifacts';
 
 export interface OnboardingProfileArtist {
+  readonly tagline?: string | null;
   readonly id: string;
   readonly name: string;
   readonly url: string;
@@ -29,9 +38,12 @@ export interface OnboardingProfileArtist {
   readonly popularity?: number | null;
   readonly genres?: readonly string[];
   readonly dspMatches?: readonly OnboardingDspMatch[];
+  /** JOV-9758: the artist's real catalog, rendered before any pricing step. */
+  readonly catalog?: OnboardingCatalogPreview | null;
 }
 
 export interface OnboardingProfileBuilderState {
+  readonly profileDraft?: OnboardingProfileDraft | null;
   readonly artist: OnboardingProfileArtist | null;
   readonly artistConfirmed: boolean;
   readonly handle: string | null;
@@ -184,12 +196,14 @@ function buildPreviewArtist(
     // Preview-only — not a real owner. Manage / claim chrome must stay off.
     owner_user_id: 'onboarding-preview',
     handle: handle ?? 'your-handle',
-    spotify_id: artist.id,
+    spotify_id: spotifyUrl ? artist.id : '',
     name: artist.name,
     image_url: artist.imageUrl ?? undefined,
-    tagline: followerLabel
-      ? `${followerLabel} Spotify followers (source: enrichment)`
-      : (firstGenre ?? undefined),
+    tagline:
+      artist.tagline ??
+      (followerLabel
+        ? `${followerLabel} Spotify followers`
+        : (firstGenre ?? undefined)),
     theme: undefined,
     settings: undefined,
     spotify_url: spotifyUrl,
@@ -300,9 +314,48 @@ function DspMatchStrip({
 export function resolvePreviewArtist(
   state: OnboardingProfileBuilderState
 ): OnboardingProfileArtist | null {
+  const draft = state.profileDraft;
+  if (draft && draft.activeRole !== 'artist') {
+    const source = draft.selectedSource;
+    if (!source || !draft.activeRole) return null;
+    return {
+      id: `source-${source.url}`,
+      name:
+        source.status === 'available' && source.title
+          ? source.title
+          : new URL(source.url).hostname,
+      url: '',
+      tagline: draft.outcome,
+    };
+  }
   if (state.artist) return state.artist;
-  if (!state.handle || state.socialLinks.length === 0) return null;
+  // Pen R6As7U: the draft profile is present as soon as a handle is known,
+  // before any artist or link is attached.
+  if (!state.handle) return null;
   return { id: `handle-${state.handle}`, name: state.handle, url: '' };
+}
+
+/**
+ * Pen R6As7U `SDt0M`: names the panel so the phone reads as the visitor's own
+ * draft. Pen sets the eyebrow in its canonical uppercase eyebrow style.
+ */
+function OnboardingDraftProfileHeader() {
+  return (
+    <header
+      className='system-b-onboarding-draft-header'
+      data-testid='onboarding-draft-profile-header'
+    >
+      <p className='system-b-onboarding-draft-eyebrow'>
+        Your profile, taking shape
+      </p>
+      <h2 className='system-b-onboarding-draft-title text-balance'>
+        Your Draft Profile
+      </h2>
+      <p className='system-b-onboarding-draft-lead'>
+        A first version from your link. Shape it as we talk.
+      </p>
+    </header>
+  );
 }
 
 export function OnboardingProfileRail({
@@ -314,6 +367,31 @@ export function OnboardingProfileRail({
 }) {
   const artist = resolvePreviewArtist(state);
   const isInline = placement === 'inline';
+  const railRef = useRef<HTMLElement>(null);
+
+  // JOV-8844 keyboard reachability, component-owned (JOV-7973): the side rail
+  // is a focusable scroll region, so Home/End must scroll it themselves rather
+  // than relying on the browser's default keyboard scrolling, which the live
+  // chat's focus/keyboard layers can shadow mid-journey — the golden-path
+  // reachability check intermittently found the rail still resting at its
+  // bottom edge after Home, clipping the preview badge at the scrollport top.
+  // Attached imperatively: this is scroll-region behavior, not element
+  // interactivity, so it stays out of the JSX a11y handler surface.
+  const hasArtist = artist !== null;
+  useEffect(() => {
+    const rail = railRef.current;
+    if (isInline || !rail) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Home' && event.key !== 'End') return;
+      event.preventDefault();
+      rail.scrollTo({
+        top: event.key === 'Home' ? 0 : rail.scrollHeight - rail.clientHeight,
+        behavior: 'auto',
+      });
+    };
+    rail.addEventListener('keydown', onKeyDown);
+    return () => rail.removeEventListener('keydown', onKeyDown);
+  }, [isInline, hasArtist]);
 
   if (!artist) return null;
 
@@ -322,33 +400,84 @@ export function OnboardingProfileRail({
   const previewLinks = buildPreviewLinks({
     artist,
     dspMatches,
-    socialLinks: state.socialLinks,
+    socialLinks:
+      state.profileDraft?.activeRole !== 'artist' &&
+      state.profileDraft?.selectedSource
+        ? [state.profileDraft.selectedSource.url]
+        : state.socialLinks,
   });
   const profileHref = `/${previewArtist.handle}`;
+  const previewReleases = toPreviewPublicReleases(artist.catalog, artist.name);
+  const draft = state.profileDraft;
+  const source = draft?.selectedSource;
+  const sourceLabels = {
+    artist: 'View music',
+    author: 'View writing',
+    creator: 'View channel or work',
+    expert: 'View services or credentials',
+    founder: 'View company or product',
+  };
 
   return (
     <aside
+      ref={railRef}
+      aria-label='Profile Preview'
+      tabIndex={isInline ? undefined : 0}
       className={cn(
-        'overflow-hidden bg-(--app-shell-content-surface) text-primary-token transition-[opacity,transform,width,border-color] duration-cinematic ease-out',
+        'overflow-x-hidden bg-(--app-shell-content-surface) text-primary-token transition-[opacity,transform,width,border-color] duration-cinematic ease-out',
         isInline
-          ? 'relative z-0 w-full rounded-3xl lg:hidden'
-          : 'z-30 max-lg:hidden lg:relative lg:h-full lg:w-95 lg:border-l lg:border-(--app-shell-border)'
+          ? 'relative z-0 w-full overflow-y-hidden rounded-3xl lg:hidden'
+          : 'z-30 overflow-y-auto overscroll-contain max-lg:hidden lg:relative lg:h-full lg:w-95 lg:border-l lg:border-(--app-shell-border)'
       )}
       data-testid={
         isInline ? 'onboarding-profile-rail-inline' : 'onboarding-profile-rail'
       }
       data-visible='true'
       data-placement={placement}
+      data-onboarding-stage={state.profileDraft?.awaiting}
+      data-catalog-releases={previewReleases.length}
     >
       <div
         className={cn(
-          'flex h-full min-h-0 items-center justify-center',
-          isInline ? 'px-0 py-2' : 'lg:w-95 lg:px-4 lg:py-4'
+          'flex min-h-0 items-center justify-center',
+          isInline ? 'h-full px-0 py-2' : 'min-h-full lg:w-95 lg:px-4 lg:py-4'
         )}
       >
         <div className='flex min-h-0 w-full flex-col items-center'>
+          {isInline ? null : <OnboardingDraftProfileHeader />}
           <ProfilePreviewBento
+            phoneContent={
+              draft?.activeRole && draft.activeRole !== 'artist' && source ? (
+                <div
+                  className='h-full overflow-y-auto bg-surface-1 px-4 pb-6 pt-19'
+                  data-testid='onboarding-source-preview'
+                >
+                  <ProfileIdentityHeader
+                    name={previewArtist.name}
+                    handle={previewArtist.handle}
+                    imageUrl={null}
+                    profileHref={source.url}
+                    listenHref={source.url}
+                    hasListenDestination={false}
+                    headingAs='p'
+                  />
+                  <p className='my-4 line-clamp-4 text-app text-secondary-token'>
+                    {draft.outcome ?? 'Profile draft'}
+                  </p>
+                  <Button asChild variant='secondary'>
+                    <a
+                      href={source.url}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                    >
+                      {sourceLabels[draft.activeRole]}
+                    </a>
+                  </Button>
+                </div>
+              ) : undefined
+            }
             artist={previewArtist}
+            releases={previewReleases}
             socialLinks={previewLinks}
             genres={previewArtist.genres}
             profileHref={profileHref}
@@ -375,7 +504,9 @@ export function OnboardingProfileRail({
                 Preview
               </span>
             }
-            caption='Preview — not claimed yet'
+            // One caption for every path: internal draft state ("Draft · artist ·
+            // Review") is not visitor-facing (2026-10-31 golden-path walk).
+            caption='Preview · not claimed yet'
             overlay={<DspMatchStrip matches={dspMatches} />}
           />
           {previewArtist.tagline ? (

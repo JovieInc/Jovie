@@ -59,6 +59,14 @@ describe('mounted homepage grid spine System B source contract', () => {
 
   it('mounts each homepage section exactly once', () => {
     const pageSource = readFileSync(path.join(webRoot, pagePath), 'utf8');
+    // The page renders the published spec; the spec renderer owns the one
+    // mount point per registered section (lib/content-records).
+    expect(countOccurrences(pageSource, '<HomepageSpecSections')).toBe(1);
+    const rendererPath = 'components/homepage/HomepageSpecSections.tsx';
+    const rendererSource = readFileSync(
+      path.join(webRoot, rendererPath),
+      'utf8'
+    );
 
     for (const mount of [
       '<HomepageArtistHero',
@@ -66,8 +74,8 @@ describe('mounted homepage grid spine System B source contract', () => {
       '<HomepageOfferClose',
     ]) {
       expect(
-        countOccurrences(pageSource, mount),
-        `${pagePath} must mount ${mount} exactly once`
+        countOccurrences(rendererSource, mount),
+        `${rendererPath} must mount ${mount} exactly once`
       ).toBe(1);
     }
 

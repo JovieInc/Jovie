@@ -1,4 +1,5 @@
 import 'server-only';
+import { parseSseFrames } from '@/lib/ovie/summer-fast-speaker';
 import { fetchSummerShadow } from '@/lib/ovie/summer-shadow-client';
 
 /**
@@ -41,21 +42,6 @@ export type SummerCanaryResult =
 
 type Frame = { event: string; data: Record<string, unknown> };
 
-function parseFrame(block: string): Frame | null {
-  let event = '';
-  let data = '';
-  for (const line of block.split('\n')) {
-    if (line.startsWith('event: ')) event = line.slice(7).trim();
-    else if (line.startsWith('data: ')) data += line.slice(6);
-  }
-  if (!event) return null;
-  try {
-    return { event, data: JSON.parse(data || '{}') as Record<string, unknown> };
-  } catch {
-    return { event, data: {} };
-  }
-}
-
 export async function runSummerCanary(input: {
   readonly principalHash: string;
   readonly now?: () => number;
@@ -78,35 +64,32 @@ export async function runSummerCanary(input: {
     });
     const headersAt = now();
     if (!response.ok || !response.body) {
+      void response.body?.cancel().catch(() => undefined);
       return { ok: false, code: `http_${response.status}` };
     }
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
     let firstDeltaAt: number | null = null;
     let done: Frame | null = null;
+    let finishedAt: number | null = null;
     let model: string | null = null;
-    for (;;) {
-      const { done: finished, value } = await reader.read();
-      if (finished) break;
-      buffer += decoder.decode(value, { stream: true });
-      let index = buffer.indexOf('\n\n');
-      while (index >= 0) {
-        const frame = parseFrame(buffer.slice(0, index));
-        buffer = buffer.slice(index + 2);
-        index = buffer.indexOf('\n\n');
-        if (!frame) continue;
-        if (frame.event === 'error') return { ok: false, code: 'stream_error' };
-        if (frame.event === 'meta' && typeof frame.data.model === 'string')
-          model = frame.data.model;
-        if (frame.event === 'delta' && firstDeltaAt === null)
-          firstDeltaAt = now();
-        if (frame.event === 'done') done = frame;
+    for await (const frame of parseSseFrames(response.body)) {
+      if (frame.event === 'error') return { ok: false, code: 'stream_error' };
+      if (frame.event === 'meta' && typeof frame.data.model === 'string')
+        model = frame.data.model;
+      if (
+        frame.event === 'delta' &&
+        typeof frame.data.text === 'string' &&
+        frame.data.text.length > 0 &&
+        firstDeltaAt === null
+      )
+        firstDeltaAt = now();
+      if (frame.event === 'done') {
+        done = frame;
+        finishedAt = now();
+        break;
       }
     }
     if (firstDeltaAt === null) return { ok: false, code: 'no_text' };
-    if (!done) return { ok: false, code: 'no_done' };
-    const finishedAt = now();
+    if (!done || finishedAt === null) return { ok: false, code: 'no_done' };
     const timing = done.data.timing as Partial<SummerServerTiming> | undefined;
     const num = (value: unknown) => (typeof value === 'number' ? value : null);
     const ttftMs = firstDeltaAt - startedAt;
@@ -135,7 +118,9 @@ export async function runSummerCanary(input: {
     return {
       ok: false,
       code:
-        error instanceof Error ? error.name || 'fetch_failed' : 'fetch_failed',
+        error instanceof Error || error instanceof DOMException
+          ? error.name || 'fetch_failed'
+          : 'fetch_failed',
     };
   }
 }

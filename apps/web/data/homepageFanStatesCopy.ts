@@ -36,4 +36,11 @@ export const HOMEPAGE_FAN_STATES_COPY = {
     },
   ],
 } as const;
-export type HomepageFanStatesCopy = typeof HOMEPAGE_FAN_STATES_COPY;
+/** Headline and label widen so a published page spec can fill them. */
+export type HomepageFanStatesCopy = Omit<
+  typeof HOMEPAGE_FAN_STATES_COPY,
+  'headline' | 'galleryLabel'
+> & {
+  readonly headline: string;
+  readonly galleryLabel: string;
+};

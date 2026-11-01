@@ -6,7 +6,7 @@ JOV-7706); grok and kimi stay `enabled: false`. Symphony Elixir on Gem is retire
 `gem-retire-elixir.sh`); nothing else claims JOV work.
 
 A lane is a provider command in `providers.json` plus a Linear label that expresses a routing
-preference. Every JOV Todo issue is eligible (Tim 2026-10-11: no `agent-ready`, plan or
+preference. Every JOV Todo issue is eligible, and since 2026-10-29 Backlog admission no longer requires `agent-ready` either (readiness is computed: spec, acceptance, no hold, no blocker, no red line) (Tim 2026-10-11: no `agent-ready`, plan or
 approval label is required): every lane reads one shared all-Todo snapshot per TTL (at most
 `TODO_POOL_PAGES` x 100 issues; a larger pool fails closed) and the cost-aware router (below)
 decides which lane takes each issue. `hold` is the one stop signal, and it expires: the
@@ -31,7 +31,10 @@ The harness, not the model, owns:
 | File-overlap admission: declared paths, then the workstream map, are compared with the cached open-PR inventory and In Progress lane tasks; hot control-plane and duplicate migration-number collisions wait, shared/generated files sequence, other overlaps flag | `file_overlap.py`, `overlap_inventory()` |
 | Hotspot admission (JOV-7708): an issue whose predicted touch set (named file paths, else its workstream area; Symphony-throughput = the lanes harness) hits a hotspot an open, non-parked PR holds waits as `hotspot-held:<path>#<pr>`. Hotspots = a static seed (lanes harness, `code-flags.ts`, command/product-truth registries, `node-environment-files.json`, `destructive-red-drift.baseline.json`) plus any file two open PRs touch; an unreadable file list admits ungated | `pool_rejections()`, `hotspot_holds()`, `open_hotspot_holds()` |
 | Sweep (every 30 min per lane): retire only explicitly labeled duplicates after live head, hold and queue revalidation; preserve unlabelled stale drafts | `sweep_lane_prs()` |
-| Generated-file conflicts: merge main, take its copy, run each file's canonical regenerator (`pnpm install --lockfile-only` for `pnpm-lock.yaml`, `pnpm ci:topology:write` for `.github/workflow-topology.gen.yml`), push; no model, no force-push | `resolve_generated_conflict()`, `remediation.GENERATED_RESOLVERS` |
+| Generated-file conflicts: merge main, restore its generated copies (including cleanly merged outputs), run each file's canonical regenerator (`pnpm install --lockfile-only` for `pnpm-lock.yaml`, `pnpm ci:topology:write` for `.github/workflow-topology.gen.yml`, `node scripts/agent-context/rule-scopes.mjs --write` for `scripts/agent-context/rule-scopes.json`), push; after resolving source conflicts, reuse the same regeneration helper | `resolve_generated_conflict()`, `regenerate_merged_generated()`, `remediation.GENERATED_RESOLVERS` |
+| Shell `&&` conflicts: when every hunk is only an `&&` chain, keep base order and append head-only prefixes; `node --test` and vitest paths follow the same rule | `resolve_and_chain_conflict()`, `fix_red_classes.resolve_and_chain_text()` |
+| Quoted-list conflicts: when every hunk is only `'path',` entries, keep main's order and append head-only lines; any other hunk stays for the model | `resolve_additive_list_conflict()`, `fix_red_classes.resolve_additive_quoted_list_text()` |
+| Identifier-list conflicts: when every hunk is one comma-separated line of slugs, keep main's order and append head-only tokens; any other hunk stays for the model. The repair mutation budget is the class list plus the model dispatch, so a new class still runs | `resolve_identifier_list_conflict()`, `fix_red_classes.merge_additive_identifier_list()`, `conflict_resolvers()` |
 | Slot locks that die with their holder | `Locked` |
 | Worktree from `origin/main`: a pre-installed pool slot when one is ready (`worktreeSource: pool` on the receipt), else fresh; shared-store hardlink install; background refill; afterwards an idle, clean checkout with fresh origin publication proof is recycled into the pool (`verdict: recycled` in `worktree-removals.jsonl`) or removed. Busy, dirty, unpublished or unverified source is preserved with a cleanup receipt; its branch is deleted only after successful checkout retirement | `run_issue()`, `worktree_pool.take()`, `remove_worktree()`, `worktree_pool.recycle()` |
 | GBrain context pack in the prompt, plus the repo contract | `context_pack()`, `render_prompt()` |
@@ -744,7 +747,7 @@ the relay), deploy
 failures and Sentry `repository_dispatch` `sentry-issue` payloads become one
 `jovie.remediation-event/v1`. `classify_blocker` / `classify_event` name exactly one class:
 `ready`, `needs-rebase` (`lockfile-only`, `generated-only` or `semantic`), `flaky-infra`, `fixable-by-model`,
-`needs-human-decision`, `obsolete`, plus `main-red` when main itself is the failure.
+`needs-human-decision` (a reserved decision or a secret-file security gate: it surfaces once and files a non-blocking Ovie `decisionAsk` with a default and a deadline; it applies no label and holds nothing, EVENT 2026-10-28), `obsolete`, plus `main-red` when main itself is the failure.
 
 The ladder (`plan_ladder`) runs deterministic rungs first — one `update-branch` per episode,
 the existing generated-file resolver, one `gh run rerun --failed` per head. Those spend no model
@@ -757,7 +760,7 @@ Spent caps are `ladder-exhausted`. Re-entry is a new external head, a cleared de
 main turning green; attempt history is kept on the `jovie-reentry/v1` receipt.
 
 Flags: `LANES_ESCALATION` default on; `LANES_ESCALATION_NOTIFY_TIM` default off (Linear
-`needs-human` label plus one comment); `LANES_ESCALATION_LIFT_HUMAN_HOLDS` default off.
+`needs-human` label plus one comment). A repaired PR always lifts its machine `hold`.
 Needs-human, obsolete and ladder-exhausted share one PR comment marked
 `<!-- symphony-surface pr=N head=SHA -->`. Hold nags are at most one per PR per head per 24h.
 Escalating, ladder-exhausted and surfaced PRs count toward the terminal cap (`slots × 4`)

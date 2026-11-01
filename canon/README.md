@@ -21,5 +21,11 @@ Read in this order:
 11. [`CAPACITY.md`](./CAPACITY.md) — generated agent capacity: plan, price, remaining
    quota or credits, policy and delegation cost per provider. Source of truth is
    `ops/registry/capacity.json`; every agent reads it before routing or delegating.
+12. [`COMPLIANCE.md`](./COMPLIANCE.md) — legal and compliance register: requirement, evidence,
+   gap, fix and owner per item; Summer gates launches against it. Not legal advice.
+
+13. [`SOURCES_OF_TRUTH.md`](./SOURCES_OF_TRUTH.md) — every fact domain, its one owner and
+   its derived surfaces; generated from `sources-of-truth.json`. Find the owner before
+   adding a fact; derive, never copy.
 
 Operational files (`CLAUDE.md`, `.claude/rules/*`, `docs/*`, skills, scripts, workflows) implement this canon. If they conflict, update the lower-level file or escalate to Tim.

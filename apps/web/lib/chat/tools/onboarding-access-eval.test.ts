@@ -222,6 +222,20 @@ describe('decideOnboardingAccess golden-path admission (Tim 2026-10-25)', () => 
     expect(decision.rationale).toBe('golden_path_admit_resolved_artist');
   });
 
+  it.each(['founder', 'author', 'creator', 'expert'] as const)(
+    'does not admit the %s job using a previous artist identity',
+    activeRole => {
+      const decision = decideOnboardingAccess({
+        ...controlled,
+        activeRole,
+        goldenPathVerdict: 'ELIGIBLE',
+        publicProfileUrl: 'https://example.com',
+      });
+      expect(decision.kind).toBe('waitlist');
+      expect(decision.goldenPathHold).toBe('hold_identity_unresolved');
+    }
+  );
+
   it.each([undefined, null, 'BLOCKED', 'UNKNOWN'] as const)(
     'still waitlists under the controlled gate when the verdict is %s',
     goldenPathVerdict => {

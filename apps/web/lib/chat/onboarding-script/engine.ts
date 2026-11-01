@@ -5,6 +5,7 @@ import {
   buildPostSelectionWritingBrief,
   type PostSelectionWritingBriefResult,
 } from '@/lib/chat/post-selection-writing-brief';
+import { ONBOARDING_OPENER_PRIMARY } from '@/lib/chat/prompts/onboarding';
 import {
   type AccessDecision,
   decideOnboardingAccess,
@@ -14,6 +15,12 @@ import {
   buildConfirmSpotifyArtistOutput,
   type OnboardingTurnState,
 } from '@/lib/chat/tools/onboarding-tool-impls';
+import { inferSegment } from '@/lib/creator/segments';
+import {
+  availableOnboardingModules,
+  onboardingDraftQuestion,
+} from '@/lib/onboarding/profile-draft';
+import { validateUsername } from '@/lib/validation/username';
 import { loadScriptBank, pickFromBank } from './line-source';
 import { renderLine, type ScriptLine, type ScriptStepId } from './script';
 import {
@@ -95,6 +102,49 @@ function messageText(message: UIMessage): string {
     .filter(part => part.type === 'text' && typeof part.text === 'string')
     .map(part => part.text)
     .join('');
+}
+
+/**
+ * A handle the visitor typed: "@name" anywhere, or a whole message that is
+ * one valid handle ("name"). Acks like "ok" never count.
+ */
+function typedHandleFrom(message: UIMessage | null): string | null {
+  if (!message) return null;
+  const text = messageText(message)
+    .replace(/https?:\/\/\S+/gi, '')
+    .trim();
+  if (!text || isIncompleteAdvanceMessage(text)) return null;
+  const candidate =
+    /(?:^|\s)@([a-z0-9_-]{1,30})\b/i.exec(text)?.[1] ??
+    /^([a-z0-9_-]{2,30})$/i.exec(text)?.[1];
+  const handle = candidate?.toLowerCase() ?? null;
+  return handle && validateUsername(handle).isValid ? handle : null;
+}
+
+/**
+ * The handle the visitor asked for, newest first: a handle typed in the latest
+ * message, else the `jov.ie/<handle>` they claimed from the homepage or a
+ * claim link ("I want to claim jov.ie/name."). The artist-name slug is only a
+ * fallback; it must never replace a handle the visitor named (2026-10-31
+ * golden-path walk: homepage claim of jov.ie/unmarkedpave became
+ * @unmarkedpavement, and the sign-up card then said "Claim @unmarkedpave").
+ */
+function requestedHandleFrom(
+  uiMessages: readonly UIMessage[],
+  latest: UIMessage | null,
+  latestIsWidgetEvent: boolean
+): string | null {
+  const typed = latestIsWidgetEvent ? null : typedHandleFrom(latest);
+  if (typed) return typed;
+  for (let i = uiMessages.length - 1; i >= 0; i -= 1) {
+    const message = uiMessages[i];
+    if (message?.role !== 'user') continue;
+    const claimed = /\bjov\.ie\/@?([a-z0-9_-]{2,30})\b/i
+      .exec(messageText(message))?.[1]
+      ?.toLowerCase();
+    if (claimed && validateUsername(claimed).isValid) return claimed;
+  }
+  return null;
 }
 
 function findWidgetEventInHistory(
@@ -307,6 +357,7 @@ function decideAccess(
       ? Math.min(state.turnCount, 2)
       : state.turnCount;
   return decideOnboardingAccess({
+    activeRole: state.profileDraft?.activeRole,
     accessControlled: state.accessControlled,
     goldenPathVerdict: state.goldenPathVerdict,
     goldenPathHold: state.goldenPathHold,
@@ -480,11 +531,105 @@ export async function decideFallbackTurn(
   }>
 ): Promise<FallbackTurn> {
   const { uiMessages, state } = input;
+  const draft = state.profileDraft;
+  if (
+    draft &&
+    (draft.activeRole !== 'artist' || (state.spotifyArtistId && !draft.outcome))
+  ) {
+    const reply = (
+      text: string,
+      toolEvents: readonly FallbackToolEvent[] = []
+    ): FallbackTurn => ({
+      line: {
+        key: `greet:adaptive-${draft.awaiting}-v1`,
+        stepId: 'greet',
+        variant: 'adaptive-v1',
+        text,
+      },
+      text:
+        state.turnCount <= 1 && !text.includes('if you sign up')
+          ? `I'll remember this chat if you sign up. ${text}`
+          : text,
+      toolEvents,
+    });
+    if (draft.awaiting === 'role' && state.turnCount <= 1)
+      return reply(ONBOARDING_OPENER_PRIMARY);
+    const source = draft.selectedSource;
+    const lastReply = [...uiMessages]
+      .reverse()
+      .find(message => message.role === 'assistant');
+    const priorText = lastReply ? messageText(lastReply) : '';
+    const observation =
+      source?.status === 'available' && source.title
+        ? priorText.includes(source.title)
+          ? ''
+          : `The page is titled “${source.title}”. `
+        : source?.status === 'unavailable' &&
+            !priorText.includes('could not read')
+          ? 'I could not read that page; its details are still unknown. '
+          : '';
+    if (draft.awaiting !== 'review') {
+      return reply(
+        `${draft.awaiting === 'outcome' ? observation : ''}${onboardingDraftQuestion(draft)}`
+      );
+    }
+    if (!availableOnboardingModules(draft).includes('public-profile'))
+      return reply(
+        'Profile setup is unavailable right now. What part of this draft would you like to refine?'
+      );
+    if (!draft.selectedSource)
+      return reply(
+        'The draft can stay here without an imported source. What public link should it include when you have one?'
+      );
+    const existingHandle = findLatestToolOutput(uiMessages, 'check_handle');
+    if (!existingHandle) {
+      const latest = lastUserMessage(uiMessages);
+      const text = latest
+        ? messageText(latest).replace(/https?:\/\/\S+/gi, '')
+        : '';
+      const handle = /(?:^|\s)@([a-z0-9_-]{1,30})\b/i
+        .exec(text)?.[1]
+        ?.toLowerCase();
+      if (!handle || !validateUsername(handle).isValid)
+        return reply(
+          `${observation}What handle would you like for this draft?`
+        );
+      return reply(`Check @${handle} below.`, [
+        {
+          toolName: 'checkHandle',
+          input: { handle },
+          output: {
+            action: 'check_handle',
+            handle,
+            summary: `Checking @${handle}.`,
+          },
+        },
+      ]);
+    }
+    if (!hasHandleConfirmed(uiMessages))
+      return reply('Confirm your chosen handle below to continue.');
+    // Current access policy remains authoritative. A role, source or draft
+    // never grants paid access or promises a domain-specific integration.
+    const decision = decideAccess(state, null);
+    if (decision.kind === 'needs_more_info')
+      return reply('What are you using for this work today?');
+    return reply('Continue below to request access and keep this draft.', [
+      proposeNextStepEvent(decision),
+    ]);
+  }
   const sessionId = state.sessionId;
   // Seeds merged with nightly-promoted lines (DB failure degrades to seeds).
   const bank = await loadScriptBank();
+  // Segment from what the visitor has said so far (JOV-9679). Unknown stays
+  // unresolved and keeps the legacy copy until a signal arrives.
+  const segment = inferSegment({
+    onboardingAnswer: uiMessages
+      .filter(message => message.role === 'user')
+      .map(message => messageText(message))
+      .join(' '),
+  }).segment;
   const pick = (stepId: ScriptStepId): ScriptLine =>
-    pickFromBank(bank, stepId, sessionId);
+    pickFromBank(bank, stepId, sessionId, segment);
   const latest = lastUserMessage(uiMessages);
   const selectedArtistId = parseArtistSelection(latest);
   const latestEvent = latest
@@ -526,6 +671,12 @@ export async function decideFallbackTurn(
     const line = hasData
       ? pick('confirm_artist')
       : pick('confirm_artist_no_data');
+    // The line says "claim a handle next", so the handle card ships in the
+    // same turn. Without it the visitor faced a prompt with no control and
+    // had to guess what to type (2026-10-31 golden-path walk).
+    const handle =
+      requestedHandleFrom(uiMessages, null, true) ??
+      handleFromArtistName(state.spotifyArtistName ?? '');
     return {
       line,
       text: renderLine(line, {
@@ -537,6 +688,15 @@ export async function decideFallbackTurn(
           toolName: 'confirmSpotifyArtist',
           input: { spotifyArtistId: selectedArtistId },
           output: output as unknown as Record<string, unknown>,
+        },
+        {
+          toolName: 'checkHandle',
+          input: { handle },
+          output: {
+            action: 'check_handle',
+            handle,
+            summary: `Checking @${handle}.`,
+          },
         },
       ],
       guardedStep: 'artist_select',
@@ -585,7 +745,9 @@ export async function decideFallbackTurn(
       WIDGET_COMPLETION_ACTIONS.HANDLE_CONFIRMED
     );
   if (!existingHandleCheck) {
-    const handle = handleFromArtistName(state.spotifyArtistName ?? '');
+    const handle =
+      requestedHandleFrom(uiMessages, latest, Boolean(latestEvent)) ??
+      handleFromArtistName(state.spotifyArtistName ?? '');
     const line = pick('handle');
     return {
       line,
@@ -618,7 +780,9 @@ export async function decideFallbackTurn(
       (typeof existingHandleCheck.handle === 'string'
         ? String(existingHandleCheck.handle)
         : handleFromArtistName(state.spotifyArtistName ?? ''));
-    const line = pick('ask_audience');
+    // The social-link card ships with this turn, so the line asks for the
+    // link; the audience question waits until the link is attached.
+    const line = pick('attach_social');
     return {
       line,
       text: renderLine(line, {}),
@@ -649,16 +813,34 @@ export async function decideFallbackTurn(
   // Handle shown but not confirmed via widget event — stay on handle.
   // Free-text "ok" / "k" does not advance.
   if (!hasHandleConfirmed(uiMessages)) {
-    // Re-surface handle step; do not decide access.
-    const handle =
+    const shownHandle =
       typeof existingHandleCheck.handle === 'string'
         ? existingHandleCheck.handle
         : handleFromArtistName(state.spotifyArtistName ?? '');
+    // A handle typed in chat replaces the suggested one: check it instead of
+    // repeating the old line (2026-10-29 canary walk: typed handles were
+    // ignored and the only way forward was editing the card's field).
+    const typedHandle = latestEvent ? null : typedHandleFrom(latest);
+    const handle =
+      typedHandle && typedHandle !== shownHandle ? typedHandle : shownHandle;
     const line = pick('handle');
     return {
       line,
       text: renderLine(line, { handle }),
-      toolEvents: [],
+      toolEvents:
+        handle === shownHandle
+          ? []
+          : [
+              {
+                toolName: 'checkHandle',
+                input: { handle },
+                output: {
+                  action: 'check_handle',
+                  handle,
+                  summary: `Checking @${handle}.`,
+                },
+              },
+            ],
       guardedStep: 'handle',
     };
   }

@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react';
-import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { YoutubeThumbnailsLanding } from '@/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding';
 import { MARKETING_PAGE_CONTRACTS } from '@/data/marketing/pageContracts';
@@ -14,21 +13,6 @@ vi.mock('next/navigation', async importOriginal => {
   return {
     ...actual,
     usePathname: () => pathnameRef.current,
-  };
-});
-
-const footerFlagCalls = vi.hoisted(() => ({
-  values: [] as Array<boolean | undefined>,
-}));
-
-vi.mock('./MarketingFooter', async importOriginal => {
-  const actual = await importOriginal<typeof import('./MarketingFooter')>();
-  return {
-    ...actual,
-    MarketingFooter: (props: ComponentProps<typeof actual.MarketingFooter>) => {
-      footerFlagCalls.values.push(props.genericCreatorNav);
-      return <actual.MarketingFooter {...props} />;
-    },
   };
 });
 
@@ -48,6 +32,25 @@ describe('PublicPageShell', () => {
     expect(mains[0]).toContainElement(
       screen.getByTestId('marketing-section-cta')
     );
+  });
+
+  it('renders route-owned pageContract markers and footer CTA suppression regardless of pathname', () => {
+    pathnameRef.current = '/not-the-route';
+    const { container } = render(
+      <PublicPageShell
+        footerShowCta={false}
+        pageContract={MARKETING_PAGE_CONTRACTS['(home)/page.tsx']}
+      >
+        <p>route content</p>
+      </PublicPageShell>
+    );
+    pathnameRef.current = '/';
+
+    expect(container.querySelector('[data-primary-cta]')).toHaveAttribute(
+      'href',
+      MARKETING_PAGE_CONTRACTS['(home)/page.tsx'].primaryCta.href
+    );
+    expect(screen.queryByTestId('marketing-footer-cta')).toBeNull();
   });
 
   it('renders children inside main#main-content with the header offset by default', () => {
@@ -135,21 +138,21 @@ describe('PublicPageShell', () => {
     expect(main).not.toHaveClass('public-shell-main--docked');
   });
 
-  it('passes MARKETING_GENERIC_CREATOR_NAV into the marketing footer', () => {
-    footerFlagCalls.values.length = 0;
-    delete process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV;
-
-    const on = render(<PublicPageShell>body</PublicPageShell>);
-    expect(footerFlagCalls.values.at(-1)).toBe(true);
-    on.unmount();
-
-    process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV = 'false';
-    try {
-      render(<PublicPageShell>body</PublicPageShell>);
-      expect(footerFlagCalls.values.at(-1)).toBe(false);
-    } finally {
-      delete process.env.FEATURE_MARKETING_GENERIC_CREATOR_NAV;
-    }
+  it('passes published chrome columns into the footer', () => {
+    render(
+      <PublicPageShell
+        chrome={{
+          nav: { primary: [], customers: [] },
+          legalLinks: [{ href: '/legal/privacy', label: 'Privacy' }],
+          footerColumns: [
+            { title: 'Beta', links: [{ href: '/about', label: 'About us' }] },
+          ],
+        }}
+      >
+        body
+      </PublicPageShell>
+    );
+    expect(screen.getByRole('link', { name: 'About us' })).toBeInTheDocument();
   });
 
   it('passes footer variant and className through to MarketingFooter', () => {
@@ -199,5 +202,21 @@ describe('PublicPageShell', () => {
     expect(
       screen.queryByRole('link', { name: 'Skip to content' })
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('prerendered homepage pathname', () => {
+  it('MarketingPageContractMarkers.tsx reads "/index" as "/" via usePublicPathname', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/site/MarketingPageContractMarkers.tsx'
+      ),
+      'utf8'
+    );
+    expect(source).toContain('usePublicPathname');
+    expect(source).not.toMatch(/\busePathname\b/);
   });
 });

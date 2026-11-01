@@ -35,6 +35,7 @@ import {
   findBlogQualificationRun,
   isStrictBlogContentPr,
 } from './lib/blog-publish-latency.mjs';
+import { ciRoundsMetrics, flattenCiRounds } from './lib/ci-rounds.mjs';
 import { formatBiomeJson } from './lib/format-biome-json.mjs';
 import {
   buildGistSloBlock,
@@ -412,7 +413,7 @@ export function collectRaw({ workflows, days }) {
 export function buildReport(
   raw,
   baseline,
-  { now = Date.now(), stageManifest = null } = {}
+  { now = Date.now(), stageManifest = null, ciCapacity = null } = {}
 ) {
   const nowMs = typeof now === 'number' ? now : Date.parse(now);
   const weekMs = 7 * 86_400_000;
@@ -459,6 +460,7 @@ export function buildReport(
       nowMs,
     }),
     productionLag: productionLag(merged, verifiedEvents, sinceMs, nowMs),
+    ciRounds: ciRoundsMetrics(prRuns, merged, { sinceMs, nowMs }),
     throughput: throughputTrend(merged, nowMs, {
       verifiedPredicate: p =>
         Boolean(
@@ -497,7 +499,11 @@ export function buildReport(
     .sort((a, b) => b.seconds - a.seconds)
     .slice(0, 5);
 
-  const flat = flattenMetrics(metrics);
+  /** @type {Record<string, any>} */
+  const flat = {
+    ...flattenMetrics(metrics),
+    ...flattenCiRounds(metrics.ciRounds),
+  };
   // When no verification evidence was collected at all, a 0 is a collector
   // gap, not a throughput signal — null the derived keys so the evaluator
   // skips them instead of filing a phantom >20% regression (JOV-8082).
@@ -542,10 +548,15 @@ export function buildReport(
     gistSlo.stages = buildStageSummary(stageTimings);
   }
 
+  // Hosted-runner capacity (scripts/ci-capacity-slo.mjs): queue wait p50/p95
+  // and control-plane job-minutes/hour, with the p95 > 120s alarm flag.
+  if (ciCapacity) gistSlo.ciCapacity = ciCapacity;
+
   return {
     schemaVersion: 1,
     generatedAt: new Date(nowMs).toISOString(),
     windowDays: 7,
+    ciCapacity,
     metrics,
     blogPublishLatency,
     flat,
@@ -613,6 +624,11 @@ export function markdownSummary(report) {
       `(target +8%) · trend ${t.growthTrend ?? 'unknown'}`,
     `**Queue ejection rate:** ${report.metrics.mergeQueue?.ejectionRate === null || report.metrics.mergeQueue?.ejectionRate === undefined ? 'n/a' : (report.metrics.mergeQueue.ejectionRate * 100).toFixed(1) + '%'}`
   );
+  const cr = report.metrics.ciRounds;
+  if (cr?.prs)
+    lines.push(
+      `**CI rounds per merged PR:** mean ${cr.roundsMean.toFixed(2)} (target <= ${cr.target}) · p95 ${cr.roundsP95} · Source Validation first-push pass ${cr.firstPushPassRate === null ? 'n/a' : `${(cr.firstPushPassRate * 100).toFixed(0)}%`} (n=${cr.firstPushSamples})`
+    );
   const blog = report.blogPublishLatency;
   lines.push(
     '',
@@ -774,7 +790,18 @@ async function main() {
       days: Number(argValue(args, '--stage-days', '29')),
     });
 
-  const report = buildReport(raw, baseline, { stageManifest });
+  let ciCapacity = null;
+  try {
+    ciCapacity = JSON.parse(
+      readFileSync(
+        resolve(REPO_ROOT, 'docs/metrics/ci-capacity-latest.json'),
+        'utf8'
+      )
+    );
+  } catch {
+    // No capacity sample this run; the SLO report is unaffected.
+  }
+  const report = buildReport(raw, baseline, { stageManifest, ciCapacity });
 
   if (hasArg(args, '--ratchet')) {
     const { next, tightened } = ratchetBaseline(

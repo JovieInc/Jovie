@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ -n "$(git ls-files --unmerged)" ]]; then
+  echo "ERROR: Unmerged index entries remain; resolve and stage every conflict."
+  exit 1
+fi
+
 # Check staged files for leftover merge conflict markers.
 # Uses git's built-in conflict marker detector, fails fast before lint/typecheck.
 output=$(LC_ALL=C git diff --cached --check 2>&1 || true)

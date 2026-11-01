@@ -12,13 +12,9 @@ import { describe, expect, it } from 'vitest';
 const MOTION_DIR = join(__dirname);
 
 const BUDGETS_GZIP_BYTES = {
-  // The WebGL2 layer, loaded as its own chunk after idle.
-  'ambient-field-gl.ts': 3 * 1024,
-  // The island that ships with the page: poster markup plus gating.
-  'MarketingAmbientField.tsx': 2 * 1024,
-  // Matte motion pair (docs/design-system/motion-effects.json). The field is
-  // the WebGL2 chunk; the hero zoom is CSS transforms only, zero GL.
-  'matte-field-gl.ts': 2 * 1024,
+  // The hero zoom is CSS transforms only, zero GL. The WebGL ambient and
+  // matte fields were removed (no production consumers, 2026-10-29); any new
+  // WebGL background registers in data/marketing/animatedBackgroundBudget.ts.
   'hero-shell-zoom.ts': 1.5 * 1024,
 } as const;
 
@@ -42,19 +38,6 @@ describe('marketing motion budgets', () => {
       expect(transpiledGzipBytes(file)).toBeLessThanOrEqual(budget);
     }
   );
-
-  it('loads the GL layer lazily, never in the page chunk', () => {
-    const island = readFileSync(
-      join(MOTION_DIR, 'MarketingAmbientField.tsx'),
-      'utf8'
-    );
-    const staticImports = island.match(
-      /^import\s+(?!type\b)[^;]*from\s+['"]\.\/ambient-field-gl['"]/gm
-    );
-
-    expect(staticImports).toBeNull();
-    expect(island).toContain("import('./ambient-field-gl')");
-  });
 
   it('keeps the hero entrance its consumers rely on, LCP-safe and motion-aware', () => {
     const css = readFileSync(

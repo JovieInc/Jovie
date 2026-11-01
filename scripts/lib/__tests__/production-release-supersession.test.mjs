@@ -23,8 +23,11 @@ import {
   aliasDecision,
   collectAliasGraduation,
   completeList,
+  MIN_SAMPLES_PER_ROUTE,
+  nearestRankP95,
   parseAliasSamples,
   selectAliasWindow,
+  uniformSamplesPerRoute,
 } from '../public-profile-alias-graduation.mjs';
 import {
   realGhVersion,
@@ -88,16 +91,12 @@ describe('public-profile alias graduation policy', () => {
     }
     expect(receipt.schema).toBe('jovie-public-profile-alias-graduation/v2');
     expect(inventory).toHaveLength(selection.enumeratedControllers);
-    const originalWindow = selectAliasWindow(
-      inventory,
-      'production',
-      '2026-10-14T15:21:25Z'
-    );
-    expect(originalWindow.map(row => row.production.jobId)).toEqual(
-      expect.arrayContaining([115872079856, 115852914061, 115804204403])
-    );
+    // Completeness: every selected window below is recomputed from the full
+    // enumerated inventory, so an omitted controller changes the selection.
     expect(selection.windowSize).toBe(policy.requiredConsecutiveRuns);
-    expect(policy.samplesPerRoute).toBe(5);
+    expect(policy.samplesPerRoute).toBeGreaterThanOrEqual(
+      MIN_SAMPLES_PER_ROUTE
+    );
     expect(policy.p95Estimator).toBe('nearest-rank');
     for (const [surface, window] of Object.entries(windows)) {
       const selected = selectAliasWindow(inventory, surface, selection.cutoff);
@@ -122,10 +121,13 @@ describe('public-profile alias graduation policy', () => {
         expect(row.jobUrl).toBe(
           `https://github.com/JovieInc/Jovie/actions/runs/${row.controllerRunId}/job/${row.jobId}`
         );
+        expect(row.samplesPerRoute).toBe(policy.samplesPerRoute);
         for (const route of ALIAS_ROUTES) {
-          expect(row.routeSamplesMs[route]).toHaveLength(5);
+          expect(row.routeSamplesMs[route]).toHaveLength(
+            policy.samplesPerRoute
+          );
           expect(row.routeP95Ms[route]).toBe(
-            Math.max(...row.routeSamplesMs[route])
+            nearestRankP95(row.routeSamplesMs[route])
           );
         }
         expect(row.observedP95Ms).toBe(
@@ -255,6 +257,50 @@ describe('public-profile alias graduation policy', () => {
     expect(aliasDecision(Array(14).fill(parsed)).graduated).toBe(true);
   });
 
+  it('reads the guard sample count from the log and checks the nearest-rank p95, not the max', () => {
+    // performance-budgets-guard takes 20 samples since #22656; its summary is
+    // the 19th of 20 sorted samples, so one 1800ms outlier still qualifies.
+    const values = index => (index === 20 ? 1800 : index === 19 ? 900 : 700);
+    const log = ALIAS_ROUTES.map(
+      route =>
+        `Checking ${route} -> /test\n${Array.from({ length: 20 }, (_, i) => `  sample ${i + 1}/20: ${values(i + 1)}ms`).join('\n')}\n${route} (/test) primary=usable-alias-result=700ms\n  PASS usable-alias-result-max: 900.0ms / 1500.0ms`
+    ).join('\n');
+    expect(parseAliasSamples(log)).toMatchObject({
+      samplesPerRoute: 20,
+      valid: true,
+      qualifies: true,
+      observedP95Ms: 900,
+    });
+    for (const broken of [
+      // summary claims the max instead of the nearest-rank p95
+      log.replaceAll('900.0ms / 1500.0ms', '1800.0ms / 1500.0ms'),
+      // one route reports a different sample count
+      log.replace('sample 20/20: 1800ms', 'sample 20/21: 1800ms'),
+      // fewer than the minimum samples per route
+      ALIAS_ROUTES.map(
+        route =>
+          `Checking ${route} -> /test\n  sample 1/1: 700ms\n${route} (/test) primary=usable-alias-result=700ms\n  PASS usable-alias-result-max: 700.0ms / 1500.0ms`
+      ).join('\n'),
+    ]) {
+      expect(parseAliasSamples(broken)).toMatchObject({
+        valid: false,
+        qualifies: false,
+      });
+    }
+    expect(
+      uniformSamplesPerRoute([
+        { valid: true, samplesPerRoute: 20 },
+        { valid: false, samplesPerRoute: 5 },
+      ])
+    ).toBe(20);
+    expect(
+      uniformSamplesPerRoute([
+        { valid: true, samplesPerRoute: 20 },
+        { valid: true, samplesPerRoute: 5 },
+      ])
+    ).toBeNull();
+  });
+
   it('collects paginated exact-attempt jobs without filtering failed controllers or borrowing staging samples', async () => {
     const at = '2026-10-20T01:00:00Z';
     const runs = Array.from({ length: 17 }, (_, index) => ({
@@ -368,7 +414,8 @@ describe('public-profile alias graduation policy', () => {
           'pnpm',
           // Record every invocation (the script runs other pnpm commands around the guard) and
           // fail only the performance-budgets guard, so the assertions read that guard's own arguments.
-          '#!/bin/sh\nprintf "%s\\n" "$@" >> "$ALIAS_GUARD_ARGUMENTS"\nprintf -- "--invocation-end--\\n" >> "$ALIAS_GUARD_ARGUMENTS"\ncase "$*" in *performance-budgets-guard*) exit "$ALIAS_GUARD_EXIT" ;; *) exit 0 ;; esac\n'
+          // Each call is appended with one write: the staged gate runs its budget lanes concurrently.
+          '#!/bin/sh\ncall="$(printf "%s\\n" "$@"; printf -- "--invocation-end--\\n")"\nprintf "%s\\n" "$call" >> "$ALIAS_GUARD_ARGUMENTS"\ncase "$*" in *performance-budgets-guard*) exit "$ALIAS_GUARD_EXIT" ;; *) exit 0 ;; esac\n'
         );
         const result = runScript(script, fixture, {
           ALIAS_GUARD_ARGUMENTS: join(fixture.root, 'arguments'),
@@ -387,7 +434,10 @@ describe('public-profile alias graduation policy', () => {
           expect(outputs).toMatchObject({
             failure_subtype: 'exact_build_performance_failed',
           });
-        else expect(outputs.performance_status).toBe('warn');
+        else
+          expect(outputs.performance_status).toBe(
+            decision === 'block' ? 'failed' : 'warn'
+          );
         const calls = readFileSync(join(fixture.root, 'arguments'), 'utf8')
           .split('--invocation-end--\n')
           .filter(Boolean);

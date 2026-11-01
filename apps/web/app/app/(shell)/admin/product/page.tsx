@@ -1,29 +1,24 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { CapabilityEvidenceMatrix } from '@/components/features/admin/CapabilityEvidenceMatrix';
-import { OvieShippingStateCard } from '@/components/features/admin/hud/OvieShippingStateCard';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { StatusPipeline } from '@/components/molecules/StatusPipeline';
 import { APP_ROUTES } from '@/constants/routes';
 import { loadCapabilityEvidence } from '@/lib/admin/capability-evidence';
+import { capabilityLifecycleStages } from '@/lib/admin/capability-evidence-model';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 
 export const metadata: Metadata = { title: 'Product | Ovie' };
 export const runtime = 'nodejs';
 
-const lifecycle = [
-  'Desired',
-  'Built',
-  'Certified',
-  'Deployed',
-  'Exposed',
-  'Observed',
-  'Healthy',
-] as const;
-
 const evidenceGaps = [
   'Web and client version distribution is not observed by an authoritative source; running-client evidence stays unknown.',
   'Only public profile pages join configured state to observed exposure and outcome; other capabilities still show configured state only.',
 ] as const;
+
+const LINK_CLASS = 'text-secondary-token hover:text-primary-token';
 
 export default async function ProductPage() {
   await requireCurrentAdminPageAccess();
@@ -31,41 +26,34 @@ export default async function ProductPage() {
 
   return (
     <AdminPage
+      views='shipping'
       title='Product'
       description='What customers are actually experiencing, from intent through healthy production observation.'
       testId='founder-product-page'
     >
-      <ol
-        className='flex min-h-11 items-center gap-1 overflow-x-auto text-2xs text-secondary-token'
-        aria-label='Product Delivery Lifecycle'
-      >
-        {lifecycle.map((stage, index) => (
-          <li key={stage} className='flex shrink-0 items-center gap-1'>
-            <span className='rounded-(--radius-sm) border border-subtle px-2 py-1'>
-              {stage}
-            </span>
-            {index < lifecycle.length - 1 ? (
-              <span aria-hidden='true'>→</span>
-            ) : null}
-          </li>
-        ))}
-      </ol>
-
-      <OvieShippingStateCard />
+      <ContentSurfaceCard surface='details' as='section'>
+        <ContentSectionHeader
+          title='Lifecycle'
+          subtitle={capabilityEvidence.title}
+          density='compact'
+        />
+        <div className='p-3'>
+          <StatusPipeline
+            ariaLabel='Product Delivery Lifecycle'
+            stages={capabilityLifecycleStages(capabilityEvidence)}
+          />
+        </div>
+      </ContentSurfaceCard>
 
       <CapabilityEvidenceMatrix record={capabilityEvidence} />
 
-      <ContentSurfaceCard surface='details'>
+      <ContentSurfaceCard surface='details' as='section'>
+        <ContentSectionHeader
+          title='Evidence Gaps'
+          subtitle='Unknown is not treated as shipped. These observations need instrumentation.'
+          density='compact'
+        />
         <div className='space-y-3 p-3'>
-          <div>
-            <h2 className='line-clamp-2 text-app font-semibold text-primary-token'>
-              Evidence Gaps
-            </h2>
-            <p className='text-2xs text-tertiary-token'>
-              Unknown is not treated as shipped. These observations need
-              instrumentation.
-            </p>
-          </div>
           <ul className='space-y-2 text-app text-secondary-token'>
             {evidenceGaps.map(gap => (
               <li
@@ -77,18 +65,12 @@ export default async function ProductPage() {
             ))}
           </ul>
           <div className='flex flex-wrap gap-3 text-2xs font-medium'>
-            <a
-              className='text-secondary-token hover:text-primary-token'
-              href={APP_ROUTES.ADMIN_FEATURES}
-            >
+            <Link className={LINK_CLASS} href={APP_ROUTES.ADMIN_FEATURES}>
               Inspect feature state →
-            </a>
-            <a
-              className='text-secondary-token hover:text-primary-token'
-              href={APP_ROUTES.ADMIN_RELEASES}
-            >
+            </Link>
+            <Link className={LINK_CLASS} href={APP_ROUTES.ADMIN_RELEASES}>
               Inspect release entities →
-            </a>
+            </Link>
           </div>
         </div>
       </ContentSurfaceCard>

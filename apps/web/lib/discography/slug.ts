@@ -17,6 +17,7 @@ import {
 } from '@/lib/db/schema/content';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import { logger } from '@/lib/utils/logger';
+import { qualifierCandidates, type VersionType } from './slug-policy';
 
 export type ContentType = 'release' | 'track' | 'release_track';
 
@@ -164,39 +165,48 @@ export async function isSlugAvailable(
 }
 
 export interface GenerateUniqueSlugOptions {
-  /**
-   * Prefer year-based disambiguation (`title-2019`) before opaque `-2` suffixes
-   * when two same-title releases collide.
-   */
+  /** Release year (fallback when no full date is known). */
   readonly year?: number | null;
+  readonly releaseDate?: Date | null;
+  /** Other `main_artist` credits besides the profile owner (co-primary). */
+  readonly coPrimary?: readonly string[];
+  readonly featured?: readonly string[];
+  readonly remixers?: readonly string[];
+  /** Explicit version metadata; never inferred from the title. */
+  readonly versionType?: VersionType | null;
 }
 
 /**
- * Ordered slug candidates for collision resolution.
- * Prefer base → year → numeric suffixes (skipping year-shaped numbers).
+ * Ordered slug candidates for collision resolution. Never numeric suffixes:
+ * base, then version, co-primary (`-with-x`), featured, year, and combinations.
  */
 export function buildSlugDisambiguationCandidates(
   baseSlug: string,
-  year?: number | null
+  options: GenerateUniqueSlugOptions = {}
 ): string[] {
   if (!baseSlug) return [];
-
-  const candidates: string[] = [baseSlug];
-  if (typeof year === 'number' && Number.isFinite(year) && year >= 1000) {
-    candidates.push(`${baseSlug}-${year}`);
-  }
-
-  for (let i = 2; i <= 100; i++) {
-    // Avoid re-emitting a year-shaped suffix already preferred above.
-    if (typeof year === 'number' && i === year) continue;
-    candidates.push(`${baseSlug}-${i}`);
-  }
-
-  return candidates;
+  const releaseDate =
+    options.releaseDate ??
+    (typeof options.year === 'number' &&
+    Number.isFinite(options.year) &&
+    options.year >= 1000
+      ? new Date(Date.UTC(options.year, 0, 1))
+      : null);
+  return [
+    baseSlug,
+    ...qualifierCandidates(baseSlug, {
+      releaseDate,
+      coPrimary: options.coPrimary ?? [],
+      featured: options.featured ?? [],
+      remixers: options.remixers ?? [],
+      versionType: options.versionType ?? null,
+    }).map(c => c.slug),
+  ];
 }
 
 /**
- * Generate a unique slug for content, handling collisions with year then -2, -3.
+ * Generate a unique slug for content, disambiguating with a meaningful
+ * qualifier (see slug-policy.ts), never `-2`/`-3`.
  */
 export async function generateUniqueSlug(
   creatorProfileId: string,
@@ -218,16 +228,30 @@ export async function generateUniqueSlug(
 
   for (const candidate of buildSlugDisambiguationCandidates(
     baseSlug,
-    options?.year
+    options
   )) {
     if (await isSlugAvailable(creatorProfileId, candidate, excludeOptions)) {
       return candidate;
     }
   }
 
-  // Fallback: append random suffix (extremely rare edge case)
-  const randomSuffix = crypto.randomUUID().slice(0, 6);
-  return `${baseSlug}-${randomSuffix}`;
+  // Still ambiguous (identical title, date and credits): letters-only suffix,
+  // never numeric.
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const word = crypto
+      .randomUUID()
+      .replaceAll(/[^a-f]/g, '')
+      .padEnd(5, 'x')
+      .slice(0, 5);
+    const candidate = `${baseSlug}-${word}`;
+    if (await isSlugAvailable(creatorProfileId, candidate, excludeOptions)) {
+      return candidate;
+    }
+  }
+  return `${baseSlug}-${crypto
+    .randomUUID()
+    .replaceAll(/[^a-f]/g, 'x')
+    .slice(0, 8)}`;
 }
 
 /**

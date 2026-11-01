@@ -3,10 +3,9 @@
 // The single source is admission-hold-labels.json, read here and by the lanes
 // (scripts/lanes/pr_events.py) so no consumer keeps its own list.
 //
-// Stop labels are explicit intent from a person or agent. Dedicated human
-// holds (tim-hold variants and do-not-merge) require an authorized disposition;
-// the hold contract never expires them or their coexisting stops. Other labels
-// use the hold contract (scripts/hold-contract.mjs, jovie-hold/v1): a receipt
+// Stop labels are explicit intent from a person or agent. No stop label is
+// human-owned: tim-hold variants and do-not-merge are retired (2026-10-28), so
+// every label uses the hold contract (scripts/hold-contract.mjs, jovie-hold/v1): a receipt
 // names an owner and a machine-checkable release, or the ownerless grace
 // period applies. `queue-poison` and `machineBlockLabels`
 // (`lane-fix-red`) are machine state, not hold-contract labels. The Lane Fix

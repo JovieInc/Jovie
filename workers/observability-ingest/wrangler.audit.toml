@@ -1,0 +1,32 @@
+name = "jovie-fleet-audit"
+main = "src/audit/index.ts"
+compatibility_date = "2026-10-15"
+workers_dev = true  # jov.ie DNS is not on Cloudflare; move to a custom domain if it ever is
+preview_urls = false
+
+[vars]
+GITHUB_APP_ID = "2934433"          # jovie-bot
+GITHUB_INSTALLATION_ID = "112037986"
+BUDGET_BYTES_MONTH = "104857600"   # 100 MB
+RETENTION_DAYS = "90"
+MESH_URL = "https://summer.jov.ie"
+
+[[d1_databases]]
+binding = "AUDIT_DB"
+database_name = "jovie-fleet-audit"
+database_id = "172ece6e-4f8d-4bcc-a23d-f935eae5790c"
+migrations_dir = "migrations/audit"
+
+[[r2_buckets]]
+binding = "ARCHIVE"
+bucket_name = "jovie-evidence"
+
+[triggers]
+# Hourly: budget check. 03:xx UTC pass also archives >90d rows to R2 (gzip NDJSON) and deletes them.
+crons = ["23 * * * *"]
+
+# Secret bindings (wrangler secret put -c wrangler.audit.toml):
+#   INGEST_HMAC_SECRET       hosts sign POST bodies (x-fleet-audit-signature: sha256=<hex>)
+#   READ_TOKEN               bearer for GET /v1/who and /v1/summary (CLI, MCP, Ovie)
+#   MESH_SENDER_ID, MESH_SENDER_KIND, MESH_TOKEN   agent-mesh sender used for Summer alerts
+#   GITHUB_APP_PRIVATE_KEY   jovie-bot key, PKCS#8 PEM; enables POST /v1/token (broker)

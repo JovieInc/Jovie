@@ -1,0 +1,21 @@
+
+   • turbo 2.11.9
+   • Packages in scope: @jovie/action-contracts, @jovie/agent-transport-contracts, @jovie/api-client, @jovie/audio-contracts, @jovie/auth-routing, @jovie/canary-otp, @jovie/cli, @jovie/console, @jovie/copy, @jovie/desktop, @jovie/docs, @jovie/extension, @jovie/extension-contracts, @jovie/media-ingest, @jovie/observability-ingest, @jovie/ovie, @jovie/release-channel-contracts, @jovie/research, @jovie/should-i-make, @jovie/ui, @jovie/web
+   • Running typecheck in 21 packages
+   • Remote caching disabled
+
+@jovie/action-contracts:typecheck: cache hit, replaying logs db00b0bd9895c94a
+@jovie/action-contracts:typecheck:
+@jovie/action-contracts:typecheck: > @jovie/action-contracts@ typecheck /workspace/Jovie/packages/action-contracts
+@jovie/action-contracts:typecheck: > tsc --noEmit
+@jovie/action-contracts:typecheck:
+@jovie/auth-routing:typecheck: cache hit, replaying logs cc32fee498bfc7f3
+@jovie/cli:typecheck: > tsc -p tsconfig.json --noEmit
+@jovie/extension:typecheck: > tsc -p tsconfig.json --noEmit
+@jovie/web:typecheck: > NODE_OPTIONS=--max-old-space-size=8192 node ../../scripts/typecheck-singleflight.mjs -- tsc -p tsconfig.typecheck.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo
+@jovie/web:typecheck: [typecheck-singleflight] phase=acquire role=owner elapsedMs=0 pid=14218 tsbuildinfo=.cache/tsbuildinfo tsbuildinfoAgeMs=802205 tsbuildinfoBytes=2829747 command=tsc -p tsconfig.typecheck.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo
+@jovie/web:typecheck: [typecheck-singleflight] phase=child-start role=owner elapsedMs=6 pid=14218 childPid=14249 cpuPct=n/a rssKb=500 tsbuildinfo=.cache/tsbuildinfo tsbuildinfoAgeMs=802211 tsbuildinfoBytes=2829747 command=tsc -p tsconfig.typecheck.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo
+@jovie/web:typecheck: [typecheck-singleflight] phase=child-complete role=owner elapsedMs=131403 pid=14218 childPid=14249 cpuPct=n/a rssKb=n/a tsbuildinfo=.cache/tsbuildinfo tsbuildinfoAgeMs=217 tsbuildinfoBytes=3611283 exit=0 command=tsc -p tsconfig.typecheck.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo
+ Tasks:    20 successful, 20 total
+Cached:    18 cached, 20 total
+  Time:    2m21.936s

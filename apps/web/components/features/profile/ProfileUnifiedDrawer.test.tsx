@@ -9,11 +9,15 @@ vi.mock('@/features/profile/ProfileDrawerShell', () => ({
   ProfileDrawerShell: ({
     children,
     dataTestId,
+    title,
   }: {
     readonly children: React.ReactNode;
     readonly dataTestId?: string;
+    readonly title?: string;
   }) => (
-    <div data-testid={dataTestId ?? 'profile-drawer-shell'}>{children}</div>
+    <div data-testid={dataTestId ?? 'profile-drawer-shell'} data-title={title}>
+      {children}
+    </div>
   ),
 }));
 
@@ -150,6 +154,28 @@ describe('ProfileUnifiedDrawer', () => {
       'text|release|text'
     );
     expect(section).toHaveAttribute('data-contacts', 'contact-1');
+  });
+
+  it('names the recipient in the pay drawer title, not in a body block', () => {
+    render(
+      <ProfileUnifiedDrawer
+        {...baseProps}
+        view='pay'
+        socialLinks={[
+          {
+            id: 'venmo-1',
+            platform: 'venmo',
+            url: 'https://venmo.com/u/timwhite',
+          } as never,
+        ]}
+      />
+    );
+
+    expect(
+      document.querySelector(`[data-title="Pay ${artist.name}"]`)
+    ).not.toBeNull();
+    expect(screen.getByTestId('pay-view')).toBeInTheDocument();
+    expect(screen.queryByTestId('profile-pay-recipient')).toBeNull();
   });
 
   it('offers release credits from the menu only when a handler is provided', () => {

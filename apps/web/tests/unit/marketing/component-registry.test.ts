@@ -705,8 +705,8 @@ describe('canonical marketing component registry', () => {
       ArtistProfileSectionShell: expect.stringContaining(
         'export function ArtistProfileSectionShell'
       ),
-      ArtistProfileSocialProof: expect.stringContaining(
-        'export function ArtistProfileSocialProof'
+      ArtistProfileSocialProof: expect.stringMatching(
+        /export function ArtistProfileSocialProof[\s\S]*export function ArtistProfileReleaseCycleGallery\(\{[\s\S]*id,/
       ),
       ArtistProfileSpecWall: expect.stringContaining(
         'export function ArtistProfileSpecWall'

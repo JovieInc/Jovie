@@ -1,0 +1,369 @@
+{
+  "schema": "jovie.dead-ends/v1",
+  "invariant": "JOV-INV-046",
+  "totalFindings": 157,
+  "files": {
+    "apps/desktop/src/build-identity.ts": {
+      "copy:dead-end-not-available:development (build time unavailable)": 1
+    },
+    "apps/desktop/src/main.ts": {
+      "copy:dead-end-not-available:Development build — build time unavailable": 1
+    },
+    "apps/web/app/(dynamic)/playlists/page.tsx": {
+      "copy:dead-end-coming-soon:Coming soon. First playlists dropping soon.": 1
+    },
+    "apps/web/app/[username]/[slug]/page.tsx": {
+      "copy:dead-end-coming-soon:\"${content.title}\"${releaseYear} by ${artistName} is coming soon. Get notified when it dro": 1,
+      "copy:dead-end-coming-soon:New music from ${artistName} - Coming Soon": 1,
+      "copy:dead-end-coming-soon:${contentTitle} by ${artistName} - Coming Soon": 1,
+      "copy:dead-end-coming-soon:coming soon": 1,
+      "copy:dead-end-coming-soon:Coming soon · ${artistName}": 1
+    },
+    "apps/web/app/[username]/opengraph-image.tsx": {
+      "copy:dead-end-not-available:Preview unavailable": 1,
+      "copy:dead-end-not-available:Profile unavailable": 1
+    },
+    "apps/web/app/a/[handle]/[slug]/page.tsx": {
+      "copy:dead-end-coming-soon:Coming soon · ${pending.artistName} · Jovie": 1
+    },
+    "apps/web/app/app/(shell)/admin/features/page.tsx": {
+      "copy:dead-end-not-available:Feature flag values could not be read. Changes are unavailable until the current values ca": 1
+    },
+    "apps/web/app/app/(shell)/admin/platform-connections/page.tsx": {
+      "copy:dead-end-not-available:Publisher connection and playlist settings could not be read. Their status is unknown; cha": 1
+    },
+    "apps/web/app/app/(shell)/admin/revenue-lift/RevenueLiftDashboardView.tsx": {
+      "copy:dead-end-not-available:Prior-window comparison unavailable": 1
+    },
+    "apps/web/app/app/(shell)/admin/screenshots/page.tsx": {
+      "copy:dead-end-not-available:Screenshot catalog is unavailable in this environment. Check the deploy logs and ensure th": 1
+    },
+    "apps/web/app/app/(shell)/admin/share-studio/page.tsx": {
+      "copy:dead-end-not-available:${label} preview unavailable": 1
+    },
+    "apps/web/app/app/(shell)/admin/shipping/ShippingMatrix.tsx": {
+      "copy:dead-end-not-available:Work matrix unavailable. In-flight work is unknown.": 1
+    },
+    "apps/web/app/app/(shell)/library/CreatorDocumentsWorkspace.tsx": {
+      "copy:dead-end-not-available:The revision changed or that source is not available.": 1,
+      "copy:dead-end-not-available:Evidence unavailable": 1
+    },
+    "apps/web/app/app/(shell)/library/LibrarySurface.tsx": {
+      "copy:dead-end-not-available:Not supported": 1
+    },
+    "apps/web/app/app/(shell)/profiles/ProfilesWorkspace.tsx": {
+      "copy:dead-end-not-available:Search Unavailable": 1,
+      "copy:dead-end-not-available:Monitoring Unknown: Search Unavailable": 1,
+      "copy:dead-end-not-available:Search rank is not available for connectors.": 1,
+      "copy:dead-end-not-available:Automatic inspection is unavailable for this source. Open the profile to compare.": 1,
+      "copy:dead-end-not-available:Source unavailable. Your profile link and identity decisions are still available.": 1,
+      "copy:dead-end-not-available:No live source claim is currently available.": 1,
+      "copy:dead-end-not-available:Rank change is not available for connectors.": 1
+    },
+    "apps/web/app/claim/page.tsx": {
+      "copy:dead-end-not-available:Artist Lookup Unavailable": 1
+    },
+    "apps/web/components/atoms/AmountSelector.tsx": {
+      "code:disabled-no-reason:<button disabled>": 1
+    },
+    "apps/web/components/atoms/DSPButton.tsx": {
+      "code:disabled-no-reason:<Button disabled>": 1
+    },
+    "apps/web/components/atoms/InvisibleTurnstile.tsx": {
+      "copy:dead-end-use-instead:Security check unsupported. Try another browser.": 1
+    },
+    "apps/web/components/features/admin/ShippingVelocityChart.tsx": {
+      "copy:dead-end-not-available:Shipping velocity is unavailable.": 2
+    },
+    "apps/web/components/features/admin/TimActionRequiredSection.tsx": {
+      "copy:dead-end-not-available:Linear actions are unavailable.": 1
+    },
+    "apps/web/components/features/admin/WhatShipped.tsx": {
+      "copy:dead-end-not-available:What shipped is unavailable.": 1
+    },
+    "apps/web/components/features/admin/certifications/CertificationFiltersMenu.tsx": {
+      "copy:dead-end-not-available:${item.label} (${item.status === 'not_connected' ? 'Unavailable' : item.rowCount})": 1
+    },
+    "apps/web/components/features/admin/certifications/CertificationWalkthrough.tsx": {
+      "copy:dead-end-not-available:Live dictation is not supported in this browser.": 1,
+      "copy:dead-end-not-available:Proof could not load. Certification is unavailable until the evidence is viewable.": 1
+    },
+    "apps/web/components/features/admin/certifications/OvieCertificationsWorkspace.tsx": {
+      "copy:dead-end-not-available:Certifications unavailable": 1
+    },
+    "apps/web/components/features/admin/design-lab/DesignProposalReviewPanel.tsx": {
+      "copy:dead-end-not-available:Taste Inbox Unavailable": 2
+    },
+    "apps/web/components/features/admin/feedback-table/AdminFeedbackTable.tsx": {
+      "copy:dead-end-not-available:Feedback unavailable": 1
+    },
+    "apps/web/components/features/admin/hud/FounderFunnelBand.tsx": {
+      "copy:dead-end-not-available:Funnel data is unavailable.": 1
+    },
+    "apps/web/components/features/admin/hud/FounderMorningWalkCard.tsx": {
+      "copy:dead-end-not-available:Screen recording is not available in this window.": 1,
+      "copy:dead-end-not-available:Screen recording is unavailable, blocked or cancelled.": 1
+    },
+    "apps/web/components/features/admin/hud/HudEnvExceptionsPanel.tsx": {
+      "copy:dead-end-not-available:Hosted environment exceptions are unavailable.": 1
+    },
+    "apps/web/components/features/admin/hud/HudShipperPanels.tsx": {
+      "copy:dead-end-not-available:Shipper status is unavailable.": 1,
+      "copy:dead-end-not-available:GitHub rate limits are unavailable.": 1
+    },
+    "apps/web/components/features/admin/hud/OperationalTasksPanel.tsx": {
+      "copy:dead-end-not-available:Task cache unavailable. Active tasks are unknown. Retrying automatically.": 1
+    },
+    "apps/web/components/features/admin/hud/OvieMacHud.tsx": {
+      "copy:dead-end-not-available:GitHub PR signal unavailable.": 1
+    },
+    "apps/web/components/features/admin/hud/SummerReconcileSection.tsx": {
+      "copy:dead-end-not-available:Recovery unavailable — founder identity is not configured.": 1,
+      "copy:dead-end-not-available:Recovery unavailable — this operation only runs from the production origin.": 1,
+      "copy:dead-end-not-available:Recovery unavailable — the pinned Summer deployment could not be verified.": 1,
+      "copy:dead-end-not-available:Recovery unavailable — the upstream runtime deployment is unverified.": 1
+    },
+    "apps/web/components/features/admin/lists/OvieListWorkspace.tsx": {
+      "copy:dead-end-not-available:List unavailable": 1
+    },
+    "apps/web/components/features/admin/lists/OvieListsIndex.tsx": {
+      "copy:dead-end-not-available:Lists unavailable": 1
+    },
+    "apps/web/components/features/admin/lists/OvieSmartViewWorkspace.tsx": {
+      "copy:dead-end-not-available:View unavailable": 1
+    },
+    "apps/web/components/features/admin/outbound/OutboundWorkspace.tsx": {
+      "copy:dead-end-not-available:Outbound queue unavailable": 1
+    },
+    "apps/web/components/features/admin/table/AdminTablePagination.tsx": {
+      "code:disabled-no-reason:<Button disabled>": 1
+    },
+    "apps/web/components/features/connectors/SuggestedActionCard.tsx": {
+      "copy:dead-end-not-available:Location unavailable": 1,
+      "copy:dead-end-not-available:Source email unavailable": 2,
+      "copy:dead-end-not-available:Date unavailable": 1
+    },
+    "apps/web/components/features/dashboard/dashboard-nav/DashboardNav.tsx": {
+      "copy:dead-end-not-available:${item.name} is not available in demo mode": 1
+    },
+    "apps/web/components/features/dashboard/organisms/DashboardAnalyticsCards.tsx": {
+      "copy:dead-end-not-available:Analytics Overview Unavailable": 1,
+      "copy:dead-end-not-available:Profile Views Metric Unavailable": 1,
+      "copy:dead-end-not-available:Unique Visitors Metric Unavailable": 1
+    },
+    "apps/web/components/features/dashboard/organisms/SettingsBillingSection.tsx": {
+      "copy:dead-end-not-available:Billing unavailable": 1
+    },
+    "apps/web/components/features/dashboard/organisms/SettingsPaymentsSection.tsx": {
+      "code:disabled-no-reason:<Button disabled>": 1
+    },
+    "apps/web/components/features/dashboard/organisms/SettingsUsageStatsSection.tsx": {
+      "copy:dead-end-not-available:Usage stats are unavailable in the passive runtime.": 1
+    },
+    "apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.tsx": {
+      "copy:dead-end-not-available:Telemetry unavailable; crawler reads remain Unknown.": 1
+    },
+    "apps/web/components/features/dashboard/organisms/jovie-work-feed/JovieWorkFeed.tsx": {
+      "copy:dead-end-not-available:Creator outcomes are unavailable.": 1
+    },
+    "apps/web/components/features/dashboard/organisms/onboarding-v2/shared/errors.ts": {
+      "copy:dead-end-not-available:Not available. Try another handle.": 1
+    },
+    "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/ProfileSmartLinkAnalytics.tsx": {
+      "copy:dead-end-not-available:Analytics unavailable": 1
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleasePlanWizard.tsx": {
+      "code:disabled-no-reason:<Button disabled>": 1
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseTableSubheader.tsx": {
+      "code:disabled-no-reason:<Button disabled>": 2
+    },
+    "apps/web/components/features/dashboard/release-tasks/MetadataAgentPanel.tsx": {
+      "copy:dead-end-not-available:Metadata submission storage is not available in this environment.": 2,
+      "copy:dead-end-not-available:Current Status: Unavailable": 1,
+      "copy:dead-end-not-available:Unavailable In This Environment": 1,
+      "copy:dead-end-not-available:Tracking unavailable": 1
+    },
+    "apps/web/components/features/dashboard/tasks/TasksPageClient.tsx": {
+      "copy:dead-end-not-available:Release unavailable": 1,
+      "copy:dead-end-not-available:This task still has a release link, but the release is not available in this profile.": 1
+    },
+    "apps/web/components/features/dashboard/youtube/YouTubeChannelPilotPanel.tsx": {
+      "copy:dead-end-not-available:status unavailable": 1
+    },
+    "apps/web/components/features/demo/DemoShowcaseSurface.tsx": {
+      "code:noop-handler:onSubmit=noop": 1
+    },
+    "apps/web/components/features/demo/FounderDemoRecordingSurface.tsx": {
+      "code:noop-handler:onChange=noop": 1,
+      "code:noop-handler:onSubmit=noop": 1
+    },
+    "apps/web/components/features/feedback/ErrorDetails.tsx": {
+      "copy:dead-end-not-available:Clipboard not available": 1
+    },
+    "apps/web/components/features/home/PipelineBottleneckBanner.tsx": {
+      "copy:dead-end-not-available:Bottleneck evidence unavailable": 1,
+      "copy:dead-end-not-available:Cost unavailable": 1,
+      "copy:dead-end-not-available:Impact unavailable": 1
+    },
+    "apps/web/components/features/library/library-catalog-columns.tsx": {
+      "copy:dead-end-not-available:${label}: Not Available": 1,
+      "copy:dead-end-not-available:${label} is not available for this item yet": 1,
+      "copy:dead-end-not-available:Length: Not Available": 1,
+      "copy:dead-end-not-available:Audio preview unavailable": 2
+    },
+    "apps/web/components/features/onboarding/OnboardingToolArtifacts.tsx": {
+      "copy:dead-end-not-available:is not available": 1,
+      "code:disabled-no-reason:<button disabled>": 1
+    },
+    "apps/web/components/features/onboarding/OnboardingTurnstile.tsx": {
+      "copy:dead-end-use-instead:This browser cannot complete the security check. Try another browser or disable restrictiv": 1
+    },
+    "apps/web/components/features/opportunity-inbox/FounderReviewRecorder.tsx": {
+      "copy:dead-end-not-available:Live transcription is unavailable in this window. Recording and typed notes still work.": 1,
+      "copy:dead-end-not-available:Audio retention is unavailable in this window. Live transcription and typed notes still wo": 1
+    },
+    "apps/web/components/features/opportunity-inbox/FounderReviewStack.tsx": {
+      "copy:dead-end-not-available:Source visual not available": 1
+    },
+    "apps/web/components/features/opportunity-inbox/WorkflowCaptureInboxCard.tsx": {
+      "copy:dead-end-not-available:Screen recording is not available in this window.": 1
+    },
+    "apps/web/components/features/pay/EmptyStates.tsx": {
+      "copy:dead-end-coming-soon:Payment Metrics Coming Soon": 1
+    },
+    "apps/web/components/features/profile/ProfilePrimaryTabPanel.tsx": {
+      "code:disabled-no-reason:<Button disabled>": 1
+    },
+    "apps/web/components/features/profile/TourModePanel.tsx": {
+      "code:disabled-no-reason:<Button disabled>": 1
+    },
+    "apps/web/components/features/profile/artist-notifications-cta/shared.tsx": {
+      "copy:dead-end-only-on-platform:[SubscriptionPearlComposer] tone=\"hero\" is only supported with inline layout.": 1
+    },
+    "apps/web/components/features/profile/pac/ProfilePacCard.tsx": {
+      "copy:dead-end-coming-soon:Coming soon": 1
+    },
+    "apps/web/components/features/release/AudioWaveformEditor.tsx": {
+      "copy:dead-end-not-available:Audio preview unavailable": 2,
+      "copy:dead-end-not-available:Preview not supported": 1
+    },
+    "apps/web/components/features/release/SmartLinkAudioPreview.tsx": {
+      "copy:dead-end-not-available:Preview unavailable": 1
+    },
+    "apps/web/components/jovie/components/AssistantMessageText.tsx": {
+      "copy:dead-end-not-available:Unavailable reference": 1
+    },
+    "apps/web/components/jovie/components/ChatComposerToolbar.tsx": {
+      "copy:dead-end-not-available:Dictation unavailable · show how to dictate": 1,
+      "copy:dead-end-not-available:Dictation unavailable": 1,
+      "copy:dead-end-not-available:Dictation unavailable in this browser": 1
+    },
+    "apps/web/components/jovie/components/ChatInput.tsx": {
+      "copy:dead-end-not-available:Dictation unavailable right now. You can keep typing.": 1
+    },
+    "apps/web/components/jovie/components/ChatMerchCard.tsx": {
+      "copy:dead-end-not-available:Preview unavailable": 1
+    },
+    "apps/web/components/jovie/components/ChatMerchDesignCarousel.tsx": {
+      "copy:dead-end-not-available:Preview unavailable": 1
+    },
+    "apps/web/components/jovie/components/ChatOpsDataCard.tsx": {
+      "copy:dead-end-not-available:Observation time unavailable": 1
+    },
+    "apps/web/components/jovie/components/EntityChipPopover.tsx": {
+      "copy:dead-end-not-available:Unavailable reference": 1
+    },
+    "apps/web/components/jovie/components/TokenizedText.tsx": {
+      "copy:dead-end-not-available:Unavailable reference": 1
+    },
+    "apps/web/components/jovie/hooks/useSpeechRecognition.ts": {
+      "copy:dead-end-use-instead:Dictation isn’t available in the desktop app. Use macOS dictation: press the 🎤 key (or Fn": 1
+    },
+    "apps/web/components/marketing/ProductScreenshotFrame.tsx": {
+      "copy:dead-end-not-available:Preview unavailable": 1
+    },
+    "apps/web/components/marketing/changelog/ChangelogTimeline.tsx": {
+      "copy:dead-end-coming-soon:No updates yet. Check back soon!": 1
+    },
+    "apps/web/components/marketing/changelog/CustomerChangelogArchive.tsx": {
+      "copy:dead-end-coming-soon:No updates yet. Check back soon!": 1
+    },
+    "apps/web/components/molecules/EmptyState.tsx": {
+      "code:disabled-no-reason:<Button disabled>": 1
+    },
+    "apps/web/components/molecules/QRCode.tsx": {
+      "copy:dead-end-not-available:QR code unavailable": 1
+    },
+    "apps/web/components/molecules/drawer/DrawerAnalyticsSummaryCard.tsx": {
+      "copy:dead-end-not-available:Analytics unavailable": 1
+    },
+    "apps/web/components/organisms/PersistentAudioBar.tsx": {
+      "copy:dead-end-not-available:Preview unavailable": 1
+    },
+    "apps/web/components/organisms/WrappedLinkMissingState.tsx": {
+      "copy:dead-end-not-available:The link you followed may be broken, expired, or unavailable.": 1
+    },
+    "apps/web/components/organisms/billing/PlanComparisonSection.tsx": {
+      "code:disabled-no-reason:<Button disabled>": 2
+    },
+    "apps/web/components/organisms/combobox/Combobox.tsx": {
+      "code:disabled-no-reason:<ComboboxButton disabled>": 1
+    },
+    "apps/web/components/organisms/entity-card/adapters.ts": {
+      "copy:dead-end-coming-soon:Coming Soon": 1
+    },
+    "apps/web/components/organisms/profile-shell/ProfileShell.tsx": {
+      "code:noop-handler:onClick=noop": 1
+    },
+    "apps/web/components/organisms/release-sidebar/ReleaseSmartLinkAnalytics.tsx": {
+      "copy:dead-end-not-available:Analytics unavailable": 1
+    },
+    "apps/web/components/organisms/release-sidebar/ReleaseTrackList.tsx": {
+      "copy:dead-end-not-available:Preview unavailable.": 1
+    },
+    "apps/web/components/organisms/release-sidebar/TrackSidebar.tsx": {
+      "copy:dead-end-not-available:Preview unavailable.": 1,
+      "copy:dead-end-not-available:Preview unavailable": 2,
+      "copy:dead-end-not-available:Preview unavailable. Verify on streaming platforms.": 1
+    },
+    "apps/web/components/organisms/table/utils/useViewMode.ts": {
+      "copy:dead-end-not-available:View mode \"${mode}\" is not available.": 1
+    },
+    "apps/web/components/organisms/user-button/UsageMenuItem.tsx": {
+      "copy:dead-end-not-available:Usage details are unavailable right now.": 1
+    },
+    "apps/web/components/organisms/user-button/UserButton.tsx": {
+      "code:disabled-no-reason:<CommonDropdown disabled>": 1
+    },
+    "apps/web/components/organisms/user-button/useUserButton.ts": {
+      "copy:dead-end-not-available:Couldn't confirm your plan. Billing actions may be unavailable.": 1
+    },
+    "apps/web/components/shell/HeaderSearchSurface.tsx": {
+      "copy:dead-end-not-available:Search unavailable": 1
+    },
+    "apps/web/components/shell/SidebarInboxLink.tsx": {
+      "copy:dead-end-not-available:Inbox — Status Unavailable": 1
+    },
+    "apps/web/components/shell/SidebarThreadsSection.tsx": {
+      "copy:dead-end-not-available:Conversations unavailable": 1
+    },
+    "apps/web/components/shell/StatusBadge.tsx": {
+      "copy:dead-end-coming-soon:Publicly announced — not yet live": 1
+    },
+    "apps/web/components/site/theme-toggle/ThemeToggleSkeleton.tsx": {
+      "code:disabled-no-reason:<Button disabled>": 1
+    },
+    "apps/web/hooks/useUserLocation.ts": {
+      "copy:dead-end-not-available:Geolocation not supported": 1
+    },
+    "apps/web/lib/chat-usage/copy.ts": {
+      "copy:dead-end-not-available:Usage Unavailable": 1,
+      "copy:dead-end-not-available:Usage unavailable": 1,
+      "copy:dead-end-not-available:AI message usage is unavailable right now.": 1
+    },
+    "packages/ui/atoms/link.tsx": {
+      "code:disabled-no-reason:<Comp disabled>": 1
+    }
+  }
+}

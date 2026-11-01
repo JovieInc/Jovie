@@ -14,6 +14,7 @@ export function DspLinksList() {
           label={service.label}
           href={service.href}
           testId={`dsp-link-${service.key}`}
+          showUrl
           icon={
             <SocialIcon
               platform={service.key}

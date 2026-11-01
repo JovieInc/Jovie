@@ -6,6 +6,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -254,7 +255,9 @@ describe('publication range failures', () => {
     for (const file of [
       'scripts/hooks/pre-push-gate.sh',
       'scripts/hooks/resolve-repo-node.sh',
+      'scripts/hooks/biome-pre-push.sh',
       'scripts/security/scan-secrets.sh',
+      'biome.json',
       '.nvmrc',
     ]) {
       mkdirSync(dirname(resolve(root, file)), { recursive: true });
@@ -262,12 +265,19 @@ describe('publication range failures', () => {
     }
     for (const file of [
       'scripts/ci-branching-guard.mjs',
+      'scripts/component-ship-gate.mjs',
       'scripts/lib/policy-gate-liveness.mjs',
       'scripts/hooks/pre-push-gate.test.mjs',
+      'scripts/preflight-changed.mjs',
     ]) {
       mkdirSync(dirname(resolve(root, file)), { recursive: true });
       writeFileSync(resolve(root, file), '');
     }
+    symlinkSync(
+      resolve(repoRoot, 'node_modules'),
+      resolve(root, 'node_modules'),
+      'dir'
+    );
     git('init', '-q');
     git('config', 'user.name', 'Fixture');
     git('config', 'user.email', 'fixture@example.invalid');

@@ -38,7 +38,7 @@ describe('PricingRecipeBody', () => {
       '$12'
     );
     expect(
-      screen.getAllByRole('link', { name: 'Claim your profile' })[0]
+      screen.getAllByRole('link', { name: 'Start Artist Presence, $12/mo' })[0]
     ).toHaveAttribute('href', '/claim?plan=pro');
     expect(
       container.querySelector(
@@ -110,7 +110,7 @@ describe('PricingRecipeBody', () => {
       screen.getAllByRole('link', { name: 'Claim my free profile' })[1]
     ).toBeVisible();
     expect(
-      screen.getByRole('link', { name: 'Claim your profile' })
+      screen.getByRole('link', { name: 'Start Artist Presence, $12/mo' })
     ).toHaveAttribute('href', '/claim?plan=pro');
     expect(screen.getByRole('link', { name: 'Contact sales' })).toHaveAttribute(
       'href',

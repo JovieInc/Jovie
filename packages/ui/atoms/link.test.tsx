@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { Link } from './link';
@@ -24,6 +25,7 @@ describe('Link', () => {
     expect(link).toHaveAttribute('data-variant', 'link');
     expect(link).toHaveAttribute('data-appearance', 'default');
     expect(link).toHaveAttribute('data-state', 'idle');
+    expect(link).not.toHaveAttribute('data-reserved-label');
     expect(link.className).toContain('text-app');
     expect(link.className).toContain('font-medium');
     expect(link.className).toContain('text-(--color-link-default)');
@@ -52,6 +54,93 @@ describe('Link', () => {
     expect(link.className).toContain('before:min-w-11');
     expect(link.className).not.toMatch(/(?:^|\s)h-11(?:\s|$)/);
   });
+
+  it.each([false, true])(
+    'reserves a label on the real anchor while preserving focus, refs and events (asChild=%s)',
+    asChild => {
+      const ref = createRef<HTMLAnchorElement>();
+      const childRef = createRef<HTMLAnchorElement>();
+      const onClick = vi.fn(event => event.preventDefault());
+      const childClick = vi.fn(event => event.preventDefault());
+      render(
+        asChild ? (
+          <Link asChild ref={ref} reserveLabel='Sign in' onClick={onClick}>
+            <a ref={childRef} href='/signin' onClick={childClick}>
+              Sign in
+            </a>
+          </Link>
+        ) : (
+          <Link
+            ref={ref}
+            href='/signin'
+            reserveLabel='Sign in'
+            onClick={onClick}
+          >
+            Sign in
+          </Link>
+        )
+      );
+      const link = screen.getByRole('link', { name: 'Sign in' });
+      expect(link).toHaveAttribute('data-reserved-label', 'Sign in');
+      expect(link).toHaveAttribute('href', '/signin');
+      expect(ref.current).toBe(link);
+      if (asChild) expect(childRef.current).toBe(link);
+      const labelNodes = Array.from(link.childNodes);
+      link.replaceChildren();
+      expect(screen.getByRole('link', { name: 'Sign in' })).toBe(link);
+      link.focus();
+      expect(link).toHaveFocus();
+      link.append(...labelNodes);
+      expect(link).toHaveTextContent('Sign in');
+      expect(link).toHaveFocus();
+      link.click();
+      expect(onClick).toHaveBeenCalledTimes(1);
+      expect(childClick).toHaveBeenCalledTimes(asChild ? 1 : 0);
+    }
+  );
+
+  it('keeps an explicit accessible name when reserving a shorter visible label', () => {
+    render(
+      <Link href='/artist' reserveLabel='Open' aria-label='Open artist profile'>
+        Open
+      </Link>
+    );
+    expect(
+      screen.getByRole('link', { name: 'Open artist profile' })
+    ).toHaveTextContent('Open');
+  });
+
+  it.each([false, true])(
+    'preserves disabled navigation and handler behavior with a reserved label (asChild=%s)',
+    asChild => {
+      const onClick = vi.fn();
+      render(
+        asChild ? (
+          <Link asChild reserveLabel='Sign in' disabled onClick={onClick}>
+            <a href='/signin'>Sign in</a>
+          </Link>
+        ) : (
+          <Link
+            href='/signin'
+            reserveLabel='Sign in'
+            disabled
+            onClick={onClick}
+          >
+            Sign in
+          </Link>
+        )
+      );
+      const link = screen.getByRole('link', { name: 'Sign in' });
+      const click = new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+      });
+      expect(link.dispatchEvent(click)).toBe(false);
+      expect(click.defaultPrevented).toBe(true);
+      expect(onClick).not.toHaveBeenCalled();
+      expect(link).toHaveAttribute('aria-disabled', 'true');
+    }
+  );
 
   it('marks visited preview state', () => {
     render(

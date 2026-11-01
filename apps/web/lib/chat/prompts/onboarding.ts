@@ -18,10 +18,14 @@ import { getPlanDisplayName } from '@/lib/entitlements/registry';
  */
 /** Shared opener / waitlist receipts — imported by the script bank to avoid copy drift. */
 export const ONBOARDING_OPENER_PRIMARY =
-  "Hey, I'm Jovie. Early access is limited, so some artists waitlist first. I'll remember this chat if you sign up. What are you working on?";
-/** Waitlist receipt without promising email (no contact address confirmed yet). */
+  "Hey, I'm Jovie. Early access is limited. I'll remember this chat if you sign up. What are you working on?";
+/**
+ * Shown with the sign-up card, before any email is verified. It must not say
+ * the visitor is on the list: the card right below says they are not until
+ * the confirmation appears (2026-10-31 golden-path walk).
+ */
 export const ONBOARDING_WAITLIST_RECEIPT =
-  'On the early list. Return here or /start to resume when a spot opens.';
+  'Sign up below to hold your name and keep this conversation.';
 /** Waitlist receipt only when a concrete email is known. */
 export const ONBOARDING_WAITLIST_RECEIPT_WITH_EMAIL =
   "On the early list. We'll email when a spot opens. Come back here or to /start to resume.";

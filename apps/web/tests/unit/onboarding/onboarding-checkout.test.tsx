@@ -91,6 +91,8 @@ vi.mock('@/app/onboarding/actions/upgrade-offer', () => ({
 }));
 
 vi.mock('@/lib/entitlements/registry', () => ({
+  getLimit: (_plan: string, key: string) =>
+    key === 'analyticsRetentionDays' ? 180 : null,
   getEntitlements: () => ({
     marketing: {
       displayName: 'Artist Presence',
@@ -347,8 +349,8 @@ describe('OnboardingCheckoutClient', () => {
 
     // Certified capabilities only (JOV-7794); monitoring is internal-only.
     for (const highlight of [
-      'Payments',
-      '90-day Analytics',
+      'Release Emails',
+      '180-day Analytics',
       'Verified Badge',
     ]) {
       expect(screen.getByText(highlight)).toBeInTheDocument();
@@ -479,7 +481,7 @@ describe('OnboardingCheckoutClient', () => {
     render(<OnboardingCheckoutClient {...defaultProps} />);
     expect(screen.queryByText(/monitoring/i)).not.toBeInTheDocument();
     expect(
-      screen.getByText('Take tips and payments on your profile')
+      screen.getByText('Email your verified subscribers when new music drops')
     ).toBeInTheDocument();
   });
 });

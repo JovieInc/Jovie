@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   prepareProductionAuthEmailForm,
+  waitForCheckoutEntryContent,
   waitForProductionDashboardContent,
 } from '../../e2e/utils/production-auth-interaction';
 
@@ -165,6 +166,37 @@ describe('production auth interaction hydration gate', () => {
     expect(page.waitForFunction).toHaveBeenCalledWith(
       expect.any(Function),
       { selector: 'main', minimumLength: 30 },
+      { timeout: 20_000 }
+    );
+  });
+
+  it('waits for the billing heading instead of sampling an empty main once', async () => {
+    document.body.innerHTML = '<main></main>';
+
+    const page = {
+      waitForFunction: vi.fn(
+        async (
+          predicate: (options: {
+            selector: string;
+            minimumLength: number;
+          }) => string | false,
+          options: { selector: string; minimumLength: number }
+        ) => {
+          // The pre-render sample is what failed the 2026-10-29 promotion.
+          expect(predicate(options)).toBe(false);
+          const main = document.querySelector('main');
+          if (main) main.textContent = 'Billing Current plan status only';
+          return { jsonValue: vi.fn(async () => predicate(options)) };
+        }
+      ),
+    };
+
+    await expect(
+      waitForCheckoutEntryContent(page as never, 20_000)
+    ).resolves.toBe('billing current plan status only');
+    expect(page.waitForFunction).toHaveBeenCalledWith(
+      expect.any(Function),
+      { selector: 'main', minimumLength: 5 },
       { timeout: 20_000 }
     );
   });

@@ -467,6 +467,9 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
             merged_window = merge_evidence.collect_shared(lane.REPO_SLUG, now - 86400, now,
                                                           state / "merge-window.json")
             merged_projects[lane.REPO_SLUG] = merged_window
+            # Keep validated observed events for positive exact-head joins even
+            # when the provider cannot certify the population denominator.
+            merged = merged_window.get("prs") or []
             merged = merge_evidence.require_complete(merged_window)
     except merge_evidence.IncompleteMergeEvidence as error:
         merged_error = str(error)
@@ -769,7 +772,7 @@ def _locked(path: Path) -> bool:
 
 
 def delivery_evidence(obs: dict, previous: dict) -> dict:
-    """Use the existing complete merge census and local exact-head coding receipts.
+    """Join observed merge events to local exact-head coding receipts.
 
     Gate success and another host's merge cannot clear a local delivery failure.
     No added collector, API calls, claim authority or provider routes.
@@ -777,11 +780,15 @@ def delivery_evidence(obs: dict, previous: dict) -> dict:
     now = obs["now"]
     window = obs.get("mergedWindow") or {}
     bounds = window.get("window") or {}
-    complete = (window.get("complete") is True and not obs.get("mergedAttributionError")
-                and isinstance(bounds.get("until"), (int, float))
+    fresh = (isinstance(bounds.get("until"), (int, float))
                 and 0 <= now - bounds["until"] <= MERGE_THROUGHPUT_CACHE_S
                 and isinstance(bounds.get("since"), (int, float))
                 and bounds["since"] <= now - DELIVERY_STALE_S)
+    complete = fresh and window.get("complete") is True and not obs.get("mergedAttributionError")
+    observed = (fresh and merge_evidence.search_observations(
+                    {**window, "prs": obs.get("merged24h") or []}, "JovieInc/Jovie")
+                and window.get("providerEnumerationComplete") is True
+                and window.get("reason") == merge_evidence.SEARCH_COVERAGE_REASON)
     delivered = []
     useful = []
     for row in obs.get("_allReceipts") or []:
@@ -795,7 +802,7 @@ def delivery_evidence(obs: dict, previous: dict) -> dict:
             continue
         useful.append({"pr": row["pr"], "headSha": head, "runId": row.get("runId"),
                        "provider": row.get("provider"), "endedAt": row["endedAt"]})
-        if not complete:
+        if not (complete or observed):
             continue
         for pr in obs.get("merged24h") or []:
             merge_age = age_s(pr.get("mergedAt"), now)
@@ -849,6 +856,7 @@ def delivery_evidence(obs: dict, previous: dict) -> dict:
     return {"schema": "jovie-lane-delivery/v1", "state": "stalled" if stale else status,
             "demandSince": since, "staleAfterSeconds": DELIVERY_STALE_S,
             "mergeEvidenceComplete": complete, "lastUsefulExecution": max(useful, key=lambda r: r["endedAt"], default=None),
+            "observedMergeEvidence": bool(observed),
             "lastDeliveredMerge": latest, "deployedVerification": None,
             "admission": {"eligiblePool": obs.get("eligiblePool"), "runnablePool": runnable if known else None,
                           "admittedLocalOutputs": admitted,
@@ -1061,7 +1069,8 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     elif (previous or {}).get("alerts", {}).get("delivery-stalled"):
         old = ((previous or {}).get("conditions") or {}).get("delivery-stalled") or {}
         merged = delivery.get("lastDeliveredMerge") or {}
-        delivered_after_alarm = (delivery.get("mergeEvidenceComplete") and merged.get("mergedAt")
+        delivered_after_alarm = ((delivery.get("mergeEvidenceComplete") or delivery.get("observedMergeEvidence"))
+                                 and merged.get("mergedAt")
                                  and merged["mergedAt"] >= old.get("firstObservedAt", "~"))
         if not delivered_after_alarm and delivery.get("state") not in ("no-eligible-work", "intentional-pause"):
             alerts["delivery-stalled"] = previous["alerts"]["delivery-stalled"]

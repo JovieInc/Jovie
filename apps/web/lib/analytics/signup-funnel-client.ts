@@ -3,6 +3,75 @@ import type { SignupFunnelId, SignupFunnelStepInput } from './signup-funnel';
 
 export const SIGNUP_FUNNEL_BEACON_ENDPOINT = '/api/journey/step';
 
+const FUNNEL_CLOCK_KEY = 'jovie:signup-funnel:clock';
+/** A gap this long starts a new session clock instead of a huge step time. */
+const FUNNEL_CLOCK_IDLE_RESET_MS = 30 * 60_000;
+
+interface FunnelClock {
+  readonly startedAt: number;
+  readonly lastAt: number;
+}
+
+let memoryClock: FunnelClock | null = null;
+
+function readFunnelClock(): FunnelClock | null {
+  try {
+    const raw = globalThis.sessionStorage?.getItem(FUNNEL_CLOCK_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<FunnelClock>;
+      if (
+        typeof parsed.startedAt === 'number' &&
+        typeof parsed.lastAt === 'number'
+      ) {
+        return { startedAt: parsed.startedAt, lastAt: parsed.lastAt };
+      }
+    }
+  } catch {
+    // Storage can be unavailable; fall back to the in-memory clock.
+  }
+  return memoryClock;
+}
+
+function writeFunnelClock(clock: FunnelClock): void {
+  memoryClock = clock;
+  try {
+    globalThis.sessionStorage?.setItem(FUNNEL_CLOCK_KEY, JSON.stringify(clock));
+  } catch {
+    // The in-memory clock still covers this page load.
+  }
+}
+
+/**
+ * Anonymous timing for the step being recorded: time since the previous step
+ * and since the first step in this browser session. The first step of a
+ * session carries no timing. No identifier is created or sent.
+ */
+export function advanceFunnelClock(now = Date.now()): {
+  stepMs?: number;
+  entryMs?: number;
+} {
+  const previous = readFunnelClock();
+  if (!previous || now - previous.lastAt > FUNNEL_CLOCK_IDLE_RESET_MS) {
+    writeFunnelClock({ startedAt: now, lastAt: now });
+    return {};
+  }
+  writeFunnelClock({ startedAt: previous.startedAt, lastAt: now });
+  return {
+    stepMs: Math.max(0, now - previous.lastAt),
+    entryMs: Math.max(0, now - previous.startedAt),
+  };
+}
+
+/** Test seam: forget the session clock. */
+export function resetFunnelClockForTests(): void {
+  memoryClock = null;
+  try {
+    globalThis.sessionStorage?.removeItem(FUNNEL_CLOCK_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 /**
  * Fire-and-forget beacon for a client-only signup funnel step. Never throws
  * and never blocks the caller. Server-verifiable steps (profile view, fan
@@ -13,7 +82,9 @@ export function trackFunnelStep<F extends SignupFunnelId>(
 ): void {
   if (globalThis.window === undefined) return;
   try {
+    const timing = advanceFunnelClock();
     postJsonBeacon(SIGNUP_FUNNEL_BEACON_ENDPOINT, {
+      ...timing,
       funnel: input.funnel,
       step: input.step,
       ...(input.outcome ? { outcome: input.outcome } : {}),

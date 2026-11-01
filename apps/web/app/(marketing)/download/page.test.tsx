@@ -22,7 +22,7 @@ describe('DownloadPage hero layout', () => {
 
     const copy = heading.parentElement;
     expect(copy).toHaveClass('max-w-xl', 'max-sm:min-h-103');
-    expect(copy?.parentElement).toHaveClass('items-start', 'lg:items-center');
+    expect(copy?.parentElement).toHaveClass('items-start');
     expect(copy?.parentElement).not.toHaveClass('items-center');
   });
 
@@ -45,5 +45,35 @@ describe('DownloadPage hero layout', () => {
       screen.getByRole('heading', { level: 2, name: 'Mac Workspace' })
     ).toBeInTheDocument();
     expect(screen.getByText(/Download the Mac app\./)).toBeInTheDocument();
+  });
+
+  it('offers only what can be downloaded: no iPhone dead end', () => {
+    render(<DownloadPage />);
+
+    const text = document.body.textContent ?? '';
+    expect(text).not.toMatch(/not a public download/i);
+    expect(text).not.toMatch(/iPhone status/i);
+    expect(text).not.toMatch(/not available on this page/i);
+    expect(document.getElementById('iphone')).toBeNull();
+  });
+
+  it('shows one legible device shot in the hero with nothing overlapping it', () => {
+    const { container } = render(<DownloadPage />);
+
+    const hero = container.querySelector(
+      '[data-testid="marketing-section-hero"]'
+    );
+    expect(hero).not.toBeNull();
+    // Product shots carry alt text; a decorative backdrop has alt="".
+    const shots = [...(hero?.querySelectorAll('img') ?? [])].filter(img =>
+      img.getAttribute('alt')
+    );
+    expect(shots).toHaveLength(1);
+    expect(hero?.querySelector('[data-overlap]')).toBeNull();
+    const shot = hero?.querySelector(
+      '[data-testid="download-desktop-screenshot"]'
+    );
+    // Full container width below the copy, never squeezed into a half column.
+    expect(shot?.className).not.toMatch(/absolute/);
   });
 });

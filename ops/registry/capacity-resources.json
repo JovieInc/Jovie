@@ -1,0 +1,970 @@
+{
+  "schema": "jovie.capacity-resources/v1",
+  "description": "Every resource that can stop shipping: metric, hard limit, what happens at the limit, and the lead time to fix. Read by scripts/capacity/forecast.py. Joins ops/registry/spend.json (spend collectors) and canon/automation-registry.jsonl (collector liveness). Metadata only, no secrets.",
+  "updatedAt": "2026-10-30T00:00:00Z",
+  "cloudCollector": "gem",
+  "hostAliases": {
+    "gem": ["gem"],
+    "mac": ["tims-macbook-pro", "tw-mac-001", "mac"],
+    "air": ["air", "office-air"]
+  },
+  "leadTimes": {
+    "cleanup": "minutes",
+    "hardware": "days (disk/NVMe)",
+    "cloudContainers": "hours",
+    "budget": "same day"
+  },
+  "resources": [
+    {
+      "id": "gem-disk",
+      "group": "host-disk",
+      "host": "gem",
+      "label": "Gem root disk (limit = 90% used, the lanes admission floor)",
+      "unit": "bytes",
+      "collector": {
+        "type": "disk",
+        "path": "/",
+        "limitFrac": 0.9
+      },
+      "atLimit": {
+        "effect": "deny",
+        "note": "factory_watchdog denies lane dispatch at the floor; 100% crashes runners and git"
+      },
+      "leadTimeHours": 168,
+      "mode": "trend",
+      "fix": {
+        "auto": ["docker system prune -f --filter until=168h"],
+        "escalate": {
+          "options": [
+            {
+              "label": "Add a 2TB NVMe to Gem",
+              "cost": "est. $150-250 one-off",
+              "lead": "2-5 days"
+            },
+            {
+              "label": "Move lanes to cloud containers (Cursor cloud / Hyperagent)",
+              "cost": "monthly, Summer to quote",
+              "lead": "hours"
+            }
+          ],
+          "default": "Sweep and archive retired worktrees now; if still inside lead time in 48h, order the NVMe",
+          "deadlineHours": 48
+        }
+      }
+    },
+    {
+      "id": "mac-disk",
+      "group": "host-disk",
+      "host": "mac",
+      "label": "Tim's Mac disk (limit = 90% used)",
+      "unit": "bytes",
+      "collector": {
+        "type": "disk",
+        "path": "/",
+        "limitFrac": 0.9
+      },
+      "atLimit": {
+        "effect": "deny",
+        "note": "Xcode, git and Claude Code fail with ENOSPC; gbrain tunnel and Ovie die with the laptop"
+      },
+      "leadTimeHours": 72,
+      "mode": "trend",
+      "fix": {
+        "auto": [
+          "python3 ~/.local/share/mac-disk-guard/mac_disk_guard.py --force"
+        ],
+        "escalate": {
+          "options": [
+            {
+              "label": "Attach a 2TB external SSD for worktrees",
+              "cost": "est. $150-200",
+              "lead": "1-2 days"
+            },
+            {
+              "label": "Move worktree-heavy lanes off the Mac (already Gem-only by policy)",
+              "cost": "none",
+              "lead": "same day"
+            }
+          ],
+          "default": "Run the Mac disk guard sweep; move any lane workspaces to Gem",
+          "deadlineHours": 24
+        }
+      }
+    },
+    {
+      "id": "air-disk",
+      "group": "host-disk",
+      "host": "air",
+      "label": "MacBook Air disk, office HUD (limit = 90% used)",
+      "unit": "bytes",
+      "collector": {
+        "type": "disk",
+        "path": "/",
+        "limitFrac": 0.9
+      },
+      "atLimit": {
+        "effect": "deny",
+        "note": "HUD stops rendering; fullscreen Ovie goes dark"
+      },
+      "leadTimeHours": 72,
+      "mode": "trend",
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [
+            {
+              "label": "Clear caches on the Air via the Mac disk guard",
+              "cost": "none",
+              "lead": "minutes"
+            },
+            {
+              "label": "Replace the Air with a fixed HUD host (mini)",
+              "cost": "est. $600+",
+              "lead": "2-4 days"
+            }
+          ],
+          "default": "Install the disk guard on the Air",
+          "deadlineHours": 48
+        }
+      }
+    },
+    {
+      "id": "gem-inodes",
+      "group": "host-disk",
+      "host": "gem",
+      "label": "Gem root inodes (limit = 90% used)",
+      "unit": "count",
+      "collector": {
+        "type": "inodes",
+        "path": "/",
+        "limitFrac": 0.9
+      },
+      "atLimit": {
+        "effect": "crash",
+        "note": "creates fail with ENOSPC at 100% inodes even with free bytes"
+      },
+      "leadTimeHours": 48,
+      "mode": "trend",
+      "fix": {
+        "auto": ["docker system prune -f --filter until=168h"],
+        "escalate": {
+          "options": [],
+          "default": "archive node_modules-heavy retired worktrees",
+          "deadlineHours": 24
+        }
+      }
+    },
+    {
+      "id": "mac-inodes",
+      "group": "host-disk",
+      "host": "mac",
+      "label": "Mac root inodes (limit = 90% used)",
+      "unit": "count",
+      "collector": {
+        "type": "inodes",
+        "path": "/",
+        "limitFrac": 0.9
+      },
+      "atLimit": {
+        "effect": "crash",
+        "note": "creates fail with ENOSPC"
+      },
+      "leadTimeHours": 48,
+      "mode": "trend",
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "run the Mac disk guard",
+          "deadlineHours": 24
+        }
+      }
+    },
+    {
+      "id": "github-rest-core",
+      "group": "github",
+      "host": "any",
+      "label": "GitHub API core calls/hour (user token)",
+      "unit": "count",
+      "collector": {
+        "type": "gh-rate",
+        "bucket": "core"
+      },
+      "atLimit": {
+        "effect": "pause",
+        "note": "gh calls 403 until the hourly reset; merge queue and Hermes loops stall"
+      },
+      "leadTimeHours": 1,
+      "mode": "level",
+      "warnFrac": 0.8,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "back off bulk gh calls; use REST with --limit",
+          "deadlineHours": 1
+        }
+      }
+    },
+    {
+      "id": "github-graphql",
+      "group": "github",
+      "host": "any",
+      "label": "GitHub API graphql calls/hour (user token)",
+      "unit": "count",
+      "collector": {
+        "type": "gh-rate",
+        "bucket": "graphql"
+      },
+      "atLimit": {
+        "effect": "pause",
+        "note": "gh calls 403 until the hourly reset; merge queue and Hermes loops stall"
+      },
+      "leadTimeHours": 1,
+      "mode": "level",
+      "warnFrac": 0.8,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "back off bulk gh calls; use REST with --limit",
+          "deadlineHours": 1
+        }
+      }
+    },
+    {
+      "id": "doppler-jovie-web-prd",
+      "group": "doppler",
+      "host": "mac",
+      "label": "Doppler secrets, jovie-web/prd (cap 100)",
+      "unit": "count",
+      "collector": {
+        "type": "doppler",
+        "project": "jovie-web",
+        "config": "prd",
+        "cap": 100
+      },
+      "atLimit": {
+        "effect": "deny",
+        "note": "new secret writes are refused; rotations and new integrations block"
+      },
+      "leadTimeHours": 72,
+      "mode": "level",
+      "warnFrac": 0.9,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [
+            {
+              "label": "Prune dead secrets or split by service into a second project",
+              "cost": "none",
+              "lead": "hours"
+            },
+            {
+              "label": "Upgrade Doppler plan",
+              "cost": "Tim's call",
+              "lead": "same day"
+            }
+          ],
+          "default": "prune dead secrets (agent proposes list, names only)",
+          "deadlineHours": 24
+        }
+      }
+    },
+    {
+      "id": "doppler-jovie-web-stg",
+      "group": "doppler",
+      "host": "mac",
+      "label": "Doppler secrets, jovie-web/stg (cap 100)",
+      "unit": "count",
+      "collector": {
+        "type": "doppler",
+        "project": "jovie-web",
+        "config": "stg",
+        "cap": 100
+      },
+      "atLimit": {
+        "effect": "deny",
+        "note": "new secret writes are refused; rotations and new integrations block"
+      },
+      "leadTimeHours": 72,
+      "mode": "level",
+      "warnFrac": 0.9,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [
+            {
+              "label": "Prune dead secrets or split by service into a second project",
+              "cost": "none",
+              "lead": "hours"
+            },
+            {
+              "label": "Upgrade Doppler plan",
+              "cost": "Tim's call",
+              "lead": "same day"
+            }
+          ],
+          "default": "prune dead secrets (agent proposes list, names only)",
+          "deadlineHours": 24
+        }
+      }
+    },
+    {
+      "id": "ai-gateway-credits",
+      "group": "spend",
+      "host": "any",
+      "label": "Vercel AI Gateway prepaid balance (projected from snapshot and burn)",
+      "unit": "usd",
+      "collector": {
+        "type": "spend",
+        "providerId": "vercel-ai-gateway-credits",
+        "fundedUsd": 12.06
+      },
+      "atLimit": {
+        "effect": "pause",
+        "note": "Gateway calls fail: Summer, Ovie and evals stop"
+      },
+      "leadTimeHours": 24,
+      "mode": "trend",
+      "maxAgeDays": 2,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [
+            {
+              "label": "Top up Gateway credits",
+              "cost": "Tim's call, same day",
+              "lead": "minutes"
+            }
+          ],
+          "default": "top up to a 14-day runway",
+          "deadlineHours": 6
+        }
+      }
+    },
+    {
+      "id": "hyperagent-credits",
+      "group": "spend",
+      "host": "any",
+      "label": "Hyperagent credits",
+      "unit": "usd",
+      "collector": {
+        "type": "spend",
+        "providerId": "hyperagent-credits",
+        "fundedUsd": 20000
+      },
+      "atLimit": {
+        "effect": "pause",
+        "note": "Kimi planner and Hyperagent failover stop"
+      },
+      "leadTimeHours": 168,
+      "mode": "trend",
+      "maxAgeDays": 8,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [
+            {
+              "label": "Buy more credits or cut burn",
+              "cost": "Tim's call",
+              "lead": "same day"
+            }
+          ],
+          "default": "cut burn to runway",
+          "deadlineHours": 48
+        }
+      }
+    },
+    {
+      "id": "vercel-spend",
+      "group": "spend",
+      "host": "cloud",
+      "label": "Vercel team spend and on-demand builds ($10 cap)",
+      "unit": "count",
+      "collector": {
+        "type": "none",
+        "note": "scripts/spend-guard.mjs (PR #23805, hourly): feed its receipt here once merged"
+      },
+      "hardLimit": "spend cap in ops/registry/spend.json",
+      "atLimit": {
+        "effect": "pause",
+        "note": "deploys pause when the spend cap is hit (the 2026-10-29 pause)"
+      },
+      "leadTimeHours": 24,
+      "mode": "trend",
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "wire collector, then forecast",
+          "deadlineHours": 72
+        }
+      }
+    },
+    {
+      "id": "vercel-build-minutes",
+      "group": "vercel",
+      "host": "cloud",
+      "label": "Vercel build minutes and concurrent builds",
+      "unit": "count",
+      "collector": {
+        "type": "none",
+        "note": "Vercel API usage pull needs a read token; add to spend-guard receipt"
+      },
+      "hardLimit": "plan-dependent: verify in Vercel",
+      "atLimit": {
+        "effect": "pause",
+        "note": "builds queue or deny"
+      },
+      "leadTimeHours": 24,
+      "mode": "trend",
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "wire collector, then forecast",
+          "deadlineHours": 72
+        }
+      }
+    },
+    {
+      "id": "vercel-functions",
+      "group": "vercel",
+      "host": "cloud",
+      "label": "Vercel function invocations and duration",
+      "unit": "count",
+      "collector": {
+        "type": "none",
+        "note": "Vercel API usage pull"
+      },
+      "hardLimit": "plan-dependent: verify in Vercel",
+      "atLimit": {
+        "effect": "deny",
+        "note": "functions 429 or bill overage"
+      },
+      "leadTimeHours": 24,
+      "mode": "trend",
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "wire collector, then forecast",
+          "deadlineHours": 72
+        }
+      }
+    },
+    {
+      "id": "cf-workers-requests",
+      "group": "cloudflare",
+      "host": "cloud",
+      "label": "Cloudflare Workers requests/day",
+      "unit": "count",
+      "collector": {
+        "type": "none",
+        "note": "Cloudflare GraphQL analytics token"
+      },
+      "hardLimit": "plan-dependent: verify",
+      "atLimit": {
+        "effect": "deny",
+        "note": "workers return 1015/429 past plan quota"
+      },
+      "leadTimeHours": 24,
+      "mode": "trend",
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "wire collector, then forecast",
+          "deadlineHours": 72
+        }
+      }
+    },
+    {
+      "id": "cf-d1-storage",
+      "group": "cloudflare",
+      "host": "cloud",
+      "label": "Cloudflare D1 storage per database",
+      "unit": "count",
+      "collector": {
+        "type": "none",
+        "note": "Cloudflare API d1 list (file_size)"
+      },
+      "hardLimit": "plan-dependent: verify",
+      "atLimit": {
+        "effect": "crash",
+        "note": "writes fail at the per-DB size cap"
+      },
+      "leadTimeHours": 72,
+      "mode": "trend",
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "wire collector, then forecast",
+          "deadlineHours": 72
+        }
+      }
+    },
+    {
+      "id": "cf-r2-storage",
+      "group": "cloudflare",
+      "host": "cloud",
+      "label": "Cloudflare R2 storage",
+      "unit": "count",
+      "collector": {
+        "type": "none",
+        "note": "Cloudflare API r2 usage"
+      },
+      "hardLimit": "plan-dependent: verify",
+      "atLimit": {
+        "effect": "deny",
+        "note": "uploads fail or bill overage"
+      },
+      "leadTimeHours": 72,
+      "mode": "trend",
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "wire collector, then forecast",
+          "deadlineHours": 72
+        }
+      }
+    },
+    {
+      "id": "cf-kv-storage",
+      "group": "cloudflare",
+      "host": "cloud",
+      "label": "Cloudflare KV storage and writes/day",
+      "unit": "count",
+      "collector": {
+        "type": "none",
+        "note": "Cloudflare API kv usage"
+      },
+      "hardLimit": "plan-dependent: verify",
+      "atLimit": {
+        "effect": "deny",
+        "note": "writes fail past the daily write quota"
+      },
+      "leadTimeHours": 24,
+      "mode": "trend",
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "wire collector, then forecast",
+          "deadlineHours": 72
+        }
+      }
+    },
+    {
+      "id": "supabase-storage-connections",
+      "group": "database",
+      "host": "cloud",
+      "label": "Supabase storage and connections (gbrain)",
+      "unit": "count",
+      "collector": {
+        "type": "none",
+        "note": "Supabase management API token"
+      },
+      "hardLimit": "plan-dependent: verify",
+      "atLimit": {
+        "effect": "crash",
+        "note": "gbrain writes fail"
+      },
+      "leadTimeHours": 72,
+      "mode": "trend",
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "wire collector, then forecast",
+          "deadlineHours": 72
+        }
+      }
+    },
+    {
+      "id": "github-actions-concurrency",
+      "group": "github",
+      "host": "cloud",
+      "label": "GitHub Actions concurrent jobs and minutes",
+      "unit": "count",
+      "collector": {
+        "type": "none",
+        "note": "gh api /orgs/JovieInc/actions queue depth + runner online count"
+      },
+      "hardLimit": "plan-dependent: verify",
+      "atLimit": {
+        "effect": "pause",
+        "note": "jobs queue; self-hosted runners absorb only if online"
+      },
+      "leadTimeHours": 4,
+      "mode": "trend",
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "wire collector, then forecast",
+          "deadlineHours": 72
+        }
+      }
+    },
+    {
+      "id": "gem-runners-online",
+      "group": "runners",
+      "host": "gem",
+      "label": "Gem self-hosted runners online (5 services)",
+      "unit": "count",
+      "collector": {
+        "type": "none",
+        "note": "systemctl is-active on actions.runner.* (Gem collector)"
+      },
+      "hardLimit": "5 runner services on Gem",
+      "atLimit": {
+        "effect": "pause",
+        "note": "CI queues when runners are offline"
+      },
+      "leadTimeHours": 4,
+      "mode": "trend",
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "wire collector, then forecast",
+          "deadlineHours": 72
+        }
+      }
+    },
+    {
+      "id": "gem-memory",
+      "group": "host-memory",
+      "host": "gem",
+      "label": "Gem memory pressure (PSI)",
+      "unit": "count",
+      "collector": {
+        "type": "none",
+        "note": "scripts/lanes/host_pressure.py sentinel (PR #23877); mirror its level here"
+      },
+      "hardLimit": "MemAvailable < 4GiB or PSI some >= 25",
+      "atLimit": {
+        "effect": "crash",
+        "note": "OOM kills runners (2026-10-24 tsc storm)"
+      },
+      "leadTimeHours": 2,
+      "mode": "trend",
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "wire collector, then forecast",
+          "deadlineHours": 72
+        }
+      }
+    },
+    {
+      "id": "docker-gem",
+      "group": "containers",
+      "host": "gem",
+      "label": "Docker volumes and containers on Gem",
+      "unit": "count",
+      "collector": {
+        "type": "none",
+        "note": "covered by gem-disk and the docker prune action"
+      },
+      "hardLimit": "shares gem-disk",
+      "atLimit": {
+        "effect": "deny",
+        "note": "image pulls fail when the disk floor is hit"
+      },
+      "leadTimeHours": 24,
+      "mode": "trend",
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "wire collector, then forecast",
+          "deadlineHours": 72
+        }
+      }
+    },
+    {
+      "id": "codex-seats",
+      "group": "model-quota",
+      "host": "cloud",
+      "label": "Codex seats weekly quota",
+      "unit": "count",
+      "collector": {
+        "type": "none",
+        "note": "scripts/lanes/capacity_live.py overlay: mirror % remaining per seat"
+      },
+      "hardLimit": "weekly cap per seat",
+      "atLimit": {
+        "effect": "pause",
+        "note": "lanes route to the next seat, then deny"
+      },
+      "leadTimeHours": 24,
+      "mode": "trend",
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "wire collector, then forecast",
+          "deadlineHours": 72
+        }
+      }
+    },
+    {
+      "id": "claude-subscription",
+      "group": "model-quota",
+      "host": "cloud",
+      "label": "Claude subscription weekly limit",
+      "unit": "count",
+      "collector": {
+        "type": "none",
+        "note": "no API: read from the Claude usage page via browser; manual until then"
+      },
+      "hardLimit": "weekly cap (near limit 2026-10-30)",
+      "atLimit": {
+        "effect": "pause",
+        "note": "agent turns refused until reset"
+      },
+      "leadTimeHours": 24,
+      "mode": "trend",
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "wire collector, then forecast",
+          "deadlineHours": 72
+        }
+      }
+    },
+    {
+      "id": "spof-gbrain-tunnel",
+      "group": "spof",
+      "host": "mac",
+      "label": "gbrain tunnel runs on Tim's Mac (JOV-10028)",
+      "unit": "count",
+      "collector": {
+        "type": "none",
+        "note": "move tunnel/pgbouncer/serve to Gem as systemd units; gate = probe from Gem"
+      },
+      "hardLimit": "single host",
+      "atLimit": {
+        "effect": "pause",
+        "note": "gbrain unreachable when the laptop sleeps, travels or fills"
+      },
+      "leadTimeHours": 24,
+      "mode": "trend",
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "wire collector, then forecast",
+          "deadlineHours": 72
+        }
+      }
+    },
+    {
+      "id": "spof-gem-lanes",
+      "group": "spof",
+      "host": "gem",
+      "label": "All lanes and runners on one host (Gem)",
+      "unit": "count",
+      "collector": {
+        "type": "none",
+        "note": "failover lane config for Cursor cloud / Hyperagent (JOV-10028)"
+      },
+      "hardLimit": "single host",
+      "atLimit": {
+        "effect": "pause",
+        "note": "shipping stops if Gem is down"
+      },
+      "leadTimeHours": 24,
+      "mode": "trend",
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "wire collector, then forecast",
+          "deadlineHours": 72
+        }
+      }
+    },
+    {
+      "id": "neon-compute-hours",
+      "group": "database",
+      "host": "cloud",
+      "label": "Neon compute CU-hours this month (Launch includes 300)",
+      "unit": "cu-hours",
+      "collector": {
+        "type": "neon",
+        "orgId": "org-soft-darkness-40519110",
+        "metric": "compute-hours",
+        "limit": 300
+      },
+      "atLimit": {
+        "effect": "crash",
+        "note": "overage billed per CU-hour; the org spend alert fires"
+      },
+      "leadTimeHours": 24,
+      "mode": "level",
+      "warnFrac": 0.7,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "find the top consumer and cut it; plan upgrade is spend, Tim decides",
+          "deadlineHours": 24
+        }
+      }
+    },
+    {
+      "id": "neon-egress-gb",
+      "group": "database",
+      "host": "cloud",
+      "label": "Neon public egress GB this month (Launch includes 100)",
+      "unit": "GB",
+      "collector": {
+        "type": "neon",
+        "orgId": "org-soft-darkness-40519110",
+        "metric": "egress-gb",
+        "limit": 100
+      },
+      "atLimit": {
+        "effect": "crash",
+        "note": "overage billed per GB"
+      },
+      "leadTimeHours": 24,
+      "mode": "level",
+      "warnFrac": 0.7,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "find the top consumer and cut it; plan upgrade is spend, Tim decides",
+          "deadlineHours": 24
+        }
+      }
+    },
+    {
+      "id": "neon-branches",
+      "group": "database",
+      "host": "cloud",
+      "label": "Neon branches in Jovie-Primary (Launch includes 10)",
+      "unit": "count",
+      "collector": {
+        "type": "neon",
+        "orgId": "org-soft-darkness-40519110",
+        "metric": "branches",
+        "projectId": "curly-dew-35158967",
+        "limit": 10
+      },
+      "atLimit": {
+        "effect": "crash",
+        "note": "extra branches billed hourly; CI branch leak signal"
+      },
+      "leadTimeHours": 2,
+      "mode": "level",
+      "warnFrac": 0.7,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "run the Neon branch reaper; CI branches must set suspend timeout and expire",
+          "deadlineHours": 2
+        }
+      }
+    },
+    {
+      "id": "neon-spend",
+      "group": "database",
+      "host": "cloud",
+      "label": "Neon est. month-to-date overage USD vs the $70 spend notification",
+      "unit": "usd",
+      "collector": {
+        "type": "neon",
+        "orgId": "org-soft-darkness-40519110",
+        "metric": "spend-usd",
+        "limit": 70,
+        "rates": {
+          "includedCuHours": 300,
+          "includedEgressGb": 100,
+          "cuHourUsd": 0.106,
+          "egressGbUsd": 0.1,
+          "extraBranchHourUsd": 0.002
+        }
+      },
+      "atLimit": {
+        "effect": "bill",
+        "note": "Neon emails at 100% and keeps billing"
+      },
+      "leadTimeHours": 72,
+      "mode": "level",
+      "warnFrac": 0.5,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "find the top consumer and cut it; plan upgrade is spend, Tim decides",
+          "deadlineHours": 72
+        }
+      }
+    },
+    {
+      "id": "resend-daily",
+      "group": "email",
+      "host": "cloud",
+      "label": "Resend emails today (free plan 100/day)",
+      "unit": "count",
+      "collector": {
+        "type": "resend",
+        "window": "day",
+        "limit": 100
+      },
+      "atLimit": {
+        "effect": "deny",
+        "note": "sends are rejected until midnight UTC: sign-in codes and receipts stop"
+      },
+      "leadTimeHours": 1,
+      "mode": "level",
+      "warnFrac": 0.5,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "find the sender by from/subject/tag; synthetic and operational mail must not use the transactional stream",
+          "deadlineHours": 1
+        }
+      }
+    },
+    {
+      "id": "resend-monthly",
+      "group": "email",
+      "host": "cloud",
+      "label": "Resend emails this month (free plan 3000/month)",
+      "unit": "count",
+      "collector": {
+        "type": "resend",
+        "window": "month",
+        "limit": 3000
+      },
+      "atLimit": {
+        "effect": "deny",
+        "note": "sends are rejected until the month rolls"
+      },
+      "leadTimeHours": 72,
+      "mode": "level",
+      "warnFrac": 0.7,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "find the top consumer and cut it; plan upgrade is spend, Tim decides",
+          "deadlineHours": 72
+        }
+      }
+    }
+  ]
+}
