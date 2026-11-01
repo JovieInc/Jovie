@@ -2606,7 +2606,26 @@ class PublishTest(unittest.TestCase):
         self.assertNotEqual(public["schema"], "symphony-lanes-status/v1")
         for key in ("running", "idle", "pool", "lanes", "alerts", "conditions"):
             self.assertNotIn(key, public, "refusal cannot manufacture a healthy empty fleet")
+        self.assertEqual(public["at"], feed["at"],
+                         "the registered gem:lanes-tick heartbeat path must survive the bounded view")
         self.assertEqual(json.loads(self.api.files["lanes-status-details.json"]), feed)
+
+    def test_unavailable_view_keeps_the_registered_lanes_tick_heartbeat(self):
+        """JOV-9006: canon/automation-registry.jsonl declares gem:lanes-tick with a
+        json-timestamp receipt reading the top-level `at` of lanes-status.json in
+        the public gist. When the essential feed exceeds PUBLIC_FEED_MAX_BYTES the
+        bounded view must still carry that `at` (fresh, written by this tick) so
+        automation-liveness.mjs reads a heartbeat instead of heartbeat-source-missing
+        while the fleet data stays explicitly unavailable."""
+        feed = self.feed(0)
+        feed["conditions"]["source-unknown"]["evidence"] = "x" * (256 * 1024)
+        doctor.publish_status(self.host, self.lane, feed)
+        public = json.loads(self.api.files["lanes-status.json"])
+        self.assertEqual(public["status"], "unavailable")
+        self.assertEqual(public["at"], feed["at"],
+                         "the dead-man must see the tick ran; only a stale `at` is silence")
+        self.assertEqual(public["fullEvidence"]["at"], feed["at"])
+        self.assertGreater(public["requiredBytes"], public["maxBytes"])
 
     def test_utf8_limit_counts_bytes_and_preserves_full_multibyte_evidence(self):
         feed = self.feed(0)

@@ -1113,6 +1113,44 @@ describe('dead-man liveness', () => {
     expect(rowFor(report, 'gem:lanes-tick').status).toBe('unknown');
   });
 
+  // JOV-9006: when the essential public feed exceeds its byte cap, doctor.py
+  // publishes the bounded `symphony-lanes-status-unavailable/v1` view. That
+  // view still carries the tick heartbeat at the receipt path (`at`), so the
+  // dead-man stays green while the feed is explicitly degraded — only a host
+  // that stops ticking goes silent.
+  it('(b) the doctor unavailable view still carries the tick heartbeat', async () => {
+    const { report } = await runLiveness({
+      registry: only('gem:lanes-tick'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'lanes-status.json': {
+          schema: 'symphony-lanes-status-unavailable/v1',
+          status: 'unavailable',
+          reason: 'essential-public-feed-exceeds-byte-limit',
+          at: iso(4),
+          requiredBytes: 290185,
+          maxBytes: 262144,
+          fullEvidence: {
+            fileName: 'lanes-status-details.json',
+            sha256: '0'.repeat(64),
+            bytes: 580808,
+            at: iso(4),
+            host: 'gem',
+            release: '9cf0916',
+            binding: 'declared-feed-identity',
+          },
+        },
+      }),
+    });
+    expect(rowFor(report, 'gem:lanes-tick')).toMatchObject({
+      status: 'fresh',
+      lastProofAt: iso(4),
+      ageMinutes: 4,
+      budgetMinutes: 30,
+    });
+    expect(livenessDecisions(report)).toEqual([]);
+  });
+
   // JOV-8799: Summer's observeReceipt reports a succeeded read as `stale`
   // once it is older than the 10-minute provider TTL. This dead-man keeps
   // its own 60-minute silence budget and still rejects unknown or failed reads.

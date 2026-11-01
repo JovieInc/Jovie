@@ -2281,9 +2281,14 @@ def public_status_projection(feed: dict, full_text: str) -> str:
         return text
     # Never trim operational ownership/hold/attempt arrays to pretend they fit.
     # Existing schema-checking readers reject this as unknown, not an empty fleet.
+    # The tick heartbeat survives the bounded view (JOV-9006): the automation
+    # registry's gem:lanes-tick receipt reads this file's top-level `at`, so an
+    # oversize feed stays explicit about unavailability without erasing the
+    # proof that the lanes tick just ran. `at` is identity, not fleet data.
     return json.dumps({
         "schema": "symphony-lanes-status-unavailable/v1", "status": "unavailable",
         "reason": "essential-public-feed-exceeds-byte-limit",
+        "at": evidence["at"],
         "requiredBytes": len(text.encode("utf-8")), "maxBytes": PUBLIC_FEED_MAX_BYTES,
         "fullEvidence": evidence,
     }, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
