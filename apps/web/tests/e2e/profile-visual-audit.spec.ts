@@ -512,3 +512,20 @@ test.describe('Public profile compact shell sizing', () => {
     expect(shellBox.y + shellBox.height).toBeLessThanOrEqual(876);
   });
 });
+
+// JOV-8629 §6.2: the profile document is ISR-cached behind the proxy's
+// per-request publication gate. A published handle renders its header; an
+// unknown handle never renders a profile body.
+test.describe('profile publication gate', () => {
+  test('renders a published handle and refuses an unknown one', async ({
+    page,
+  }) => {
+    const published = await page.goto(`/${TEST_PROFILE}`);
+    expect(published?.status()).toBe(200);
+    await expect(page.locator(PROFILE_READY_SELECTOR).first()).toBeVisible();
+
+    const unknown = await page.request.get('/zz-no-such-artist-e2e-gate');
+    expect(unknown.status()).toBe(404);
+    expect(await unknown.text()).not.toContain('profile-compact-shell');
+  });
+});

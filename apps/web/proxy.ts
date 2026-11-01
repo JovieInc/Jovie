@@ -15,6 +15,7 @@ import {
   isTestAuthBypassEnabled,
   resolveTestBypassUserId,
 } from '@/lib/auth/test-mode';
+import { gateProfilePublicationAtEdge } from '@/lib/routing/profile-publication-edge';
 import { analyzeHost } from '@/lib/routing/proxy-routing';
 import {
   createFastNotFoundResponse,
@@ -188,6 +189,21 @@ export default async function middleware(
   }
 
   // ========================================================================
+  // Public profiles are ISR-cached; publication is decided fresh here on
+  // every request so a cached body is never served after withdrawal,
+  // deletion, rename or a storage failure (JOV-8629 §6.2).
+  // ========================================================================
+  if (req.method !== 'OPTIONS') {
+    const profilePublicationResponse = await gateProfilePublicationAtEdge(
+      req.nextUrl.pathname,
+      req.nextUrl.origin,
+      req.headers.get('cookie'),
+      req.headers.get('x-vercel-protection-bypass')
+    );
+    if (profilePublicationResponse) return profilePublicationResponse;
+  }
+
+  // ========================================================================
   // Better Auth catch-all endpoints (sign-in/social, OAuth callbacks, email
   // OTP send/verify, one-time-token verify, session endpoints) pass through
   // untouched so the BA handler at app/api/auth/[...all]/route.ts owns the
@@ -258,7 +274,7 @@ export const config = {
     // \\. which is a literal dot in the compiled regex. A single \\. in a
     // JS string becomes just . (any char), which would allow paths like
     // /wp-json or /a-css/foo to bypass middleware (JOV-2236).
-    '/((?!_next|monitoring(?:/|$)|\\.well-known|api/profile-alias-decision(?:/|$)|.*\\.(?:html?|css|js|json|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/((?!_next|monitoring(?:/|$)|\\.well-known|api/profile-alias-decision(?:/|$)|api/profile-publication(?:/|$)|.*\\.(?:html?|css|js|json|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     // Always run for API routes so the /api/auth/* early-return above and
     // the protected-API redirect logic in handleProxyRequest apply.
     // /api/profile-alias-decision is EXCLUDED: the proxy's alias fast path
@@ -268,6 +284,6 @@ export const config = {
     // alias redirect whenever the CDN-cached decision is not served fresh.
     // The endpoint is public, visitor-independent routing JSON that reads no
     // cookies, so it needs none of the proxy's gates (JOV-8338).
-    '/((?!api/profile-alias-decision(?:/|$))(?:api|trpc).*)',
+    '/((?!api/profile-alias-decision(?:/|$)|api/profile-publication(?:/|$))(?:api|trpc).*)',
   ],
 };
