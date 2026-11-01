@@ -4283,3 +4283,34 @@ html:not(.dark) .smart-link-powered-by {
   width: 100%;
   max-width: none;
 }
+
+/* Floating profile sheet (ProfileDrawerShell floating): a short task sheet
+   opened on its own, such as Share, ends on its own rounded edge above the
+   bottom nav and safe area instead of running into the screen edge. */
+.profile-drawer-floating {
+  width: calc(100% - var(--space-4));
+  margin-inline: auto;
+  /* Clear the profile's floating bottom nav, which stays visible under
+     sheets, plus the same gap as the sides. */
+  margin-bottom: calc(var(--profile-bottom-nav-height, 0px) + var(--space-2));
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: var(--profile-drawer-radius-mobile);
+}
+
+/* The floating sheet sizes to its content (docked sheets keep one fixed
+   body height so view switches never jump); its edge already clears the
+   nav and safe area, so the body needs only the standard inset. */
+.profile-drawer-floating-body {
+  max-height: calc(
+    var(--profile-drawer-height-max) -
+    var(--profile-drawer-header)
+  );
+  /* Matches the inset above the first row (rows carry their own py-3). */
+  padding-bottom: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .profile-drawer-floating {
+    border-radius: var(--profile-drawer-radius-desktop);
+  }
+}
