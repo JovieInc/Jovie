@@ -529,3 +529,14 @@ test.describe('profile publication gate', () => {
     expect(await unknown.text()).not.toContain('profile-compact-shell');
   });
 });
+
+// JOV-10246: the release artwork (profile LCP element) is server-rendered
+// markup with a high fetch priority, so it can paint before hydration.
+test.describe('profile LCP artwork', () => {
+  test('ships the artwork in the first HTML', async ({ page }) => {
+    const response = await page.request.get(`/${TEST_PROFILE}`);
+    expect(response.status()).toBe(200);
+    const html = await response.text();
+    expect(html).toMatch(/<img[^>]*fetchPriority="high"/i);
+  });
+});
