@@ -3170,8 +3170,16 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
                               f"{type(failure).__name__}: {failure}\n")
                 except (AttributeError, OSError):
                     pass
+        stop_failure = None
+        if _lifecycle_helper:
+            _HELD_CLEANUP[:] = [owned, proc]
         try:
             owned.stop(proc)
+        except RuntimeError as failure:
+            # A failed tracked-descendant stop must not skip the process-group sweep below
+            # or replace the stop cause with a permanent cleanup hold (Gem, 2026-10-29: a
+            # `--timeout 600` trufflehog gate lived 2d17h). Re-verify drainage afterwards.
+            stop_failure = failure
         finally:
             for sig, grace in ((signal.SIGTERM, 15), (signal.SIGKILL, 5)):
                 # A reaped leader's PID/PGID may now belong to an unrelated job.
@@ -3195,6 +3203,8 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
                 else:
                     continue
                 break
+        if stop_failure is not None and not _cleanup_drained(owned, proc):
+            raise stop_failure
         raise
     finally:
         for signo, previous in restored.items():
@@ -3202,6 +3212,36 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
                 signal.signal(signo, previous)
             except (ValueError, OSError):
                 pass
+
+
+_HELD_CLEANUP: list = []  # [AgentProcesses, Popen] of the helper's last stopped run
+
+
+def _cleanup_drained(owned, proc) -> bool:
+    """True only when no owned descendant and no process-group member remains."""
+    try:
+        proc.poll()
+        return not owned.observe() and not process_group_alive(proc.pid)
+    except Exception:
+        return False  # unreadable membership cannot prove drainage
+
+
+def retry_held_cleanup() -> bool:
+    """One more TERM/KILL sweep over the helper's owned tree and its process group."""
+    import signal
+    if len(_HELD_CLEANUP) != 2:
+        return False
+    owned, proc = _HELD_CLEANUP
+    try:
+        owned.stop(proc)
+    except Exception:
+        pass
+    if proc.returncode is None:  # unreaped leader: its PID/PGID cannot belong to anyone else
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except OSError:
+            pass
+    return _cleanup_drained(owned, proc)
 
 
 PROVIDER_HANDOFFS = 2
@@ -11557,8 +11597,12 @@ def guarded_main(argv: list[str] | None = None) -> int:
                       file=sys.stderr, flush=True)
             except OSError:
                 pass
-            while True:
-                time.sleep(60)
+            # Keep the locks only while descendants are provably alive: retry the sweep and
+            # release the moment the tree drains, instead of holding them until an operator.
+            while not retry_held_cleanup():
+                time.sleep(float(os.environ.get("LANES_GATE_CLEANUP_RETRY_S", 10)))
+            report_outcome({"returncode": None, "timeout": True})
+            return 124
     if args.command == "context-manifest":
         path = HERE / "context-manifest.json"
         generated = context_manifest_json()
