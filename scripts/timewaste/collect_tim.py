@@ -4,6 +4,9 @@ No message text leaves this module: bodies are classified in memory and dropped.
 """
 from __future__ import annotations
 
+# api-budget: github-user-core 16/hr - weekly collect at <=1/hr; user lookup plus three event pages, four client attempts each
+# api-budget: linear-requests 8/hr - weekly collect at <=1/hr; one query with four client attempts and one auth refresh
+
 import glob
 import json
 import os

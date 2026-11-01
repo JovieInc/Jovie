@@ -6,6 +6,9 @@ idle-exits.jsonl / host-alarms.jsonl / queue-timings.json under the lanes state 
 """
 from __future__ import annotations
 
+# api-budget: github-user-core 12/hr - weekly collect at <=1/hr; three merge-group run pages, four client attempts each
+# api-budget: github-user-graphql 200/hr - weekly collect at <=1/hr; point reserve for three CI-query sizes and ten PR-list pages including retries
+
 import json
 import re
 import statistics
