@@ -77,6 +77,26 @@ const TOOL_INPUT_ENV_READERS = new Set([
   '.claude/hooks/typecheck.sh',
 ]);
 
+test('gitleaks coverage script stays executable for direct workflow runs (JOV-8895)', () => {
+  const script = 'scripts/security/verify-gitleaks-coverage.sh';
+  const modes = trackedModes(script);
+  assert.equal(
+    modes.get(script),
+    '100755',
+    `${script} is invoked as ./${script}; a 100644 tree entry exits 126`
+  );
+  for (const workflow of [
+    '.github/workflows/source-validation.yml',
+    '.github/workflows/ci.yml',
+    '.github/workflows/security.yml',
+  ]) {
+    assert.match(
+      readFileSync(resolve(ROOT, workflow), 'utf8'),
+      /\.\/scripts\/security\/verify-gitleaks-coverage\.sh/
+    );
+  }
+});
+
 test('no new Claude hook reads the unset $TOOL_INPUT env var (JOV-6613 ratchet)', () => {
   const scripts = new Set(
     claudeHookCommands().map(hookScriptPath).filter(Boolean)
