@@ -30,6 +30,7 @@ from urllib.parse import urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import disk_guard  # noqa: E402
 import lifecycle  # noqa: E402
+import pr_wip  # noqa: E402  (per-producer WIP census and idle expiry, 2026-11-01)
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -2576,6 +2577,9 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
         settling = age < ORPHAN_GRACE_S or pr.get("rollup") in ("PENDING", "EXPECTED")
         if not (explicitly_held or queued or settling):
             plan["orphans"].append(number)
+    # Open-PR count, age, mergeability and per-producer WIP against its cap: the lanes feed
+    # `prs.wip` block that Ovie and Summer's digest read (2026-11-01).
+    counts["wip"] = pr_wip.census(prs, now)
     plan["counts"] = counts
     plan["dispositions"] = dispositions(prs, plan, attempts, max_attempts, now, held)
     return plan
@@ -2692,12 +2696,33 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
                 if row["pr"] == pr["number"]:
                     row.update(reason=f"parked {int((now - since) // 3600)}h; issue requeued",
                                next="the issue rebuilds from main; label this PR `duplicate` once it lands")
+    expired = expire_idle(host, lane, prs, now)
     record = {"at": lane.now_iso(), "atEpoch": now, "counts": plan["counts"], "labeled": labeled,
-              "closed": closed, "parkedRequeued": parked, "orphans": plan["orphans"],
+              "closed": closed, "expired": expired, "parkedRequeued": parked, "orphans": plan["orphans"],
               "depHolds": plan["depHolds"], "dispositions": plan["dispositions"], "staleHolds": stale,
               "holdNags": next_nags}
     lane.update_json(host.state / "reconcile.json", lambda data: (data.clear(), data.update(record)))
     return record
+
+
+def expire_idle(host, lane, prs: list[dict], now: float) -> list[dict]:
+    """Close ownerless or long-idle PRs (pr-wip-policy.json `expire`), at most
+    maxClosesPerTick per reconcile, with a comment; the branch is kept. A PR under a repair
+    lease or a terminal generation stays (maintenance_hold). Disabled in the policy until
+    JOV-INV-011 (automatic close needs an explicit duplicate label) is amended; then this is
+    the one automatic path. LANES_PR_EXPIRE=0 is the kill switch."""
+    if os.environ.get("LANES_PR_EXPIRE", "1").lower() in ("0", "false", "no"):
+        return []
+
+    def close(number: int, body: str) -> bool:
+        pr = next((row for row in prs if row["number"] == number), None)
+        if pr is None or maintenance_hold(host, lane, pr, now):
+            return False
+        return pr_wip.close_pr(number, body)
+    try:
+        return pr_wip.expire(prs, now, pr_wip.load_policy(), close)
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+        return []  # expiry is housekeeping; it never fails the reconcile
 
 
 def tick(host, lane, linear_factory, now: float | None = None) -> dict:

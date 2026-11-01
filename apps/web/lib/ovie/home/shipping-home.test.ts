@@ -230,6 +230,7 @@ describe('buildPulse', () => {
       'merges-hour',
       'queue',
       'red-prs',
+      'open-prs',
       'lanes',
       'eligible',
       'held',
@@ -286,6 +287,46 @@ describe('buildPulse', () => {
     expect(byKey.held).toMatchObject({ value: '3', tone: 'bad' });
     expect(byKey['gem-disk']?.tone).toBe('bad');
     expect(byKey.lanes?.tone).toBe('neutral');
+  });
+
+  it('shows open PRs with drain time and flags a producer over its WIP cap', () => {
+    const base = measuredDelivery();
+    const tile = (flow: Partial<NonNullable<typeof base.lanes.flow>>) =>
+      buildPulse(
+        delivery({
+          ...base,
+          lanes: {
+            ...base.lanes,
+            flow: {
+              openPrs: 96,
+              redPrs: 10,
+              dirtyPrs: 5,
+              cleanNotQueued: 0,
+              exhaustedPrs: 0,
+              mergesPerHour: 4,
+              queueEjectionRate: null,
+              queueWaitP95Seconds: null,
+              productionLagP95Seconds: null,
+              eligiblePool: null,
+              candidatePool: null,
+              ownerless: null,
+              openPrAgeP95Hours: 120,
+              overWipProducers: 0,
+              regressions: [],
+              at: null,
+              ...flow,
+            },
+          },
+        })
+      ).find(row => row.key === 'open-prs');
+    expect(tile({})).toMatchObject({
+      label: 'Open PRs',
+      value: '96 · 1.0d drain · p95 5d old',
+      tone: 'good',
+    });
+    expect(tile({ openPrs: 391 })?.tone).toBe('bad');
+    expect(tile({ overWipProducers: 2 })?.tone).toBe('bad');
+    expect(tile({ mergesPerHour: null })).toMatchObject({ value: '96' });
   });
 
   it('shows LogYourBody production deploy health on Home, failing in bad tone', () => {

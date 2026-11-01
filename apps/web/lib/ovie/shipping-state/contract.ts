@@ -421,6 +421,9 @@ export type DeliveryFlow = {
   readonly eligiblePool: number | null;
   readonly candidatePool: number | null;
   readonly ownerless: number | null;
+  /** Open-PR age p95 in hours and producers over their WIP cap (lanes `prs.wip`, pr-wip-policy.json). */
+  readonly openPrAgeP95Hours?: number | null;
+  readonly overWipProducers?: number | null;
   readonly regressions: readonly string[];
   readonly at: string | null;
 };

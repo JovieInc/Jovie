@@ -269,6 +269,14 @@ const deliveryLanesSchema = z.object({
       eligiblePool: nullableCount,
       candidatePool: nullableCount,
       ownerless: nullableCount,
+      openPrAgeP95Hours: z
+        .number()
+        .finite()
+        .nonnegative()
+        .nullable()
+        .optional()
+        .default(null),
+      overWipProducers: nullableCount.optional().default(null),
       regressions: z.array(z.string().max(120)).max(10),
       at: z.string().nullable(),
     })

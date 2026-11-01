@@ -928,6 +928,7 @@ export function parseLaneFlow(
   const throughput = slo && isRecord(slo.throughput) ? slo.throughput : null;
   const mergesPerDay = finiteOrNull(throughput?.mergesPerDay);
   const ejection = finiteOrNull(slo?.queueEjectionRate);
+  const wip = prs && isRecord(prs.wip) ? prs.wip : null;
   const regressions = (
     slo && Array.isArray(slo.regressions) ? slo.regressions : []
   )
@@ -949,6 +950,8 @@ export function parseLaneFlow(
     eligiblePool: countOrNull(admission?.eligiblePool),
     candidatePool: countOrNull(admission?.candidatePool),
     ownerless: countOrNull(ownership?.ownerless),
+    openPrAgeP95Hours: finiteOrNull(wip?.ageP95Hours),
+    overWipProducers: Array.isArray(wip?.overCap) ? wip.overCap.length : null,
     regressions,
     at: slo ? parseTimestamp(slo.at) : null,
   };

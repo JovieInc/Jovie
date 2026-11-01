@@ -15,6 +15,7 @@ import {
   main,
   redOutput,
   refreshBodyChecks,
+  wipAdmission,
 } from './pr-open.mjs';
 
 const file = (filename, status = 'modified') => ({
@@ -527,6 +528,121 @@ test('open fills its new self URL after ordinary publication', async () => {
       /Verify: https:\/\/github.com\/JovieInc\/Jovie\/pull\/42/
     );
     assert.doesNotMatch(edited, /<PR URL/);
+  } finally {
+    cleanup();
+  }
+});
+
+test('wip admission refuses a producer at its cap and admits when the count is unreadable', () => {
+  const seen = [];
+  const refused = wipAdmission(
+    'codex/jov-1-20261101',
+    (command, args) => {
+      seen.push([command, ...args]);
+      return {
+        status: 3,
+        stdout: JSON.stringify({
+          allowed: false,
+          reason: 'wip-cap',
+          producer: 'codex',
+          used: 8,
+          cap: 8,
+        }),
+        stderr: '',
+      };
+    },
+    '.'
+  );
+  assert.deepEqual(seen[0], [
+    'python3',
+    'scripts/lanes/pr_wip.py',
+    'admit',
+    '--branch',
+    'codex/jov-1-20261101',
+  ]);
+  assert.equal(refused.allowed, false);
+  assert.match(refused.message, /`codex\/` already owns 8 open PRs \(cap 8/);
+  const unknown = wipAdmission(
+    'codex/x',
+    () => ({ status: 75, stdout: '', stderr: 'gh unavailable' }),
+    '.'
+  );
+  assert.equal(unknown.allowed, true);
+  assert.match(unknown.message, /admitting/);
+  const within = wipAdmission(
+    'codex/x',
+    () => ({
+      status: 0,
+      stdout: '{"allowed":true,"producer":"codex","used":2,"cap":8}',
+      stderr: '',
+    }),
+    '.'
+  );
+  assert.deepEqual(within, { allowed: true, message: null });
+});
+
+test('open stops before pushing or creating when the producer is over its WIP cap', async () => {
+  const { repo, cleanup } = localRepo();
+  const filename = path.join(repo, 'body.md');
+  writeFileSync(
+    filename,
+    draftBody({ title: 'perf(ci): cheaper', files: [], metric })
+  );
+  try {
+    const calls = [];
+    const execute = (command, args) => {
+      if (command === 'python3')
+        return {
+          status: 3,
+          stdout: '{"allowed":false,"producer":"hyperagent","used":36,"cap":5}',
+          stderr: '',
+        };
+      if (args[0] === 'push') calls.push('push');
+      return args[0] === 'log'
+        ? okText('perf(ci): cheaper')
+        : fakeDiffRunner(command, args);
+    };
+    const github = (_cwd, args) => {
+      calls.push(args[1]);
+      return okText('');
+    };
+    const out = [];
+    assert.equal(
+      await main(
+        ['open', '--repo', repo, '--body-file', filename],
+        x => out.push(x),
+        { github, execute }
+      ),
+      3
+    );
+    assert.deepEqual(calls, []);
+    assert.match(out.join('\n'), /FAIL {2}wip-cap/);
+    let created;
+    const overriding = (_cwd, args) => {
+      if (args[1] === 'create') {
+        created = args;
+        return okText('https://github.com/JovieInc/Jovie/pull/43');
+      }
+      return okText('');
+    };
+    assert.equal(
+      await main(
+        [
+          'open',
+          '--repo',
+          repo,
+          '--body-file',
+          filename,
+          '--no-push',
+          '--wip-override',
+          'this PR installs the cap itself',
+        ],
+        () => {},
+        { github: overriding, execute }
+      ),
+      0
+    );
+    assert.equal(created[created.indexOf('--label') + 1], 'wip-override');
   } finally {
     cleanup();
   }
