@@ -18,6 +18,7 @@ import {
   screen,
   session,
   shell,
+  systemPreferences,
   type WebContents,
 } from 'electron';
 import { autoUpdater } from 'electron-updater';
@@ -92,6 +93,7 @@ import {
   resolveDesktopNotificationClickAction,
 } from './desktop-notifications';
 import {
+  resolveMicrophoneAccess,
   shouldGrantTrustedAudioPermission,
   shouldGrantTrustedAudioPermissionCheck,
   shouldGrantTrustedHudScreenPermission,
@@ -887,18 +889,15 @@ function findLegacyAuthReturnRouteInArgv(
 // Electron cannot ship, so `webkitSpeechRecognition` exists in the renderer
 // but every start() fails with a 'network' error (electron/electron#46143,
 // #7749). Advertising it as a fallback made the composer mic look live and
-// fail on every press. Report it unavailable so the renderer points at OS
-// dictation instead — macOS dictation types into any focused field here.
+// fail on every press. Report it unavailable so the renderer records with
+// MediaRecorder and transcribes on the server instead (JOV-9665).
 function getDesktopDictationStatus(): DesktopDictationStatus {
   return {
     ok: true,
     nativeAvailable: false,
     webSpeechFallbackAllowed: false,
     mode: 'unavailable',
-    reason:
-      process.platform === 'darwin'
-        ? 'web-speech-unsupported-in-electron-use-macos-system-dictation'
-        : 'web-speech-unsupported-in-electron-use-system-dictation',
+    reason: 'web-speech-unsupported-in-electron-use-server-transcription',
   };
 }
 
@@ -1025,23 +1024,30 @@ function registerMainWindowPermissionHandlers(session: Session): void {
         typeof details.requestingUrl === 'string'
           ? details.requestingUrl
           : undefined;
+      const trustedAudio = shouldGrantTrustedAudioPermission({
+        permission,
+        details,
+        webContents,
+        requestingOrigin,
+        parseUrl,
+        appOrigin: APP_ORIGIN,
+      });
+      if (trustedAudio) {
+        void resolveMicrophoneAccess(process.platform, systemPreferences).then(
+          callback,
+          () => callback(false)
+        );
+        return;
+      }
       callback(
-        shouldGrantTrustedAudioPermission({
+        shouldGrantTrustedHudScreenPermission({
           permission,
           details,
           webContents,
           requestingOrigin,
           parseUrl,
           appOrigin: APP_ORIGIN,
-        }) ||
-          shouldGrantTrustedHudScreenPermission({
-            permission,
-            details,
-            webContents,
-            requestingOrigin,
-            parseUrl,
-            appOrigin: APP_ORIGIN,
-          })
+        })
       );
     }
   );

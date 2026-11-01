@@ -24,6 +24,18 @@
       "rule": "provider-host",
       "max": 2,
       "reason": "Research router source: the literal is the url passed to @jovie/api-client ApiClient.request, so the call is budgeted."
+    },
+    {
+      "path": "apps/web/lib/dictation/stt/cloudflare.ts",
+      "rule": "provider-host",
+      "max": 1,
+      "reason": "Dictation STT adapter: the Cloudflare Workers AI literal is the url passed to @jovie/api-client ApiClient.request, so the call is budgeted and spend-capped."
+    },
+    {
+      "path": "apps/web/lib/dictation/stt/elevenlabs.ts",
+      "rule": "provider-host",
+      "max": 1,
+      "reason": "Dictation STT adapter: the ElevenLabs Scribe literal is the url passed to @jovie/api-client ApiClient.request, so the call is budgeted and spend-capped."
     }
   ]
 }

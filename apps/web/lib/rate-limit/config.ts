@@ -72,6 +72,17 @@ export const RATE_LIMITERS = {
     trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
+  /** Dictation transcription fallback: short clips, per user */
+  chatTranscribe: {
+    name: 'Chat Transcribe',
+    limit: 30,
+    window: '1 m',
+    prefix: 'chat_transcribe',
+    analytics: false,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
+  } satisfies RateLimitConfig,
+
   /** Artwork upload: 5 uploads per minute per user */
   artworkUpload: {
     name: 'Artwork Upload',

@@ -30,8 +30,6 @@ type Story = StoryObj<typeof meta>;
 export const Idle: Story = {
   args: {
     isListening: false,
-    isSupported: true,
-    unavailableHint: null,
     onPreserveFocus: fn(),
     onPushStart: fn(),
     onPushEnd: fn(),
@@ -43,15 +41,5 @@ export const Listening: Story = {
   args: {
     ...Idle.args,
     isListening: true,
-  },
-};
-
-export const UnsupportedWithSystemDictationHint: Story = {
-  args: {
-    ...Idle.args,
-    isSupported: false,
-    unavailableHint:
-      'Use macOS dictation (press Fn twice) inside the desktop app.',
-    onUnavailable: fn(),
   },
 };

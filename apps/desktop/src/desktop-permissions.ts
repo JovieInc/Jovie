@@ -200,3 +200,34 @@ export function shouldGrantTrustedAudioPermissionCheck(input: {
     input.appOrigin
   );
 }
+
+export type MicrophoneAccessStatus =
+  | 'not-determined'
+  | 'granted'
+  | 'denied'
+  | 'restricted'
+  | 'unknown';
+
+export interface MediaAccessApi {
+  getMediaAccessStatus(mediaType: 'microphone'): MicrophoneAccessStatus;
+  askForMediaAccess(mediaType: 'microphone'): Promise<boolean>;
+}
+
+/**
+ * macOS gates the mic per app (TCC), independent of Chromium's permission
+ * handler. Approving the web request alone leaves getUserMedia failing
+ * silently, so ask the OS first; a prior denial stays denied (the renderer
+ * then shows an honest permission error) rather than re-prompting.
+ */
+export async function resolveMicrophoneAccess(
+  platform: string,
+  mediaAccess: MediaAccessApi
+): Promise<boolean> {
+  if (platform !== 'darwin') return true;
+  const status = mediaAccess.getMediaAccessStatus('microphone');
+  if (status === 'granted') return true;
+  if (status === 'not-determined') {
+    return mediaAccess.askForMediaAccess('microphone');
+  }
+  return false;
+}

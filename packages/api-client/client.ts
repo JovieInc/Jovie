@@ -118,7 +118,8 @@ export interface RequestOptions {
   readonly url: string;
   readonly method?: string;
   readonly headers?: Readonly<Record<string, string>>;
-  readonly body?: string | object;
+  /** Binary and multipart bodies are sent as-is (never JSON-encoded). */
+  readonly body?: string | object | Uint8Array | FormData;
   readonly priority?: PriorityName;
   readonly costs?: Readonly<Record<string, number>>;
   readonly write?: boolean;
@@ -211,8 +212,18 @@ function maybeJson(text: string, headers: Headers | undefined): unknown {
   }
 }
 
-function bodyText(body: string | object | undefined): string | undefined {
+function isRawBody(body: unknown): body is Uint8Array | FormData {
+  return (
+    body instanceof Uint8Array ||
+    (typeof FormData !== 'undefined' && body instanceof FormData)
+  );
+}
+
+function bodyText(
+  body: string | object | Uint8Array | FormData | undefined
+): string | undefined {
   if (body === undefined) return undefined;
+  if (isRawBody(body)) return '';
   return typeof body === 'string' ? body : JSON.stringify(body);
 }
 
@@ -384,7 +395,9 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         response = await fetchImpl(url, {
           method,
           headers,
-          body,
+          body: (isRawBody(opts.body) ? opts.body : body) as
+            | BodyInit
+            | undefined,
           signal: opts.signal
             ? AbortSignal.any([timeout, opts.signal])
             : timeout,
