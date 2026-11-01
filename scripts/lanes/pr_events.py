@@ -437,6 +437,9 @@ HEAD_CHECKS_QUERY = """query($owner:String!,$name:String!,$number:Int!){reposito
 pullRequest(number:$number){commits(last:1){nodes{commit{statusCheckRollup{contexts(first:100){nodes{__typename
 ... on CheckRun{name conclusion startedAt completedAt} ... on StatusContext{context state createdAt}}}}}}}}}}"""
 RED_CHECK_STATES = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "ERROR"})
+# Advisory checks that never gate a merge: their red (Tently's provider was down all night on
+# 2026-11-01, ~100 PRs got lane-fix-red) is no repair signal.
+NON_REQUIRED_CHECKS = frozenset({"tently"})
 
 
 def head_red(number: int, sh=run) -> bool | None:
@@ -457,9 +460,24 @@ def head_red(number: int, sh=run) -> bool | None:
         key = node.get("name") or node.get("context")
         at = node.get("completedAt") or node.get("startedAt") or node.get("createdAt") or ""
         state = str(node.get("conclusion") or node.get("state") or "").upper()
+        if key and key.lower() in NON_REQUIRED_CHECKS:
+            continue
         if key and (key not in latest or at >= latest[key][0]):
             latest[key] = (at, state)
     return any(state in RED_CHECK_STATES for _, state in latest.values())
+
+
+def red_label_justified(number: int, pr: dict, sh=run) -> bool:
+    """May `lane-fix-red` go on this head? Only after a completed failure.
+
+    2026-11-01: #24141 had every required check green and Source Validation merely re-running
+    when this label landed on it; Green Enroll treated the label as a hold and dequeued it
+    (queue position lost for 2h+). A required-green merge state (CLEAN, HAS_HOOKS, UNSTABLE) or a
+    head whose latest run of every check is not a failure (pending re-run, passed) is not red.
+    An unreadable check list keeps the old behaviour: a real red must not be dropped."""
+    if pr.get("mergeStateStatus") in REQUIRED_GREEN:
+        return False
+    return head_red(number, sh) is not False
 
 
 def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
@@ -1191,6 +1209,8 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
         if kind == "dequeued" and mark_poison(number, pr, time.time(), sh):
             added.append((number, POISON_LABEL))
         if PREFIX + kind in label_names(pr):
+            continue
+        if kind == "red" and not red_label_justified(number, pr, sh):
             continue
         if in_scope(pr, kind, disabled) and add_label(number, kind, sh):
             added.append((number, kind))
@@ -2606,8 +2626,9 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
         if kind == "conflict" and claim_active(
                 number, by_number[number].get("headRefOid"), lane.sh, now):
             continue
-        if kind == "red" and head_red(number, lane.sh) is not True:
-            continue  # a cancelled/superseded run reddens the rollup; unknown waits a pass
+        if kind == "red" and (by_number[number].get("mergeStateStatus") in REQUIRED_GREEN
+                              or head_red(number, lane.sh) is not True):
+            continue  # a cancelled/superseded run or a non-required red; unknown waits a pass
         if add_label(number, kind, lane.sh):
             labeled.append((number, kind))
     for number, kind in plan["unlabel"]:

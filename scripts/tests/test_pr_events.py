@@ -508,6 +508,36 @@ class RelayTest(unittest.TestCase):
         self.assertEqual(exhausted.made("gh", "api", "-X", "POST"), [],
                          "a terminal head never gets another repair signal")
 
+    def test_red_label_needs_a_completed_failure_not_a_pending_rerun_or_green_head(self):
+        # 2026-11-01: lane-fix-red landed on queued #24141 while Source Validation only re-ran;
+        # green enroll read it as a hold and dequeued the PR.
+        run = {"event": "pull_request", "conclusion": "failure", "head_sha": "h1", "pull_requests": [{"number": 5}]}
+
+        def checks(*rows):
+            return {"data": {"repository": {"pullRequest": {"commits": {"nodes": [{"commit": {
+                "statusCheckRollup": {"contexts": {"nodes": list(rows)}}}}]}}}}}
+
+        def relay(merge, rows):
+            view = {"state": "OPEN", "isDraft": False, "headRefName": "tim/fix", "headRefOid": "h1",
+                    "isCrossRepository": False, "mergeStateStatus": merge, "labels": []}
+            shell = Shell({("gh", "pr", "view"): view, ("gh", "api", "graphql"): checks(*rows)})
+            return events.relay("workflow_run", {"workflow_run": run}, shell, set()), shell
+
+        failed = {"__typename": "CheckRun", "name": "Source Validation", "conclusion": "FAILURE",
+                  "completedAt": "2026-11-01T03:00:00Z"}
+        rerun = {"__typename": "CheckRun", "name": "Source Validation", "conclusion": None,
+                 "startedAt": "2026-11-01T03:13:00Z"}
+        passed = {**failed, "conclusion": "SUCCESS", "completedAt": "2026-11-01T03:20:00Z"}
+        added, _ = relay("BLOCKED", [failed])
+        self.assertEqual(added, [(5, "red")], "a completed failure still labels")
+        for merge, rows, why in (("BLOCKED", [failed, rerun], "pending re-run of the failed check"),
+                                 ("BLOCKED", [failed, passed], "the re-run passed"),
+                                 ("CLEAN", [failed], "required-green merge state"),
+                                 ("UNSTABLE", [failed], "only a non-required check is red")):
+            added, shell = relay(merge, rows)
+            self.assertEqual(added, [], why)
+            self.assertEqual(shell.made("gh", "api", "-X", "POST"), [], why)
+
     def test_required_green_success_clears_stale_lane_fix_red_and_a_red_head_keeps_it(self):
         def success(status, **extra):
             view = pr(branch="cursor/fix", sha="h1", merge=status, labels=["lane-fix-red"],
@@ -1759,6 +1789,9 @@ class GapTest(unittest.TestCase):
         self.assertIs(events.head_red(1, reply(cancelled, passed, failed_old, passed_new)), False)
         self.assertIs(events.head_red(1, reply(passed, {**failed_old, "completedAt": "2026-10-21T02:00:00Z"})), True)
         self.assertIs(events.head_red(1, reply({"context": "ci/legacy", "state": "ERROR", "createdAt": "x"})), True)
+        tently = {"name": "Tently", "conclusion": "FAILURE", "completedAt": "2026-10-21T03:00:00Z"}
+        self.assertIs(events.head_red(1, reply(passed, tently)), False, "a non-required AI review is no repair signal")
+        self.assertIs(events.head_red(1, reply(tently, {**failed_old, "completedAt": "2026-10-21T02:00:00Z"})), True)
         self.assertIsNone(events.head_red(1, reply(passed, code=1)))
         self.assertIsNone(events.head_red(1, lambda *a, **k: SimpleNamespace(returncode=0, stdout="nope", stderr="")))
 

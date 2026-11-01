@@ -178,6 +178,10 @@ async function fixture(
           repository: { mergeQueue: { entries: { nodes: queueEntries } } },
         };
       }
+      if (query.includes('dequeuePullRequest')) {
+        mutations.push({ ...params, dequeue: true });
+        return { dequeuePullRequest: { clientMutationId: null } };
+      }
       if (query.includes('enqueuePullRequest')) {
         mutations.push(
           query.includes('jump: true') ? { ...params, jump: true } : params
@@ -2458,6 +2462,7 @@ test('every enroll decision on a ready PR leaves a receipt (pr, head, reason)', 
     "receipt(pr, 'held', failure.reason)",
     "receipt(pr, 'skip', `head-unchanged-since-removal:",
     "receipt(pr, jump ? 'enqueued-jump' : 'enqueued',",
+    "receipt(pr, 'relabel-jump',",
     "receipt(pr, 'error',",
   ])
     assert.ok(script.includes(decision), decision);
@@ -2535,4 +2540,81 @@ test('compounding PRs jump the queue under the reset-safe policy and every decis
     queueEntries: [entry(8, 'QUEUED', 300)],
   });
   assert.deepEqual(batched.mutations, [unjumped]);
+});
+
+test('a queued PR labeled compounding is re-routed with jump under the same caps and leaves a relabel-jump receipt', async () => {
+  const queuedCompounding = {
+    isInMergeQueue: true,
+    labels: {
+      pageInfo: { hasNextPage: false },
+      nodes: [{ name: 'compounding' }],
+    },
+  };
+  const iso = secondsAgo =>
+    new Date(Date.now() - secondsAgo * 1000).toISOString();
+  const entry = (number, position, over = {}) => ({
+    state: 'QUEUED',
+    position,
+    enqueuedAt: iso(3600),
+    pullRequest: { number, labels: { nodes: [] } },
+    ...over,
+  });
+  const self = position => entry(1, position);
+  const compoundingEntry = (number, position, secondsAgo = 3600) =>
+    entry(number, position, {
+      enqueuedAt: iso(secondsAgo),
+      pullRequest: { number, labels: { nodes: [{ name: 'compounding' }] } },
+    });
+  const dequeued = { id: 'PR_1', dequeue: true };
+  const jumped = { id: 'PR_1', oid: sha, jump: true };
+  const reroute = queueEntries =>
+    fixture({ overrides: { 1: queuedCompounding }, queueEntries });
+
+  // Behind a plain entry: dequeue then enqueue with jump, never the manual-removal block.
+  const rerouted = await reroute([entry(8, 1), self(2)]);
+  assert.deepEqual(rerouted.mutations, [dequeued, jumped]);
+  // Already first, or only compounding entries ahead: untouched.
+  assert.deepEqual((await reroute([self(1), entry(8, 2)])).mutations, []);
+  assert.deepEqual(
+    (await reroute([compoundingEntry(8, 1), self(2)])).mutations,
+    []
+  );
+  // Caps apply unchanged: MAX_JUMPED, JUMP_MAX_BUILD_S and JUMP_BATCH_S defer the re-route.
+  const capped = await reroute([
+    compoundingEntry(8, 1),
+    compoundingEntry(9, 2),
+    entry(7, 3),
+    self(4),
+  ]);
+  assert.deepEqual(capped.mutations, []);
+  const stale = await reroute([
+    entry(30, 1, { state: 'AWAITING_CHECKS', enqueuedAt: iso(900) }),
+    self(2),
+  ]);
+  assert.deepEqual(stale.mutations, []);
+  const batched = await reroute([
+    compoundingEntry(8, 1, 300),
+    entry(7, 2),
+    self(3),
+  ]);
+  assert.deepEqual(batched.mutations, []);
+  // A young building group may be reset; the reset is logged.
+  const young = await reroute([
+    entry(31, 1, { state: 'AWAITING_CHECKS', enqueuedAt: iso(60) }),
+    self(2),
+  ]);
+  assert.deepEqual(young.mutations, [dequeued, jumped]);
+  assert.ok(young.warnings.some(w => /JUMP RESET by #1.*#31/.test(w)));
+  // A queued PR without the label, or a dry run, is never touched.
+  const unlabeled = await fixture({
+    overrides: { 1: { isInMergeQueue: true } },
+    queueEntries: [entry(8, 1), self(2)],
+  });
+  assert.deepEqual(unlabeled.mutations, []);
+  const dry = await fixture({
+    overrides: { 1: queuedCompounding },
+    queueEntries: [entry(8, 1), self(2)],
+    dry: true,
+  });
+  assert.deepEqual(dry.mutations, []);
 });
