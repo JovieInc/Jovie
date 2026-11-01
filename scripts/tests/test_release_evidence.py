@@ -117,6 +117,39 @@ class LogRetry(unittest.TestCase):
             self.assertEqual(out["streaks"]["golden-path"]["specs"], ["tests/e2e/x.spec.ts:5"])
 
 
+class OnlyGreenClears(unittest.TestCase):
+    def test_skipped_runs_sliding_the_reds_out_of_the_window_do_not_clear_the_streak(self):
+        state = {"rows": runs("failure", "failure")}
+
+        def gh(args, **_):
+            path = args[1]
+            rows = state["rows"]
+            if "workflows/ci.yml/runs" in path:
+                body = {"workflow_runs": [{k: v for k, v in r.items() if k != "_job"} for r in rows]}
+            elif "/jobs?" in path:
+                body = {"jobs": jobs_of_factory(rows)(int(path.split("/runs/")[1].split("/")[0]))}
+            elif path.endswith("/logs"):
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            else:
+                body = {"sha": "f" * 40}
+            return SimpleNamespace(returncode=0, stdout=json.dumps(body), stderr="")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out, _ = release_evidence.sample(Path(tmp), 1_000_000.0, run=gh, version=lambda: "a163bac")
+            self.assertEqual(out["streaks"]["golden-path"]["count"], 2)
+            skipped = runs(*[None] * 8)
+            for r in skipped:
+                r["id"] += 1000
+            state["rows"] = skipped
+            out, _ = release_evidence.sample(Path(tmp), 1_000_400.0, run=gh, version=lambda: "a163bac")
+            self.assertEqual(out["streaks"]["golden-path"]["count"], 2)
+            green = runs("success")
+            green[0]["id"] += 2000
+            state["rows"] = green
+            out, _ = release_evidence.sample(Path(tmp), 1_000_800.0, run=gh, version=lambda: "a163bac")
+            self.assertNotIn("golden-path", out["streaks"])
+
+
 class BuildStale(unittest.TestCase):
     def test_stale_only_after_two_hours_with_main_advanced(self):
         t0 = 1_000_000.0

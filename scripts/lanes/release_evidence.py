@@ -162,7 +162,12 @@ def sample(state_dir: Path, now: float, run=None, version=read_version) -> tuple
             return jobs_cache[key]
 
         previous = cached.get("streaks") or {}
-        streaks = {slug: carry_streak(streak, previous.get(slug)) for slug, streak in red_streaks(job_conclusions(runs, jobs_of)).items()}
+        rows = job_conclusions(runs, jobs_of)
+        streaks = {slug: carry_streak(streak, previous.get(slug)) for slug, streak in red_streaks(rows).items()}
+        for slug, prior in previous.items():
+            # Only a green run clears a streak: runs that skipped the job (or slid the reds out of the window) do not.
+            if slug not in streaks and not any(row["jobs"].get(slug, (None,))[0] == "success" for row in rows):
+                streaks[slug] = prior
         for slug, streak in streaks.items():
             prior = previous.get(slug) or {}
             if streak["count"] >= RED_STREAK and prior.get("newestJobId") == streak["newestJobId"] and prior.get("specs") is not None:
