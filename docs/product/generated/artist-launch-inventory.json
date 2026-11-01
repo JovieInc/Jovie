@@ -3316,7 +3316,7 @@
       "source": "apps/web/app/api/internal/ovie/golden-path-evidence/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/golden-path-evidence",
-      "methods": ["POST"],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },

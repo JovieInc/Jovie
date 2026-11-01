@@ -2,7 +2,9 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import type { CertificationRecordBackend } from '@/lib/agent-os/certification-cas';
 import {
+  certifiedProdGoldenPathSurfaces,
   isProdGoldenPathReceipt,
+  PROD_GOLDEN_PATH_CERTIFICATION_MAX_AGE_MS,
   PROD_GOLDEN_PATH_RECEIPT_SCHEMA,
   type ProdGoldenPathReceipt,
   prodGoldenPathPacketFiles,
@@ -349,5 +351,66 @@ describe('prod golden-path ledger', () => {
     expect(withEvidence.screenshot?.dataUrl).toBe(
       'data:image/jpeg;base64,frame'
     );
+  });
+});
+
+describe('certified golden-path surfaces (alias gate scope)', () => {
+  const ENDED = Date.parse('2026-10-28T20:00:05.000Z');
+
+  async function ledgerWith(receipts: ProdGoldenPathReceipt[]) {
+    const backend = memoryBackend();
+    await recordProdGoldenPathRun({ backend, receipts });
+    return readProdGoldenPathLedger(backend);
+  }
+
+  it('certifies nothing without a ledger', () => {
+    expect(certifiedProdGoldenPathSurfaces(null, ENDED)).toEqual([]);
+  });
+
+  it('lists only surfaces whose latest receipt passed within the certification period, in launch order', async () => {
+    const ledger = await ledgerWith([
+      receipt({ surface: 'public-profile' }),
+      receipt({ surface: 'landing' }),
+      receipt({
+        surface: 'checkout',
+        status: 'failed',
+        checks: [
+          {
+            id: 'checkout-entry',
+            status: 'failed',
+            startedAt: '2026-10-28T20:00:00.000Z',
+            endedAt: '2026-10-28T20:00:05.000Z',
+            summary: 'no button',
+          },
+        ],
+      }),
+    ]);
+    expect(certifiedProdGoldenPathSurfaces(ledger, ENDED + 60_000)).toEqual([
+      'landing',
+      'public-profile',
+    ]);
+  });
+
+  it('expires a certification once the latest pass is older than the certification period', async () => {
+    const ledger = await ledgerWith([receipt({ surface: 'public-profile' })]);
+    expect(
+      certifiedProdGoldenPathSurfaces(
+        ledger,
+        ENDED + PROD_GOLDEN_PATH_CERTIFICATION_MAX_AGE_MS
+      )
+    ).toEqual(['public-profile']);
+    expect(
+      certifiedProdGoldenPathSurfaces(
+        ledger,
+        ENDED + PROD_GOLDEN_PATH_CERTIFICATION_MAX_AGE_MS + 1
+      )
+    ).toEqual([]);
+  });
+
+  it('does not trust a receipt stamped far in the future', async () => {
+    const ledger = await ledgerWith([receipt({ surface: 'public-profile' })]);
+    expect(
+      certifiedProdGoldenPathSurfaces(ledger, ENDED - 60 * 60 * 1000)
+    ).toEqual([]);
   });
 });

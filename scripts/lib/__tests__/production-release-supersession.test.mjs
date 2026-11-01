@@ -173,9 +173,14 @@ describe('public-profile alias graduation policy', () => {
     expect(production).toContain(
       `no later than ${review} (${policy.trackingIssue})`
     );
-    expect(production.includes('performance_status=warn')).toBe(
-      !windows.production.graduated
+    // A graduated receipt authorizes blocking, but only on pages whose
+    // golden-path surface is certified in the Ovie ledger; the rest warn.
+    expect(production.includes('performance_status=failed')).toBe(
+      windows.production.graduated
     );
+    expect(production).toContain('scripts/lib/alias-gate-certified-routes.mjs');
+    expect(production).toContain('/api/internal/ovie/golden-path-evidence');
+    expect(production).toContain('performance_status=${status}');
     expect(production).not.toContain('JOV-4854');
   });
 
@@ -392,10 +397,17 @@ describe('public-profile alias graduation policy', () => {
     ).rejects.toThrow('Incomplete');
   });
 
-  it.each(['production', 'staging'])(
-    'executes the %s guard with the measured enforcement decision',
-    surface => {
+  it.each([
+    ['production', 'certified'],
+    ['production', 'uncertified'],
+    ['production', 'unreadable'],
+    ['staging', 'n/a'],
+  ])(
+    'executes the %s guard with the measured enforcement decision (%s ledger)',
+    (surface, ledgerState) => {
       const staging = surface === 'staging';
+      // Production blocks only while public-profile is certified in the ledger.
+      const certified = !staging && ledgerState === 'certified';
       const job = getJobBlock(
         RELEASE_WORKFLOW,
         staging ? 'promote-production' : 'production-public-profile-alias-gate'
@@ -417,7 +429,25 @@ describe('public-profile alias graduation policy', () => {
           // Each call is appended with one write: the staged gate runs its budget lanes concurrently.
           '#!/bin/sh\ncall="$(printf "%s\\n" "$@"; printf -- "--invocation-end--\\n")"\nprintf "%s\\n" "$call" >> "$ALIAS_GUARD_ARGUMENTS"\ncase "$*" in *performance-budgets-guard*) exit "$ALIAS_GUARD_EXIT" ;; *) exit 0 ;; esac\n'
         );
+        const ledgerBody =
+          ledgerState === 'unreadable'
+            ? '<html>bad gateway</html>'
+            : JSON.stringify({
+                schema: 'jovie.prod-golden-path-certified/v1',
+                ledger: 'present',
+                certifiedSurfaces: certified
+                  ? ['landing', 'public-profile']
+                  : ['landing'],
+              });
+        writeFileSync(join(fixture.root, 'ledger.json'), ledgerBody);
+        stubCommand(
+          fixture.bin,
+          'curl',
+          '#!/bin/sh\ncase "$*" in *golden-path-evidence*) cat "$ALIAS_LEDGER_BODY" ;; *) exit 22 ;; esac\n'
+        );
         const result = runScript(script, fixture, {
+          ALIAS_LEDGER_BODY: join(fixture.root, 'ledger.json'),
+          CRON_SECRET: 'fixture-cron-secret',
           ALIAS_GUARD_ARGUMENTS: join(fixture.root, 'arguments'),
           ALIAS_GUARD_EXIT: String(exit),
           DOPPLER_TOKEN: '',
@@ -427,7 +457,10 @@ describe('public-profile alias graduation policy', () => {
         });
         const decision =
           PUBLIC_PROFILE_ALIAS_GRADUATION.windows[surface].decision;
-        expect(result.status).toBe(exit && decision === 'block' ? 1 : 0);
+        const blocks = staging
+          ? decision === 'block'
+          : certified && decision === 'block';
+        expect(result.status).toBe(exit && blocks ? 1 : 0);
         const outputs = parseOutputs(fixture.output);
         if (!exit) expect(outputs.performance_status).toBe('passed');
         else if (staging)
@@ -435,9 +468,7 @@ describe('public-profile alias graduation policy', () => {
             failure_subtype: 'exact_build_performance_failed',
           });
         else
-          expect(outputs.performance_status).toBe(
-            decision === 'block' ? 'failed' : 'warn'
-          );
+          expect(outputs.performance_status).toBe(blocks ? 'failed' : 'warn');
         const calls = readFileSync(join(fixture.root, 'arguments'), 'utf8')
           .split('--invocation-end--\n')
           .filter(Boolean);
