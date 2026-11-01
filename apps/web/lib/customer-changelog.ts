@@ -389,9 +389,9 @@ export function projectCustomerChangelogArchive(
   }
 
   assertUniqueCustomerPermalinks(entries, tombstones);
-  // Newest first regardless of where a post sits in CHANGELOG.md; Array.sort
-  // is stable, so same-day entries keep their published order.
-  entries.sort((left, right) => right.date.localeCompare(left.date));
+  // Newest first regardless of where a post sits in CHANGELOG.md. Array.sort is
+  // stable, so same-day entries keep their published order.
+  entries.sort(compareCustomerChangelogNewestFirst);
   return { entries, tombstones };
 }
 
@@ -431,6 +431,14 @@ export function customerChangelogEntryPath(
   entry: Pick<CustomerChangelogEntry, 'slug'>
 ): string {
   return `${APP_ROUTES.CHANGELOG}#${encodeURIComponent(entry.slug)}`;
+}
+
+/** Newest date first; undated entries sink to the end. */
+export function compareCustomerChangelogNewestFirst(
+  left: Pick<CustomerChangelogEntry, 'date'>,
+  right: Pick<CustomerChangelogEntry, 'date'>
+): number {
+  return right.date.localeCompare(left.date);
 }
 
 export function groupCustomerChangelogByMonth(
