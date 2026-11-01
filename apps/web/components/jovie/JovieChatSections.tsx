@@ -3,6 +3,8 @@
 import { Button } from '@jovie/ui';
 import type { Virtualizer } from '@tanstack/react-virtual';
 import { memo, type ReactNode, type RefCallback } from 'react';
+import { ChatSummerProgress } from '@/components/jovie/components/ChatSummerProgress';
+import type { SummerProgressPart } from '@/lib/chat/summer-progress';
 import { useDesktopChatWorkState } from '@/lib/desktop/chat-work-state';
 import { composerPlaceholderForChatMode } from './chat-composer-copy';
 import {
@@ -248,6 +250,8 @@ interface ChatThreadMessagesProps {
   /** Earlier unanswered turns hidden behind one control (Summer only). */
   readonly collapsedFailureCount?: number;
   readonly onShowCollapsedFailures?: () => void;
+  /** Truthful Summer progress for the in-flight turn; hidden once answer text arrives. */
+  readonly summerProgress?: readonly SummerProgressPart[];
 }
 
 export function ChatThreadMessages({
@@ -270,6 +274,7 @@ export function ChatThreadMessages({
   conversationId,
   collapsedFailureCount = 0,
   onShowCollapsedFailures,
+  summerProgress,
 }: ChatThreadMessagesProps) {
   // Reads live `virtualizer` state each render; see JovieChat (JOV-6702).
   'use no memo';
@@ -381,6 +386,15 @@ export function ChatThreadMessages({
         </div>
       )}
 
+      {isStreaming &&
+      summerProgress &&
+      summerProgress.length > 0 &&
+      !assistantAnswerStarted(messages[lastAssistantIndex]) ? (
+        <div className={CHAT_MESSAGE_CONTENT_SHELL_CLASSNAME}>
+          <ChatSummerProgress progress={summerProgress} />
+        </div>
+      ) : null}
+
       {inlineChatError}
 
       <div
@@ -392,6 +406,19 @@ export function ChatThreadMessages({
 
       <ScrollToBottom visible={!isStuckToBottom} onClick={onScrollToBottom} />
     </div>
+  );
+}
+
+/** True once the in-flight assistant message has real answer text (the line collapses then). */
+function assistantAnswerStarted(message: ChatThreadMessage | undefined) {
+  return Boolean(
+    message?.role === 'assistant' &&
+      message.parts.some(
+        part =>
+          part.type === 'text' &&
+          typeof part.text === 'string' &&
+          part.text.trim().length > 0
+      )
   );
 }
 
