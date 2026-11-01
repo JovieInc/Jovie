@@ -255,10 +255,11 @@ const desktopBuildIdentity = resolveDesktopBuildIdentity({
 const printBuildIdentityOnStart = process.argv.includes(
   DESKTOP_BUILD_IDENTITY_PRINT_FLAG
 );
-const MACOS_TRAFFIC_LIGHT_X = 20;
-// JOV-8974: the titlebar band sits one app-shell gap (8px) below the window
-// top, so the native lights ride down with the band (was 17 flush-top).
-const MACOS_TRAFFIC_LIGHT_Y = 25;
+// JOV-8940: locked 44pt title-row chrome. The native lights lead at 12px
+// and their centers sit on the row's icon centerline — 15px in-band, plus
+// the JOV-8974 top gutter that rides the band one shell gap down.
+const MACOS_TRAFFIC_LIGHT_X = 12;
+const MACOS_TRAFFIC_LIGHT_Y = 23;
 const MACOS_TRAFFIC_LIGHT_POSITION = {
   x: MACOS_TRAFFIC_LIGHT_X,
   y: MACOS_TRAFFIC_LIGHT_Y,
@@ -275,6 +276,10 @@ const DESKTOP_UPDATE_NOTES_URL = `${APP_ORIGIN}/changelog`;
 const GO_BACK_CHANNEL = 'go-back';
 const GO_FORWARD_CHANNEL = 'go-forward';
 const NAV_STATE_CHANNEL = 'nav-state-changed';
+// JOV-8940: the renderer collapses its traffic-light reserve when macOS
+// hides the native lights in full screen, so the shell must learn about it.
+const FULL_SCREEN_STATE_CHANNEL = 'desktop-full-screen-changed';
+const GET_FULL_SCREEN_STATE_CHANNEL = 'desktop-get-full-screen-state';
 const START_DESKTOP_AUTH_HANDOFF_CHANNEL = 'start-desktop-auth-handoff';
 const OPEN_DESKTOP_AUTH_URL_CHANNEL = 'open-desktop-auth-url';
 const OPEN_CURRENT_OVIE_IN_BROWSER_CHANNEL = 'open-current-ovie-in-browser';
@@ -2526,6 +2531,15 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
 
   mainWindow = win;
   configureSidebarShortcut(win);
+  // JOV-8940: broadcast native full-screen transitions so the renderer can
+  // collapse its traffic-light reserve while macOS hides the native lights.
+  const sendFullScreenState = () => {
+    if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
+      win.webContents.send(FULL_SCREEN_STATE_CHANNEL, win.isFullScreen());
+    }
+  };
+  win.on('enter-full-screen', sendFullScreenState);
+  win.on('leave-full-screen', sendFullScreenState);
   const navigationContentsId = win.webContents.id;
   win.webContents.on('render-process-gone', () => {
     desktopNavigation.setReady(navigationContentsId, false);
@@ -3368,6 +3382,12 @@ ipcMain.handle(GO_FORWARD_CHANNEL, (event: IpcMainInvokeEvent) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (win && !win.isDestroyed() && win.webContents.canGoForward())
     win.webContents.goForward();
+});
+
+ipcMain.handle(GET_FULL_SCREEN_STATE_CHANNEL, (event: IpcMainInvokeEvent) => {
+  if (!isTrustedIpcSender(event)) return false;
+  const win = BrowserWindow.fromWebContents(event.sender);
+  return Boolean(win && !win.isDestroyed() && win.isFullScreen());
 });
 
 ipcMain.handle(
