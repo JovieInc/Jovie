@@ -5,7 +5,17 @@
  * This is the single source of truth for profile queries.
  */
 
-import { and, asc, eq, gt, inArray, isNull, ne, or } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  sql as drizzleSql,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  ne,
+  or,
+} from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { getPressPhotosByProfileId } from '@/lib/db/queries/press-photos';
@@ -179,6 +189,10 @@ const PUBLIC_PROFILE_QUERY_TIMEOUT_MS =
  * @param profileId - The profile ID
  * @returns Profile data or null if not found
  */
+
+/** True while the profile carries an unreleased lead-build hold (migration 0152). */
+const leadBuildHeldSql = drizzleSql`(${creatorProfiles.settings} -> 'leadBuild' ->> 'held') = 'true' and (${creatorProfiles.settings} -> 'leadBuild' ->> 'releasedAt') is null`;
+
 export async function getProfileById(
   profileId: string
 ): Promise<ProfileData | null> {
@@ -340,10 +354,11 @@ export async function getProfileContacts(
  * @param username - The username to look up
  * @param options - Query options
  * @returns Full profile with links and contacts, or null if not found
+ * @throws Storage failures/timeouts when throwOnError is enabled by an authoritative reader
  */
 export async function getProfileWithLinks(
   username: string,
-  options?: { skipCache?: boolean }
+  options?: { skipCache?: boolean; throwOnError?: boolean }
 ): Promise<ProfileWithLinks | null> {
   const normalizedUsername = username.toLowerCase();
   if (KNOWN_PROBE_USERNAMES.has(normalizedUsername)) {
@@ -395,6 +410,7 @@ export async function getProfileWithLinks(
       },
       'profile-service'
     );
+    if (options?.throwOnError) throw error;
     return null;
   }
 
@@ -761,7 +777,9 @@ export async function isClaimTokenValid(
           eq(creatorProfiles.claimToken, claimTokenHash),
           eq(creatorProfiles.claimToken, claimToken)
         ),
-        eq(creatorProfiles.isPublic, true),
+        // A lead-built page is private until claimed or certified, but its
+        // artist must still be able to follow the claim link to claim it.
+        or(eq(creatorProfiles.isPublic, true), leadBuildHeldSql),
         eq(creatorProfiles.isClaimed, false),
         // Expired claim tokens must not resolve. NULL expiry is tolerated for
         // legacy invites issued before expiry stamping (migration 0039).
@@ -797,7 +815,9 @@ export async function lookupUsernameByClaimToken(
           eq(creatorProfiles.claimToken, claimTokenHash),
           eq(creatorProfiles.claimToken, claimToken)
         ),
-        eq(creatorProfiles.isPublic, true),
+        // A lead-built page is private until claimed or certified, but its
+        // artist must still be able to follow the claim link to claim it.
+        or(eq(creatorProfiles.isPublic, true), leadBuildHeldSql),
         eq(creatorProfiles.isClaimed, false),
         // Expired claim tokens must not resolve. NULL expiry is tolerated for
         // legacy invites issued before expiry stamping (migration 0039).

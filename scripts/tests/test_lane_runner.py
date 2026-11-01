@@ -34,6 +34,8 @@ from types import SimpleNamespace
 
 os.environ["LANES_EXECUTION_BACKEND"] = "local-test"
 ROOT = Path(__file__).resolve().parents[2]
+# Literal header: the staged lanes release bundle carries no canon/ files.
+REGISTRY_HEADER = '{"schema": "jovie-automation-registry/v1"}\n'
 sys.path.insert(0, str(ROOT / "scripts/lanes"))
 import git_housekeeping  # noqa: E402
 
@@ -9614,7 +9616,7 @@ class UpdateBackoffTest(unittest.TestCase):
             host.state.mkdir()
             real = lane.sh
             lane.sh = lambda cmd, **k: SimpleNamespace(returncode=0, stderr="", stdout="t1\n" if "rev-parse" in cmd else "")
-            identity = patch.object(lane, "release_identity", return_value={"bundleDigest": "t1", "sourceCommit": "a" * 40})
+            identity = patch.object(lane, "release_identity", return_value={"bundleDigest": "t1", "sourceCommit": "a" * 40, "objects": {"scripts/lanes": "f" * 40}})
             identity.start()
             try:
                 refused = host.state / "update-refused.json"
@@ -10926,7 +10928,7 @@ class StagingGateAdmissionTest(unittest.TestCase):
             self.assertEqual(sum(future.result() == "admitted" for future in futures), 1)
 
     def test_active_qualification_preserves_refused_stage_before_any_archive_or_cleanup(self):
-        bundle = {"bundleDigest": "b" * 64, "sourceCommit": "a" * 40}
+        bundle = {"bundleDigest": "b" * 64, "sourceCommit": "a" * 40, "objects": {"scripts/lanes": "f" * 40}}
         stage = self.host.state / "releases" / ("." + bundle["bundleDigest"] + ".tmp")
         stage.mkdir(parents=True)
         retained = stage / "original-diagnostic"
@@ -10949,7 +10951,7 @@ class StagingGateAdmissionTest(unittest.TestCase):
             seat.release()
 
     def test_real_custody_exception_is_not_retried_or_converted_to_a_test_failure(self):
-        bundle = {"bundleDigest": "b" * 64, "sourceCommit": "a" * 40}
+        bundle = {"bundleDigest": "b" * 64, "sourceCommit": "a" * 40, "objects": {"scripts/lanes": "f" * 40}}
         original = lane.SelftestCleanupHeld("selftest-process-custody-unreadable")
         calls = []
 
@@ -12017,6 +12019,39 @@ class DoctorFreshnessTest(unittest.TestCase):
                     lane.lifecycle.HEARTBEAT = None
 
 
+class UpdaterSelfHealTest(unittest.TestCase):
+    def test_paths_deleted_upstream_drop_out_of_the_bundle_instead_of_refusing_forever(self):
+        with tempfile.TemporaryDirectory() as raw:
+            repo = Path(raw)
+            run = lambda *a: subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", *a], cwd=repo, check=True, capture_output=True)
+            run("init", "-q", "-b", "main")
+            (repo / "scripts/lanes").mkdir(parents=True)
+            (repo / "scripts/lanes/lane_runner.py").write_text("x")
+            keep, gone = "scripts/kept.mjs", "ops/registry/gone.jsonl"
+            (repo / "scripts").mkdir(exist_ok=True); (repo / keep).write_text("k")
+            run("add", "-A"); run("commit", "-qm", "c")
+            with patch.object(lane, "RELEASE_EXTRAS", [keep, gone]), patch.object(lane, "LANE_TESTS", []):
+                self.assertEqual(lane.release_paths(repo, "HEAD"), [keep, "scripts/lanes"])
+            (repo / "scripts/lanes/lane_runner.py").unlink(); run("add", "-A"); run("commit", "-qm", "d")
+            with patch.object(lane, "RELEASE_EXTRAS", []), patch.object(lane, "LANE_TESTS", []), self.assertRaises(RuntimeError):
+                lane.release_paths(repo, "HEAD")
+
+    def test_aged_dependency_pool_is_refilled_once_before_the_build(self):
+        host = lane.Host(state=Path("/nonexistent-state"), repo=Path("/nonexistent-repo"))
+        with patch.object(lane.worktree_pool, "enabled", return_value=True), \
+             patch.object(lane.worktree_pool, "pool_dir", return_value=Path("/p")), \
+             patch.object(lane.worktree_pool, "ready_slots", return_value=[]), \
+             patch.object(lane.worktree_pool, "fill", return_value=["built slot-a"]) as fill:
+            self.assertTrue(lane.ensure_dependency_pool(host))
+            fill.assert_called_once()
+        with patch.object(lane.worktree_pool, "enabled", return_value=True), \
+             patch.object(lane.worktree_pool, "pool_dir", return_value=Path("/p")), \
+             patch.object(lane.worktree_pool, "ready_slots", return_value=[Path("/p/slot-a")]), \
+             patch.object(lane.worktree_pool, "fill") as fill:
+            self.assertFalse(lane.ensure_dependency_pool(host))
+            fill.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
 
@@ -12396,6 +12431,61 @@ class OnePrPerIssueTest(unittest.TestCase):
             claims.assert_not_called()
 
 
+class AtomicWriteRouteTest(unittest.TestCase):
+    def test_conflict_pass_preserves_checkout_when_target_enters_queue(self):
+        pr = {"number": 1, "headRefOid": "head", "headRefName": "feature", "isDraft": False,
+              "isCrossRepository": False, "isInMergeQueue": False, "mergeStateStatus": "DIRTY"}
+        calls = []
+        refuse_add = False
+        def shell(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=int(refuse_add and args[:3] == ["git", "worktree", "add"]),
+                                   stdout="main refs/heads/main\n" if "ls-remote" in args else "head\n")
+        def resolve(*args, guard, **kwargs):
+            guard()
+        with tempfile.TemporaryDirectory() as tmp, patch.object(lane, "sh", side_effect=shell), \
+             patch.object(lane, "conflict_files", return_value=["pnpm-lock.yaml"]), \
+             patch.object(lane, "claimed_elsewhere", return_value=False), \
+             patch.object(lane, "resolve_generated_conflict", side_effect=resolve), \
+             patch.object(lane, "require_fix_target", side_effect=lane.RepairStopped("target-pr-queued", {}, "test")):
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            self.assertEqual(lane.deterministic_conflict_pass(host, [pr], now=1000), [1])
+            self.assertEqual(json.loads((Path(tmp) / "deterministic-conflict.json").read_text())["1"]["outcome"], "target-changed")
+            (Path(tmp) / "deterministic-conflict.json").unlink()
+            with patch.object(lane, "Locked", return_value=SimpleNamespace(held=False, release=Mock())):
+                self.assertEqual(lane.deterministic_conflict_pass(host, [pr], now=1000), [])
+            refuse_add = True
+            self.assertEqual(lane.deterministic_conflict_pass(host, [pr], now=1000), [1])
+        self.assertFalse(any(c[:3] == ["git", "worktree", "remove"] for c in calls))
+
+    def test_verifies_and_rechecks_target_before_fast_forward_publication(self):
+        calls = []
+        pr = {"number": 1, "headRefOid": "head", "headRefName": "feature"}
+        def shell(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        def target(*args, **kwargs):
+            self.assertEqual(calls[-1][:2], ["git", "commit"])
+        receipt = {}
+        with patch.object(lane, "failed_logs", return_value={"Source Validation": "ratchet"}), \
+             patch.object(lane.fix_red_classes, "repair_atomic_state_writes", return_value=["scripts/lanes/a.py"]), \
+             patch.object(lane, "require_fix_target", side_effect=target) as guard, \
+             patch.object(lane, "sh", side_effect=shell):
+            self.assertEqual(lane.atomic_state_fix(None, pr, {}, Path("/unused"), None, receipt).returncode, 0)
+        guard.assert_called_once()
+        self.assertEqual(calls[0], ["python3", "-m", "unittest", "scripts.tests.test_lanes_atomic_state"])
+        self.assertIn(["pnpm", "preflight:changed"], calls)
+        self.assertEqual(calls[-1], ["git", "push", "-q", "origin", "HEAD:feature"])
+        self.assertEqual(receipt["atomicFiles"], ["scripts/lanes/a.py"])
+
+    def test_failed_ratchet_keeps_edits_local(self):
+        with patch.object(lane, "failed_logs", return_value={"Source Validation": "ratchet"}), \
+             patch.object(lane.fix_red_classes, "repair_atomic_state_writes", return_value=["scripts/lanes/a.py"]), \
+             patch.object(lane, "sh", return_value=SimpleNamespace(returncode=1)) as shell:
+            self.assertIsNone(lane.atomic_state_fix(None, {}, {}, Path("/unused"), None, {}))
+        self.assertEqual(shell.call_count, 1)
+
+
 class LockfileConflictTest(unittest.TestCase):
     """JOV-6837/JOV-7594: a generated-file-only conflict is resolved without a model; anything else is not."""
 
@@ -12495,6 +12585,34 @@ class LockfileConflictTest(unittest.TestCase):
             self.assertEqual(self.git("show", f"devin/jov-1-20260927:{path}", cwd=origin), "regenerated")
             self.assertEqual(self.git("show", "devin/jov-1-20260927:a.ts", cwd=origin), "main")
 
+    def test_append_only_registry_conflict_keeps_both_sides_without_a_model(self):
+        """2026-10-29: canon/automation-registry.jsonl conflicted on 4 PRs; both sides' lines are the merge."""
+        path = "canon/automation-registry.jsonl"
+        header = REGISTRY_HEADER
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, work = self.repo(Path(tmp), {path: header + '{"id":"base"}\n{"id":"pr"}\n'},
+                                     main_changes={path: header + '{"id":"base"}\n{"id":"main"}\n', "a.ts": "main\n"})
+            ok, calls = self.run_resolve(work)
+            self.assertTrue(ok)
+            merged = self.git("show", f"devin/jov-1-20260927:{path}", cwd=origin)
+            self.assertIn('"id":"pr"', merged)
+            self.assertIn('"id":"main"', merged)
+            self.assertNotIn("<<<<<<<", merged)
+
+    def test_rule_scopes_record_is_a_generated_resolver(self):
+        self.assertEqual(lane.remediation.GENERATED_RESOLVERS["scripts/agent-context/rule-scopes.json"],
+                         ("node", "scripts/agent-context/rule-scopes.mjs", "--write"))
+        self.assertIn("canon/automation-registry.jsonl", lane.remediation.RESOLVABLE_CONFLICT_FILES)
+
+    def test_registry_edits_to_the_same_id_stay_unresolved(self):
+        path = "canon/automation-registry.jsonl"
+        header = REGISTRY_HEADER
+        with tempfile.TemporaryDirectory() as tmp:
+            _, work = self.repo(Path(tmp), {path: header + '{"id":"base","value":"pr"}\n'},
+                                main_changes={path: header + '{"id":"base","value":"main"}\n'})
+            ok, _ = self.run_resolve(work)
+            self.assertFalse(ok)
+            self.assertEqual((work / path).read_text(), header + '{"id":"base","value":"pr"}\n')
     def test_sources_of_truth_conflict_regenerates_from_merged_source(self):
         path = "canon/SOURCES_OF_TRUTH.md"
         generator = "scripts/sources-of-truth.mjs"
@@ -15448,6 +15566,12 @@ class RepositoryBindingTest(unittest.TestCase):
         # LYB 2026-10-12: a queued PR is never re-enqueued (it would go to the back), whoever queued it.
         self.assertEqual([(kind, pr["number"]) for kind, pr in actions],
                          [("enqueue", 3), ("ready", 5), ("rebase", 8)])
+
+    def test_a_compounding_pr_is_left_to_green_enroll_for_its_jump(self):
+        # 2026-11-01: a plain lane enqueue of #24141 beat green enroll's compounding jump.
+        rows = [self.row(3, labels=["compounding"]), self.row(4, labels=["Compounding"]), self.row(5)]
+        actions = lane.bindings.maintenance_actions(self.binding, rows, time.time())
+        self.assertEqual([(kind, pr["number"]) for kind, pr in actions], [("enqueue", 5)])
 
     def test_maintain_writes_once_per_head_and_retries_a_failed_write_later(self):
         (self.host.state / "bindings" / "LYB").mkdir(parents=True)

@@ -274,6 +274,85 @@ describe('useStickToBottom', () => {
     expect(result.current.isStuckToBottom).toBe(false);
   });
 
+  it('keeps following a tall single append after pinning (JOV-10131)', () => {
+    const { result } = renderHook(() => useStickToBottom());
+
+    const container = document.createElement('div');
+    let scrollHeight = 900;
+    Object.defineProperty(container, 'scrollHeight', {
+      configurable: true,
+      get: () => scrollHeight,
+    });
+    Object.defineProperty(container, 'clientHeight', {
+      configurable: true,
+      value: 400,
+    });
+    let scrollTop = 500;
+    Object.defineProperty(container, 'scrollTop', {
+      configurable: true,
+      get: () => scrollTop,
+      set: value => {
+        scrollTop = Math.min(value, scrollHeight - 400);
+      },
+    });
+    result.current.scrollContainerRef.current = container;
+
+    const content = document.createElement('div');
+    act(() => {
+      result.current.totalSizeRef(content);
+      result.current.setStuckToBottom(true);
+    });
+
+    // A reply and its tool card land in one frame: 300px of growth with no
+    // user scroll. The viewport never moved, so it must keep following.
+    scrollHeight = 1200;
+    act(() => {
+      resizeCallback?.([{ target: content }]);
+    });
+    flushRaf();
+
+    expect(scrollTop).toBe(800);
+    expect(result.current.isStuckToBottom).toBe(true);
+  });
+
+  it('releases stick when the user scrolls up from the pinned bottom before a resize', () => {
+    const { result } = renderHook(() => useStickToBottom());
+
+    const container = document.createElement('div');
+    Object.defineProperty(container, 'scrollHeight', {
+      configurable: true,
+      value: 1200,
+    });
+    Object.defineProperty(container, 'clientHeight', {
+      configurable: true,
+      value: 400,
+    });
+    let scrollTop = 800;
+    Object.defineProperty(container, 'scrollTop', {
+      configurable: true,
+      get: () => scrollTop,
+      set: value => {
+        scrollTop = value;
+      },
+    });
+    result.current.scrollContainerRef.current = container;
+
+    const content = document.createElement('div');
+    act(() => {
+      result.current.totalSizeRef(content);
+      result.current.setStuckToBottom(true);
+    });
+
+    scrollTop = 300;
+    act(() => {
+      resizeCallback?.([{ target: content }]);
+    });
+    flushRaf();
+
+    expect(scrollTop).toBe(300);
+    expect(result.current.isStuckToBottom).toBe(false);
+  });
+
   it('does not scroll on resize when the user has scrolled away', () => {
     const { result } = renderHook(() => useStickToBottom());
 

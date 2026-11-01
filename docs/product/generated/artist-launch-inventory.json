@@ -558,6 +558,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/(marketing)/changelog/rss.xml/route.ts",
+      "kind": "handler",
+      "route": "/changelog/rss.xml",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/(marketing)/changelog/whats-new.json/route.ts",
       "kind": "handler",
       "route": "/changelog/whats-new.json",
@@ -3364,6 +3372,22 @@
       "source": "apps/web/app/api/internal/ovie/summer-bottleneck/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-bottleneck",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/ovie/summer-cards/[id]/decision/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-cards/[id]/decision",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/ovie/summer-cards/[id]/supersede/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-cards/[id]/supersede",
       "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"

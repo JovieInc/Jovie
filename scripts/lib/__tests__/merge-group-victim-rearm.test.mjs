@@ -9,6 +9,7 @@ import {
   commitRearmFailure,
   ENQUEUE_PULL_REQUEST_MUTATION,
   enqueueVictim,
+  frontFailurePassedOnBase,
   heldRevisionFromReceipt,
   implicatedPathsFromAnnotations,
   latestDequeue,
@@ -806,4 +807,118 @@ test('latestDequeue picks the newest removal and ignores other events', () => {
     }
   );
   assert.equal(latestDequeue([]), null);
+});
+
+// 2026-10-31: #24072's group (run 41247973238) failed Visual Snapshot Compare,
+// which had already passed on its base's run (41247971178). The hold had
+// deferred on the unfinished ahead run, so no receipt named #24072, and the
+// culprit was re-armed as base-branch by elimination.
+const visualFailed = [
+  { name: 'Visual Snapshot Compare', conclusion: 'failure' },
+  { name: 'PR Ready', conclusion: 'failure' },
+  { name: 'Unit Tests (1/14)', conclusion: 'success' },
+];
+
+test('front failure counts as its own only when the base run passed every failing job', () => {
+  const passed = [
+    {
+      name: 'Visual Snapshot Compare',
+      status: 'completed',
+      conclusion: 'success',
+    },
+  ];
+  assert.equal(
+    frontFailurePassedOnBase({ currentJobs: visualFailed, baseJobs: passed }),
+    true
+  );
+  for (const baseJobs of [
+    [
+      {
+        name: 'Visual Snapshot Compare',
+        status: 'completed',
+        conclusion: 'failure',
+      },
+    ],
+    [
+      {
+        name: 'Visual Snapshot Compare',
+        status: 'in_progress',
+        conclusion: null,
+      },
+    ],
+    [
+      {
+        name: 'Visual Snapshot Compare',
+        status: 'completed',
+        conclusion: 'skipped',
+      },
+    ],
+    [],
+    undefined,
+  ]) {
+    assert.equal(
+      frontFailurePassedOnBase({ currentJobs: visualFailed, baseJobs }),
+      false
+    );
+  }
+  assert.equal(
+    frontFailurePassedOnBase({
+      currentJobs: [{ name: 'PR Ready', conclusion: 'failure' }],
+      baseJobs: passed,
+    }),
+    false
+  );
+});
+
+test('the front entry is not re-armed as base-branch when its failing jobs passed on the base', () => {
+  const front = candidate({
+    prNumber: 24072,
+    files: ['apps/web/app/(marketing)/changelog/page.tsx'],
+  });
+  const plan = guard =>
+    planVictimRearms({
+      runId: 41247973238,
+      implicatedPaths: [
+        'apps/web/tests/product-screenshots/route-dom-certification.spec.ts',
+      ],
+      candidates: [front],
+      frontPr: 24072,
+      frontFailureOwn: guard,
+    });
+  assert.deepEqual(plan(true), [
+    { action: 'skip', prNumber: 24072, reason: 'front-failure-passed-on-base' },
+  ]);
+  assert.equal(plan(false)[0].action, 'rearm');
+  assert.equal(plan(false)[0].classification, 'base-branch');
+});
+
+test('the guard never blocks another PR in the group or a flake with no implicated path', () => {
+  const group = [
+    candidate({ prNumber: 10, files: ['docs/guide.md'] }),
+    candidate({ prNumber: 11, headSha: other, files: ['apps/web/story.tsx'] }),
+  ];
+  const decisions = planVictimRearms({
+    runId: 200,
+    implicatedPaths: ['apps/web/story.tsx'],
+    candidates: group,
+    frontPr: 10,
+    frontFailureOwn: true,
+  });
+  assert.equal(decisions[0].action, 'rearm');
+  assert.equal(decisions[0].classification, 'another-pr');
+  const flake = planVictimRearms({
+    runId: 201,
+    implicatedPaths: [],
+    candidates: [
+      candidate({
+        prNumber: 10,
+        dequeue: { actor: 'github-merge-queue[bot]', atMs: 1_000 },
+      }),
+    ],
+    frontPr: 10,
+    frontFailureOwn: true,
+    now: 2_000,
+  });
+  assert.equal(flake[0].action, 'rearm');
+  assert.equal(flake[0].classification, 'unattributed');
 });
