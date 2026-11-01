@@ -219,7 +219,7 @@
     {
       "id": "profile_lcp_rank",
       "label": "Profile load speed (LCP) against link-in-bio platforms",
-      "unit": "ms",
+      "unit": "count",
       "better": "lower",
       "visibility": "public",
       "legalClass": "comparative",
@@ -236,10 +236,7 @@
       "threshold": null,
       "display": {
         "sentence": "Profiles load faster than {value} measured link-in-bio platforms",
-        "rounding": {
-          "mode": "ceil",
-          "step": 100
-        }
+        "rounding": { "mode": "floor", "step": 1 }
       },
       "fallback": null,
       "methodology": "/proof/methodology#profile_lcp_rank",
@@ -254,7 +251,7 @@
     {
       "id": "profile_js_bytes_rank",
       "label": "Profile page weight against link-in-bio platforms",
-      "unit": "bytes",
+      "unit": "count",
       "better": "lower",
       "visibility": "public",
       "legalClass": "comparative",
@@ -271,10 +268,7 @@
       "threshold": null,
       "display": {
         "sentence": "Lighter than {value} measured link-in-bio platforms",
-        "rounding": {
-          "mode": "ceil",
-          "step": 10000
-        }
+        "rounding": { "mode": "floor", "step": 1 }
       },
       "fallback": null,
       "methodology": "/proof/methodology#profile_js_bytes_rank",

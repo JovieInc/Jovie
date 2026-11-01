@@ -198,7 +198,14 @@ export interface RecordResult {
   readonly changed: readonly string[];
   readonly events: readonly ProofStatEvent[];
 }
-/** Publish changed observations; carry approval only while the value is unchanged. */
+function sameBreakdown(
+  a: ProofStatObservation['breakdown'],
+  b: ProofStatObservation['breakdown']
+): boolean {
+  return JSON.stringify(a ?? []) === JSON.stringify(b ?? []);
+}
+
+/** Publish changed observations; carry approval only while the claim is unchanged. */
 export async function recordProofObservations(
   updates: readonly ProofStatUpdate[],
   input: {
@@ -213,9 +220,13 @@ export async function recordProofObservations(
   const changed: string[] = [];
   for (const update of updates) {
     const before = observations[update.id];
+    // An approval covers the exact claim the founder saw: the value and, for
+    // comparative stats, every entrant in the breakdown.
     const carried =
       update.observation.approval ??
-      (before && before.value === update.observation.value
+      (before &&
+      before.value === update.observation.value &&
+      sameBreakdown(before.breakdown, update.observation.breakdown)
         ? before.approval
         : null);
     const after: ProofStatObservation = {

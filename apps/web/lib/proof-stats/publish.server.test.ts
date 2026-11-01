@@ -155,4 +155,34 @@ describe('proof-stat publishing', () => {
     await record(1, 336);
     expect(state.live?.observations.profile_lcp_rank?.approval).toBeNull();
   });
+  it('drops an approval when a comparative breakdown changes at the same value', async () => {
+    const approval = { cardId: 'card_bd', approvedAt: T0.toISOString() };
+    const observe = (hours: number, other: number, approved = false) =>
+      recordProofObservations(
+        [
+          {
+            id: 'profile_lcp_rank',
+            observation: {
+              value: 1,
+              measuredAt: at(hours).toISOString(),
+              source: 'workflow:public-benchmark',
+              receipt: 'https://github.com/JovieInc/Jovie/actions/runs/2',
+              breakdown: [
+                { label: 'Jovie', value: 900, self: true },
+                { label: 'Other', value: other, self: false },
+              ],
+              ...(approved ? { approval } : {}),
+            },
+          },
+        ],
+        { actor: 'agent:summer', reason: 'bench', now: at(hours) }
+      );
+    await observe(0, 1500, true);
+    await observe(24, 1500);
+    expect(state.live?.observations.profile_lcp_rank?.approval?.cardId).toBe(
+      'card_bd'
+    );
+    await observe(48, 1400);
+    expect(state.live?.observations.profile_lcp_rank?.approval).toBeNull();
+  });
 });
