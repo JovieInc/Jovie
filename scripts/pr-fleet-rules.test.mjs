@@ -18,6 +18,8 @@ import {
   evaluateFleetRules,
   githubRequest,
   hasPremiseEvidence,
+  intentEvalFinding,
+  intentEvalMode,
   isLockedArea,
   main,
   onlyWeakensAssertions,
@@ -237,6 +239,52 @@ test('4: blast radius is warning-only and requires impact plus proof', () => {
     assert.equal(result.warnings.length, 1);
   }
   assert.deepEqual(check(pr()).warnings, []);
+});
+
+test('4b: user-facing output needs an audience-intent receipt (warn until calibrated)', () => {
+  const ui = [file('apps/web/components/features/home/Hero.tsx')];
+  const result = check(pr(), ui);
+  assert.deepEqual(result.errors, []);
+  assert.match(
+    result.warnings.join('\n'),
+    /intent-eval: .*Hero\.tsx.*jovie output check/
+  );
+  for (const line of [
+    'Intent-eval: jovie.intent-eval/v1 run=20261101T004533-28f688b8 verdict=pass score=88 passes=2 sha256=abc mission="x"',
+    'Output-check: jovie.output-check/v1 run=20261101T004533-28f688b8 verdict=fail mode=warn gates=copy:pass',
+    'Intent-eval: n/a - server-only refactor, no rendered change',
+  ])
+    assert.deepEqual(check(pr({ body: `${proof}\n${line}` }), ui).warnings, []);
+  assert.equal(
+    intentEvalFinding(
+      ['apps/web/components/a/A.test.tsx', 'scripts/x.mjs'],
+      ''
+    ),
+    null
+  );
+  assert.match(
+    intentEvalFinding(
+      [
+        'apps/web/app/a/page.tsx',
+        'apps/web/app/b/page.tsx',
+        'apps/web/app/c/page.tsx',
+        'apps/web/app/d/page.tsx',
+      ],
+      'Intent-eval: n/a'
+    ),
+    /, \.\.\./
+  );
+  assert.equal(intentEvalMode(), 'warn');
+  assert.equal(
+    intentEvalMode(() => '{"mode":"enforce"}'),
+    'enforce'
+  );
+  assert.equal(
+    intentEvalMode(() => {
+      throw new Error('missing');
+    }),
+    'warn'
+  );
 });
 
 test('5: real locked paths require a GBrain or locking PR reference', () => {

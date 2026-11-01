@@ -1,0 +1,61 @@
+{
+  "schema": "jovie.output-quality.policy/v1",
+  "mode": "warn",
+  "flip": "Set mode to enforce only when `node scripts/output-quality/calibrate.mjs` lands every fixture on its expected verdict (mustFail cases included) and writes a passing calibration record below. Enforcement points: PR Fleet Rules intent-eval receipt check (scripts/pr-fleet-rules.mjs) and Summer's pre-send check (JovieInc/summer-config).",
+  "calibration": {
+    "at": "2026-11-01T00:59:29.007Z",
+    "cases": 6,
+    "matched": 6,
+    "allMatched": true,
+    "results": [
+      {
+        "id": "clock-every-timezone",
+        "expect": "fail",
+        "mustFail": true,
+        "verdict": "fail",
+        "score": 25,
+        "runId": "20261101T005742-b5ce790e"
+      },
+      {
+        "id": "clock-local-time",
+        "expect": "pass",
+        "mustFail": false,
+        "verdict": "pass",
+        "score": 97,
+        "runId": "20261101T005807-486d98f8"
+      },
+      {
+        "id": "vendor-thanks-slop",
+        "expect": "fail",
+        "mustFail": true,
+        "verdict": "fail",
+        "score": 12,
+        "runId": "20261101T005826-a7fd1958"
+      },
+      {
+        "id": "vendor-thanks-good",
+        "expect": "pass",
+        "mustFail": false,
+        "verdict": "pass",
+        "score": 90,
+        "runId": "20261101T005837-2681456c"
+      },
+      {
+        "id": "summer-text-dump",
+        "expect": "fail",
+        "mustFail": true,
+        "verdict": "fail",
+        "score": 20,
+        "runId": "20261101T005859-139497e9"
+      },
+      {
+        "id": "summer-text-one-ask",
+        "expect": "pass",
+        "mustFail": false,
+        "verdict": "pass",
+        "score": 90,
+        "runId": "20261101T005914-aa0cbeb1"
+      }
+    ]
+  }
+}
