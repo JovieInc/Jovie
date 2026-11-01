@@ -73,6 +73,25 @@ class Streaks(unittest.TestCase):
         self.assertEqual(release_evidence.failing_specs(log), ["tests/e2e/start-entry-continuity.spec.ts:330"])
 
 
+class CarryStreak(unittest.TestCase):
+    def test_first_bad_sha_survives_a_streak_longer_than_the_read_window(self):
+        rows = runs(*["failure"] * 8)
+        first = release_evidence.red_streaks(release_evidence.job_conclusions(rows, jobs_of_factory(rows)))["golden-path"]
+        self.assertFalse(first["bounded"])
+        newer = runs(*["failure"] * 10)[:8]  # two new reds arrived, the window slid
+        for i, r in enumerate(newer):
+            r["head_sha"] = f"n{i}".ljust(40, "0") if i < 2 else rows[i - 2]["head_sha"]
+        current = release_evidence.red_streaks(release_evidence.job_conclusions(newer, jobs_of_factory(newer)))["golden-path"]
+        carried = release_evidence.carry_streak(current, first)
+        self.assertEqual(carried["firstBadSha"], rows[7]["head_sha"])
+        self.assertEqual(carried["count"], 10)
+
+    def test_a_green_in_the_window_bounds_the_streak(self):
+        rows = runs("failure", "failure", "success")
+        current = release_evidence.red_streaks(release_evidence.job_conclusions(rows, jobs_of_factory(rows)))["golden-path"]
+        self.assertEqual(release_evidence.carry_streak(current, {"firstBadSha": "old", "count": 9})["firstBadSha"], rows[1]["head_sha"])
+
+
 class BuildStale(unittest.TestCase):
     def test_stale_only_after_two_hours_with_main_advanced(self):
         t0 = 1_000_000.0

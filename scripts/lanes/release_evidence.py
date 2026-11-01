@@ -66,17 +66,36 @@ def red_streaks(rows: list[dict]) -> dict[str, dict]:
     out: dict[str, dict] = {}
     for slug in RELEASE_EVIDENCE_JOBS.values():
         streak: list[dict] = []
+        bounded = False
         for row in rows:
             conclusion, job_id, job_url = row["jobs"].get(slug, (None, None, None))
             if conclusion in FAILED:
                 streak.append({**row, "jobId": job_id, "jobUrl": job_url})
             elif conclusion == "success":
+                bounded = True
                 break
         if streak:
             out[slug] = {"count": len(streak), "newestSha": streak[0]["sha"], "firstBadSha": streak[-1]["sha"],
                          "firstBadAt": streak[-1]["at"], "newestJobId": streak[0]["jobId"],
-                         "newestJobUrl": streak[0]["jobUrl"] or streak[0]["url"]}
+                         "newestJobUrl": streak[0]["jobUrl"] or streak[0]["url"],
+                         # False when no green run is inside the read window: the streak may be longer than what was read.
+                         "bounded": bounded, "shas": [row["sha"] for row in streak]}
     return out
+
+
+def carry_streak(current: dict, prior: dict | None) -> dict:
+    """Keep the true first bad SHA once a streak outgrows the read window (2026-11-01 replay: it drifted).
+
+    When no green run is in the window and the previous tick saw the same streak (its newest red SHA is still in
+    this streak, or older than everything read), the first bad SHA and its time come from the previous tick and the
+    count grows by the reds that are new since then.
+    """
+    if current.get("bounded") or not prior or not prior.get("firstBadSha"):
+        return current
+    shas = current.get("shas") or []
+    newer = shas.index(prior.get("newestSha")) if prior.get("newestSha") in shas else len(shas)
+    return {**current, "firstBadSha": prior["firstBadSha"], "firstBadAt": prior.get("firstBadAt"),
+            "count": max(current["count"], int(prior.get("count") or 0) + newer)}
 
 
 def failing_specs(log_text: str, limit: int = 5) -> list[str]:
@@ -137,8 +156,8 @@ def sample(state_dir: Path, now: float, run=None, version=read_version) -> tuple
                                    for j in gh(f"repos/{REPO}/actions/runs/{run_id}/jobs?per_page=100&filter=latest").get("jobs") or []]
             return jobs_cache[key]
 
-        streaks = red_streaks(job_conclusions(runs, jobs_of))
         previous = cached.get("streaks") or {}
+        streaks = {slug: carry_streak(streak, previous.get(slug)) for slug, streak in red_streaks(job_conclusions(runs, jobs_of)).items()}
         for slug, streak in streaks.items():
             prior = previous.get(slug) or {}
             if streak["count"] >= RED_STREAK and prior.get("newestJobId") == streak["newestJobId"] and prior.get("specs") is not None:
