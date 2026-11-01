@@ -154,10 +154,10 @@ describe('exact-build performance gate lanes', () => {
     expect(result.stdout).toContain('::warning::');
   });
 
-  for (const [failing, certify] of [
-    ['creator-tasks', false],
-    ['public-profile-tip', true],
-    ['lighthouse-entry-gate', false],
+  for (const { failing, certify } of [
+    { failing: 'creator-tasks', certify: false },
+    { failing: 'public-profile-tip', certify: true },
+    { failing: 'lighthouse-entry-gate', certify: false },
   ]) {
     it(`blocks promotion when ${failing} fails${certify ? ' on a certified page' : ''}`, () => {
       const result = run(failing, { certify });
