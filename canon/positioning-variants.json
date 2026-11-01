@@ -1,0 +1,182 @@
+{
+  "schema": "jovie-positioning-variants/v1",
+  "updated": "2026-11-01",
+  "rule": "The ONE source for positioning lines per surface (applications, deck, homepage hero, artist pages, App Store, social bios). canon/POSITIONING.md owns meaning and message roles; this file holds the concrete lines that express it, the candidates competing for each surface, and which one is active. Consumers read lines from here; never retype them. Change an active line only through scripts/positioning/rank.mjs (offline gates + persona panel) and, where traffic exists, a live experiment (canon/growth-experiments.jsonl). A variant that implies a different ICP or business model is a pivot signal: it goes to Tim, not to a surface.",
+  "canonRef": "canon/POSITIONING.md v1.1 (2026-09-26)",
+  "allowedIcps": ["independent-artists", "creators"],
+  "priceOwner": "apps/web/lib/config/plan-prices.ts",
+  "surfaces": {
+    "application.one_liner": {
+      "audience": "investor",
+      "register": "founder-tim",
+      "maxChars": 50,
+      "line": "one_liner",
+      "active": "v1-artist-profiles",
+      "consumers": ["fundraising registry answers.yaml one_liner.c50 (private)"]
+    },
+    "application.what_building": {
+      "audience": "investor",
+      "register": "founder-tim",
+      "line": "what_building",
+      "active": "v1-artist-profiles",
+      "consumers": [
+        "fundraising registry answers.yaml what_building.short (private)"
+      ]
+    },
+    "deck.title": {
+      "audience": "investor",
+      "register": "founder-tim",
+      "line": "deck_title",
+      "active": "v1-artist-profiles",
+      "consumers": ["fundraising registry deck.yaml cover (private)"]
+    },
+    "homepage.hero": {
+      "audience": "general",
+      "register": "jovie-marketing",
+      "line": null,
+      "active": null,
+      "consumers": ["content record marketing-page/home"],
+      "note": "Generic ICP (MKT-D16; POSITIONING.md message architecture). The headline is a locked line in code; no artist-specific variant may target this surface. Live tests run through the content record `experiment` field."
+    },
+    "artist_profiles.hero": {
+      "audience": "buyer",
+      "register": "jovie-marketing",
+      "line": "one_liner",
+      "active": null,
+      "consumers": ["/artist-profiles"],
+      "note": "Not yet wired; first live-test surface for artist-ICP variants."
+    }
+  },
+  "variants": [
+    {
+      "id": "v1-artist-profiles",
+      "frame": "concrete",
+      "icp": "independent-artists",
+      "status": "active",
+      "lines": {
+        "one_liner": "Artist profiles that turn each release into fans",
+        "what_building": "Jovie is the system around a release for independent musicians. Connect Spotify and Jovie builds your profile, smart links to every streaming service and a page for each release. Fans who sign up are yours, and Jovie emails them when the next song drops.",
+        "deck_title": "Artist profiles that turn each release into fans"
+      },
+      "mvp": "Spotify catalog import builds a profile, smart links and release pages; fan signups are owned by the artist; paid plan emails fans on the next release.",
+      "vision": null
+    },
+    {
+      "id": "v2-smart-links-fan-lists",
+      "frame": "concrete",
+      "icp": "independent-artists",
+      "status": "candidate",
+      "lines": {
+        "one_liner": "Smart links and fan lists for independent artists",
+        "what_building": "Jovie gives independent musicians smart links and a fan list they own. Connect Spotify and Jovie builds a profile and a page for each release, with links to every streaming service. Fans sign up on those pages, and Jovie emails them when the next song drops.",
+        "deck_title": "Smart links and fan lists for independent artists"
+      },
+      "mvp": "Same product as v1, named by its features.",
+      "vision": null
+    },
+    {
+      "id": "v3-label-as-software",
+      "frame": "familiar",
+      "icp": "independent-artists",
+      "status": "candidate",
+      "lines": {
+        "one_liner": "What a label does for a release, as software",
+        "what_building": "A label runs the links, the fan list and the follow-up for each release. Independent musicians mostly skip it. Jovie does that part as software: connect Spotify and it builds your profile, smart links and a page per release, collects fans you own, and emails them when the next song drops.",
+        "deck_title": "What a label does for a release, as software"
+      },
+      "mvp": "Same product as v1, framed as a variant of something familiar (YC howtoapply).",
+      "vision": null
+    },
+    {
+      "id": "v4-owned-fan-list",
+      "frame": "concrete",
+      "icp": "independent-artists",
+      "status": "candidate",
+      "lines": {
+        "one_liner": "The fan list every independent artist owns",
+        "what_building": "Independent musicians have listeners on Spotify and no way to reach them when the next song comes out. Jovie fixes that: connect Spotify and it builds your profile and a page for each release, collects fans who sign up into a list you own, and emails them when you release again.",
+        "deck_title": "The fan list every independent artist owns"
+      },
+      "mvp": "Same product as v1, led by the owned-audience outcome.",
+      "vision": null
+    },
+    {
+      "id": "v10-owned-fan-list-then-vision",
+      "frame": "wedge-vision",
+      "icp": "independent-artists",
+      "status": "candidate",
+      "lines": {
+        "one_liner": "The fan list every independent artist owns",
+        "what_building": "Independent musicians have listeners on Spotify and no way to reach them when the next song comes out. Jovie fixes that: connect Spotify and it builds your profile and a page for each release, collects fans who sign up into a list you own, and emails them when you release again. Where it's going: the same loop for every creator who releases work on a schedule.",
+        "deck_title": "The fan list every independent artist owns. Next: every creator who releases on a schedule."
+      },
+      "mvp": "v4's product statement; round 1 (2026-11-01) showed investors reward a labeled expansion line while buyers penalize it, so the vision sentence is for investor surfaces only.",
+      "vision": "The same release-to-fans loop for every creator who releases on a schedule (video, podcast)."
+    },
+    {
+      "id": "v5-wedge-then-vision",
+      "frame": "wedge-vision",
+      "icp": "independent-artists",
+      "status": "candidate",
+      "lines": {
+        "one_liner": "Artist profiles that turn each release into fans",
+        "what_building": "Today Jovie is the system around a release for independent musicians: connect Spotify and it builds your profile, smart links and a page per release, collects fans you own, and emails them when the next song drops. Where it's going: the same loop for every creator who releases work on a schedule.",
+        "deck_title": "Artist profiles that turn each release into fans. Next: every creator who releases on a schedule."
+      },
+      "mvp": "Concrete lead; vision as the last, labeled sentence.",
+      "vision": "The same release-to-fans loop for every creator who releases on a schedule (video, podcast)."
+    },
+    {
+      "id": "v6-content-to-careers",
+      "frame": "vision-led",
+      "icp": "creators",
+      "status": "candidate",
+      "lines": {
+        "one_liner": "Where creators turn content into careers",
+        "what_building": "We're building the place where creators turn content into careers. Today it does one job, for independent musicians: connect Spotify and Jovie builds your profile, smart links and a page per release, collects fans you own, and emails them when the next song drops.",
+        "deck_title": "Where creators turn content into careers. Today: release pages that collect fans for independent artists."
+      },
+      "mvp": "Vision lead, labeled as direction ('We're building'); today's product stated literally.",
+      "vision": "Creators turning content into careers."
+    },
+    {
+      "id": "v7-career-harness",
+      "frame": "vision-led",
+      "icp": "creators",
+      "status": "candidate",
+      "lines": {
+        "one_liner": "A career harness for creators, starting with music",
+        "what_building": "We're building the harness creators use to turn content into careers. Today it is live for independent musicians: connect Spotify and Jovie builds your profile, smart links and a page per release, collects fans you own, and emails them when the next song drops.",
+        "deck_title": "The harness for creators turning content into careers. Today: independent musicians."
+      },
+      "mvp": "Tim's 2026-11-01 framing, vision lead with the MVP labeled 'today'.",
+      "vision": "The harness creators use to turn content into careers."
+    },
+    {
+      "id": "v8-creator-os",
+      "frame": "vision-led",
+      "icp": "creators",
+      "status": "candidate",
+      "lines": {
+        "one_liner": "The creator OS; today, release pages for artists",
+        "what_building": "We're building the operating system for creators turning content into careers. Today: release pages for independent musicians. Connect Spotify and Jovie builds your profile, smart links and a page per release, collects fans you own, and emails them when the next song drops.",
+        "deck_title": "The operating system for creators turning content into careers. Today: release pages for independent artists."
+      },
+      "mvp": "Category-claim vision lead with an explicit 'today'.",
+      "vision": "Operating system for creators turning content into careers."
+    },
+    {
+      "id": "v9-ai-leverage",
+      "frame": "wedge-vision",
+      "icp": "creators",
+      "status": "candidate",
+      "lines": {
+        "one_liner": "AI leverage for creators, starting with musicians",
+        "what_building": "Jovie gives creators the leverage a label or team used to provide, starting with independent musicians: connect Spotify and it builds your profile, smart links and a page per release, collects fans you own, and emails them when the next song drops. An assistant in the app handles the next step when asked.",
+        "deck_title": "AI leverage for human creators, starting with independent musicians"
+      },
+      "mvp": "POSITIONING.md's approved investor-depth mechanism line.",
+      "vision": "AI leverage for human creators."
+    }
+  ]
+}
