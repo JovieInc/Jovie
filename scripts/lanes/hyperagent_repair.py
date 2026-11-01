@@ -45,6 +45,7 @@ from typing import Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import hyperagent_lane  # noqa: E402
+from atomic_state import atomic_write_text  # noqa: E402
 import pr_events  # noqa: E402
 
 REPO = "JovieInc/Jovie"
@@ -221,7 +222,7 @@ def reserve_run(deps: Deps, run_id: str, prompt: str) -> bool:
         fcntl.flock(handle, fcntl.LOCK_EX)
         if runs_today(deps) >= deps.cap:
             return False
-        (deps.runs / f"{run_id}.prompt.md").write_text(prompt)
+        atomic_write_text(deps.runs / f"{run_id}.prompt.md", prompt)  # no 0-byte token on ENOSPC
         return True
 
 
