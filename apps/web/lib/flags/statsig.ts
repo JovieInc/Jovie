@@ -1,7 +1,13 @@
 import 'server-only';
-import { Statsig, StatsigUser } from '@statsig/statsig-node-core';
+import {
+  type DataStore,
+  Statsig,
+  StatsigUser,
+} from '@statsig/statsig-node-core';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
+import { captureWarning } from '@/lib/error-tracking';
+import { getRedis } from '@/lib/redis';
 import { withTimeout } from '@/lib/resilience/primitives';
 import { logger } from '@/lib/utils/logger';
 import {
@@ -22,9 +28,24 @@ let statsigInitialized = false;
 let statsigClient: Statsig | null = null;
 let statsigInitPromise: Promise<void> | null = null;
 let statsigWarnedNoSecret = false;
+let nextInitAttemptAt = 0;
+let lastDefaultsAlertAt = 0;
+let initStartedAt = 0;
 
 const isE2ERuntime = publicEnv.NEXT_PUBLIC_E2E_MODE === '1';
+// The SDK's own default init timeout (~3s) is what produced the production
+// "operation timed out" errors on cold serverless starts. Give the SDK a longer
+// budget, wrapped by a slightly longer hard cap.
+const STATSIG_SDK_INIT_TIMEOUT_MS = 8_000;
 const STATSIG_INIT_TIMEOUT_MS = 10_000;
+// A request never waits longer than this for init; it serves defaults instead
+// while init keeps running in the background for later requests.
+const REQUEST_INIT_WAIT_MS = 1_000;
+// After a failed init, do not retry on every request.
+const INIT_RETRY_COOLDOWN_MS = 5_000;
+const DEFAULTS_ALERT_INTERVAL_MS = 60_000;
+const SPECS_STORE_TTL_SECONDS = 24 * 60 * 60;
+const SPECS_STORE_TIMEOUT_MS = 500;
 const STATSIG_SHUTDOWN_TIMEOUT_MS = 1500;
 const GATE_CACHE_TTL_MS = 10_000;
 const gateCache = new Map<string, { value: boolean; expiresAt: number }>();
@@ -63,6 +84,42 @@ function getStatsigUser(userId: string | null): StatsigUser {
   return StatsigUser.withUserID(userId ?? 'anonymous');
 }
 
+/**
+ * Statsig data adapter backed by the shared Redis. A cold instance reads the
+ * last config spec from Redis (one fast hop) instead of waiting on the Statsig
+ * network; the SDK writes fresh specs back after any network fetch. Returns
+ * undefined when Redis is not configured, so the SDK uses the network as before.
+ */
+export function createSpecsDataStore(): DataStore | undefined {
+  const redis = getRedis();
+  if (!redis) return undefined;
+  const storeKey = (key: string) => `statsig:${key}`;
+  return {
+    get: async key => {
+      try {
+        const value = await withTimeout(redis.get(storeKey(key)), {
+          timeoutMs: SPECS_STORE_TIMEOUT_MS,
+          context: 'Statsig specs store read',
+        });
+        if (value == null) return {};
+        return {
+          result: typeof value === 'string' ? value : JSON.stringify(value),
+        };
+      } catch {
+        return {};
+      }
+    },
+    set: async (key, value) => {
+      try {
+        await redis.set(storeKey(key), value, { ex: SPECS_STORE_TTL_SECONDS });
+      } catch {
+        // Best effort: the store only accelerates cold starts.
+      }
+    },
+    supportPollingUpdatesFor: async () => false,
+  };
+}
+
 function getStatsigClient(serverSecret: string): Statsig {
   if (statsigClient) {
     return statsigClient;
@@ -70,6 +127,8 @@ function getStatsigClient(serverSecret: string): Statsig {
 
   statsigClient = new Statsig(serverSecret, {
     environment: env.VERCEL_ENV || env.NODE_ENV || 'development',
+    initTimeoutMs: STATSIG_SDK_INIT_TIMEOUT_MS,
+    dataStore: createSpecsDataStore(),
   });
   return statsigClient;
 }
@@ -93,51 +152,98 @@ async function cleanupStatsigClientAfterInitFailure(
   }
 }
 
-async function initializeStatsig(): Promise<void> {
-  if (statsigInitialized || isE2ERuntime) return;
-  if (statsigInitPromise) {
-    await statsigInitPromise;
+async function runStatsigInit(): Promise<void> {
+  const serverSecret = env.STATSIG_SERVER_SECRET;
+  if (!serverSecret) {
+    if (!statsigWarnedNoSecret) {
+      logger.warn(
+        '[Statsig] Server secret not configured - feature flags will use defaults'
+      );
+      statsigWarnedNoSecret = true;
+    }
     return;
   }
 
-  statsigInitPromise = (async () => {
-    const serverSecret = env.STATSIG_SERVER_SECRET;
-    if (!serverSecret) {
-      if (!statsigWarnedNoSecret) {
-        logger.warn(
-          '[Statsig] Server secret not configured - feature flags will use defaults'
-        );
-        statsigWarnedNoSecret = true;
-      }
-      return;
-    }
-
-    let statsig: Statsig | null = null;
-    try {
-      statsig = getStatsigClient(serverSecret);
-      await withTimeout(statsig.initialize(), {
-        timeoutMs: STATSIG_INIT_TIMEOUT_MS,
-        context: 'Statsig initialization',
-      });
-      statsigInitialized = true;
-      logger.info('[Statsig] Server SDK initialized', undefined, 'Statsig');
-    } catch (error) {
-      const failedStatsig = statsig ?? statsigClient;
-      statsigInitialized = false;
-      statsigClient = null;
-      await cleanupStatsigClientAfterInitFailure(failedStatsig);
-      logger.error(
-        '[Statsig] Failed to initialize server SDK',
-        error,
-        'Statsig'
-      );
-    }
-  })();
-
+  let statsig: Statsig | null = null;
+  initStartedAt = Date.now();
   try {
-    await statsigInitPromise;
+    statsig = getStatsigClient(serverSecret);
+    await withTimeout(statsig.initialize(), {
+      timeoutMs: STATSIG_INIT_TIMEOUT_MS,
+      context: 'Statsig initialization',
+    });
+    statsigInitialized = true;
+    // Measurable: init outcome + latency per cold start.
+    logger.info(
+      `[Statsig] Server SDK initialized initMs=${Date.now() - initStartedAt}`,
+      { outcome: 'ok', initMs: Date.now() - initStartedAt },
+      'Statsig'
+    );
+  } catch (error) {
+    const failedStatsig = statsig ?? statsigClient;
+    statsigInitialized = false;
+    statsigClient = null;
+    nextInitAttemptAt = Date.now() + INIT_RETRY_COOLDOWN_MS;
+    await cleanupStatsigClientAfterInitFailure(failedStatsig);
+    logger.error(
+      `[Statsig] Failed to initialize server SDK initMs=${Date.now() - initStartedAt}`,
+      error,
+      'Statsig'
+    );
+    void captureWarning('Statsig init failed; flags serving defaults', error, {
+      route: 'statsig-init',
+      initMs: Date.now() - initStartedAt,
+    });
+  }
+}
+
+/**
+ * Starts init at most once at a time (module singleton) and lets a request
+ * wait at most REQUEST_INIT_WAIT_MS. Init continues in the background, so a
+ * slow cold start costs a request at most the budget, never the full timeout.
+ */
+async function initializeStatsig(): Promise<void> {
+  if (statsigInitialized || isE2ERuntime) return;
+
+  if (!statsigInitPromise) {
+    if (Date.now() < nextInitAttemptAt) return;
+    statsigInitPromise = runStatsigInit().finally(() => {
+      statsigInitPromise = null;
+    });
+  }
+
+  let budgetTimer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    await Promise.race([
+      statsigInitPromise,
+      new Promise<void>(resolve => {
+        budgetTimer = setTimeout(resolve, REQUEST_INIT_WAIT_MS);
+      }),
+    ]);
   } finally {
-    statsigInitPromise = null;
+    if (budgetTimer) clearTimeout(budgetTimer);
+  }
+
+  if (!statsigInitialized && env.STATSIG_SERVER_SECRET) {
+    reportServingDefaults();
+  }
+}
+
+/** Fail loudly (throttled) when production serves flag defaults. */
+function reportServingDefaults(): void {
+  const now = Date.now();
+  if (now - lastDefaultsAlertAt < DEFAULTS_ALERT_INTERVAL_MS) return;
+  lastDefaultsAlertAt = now;
+  logger.warn(
+    '[Statsig] Serving flag defaults: SDK not initialized for this request',
+    { outcome: 'defaults', waitedMs: REQUEST_INIT_WAIT_MS },
+    'Statsig'
+  );
+  if (env.VERCEL_ENV === 'production') {
+    void captureWarning('Statsig flags serving defaults in production', null, {
+      route: 'statsig-init',
+      waitedMs: REQUEST_INIT_WAIT_MS,
+    });
   }
 }
 
@@ -328,5 +434,6 @@ export async function shutdownStatsig(): Promise<void> {
     statsigInitialized = false;
     statsigClient = null;
     statsigInitPromise = null;
+    nextInitAttemptAt = 0;
   }
 }
