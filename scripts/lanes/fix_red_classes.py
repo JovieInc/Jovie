@@ -125,8 +125,6 @@ SIGNATURES = (
     # rate-limit lines beside the guard error that actually failed the job.
     ("domain-write", DOMAIN_WRITE, REGISTER_DOMAIN),
     ("changelog-metadata", CHANGELOG_MISSING, STAMP_CHANGELOG),
-    # Before platform-infra: the ratchet message includes a count such as 591,
-    # and `\b5\d\d\b` would otherwise treat that count as an HTTP 5xx.
     ("spacing-scale", SPACING_RATCHET_TEXT, SNAP_SPACING),
     ("census-certification", CENSUS_CERTIFICATION, SYNC_MAIN),
     ("quota-deferred", QUOTA_TEXT, RERUN),
@@ -144,8 +142,10 @@ DEFAULT_BREAKER_N, MAX_BREAKER_N, MIN_CELL_RUNS = 2, 3, 10
 
 
 def error_signature(text: str) -> str:
-    """The first error-looking line with volatile tokens removed, so two runs of one failure match."""
-    for line in str(text or "").splitlines():
+    """Prefer the failed-test summary to setup/mock output; normalize volatile tokens."""
+    text = re.sub(r"\x1b\[[0-9;]*m", "", str(text or ""))
+    text = re.split(r"(?m)^.*?\bFailed (?:Tests|Suites) [1-9]\d*\s*[⎯─-]*\s*$", text)[-1]
+    for line in text.splitlines():
         if re.search(r"\b(error|fail(?:ed|ure)?|assert|expected|unwired|violation)\b", line, re.IGNORECASE):
             line = re.sub(r"^\S*\d{4}-\d\d-\d\dT[\d:.]+Z\s*", "", line.strip())
             line = re.sub(r"\b[0-9a-f]{7,40}\b|\d+", "#", line)
