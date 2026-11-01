@@ -3,6 +3,11 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import {
+  fleetCommit,
+  nonGreenFleetProofs,
+} from './lib/__tests__/fixtures/fleet-rules.mjs';
+import { fleetRulesAdmission } from './lib/fleet-rules-admission.mjs';
+import {
   ADMISSION_STEP,
   applyMergeGroupFailure,
 } from './merge-group-failure-hold.mjs';
@@ -52,7 +57,20 @@ const current = number => ({
   isCrossRepository: false,
   mergeStateStatus: 'CLEAN',
   labels: { pageInfo: { hasNextPage: false }, nodes: [] },
-  commits: { nodes: [{ commit: { committedDate: '2026-10-02T12:00:00Z' } }] },
+  commits: {
+    nodes: [
+      {
+        commit: {
+          ...fleetCommit(sha),
+          statusCheckRollup: {
+            ...fleetCommit(sha).statusCheckRollup,
+            state: undefined,
+          },
+          committedDate: '2026-10-02T12:00:00Z',
+        },
+      },
+    ],
+  },
   timelineItems: { nodes: [] },
 });
 
@@ -194,6 +212,25 @@ async function fixture(
       const snapshot = readCurrentSnapshot
         ? await readCurrentSnapshot(params.number, reads.length)
         : { ...current(params.number), ...overrides[params.number] };
+      // Legacy fixtures vary readiness state alone; include independent Fleet proof.
+      const commit = snapshot.commits?.nodes?.[0]?.commit;
+      if (commit && !('oid' in commit)) {
+        const proof = fleetCommit(snapshot.headRefOid);
+        snapshot.commits = {
+          nodes: [
+            {
+              commit: {
+                ...proof,
+                ...commit,
+                statusCheckRollup: {
+                  ...proof.statusCheckRollup,
+                  ...commit.statusCheckRollup,
+                },
+              },
+            },
+          ],
+        };
+      }
       return { repository: { pullRequest: structuredClone(snapshot) } };
     },
   };
@@ -226,7 +263,7 @@ test('scans 113 PRs without a multiplied GraphQL query and pins each enqueue hea
     draft: i < 110,
   }));
   const result = await fixture({ roster });
-  assert.deepEqual(result.reads, [111, 112, 113]);
+  assert.deepEqual(result.reads, [111, 112, 113, 111, 112, 113]);
   assert.deepEqual(
     result.mutations,
     [111, 112, 113].map(n => ({ id: `PR_${n}`, oid: sha }))
@@ -458,7 +495,7 @@ test('an UNKNOWN merge state after main moves is re-read instead of dropping the
       mergeStateStatus: readCount < 3 ? 'UNKNOWN' : 'CLEAN',
     }),
   });
-  assert.deepEqual(settles.reads, [1, 1, 1]);
+  assert.deepEqual(settles.reads, [1, 1, 1, 1]);
   assert.deepEqual(settles.mutations, [{ id: 'PR_1', oid: sha }]);
   const never = await fixture({
     ...wake,
@@ -530,7 +567,7 @@ test('a required-green BLOCKED head is re-read and, if it stays BLOCKED, dispatc
       }),
     })
   );
-  assert.deepEqual(settles.result.reads, [1, 1]);
+  assert.deepEqual(settles.result.reads, [1, 1, 1]);
   assert.deepEqual(settles.result.mutations, [{ id: 'PR_1', oid: sha }]);
   assert.deepEqual(settles.calls, []);
   const third = await withFetch(() =>
@@ -544,7 +581,7 @@ test('a required-green BLOCKED head is re-read and, if it stays BLOCKED, dispatc
       }),
     })
   );
-  assert.deepEqual(third.result.reads, [1, 1, 1]);
+  assert.deepEqual(third.result.reads, [1, 1, 1, 1]);
   assert.deepEqual(third.result.mutations, [{ id: 'PR_1', oid: sha }]);
   assert.deepEqual(third.calls, []);
   const stays = await withFetch(() =>
@@ -755,8 +792,8 @@ test('a 70-PR sweep with UNKNOWN entries reads in parallel, never sleeps, and st
     'reads overlap instead of running serially'
   );
   assert.ok(peak > 1 && peak <= 6, `prefetch concurrency ${peak}`);
-  // One prefetch per PR plus one fresh read per UNKNOWN; no retry loop.
-  assert.equal(result.reads.length, 70 + 70 - 23);
+  // One prefetch per PR, one bounded UNKNOWN refresh, and a final read for each of 24 enqueues.
+  assert.equal(result.reads.length, 70 + 70 - 23 + 24);
   const cleanNumbers = roster.map(pr => pr.number).filter(n => n % 3 === 1);
   assert.deepEqual(
     result.mutations.map(m => m.id).sort(),
@@ -784,13 +821,13 @@ test('a sweep goes longest-waiting first and stops at its budget', async () => {
       return current(number);
     },
   });
-  // Prefetch stops at half the budget; the loop reads PR 2 itself, then stops.
+  // Prefetch stops at half the budget; PR 1 gets its mutation fence, then the budget stops the sweep.
   assert.deepEqual(
     spent.mutations.map(m => m.id),
-    ['PR_1', 'PR_2']
+    ['PR_1']
   );
   assert.ok(
-    spent.warnings.some(w => w.includes('sweep budget spent after 2/3'))
+    spent.warnings.some(w => w.includes('sweep budget spent after 1/3'))
   );
 });
 
@@ -1474,7 +1511,7 @@ test('a PR wake reads only its current candidate instead of rescanning the whole
     const result = await fixture({ roster, eventName, payload });
     assert.deepEqual(result.inventories, []);
     assert.deepEqual(result.gets, [7]);
-    assert.deepEqual(result.reads, [7]);
+    assert.deepEqual(result.reads, [7, 7]);
     assert.equal(result.mutations.length, 1);
   }
 });
@@ -1548,7 +1585,7 @@ test('PR-target workflow receipts resolve only an exact same-repo source associa
   });
   assert.equal(result.inventories.length, 1);
   assert.deepEqual(result.gets, []);
-  assert.deepEqual(result.reads, [7]);
+  assert.deepEqual(result.reads, [7, 7]);
   assert.equal(result.mutations.length, 1);
 });
 
@@ -1606,7 +1643,7 @@ test('paginated commit associations enqueue each exact open main PR once', async
   });
   assert.equal(result.inventories.length, 1);
   assert.deepEqual(result.gets, []);
-  assert.deepEqual(result.reads, [7, 8]);
+  assert.deepEqual(result.reads, [7, 7, 8, 8]);
   assert.equal(result.mutations.length, 2);
 });
 
@@ -1622,7 +1659,7 @@ test('a green wake that already carries the head skips pulls.get', async () => {
     },
   });
   assert.deepEqual(result.gets, []);
-  assert.deepEqual(result.reads, [7]);
+  assert.deepEqual(result.reads, [7, 7]);
   assert.equal(result.mutations.length, 1);
   const mismatch = await fixture({
     eventName: 'workflow_run',
@@ -1649,7 +1686,7 @@ test('duplicated automatic PR associations do not multiply live reads or enqueue
     },
   });
   assert.deepEqual(result.gets, [7]);
-  assert.deepEqual(result.reads, [7]);
+  assert.deepEqual(result.reads, [7, 7]);
   assert.equal(result.mutations.length, 1);
 });
 
@@ -2242,7 +2279,7 @@ test('a landing on main reconciles the full roster and the hold contract without
   const effects = await fixture({ eventName: 'push', roster: [candidate(1)] });
   // One paginated pulls.list inventory, as for a manual dispatch.
   assert.equal(effects.inventories.length, 1);
-  assert.deepEqual(effects.reads, [1]);
+  assert.deepEqual(effects.reads, [1, 1]);
   assert.equal(effects.mutations.length, 1);
   const contract = workflow.jobs['enforce-hold-contract'].if;
   assert.equal(workflow.on.schedule, undefined);
@@ -2257,7 +2294,7 @@ test('a dispatch naming one PR takes the per-PR path and coalesces with its wake
   const one = await fixture({ roster, env: { DISPATCH_PR_NUMBER: '7' } });
   assert.deepEqual(one.inventories, []);
   assert.deepEqual(one.gets, [7]);
-  assert.deepEqual(one.reads, [7]);
+  assert.deepEqual(one.reads, [7, 7]);
   assert.equal(one.mutations.length, 1);
   for (const unnamed of ['', '0', 'abc']) {
     const sweep = await fixture({
@@ -2530,4 +2567,136 @@ test('compounding PRs jump the queue under the reset-safe policy and every decis
     queueEntries: [entry(8, 'QUEUED', 300)],
   });
   assert.deepEqual(batched.mutations, [unjumped]);
+});
+
+for (const [reason, proof] of Object.entries(nonGreenFleetProofs(sha))) {
+  for (const jump of [false, true]) {
+    test(`JOV-9966 ${reason} Fleet Rules blocks ${jump ? 'jump' : 'normal'} despite green readiness`, async () => {
+      const result = await fixture({
+        overrides: {
+          1: {
+            commits: { nodes: [{ commit: proof }] },
+            labels: {
+              pageInfo: { hasNextPage: false },
+              nodes: jump ? [{ name: 'compounding' }] : [],
+            },
+          },
+        },
+      });
+      assert.equal(result.mutations.length, 0);
+    });
+  }
+}
+test('JOV-9966 a red verdict appearing during jump inspection prevents enqueue', async () => {
+  const result = await fixture({
+    readCurrentSnapshot: (_number, count) => ({
+      ...current(1),
+      labels: {
+        pageInfo: { hasNextPage: false },
+        nodes: [{ name: 'compounding' }],
+      },
+      commits: {
+        nodes: [
+          {
+            commit: fleetCommit(
+              sha,
+              count > 1 ? { conclusion: 'FAILURE' } : {}
+            ),
+          },
+        ],
+      },
+    }),
+  });
+  assert.equal(result.mutations.length, 0);
+});
+test('JOV-9966 successful PR Fleet Rules completion wakes the existing enroll workflow', () => {
+  assert.ok(workflow.on.workflow_run.workflows.includes('PR Fleet Rules'));
+});
+
+test('JOV-9966 a Fleet Rules green completion admits the held current head', async () => {
+  const result = await fixture({
+    ...requiredGreenWake,
+    payload: {
+      workflow_run: {
+        ...requiredGreenWake.payload.workflow_run,
+        name: 'PR Fleet Rules',
+      },
+    },
+  });
+  assert.equal(result.mutations.length, 1);
+  assert.equal(result.mutations[0].oid, sha);
+});
+
+for (const conclusion of [
+  'FAILURE',
+  'CANCELLED',
+  'SKIPPED',
+  'NEUTRAL',
+  'TIMED_OUT',
+  null,
+]) {
+  test(`Fleet Rules ${conclusion} cannot inherit an older green verdict`, () => {
+    const proof = fleetCommit(sha);
+    proof.statusCheckRollup.contexts.nodes.push({
+      ...proof.statusCheckRollup.contexts.nodes[0],
+      databaseId: 101,
+      conclusion,
+    });
+    assert.equal(
+      fleetRulesAdmission(proof, sha, 'JovieInc/Jovie').allowed,
+      false
+    );
+  });
+}
+test('latest trusted green supersedes older red regardless of response order', () => {
+  const proof = fleetCommit(sha, { databaseId: 123751919914 });
+  proof.statusCheckRollup.contexts.nodes.push({
+    ...proof.statusCheckRollup.contexts.nodes[0],
+    databaseId: 99,
+    conclusion: 'FAILURE',
+  });
+  assert.equal(fleetRulesAdmission(proof, sha, 'JovieInc/Jovie').allowed, true);
+});
+for (const field of ['event', 'file', 'databaseId']) {
+  test(`unreadable newest Fleet Rules ${field} holds instead of inheriting green`, () => {
+    const proof = fleetCommit(sha);
+    const newer = structuredClone(proof.statusCheckRollup.contexts.nodes[0]);
+    newer.databaseId = 101;
+    delete newer.checkSuite.workflowRun[field];
+    proof.statusCheckRollup.contexts.nodes.push(newer);
+    assert.equal(
+      fleetRulesAdmission(proof, sha, 'JovieInc/Jovie').allowed,
+      false
+    );
+  });
+}
+test('wrong producer, repository and head cannot certify Fleet Rules', () => {
+  for (const change of [
+    check => {
+      check.checkSuite.app.databaseId = 1;
+    },
+    check => {
+      check.checkSuite.workflowRun.event = 'push';
+    },
+    check => {
+      check.checkSuite.workflowRun.file.path = '.github/workflows/spoof.yml';
+    },
+    check => {
+      check.checkSuite.workflowRun.file.repositoryName = 'untrusted/fork';
+    },
+    check => {
+      check.databaseId = undefined;
+    },
+  ]) {
+    const proof = fleetCommit(sha);
+    change(proof.statusCheckRollup.contexts.nodes[0]);
+    assert.equal(
+      fleetRulesAdmission(proof, sha, 'JovieInc/Jovie').allowed,
+      false
+    );
+  }
+  assert.equal(
+    fleetRulesAdmission(fleetCommit(sha), '', 'JovieInc/Jovie').allowed,
+    false
+  );
 });

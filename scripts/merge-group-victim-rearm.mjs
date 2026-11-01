@@ -17,6 +17,10 @@
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { ADMISSION_BLOCKING_LABELS } from './lib/admission-hold-labels.mjs';
+import {
+  FLEET_RULES_COMMIT_FIELDS,
+  fleetRulesAdmission,
+} from './lib/fleet-rules-admission.mjs';
 
 export const REARM_CONTEXT = 'jovie-queue-victim-rearm/v1';
 export const REARM_CAP = 2;
@@ -402,6 +406,14 @@ export async function applyVictimRearms(decisions, io) {
     ) {
       continue;
     }
+    if (
+      !fleetRulesAdmission(
+        current.fleetRulesCommit,
+        decision.headSha,
+        io.repository ?? 'JovieInc/Jovie'
+      ).allowed
+    )
+      continue;
     // The cap counts successful enqueues only. A denied or failed mutation
     // leaves no receipt, so a later run can try this head again.
     await io.enable(decision.prNumber, current);
@@ -552,7 +564,7 @@ function readArmState(repository, prNumber) {
     'api',
     'graphql',
     '-f',
-    'query=query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id headRefOid mergeStateStatus isInMergeQueue autoMergeRequest{enabledAt}}}}',
+    `query=query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id headRefOid mergeStateStatus isInMergeQueue autoMergeRequest{enabledAt} commits(last:1){nodes{commit{${FLEET_RULES_COMMIT_FIELDS}}}}}}}`,
     '-F',
     `owner=${owner}`,
     '-F',
@@ -562,6 +574,7 @@ function readArmState(repository, prNumber) {
   ]).data.repository.pullRequest;
   return {
     nodeId: typeof data?.id === 'string' ? data.id : '',
+    fleetRulesCommit: data?.commits?.nodes?.[0]?.commit,
     headSha: String(data?.headRefOid ?? '').toLowerCase(),
     mergeStateStatus: data?.mergeStateStatus,
     inQueue: data?.isInMergeQueue === true,
@@ -609,6 +622,7 @@ function main() {
   });
   const targetUrl = `https://github.com/${repository}/actions/runs/${run.id}`;
   applyVictimRearms(decisions, {
+    repository,
     targetUrl,
     readPullRequest(prNumber) {
       return readArmState(repository, prNumber);
