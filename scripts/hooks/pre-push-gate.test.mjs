@@ -24,7 +24,7 @@ function runGate(args = [], env = {}) {
   return spawnSync('bash', [gateScript, ...args], {
     cwd: repoRoot,
     encoding: 'utf8',
-    env: { ...process.env, ...env },
+    env: { ...process.env, JOVIE_PREFLIGHT_DEPTH: undefined, ...env },
   });
 }
 
@@ -90,6 +90,7 @@ for (const linkedWorktree of [false, true]) {
     assert.equal(localNames.status, 0, localNames.stderr);
     for (const name of localNames.stdout.trim().split('\n')) delete env[name];
     delete env.JOVIE_SKIP_PRE_PUSH_GATE;
+    delete env.JOVIE_PREFLIGHT_DEPTH;
     env.GIT_CONFIG_GLOBAL = '/dev/null';
     env.GIT_CONFIG_NOSYSTEM = '1';
 
@@ -199,6 +200,7 @@ test('publication rejects committed formatter drift and accepts the formatted re
   assert.equal(localNames.status, 0, localNames.stderr);
   for (const name of localNames.stdout.trim().split('\n')) delete env[name];
   delete env.JOVIE_SKIP_PRE_PUSH_GATE;
+  delete env.JOVIE_PREFLIGHT_DEPTH;
   env.GIT_CONFIG_GLOBAL = '/dev/null';
   env.GIT_CONFIG_NOSYSTEM = '1';
   const run = (command, args) =>
@@ -377,4 +379,10 @@ process.exit(report.ok ? 0 : 1);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('pre-push-gate.sh refuses when nested inside a preflight', () => {
+  const result = runGate([], { JOVIE_PREFLIGHT_DEPTH: '1' });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /nested inside a preflight/);
 });

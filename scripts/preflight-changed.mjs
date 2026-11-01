@@ -47,6 +47,7 @@ import {
   PR_BODY_SKELETON,
   parseMergeConflicts,
 } from './lib/preflight-changed.mjs';
+import { guardNested, withPreflightDepth } from './lib/preflight-depth.mjs';
 
 export { baseRefCandidates, resolveBaseRef };
 
@@ -623,7 +624,7 @@ export async function main({
     return 1;
   }
   const started = Date.now();
-  const childEnv = { ...env };
+  const childEnv = withPreflightDepth(env);
   for (const k of Object.keys(childEnv))
     if (/^GIT_/.test(k)) delete childEnv[k];
   // Gates refuse the ambient Node when it violates engines (same pin preflight.mjs uses).
@@ -1006,5 +1007,5 @@ if (
   existsSync(process.argv[1]) &&
   realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1])
 )
-  process.exitCode = await main();
+  process.exitCode = guardNested('preflight:changed') ?? (await main());
 void SELF;
