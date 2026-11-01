@@ -51,10 +51,14 @@ describe('exact-build performance gate lanes', () => {
     }
     expect(gate.run).not.toContain('|| true');
     expect(gate['continue-on-error']).toBeUndefined();
-    // The only warning is the certified-only alias rule (Tim 2026-10-31):
-    // uncertified alias routes warn and file one Linear perf ticket.
+    // Two warnings, both from the certified-only alias rule (Tim 2026-10-31):
+    // uncertified routes that miss, and an unreadable ledger (which also
+    // files a P1 so it is never silent).
     const warnings = gate.run.match(/::warning::/g) ?? [];
-    expect(warnings).toHaveLength(1);
+    expect(warnings).toHaveLength(2);
+    expect(gate.run).toMatch(
+      /if \[ "\$certification" != 'present' \]; then[\s\S]*?::warning::Golden-path certification ledger[\s\S]*?alias-ledger-unreadable-intake\.mjs/
+    );
     expect(gate.run).toMatch(
       /if ! staged_alias_guard \$warning; then\s+echo "::warning::Exact staged-build public-profile alias budgets missed on uncertified pages[\s\S]*?staged-alias-perf-intake\.mjs/
     );

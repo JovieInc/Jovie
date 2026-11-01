@@ -466,6 +466,12 @@ describe('public-profile alias graduation policy', () => {
           PRODUCTION_DEPLOYMENT_URL_B64:
             Buffer.from(DEPLOYMENT_URL).toString('base64'),
         });
+        // An unreadable ledger is never silent: it warns and files a P1.
+        expect(
+          result.stdout.includes(
+            '::warning::Golden-path certification ledger unavailable'
+          )
+        ).toBe(ledgerState === 'unreadable');
         const decision =
           PUBLIC_PROFILE_ALIAS_GRADUATION.windows[surface].decision;
         const blocks = certified && decision === 'block';
