@@ -12,7 +12,7 @@ export interface ProofStatObservation {
     readonly approvedAt: string;
   } | null;
   /** Comparative stats: every measured entrant (ranked chart data). */
-  readonly breakdown?: readonly {
+  readonly breakdown?: {
     readonly label: string;
     readonly value: number;
     readonly self: boolean;
