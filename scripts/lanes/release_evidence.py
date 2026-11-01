@@ -37,6 +37,7 @@ FAILED = {"failure", "timed_out", "startup_failure", "cancelled"}
 VERSION_URL = "https://jov.ie/api/version"
 STALE_BUILD_S = 2 * 3600
 REFRESH_S = 300
+CARRY_TTL_S = 24 * 3600  # a streak whose job no longer runs at all (skipped, renamed, removed) expires after this
 READ_STALE_S = 1800  # no successful CI evidence read for this long is its own alert (dead-man)
 SPEC_LINE = re.compile(r"(tests/[\w./-]+\.spec\.ts(?::\d+)?)")
 STATE_FILE = "release-evidence.json"
@@ -102,10 +103,19 @@ def carry_streak(current: dict, prior: dict | None) -> dict:
 def failing_specs(log_text: str, limit: int = 5) -> list[str]:
     """Playwright/Vitest spec paths on failure lines of a job log, most frequent first."""
     counts: dict[str, int] = {}
+    in_failed_summary = False
     for line in log_text.splitlines():
-        if not re.search(r"(✘|✗|×|FAIL|failed|Error:)", line):
+        text = re.sub(r"^\S*Z\s+", "", line)  # Actions timestamp prefix
+        if re.match(r"^\s*\d+ (?:failed|flaky)\b", text):
+            in_failed_summary = True  # Playwright's summary block lists one failing test per indented line
             continue
-        for spec in SPEC_LINE.findall(line):
+        if in_failed_summary and not re.match(r"^\s+\S", text):
+            in_failed_summary = False
+        failing = (in_failed_summary or re.search(r"(✘|✗|×|FAIL|failed|Error:)", text)
+                   or re.match(r"^\s*\d+\)\s", text))  # `line`/`list` reporter failure header: "  1) [chromium] › spec"
+        if not failing:
+            continue
+        for spec in SPEC_LINE.findall(text):
             counts[spec] = counts.get(spec, 0) + 1
     return [spec for spec, _ in sorted(counts.items(), key=lambda kv: -kv[1])][:limit]
 
@@ -165,10 +175,14 @@ def sample(state_dir: Path, now: float, run=None, version=read_version) -> tuple
 
         previous = cached.get("streaks") or {}
         rows = job_conclusions(runs, jobs_of)
-        streaks = {slug: carry_streak(streak, previous.get(slug)) for slug, streak in red_streaks(rows).items()}
+        streaks = {slug: {**carry_streak(streak, previous.get(slug)), "lastRedSeenAt": now}
+                   for slug, streak in red_streaks(rows).items()}
         for slug, prior in previous.items():
             # Only a green run clears a streak: runs that skipped the job (or slid the reds out of the window) do not.
-            if slug not in streaks and not any(row["jobs"].get(slug, (None,))[0] == "success" for row in rows):
+            # A job that stopped running entirely (renamed or removed) expires after CARRY_TTL_S.
+            green = any(row["jobs"].get(slug, (None,))[0] == "success" for row in rows)
+            fresh = now - float(prior.get("lastRedSeenAt") or now) <= CARRY_TTL_S
+            if slug not in streaks and not green and fresh:
                 streaks[slug] = prior
         for slug, streak in streaks.items():
             prior = previous.get(slug) or {}

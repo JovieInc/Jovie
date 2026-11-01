@@ -72,6 +72,17 @@ class Streaks(unittest.TestCase):
         ])
         self.assertEqual(release_evidence.failing_specs(log), ["tests/e2e/start-entry-continuity.spec.ts:330"])
 
+    def test_line_reporter_headers_and_failed_summary_block(self):
+        log = "\n".join([
+            "2026-11-01T05:00:00.0000000Z   1) [chromium] › tests/e2e/start-entry-continuity.spec.ts:330:7 › continuity ─────",
+            "2026-11-01T05:00:01.0000000Z     Timed out 5000ms waiting for expect(locator).toBeVisible()",
+            "2026-11-01T05:00:02.0000000Z   1 failed",
+            "2026-11-01T05:00:02.0000000Z     [chromium] › tests/e2e/start-entry-continuity.spec.ts:330:7 › continuity",
+            "2026-11-01T05:00:02.0000000Z   40 passed (3.2m)",
+            "2026-11-01T05:00:02.0000000Z     [chromium] › tests/e2e/golden-path.spec.ts:10:3 › should not count",
+        ])
+        self.assertEqual(release_evidence.failing_specs(log), ["tests/e2e/start-entry-continuity.spec.ts:330"])
+
 
 class CarryStreak(unittest.TestCase):
     def test_first_bad_sha_survives_a_streak_longer_than_the_read_window(self):
@@ -147,6 +158,27 @@ class OnlyGreenClears(unittest.TestCase):
             green[0]["id"] += 2000
             state["rows"] = green
             out, _ = release_evidence.sample(Path(tmp), 1_000_800.0, run=gh, version=lambda: "a163bac")
+            self.assertNotIn("golden-path", out["streaks"])
+
+    def test_a_job_that_stopped_running_expires_after_a_day(self):
+        prior = {"count": 3, "firstBadSha": "a" * 40, "newestSha": "b" * 40, "lastRedSeenAt": 1_000_000.0}
+
+        def gh(args, **_):
+            path = args[1]
+            if "workflows/ci.yml/runs" in path:
+                rows = runs(None, None)
+                body = {"workflow_runs": [{k: v for k, v in r.items() if k != "_job"} for r in rows]}
+            elif "/jobs?" in path:
+                body = {"jobs": []}
+            else:
+                body = {"sha": "f" * 40}
+            return SimpleNamespace(returncode=0, stdout=json.dumps(body), stderr="")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / release_evidence.STATE_FILE).write_text(json.dumps({"streaks": {"golden-path": prior}}))
+            out, _ = release_evidence.sample(Path(tmp), 1_000_000.0 + 3600, run=gh, version=lambda: "a163bac")
+            self.assertIn("golden-path", out["streaks"])
+            out, _ = release_evidence.sample(Path(tmp), 1_000_000.0 + 25 * 3600, run=gh, version=lambda: "a163bac")
             self.assertNotIn("golden-path", out["streaks"])
 
 
