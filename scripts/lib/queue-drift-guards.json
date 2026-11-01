@@ -164,6 +164,15 @@
       "remediation": "A post-mortem made a failure class recurring: add it to docs/postmortems/failure-class-actions.json with its class-action issue."
     },
     {
+      "id": "agent-display-name-brand",
+      "command": ["node", "scripts/invariants/agent-display-name-brand.mjs"],
+      "requires": [
+        "scripts/invariants/agent-display-name-brand.mjs",
+        "apps/web/lib/brand/agent-display-name.ts"
+      ],
+      "remediation": "Replace the forbidden internal agent wording with JOVIE_AGENT_DISPLAY_NAME (JOV-3121). This check used to run only in the merge group, so one leak on main failed every group."
+    },
+    {
       "id": "swift-arch",
       "command": ["node", "scripts/swift-arch/guard.mjs"],
       "requires": ["scripts/swift-arch/guard.mjs"],
