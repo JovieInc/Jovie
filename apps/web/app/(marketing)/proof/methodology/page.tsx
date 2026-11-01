@@ -27,7 +27,10 @@ export const metadata: Metadata = {
 export default function ProofMethodologyPage() {
   return (
     <MarketingContainer width='prose' className='pt-24 pb-20 sm:pt-28 sm:pb-28'>
-      <h1 className='system-b-marketing-route-title text-primary-token text-balance'>
+      <h1
+        data-wrap='editorial-title'
+        className='system-b-marketing-route-title text-primary-token text-balance'
+      >
         {TITLE}
       </h1>
       <p className='mt-6 text-lg leading-relaxed text-secondary-token text-pretty'>

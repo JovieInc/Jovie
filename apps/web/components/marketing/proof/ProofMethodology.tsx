@@ -71,7 +71,10 @@ export function ProofMethodology({ stats, className }: ProofMethodologyProps) {
   return (
     <div data-accent='ion' className={cn('flex flex-col gap-12', className)}>
       <section className='flex flex-col gap-3'>
-        <h2 className='text-lg font-medium text-primary-token text-balance'>
+        <h2
+          data-wrap='editorial-title'
+          className='text-lg font-medium text-primary-token text-balance'
+        >
           {PROOF_METHODOLOGY_COPY.rules.heading}
         </h2>
         <ul className='flex list-disc flex-col gap-2 pl-5 text-sm leading-6 text-secondary-token'>
@@ -81,7 +84,10 @@ export function ProofMethodology({ stats, className }: ProofMethodologyProps) {
         </ul>
       </section>
       <section className='flex flex-col gap-3'>
-        <h2 className='text-lg font-medium text-primary-token text-balance'>
+        <h2
+          data-wrap='editorial-title'
+          className='text-lg font-medium text-primary-token text-balance'
+        >
           {PROOF_METHODOLOGY_COPY.benchmark.heading}
         </h2>
         <p className='max-w-2xl text-sm leading-6 text-secondary-token text-pretty'>
@@ -89,7 +95,10 @@ export function ProofMethodology({ stats, className }: ProofMethodologyProps) {
         </p>
       </section>
       <section className='flex flex-col gap-6'>
-        <h2 className='text-lg font-medium text-primary-token text-balance'>
+        <h2
+          data-wrap='editorial-title'
+          className='text-lg font-medium text-primary-token text-balance'
+        >
           {PROOF_METHODOLOGY_COPY.meanings.heading}
         </h2>
         <dl className='flex flex-col'>
