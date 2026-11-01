@@ -138,6 +138,14 @@ jobs:
             echo "samples=$SAMPLES"
           } >> "$GITHUB_OUTPUT"
 
+      # Merge to live per production promotion (alias move), last 10: p50/p95
+      # and the slowest stage. REST only, so a GraphQL shed cannot blank it.
+      - name: Measure merge-to-live lead time
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/merge-to-live.mjs --runs 40 --limit 10 >> "$GITHUB_STEP_SUMMARY" || true
+
       - name: Open latest snapshot PR
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -150,6 +158,7 @@ jobs:
           git switch -c "$BRANCH"
           git add docs/metrics/shipping-slo-latest.json docs/metrics/blog-publish-latency-latest.json docs/metrics/stage-timings-latest.json
           git add docs/metrics/review-escapes-latest.json 2>/dev/null || true
+          git add docs/metrics/merge-to-live-latest.json 2>/dev/null || true
           if git diff --staged --quiet; then
             echo "Snapshot unchanged — nothing to commit."
             exit 0
