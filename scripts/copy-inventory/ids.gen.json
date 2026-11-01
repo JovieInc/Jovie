@@ -502,6 +502,7 @@
     "apps/web/components/features/waitlist/WaitlistOutcomeView.tsx#Today's Access Is Full": "WAIT-8",
     "apps/web/components/features/waitlist/WaitlistOutcomeView.tsx#Too Many Attempts": "WAIT-13",
     "apps/web/components/features/waitlist/WaitlistOutcomeView.tsx#Try Again": "WAIT-19",
+    "apps/web/components/features/waitlist/WaitlistOutcomeView.tsx#Want in now? {…} ({…}) lets you skip the waitlist: setup opens as soon as payment clears.": "WAIT-60",
     "apps/web/components/features/waitlist/WaitlistOutcomeView.tsx#We Couldn't Save This": "WAIT-11",
     "apps/web/components/features/waitlist/WaitlistOutcomeView.tsx#We Couldn't Verify Your Request": "WAIT-12",
     "apps/web/components/features/waitlist/WaitlistOutcomeView.tsx#You Have Access": "WAIT-5",
