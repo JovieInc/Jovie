@@ -1,7 +1,7 @@
 export const revalidate = false;
 
 /**
- * Pass-through segment layout. Each legal route renders LegalDocumentShell (./legal-document-shell.tsx)
+ * Pass-through segment layout. Each legal route renders LegalDocumentShell (./legal-shell.tsx)
  * from its own layout (see that component for why the shell is not hoisted
  * here).
  */

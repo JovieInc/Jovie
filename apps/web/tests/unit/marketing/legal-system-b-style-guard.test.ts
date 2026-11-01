@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
  * itself checked by `design-system-source-ratchet.mjs`).
  *
  * 2026-10-29 marketing critic sweep: every legal route renders one shell
- * (legal-document-shell.tsx, from each route's own layout) with the full
+ * (legal-shell.tsx, from each route's own layout) with the full
  * docked MarketingHeader and expanded footer, and no route hero. The texture hero repeated the document title above the real
  * H1 over off-palette wallpaper; cookies/dmca ran a different header.
  */
@@ -24,7 +24,7 @@ const legalRoutes = ['privacy', 'terms', 'cookies', 'dmca'] as const;
 
 const sharedSources = [
   'app/(dynamic)/legal/layout.tsx',
-  'app/(dynamic)/legal/legal-document-shell.tsx',
+  'app/(dynamic)/legal/legal-shell.tsx',
   'app/(dynamic)/legal/privacy/page.tsx',
   'app/(dynamic)/legal/terms/page.tsx',
   'app/(dynamic)/legal/cookies/page.tsx',
@@ -63,7 +63,7 @@ describe('legal pages System B source contract', () => {
   });
 
   it('gives every legal route one shell: full header, expanded footer, no hero', () => {
-    const layout = readSource('app/(dynamic)/legal/legal-document-shell.tsx');
+    const layout = readSource('app/(dynamic)/legal/legal-shell.tsx');
 
     expect(layout).toContain('<PublicPageShell');
     expect(layout).not.toContain("headerVariant='minimal'");

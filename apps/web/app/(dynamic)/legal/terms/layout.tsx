@@ -1,4 +1,4 @@
-import { LegalDocumentShell } from '../legal-document-shell';
+import { LegalDocumentShell } from '../legal-shell';
 
 export const revalidate = false;
 
