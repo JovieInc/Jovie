@@ -150,6 +150,12 @@ class OnlyGreenClears(unittest.TestCase):
             self.assertNotIn("golden-path", out["streaks"])
 
 
+class ReadStale(unittest.TestCase):
+    def test_a_failed_evidence_read_does_not_look_fresh(self):
+        self.assertEqual(release_evidence.judge({"evidenceReadAt": 1000.0}, 1000.0 + 600), {})
+        self.assertIn("release-evidence-stale", release_evidence.judge({"evidenceReadAt": 1000.0}, 1000.0 + 1801))
+
+
 class BuildStale(unittest.TestCase):
     def test_stale_only_after_two_hours_with_main_advanced(self):
         t0 = 1_000_000.0

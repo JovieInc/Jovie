@@ -37,6 +37,7 @@ FAILED = {"failure", "timed_out", "startup_failure", "cancelled"}
 VERSION_URL = "https://jov.ie/api/version"
 STALE_BUILD_S = 2 * 3600
 REFRESH_S = 300
+READ_STALE_S = 1800  # no successful CI evidence read for this long is its own alert (dead-man)
 SPEC_LINE = re.compile(r"(tests/[\w./-]+\.spec\.ts(?::\d+)?)")
 STATE_FILE = "release-evidence.json"
 
@@ -147,7 +148,7 @@ def sample(state_dir: Path, now: float, run=None, version=read_version) -> tuple
     gh = lambda p: sentinel._gh_json(run, p)  # noqa: E731
     errors: list[str] = []
     jobs_cache: dict[str, list] = dict(cached.get("jobsCache") or {})
-    out = {"observedAt": now, "streaks": {}, "build": cached.get("build") or {}, "jobsCache": {}}
+    out = {"observedAt": now, "evidenceReadAt": cached.get("evidenceReadAt"), "streaks": {}, "build": cached.get("build") or {}, "jobsCache": {}}
     try:
         runs = gh(f"repos/{REPO}/actions/workflows/ci.yml/runs?branch=main&event=push&status=completed"
                   f"&per_page={RUNS_READ}").get("workflow_runs") or []
@@ -181,6 +182,7 @@ def sample(state_dir: Path, now: float, run=None, version=read_version) -> tuple
                 except Exception:  # noqa: BLE001
                     streak["specs"] = None
         out["streaks"] = streaks
+        out["evidenceReadAt"] = now
         keys = {f"{r['id']}:{r.get('run_attempt') or 1}" for r in runs[:RUNS_READ]}
         out["jobsCache"] = {k: v for k, v in jobs_cache.items() if k in keys}
     except Exception as error:  # noqa: BLE001
@@ -202,6 +204,10 @@ def judge(sample_: dict | None, now: float) -> dict[str, str]:
     alerts: dict[str, str] = {}
     if not sample_:
         return alerts
+    read_at = sample_.get("evidenceReadAt")
+    if isinstance(read_at, (int, float)) and now - read_at > READ_STALE_S:
+        alerts["release-evidence-stale"] = (f"main CI release evidence was last read {int((now - read_at) // 60)} min ago "
+                                            f"(limit {READ_STALE_S // 60}); a red Golden Path would go unnoticed")
     names = {slug: name for name, slug in RELEASE_EVIDENCE_JOBS.items()}
     for slug, streak in sorted((sample_.get("streaks") or {}).items()):
         if streak.get("count", 0) >= RED_STREAK:
