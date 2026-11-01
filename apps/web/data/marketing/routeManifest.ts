@@ -1429,6 +1429,30 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
   },
   {
+    glob: '(marketing)/proof/methodology/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'proof-stat registry methodology',
+      notes:
+        'Methodology page is generated from apps/web/data/proof-stats/registry.json; prose-led reference, not recipe-composable.',
+    },
+    exempt: {
+      reason:
+        'public proof methodology — generated from the stat registry; not recipe-composable',
+      linearId: 'JOV-9911',
+      approvedBy: 'autonomous-shipping-policy (agent)',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/23666',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/proof/methodology',
+    healthCheck: {
+      path: '/proof/methodology',
+      expected: 'page',
+    },
+  },
+  {
     glob: '(marketing)/api-versioning/page.tsx',
     renderedSections: [],
     bindingEvidence: {

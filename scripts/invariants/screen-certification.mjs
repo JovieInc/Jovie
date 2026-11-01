@@ -77,6 +77,7 @@ export const SCREEN_MARKETING_ROUTES = Object.freeze({
   'web.marketing-integrations': '/integrations',
   'web.developers': '/developers',
   'web.developers-agents': '/developers/agents',
+  'web.proof-methodology': '/proof/methodology',
   'web.api-versioning-policy': '/api-versioning',
   'web.cli-landing': '/cli',
   // JOV-7110: web.engineering-publication used to cover both engineering
@@ -255,6 +256,7 @@ web.artists|web|marketing-artists|apps/web/app/artists/page.tsx|desktop,mobile
 web.waitlist|web|marketing-waitlist|apps/web/app/waitlist/page.tsx,apps/web/app/waitlist/layout.tsx,apps/web/app/waitlist/error.tsx|desktop,mobile
 web.developers|web|developer-documentation|apps/web/app/(marketing)/developers/page.tsx|desktop,mobile
 web.developers-agents|web|developer-agent-docs|apps/web/app/(marketing)/developers/agents/page.tsx|desktop,mobile
+web.proof-methodology|web|proof-methodology|apps/web/app/(marketing)/proof/methodology/page.tsx|desktop,mobile
 web.api-versioning-policy|web|api-versioning-policy|apps/web/app/(marketing)/api-versioning/page.tsx|desktop,mobile
 web.cli-landing|web|cli-landing|apps/web/app/(marketing)/cli/page.tsx|desktop,mobile
 web.engineering-publication|web|engineering-publication|apps/web/app/(marketing)/engineering/page.tsx,apps/web/app/(marketing)/engineering/[slug]/page.tsx|desktop,mobile
