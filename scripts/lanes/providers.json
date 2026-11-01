@@ -116,7 +116,7 @@
     "accountClass": "hyperagent-credits",
     "slots": 2,
     "repairs": false,
-    "remoteRepairs": true,
+    "remoteRepairs": false,
     "routes": [
       {
         "model": "z-ai/glm-5.3",
