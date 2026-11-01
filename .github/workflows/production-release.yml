@@ -1232,7 +1232,6 @@ jobs:
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
-          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
         run: |
           set -euo pipefail
 
@@ -1379,7 +1378,9 @@ jobs:
             # warning and blinds Summer's golden-path reader. Warn and file a P1;
             # the release still proceeds.
             echo "::warning::Golden-path certification ledger ${certification} (${ledger_detail}); every alias route is treated as uncertified. Filing P1."
-            node "${GITHUB_WORKSPACE}/scripts/alias-ledger-unreadable-intake.mjs" \
+            doppler run --project jovie-web --config prd \
+              --only-secrets=LINEAR_API_KEY --no-fallback -- env -u DOPPLER_TOKEN \
+              node "${GITHUB_WORKSPACE}/scripts/alias-ledger-unreadable-intake.mjs" \
               --lane staged-alias --state "$certification" --source "$ledger_source" \
               --detail "$ledger_detail" \
               --run-url "${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-JovieInc/Jovie}/actions/runs/${GITHUB_RUN_ID:-}" \
@@ -1398,7 +1399,9 @@ jobs:
             # shellcheck disable=SC2086
             if ! staged_alias_guard $warning; then
               echo "::warning::Exact staged-build public-profile alias budgets missed on uncertified pages (${warning}); warning only until their golden-path surface certifies (JOV-8737)."
-              node "${GITHUB_WORKSPACE}/scripts/staged-alias-perf-intake.mjs" \
+              doppler run --project jovie-web --config prd \
+                --only-secrets=LINEAR_API_KEY --no-fallback -- env -u DOPPLER_TOKEN \
+                node "${GITHUB_WORKSPACE}/scripts/staged-alias-perf-intake.mjs" \
                   --routes "$warning" \
                   --run-url "${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-JovieInc/Jovie}/actions/runs/${GITHUB_RUN_ID:-}" \
                   --sha "${EXPECTED_COMMIT_SHA:-}" ||
@@ -1949,13 +1952,12 @@ jobs:
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
         # Unresolved means nothing is certified: the gate warns, never blocks.
-        run: node .github/scripts/resolve-synthetic-secrets.mjs --name CRON_SECRET || echo "::warning::CRON_SECRET unresolved; alias budgets warn only."
+        run: node .github/scripts/resolve-synthetic-secrets.mjs --name CRON_SECRET --name LINEAR_API_KEY || echo "::warning::CRON_SECRET or LINEAR_API_KEY unresolved; alias budgets warn only and the ledger P1 may not file."
       - name: Gate canonical public-profile aliases on usable results
         id: alias-perf
         working-directory: apps/web
         env:
           CI: 'true'
-          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
         run: |
           set -euo pipefail
           routes='public-profile-listen public-profile-music public-profile-subscribe public-profile-tip public-profile-tour public-profile-releases'
