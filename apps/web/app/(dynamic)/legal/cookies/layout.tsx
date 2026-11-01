@@ -1,28 +1,9 @@
-import { MarketingContainer } from '@/components/marketing';
-import { PublicPageShell } from '@/components/site/PublicPageShell';
-import { getSiteChrome } from '@/lib/content-records/site-chrome.server';
+import { LegalDocumentShell } from '../legal-shell';
 
-export const revalidate = false;
-
-export default async function CookiesLegalLayout({
+export default function CookiesLegalLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const chrome = await getSiteChrome();
-  return (
-    <PublicPageShell
-      chrome={chrome}
-      className='public-legal-shell bg-base text-primary-token'
-      headerVariant='minimal'
-      logoSize='sm'
-    >
-      <MarketingContainer
-        className='public-legal-content py-16 sm:py-20'
-        width='page'
-      >
-        {children}
-      </MarketingContainer>
-    </PublicPageShell>
-  );
+  return <LegalDocumentShell>{children}</LegalDocumentShell>;
 }
