@@ -1,12 +1,19 @@
 import 'server-only';
 
 import { and, eq } from 'drizzle-orm';
+import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
+import {
+  CACHE_TAGS,
+  createProfileTag,
+  sanitizeCacheTags,
+} from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 // eslint-disable-next-line no-restricted-imports -- Schema barrel import needed for the contact type alias
 import type { CreatorContact as DbCreatorContact } from '@/lib/db/schema';
 import type { DiscogRelease } from '@/lib/db/schema/content';
 import { creatorPixels } from '@/lib/db/schema/pixels';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { checkBoolean } from '@/lib/entitlements/registry';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { mergeProfileTheme } from '@/lib/profile/profile-theme';
@@ -19,6 +26,7 @@ import { isReservedUsername } from '@/lib/validation/username-core';
 import type { CreatorProfile, LegacySocialLink } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
 import { mapProfileWithLinksToCreatorProfile } from './profile-mapper';
+import { shouldBypassPublicProfileQaCache } from './public-profile-qa';
 
 /**
  * Shape returned to every consumer of the public profile loader. Stable
@@ -126,7 +134,18 @@ function calculateProfileCompletion(
   }).percentage;
 }
 
-/** Fetches profile and social links in a single database call. */
+const NOT_FOUND_RESULT: PublicProfileLoaderResult = RESERVED_PROFILE_NOT_FOUND;
+
+const ERROR_RESULT: PublicProfileLoaderResult = {
+  ...RESERVED_PROFILE_NOT_FOUND,
+  status: 'error',
+};
+
+/**
+ * Fetches the full profile body (profile, links, contacts, pixel) in one
+ * storage pass. The body re-checks publication itself, so a fresh call is a
+ * complete authoritative read on its own.
+ */
 const fetchProfileAndLinks = async (
   username: string
 ): Promise<PublicProfileLoaderResult> => {
@@ -243,9 +262,131 @@ const fetchProfileAndLinks = async (
   }
 };
 
-/** Per-request deduplication only; no cross-request success can authorize itself. */
+const PUBLICATION_AUTHORITY_TIMEOUT_MS = 5_000;
+const PROFILE_BODY_CACHE_TTL_SECONDS = 3600;
+
+interface PublicationAuthority {
+  readonly id: string;
+  readonly isPublic: unknown;
+}
+
+/**
+ * The per-request publication decision (JOV-8629). One indexed primary-key
+ * style read on `username_normalized`. Storage failure or timeout throws so the
+ * caller renders an error, never a previously cached public body.
+ */
+async function readPublicationAuthority(
+  username: string
+): Promise<PublicationAuthority | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const rows = await Promise.race([
+      db
+        .select({ id: creatorProfiles.id, isPublic: creatorProfiles.isPublic })
+        .from(creatorProfiles)
+        .where(eq(creatorProfiles.usernameNormalized, username))
+        .limit(1),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error('Publication authority read timeout')),
+          PUBLICATION_AUTHORITY_TIMEOUT_MS
+        );
+      }),
+    ]);
+    return rows[0] ?? null;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+class NonCacheableProfileBodyError extends Error {
+  constructor(readonly result: PublicProfileLoaderResult) {
+    super(`Profile body is not cacheable: ${result.status}`);
+    this.name = 'NonCacheableProfileBodyError';
+  }
+}
+
+/**
+ * Cross-request cache for the non-authority profile body. Only `ok` bodies are
+ * retained; invalidateProfileCache() expires them through the same
+ * `profile:<handle>` / `profiles-all` tags (immediately on privacy changes).
+ * A cached body is never consulted on its own: getProfileAndLinks only returns
+ * it after a fresh publication read for the same profile id permits it.
+ */
+async function readCachedProfileBody(
+  username: string
+): Promise<PublicProfileLoaderResult | null> {
+  try {
+    return await unstable_cache(
+      async () => {
+        const body = await fetchProfileAndLinks(username);
+        if (body.status !== 'ok') throw new NonCacheableProfileBodyError(body);
+        return body;
+      },
+      ['public-profile-body', username],
+      {
+        tags: sanitizeCacheTags([
+          CACHE_TAGS.PUBLIC_PROFILE,
+          createProfileTag(username),
+        ]),
+        revalidate: PROFILE_BODY_CACHE_TTL_SECONDS,
+      }
+    )();
+  } catch {
+    // Non-ok bodies and cache-store failures fall back to a fresh read.
+    return null;
+  }
+}
+
+function shouldBypassProfileBodyCache(): boolean {
+  return (
+    process.env.NODE_ENV === 'test' ||
+    process.env.NODE_ENV === 'development' ||
+    shouldBypassPublicProfileQaCache()
+  );
+}
+
+/**
+ * Fresh publication decision, cached non-authority body (JOV-8629 §6.2,
+ * "cache non-authority facts behind a fresh publication decision"). The
+ * authority read and the cached body read overlap; the body is only returned
+ * when current storage says this exact profile id is published.
+ */
+async function loadPublicProfile(
+  username: string
+): Promise<PublicProfileLoaderResult> {
+  if (isReservedUsername(username)) return RESERVED_PROFILE_NOT_FOUND;
+  if (shouldBypassProfileBodyCache()) return fetchProfileAndLinks(username);
+
+  const [authority, cachedBody] = await Promise.all([
+    readPublicationAuthority(username).then(
+      value => ({ ok: true as const, value }),
+      (error: unknown) => ({ ok: false as const, error })
+    ),
+    readCachedProfileBody(username),
+  ]);
+
+  if (!authority.ok) {
+    logger.error(
+      'Error reading public profile publication',
+      { error: authority.error, route: '/[username]', username },
+      'public-profile'
+    );
+    return ERROR_RESULT;
+  }
+  if (!authority.value || !isPublicProfilePublished(authority.value.isPublic)) {
+    return NOT_FOUND_RESULT;
+  }
+  if (cachedBody?.profile?.id === authority.value.id) {
+    return cachedBody;
+  }
+  // Cache miss, store failure, or a handle now owned by a different profile.
+  return fetchProfileAndLinks(username);
+}
+
+/** Per-request deduplication of the fresh-authority profile load. */
 export const getProfileAndLinks = cache(
   async (username: string): Promise<PublicProfileLoaderResult> => {
-    return fetchProfileAndLinks(username.toLowerCase());
+    return loadPublicProfile(username.toLowerCase());
   }
 );

@@ -468,10 +468,16 @@ ISR decision; separately published release and asset authority remains unchanged
 
 **Read current publication before serving each profile representation.**
 
-1. The canonical profile loader bypasses Redis and cross-request success caches.
-   React `cache()` only deduplicates reads within one request. Authoritative
-   profile and OG readers propagate storage failures rather than treating them
-   as absent rows; missing/private profiles disclose no profile body.
+1. The canonical profile loader reads publication (`id`, `is_public` by
+   `username_normalized`) from storage on every request. Only after that fresh
+   read permits the same profile id may it return the non-authority profile
+   body, which is cached cross-request (`unstable_cache`, tags `profiles-all` +
+   `profile:<handle>`, 1h, `ok` bodies only, expired immediately on privacy
+   changes). A cache miss, cache-store failure or a handle now owned by a
+   different profile id reads the body fresh. Redis is still bypassed. React
+   `cache()` deduplicates within one request. Authoritative profile and OG
+   readers propagate storage failures rather than treating them as absent rows;
+   missing/private profiles disclose no profile body.
 2. Profile pages and their rewritten modes use native `force-dynamic` and
    `revalidate = 0`. The shared username layout keeps its default behavior so
    release descendants retain their own caching and publication rules.
@@ -482,9 +488,11 @@ ISR decision; separately published release and asset authority remains unchanged
 5. Anonymous visitor personalization stays client-side after hydration. The
    tracking HMAC may still be generated server-side without a viewer-cookie read.
 
-Ship now: fresh authority through the existing profile service and framework
-configuration. Re-evaluate when measured profile latency or SQL budgets regress.
-Then cache non-authority facts behind a fresh publication decision. The staged
+Shipped 2026-11-01: profile latency regressed once every request re-read the
+full body (staged-build alias budgets: median 822-1068ms and p95 up to 2.3s,
+every canonical document a cache MISS, against a 490-590ms median before), so
+non-authority facts are now cached behind the fresh publication decision
+described in item 1. The staged
 field-policy parser does not enable a field setting or change audience authority;
 complete privacy acceptance remains tracked by JOV-8629.
 

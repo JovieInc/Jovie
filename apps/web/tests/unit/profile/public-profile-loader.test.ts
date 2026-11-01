@@ -6,7 +6,8 @@
  * - ok results map profile/links/contacts and inject venmo tipping links
  * - non-public profiles resolve to not_found
  * - storage failures resolve to error (never throw into the RSC render)
- * - no cross-request cached body grants public access
+ * - no cross-request cached body grants public access: production reads a
+ *   fresh publication decision and only then serves the cached body
  *
  * Related surface: public-profile-isr (docs/TEST_RISK_REGISTER.md, 75% target).
  */
@@ -116,6 +117,15 @@ function buildProfileWithLinks(
     pressPhotos: [],
     ...overrides,
   } as ProfileWithLinks;
+}
+
+async function mockPublicationAuthority(
+  rows: Array<{ id: string; isPublic: unknown }>
+) {
+  const { db } = await import('@/lib/db');
+  vi.mocked(db.select).mockImplementation((() => ({
+    from: () => ({ where: () => ({ limit: async () => rows }) }),
+  })) as never);
 }
 
 async function importLoader() {
@@ -423,15 +433,19 @@ describe('public profile loader behavior (JOV-5778)', () => {
       delete process.env.PUBLIC_NOAUTH_SMOKE;
     });
 
-    it('keeps production profile authority outside cross-request caches', async () => {
+    it('keeps production authority fresh and caches only the body', async () => {
       vi.stubEnv('NODE_ENV', 'production');
       delete process.env.PUBLIC_NOAUTH_SMOKE;
       getProfileWithLinksMock.mockResolvedValue(buildProfileWithLinks());
+      await mockPublicationAuthority([{ id: 'profile-1', isPublic: true }]);
       const { getProfileAndLinks } = await importLoader();
 
-      await getProfileAndLinks('testartist');
+      expect((await getProfileAndLinks('testartist')).status).toBe('ok');
 
-      expect(unstableCacheMock).not.toHaveBeenCalled();
+      expect(unstableCacheMock).toHaveBeenCalledWith(
+        ['public-profile-body', 'testartist'],
+        expect.objectContaining({ revalidate: 3600 })
+      );
       expect(getProfileWithLinksMock).toHaveBeenCalledWith('testartist', {
         skipCache: true,
         throwOnError: true,
@@ -444,6 +458,7 @@ describe('public profile loader behavior (JOV-5778)', () => {
       getProfileWithLinksMock.mockResolvedValue(
         buildProfileWithLinks({ isPublic: false })
       );
+      await mockPublicationAuthority([{ id: 'profile-1', isPublic: false }]);
       const { getProfileAndLinks } = await importLoader();
 
       const result = await getProfileAndLinks('testartist');
@@ -457,24 +472,23 @@ describe('authoritative reads despite shared cache state', () => {
   it('rechecks publication after a previous not-found response', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     delete process.env.PUBLIC_NOAUTH_SMOKE;
-    getProfileWithLinksMock
-      .mockResolvedValueOnce(buildProfileWithLinks({ isPublic: false }))
-      .mockResolvedValueOnce(buildProfileWithLinks());
+    getProfileWithLinksMock.mockResolvedValue(buildProfileWithLinks());
+    await mockPublicationAuthority([{ id: 'profile-1', isPublic: false }]);
     const loader = await importLoader();
 
     const result = await loader.getProfileAndLinks('testartist');
 
     expect(result.status).toBe('not_found');
     expect(result.profile).toBeNull();
+    await mockPublicationAuthority([{ id: 'profile-1', isPublic: true }]);
     expect((await loader.getProfileAndLinks('testartist')).status).toBe('ok');
-    expect(getProfileWithLinksMock).toHaveBeenCalledTimes(2);
   });
 
-  it('reads authoritative storage without consulting an unavailable shared cache', async () => {
+  it('reads authoritative storage when the shared cache is unavailable', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     delete process.env.PUBLIC_NOAUTH_SMOKE;
-    getProfileWithLinksMock.mockResolvedValueOnce(buildProfileWithLinks());
-    // Any attempted use of this shared cache would fail.
+    getProfileWithLinksMock.mockResolvedValue(buildProfileWithLinks());
+    await mockPublicationAuthority([{ id: 'profile-1', isPublic: true }]);
     const { unstable_cache } = await import('next/cache');
     vi.mocked(unstable_cache).mockImplementationOnce((() => () => {
       throw new Error('cache store unavailable');
@@ -484,14 +498,10 @@ describe('authoritative reads despite shared cache state', () => {
     const result = await loader.getProfileAndLinks('testartist');
 
     expect(result.status).toBe('ok');
-    expect(unstableCacheMock).not.toHaveBeenCalled();
-    expect(getProfileWithLinksMock).toHaveBeenCalledExactlyOnceWith(
-      'testartist',
-      {
-        skipCache: true,
-        throwOnError: true,
-      }
-    );
+    expect(getProfileWithLinksMock).toHaveBeenCalledWith('testartist', {
+      skipCache: true,
+      throwOnError: true,
+    });
   });
 });
 

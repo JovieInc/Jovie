@@ -353,9 +353,10 @@ async function ArtistPageContent({
     getClientTrackingToken(profile.id).token ?? undefined;
 
   const latestRelease = fetchedLatestRelease;
-  const releaseCredits = latestRelease?.id
-    ? await loadPublicReleaseCredits(latestRelease.id).catch(() => [])
-    : [];
+  // Overlaps the batch below instead of adding a serial storage round trip.
+  const releaseCreditsPromise = latestRelease?.id
+    ? loadPublicReleaseCredits(latestRelease.id).catch(() => [])
+    : Promise.resolve([]);
 
   const publicContacts: PublicContact[] = toPublicContacts(
     contacts,
@@ -391,6 +392,7 @@ async function ArtistPageContent({
     entityLinks,
     creditedArtists,
     releaseCollaborators,
+    releaseCredits,
   ] = await Promise.all([
     tourDatesPromise.catch(() => [] as TourDateViewModel[]),
     releasesPromise,
@@ -403,6 +405,7 @@ async function ArtistPageContent({
     entityLinksPromise.catch(() => []),
     creditedArtistsPromise,
     releaseCollaboratorsPromise,
+    releaseCreditsPromise,
   ]);
   const tourDates = [...tourDatesRaw].sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
