@@ -158,6 +158,39 @@ export function onlyWeakensAssertions(files) {
   return weakened;
 }
 
+// Output quality loop (JovieInc/ci canon/OUTPUT-QUALITY-LOOP.md): a PR that
+// changes what users, customers, investors or the public see carries an
+// audience-intent receipt from `jovie output check` / `jovie eval intent`.
+// Warn until scripts/output-quality/policy.json is calibrated and enforcing.
+const USER_FACING =
+  /^(?:apps\/web\/(?:app|components|content|lib\/email\/templates|lib\/chat\/onboarding-script)\/|apps\/web\/data\/\w*Copy\.ts$|apps\/docs\/(?:app|content|components)\/|packages\/ui\/|apps\/ios\/.*View\.swift$)/;
+const NOT_OUTPUT =
+  /(?:\.(?:test|spec|stories)\.[cm]?[jt]sx?$|\/__(?:tests|snapshots|screenshots)__\/|\/legal\/)/;
+const INTENT_RECEIPT =
+  /^(?:Intent-eval: jovie\.intent-eval\/v1 run=\S+ verdict=(?:pass|fail|abstain)|Output-check: jovie\.output-check\/v1 run=\S+ verdict=(?:pass|fail|abstain)|Intent-eval: n\/a\b.{10,})/im;
+
+export function intentEvalMode(
+  read = () =>
+    readFileSync(
+      new URL('./output-quality/policy.json', import.meta.url),
+      'utf8'
+    )
+) {
+  try {
+    return JSON.parse(read()).mode === 'enforce' ? 'enforce' : 'warn';
+  } catch {
+    return 'warn';
+  }
+}
+
+export function intentEvalFinding(paths, body) {
+  const output = paths.filter(
+    path => USER_FACING.test(path) && !NOT_OUTPUT.test(path)
+  );
+  if (!output.length || INTENT_RECEIPT.test(body)) return null;
+  return `intent-eval: this PR changes user-facing output (${[...new Set(output)].slice(0, 3).join(', ')}${output.length > 3 ? ', ...' : ''}) but its body has no audience-intent receipt. Run \`jovie output check <artifact|url> --kind ui --mission "<one line>" --audience "<who>" --fix auto\` and paste its "Output-check:" or "Intent-eval:" line, or write "Intent-eval: n/a - <reason>". Canon: JovieInc/ci canon/OUTPUT-QUALITY-LOOP.md.`;
+}
+
 export function evaluateFleetRules({
   pr,
   files,
@@ -244,6 +277,8 @@ export function evaluateFleetRules({
     warnings.push(
       'blast-radius: describe what could break outside the diff and provide proof.'
     );
+  const intent = intentEvalFinding(paths, body);
+  if (intent) (intentEvalMode() === 'enforce' ? errors : warnings).push(intent);
   const locked = paths.filter(isLockedArea);
   const reference = section(body, 'Locked areas');
   const brain = field(reference, 'GBrain').replace(/`/g, '');
