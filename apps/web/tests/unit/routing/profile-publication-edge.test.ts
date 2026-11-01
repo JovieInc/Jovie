@@ -42,6 +42,9 @@ describe('profile publication gate scope', () => {
     '/dualipa/listen',
     '/dualipa/tour',
     '/%E0%A4%A',
+    '/unfazed',
+    '/Unfazed',
+    '/jovie-screen-fixture',
   ])('never gates %s', path => {
     expect(getGatedProfileHandle(path)).toBeNull();
   });

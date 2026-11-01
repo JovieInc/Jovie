@@ -26,9 +26,21 @@ import { STATIC_TOP_LEVEL_ROUTE_SEGMENTS } from './static-top-level-route-segmen
 export const PROFILE_PUBLICATION_DECISION_PATH = '/api/profile-publication';
 const PROFILE_PUBLICATION_DECISION_TIMEOUT_MS = 2_500;
 
+/**
+ * Handles `app/[username]/page.tsx` renders from a built-in fixture without
+ * reading storage (the reserved `/unfazed` capture profile and the screen-cert
+ * smart-link fixture). There is no publication state to decide for them, and
+ * the gate's storage lookup would 503 them on the capture server's noop DB.
+ */
+const FIXTURE_RENDERED_HANDLES: ReadonlySet<string> = new Set([
+  'unfazed',
+  'jovie-screen-fixture',
+]);
+
 export function isProfilePublicationCandidate(segment: string): boolean {
   const handle = segment.toLowerCase();
   return (
+    !FIXTURE_RENDERED_HANDLES.has(handle) &&
     handle.length >= USERNAME_MIN_LENGTH &&
     handle.length <= USERNAME_MAX_LENGTH &&
     USERNAME_PATTERN.test(handle) &&
