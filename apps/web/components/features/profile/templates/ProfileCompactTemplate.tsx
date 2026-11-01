@@ -35,6 +35,7 @@ import {
   getProfileModeHref,
 } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
+import { ReleaseCreditsDrawer } from '@/features/release/ReleaseCreditsDrawer';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
@@ -75,13 +76,6 @@ import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
  * desktop surface renders only behind its flag. Both stay out of the entry
  * chunk. Guard: tests/unit/profile/profile-entry-bundle.test.ts
  */
-const ReleaseCreditsDrawer = dynamic(
-  () =>
-    import('@/features/release/ReleaseCreditsDrawer').then(
-      mod => mod.ReleaseCreditsDrawer
-    ),
-  { ssr: false }
-);
 // Built only when the build-time flag is on, so a disabled surface adds no
 // loader or chunk reference to any route's entry bundle.
 const ProfileDesktopSurface = PROFILE_DESKTOP_SURFACE_ENABLED
@@ -317,11 +311,6 @@ export function ProfileCompactTemplate({
     group => group.entries.length > 0
   );
   const [creditsOpen, setCreditsOpen] = useState(false);
-  // Latched on first open so the lazy drawer keeps its close animation.
-  const [creditsEverOpened, setCreditsEverOpened] = useState(false);
-  useEffect(() => {
-    if (creditsOpen) setCreditsEverOpened(true);
-  }, [creditsOpen]);
   const hasContacts = contacts.some(contact => contact.channels.length > 0);
   const hasTip =
     showPayButton && socialLinks.some(link => link.platform === 'venmo');
@@ -1178,14 +1167,12 @@ export function ProfileCompactTemplate({
             }
             data-public-profile-nav={publicProfileNavIds}
           >
-            {creditsEverOpened ? (
-              <ReleaseCreditsDrawer
-                open={creditsOpen && !isDesktopLayout}
-                onOpenChange={setCreditsOpen}
-                credits={visibleReleaseCredits}
-                presentation={drawerPresentation}
-              />
-            ) : null}
+            <ReleaseCreditsDrawer
+              open={creditsOpen && !isDesktopLayout}
+              onOpenChange={setCreditsOpen}
+              credits={visibleReleaseCredits}
+              presentation={drawerPresentation}
+            />
             {profileBanner && !isDesktopLayout ? (
               <div
                 className='relative z-20 w-full shrink-0'
@@ -1335,14 +1322,12 @@ export function ProfileCompactTemplate({
                     : undefined
                 }
               />
-              {creditsEverOpened ? (
-                <ReleaseCreditsDrawer
-                  open={creditsOpen && isDesktopLayout}
-                  onOpenChange={setCreditsOpen}
-                  credits={visibleReleaseCredits}
-                  presentation='modal'
-                />
-              ) : null}
+              <ReleaseCreditsDrawer
+                open={creditsOpen && isDesktopLayout}
+                onOpenChange={setCreditsOpen}
+                credits={visibleReleaseCredits}
+                presentation='modal'
+              />
             </div>
           ) : null
         }

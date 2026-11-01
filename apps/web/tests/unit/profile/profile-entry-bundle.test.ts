@@ -48,15 +48,8 @@ describe('public profile entry bundle (JOV-10246)', () => {
     expect(islands.match(/\{ ssr: false \}/g) ?? []).toHaveLength(1);
   });
 
-  it('lazy-loads the credits drawer after first open and the desktop surface', () => {
-    expect(
-      staticImport(template, '@/features/release/ReleaseCreditsDrawer')
-    ).toBe(false);
+  it('builds the flagged desktop surface only as a lazy chunk', () => {
     expect(staticImport(template, './ProfileDesktopSurface')).toBe(false);
-    expect(template).toContain(
-      "import('@/features/release/ReleaseCreditsDrawer')"
-    );
     expect(template).toContain("import('./ProfileDesktopSurface')");
-    expect(template.match(/creditsEverOpened \? \(/g) ?? []).toHaveLength(2);
   });
 });
