@@ -750,11 +750,16 @@ test('a 70-PR sweep with UNKNOWN entries reads in parallel, never sleeps, and st
       return { ...current(number), mergeStateStatus: state };
     },
   });
+  // Overlap is proven by peak concurrency, not wall clock (a loaded runner
+  // blew a 1.4 s bound). The time bound only catches the 600 s retry sleep.
   assert.ok(
-    Date.now() - started < 20 * 70,
-    'reads overlap instead of running serially'
+    Date.now() - started < 60_000,
+    'sweep slept on UNKNOWN instead of reading once more'
   );
-  assert.ok(peak > 1 && peak <= 6, `prefetch concurrency ${peak}`);
+  assert.ok(
+    peak > 1 && peak <= 6,
+    `reads overlap instead of running serially (prefetch concurrency ${peak})`
+  );
   // One prefetch per PR plus one fresh read per UNKNOWN; no retry loop.
   assert.equal(result.reads.length, 70 + 70 - 23);
   const cleanNumbers = roster.map(pr => pr.number).filter(n => n % 3 === 1);
