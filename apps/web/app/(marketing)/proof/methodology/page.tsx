@@ -3,6 +3,7 @@ import { MarketingContainer } from '@/components/marketing';
 import { ProofMethodology } from '@/components/marketing/proof/ProofMethodology';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { marketingOgImage } from '@/data/marketingOgCards';
 import { listProofStats } from '@/lib/proof-stats/registry';
 import { documentTitle } from '@/lib/seo/document-title';
 
@@ -20,6 +21,7 @@ export const metadata: Metadata = {
     description: DESCRIPTION,
     url: PAGE_URL,
     type: 'article',
+    images: [marketingOgImage('default')],
   },
 };
 
