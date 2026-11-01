@@ -162,6 +162,12 @@
       "command": ["node", "scripts/postmortem-review.mjs", "--check"],
       "requires": ["scripts/postmortem-review.mjs"],
       "remediation": "A post-mortem made a failure class recurring: add it to docs/postmortems/failure-class-actions.json with its class-action issue."
+    },
+    {
+      "id": "swift-arch",
+      "command": ["node", "scripts/swift-arch/guard.mjs"],
+      "requires": ["scripts/swift-arch/guard.mjs"],
+      "remediation": "Run `node scripts/swift-arch/guard.mjs` after merging main; shrink the baseline with --write-baseline (never loosen)."
     }
   ],
   "exempt": [
