@@ -10,6 +10,7 @@ import {
   planStaleDraftRollup,
   planSummerConfigRedPulls,
   planSummerReceipts,
+  planSwiftArchDebt,
   planVercelFailure,
   RECEIPT_STALE_MS,
   runRemediationSweep,
@@ -373,6 +374,51 @@ describe('remediation sweep selection', () => {
     });
     expect(loadDeployments).not.toHaveBeenCalled();
     expect(skipped.warnings).toEqual([VERCEL_TOKEN_MISSING_WARNING]);
+  });
+
+  it('files one stable Swift architecture debt issue per rule with debt', async () => {
+    const metrics = {
+      generatedAt: '2026-10-29T00:00:00.000Z',
+      total: 5,
+      byRule: {
+        'main-actor-keychain': 3,
+        'gcd-main-hop': 2,
+        'polling-timer': 0,
+      },
+      topFiles: [
+        { rule: 'main-actor-keychain', file: 'App/A.swift', count: 3 },
+        { rule: 'gcd-main-hop', file: 'App/B.swift', count: 2 },
+      ],
+    };
+    const plans = planSwiftArchDebt(metrics);
+    expect(plans.map(plan => plan.fingerprint)).toEqual([
+      'remediation:swift-arch-debt:main-actor-keychain',
+      'remediation:swift-arch-debt:gcd-main-hop',
+    ]);
+    expect(plans[0].title).toBe(
+      'Swift architecture debt: main-actor-keychain (remediation:swift-arch-debt:main-actor-keychain)'
+    );
+    expect(plans[0].priority).toBe(2);
+    expect(plans[1].priority).toBe(3);
+    expect(plans[0].description).toContain('`App/A.swift`: 3');
+    expect(plans[0].description).toContain('--write-baseline');
+    expect(planSwiftArchDebt(null)).toEqual([]);
+
+    const missing = await runRemediationSweep({
+      mode: 'swift-arch',
+      dryRun: true,
+      upsert: vi.fn(),
+    });
+    expect(missing.warnings).toEqual([
+      'Swift architecture guard loader not wired; not judged',
+    ]);
+    const dry = await runRemediationSweep({
+      mode: 'swift-arch',
+      dryRun: true,
+      loadSwiftArch: async () => metrics,
+      upsert: vi.fn(),
+    });
+    expect(dry.issues).toHaveLength(2);
   });
 
   it('wires the summer-config scan to the existing daily workflow', () => {
