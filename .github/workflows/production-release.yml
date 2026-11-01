@@ -1232,6 +1232,7 @@ jobs:
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
         run: |
           set -euo pipefail
 
@@ -1347,14 +1348,25 @@ jobs:
           local routes ledger split certification blocking warning
           routes='public-profile-listen public-profile-music public-profile-subscribe public-profile-tip public-profile-tour public-profile-releases'
           ledger=''
+          ledger_detail='DOPPLER_TOKEN unset'
+          ledger_source=''
           if [ -n "${DOPPLER_TOKEN:-}" ]; then
-            # Expanded inside the Doppler child shell.
-            # shellcheck disable=SC2016
-            if ! ledger="$(doppler run --project jovie-web --config prd \
-              --only-secrets=CRON_SECRET --no-fallback -- env -u DOPPLER_TOKEN bash -c \
-                '[ -n "${CRON_SECRET:-}" ] && curl -fsS --max-time 20 -H "authorization: Bearer ${CRON_SECRET}" https://jov.ie/api/internal/ovie/golden-path-evidence')"; then
+            # Read the ledger from the exact staged build first: it always
+            # carries the endpoint this release ships, so a production build
+            # that predates the endpoint (405 on 2026-11-01) cannot blank it.
+            # jov.ie is the fallback. Both read the same Redis ledger.
+            for ledger_source in "${deployment_url}/api/internal/ovie/golden-path-evidence" https://jov.ie/api/internal/ovie/golden-path-evidence; do
+              # Expanded inside the Doppler child shell.
+              # shellcheck disable=SC2016
+              if ledger="$(LEDGER_URL="$ledger_source" doppler run --project jovie-web --config prd \
+                --only-secrets=CRON_SECRET --no-fallback -- env -u DOPPLER_TOKEN bash -c \
+                  '[ -n "${CRON_SECRET:-}" ] && curl -fsS --max-time 20 -H "authorization: Bearer ${CRON_SECRET}" -H "x-vercel-protection-bypass: ${PLAYWRIGHT_VERCEL_BYPASS_SECRET:-}" "$LEDGER_URL"' 2>&1)"; then
+                ledger_detail='read ok'
+                break
+              fi
+              ledger_detail="$(printf '%s' "$ledger" | tail -c 200)"
               ledger=''
-            fi
+            done
           fi
           # shellcheck disable=SC2086 # route ids are fixed tokens.
           split="$(printf '%s' "$ledger" | node "${GITHUB_WORKSPACE}/scripts/lib/alias-gate-certified-routes.mjs" $routes)"
@@ -1362,6 +1374,18 @@ jobs:
           blocking="$(printf '%s\n' "$split" | sed -n 's/^blocking=//p')"
           warning="$(printf '%s\n' "$split" | sed -n 's/^warning=//p')"
           echo "Certification ledger: ${certification}; blocking routes: ${blocking:-none}; warning routes: ${warning:-none}"
+          if [ "$certification" != 'present' ]; then
+            # Never silent: an unreadable ledger turns every alias route into a
+            # warning and blinds Summer's golden-path reader. Warn and file a P1;
+            # the release still proceeds.
+            echo "::warning::Golden-path certification ledger ${certification} (${ledger_detail}); every alias route is treated as uncertified. Filing P1."
+            node "${GITHUB_WORKSPACE}/scripts/alias-ledger-unreadable-intake.mjs" \
+              --lane staged-alias --state "$certification" --source "$ledger_source" \
+              --detail "$ledger_detail" \
+              --run-url "${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-JovieInc/Jovie}/actions/runs/${GITHUB_RUN_ID:-}" \
+              --sha "${EXPECTED_COMMIT_SHA:-}" ||
+              echo "Certification-ledger P1 not filed; see the intake output above."
+          fi
           staged_alias_guard() {
             local args=()
             for route in "$@"; do args+=(--route-id "$route"); done
@@ -1374,10 +1398,7 @@ jobs:
             # shellcheck disable=SC2086
             if ! staged_alias_guard $warning; then
               echo "::warning::Exact staged-build public-profile alias budgets missed on uncertified pages (${warning}); warning only until their golden-path surface certifies (JOV-8737)."
-              # shellcheck disable=SC2016
-              doppler run --project jovie-web --config prd \
-                --only-secrets=LINEAR_API_KEY --no-fallback -- env -u DOPPLER_TOKEN \
-                node "${GITHUB_WORKSPACE}/scripts/staged-alias-perf-intake.mjs" \
+              node "${GITHUB_WORKSPACE}/scripts/staged-alias-perf-intake.mjs" \
                   --routes "$warning" \
                   --run-url "${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-JovieInc/Jovie}/actions/runs/${GITHUB_RUN_ID:-}" \
                   --sha "${EXPECTED_COMMIT_SHA:-}" ||
@@ -1934,16 +1955,23 @@ jobs:
         working-directory: apps/web
         env:
           CI: 'true'
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
         run: |
           set -euo pipefail
           routes='public-profile-listen public-profile-music public-profile-subscribe public-profile-tip public-profile-tour public-profile-releases'
           # Certified pages come from the Ovie certification ledger, never a
-          # hand-kept list. An unreadable ledger certifies nothing.
+          # hand-kept list. An unreadable ledger certifies nothing, loudly.
           ledger=''
+          ledger_detail='CRON_SECRET unset'
           if [ -n "${CRON_SECRET:-}" ]; then
-            ledger="$(curl -fsS --max-time 20 \
+            if ledger="$(curl -fsS --max-time 20 \
               -H "authorization: Bearer ${CRON_SECRET}" \
-              https://jov.ie/api/internal/ovie/golden-path-evidence || true)"
+              https://jov.ie/api/internal/ovie/golden-path-evidence 2>&1)"; then
+              ledger_detail='read ok'
+            else
+              ledger_detail="$(printf '%s' "$ledger" | tail -c 200)"
+              ledger=''
+            fi
           fi
           # shellcheck disable=SC2086 # route ids are fixed tokens.
           split="$(printf '%s' "$ledger" | node "${GITHUB_WORKSPACE}/scripts/lib/alias-gate-certified-routes.mjs" $routes)"
@@ -1951,6 +1979,16 @@ jobs:
           blocking="$(printf '%s\n' "$split" | sed -n 's/^blocking=//p')"
           warning="$(printf '%s\n' "$split" | sed -n 's/^warning=//p')"
           echo "Certification ledger: ${certification}; blocking routes: ${blocking:-none}; warning routes: ${warning:-none}"
+          if [ "$certification" != 'present' ]; then
+            echo "::warning::Golden-path certification ledger ${certification} (${ledger_detail}); every alias route is treated as uncertified. Filing P1."
+            node "${GITHUB_WORKSPACE}/scripts/alias-ledger-unreadable-intake.mjs" \
+              --lane production-alias --state "$certification" \
+              --source https://jov.ie/api/internal/ovie/golden-path-evidence \
+              --detail "$ledger_detail" \
+              --run-url "${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-JovieInc/Jovie}/actions/runs/${GITHUB_RUN_ID:-}" \
+              --sha "${GITHUB_SHA:-}" ||
+              echo "Certification-ledger P1 not filed; see the intake output above."
+          fi
           guard() {
             local args=()
             for route in "$@"; do args+=(--route-id "$route"); done
