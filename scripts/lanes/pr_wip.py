@@ -74,6 +74,13 @@ def _percentile(values: list[float], q: float) -> float | None:
     return ordered[max(0, math.ceil(q * len(ordered)) - 1)]
 
 
+def last_activity(pr: dict) -> float | None:
+    """Last push (head commit time) or creation, whichever is later. Not `updatedAt`: lane
+    label churn touches every open PR, which made all of them look fresh (2026-11-01)."""
+    times = [t for t in (_epoch(pr.get("lastCommitAt")), _epoch(pr.get("createdAt"))) if t is not None]
+    return max(times) if times else _epoch(pr.get("updatedAt"))
+
+
 def owned(prs: list[dict], producer: str) -> list[dict]:
     """A producer's WIP: its open PRs, minus human-held ones (not the producer's to land)."""
     return [pr for pr in prs if producer_of(pr.get("headRefName")) == producer and not held(pr)]
@@ -97,7 +104,7 @@ def live_producers(prs: list[dict], now: float, policy: dict) -> set[str]:
     """A producer is live when any of its open PRs moved inside liveWindowHours."""
     window = float(policy.get("liveWindowHours", 48)) * 3600
     return {producer_of(pr.get("headRefName")) for pr in prs
-            if (moved := _epoch(pr.get("updatedAt"))) is not None and now - moved <= window}
+            if (moved := last_activity(pr)) is not None and now - moved <= window}
 
 
 def expiry_candidates(prs: list[dict], now: float, policy: dict | None = None, *,
@@ -113,16 +120,16 @@ def expiry_candidates(prs: list[dict], now: float, policy: dict | None = None, *
     out = []
     for pr in prs:
         producer = producer_of(pr.get("headRefName"))
-        moved = _epoch(pr.get("updatedAt"))
+        moved = last_activity(pr)
         if moved is None or held(pr) or cap_for(producer, policy) is None or pr.get("isInMergeQueue"):
             continue
         idle_days = (now - moved) / 86400
         if producer not in live and idle_days > float(rule.get("ownerlessIdleDays", 7)):
-            out.append((pr, f"no live owner: `{producer}/` has no PR activity in "
+            out.append((pr, f"no live owner: `{producer}/` has pushed no PR in "
                             f"{policy.get('liveWindowHours', 48)}h and this PR is idle {idle_days:.0f} days"))
         elif idle_days > float(rule.get("anyIdleDays", 21)):
             out.append((pr, f"idle {idle_days:.0f} days (over the {rule.get('anyIdleDays', 21)}-day limit)"))
-    return sorted(out, key=lambda row: _epoch(row[0].get("updatedAt")) or 0)
+    return sorted(out, key=lambda row: last_activity(row[0]) or 0)
 
 
 def census(prs: list[dict], now: float, policy: dict | None = None) -> dict:
@@ -155,7 +162,7 @@ EXPIRY_COMMENT = ("🤖 pr-wip: closing this idle PR ({why}). Policy: `scripts/l
 OPEN_PRS_QUERY = ("query($endCursor:String){repository(owner:\"JovieInc\",name:\"Jovie\"){pullRequests("
                   "states:OPEN,first:100,after:$endCursor){pageInfo{hasNextPage endCursor} nodes{number "
                   "headRefName isDraft mergeStateStatus isInMergeQueue createdAt updatedAt "
-                  "labels(first:20){nodes{name}}}}}}")
+                  "labels(first:20){nodes{name}} commits(last:1){nodes{commit{committedDate}}}}}}}")
 
 
 def fetch_open_prs(run_gh=None) -> list[dict] | None:
@@ -172,6 +179,8 @@ def fetch_open_prs(run_gh=None) -> list[dict] | None:
         return None
     for row in rows:
         row["labels"] = (row.get("labels") or {}).get("nodes") or []
+        commits = (row.pop("commits", None) or {}).get("nodes") or [{}]
+        row["lastCommitAt"] = (commits[0].get("commit") or {}).get("committedDate")
     return rows
 
 

@@ -27,8 +27,9 @@ def iso(epoch: float) -> str:
 
 
 def pr(number, branch, *, idle_days=0.0, age_days=1.0, labels=(), state="BLOCKED", draft=False, queued=False):
-    return {"number": number, "headRefName": branch, "updatedAt": iso(NOW - idle_days * DAY),
-            "createdAt": iso(NOW - age_days * DAY), "labels": [{"name": name} for name in labels],
+    return {"number": number, "headRefName": branch, "updatedAt": iso(NOW - 60),
+            "lastCommitAt": iso(NOW - idle_days * DAY),
+            "createdAt": iso(NOW - max(age_days, idle_days) * DAY), "labels": [{"name": name} for name in labels],
             "mergeStateStatus": state, "isDraft": draft, "isInMergeQueue": queued}
 
 
@@ -97,6 +98,12 @@ class Expiry(unittest.TestCase):
         self.assertEqual([row[0]["number"] for row in found], [4, 1], "oldest first")
         self.assertIn("idle 30 days", found[0][1])
         self.assertIn("no live owner", found[1][1])
+
+    def test_label_churn_does_not_make_an_idle_pr_look_live(self):
+        policy = {**POLICY, "expire": {**POLICY["expire"], "enabled": True}}
+        stale = pr(1, "ui/old", idle_days=9, age_days=12)
+        self.assertEqual(stale["updatedAt"], iso(NOW - 60), "fixture: a bot touched it a minute ago")
+        self.assertEqual([row[0]["number"] for row in pr_wip.expiry_candidates([stale], NOW, policy)], [1])
 
     def test_expire_respects_the_per_tick_cap_and_keeps_failed_closes_open(self):
         policy = {**POLICY, "expire": {**POLICY["expire"], "enabled": True, "maxClosesPerTick": 2}}
