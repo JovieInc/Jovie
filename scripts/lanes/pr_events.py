@@ -1045,7 +1045,8 @@ def with_red_section(body: str, block: str) -> str:
 
 
 def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None,
-                         locking_pr: int | None = None, win_section: str | None = None) -> str:
+                         locking_pr: int | None = None, premise_check: dict | None = None,
+                         win_section: str | None = None) -> str:
     """Complete repair metadata without replacing existing evidence or customer decisions.
 
     The caller chooses the customer outcome and supplies any locking PR provenance;
@@ -1053,6 +1054,11 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
     Measured wins must be supplied by the caller, never inferred from a red check.
     The canonical Fleet/changelog guards still validate the resulting body.
     """
+    premise_fields = {"assumption": "Assumption", "falsifying_test": "Falsifying test", "result": "Result"}
+    if premise_check is not None and (not isinstance(premise_check, dict) or any(
+            not isinstance(premise_check.get(key), str) or not premise_check[key].strip()
+            or any(char in premise_check[key] for char in "\r\n") for key in premise_fields)):
+        raise ValueError("premise check requires single-line assumption, falsifying_test and result evidence")
     updated = body
     if not red_section_complete(updated):
         block = red_before_green_block(pr, excerpt)
@@ -1073,6 +1079,35 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
         visible = re.sub(r"<!--[\s\S]*?-->", "", updated)
         if not re.search(r"^#{1,6}\s+Locked areas\s*$", visible, re.I | re.M):
             updated = updated.rstrip("\n") + f"\n\n## Locked areas\n\nLocking PR: #{locking_pr}\n"
+    if premise_check is not None:
+        lines = updated.split("\n")
+        visible = re.sub(r"<!--[\s\S]*?-->", lambda m: "\n" * m[0].count("\n"), updated).split("\n")
+        headings, fenced = [], False
+        for index, line in enumerate(visible):
+            if re.match(r"^\s*(?:```|~~~)", line):
+                fenced = not fenced
+            elif not fenced and ANY_HEADING.match(line):
+                headings.append(index)
+        start = next((i for i in headings if re.fullmatch(r"#{1,6}\s+Premise check\s*", visible[i], re.I)), None)
+        if start is None:
+            fields = "\n".join(f"- {label}: {premise_check[key].strip()}" for key, label in premise_fields.items())
+            updated = updated.rstrip("\n") + f"\n\n## Premise check\n\n{fields}\n"
+        else:
+            end = next((i for i in headings if i > start), len(lines))
+            additions = []
+            for key, label in premise_fields.items():
+                pattern = re.compile(rf"^[ \t]*(?:-[ \t]*)?{label}:[ \t]*(.*)$", re.I)
+                found = next(((i, pattern.match(visible[i])) for i in range(start + 1, end)
+                              if pattern.match(visible[i])), None)
+                value = found[1][1].strip() if found else ""
+                if len(value) > 2 and not re.fullmatch(r"(?:todo|tbd|n/?a|none|not applicable|\.\.\.|<[^>]*>)\s*[.!]?", value, re.I):
+                    continue
+                replacement = f"- {label}: {premise_check[key].strip()}"
+                if found:
+                    lines[found[0]] = replacement
+                else:
+                    additions.append(replacement)
+            updated = "\n".join(lines[:end] + additions + lines[end:])
     if win_section is not None and win_section != "":
         if not isinstance(win_section, str) or not re.match(r"\A## Win\s*\n", win_section):
             raise ValueError("measured win requires a complete ## Win section")
@@ -1092,16 +1127,19 @@ def api_gh(args, **_):
 
 
 def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_decision: dict | None = None,
-                            locking_pr: int | None = None, win_section: str | None = None) -> bool:
+                            locking_pr: int | None = None, premise_check: dict | None = None,
+                            win_section: str | None = None) -> bool:
     """Complete repair evidence and an optional caller-selected customer decision."""
     if not isinstance(pr.get("number"), int) or (
-            customer_decision is None and locking_pr is None and win_section is None and red_before_green_block(pr, excerpt) is None):
+            customer_decision is None and locking_pr is None and premise_check is None
+            and win_section is None and red_before_green_block(pr, excerpt) is None):
         return False
     viewed = sh(["pr", "view", str(pr["number"]), "--repo", REPO, "--json", "body", "--jq", ".body"])
     if viewed.returncode != 0:
         return False
     body = viewed.stdout or ""
-    updated = repair_evidence_body(pr, body, excerpt, customer_decision=customer_decision, locking_pr=locking_pr,
+    updated = repair_evidence_body(pr, body, excerpt, customer_decision=customer_decision,
+                                   locking_pr=locking_pr, premise_check=premise_check,
                                    win_section=win_section)
     if updated == body:
         return False
