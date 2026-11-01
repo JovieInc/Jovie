@@ -349,7 +349,11 @@ export async function loadDriftPlans({
 
 const ROOT = new URL('..', import.meta.url).pathname;
 
-/** Summer's proof-stat feed (stats, metrics, events) from production. */
+/**
+ * Summer's proof-stat feed (stats, metrics, events) from production.
+ * @param {{ env?: Record<string, string | undefined>, fetchImpl?: (url: string, init: { headers: Record<string, string>, signal?: AbortSignal }) => Promise<any> }} [options]
+ * @returns {Promise<any>}
+ */
 export async function loadProofFeed({
   env = process.env,
   fetchImpl = fetch,
@@ -370,7 +374,10 @@ export async function loadProofFeed({
   return res.json();
 }
 
-/** proof-ratchets.json from the latest successful Public Profile Benchmark run. */
+/**
+ * proof-ratchets.json from the latest successful Public Profile Benchmark run.
+ * @param {{ ghRunner?: (args: readonly string[]) => Promise<{ code: number, stdout: string, stderr: string }>, dir?: string }} [options]
+ */
 export async function loadProofRatchets({ ghRunner = runGh, dir } = {}) {
   const repo = process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
   const list = await ghRunner(
