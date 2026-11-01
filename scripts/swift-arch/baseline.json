@@ -1,0 +1,72 @@
+{
+  "schema": "jovie.swift-arch-baseline/v1",
+  "config": {
+    "repo": "JovieInc/Jovie",
+    "roots": [
+      "apps/ios/Jovie",
+      "apps/ios/Packages/JovieKit/Sources",
+      "apps/ios/JovieMac",
+      "apps/macos/MenuMonitor/Sources"
+    ],
+    "projects": [
+      "apps/ios/Jovie.xcodeproj/project.pbxproj",
+      "apps/ios/JovieMac.xcodeproj/project.pbxproj",
+      "apps/ios/Packages/JovieKit/Package.swift",
+      "apps/macos/MenuMonitor/Package.swift"
+    ],
+    "extraMainActorCalls": [
+      "\\bNativeSessionTokenStore\\.(?:load|isCurrent|ownedRequestAuthorization|requestAuthorization|captureSessionContext|refresh|commit)\\("
+    ]
+  },
+  "counts": {
+    "combine-observation-wrapper": {
+      "apps/ios/Jovie/App/JovieApp.swift": 1,
+      "apps/ios/Jovie/App/LiveRootContainer.swift": 1,
+      "apps/ios/Jovie/Features/Auth/AuthScreen.swift": 1,
+      "apps/ios/Jovie/Features/Auth/MobileAuthCoordinator.swift": 2,
+      "apps/ios/Jovie/Features/Dashboard/PublicProfileBrowserView.swift": 5,
+      "apps/macos/MenuMonitor/Sources/MenuMonitor/MenuMonitorApp.swift": 2,
+      "apps/macos/MenuMonitor/Sources/MenuMonitor/ShippingStatusStore.swift": 7
+    },
+    "gcd-main-hop": {
+      "apps/ios/Jovie/Features/AppShell/AppShellView.swift": 2
+    },
+    "main-actor-blocking-call": {
+      "apps/ios/Jovie/App/AppState.swift": 1,
+      "apps/ios/Jovie/App/JovieApp.swift": 5,
+      "apps/ios/Jovie/App/LiveRootContainer.swift": 4,
+      "apps/ios/Jovie/Core/ChatRepository.swift": 1,
+      "apps/ios/Jovie/Features/Auth/MobileAuthCoordinator.swift": 1
+    },
+    "main-actor-json-codec": {
+      "apps/ios/Jovie/App/MobileAuthReturn.swift": 2,
+      "apps/ios/Packages/JovieKit/Sources/JovieKit/AppReviewPolicy.swift": 2
+    },
+    "main-actor-sync-io": {
+      "apps/ios/Jovie/Features/Teleprompter/TeleprompterCaptureController.swift": 1
+    },
+    "observable-object-type": {
+      "apps/ios/Jovie/Features/Auth/MobileAuthCoordinator.swift": 1,
+      "apps/ios/Jovie/Features/Dashboard/PublicProfileBrowserView.swift": 1,
+      "apps/macos/MenuMonitor/Sources/MenuMonitor/ShippingStatusStore.swift": 1
+    },
+    "per-call-formatter-or-regex": {
+      "apps/ios/Jovie/Core/ChatRepository.swift": 3,
+      "apps/ios/Jovie/Core/MobileActionLoopInboxResponse.swift": 1,
+      "apps/ios/Jovie/Core/MobileChatContentParser.swift": 6,
+      "apps/ios/Jovie/Core/MobileChatMerchParsing.swift": 1,
+      "apps/ios/Jovie/Core/Observability/ObservabilityReportBuilder.swift": 1,
+      "apps/macos/MenuMonitor/Sources/MenuMonitor/ShippingStatusStore.swift": 1
+    },
+    "polling-timer": {
+      "apps/ios/Jovie/Features/Teleprompter/TeleprompterViewModel.swift": 1,
+      "apps/macos/MenuMonitor/Sources/MenuMonitor/ShippingStatusStore.swift": 1
+    },
+    "strict-concurrency-not-complete": {
+      "apps/ios/Jovie.xcodeproj/project.pbxproj": 8,
+      "apps/ios/JovieMac.xcodeproj/project.pbxproj": 6,
+      "apps/ios/Packages/JovieKit/Package.swift": 1,
+      "apps/macos/MenuMonitor/Package.swift": 1
+    }
+  }
+}

@@ -20,6 +20,7 @@ import { COMMANDS, type CommandSpec, findCommand } from './commands.js';
 import { installSkill } from './init.js';
 import { serveMcp } from './mcp.js';
 import {
+  MESH_BOOLEAN_FLAG_NAMES,
   MESH_FLAG_NAMES,
   MESH_USAGE,
   type MeshDependencies,
@@ -283,6 +284,12 @@ function parseCliArgs(argv: readonly string[]): {
       json: { type: 'boolean' },
       version: { type: 'boolean', short: 'v' },
       ...Object.fromEntries(
+        MESH_BOOLEAN_FLAG_NAMES.map(name => [
+          name,
+          { type: 'boolean' as const },
+        ])
+      ),
+      ...Object.fromEntries(
         [...COMMAND_FLAG_NAMES, ...MESH_FLAG_NAMES].map(name => [
           name,
           { type: 'string' as const },
@@ -313,12 +320,14 @@ function parseCliArgs(argv: readonly string[]): {
           name => [name, String(values[name])]
         )
       ),
-      meshFlags: Object.fromEntries(
-        MESH_FLAG_NAMES.filter(name => values[name] !== undefined).map(name => [
-          name,
-          String(values[name]),
-        ])
-      ),
+      meshFlags: Object.fromEntries([
+        ...MESH_FLAG_NAMES.filter(name => values[name] !== undefined).map(
+          name => [name, String(values[name])]
+        ),
+        ...MESH_BOOLEAN_FLAG_NAMES.filter(name => values[name] === true).map(
+          name => [name, 'true']
+        ),
+      ]),
       dir: values.dir,
       fleet: values.fleet,
       full: values.full,
@@ -348,7 +357,11 @@ async function execute(
   }
   if (first === 'mesh') {
     // Shared names (--kind) parse into both sets; only foreign ones are stray.
-    if (values.full || values.dir || strayFlags(values.flags, MESH_FLAG_NAMES))
+    if (
+      values.full ||
+      values.dir ||
+      strayFlags(values.flags, [...MESH_FLAG_NAMES, ...MESH_BOOLEAN_FLAG_NAMES])
+    )
       throw new UsageError('Unsupported option for mesh.');
     const watching = positionals[1] === 'watch';
     const result = await runMesh(

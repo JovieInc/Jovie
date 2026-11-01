@@ -155,7 +155,7 @@ rules:
       # GITHUB_TOKEN quota, so change
       # this file and the live ruleset together; lower live values remain
       # supported for rollback.
-      max_entries_to_build: 8
+      max_entries_to_build: 4
       min_entries_to_merge_wait_minutes: 0
       # 30 minutes (live ruleset readback 2026-10-29): merge-group CI p95 is
       # ~24 min end to end; a stuck check ejects after 30 minutes instead of

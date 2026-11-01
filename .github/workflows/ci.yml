@@ -7854,13 +7854,45 @@ jobs:
   # Storybook a11y evidence lives exclusively in the scheduled visual-a11y.yml
   # storybook-a11y lane; the duplicate manual ci-storybook-a11y job was removed
   # (JOV-4326) so the evidence has a single owner.
+  ci-slop-guard:
+    name: Slop Guard
+    # Company anti-slop ratchets (JOV-9975). Policy, tool versions and tool configs live in
+    # JovieInc/ci (policy/JovieInc__Jovie/); this repo owns only config/slop-guard/baseline.json,
+    # which may only shrink. Feeds PR Ready, so a red guard blocks the merge.
+    needs: [ci-path-changes]
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    env:
+      HAS_BOT_KEY: ${{ secrets.JOVIE_BOT_PRIVATE_KEY != '' && secrets.JOVIE_BOT_APP_ID != '' && github.event.pull_request.head.repo.full_name == github.repository }}
+    steps:
+      - *shallow-checkout
+      - uses: ./.github/actions/setup-node-pnpm
+      # Optional: with the jovie-bot App secrets, fixed debt lowers the baseline automatically.
+      # Without them (or on forks) auto-shrink is skipped and the guard stays warn-only for that part.
+      - name: Mint jovie-bot token
+        id: bot
+        if: env.HAS_BOT_KEY == 'true'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ secrets.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+      - uses: JovieInc/ci/actions/slop-guard@dc568f8b92fd8b3681e2f3c56b39a9bda5700d0d # JovieInc/ci#12
+        with:
+          auto-shrink: ${{ steps.bot.outputs.token != '' }}
+          token: ${{ steps.bot.outputs.token || github.token }}
+
   ci-pr-ready:
     name: ${{ github.event_name == 'pull_request' && 'PR Ready' || 'PR Ready (source inactive)' }}
     # The source aggregate stays deterministic: exact-head V8 coverage runs in
     # parallel with the fast lanes, while build/layout integration stays on the
     # merge-group head. Migration Guard, Fork PR Gate, and PR Size Guard remain
     # separately required ruleset contexts.
-    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare]
+    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare, ci-slop-guard]
     if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -7875,6 +7907,7 @@ jobs:
           SECRET_SCAN_RESULT="${{ needs.ci-secret-scan.result }}"
           GOLDEN_PATH_LOCK_RESULT="${{ needs.ci-golden-path-lock.result }}"
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
+          SLOP_RESULT="${{ needs.ci-slop-guard.result }}"
           COVERAGE_RESULT="${{ needs.ci-exact-head-coverage.result }}"
           RISK_LEVEL="${{ needs.ci-risk-classifier.outputs.risk_level }}"
           RISK_RULES="${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}"
@@ -7896,6 +7929,7 @@ jobs:
             echo "| Exact-head Coverage | $COVERAGE_RESULT | \`pnpm --filter @jovie/web test:coverage && node scripts/check-changed-test-coverage.mjs --base <base-sha> --head <head-sha>\` |"
             echo "| Secret Scan | $SECRET_SCAN_RESULT | \`./scripts/security/scan-secrets.sh ci-pr origin/main\` |"
             echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT | \`node scripts/golden-path-lock.mjs merge-gate\` |"
+            echo "| Slop Guard (size, pass-through, dead code, duplication) | $SLOP_RESULT | \`node ../ci/actions/slop-guard/slop-guard.mjs --policy <ci>/policy/JovieInc__Jovie/policy.json\` |"
             echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
             echo "| Visual Snapshot Compare (homepage + marketing DOM PRs) | $VISUAL_COMPARE_RESULT | \`node scripts/visual-snapshot-compare.mjs compare\` |"
             echo
@@ -7917,6 +7951,10 @@ jobs:
           fi
           if [[ "$RISK_RESULT" != "success" ]]; then
             echo "❌ CI risk classifier did not pass (result: $RISK_RESULT)"
+            exit 1
+          fi
+          if [[ "$SLOP_RESULT" != "success" ]]; then
+            echo "❌ Slop Guard did not pass (result: $SLOP_RESULT); see the job log for the offender and its budget"
             exit 1
           fi
 

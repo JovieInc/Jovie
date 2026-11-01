@@ -17,6 +17,7 @@
  *     [--title t] [--no-coverage] [--no-typecheck] [--thorough] [--no-write]
  *     [--hook] [--list] [--json]
  *
+ *   --fast      static guards only (= --no-typecheck --no-coverage)
  *   --hook      pre-push mode: honours JOVIE_PREFLIGHT_CHANGED=0, never needs a PR
  *   --thorough  also run the heavy guards deferred by default
  *   --no-write  check generators instead of writing their output
@@ -153,7 +154,10 @@ export function parseArgs(argv) {
     else if (f === '--no-coverage') a.coverage = false;
     else if (f === '--no-typecheck') a.typecheck = false;
     else if (f === '--thorough') a.thorough = true;
-    else if (f === '--no-write') a.write = false;
+    else if (f === '--fast') {
+      a.coverage = false;
+      a.typecheck = false;
+    } else if (f === '--no-write') a.write = false;
     else if (f === '--hook') a.hook = true;
     else if (f === '--list') a.list = true;
     else if (f === '--json') a.json = true;
@@ -230,6 +234,19 @@ export function changedFiles(cwd, base) {
         patch: '',
       });
   return { mergeBase: mb, files: rows };
+}
+
+/** Run changed invariant contracts locally even when the full suite is deferred. */
+export function invariantTestFiles(files, repo) {
+  const tests = new Set();
+  for (const file of files) {
+    for (const source of [file.filename, file.previous_filename]) {
+      if (!/^scripts\/invariants\/.+\.mjs$/.test(source ?? '')) continue;
+      const candidate = source.replace(/(?:\.test)?\.mjs$/, '.test.mjs');
+      if (existsSync(path.join(repo, candidate))) tests.add(candidate);
+    }
+  }
+  return [...tests].sort();
 }
 
 /** GitHub reads go through the shared budgeted client (external-apis rule). */
@@ -352,8 +369,11 @@ function biomeTargets(files) {
 export function typecheckTargets(files, cwd) {
   const out = new Set();
   for (const f of files) {
-    if (f.status === 'removed' || !/\.(?:tsx?|mts|cts)$/.test(f.filename))
-      continue;
+    // scripts/ is checkJs (typecheck:scripts), so .mjs/.js count there.
+    const ext = /^scripts\//.test(f.filename)
+      ? /\.(?:tsx?|mts|cts|mjs|js)$/
+      : /\.(?:tsx?|mts|cts)$/;
+    if (f.status === 'removed' || !ext.test(f.filename)) continue;
     const isTest = /\.(?:test|spec)\.[^/]+$|\/tests?\//.test(f.filename);
     const web = f.filename.startsWith('apps/web/');
     if (web) {
@@ -487,66 +507,28 @@ export async function main({
     );
   }
 
+  const invariantTests = invariantTestFiles(files, cwd);
+  if (invariantTests.length)
+    cmd(
+      'invariant-tests',
+      `changed invariant contracts (${invariantTests.length} files)`,
+      `node --test ${invariantTests.map(f => `'${f.replaceAll("'", "'\\''")}'`).join(' ')}`
+    );
+
   const any = re => paths.some(p => re.test(p));
-  if (any(/^\.github\/(?:workflows|actions)\//)) {
-    cmd(
-      'wf:refs',
-      'workflow references',
-      'node scripts/verify-workflow-references.mjs'
-    );
-    cmd(
-      'wf:budget',
-      'workflow expression budget',
-      `node scripts/workflow-expression-budget.mjs --ref HEAD --merge-with origin/${args.base}`
-    );
-    cmd(
-      'wf:token-scope',
-      'workflow token scope',
-      'node scripts/workflow-token-scope.mjs'
-    );
-    cmd(
-      'wf:token-budget',
-      'workflow github-token budget',
-      'node scripts/workflow-token-budget-guard.mjs'
-    );
+  // Source Validation guards come from one manifest (see
+  // scripts/lib/source-validation-manifest.mjs); a test keeps it equal to the workflow.
+  const manifest = await import(
+    pathToFileURL(path.join(cwd, 'scripts/lib/source-validation-manifest.mjs'))
+      .href
+  );
+  for (const g of manifest.selectManifestGuards(paths, args.base)) {
+    if (g.heavy && !args.thorough) {
+      deferred.push(g.id);
+      continue;
+    }
+    cmd(g.id, g.name, g.command, g.phase ?? 1);
   }
-  if (any(/^(?:\.github\/workflows\/|canon\/|scripts\/ownership-registry)/))
-    cmd(
-      'ownership',
-      'ownership registry',
-      'node scripts/ownership-registry.mjs --report',
-      1
-    );
-  // One source of truth per fact (canon/SOURCES_OF_TRUTH.md): the map must stay
-  // sound whenever it, the rule or an owner file changes.
-  if (
-    any(
-      /^(?:canon\/(?:sources-of-truth\.json|SOURCES_OF_TRUTH\.md)|\.claude\/rules\/source-of-truth\.md|scripts\/(?:lib\/)?sources-of-truth|apps\/web\/lib\/(?:config\/plan-prices|entitlements\/registry|analytics\/data-retention)|ops\/registry\/)/
-    )
-  )
-    cmd(
-      'sources-of-truth',
-      'sources-of-truth map',
-      'node scripts/sources-of-truth.mjs'
-    );
-  if (any(/^apps\/(?:web|docs)\/(?:app|components|data|content|lib)\//))
-    cmd(
-      'duplicate-literals',
-      'no copied owner values (prices, names, retention, limits)',
-      'node scripts/invariants/duplicate-literals.mjs'
-    );
-  if (any(/(?:^|\/)package\.json$|pnpm-lock\.yaml$/))
-    cmd(
-      'lockfile',
-      'lockfile specifiers',
-      'node scripts/lockfile-specifier-preflight.mjs'
-    );
-  if (any(/^(?:CLAUDE\.md|AGENTS\.md|\.claude\/|docs\/agent-context|canon\/)/))
-    cmd(
-      'agent-context',
-      'agent-context size and contracts',
-      'node --run agent-context:check'
-    );
 
   const bio = biomeTargets(files);
   if (bio.length)

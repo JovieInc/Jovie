@@ -21,6 +21,21 @@ schedule, but workflow enablement is an explicit operational step; do not rely
 on it as continuous protection until its enabled state and Production secrets
 have been verified.
 
+### Spend guard (added 2026-10-30)
+
+`spend-guard.yml` runs hourly with a read-only Vercel token and `scripts/spend-guard.mjs`:
+it forecasts the cycle's spend from the trailing 7 complete days, alerts at 50/75/90 percent of
+the team budget or when the projected pause date is under 7 days away, flags per-project cost
+(or builds per hour) above 3x the 7-day baseline with the top resource named, and audits every
+project against `ops/registry/vercel-projects.json` (ignored-build policy). Alerts go to Slack and
+the remediation intake (`vercel-spend-guard` fingerprint), which routes to Summer. Allowed
+auto-remediation is limited to reversible actions (set an ignored-build command, report a
+missing one; throttling branch automation and pausing non-critical crons are planned, not
+applied); budgets are never raised. `scripts/vercel-log-errors.mjs` polls `vercel logs` (no log
+drain, no paid ingestion), clusters by signature, and files new or rising signatures and route
+spikes. `workers/prod-liveness` probes jov.ie and summer.jov.ie every minute from Cloudflare.
+Vercel's own budget webhook (`POST /summer/v1/events/vercel` on Summer) is the event-driven path.
+
 ### Production-continuity policy
 
 `production-continuity.yml` probes both `jov.ie` and `summer.jov.ie` outside

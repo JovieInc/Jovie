@@ -4,6 +4,11 @@ import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import {
+  DECISION_CARD_COPY_CONTRACT,
+  decisionCardCopyErrors,
+  lintDecisionCardCopy,
+} from '@/lib/ovie/decision-card-copy';
+import {
   buildHumanServiceCaseBinding,
   buildHumanServiceOutcomeReceipt,
   evaluateHumanServiceRequest,
@@ -209,6 +214,20 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (parsed.data.kind === 'spend') {
     return json({ error: 'spend_preflight_required' }, 422);
   }
+  // Cards are born clean: copy errors are refused with the reasons so the
+  // writer can fix and refile; warnings ride along on the receipt.
+  const copy = lintDecisionCardCopy(parsed.data);
+  const copyErrors = decisionCardCopyErrors(copy);
+  if (copyErrors.length > 0) {
+    return json(
+      {
+        error: 'card_copy_lint',
+        contract: DECISION_CARD_COPY_CONTRACT,
+        violations: copyErrors,
+      },
+      422
+    );
+  }
 
   try {
     const result = await submitSummerCard(parsed.data);
@@ -216,7 +235,9 @@ export async function POST(request: Request): Promise<NextResponse> {
       return json({ error: 'idempotency_key_conflict' }, 409);
     }
     return json(
-      { card: result.card },
+      copy.length > 0
+        ? { card: result.card, copyWarnings: copy }
+        : { card: result.card },
       result.outcome === 'created' ? 201 : 200
     );
   } catch (error) {

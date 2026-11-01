@@ -957,13 +957,33 @@ JOB_URL = re.compile(r"^(https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\
 RED_RUN_URL = re.compile(r"https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\d*(?:/attempts/[1-9]\d*)?")
 
 
+def red_section_bounds(lines: list[str], heading=RED_HEADING) -> tuple[int, int] | None:
+    """Match Fleet's section boundaries: headings inside code fences are log text."""
+    # Ignore hidden Markdown while retaining source line indexes for replacement.
+    visible = re.sub(r"<!--[\s\S]*?-->", lambda match: "\n" * match.group().count("\n"), "\n".join(lines))
+    fenced = False
+    start = None
+    for index, line in enumerate(visible.split("\n")):
+        if re.match(r"^\s*(?:```|~~~)", line):
+            fenced = not fenced
+            continue
+        if fenced:
+            continue
+        if start is None:
+            if heading.match(line.strip()):
+                start = index
+        elif ANY_HEADING.match(line):
+            return start, index
+    return (start, len(lines)) if start is not None else None
+
+
 def red_section_complete(body: str) -> bool:
     """Mirror of scripts/pr-fleet-rules.mjs: a Failing command plus a red-output fence or run URL."""
     lines = re.sub(r"<!--[\s\S]*?-->", "", body or "").split("\n")
-    start = next((i for i, line in enumerate(lines) if RED_HEADING.match(line.strip())), None)
-    if start is None:
+    bounds = red_section_bounds(lines)
+    if bounds is None:
         return False
-    end = next((i for i in range(start + 1, len(lines)) if ANY_HEADING.match(lines[i])), len(lines))
+    start, end = bounds
     section = "\n".join(lines[start + 1:end])
     command = re.search(r"^\s*(?:-\s*)?Failing command:\s*(.+)$", section, re.I | re.M)
     run_url = re.search(r"^\s*(?:-\s*)?Failing run \(before fix\):\s*`?(https://\S+?)`?\s*$", section, re.I | re.M)
@@ -1017,19 +1037,20 @@ def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
 def with_red_section(body: str, block: str) -> str:
     """Replace an empty/placeholder Red-before-green section with the block, or append one."""
     lines = (body or "").split("\n")
-    start = next((i for i, line in enumerate(lines) if RED_HEADING.match(line.strip())), None)
-    if start is None:
+    bounds = red_section_bounds(lines)
+    if bounds is None:
         return (body or "").rstrip("\n") + "\n\n" + block + "\n"
-    end = next((i for i in range(start + 1, len(lines)) if ANY_HEADING.match(lines[i])), len(lines))
+    start, end = bounds
     return "\n".join(lines[:start] + block.split("\n") + [""] + lines[end:])
 
 
 def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None,
-                         locking_pr: int | None = None) -> str:
+                         locking_pr: int | None = None, win_section: str | None = None) -> str:
     """Complete repair metadata without replacing existing evidence or customer decisions.
 
     The caller chooses the customer outcome and supplies any locking PR provenance;
     never infer either from a failed check. Existing locked-area decisions are preserved.
+    Measured wins must be supplied by the caller, never inferred from a red check.
     The canonical Fleet/changelog guards still validate the resulting body.
     """
     updated = body
@@ -1052,6 +1073,11 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
         visible = re.sub(r"<!--[\s\S]*?-->", "", updated)
         if not re.search(r"^#{1,6}\s+Locked areas\s*$", visible, re.I | re.M):
             updated = updated.rstrip("\n") + f"\n\n## Locked areas\n\nLocking PR: #{locking_pr}\n"
+    if win_section is not None and win_section != "":
+        if not isinstance(win_section, str) or not re.match(r"\A## Win\s*\n", win_section):
+            raise ValueError("measured win requires a complete ## Win section")
+        if red_section_bounds(updated.split("\n"), re.compile(r"^#{2,3}\s*Win\s*$", re.I)) is None:
+            updated = updated.rstrip("\n") + "\n\n" + win_section.rstrip("\n") + "\n"
     return updated
 
 
@@ -1066,16 +1092,17 @@ def api_gh(args, **_):
 
 
 def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_decision: dict | None = None,
-                            locking_pr: int | None = None) -> bool:
+                            locking_pr: int | None = None, win_section: str | None = None) -> bool:
     """Complete repair evidence and an optional caller-selected customer decision."""
     if not isinstance(pr.get("number"), int) or (
-            customer_decision is None and locking_pr is None and red_before_green_block(pr, excerpt) is None):
+            customer_decision is None and locking_pr is None and win_section is None and red_before_green_block(pr, excerpt) is None):
         return False
     viewed = sh(["pr", "view", str(pr["number"]), "--repo", REPO, "--json", "body", "--jq", ".body"])
     if viewed.returncode != 0:
         return False
     body = viewed.stdout or ""
-    updated = repair_evidence_body(pr, body, excerpt, customer_decision=customer_decision, locking_pr=locking_pr)
+    updated = repair_evidence_body(pr, body, excerpt, customer_decision=customer_decision, locking_pr=locking_pr,
+                                   win_section=win_section)
     if updated == body:
         return False
     with tempfile.TemporaryDirectory(prefix="red-before-green-") as tmp:

@@ -1,0 +1,344 @@
+{
+  "schema": "jovie.rate-limits/v1",
+  "description": "Planning input for every API consumer: one entry per rate limit with the limit itself, how it was learned, how to read live headroom, and who spends it. Metadata only. Consumers declare their expected calls/hour in the file that makes the calls with a line `api-budget: <limit-id> <N>/hr - <reason>`; scripts/rate-limit-headroom.mjs sums those against the limit and overlays live reads. Contract: .claude/rules/external-apis.md.",
+  "updatedAt": "2026-10-28T00:00:00Z",
+  "thresholds": {
+    "plannedWarnPct": 60,
+    "plannedFailPct": 85,
+    "liveWarnPct": 70,
+    "liveCriticalPct": 90
+  },
+  "limits": [
+    {
+      "id": "github-user-core",
+      "provider": "github",
+      "label": "GitHub REST, personal gh login (Tim's token; Mac agents, Hermes scripts)",
+      "limit": 5000,
+      "unit": "requests",
+      "window": "hour",
+      "scope": "per user token, shared by every process using it",
+      "basis": "measured",
+      "source": "x-ratelimit-limit header on the rate_limit resource, 2026-10-28",
+      "live": {
+        "kind": "github-rate-limit",
+        "credential": "gh-user",
+        "resource": "core"
+      },
+      "ledger": { "provider": "github", "resource": "core" },
+      "consumers": [
+        "Mac Claude/Codex sessions and hooks",
+        "Hermes ship-loop scripts (pr-merge-queue, pr-autofix, codex-kanban-ship)",
+        "scripts/lanes via apiclient when GH_TOKEN is the user token"
+      ],
+      "notes": "2026-10-28 16:40Z sample: 962 used in the first 40 minutes of the window by one fleet. Prefer the App token for fleet work."
+    },
+    {
+      "id": "github-user-graphql",
+      "provider": "github",
+      "label": "GitHub GraphQL, personal gh login",
+      "limit": 5000,
+      "unit": "points",
+      "window": "hour",
+      "scope": "per user token",
+      "basis": "measured",
+      "source": "GitHub rate_limit resource, measured 2026-10-28",
+      "live": {
+        "kind": "github-rate-limit",
+        "credential": "gh-user",
+        "resource": "graphql"
+      },
+      "ledger": { "provider": "github", "resource": "graphql" },
+      "consumers": [
+        "gh pr/issue list and view (all are GraphQL)",
+        "parallel agents"
+      ],
+      "notes": "Cost is points, not calls: one aliased batch() query is far cheaper than N gh pr view calls."
+    },
+    {
+      "id": "github-search",
+      "provider": "github",
+      "label": "GitHub search API",
+      "limit": 30,
+      "unit": "requests",
+      "window": "minute",
+      "scope": "per token",
+      "basis": "measured",
+      "source": "GitHub rate_limit resource, measured 2026-10-28",
+      "live": {
+        "kind": "github-rate-limit",
+        "credential": "gh-user",
+        "resource": "search"
+      },
+      "consumers": ["gh pr list --search", "gh search"],
+      "notes": "Separate bucket; `gh pr list --search` overlap checks burn it first. Use list + filter locally when polling."
+    },
+    {
+      "id": "github-app-core",
+      "provider": "github",
+      "label": "GitHub REST, App installation tokens (jovie-bot for Gem lanes; jovie-ci-lane, jovie-symphony-lane, jovie-agents-lane, jovie-docs-lane)",
+      "limit": 5000,
+      "unit": "requests",
+      "window": "hour",
+      "scope": "per installation, independent of the user token",
+      "basis": "measured",
+      "source": "rate_limit with a minted jovie-bot token, 2026-10-28; GitHub scales installations on large orgs up to 12,500",
+      "live": {
+        "kind": "github-rate-limit",
+        "credential": "gh-app",
+        "resource": "core"
+      },
+      "consumers": [
+        "Gem lanes (scripts/lanes, lane_runner.py)",
+        "CI App token reads in workflows"
+      ],
+      "notes": "Own bucket per installation; the cheapest place to move read-only fleet traffic."
+    },
+    {
+      "id": "github-app-graphql",
+      "provider": "github",
+      "label": "GitHub GraphQL, App installation token (jovie-bot)",
+      "limit": 5000,
+      "unit": "points",
+      "window": "hour",
+      "scope": "per installation",
+      "basis": "measured",
+      "source": "rate_limit with a minted jovie-bot token, 2026-10-28",
+      "live": {
+        "kind": "github-rate-limit",
+        "credential": "gh-app",
+        "resource": "graphql"
+      },
+      "consumers": ["Gem lanes PR/queue reads"],
+      "notes": "1972 of 5000 points used when sampled mid-window."
+    },
+    {
+      "id": "github-actions-token",
+      "provider": "github",
+      "label": "GITHUB_TOKEN inside Actions (per repo, shared by all workflows)",
+      "limit": 1000,
+      "unit": "requests",
+      "window": "hour",
+      "scope": "per repo, shared by every workflow run",
+      "basis": "documented",
+      "source": "GitHub docs for the Team plan: 1,000/hr/repo. The 05:22Z 2026-10-25 api-quota sample showed limit=5000; plan against 1,000 until that is stable.",
+      "live": {
+        "kind": "api-quota-report",
+        "command": "node scripts/lib/api-quota-report.mjs headroom --hours 1 --json"
+      },
+      "consumers": [
+        "114 workflows (23 on a schedule)",
+        "Merge Queue Green Enroll (samples quota about once a minute)",
+        "Source Validation (actions/setup-node manifest calls)",
+        "PR Fleet Rules / PR Ready evidence reads"
+      ],
+      "notes": "2026-10-25 demand was 5-7x the limit; Fleet Rules Evidence and PR Ready deferred every hour. Declared per workflow with `# github-token-budget: N calls/run` (workflow-token-budget-guard)."
+    },
+    {
+      "id": "github-secondary",
+      "provider": "github",
+      "label": "GitHub secondary limits (all tokens)",
+      "limit": 900,
+      "unit": "points",
+      "window": "minute",
+      "scope": "REST 900 points/min per token; 100 concurrent requests; 80 content-creating requests/min, 500/hr",
+      "basis": "documented",
+      "source": "docs.github.com rate limits for the REST API",
+      "live": null,
+      "consumers": ["parallel agents on one token", "comment/label/PR writers"],
+      "notes": "The client's minWriteIntervalMs (1s) and pacing exist for this; a 403/429 with 'secondary rate limit' opens the breaker."
+    },
+    {
+      "id": "linear-requests",
+      "provider": "linear",
+      "label": "Linear API requests",
+      "limit": 2500,
+      "unit": "requests",
+      "window": "hour",
+      "scope": "per credential",
+      "basis": "measured",
+      "source": "x-ratelimit-requests-limit in the host ledger (last observed 2026-10-21)",
+      "live": {
+        "kind": "ledger",
+        "provider": "linear",
+        "resource": "requests"
+      },
+      "ledger": { "provider": "linear", "resource": "requests" },
+      "consumers": [
+        "lanes linear_sync / remediation intake (Jovie Lanes Linear app)",
+        "linear-sync-on-merge workflow",
+        "Hermes kanban ship loop",
+        "Summer"
+      ],
+      "notes": "App tokens and personal keys are separate buckets; never use a personal key for fleet work (#22378)."
+    },
+    {
+      "id": "linear-complexity",
+      "provider": "linear",
+      "label": "Linear query complexity",
+      "limit": 3000000,
+      "unit": "points",
+      "window": "hour",
+      "scope": "per credential",
+      "basis": "measured",
+      "source": "x-ratelimit-complexity-limit in the host ledger",
+      "live": {
+        "kind": "ledger",
+        "provider": "linear",
+        "resource": "complexity"
+      },
+      "ledger": { "provider": "linear", "resource": "complexity" },
+      "consumers": ["same as linear-requests"],
+      "notes": "Wide nested queries cost far more than their count; a single query is capped at 10,000."
+    },
+    {
+      "id": "vercel-api",
+      "provider": "vercel",
+      "label": "Vercel REST API",
+      "limit": null,
+      "unit": "requests",
+      "window": "varies by endpoint",
+      "scope": "per team and endpoint",
+      "basis": "unmeasured",
+      "source": "Limits are per endpoint and arrive in x-ratelimit-* headers; the ledger has not recorded any yet",
+      "live": {
+        "kind": "ledger",
+        "provider": "vercel",
+        "resource": "requests"
+      },
+      "ledger": { "provider": "vercel", "resource": "requests" },
+      "consumers": [
+        "deploy-health / deploy_lag lanes",
+        "release workflows",
+        "Summer"
+      ],
+      "notes": "Gap: route Vercel calls through the client so the ledger learns the limit."
+    },
+    {
+      "id": "sentry-api",
+      "provider": "sentry",
+      "label": "Sentry API",
+      "limit": 5,
+      "unit": "requests",
+      "window": "unknown (header x-sentry-rate-limit-limit=5, likely concurrent/second)",
+      "scope": "per org endpoint",
+      "basis": "measured",
+      "source": "host ledger, last observed 2026-10-22; window is not stated by the header",
+      "live": {
+        "kind": "ledger",
+        "provider": "sentry",
+        "resource": "requests"
+      },
+      "ledger": { "provider": "sentry", "resource": "requests" },
+      "consumers": [
+        "sentry-autofix-recurrence workflow",
+        "remediation sweep",
+        "Summer"
+      ],
+      "notes": "Treat as a burst limit: serialize Sentry calls; do not fan out."
+    },
+    {
+      "id": "ai-gateway",
+      "provider": "ai-gateway",
+      "label": "Vercel AI Gateway",
+      "limit": null,
+      "unit": "usd",
+      "window": "balance",
+      "scope": "shared prepaid credit across every Gateway key and project (ops/registry/spend.json: vercel-ai-gateway-credits)",
+      "basis": "spend",
+      "source": "ops/registry/spend.json; the binding limit is dollars, not request rate",
+      "live": {
+        "kind": "spend-registry",
+        "spendId": "vercel-ai-gateway-credits"
+      },
+      "consumers": [
+        "apps/web AI features",
+        "Summer (gateway-budget-jovie-eve-shadow, $100/mo)",
+        "gbrain expansion/embedding when not local"
+      ],
+      "notes": "Check runway with scripts/credentials-spend-check.mjs; a priced call passes priceUsd."
+    },
+    {
+      "id": "cloudflare-api",
+      "provider": "cloudflare",
+      "label": "Cloudflare API",
+      "limit": 1200,
+      "unit": "requests",
+      "window": "5 minutes",
+      "scope": "per user/token across the API",
+      "basis": "documented",
+      "source": "developers.cloudflare.com/fundamentals/api/reference/limits",
+      "live": null,
+      "ledger": { "provider": "cloudflare", "resource": "requests" },
+      "consumers": [
+        "DNS/cache ops",
+        "jovie-research router (Cloudflare source)"
+      ],
+      "notes": "Equals 14,400/hr if spread evenly; a 429 blocks the token for the rest of the 5-minute window."
+    },
+    {
+      "id": "neon-api",
+      "provider": "neon",
+      "label": "Neon control-plane API",
+      "limit": 700,
+      "unit": "requests",
+      "window": "minute",
+      "scope": "per account; burst 40/second",
+      "basis": "documented",
+      "source": "neon.com/docs/reference/api-reference",
+      "live": null,
+      "consumers": [
+        "branch create/delete in CI and agent worktrees",
+        "Neon MCP"
+      ],
+      "notes": "Not in packages/api-client/providers.json yet (no registered host); branch fan-out is the only realistic way to hit it."
+    },
+    {
+      "id": "gbrain",
+      "provider": "gbrain",
+      "label": "gbrain MCP daemon (127.0.0.1:7801) over Supabase pooler",
+      "limit": null,
+      "unit": "concurrent queries",
+      "window": "latency-bound",
+      "scope": "one shared daemon, one Postgres pool, one local ollama",
+      "basis": "measured",
+      "source": "scripts/agent/gbrain-latency-bench.py; see the latency table in .claude/rules/gstack.md",
+      "live": null,
+      "consumers": [
+        "every agent session via MCP",
+        "hooks",
+        "gbrain-worker",
+        "sync-memory-to-gbrain"
+      ],
+      "notes": "No rate limit, a latency budget: default `query` pays a ~6s local llama3.2 expansion; agents use expand=false. Load average above 20 on the Mac multiplies every arm by 3-4x."
+    },
+    {
+      "id": "hyperagent",
+      "provider": "hyperagent",
+      "label": "Hyperagent API / MCP",
+      "limit": null,
+      "unit": "requests",
+      "window": "unknown",
+      "scope": "per token",
+      "basis": "unmeasured",
+      "source": "no budget headers; credit-metered",
+      "live": null,
+      "ledger": { "provider": "hyperagent", "resource": "requests" },
+      "consumers": ["hyperagent_lane.py", "jovie-research --mode deep"],
+      "notes": "Gap: spend and rate unknown; the research router enforces per-source daily caps."
+    },
+    {
+      "id": "model-providers",
+      "provider": "anthropic/openai/xai",
+      "label": "Direct model providers (Anthropic, OpenAI, xAI)",
+      "limit": null,
+      "unit": "plan quota",
+      "window": "weekly/5h per account",
+      "scope": "per account; see ops/registry/capacity.json",
+      "basis": "capacity-registry",
+      "source": "ops/registry/capacity.json and scripts/lanes/capacity_live.py",
+      "live": { "kind": "capacity-registry" },
+      "consumers": ["lanes (Codex/Claude accounts)", "Hermes coder"],
+      "notes": "Plan quota, not request rate; route by pace policy in capacity.json."
+    }
+  ]
+}

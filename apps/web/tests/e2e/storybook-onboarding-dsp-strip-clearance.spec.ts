@@ -133,9 +133,7 @@ for (const viewport of [
       { waitUntil: 'domcontentloaded' }
     );
     const rail = page.getByTestId('onboarding-profile-rail');
-    const followers = rail.getByText(
-      '12.3K Spotify followers (source: enrichment)'
-    );
+    const followers = rail.getByText('12.3K Spotify followers');
     await expect(followers).toBeVisible();
     await page.evaluate(fontSize => {
       document.documentElement.style.fontSize = `${fontSize}px`;

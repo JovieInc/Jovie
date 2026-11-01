@@ -3018,6 +3018,62 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         {"name": "Source Validation", "conclusion": "FAILURE",
          "detailsUrl": "https://github.com/JovieInc/Jovie/actions/runs/123/job/456"}]}
 
+    WIN = ("## Win\n\n- Claim: Complete measured repair evidence.\n- Area: quality\n"
+           "- Theme: repair-evidence\n"
+           "- Metric: missing evidence fields | count | lower | 1 | 0 | Fleet policy | node --test\n"
+           "- Verify: https://github.com/JovieInc/Jovie/actions/runs/123\n")
+
+    def test_explicit_measured_win_repairs_compounding_body_and_passes_fleet(self):
+        body = events.red_before_green_block(self.PR)
+        updated = events.repair_evidence_body(self.PR, body, win_section=self.WIN,
+                                              customer_decision={"releaseWorthy": False})
+        self.assertIn(body, updated)
+        self.assertIn(self.WIN, updated)
+        self.assertEqual(events.repair_evidence_body(self.PR, updated, win_section=self.WIN), updated)
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+const bodies = JSON.parse(readFileSync(0, 'utf8'));
+console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
+  pr: {title: 'fix(music-resolver): repair certification', body, labels: ['compounding']}, files: [],
+}).errors)));
+"""], cwd=ROOT, input=json.dumps([body, updated]), text=True, capture_output=True, check=True)
+        before, after = json.loads(checked.stdout)
+        self.assertTrue(any(error.startswith("win:") for error in before), before)
+        self.assertEqual(after, [])
+
+    def test_measured_win_is_explicit_and_preserves_existing_decisions(self):
+        body = events.red_before_green_block(self.PR)
+        self.assertNotIn("## Win", events.repair_evidence_body(self.PR, body))
+        for existing in ("## Win\n\nnone\n", self.WIN, "### Win\n\n- Claim: incomplete\n"):
+            with self.subTest(existing=existing):
+                original = body + "\n" + existing
+                self.assertEqual(events.repair_evidence_body(self.PR, original, win_section=self.WIN), original)
+        # A template in a comment or failure log is not the author's Win section.
+        template = "\n<!--\n## Win\n-->\n```text\n## Win\n```\n"
+        updated = events.repair_evidence_body(self.PR, body + template, win_section=self.WIN)
+        self.assertTrue(updated.endswith(self.WIN))
+
+    def test_ensure_can_write_measured_win_without_a_red_run(self):
+        written = []
+        def shell(args):
+            if args[:2] == ["pr", "view"]:
+                return SimpleNamespace(returncode=0, stdout="Summary")
+            written.append(Path(args[args.index("--body-file") + 1]).read_text())
+            return SimpleNamespace(returncode=0, stdout="")
+        self.assertTrue(events.ensure_red_before_green({"number": 7}, sh=shell, win_section=self.WIN))
+        self.assertEqual(written, ["Summary\n\n" + self.WIN])
+
+    def test_explicit_invalid_win_is_rejected_instead_of_silently_omitted(self):
+        for invalid in (0, False, [], {}, "- Metric: incomplete"):
+            with self.subTest(invalid=invalid):
+                with self.assertRaisesRegex(ValueError, "complete ## Win section"):
+                    events.repair_evidence_body(self.PR, "Summary", win_section=invalid)
+
+    def test_empty_optional_win_keeps_existing_caller_contract(self):
+        body = events.repair_evidence_body(self.PR, "Summary")
+        self.assertEqual(events.repair_evidence_body(self.PR, "Summary", win_section=""), body)
+
     def test_block_carries_the_failing_run_and_red_output_and_passes_the_parser_shape(self):
         block = events.red_before_green_block(self.PR, "### Source Validation\n# not a heading\nAssertionError: x")
         self.assertIn("Failing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/123", block)
@@ -3103,6 +3159,53 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         self.assertIn('<!-- customer-changelog/v1 {"releaseWorthy":false} -->', updated)
         self.assertEqual(events.repair_evidence_body(self.PR, updated,
                                                    customer_decision={"releaseWorthy": False}), updated)
+
+    def test_repair_preserves_fenced_red_logs_accepted_by_the_canonical_gate(self):
+        bodies = [
+            "## Red-before-green\n- Failing command: `node probe.mjs`\n\n"
+            "```text\n# launcher probe\nFAIL status null\n```\n",
+            "~~~markdown\n## Red-before-green\nExample only.\n~~~\n\n"
+            "## Red-before-green\n- Failing command: `node probe.mjs`\n\n"
+            "```text\n### heap diagnostic\nError: launcher timed out\n```\n",
+        ]
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+console.log(JSON.stringify(JSON.parse(readFileSync(0, 'utf8')).map(body =>
+  evaluateFleetRules({pr: {title: 'fix: preserve red logs', body}, files: []}).errors
+)));
+"""], cwd=ROOT, input=json.dumps(bodies), text=True, capture_output=True, check=True, timeout=15)
+        self.assertEqual(json.loads(checked.stdout), [[], []])
+        for body in bodies:
+            with self.subTest(body=body):
+                self.assertTrue(events.red_section_complete(body))
+                updated = events.repair_evidence_body(self.PR, body, "FAIL newer run",
+                                                      customer_decision={"releaseWorthy": False})
+                self.assertTrue(updated.startswith(body))
+                self.assertNotIn("FAIL newer run", updated)
+                self.assertEqual(updated.count("customer-changelog/v1"), 1)
+                self.assertEqual(events.repair_evidence_body(self.PR, updated), updated)
+
+    def test_replacement_ignores_fenced_headings_and_preserves_the_next_section(self):
+        example = "```markdown\n## Red-before-green\nExample only.\n```\n\n"
+        following = "## Blast radius\nKeep existing proof.\n"
+        body = (example + "## Red-before-green\n- Failing command: `<cmd>`\n\n"
+                "```text\n# diagnostic\nFAIL incomplete command\n```\n\n" + following)
+        block = events.red_before_green_block(self.PR, "FAIL real run")
+        updated = events.with_red_section(body, block)
+        self.assertTrue(updated.startswith(example + block))
+        self.assertTrue(updated.endswith(following))
+        self.assertNotIn("FAIL incomplete command", updated)
+        self.assertTrue(events.red_section_complete(updated))
+        self.assertTrue(events.with_red_section(example + following, block).startswith(example + following))
+
+    def test_replacement_ignores_comment_fences_without_deleting_following_proof(self):
+        following = "## Blast radius\nPreserve existing proof.\n\n## Review\nPreserve verdict.\n"
+        body = ("## Red-before-green\n- Failing command: <cmd>\n\n"
+                "<!-- reviewer scratch\n```text\n-->\n\n" + following)
+        updated = events.repair_evidence_body(self.PR, body, "FAIL real run")
+        self.assertTrue(events.red_section_complete(updated))
+        self.assertTrue(updated.endswith(following))
 
     def test_explicit_locking_pr_repairs_missing_provenance_and_passes_fleet(self):
         body = events.red_before_green_block(self.PR)
