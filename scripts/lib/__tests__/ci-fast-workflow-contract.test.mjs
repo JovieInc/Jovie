@@ -95,7 +95,7 @@ const HOSTED_GROUP_JOBS = [
   },
   {
     jobId: 'ci-fast-structural-web',
-    nextJobId: 'ci-knip',
+    nextJobId: 'ci-fast-structural-lanes',
     jobName: 'ci-fast (structural web)',
   },
 ];
@@ -2667,7 +2667,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(remaining).not.toContain('ci-fast-typecheck');
 
     expect(aggregate).toMatch(
-      /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-fast-structural-python,\s*ci-fast-structural-web,\s*\]/s
+      /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-fast-structural-python,\s*ci-fast-structural-web,\s*ci-fast-structural-lanes,\s*\]/s
     );
     expect(aggregate).toMatch(/^  ci-fast:\n    name: ci-fast$/m);
     expect(aggregate).toMatch(/if: >-\s+always\(\)/);
@@ -2686,7 +2686,7 @@ describe('ci-fast bounded parallel workflow', () => {
       /PROFILE_BROWSER_RESULT: \$\{\{ needs\.ci-profile-admission-browser\.result \}\}/
     );
     expect(aggregate).toMatch(
-      /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \|\| "\$STRUCTURAL_WEB_RESULT" != "success" \]\]/
+      /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \|\| "\$STRUCTURAL_WEB_RESULT" != "success" \|\| "\$STRUCTURAL_LANES_RESULT" != "success" \]\]/
     );
     expect(aggregate).toMatch(
       /STRUCTURAL_WEB_RESULT: \$\{\{ needs\.ci-fast-structural-web\.result \}\}/
@@ -2712,12 +2712,31 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(python).not.toContain('CI_FAST_STRUCTURAL_WEB');
   });
 
+  it('runs the lanes coverage pytest alone in an aliased ci-fast job', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const lanes = jobBlock('ci-fast-structural-lanes', 'ci-knip');
+    expect(lanes).toMatch(
+      /^ {2}ci-fast-structural-lanes:\n {4}name: ci-fast \(structural lanes\)$/m
+    );
+    const aliases = lanes.match(/(?<= \*)[\w-]+/g);
+    expect(aliases).toHaveLength(10);
+    for (const name of aliases) expect(remaining).toContain(`&${name}`);
+    expect(remaining).toContain('CI_FAST_STRUCTURAL_LANES: skip');
+    expect(lanes).toContain('CI_FAST_STRUCTURAL_LANES: only');
+    expect(lanes).not.toContain('CI_FAST_STRUCTURAL_PYTEST');
+    expect(lanes).not.toContain('CI_FAST_STRUCTURAL_WEB');
+    expect(lanes).toContain('runs-on: ubuntu-24.04');
+  });
+
   it('runs the structural web commands in an aliased ci-fast job', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
     );
-    const web = jobBlock('ci-fast-structural-web', 'ci-knip');
+    const web = jobBlock('ci-fast-structural-web', 'ci-fast-structural-lanes');
     expect(web).toMatch(
       /^ {2}ci-fast-structural-web:\n {4}name: ci-fast \(structural web\)$/m
     );
@@ -2735,7 +2754,7 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('moves the slowest cheap lanes into a background web group without dropping any', () => {
-    const web = jobBlock('ci-fast-structural-web', 'ci-knip');
+    const web = jobBlock('ci-fast-structural-web', 'ci-fast-structural-lanes');
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
