@@ -15,11 +15,13 @@ vi.mock('@/lib/spotify', () => ({
     `https://open.spotify.com/artist/${id}`,
 }));
 
+import { confirmSelectedArtist } from '@/lib/chat/onboarding-script/engine';
 import { routeOnboardingTurn } from '@/lib/chat/onboarding-script/route';
 import { SCRIPT_LINES } from '@/lib/chat/onboarding-script/script';
 import { ONBOARDING_WIDGET_EVENTS } from '@/lib/chat/onboarding-script/widget-events';
 import { createOnboardingTurnState } from '@/lib/chat/tools/onboarding-tool-impls';
 import { lintVoice } from '@/lib/chat/voice-lint';
+import { getSpotifyArtist } from '@/lib/spotify';
 
 const SESSION = '00112233-4455-6677-8899-aabbccddeeff';
 
@@ -155,4 +157,44 @@ describe('system-1 answer sets', () => {
       expect(lintVoice(text as string).violations).toEqual([]);
     }
   );
+});
+
+// JOV-10168: the picker-selection turn renders "Confirm the handle below"
+// but shipped no checkHandle card, so the visitor faced the prompt with no
+// confirm control until they typed a reply (2026-10-31 signed-out replay).
+describe('picker-selection turn (JOV-10168)', () => {
+  it('ships the handle confirm card in the same turn as the confirm line', async () => {
+    const PICKED = '4Uwpa6zW3zzCSQvooQNksm';
+    vi.mocked(getSpotifyArtist).mockResolvedValue({
+      id: PICKED,
+      name: 'Greek',
+      images: [],
+      genres: [],
+      popularity: 12,
+      followers: { total: 4_321 },
+    });
+    const messages = [
+      user('Tame Impala'),
+      user('Selected: Greek', { spotifyArtistId: PICKED }),
+    ];
+    const state = stateFor(messages);
+    const confirmation = await confirmSelectedArtist(messages, state);
+    expect(confirmation).not.toBeNull();
+
+    const routed = await routeOnboardingTurn({
+      uiMessages: messages,
+      state,
+      artistConfirmation: confirmation,
+    });
+    expect(routed.kind).toBe('script');
+    if (routed.kind !== 'script') return;
+    expect(routed.turn.text).toContain('Confirm the handle');
+    const check = routed.turn.toolEvents.find(
+      event => event.toolName === 'checkHandle'
+    );
+    expect(check?.output).toMatchObject({
+      action: 'check_handle',
+      handle: 'greek',
+    });
+  });
 });

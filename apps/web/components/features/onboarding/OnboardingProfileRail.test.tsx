@@ -94,6 +94,22 @@ describe('OnboardingProfileRail', () => {
               input: {},
               output,
             },
+            // The confirm-artist turn always ships the handle card next to
+            // the confirm output (JOV-10168), so the preview artist has a
+            // real handle and the rail renders (JOV-10169: no fabricated
+            // jov.ie/your-handle placeholder when it is still unknown).
+            {
+              type: 'dynamic-tool',
+              toolName: 'checkHandle',
+              toolCallId: 'handle',
+              state: 'output-available',
+              input: { handle: 'testartist' },
+              output: {
+                action: 'check_handle',
+                handle: 'testartist',
+                summary: 'Checking @testartist.',
+              },
+            },
           ],
         } as UIMessage,
       ],
@@ -272,6 +288,23 @@ describe('resolvePreviewArtist', () => {
         socialLinks: ['https://instagram.com/djnova'],
       })
     ).toEqual({ id: 'handle-djnova', name: 'djnova', url: '' });
+  });
+
+  it('hides the artist preview until a handle is known (JOV-10169: no jov.ie/your-handle flash)', () => {
+    const pickedArtist = {
+      artist: {
+        id: 'sp-1',
+        name: 'Greek',
+        url: 'https://open.spotify.com/artist/sp-1',
+      },
+      artistConfirmed: true,
+      handle: null,
+      socialLinks: [],
+    };
+    expect(resolvePreviewArtist(pickedArtist)).toBeNull();
+    expect(
+      resolvePreviewArtist({ ...pickedArtist, handle: 'greek' })
+    ).toMatchObject({ id: 'sp-1' });
   });
 });
 

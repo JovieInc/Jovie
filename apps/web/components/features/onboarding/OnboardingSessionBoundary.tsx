@@ -123,20 +123,42 @@ export function OnboardingSessionBoundary({
   const runAction = async (action: 'restart' | 'logout') => {
     if (actionPending || chatBusy || !identity) return;
     const owner = identity;
-    setActionPending(true);
-    setActionError(null);
-    try {
-      const response = await fetch('/api/onboarding/conversation', {
+    const postAction = (conversationId: string | null) =>
+      fetch('/api/onboarding/conversation', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           action,
           identityId: userId,
-          conversationId: loaded?.snapshot.conversationId ?? null,
+          conversationId,
         }),
         signal: AbortSignal.timeout(10_000),
       });
-      if (!response.ok) throw new Error('action failed');
+    setActionPending(true);
+    setActionError(null);
+    try {
+      const response = await postAction(
+        loaded?.snapshot.conversationId ?? null
+      );
+      // JOV-10170: the boundary's snapshot conversation id is frozen at page
+      // load. A conversation the chat created after that (a fresh visitor's
+      // first message mints one server-side) made the restart 409 instead of
+      // resetting, so Start Over only worked after a manual reload plus a
+      // second click. Refresh the snapshot once and retry with the live id.
+      let actionResponse = response;
+      if (action === 'restart' && response.status === 409) {
+        const refreshed = await fetch('/api/onboarding/conversation', {
+          cache: 'no-store',
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (refreshed.ok) {
+          const fresh: Snapshot = await refreshed.json();
+          if ((fresh.identityId ?? 'anonymous') !== identity)
+            throw new Error('action failed');
+          actionResponse = await postAction(fresh.conversationId ?? null);
+        }
+      }
+      if (!actionResponse.ok) throw new Error('action failed');
       if (actionIdentity.current !== owner) return;
       if (action === 'logout') await signOut({ redirectUrl: APP_ROUTES.START });
       else {

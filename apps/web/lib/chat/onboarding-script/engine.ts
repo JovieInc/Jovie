@@ -129,7 +129,7 @@ function typedHandleFrom(message: UIMessage | null): string | null {
  * golden-path walk: homepage claim of jov.ie/unmarkedpave became
  * @unmarkedpavement, and the sign-up card then said "Claim @unmarkedpave").
  */
-function requestedHandleFrom(
+export function requestedHandleFrom(
   uiMessages: readonly UIMessage[],
   latest: UIMessage | null,
   latestIsWidgetEvent: boolean
