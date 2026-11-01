@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { toolRoutePolicySchema } from '@jovie/action-contracts';
 import { z } from 'zod';
 import { env } from '@/lib/env-server';
 import { normalizeHermesAllowedPaths } from '@/lib/hermes/allowed-paths';
@@ -50,6 +51,7 @@ export class HermesDispatchGitHubError extends Error {
 }
 
 const HermesDispatchRequestSchema = z.object({
+  routePolicy: toolRoutePolicySchema.optional(),
   source: z.enum(['github', 'linear', 'sentry', 'hermes', 'hermes-air', 'ci']),
   sourceId: z.string().trim().min(1).max(160).optional(),
   sourceUrl: z
@@ -171,6 +173,7 @@ export function normalizeHermesDispatchRequest(
   const branchSlug = slugify(`${parsed.kind}-${sourceId}`);
 
   return {
+    routePolicy: parsed.routePolicy,
     source: parsed.source,
     sourceId,
     sourceUrl:

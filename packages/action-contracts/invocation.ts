@@ -1,10 +1,10 @@
 import { z } from 'zod';
-
 import {
   actionErrorSchema,
   actionHandoffSchema,
   entityRefSchema,
 } from './errors';
+import { toolRouteReceiptSchema } from './tool-route';
 
 /**
  * Invocation envelope, result/receipt union, and capability resolution
@@ -78,6 +78,7 @@ export const actionReceiptSchema = z.object({
   startedAt: z.iso.datetime(),
   completedAt: z.iso.datetime().optional(),
   entityRef: entityRefSchema.optional(),
+  route: toolRouteReceiptSchema.optional(),
 });
 
 export type ActionReceipt = z.infer<typeof actionReceiptSchema>;
