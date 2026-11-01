@@ -4968,6 +4968,41 @@ class OversizeDiffExitTest(unittest.TestCase):
 
 
 class RunAgentTest(unittest.TestCase):
+    def test_failed_tracked_stop_still_kills_the_group_and_reports_the_timeout(self):
+        # Gem 2026-10-29: a gate-command trufflehog outlived `--timeout 600` for 2d17h because a
+        # failed tracked-descendant stop replaced the timeout with a permanent cleanup hold.
+        marker = Path(tempfile.mkdtemp()) / "pids"
+        script = f"sleep 300 & echo $! > {marker}; wait"
+        with patch.object(lane.AgentProcesses, "stop", side_effect=RuntimeError("owned-processes-still-running")):
+            with self.assertRaises(subprocess.TimeoutExpired):
+                lane.run_agent(["sh", "-c", script], Path("."), None, timeout=1, guard_interval=.1)
+        child = int(marker.read_text())
+        time.sleep(.2)
+        with self.assertRaises(ProcessLookupError):
+            os.kill(child, 0)
+
+    def test_held_cleanup_retry_releases_only_after_the_tree_drains(self):
+        proc = subprocess.Popen(["sleep", "300"], start_new_session=True)
+        owned = lane.AgentProcesses(proc.pid)
+        owned.observe()
+        with patch.object(lane, "_HELD_CLEANUP", [owned, proc]):
+            self.assertTrue(lane.retry_held_cleanup())
+        self.assertIsNotNone(proc.poll())
+        with patch.object(lane, "_HELD_CLEANUP", []):
+            self.assertFalse(lane.retry_held_cleanup())
+
+    def test_gate_command_timeout_kills_a_term_ignoring_descendant(self):
+        marker = Path(tempfile.mkdtemp()) / "pids"
+        script = f"trap '' TERM; sleep 300 & echo $! > {marker}; wait"
+        started = time.monotonic()
+        result = subprocess.run([sys.executable, str(Path(lane.__file__).resolve()), "gate-command",
+                                 "--timeout", "1", "--", "sh", "-c", script], timeout=60,
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 124)
+        self.assertLess(time.monotonic() - started, 45)
+        with self.assertRaises(ProcessLookupError):
+            os.kill(int(marker.read_text()), 0)
+
     def test_cancellation_does_not_signal_a_reused_root_process_group(self):
         original = {10: (1, 10, "S", "original")}
         reused = {10: (1, 10, "S", "replacement"), 11: (10, 10, "S", "unrelated")}
