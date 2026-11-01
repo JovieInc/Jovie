@@ -30,6 +30,7 @@ import {
   listMergedLinkedPulls,
   mergedUiEvidence,
   pullImplementsIssue,
+  readClosedPullSnapshot,
   reconcileValidation,
 } from '../validation-sync.mjs';
 import {
@@ -974,6 +975,174 @@ describe('validation sync: facts', () => {
     }, 'gh_test');
     await expect(github('repos/x')).rejects.toThrow(/GitHub HTTP 404/);
     expect(calls).toBe(1);
+  });
+});
+
+describe('batched closed-pull snapshot (repo quota, 2026-10-30)', () => {
+  const snapshotEntry = (number, merged) => ({
+    number,
+    title: 'feat(profile): editorial card',
+    body: '',
+    headRef: `codex/jov-1-card-${number}`,
+    merged,
+    mergedAt: merged ? '2026-10-03T10:00:00Z' : '',
+    mergeCommitSha: merged ? MAIN[1] : '',
+    baseRef: 'main',
+  });
+
+  const row = (number, overrides = {}) => ({
+    number,
+    html_url: `https://github.com/${REPO}/pull/${number}`,
+    merged_at: '2026-10-03T10:00:00Z',
+    merge_commit_sha: MAIN[1],
+    base: { ref: 'main' },
+    head: { ref: `codex/jov-1-card-${number}` },
+    title: 'feat(profile): editorial card',
+    body: '',
+    ...overrides,
+  });
+  const page = (body, link = '') => ({
+    ok: true,
+    headers: { get: name => (name === 'link' ? link : '') },
+    json: async () => body,
+  });
+
+  it('maps merged and closed-unmerged rows across the bounded pages', async () => {
+    const requested = [];
+    const fetchImpl = async url => {
+      const href = String(url);
+      requested.push(href);
+      // A Link header carries an absolute URL; the client must never request
+      // it with the API origin prepended a second time.
+      if (/^https:\/\/api\.github\.com\/https?:/i.test(href)) {
+        throw new Error(`doubled API origin: ${href}`);
+      }
+      if (href.endsWith('page=1')) {
+        return page(
+          [
+            row(101),
+            row(102, { merged_at: null, merge_commit_sha: null }),
+            row(103, { merge_commit_sha: 'deadbeef' }),
+          ],
+          `<${href.replace(/page=1$/, 'page=2')}>; rel="next", <${href}>; rel="first"`
+        );
+      }
+      if (href.endsWith('page=2')) return page([row(104)]);
+      throw new Error(`unexpected url ${href}`);
+    };
+    const snapshot = await readClosedPullSnapshot({
+      fetchImpl,
+      token: 'gh_test',
+      repository: REPO,
+    });
+    expect(requested).toHaveLength(2);
+    expect(requested[1]).toBe(
+      'https://api.github.com/repos/JovieInc/Jovie/pulls?state=closed&sort=updated&direction=desc&per_page=100&page=2'
+    );
+    expect(snapshot.size).toBe(4);
+    expect(snapshot.get(101)).toMatchObject({
+      merged: true,
+      mergedAt: '2026-10-03T10:00:00Z',
+      mergeCommitSha: MAIN[1],
+      baseRef: 'main',
+      headRef: 'codex/jov-1-card-101',
+    });
+    // Closed without merging, and a merged row whose sha is not a commit:
+    // neither can be a binding merge.
+    expect(snapshot.get(102)?.merged).toBe(false);
+    expect(snapshot.get(103)?.merged).toBe(false);
+    expect(snapshot.get(104)?.merged).toBe(true);
+  });
+
+  it('bounds the snapshot pages and reports a non-list response', async () => {
+    const fetchImpl = async () =>
+      page(
+        [row(101)],
+        '<https://api.github.com/repos/JovieInc/Jovie/pulls?state=closed&sort=updated&direction=desc&per_page=100&page=2>; rel="next"'
+      );
+    const bounded = await readClosedPullSnapshot({
+      fetchImpl,
+      token: 'gh_test',
+      repository: REPO,
+      maxPages: 1,
+    });
+    expect(bounded.size).toBe(1);
+    await expect(
+      readClosedPullSnapshot({
+        fetchImpl: async () => page({ no: 'list' }),
+        token: 'gh_test',
+        repository: REPO,
+      })
+    ).rejects.toThrow(/was not a list/);
+  });
+
+  it('answers unmerged and open linked pulls from the snapshot without per-pull reads', async () => {
+    const reads = [];
+    const github = async path => {
+      reads.push(path);
+      if (path.endsWith('/pulls/101')) {
+        return {
+          body: {
+            number: 101,
+            html_url: `https://github.com/${REPO}/pull/101`,
+            merged_at: '2026-10-03T10:00:00Z',
+            merge_commit_sha: MAIN[1],
+            base: { ref: 'main' },
+            head: { ref: 'codex/jov-1-card' },
+            title: 'feat(profile): editorial card (JOV-1)',
+            body: '',
+          },
+          link: '',
+        };
+      }
+      if (path.endsWith('/pulls/104')) {
+        return {
+          body: {
+            number: 104,
+            merged_at: null,
+            merge_commit_sha: null,
+            base: { ref: 'main' },
+          },
+          link: '',
+        };
+      }
+      throw new Error(`unexpected read ${path}`);
+    };
+    const merged = await listMergedLinkedPulls({
+      github,
+      repository: REPO,
+      identifier: 'JOV-1',
+      attachmentUrls: [
+        `https://github.com/${REPO}/pull/101`,
+        `https://github.com/${REPO}/pull/102`,
+        `https://github.com/${REPO}/pull/103`,
+        `https://github.com/${REPO}/pull/104`,
+      ],
+      closedPulls: new Map([
+        [101, snapshotEntry(101, true)],
+        [102, snapshotEntry(102, false)],
+        [103, snapshotEntry(103, false)],
+      ]),
+      openPullNumbers: new Set([103]),
+    });
+    // 101 is merged in the snapshot: the authoritative per-pull read still
+    // runs (its full body decides the binding, and the immutable cache keeps
+    // it). 102 is closed-unmerged and 103 open: answered without any read.
+    // 104 is outside the snapshot window: the per-pull read is the fallback.
+    expect(merged).toEqual([
+      {
+        number: 101,
+        url: `https://github.com/${REPO}/pull/101`,
+        mergeSha: MAIN[1],
+        mergedAt: '2026-10-03T10:00:00Z',
+      },
+    ]);
+    // Linked numbers are visited newest-first; 104 (outside the snapshot)
+    // is read before 101 (merged inside it).
+    expect(reads).toEqual([
+      `repos/${REPO}/pulls/104`,
+      `repos/${REPO}/pulls/101`,
+    ]);
   });
 });
 

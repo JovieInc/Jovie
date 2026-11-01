@@ -19,4 +19,12 @@ describe('CompositeField', () => {
     render(<CompositeField data-testid='field' shape='md' />);
     expect(screen.getByTestId('field').className).toContain('rounded-lg');
   });
+
+  it('exposes the field surface as a data attribute for CSS', () => {
+    render(<CompositeField data-testid='field' surface='field' />);
+    expect(screen.getByTestId('field')).toHaveAttribute(
+      'data-surface',
+      'field'
+    );
+  });
 });

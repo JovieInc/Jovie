@@ -1,3 +1,4 @@
+import { auditSummary, auditWho, formatSummary, formatWho } from './audit.js';
 import {
   createProfile,
   fetchArtist,
@@ -16,6 +17,8 @@ import { FLEET_COMMANDS } from './fleet-contract.generated.js';
 export interface CommandInput {
   readonly arg?: string;
   readonly full?: boolean;
+  /** CLI `--json`: structured output instead of the human table. */
+  readonly json?: boolean;
   readonly flags?: Readonly<Record<string, string | undefined>>;
   /** Set by the caller (CLI or MCP); attached to reports as safe context. */
   readonly meta?: { readonly channel: 'cli' | 'mcp'; readonly version: string };
@@ -37,6 +40,8 @@ export interface CommandSpec {
   readonly flags?: readonly FlagSpec[];
   readonly readOnly: boolean;
   readonly internal?: boolean;
+  /** Talks to an operator service (e.g. the fleet audit Worker), not the published jov.ie contract. */
+  readonly operator?: boolean;
   readonly run: (
     input: CommandInput,
     options: ResourceOptions
@@ -113,6 +118,52 @@ export const COMMANDS: readonly CommandSpec[] = [
         },
         options
       ),
+  },
+  {
+    path: ['audit', 'who'],
+    tool: 'audit_who',
+    operator: true,
+    summary:
+      'Who did what to a repo, PR, issue, or branch: fleet audit events (agent, host, action, reason) plus GitHub changes no agent claimed. Needs FLEET_AUDIT_READ_TOKEN.',
+    arg: {
+      name: 'target',
+      description: 'Substring of the target, e.g. a repo, PR URL, or branch',
+    },
+    flags: [
+      {
+        name: 'since',
+        description: 'Window start: 7d, 24h, 30m, or an ISO timestamp',
+      },
+      { name: 'limit', description: 'Max events, 1-200 (default 50)' },
+    ],
+    readOnly: true,
+    run: async (input, options) => {
+      const result = await auditWho(
+        {
+          target: required(input),
+          since: input.flags?.since,
+          limit: input.flags?.limit,
+        },
+        options
+      );
+      return input.meta?.channel === 'cli' && !input.json
+        ? formatWho(result)
+        : result;
+    },
+  },
+  {
+    path: ['audit', 'summary'],
+    tool: 'audit_summary',
+    operator: true,
+    summary:
+      'Fleet audit summary: storage budget, dangerous actions and unattributed GitHub changes from the last 7d. Needs FLEET_AUDIT_READ_TOKEN.',
+    readOnly: true,
+    run: async (input, options) => {
+      const result = await auditSummary(options);
+      return input.meta?.channel === 'cli' && !input.json
+        ? formatSummary(result)
+        : result;
+    },
   },
   ...FLEET_COMMANDS.map(command => ({
     internal: true,

@@ -1725,6 +1725,18 @@ body {
     }
   }
 
+  /* Link's opt-in label uses the real control's font and box model. The
+     opening tag reserves its width before streamed children arrive. */
+  [data-variant="link"][data-reserved-label]::after {
+    content: attr(data-reserved-label);
+    visibility: hidden;
+    grid-area: 1 / 1;
+  }
+
+  [data-variant="link"][data-reserved-label] > span {
+    grid-area: 1 / 1;
+  }
+
   .btn-linear-login {
     background-color: transparent;
     border-color: transparent;
@@ -2115,6 +2127,10 @@ body {
   .composite-field[data-surface="page"] {
     border: 1px solid transparent;
     background: var(--color-bg-page);
+  }
+  .composite-field[data-surface="field"] {
+    border: 1px solid var(--color-border-subtle);
+    background: var(--color-bg-surface-1);
   }
   .composite-field[data-surface="shell"] {
     color: var(--color-text-primary-token);

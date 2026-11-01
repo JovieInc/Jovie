@@ -32,6 +32,8 @@ on:
   # are re-run once the status exists, so there is no polling.
   workflow_run:
     workflows: [Source Validation]
+    # The re-run hop needs event pull_request; merge-group refs never qualify.
+    branches-ignore: ['gh-readonly-queue/**']
     types: [completed]
 
 permissions: {}
@@ -75,6 +77,7 @@ jobs:
             .nvmrc
             .github/dependency-review-config.yml
             scripts/pr-fleet-rules.mjs
+            scripts/lib/wins-ledger.mjs
             packages/api-client
             .github/scripts/fleet-rules-verdict.sh
             .github/scripts/fleet-rules-rerun.sh

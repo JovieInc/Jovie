@@ -41,6 +41,19 @@ Name tests by behavior: `describe('ComponentName')` → `it('shows error when in
 
 See `.claude/rules/auth.md` → "E2E Authentication" for the canonical helpers, do-not patterns, and golden-path references. Use `E2E_USE_TEST_AUTH_BYPASS=1` and `/api/dev/test-auth/enter`. Do not import `@clerk/testing` or create Clerk test users.
 
+## Production Certification Identity Path (JOV-9625)
+
+The post-promotion golden-path certification (`.github/workflows/postdeploy-probes.yml` → `scripts/prod-cert.mjs` → `apps/web/tests/e2e/prod-cert-start-chat.spec.ts` + `smoke-prod-auth.spec.ts`) runs against the real https://jov.ie production deployment. It never creates credentials; it acts only as the documented canary identities below, all classified internal by `isInternalOrTestAccountEmail` so nothing reaches customer metrics. The single source of truth for the addresses is `apps/web/lib/synthetic/prodcert-identities.ts`.
+
+- **Returning canary (creator-ready)**: `browse-ready+clerk_test@jov.ie` — `E2E_PROD_USER_EMAIL` from Doppler `jovie-web/prd`. The run never stores a password; it requests a fresh Better Auth email code on the rendered sign-in form and reads the one-time code from the `ba_verifications` table via `waitForProductionAuthOtp` (`apps/web/tests/e2e/utils/production-auth-otp.ts`). Owns the claimed profile used by the `claimed-profile-owned`, `public-profile` and `profile-edit-save-readback` steps.
+- **Fresh-user canary (new-user)**: `browse-ready+synthetic-prodcert-<run>@jov.ie`, minted per run by `newProdcertUserEmail`. Signs up through the rendered email-code flow with an OTP read from `ba_verifications` the same way. Used by the `new-user-email-otp` and `fresh-user-onboarding-first-value` steps.
+- **Anonymous first touch (claim/start)**: no account at all. The `/start` visit carries a short-lived, single-use canary passage token (`PASSAGE_TOKEN_HEADER`) minted in CI from `SYNTHETIC_PASSAGE_KEY` — an HKDF derivative of `CRON_SECRET` produced by `scripts/synthetic-passage-key.mjs`; the spec never sees `CRON_SECRET` itself. The server verifies the token in Cloudflare Turnstile test mode for that visit only.
+- **Admin certifications readback**: `/app/admin/certifications` and `GET /api/ovie/certifications` are admin-gated (`authorizeSummerControl`). The signed-in readback fixture is the documented admin test account `browse-admin+clerk_test@jov.ie` (the `admin` persona of `DEFAULT_DEV_TEST_AUTH_EMAILS`), signed in through the same rendered email-code path with the OTP read from `ba_verifications`. Never create new accounts or rotate anything for the readback.
+
+**Weekly AI quota at release gates (JOV-9625 outcome rework):** the dedicated chat-health canary (`browse-ready+chat-health@jov.ie`, #23703) is the one identity whose weekly AI quota the server skips (burst limiter still enforced) — the returning golden-path canary stays metered. The browser chat-turn certification signs in as that chat-health canary in its own serial spec test, so an exhausted weekly counter can never block a promotion run's chat certification, and the exact-build perf lane's authenticated setup (`--grep "sign-in works and dashboard loads"`) never performs a chat turn at all.
+
+Fixture-artist selection for the claim surface is read-only and idempotent per run (`selectUnclaimedCertArtist`, JOV-9928): each run picks the first `SHARED_E2E_ARTIST_POOL` candidate with no bound `creator_profiles` row and blocks the claim steps with the exact reason when none is free. The `confirm_artist:` assertion is never weakened to accommodate stale fixture state.
+
 ## Keep Tests Aligned With Removed UI And Hook Contracts
 
 - When removing UI behavior, find and remove or rewrite its obsolete assertions
@@ -163,6 +176,17 @@ Never mark a task complete without confirming the fix works:
 
 - Full E2E details: `apps/web/tests/TESTING.md`
 - Testing philosophy: `docs/TESTING_GUIDELINES.md`
+
+## PR size counts production code
+
+PR Size Guard caps changed lines and files in production code only. Tests and
+fixtures (`*.test.*`, `*.spec.*`, `__tests__/`, `fixtures/`, `test_*.py`,
+`*_test.py`, `*Tests.swift`) do not count, along with generated, lock and
+snapshot files. The coverage floors require tests, so the size cap must not
+penalise them (#23956 went over 1500 lines only because of required coverage
+tests). The one list is `scripts/lib/pr-size-exclusions.mjs`, and the workflows
+run it from the base tip. Repository-hygiene byte and path budgets still apply
+to every file. Do not split production code into fixture paths to dodge the cap.
 
 ## Gate weakening (JOV-INV-045)
 

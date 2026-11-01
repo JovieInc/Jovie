@@ -1,4 +1,5 @@
 name: Unstack Merged Parent
+# github-token-budget: 4 calls/run - one REST page of up to 50 children on a merged-parent wake, including the api-client maximum of four attempts; edited/dispatch use no API reads.
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
 # necessary-trust-boundary: A hosted App-token writer must rewrite a stacked PR branch after its parent squash-merges; GitHub retargets the base but keeps the parent's original commits, which re-inflates the diff and strands the PR.
@@ -6,17 +7,22 @@ name: Unstack Merged Parent
 #
 # A stacked PR whose parent merged is rebased onto main with only its own
 # commits, retargeted to main, and its open descendants are restacked on the
-# rewritten branch. See scripts/unstack-merged-parent.sh. Never closes a PR,
-# never enables auto-merge, never touches held/gated PRs.
+# rewritten branch. The child is then handed to Merge Queue Green Enroll's
+# per-PR dispatch, the only queue writer, which enqueues it when green and not
+# held. See scripts/unstack-merged-parent.sh. Never closes a PR, never touches
+# held/gated PRs, never arms or enqueues anything itself.
 #
-# Wakes: GitHub retargets a child to main when delete_branch_on_merge removes
-# its merged parent's branch; that emits pull_request_target `edited` with the
-# old base in `changes.base.ref.from`. Manual dispatch covers children of
-# parents merged before the setting was on (their base branch still exists).
+# Wakes: (1) pull_request_target `closed` + merged: open children whose base is
+# the merged PR's head branch (found while the base branch still exists);
+# (2) GitHub retargets a child to main when delete_branch_on_merge removes its
+# merged parent's branch; that emits `edited` with the old base in
+# `changes.base.ref.from`. Both converge on the same idempotent script: a child
+# that no longer carries the parent tip is "already unstacked". (3) Manual
+# dispatch covers children of parents merged before either wake existed.
 
 on:
   pull_request_target:
-    types: [edited]
+    types: [edited, closed]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -28,17 +34,70 @@ permissions:
   contents: read
 
 jobs:
-  unstack:
+  plan:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (
+        github.event.action == 'edited' &&
         github.event.changes.base.ref.from != '' &&
         github.event.pull_request.base.ref == 'main' &&
         github.event.pull_request.state == 'open' &&
         github.event.pull_request.head.repo.full_name == github.repository
+      ) ||
+      (
+        github.event.action == 'closed' &&
+        github.event.pull_request.merged == true &&
+        github.event.pull_request.base.ref == 'main' &&
+        github.event.pull_request.head.repo.full_name == github.repository
       )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      children: ${{ steps.children.outputs.children }}
+    steps:
+      - name: Checkout main policy code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Prime Node toolcache
+        uses: ./.github/actions/prime-node-toolcache
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+      - name: List the stacked children to unstack
+        id: children
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          INPUT_PR: ${{ github.event.inputs.pr_number }}
+          EVENT_PR: ${{ github.event.pull_request.number }}
+          MERGED_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = workflow_dispatch ]; then
+            list="[$INPUT_PR]"
+          elif [ "$ACTION" = closed ]; then
+            list="$(node packages/api-client/cli.ts gh --priority merge -- api "repos/$REPO/pulls" --method GET -f state=open -f base="$MERGED_HEAD_REF" -F per_page=50 --jq '[.[].number]')"
+          else
+            list="[$EVENT_PR]"
+          fi
+          echo "children=$(jq -c . <<<"$list")" >> "$GITHUB_OUTPUT"
+
+  unstack:
+    needs: plan
+    if: needs.plan.outputs.children != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        child: ${{ fromJSON(needs.plan.outputs.children) }}
     concurrency:
-      group: unstack-merged-parent-${{ github.event.inputs.pr_number || github.event.pull_request.number }}
+      group: unstack-merged-parent-${{ matrix.child }}
       cancel-in-progress: false
     runs-on: ubuntu-latest
     permissions:
@@ -61,12 +120,20 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
+      - name: Prime Node toolcache
+        uses: ./.github/actions/prime-node-toolcache
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+
       - name: Unstack
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
           GH_RETRY_ATTEMPTS: 8
           GH_RETRY_MAX_DELAY: 60
-          CHILD_PR: ${{ github.event.inputs.pr_number || github.event.pull_request.number }}
-          OLD_BASE_REF: ${{ github.event.changes.base.ref.from || '' }}
+          CHILD_PR: ${{ matrix.child }}
+          OLD_BASE_REF: ${{ (github.event.action == 'closed' && github.event.pull_request.head.ref) || github.event.changes.base.ref.from || '' }}
+          ADMIT_AFTER_UNSTACK: ${{ vars.QUEUE_FREEZE != '1' && '1' || '0' }}
         run: bash scripts/unstack-merged-parent.sh

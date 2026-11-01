@@ -1,0 +1,77 @@
+name: Auto-Merge Base Guard
+# github-token-budget: 0 calls/run - runtime API calls use the Jovie App token; Node is primed from nodejs.org.
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: Disabling auto-merge on a PR is a repository write that GITHUB_TOKEN may not perform on a PR it does not own; the Jovie Bot app token does it from trusted main code.
+# revisit-trigger: Remove when a ruleset can refuse auto-merge on PRs whose base is not the default branch.
+#
+# Auto-merge only ever belongs on a PR that targets main. A stacked child armed
+# against its parent branch merges into the parent branch, not main, and the
+# work never ships (it happened once, 2026-10-29). Every arming path now refuses
+# a non-main base (scripts/merge-queue-backend.mjs assertEnrollCandidate); this
+# is the reactive backstop for any writer that bypasses it (a person or agent
+# enabling auto-merge by hand): the moment auto-merge is enabled on a PR whose
+# base is not main, disable it and say why. Code comes from trusted main only.
+
+on:
+  pull_request_target:
+    types: [auto_merge_enabled]
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    if: github.event.pull_request.base.ref != 'main'
+    concurrency:
+      group: auto-merge-base-guard-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Generate short-lived Jovie App token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
+      - name: Checkout main policy code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: false
+
+      - name: Prime Node toolcache
+        uses: ./.github/actions/prime-node-toolcache
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Disable auto-merge on a non-main base
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          PR_NODE_ID: ${{ github.event.pull_request.node_id }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Re-read the live base: the event payload can be stale if the PR was
+          # retargeted to main between arming and this run.
+          live_base="$(node packages/api-client/cli.ts gh --priority merge -- pr view "$PR" -R "$REPO" --json baseRefName --jq .baseRefName)"
+          if [ "$live_base" = main ]; then
+            echo "#$PR now targets main; leaving auto-merge armed"
+            exit 0
+          fi
+          node packages/api-client/cli.ts gh --priority merge -- api graphql \
+            -f query='mutation($id:ID!){disablePullRequestAutoMerge(input:{pullRequestId:$id}){pullRequest{id}}}' \
+            -f id="$PR_NODE_ID" >/dev/null
+          echo "disabled auto-merge on #$PR (base=$live_base)"
+          bash scripts/lib/upsert-pr-comment.sh "$PR" auto-merge-base-guard \
+            "Auto-merge was disabled: this PR targets \`$live_base\`, not \`main\`, so merging it would land the work in a branch that never ships. Retarget to \`main\` (the Unstack Merged Parent workflow does this when the parent merges), then re-arm."

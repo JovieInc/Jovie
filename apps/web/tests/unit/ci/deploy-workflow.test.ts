@@ -1672,7 +1672,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(verifyStep).toContain('EXPECTED_PRODUCTION_DEPLOYMENT_ID');
   });
 
-  it('measures production public-profile alias budgets as warning-only', () => {
+  it('fails production public-profile alias budgets closed once graduated', () => {
     const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const aliasGate = getJobBlock(
       workflow,
@@ -1684,25 +1684,26 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(aliasGate).toContain('setup-playwright');
     expect(aliasGate).toContain('--base-url https://jov.ie');
     expect(aliasGate).toContain('--runs 5');
-    // Post-promote production alias budgets must not fail the job on miss.
+    // The 2026-10-31 receipt graduated production alias budgets (14/14,
+    // JOV-8737): a post-promote miss fails the job and release-result.
     expect(aliasGate).toContain('id: alias-perf');
     expect(aliasGate).toContain(
       'if ! pnpm exec tsx scripts/performance-budgets-guard.ts'
     );
-    expect(aliasGate).toContain(
-      'echo "performance_status=warn" >> "$GITHUB_OUTPUT"'
+    expect(aliasGate).toMatch(
+      /if ! pnpm exec tsx scripts\/performance-budgets-guard\.ts[\s\S]*?echo "performance_status=failed" >> "\$GITHUB_OUTPUT"\s+exit 1\s+fi/
     );
     expect(aliasGate).toContain(
       'echo "performance_status=passed" >> "$GITHUB_OUTPUT"'
     );
-    expect(aliasGate).toContain('::warning::');
+    expect(aliasGate).toContain('::error::');
+    expect(aliasGate).not.toContain('performance_status=warn');
     expect(aliasGate).toContain(
       'performance_status: ${{ steps.alias-perf.outputs.performance_status }}'
     );
-    expect(aliasGate).not.toContain('fail_performance_gate');
     expect(aliasGate).not.toContain('continue-on-error: true');
-    expect(aliasGate).not.toMatch(
-      /if ! pnpm exec tsx scripts\/performance-budgets-guard\.ts[\s\S]*?exit 1/
+    expect(releaseResult).toContain(
+      'production-public-profile-alias-gate:${{ needs.production-public-profile-alias-gate.result }}'
     );
     const promoteJob = getJobBlock(workflow, 'promote-production');
     const stagedPerformanceGate = getStepBlock(
@@ -1716,10 +1717,9 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       )
     );
     // JOV-8338 graduated the exact staged-build budget independently
-    // (2026-10-21 receipt: staging 14/14 qualifying), so it fails closed with
-    // the exact-build failure subtype. Production canonical-alias budgets
-    // above stay warning-only (11/14, streak 0/14) until their own receipt
-    // graduates.
+    // (staging 14/14 qualifying), so it fails closed with the exact-build
+    // failure subtype. Production canonical-alias budgets above graduated
+    // separately on the 2026-10-31 receipt (JOV-8737).
     expect(stagedPublicProfileGate).toContain(
       'fail_performance_gate "Exact staged-build public-profile alias budgets failed."'
     );
@@ -3444,8 +3444,6 @@ describe('CI E2E smoke workflow', () => {
     expect(builds).toHaveLength(1);
     expect(builds[0]?.env).toMatchObject({
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: '1x00000000000000000000AA',
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
-        '${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}',
       NEXT_PUBLIC_APP_URL: 'http://localhost:3250',
       NEXT_PUBLIC_BETTER_AUTH_URL: 'http://localhost:3250',
     });

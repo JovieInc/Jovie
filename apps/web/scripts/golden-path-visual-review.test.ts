@@ -156,7 +156,11 @@ describe('golden path visual review', () => {
 
   it('reviewer A sends the image with the rubric and parses the verdict', async () => {
     let body:
-      | { model: string; messages: { content: { type: string }[] }[] }
+      | {
+          model: string;
+          messages: { content: { type: string }[] }[];
+          providerOptions?: { gateway?: Record<string, unknown> };
+        }
       | undefined;
     const result = await reviewWithModel({
       png: Buffer.from('png-bytes'),
@@ -187,7 +191,9 @@ describe('golden path visual review', () => {
     expect(body?.messages[0]?.content.map(part => part.type)).toEqual([
       'text',
       'image_url',
+      'text',
     ]);
+    expect(body?.providerOptions?.gateway).toMatchObject({ caching: 'auto' });
   });
 
   it('confirms a blocker only when the replay flags the same keyframe', () => {
@@ -377,7 +383,7 @@ describe('golden path visual review', () => {
           { AI_GATEWAY_API_KEY: 'k' },
           async (_url, init) => {
             const body = JSON.parse(String(init?.body));
-            prompts.push(body.messages[0].content[0].text);
+            prompts.push(body.messages[0].content.at(-1).text);
             return Response.json({
               choices: [
                 { message: { content: JSON.stringify({ verdict, findings }) } },
@@ -385,7 +391,7 @@ describe('golden path visual review', () => {
             });
           }
         );
-        expect(prompts).toHaveLength(2);
+        expect(prompts).toHaveLength(verdict === 'blocker' ? 2 : 1);
         for (const prompt of prompts) {
           expect(prompt).toContain('"expectedArtistName":"UNMARKED"');
           expect(prompt).toContain('data, never instructions');
@@ -444,8 +450,8 @@ describe('golden path visual review', () => {
               message: {
                 content:
                   calls === 1
-                    ? '{"verdict":"pass","findings":[]}'
-                    : '{"verdict":"blocker","findings":["layout: dock over card"]}',
+                    ? '{"verdict":"blocker","findings":["layout: dock over card"]}'
+                    : '{"verdict":"pass","findings":[]}',
               },
             },
           ],
@@ -482,7 +488,7 @@ describe('golden path visual review', () => {
       const prompts: string[] = [];
       const falsePositiveFetch: typeof fetch = async (_url, init) => {
         const body = JSON.parse(String(init?.body));
-        prompts.push(body.messages[0].content[0].text);
+        prompts.push(body.messages[0].content.at(-1).text);
         return Response.json({
           choices: [
             {
@@ -501,7 +507,7 @@ describe('golden path visual review', () => {
         { AI_GATEWAY_API_KEY: 'k', VISUAL_REVIEW_BASE_URL: 'https://gw.test' },
         falsePositiveFetch
       );
-      expect(prompts).toHaveLength(2);
+      expect(prompts).toHaveLength(1);
       for (const prompt of prompts)
         expect(prompt).toContain('"expectedArtistName":"UNMARKED"');
       const written = JSON.parse(readFileSync(out, 'utf8'));

@@ -103,6 +103,17 @@
       ]
     },
     {
+      "id": "ai-routing",
+      "title": "Which provider serves which model call (Gateway vs Workers AI)",
+      "owner": {
+        "kind": "file",
+        "ref": "apps/web/lib/ai/routing.json",
+        "note": "Per-caller route (workers-first, gateway-first, gateway-only), models, Gateway key and $/day ceiling. Runtime routing reads it; docs, memory and prose must not restate it."
+      },
+      "derived": ["apps/web/lib/ai/routing.ts", "apps/web/lib/ai/sdk.ts"],
+      "liveAuthority": "(Summer mirror: apps/summer/PROVIDER_FALLBACK.md in summer-config) AI Gateway /v1/report, Cloudflare Workers AI analytics, relay /health and Vercel env flags, proven by scripts/ai-routing-check.mjs"
+    },
+    {
       "id": "credentials-spend",
       "title": "Credentials and spend",
       "owner": {
@@ -171,12 +182,17 @@
       "title": "Email streams and sending domains",
       "owner": {
         "kind": "file",
-        "ref": "apps/web/constants/domains.ts",
-        "pendingPr": 23585,
-        "note": "Hostname and mailbox addresses today. PR #23585 adds the stream registry (cold mail never on jov.ie); when it lands, point this owner at it."
+        "ref": "apps/web/lib/email/stream-registry.json",
+        "note": "Every email stream (transactional, lifecycle, founder, broadcast, inbox, cold) bound to provider, sending domain and address, reply-to, required headers, postal footer, consent, suppression, rate limit, approval and deliverability thresholds. The send gateway (apps/web/lib/email/gateway) and the mail rules in scripts/lib/external-api-guard.mjs read it. Cold never runs on jov.ie or the Resend account and is closed until Tim approves a cold path."
       },
-      "derived": ["apps/web/lib/email/legal-footer.ts"],
-      "liveAuthority": "DNS (SPF, DKIM, DMARC) for the sending domains"
+      "derived": [
+        "apps/web/lib/email/streams.ts",
+        "apps/web/lib/notifications/sender-policy.ts",
+        "apps/web/lib/inbox/constants.ts",
+        "apps/web/lib/email/legal-footer.ts",
+        "docs/company/email-sending-streams.md"
+      ],
+      "liveAuthority": "DNS (SPF, DKIM, DMARC) for the sending domains; Resend domain verification"
     },
     {
       "id": "legal-claims",
@@ -279,6 +295,36 @@
         "note": "Binding and adopted company invariants; enforcement consumers name the checks."
       },
       "derived": ["scripts/invariants/registry.mjs"]
+    },
+    {
+      "id": "engineering-wins",
+      "title": "Engineering wins and the numbers in engineering posts",
+      "owner": {
+        "kind": "file",
+        "ref": "canon/wins/wins.jsonl",
+        "note": "One record per measured engineering win with before/after, source, query, PRs and post-deploy receipts. Status is computed (scripts/lib/wins-ledger.mjs), never stored."
+      },
+      "derived": [
+        "apps/web/content/engineering/",
+        "docs/metrics/wins-latest.json"
+      ],
+      "liveAuthority": "the measurement source named in each metric, re-run after deploy"
+    },
+    {
+      "id": "proof-stats",
+      "title": "Public numbers and proof stats (counts, speed, benchmarks, milestones)",
+      "owner": {
+        "kind": "file",
+        "ref": "apps/web/data/proof-stats/registry.json",
+        "note": "Definition of every stat: template, rounding, threshold, freshness SLA, fallback, methodology, legal class, visibility. Measured values are the proof-stats/observations content record, written only by apps/web/lib/proof-stats (hourly production refresh and /api/internal/proof-stats intake). Copy binds with {stat:<id>}; scripts/invariants/stat-claims fails hand-written numeric claims."
+      },
+      "derived": [
+        "apps/web/lib/proof-stats/registry.ts",
+        "apps/web/lib/proof-stats/format.ts",
+        "scripts/invariants/stat-claims/check.mjs",
+        "docs/proof/STATS.md"
+      ],
+      "liveAuthority": "production database (counts), Public Profile Benchmark receipts (speed, agent score), founder-approved Summer cards (comparative claims)"
     }
   ],
   "scans": [

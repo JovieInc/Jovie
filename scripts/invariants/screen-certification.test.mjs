@@ -491,6 +491,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
   it('registers every founder cockpit route for changed-surface certification', () => {
     const sources = [
       'apps/web/app/app/(shell)/admin/activity/page.tsx',
+      'apps/web/app/app/(shell)/admin/activity/loading.tsx',
       'apps/web/app/app/(shell)/admin/growth/page.tsx',
       'apps/web/app/app/(shell)/admin/operations/page.tsx',
       'apps/web/app/app/(shell)/admin/product/page.tsx',
@@ -506,7 +507,21 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       sources,
       viewports: ['desktop', 'mobile'],
     });
-    for (const source of sources) assert.equal(kindOf(source), 'registered');
+    for (const source of sources) {
+      assert.equal(kindOf(source), 'registered');
+      const result = evaluateChangedScreens({
+        changedFiles: [{ path: source, status: 'M' }],
+        headSha: HEAD,
+      });
+      assert.deepEqual(result.issues, []);
+      assert.deepEqual(result.changedScreens, [
+        {
+          id: 'web.ov-founder-cockpit',
+          verdict: 'evidence-required',
+          findings: [],
+        },
+      ]);
+    }
   });
 
   it('registers the public artists directory for changed-surface certification', () => {

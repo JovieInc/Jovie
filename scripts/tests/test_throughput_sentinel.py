@@ -73,6 +73,26 @@ class ThroughputSentinelTest(unittest.TestCase):
                  releaseFlow={"mergeGroupRuns": 1, "mergeGroupJobs": 2, "mergeGroupStartP50Min": 30, "leaseHeldMin": 44.9})
         self.assertEqual(ts.judge(ok), {})
 
+    def test_merge_gate_pool_alarm_names_the_faster_pool(self):
+        def flow(pools):
+            return obs(pushes1h={"JovieInc/Jovie|codex": 1},
+                       releaseFlow={"mergeGroupRuns": 3, "mergeGroupJobs": 40, "mergeGroupStartP50Min": 0.1,
+                                    "mergeGroupStartByPool": pools})
+        hosted = {"n": 40, "p50S": 3.0, "p95S": 33.0}
+        slow_fixed = {"n": 13, "p50S": 120.0, "p95S": 451.0}
+        alert = ts.judge(flow({"hosted": hosted, "self-hosted": slow_fixed}))["throughput-merge-gate-pool"]
+        self.assertIn("self-hosted p50 120.0s", alert)
+        self.assertIn("deleting repo variable MERGE_GATE_POOL", alert)
+        # Within the margin, or too few self-hosted jobs: no alarm.
+        self.assertNotIn("throughput-merge-gate-pool", ts.judge(flow({"hosted": hosted, "self-hosted": {"n": 13, "p50S": 30.0, "p95S": 60.0}})))
+        self.assertNotIn("throughput-merge-gate-pool", ts.judge(flow({"hosted": hosted, "self-hosted": {"n": 2, "p50S": 900.0, "p95S": 900.0}})))
+        # Hosted saturated with nothing on the gem pool: suggest the fallback.
+        saturated = ts.judge(flow({"hosted": {"n": 20, "p50S": 141.0, "p95S": 167.0}}))["throughput-merge-gate-pool"]
+        self.assertIn("MERGE_GATE_POOL=fixed", saturated)
+        self.assertEqual(ts.runner_pool(["self-hosted", "jovie-fixed"]), "self-hosted")
+        self.assertEqual(ts.runner_pool(["ubuntu-latest"]), "hosted")
+        self.assertEqual(ts.runner_pool(None), "hosted")
+
     def test_one_dominant_idle_reason_alarms_only_with_demand_and_volume(self):
         busy = obs(pushes1h={"JovieInc/Jovie|codex": 1}, idleExits1h={"repair-inventory-oversize": 7, "linear-rate-limited": 3})
         self.assertIn("70%", ts.judge(busy)["throughput-idle-dominant"])
@@ -128,7 +148,8 @@ class ThroughputSentinelTest(unittest.TestCase):
             if "/jobs" in args[-1]:
                 run_id = int(args[-1].split("/runs/")[1].split("/")[0])
                 wait = {10: 120, 11: 600, 12: 900}[run_id]
-                jobs = [{"created_at": iso(NOW - 500), "started_at": iso(NOW - 500 + wait)}]
+                jobs = [{"created_at": iso(NOW - 500), "started_at": iso(NOW - 500 + wait),
+                         "labels": ["self-hosted", "Linux", "X64", "jovie-fixed"] if run_id == 12 else ["ubuntu-latest"]}]
                 return SimpleNamespace(returncode=0, stdout=json.dumps({"jobs": jobs}), stderr="")
             return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps(
                 {"workflow_runs": [{"id": 7, "run_started_at": iso(NOW - 50 * 60)}]}))
@@ -138,6 +159,9 @@ class ThroughputSentinelTest(unittest.TestCase):
             self.assertIsNone(error)
             self.assertEqual((signal["mergeGroupRuns"], signal["mergeGroupStartP50Min"], signal["leaseHeldMin"]),
                              (3, 10.0, 50.0))  # skipped run ignored, three jobs sampled
+            self.assertEqual(signal["mergeGroupStartByPool"],
+                             {"hosted": {"n": 2, "p50S": 360.0, "p95S": 600.0},
+                              "self-hosted": {"n": 1, "p50S": 900.0, "p95S": 900.0}})
             again, _ = ts.sample_release_flow(Path(raw), NOW + 10, run)
             self.assertEqual(len(calls), 6)  # 1 runs + 3 jobs + 1 lease + 1 queued count; cached for five minutes
             self.assertEqual(again["leaseRunIds"], [7])
@@ -190,6 +214,29 @@ class QueueUnmergeableTest(unittest.TestCase):
 
 
 class QueueBreakerTest(unittest.TestCase):
+    def test_headgreen_failed_build_of_a_still_queued_entry_is_not_counted(self):
+        qb = importlib.util.module_from_spec(importlib.util.spec_from_file_location("queue_breaker", ROOT / "scripts/lanes/queue_breaker.py"))
+        qb.__spec__.loader.exec_module(qb)
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append(args)
+            flat = " ".join(args)
+            if "workflows/ci.yml/runs" in flat:
+                rows = [{"id": 11, "head_branch": "gh-readonly-queue/main/pr-700-abc", "conclusion": "failure", "updated_at": iso(NOW - 600), "head_sha": "live1"},
+                        {"id": 12, "head_branch": "gh-readonly-queue/main/pr-700-def", "conclusion": "failure", "updated_at": iso(NOW - 3000), "head_sha": "old2"}]
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"data": None, "workflow_runs": rows}))
+            if "mergeQueue" in flat:
+                nodes = [{"state": "AWAITING_CHECKS", "headCommit": {"oid": "LIVE1"}, "pullRequest": {"id": "PR_X", "number": 700, "headRefOid": "a" * 40}}]
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"data": {"repository": {"mergeQueue": {"entries": {"nodes": nodes}}}}}))
+            return SimpleNamespace(returncode=0, stderr="", stdout="{}")
+
+        with tempfile.TemporaryDirectory() as raw:
+            out = qb.sweep(raw, run, now=NOW)
+        # One failure is the live entry (never ejected under HEADGREEN); one failure is not a trip.
+        self.assertEqual(out["tripped"], [])
+        self.assertFalse(any("dequeuePullRequest" in " ".join(c) for c in calls))
+
     def test_two_group_failures_in_three_hours_dequeue_hold_and_keep_the_head_blocked(self):
         qb = importlib.util.module_from_spec(importlib.util.spec_from_file_location("queue_breaker", ROOT / "scripts/lanes/queue_breaker.py"))
         qb.__spec__.loader.exec_module(qb)
@@ -409,6 +456,79 @@ class mock_max:
 
     def __exit__(self, *exc):
         self.module.IDLE_LOG_MAX_BYTES = self.old
+
+
+
+class SupplyFlowTest(unittest.TestCase):
+    def graphql(self, nodes, depth):
+        body = {"data": {"repository": {"mergeQueue": {"entries": {"totalCount": depth}},
+                                         "pullRequests": {"pageInfo": {"hasNextPage": False, "endCursor": None},
+                                                          "nodes": nodes}}}}
+        return lambda args, **_: SimpleNamespace(returncode=0, stdout=json.dumps(body), stderr="")
+
+    def pr(self, number, status="CLEAN", queued=False, labels=(), draft=False):
+        return {"number": number, "isDraft": draft, "isInMergeQueue": queued, "isCrossRepository": False,
+                "mergeStateStatus": status, "createdAt": iso(NOW), "headRefOid": "a" * 40,
+                "labels": {"nodes": [{"name": name} for name in labels]}}
+
+    def test_queue_starved_alarm_needs_ten_minutes_of_clean_unqueued_with_depth_at_most_one(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            nodes = [self.pr(1), self.pr(2, "DIRTY"), self.pr(3, labels=["hold"]), self.pr(4, draft=True),
+                     self.pr(5, "CLEAN", queued=True), self.pr(6, "BLOCKED")]
+            first, error = ts.sample_supply_flow(Path(tmp), NOW, self.graphql(nodes, 1))
+            self.assertIsNone(error)
+            self.assertEqual(first["counts"], {"BLOCKED": 1, "CLEAN-unqueued": 1, "DIRTY": 1, "held": 1, "queued": 1})
+            self.assertEqual(first["cleanUnqueued"], [1])
+            self.assertEqual(ts.judge(obs(pushes1h={"JovieInc/Jovie|codex": 1}, supplyFlow=first)), {})
+            later, _ = ts.sample_supply_flow(Path(tmp), NOW + 700, self.graphql(nodes, 1))
+            self.assertGreater(later["starvedForS"], 600)
+            alerts = ts.judge({**obs(pushes1h={"JovieInc/Jovie|codex": 1}, supplyFlow=later), "now": NOW + 700})
+            self.assertIn("throughput-queue-starved", alerts)
+            self.assertIn("#1", alerts["throughput-queue-starved"])
+            deep, _ = ts.sample_supply_flow(Path(tmp), NOW + 1500, self.graphql(nodes, 6))
+            self.assertEqual(deep["starvedForS"], 0)
+
+    def test_lanes_tick_dispatches_the_enroll_sweep_after_ten_minutes_once_per_window(self):
+        calls = []
+
+        def run(args, **_):
+            calls.append(args)
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        with tempfile.TemporaryDirectory() as tmp:
+            first, _ = ts.sample_supply_flow(Path(tmp), NOW, self.graphql([self.pr(1)], 1))
+            self.assertIsNone(ts.backstop_enroll(Path(tmp), first, NOW + 60, run))
+            later, _ = ts.sample_supply_flow(Path(tmp), NOW + 700, self.graphql([self.pr(1)], 1))
+            receipt = ts.backstop_enroll(Path(tmp), later, NOW + 700, run)
+            self.assertTrue(receipt["ok"])
+            self.assertEqual(calls, [["workflow", "run", "merge-queue-green-enroll.yml", "-R", "JovieInc/Jovie", "--ref", "main"]])
+            ts.backstop_enroll(Path(tmp), later, NOW + 800, run)
+            self.assertEqual(len(calls), 1)
+
+    def test_remediation_dead_man_alarms_after_thirty_silent_minutes_with_waiting_prs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            supply, _ = ts.sample_supply_flow(Path(tmp), NOW, self.graphql([self.pr(1, "DIRTY"), self.pr(2, "BLOCKED")], 3))
+            old = iso(NOW - 3600)
+            run = lambda args, **_: SimpleNamespace(returncode=0, stdout=json.dumps({"workflow_runs": [{"created_at": old}]}), stderr="")
+            live = ts.remediation_liveness(Path(tmp), supply, NOW, run)
+            self.assertEqual((live["waiting"], live["silentForS"]), (2, 3600))
+            alerts = ts.judge(obs(pushes1h={"JovieInc/Jovie|codex": 1}, supplyFlow=supply, remediation=live))
+            self.assertIn("throughput-remediation-silent", alerts)
+            fresh = {**live, "silentForS": 300}
+            self.assertNotIn("throughput-remediation-silent", ts.judge(obs(pushes1h={"JovieInc/Jovie|codex": 1}, supplyFlow=supply, remediation=fresh)))
+            supply["prs"]["1"]["since"] = NOW - 3600
+            empty = lambda *a, **k: SimpleNamespace(returncode=0, stdout='{"workflow_runs":[]}', stderr="")
+            self.assertEqual(ts.remediation_liveness(Path(tmp), supply, NOW, empty)["silentForS"], 3600)
+
+    def test_enqueue_records_green_to_enqueue_dwell_and_supply_dwell_alarm(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ts.sample_supply_flow(Path(tmp), NOW, self.graphql([self.pr(1)], 4))
+            after, _ = ts.sample_supply_flow(Path(tmp), NOW + 130, self.graphql([self.pr(1, queued=True)], 5))
+            self.assertEqual(after["greenToEnqueueS"], [130.0])
+            dirty = [self.pr(n, "DIRTY") for n in range(10, 14)]
+            ts.sample_supply_flow(Path(tmp), NOW + 300, self.graphql(dirty, 5))
+            late, _ = ts.sample_supply_flow(Path(tmp), NOW + 300 + 7 * 3600, self.graphql(dirty, 5))
+            alerts = ts.judge({**obs(pushes1h={"JovieInc/Jovie|codex": 1}, supplyFlow=late), "now": NOW + 300 + 7 * 3600})
+            self.assertIn("throughput-supply-dwell:DIRTY", alerts)
 
 
 if __name__ == "__main__":

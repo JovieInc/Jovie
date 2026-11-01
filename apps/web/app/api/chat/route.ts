@@ -229,6 +229,7 @@ import {
 } from '@/lib/services/pitch';
 import { isRetouchConfigured } from '@/lib/services/retouching/provider-gemini';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
+import { isChatHealthCanaryEmail } from '@/lib/synthetic/prodcert-identities';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 
@@ -2873,7 +2874,9 @@ export async function POST(req: Request) {
 
   // Rate limiting - plan-aware weekly quota + burst protection. For clients
   // that send clientTurnId, reservation/replay happens before quota charging.
-  const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan);
+  const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan, {
+    skipWeeklyQuota: isChatHealthCanaryEmail(accountContext.email),
+  });
   if (!rateLimitResult.success) {
     const rateLimitMessage =
       accountContext.billingVerification === 'unavailable'
@@ -3097,7 +3100,7 @@ export async function POST(req: Request) {
       const failure = classifyChatStreamFailure(error);
       await markChatTurnTerminal({
         turnId: reservedTurn.turnId,
-        status: 'failed_model_error',
+        status: failure.terminalStatus,
         errorCode: failure.errorCode,
         errorMessage: failure.errorMessage,
       });
@@ -3321,7 +3324,7 @@ export async function POST(req: Request) {
       const failure = classifyChatStreamFailure(error);
       await markChatTurnTerminal({
         turnId: reservedTurn.turnId,
-        status: 'failed_model_error',
+        status: failure.terminalStatus,
         errorCode: failure.errorCode,
         errorMessage: failure.errorMessage,
       }).catch(() => null);

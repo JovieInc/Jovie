@@ -1,8 +1,18 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { test } from 'node:test';
-import { checkIcpLanguage } from './check.mjs';
+import { execFileSync } from 'node:child_process';
 import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { test } from 'node:test';
+import { checkIcpLanguage, writeBaseline } from './check.mjs';
+import {
+  BASELINE_RELATIVE,
   isExemptPath,
   loadConfig,
   matchTerms,
@@ -14,6 +24,78 @@ import { collectScanFiles, REPO_ROOT } from './scan.mjs';
 const config = loadConfig();
 const terms = (text, extra) =>
   matchTerms(text, config.terms, extra ?? config.suppressedPrefixes);
+
+function baselineFixture(t) {
+  const root = mkdtempSync(join(tmpdir(), 'icp-baseline-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const path = join(root, BASELINE_RELATIVE);
+  mkdirSync(dirname(path), { recursive: true });
+  const ids = ['artist:old.ts:abc', 'music:old.ts:def'];
+  writeFileSync(path, `${JSON.stringify({ count: ids.length, ids })}\n`);
+  const git = args => execFileSync('git', args, { cwd: root, stdio: 'pipe' });
+  git(['init', '--quiet']);
+  git(['add', '.']);
+  git([
+    '-c',
+    'user.name=fixture',
+    '-c',
+    'user.email=fixture@example.com',
+    'commit',
+    '--quiet',
+    '-m',
+    'baseline',
+  ]);
+  git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  return { root, path, ids, git };
+}
+
+test('baseline writer removes resolved ids and preserves live debt', t => {
+  const { root, path, ids } = baselineFixture(t);
+  writeBaseline(root, [ids[1]]);
+  assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), {
+    schema: 'jovie.icp-language-baseline/v1',
+    count: 1,
+    ids: [ids[1]],
+  });
+});
+
+test('baseline writer refuses new violations without modifying the file', t => {
+  const { root, path, ids } = baselineFixture(t);
+  const before = readFileSync(path, 'utf8');
+  assert.throws(
+    () => writeBaseline(root, [...ids, 'artist:new.ts:xyz']),
+    /new violations/
+  );
+  assert.equal(readFileSync(path, 'utf8'), before);
+});
+
+test('baseline writer refuses a corrupt count without modifying the file', t => {
+  const { root, path, ids } = baselineFixture(t);
+  writeFileSync(path, JSON.stringify({ count: 0, ids }));
+  const before = readFileSync(path, 'utf8');
+  assert.throws(() => writeBaseline(root, [ids[1]]), /count does not match/);
+  assert.equal(readFileSync(path, 'utf8'), before);
+});
+
+test('baseline writer refuses missing ancestor evidence without modifying the file', t => {
+  const { root, path, ids, git } = baselineFixture(t);
+  git(['update-ref', '-d', 'refs/remotes/origin/main']);
+  const before = readFileSync(path, 'utf8');
+  assert.throws(
+    () => writeBaseline(root, [ids[1]]),
+    /origin\/main is not available/
+  );
+  assert.equal(readFileSync(path, 'utf8'), before);
+});
+
+test('baseline writer cannot preserve ids already added beyond the trusted ancestor', t => {
+  const { root, path, ids } = baselineFixture(t);
+  const grown = [...ids, 'artist:new.ts:xyz'];
+  writeFileSync(path, JSON.stringify({ count: grown.length, ids: grown }));
+  const before = readFileSync(path, 'utf8');
+  assert.throws(() => writeBaseline(root, grown), /new violations/);
+  assert.equal(readFileSync(path, 'utf8'), before);
+});
 
 test('word boundaries match segment words and miss lookalikes', () => {
   assert.deepEqual(terms('for artists and musicians'), ['artist', 'musician']);

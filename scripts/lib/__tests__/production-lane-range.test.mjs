@@ -11,10 +11,14 @@ import {
   PRODUCTION_BASE_EVIDENCE,
   planProductionLaneRange,
   planProductionMarkerRecovery,
+  resolveExactGreenEvidence,
   resolveHistoricalLaneEvidence,
+  resolveRangeWebEvidence,
   runProductionLaneRange,
   validateLaneEvidenceReceipt,
+  validateLaterTipGreenReceipt,
   WEB_BIND_REASONS,
+  WEB_EVIDENCE_SOURCES,
 } from '../production-lane-range.mjs';
 
 const sha = character => character.repeat(40);
@@ -668,6 +672,365 @@ describe('production lane range', () => {
     expect(classifyProductionMarkerEvidence(unbound)).toMatchObject({
       state: 'manual',
       reason: 'malformed_or_contradictory_marker',
+    });
+  });
+});
+
+describe('range Web evidence carryover', () => {
+  const repository = 'JovieInc/Jovie';
+
+  function ciRun({ id, headSha, event, attempt = 1 }) {
+    return {
+      id,
+      run_attempt: attempt,
+      event,
+      head_sha: headSha,
+      head_branch:
+        event === 'push' ? 'main' : 'gh-readonly-queue/main/pr-1-base',
+      path: '.github/workflows/ci.yml',
+      head_repository: { full_name: repository },
+      status: 'completed',
+      conclusion: 'success',
+    };
+  }
+
+  function greenReceipt({ headSha, runId, selectedLanes = ['operations'] }) {
+    return {
+      provenance: {
+        sha: headSha,
+        runId: String(runId),
+        runAttempt: '1',
+      },
+      selectedLanes,
+      aggregatePassed: true,
+      admissions: Object.fromEntries(
+        selectedLanes.map(lane => [
+          lane,
+          { selected: true, passed: true, results: ['success'] },
+        ])
+      ),
+    };
+  }
+
+  /** CI fixture API: runs keyed by head SHA, receipts keyed by artifact id. */
+  function evidenceApi({ runsBySha = {}, receiptsByRunId = {} } = {}) {
+    const allRuns = Object.values(runsBySha).flat();
+    const findRun = runId => allRuns.find(row => row.id === runId);
+    return {
+      ghJsonImpl: endpoint => {
+        if (endpoint.includes('/ci.yml/runs?')) {
+          const params = new URL(`https://api.github.com/${endpoint}`)
+            .searchParams;
+          return {
+            workflow_runs: (runsBySha[params.get('head_sha')] ?? []).filter(
+              run => run.event === params.get('event')
+            ),
+          };
+        }
+        const run = findRun(Number(endpoint.match(/\/runs\/(\d+)/)?.[1]));
+        if (!run) throw new Error(`Unexpected fixture endpoint: ${endpoint}`);
+        if (endpoint.includes('/jobs?'))
+          return {
+            total_count: 1,
+            jobs: [
+              {
+                name: run.event === 'push' ? 'Main Release Ready' : 'PR Ready',
+                run_id: run.id,
+                run_attempt: run.run_attempt,
+                head_sha: run.head_sha,
+                status: 'completed',
+                conclusion: 'success',
+              },
+            ],
+          };
+        if (endpoint.includes('/artifacts?'))
+          return {
+            total_count: 1,
+            artifacts: [
+              {
+                id: run.id + 1000,
+                name: `product-lane-final-${run.head_sha}-${run.run_attempt}`,
+                expired: false,
+              },
+            ],
+          };
+        throw new Error(`Unexpected fixture endpoint: ${endpoint}`);
+      },
+      downloadFinalReceiptImpl: (_repository, artifactId) => {
+        const receipt = receiptsByRunId[artifactId - 1000];
+        if (!receipt)
+          throw new Error(`Unexpected fixture artifact: ${artifactId}`);
+        return receipt;
+      },
+    };
+  }
+
+  it('keeps the anchored exact receipt when one exists', () => {
+    const anchorSha = sha('a');
+    const currentSha = sha('c');
+    const { ghJsonImpl, downloadFinalReceiptImpl } = evidenceApi({
+      runsBySha: {
+        [anchorSha]: [ciRun({ id: 301, headSha: anchorSha, event: 'push' })],
+      },
+      receiptsByRunId: {
+        301: receipt({
+          headSha: anchorSha,
+          runId: 301,
+          selectedLanes: ['web'],
+          webPassed: true,
+        }),
+      },
+    });
+
+    expect(
+      resolveRangeWebEvidence({
+        repository,
+        anchorSha,
+        currentSha,
+        laterTipShas: [currentSha],
+        ghJsonImpl,
+        downloadFinalReceiptImpl,
+      })
+    ).toEqual({
+      webEvidence: {
+        sha: anchorSha,
+        lane: 'web',
+        event: 'push',
+        runId: 301,
+        runAttempt: 1,
+        artifactId: 1301,
+        artifactName: `product-lane-final-${anchorSha}-1`,
+        source: WEB_EVIDENCE_SOURCES.historicalExact,
+      },
+      webEvidenceSha: anchorSha,
+      fallback: null,
+    });
+  });
+
+  it('falls back to the newest later tip with full exact green evidence when the anchor has no receipt', () => {
+    const anchorSha = sha('a');
+    const intermediateSha = sha('b');
+    const currentSha = sha('c');
+    const { ghJsonImpl, downloadFinalReceiptImpl } = evidenceApi({
+      runsBySha: {
+        [intermediateSha]: [
+          ciRun({ id: 302, headSha: intermediateSha, event: 'push' }),
+        ],
+        [currentSha]: [ciRun({ id: 303, headSha: currentSha, event: 'push' })],
+      },
+      receiptsByRunId: {
+        302: greenReceipt({ headSha: intermediateSha, runId: 302 }),
+        303: greenReceipt({
+          headSha: currentSha,
+          runId: 303,
+          selectedLanes: ['operations', 'cross-product'],
+        }),
+      },
+    });
+
+    expect(
+      resolveRangeWebEvidence({
+        repository,
+        anchorSha,
+        currentSha,
+        laterTipShas: [currentSha, intermediateSha],
+        ghJsonImpl,
+        downloadFinalReceiptImpl,
+      })
+    ).toEqual({
+      webEvidence: {
+        sha: currentSha,
+        event: 'push',
+        runId: 303,
+        runAttempt: 1,
+        artifactId: 1303,
+        artifactName: `product-lane-final-${currentSha}-1`,
+        selectedLanes: ['operations', 'cross-product'],
+        lane: 'web',
+        source: WEB_EVIDENCE_SOURCES.laterTipCarryover,
+        carryoverAnchorSha: anchorSha,
+        receiptLanes: ['operations', 'cross-product'],
+      },
+      webEvidenceSha: currentSha,
+      fallback: {
+        anchorSha,
+        resolvedSha: currentSha,
+        reason: 'anchor-exact-receipt-missing',
+      },
+    });
+  });
+
+  it('falls back to an intermediate tip when newer tips hold no green evidence', () => {
+    const anchorSha = sha('a');
+    const intermediateSha = sha('b');
+    const currentSha = sha('c');
+    const { ghJsonImpl, downloadFinalReceiptImpl } = evidenceApi({
+      runsBySha: {
+        [intermediateSha]: [
+          ciRun({ id: 302, headSha: intermediateSha, event: 'push' }),
+        ],
+      },
+      receiptsByRunId: {
+        302: greenReceipt({ headSha: intermediateSha, runId: 302 }),
+      },
+    });
+
+    expect(
+      resolveRangeWebEvidence({
+        repository,
+        anchorSha,
+        currentSha,
+        laterTipShas: [currentSha, intermediateSha],
+        ghJsonImpl,
+        downloadFinalReceiptImpl,
+      })
+    ).toMatchObject({
+      webEvidence: {
+        sha: intermediateSha,
+        runId: 302,
+        source: WEB_EVIDENCE_SOURCES.laterTipCarryover,
+        carryoverAnchorSha: anchorSha,
+      },
+      webEvidenceSha: intermediateSha,
+      fallback: {
+        anchorSha,
+        resolvedSha: intermediateSha,
+        reason: 'anchor-exact-receipt-missing',
+      },
+    });
+  });
+
+  it('skips later tips whose receipts failed and keeps fail-closed when none are green', () => {
+    const anchorSha = sha('a');
+    const currentSha = sha('c');
+    const failingTipReceipt = greenReceipt({
+      headSha: currentSha,
+      runId: 303,
+    });
+    failingTipReceipt.aggregatePassed = false;
+    failingTipReceipt.admissions.operations = {
+      selected: true,
+      passed: false,
+      results: ['failure'],
+    };
+    const { ghJsonImpl, downloadFinalReceiptImpl } = evidenceApi({
+      runsBySha: {
+        [currentSha]: [ciRun({ id: 303, headSha: currentSha, event: 'push' })],
+      },
+      receiptsByRunId: { 303: failingTipReceipt },
+    });
+
+    expect(() =>
+      resolveRangeWebEvidence({
+        repository,
+        anchorSha,
+        currentSha,
+        laterTipShas: [currentSha],
+        ghJsonImpl,
+        downloadFinalReceiptImpl,
+      })
+    ).toThrow(
+      `expected one exact passing web receipt for ${anchorSha}; found 0`
+    );
+  });
+
+  it('stays fail-closed when the anchored receipt is ambiguous', () => {
+    const anchorSha = sha('a');
+    const currentSha = sha('c');
+    const { ghJsonImpl, downloadFinalReceiptImpl } = evidenceApi({
+      runsBySha: {
+        [anchorSha]: [
+          ciRun({ id: 311, headSha: anchorSha, event: 'push' }),
+          ciRun({ id: 312, headSha: anchorSha, event: 'push' }),
+        ],
+      },
+      receiptsByRunId: {
+        311: receipt({ headSha: anchorSha, runId: 311 }),
+        312: receipt({ headSha: anchorSha, runId: 312 }),
+      },
+    });
+
+    expect(() =>
+      resolveRangeWebEvidence({
+        repository,
+        anchorSha,
+        currentSha,
+        laterTipShas: [currentSha],
+        ghJsonImpl,
+        downloadFinalReceiptImpl,
+      })
+    ).toThrow(
+      `expected one exact passing web receipt for ${anchorSha}; found 2`
+    );
+  });
+
+  it('never overrides an anchored receipt that exists and failed the web lane', () => {
+    const anchorSha = sha('a');
+    const currentSha = sha('c');
+    const { ghJsonImpl, downloadFinalReceiptImpl } = evidenceApi({
+      runsBySha: {
+        [anchorSha]: [ciRun({ id: 321, headSha: anchorSha, event: 'push' })],
+        [currentSha]: [ciRun({ id: 303, headSha: currentSha, event: 'push' })],
+      },
+      receiptsByRunId: {
+        321: receipt({
+          headSha: anchorSha,
+          runId: 321,
+          webPassed: false,
+        }),
+        303: greenReceipt({ headSha: currentSha, runId: 303 }),
+      },
+    });
+
+    expect(() =>
+      resolveRangeWebEvidence({
+        repository,
+        anchorSha,
+        currentSha,
+        laterTipShas: [currentSha],
+        ghJsonImpl,
+        downloadFinalReceiptImpl,
+      })
+    ).toThrow('web admission did not pass');
+  });
+
+  it('rejects later-tip receipts with no selected lanes', () => {
+    const tipSha = sha('c');
+    const emptyLanes = greenReceipt({ headSha: tipSha, runId: 303 });
+    emptyLanes.selectedLanes = [];
+    expect(() =>
+      validateLaterTipGreenReceipt({ receipt: emptyLanes, expectedSha: tipSha })
+    ).toThrow('later tip receipt selected no product lanes');
+  });
+
+  it('resolves exactly one green receipt per later tip and prefers main push', () => {
+    const tipSha = sha('b');
+    const { ghJsonImpl, downloadFinalReceiptImpl } = evidenceApi({
+      runsBySha: {
+        [tipSha]: [
+          ciRun({ id: 331, headSha: tipSha, event: 'merge_group' }),
+          ciRun({ id: 332, headSha: tipSha, event: 'push' }),
+        ],
+      },
+      receiptsByRunId: {
+        331: greenReceipt({ headSha: tipSha, runId: 331 }),
+        332: greenReceipt({ headSha: tipSha, runId: 332 }),
+      },
+    });
+
+    expect(
+      resolveExactGreenEvidence({
+        repository,
+        sha: tipSha,
+        ghJsonImpl,
+        downloadFinalReceiptImpl,
+      })
+    ).toMatchObject({
+      sha: tipSha,
+      event: 'push',
+      runId: 332,
+      artifactId: 1332,
+      selectedLanes: ['operations'],
     });
   });
 });

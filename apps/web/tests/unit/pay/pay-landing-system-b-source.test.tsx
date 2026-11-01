@@ -141,6 +141,30 @@ describe('pay landing System B source contract', () => {
   });
 });
 
+describe('bare icons and sr-only step labels', () => {
+  it('renders the steps as an ordered list with non-visible step counts', () => {
+    const { container } = render(<PayLanding />);
+
+    const list = container.querySelector('ol');
+    expect(list).not.toBeNull();
+    const counts = Array.from(list!.querySelectorAll('li > span.sr-only')).map(
+      node => node.textContent
+    );
+    expect(counts).toEqual(['Step 1', 'Step 2', 'Step 3']);
+  });
+
+  it('draws icons bare and hidden from assistive tech, with no tile wrapper', () => {
+    const { container } = render(<PayLanding />);
+
+    const icons = container.querySelectorAll('li svg, svg.h-5.w-5');
+    expect(icons.length).toBeGreaterThan(0);
+    for (const icon of Array.from(icons)) {
+      expect(icon).toHaveAttribute('aria-hidden', 'true');
+    }
+    expect(container.querySelector('.h-11.w-11')).toBeNull();
+  });
+});
+
 const OWN_WIDTH_CAP =
   /max-w-(?:300|315|280|4xl|6xl|linear-content)|--homepage-section-max/;
 

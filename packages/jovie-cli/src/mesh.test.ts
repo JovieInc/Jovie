@@ -18,6 +18,7 @@ import {
   meshRegister,
   meshSend,
   meshVouch,
+  meshWatch,
   runMesh,
 } from './mesh.js';
 
@@ -28,6 +29,8 @@ const env = {
   JOVIE_MESH_TOKEN: TOKEN,
   JOVIE_MESH_SENDER_ID: SENDER_ID,
   JOVIE_MESH_SENDER_KIND: 'claude',
+  // These cases cover the legacy Summer transport; the hub has its own suite.
+  JOVIE_MESH_HUB: '0',
 };
 
 type Call = { url: string; init: RequestInit };
@@ -131,7 +134,9 @@ describe('jovie mesh', () => {
     await expect(meshSend('x'.repeat(4001), {}, deps)).rejects.toThrow(
       '1–4000'
     );
-    await expect(meshSend('x', { to: 'nobody' }, deps)).rejects.toThrow('--to');
+    await expect(meshSend('x', { to: 'No Body!' }, deps)).rejects.toThrow(
+      '--to'
+    );
     await expect(
       meshSend('x', { refs: Array(9).fill('r').join(',') }, deps)
     ).rejects.toThrow('--refs');
@@ -368,7 +373,7 @@ describe('jovie mesh', () => {
           env: {
             JOVIE_MESH_TOKEN: TOKEN,
             JOVIE_MESH_SENDER_ID: SENDER_ID,
-            JOVIE_MESH_SENDER_KIND: 'nobody',
+            JOVIE_MESH_SENDER_KIND: 'No Body!',
           },
         }
       )
@@ -585,5 +590,146 @@ describe('macOS keychain adapter', () => {
     await expect(
       macKeychain.create('jovie.mesh.muse', SENDER_ID, 'a b')
     ).rejects.toThrow('Unsafe');
+  });
+});
+
+describe('jovie mesh watch', () => {
+  const msg = (id: string, at = '2026-10-03T21:00:05.000Z') => ({
+    senderKind: 'summer',
+    to: 'claude',
+    correlationId: id,
+    receivedAt: at,
+    quotedBody: JSON.stringify('hello'),
+  });
+  const page = (messages: unknown[], extra: Record<string, unknown> = {}) =>
+    new Response(
+      JSON.stringify({
+        ok: true,
+        messages,
+        hasMore: false,
+        nextCursor: null,
+        ...extra,
+      }),
+      { status: 200 }
+    );
+
+  it('skips the backlog, prints one line per new message, dedupes, and sends wait', async () => {
+    const urls: string[] = [];
+    const queue: (() => Response | Promise<Response>)[] = [
+      () => page([msg('reply:old')]), // backlog drain, not printed
+      () => page([msg('reply:old'), msg('reply:new1')]), // long-poll
+      () => page([]), // nothing new for a moment
+    ];
+    const controller = new AbortController();
+    const lines: string[] = [];
+    const fetchImpl: FetchImplementation = async input => {
+      urls.push(String(input));
+      const next = queue.shift();
+      if (!next) {
+        controller.abort();
+        return page([]);
+      }
+      return next();
+    };
+    const result = await meshWatch(
+      {},
+      {
+        env,
+        fetchImpl,
+        now: () => NOW,
+        signal: controller.signal,
+        emit: line => lines.push(line),
+        sleep: async () => undefined,
+      }
+    );
+    expect(lines).toEqual([
+      'mesh from=summer to=claude id=reply:new1 at=2026-10-03T21:00:05.000Z body="hello"',
+    ]);
+    expect(urls[0]).not.toContain('wait=');
+    expect(urls[1]).toContain('wait=25');
+    expect(result).toMatchObject({ ok: true, stopped: true, emitted: 1 });
+  });
+
+  it('pauses instead of spinning when the server ignores wait', async () => {
+    const pauses: number[] = [];
+    const controller = new AbortController();
+    let calls = 0;
+    const fetchImpl: FetchImplementation = async () => {
+      if (++calls > 3) controller.abort();
+      return page([]);
+    };
+    await meshWatch(
+      { cursor: 'c' },
+      {
+        env,
+        fetchImpl,
+        now: () => NOW,
+        signal: controller.signal,
+        emit: () => undefined,
+        sleep: async ms => {
+          pauses.push(ms);
+        },
+      }
+    );
+    expect(pauses.length).toBeGreaterThanOrEqual(2);
+    expect(pauses.every(ms => ms >= 5000)).toBe(true);
+  });
+
+  it('reconnects with exponential backoff on 503 and stops on an auth error', async () => {
+    const sleeps: number[] = [];
+    let calls = 0;
+    const fetchImpl: FetchImplementation = async () => {
+      calls++;
+      if (calls <= 3)
+        return new Response(
+          JSON.stringify({ ok: false, code: 'mesh_inbox_unavailable' }),
+          { status: 503 }
+        );
+      return new Response(JSON.stringify({ ok: false, code: 'unauthorized' }), {
+        status: 401,
+      });
+    };
+    await expect(
+      meshWatch(
+        { cursor: 'c1' },
+        {
+          env,
+          fetchImpl,
+          now: () => NOW,
+          emit: () => undefined,
+          sleep: async ms => {
+            sleeps.push(ms);
+          },
+        }
+      )
+    ).rejects.toThrow(/401/);
+    expect(sleeps).toEqual([1000, 2000, 4000]);
+  });
+
+  it('prints through the cli and resumes from --cursor', async () => {
+    const controller = new AbortController();
+    const urls: string[] = [];
+    const fetchImpl: FetchImplementation = async input => {
+      urls.push(String(input));
+      if (urls.length > 1) controller.abort();
+      return page(urls.length === 1 ? [msg('reply:x1')] : []);
+    };
+    const out = sink();
+    const code = await runCli(['mesh', 'watch', '--cursor', 'abc', '--json'], {
+      stdout: out.output,
+      stderr: sink().output,
+      mesh: {
+        env,
+        fetchImpl,
+        now: () => NOW,
+        signal: controller.signal,
+        sleep: async () => undefined,
+      },
+    });
+    expect(code).toBe(0);
+    expect(urls[0]).toContain('cursor=abc');
+    expect(JSON.parse(out.text().trim())).toMatchObject({
+      correlationId: 'reply:x1',
+    });
   });
 });

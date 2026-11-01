@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
-import { PLAN_PRICES } from '@/lib/config/plan-prices';
+import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import { useCheckoutMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import type { WaitlistAccessOutcome } from '@/lib/waitlist/access-request';
@@ -202,7 +202,7 @@ function StartProCheckoutButton({ priceId }: { readonly priceId: string }) {
       >
         {checkout.isPending
           ? 'Opening Checkout...'
-          : `Start Pro ($${PLAN_PRICES.pro.monthly})`}
+          : getPublicPriceClaim('pro').ctaLabel}
       </Button>
       {checkout.isError ? (
         <p className='text-sm text-error' role='alert'>

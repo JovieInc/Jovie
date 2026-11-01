@@ -1,3 +1,4 @@
+import hashlib
 import sys
 import tempfile
 import unittest
@@ -14,6 +15,25 @@ NOW = 2_000_000_000.0
 
 
 class GateTest(unittest.TestCase):
+    def test_a_cancelled_sibling_does_not_define_a_second_fix_red_class(self):
+        failed = {"statusCheckRollup": [
+            {"name": "Source Validation", "conclusion": "FAILURE"},
+            {"name": "PR Ready", "conclusion": "FAILURE"},
+        ]}
+        mixed = {"statusCheckRollup": [
+            {"name": "Source Validation", "conclusion": "FAILURE"},
+            {"name": "Fleet Rules Evidence", "conclusion": "CANCELLED"},
+            {"name": "PR Ready", "conclusion": "FAILURE"},
+        ]}
+        cancelled = {"statusCheckRollup": [{"name": "Fleet Rules Evidence", "conclusion": "CANCELLED"}]}
+        solo = gap.check_fingerprint(failed)
+        self.assertEqual(gap.check_fingerprint(mixed), solo)
+        self.assertNotEqual(gap.check_fingerprint(cancelled), solo)
+        self.assertEqual(solo, "fix-red-" + hashlib.sha256(b"Source Validation").hexdigest()[:10])
+        pair = "fix-red-" + hashlib.sha256(b"Fleet Rules Evidence|Source Validation").hexdigest()[:10]
+        self.assertEqual(pair, "fix-red-6c3efaf400")
+        self.assertNotEqual(solo, pair)
+
     def test_fingerprint_ignores_ids_and_numbers_and_honours_explicit_labels(self):
         a = gap.fingerprint("fix: JOV-9001 sentry error 42 in profile page", [])
         b = gap.fingerprint("Fix Sentry error 77 in profile page (JOV-9100)", [])

@@ -436,7 +436,7 @@ def prepare_red(a, plan: dict, pr: dict) -> int:
     if regen and action == classes.AGENT:
         plan.update(action="regen", regen=regen, cls="regen")
         action = "regen"
-    elif action == classes.RENUMBER:
+    elif action in {classes.RENUMBER, classes.REGISTER_DOMAIN}:
         skip = "deterministic-unsupported->lanes"
     elif action == classes.AGENT:
         if cls["cls"] in NOT_MODEL_FIXABLE:

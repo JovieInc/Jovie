@@ -165,8 +165,6 @@ jobs:
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
           NODE_ENV: test
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
@@ -177,12 +175,11 @@ jobs:
           # NEXT_PUBLIC_* is compiled into the standalone server. A dev-server
           # warmup does not compile /app client modules, so auth setup still
           # waits out the first navigation.
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100
           NEXT_PUBLIC_BETTER_AUTH_URL: http://127.0.0.1:3100
           NEXT_PUBLIC_E2E_MODE: '1'
-          NEXT_PUBLIC_CLERK_MOCK: '1'
-          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_AUTH_MOCK: '1'
+          NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
@@ -239,15 +236,13 @@ jobs:
           BASE_URL: http://127.0.0.1:3100
           NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100
           NEXT_PUBLIC_BETTER_AUTH_URL: http://127.0.0.1:3100
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
           E2E_USE_TEST_AUTH_BYPASS: '1'
           E2E_FAST_ONBOARDING: '1'
           E2E_TEST_AUTH_PERSONA: creator
           NEXT_PUBLIC_E2E_MODE: '1'
-          NEXT_PUBLIC_CLERK_MOCK: '1'
-          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_AUTH_MOCK: '1'
+          NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
           NEXT_DISABLE_TOOLBAR: '1'
           E2E_ALLOW_DEV_CSP: '1'
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
@@ -294,8 +289,6 @@ jobs:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
           NODE_ENV: test
           BASE_URL: http://127.0.0.1:3100
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
           E2E_USE_TEST_AUTH_BYPASS: '1'
           E2E_FAST_ONBOARDING: '1'
@@ -322,8 +315,6 @@ jobs:
           NODE_ENV: test
           BASE_URL: http://127.0.0.1:3100
           E2E_SKIP_WARMUP: '1'
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
@@ -375,20 +366,6 @@ jobs:
           name: full-surface-chaos-${{ github.run_id }}
           path: apps/web/test-results/full-surface-chaos-report.json
           retention-days: 7
-
-      - name: Cleanup Clerk E2E test users
-        if: always()
-        continue-on-error: true
-        run: |
-          cd apps/web
-          if [[ "${CLERK_SECRET_KEY:-}" != sk_test_* ]]; then
-            echo "Skipping Clerk E2E cleanup because CLERK_SECRET_KEY is not a Clerk test secret."
-            exit 0
-          fi
-          pnpm tsx scripts/cleanup-e2e-users.ts --force
-        env:
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
 
       - name: Cleanup Neon branch
         if: always()

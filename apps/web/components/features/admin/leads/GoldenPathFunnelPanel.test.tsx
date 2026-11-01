@@ -29,4 +29,14 @@ describe('GoldenPathFunnelPanel', () => {
     render(<GoldenPathFunnelPanel report={report} />);
     expect(screen.getByRole('alert')).toHaveTextContent('Signed in');
   });
+
+  it('says a rate has no base instead of printing n/a', () => {
+    render(
+      <GoldenPathFunnelPanel
+        report={buildGoldenPathReport({ totalVisits: 0, timelines: [] })}
+      />
+    );
+    expect(screen.getAllByText('No base').length).toBeGreaterThan(0);
+    expect(screen.queryByText('n/a')).toBeNull();
+  });
 });

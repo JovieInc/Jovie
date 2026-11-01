@@ -4,6 +4,10 @@ import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ArtistsDirectory } from '@/components/organisms/ArtistsDirectory';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 import {
+  ARTISTS_DIRECTORY_FALLBACK_HREF,
+  isArtistsDirectoryPublishable,
+} from '@/lib/profile/artists-directory-gate';
+import {
   loadArtistsDirectoryCount,
   loadArtistsDirectoryProfiles,
 } from '@/lib/profile/public-discovery-catalog';
@@ -31,6 +35,12 @@ export default async function ArtistsPage({
 
   if (catalog.status === 'unavailable') {
     return renderFallback();
+  }
+
+  // A directory of a few profiles is a dead end that advertises we have no
+  // users: unpublished (redirect, not indexed, not linked) until it is real.
+  if (!isArtistsDirectoryPublishable(total)) {
+    redirect(ARTISTS_DIRECTORY_FALLBACK_HREF);
   }
 
   // A stale or exhausted cursor must never render a "0 PUBLIC PROFILES"

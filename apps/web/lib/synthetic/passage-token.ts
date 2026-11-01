@@ -20,8 +20,10 @@ import { isProdcertCanaryEmail } from './prodcert-identities';
  *   - lives at most {@link PASSAGE_TOKEN_MAX_TTL_SECONDS};
  *   - single use (jti consumed in Redis) and rate limited server-side;
  *   - its only effect is that the server verifies the Turnstile token in
- *     Cloudflare's official test mode. Every other gate and rate limit still
- *     runs, and every use is logged.
+ *     Cloudflare's official test mode (onboarding_chat) or tags a smartlink
+ *     click synthetic so it stays out of customer analytics
+ *     (smartlink_click). Every other gate and rate limit still runs, and
+ *     every use is logged.
  *
  * Wire format: `jsp1.<base64url(JSON claims)>.<base64url(HMAC-SHA256)>`.
  */
@@ -34,7 +36,10 @@ const MAX_CLOCK_SKEW_SECONDS = 30;
 const KEY_INFO = 'jovie.synthetic-passage/v1';
 const KEY_SALT = 'jovie-synthetic-passage';
 
-export const PASSAGE_TOKEN_SCOPES = ['onboarding_chat'] as const;
+export const PASSAGE_TOKEN_SCOPES = [
+  'onboarding_chat',
+  'smartlink_click',
+] as const;
 export type PassageTokenScope = (typeof PASSAGE_TOKEN_SCOPES)[number];
 
 export interface PassageTokenClaims {

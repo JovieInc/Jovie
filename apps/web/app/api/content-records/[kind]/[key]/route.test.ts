@@ -89,6 +89,23 @@ describe('/api/content-records/[kind]/[key]', () => {
     ).toBe(404);
   });
 
+  it('refuses drafts of a producer-only kind but allows its rollback', async () => {
+    const params = { kind: 'proof-stats', key: 'observations' };
+    const draft = await call(
+      'POST',
+      { action: 'draft', data: { schemaVersion: 1, observations: {} } },
+      params
+    );
+    expect(draft.status).toBe(403);
+    expect(draft.json.error).toMatch(/written only by its producer/);
+    const rollback = await call(
+      'POST',
+      { action: 'rollback', reason: 'bad number' },
+      params
+    );
+    expect(rollback.status).not.toBe(403);
+  });
+
   it('validates a spec without storing it', async () => {
     expect(
       await call('POST', { action: 'validate', data: await validSpec() })

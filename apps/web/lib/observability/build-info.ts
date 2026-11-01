@@ -38,8 +38,13 @@ export function resolveCommitSha(): string | undefined {
   const buildSha = env.NEXT_PUBLIC_BUILD_SHA?.trim();
   const runtimeCommitSha = env.VERCEL_GIT_COMMIT_SHA?.trim();
   // Prefer build-time SHA when present (inlined for prebuilt artifacts). Fall
-  // back to the runtime Vercel deployment SHA so CLI deploys still identify.
-  return [buildSha, runtimeCommitSha].find(sha =>
+  // back to the runtime Vercel deployment SHA so CLI deploys still identify,
+  // then to GITHUB_SHA so GitHub-hosted standalone servers (the E2E full
+  // browser matrix build runs off-Vercel) still self-identify with the exact
+  // 40-hex commit — the canonical-artist-navigation matrix spec reads this
+  // receipt before navigating.
+  const ciCommitSha = env.GITHUB_SHA?.trim();
+  return [buildSha, runtimeCommitSha, ciCommitSha].find(sha =>
     /^[0-9a-f]{40}$/.test(sha ?? '')
   );
 }
