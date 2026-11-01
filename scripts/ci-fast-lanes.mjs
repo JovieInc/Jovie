@@ -1121,6 +1121,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/component-rendered-invariant-policy.test.mjs',
   'scripts/lib/__tests__/daily-changelog.test.mjs',
   'scripts/lib/__tests__/daily-changelog-publication.test.mjs',
+  'scripts/lib/__tests__/changelog-staleness.test.mjs',
   'scripts/lib/__tests__/changelog-source-guard.test.mjs',
   'scripts/lib/__tests__/delivery-control-receipts-workflow.test.mjs',
   'scripts/lib/__tests__/dependabot-update-policy.test.mjs',
