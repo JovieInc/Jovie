@@ -462,6 +462,19 @@ def head_red(number: int, sh=run) -> bool | None:
     return any(state in RED_CHECK_STATES for _, state in latest.values())
 
 
+def red_label_justified(number: int, pr: dict, sh=run) -> bool:
+    """May `lane-fix-red` go on this head? Only after a completed failure.
+
+    2026-11-01: #24141 had every required check green and Source Validation merely re-running
+    when this label landed on it; Green Enroll treated the label as a hold and dequeued it
+    (queue position lost for 2h+). A required-green merge state (CLEAN, HAS_HOOKS, UNSTABLE) or a
+    head whose latest run of every check is not a failure (pending re-run, passed) is not red.
+    An unreadable check list keeps the old behaviour: a real red must not be dropped."""
+    if pr.get("mergeStateStatus") in REQUIRED_GREEN:
+        return False
+    return head_red(number, sh) is not False
+
+
 def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
     """Drop lane-fix-red once this head is required-green.
 
@@ -1191,6 +1204,8 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
         if kind == "dequeued" and mark_poison(number, pr, time.time(), sh):
             added.append((number, POISON_LABEL))
         if PREFIX + kind in label_names(pr):
+            continue
+        if kind == "red" and not red_label_justified(number, pr, sh):
             continue
         if in_scope(pr, kind, disabled) and add_label(number, kind, sh):
             added.append((number, kind))
