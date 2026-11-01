@@ -167,7 +167,7 @@ function main(argv) {
   const authorLogin = pr.user?.login ?? '';
   const body = pr.body ?? '';
   const branch = pr.head?.ref ?? '';
-  const context = { prNumber, headSha, writerLogin: authorLogin, branch, body };
+  const context = { prNumber, headSha, authorLogin, branch, body };
 
   const eligibility = releasePrEligibleForWriterProof(context);
   if (!eligibility.eligible) {
