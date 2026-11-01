@@ -7,7 +7,6 @@ import { postgresRecordBackend } from '@/lib/ovie/mcp/postgres-backend';
 import { verifySummerOidcRequest } from '@/lib/ovie/summer-oidc.server';
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
 
 /** Read-only production golden-path status for Summer (authoritative prod-cert receipts, per surface). */
 export async function GET(request: Request): Promise<NextResponse> {
