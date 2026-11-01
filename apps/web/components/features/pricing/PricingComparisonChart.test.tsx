@@ -1,11 +1,11 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ARTIST_VISIBILITY_OFFER_CONTRACT_ID } from '@/lib/billing/offer-truth';
-import { getPaidPlanAdditionNames } from '@/lib/billing/public-pricing-features';
 import {
   getPublicPricingComparison,
   isPublicPricingFeature,
 } from '@/lib/billing/public-pricing-comparison';
+import { getPaidPlanAdditionNames } from '@/lib/billing/public-pricing-features';
 import { PRICING_COMPARISON } from '@/lib/entitlements/registry';
 import { PricingComparisonChart } from './PricingComparisonChart';
 
@@ -87,11 +87,7 @@ describe('PricingComparisonChart', () => {
     }
 
     const feature = within(mobileTable).getByRole('rowheader', {
-<<<<<<< HEAD
       name: 'Audience email capture',
-=======
-      name: PUBLIC_ROWS.find(row => row.pro !== false)?.name ?? '',
->>>>>>> 0029062d6e (chore(marketing): refresh baselines and pricing test after rebase onto main)
     });
     expect(feature).toHaveAttribute('scope', 'row');
     expect(feature).toHaveAttribute('data-wrap', 'feature-label');
