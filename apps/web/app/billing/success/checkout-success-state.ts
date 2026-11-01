@@ -53,7 +53,7 @@ export const ARTIST_VISIBILITY_ACTIVATION_COPY = {
 export const ARTIST_VISIBILITY_FAN_LIST_UNLOCK = {
   title: 'Your fan list: export',
   description:
-    'Download every subscriber as a spreadsheet with name, email, country and the date they agreed to hear from you.',
+    'Download every subscriber with name, email, country and consent date.',
   cta: 'Export your fan list',
   href: APP_ROUTES.CONTACTS_AUDIENCE,
 } as const;
