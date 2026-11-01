@@ -182,6 +182,7 @@ def sample(state_dir: Path, now: float, run=None, version=read_version) -> tuple
     except Exception as error:  # noqa: BLE001
         errors.append(f"ci evidence: {type(error).__name__}: {str(error)[:80]}")
         out["streaks"] = cached.get("streaks") or {}
+        out["jobsCache"] = jobs_cache  # keep what was read: a transient error must not force a full refetch
         main_sha = (cached.get("build") or {}).get("mainSha")
     out["build"] = build_staleness(cached.get("build") or {}, version(), main_sha, now)
     atomic_write_text(path, json.dumps(out))
