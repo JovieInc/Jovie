@@ -558,6 +558,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/(marketing)/changelog/rss.xml/route.ts",
+      "kind": "handler",
+      "route": "/changelog/rss.xml",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/(marketing)/changelog/whats-new.json/route.ts",
       "kind": "handler",
       "route": "/changelog/whats-new.json",

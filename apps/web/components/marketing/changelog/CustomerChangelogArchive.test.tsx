@@ -330,6 +330,27 @@ describe('CustomerChangelogArchive', () => {
     expect(document.querySelector('.changelog-entry-media')).toBeNull();
   });
 
+  it('binds the last two title words so no word sits alone on the last line', () => {
+    render(
+      <CustomerChangelogArchive
+        months={[
+          {
+            ...MONTHS[0],
+            entries: [
+              { ...MONTHS[0].entries[0], title: 'Google connection recovery' },
+            ],
+          },
+        ]}
+      />
+    );
+
+    const heading = screen.getByRole('heading', {
+      name: 'Google connection recovery',
+    });
+    const bound = heading.querySelector('span.inline-block');
+    expect(bound?.textContent).toBe('connection recovery');
+  });
+
   it('shows one month then loads earlier updates without 1-of-N theater', () => {
     const { container } = render(<CustomerChangelogArchive months={MONTHS} />);
 

@@ -192,6 +192,17 @@ jobs:
           doppler run --preserve-env -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/public-profile-smoke.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/public-profile-smoke
         continue-on-error: true
 
+      - name: Run Start Chat Fail-Open Guard (desktop + Instagram webview)
+        env:
+          BASE_URL: https://jov.ie
+          PLAYWRIGHT_TEST_BASE_URL: https://jov.ie
+          E2E_SKIP_WEB_SERVER: '1'
+          E2E_SYNTHETIC_MODE: 'true'
+          E2E_ENVIRONMENT: production
+          SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-start-chat-results.json
+        run: |
+          env -u DOPPLER_TOKEN -u DATABASE_URL node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-start-chat.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-start-chat
+
       - name: Confirm synthetic identity policy
         if: always()
         run: |

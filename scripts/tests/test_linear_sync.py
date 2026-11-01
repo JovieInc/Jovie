@@ -362,6 +362,34 @@ class StartedOwnershipTest(Base):
         lease.close()  # a run that ended: released without waiting for the legacy grace
         self.assertEqual(self.reconcile(at=ownership.CLAIM_GRACE_S)["claimsReleased"], ["JOV-5"])
 
+    def worktree(self, ident, stamp="20261031T010101Z"):
+        path = self.state / "worktrees" / f"{stamp}-{ident}-codex-ab12cd"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def test_a_worktree_leftover_does_not_keep_a_dead_lease_claim(self):
+        """JOV-10218: JOV-7577 stayed `active` for as long as its preserved worktree existed,
+        while the doctor called the claim stranded. A live run always holds its run lease (the
+        kernel releases it if the worker dies), so a checkout without one is a leftover."""
+        self.started(30)
+        self.claim_at(30, self.NOW - ownership.LEGACY_RUN_GRACE_S - 1)
+        self.worktree("JOV-30")
+        report = self.reconcile()
+        self.assertEqual(report["claimsReleased"], ["JOV-30"])
+        self.assertEqual(ls.claim_status(self.state, "id-30"), "released")
+
+    def test_a_worktree_does_not_release_a_live_lease_claim(self):
+        self.started(31)
+        self.claim_at(31, self.NOW - ownership.LEGACY_RUN_GRACE_S - 1)
+        self.worktree("JOV-31")
+        lease = ownership.acquire_run_lease(self.state, "id-31", "JOV-31", "codex")
+        try:
+            report = self.reconcile()
+        finally:
+            lease.close()
+        self.assertEqual(report["claimsReleased"], [])
+        self.assertEqual(ls.claim_status(self.state, "id-31"), "active")
+
     def test_a_started_state_without_an_owner_is_rejected(self):
         with self.assertRaises(ls.StartedWithoutOwner):
             ls.enqueue(self.state, "move", "id-6", target="In Progress")

@@ -11,7 +11,12 @@ inherits the old head's failures. The hold stays while the head is the one that 
 the label back if the relay cleared it); when a new head is pushed the sweep removes `lane-fix-red`
 itself, for PRs this breaker tripped only (a human or hold-contract label is never touched). State: queue-breaker.json, log:
 queue-breaker.jsonl. HEADGREEN grouping (live 2026-10-29): only a group head's build gates the merge, so a failed
-build of an entry that is still queued on that same synthetic commit did not eject it and is not counted. All GitHub access goes through the injected budgeted gh runner."""
+build of an entry that is still queued on that same synthetic commit did not eject it and is not counted.
+2026-11-01: merge-group failures are attributed before a trip. A signal that also fails WITHOUT the PR — the same
+failing check and first error line in another PR's group that does not contain it, or on a main-branch CI run — is a
+shared/base-branch failure, never that PR's (main's brand-guard break ejected green queued #24111/#24105/#22252 and
+re-labeled each relay clear until dequeue-held had churned them twice). Shared evidence skips the trip and releases
+an earlier one; unreadable evidence keeps today's behavior. All GitHub access goes through the injected budgeted gh runner."""
 from __future__ import annotations
 
 import json
@@ -22,6 +27,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 WINDOW_S, TRIP_FAILURES, STATE_KEEP_S, MAX_TRIPS_PER_TICK = 3 * 3600, 2, 24 * 3600, 2
+SHARED_WINDOW_S, MAX_SHARED_PEERS, MAX_SHARED_MAIN_RUNS = 6 * 3600, 5, 3
 STATE_FILE, LOG_FILE, HOLD_LABEL = "queue-breaker.json", "queue-breaker.jsonl", "lane-fix-red"
 QUEUE_QUERY = ("query($o:String!,$r:String!){repository(owner:$o,name:$r){mergeQueue(branch:\"main\"){entries(first:50)"
                "{nodes{state headCommit{oid} pullRequest{id number headRefOid}}}}}}")
@@ -93,6 +99,72 @@ def failing_check(run, repo: str, run_id: int) -> dict:
     return {"job": job.get("name"), "step": step, "line": line}
 
 
+def group_contains_pr(run, repo: str, group_head, number: int) -> bool | None:
+    """Whether the queue group's synthetic head carries PR #number's squashed commit (its subject ends
+    "(#number)"). None when the head or the compare is unreadable; None is never shared evidence."""
+    if not isinstance(group_head, str) or not re.fullmatch(r"[0-9a-f]{40}", group_head):
+        return None
+    try:
+        compare = json.loads(_gh(run, "api", f"repos/{repo}/compare/main...{group_head}"))
+    except (RuntimeError, ValueError):
+        return None
+    commits = compare.get("commits") if isinstance(compare, dict) else None
+    if not isinstance(commits, list):
+        return None
+    suffix = f"(#{number})"
+    for row in commits:
+        subject = str((row.get("commit") or {}).get("message") or "").split("\n")[0].strip()
+        if subject.endswith(suffix):
+            return True
+    return False
+
+
+def shared_failure_evidence(run, repo: str, runs: list[dict], number: int, check: dict, now: float) -> dict | None:
+    """Proof the failing signal also fails WITHOUT PR #number, so its merge-group failures say nothing
+    about it: a failed merge-group run of a different PR, inside SHARED_WINDOW_S, whose group does not
+    contain #number, failing the same check name with the same first error line; or a failed main-branch
+    CI run doing the same (the single-queued-PR case). None means not proven shared: today's behavior."""
+    job, line = (check or {}).get("job"), (check or {}).get("line")
+    if not job or not line:
+        return None
+    peers = []
+    for row in runs:
+        match = BRANCH.match(str(row.get("head_branch") or ""))
+        ended = _epoch(row.get("updated_at"))
+        if row.get("conclusion") != "failure" or not match or ended is None or int(match[1]) == number:
+            continue
+        if not 0 <= now - ended <= SHARED_WINDOW_S:
+            continue
+        peers.append(row)
+    peers.sort(key=lambda r: _epoch(r.get("updated_at")) or 0, reverse=True)
+    for row in peers[:MAX_SHARED_PEERS]:
+        if group_contains_pr(run, repo, row.get("head_sha"), number) is not False:
+            continue  # unreadable, or this PR rides in the peer's group: no evidence either way
+        try:
+            peer_check = failing_check(run, repo, row["id"])
+        except (RuntimeError, ValueError, KeyError, TypeError):
+            continue
+        if peer_check.get("job") == job and peer_check.get("line") == line:
+            return {"kind": "peer", "run": row["id"], "pr": int(BRANCH.match(str(row["head_branch"]))[1]),
+                    "job": job, "line": line}
+    try:
+        main_runs = json.loads(_gh(run, "api",
+                                   f"repos/{repo}/actions/workflows/ci.yml/runs?branch=main&status=failure&per_page=10")).get("workflow_runs") or []
+    except (RuntimeError, ValueError):
+        main_runs = []
+    recent = [row for row in (main_runs if isinstance(main_runs, list) else [])
+              if isinstance(row, dict) and (ended := _epoch(row.get("updated_at"))) is not None
+              and 0 <= now - ended <= SHARED_WINDOW_S]
+    for row in recent[:MAX_SHARED_MAIN_RUNS]:
+        try:
+            main_check = failing_check(run, repo, row["id"])
+        except (RuntimeError, ValueError, KeyError, TypeError):
+            continue
+        if main_check.get("job") == job and main_check.get("line") == line:
+            return {"kind": "main", "run": row.get("id"), "job": job, "line": line}
+    return None
+
+
 def sweep(state, run, now: float | None = None, repo: str = "JovieInc/Jovie") -> dict:
     now, state = time.time() if now is None else now, Path(state)
     owner, name = repo.split("/")
@@ -125,6 +197,14 @@ def sweep(state, run, now: float | None = None, repo: str = "JovieInc/Jovie") ->
             continue
         try:
             check = failing_check(run, repo, max(fails, key=lambda f: f["at"])["id"])
+            shared = shared_failure_evidence(run, repo, runs, number, check, now)
+            if shared:
+                out.setdefault("skipped-shared", []).append(int(number))
+                with open(state / LOG_FILE, "a") as log:
+                    log.write(json.dumps({"at": now, "pr": number, "failures": len(fails), "check": check,
+                                          "head": pr.get("headRefOid"), "action": "skipped-shared-failure",
+                                          "shared": shared}) + "\n")
+                continue
             _gh(run, "api", "graphql", "-f", f"query={DEQUEUE}", "-f", f"id={pr['id']}")
             marker = json.dumps({"code": "merge-group-breaker", "by": "lanes/queue_breaker", "failures": len(fails), "check": check.get("job")})
             body = (f"Dequeued from the merge queue: {len(fails)} merge-group CI failures in {WINDOW_S // 3600}h, each of which "
@@ -166,6 +246,17 @@ def sweep(state, run, now: float | None = None, repo: str = "JovieInc/Jovie") ->
             else:
                 labels = [l.get("name") for l in current.get("labels") or []]
                 if HOLD_LABEL not in labels:
+                    shared = shared_failure_evidence(run, repo, runs, number, record.get("check") or {}, now)
+                    if shared:
+                        # The trip's failures were never this PR's: release the hold instead of re-applying
+                        # the label (each re-application wakes dequeue-held and churns a green queued PR).
+                        saved.pop(number, None)
+                        out.setdefault("released-shared", []).append(int(number))
+                        with open(state / LOG_FILE, "a") as log:
+                            log.write(json.dumps({"at": now, "pr": int(number), "head": record.get("head"),
+                                                  "check": record.get("check"), "action": "released-shared-failure",
+                                                  "shared": shared}) + "\n")
+                        continue
                     _gh(run, "api", f"repos/{repo}/issues/{number}/labels", "-f", f"labels[]={HOLD_LABEL}")
                     out["reblocked"].append(int(number))
                     with open(state / LOG_FILE, "a") as log:
