@@ -41,16 +41,7 @@ import {
   tool,
   type UIMessageChunk,
 } from 'ai';
-import {
-  and,
-  count,
-  sql as drizzleSql,
-  eq,
-  isNull,
-  lte,
-  ne,
-  or,
-} from 'drizzle-orm';
+import { and, count, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { tryHandleAnonymousOnboardingChat } from '@/app/api/chat/onboarding-handler';
@@ -93,6 +84,7 @@ import { resolveHasMusicLinks } from '@/lib/chat/music-link-presence';
 import { canUseOvChatMode, parseChatMode } from '@/lib/chat/ov-mode';
 import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
 import { buildRelatedSuggestionsFraming } from '@/lib/chat/related-recommendations';
+import { countVisibleReleaseListenLinks } from '@/lib/chat/release-listen-links';
 import {
   updateOwnedReleaseGeneratedPitches,
   updateOwnedReleaseMetadata,
@@ -152,7 +144,6 @@ import { wrapToolSetFailSoft } from '@/lib/chat/wrap-tool-execute';
 import { loadCustomerChatPinnedOpportunity } from '@/lib/connectors/customer-pinned-opportunity';
 import { db } from '@/lib/db';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
-import { discogReleases, providerLinks } from '@/lib/db/schema/content';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlAny } from '@/lib/db/sql-helpers';
@@ -240,7 +231,7 @@ import {
 } from '@/lib/services/pitch';
 import { isRetouchConfigured } from '@/lib/services/retouching/provider-gemini';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
-import { isChatHealthCanaryEmail } from '@/lib/synthetic/prodcert-identities';
+import { isWeeklyQuotaExemptCanaryEmail } from '@/lib/synthetic/prodcert-identities';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 
@@ -305,71 +296,51 @@ async function fetchArtistContext(
   startOfMonth.setUTCHours(0, 0, 0, 0);
   const startOfMonthISO = startOfMonth.toISOString();
 
-  const [linkCounts, releaseListen, tipTotals, clickStats, profileViews] =
-    await Promise.all([
-      db
-        .select({
-          totalActive: count(),
-          musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ${sqlAny(DSP_PLATFORMS)})`,
-        })
-        .from(socialLinks)
-        .where(
-          and(
-            eq(socialLinks.creatorProfileId, profileId),
-            eq(socialLinks.state, 'active')
-          )
+  // Release listen links render on the public profile too.
+  const releaseListenCount = countVisibleReleaseListenLinks(profileId);
+  const [linkCounts, tipTotals, clickStats, profileViews] = await Promise.all([
+    db
+      .select({
+        totalActive: count(),
+        musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ${sqlAny(DSP_PLATFORMS)})`,
+      })
+      .from(socialLinks)
+      .where(
+        and(
+          eq(socialLinks.creatorProfileId, profileId),
+          eq(socialLinks.state, 'active')
         )
-        .then(r => r[0]),
-      // Release listen links render on the public profile too: count only
-      // releases a visitor can see (not deleted, not draft, released or revealed).
-      db
-        .select({ total: count() })
-        .from(providerLinks)
-        .innerJoin(
-          discogReleases,
-          eq(providerLinks.releaseId, discogReleases.id)
+      )
+      .then(r => r[0]),
+    db
+      .select({
+        totalReceived: drizzleSql<number>`COALESCE(SUM(${tips.amountCents}), 0)`,
+        monthReceived: drizzleSql<number>`COALESCE(SUM(CASE WHEN ${tips.createdAt} >= ${startOfMonthISO}::timestamp THEN ${tips.amountCents} ELSE 0 END), 0)`,
+        tipsSubmitted: drizzleSql<number>`COALESCE(COUNT(${tips.id}), 0)`,
+      })
+      .from(tips)
+      .where(eq(tips.creatorProfileId, profileId))
+      .then(r => r[0]),
+    db
+      .select({
+        total: drizzleSql<number>`count(*)`,
+      })
+      .from(clickEvents)
+      .where(
+        and(
+          eq(clickEvents.creatorProfileId, profileId),
+          eq(clickEvents.linkType, 'tip')
         )
-        .where(
-          and(
-            eq(discogReleases.creatorProfileId, profileId),
-            isNull(discogReleases.deletedAt),
-            ne(discogReleases.status, 'draft'),
-            or(
-              lte(discogReleases.releaseDate, new Date()),
-              lte(discogReleases.revealDate, new Date())
-            )
-          )
-        )
-        .then(r => r[0]),
-      db
-        .select({
-          totalReceived: drizzleSql<number>`COALESCE(SUM(${tips.amountCents}), 0)`,
-          monthReceived: drizzleSql<number>`COALESCE(SUM(CASE WHEN ${tips.createdAt} >= ${startOfMonthISO}::timestamp THEN ${tips.amountCents} ELSE 0 END), 0)`,
-          tipsSubmitted: drizzleSql<number>`COALESCE(COUNT(${tips.id}), 0)`,
-        })
-        .from(tips)
-        .where(eq(tips.creatorProfileId, profileId))
-        .then(r => r[0]),
-      db
-        .select({
-          total: drizzleSql<number>`count(*)`,
-        })
-        .from(clickEvents)
-        .where(
-          and(
-            eq(clickEvents.creatorProfileId, profileId),
-            eq(clickEvents.linkType, 'tip')
-          )
-        )
-        .then(r => r[0]),
-      readAuthorizedProfileViews(appUserId).catch(error => {
-        logger.warn('Authorized analytics unavailable for chat context', {
-          profileId,
-          error,
-        });
-        return 0;
-      }),
-    ]);
+      )
+      .then(r => r[0]),
+    readAuthorizedProfileViews(appUserId).catch(error => {
+      logger.warn('Authorized analytics unavailable for chat context', {
+        profileId,
+        error,
+      });
+      return 0;
+    }),
+  ]);
 
   return {
     displayName: result.displayName ?? result.username,
@@ -384,7 +355,7 @@ async function fetchArtistContext(
     hasSocialLinks: Number(linkCounts?.totalActive ?? 0) > 0,
     hasMusicLinks: resolveHasMusicLinks({
       dspSocialLinkCount: Number(linkCounts?.musicActive ?? 0),
-      releaseListenLinkCount: Number(releaseListen?.total ?? 0),
+      releaseListenLinkCount: await releaseListenCount,
       spotifyUrl: result.spotifyUrl,
       appleMusicUrl: result.appleMusicUrl,
     }),
@@ -2913,7 +2884,7 @@ export async function POST(req: Request) {
   // Rate limiting - plan-aware weekly quota + burst protection. For clients
   // that send clientTurnId, reservation/replay happens before quota charging.
   const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan, {
-    skipWeeklyQuota: isChatHealthCanaryEmail(accountContext.email),
+    skipWeeklyQuota: isWeeklyQuotaExemptCanaryEmail(accountContext.email),
   });
   if (!rateLimitResult.success) {
     const rateLimitMessage =
