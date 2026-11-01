@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { PROOF_STAT_COPY } from '@/data/proofStatCopy';
 import type { ResolvedProofStat } from '@/lib/proof-stats/format';
 import { cn } from '@/lib/utils';
 
@@ -56,7 +57,7 @@ export function ProofMetricCard({
               href={stat.methodology}
               className='underline-offset-4 hover:underline focus-ring-themed'
             >
-              Methodology
+              {PROOF_STAT_COPY.methodologyLink}
             </Link>
           ) : null}
         </dd>

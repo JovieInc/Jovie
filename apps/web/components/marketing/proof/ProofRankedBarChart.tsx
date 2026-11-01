@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { PROOF_STAT_COPY } from '@/data/proofStatCopy';
+import { computeRatePercent } from '@/lib/analytics/metrics';
 import type { ResolvedProofStat } from '@/lib/proof-stats/format';
 import { cn } from '@/lib/utils';
 
@@ -73,7 +75,7 @@ export function ProofRankedBarChart({
                 href={stat.methodology}
                 className='underline-offset-4 hover:underline focus-ring-themed'
               >
-                Methodology
+                {PROOF_STAT_COPY.methodologyLink}
               </Link>
             </>
           ) : null}
@@ -81,7 +83,7 @@ export function ProofRankedBarChart({
       </figcaption>
       <ol className='flex flex-col gap-3'>
         {ranked.map(entry => {
-          const width = max > 0 ? (entry.value / max) * 100 : 0;
+          const width = computeRatePercent(entry.value, max, 2);
           return (
             <li
               key={entry.id}
