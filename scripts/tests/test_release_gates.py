@@ -178,6 +178,32 @@ class MainChecks(unittest.TestCase):
             got, _ = rg.sample(Path(tmp), 5_000_400.0, run=FakeGitHub(1, red_commits=1))
             self.assertNotIn("production-deploy:release-gate-red:check:generate-screenshots", rg.judge(got, 5_000_400.0))
 
+    def test_red_check_never_rerun_on_newer_commits_is_dispatched_once_with_a_receipt(self):
+        class Stale(FakeGitHub):
+            posts = []
+
+            def __call__(self, args, **kw):
+                if len(args) > 3 and "dispatches" in args[3]:
+                    self.posts.append(args)
+                    return SimpleNamespace(returncode=0, stdout="", stderr="")
+                if "/check-runs?" in args[1] and "Generate" in unquote(args[1]):
+                    sha = args[1].split("/commits/")[1].split("/")[0]
+                    if int(sha[1:]) < 2:  # c0, c1: path filter skipped them, no run
+                        return SimpleNamespace(returncode=0, stdout=json.dumps({"check_runs": []}), stderr="")
+                    return SimpleNamespace(returncode=0, stdout=json.dumps({"check_runs": [
+                        {"id": 77, "status": "completed", "conclusion": "failure", "html_url": "u"}]}), stderr="")
+                return super().__call__(args, **kw)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            gh = Stale(1)
+            got, err = rg.sample(Path(tmp), 6_000_000.0, run=gh)
+            self.assertIsNone(err)
+            self.assertEqual(len(gh.posts), 1)
+            self.assertIn("screenshots.yml/dispatches", gh.posts[0][3])
+            self.assertEqual(list(got["dispatches"].values())[0]["redCheckRunId"], 77)
+            rg.sample(Path(tmp), 6_000_400.0, run=gh)
+            self.assertEqual(len(gh.posts), 1, "once per red check run")
+
     def test_stale_evidence_read_alerts(self):
         self.assertIn("release-gates-stale", rg.judge({"evidenceReadAt": 1000.0}, 1000.0 + 1801))
 
