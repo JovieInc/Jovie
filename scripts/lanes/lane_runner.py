@@ -9229,7 +9229,7 @@ def reserved_binding_pass(host: Host, name: str, spec: dict) -> int:
     guaranteed seat, so a full or throttled Jovie pool cannot stall another repository. Disk-critical
     hosts admit nothing: a binding run needs a local checkout like any other."""
     try:
-        pct = disk_guard.free_pct(host.state)  # observation only: cleanup stays with slot holders
+        pct = disk_guard.lanes_free_pct(host.state)  # observation only: cleanup stays with slot holders
         if pct is None or pct <= disk_guard.CRITICAL_PCT:
             return 0
         bound = bindings.reserve(THIS, host, name, spec)

@@ -29,6 +29,7 @@ import lifecycle  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import autoscale  # noqa: E402  (sibling module of the release)
+import disk_guard  # noqa: E402  (lowest free % across every lanes mount)
 import pr_events  # noqa: E402  (sibling module of the release)
 import design_gate  # noqa: E402  (design-brief admission census)
 import gh_app_token  # noqa: E402  (canonical GitHub read-budget floor)
@@ -564,7 +565,10 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
     held = read_json(state / "held.json", {})
     failures = read_json(state / "failures.json", {})
     idle_exit = read_json(state / "worker-idle.json", {})
-    disk = shutil.disk_usage("/")
+    disk_pct, disk_mounts = disk_guard.lanes_free(state)
+    root = shutil.disk_usage("/")
+    # JOV-10233: the lowest lanes mount decides, not "/": worktrees live on a separate disk.
+    disk_pct = round(100 * root.free / root.total, 1) if disk_pct is None else min(disk_pct, round(100 * root.free / root.total, 1))
     hud_beat = None
     try:
         hud_beat = now - (state / "hud.heartbeat").stat().st_mtime
@@ -634,7 +638,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "mergeThroughput": merge_throughput, "mergeThroughputError": merge_throughput_error,
         "autoscale": _autoscale_block(host),
         "mergedWindow": ({k: v for k, v in merged_window.items() if k != "prs"} if merged_window else None),
-        "diskFreePct": round(100 * disk.free / disk.total, 1),
+        "diskFreePct": disk_pct,
+        "diskMounts": disk_mounts,
         "sweepSecretHeld": [row for row in (read_json(state / "worktree-sweep.json", {}).get("secretHeld") or [])
                             if isinstance(row, dict) and row.get("path") and Path(row["path"]).exists()],
         "hudExpected": (state / "hud.expected").exists(), "hudBeatAge": hud_beat,
@@ -946,6 +951,11 @@ def provider_idle_with_qualified_work(obs: dict, provider: str) -> bool:
     vacant = (type(slots) is int and type(running) is int and 0 <= running < slots)
     return bool(pool and account_ready and vacant
                 and provider in (tick.get("spawned") or []) and provider not in (tick.get("unhealthy") or []))
+
+
+def _lowest_mount(obs: dict) -> str:
+    rows = [row for row in obs.get("diskMounts") or [] if isinstance(row, dict) and "freePct" in row]
+    return f"lowest mount {min(rows, key=lambda row: row['freePct'])['path']}" if rows else "root"
 
 
 def disk_held(obs: dict) -> bool:
@@ -1321,16 +1331,16 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
             f"worktree sweep did not publish a snapshot of {row.get('path')}: {row.get('reason')}; "
             "the checkout is kept untouched until its owner reviews it")
     if obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_CRIT_PCT:
-        alerts["disk-critical"] = (f"root disk {obs['diskFreePct']}% free even after the disk-pressure "
+        alerts["disk-critical"] = (f"lanes disk {obs['diskFreePct']}% free ({_lowest_mount(obs)}) even after the disk-pressure "
                                  f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")
     elif obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_MIN_PCT:
-        alerts["disk-low"] = f"root disk {obs['diskFreePct']}% free; worktrees and installs will start failing"
+        alerts["disk-low"] = f"lanes disk {obs['diskFreePct']}% free ({_lowest_mount(obs)}); worktrees and installs will start failing"
     held_since = (previous or {}).get("diskHeldSince")
     if disk_held(obs) and isinstance(held_since, (int, float)) and obs["now"] - held_since >= DISK_HELD_S:
         top = obs.get("diskTop") or (previous or {}).get("diskTop") or []
         named = ", ".join(f"{row['path']} {row['gib']} GiB" for row in top) or "consumers not yet measured"
         alerts["disk-capacity-held"] = (
-            f"root disk {obs['diskFreePct']}% free (growth floor {autoscale.DISK_INCREASE_MIN}%) for "
+            f"lanes disk {obs['diskFreePct']}% free ({_lowest_mount(obs)}; growth floor {autoscale.DISK_INCREASE_MIN}%) for "
             f"{int((obs['now'] - held_since) // 60)}m: lane capacity is held below base. Top consumers: {named}")
     if github_reads_held:
         alerts["github-quota"] = (f"GitHub GraphQL budget {obs['githubRemaining']} left this hour; read-only polling "
