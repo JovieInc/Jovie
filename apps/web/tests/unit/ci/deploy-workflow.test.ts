@@ -1717,20 +1717,22 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     );
     expect(stagedPerformanceGate).toContain('--base-url "$deployment_url"');
     const stagedPublicProfileGate = stagedPerformanceGate.slice(
-      stagedPerformanceGate.lastIndexOf(
-        'if ! CI=true pnpm exec tsx scripts/performance-budgets-guard.ts'
-      )
+      stagedPerformanceGate.indexOf('public_profile_budget_lane() {'),
+      stagedPerformanceGate.indexOf('entry_route_lighthouse_lane() {')
     );
-    // JOV-8338 graduated the exact staged-build budget independently
-    // (staging 14/14 qualifying), so it fails closed with the exact-build
-    // failure subtype. Production canonical-alias budgets above graduated
-    // separately on the 2026-10-31 receipt (JOV-8737).
+    // JOV-8338 graduated the exact staged-build budget (staging 14/14). Like
+    // the post-promotion gate (#24006, Tim 2026-10-31), it blocks only routes
+    // whose golden-path surface is certified in the Ovie ledger; uncertified
+    // routes warn and file one Linear perf ticket.
     expect(stagedPublicProfileGate).toContain(
-      'fail_performance_gate "Exact staged-build public-profile alias budgets failed."'
+      'scripts/lib/alias-gate-certified-routes.mjs'
     );
+    expect(stagedPublicProfileGate).toMatch(
+      /if ! staged_alias_guard \$blocking; then\s+fail_performance_gate "Exact staged-build public-profile alias budgets failed on certified pages/
+    );
+    expect(stagedPublicProfileGate).toContain('staged-alias-perf-intake.mjs');
+    expect(stagedPublicProfileGate).toContain('--base-url "$deployment_url"');
     expect(stagedPublicProfileGate).not.toContain('continue-on-error: true');
-    expect(stagedPublicProfileGate).not.toContain('performance_status=warn');
-    expect(stagedPublicProfileGate).not.toContain('::warning::');
     for (const routeId of [
       'public-profile-listen',
       'public-profile-music',
