@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   profileRows: [] as Array<{
     isClaimed: boolean | null;
     isPublic?: boolean | null;
+    username?: string | null;
   }>,
   proofPending: false,
   recordedStages: [] as string[],
