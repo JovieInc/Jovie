@@ -104,6 +104,16 @@ class BuildStale(unittest.TestCase):
         alerts = release_evidence.judge({"build": b}, t0)
         self.assertIn("a163bac", alerts["production-deploy:build-stale"])
 
+    def test_age_counts_from_when_main_moved_past_the_build_not_from_deploy(self):
+        t0 = 1_000_000.0
+        b = release_evidence.build_staleness({}, "a163bac", "a163bac" + "0" * 33, t0)  # live build is main
+        b = release_evidence.build_staleness(b, "a163bac", "a163bac" + "0" * 33, t0 + 10 * 3600)  # 10h, main unchanged
+        self.assertFalse(b["stale"])
+        b = release_evidence.build_staleness(b, "a163bac", "f" * 40, t0 + 10 * 3600 + 60)  # a new commit lands
+        self.assertFalse(b["stale"])
+        b = release_evidence.build_staleness(b, "a163bac", "e" * 40, t0 + 12 * 3600 + 120)
+        self.assertTrue(b["stale"])
+
     def test_main_not_advanced_is_a_no_op_and_a_new_build_clears(self):
         t0 = 1_000_000.0
         b = release_evidence.build_staleness({"buildId": "a163bac", "since": t0 - 5 * 3600}, "a163bac", "a163bac" + "0" * 33, t0)
@@ -121,12 +131,13 @@ class Sample(unittest.TestCase):
     def test_sample_reads_ci_and_version_and_caches_completed_jobs(self):
         rows = runs("failure", "failure", "success")
         calls = []
+        attempt = [1]
 
         def gh(args, **_):
             path = args[1]
             calls.append(path)
             if path.startswith("repos/JovieInc/Jovie/actions/workflows/ci.yml/runs"):
-                body = {"workflow_runs": [{k: v for k, v in r.items() if k != "_job"} for r in rows]}
+                body = {"workflow_runs": [{**{k: v for k, v in r.items() if k != "_job"}, "run_attempt": attempt[0]} for r in rows]}
             elif "/jobs?" in path:
                 run_id = int(path.split("/runs/")[1].split("/")[0])
                 body = {"jobs": jobs_of_factory(rows)(run_id)}
@@ -149,6 +160,10 @@ class Sample(unittest.TestCase):
             self.assertEqual(sum(1 for c in calls if "/jobs?" in c), 0)  # completed runs' jobs are cached
             self.assertEqual(sum(1 for c in calls if c.endswith("/logs")), 0)  # same failing job: no second log read
             self.assertEqual(jobs_reads, 3)
+            attempt[0] = 2  # a manual rerun of every run: new attempts are read again
+            calls.clear()
+            release_evidence.sample(Path(tmp), 1_000_000.0 + 800, run=gh, version=lambda: "a163bac")
+            self.assertEqual(sum(1 for c in calls if "/jobs?" in c), 3)
 
 
 if __name__ == "__main__":

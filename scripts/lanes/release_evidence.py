@@ -122,14 +122,17 @@ def read_version(url: str = VERSION_URL, opener=urllib.request.urlopen) -> str |
 
 
 def build_staleness(previous: dict, build_id: str | None, main_sha: str | None, now: float) -> dict:
-    """Track when the live buildId was first seen; stale when unchanged > 2h and main is not that build."""
+    """Stale when main has been past the live buildId for more than 2h (measured from when main first advanced past
+    this build, not from when the build went live: a long-running build is fine until main moves)."""
     if not build_id:
         return {**previous, "readable": False}
-    since = previous.get("since") if previous.get("buildId") == build_id else now
+    same = previous.get("buildId") == build_id
+    since = previous.get("since") if same else now
     advanced = bool(main_sha) and not main_sha.startswith(build_id)
-    age = int(now - since)
-    return {"buildId": build_id, "since": since, "mainSha": main_sha, "ageS": age, "readable": True,
-            "stale": advanced and age > STALE_BUILD_S}
+    advanced_since = (previous.get("advancedSince") if same and previous.get("advancedSince") else now) if advanced else None
+    age = int(now - advanced_since) if advanced_since is not None else 0
+    return {"buildId": build_id, "since": since, "advancedSince": advanced_since, "mainSha": main_sha, "ageS": age,
+            "readable": True, "stale": advanced and age > STALE_BUILD_S}
 
 
 def sample(state_dir: Path, now: float, run=None, version=read_version) -> tuple[dict | None, str | None]:
@@ -149,8 +152,10 @@ def sample(state_dir: Path, now: float, run=None, version=read_version) -> tuple
         runs = gh(f"repos/{REPO}/actions/workflows/ci.yml/runs?branch=main&event=push&status=completed"
                   f"&per_page={RUNS_READ}").get("workflow_runs") or []
 
+        attempts = {r["id"]: r.get("run_attempt") or 1 for r in runs}
+
         def jobs_of(run_id: int) -> list:
-            key = str(run_id)
+            key = f"{run_id}:{attempts.get(run_id, 1)}"  # a manual rerun is a new attempt with new job results
             if key not in jobs_cache:
                 jobs_cache[key] = [{k: j.get(k) for k in ("name", "conclusion", "id", "html_url")}
                                    for j in gh(f"repos/{REPO}/actions/runs/{run_id}/jobs?per_page=100&filter=latest").get("jobs") or []]
@@ -170,7 +175,8 @@ def sample(state_dir: Path, now: float, run=None, version=read_version) -> tuple
                 except Exception:  # noqa: BLE001
                     streak["specs"] = []
         out["streaks"] = streaks
-        out["jobsCache"] = {str(r["id"]): jobs_cache[str(r["id"])] for r in runs[:RUNS_READ] if str(r["id"]) in jobs_cache}
+        keys = {f"{r['id']}:{r.get('run_attempt') or 1}" for r in runs[:RUNS_READ]}
+        out["jobsCache"] = {k: v for k, v in jobs_cache.items() if k in keys}
         main_sha = (gh(f"repos/{REPO}/commits/main") or {}).get("sha")
     except Exception as error:  # noqa: BLE001
         errors.append(f"ci evidence: {type(error).__name__}: {str(error)[:80]}")
@@ -197,6 +203,6 @@ def judge(sample_: dict | None, now: float) -> dict[str, str]:
     build = sample_.get("build") or {}
     if build.get("stale"):
         alerts["production-deploy:build-stale"] = (
-            f"production has served build {build.get('buildId')} for {build.get('ageS', 0) // 60} min "
-            f"(limit {STALE_BUILD_S // 60}) while main advanced to {str(build.get('mainSha'))[:12]} ({VERSION_URL})")
+            f"production still serves build {build.get('buildId')} {build.get('ageS', 0) // 60} min after main advanced past it "
+            f"(limit {STALE_BUILD_S // 60}); main is at {str(build.get('mainSha'))[:12]} ({VERSION_URL})")
     return alerts
