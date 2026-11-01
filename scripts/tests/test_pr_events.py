@@ -1789,6 +1789,9 @@ class GapTest(unittest.TestCase):
         self.assertIs(events.head_red(1, reply(cancelled, passed, failed_old, passed_new)), False)
         self.assertIs(events.head_red(1, reply(passed, {**failed_old, "completedAt": "2026-10-21T02:00:00Z"})), True)
         self.assertIs(events.head_red(1, reply({"context": "ci/legacy", "state": "ERROR", "createdAt": "x"})), True)
+        tently = {"name": "Tently", "conclusion": "FAILURE", "completedAt": "2026-10-21T03:00:00Z"}
+        self.assertIs(events.head_red(1, reply(passed, tently)), False, "a non-required AI review is no repair signal")
+        self.assertIs(events.head_red(1, reply(tently, {**failed_old, "completedAt": "2026-10-21T02:00:00Z"})), True)
         self.assertIsNone(events.head_red(1, reply(passed, code=1)))
         self.assertIsNone(events.head_red(1, lambda *a, **k: SimpleNamespace(returncode=0, stdout="nope", stderr="")))
 
