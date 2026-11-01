@@ -1152,7 +1152,9 @@ sourceDescribe('profile mode route redirects', () => {
     for (const [root] of staticAliasRoutes) {
       expect(reservedRoots.has(root ?? '')).toBe(true);
     }
-    expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('<AliasCollisionRecovery');
+    expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+      '<DeferredAliasCollisionRecovery'
+    );
   });
 
   it('routes legacy aliases through the collision-safe resolver after filesystem matches', async () => {

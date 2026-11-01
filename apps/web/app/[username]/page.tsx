@@ -10,8 +10,14 @@ import { isScreenCertSmartLinkProfileRequest } from '@/app/[username]/[slug]/_li
 export const revalidate = 3600;
 
 import { AskJovieWidget } from '@/components/features/ask-jovie/AskJovieWidget';
-import { AliasCollisionRecovery } from '@/components/features/profile/AliasCollisionRecovery';
 import type { ProfileMode } from '@/components/features/profile/contracts';
+import {
+  DeferredAliasCollisionRecovery,
+  DeferredJoviePixel,
+  DeferredMetaPixel,
+  DeferredProfileViewTracker,
+  DeferredSignupFunnelBeacon,
+} from '@/components/features/profile/ProfileDeferredIslands';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import { UnfazedProfileClient } from '@/components/features/profile/UnfazedProfileClient';
 import { BASE_URL } from '@/constants/app';
@@ -19,12 +25,8 @@ import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClien
 import { assertLiveProfileRoute } from '@/features/profile/live-profile-lock';
 import { ProfileAeoContent } from '@/features/profile/ProfileAeoContent';
 import { ProfileAeoProofClaimCard } from '@/features/profile/ProfileAeoProofClaimCard';
-import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
 import { getProfileModeDefinition } from '@/features/profile/registry';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
-import { JoviePixel } from '@/features/tracking/JoviePixel';
-import { MetaPixel } from '@/features/tracking/MetaPixel';
-import { SignupFunnelBeacon } from '@/features/tracking/SignupFunnelBeacon';
 import {
   isProofProfileHandle,
   resolveProofClaimCta,
@@ -469,7 +471,7 @@ async function ArtistPageContent({
 
   return (
     <>
-      <AliasCollisionRecovery username={username} />
+      <DeferredAliasCollisionRecovery username={username} />
       {/* JSON-LD Structured Data for SEO — single @graph for all schemas */}
       <script type='application/ld+json'>
         {safeJsonLdStringify(structuredData)}
@@ -482,19 +484,27 @@ async function ArtistPageContent({
       )}
 
       {isPublicNoAuthSmoke ? null : (
-        <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
+        <DeferredProfileViewTracker
+          handle={artist.handle}
+          artistId={artist.id}
+        />
       )}
       {isPublicNoAuthSmoke || isClaimed ? null : (
-        <SignupFunnelBeacon surface='profile_claim' trackLanding={false} />
+        <DeferredSignupFunnelBeacon
+          surface='profile_claim'
+          trackLanding={false}
+        />
       )}
       {/* Server-side pixel tracking */}
-      {isPublicNoAuthSmoke ? null : <JoviePixel profileId={profile.id} />}
+      {isPublicNoAuthSmoke ? null : (
+        <DeferredJoviePixel profileId={profile.id} />
+      )}
       {/* Browser Meta pixel (fbq) — builds the retargeting website custom
           audience; CAPI alone cannot (JOV-5078). Creator pixel is
           entitlement-gated in the loader; the Jovie platform pixel is the
           customer-one retarget path. */}
       {isPublicNoAuthSmoke ? null : (
-        <MetaPixel
+        <DeferredMetaPixel
           pixelIds={[creatorMetaPixelId, env.JOVIE_FACEBOOK_PIXEL_ID].filter(
             (id): id is string => Boolean(id)
           )}

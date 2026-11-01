@@ -80,25 +80,45 @@ const {
   };
 });
 
-vi.mock('next/dynamic', () => ({
-  default: (loader: unknown) => {
-    const source = String(loader);
+vi.mock('next/dynamic', async () => {
+  const React = await import('react');
+  return {
+    default: (loader: unknown) => {
+      const source = String(loader);
 
-    if (source.includes('ProfileUnifiedDrawer')) {
-      return (props: unknown) => mockProfileUnifiedDrawer(props);
-    }
+      // JOV-10246: the credits drawer is lazy; render the real module.
+      if (source.includes('ReleaseCreditsDrawer')) {
+        const Lazy = React.lazy(() =>
+          (loader as () => Promise<React.ComponentType<object>>)().then(
+            component => ({ default: component })
+          )
+        );
+        function LazyReleaseCreditsDrawer(props: object) {
+          return React.createElement(
+            React.Suspense,
+            { fallback: null },
+            React.createElement(Lazy, props)
+          );
+        }
+        return LazyReleaseCreditsDrawer;
+      }
 
-    if (source.includes('ProfileInlineNotificationsCTA')) {
-      return (props: unknown) => mockProfileInlineNotificationsCTA(props);
-    }
+      if (source.includes('ProfileUnifiedDrawer')) {
+        return (props: unknown) => mockProfileUnifiedDrawer(props);
+      }
 
-    if (source.includes('ProfileDesktopSurface')) {
-      return MockProfileDesktopSurface;
-    }
+      if (source.includes('ProfileInlineNotificationsCTA')) {
+        return (props: unknown) => mockProfileInlineNotificationsCTA(props);
+      }
 
-    return () => null;
-  },
-}));
+      if (source.includes('ProfileDesktopSurface')) {
+        return MockProfileDesktopSurface;
+      }
+
+      return () => null;
+    },
+  };
+});
 
 vi.mock('next/link', () => ({
   default: ({
@@ -830,7 +850,11 @@ describe('ProfileCompactTemplate', () => {
     expect(drawerProps.onOpenReleaseCredits).toBeTypeOf('function');
     act(() => drawerProps.onOpenReleaseCredits?.());
 
-    const drawer = await screen.findByRole('dialog', { name: 'Credits' });
+    const drawer = await screen.findByRole(
+      'dialog',
+      { name: 'Credits' },
+      { timeout: 5000 }
+    );
     expect(within(drawer).getByText('Main artist')).toBeInTheDocument();
     expect(within(drawer).queryByText('Producer')).toBeNull();
 

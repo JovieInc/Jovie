@@ -1,6 +1,7 @@
 // @coverage-via apps/web/tests/unit/profile/profile-compact-template.test.tsx
 'use client';
 
+import dynamic from 'next/dynamic';
 import {
   type CSSProperties,
   type ReactNode,
@@ -34,7 +35,6 @@ import {
   getProfileModeHref,
 } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
-import { ReleaseCreditsDrawer } from '@/features/release/ReleaseCreditsDrawer';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
@@ -66,8 +66,25 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import { ProfileCompactSurface } from './ProfileCompactSurface';
-import { ProfileDesktopSurface } from './ProfileDesktopSurface';
 import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
+
+/**
+ * JOV-10246: keep the public profile's hydration tree small so the release
+ * artwork paints before hydration on throttled mobile. The credits drawer is
+ * closed on every first paint and mounts only after the first open; the
+ * desktop surface renders only behind its flag. Both stay out of the entry
+ * chunk. Guard: tests/unit/profile/profile-entry-bundle.test.ts
+ */
+const ReleaseCreditsDrawer = dynamic(
+  () =>
+    import('@/features/release/ReleaseCreditsDrawer').then(
+      mod => mod.ReleaseCreditsDrawer
+    ),
+  { ssr: false }
+);
+const ProfileDesktopSurface = dynamic(() =>
+  import('./ProfileDesktopSurface').then(mod => mod.ProfileDesktopSurface)
+);
 
 interface ProfileCompactTemplateProps {
   readonly mode: ProfileMode;
@@ -296,6 +313,11 @@ export function ProfileCompactTemplate({
     group => group.entries.length > 0
   );
   const [creditsOpen, setCreditsOpen] = useState(false);
+  // Latched on first open so the lazy drawer keeps its close animation.
+  const [creditsEverOpened, setCreditsEverOpened] = useState(false);
+  useEffect(() => {
+    if (creditsOpen) setCreditsEverOpened(true);
+  }, [creditsOpen]);
   const hasContacts = contacts.some(contact => contact.channels.length > 0);
   const hasTip =
     showPayButton && socialLinks.some(link => link.platform === 'venmo');
@@ -1152,12 +1174,14 @@ export function ProfileCompactTemplate({
             }
             data-public-profile-nav={publicProfileNavIds}
           >
-            <ReleaseCreditsDrawer
-              open={creditsOpen && !isDesktopLayout}
-              onOpenChange={setCreditsOpen}
-              credits={visibleReleaseCredits}
-              presentation={drawerPresentation}
-            />
+            {creditsEverOpened ? (
+              <ReleaseCreditsDrawer
+                open={creditsOpen && !isDesktopLayout}
+                onOpenChange={setCreditsOpen}
+                credits={visibleReleaseCredits}
+                presentation={drawerPresentation}
+              />
+            ) : null}
             {profileBanner && !isDesktopLayout ? (
               <div
                 className='relative z-20 w-full shrink-0'
@@ -1307,12 +1331,14 @@ export function ProfileCompactTemplate({
                     : undefined
                 }
               />
-              <ReleaseCreditsDrawer
-                open={creditsOpen && isDesktopLayout}
-                onOpenChange={setCreditsOpen}
-                credits={visibleReleaseCredits}
-                presentation='modal'
-              />
+              {creditsEverOpened ? (
+                <ReleaseCreditsDrawer
+                  open={creditsOpen && isDesktopLayout}
+                  onOpenChange={setCreditsOpen}
+                  credits={visibleReleaseCredits}
+                  presentation='modal'
+                />
+              ) : null}
             </div>
           ) : null
         }
