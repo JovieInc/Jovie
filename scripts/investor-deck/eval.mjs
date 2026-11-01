@@ -50,6 +50,23 @@ export function investRoute(routing = ROUTING) {
   };
 }
 
+/** Max relay calls in flight: 84 at once opened the breaker on a secondary limit (2026-11-01). */
+export const MAX_IN_FLIGHT = 8;
+let inFlight = 0;
+const waiting = [];
+/** Bound concurrent relay calls across every persona and fixture in this process. */
+export async function pooled(fn) {
+  if (inFlight >= MAX_IN_FLIGHT)
+    await new Promise(resolve => waiting.push(resolve));
+  inFlight += 1;
+  try {
+    return await fn();
+  } finally {
+    inFlight -= 1;
+    waiting.shift()?.();
+  }
+}
+
 /** N independent samples for one persona over one deck. */
 export async function judgeDeck({
   persona,
@@ -62,13 +79,15 @@ export async function judgeDeck({
   const schema = buildInvestSchema();
   const settled = await Promise.allSettled(
     Array.from({ length: samples }, () =>
-      call({
-        model: route.model,
-        baseUrl: route.baseUrl,
-        content: [{ type: 'text', text: prompt }],
-        schema,
-        timeoutMs: 240_000,
-      })
+      pooled(() =>
+        call({
+          model: route.model,
+          baseUrl: route.baseUrl,
+          content: [{ type: 'text', text: prompt }],
+          schema,
+          timeoutMs: 240_000,
+        })
+      )
     )
   );
   const parsed = [];

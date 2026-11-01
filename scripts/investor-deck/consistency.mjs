@@ -106,6 +106,7 @@ export function checkConsistency({ deckText, drafts, ledger }) {
         );
     }
 
+  /** @type {Record<string, {deck: string[], drafts: string[]}>} */
   const families = {};
   for (const family of QUANTITY_FAMILIES) {
     const deck = familyValues(deckText, family);

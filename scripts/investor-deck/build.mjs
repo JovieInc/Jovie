@@ -40,12 +40,18 @@ export function defaultLedgerDir(env = process.env) {
   );
 }
 
+/**
+ * @param {string} dir
+ * @returns {{ story: import('../../apps/web/lib/investors/yc-deck.ts').LedgerDeckStory, ledger: import('../../apps/web/lib/investors/yc-deck.ts').FundraisingLedger, drafts: Record<string, string> }}
+ */
 export function loadLedger(dir) {
+  /** @type {(name: string) => any} */
   const read = name => loadYaml(readFileSync(join(dir, name), 'utf8'));
   const claims = read('claims.yaml')?.claims ?? {};
   const metricsFile = read('metrics.yaml') ?? {};
   const story = read('deck.yaml');
   const draftsDir = resolve(dir, '..', 'drafts');
+  /** @type {Record<string, string>} */
   const drafts = {};
   if (existsSync(draftsDir))
     for (const name of readdirSync(draftsDir))
@@ -83,7 +89,7 @@ async function exportPdf(htmlPath, outDir, count) {
       viewport: { width: 1920, height: 1080 },
     });
     await page.goto(`file://${htmlPath}`);
-    await page.evaluate(() => document.fonts.ready);
+    await page.evaluate('document.fonts.ready');
     await page.pdf({
       path: join(outDir, 'deck.pdf'),
       width: '1920px',
@@ -99,7 +105,7 @@ async function exportPdf(htmlPath, outDir, count) {
     return await page.$$eval('section.slide', nodes =>
       nodes
         .filter(node => node.scrollHeight > node.clientHeight + 1)
-        .map(node => node.dataset.slide)
+        .map(node => node.getAttribute('data-slide'))
     );
   } finally {
     await browser.close();

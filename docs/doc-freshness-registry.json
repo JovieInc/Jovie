@@ -167,6 +167,17 @@
         }
       ]
     },
+    ".claude/rules/investor-deck.md": {
+      "owner": "@itstimwhite",
+      "claim": "Investor decks are generated from the claims ledger and pass the fail-closed would-you-invest gate before they are sent.",
+      "documentSha256": "3051a0872b40f593a9e47bc904b2225911835b6a09963a39f9c43a3187e5a50a",
+      "sources": [
+        {
+          "path": "scripts/investor-deck/gate.mjs",
+          "sha256": "c9693dbc3cd9b0ab80d4c7812fe7df4931871c9c8467fc62c3e053a93fcfce37"
+        }
+      ]
+    },
     ".claude/rules/ios.md": {
       "owner": "@itstimwhite",
       "claim": "The hard-invariant table is implemented by the existing iOS lint; the data-architecture section is enforced by the swift-arch guard.",

@@ -134,6 +134,10 @@ ${slide.kicker ? `<div class="kicker">${esc(slide.kicker)}</div>` : ''}
 </section>`;
 }
 
+/**
+ * @param {readonly any[]} slides
+ * @param {{ title?: string, tokens?: any }} [options]
+ */
 export function renderDeckHtml(slides, { title, tokens } = {}) {
   const css = [
     fontFace('Inter', FONTS.inter, '100 900'),
