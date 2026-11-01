@@ -43,6 +43,21 @@ export const ARTIST_VISIBILITY_ACTIVATION_COPY = {
   next: 'Included with your plan.',
 } as const;
 
+/**
+ * The one thing only the paid plan unlocks that works the moment checkout
+ * lands: contact export (`canExportContacts` is false on Free, true on the
+ * paid plan; POST /api/dashboard/audience/subscribers returns 403 without
+ * it). The CSV columns match SUBSCRIBER_EXPORT_COLUMNS in the audience
+ * toolbar: name, email, country, consent date.
+ */
+export const ARTIST_VISIBILITY_FAN_LIST_UNLOCK = {
+  title: 'Your fan list: export',
+  description:
+    'Download every subscriber as a spreadsheet with name, email, country and the date they agreed to hear from you.',
+  cta: 'Export your fan list',
+  href: APP_ROUTES.CONTACTS_AUDIENCE,
+} as const;
+
 export const ARTIST_VISIBILITY_ACTIVATION_STEPS = [
   {
     key: 'notify',
@@ -148,7 +163,7 @@ export function getPaidSuccessPrimaryHref(input: {
   if (input.isOnboardingUpgrade) return APP_ROUTES.DASHBOARD;
   if (input.needsProfile) return APP_ROUTES.START;
   return isArtistVisibilityPlan(input.plan)
-    ? APP_ROUTES.PRESENCE
+    ? ARTIST_VISIBILITY_FAN_LIST_UNLOCK.href
     : APP_ROUTES.CHAT;
 }
 
@@ -159,7 +174,9 @@ export function getPaidSuccessPrimaryLabel(input: {
 }): string {
   if (input.isOnboardingUpgrade) return 'Explore your dashboard';
   if (input.needsProfile) return 'Claim your link';
-  return isArtistVisibilityPlan(input.plan) ? 'Open Identity' : 'Go to chat';
+  return isArtistVisibilityPlan(input.plan)
+    ? 'Open your fan list'
+    : 'Go to chat';
 }
 
 export function shouldCelebratePaidSuccess(

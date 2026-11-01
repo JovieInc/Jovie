@@ -68,6 +68,30 @@ export function isChatHealthCanaryEmail(
   return !!email && normalizeEmail(email) === PRODCERT_CHAT_HEALTH_CANARY_EMAIL;
 }
 
+/**
+ * Fixed certification canaries whose weekly AI quota the server skips: the
+ * chat-health canary and the seeded returning canary (the account every
+ * golden-path walk signs in as). Synthetic traffic must never be able to
+ * lock a certification account out of its first message, and the returning
+ * canary is a Free account that every walk and re-walk adds messages to.
+ * The hourly burst limiter still caps spend. Exact match, evaluated from the
+ * server-validated session email, never from a request header.
+ */
+export const QUOTA_EXEMPT_CANARY_EMAILS: readonly string[] = [
+  PRODCERT_CHAT_HEALTH_CANARY_EMAIL,
+  PRODCERT_RETURNING_CANARY_EMAIL,
+];
+
+export function isWeeklyQuotaExemptCanaryEmail(
+  email: string | null | undefined
+): boolean {
+  if (!email) return false;
+  const normalized = normalizeEmail(email);
+  return QUOTA_EXEMPT_CANARY_EMAILS.some(
+    exempt => normalizeEmail(exempt) === normalized
+  );
+}
+
 export function newProdcertUserEmail(runId: string): string {
   const slug = runId
     .toLowerCase()

@@ -314,12 +314,18 @@ describe('CheckoutSuccessPage — CTAs and verification', () => {
     searchParamsMock.mockReturnValue(new URLSearchParams());
   });
 
-  it('primary Pro CTA routes to the Identity workspace', () => {
+  it('primary Pro CTA routes to the fan list, with the paid-only export card', () => {
     mockBilling('pro');
     render(<CheckoutSuccessPage />);
     expect(
-      screen.getByRole('link', { name: /open identity/i })
-    ).toHaveAttribute('href', '/app/presence');
+      screen.getByRole('link', { name: /open your fan list/i })
+    ).toHaveAttribute('href', '/app/contacts?tab=audience');
+    expect(screen.getByTestId('paid-unlock-fan-list')).toHaveTextContent(
+      'Your fan list: export'
+    );
+    expect(
+      screen.getByRole('link', { name: /export your fan list/i })
+    ).toHaveAttribute('href', '/app/contacts?tab=audience');
   });
 
   it('sends a buyer who paid before claiming a link on to claim it', async () => {

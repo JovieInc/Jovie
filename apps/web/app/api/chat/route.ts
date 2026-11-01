@@ -229,7 +229,7 @@ import {
 } from '@/lib/services/pitch';
 import { isRetouchConfigured } from '@/lib/services/retouching/provider-gemini';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
-import { isChatHealthCanaryEmail } from '@/lib/synthetic/prodcert-identities';
+import { isWeeklyQuotaExemptCanaryEmail } from '@/lib/synthetic/prodcert-identities';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 
@@ -2875,7 +2875,7 @@ export async function POST(req: Request) {
   // Rate limiting - plan-aware weekly quota + burst protection. For clients
   // that send clientTurnId, reservation/replay happens before quota charging.
   const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan, {
-    skipWeeklyQuota: isChatHealthCanaryEmail(accountContext.email),
+    skipWeeklyQuota: isWeeklyQuotaExemptCanaryEmail(accountContext.email),
   });
   if (!rateLimitResult.success) {
     const rateLimitMessage =

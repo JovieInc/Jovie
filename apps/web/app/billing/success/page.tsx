@@ -5,6 +5,7 @@ import {
   BadgeCheck,
   BarChart3,
   CalendarClock,
+  Download,
   Loader2,
   Mail,
   PartyPopper,
@@ -29,6 +30,7 @@ import { useBillingStatusQuery } from '@/lib/queries';
 import {
   ARTIST_VISIBILITY_ACTIVATION_COPY,
   ARTIST_VISIBILITY_ACTIVATION_STEPS,
+  ARTIST_VISIBILITY_FAN_LIST_UNLOCK,
   CHECKOUT_PENDING_COPY,
   CHECKOUT_RECOVERY_COPY,
   getPaidSuccessPrimaryHref,
@@ -417,6 +419,29 @@ export default function CheckoutSuccessPage() {
               <p className='text-app font-semibold text-primary-token'>
                 {ARTIST_VISIBILITY_ACTIVATION_COPY.status}
               </p>
+              {needsProfile ? null : (
+                <ContentSurfaceCard
+                  surface='nested'
+                  className='space-y-3 p-4 text-left'
+                  data-testid='paid-unlock-fan-list'
+                >
+                  <Download
+                    className='h-5 w-5 text-accent'
+                    aria-hidden='true'
+                  />
+                  <p className='text-app font-semibold text-primary-token'>
+                    {ARTIST_VISIBILITY_FAN_LIST_UNLOCK.title}
+                  </p>
+                  <p className='text-xs leading-5 text-tertiary-token'>
+                    {ARTIST_VISIBILITY_FAN_LIST_UNLOCK.description}
+                  </p>
+                  <Button asChild variant='secondary' size='sm'>
+                    <Link href={ARTIST_VISIBILITY_FAN_LIST_UNLOCK.href}>
+                      {ARTIST_VISIBILITY_FAN_LIST_UNLOCK.cta}
+                    </Link>
+                  </Button>
+                </ContentSurfaceCard>
+              )}
               <div className='grid gap-4 sm:grid-cols-2'>
                 {ARTIST_VISIBILITY_ACTIVATION_STEPS.map(step => (
                   <FeatureCard

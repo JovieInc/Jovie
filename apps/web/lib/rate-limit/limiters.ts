@@ -894,7 +894,7 @@ export async function checkAiChatRateLimitForPlan(
     }
 
     // The dedicated production chat-health canary (see
-    // `isChatHealthCanaryEmail`) skips only the weekly quota so deploy probes
+    // `isWeeklyQuotaExemptCanaryEmail`) skips only the weekly quota so deploy probes
     // cannot exhaust any account's allowance; the hourly burst limiter above
     // still caps its spend.
     if (options.skipWeeklyQuota === true) return burstAllowed;
