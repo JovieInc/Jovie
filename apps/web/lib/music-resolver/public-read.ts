@@ -5,6 +5,7 @@ import { type InHouseQuery, resolveInHouse } from './in-house';
 import { createDefaultInHouseSources } from './in-house-sources';
 import { projectPublicMusic } from './public-projection';
 import { musicResolveSchema } from './public-schemas';
+import { scheduleResolveParity } from './resolve-parity.server';
 
 export { musicResolveOutputSchema, musicResolveSchema } from './public-schemas';
 
@@ -67,5 +68,9 @@ export async function resolvePublicMusic(
     return { error: { code: 'CANCELLED', retryable: false } };
   if (result.status === 'upstream_error')
     return { error: { code: 'UPSTREAM_FAILURE', retryable: true } };
+  scheduleResolveParity(
+    result,
+    ('territory' in query && query.territory) || 'US'
+  );
   return projectPublicMusic(result);
 }

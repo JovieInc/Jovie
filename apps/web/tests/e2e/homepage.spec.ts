@@ -123,13 +123,28 @@ test.describe('Homepage', () => {
       await page.setViewportSize({ width, height: 900 });
       const gallery = page.getByTestId('homepage-fan-states');
       await gallery.scrollIntoViewIfNeeded();
+      // #23358 keeps real faces off the homepage: states are caption-only by
+      // design (no scenarioId, so no capture and no phone frame). The gallery
+      // must paint every caption with zero image content, and its rendered
+      // count must match the shipped copy record.
+      await expect(gallery.getByRole('img')).toHaveCount(0);
+      await expect(gallery).toHaveAttribute(
+        'data-count',
+        String(HOMEPAGE_FAN_STATES_COPY.states.length)
+      );
       for (const state of HOMEPAGE_FAN_STATES_COPY.states) {
-        const image = gallery.getByRole('img', { name: state.alt });
-        await image.scrollIntoViewIfNeeded();
-        await expect(image).toBeVisible();
+        // hasText is a substring match and every caption body contains the
+        // word "listen", so filter on the title's exact text instead (the
+        // title span is the only element whose full text equals it).
+        const item = gallery.getByRole('listitem').filter({
+          has: page.getByText(state.title, { exact: true }),
+        });
+        await item.scrollIntoViewIfNeeded();
+        await expect(item).toBeVisible();
         await expect(
           gallery.getByText(state.title, { exact: true })
         ).toBeVisible();
+        await expect(gallery.getByText(state.body)).toBeVisible();
       }
       const overflow = await page.evaluate(
         () =>

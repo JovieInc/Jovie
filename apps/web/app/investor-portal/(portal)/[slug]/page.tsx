@@ -1,8 +1,12 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getMarkdownDocument } from '@/lib/docs/getMarkdownDocument';
+import {
+  applyMarkdownTemplate,
+  createMarkdownDocument,
+} from '@/lib/docs/getMarkdownDocument';
 import { getInvestorManifest } from '@/lib/investors/manifest';
 import { getInvestorPortalAccess } from '@/lib/investors/portal-access';
+import { readInvestorPrivateText } from '@/lib/investors/private-content';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import { MemoContent } from '../../_components/MemoContent';
 
@@ -45,7 +49,7 @@ async function requireInvestorAccess(): Promise<void> {
 
 /**
  * Dynamic memo pages for the investor portal.
- * Reads markdown from investors/ based on manifest.json.
+ * Reads markdown from the private investor store based on manifest.json.
  * Beautiful prose styling with light/dark toggle and TOC.
  */
 export async function generateMetadata({
@@ -75,7 +79,14 @@ export default async function InvestorMemoPage({ params }: PageProps) {
     notFound();
   }
 
-  const doc = await getMarkdownDocument(`investors/${page.file}`);
+  // Memo markdown is private: read from the private investor store, never the repo.
+  let raw: string;
+  try {
+    raw = await readInvestorPrivateText(`content/investors/${page.file}`);
+  } catch {
+    notFound();
+  }
+  const doc = await createMarkdownDocument(applyMarkdownTemplate(raw));
   const toc = doc.toc
     .filter(entry => entry.level === 2)
     .map(entry => ({ id: entry.id, title: entry.title }));

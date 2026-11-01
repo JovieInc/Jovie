@@ -103,6 +103,10 @@ export const Drafting: Story = {
   },
 };
 
+export const HeroDrafting: Story = {
+  args: { ...Drafting.args, variant: 'hero' },
+};
+
 export const ProcessingFile: Story = {
   args: {
     value: 'Use the attached cover art for the campaign.',

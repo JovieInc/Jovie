@@ -14,6 +14,7 @@ vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
 vi.mock('@/lib/queries', () => ({ useCheckoutMutation: () => checkout }));
 
 import { WaitlistOutcomeView } from '@/components/features/waitlist/WaitlistOutcomeView';
+import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 
 describe('WaitlistOutcomeView pending receipt', () => {
   it('claims jov.ie/<handle> is reserved only when a held handle is passed', () => {
@@ -56,7 +57,9 @@ describe('WaitlistOutcomeView Start Pro (JOV-7701: anyone can buy)', () => {
     );
 
     const cta = screen.getByTestId('waitlist-start-pro-checkout');
-    expect(cta).toHaveTextContent('Start Pro ($12)');
+    expect(cta).toHaveTextContent(getPublicPriceClaim('pro').ctaLabel);
+    expect(cta).toHaveTextContent('Start Artist Presence');
+    expect(cta).not.toHaveTextContent('Start Pro');
     fireEvent.click(cta);
     // Default checkout: no onboarding source, so success lands on
     // /billing/success and routes a link-less buyer to /start.

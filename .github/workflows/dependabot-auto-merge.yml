@@ -67,9 +67,11 @@ jobs:
             scripts/dependabot-workflow-run-adapter.mjs
             scripts/lib/source-admission-policy.mjs
             scripts/pr-fleet-rules.mjs
+            scripts/lib/wins-ledger.mjs
             packages/api-client
             scripts/lib/product-lane-classifier.mjs
             scripts/lib/merge-group-member-policy.mjs
+            scripts/lib/pr-size-exclusions.mjs
             scripts/lib/pr-size-guard-policy.mjs
             scripts/lib/repo-hygiene-limits.mjs
             scripts/lib/pre-land-changelog.mjs

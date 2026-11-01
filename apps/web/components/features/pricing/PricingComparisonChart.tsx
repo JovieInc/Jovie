@@ -7,26 +7,8 @@ import {
   formatPublicPriceDisplay,
   getPublicPriceClaim,
 } from '@/lib/billing/offer-truth';
-import {
-  type ComparisonFeature,
-  PRICING_COMPARISON,
-} from '@/lib/entitlements/registry';
-
-// Public rows: certified capabilities only (product-truth publication=public,
-// proofAuthorized). Pro rows are entitlement-gated, so they are real differences.
-const PUBLIC_PRICING_FEATURE_NAMES = new Set([
-  'Public Jovie profile page',
-  'Fan email capture',
-  'Release notifications (email to fans)',
-  'Pre-release & countdown pages',
-]);
-
-const PUBLIC_PRICING_COMPARISON = PRICING_COMPARISON.map(category => ({
-  ...category,
-  features: category.features.filter(feature =>
-    PUBLIC_PRICING_FEATURE_NAMES.has(feature.name)
-  ),
-})).filter(category => category.features.length > 0);
+import { PUBLIC_PRICING_COMPARISON } from '@/lib/billing/public-pricing-features';
+import type { ComparisonFeature } from '@/lib/entitlements/registry';
 
 type PlanColumn = 'free' | 'pro';
 

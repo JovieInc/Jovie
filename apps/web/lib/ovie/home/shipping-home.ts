@@ -72,6 +72,7 @@ export type OvieAsk = HomeLoopAsk;
 /** Priority order: the row shows as many as fit, left to right. */
 export type OviePulseKey =
   | 'prod'
+  | 'lyb-deploy'
   | 'merges-hour'
   | 'queue'
   | 'red-prs'
@@ -87,6 +88,7 @@ export type OviePulseTile = HomeLoopTile<OviePulseKey>;
 
 const PULSE_ORDER: readonly OviePulseKey[] = [
   'prod',
+  'lyb-deploy',
   'merges-hour',
   'queue',
   'red-prs',
@@ -252,6 +254,38 @@ function sumValues(record: Readonly<Record<string, number>>): number {
   return Object.values(record).reduce((total, value) => total + value, 0);
 }
 
+const LYB_REPO = 'JovieInc/LogYourBody';
+
+/**
+ * LogYourBody production deploy health from the lanes feed's `deployHealth` block: "Failing, N behind" when its
+ * deploys are red, otherwise how many commits production lags main. #23233 put this in HudShippingStrip, which no
+ * page renders, so the Home vitals never showed it while LYB production sat 87 commits behind. Missing stays
+ * missing, never healthy.
+ */
+function lybDeploy(health: DeliverySummary['lanes']['deployHealth']): {
+  readonly value: string;
+  readonly measured: boolean;
+  readonly tone: OviePulseTile['tone'];
+} {
+  const repo = health?.repos.find(row => row.repo === LYB_REPO);
+  if (!repo || repo.status === 'unknown')
+    return { value: OVIE_NOT_MEASURED, measured: false, tone: 'neutral' };
+  const behind = repo.behindMain === null ? null : formatCount(repo.behindMain);
+  if (repo.status === 'failing')
+    return {
+      value: behind === null ? 'Failing' : `Failing, ${behind} behind`,
+      measured: true,
+      tone: 'bad',
+    };
+  if (behind === null)
+    return { value: OVIE_NOT_MEASURED, measured: false, tone: 'neutral' };
+  return {
+    value: repo.behindMain === 0 ? 'Current' : `${behind} behind`,
+    measured: true,
+    tone: repo.behindMain === 0 ? 'good' : 'warn',
+  };
+}
+
 function rawPulse(
   delivery: DeliverySummary
 ): readonly Omit<OviePulseTile, 'was'>[] {
@@ -275,6 +309,8 @@ function rawPulse(
   const candidates = flow?.candidatePool ?? null;
   const ownerless = flow?.ownerless ?? null;
 
+  const lyb = lybDeploy(lanes.deployHealth);
+
   const tiles: Omit<OviePulseTile, 'was'>[] = [
     {
       key: 'prod',
@@ -287,6 +323,13 @@ function rawPulse(
           : behind === 0
             ? 'good'
             : 'warn',
+    },
+    {
+      key: 'lyb-deploy',
+      label: 'LYB prod',
+      value: lyb.value,
+      measured: lyb.measured,
+      tone: lyb.tone,
     },
     {
       key: 'merges-hour',

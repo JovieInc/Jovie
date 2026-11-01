@@ -5,8 +5,10 @@
  * Golden Path lane:
  *  - A: an economical vision model through the allowlisted AI Gateway, with a
  *       strict user-blocking rubric (never taste or polish). Each keyframe is
- *       sampled twice and flagged when either sample finds a blocker: single
- *       samples missed real blockers across runs (JOV-5489 calibration).
+ *       sampled once; a second sample is taken only when the first flags a
+ *       blocker, and either sample finding one flags it (JOV-5489 calibration
+ *       wanted 2 samples; sampling the clean majority twice cost 2x for no
+ *       extra signal, so the second sample is conditional).
  *  - B: the deterministic in-page layout audit recorded with the keyframe.
  * A suspected blocker only fails the gate once an independent second review flags
  * the same keyframe again. Model outages or unparseable answers are recorded
@@ -22,6 +24,7 @@ export const RUBRIC_VERSION = 'golden-path-user-blocking/v3';
 /** Public catalog artist claimed by the golden-path journey. */
 const GOLDEN_PATH_ARTIST_NAME = 'UNMARKED';
 export const REVIEW_MODEL = 'zai/glm-5.3-flash';
+/** Maximum samples per keyframe; the second runs only after a first-sample blocker. */
 export const MODEL_SAMPLES = 2;
 const VERDICT_SCHEMA = 'jovie.golden-path-visual-review/v1';
 
@@ -206,19 +209,33 @@ export async function reviewWithModel(input: {
           model: REVIEW_MODEL,
           max_tokens: 1_500,
           temperature: 0,
+          // Cost attribution and prompt caching at the Gateway (compounding AI-cost cut).
+          providerOptions: {
+            gateway: {
+              caching: 'auto',
+              tags: [
+                'feature:golden-path-review',
+                'caller:ci',
+                'step:keyframe',
+              ],
+            },
+          },
           messages: [
             {
               role: 'user',
               content: [
-                {
-                  type: 'text',
-                  text: `${RUBRIC_PROMPT}\n\nJourney step: ${input.stepId} (${input.path})${identityContext}`,
-                },
+                // Stable prefix first (rubric, then the screenshot) so a repeat
+                // sample of the same frame hits the cache; variable text last.
+                { type: 'text', text: RUBRIC_PROMPT },
                 {
                   type: 'image_url',
                   image_url: {
                     url: `data:image/png;base64,${input.png.toString('base64')}`,
                   },
+                },
+                {
+                  type: 'text',
+                  text: `Journey step: ${input.stepId} (${input.path})${identityContext}`,
                 },
               ],
             },
@@ -328,7 +345,9 @@ export async function main(
             );
         }
       }
-      modelSamples.push(acceptModelVerdict(raw));
+      const accepted = acceptModelVerdict(raw);
+      modelSamples.push(accepted);
+      if (accepted.verdict !== 'blocker') break;
     }
     const model = mergeModelVerdicts(modelSamples);
     const suspected = layout.blockers.length > 0 || model.verdict === 'blocker';

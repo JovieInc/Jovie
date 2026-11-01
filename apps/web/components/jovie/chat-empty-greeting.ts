@@ -1,3 +1,8 @@
+import {
+  appliesToSegment,
+  INSIGHT_ACTIONS,
+} from '@/lib/creator/segment-registry';
+import type { ResolvedSegment } from '@/lib/creator/segments';
 import type { InsightResponse, InsightType } from '@/types/insights';
 
 /** Home welcomes the person and offers one real next step (JOV-7150). */
@@ -59,9 +64,22 @@ const ACTION_BY_TYPE: Record<InsightType, string> = {
  */
 export function resolveChatEmptyStateInsight(
   insights: readonly InsightResponse[],
-  now = Date.now()
+  now = Date.now(),
+  segment?: ResolvedSegment
 ): ChatEmptyStateAction | null {
   for (const insight of insights) {
+    // Segment gate (JOV-9679): a comedian never gets "Draft a release update".
+    // `segment` omitted keeps legacy behavior for callers without a profile.
+    if (
+      segment !== undefined &&
+      !INSIGHT_ACTIONS.some(
+        item =>
+          item.insightType === insight.insightType &&
+          appliesToSegment(item.segments, segment)
+      )
+    ) {
+      continue;
+    }
     const suggestion = insight.actionSuggestion?.trim();
     const supportedAction = ACTION_BY_TYPE[insight.insightType];
     const expiresAt = Date.parse(insight.expiresAt);

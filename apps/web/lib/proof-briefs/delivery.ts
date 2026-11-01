@@ -51,6 +51,11 @@ export function prepareCustomerRecapEmail(input: {
       dedupKey: identity,
       idempotencyKey: identity,
       category: 'marketing',
+      emailRoute: {
+        stream: 'broadcast',
+        purpose: 'weekly-recap',
+        consent: 'opt-in',
+      },
       channels: ['email'],
       respectUserPreferences: true,
       subject: email.subject,

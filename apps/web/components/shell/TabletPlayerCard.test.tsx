@@ -80,6 +80,7 @@ describe('TabletPlayerCard', () => {
     expect(playButton).toHaveAttribute('type', 'button');
     expect(playButton).toHaveClass('h-9', 'w-9', 'rounded-full');
 
+    expect(screen.getByLabelText('Previous')).toHaveAttribute('type', 'button');
     fireEvent.click(screen.getByLabelText('Previous'));
     fireEvent.click(playButton);
     fireEvent.click(screen.getByLabelText('Next'));

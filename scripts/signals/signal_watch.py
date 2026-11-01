@@ -723,7 +723,7 @@ def deliver(state: dict, config: dict | None, poster=post_json, now: float | Non
 def triage_signals(since: str, runner=None) -> dict:
     """Hand this run's pages to the research router's decision log (`jovie-research
     triage-signals`): high-scoring internal adopt/buy/borrow/clone items become review triggers,
-    once per signal. Fail-open: a missing or failing command never fails the watcher."""
+    once per signal. Degraded or unverifiable research fails the watcher."""
     import subprocess
     runner = runner or subprocess.run
     if runner is subprocess.run and not shutil.which("jovie-research"):
@@ -737,10 +737,17 @@ def triage_signals(since: str, runner=None) -> dict:
         return {"status": "failed", "exit": done.returncode}
     try:
         result = json.loads(done.stdout or "{}")
+        if not isinstance(result, dict):
+            return {"status": "failed", "reasons": ["invalid research triage result"]}
+        if result.get("verdict") == "degraded" or result.get("status") in ("degraded", "failed") or result.get("degraded") is True:
+            return {"status": "failed", "reasons": result.get("reasons") or ["research degraded"]}
+        if (not isinstance(result.get("scanned"), int) or not isinstance(result.get("actionable"), int)
+                or not isinstance(result.get("reviews"), list)):
+            return {"status": "failed", "reasons": ["invalid research triage result"]}
         return {"status": "ok", "scanned": result.get("scanned"), "actionable": result.get("actionable"),
                 "reviews": len(result.get("reviews") or [])}
     except ValueError:
-        return {"status": "ok", "output": (done.stdout or "")[-200:]}
+        return {"status": "failed", "reasons": ["invalid research triage JSON"]}
 
 
 # ---------------------------------------------------------------------------------------------
@@ -871,6 +878,9 @@ def run(state_path: Path, *, env=None, sources: list[dict] | None = None, inbox:
               "jevCallsToday": budget["calls"], "failures": failures[:20], "failureCount": len(failures)}
     if stored and not dry_run:
         result["triage"] = triage(observed)
+        if result["triage"].get("status") != "ok":
+            failures.append("research triage: " + str(result["triage"].get("status")))
+            result.update(status="failed", failures=failures[:20], failureCount=len(failures))
     state["lastRun"] = result
     state["nextAttemptAt"] = now + (3600 if result["status"] != "ok" else REFRESH_INTERVAL_S)
     if not dry_run:

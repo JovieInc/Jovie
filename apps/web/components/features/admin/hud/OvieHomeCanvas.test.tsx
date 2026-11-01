@@ -25,6 +25,11 @@ vi.mock('./useOvieHomeReadyTiming', () => ({
   useOvieHomeReadyTiming: readyTiming,
 }));
 
+const panelAlert = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/ovie/home/panel-alerts', () => ({
+  reportOvieHomePanelError: panelAlert,
+}));
+
 const shipping = vi.hoisted(() => ({
   data: undefined as unknown,
   refetch: vi.fn(),
@@ -177,6 +182,7 @@ describe('OvieHomeCanvas', () => {
 
   beforeEach(() => {
     readyTiming.mockReset();
+    panelAlert.mockReset();
     shipping.data = snapshot();
     inbox = INBOX;
     toastMock.mockClear();
@@ -329,8 +335,21 @@ describe('OvieHomeCanvas', () => {
       ).toBeVisible();
       await screen.findByTestId('home-loop-ask-approve');
       expect(readyTiming).toHaveBeenLastCalledWith(true);
+      expect(panelAlert).toHaveBeenCalledWith(
+        'shipping-loop',
+        connection === 'unauthorized'
+          ? 'unauthorized'
+          : 'operational-tasks-unavailable'
+      );
     }
   );
+
+  it('raises no panel alert when every section is ready', async () => {
+    shipping.data = snapshot();
+    renderCanvas();
+    await screen.findByTestId('home-loop-ask-approve');
+    expect(panelAlert).not.toHaveBeenCalled();
+  });
 
   it('keeps reconciled tasks visible when a later shipping read fails', () => {
     const base = snapshot();

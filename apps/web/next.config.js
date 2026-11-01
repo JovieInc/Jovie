@@ -87,8 +87,6 @@ const nextConfig = {
     ],
     '/app/admin/screenshots': screenshotCatalogTraceIncludes,
     '/api/admin/screenshots/**': screenshotCatalogTraceIncludes,
-    // Gated investor deck PDF: kept out of public/ so no CDN URL serves it.
-    '/investor-portal/deck/[...path]': ['assets/investor-deck/**/*'],
   },
   // Dynamic fs paths make NFT over-approximate and copy repo files no route
   // reads into server functions (e2e PNG snapshots, 45 MB of drizzle migration

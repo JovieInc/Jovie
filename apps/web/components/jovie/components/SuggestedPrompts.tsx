@@ -22,6 +22,11 @@ import {
   type FeaturedSkillCommand,
   featuredSkillCommands,
 } from '@/lib/commands/registry';
+import {
+  isFeatureVisible,
+  STARTER_ACTION_FEATURE,
+} from '@/lib/creator/segment-registry';
+import type { ResolvedSegment } from '@/lib/creator/segments';
 import { cn } from '@/lib/utils';
 import type { ChatStarterActionId } from '../starter-actions';
 import {
@@ -71,6 +76,12 @@ interface SuggestedPromptsProps {
   /** Restrict unprompted discovery to explicitly featured registry skills. */
   readonly featuredOnly?: boolean;
   readonly layout?: 'rail' | 'grid' | 'flat';
+  /**
+   * Creator segment (JOV-9679). Hides chips whose feature does not apply
+   * (release planning, album art, pitching) for other segments. Omitted keeps
+   * the legacy full list.
+   */
+  readonly segment?: ResolvedSegment;
   /**
    * Variant F: while the slash picker is open, fade chips out (don't unmount)
    * so they don't compete with the morphing surface behind them.
@@ -179,6 +190,7 @@ export function SuggestedPrompts({
   excludeActionIds,
   featuredOnly = false,
   layout = 'rail',
+  segment,
   dimmed = false,
 }: SuggestedPromptsProps) {
   const filterProfileSuggestion = (suggestions: readonly ChatSuggestion[]) => {
@@ -187,7 +199,16 @@ export function SuggestedPrompts({
           suggestion => suggestion.actionId !== 'build-artist-profile'
         )
       : suggestions;
-    return filterExcludedActions(withoutProfile, excludeActionIds);
+    const inSegment =
+      segment === undefined
+        ? withoutProfile
+        : withoutProfile.filter(suggestion => {
+            const feature =
+              suggestion.actionId &&
+              STARTER_ACTION_FEATURE[suggestion.actionId];
+            return !feature || isFeatureVisible(feature, segment);
+          });
+    return filterExcludedActions(inSegment, excludeActionIds);
   };
 
   const promptSuggestions = filterProfileSuggestion(
@@ -246,7 +267,10 @@ export function SuggestedPrompts({
 
   // Build the pitch suggestion (personalized if release title available)
   const pitchSuggestion =
-    !featuredOnly && canUseAdvancedTools && !isFirstSession
+    !featuredOnly &&
+    canUseAdvancedTools &&
+    !isFirstSession &&
+    (segment === undefined || isFeatureVisible('release_pitching', segment))
       ? (() => {
           if (
             typeof latestReleaseTitle === 'string' &&
