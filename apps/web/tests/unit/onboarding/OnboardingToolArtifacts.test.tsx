@@ -488,6 +488,26 @@ describe('onboarding tool artifacts', () => {
     expect(onNoneOfThese).toHaveBeenCalled();
   });
 
+  it('keeps the search field mounted while the artist name is typed', () => {
+    fastRender(
+      <OnboardingSpotifyArtistPickerCard
+        state='output-available'
+        output={{ action: 'open_artist_picker', query: '' }}
+        onSelectArtist={vi.fn()}
+      />
+    );
+    // Prod 2026-11-01: the first keystroke swapped the field for the
+    // proposal card, so every later keystroke was lost.
+    mocks.artistSearch.isPending = true;
+    const field = screen.getByPlaceholderText('Search Spotify artists');
+    fireEvent.change(field, { target: { value: 'U' } });
+    const after = screen.getByPlaceholderText('Search Spotify artists');
+    fireEvent.change(after, { target: { value: 'Un' } });
+    expect(
+      screen.getByPlaceholderText('Search Spotify artists')
+    ).toHaveProperty('value', 'Un');
+  });
+
   it('routes picker, handle, and social fields through one focus owner', () => {
     mocks.handleAvailability.data = { available: true };
 
