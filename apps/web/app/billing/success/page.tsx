@@ -429,6 +429,9 @@ export default function CheckoutSuccessPage() {
                     className='h-5 w-5 text-accent'
                     aria-hidden='true'
                   />
+                  <p className='text-2xs font-medium text-secondary-token'>
+                    {ARTIST_VISIBILITY_FAN_LIST_UNLOCK.header}
+                  </p>
                   <p className='text-app font-semibold text-primary-token'>
                     {ARTIST_VISIBILITY_FAN_LIST_UNLOCK.title}
                   </p>

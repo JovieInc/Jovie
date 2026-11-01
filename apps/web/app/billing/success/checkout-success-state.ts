@@ -51,6 +51,7 @@ export const ARTIST_VISIBILITY_ACTIVATION_COPY = {
  * toolbar: name, email, country, consent date.
  */
 export const ARTIST_VISIBILITY_FAN_LIST_UNLOCK = {
+  header: `You're on ${PRO_PLAN_DISPLAY_NAME}: unlocked`,
   title: 'Your fan list: export',
   description:
     'Download every subscriber with name, email, country and consent date.',

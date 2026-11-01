@@ -323,6 +323,9 @@ describe('CheckoutSuccessPage — CTAs and verification', () => {
     expect(screen.getByTestId('paid-unlock-fan-list')).toHaveTextContent(
       'Your fan list: export'
     );
+    expect(screen.getByTestId('paid-unlock-fan-list')).toHaveTextContent(
+      /You're on .+: unlocked/
+    );
     expect(
       screen.getByRole('link', { name: /export your fan list/i })
     ).toHaveAttribute('href', '/app/contacts?tab=audience');
