@@ -77,6 +77,8 @@ describe('withheld marketing routes', () => {
     }
   });
 
+  const LEAF_PUBLISHING_HUBS = new Set(['/compare', '/alternatives']);
+
   it('serves every withheld page with noindex metadata', async () => {
     for (const route of withheld) {
       const load = PAGE_LOADERS[route];
@@ -85,7 +87,12 @@ describe('withheld marketing routes', () => {
         metadata?: { robots?: { index?: boolean; follow?: boolean } };
       };
       expect(metadata?.robots?.index, `${route} must be noindex`).toBe(false);
-      expect(metadata?.robots?.follow, `${route} must be nofollow`).toBe(false);
+      // Hubs keep follow so crawlers still reach their published leaf pages.
+      const expectFollow = LEAF_PUBLISHING_HUBS.has(route);
+      expect(
+        metadata?.robots?.follow,
+        `${route} must be ${expectFollow ? 'follow' : 'nofollow'}`
+      ).toBe(expectFollow);
     }
   });
 });
