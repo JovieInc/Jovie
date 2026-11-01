@@ -18,8 +18,15 @@ import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClien
 import { assertLiveProfileRoute } from '@/features/profile/live-profile-lock';
 import { ProfileAeoContent } from '@/features/profile/ProfileAeoContent';
 import { ProfileAeoProofClaimCard } from '@/features/profile/ProfileAeoProofClaimCard';
+// Artist-paid audience data (view, pixels, funnel) must fire right after
+// hydration with no idle or interaction gate, so these stay in the entry
+// bundle; only heavy, non-revenue islands are lazy (JOV-10246).
+import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
 import { getProfileModeDefinition } from '@/features/profile/registry';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
+import { JoviePixel } from '@/features/tracking/JoviePixel';
+import { MetaPixel } from '@/features/tracking/MetaPixel';
+import { SignupFunnelBeacon } from '@/features/tracking/SignupFunnelBeacon';
 import {
   isProofProfileHandle,
   resolveProofClaimCta,
@@ -79,13 +86,7 @@ import {
 } from '@/lib/validation/username-core';
 import type { PublicContact } from '@/types/contacts';
 import { convertCreatorProfileToArtist } from '@/types/db';
-import {
-  DeferredAliasCollisionRecovery,
-  DeferredJoviePixel,
-  DeferredMetaPixel,
-  DeferredProfileViewTracker,
-  DeferredSignupFunnelBeacon,
-} from './_components/ProfileDeferredIslands';
+import { DeferredAliasCollisionRecovery } from './_components/ProfileDeferredIslands';
 import { PublicClaimBanner } from './_components/PublicClaimBanner';
 import { PublicProfileErrorState } from './_components/PublicProfileErrorState';
 import { getProfileStaticParams } from './_lib/profile-static-params';
@@ -484,27 +485,19 @@ async function ArtistPageContent({
       )}
 
       {isPublicNoAuthSmoke ? null : (
-        <DeferredProfileViewTracker
-          handle={artist.handle}
-          artistId={artist.id}
-        />
+        <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
       )}
       {isPublicNoAuthSmoke || isClaimed ? null : (
-        <DeferredSignupFunnelBeacon
-          surface='profile_claim'
-          trackLanding={false}
-        />
+        <SignupFunnelBeacon surface='profile_claim' trackLanding={false} />
       )}
       {/* Server-side pixel tracking */}
-      {isPublicNoAuthSmoke ? null : (
-        <DeferredJoviePixel profileId={profile.id} />
-      )}
+      {isPublicNoAuthSmoke ? null : <JoviePixel profileId={profile.id} />}
       {/* Browser Meta pixel (fbq) — builds the retargeting website custom
           audience; CAPI alone cannot (JOV-5078). Creator pixel is
           entitlement-gated in the loader; the Jovie platform pixel is the
           customer-one retarget path. */}
       {isPublicNoAuthSmoke ? null : (
-        <DeferredMetaPixel
+        <MetaPixel
           pixelIds={[creatorMetaPixelId, env.JOVIE_FACEBOOK_PIXEL_ID].filter(
             (id): id is string => Boolean(id)
           )}

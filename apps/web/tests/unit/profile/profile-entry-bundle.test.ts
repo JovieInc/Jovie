@@ -29,15 +29,23 @@ describe('public profile entry bundle (JOV-10246)', () => {
     '@/features/tracking/SignupFunnelBeacon',
     '@/features/tracking/JoviePixel',
     '@/features/tracking/MetaPixel',
-    '@/components/features/profile/AliasCollisionRecovery',
-  ])('keeps %s out of the page entry and lazy without SSR', specifier => {
-    expect(staticImport(page, specifier)).toBe(false);
-    expect(islands).toContain(`import('${specifier}')`);
-  });
+  ])(
+    'keeps artist-paid tracking %s in the page entry, never lazy',
+    specifier => {
+      expect(staticImport(page, specifier)).toBe(true);
+      expect(islands).not.toContain(`import('${specifier}')`);
+    }
+  );
 
-  it('defers every island without server rendering', () => {
-    expect(islands.match(/dynamic\(/g) ?? []).toHaveLength(5);
-    expect(islands.match(/\{ ssr: false \}/g) ?? []).toHaveLength(5);
+  it('defers only the alias-collision recovery island without SSR', () => {
+    expect(
+      staticImport(page, '@/components/features/profile/AliasCollisionRecovery')
+    ).toBe(false);
+    expect(islands).toContain(
+      "import('@/components/features/profile/AliasCollisionRecovery')"
+    );
+    expect(islands.match(/dynamic\(/g) ?? []).toHaveLength(1);
+    expect(islands.match(/\{ ssr: false \}/g) ?? []).toHaveLength(1);
   });
 
   it('lazy-loads the credits drawer after first open and the desktop surface', () => {

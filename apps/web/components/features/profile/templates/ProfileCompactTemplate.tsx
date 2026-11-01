@@ -82,9 +82,13 @@ const ReleaseCreditsDrawer = dynamic(
     ),
   { ssr: false }
 );
-const ProfileDesktopSurface = dynamic(() =>
-  import('./ProfileDesktopSurface').then(mod => mod.ProfileDesktopSurface)
-);
+// Built only when the build-time flag is on, so a disabled surface adds no
+// loader or chunk reference to any route's entry bundle.
+const ProfileDesktopSurface = PROFILE_DESKTOP_SURFACE_ENABLED
+  ? dynamic(() =>
+      import('./ProfileDesktopSurface').then(mod => mod.ProfileDesktopSurface)
+    )
+  : null;
 
 interface ProfileCompactTemplateProps {
   readonly mode: ProfileMode;
@@ -1278,7 +1282,7 @@ export function ProfileCompactTemplate({
             : profileBanner
         }
         desktopSurface={
-          PROFILE_DESKTOP_SURFACE_ENABLED ? (
+          PROFILE_DESKTOP_SURFACE_ENABLED && ProfileDesktopSurface ? (
             <div
               className='relative flex min-h-0 w-full flex-1 flex-col'
               data-sheet-container
