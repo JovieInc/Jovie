@@ -28,8 +28,12 @@ const previous = {
   lanes: process.env.LANES_STATE,
   backoff: process.env.LINEAR_BACKOFF_STATE_DIR,
   key: process.env.LINEAR_API_KEY,
+  fallback: process.env.LINEAR_COOLDOWN_FALLBACK_DIR,
+  intake: process.env.LINEAR_COOLDOWN_REPORT_INTAKE,
 };
 process.env.LINEAR_COOLDOWN_STATE_DIR = root;
+process.env.LINEAR_COOLDOWN_FALLBACK_DIR = join(root, 'fallback');
+process.env.LINEAR_COOLDOWN_REPORT_INTAKE = '0';
 delete process.env.LANES_STATE;
 delete process.env.LINEAR_BACKOFF_STATE_DIR;
 afterEach(() => {
@@ -400,6 +404,8 @@ describe('shared linear cooldown', () => {
     const blocker = join(root, 'blocked');
     fs.writeFileSync(blocker, 'not a directory');
     const previousDir = process.env.LINEAR_COOLDOWN_STATE_DIR;
+    const consoleError = console.error;
+    console.error = () => {};
     process.env.LINEAR_COOLDOWN_STATE_DIR = blocker;
     try {
       const resetAt = await publishLaneCooldown(
@@ -410,6 +416,7 @@ describe('shared linear cooldown', () => {
       );
       assert.ok(resetAt > Date.now());
     } finally {
+      console.error = consoleError;
       process.env.LINEAR_COOLDOWN_STATE_DIR = previousDir;
     }
   });
@@ -417,19 +424,20 @@ describe('shared linear cooldown', () => {
   it('LINEAR_COOLDOWN_FALLBACK_DIR overrides the fallback location', () => {
     const override = join(root, 'fallback-override');
     const previousFallback = process.env.LINEAR_COOLDOWN_FALLBACK_DIR;
-    process.env.LINEAR_COOLDOWN_FALLBACK_DIR = override;
+    const uid = process.getuid ? process.getuid() : 'shared';
+    delete process.env.LINEAR_COOLDOWN_FALLBACK_DIR;
     try {
+      assert.equal(
+        fallbackCooldownRoot(),
+        join(tmpdir(), `jovie-linear-cooldown-${uid}`)
+      );
+      process.env.LINEAR_COOLDOWN_FALLBACK_DIR = override;
       assert.equal(fallbackCooldownRoot(), override);
     } finally {
       if (previousFallback === undefined)
         delete process.env.LINEAR_COOLDOWN_FALLBACK_DIR;
       else process.env.LINEAR_COOLDOWN_FALLBACK_DIR = previousFallback;
     }
-    const uid = process.getuid ? process.getuid() : 'shared';
-    assert.equal(
-      fallbackCooldownRoot(),
-      join(tmpdir(), `jovie-linear-cooldown-${uid}`)
-    );
   });
 
   it('an unwritable state dir still backs siblings off and reports (JOV-7577)', async () => {
@@ -474,6 +482,17 @@ describe('shared linear cooldown', () => {
       });
       assert.equal(skipped.rateLimited, true);
       assert.equal(calls, 0);
+      const receipt = JSON.parse(
+        fs.readFileSync(
+          join(fallbackCooldownRoot(), 'write-failure.json'),
+          'utf8'
+        )
+      );
+      assert.equal(receipt.schema, 'jovie.linear-cooldown-write-failure/v1');
+      assert.equal(receipt.fingerprint, 'linear-cooldown-unwritable');
+      assert.equal(receipt.scope, credentialHash(key));
+      assert.match(receipt.error, /kind=other/);
+      assert.equal(JSON.stringify(receipt).includes(key), false);
     } finally {
       console.error = consoleError;
       process.env.LINEAR_COOLDOWN_STATE_DIR = previousDir;
@@ -527,6 +546,12 @@ process.on('exit', () => {
   else process.env.LINEAR_BACKOFF_STATE_DIR = previous.backoff;
   if (previous.key === undefined) delete process.env.LINEAR_API_KEY;
   else process.env.LINEAR_API_KEY = previous.key;
+  if (previous.fallback === undefined)
+    delete process.env.LINEAR_COOLDOWN_FALLBACK_DIR;
+  else process.env.LINEAR_COOLDOWN_FALLBACK_DIR = previous.fallback;
+  if (previous.intake === undefined)
+    delete process.env.LINEAR_COOLDOWN_REPORT_INTAKE;
+  else process.env.LINEAR_COOLDOWN_REPORT_INTAKE = previous.intake;
 });
 
 describe('linearAuthorization', () => {

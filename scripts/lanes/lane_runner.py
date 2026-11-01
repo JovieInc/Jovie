@@ -2024,20 +2024,26 @@ _COOLDOWN_UNWRITABLE_EVENT_FIRED = False
 
 
 def _tmp_cooldown_root() -> Path:
+    override = os.environ.get("LINEAR_COOLDOWN_FALLBACK_DIR")
+    if override:
+        return Path(override)
     uid = os.getuid() if hasattr(os, "getuid") else "shared"
     return Path(tempfile.gettempdir()) / f"jovie-linear-cooldown-{uid}"
+
+
+def _write_private_tmp(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    _chmod_private(path.parent, 0o700)
+    atomic_write_text(path, text)
+    _chmod_private(path, 0o600)
 
 
 def _tmp_fallback_publish(scope_id: str, reset_s: float) -> None:
     """Best-effort record under tmp so sibling processes still back off."""
     try:
-        scope = _tmp_cooldown_root() / scope_id
-        scope.mkdir(parents=True, exist_ok=True)
-        _chmod_private(scope, 0o700)
         reset_ms = int(reset_s * 1000)
-        record = scope / f"{reset_ms}-{uuid.uuid4()}.json"
-        atomic_write_text(record, json.dumps({"schema": 1, "resetAt": reset_ms}))
-        _chmod_private(record, 0o600)
+        record = _tmp_cooldown_root() / scope_id / f"{reset_ms}-{uuid.uuid4()}.json"
+        _write_private_tmp(record, json.dumps({"schema": 1, "resetAt": reset_ms}))
     except OSError:
         pass
 
@@ -2060,11 +2066,30 @@ def _emit_cooldown_unwritable_event(root: Path, error: Exception) -> None:
         pass
 
 
+def _cooldown_failure_payload(root: Path, scope_id: str, error: Exception) -> dict[str, str]:
+    text = f"{type(error).__name__}: {error}"
+    return {
+        "schema": "jovie.linear-cooldown-write-failure/v1",
+        "fingerprint": "linear-cooldown-unwritable",
+        "root": str(root),
+        "scope": scope_id,
+        "error": text[:500],
+        "at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+
+
+def _persist_cooldown_write_failure(payload: dict[str, str]) -> None:
+    """Leave the errno beside the tmp cooldown. Worker stderr is discarded."""
+    try:
+        _write_private_tmp(_tmp_cooldown_root() / "write-failure.json", json.dumps(payload))
+    except Exception:
+        return
+
+
 def _cooldown_write_failed(root: Path, scope_id: str, reset_s: float, error: Exception) -> None:
-    print(json.dumps({"schema": "jovie.linear-cooldown-write-failure/v1",
-                      "fingerprint": "linear-cooldown-unwritable", "root": str(root),
-                      "error": f"{type(error).__name__}: {error}"}),
-          file=sys.stderr, flush=True)
+    payload = _cooldown_failure_payload(root, scope_id, error)
+    _persist_cooldown_write_failure(payload)
+    print(json.dumps(payload), file=sys.stderr, flush=True)
     _PROCESS_LINEAR_COOLDOWNS[scope_id] = max(reset_s, _PROCESS_LINEAR_COOLDOWNS.get(scope_id, 0))
     _tmp_fallback_publish(scope_id, reset_s)
     _emit_cooldown_unwritable_event(root, error)
