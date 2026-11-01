@@ -327,11 +327,25 @@ test.describe('current-state essential actions (JOV-7771)', () => {
     });
   });
 
-  test('delayed interactive verification and its failure retain a reachable draft without a dead end', async ({
+  test('delayed interactive verification and its failure fail open without a dead end', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await installControlledVerification(page);
+    // JOV-10194: the starter prompt auto-submits once the check resolves, so
+    // capture the first send instead of calling the real model.
+    const sends: Array<{ turnstileToken?: string }> = [];
+    await page.route('**/api/chat', async route => {
+      if (route.request().method() !== 'POST') return route.continue();
+      sends.push(route.request().postDataJSON());
+      await route.fulfill({
+        headers: {
+          'content-type': 'text/event-stream',
+          'x-vercel-ai-ui-message-stream': 'v1',
+        },
+        body: 'data: {"type":"start","messageId":"reply"}\n\ndata: {"type":"text-start","id":"reply-text"}\n\ndata: {"type":"text-delta","id":"reply-text","delta":"Your draft is saved."}\n\ndata: {"type":"text-end","id":"reply-text"}\n\ndata: {"type":"finish","finishReason":"stop"}\n\ndata: [DONE]\n\n',
+      });
+    });
     await page.goto(startUrl);
     await expect
       .poll(() => page.evaluate(() => Boolean(window.__claimProviderFixture)))
@@ -343,17 +357,21 @@ test.describe('current-state essential actions (JOV-7771)', () => {
     ).toHaveAttribute('data-turnstile-mount', 'inline');
     await expectEssentials(page);
     await page.evaluate(() => window.__claimProviderFixture?.fail());
+    // Settled signal first: the visitor's message went out on the fail-open
+    // marker and the reply rendered. Only then assert there is no dead end.
+    await expect(
+      page.getByTestId('chat-user-bubble').filter({ hasText: prompt })
+    ).toHaveCount(1);
+    await expect(page.getByText('Your draft is saved.')).toBeVisible();
+    expect(sends).toHaveLength(1);
+    expect(sends[0]?.turnstileToken).toMatch(/^jv-unverified:/);
     // Next.js owns a separate, empty route-announcer alert outside this shell.
-    const recoveryAlert = page.locator(
-      '[data-onboarding-session] [role="alert"]'
-    );
-    // JOV-10194: a hard widget failure fails open (the send goes out on the
-    // unverified budget), so the shell shows no dead-end alert.
-    await expect(recoveryAlert).toHaveCount(0);
-    await expectEssentials(page);
+    await expect(
+      page.locator('[data-onboarding-session] [role="alert"]')
+    ).toHaveCount(0);
     await expect(
       page.getByRole('textbox', { name: 'Chat message input', exact: false })
-    ).toHaveValue(prompt);
+    ).toBeVisible();
   });
 
   test('fresh handoff submits once and restored history never resends its starter', async ({
