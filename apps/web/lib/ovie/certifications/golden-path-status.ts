@@ -27,8 +27,37 @@ export type GoldenPathStatusSurface = {
   readonly blocker: string | null;
   readonly issueUrl: string | null;
 };
+/** The ten golden-path steps, in journey order, as prod-cert records them in each receipt's checks[]. */
+export const GOLDEN_PATH_STEPS = [
+  'outreach',
+  'claim-landing',
+  'start',
+  'qualify-chat',
+  'profile-reveal',
+  'claim-decision',
+  'upgrade',
+  'hosted-test-checkout',
+  'paid-value',
+  'first-use',
+] as const;
+export type GoldenPathStepStatus =
+  | 'passed'
+  | 'failed'
+  | 'held'
+  | 'expired'
+  | 'missing';
+export type GoldenPathStep = {
+  readonly id: (typeof GOLDEN_PATH_STEPS)[number];
+  readonly status: GoldenPathStepStatus;
+  readonly surface: string | null;
+  /** The fix PR number when the failing surface links one (issueUrl or "fix #N" in the blocker). */
+  readonly fixPr: number | null;
+};
 export type GoldenPathStatus = {
   readonly schema: 'jovie.summer-golden-path-status/v1';
+  /** Steps from checks[] across the latest receipts: what "Golden path N/10" counts. */
+  readonly steps: readonly GoldenPathStep[];
+  readonly stepsPassed: number;
   readonly observedAt: string;
   readonly ledger: 'available' | 'missing';
   readonly ledgerUpdatedAt: string | null;
@@ -78,8 +107,37 @@ export function goldenPathStatus(
       };
     }
   );
+  const steps = GOLDEN_PATH_STEPS.map((id): GoldenPathStep => {
+    for (const record of Object.values(ledger?.surfaces ?? {})) {
+      const receipt = record.latest;
+      const check = receipt.checks.find(c => c.id === id);
+      if (!check) continue;
+      const stale =
+        nowMs - Date.parse(receipt.endedAt) > PROD_GOLDEN_PATH_FRESHNESS_MS;
+      const status: GoldenPathStepStatus =
+        check.status === 'skipped'
+          ? 'held'
+          : check.status === 'passed'
+            ? stale
+              ? 'expired'
+              : 'passed'
+            : 'failed';
+      const pr =
+        /\/pull\/(\d+)/u.exec(receipt.issueUrl ?? '')?.[1] ??
+        /fix #(\d+)/u.exec(receipt.blocker ?? '')?.[1];
+      return {
+        id,
+        status,
+        surface: receipt.surface,
+        fixPr: status === 'failed' && pr ? Number(pr) : null,
+      };
+    }
+    return { id, status: 'missing', surface: null, fixPr: null };
+  });
   return {
     schema: 'jovie.summer-golden-path-status/v1',
+    steps,
+    stepsPassed: steps.filter(s => s.status === 'passed').length,
     observedAt: now.toISOString(),
     ledger: ledger ? 'available' : 'missing',
     ledgerUpdatedAt: ledger?.updatedAt ?? null,

@@ -83,3 +83,71 @@ describe('goldenPathStatus', () => {
     expect(by['public-profile']?.status).toBe('missing');
   });
 });
+
+describe('golden-path steps from checks[] (prod-cert receipts, 2026-11-01 run on 1283d1e)', () => {
+  const at = '2026-11-01T11:00:00.000Z';
+  const r = (
+    surface: string,
+    status: 'passed' | 'failed',
+    checks: [string, string][],
+    extra: Partial<ProdGoldenPathReceipt> = {}
+  ) =>
+    ({
+      ...receipt(surface, status, at, extra),
+      checks: checks.map(([id, s]) => ({
+        id,
+        status: s,
+        startedAt: at,
+        endedAt: at,
+        summary: '',
+      })),
+    }) as unknown as ProdGoldenPathReceipt;
+  it('counts the ten steps, holds skipped outreach, and links the fix PR', () => {
+    const out = goldenPathStatus(
+      ledger({
+        landing: r('landing', 'passed', [
+          ['outreach', 'skipped'],
+          ['claim-landing', 'passed'],
+        ]),
+        'signup-signin': r('signup-signin', 'passed', [['start', 'passed']]),
+        onboarding: r(
+          'onboarding',
+          'failed',
+          [
+            ['qualify-chat', 'failed'],
+            ['profile-reveal', 'passed'],
+          ],
+          {
+            blocker:
+              'Spotify picker drops keystrokes after the first (fix #24190, not yet live).',
+            issueUrl: 'https://github.com/JovieInc/Jovie/pull/24190',
+          }
+        ),
+        claim: r('claim', 'passed', [['claim-decision', 'passed']]),
+        checkout: r(
+          'checkout',
+          'failed',
+          [
+            ['upgrade', 'passed'],
+            ['hosted-test-checkout', 'passed'],
+            ['paid-value', 'failed'],
+          ],
+          { blocker: 'Paid value has no receipt.' }
+        ),
+        chat: r('chat', 'failed', [['first-use', 'failed']], {
+          blocker: 'Returning canary quota exhausted.',
+        }),
+      }),
+      NOW
+    );
+    expect(out.stepsPassed).toBe(6);
+    const by = Object.fromEntries(out.steps.map(s => [s.id, s]));
+    expect(by.outreach?.status).toBe('held');
+    expect(by['qualify-chat']).toMatchObject({
+      status: 'failed',
+      fixPr: 24190,
+    });
+    expect(by['paid-value']).toMatchObject({ status: 'failed', fixPr: null });
+    expect(by['first-use']?.status).toBe('failed');
+  });
+});
