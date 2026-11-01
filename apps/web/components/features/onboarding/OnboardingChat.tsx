@@ -107,10 +107,36 @@ const loadChatProposeCheckoutCard = () =>
 const loadChatProposeNextStepCard = () =>
   import('./ChatProposeNextStepCard').then(mod => mod.ChatProposeNextStepCard);
 
-const ChatMessage = dynamic(loadChatMessage);
-const ToolPartsRenderer = dynamic(loadToolPartsRenderer);
-const ChatProposeCheckoutCard = dynamic(loadChatProposeCheckoutCard);
-const ChatProposeNextStepCard = dynamic(loadChatProposeNextStepCard);
+// Inline import() inside dynamic() keeps Next's loadable preload metadata; the
+// loaders above resolve to the same chunks for idle preloading. Each `loading`
+// placeholder reserves the slot locally so a not-yet-fetched chunk never
+// suspends up to the route-level fallback.
+function ReservedChatSlot({ minHeightClass }: { minHeightClass: string }) {
+  return <div aria-hidden='true' className={`w-full ${minHeightClass}`} />;
+}
+
+const ChatMessage = dynamic(
+  () => import('@/components/jovie/components').then(mod => mod.ChatMessage),
+  { loading: () => <ReservedChatSlot minHeightClass='min-h-10' /> }
+);
+const ToolPartsRenderer = dynamic(
+  () => import('@/components/jovie/tool-ui').then(mod => mod.ToolPartsRenderer),
+  { loading: () => null }
+);
+const ChatProposeCheckoutCard = dynamic(
+  () =>
+    import('./ChatProposeCheckoutCard').then(
+      mod => mod.ChatProposeCheckoutCard
+    ),
+  { loading: () => <ReservedChatSlot minHeightClass='min-h-32' /> }
+);
+const ChatProposeNextStepCard = dynamic(
+  () =>
+    import('./ChatProposeNextStepCard').then(
+      mod => mod.ChatProposeNextStepCard
+    ),
+  { loading: () => <ReservedChatSlot minHeightClass='min-h-24' /> }
+);
 
 function preloadOnboardingConversationChunks() {
   void Promise.all([

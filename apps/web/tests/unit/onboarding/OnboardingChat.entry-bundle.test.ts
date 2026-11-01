@@ -46,8 +46,13 @@ describe('OnboardingChat entry bundle', () => {
   });
 
   it('loads conversation renderers on demand and warms them when idle', () => {
-    expect(source).toMatch(/dynamic\(loadChatMessage\)/);
-    expect(source).toMatch(/dynamic\(loadToolPartsRenderer\)/);
+    // Inline import() keeps Next preload metadata; every dynamic() reserves
+    // its slot with a local loading fallback instead of suspending the route.
+    const dynamicCalls =
+      source.match(/dynamic\(\s*\(\)\s*=>\s*import\(/g) ?? [];
+    expect(dynamicCalls).toHaveLength(4);
+    expect(source.match(/\{\s*loading:/g) ?? []).toHaveLength(4);
+    expect(source).toMatch(/loadChatMessage\(\)/);
     expect(source).toMatch(/scheduleOnboardingConversationPreload\(\)/);
   });
 });
