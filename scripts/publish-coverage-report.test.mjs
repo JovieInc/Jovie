@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -38,7 +39,6 @@ test('every integrated workflow retains origin data and the handoff grants only 
     'dependabot-auto-merge',
     'dependabot-pin-sync',
     'desktop-release',
-    'nightly-testing-agent',
     'production-controller',
     'screenshots',
     'sentry-autofix',
@@ -293,60 +293,6 @@ test('nightly publication skips unchanged evidence and rejects unrelated coverag
   assert.deepEqual(f.calls, []);
 });
 
-test('the actual nightly publication step succeeds with main protected', t => {
-  const f = fixture(t, true);
-  f.git('branch', '--set-upstream-to=origin/main');
-  writeFileSync(
-    join(f.cwd, 'docs/NIGHTLY_TESTING_AGENT_REPORT.md'),
-    'Nightly failed; evidence retained\n'
-  );
-  mkdirSync(join(f.cwd, 'scripts/lib'), { recursive: true });
-  for (const lib of [
-    'publish-coverage-report.mjs',
-    'retire-coverage-reports.mjs',
-  ]) {
-    writeFileSync(
-      join(f.cwd, `scripts/lib/${lib}`),
-      readFileSync(new URL(`./lib/${lib}`, import.meta.url))
-    );
-  }
-  const bin = join(f.root, 'bin');
-  mkdirSync(bin);
-  installOriginFixture(f, bin);
-  const workflow =
-    /** @type {{ jobs: { report: { steps: {name?: string, run?: string}[] } } }} */ (
-      load(
-        readFileSync(
-          new URL(
-            '../.github/workflows/nightly-testing-agent.yml',
-            import.meta.url
-          ),
-          'utf8'
-        )
-      )
-    );
-  const step = workflow.jobs.report.steps.find(
-    candidate =>
-      candidate.name === 'Commit evidence report when changed' ||
-      candidate.name === 'Open nightly evidence PR'
-  );
-  execFileSync('bash', ['-e', '-c', step.run], {
-    cwd: f.cwd,
-    env: {
-      ...f.env,
-      GH_TOKEN: 'synthetic-local-only',
-      PATH: `${bin}:${process.env.PATH}`,
-    },
-    encoding: 'utf8',
-  });
-  assert.equal(f.git('rev-parse', 'origin/main'), f.source);
-  assert.equal(f.git('rev-parse', 'HEAD^'), f.source);
-  assert.equal(
-    f.git('branch', '--show-current'),
-    'bot/nightly-evidence-12345-1'
-  );
-});
-
 test('does not mint git credentials or create a PR when the report is unchanged', t => {
   const f = fixture(t);
   assert.deepEqual(publishCoverageReport(f), {
@@ -475,6 +421,53 @@ test('PR creation failure and missing receipts fail rather than reporting public
       assert.equal(f.git('rev-parse', 'origin/main'), f.source);
     });
   }
+});
+
+test('the real gh adapter absorbs a multi-megabyte open-PR listing when retiring reports', t => {
+  const f = fixture(t);
+  f.change();
+  const bin = join(f.root, 'bin');
+  mkdirSync(bin);
+  installOriginFixture(f, bin);
+  // Retirement inventories up to 1000 open PRs with full bodies; 600 ~2 KiB
+  // bodies exceed the 1 MiB child_process default that used to ship here
+  // (run 41049117742 died with spawnSync gh ENOBUFS in the retire step).
+  const entries = [];
+  for (let number = 1; number <= 600; number += 1) {
+    entries.push(
+      JSON.stringify({
+        number,
+        headRefName: `feature/large-${number}`,
+        createdAt: '2026-10-01T00:00:00Z',
+        mergeable: 'MERGEABLE',
+        isDraft: true,
+        labels: [],
+        body: `Large PR body ${number}: ${'x'.repeat(2048)}`,
+      })
+    );
+  }
+  const listing = join(bin, 'listing.json');
+  writeFileSync(listing, `[${entries.join(',\n')}]`);
+  assert.ok(
+    statSync(listing).size > 1024 * 1024,
+    'fixture listing must exceed the retired 1 MiB default'
+  );
+  // Keep the origin/attribution api cases from installOriginFixture and swap
+  // only the pr listing: real execFileSync('gh') now reads >1 MiB of output.
+  const ghPath = join(bin, 'gh');
+  const ghScript = readFileSync(ghPath, 'utf8');
+  assert.ok(ghScript.includes("pr:list) echo '[]' ;;"));
+  writeFileSync(
+    ghPath,
+    ghScript.replace("pr:list) echo '[]' ;;", `pr:list) cat '${listing}' ;;`),
+    { mode: 0o755 }
+  );
+  const result = publishCoverageReport({
+    cwd: f.cwd,
+    env: { ...f.env, PATH: `${bin}:${process.env.PATH}` },
+  });
+  assert.equal(result.status, 'published');
+  assert.equal(result.url, url);
 });
 
 test('uses the real gh command adapter and supports runners without a summary file', t => {

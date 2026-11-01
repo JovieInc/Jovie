@@ -1,5 +1,5 @@
+import { IconButton } from '@jovie/ui';
 import { Repeat } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 export type LoopMode = 'off' | 'track' | 'section';
 
@@ -28,16 +28,12 @@ export function LoopBtn({
 }) {
   const active = mode !== 'off';
   return (
-    <button
+    <IconButton
+      variant='ghost'
+      size='sm'
       type='button'
       onClick={onClick}
-      className={cn(
-        'relative h-7 w-7 rounded-md grid place-items-center transition-colors duration-subtle ease-subtle focus-ring-themed',
-        active
-          ? 'text-primary-token'
-          : 'text-quaternary-token hover:text-primary-token',
-        className
-      )}
+      className={className}
       aria-label={`Loop: ${mode}`}
       title={`Loop: ${mode}`}
     >
@@ -55,6 +51,6 @@ export function LoopBtn({
       {active && (
         <span className='absolute -top-px left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-primary-token' />
       )}
-    </button>
+    </IconButton>
   );
 }

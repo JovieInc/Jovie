@@ -157,6 +157,21 @@ async function handleCheckoutError(error: unknown): Promise<NextResponse> {
     return jsonServiceUnavailable();
   }
 
+  // E2E dogfood observability (JOV-8805): the claim-checkout dogfood server
+  // has no Sentry DSN and the production logger is a no-op, so the real
+  // cause of a 500 was invisible to the journey. Under the test-mode flag,
+  // name the actual failing error in the body the spec already prints.
+  if (
+    process.env.E2E_TEST_MODE === '1' &&
+    error instanceof Error &&
+    error.message
+  ) {
+    return jsonError(
+      `Failed to create checkout session: ${error.message}`,
+      500
+    );
+  }
+
   return jsonError('Failed to create checkout session', 500);
 }
 
@@ -363,6 +378,12 @@ export async function POST(request: NextRequest) {
       error,
     });
     logger.error('Error creating checkout session:', error);
+    if (process.env.E2E_TEST_MODE === '1') {
+      // The standalone dogfood server has no Sentry DSN and logger is
+      // compiled out of the production build, so keep the thrown error on
+      // the step log for the claim-checkout journey (JOV-8805).
+      console.error('[claim-dogfood] checkout session creation failed:', error);
+    }
     return handleCheckoutError(error);
   }
 }

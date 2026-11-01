@@ -9,6 +9,10 @@ import {
   hasAdminCredentials,
   prepareBetterAuthEmailOtp,
 } from '../helpers/auth';
+import {
+  releaseGoldenPathTestBindings,
+  selectGoldenPathArtist,
+} from './helpers/claim-dogfood-fixtures';
 import { completeGoldenPathBillingJourney } from './helpers/golden-path-billing';
 import { openHomeWelcome } from './helpers/golden-path-home-welcome';
 import {
@@ -38,7 +42,9 @@ import {
  * The profile first-value proof and post-activation Stripe persistence proof
  * intentionally share one identity, claim, catalog, and production build.
  *
- * Test artist: "UNMARKED" (public catalog, no known Jovie owner)
+ * Test artist: selected at run time from SHARED_E2E_ARTIST_POOL (first one with
+ * no bound creator_profiles row) and released in teardown, so a stale binding
+ * from an earlier run can never turn the claim step into ownership_conflict:v1.
  */
 
 /* ------------------------------------------------------------------ */
@@ -49,11 +55,11 @@ const REQUIRED_ENV = {
   DATABASE_URL: process.env.DATABASE_URL,
 } as const;
 
-const TEST_SPOTIFY_ARTIST = {
-  id: '1ZlSI1juLMMN1HU8X7RViN',
-  name: 'UNMARKED',
-  url: 'https://open.spotify.com/artist/1ZlSI1juLMMN1HU8X7RViN',
-} as const;
+let TEST_SPOTIFY_ARTIST: { id: string; name: string; url: string } = {
+  id: '',
+  name: '',
+  url: '',
+};
 
 const IS_LOCAL_AUTH_BYPASS =
   process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ||
@@ -342,7 +348,7 @@ async function ensureDbUser(betterAuthUserId: string) {
       async () => {
         const [user] = await sql`
           UPDATE users
-          SET user_status = 'waitlist_approved', updated_at = NOW()
+          SET user_status = 'waitlist_approved', name = COALESCE(NULLIF(BTRIM(name), ''), 'Golden Path Artist'), updated_at = NOW()
           WHERE better_auth_user_id = ${betterAuthUserId}
           RETURNING id
         `;
@@ -636,6 +642,8 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
   expect(handleResponse.headers()['x-onboarding-fallback']).toMatch(/^handle:/);
   const handleCard = page.getByTestId('onboarding-handle-check');
   await expect(handleCard).toBeVisible({ timeout: 60_000 });
+  // Pen R6As7U: the field sits behind an explicit Change Handle action.
+  await handleCard.getByTestId('onboarding-edit-handle').click();
   await handleCard.getByLabel('Edit Proposed Handle').fill(handle);
   await expect(handleCard.getByText('is available')).toBeVisible({
     timeout: 30_000,
@@ -840,6 +848,13 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
   // Fresh browser — no inherited auth state
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  // Teardown: release the fixture binding this run created so the next run
+  // (or the prod-cert pool) starts from an unclaimed artist.
+  test.afterAll(async () => {
+    if (!process.env.DATABASE_URL) return;
+    await releaseGoldenPathTestBindings(neon(process.env.DATABASE_URL));
+  });
+
   test.beforeEach(() => {
     if (IS_LOCAL_AUTH_BYPASS) {
       if (IS_REQUIRED_GOLDEN_PATH) {
@@ -869,6 +884,10 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
     page,
     browser,
   }) => {
+    TEST_SPOTIFY_ARTIST = await selectGoldenPathArtist(
+      neon(process.env.DATABASE_URL!)
+    );
+
     test.setTimeout(900_000);
     const trackingFixture = await interceptGoldenPathTrackingCalls(page);
     // JOV-5489: keyframes for the recorded visual review (no-op unless enabled).
@@ -900,6 +919,31 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
       page,
       uniqueHandle
     );
+    // The real /start rail must expose its full preview at the hosted desktop
+    // viewport, regardless of the selected artist's optional enrichment copy.
+    const profilePreview = page.getByTestId('onboarding-profile-rail');
+    await expect(profilePreview).toBeInViewport({ ratio: 1 });
+    await profilePreview.focus();
+    await expect(profilePreview).toBeFocused();
+    await page.keyboard.press('End');
+    await expect
+      .poll(
+        () =>
+          profilePreview.evaluate(element =>
+            Math.abs(
+              element.scrollHeight - element.clientHeight - element.scrollTop
+            )
+          ),
+        { message: 'Preview bottom remains unreachable after pressing End' }
+      )
+      .toBeLessThanOrEqual(1);
+    await page.keyboard.press('Home');
+    await expect(
+      profilePreview.getByTestId('onboarding-profile-preview-badge')
+    ).toBeInViewport({ ratio: 1 });
+    await profilePreview.evaluate(element => {
+      if (element instanceof HTMLElement) element.blur();
+    });
     await captureKeyframe(page, 'anonymous-chat');
 
     // ──────────────────────────────────────────────────────────────────

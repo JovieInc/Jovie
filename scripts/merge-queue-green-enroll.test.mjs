@@ -750,11 +750,16 @@ test('a 70-PR sweep with UNKNOWN entries reads in parallel, never sleeps, and st
       return { ...current(number), mergeStateStatus: state };
     },
   });
+  // Overlap is proven by peak concurrency, not wall clock (a loaded runner
+  // blew a 1.4 s bound). The time bound only catches the 600 s retry sleep.
   assert.ok(
-    Date.now() - started < 20 * 70,
-    'reads overlap instead of running serially'
+    Date.now() - started < 60_000,
+    'sweep slept on UNKNOWN instead of reading once more'
   );
-  assert.ok(peak > 1 && peak <= 6, `prefetch concurrency ${peak}`);
+  assert.ok(
+    peak > 1 && peak <= 6,
+    `reads overlap instead of running serially (prefetch concurrency ${peak})`
+  );
   // One prefetch per PR plus one fresh read per UNKNOWN; no retry loop.
   assert.equal(result.reads.length, 70 + 70 - 23);
   const cleanNumbers = roster.map(pr => pr.number).filter(n => n % 3 === 1);
@@ -879,12 +884,21 @@ test('a queue-breaker dequeue is re-admitted after the freeze and its marker rem
   );
   const failed = await fixture({
     overrides: { 1: breaker('FAILED_CHECKS') },
+    statuses: [
+      {
+        context: 'jovie-queue-failure-hold/v1',
+        state: 'success',
+        creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+        description: 'class=deterministic-source;n=1;run=456;try=1',
+        target_url: 'https://github.com/JovieInc/Jovie/actions/runs/456',
+      },
+    ],
     eventName: 'push',
   });
   assert.deepEqual(
     failed.mutations,
     [],
-    'the marker never re-admits a failed_checks removal'
+    'the marker never bypasses a recorded source failure'
   );
   const notGreen = await fixture({
     overrides: { 1: { ...breaker('MANUAL'), mergeStateStatus: 'BLOCKED' } },
@@ -1064,7 +1078,7 @@ test('enrolls a required-green head once lane-fix-red is gone', async () => {
   assert.deepEqual(result.mutations, [{ id: 'PR_1', oid: sha }]);
 });
 
-test('a hold released after a manual dequeue re-enrolls the same head; check failures never do', async () => {
+test('a released manual dequeue and unheld automatic ejection re-enroll; source failure holds block', async () => {
   const removal = reason => ({
     timelineItems: { nodes: [{ createdAt: '2026-10-02T13:00:00Z', reason }] },
   });
@@ -1088,7 +1102,7 @@ test('a hold released after a manual dequeue re-enrolls the same head; check fai
   );
   assert.equal(
     await enqueued({ ...removal('FAILED_CHECKS'), ...release('lane-fix-red') }),
-    0
+    1
   );
   assert.equal(
     await enqueued({
@@ -1099,7 +1113,7 @@ test('a hold released after a manual dequeue re-enrolls the same head; check fai
   );
   assert.equal(
     await enqueued({ ...removal('FAILED_CHECKS'), ...release('hold') }),
-    0
+    1
   );
   assert.equal(
     await enqueued({ ...removal(undefined), ...release('hold') }),
@@ -1117,6 +1131,41 @@ test('a hold released after a manual dequeue re-enrolls the same head; check fai
     overrides: { 1: { ...removal('manual'), ...release('hold') } },
   });
   assert.deepEqual(held.mutations, []);
+});
+
+test('ejection re-enrollment admits bots within bounds and preserves human dequeues', async () => {
+  const removal = {
+    createdAt: new Date(Date.now() - 600_000).toISOString(),
+    reason: 'manual',
+    actor: { __typename: 'Bot', login: 'jovie-bot[bot]' },
+  };
+  /** @type {Array<[typeof removal, number, number]>} */
+  const cases = [
+    [removal, 1, 1],
+    [{ ...removal, actor: { __typename: 'User', login: 'tim' } }, 1, 0],
+    [removal, 3, 0],
+    [{ ...removal, createdAt: new Date().toISOString() }, 1, 0],
+  ];
+  for (const [event, count, expected] of cases) {
+    const result = await fixture({
+      overrides: {
+        1: {
+          timelineItems: { nodes: [event] },
+          breakerEvents: {
+            nodes: Array.from({ length: count }, () => ({
+              ...event,
+              __typename: 'RemovedFromMergeQueueEvent',
+            })),
+          },
+        },
+      },
+    });
+    assert.equal(
+      result.mutations.length,
+      expected,
+      JSON.stringify({ event, count })
+    );
+  }
 });
 
 test('main is read only to resolve a held candidate, never on an ineligible wake', async () => {

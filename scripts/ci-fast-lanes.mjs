@@ -175,6 +175,11 @@ export const LANES_SELFTEST_CHANGED_TESTS_SCRIPT = [
   'lanes_py=0; for f in $files; do case "$f" in scripts/lanes/*.py) lanes_py=1;; esac; done',
   'extra=""',
   'if [ "$lanes_py" = 1 ]; then case " $tests " in *" scripts/tests/test_lanes_atomic_state.py "*) ;; *) tests="$tests scripts/tests/test_lanes_atomic_state.py";; esac; extra="scripts.tests.test_lane_runner.UpdateTest"; fi',
+  // A changed release test also runs inside the staged release bundle (UpdateTest). Tests that read repo
+  // files outside LANE_TESTS/RELEASE_EXTRAS (canon/automation-registry.jsonl in #23706, .github/pull_request_template.md
+  // in a group ahead of #23665) pass here and in the checkout, then fail only in the merge group and eject
+  // unrelated PRs. Deterministic, not a flake: shift it left so the author sees it on the PR.
+  'if [ -n "${tests// /}" ]; then case " $tests $extra " in *" scripts/tests/test_lane_runner.py "*|*" scripts.tests.test_lane_runner.UpdateTest "*) ;; *) extra="$extra scripts.tests.test_lane_runner.UpdateTest";; esac; fi',
   // Read the one release inventory as data, never execute lane_runner just to select tests.
   // Shipped JS/TS edits otherwise skip this guard and first fail inside the native queue.
   `release_closure="$(python3 -c ${shellQuote(
@@ -197,11 +202,30 @@ export const LANES_SELFTEST_CHANGED_TESTS_SCRIPT = [
 
 export const SOURCE_GUARDS = Object.freeze([
   Object.freeze({
+    id: 'native-design-system',
+    command:
+      'node apps/ios/scripts/native-design-system.mjs && node --test --experimental-test-coverage --test-coverage-include=apps/ios/scripts/native-design-system.mjs --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=95 apps/ios/scripts/native-design-system.test.mjs && node scripts/invariants/native-spacing-scale.mjs',
+    inputs:
+      /^(?:apps\/ios\/|apps\/web\/design\/ziawi-color-sot\.json$|apps\/web\/styles\/design-system\.css$|scripts\/invariants\/native-spacing-scale)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     id: 'artist-launch-contract',
     command:
       'node scripts/artist-launch-contract.mjs --check && node --test --test-isolation=none scripts/artist-launch-contract.test.mjs',
     inputs:
       /^(?:apps\/web\/app\/|apps\/web\/components\/features\/(?:dashboard\/organisms\/|profile\/)|docs\/product\/(?:artist-launch-|generated\/artist-launch-inventory\.json$)|scripts\/artist-launch-|scripts\/ci-fast-lanes\.mjs$)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
+    // Compliance: no third-party tracker component on routes where people
+    // type (CIPA wiretap exposure). Canon: gbrain
+    // decisions/company/privacy-tracking-compliance-guidelines-2026-10-31.
+    id: 'privacy-input-route-trackers',
+    command:
+      'node --test --test-isolation=none scripts/compliance/input-page-trackers.test.mjs',
+    inputs:
+      /^(?:apps\/web\/app\/|apps\/web\/components\/features\/tracking\/|scripts\/compliance\/|scripts\/ci-fast-lanes\.mjs$)/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -250,6 +274,17 @@ export const SOURCE_GUARDS = Object.freeze([
       'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/growth-registry.test.mjs',
     inputs:
       /^(?:canon\/growth-(?:loops|experiments)\.jsonl|scripts\/lib\/(?:growth-registry\.mjs|__tests__\/growth-registry\.test\.mjs))$/u,
+    prOnly: false,
+  }),
+  Object.freeze({
+    // Shared outcome-verifier contract (false-green class, JOV-9625): every
+    // known-bad sample and every failure string /api/chat emits must be
+    // rejected; coverage floors keep the verifier itself fully exercised.
+    id: 'outcome-verifier',
+    command:
+      'pnpm exec vitest --root scripts --config vitest.config.mts run --coverage --coverage.include=lib/outcome-verifier.mjs --coverage.reporter=text --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-outcome-verifier-coverage" --coverage.thresholds.lines=100 --coverage.thresholds.functions=100 --coverage.thresholds.branches=90 lib/__tests__/outcome-verifier.test.mjs',
+    inputs:
+      /^(?:scripts\/lib\/(?:outcome-verifier\.mjs|__tests__\/outcome-verifier\.test\.mjs)|apps\/web\/app\/api\/chat\/(?:route|onboarding-handler)\.ts|apps\/web\/lib\/rate-limit\/limiters\.ts|scripts\/ci-fast-lanes\.mjs)$/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -373,9 +408,12 @@ export const SOURCE_GUARDS = Object.freeze([
     // runs with the script contracts (SCRIPT_CONTRACT_VITEST_TESTS).
     // Also runs model-id-guard (same inputs): a concrete OpenAI model id lives only in
     // ops/registry/capacity.json modelFamilies; grandfathered sites only shrink.
-    command: `node ${shellQuote(fileURLToPath(new URL('./external-api-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./model-id-guard.mjs', import.meta.url)))}`,
+    // Also runs ai-call-guard: model calls go through apps/web/lib/ai/sdk.ts so Gateway spend is tagged.
+    // Also runs subscription-cli-guard: no `claude -p` / `codex exec` from automation, evals or CI
+    // outside the allowlisted mesh executors (JOV-10091).
+    command: `node ${shellQuote(fileURLToPath(new URL('./external-api-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./model-id-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./ai-call-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./subscription-cli-guard.mjs', import.meta.url)))}`,
     inputs:
-      /(?:\.(?:ts|tsx|js|mjs|cjs|mts|cts|py|sh|bash|ya?ml)$|^packages\/api-client\/providers\.json$|^scripts\/lib\/external-api-guard\.)/u,
+      /(?:\.(?:ts|tsx|js|mjs|cjs|mts|cts|py|sh|bash|ya?ml)$|^packages\/api-client\/providers\.json$|^scripts\/lib\/external-api-guard\.|^scripts\/lib\/subscription-cli-guard\.json$)/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -860,7 +898,10 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/lib/__tests__/spend-guard.test.mjs',
   'scripts/lib/__tests__/wins-ledger.test.mjs',
+  'scripts/lib/__tests__/wins-store.test.mjs',
+  'scripts/pr-open.test.mjs',
   'scripts/lib/__tests__/sources-of-truth.test.mjs',
   'scripts/invariants/duplicate-literals.test.mjs',
   'scripts/lib/__tests__/source-drift.test.mjs',
@@ -868,6 +909,8 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/preflight.test.mjs',
   'scripts/installation-budget-sentinel.test.mjs',
   'scripts/layout-guard-pen-contracts.test.mjs',
+  // JOV-INV-047: one shell and IA registry; ad-hoc chrome ratchet.
+  'scripts/invariants/shell-ia.test.mjs',
   'scripts/ci-rounds-report.test.mjs',
   'scripts/preflight-changed.test.mjs',
   'scripts/preflight-remote.test.mjs',
@@ -876,6 +919,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/copy-leak/copy-leak.test.mjs',
   'scripts/invariants/offer-claims/offer-claims.test.mjs',
   'scripts/copy-inventory/extract.test.mjs',
+  'scripts/invariants/stat-claims/stat-claims.test.mjs',
   'scripts/lib/__tests__/script-contract-affected.test.mjs',
   'scripts/lib/__tests__/web-source-read-tests.test.mjs',
   '.claude/hooks/post-task-validate.test.mjs',
@@ -911,11 +955,15 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/deprecation-intake.test.mjs',
   'scripts/deprecation-clearance.test.mjs',
   'scripts/security-advisory-intake.test.mjs',
+  'scripts/sonar-token-validation.test.mjs',
   'scripts/design-authority-guard.test.mjs',
   'scripts/evals/artist-identity.test.mjs',
   'scripts/evals/gtm-lead-copy.test.mjs',
   'scripts/evals/release-task-cluster.test.mjs',
   'scripts/evals/summer-ops-card-copy.test.mjs',
+  'scripts/buyer-eval/buyer-eval.test.mjs',
+  'scripts/buyer-eval/gate.test.mjs',
+  'scripts/positioning/positioning.test.mjs',
   'scripts/dogfood-judge/judge-core.test.mjs',
   'scripts/funnel-judge/preview-gate.test.mjs',
   'scripts/funnel-judge/proof-gate.test.mjs',
@@ -953,6 +1001,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/pr-unacquired-runner-rerun.test.mjs',
   'scripts/dequeue-held-reason.test.mjs',
   'scripts/lib/__tests__/self-hosted-jobs.test.mjs',
+  'scripts/release-lag-check.test.mjs',
   'scripts/production-controller-read-token.test.mjs',
   'scripts/lib/__tests__/lane-fix-relay-wakes.test.mjs',
   'scripts/lib/__tests__/fleet-rules-evidence-concurrency.test.mjs',
@@ -1002,12 +1051,15 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/vercel-source-contract.test.mjs',
   'scripts/verify-workflow-references.test.mjs',
   'scripts/vision/art-evaluator.test.mjs',
+  'scripts/screenshot-publish-cadence.test.mjs',
   'scripts/visual-baseline-adopt.test.mjs',
   'scripts/voc/voc-mine.test.mjs',
   'scripts/web-ai-health-intake.test.mjs',
   'scripts/weekly-agent-readiness.test.mjs',
   'scripts/lib/__tests__/pr-fleet-rules-workflow.test.mjs',
   'scripts/lib/__tests__/wake-fanout-contract.test.mjs',
+  'scripts/design-system-source-ratchet.test.mjs',
+  'scripts/review-escapes.test.mjs',
 ]);
 export const DEPRECATION_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/deprecation-clearance.mjs --test-coverage-include=scripts/lib/deprecation-observation.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=90 scripts/deprecation-clearance.test.mjs';
@@ -1015,7 +1067,10 @@ export const DEPRECATION_COVERAGE_COMMAND =
 // structural CI executes it once with measured coverage and a fixed floor.
 export const ASSURANCE_MATRIX_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/invariants/assurance-matrix.mjs --test-coverage-lines=90 --test-coverage-branches=55 --test-coverage-functions=100 scripts/invariants/assurance-matrix.test.mjs';
-export const SCRIPT_CONTRACT_NODE_COMMAND = `${DEPRECATION_COVERAGE_COMMAND} && ${CODEX_BOOTSTRAP_COVERAGE_COMMAND} && ${ASSURANCE_MATRIX_COVERAGE_COMMAND} && node --import tsx --test --test-isolation=none scripts/content-os/project.test.mts scripts/lib/__tests__/lesson-analysis.test.mjs && pnpm --filter @jovie/copy exec vitest run --config vitest.config.mts transport.test.ts judge.test.ts && node --test ${SCRIPT_CONTRACT_NODE_TESTS.filter(test => test !== 'scripts/invariants/assurance-matrix.test.mjs').join(' ')}`;
+export const PR_OPEN_COVERAGE_COMMAND =
+  'node --test --experimental-test-coverage --test-coverage-include=scripts/pr-open.mjs --test-coverage-lines=90 --test-coverage-branches=75 --test-coverage-functions=90 scripts/pr-open.test.mjs';
+
+export const SCRIPT_CONTRACT_NODE_COMMAND = `${PR_OPEN_COVERAGE_COMMAND} && ${DEPRECATION_COVERAGE_COMMAND} && ${CODEX_BOOTSTRAP_COVERAGE_COMMAND} && ${ASSURANCE_MATRIX_COVERAGE_COMMAND} && node --import tsx --test --test-isolation=none scripts/content-os/project.test.mts scripts/lib/__tests__/lesson-analysis.test.mjs && pnpm --filter @jovie/copy exec vitest run --config vitest.config.mts transport.test.ts judge.test.ts && node --test ${SCRIPT_CONTRACT_NODE_TESTS.filter(test => test !== 'scripts/invariants/assurance-matrix.test.mjs').join(' ')}`;
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
@@ -1069,10 +1124,14 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/component-rendered-invariant-policy.test.mjs',
   'scripts/lib/__tests__/daily-changelog.test.mjs',
   'scripts/lib/__tests__/daily-changelog-publication.test.mjs',
+  'scripts/lib/__tests__/changelog-staleness.test.mjs',
   'scripts/lib/__tests__/changelog-source-guard.test.mjs',
+  'scripts/lib/__tests__/attach-changelog-writer-proof.test.mjs',
   'scripts/lib/__tests__/delivery-control-receipts-workflow.test.mjs',
   'scripts/lib/__tests__/dependabot-update-policy.test.mjs',
   'scripts/lib/__tests__/design-surface-census.test.mjs',
+  'scripts/lib/__tests__/main-red-eject.test.mjs',
+  'scripts/lib/__tests__/main-red-eject-failing-head.test.mjs',
   'scripts/lib/__tests__/doc-freshness.test.mjs',
   'scripts/lib/__tests__/flaky-test-filing.test.mjs',
   'scripts/lib/__tests__/gbrain-pool-env.test.mjs',
@@ -1103,6 +1162,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/pr-review-rank.test.mjs',
   'scripts/lib/__tests__/pr-size-guard-base-tip.test.mjs',
   'scripts/lib/__tests__/pr-size-guard-label-override.test.mjs',
+  'scripts/lib/__tests__/pr-size-exclusions.test.mjs',
   'scripts/lib/__tests__/pr-size-guard-policy.test.mjs',
   'scripts/lib/__tests__/pre-push-gate.test.mjs',
   'scripts/lib/__tests__/production-unbound-repair-attestation.test.mjs',
@@ -1114,6 +1174,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/queue-deferred-release.test.mjs',
   'scripts/lib/__tests__/ratchet-core.test.mjs',
   'scripts/lib/__tests__/domain-expiry.test.mjs',
+  'scripts/lib/__tests__/ai-routing-drift.test.mjs',
   'scripts/lib/__tests__/credentials-registry.test.mjs',
   'scripts/lib/__tests__/credentials-spend-check.test.mjs',
   'scripts/lib/__tests__/secrets-tooling.test.mjs',
@@ -1163,7 +1224,12 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/workflow-triggers.test.mjs',
   'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
   'scripts/lib/__tests__/external-api-guard.test.mjs',
+  'scripts/lib/__tests__/source-validation-manifest.test.mjs',
   'scripts/lib/__tests__/model-id-guard.test.mjs',
+  'scripts/lib/__tests__/ai-gateway-report.test.mjs',
+  'scripts/lib/__tests__/ai-call-guard.test.mjs',
+  'scripts/lib/__tests__/subscription-cli-guard.test.mjs',
+  'scripts/lib/__tests__/api-budget.test.mjs',
   'scripts/lib/__tests__/domain-write-guard.test.mjs',
   'scripts/lib/__tests__/screen-audit-receipts.test.mjs',
   'scripts/lib/__tests__/component-certificate.test.mjs',
@@ -1484,6 +1550,34 @@ function argv(command, args, opts = {}) {
   };
 }
 
+/**
+ * Lane selection for a merge group must cover every entry the head contains.
+ * merge_group.base_sha is the entry ahead, so HEADGREEN landed a red entry
+ * behind a docs-only green head (#23600, 2026-10-29). Prefer the merge base
+ * with live origin/main (fetched by the ci-fast job); fall back to the event base.
+ * @param {string} cwd
+ * @param {string} fallback
+ */
+export function mergeGroupDiffBase(cwd, fallback) {
+  const mergeBase = argv('git', ['merge-base', 'HEAD', 'origin/main'], { cwd });
+  const sha = mergeBase.output.trim();
+  return mergeBase.code === 0 && /^[0-9a-f]{40}$/.test(sha) ? sha : fallback;
+}
+
+/** Keep Turbo's affected graph as wide as merge-group lane selection. */
+export function typecheckEnvironment(cwd = REPO_ROOT) {
+  return process.env.GITHUB_EVENT_NAME === 'merge_group'
+    ? {
+        ...process.env,
+        TURBO_SCM_BASE: mergeGroupDiffBase(
+          cwd,
+          process.env.TURBO_SCM_BASE || 'HEAD^1'
+        ),
+        TURBO_SCM_HEAD: 'HEAD',
+      }
+    : process.env;
+}
+
 /** @param {readonly string[]} patterns */
 export function changedFiles(patterns = [], cwd = REPO_ROOT) {
   const event = process.env.GITHUB_EVENT_NAME || '';
@@ -1498,6 +1592,8 @@ export function changedFiles(patterns = [], cwd = REPO_ROOT) {
       probe.code === 0
         ? `origin/${base}`
         : process.env.TURBO_SCM_BASE || diffBase;
+  } else if (event === 'merge_group') {
+    diffBase = mergeGroupDiffBase(cwd, process.env.TURBO_SCM_BASE || diffBase);
   } else if (process.env.TURBO_SCM_BASE) {
     diffBase = process.env.TURBO_SCM_BASE;
   }
@@ -2140,7 +2236,10 @@ function runTypecheck() {
       };
     }
   }
-  return shellAsync('pnpm turbo typecheck --affected --force');
+  return shellAsync(
+    'pnpm turbo typecheck --affected --force',
+    typecheckEnvironment()
+  );
 }
 
 function runWebTestsTypecheck() {
@@ -2239,6 +2338,7 @@ export const GUARDRAIL_OPERATIONS_TESTS = Object.freeze([
   'scripts/desktop-installed-apps-audit.test.mjs',
   'scripts/dev-web-fast.test.mjs',
   'scripts/ios-guardrail-rollout-audit.test.mjs',
+  'scripts/swift-arch/guard.test.mjs',
   'scripts/version-fanout-guard.test.mjs',
   'scripts/version-stamp.test.mjs',
   'scripts/agent/preflight.test.mjs',
@@ -2446,6 +2546,11 @@ function runIosFast() {
     'Gemfile',
     'Gemfile.lock',
     'scripts/ios-best-practices-lint.sh',
+    'apps/web/design/ziawi-color-sot.json',
+    'apps/web/styles/design-system.css',
+    'scripts/invariants/native-spacing-scale*',
+    'scripts/swift-arch/**',
+    'apps/macos/**',
     '.github/workflows/ios-ci.yml',
     '.github/workflows/ios-testflight.yml',
   ]);
@@ -2456,7 +2561,9 @@ function runIosFast() {
       skipped: true,
     };
   }
-  return shell('pnpm run ios:lint && pnpm run ios:app-store:test');
+  return shell(
+    'node apps/ios/scripts/native-design-system.mjs && pnpm run ios:lint && pnpm run ios:app-store:test'
+  );
 }
 
 function runProfileAdmission() {
@@ -2540,14 +2647,14 @@ function shellQuote(value) {
 }
 
 /** Async twin of shell() so structural commands can overlap. */
-function shellAsync(command) {
+function shellAsync(command, env = process.env) {
   return new Promise(resolveResult => {
     const stdout = [];
     const stderr = [];
     const child = spawn(command, {
       shell: true,
       cwd: REPO_ROOT,
-      env: process.env,
+      env,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     child.stdout.on('data', chunk => stdout.push(chunk));

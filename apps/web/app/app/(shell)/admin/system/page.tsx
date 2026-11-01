@@ -5,7 +5,7 @@ import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const metadata: Metadata = {
-  title: 'System Map | Admin',
+  title: 'Agents | Ovie',
   robots: NOINDEX_ROBOTS,
 };
 
@@ -41,7 +41,8 @@ export default async function AdminSystemPage({ searchParams }: Props) {
 
   return (
     <AdminPage
-      title='System Map'
+      views='operations'
+      title='Agents'
       description='Read-only overview of skills, connectors, tools, and memory — separation of concerns for the platform.'
       testId='admin-system-page'
       viewTestId='admin-system-content'

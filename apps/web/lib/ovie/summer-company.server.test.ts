@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   stripeMetrics: vi.fn(),
+  mercuryMetrics: vi.fn(),
   lybMrr: vi.fn(),
   founderAccounts: vi.fn(),
   sessionsList: vi.fn(),
@@ -12,6 +13,9 @@ const hoisted = vi.hoisted(() => ({
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/admin/stripe-metrics', () => ({
   getAdminStripeOverviewMetrics: hoisted.stripeMetrics,
+}));
+vi.mock('@/lib/admin/mercury-metrics', () => ({
+  getAdminMercuryMetrics: hoisted.mercuryMetrics,
 }));
 vi.mock('./lyb-mrr.server', () => ({ getLybDailyMrr: hoisted.lybMrr }));
 vi.mock('./summer-founder-cohort.server', () => ({
@@ -54,6 +58,10 @@ describe('getSummerRevenue', () => {
     vi.clearAllMocks();
     hoisted.dbResults.length = 0;
     hoisted.lybMrr.mockResolvedValue(lybRecord);
+    hoisted.mercuryMetrics.mockResolvedValue({
+      isConfigured: false,
+      isAvailable: false,
+    });
   });
 
   it('reports Jovie Stripe MRR and passes the LYB record through', async () => {
@@ -80,6 +88,43 @@ describe('getSummerRevenue', () => {
         source: 'stripe',
       },
       lyb: lybRecord,
+      cash: { status: 'unavailable', reason: 'mercury_not_configured' },
+    });
+  });
+
+  it('reports Mercury cash from the read-only token and never turns a failure into $0', async () => {
+    hoisted.dbResults.push([]);
+    hoisted.stripeMetrics.mockResolvedValue({
+      mrrUsd: 0,
+      activeSubscribers: 0,
+      excludedInternalSubscribers: 0,
+      excludedInternalMrrUsd: 0,
+      isConfigured: true,
+      isAvailable: true,
+    });
+    hoisted.mercuryMetrics.mockResolvedValue({
+      balanceUsd: 812.5,
+      burnRateUsd: 4100,
+      burnWindowDays: 30,
+      burnRateAvailable: true,
+      observedAtIso: '2026-09-26T11:59:00.000Z',
+      isConfigured: true,
+      isAvailable: true,
+      defaultStatus: 'dead',
+    });
+    await expect(getSummerRevenue(NOW)).resolves.toMatchObject({
+      cash: {
+        balanceUsd: 812.5,
+        burnRateUsd: 4100,
+        burnWindowDays: 30,
+        defaultStatus: 'dead',
+        observedAt: '2026-09-26T11:59:00.000Z',
+        source: 'mercury',
+      },
+    });
+    hoisted.mercuryMetrics.mockRejectedValue(new Error('boom'));
+    await expect(getSummerRevenue(NOW)).resolves.toMatchObject({
+      cash: { status: 'unavailable', reason: 'mercury_request_failed' },
     });
   });
 

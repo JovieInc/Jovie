@@ -169,6 +169,42 @@ export async function postStripeWebhook(
   });
 }
 
+/**
+ * Detach every payment method Stripe still holds for the persona's
+ * customer(s). The persona email persists across runs — the Stripe test
+ * account is shared while the database is ephemeral — and each materialized
+ * checkout attaches one more test PaymentMethod. Past Stripe's per-customer
+ * payment-method cap, the app's checkout.sessions.create fails with
+ * "Customer has maximum number of payment methods attached" (JOV-8805),
+ * which is exactly how every claim-checkout dogfood run went red. Call at
+ * journey start and in the finally of every test that attaches.
+ */
+export async function detachCustomerPaymentMethods(
+  stripeClient: Stripe,
+  email: string
+): Promise<number> {
+  const customers = await stripeClient.customers.list({ email, limit: 10 });
+  let detached = 0;
+  for (const customer of customers.data) {
+    if (customer.deleted || customer.livemode !== false) continue;
+    for (;;) {
+      const paymentMethods = await stripeClient.paymentMethods.list({
+        customer: customer.id,
+        limit: 100,
+      });
+      if (paymentMethods.data.length === 0) break;
+      for (const paymentMethod of paymentMethods.data) {
+        await stripeClient.paymentMethods.detach(paymentMethod.id);
+        detached += 1;
+        // Runaway guard: each journey attaches one method, so 500 covers
+        // any accumulated backlog without an unbounded loop.
+        if (detached >= 500) return detached;
+      }
+    }
+  }
+  return detached;
+}
+
 /** Cancel any active subscription so the user starts on free tier. */
 export async function ensureUserIsFree(page: Page, stripeClient: Stripe) {
   const status = await getBillingStatus(page);

@@ -52,6 +52,24 @@ class HostPressureTest(unittest.TestCase):
         self.assertLessEqual(len(rows), 2)
         self.assertTrue(all({"pid", "rssMiB", "cgroup", "cmd"} <= set(r) for r in rows))
 
+    def test_disk_forecast_alarms_on_a_shrinking_trend_before_the_threshold(self):
+        total, day = 1000 * G, 86400
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            lines = lambda: (state / "host-alarms.jsonl").read_text().splitlines() if (state / "host-alarms.jsonl").exists() else []
+            # 20% free, losing 2% (20 GB) per day: 5% floor is 7.5 days away -> quiet, then alarm as it nears.
+            for hour in range(0, 49):
+                now = 1_000_000 + hour * 3600
+                free = 200 * G - int(20 * G * hour / 24)
+                hp.publish_disk_forecast(state, now, usage=lambda _p, f=free: (total, total - f, f))
+            self.assertEqual(len(lines()), 1)
+            self.assertEqual(json.loads(lines()[0])["kind"], "host-disk-forecast")
+            self.assertTrue(json.loads(lines()[0])["alarm"])
+            # Space recovers (flat trend afterwards would take days of history); a big jump flips the slope.
+            self.assertEqual(hp.forecast_days([[0, 100 * G], [3600, 100 * G], [8 * 3600, 100 * G]], total), None)
+            self.assertIsNone(hp.forecast_days([[0, 100 * G]], total))
+            self.assertEqual(hp.forecast_days([[0, 60 * G], [3600, 55 * G], [8 * 3600, 40 * G]], total), 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

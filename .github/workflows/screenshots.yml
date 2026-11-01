@@ -1090,6 +1090,19 @@ jobs:
           EXISTING_PR=$(gh pr list --head "$BRANCH" --state open --json number \
             -q '.[0].number' 2>/dev/null || true)
 
+          # Batch refreshes: a new PR costs a merge-queue slot plus a full CI run,
+          # so open one at most per day. Updating an open PR is always allowed.
+          LAST_MERGED=$(node packages/api-client/cli.ts gh --priority default -- pr list --head "$BRANCH" --state merged --limit 1 \
+            --json mergedAt -q '.[0].mergedAt' 2>/dev/null || true)
+          CADENCE=$(node .github/scripts/screenshot-publish-cadence.mjs \
+            "$EXISTING_PR" "$LAST_MERGED")
+          echo "screenshot-cadence: $CADENCE"
+          echo "screenshot-cadence: $CADENCE" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$(printf '%s' "$CADENCE" | jq -r .publish)" != true ]; then
+            echo "::notice::Screenshot refresh batched into the next daily PR (queue slot saved)."
+            exit 0
+          fi
+
           git checkout -b "$BRANCH"
           git add apps/web/public/product-screenshots/ apps/web/screenshot-catalog/current/
           git commit -m "chore: update product screenshots [auto]

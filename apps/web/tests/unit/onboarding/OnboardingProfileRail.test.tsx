@@ -59,7 +59,7 @@ describe('OnboardingProfileRail', () => {
     expect(
       screen.getByTestId('onboarding-profile-preview-badge')
     ).toHaveTextContent('Preview');
-    expect(screen.getByText('Preview — not claimed yet')).toBeDefined();
+    expect(screen.getByText('Preview · not claimed yet')).toBeDefined();
     expect(screen.queryByText('Manage')).toBeNull();
     expect(screen.queryByText('Live')).toBeNull();
     expect(screen.queryByTestId('onboarding-rail-progress')).toBeNull();
@@ -152,13 +152,36 @@ describe('OnboardingProfileRail', () => {
     expect(screen.queryAllByTitle('Spotify')).toHaveLength(0);
   });
 
-  it('renders nothing for a non-artist before a public profile is shared', () => {
+  it('shows the draft profile for a claimed handle before any link is shared (Pen R6As7U)', () => {
     fastRender(
       <OnboardingProfileRail
         state={{
           artist: null,
           artistConfirmed: false,
           handle: 'avery',
+          socialLinks: [],
+        }}
+      />
+    );
+
+    const rail = screen.getByTestId('onboarding-profile-rail');
+    expect(
+      within(rail).getByRole('heading', { name: 'Your Draft Profile' })
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('onboarding-phone-preview')).getByTestId(
+        'profile-identity-handle'
+      )
+    ).toHaveTextContent('jov.ie/avery');
+  });
+
+  it('renders nothing before a handle or profile is known', () => {
+    fastRender(
+      <OnboardingProfileRail
+        state={{
+          artist: null,
+          artistConfirmed: false,
+          handle: null,
           socialLinks: [],
         }}
       />

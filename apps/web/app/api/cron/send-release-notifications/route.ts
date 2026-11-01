@@ -1,5 +1,12 @@
 import { and, sql as drizzleSql, eq, inArray, lt, lte } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import {
+  isReleaseEmailCanaryRecipient,
+  type ReleaseEmailCanaryScope,
+  readReleaseEmailCanaryScope,
+} from '@/lib/canaries/release-email';
+import { canSendNotification } from '@/lib/creator/segment-registry';
+import { explicitSegmentFromSettings } from '@/lib/creator/segments';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
@@ -10,6 +17,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import type { ReleaseSourceType } from '@/lib/discography/queries';
 import { getReleaseDayNotificationEmail } from '@/lib/email/templates/release-day-notification';
 import { getBatchCreatorEntitlements } from '@/lib/entitlements/creator-plan';
+import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import {
   getReleaseNotificationEligibility,
@@ -121,7 +129,8 @@ type BatchSubscriber = {
 
 async function recoverStuckNotifications(
   now: Date,
-  timeoutThreshold: Date
+  timeoutThreshold: Date,
+  canaryScope: ReleaseEmailCanaryScope | null
 ): Promise<number> {
   const recoveredRows = await db
     .update(fanReleaseNotifications)
@@ -129,7 +138,13 @@ async function recoverStuckNotifications(
     .where(
       and(
         eq(fanReleaseNotifications.status, 'sending'),
-        lt(fanReleaseNotifications.updatedAt, timeoutThreshold)
+        lt(fanReleaseNotifications.updatedAt, timeoutThreshold),
+        canaryScope
+          ? eq(
+              fanReleaseNotifications.creatorProfileId,
+              canaryScope.creatorProfileId
+            )
+          : undefined
       )
     )
     .returning({ id: fanReleaseNotifications.id });
@@ -138,7 +153,8 @@ async function recoverStuckNotifications(
 }
 
 async function fetchPendingNotifications(
-  now: Date
+  now: Date,
+  canaryScope: ReleaseEmailCanaryScope | null
 ): Promise<PendingNotification[]> {
   return db
     .select({
@@ -159,7 +175,13 @@ async function fetchPendingNotifications(
           'release_day',
           'preview',
         ]),
-        lte(fanReleaseNotifications.scheduledFor, now)
+        lte(fanReleaseNotifications.scheduledFor, now),
+        canaryScope
+          ? eq(
+              fanReleaseNotifications.creatorProfileId,
+              canaryScope.creatorProfileId
+            )
+          : undefined
       )
     )
     .orderBy(
@@ -434,6 +456,8 @@ async function sendSmsNotification(
 }
 
 async function processNotificationWithBatchedData(ctx: {
+  /** Set only when audience delivery is denied: limits dispatch to the canary. */
+  canaryScope: ReleaseEmailCanaryScope | null;
   notification: PendingNotification;
   now: Date;
   releasesMap: Map<string, BatchRelease>;
@@ -452,6 +476,7 @@ async function processNotificationWithBatchedData(ctx: {
   >;
 }): Promise<ProcessResult> {
   const {
+    canaryScope,
     notification,
     now,
     releasesMap,
@@ -488,6 +513,17 @@ async function processNotificationWithBatchedData(ctx: {
     const subscriber = subscribersMap.get(
       notification.notificationSubscriptionId
     );
+    if (
+      canaryScope &&
+      !isReleaseEmailCanaryRecipient(canaryScope, {
+        creatorProfileId: notification.creatorProfileId,
+        channel: subscriber?.channel,
+        email: subscriber?.email,
+      })
+    ) {
+      // Leave a non-canary row untouched while audience delivery is denied.
+      return 'skipped';
+    }
     const links = linksMap.get(release.id) ?? [];
     const creatorEntitlements = entitlementsMap.get(
       notification.creatorProfileId
@@ -530,6 +566,23 @@ async function processNotificationWithBatchedData(ctx: {
         now,
         'cancelled',
         getCancellationReason(eligibility.reason)
+      );
+      return 'skipped';
+    }
+
+    // Segment gate (JOV-9679): release-day messages are music-segment
+    // templates. Only an explicit non-music segment blocks; unlabeled
+    // profiles with release records keep sending.
+    const explicitSegment = explicitSegmentFromSettings(creator.settings);
+    if (
+      explicitSegment &&
+      !canSendNotification('release_day_sms', explicitSegment)
+    ) {
+      await updateNotificationStatus(
+        notification.id,
+        now,
+        'cancelled',
+        'Release notifications do not apply to this creator segment'
       );
       return 'skipped';
     }
@@ -683,7 +736,8 @@ async function processNotificationBatches(
   linksMap: Map<string, Array<{ providerId: string; url: string }>>,
   entitlementsMap: NonNullable<
     Awaited<ReturnType<typeof getCreatorEntitlementsMap>>
-  >
+  >,
+  canaryScope: ReleaseEmailCanaryScope | null
 ): Promise<{ totalSent: number; totalFailed: number; totalSkipped: number }> {
   let totalSent = 0;
   let totalFailed = 0;
@@ -698,6 +752,7 @@ async function processNotificationBatches(
 
   for (const notification of pendingNotifications) {
     const result = await processNotificationWithBatchedData({
+      canaryScope,
       notification,
       now,
       releasesMap,
@@ -734,26 +789,36 @@ export async function sendPendingNotifications(): Promise<{
   skipped: number;
   processed: number;
   policyBlocked?: BlockedEffectReceipt;
+  canaryOnly?: true;
 }> {
   const policy = denyAudienceEffect('audience.bulk.send');
+  let canaryScope: ReleaseEmailCanaryScope | null = null;
   if (!policy.dispatchAllowed) {
     // Refuse stored jobs, recovery and retries before reading recipients or
     // mutating queue rows. Consent and entitlements cannot grant dispatch.
-    return {
-      sent: 0,
-      failed: 0,
-      skipped: 0,
-      processed: 0,
-      policyBlocked: policy,
-    };
+    // JOV-9779: one synthetic profile and inbox, or the original refusal.
+    canaryScope = readReleaseEmailCanaryScope(env);
+    if (!canaryScope) {
+      return {
+        sent: 0,
+        failed: 0,
+        skipped: 0,
+        processed: 0,
+        policyBlocked: policy,
+      };
+    }
   }
+  const canaryResult = canaryScope
+    ? ({ policyBlocked: policy, canaryOnly: true } as const)
+    : {};
   const now = new Date();
   const sendingTimeoutThreshold = new Date(now.getTime() - SENDING_TIMEOUT_MS);
 
   // Recovery: Reset stuck "sending" rows back to "pending" for retry
   const recoveredCount = await recoverStuckNotifications(
     now,
-    sendingTimeoutThreshold
+    sendingTimeoutThreshold,
+    canaryScope
   );
   if (recoveredCount > 0) {
     logger.info(
@@ -762,11 +827,14 @@ export async function sendPendingNotifications(): Promise<{
   }
 
   // Find pending notifications that are due
-  const pendingNotifications = await fetchPendingNotifications(now);
+  const pendingNotifications = await fetchPendingNotifications(
+    now,
+    canaryScope
+  );
 
   if (pendingNotifications.length === 0) {
     logger.info('[send-release-notifications] No pending notifications');
-    return { sent: 0, failed: 0, skipped: 0, processed: 0 };
+    return { sent: 0, failed: 0, skipped: 0, processed: 0, ...canaryResult };
   }
 
   // Batch fetch all required data upfront
@@ -831,6 +899,7 @@ export async function sendPendingNotifications(): Promise<{
       failed: 0,
       skipped: ineligibleNotifications.length,
       processed: pendingNotifications.length,
+      ...canaryResult,
     };
   }
 
@@ -842,7 +911,8 @@ export async function sendPendingNotifications(): Promise<{
     creatorsMap,
     subscribersMap,
     linksMap,
-    entitlementsMap
+    entitlementsMap,
+    canaryScope
   );
 
   logger.info(
@@ -854,6 +924,7 @@ export async function sendPendingNotifications(): Promise<{
     failed: totals.totalFailed,
     skipped: totals.totalSkipped + ineligibleNotifications.length,
     processed: pendingNotifications.length,
+    ...canaryResult,
   };
 }
 
@@ -871,7 +942,7 @@ export async function GET(request: Request) {
   try {
     const result = await sendPendingNotifications();
 
-    if (result.policyBlocked) {
+    if (result.policyBlocked && !result.canaryOnly) {
       return NextResponse.json(
         {
           success: true,

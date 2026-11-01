@@ -19,8 +19,18 @@ import {
 } from '@/lib/email/templates/promo-download-otp';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import {
+  emailOtpResendCooldownLimiter,
+  emailOtpSendLimiter,
+} from '@/lib/notifications/email-otp-limiters';
 import { requestEmailOtp } from '@/lib/notifications/otp-service';
 import { sendNotification } from '@/lib/notifications/service';
+import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
+import {
+  createRateLimitHeaders,
+  generalLimiter,
+  getClientIP,
+} from '@/lib/rate-limit';
 import { decodeCityHeader } from '../_geo';
 
 export const runtime = 'nodejs';
@@ -30,6 +40,36 @@ const requestOtpSchema = z.object({
   /** Honeypot field — if filled, silently succeed without sending OTP */
   website: z.string().optional(),
 });
+
+async function limitPromoOtp(
+  request: NextRequest,
+  rawEmail: string
+): Promise<NextResponse | null> {
+  let blocked: Awaited<ReturnType<typeof generalLimiter.limit>> | null = null;
+  const ipResult = await generalLimiter.limit(getClientIP(request));
+  if (!ipResult.success) blocked = ipResult;
+  if (!blocked) {
+    const email = normalizeSubscriptionEmail(rawEmail) ?? rawEmail;
+    for (const limiter of [
+      emailOtpResendCooldownLimiter,
+      emailOtpSendLimiter,
+    ]) {
+      const result = await limiter.limit(email);
+      if (!result.success) {
+        blocked = result;
+        break;
+      }
+    }
+  }
+  if (!blocked) return null;
+  return NextResponse.json(
+    { error: 'Too many requests. Please wait and try again.' },
+    {
+      status: 429,
+      headers: { ...NO_STORE_HEADERS, ...createRateLimitHeaders(blocked) },
+    }
+  );
+}
 
 export async function POST(
   request: NextRequest,
@@ -83,6 +123,12 @@ export async function POST(
         { status: 404, headers: NO_STORE_HEADERS }
       );
     }
+
+    // Requesting a code resets the per-code attempt cap, so unlimited requests
+    // would mean unlimited guesses. Same limiters as the fan subscribe OTP. Runs after the promo
+    // lookup so made-up ids cannot burn a victim's per-email budget.
+    const limited = await limitPromoOtp(request, parsed.data.email);
+    if (limited) return limited;
 
     // Extract geo from headers
     const ip =

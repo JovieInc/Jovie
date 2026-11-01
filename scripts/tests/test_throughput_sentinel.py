@@ -248,6 +248,8 @@ class QueueBreakerTest(unittest.TestCase):
             calls.append(args)
             path = args[-1] if args[0] == "api" else ""
             flat = " ".join(args)
+            if "branch=main" in flat:
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"workflow_runs": []}))
             if "workflows/ci.yml/runs" in flat:
                 rows = [{"id": 11, "head_branch": "gh-readonly-queue/main/pr-23471-abc", "conclusion": "failure", "updated_at": iso(NOW - 600), "head_sha": "s1"},
                         {"id": 12, "head_branch": "gh-readonly-queue/main/pr-23471-def", "conclusion": "failure", "updated_at": iso(NOW - 3000), "head_sha": "s2"},
@@ -325,6 +327,143 @@ class QueueBreakerTest(unittest.TestCase):
             pushed_at = NOW - 3000
             again = qb.sweep(Path(raw), run, NOW)
             self.assertEqual(again["tripped"], [23570])
+
+    BRAND = "tests/unit/brand/agent-display-name.test.ts brand guard finds the forbidden wording"
+
+    def _breaker(self):
+        qb = importlib.util.module_from_spec(importlib.util.spec_from_file_location("queue_breaker", ROOT / "scripts/lanes/queue_breaker.py"))
+        qb.__spec__.loader.exec_module(qb)
+        return qb
+
+    def _attribution_world(self, calls, *, peer_line=None, peer_contains=False, main_line=None,
+                           with_own_failures=True, with_peer=True):
+        """Fake gh world for attribution: PR #24111 queued on head a*40 with two own merge-group
+        failures on `Unit Tests (7/14)` and the brand-guard error line; an optional peer group
+        failure for #24105 (same signal by default, group without #24111) and an optional
+        main-branch red. Jobs and logs are keyed by run and job id."""
+        brand = self.BRAND
+        peer_line = brand if peer_line is None else peer_line
+
+        def run(args, **kwargs):
+            calls.append(args)
+            flat = " ".join(args)
+            path = args[-1] if args and args[0] == "api" else ""
+            if "branch=main" in flat:
+                rows = [{"id": 77, "updated_at": iso(NOW - 1500)}] if main_line is not None else []
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"workflow_runs": rows}))
+            if "workflows/ci.yml/runs" in flat:
+                rows = []
+                if with_own_failures:
+                    rows += [{"id": 31, "head_branch": "gh-readonly-queue/main/pr-24111-aaa", "conclusion": "failure",
+                              "created_at": iso(NOW - 700), "updated_at": iso(NOW - 600), "head_sha": "p" * 40},
+                             {"id": 32, "head_branch": "gh-readonly-queue/main/pr-24111-bbb", "conclusion": "failure",
+                              "created_at": iso(NOW - 1300), "updated_at": iso(NOW - 1200), "head_sha": "q" * 40}]
+                if with_peer:
+                    rows.append({"id": 33, "head_branch": "gh-readonly-queue/main/pr-24105-ccc", "conclusion": "failure",
+                                 "created_at": iso(NOW - 1000), "updated_at": iso(NOW - 900), "head_sha": "e" * 40})
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"workflow_runs": rows}))
+            if "mergeQueue" in flat:
+                nodes = [{"state": "AWAITING_CHECKS", "headCommit": {"oid": "z" * 40},
+                          "pullRequest": {"id": "PR_V", "number": 24111, "headRefOid": "a" * 40}}]
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"data": {"repository": {"mergeQueue": {"entries": {"nodes": nodes}}}}}))
+            if "/compare/" in flat:
+                commits = [{"commit": {"message": "peer entry (#24105)"}}]
+                if peer_contains:
+                    commits.append({"commit": {"message": "this group carries the tripped PR (#24111)"}})
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"commits": commits}))
+            if path.endswith("/jobs?per_page=100"):
+                run_id = int(path.split("/runs/")[1].split("/")[0])
+                job_id = {31: 91, 32: 92, 33: 93, 77: 97}[run_id]
+                jobs = [{"id": job_id, "name": "Unit Tests (7/14)", "conclusion": "failure",
+                         "steps": [{"name": "Run unit tests", "conclusion": "failure"}]}]
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"jobs": jobs}))
+            if path.endswith("/logs"):
+                job_id = int(path.split("/jobs/")[1].split("/")[0])
+                line = peer_line if job_id == 93 else (main_line if job_id == 97 else brand)
+                return SimpleNamespace(returncode=0, stderr="", stdout=f"setup\n##[error]{line}\n")
+            if "/pulls/24111" in flat:
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"state": "open", "head": {"sha": "a" * 40}, "labels": []}))
+            return SimpleNamespace(returncode=0, stderr="", stdout="{}")
+
+        return run
+
+    def test_a_shared_peer_failure_skips_the_trip(self):
+        """2026-11-01: main's brand-guard break failed every group whatever PR it carried, so a
+        green queued PR whose own head checks pass must not be tripped, dequeued or labeled."""
+        calls = []
+        qb = self._breaker()
+        run = self._attribution_world(calls)
+        with tempfile.TemporaryDirectory() as raw:
+            out = qb.sweep(Path(raw), run, NOW)
+            flat = "\n".join(" ".join(c) for c in calls)
+            log = (Path(raw) / qb.LOG_FILE).read_text()
+            state = json.loads((Path(raw) / qb.STATE_FILE).read_text())
+        self.assertEqual(out["tripped"], [])
+        self.assertEqual(out.get("skipped-shared"), [24111])
+        self.assertNotIn("dequeuePullRequest", flat)
+        self.assertNotIn("issues/24111/labels", flat)
+        self.assertIn("/compare/main...", flat)  # containment was actually checked
+        self.assertIn("skipped-shared-failure", log)
+        self.assertIn('"kind": "peer"', log)
+        self.assertEqual(state, {})
+
+    def test_a_peer_group_containing_the_pr_is_not_shared_evidence(self):
+        calls = []
+        qb = self._breaker()
+        run = self._attribution_world(calls, peer_contains=True)
+        with tempfile.TemporaryDirectory() as raw:
+            out = qb.sweep(Path(raw), run, NOW)
+            flat = "\n".join(" ".join(c) for c in calls)
+        self.assertEqual(out["tripped"], [24111])
+        self.assertNotIn("skipped-shared", out)
+        self.assertIn("dequeuePullRequest", flat)
+
+    def test_a_peer_failing_a_different_signal_still_trips(self):
+        """Genuine red detection is not weakened: a peer failing something else is not evidence."""
+        calls = []
+        qb = self._breaker()
+        run = self._attribution_world(calls, peer_line="OwnBreak failed: 1 != 0")
+        with tempfile.TemporaryDirectory() as raw:
+            out = qb.sweep(Path(raw), run, NOW)
+            flat = "\n".join(" ".join(c) for c in calls)
+        self.assertEqual(out["tripped"], [24111])
+        self.assertNotIn("skipped-shared", out)
+        self.assertIn("dequeuePullRequest", flat)
+
+    def test_a_main_branch_red_skips_the_single_pr_trip(self):
+        """With no other queued PR, a main-branch CI red on the same signal is the evidence."""
+        calls = []
+        qb = self._breaker()
+        run = self._attribution_world(calls, with_peer=False, main_line=self.BRAND)
+        with tempfile.TemporaryDirectory() as raw:
+            out = qb.sweep(Path(raw), run, NOW)
+            flat = "\n".join(" ".join(c) for c in calls)
+            log = (Path(raw) / qb.LOG_FILE).read_text()
+        self.assertEqual(out["tripped"], [])
+        self.assertEqual(out.get("skipped-shared"), [24111])
+        self.assertNotIn("dequeuePullRequest", flat)
+        self.assertIn('"kind": "main"', log)
+
+    def test_a_shared_failure_hold_is_released_instead_of_reblocked(self):
+        """The relay cleared the label on a required-green head; a shared failure must not put it
+        back (each re-application wakes dequeue-held and churns the green queued PR again)."""
+        calls = []
+        qb = self._breaker()
+        run = self._attribution_world(calls, with_own_failures=False)
+        with tempfile.TemporaryDirectory() as raw:
+            (Path(raw) / qb.STATE_FILE).write_text(json.dumps(
+                {"24111": {"head": "a" * 40, "at": NOW - 2000,
+                           "check": {"job": "Unit Tests (7/14)", "step": "Run unit tests", "line": self.BRAND}}}))
+            out = qb.sweep(Path(raw), run, NOW)
+            flat = "\n".join(" ".join(c) for c in calls)
+            log = (Path(raw) / qb.LOG_FILE).read_text()
+            state = json.loads((Path(raw) / qb.STATE_FILE).read_text())
+        self.assertEqual(out.get("released-shared"), [24111])
+        self.assertEqual(out["reblocked"], [])
+        self.assertNotIn("issues/24111/labels", flat)
+        self.assertIn("released-shared-failure", log)
+        self.assertEqual(state, {})
+
 
 class QueueTimingsTest(unittest.TestCase):
     def test_queue_timings_report_group_ci_and_enqueue_to_merge(self):
@@ -456,6 +595,79 @@ class mock_max:
 
     def __exit__(self, *exc):
         self.module.IDLE_LOG_MAX_BYTES = self.old
+
+
+
+class SupplyFlowTest(unittest.TestCase):
+    def graphql(self, nodes, depth):
+        body = {"data": {"repository": {"mergeQueue": {"entries": {"totalCount": depth}},
+                                         "pullRequests": {"pageInfo": {"hasNextPage": False, "endCursor": None},
+                                                          "nodes": nodes}}}}
+        return lambda args, **_: SimpleNamespace(returncode=0, stdout=json.dumps(body), stderr="")
+
+    def pr(self, number, status="CLEAN", queued=False, labels=(), draft=False):
+        return {"number": number, "isDraft": draft, "isInMergeQueue": queued, "isCrossRepository": False,
+                "mergeStateStatus": status, "createdAt": iso(NOW), "headRefOid": "a" * 40,
+                "labels": {"nodes": [{"name": name} for name in labels]}}
+
+    def test_queue_starved_alarm_needs_ten_minutes_of_clean_unqueued_with_depth_at_most_one(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            nodes = [self.pr(1), self.pr(2, "DIRTY"), self.pr(3, labels=["hold"]), self.pr(4, draft=True),
+                     self.pr(5, "CLEAN", queued=True), self.pr(6, "BLOCKED")]
+            first, error = ts.sample_supply_flow(Path(tmp), NOW, self.graphql(nodes, 1))
+            self.assertIsNone(error)
+            self.assertEqual(first["counts"], {"BLOCKED": 1, "CLEAN-unqueued": 1, "DIRTY": 1, "held": 1, "queued": 1})
+            self.assertEqual(first["cleanUnqueued"], [1])
+            self.assertEqual(ts.judge(obs(pushes1h={"JovieInc/Jovie|codex": 1}, supplyFlow=first)), {})
+            later, _ = ts.sample_supply_flow(Path(tmp), NOW + 700, self.graphql(nodes, 1))
+            self.assertGreater(later["starvedForS"], 600)
+            alerts = ts.judge({**obs(pushes1h={"JovieInc/Jovie|codex": 1}, supplyFlow=later), "now": NOW + 700})
+            self.assertIn("throughput-queue-starved", alerts)
+            self.assertIn("#1", alerts["throughput-queue-starved"])
+            deep, _ = ts.sample_supply_flow(Path(tmp), NOW + 1500, self.graphql(nodes, 6))
+            self.assertEqual(deep["starvedForS"], 0)
+
+    def test_lanes_tick_dispatches_the_enroll_sweep_after_ten_minutes_once_per_window(self):
+        calls = []
+
+        def run(args, **_):
+            calls.append(args)
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        with tempfile.TemporaryDirectory() as tmp:
+            first, _ = ts.sample_supply_flow(Path(tmp), NOW, self.graphql([self.pr(1)], 1))
+            self.assertIsNone(ts.backstop_enroll(Path(tmp), first, NOW + 60, run))
+            later, _ = ts.sample_supply_flow(Path(tmp), NOW + 700, self.graphql([self.pr(1)], 1))
+            receipt = ts.backstop_enroll(Path(tmp), later, NOW + 700, run)
+            self.assertTrue(receipt["ok"])
+            self.assertEqual(calls, [["workflow", "run", "merge-queue-green-enroll.yml", "-R", "JovieInc/Jovie", "--ref", "main"]])
+            ts.backstop_enroll(Path(tmp), later, NOW + 800, run)
+            self.assertEqual(len(calls), 1)
+
+    def test_remediation_dead_man_alarms_after_thirty_silent_minutes_with_waiting_prs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            supply, _ = ts.sample_supply_flow(Path(tmp), NOW, self.graphql([self.pr(1, "DIRTY"), self.pr(2, "BLOCKED")], 3))
+            old = iso(NOW - 3600)
+            run = lambda args, **_: SimpleNamespace(returncode=0, stdout=json.dumps({"workflow_runs": [{"created_at": old}]}), stderr="")
+            live = ts.remediation_liveness(Path(tmp), supply, NOW, run)
+            self.assertEqual((live["waiting"], live["silentForS"]), (2, 3600))
+            alerts = ts.judge(obs(pushes1h={"JovieInc/Jovie|codex": 1}, supplyFlow=supply, remediation=live))
+            self.assertIn("throughput-remediation-silent", alerts)
+            fresh = {**live, "silentForS": 300}
+            self.assertNotIn("throughput-remediation-silent", ts.judge(obs(pushes1h={"JovieInc/Jovie|codex": 1}, supplyFlow=supply, remediation=fresh)))
+            supply["prs"]["1"]["since"] = NOW - 3600
+            empty = lambda *a, **k: SimpleNamespace(returncode=0, stdout='{"workflow_runs":[]}', stderr="")
+            self.assertEqual(ts.remediation_liveness(Path(tmp), supply, NOW, empty)["silentForS"], 3600)
+
+    def test_enqueue_records_green_to_enqueue_dwell_and_supply_dwell_alarm(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ts.sample_supply_flow(Path(tmp), NOW, self.graphql([self.pr(1)], 4))
+            after, _ = ts.sample_supply_flow(Path(tmp), NOW + 130, self.graphql([self.pr(1, queued=True)], 5))
+            self.assertEqual(after["greenToEnqueueS"], [130.0])
+            dirty = [self.pr(n, "DIRTY") for n in range(10, 14)]
+            ts.sample_supply_flow(Path(tmp), NOW + 300, self.graphql(dirty, 5))
+            late, _ = ts.sample_supply_flow(Path(tmp), NOW + 300 + 7 * 3600, self.graphql(dirty, 5))
+            alerts = ts.judge({**obs(pushes1h={"JovieInc/Jovie|codex": 1}, supplyFlow=late), "now": NOW + 300 + 7 * 3600})
+            self.assertIn("throughput-supply-dwell:DIRTY", alerts)
 
 
 if __name__ == "__main__":

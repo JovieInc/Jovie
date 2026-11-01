@@ -28,6 +28,7 @@ describe('LyricsHeader', () => {
         onArtistClick={onArtistClick}
       />
     );
+    expect(screen.getByRole('button')).toHaveAttribute('type', 'button');
     fireEvent.click(screen.getByText('Bahamas'));
     expect(onArtistClick).toHaveBeenCalledOnce();
   });

@@ -139,9 +139,21 @@ vi.mock(
 vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog',
   () => ({
-    SpotifyConnectDialog: ({ open }: { open: boolean }) =>
+    SpotifyConnectDialog: ({
+      open,
+      connected,
+      connectedArtistName,
+    }: {
+      open: boolean;
+      connected?: boolean;
+      connectedArtistName?: string | null;
+    }) =>
       open ? (
-        <div data-testid='spotify-connect-dialog'>
+        <div
+          data-testid='spotify-connect-dialog'
+          data-connected={String(connected)}
+          data-artist={connectedArtistName ?? ''}
+        >
           <h2>Connect Spotify</h2>
           <label htmlFor='spotify-search'>
             Search Spotify artists or paste a link
@@ -649,6 +661,7 @@ describe('ShellReleasesView', () => {
     renderShell([]);
 
     const dialog = screen.getByTestId('spotify-connect-dialog');
+    expect(dialog).toHaveAttribute('data-connected', 'false');
     expect(
       within(dialog).getByRole('heading', { name: 'Connect Spotify' })
     ).toBeInTheDocument();

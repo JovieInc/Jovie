@@ -9,6 +9,7 @@ import {
   sanitizeIcsUrl,
 } from '@/lib/ics/format';
 import { scheduleAfter } from '@/lib/next/schedule-after';
+import { isPublicProfilePublished } from '@/lib/profile/public-profile-access';
 import { getPublicProfileDiscoveryExclusionResponse } from '@/lib/profile/public-profile-discovery-response';
 import { apiLimiter, createRateLimitHeaders } from '@/lib/rate-limit';
 import { getConfirmedTourEventsForProfile } from '@/lib/tour-dates/queries';
@@ -132,7 +133,7 @@ export async function GET(
     // Private profiles AND missing profiles return 404. Same surface a
     // scraper would see for either case → no profile-existence side
     // channel.
-    if (!profile?.isPublic) {
+    if (!profile || !isPublicProfilePublished(profile.isPublic)) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
     const profileExclusion = getPublicProfileDiscoveryExclusionResponse(
@@ -176,7 +177,7 @@ export async function GET(
       headers: {
         'Content-Type': 'text/calendar; charset=utf-8',
         'Content-Disposition': `attachment; filename="${filename}"`,
-        'Cache-Control': 'public, max-age=3600, must-revalidate',
+        'Cache-Control': 'no-store',
       },
     });
   } catch (error) {

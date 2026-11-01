@@ -54,8 +54,16 @@ export function legacyCooldownRoots(
   return [...new Set(roots)].filter(root => root && root !== canonical);
 }
 
-/** Per-uid tmp fallback used when the shared state dir rejects a write. */
-export function fallbackCooldownRoot() {
+/**
+ * Per-uid tmp fallback used when the shared state dir rejects a write.
+ * `LINEAR_COOLDOWN_FALLBACK_DIR` overrides the location so a process can own
+ * its fallback surface outright. Without it, a replayed publish-failure
+ * scenario inside the deadline window inherits the previous run's live
+ * fallback record and reports cooling-down instead of the failure under
+ * test (merge-group run 41019753132, structural command 42/61).
+ */
+export function fallbackCooldownRoot(env = process.env) {
+  if (env.LINEAR_COOLDOWN_FALLBACK_DIR) return env.LINEAR_COOLDOWN_FALLBACK_DIR;
   const uid = process.getuid ? process.getuid() : 'shared';
   return join(tmpdir(), `jovie-linear-cooldown-${uid}`);
 }

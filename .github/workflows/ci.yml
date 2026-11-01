@@ -552,6 +552,8 @@ jobs:
       run_golden_eval_set: ${{ steps.detect.outputs.run_golden_eval_set || 'false' }}
       run_e2e: ${{ steps.detect.outputs.run_e2e || 'false' }}
       run_golden_path: ${{ steps.detect.outputs.run_golden_path || 'false' }}
+      # Empty (run the model review) unless the diff touched no UI files; see detect step.
+      golden_path_no_ui_diff: ${{ steps.detect.outputs.golden_path_no_ui_diff || '' }}
       # JOV-5960: selects the source-lane visual snapshot compare on homepage
       # PRs so a skipped compare can never read as green there.
       run_homepage_visual: ${{ steps.homepage-visual.outputs.run_homepage_visual || 'false' }}
@@ -977,6 +979,9 @@ jobs:
           else
             echo "run_golden_path=false" >> "$GITHUB_OUTPUT"
           fi
+
+          # No UI file changed: skip the paid golden-path model review (empty = review runs)
+          echo "$CHANGED_FILES" | grep -q -E '^(apps/web/(app|components|styles|public)/|apps/web/.*\.(css|scss|tsx)$|packages/ui/)' || echo "golden_path_no_ui_diff=true" >> "$GITHUB_OUTPUT"
 
           # Drizzle paths
           DRIZZLE_PATTERN='^(apps/web/drizzle/|apps/web/lib/db/|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts))'
@@ -3588,11 +3593,14 @@ jobs:
     # The 162 Storybook specs took 4.0m of a 6.6m job on two workers and set
     # the merge-group wall (end p50 7.3m over 18 web merge groups on
     # 2026-10-12). Playwright --shard splits the same fullyParallel spec list
-    # across two runners; the aggregates read the matrix result.
+    # across runners; the aggregates read the matrix result. Three shards since
+    # 2026-11-01: on two, the matrix step was 276s p50 and the shards ended
+    # at 12.2 of 14.4 min, the next tail once ci-fast (remaining) stopped
+    # waiting on the lanes pytest.
     strategy:
       fail-fast: true
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3]
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -3656,6 +3664,7 @@ jobs:
               node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
                 pnpm exec playwright test \
                   tests/e2e/storybook-agent-status.spec.ts \
+                  tests/e2e/storybook-chat-composer-streaming.spec.ts \
                   tests/e2e/storybook-destructive-button.spec.ts \
                   tests/e2e/storybook-download-visual.spec.ts \
                   tests/e2e/storybook-elevation.spec.ts \
@@ -3668,6 +3677,7 @@ jobs:
                   tests/e2e/storybook-overlay-collisions.spec.ts \
                   tests/e2e/storybook-spotify-connect.spec.ts \
                   tests/e2e/storybook-ovie-privacy-boundary.spec.ts \
+                  tests/e2e/storybook-onboarding-dsp-strip-clearance.spec.ts \
                   tests/e2e/storybook-onboarding-recovery.spec.ts \
                   tests/e2e/storybook-task-row-geometry.spec.ts \
                   tests/e2e/storybook-desktop-update-modal.spec.ts \
@@ -3682,7 +3692,7 @@ jobs:
           exit 1
         env:
           STORYBOOK_BASE_URL: http://localhost:6006
-          STORYBOOK_SHARD: ${{ matrix.shard }}/2
+          STORYBOOK_SHARD: ${{ matrix.shard }}/3
           MERGE_GROUP_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}
           CI: true
           JOVIE_STORYBOOK_MANUAL_AXE: '1'
@@ -6748,7 +6758,7 @@ jobs:
       # the auth/billing journey evidence, which is built from the journey step.
       - name: Review golden-path keyframes (visual verdict)
         id: visual_review
-        if: ${{ !cancelled() && steps.canonical_journey.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.canonical_journey.outcome == 'success' && needs.ci-path-changes.outputs.golden_path_no_ui_diff != 'true' }}
         run: |
           cd "$GITHUB_WORKSPACE"
           # JOV-5489: recorded visual review of the golden-path keyframes. A
@@ -7847,13 +7857,45 @@ jobs:
   # Storybook a11y evidence lives exclusively in the scheduled visual-a11y.yml
   # storybook-a11y lane; the duplicate manual ci-storybook-a11y job was removed
   # (JOV-4326) so the evidence has a single owner.
+  ci-slop-guard:
+    name: Slop Guard
+    # Company anti-slop ratchets (JOV-9975). Policy, tool versions and tool configs live in
+    # JovieInc/ci (policy/JovieInc__Jovie/); this repo owns only config/slop-guard/baseline.json,
+    # which may only shrink. Feeds PR Ready, so a red guard blocks the merge.
+    needs: [ci-path-changes]
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    env:
+      HAS_BOT_KEY: ${{ secrets.JOVIE_BOT_PRIVATE_KEY != '' && secrets.JOVIE_BOT_APP_ID != '' && github.event.pull_request.head.repo.full_name == github.repository }}
+    steps:
+      - *shallow-checkout
+      - uses: ./.github/actions/setup-node-pnpm
+      # Optional: with the jovie-bot App secrets, fixed debt lowers the baseline automatically.
+      # Without them (or on forks) auto-shrink is skipped and the guard stays warn-only for that part.
+      - name: Mint jovie-bot token
+        id: bot
+        if: env.HAS_BOT_KEY == 'true'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ secrets.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+      - uses: JovieInc/ci/actions/slop-guard@dc568f8b92fd8b3681e2f3c56b39a9bda5700d0d # JovieInc/ci#12
+        with:
+          auto-shrink: ${{ steps.bot.outputs.token != '' }}
+          token: ${{ steps.bot.outputs.token || github.token }}
+
   ci-pr-ready:
     name: ${{ github.event_name == 'pull_request' && 'PR Ready' || 'PR Ready (source inactive)' }}
     # The source aggregate stays deterministic: exact-head V8 coverage runs in
     # parallel with the fast lanes, while build/layout integration stays on the
     # merge-group head. Migration Guard, Fork PR Gate, and PR Size Guard remain
     # separately required ruleset contexts.
-    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare]
+    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare, ci-slop-guard]
     if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -7868,6 +7910,7 @@ jobs:
           SECRET_SCAN_RESULT="${{ needs.ci-secret-scan.result }}"
           GOLDEN_PATH_LOCK_RESULT="${{ needs.ci-golden-path-lock.result }}"
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
+          SLOP_RESULT="${{ needs.ci-slop-guard.result }}"
           COVERAGE_RESULT="${{ needs.ci-exact-head-coverage.result }}"
           RISK_LEVEL="${{ needs.ci-risk-classifier.outputs.risk_level }}"
           RISK_RULES="${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}"
@@ -7889,6 +7932,7 @@ jobs:
             echo "| Exact-head Coverage | $COVERAGE_RESULT | \`pnpm --filter @jovie/web test:coverage && node scripts/check-changed-test-coverage.mjs --base <base-sha> --head <head-sha>\` |"
             echo "| Secret Scan | $SECRET_SCAN_RESULT | \`./scripts/security/scan-secrets.sh ci-pr origin/main\` |"
             echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT | \`node scripts/golden-path-lock.mjs merge-gate\` |"
+            echo "| Slop Guard (size, pass-through, dead code, duplication) | $SLOP_RESULT | \`node ../ci/actions/slop-guard/slop-guard.mjs --policy <ci>/policy/JovieInc__Jovie/policy.json\` |"
             echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
             echo "| Visual Snapshot Compare (homepage + marketing DOM PRs) | $VISUAL_COMPARE_RESULT | \`node scripts/visual-snapshot-compare.mjs compare\` |"
             echo
@@ -7910,6 +7954,10 @@ jobs:
           fi
           if [[ "$RISK_RESULT" != "success" ]]; then
             echo "❌ CI risk classifier did not pass (result: $RISK_RESULT)"
+            exit 1
+          fi
+          if [[ "$SLOP_RESULT" != "success" ]]; then
+            echo "❌ Slop Guard did not pass (result: $SLOP_RESULT); see the job log for the offender and its budget"
             exit 1
           fi
 

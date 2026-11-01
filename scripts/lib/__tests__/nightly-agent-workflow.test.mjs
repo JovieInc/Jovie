@@ -189,24 +189,20 @@ describe('Nightly Testing Agent evidence flow', () => {
     }
   );
 
-  it('uploads staged report evidence before minting publication credentials', () => {
+  it('uploads staged report evidence and never publishes it as a PR', () => {
     const producerIndex = report.steps.findIndex(
       candidate => candidate.name === 'Publish evidence report and ops status'
     );
     const uploadIndex = report.steps.findIndex(
       candidate => candidate.name === 'Upload final report'
     );
-    const tokenIndex = report.steps.findIndex(
-      candidate => candidate.id === 'report-token'
-    );
-    const publishIndex = report.steps.findIndex(
-      candidate => candidate.name === 'Open nightly evidence PR'
-    );
 
     expect(producerIndex).toBeGreaterThanOrEqual(0);
     expect(uploadIndex).toBeGreaterThan(producerIndex);
-    expect(tokenIndex).toBeGreaterThan(uploadIndex);
-    expect(publishIndex).toBeGreaterThan(tokenIndex);
+    expect(report.steps.some(c => c.id === 'report-token')).toBe(false);
+    expect(report.steps.some(c => c.name === 'Open nightly evidence PR')).toBe(
+      false
+    );
     expect(report.steps[producerIndex].run).toContain(
       'guard-playwright-artifacts.mjs --run --'
     );

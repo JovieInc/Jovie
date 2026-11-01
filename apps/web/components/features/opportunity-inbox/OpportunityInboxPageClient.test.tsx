@@ -449,6 +449,10 @@ describe('OpportunityInboxPageClient', () => {
       'aria-expanded',
       'false'
     );
+    // Aligned with the centered tab toolbar, not floating left.
+    expect(
+      screen.getByRole('button', { name: 'Add Notes' }).parentElement
+    ).toHaveClass('justify-center');
   });
 
   it('discloses empty notes by keyboard and restores focus on Escape', async () => {
