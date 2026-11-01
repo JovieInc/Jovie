@@ -42,9 +42,6 @@ describe('profile publication gate scope', () => {
     '/dualipa/listen',
     '/dualipa/tour',
     '/%E0%A4%A',
-    '/unfazed',
-    '/Unfazed',
-    '/jovie-screen-fixture',
   ])('never gates %s', path => {
     expect(getGatedProfileHandle(path)).toBeNull();
   });
@@ -100,5 +97,37 @@ describe('profile publication gate decisions', () => {
       await gateProfilePublicationAtEdge('/start', ORIGIN, null)
     ).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('fixture handles', () => {
+  it('skips the gate for fixture handles on a managed fixture runtime', async () => {
+    vi.stubEnv('PUBLIC_NOAUTH_SMOKE', '1');
+    vi.stubEnv('VERCEL_ENV', '');
+    for (const path of ['/unfazed', '/Unfazed', '/jovie-screen-fixture']) {
+      expect(await gateProfilePublicationAtEdge(path, ORIGIN, null)).toBeNull();
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['/unfazed', '/jovie-screen-fixture'])(
+    'still gates a DB-backed profile at %s in production',
+    async path => {
+      vi.stubEnv('PUBLIC_NOAUTH_SMOKE', '1');
+      vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
+      vi.stubEnv('VERCEL_ENV', 'production');
+      decision({ published: false });
+      const res = await gateProfilePublicationAtEdge(path, ORIGIN, null);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(res?.status).toBe(404);
+    }
+  );
+
+  it('still gates fixture handles when no fixture runtime flag is set', async () => {
+    vi.stubEnv('PUBLIC_NOAUTH_SMOKE', '');
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '');
+    decision({ published: false });
+    const res = await gateProfilePublicationAtEdge('/unfazed', ORIGIN, null);
+    expect(res?.status).toBe(404);
   });
 });

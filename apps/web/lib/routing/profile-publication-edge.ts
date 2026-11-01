@@ -29,18 +29,26 @@ const PROFILE_PUBLICATION_DECISION_TIMEOUT_MS = 2_500;
 /**
  * Handles `app/[username]/page.tsx` renders from a built-in fixture without
  * reading storage (the reserved `/unfazed` capture profile and the screen-cert
- * smart-link fixture). There is no publication state to decide for them, and
- * the gate's storage lookup would 503 them on the capture server's noop DB.
+ * smart-link fixture). The exemption applies only on a managed fixture runtime
+ * (E2E/smoke env) and never on a real production deployment, so a DB-backed
+ * profile with one of these handles always goes through the gate in production.
  */
 const FIXTURE_RENDERED_HANDLES: ReadonlySet<string> = new Set([
   'unfazed',
   'jovie-screen-fixture',
 ]);
 
+function isFixtureRuntime(): boolean {
+  if (process.env.VERCEL_ENV === 'production') return false;
+  return (
+    process.env.PUBLIC_NOAUTH_SMOKE === '1' ||
+    process.env.NEXT_PUBLIC_E2E_MODE === '1'
+  );
+}
+
 export function isProfilePublicationCandidate(segment: string): boolean {
   const handle = segment.toLowerCase();
   return (
-    !FIXTURE_RENDERED_HANDLES.has(handle) &&
     handle.length >= USERNAME_MIN_LENGTH &&
     handle.length <= USERNAME_MAX_LENGTH &&
     USERNAME_PATTERN.test(handle) &&
@@ -112,6 +120,7 @@ export async function gateProfilePublicationAtEdge(
   }
   const handle = getGatedProfileHandle(pathname);
   if (!handle) return null;
+  if (FIXTURE_RENDERED_HANDLES.has(handle) && isFixtureRuntime()) return null;
 
   const decisionUrl = new URL(PROFILE_PUBLICATION_DECISION_PATH, origin);
   decisionUrl.searchParams.set('username', handle);
