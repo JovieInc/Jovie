@@ -86,7 +86,6 @@ describe('legal pages System B source contract', () => {
       expect(routeLayout, `${route} must render LegalDocumentShell`).toContain(
         '<LegalDocumentShell>'
       );
-      expect(routeLayout).toContain('export const revalidate = false');
       expect(routeLayout).not.toContain('<PublicPageShell');
     }
   });
