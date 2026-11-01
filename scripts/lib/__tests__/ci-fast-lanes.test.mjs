@@ -1559,16 +1559,17 @@ describe('structural command pool', () => {
     // Later commands finish first; output must not follow completion order.
     const delayed = failing => command => {
       const index = order.indexOf(command);
-      return new Promise(resolveCall =>
-        setTimeout(
-          () =>
-            resolveCall({
-              code: failing.includes(index) ? 40 + index : 0,
-              output: `out-${index}\n`,
-            }),
-          Math.max(0, 4 - index) * 5
-        )
-      );
+      // Completion order is set by microtask ticks (index 0 waits longest),
+      // never by wall-clock delays that a loaded runner can reorder.
+      return (async () => {
+        for (let tick = Math.max(0, 4 - index); tick > 0; tick -= 1) {
+          await Promise.resolve();
+        }
+        return {
+          code: failing.includes(index) ? 40 + index : 0,
+          output: `out-${index}\n`,
+        };
+      })();
     };
 
     const pass = await runStructural({ execute: delayed([]), concurrency: 3 });
@@ -1607,10 +1608,10 @@ describe('structural command pool', () => {
         active.set(command, locks);
         started.push(command);
         maxActive = Math.max(maxActive, active.size);
-        setTimeout(() => {
+        setImmediate(() => {
           active.delete(command);
           resolveCall({ code: 0, output: '' });
-        }, 1);
+        });
       });
     const result = await runStructural({ execute });
     expect(result.code).toBe(0);

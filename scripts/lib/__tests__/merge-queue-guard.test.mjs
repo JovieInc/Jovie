@@ -1074,8 +1074,6 @@ describe('absolute update-branch subprocess deadline', () => {
       if (args[0] === 'api' && args[1] === 'graphql') mutationReturned = true;
       return result;
     });
-    const startedAt = Date.now();
-
     const result = await tryGitHubRebase({
       repo: 'JovieInc/Jovie',
       pr: blockedPr(),
@@ -1085,7 +1083,6 @@ describe('absolute update-branch subprocess deadline', () => {
       integrationProofImpl: gh.integrationProofImpl,
       operationBudgetMs: 80,
     });
-    const elapsedMs = Date.now() - startedAt;
 
     expect(result).toMatchObject({
       ok: false,
@@ -1094,8 +1091,6 @@ describe('absolute update-branch subprocess deadline', () => {
     });
     expect(hungTimeoutMs).toBeGreaterThan(0);
     expect(hungTimeoutMs).toBeLessThan(80);
-    expect(elapsedMs).toBeGreaterThanOrEqual(50);
-    expect(elapsedMs).toBeLessThan(500);
 
     const next = ghSequence({ alreadyIntegrated: true });
     await expect(

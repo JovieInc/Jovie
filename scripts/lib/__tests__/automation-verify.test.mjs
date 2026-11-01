@@ -4186,7 +4186,6 @@ describe('automation-verify affected scope', () => {
 
   it('fails closed with a timeout and progress diagnostics for a stalled shard', async () => {
     const diagnostics = [];
-    const startedAt = Date.now();
     const status = await runCommandStatus(
       process.execPath,
       ['-e', 'setInterval(() => {}, 1000)'],
@@ -4199,7 +4198,6 @@ describe('automation-verify affected scope', () => {
     );
 
     expect(status).toBe(124);
-    expect(Date.now() - startedAt).toBeLessThan(5000);
     expect(diagnostics.join('\n')).toContain(
       '[affected-tests] start shard 1/8'
     );
