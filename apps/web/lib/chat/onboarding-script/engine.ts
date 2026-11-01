@@ -287,6 +287,31 @@ export function handleFromArtistName(name: string): string {
 }
 
 /**
+ * The handle card that ships with an artist confirmation: the visitor's own
+ * requested handle (typed, else the claimed `jov.ie/<handle>`), else the
+ * artist-name slug. One builder for the engine and the system-1 route so the
+ * two confirmation paths cannot drift (2026-10-31: the system-1 path said
+ * "confirm the handle below" with no card under it).
+ */
+export function handleCardEventForConfirmation(
+  uiMessages: readonly UIMessage[],
+  artistName: string | null
+): FallbackToolEvent {
+  const handle =
+    requestedHandleFrom(uiMessages, null, true) ??
+    handleFromArtistName(artistName ?? '');
+  return {
+    toolName: 'checkHandle',
+    input: { handle },
+    output: {
+      action: 'check_handle',
+      handle,
+      summary: `Checking @${handle}.`,
+    },
+  };
+}
+
+/**
  * Resolve the current guarded step from conversation history + turn state.
  * Pure — used by the engine and unit tests.
  */
@@ -674,9 +699,6 @@ export async function decideFallbackTurn(
     // The line says "claim a handle next", so the handle card ships in the
     // same turn. Without it the visitor faced a prompt with no control and
     // had to guess what to type (2026-10-31 golden-path walk).
-    const handle =
-      requestedHandleFrom(uiMessages, null, true) ??
-      handleFromArtistName(state.spotifyArtistName ?? '');
     return {
       line,
       text: renderLine(line, {
@@ -689,15 +711,7 @@ export async function decideFallbackTurn(
           input: { spotifyArtistId: selectedArtistId },
           output: output as unknown as Record<string, unknown>,
         },
-        {
-          toolName: 'checkHandle',
-          input: { handle },
-          output: {
-            action: 'check_handle',
-            handle,
-            summary: `Checking @${handle}.`,
-          },
-        },
+        handleCardEventForConfirmation(uiMessages, state.spotifyArtistName),
       ],
       guardedStep: 'artist_select',
     };

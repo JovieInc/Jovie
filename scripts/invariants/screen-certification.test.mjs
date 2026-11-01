@@ -250,6 +250,32 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       'coherent labels do not grant artifact trust'
     );
   });
+  it('registers each profile representation without borrowing canonical profile proof', () => {
+    const routes = ['alerts', 'notifications', 'shop'];
+    const paths = routes.map(
+      route => `apps/web/app/[username]/${route}/page.tsx`
+    );
+    for (const [index, path] of paths.entries()) {
+      const classified = classifyScreenPath(path);
+      assert.equal(classified.kind, 'registered');
+      assert.equal(classified.entry.id, `web.public-profile-${routes[index]}`);
+      assert.equal(classified.entry.owner, 'public-profile');
+      assert.deepEqual(classified.entry.viewports, ['desktop', 'mobile']);
+    }
+    const result = evaluateChangedScreens({
+      changedFiles: paths,
+      headSha: HEAD,
+      requireExternalEvidence: true,
+    });
+    assert.deepEqual(
+      result.issues,
+      routes.map(
+        route => `missing exact-head proof for web.public-profile-${route}`
+      )
+    );
+    assert.deepEqual(result.excludedChanges, []);
+  });
+
   it('registers integrations while requiring separate public and operator proofs', () => {
     for (const [path, id] of [
       [

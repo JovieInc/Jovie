@@ -72,7 +72,7 @@
     },
     {
       "id": "hermes.agent",
-      "label": "Hermes agent (outside this repo; model glm-5.2 is off the web allowlist)",
+      "label": "Hermes CLI worker (outside this repo; model glm-5.2 is off the web allowlist)",
       "repo": "hermes",
       "route": "gateway-only",
       "fallback": null,

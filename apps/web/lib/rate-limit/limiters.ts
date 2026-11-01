@@ -143,6 +143,18 @@ export const anonymousOnboardingChatFirstTouchLimiter = createRateLimiter(
   RATE_LIMITERS.anonymousOnboardingChatFirstTouch
 );
 
+/** Fail-open /start unverified budgets. Redis only: an outage denies. */
+export const anonymousOnboardingChatUnverifiedIpLimiter = createRateLimiter(
+  RATE_LIMITERS.anonymousOnboardingChatUnverifiedIp,
+  { requireRedis: true }
+);
+export const anonymousOnboardingChatUnverifiedGlobalLimiter = createRateLimiter(
+  RATE_LIMITERS.anonymousOnboardingChatUnverifiedGlobal,
+  {
+    requireRedis: true,
+  }
+);
+
 /** Canary passage tokens for the /start bot check (JOV-9625). Redis only. */
 export const syntheticPassageTokenLimiter = createRateLimiter(
   RATE_LIMITERS.syntheticPassageToken,

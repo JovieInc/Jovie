@@ -7,11 +7,9 @@ import { getPublicProfileRobots } from '@/lib/profile/public-profile-indexing-po
 import { convertCreatorProfileToArtist } from '@/types/db';
 import { getProfileAndLinks } from '../_lib/public-profile-loader';
 
-// Per-artist surface. The page is fully static (no `searchParams` reads
-// here — the source-link `?s=<code>` is read client-side via
-// `useSearchParams` inside <AlertGrowthLanding>) so paid traffic gets
-// CDN-cached HTML. Profile freshness budget matches the profile route.
-export const revalidate = 3600;
+// This profile representation must observe publication withdrawal on every request.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 interface AlertsPageProps {
   readonly params: Promise<{ username: string }>;
@@ -63,9 +61,8 @@ export default async function AlertsPage({ params }: AlertsPageProps) {
   // the privacy guideline bans pixels and replay where people type (CIPA
   // §631 exposure). Guarded by scripts/compliance/input-page-trackers.test.mjs.
   // AlertGrowthLanding reads `?s=<code>` via useSearchParams. Without a
-  // Suspense boundary at this level, Next opts the entire route out of
-  // static generation — which contradicts `revalidate = 3600` and the
-  // CDN-caching goal. The fallback can be null because the artist+page
+  // Suspense boundary at this level, the search-param reader cannot stream
+  // independently of the page shell. The fallback can be null because the artist+page
   // shell renders synchronously above the form.
   return (
     <Suspense fallback={null}>

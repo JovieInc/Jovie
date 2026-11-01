@@ -14,6 +14,7 @@ import {
 import {
   COLOR_SOT_PATH,
   COLOR_SOT_SCHEMA,
+  DESIGN_SYSTEM_PATH,
   PALETTE_PATH,
   REPO_ROOT,
   runOklchPaletteGuard,
@@ -23,6 +24,17 @@ import {
 
 const loadPalette = () =>
   JSON.parse(readFileSync(join(REPO_ROOT, PALETTE_PATH), 'utf8'));
+
+test('a :root mention inside a comment is not a light css binding', () => {
+  const css = readFileSync(join(REPO_ROOT, DESIGN_SYSTEM_PATH), 'utf8');
+  assert.match(css, /references at :root,/);
+  assert.deepEqual(
+    validateOklchPalette(loadPalette(), REPO_ROOT, { css }).filter(
+      issue => issue.code === 'css-binding'
+    ),
+    []
+  );
+});
 
 test('canonical registry locks Mint/Orange/Red and surface-0..3', () => {
   const palette = loadPalette();

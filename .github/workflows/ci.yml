@@ -3593,11 +3593,14 @@ jobs:
     # The 162 Storybook specs took 4.0m of a 6.6m job on two workers and set
     # the merge-group wall (end p50 7.3m over 18 web merge groups on
     # 2026-10-12). Playwright --shard splits the same fullyParallel spec list
-    # across two runners; the aggregates read the matrix result.
+    # across runners; the aggregates read the matrix result. Three shards since
+    # 2026-11-01: on two, the matrix step was 276s p50 and the shards ended
+    # at 12.2 of 14.4 min, the next tail once ci-fast (remaining) stopped
+    # waiting on the lanes pytest.
     strategy:
       fail-fast: true
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3]
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -3689,7 +3692,7 @@ jobs:
           exit 1
         env:
           STORYBOOK_BASE_URL: http://localhost:6006
-          STORYBOOK_SHARD: ${{ matrix.shard }}/2
+          STORYBOOK_SHARD: ${{ matrix.shard }}/3
           MERGE_GROUP_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}
           CI: true
           JOVIE_STORYBOOK_MANUAL_AXE: '1'

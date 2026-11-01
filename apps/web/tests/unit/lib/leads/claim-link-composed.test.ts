@@ -79,6 +79,9 @@ vi.mock('@/lib/ingestion/flows/full-extraction-flow', () => ({
     ],
   }),
 }));
+vi.mock('@/lib/leads/build-lead-catalog.server', () => ({
+  buildLeadProfileCatalog: async () => ({ status: 'skipped' }),
+}));
 vi.mock('@/lib/ingestion/flows/avatar-hosting', () => ({
   resolveHostedAvatarUrl: async () => 'https://blob.test/avatar.avif',
 }));
@@ -102,16 +105,20 @@ vi.mock('@/lib/leads/pipeline-logger', () => ({
 }));
 
 import { GET as claimLinkRoute } from '@/app/claim/[token]/route';
+import { invalidateProfileCache } from '@/lib/cache/profile';
 import { PENDING_CLAIM_COOKIE } from '@/lib/claim/context';
 import { claimPrebuiltProfileForUser } from '@/lib/claim/finalize';
 import { users } from '@/lib/db/schema/auth';
 import { leads } from '@/lib/db/schema/leads';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { handleReingestProfile } from '@/lib/ingestion/flows/reingest-flow';
 import { approveLead } from '@/lib/leads/approve-lead';
+import { withLeadBuildRelease } from '@/lib/leads/lead-build-hold';
 import { resolveLeadClaimToken } from '@/lib/leads/lead-claim-token';
 import { outreachApprovedWhere } from '@/lib/leads/outreach-eligible-status';
 import { routeLead } from '@/lib/leads/route-lead';
 import { hashClaimToken } from '@/lib/security/claim-token';
+import { holdLeadBuiltProfileInTx } from '@/lib/services/profile/mutations';
 
 type TestDb = ReturnType<typeof drizzle>;
 const db = () => holder.db as TestDb;
@@ -196,7 +203,11 @@ describe('outbound claim link, composed', () => {
       { params: Promise.resolve({ token }) }
     );
     const location = response.headers.get('location') ?? '';
-    expect(location).toContain(`/${profile.usernameNormalized}?claim=1`);
+    // The lead-built page is private until claimed, so the link starts the
+    // claim directly instead of previewing a page nobody may see.
+    expect(profile.isPublic).toBe(false);
+    expect(location).toContain(`/${profile.usernameNormalized}/claim?token=`);
+    expect(location).toContain('next=auth');
 
     // Interrupted auth: the signed cookie is all that survives; resume with it.
     const cookie = response.cookies.get(PENDING_CLAIM_COOKIE)?.value ?? '';
@@ -225,6 +236,209 @@ describe('outbound claim link, composed', () => {
       })
     );
     expect(claimed.profileId).toBe(profile.id);
+
+    // Claiming is the release: the page goes public with its owner.
+    const [afterClaim] = await db()
+      .select({ isPublic: creatorProfiles.isPublic })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, profile.id));
+    expect(afterClaim.isPublic).toBe(true);
+  });
+
+  it('a held lead-built profile cannot be published around the hold', async () => {
+    const lead = await insertLead('heldartist');
+    const result = await approveLead({ ...lead, linktreeHandle: 'heldartist' });
+    const profileId = result.ingestion?.profileId as string;
+    await db()
+      .update(creatorProfiles)
+      .set({ isPublic: true })
+      .where(eq(creatorProfiles.id, profileId));
+    const [row] = await db()
+      .select({ isPublic: creatorProfiles.isPublic })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, profileId));
+    expect(row.isPublic).toBe(false);
+  });
+
+  it('re-ingest applies the hold through the profile owner and preserves other settings', async () => {
+    const lead = await insertLead('reheldartist');
+    const result = await approveLead({
+      ...lead,
+      linktreeHandle: 'reheldartist',
+    });
+    const profileId = result.ingestion?.profileId as string;
+    const settings = { customKey: 'preserved' };
+    await db()
+      .update(creatorProfiles)
+      .set({ settings, isPublic: true })
+      .where(eq(creatorProfiles.id, profileId));
+    const [existing] = await db()
+      .select()
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, profileId));
+
+    const response = await handleReingestProfile({
+      existing,
+      extraction: {
+        displayName: 'Synthetic Claim Artist',
+        avatarUrl: 'https://blob.test/avatar.avif',
+        links: [],
+      },
+      displayName: 'Synthetic Claim Artist',
+      leadHold: true,
+    });
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      quarantined: true,
+    });
+    const [profile] = await db()
+      .select()
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, profileId));
+    expect(profile.isPublic).toBe(false);
+    expect(profile.settings).toMatchObject({
+      ...settings,
+      leadBuild: { held: true, reason: 'lead_built_uncertified' },
+    });
+    expect(vi.mocked(invalidateProfileCache)).toHaveBeenCalledWith(
+      'reheldartist'
+    );
+  });
+
+  it('the domain hold rolls back with the supplied transaction and rejects missing profiles', async () => {
+    const [legacy] = await db()
+      .insert(creatorProfiles)
+      .values({
+        creatorType: 'artist',
+        username: 'rollbackholdartist',
+        usernameNormalized: 'rollbackholdartist',
+        settings: {},
+        isPublic: true,
+      })
+      .returning();
+    const profileId = legacy.id;
+
+    await expect(
+      db().transaction(async tx => {
+        await holdLeadBuiltProfileInTx(tx as never, profileId);
+        throw new Error('injected rollback');
+      })
+    ).rejects.toThrow('injected rollback');
+    const [profile] = await db()
+      .select()
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, profileId));
+    expect(profile.isPublic).toBe(true);
+    expect(profile.settings).toEqual({});
+    await expect(
+      holdLeadBuiltProfileInTx(
+        db() as never,
+        '00000000-0000-4000-8000-000000000000'
+      )
+    ).rejects.toThrow('Lead-built profile not found');
+  });
+
+  it('holds legacy profiles whose isClaimed value is null', async () => {
+    const [legacy] = await db()
+      .insert(creatorProfiles)
+      .values({
+        creatorType: 'artist',
+        username: 'nullclaimholdartist',
+        usernameNormalized: 'nullclaimholdartist',
+        settings: {},
+        isClaimed: null,
+        isPublic: true,
+      })
+      .returning();
+    const profileId = legacy.id;
+    await expect(
+      holdLeadBuiltProfileInTx(db() as never, profileId)
+    ).resolves.toBe(true);
+    const [profile] = await db()
+      .select()
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, profileId));
+    expect(profile.isPublic).toBe(false);
+    expect(profile.settings).toMatchObject({ leadBuild: { held: true } });
+  });
+
+  it.each(['claimed', 'certified'] as const)(
+    'does not re-hold a profile %s while extraction was in flight',
+    async state => {
+      const handle = `holdrace${state}`;
+      const lead = await insertLead(handle);
+      const result = await approveLead({ ...lead, linktreeHandle: handle });
+      const profileId = result.ingestion?.profileId as string;
+      const [existing] = await db()
+        .select()
+        .from(creatorProfiles)
+        .where(eq(creatorProfiles.id, profileId));
+      const settings =
+        state === 'certified'
+          ? withLeadBuildRelease(
+              existing.settings,
+              new Date('2026-10-29T12:00:00Z')
+            )
+          : existing.settings;
+      await db()
+        .update(creatorProfiles)
+        .set({ settings, isPublic: true, isClaimed: state === 'claimed' })
+        .where(eq(creatorProfiles.id, profileId));
+
+      const response = await handleReingestProfile({
+        existing,
+        extraction: {
+          displayName: 'Synthetic Claim Artist',
+          avatarUrl: null,
+          links: [],
+        },
+        displayName: 'Synthetic Claim Artist',
+        leadHold: true,
+      });
+      expect(await response.json()).toMatchObject({
+        ok: true,
+        quarantined: false,
+      });
+      if (state === 'certified') {
+        // A background task may finish with settings read before certification.
+        await db()
+          .update(creatorProfiles)
+          .set({ settings: existing.settings })
+          .where(eq(creatorProfiles.id, profileId));
+      }
+      const [profile] = await db()
+        .select()
+        .from(creatorProfiles)
+        .where(eq(creatorProfiles.id, profileId));
+      expect(profile.isPublic).toBe(true);
+      expect(profile.settings).toEqual(settings);
+    }
+  );
+
+  it('an ordinary settings replacement cannot erase an active hold and publish the profile', async () => {
+    const lead = await insertLead('holdsettingsartist');
+    const result = await approveLead({
+      ...lead,
+      linktreeHandle: 'holdsettingsartist',
+    });
+    const profileId = result.ingestion?.profileId as string;
+    await db()
+      .update(creatorProfiles)
+      .set({ settings: { featuredPlaylistFallbackCandidate: null } })
+      .where(eq(creatorProfiles.id, profileId));
+    await db()
+      .update(creatorProfiles)
+      .set({ isPublic: true })
+      .where(eq(creatorProfiles.id, profileId));
+    const [profile] = await db()
+      .select()
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, profileId));
+    expect(profile.isPublic).toBe(false);
+    expect(profile.settings).toMatchObject({
+      featuredPlaylistFallbackCandidate: null,
+      leadBuild: { held: true, reason: 'lead_built_uncertified' },
+    });
   });
 
   it('re-routing after the profile token changed re-syncs the profile to the lead token', async () => {

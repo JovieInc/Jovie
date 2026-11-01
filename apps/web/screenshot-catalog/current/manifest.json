@@ -127,8 +127,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-29T18:27:50.192Z",
-    "gitSha": "a67bf3b1923804bc0935ae36c7e4d3e10b8eee8b",
+    "capturedAt": "2026-11-01T05:40:01.930Z",
+    "gitSha": "dd77c9a2a584f17c7d69c18fc57e0194cf873d53",
     "imagePath": "artist-profile-adaptive-section-desktop.png"
   },
   {
@@ -166,8 +166,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-30T22:55:31.630Z",
-    "gitSha": "673d3abec7f4d577cd1f28154f03cb17335b0964",
+    "capturedAt": "2026-11-01T05:40:23.450Z",
+    "gitSha": "dd77c9a2a584f17c7d69c18fc57e0194cf873d53",
     "imagePath": "artist-profile-opinionated-section-desktop.png"
   },
   {
@@ -179,8 +179,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-30T22:55:39.455Z",
-    "gitSha": "673d3abec7f4d577cd1f28154f03cb17335b0964",
+    "capturedAt": "2026-11-01T05:40:31.382Z",
+    "gitSha": "dd77c9a2a584f17c7d69c18fc57e0194cf873d53",
     "imagePath": "artist-profile-spec-wall-section-desktop.png"
   },
   {
@@ -218,8 +218,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-30T22:55:58.435Z",
-    "gitSha": "673d3abec7f4d577cd1f28154f03cb17335b0964",
+    "capturedAt": "2026-11-01T05:40:50.326Z",
+    "gitSha": "dd77c9a2a584f17c7d69c18fc57e0194cf873d53",
     "imagePath": "artist-profile-final-cta-section-desktop.png"
   },
   {
@@ -782,8 +782,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin"],
-    "capturedAt": "2026-10-28T20:27:11.550Z",
-    "gitSha": "14eb4bbc45d9ce19df7f20fbf1f09403634d3113",
+    "capturedAt": "2026-11-01T05:43:50.495Z",
+    "gitSha": "dd77c9a2a584f17c7d69c18fc57e0194cf873d53",
     "imagePath": "settings-profile-desktop.png"
   },
   {
@@ -798,8 +798,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-28T20:27:15.743Z",
-    "gitSha": "14eb4bbc45d9ce19df7f20fbf1f09403634d3113",
+    "capturedAt": "2026-11-01T05:43:54.746Z",
+    "gitSha": "dd77c9a2a584f17c7d69c18fc57e0194cf873d53",
     "imagePath": "settings-links-desktop.png"
   },
   {

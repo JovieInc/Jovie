@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { execFileSync } from 'node:child_process';
 import { validateAssuranceMatrixPolicy } from './assurance-matrix.mjs';
 import { validateDeliveryModelPolicy } from './delivery-model.mjs';
 import { evaluateDesignCiJudgeRouterContract } from './design-ci-judge-router-contract.mjs';
@@ -13,8 +14,7 @@ import { auditFeedbackLinkage } from './feedback-linkage.mjs';
 import { validateGateIntegrityPolicy } from './gate-integrity.mjs';
 import {
   buildHarnessReceipt,
-  harnessExpiringExceptions,
-  validateHarnessContract,
+  evaluateHarnessContract,
 } from './harness-contract.mjs';
 import { validateIosWebNoScrollJank } from './ios-web-no-scroll-jank.mjs';
 import { validateLatencySensitiveExecution } from './latency-sensitive-execution.mjs';
@@ -68,7 +68,43 @@ const harnessJson = process.argv.includes('--harness-json');
 
 const registry = readInvariantRegistry();
 const result = validateInvariantRegistry(registry);
-const harnessErrors = validateHarnessContract(registry);
+// Paths this change touches relative to its base, so an expired harness
+// exception blocks only changes inside its scope. Unknown (no base ref, shallow
+// clone) yields null: expiry then warns instead of failing every run.
+function changedPathsFromBase() {
+  if (process.env.JOVIE_CHANGED_PATHS !== undefined) {
+    return process.env.JOVIE_CHANGED_PATHS.split(/\r?\n/u).filter(Boolean);
+  }
+  try {
+    const git = args =>
+      execFileSync('git', args, {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+        timeout: 10_000,
+      }).trim();
+    const base = git([
+      'merge-base',
+      `origin/${process.env.GITHUB_BASE_REF || 'main'}`,
+      'HEAD',
+    ]);
+    return git(['diff', '--name-only', base, 'HEAD'])
+      .split('\n')
+      .filter(Boolean);
+  } catch {
+    return null;
+  }
+}
+const harness = evaluateHarnessContract(registry, {
+  changedPaths: changedPathsFromBase(),
+});
+const harnessErrors = harness.errors;
+for (const warning of harness.warnings) {
+  process.stdout.write(`invariant-warning: harness-contract: ${warning}\n`);
+  // GitHub annotation so the warning is visible on the PR, not only in logs.
+  if (process.env.GITHUB_ACTIONS) {
+    process.stdout.write(`::warning title=harness exception::${warning}\n`);
+  }
+}
 const performanceErrors = validatePerformanceFactory(undefined, { registry });
 const qualityErrors = validateQualityRatchet(registry);
 const lifecycleErrors = validatePrLifecycleContract(registry);
@@ -147,11 +183,6 @@ if (!ok) {
   process.stdout.write(
     `Harness contract valid: ${receipt.principles} principles, ${receipt.partial} expiring exceptions.\n`
   );
-  for (const soon of harnessExpiringExceptions(registry)) {
-    process.stdout.write(
-      `::warning title=harness exception expiring::${soon.exception} (${soon.principle}) expires ${soon.expires}; Summer must close or renew it before then or every PR's Source Validation fails.\n`
-    );
-  }
   // Visual founder rules without an evaluator receipt stay explicitly
   // not-certified in the receipt, even while their dated record is valid.
   process.stdout.write(

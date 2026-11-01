@@ -1,7 +1,12 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ShareContext, ShareLaunchResult } from '@/lib/share/types';
-import { PublicShareActionList } from './PublicShareMenu';
+import {
+  PUBLIC_SHARE_DIRECT_ITEM_CLASS,
+  PUBLIC_SHARE_DRAWER_ITEM_CLASS,
+  PUBLIC_SHARE_MENU_ITEM_CLASS,
+  PublicShareActionList,
+} from './PublicShareMenu';
 
 const { launchMock, toastMock } = vi.hoisted(() => ({
   launchMock:
@@ -91,5 +96,23 @@ describe('PublicShareActionList', () => {
       await screen.findByText('Share text copied — paste it into your post.')
     ).toBeInTheDocument();
     expect(toastMock.message).toHaveBeenCalledTimes(1);
+  });
+
+  it('aligns rows to the drawer header they sit under', () => {
+    const { rerender } = render(<PublicShareActionList context={context} />);
+    const row = () => screen.getAllByRole('button')[0];
+    expect(row().className).toBe(PUBLIC_SHARE_MENU_ITEM_CLASS);
+
+    // Under a back button: icons centre under it, labels on the title edge.
+    rerender(
+      <PublicShareActionList context={context} drawerHeader='secondary' />
+    );
+    expect(row().className).toBe(PUBLIC_SHARE_DRAWER_ITEM_CLASS);
+    expect(row().className).toContain('gap-6');
+
+    // No back button: icons start on the title edge.
+    rerender(<PublicShareActionList context={context} drawerHeader='direct' />);
+    expect(row().className).toBe(PUBLIC_SHARE_DIRECT_ITEM_CLASS);
+    expect(row().className).toContain('-mx-3 px-3');
   });
 });

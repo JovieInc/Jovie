@@ -12,7 +12,7 @@ import {
   resolveToolFailurePresentation,
 } from '@/lib/chat/tool-errors';
 import { isSummerFailureHop, summerHopLabel } from '@/lib/ovie/summer-failure';
-import type { ChatErrorType, MessagePart } from './types';
+import type { ChatError, ChatErrorType, MessagePart } from './types';
 
 /**
  * Cheap fingerprint for streamed part updates. Avoids JSON.stringify on the hot path.
@@ -69,6 +69,20 @@ export function getMessageText(parts: readonly MessagePart[]): string {
  * Determine the error type from an Error object.
  * Prefers structured properties (status, code, name) before falling back to message matching.
  */
+/**
+ * The weekly AI message limit is an expected plan state owned by
+ * `ChatUsageAlert` (which carries the upgrade action). The inline error slot
+ * must not repeat it.
+ */
+export function isWeeklyPlanLimitError(
+  chatError: Pick<ChatError, 'type' | 'message'>
+): boolean {
+  return (
+    chatError.type === 'rate_limit' &&
+    /weekly AI message limit/i.test(chatError.message)
+  );
+}
+
 export function getErrorType(error: Error): ChatErrorType {
   // Check structured properties first (e.g. { status, code } from API errors)
   const errorObj = error as unknown as Record<string, unknown>;

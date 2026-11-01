@@ -197,3 +197,20 @@ describe('CI key derivation parity (scripts/synthetic-passage-key.mjs)', () => {
     expect(() => derivePassageKeyBase64Url('')).toThrow(/CRON_SECRET/);
   });
 });
+
+describe('agent mint parity (scripts/synthetic-passage-mint.mjs)', () => {
+  it('mints a token the server verifies for the chat-health canary', async () => {
+    const { mintPassageTokenFromSecret } = await import(
+      '../../../../scripts/synthetic-passage-mint.mjs'
+    );
+    const token = mintPassageTokenFromSecret(ROOT, { run: 'agent-test' });
+    const verdict = verifyPassageToken(token, KEY, 'onboarding_chat');
+    expect(verdict.ok).toBe(true);
+    expect(() =>
+      mintPassageTokenFromSecret(ROOT, {
+        sub: 'someone@example.com',
+        run: 'agent-test',
+      })
+    ).toThrow(/non-canary/);
+  });
+});

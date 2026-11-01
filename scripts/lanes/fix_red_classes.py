@@ -1034,6 +1034,48 @@ def wire_ci_fast(root: Path, files: list[str]) -> list[str]:
     return added
 
 
+def _ensure_objects(literal: str) -> str:
+    """Add the objects map install_release archives, unless this flat dict already has one."""
+    if not literal.startswith("{") or not literal.endswith("}") or "\n" in literal or "**" in literal:
+        return literal
+    if re.search(r"""['"]objects['"]\s*:""", literal):
+        return literal
+    body = literal[1:-1].rstrip()
+    suffix = "" if not body.strip() or body.endswith(",") else ","
+    return "{" + body + suffix + ' "objects": {"scripts/lanes": "f" * 40}}'
+
+
+def _complete_block(block: str) -> str:
+    names = set()
+    for match in re.finditer(r"return_value\s*=\s*([A-Za-z_]\w*)\b", block):
+        if match.end() < len(block) and block[match.end()] == ".":
+            continue
+        names.add(match.group(1))
+
+    def rewrite(found):
+        return found.group(1) + _ensure_objects(found.group(2))
+
+    for name in sorted(names):
+        block = re.sub(rf"(?m)^(\s*{re.escape(name)}\s*=\s*)(\{{[^\n]*\}})", rewrite, block)
+    return re.sub(r"(return_value\s*=\s*)(\{[^\n]*\})", rewrite, block)
+
+
+def complete_release_identity_stubs(source: str) -> str:
+    """Fill one-line release_identity fixtures that install_release will archive.
+
+    A top-level function or test method that both stubs release_identity and calls
+    install_release needs an objects map: install_release archives sorted(bundle["objects"])
+    before prove-staging. On 2026-10-29 that KeyError failed Source Validation for an
+    incomplete custody stub, and the update backoff test uses the same shape. Multiline
+    literals and **spreads stay as written. The checked-in lane runner tests are a fixed
+    point of this function.
+    """
+    parts = re.split(r"(?=^(?:def |    def ))", source, flags=re.M)
+    return "".join(
+        _complete_block(part) if "install_release" in part and "release_identity" in part else part
+        for part in parts)
+
+
 # ---- measurement ---------------------------------------------------------------------------------
 
 def _epoch(row: dict) -> float | None:
