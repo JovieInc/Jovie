@@ -18,6 +18,7 @@ import {
   buildHarnessReceipt,
   HARNESS_CONTRACT_INVARIANT_ID,
   HARNESS_RECEIPT_SCHEMA,
+  harnessExpiringExceptions,
   validateHarnessContract,
 } from './harness-contract.mjs';
 import { readInvariantRegistry } from './registry.mjs';
@@ -415,5 +416,22 @@ describe('H-06 repeated-feedback linkage', () => {
         /unclosed/
       );
     }
+  });
+
+  it('warns 48h ahead of an exception expiry, never blocking', () => {
+    const registry = clone();
+    harnessPrinciple(registry, 'H-02').exception.expires = '2026-11-07';
+    const soon = harnessExpiringExceptions(registry, {
+      now: new Date('2026-11-05T12:00:00Z'),
+    });
+    assert.ok(
+      soon.some(
+        entry => entry.exception === 'H-EX-02' && entry.expires === '2026-11-07'
+      )
+    );
+    const later = harnessExpiringExceptions(registry, {
+      now: new Date('2026-10-20T00:00:00Z'),
+    });
+    assert.ok(!later.some(entry => entry.exception === 'H-EX-02'));
   });
 });

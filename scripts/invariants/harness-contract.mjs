@@ -247,6 +247,35 @@ export function validateHarnessContract(registry, options = {}) {
 }
 
 /**
+ * Exceptions expiring within `withinHours` (default 48). Non-blocking: validate.mjs prints them as
+ * warnings so an expiry is renewed or closed before it turns every PR's Source Validation red
+ * (2026-11-01: six exceptions expired at 00:00Z and blocked all Jovie PRs).
+ */
+export function harnessExpiringExceptions(registry, options = {}) {
+  const now = options.now ?? new Date();
+  const withinMs = (options.withinHours ?? 48) * 3_600_000;
+  const principles =
+    harnessContractInvariant(registry)?.policy?.value?.principles ?? [];
+  return principles
+    .filter(
+      principle => principle?.exception && hasText(principle.exception.expires)
+    )
+    .map(principle => ({
+      principle: principle.id,
+      exception: principle.exception.id,
+      expires: principle.exception.expires,
+      day: utcDay(principle.exception.expires),
+    }))
+    .filter(
+      entry =>
+        entry.day &&
+        entry.day.getTime() >= now.getTime() - 86_400_000 &&
+        entry.day.getTime() - now.getTime() <= withinMs
+    )
+    .map(({ day: _day, ...entry }) => entry);
+}
+
+/**
  * Build the deterministic JSON receipt emitted by
  * `node scripts/invariants/validate.mjs --harness-json`.
  */

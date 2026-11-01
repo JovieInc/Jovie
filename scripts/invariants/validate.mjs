@@ -13,6 +13,7 @@ import { auditFeedbackLinkage } from './feedback-linkage.mjs';
 import { validateGateIntegrityPolicy } from './gate-integrity.mjs';
 import {
   buildHarnessReceipt,
+  harnessExpiringExceptions,
   validateHarnessContract,
 } from './harness-contract.mjs';
 import { validateIosWebNoScrollJank } from './ios-web-no-scroll-jank.mjs';
@@ -146,6 +147,11 @@ if (!ok) {
   process.stdout.write(
     `Harness contract valid: ${receipt.principles} principles, ${receipt.partial} expiring exceptions.\n`
   );
+  for (const soon of harnessExpiringExceptions(registry)) {
+    process.stdout.write(
+      `::warning title=harness exception expiring::${soon.exception} (${soon.principle}) expires ${soon.expires}; Summer must close or renew it before then or every PR's Source Validation fails.\n`
+    );
+  }
   // Visual founder rules without an evaluator receipt stay explicitly
   // not-certified in the receipt, even while their dated record is valid.
   process.stdout.write(
