@@ -54,6 +54,9 @@ REMOTE_TIMEOUT_S = 1800
 CHECK_WAIT_S = 90 * 60
 SCAN_LIMIT = 25
 POLL_S = 120
+MAX_NUDGES = 1
+CONTINUE = ("The previous turn stopped on a service error. Continue the repair task above from where you "
+            "left off and finish with the one-line reply it asks for.")
 TRAILER = "Hyperagent-Repair"
 RECEIPT_TRAILER = "Lane-Receipt"
 HOLD_LABELS = pr_events.HOLD_LABELS | {"hold", "do-not-merge", "wip"}
@@ -350,8 +353,9 @@ def render_prompt(pr: dict, kind: str, excerpt: str, attempt: str, run_id: str) 
 
 
 def await_thread(deps: Deps, proof: dict, thread: str) -> tuple[str, str]:
-    """(state, assistant text). state: done | approval | timeout | mismatch."""
+    """(state, assistant text). state: done | approval | timeout | mismatch | error."""
     deadline = deps.clock() + deps.remote_timeout
+    nudges = 0
     while deps.clock() < deadline:
         payload = deps.call("get_thread", {"threadId": thread, "messageLimit": 50})
         identity = payload.get("thread") or {}
@@ -361,6 +365,16 @@ def await_thread(deps: Deps, proof: dict, thread: str) -> tuple[str, str]:
             hyperagent_lane.record_approval(deps.call, thread, "PR-repair", deps.runs, deps.clock)
             return "approval", ""
         if payload.get("isRunning") is False:
+            messages = [m for m in payload.get("messages") or [] if isinstance(m, dict)]
+            if messages and messages[-1].get("role") == "error":
+                # A remote model timeout or budget stop ends the turn without work. Ask once
+                # to continue on the same thread (no new thread, no new daily run).
+                if nudges >= MAX_NUDGES:
+                    return "error", str(messages[-1].get("content") or "")[:300]
+                nudges += 1
+                deps.call("send_message", {"threadId": thread, "message": CONTINUE})
+                deps.sleep(15)
+                continue
             text = "\n".join(m["content"] for m in payload.get("messages") or []
                              if isinstance(m, dict) and m.get("role") == "assistant" and isinstance(m.get("content"), str))
             return "done", text
@@ -473,11 +487,17 @@ def repair(deps: Deps, only: int | None = None) -> dict:
         stamps["remoteDoneAt"] = now_iso(deps.clock())
         receipt["remoteState"] = state
         receipt["remoteReply"] = text[-500:]
-        if state != "done":
+        if state == "error":
+            # The thread has ended, so verify what (if anything) it pushed before releasing.
+            receipt["remoteError"] = text
+            text = ""
+        elif state != "done":
             receipt.update(verdict=f"remote-{state}")
             return receipt
         verdict, pushed = verify(deps, number, base, attempt, stamps)
         keep = False
+        if state == "error" and verdict == "no-push":
+            verdict = "remote-error"
         receipt.update(verdict=verdict, pushedHead=pushed, success=verdict == "repaired")
         claimed = SHA.findall(text.split("pushed:", 1)[1]) if "pushed:" in text else []
         receipt["replyMatchesHead"] = bool(pushed and claimed and claimed[0] == pushed)

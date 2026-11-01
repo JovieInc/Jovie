@@ -43,6 +43,7 @@ class FakeWorld:
         self.push_mode = "attributed"   # attributed | none | unattributed
         self.check_outcome = "pass"     # pass | fail
         self.remote_runs_forever = False
+        self.remote_errors = 0          # error turns before the agent works
         self.next_comment = 100
 
     # -- fixtures
@@ -125,9 +126,15 @@ class FakeWorld:
             running = self.remote_runs_forever or job["polls"] < 2
             payload = {"thread": {"id": args["threadId"], "namedAgentId": "agent-1"},
                        "isRunning": running, "awaitingApproval": False, "messages": []}
-            if not running:
+            if not running and job.get("errored", 0) < self.remote_errors:
+                job["errored"] = job.get("errored", 0) + 1
+                payload["messages"] = [{"role": "error", "content": "The AI service timed out. Please try again."}]
+            elif not running:
                 payload["messages"] = [{"role": "assistant", "content": self.agent_push(job)}]
             return payload
+        if name == "send_message":
+            self.threads[args["threadId"]]["polls"] = 0
+            return {"ok": True}
         raise AssertionError(f"unexpected hyperagent call {name}")
 
     def agent_push(self, job):
@@ -279,6 +286,22 @@ class HyperagentRepairTest(unittest.TestCase):
         record = self.attempts()["56"]
         self.assertNotIn("endedAt", record)  # local lanes keep skipping it (in_flight) until FIX_LEASE_S
         self.assertTrue(any("lane claim kind=fix" in c["body"] for c in self.world.comments.values()))
+
+    def test_a_remote_service_error_is_nudged_once_on_the_same_thread(self):
+        self.world.add_pr(57)
+        self.world.remote_errors = 1
+        receipt = repair.repair(self.deps())
+        self.assertEqual(receipt["verdict"], "repaired")
+        self.assertEqual(len(self.created()), 1)
+        self.assertEqual(self.world.calls.count(("hyperagent", "send_message")), 1)
+
+    def test_a_persistent_remote_error_is_recorded_and_releases_the_lease(self):
+        self.world.add_pr(58)
+        self.world.remote_errors = 5
+        receipt = repair.repair(self.deps())
+        self.assertEqual(receipt["verdict"], "remote-error")
+        self.assertIn("timed out", receipt["remoteError"])
+        self.assertIn("endedAt", self.attempts()["58"])
 
     def test_lane_turn_reports_capped_so_the_issue_path_stops_too(self):
         stamp = datetime.fromtimestamp(NOW, timezone.utc)
