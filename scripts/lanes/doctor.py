@@ -996,6 +996,10 @@ def admission_repair_holds(obs: dict) -> list[str] | None:
 
 # Measured on Gem (59 releases since 2026-10-23): install lag p50 22 min, p80 85, p95 215. Alert past p80.
 INSTALL_LAG_ALERT_S = 90 * 60
+# SLO: a lane-affecting main commit is installed on Gem within 2h. Past it with the updater refusing
+# or backing off the cause is a defect, not a wait, so it is critical and owned (2026-10-26 to 10-29:
+# Gem sat three days on one release while `install-lag` stayed a degraded alert nobody acted on).
+INSTALL_LAG_P0_S = 2 * 3600
 
 
 def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
@@ -1108,6 +1112,12 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["install-lag"] = (f"main's lane bundle {str(lag.get('behindCommit'))[:8]} is {round(lag['behindS'] / 60)}m "
                                  f"from installed (alert past {INSTALL_LAG_ALERT_S // 60}m); "
                                  f"last update: {lag.get('error') or 'waiting on a free gate seat or drain'}")
+    if (isinstance(lag.get("behindS"), (int, float)) and lag["behindS"] > INSTALL_LAG_P0_S and lag.get("error")):
+        alerts["install-lag-refused"] = (
+            f"P0 install SLO breached: Gem is {round(lag['behindS'] / 3600, 1)}h behind main's lane bundle "
+            f"{str(lag.get('behindCommit'))[:8]} (SLO {INSTALL_LAG_P0_S // 3600}h) and the updater is refusing: "
+            f"{lag.get('error')}; owner gem-lanes updater (scripts/lanes/lane_runner.py install_release); "
+            "runbook: update-refused.json holds the tree and reason, ensure_dependency_pool refills an aged pool")
     if obs.get("linearAppCredential") is False:
         alerts["linear-app-credential-missing"] = (
             "no Jovie Lanes Linear app credential (~/.config/jovie-lanes/linear-app.env); lanes Linear "
@@ -1327,7 +1337,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
     prior = previous.get("conditions") or {}
     receipts: dict[str, dict] = {}
     now = float(obs["now"])
-    critical = ("tick-error", "linear-down", "spawn-exit", "no-landing", "disk-critical", "delivery-stalled")
+    critical = ("tick-error", "linear-down", "spawn-exit", "no-landing", "disk-critical", "delivery-stalled", "install-lag-refused")
     actions = {
         "tick-error": "retry-dispatch-tick",
         "linear-down": "retry-linear-read-and-publish-independent-receipt",
@@ -1342,6 +1352,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         "disk-capacity-held": "reclaim-top-disk-consumers-then-restore-lane-seats",
         "delivery-stalled": "investigate-repair-and-verify-native-delivery",
         "remediation-delivery": "repair-and-read-back-existing-event-delivery",
+        "install-lag-refused": "repair-updater-refusal-and-install-current-main",
     }
     resources = {
         "linear-down": ["linear", "pool"],
@@ -1388,7 +1399,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
             "generation": generation,
             "state": "active",
             "severity": "critical" if key in critical or key.startswith(("provider-idle:", "provider-down:")) else "degraded",
-            "owner": "symphony-lanes-doctor",
+            "owner": "gem-lanes-updater" if key == "install-lag-refused" else "symphony-lanes-doctor",
             "owningInvariant": "JOV-6004",
             "affectedResources": affected,
             "firstObservedAt": epoch_iso(first),

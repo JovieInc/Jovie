@@ -168,3 +168,133 @@ export function attributeAgainstAheadRun({
   }
   return { attributable: true, reason: 'failing-signals-passed-on-ahead-run' };
 }
+
+// Peer recurrence (shadow evidence, canon/MERGE_QUEUE_STEWARD.md invariant 4).
+//
+// A signal that also failed in a completed merge group that did not contain
+// this PR cannot be this PR's doing alone. On 2026-10-31 one ci-fast-lanes
+// timeout ejected #23938 (run 41243949300) and #23706 (run 41244978915), two
+// groups with no shared entry, and both were held as deterministic-source.
+// Evidence is positive only: every failing test of every failed structural
+// command must appear, under the same command, in a failed peer group whose
+// membership excludes the PR. Unparsed output, other failing jobs or lanes,
+// and peers of unknown membership prove nothing.
+
+const STRUCTURAL_COMMAND_FAILED =
+  /^Structural command \d+\/\d+ failed \(exit -?\d+\)\. Command: (.+?)(?: \| |$)/;
+const VITEST_FAIL = /^FAIL\s+(?:\S+\s+)?(\S+\.test\.[cm]?[jt]sx?) > (.+?)\s*$/;
+const NODE_TEST_FRAME =
+  /\(file:\/\/\/\S*?\/((?:apps|packages|scripts)\/\S+?\.test\.[cm]?[jt]sx?):(\d+):\d+\)/;
+const SEGMENT_END = /^(?:#### Structural command timings|\[ci-fast\] )/;
+
+/**
+ * Failing tests per failed structural command in a `ci-fast (remaining)` log.
+ * @param {string} text
+ * @returns {Array<{ command: string, tests: Set<string> }>}
+ */
+export function parseFailedSignals(text) {
+  /** @type {Array<{ command: string, tests: Set<string> }>} */
+  const commands = [];
+  let current = null;
+  for (const raw of String(text ?? '').split('\n')) {
+    const line = stripLogPrefix(raw.replace(/^[^\t]*\t[^\t]*\t/, '')).trim();
+    const failed = STRUCTURAL_COMMAND_FAILED.exec(line);
+    if (failed) {
+      current =
+        commands.find(entry => sameCommand(entry.command, failed[1])) ?? null;
+      if (!current) {
+        current = {
+          command: normalizeCommandLabel(failed[1]),
+          tests: new Set(),
+        };
+        commands.push(current);
+      }
+      continue;
+    }
+    if (!current) continue;
+    if (SEGMENT_END.test(line)) {
+      current = null;
+      continue;
+    }
+    const vitest = VITEST_FAIL.exec(line);
+    if (vitest) current.tests.add(`${vitest[1]} > ${vitest[2]}`);
+    const frame = NODE_TEST_FRAME.exec(line);
+    if (frame) current.tests.add(`${frame[1]}:${frame[2]}`);
+  }
+  return commands;
+}
+
+/**
+ * @param {{
+ *   currentJobs: Array<{ name: string, conclusion: string | null }>,
+ *   currentCiFastLog?: string | null,
+ *   peers: Array<{ runId: number, conclusion: string | null, containsPr: boolean | null, ciFastLog?: string | null }>,
+ * }} input
+ * @returns {{ recurring: boolean, reason: string, signals?: string[], peerRunIds?: number[] }}
+ */
+export function attributeAgainstPeerRuns({
+  currentJobs,
+  currentCiFastLog,
+  peers,
+}) {
+  const no = reason => ({ recurring: false, reason });
+  if (!Array.isArray(currentJobs)) return no('job-evidence-missing');
+  const substantive = currentJobs
+    .filter(job =>
+      ['failure', 'timed_out', 'cancelled', 'action_required'].includes(
+        job?.conclusion
+      )
+    )
+    .filter(job => !AGGREGATE_JOBS.has(job.name));
+  if (
+    substantive.length !== 1 ||
+    substantive[0].name !== CI_FAST_REMAINING_JOB ||
+    substantive[0].conclusion !== 'failure'
+  ) {
+    return no(
+      `not-structural-only:${substantive.map(job => job.name).join(',') || 'none'}`
+    );
+  }
+  if (!currentCiFastLog) return no('ci-fast-log-missing');
+  const lanes = failingLanes(parseCiFastLog(currentCiFastLog));
+  if (lanes.length !== 1 || lanes[0] !== 'structural') {
+    return no(`not-structural-only:${lanes.join(',') || 'none'}`);
+  }
+  const current = parseFailedSignals(currentCiFastLog);
+  if (current.length === 0) return no('structural-failure-unparsed');
+  const unparsed = current.find(entry => entry.tests.size === 0);
+  if (unparsed) return no(`failing-tests-unparsed:${unparsed.command}`);
+  const witnesses = (Array.isArray(peers) ? peers : [])
+    .filter(
+      peer =>
+        peer?.conclusion === 'failure' &&
+        peer.containsPr === false &&
+        Number.isSafeInteger(peer.runId) &&
+        typeof peer.ciFastLog === 'string'
+    )
+    .map(peer => ({
+      runId: peer.runId,
+      signals: parseFailedSignals(peer.ciFastLog),
+    }));
+  const signals = [];
+  const peerRunIds = new Set();
+  for (const entry of current) {
+    for (const test of entry.tests) {
+      const witness = witnesses.find(peer =>
+        peer.signals.some(
+          signal =>
+            sameCommand(signal.command, entry.command) && signal.tests.has(test)
+        )
+      );
+      if (!witness) return no(`signal-not-seen-without-pr:${test}`);
+      signals.push(test);
+      peerRunIds.add(witness.runId);
+    }
+  }
+  return {
+    recurring: true,
+    reason: 'failing-signals-recurred-without-pr',
+    signals,
+    peerRunIds: [...peerRunIds],
+  };
+}

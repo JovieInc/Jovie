@@ -4,6 +4,7 @@
   "updatedAt": "2026-10-30T00:30:00Z",
   "thresholds": {
     "runwayAlertDays": 14,
+    "runwayPageDays": 3,
     "capAlertPercents": [50, 80, 100],
     "observationMaxAgeDays": 8
   },

@@ -37,6 +37,14 @@ Recovered work is dated when its path is verified, never its merge date. `--seed
 
 The customer archive, release detail, hero, and customer-entry feeds use the persisted slug. Alias anchors resolve to the same entry. If a receipted entry is withdrawn from public sections, its fragments resolve to an explicit unpublished tombstone and never to another update. Daily-post dismissal stays keyed to the existing date/version post identity.
 
+## Catch-up mode
+
+After a long gap, `publish-daily-changelog.mjs --catch-up` (workflow: repo variable `CHANGELOG_CATCH_UP=1` for one run) folds the backlog into one post of at most three area stories (Mac app, Sidebar and inbox, Profiles, releases and onboarding), each a lead outcome plus up to three bullets. Every line is an outcome's own approved copy mapped to its own claim; outcomes that do not fit stay deferred. Ongoing releases keep the three-outcomes-per-day cap. Catch-up never sends email.
+
+## Stuck-publication guard and staleness alarm
+
+One open `release/daily-changelog-*` PR owns publication. If it has been open 6 hours and is not in the merge queue, the publish job closes it and regenerates from the last merged receipt, so a stuck draft can no longer freeze the changelog (the 2026-10-25..29 gap). `changelog-staleness` (Production Controller, after each Production Verified) files a `production-monitor-customer-changelog-stale` Summer signal when release-worthy changes have been live in production for over 24 hours with no entry, and resolves it when one lands. Customer surfaces list entries newest first regardless of where a post sits in CHANGELOG.md.
+
 ## Verification and cost
 
 Scripts CI runs evaluator/publication tests with per-file floors: 85% lines, 75% branches, 82% functions.

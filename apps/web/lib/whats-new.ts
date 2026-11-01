@@ -56,7 +56,11 @@ export function projectWhatsNew(
 ): WhatsNewFeed {
   const entries: WhatsNewEntry[] = [];
 
-  for (const release of releases) {
+  // Newest first even when a post sits out of order in CHANGELOG.md (stable sort).
+  const newestFirst = [...releases].sort((left, right) =>
+    right.date.localeCompare(left.date)
+  );
+  for (const release of newestFirst) {
     if (entries.length >= limit) break;
     const outcomes = projectCustomerChangelog([release]);
     const lead = outcomes[0];

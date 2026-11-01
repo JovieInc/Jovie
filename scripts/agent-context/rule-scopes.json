@@ -17,7 +17,7 @@
   {
     "file": ".claude/rules/code-style.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "e432bd7b9d223fec22c3eb84bc978c5faa11c3176cfa80c7d7fed3c570e6195f"
+    "bodySha256": "906cb63c08cbdaf6eb1fd6988470fc5f706896c3421485337a921e0d6333e67e"
   },
   {
     "file": ".claude/rules/db.md",
@@ -92,7 +92,7 @@
   {
     "file": ".claude/rules/ios.md",
     "paths": ["apps/ios/**", "**/*.swift"],
-    "bodySha256": "8064a84295f7bac353ab5ca2858863bee4f7e82be6e12c0e8c2df8b7d305ad7d"
+    "bodySha256": "030e26d1dbf17cde238efb27e147635a2a90ddd6434eb2196420779fb2af5135"
   },
   {
     "file": ".claude/rules/linear.md",
