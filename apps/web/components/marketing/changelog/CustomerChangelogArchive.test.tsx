@@ -505,7 +505,18 @@ describe('CustomerChangelogArchive', () => {
     const months = groupCustomerChangelogByMonth(
       projectCustomerChangelog(releases)
     );
-    expect(months).toHaveLength(1); // Historical engineering records stay in the technical log.
+    // Historical engineering records stay in the technical log: every customer
+    // month group is a real publication month (YYYY-MM) whose entries belong
+    // to that month — never a bare version release or an undated bucket. The
+    // group count grows as new months are published (JOV-10216: the pinned
+    // single-month count broke the daily release PR at every month boundary).
+    expect(months.length).toBeGreaterThanOrEqual(1);
+    for (const month of months) {
+      expect(month.monthKey).toMatch(/^\d{4}-\d{2}$/);
+      for (const entry of month.entries) {
+        expect(entry.date.startsWith(month.monthKey)).toBe(true);
+      }
+    }
     const olderVersions = releases
       .filter(release => release.version !== '2026-10-02')
       .map(release => release.version);
