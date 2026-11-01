@@ -8,7 +8,7 @@ const ok = (body: unknown = {}) => ({ ok: () => true, json: async () => body });
 
 describe('deleteSyntheticChats', () => {
   it('deletes only prodcert synthetic chats and keeps real ones', async () => {
-    const del = vi.fn(async () => ok());
+    const del = vi.fn(async (_url: string) => ok());
     const request = {
       get: vi.fn(async () =>
         ok({
