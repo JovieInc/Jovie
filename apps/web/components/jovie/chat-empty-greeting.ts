@@ -16,14 +16,17 @@ export function getTimeOfDayGreeting(date: Date = new Date()): string {
 }
 
 /**
- * First name only when the display name clearly reads as a person's
- * first-and-last name (security.md "Outbound Email Personalization Must Fail
- * Safe"). Artist and band names ("Good Dropouts") greet with no name at all.
+ * A person's first-and-last name greets by first name ("Tim White" -> "Tim").
+ * Any other display name is an artist or band name and greets whole ("Good
+ * Dropouts", "UNMARKED"), never by its first word ("Good afternoon, Good.").
+ * Artists are greeted by name: the golden path asserts it.
  */
 export function getChatEmptyStateFirstName(
   displayName: string | null | undefined
 ): string | null {
-  return resolveSafeFirstName(displayName, '');
+  const name = displayName?.trim().replaceAll(/\s+/g, ' ') ?? '';
+  if (!name) return null;
+  return resolveSafeFirstName(name, '') ?? name;
 }
 
 export function getChatEmptyStateGreetingText(
