@@ -54,9 +54,16 @@ export const ARTIST_VISIBILITY_FAN_LIST_UNLOCK = {
   header: `You're on ${PRO_PLAN_DISPLAY_NAME}: unlocked`,
   title: 'Your fan list: export',
   description:
-    'Download every subscriber with name, email, country and consent date.',
-  cta: 'Export your fan list',
+    'Fans who subscribe on your page are yours to export anytime with name, email, country and consent date.',
+  cta: 'Open your fan list',
   href: APP_ROUTES.CONTACTS_AUDIENCE,
+} as const;
+
+/** Day one the fan list is empty, so the first action is filling it. */
+export const ARTIST_VISIBILITY_SHARE_PROMPT = {
+  title: 'Share your page to collect your first fans',
+  shareLabel: 'Share',
+  shareText: 'Subscribe to hear when I release new music.',
 } as const;
 
 export const ARTIST_VISIBILITY_ACTIVATION_STEPS = [
@@ -164,7 +171,7 @@ export function getPaidSuccessPrimaryHref(input: {
   if (input.isOnboardingUpgrade) return APP_ROUTES.DASHBOARD;
   if (input.needsProfile) return APP_ROUTES.START;
   return isArtistVisibilityPlan(input.plan)
-    ? ARTIST_VISIBILITY_FAN_LIST_UNLOCK.href
+    ? APP_ROUTES.PRESENCE
     : APP_ROUTES.CHAT;
 }
 
@@ -175,9 +182,7 @@ export function getPaidSuccessPrimaryLabel(input: {
 }): string {
   if (input.isOnboardingUpgrade) return 'Explore your dashboard';
   if (input.needsProfile) return 'Claim your link';
-  return isArtistVisibilityPlan(input.plan)
-    ? 'Open your fan list'
-    : 'Go to chat';
+  return isArtistVisibilityPlan(input.plan) ? 'Open Identity' : 'Go to chat';
 }
 
 export function shouldCelebratePaidSuccess(

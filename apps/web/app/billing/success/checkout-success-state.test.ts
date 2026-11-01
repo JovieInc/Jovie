@@ -39,7 +39,7 @@ describe('resolveCheckoutSuccessView', () => {
     ).toMatchObject({ kind: 'success', plan: 'pro' });
     expect(
       getPaidSuccessPrimaryHref({ plan: 'pro', isOnboardingUpgrade: false })
-    ).toBe(APP_ROUTES.CONTACTS_AUDIENCE);
+    ).toBe(APP_ROUTES.PRESENCE);
   });
 
   it('routes a paid buyer without a claimed profile to claim a link', () => {
@@ -54,9 +54,7 @@ describe('resolveCheckoutSuccessView', () => {
 });
 
 describe('paid-only unlock after checkout', () => {
-  it('lands the paid artist on the fan list export, which Free cannot use', () => {
-    const input = { plan: 'pro' as const, isOnboardingUpgrade: false };
-    expect(getPaidSuccessPrimaryLabel(input)).toBe('Open your fan list');
+  it('secures the fan list export, which Free cannot use', () => {
     expect(ARTIST_VISIBILITY_FAN_LIST_UNLOCK.href).toBe(
       APP_ROUTES.CONTACTS_AUDIENCE
     );

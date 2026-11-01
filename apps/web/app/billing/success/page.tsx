@@ -20,6 +20,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ConfettiOverlay } from '@/components/atoms/Confetti';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { CopyableUrlRow } from '@/components/molecules/CopyableUrlRow';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 import { APP_ROUTES } from '@/constants/routes';
@@ -31,6 +32,7 @@ import {
   ARTIST_VISIBILITY_ACTIVATION_COPY,
   ARTIST_VISIBILITY_ACTIVATION_STEPS,
   ARTIST_VISIBILITY_FAN_LIST_UNLOCK,
+  ARTIST_VISIBILITY_SHARE_PROMPT,
   CHECKOUT_PENDING_COPY,
   CHECKOUT_RECOVERY_COPY,
   getPaidSuccessPrimaryHref,
@@ -75,23 +77,32 @@ async function fetchValidatedSession(
   plan: PaidPlanId | null;
   needsProfile: boolean;
   proofPending: boolean;
+  shareUrl: string | null;
 }> {
   const response = await fetch(
     `/api/billing/checkout-session?session_id=${encodeURIComponent(sessionId)}`,
     { cache: 'no-store', signal }
   );
   if (!response.ok) {
-    return { plan: null, needsProfile: false, proofPending: false };
+    return {
+      plan: null,
+      needsProfile: false,
+      proofPending: false,
+      shareUrl: null,
+    };
   }
   const body = (await response.json()) as {
     plan?: string | null;
     needsProfile?: boolean;
     proofPending?: boolean;
+    profileShareUrl?: string | null;
   };
   return {
     plan: resolvePaidPlan(body.plan ?? null),
     needsProfile: body.needsProfile === true,
     proofPending: body.proofPending === true,
+    shareUrl:
+      typeof body.profileShareUrl === 'string' ? body.profileShareUrl : null,
   };
 }
 
@@ -149,6 +160,7 @@ export default function CheckoutSuccessPage() {
   const [needsProfile, setNeedsProfile] = useState(false);
   // Private until we confirm it is the artist's: never say "live".
   const [proofPending, setProofPending] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
   const prefersReducedMotion = useReducedMotion();
   const shouldSuppressMotion = hasHydratedMotion && prefersReducedMotion;
   const isBillingPending =
@@ -182,6 +194,7 @@ export default function CheckoutSuccessPage() {
         setValidatedSessionPlan(session.plan);
         setNeedsProfile(session.needsProfile);
         setProofPending(session.proofPending);
+        setShareUrl(session.shareUrl);
       })
       .catch(error => {
         if (controller.signal.aborted) return;
@@ -270,6 +283,16 @@ export default function CheckoutSuccessPage() {
       track('onboarding_upgrade_success', { plan: view.plan });
     }
   }, [checkoutSessionId, isOnboardingUpgrade, isSessionPlanPending, view]);
+
+  const canNativeShare =
+    hasHydratedMotion &&
+    typeof navigator !== 'undefined' &&
+    typeof navigator.share === 'function';
+  const handleNativeShare = (url: string) => {
+    void navigator
+      .share({ url, text: ARTIST_VISIBILITY_SHARE_PROMPT.shareText })
+      .catch(() => undefined);
+  };
 
   const handleRequestVerification = async () => {
     if (requestState === 'submitting') return;
@@ -419,6 +442,31 @@ export default function CheckoutSuccessPage() {
               <p className='text-app font-semibold text-primary-token'>
                 {ARTIST_VISIBILITY_ACTIVATION_COPY.status}
               </p>
+              {shareUrl ? (
+                <ContentSurfaceCard
+                  surface='nested'
+                  className='space-y-3 p-4 text-left'
+                  data-testid='paid-share-prompt'
+                >
+                  <p className='text-app font-semibold text-primary-token'>
+                    {ARTIST_VISIBILITY_SHARE_PROMPT.title}
+                  </p>
+                  <CopyableUrlRow
+                    url={shareUrl}
+                    displayValue={shareUrl.replace(/^https?:\/\//u, '')}
+                    testId='paid-share-link'
+                  />
+                  {canNativeShare ? (
+                    <Button
+                      type='button'
+                      size='sm'
+                      onClick={() => handleNativeShare(shareUrl)}
+                    >
+                      {ARTIST_VISIBILITY_SHARE_PROMPT.shareLabel}
+                    </Button>
+                  ) : null}
+                </ContentSurfaceCard>
+              ) : null}
               {needsProfile ? null : (
                 <ContentSurfaceCard
                   surface='nested'
