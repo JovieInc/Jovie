@@ -43,7 +43,9 @@ vi.mock('../../../packages/api-client/gh.ts', () => ({
 }));
 
 vi.mock('../../merge-queue-backend.mjs', async importOriginal => {
-  const actual = await importOriginal();
+  const actual = /** @type {typeof import('../../merge-queue-backend.mjs')} */ (
+    await importOriginal()
+  );
   return {
     ...actual,
     // Only the runner factory is faked; dequeuePullRequest and the real
