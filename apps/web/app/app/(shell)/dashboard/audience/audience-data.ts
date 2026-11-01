@@ -32,6 +32,7 @@ import {
   isArtistEmailOptedIn,
   readArtistEmailReadyFromSettings,
 } from '@/lib/notifications/artist-email';
+import { withTimeout } from '@/lib/resilience/primitives';
 import { formatCountryLabel } from '@/lib/utils/audience';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { safeDecodeURIComponent } from '@/lib/utils/string-utils';
@@ -913,51 +914,61 @@ export async function getAudienceServerData(params: {
     segmentsKey,
   ];
 
-  const cached = await unstable_cache(
-    () =>
-      fetchAudienceData(
-        userId,
-        selectedProfileId,
-        searchParams,
-        includeDetails,
-        memberId,
-        view,
-        segments
-      ),
-    cacheKeyParts,
-    {
-      revalidate: CACHE_TTL.MEDIUM, // 300 seconds (5 minutes)
-      tags: [
-        CACHE_TAGS.AUDIENCE_DATA,
-        createAudienceDataTag(selectedProfileId),
-      ],
-    }
-  )();
+  // Bounded waits (JOV-8791 / resilience.spec.ts): a wedged read must reject
+  // so the route renders its error state, never park the document on the
+  // loading skeleton forever (matrix run 41165879189 — chromium shard 4 sat
+  // on AppShellSkeleton past the observation window).
+  const cached = await withTimeout(
+    unstable_cache(
+      () =>
+        fetchAudienceData(
+          userId,
+          selectedProfileId,
+          searchParams,
+          includeDetails,
+          memberId,
+          view,
+          segments
+        ),
+      cacheKeyParts,
+      {
+        revalidate: CACHE_TTL.MEDIUM, // 300 seconds (5 minutes)
+        tags: [
+          CACHE_TAGS.AUDIENCE_DATA,
+          createAudienceDataTag(selectedProfileId),
+        ],
+      }
+    )(),
+    { timeoutMs: 10_000, context: 'Audience data read' }
+  );
 
   // Level-2 gate for BOTH modes, evaluated fresh on every request after the
   // cache (never cached), so a revoked share disappears immediately.
-  const gatedRows = await withDbSessionTx(
-    async tx => {
-      const keys = await loadSharedContactKeys(
-        tx,
-        selectedProfileId,
-        cached.rows
-      );
-      const gated = applyShareGate(cached.rows, keys);
-      if (cached.mode !== 'subscribers') return gated;
-      // Names and birthdays are gated with the contact for subscribers.
-      return gated.map(row =>
-        row.emailVisibleToArtist
-          ? row
-          : {
-              ...row,
-              displayName:
-                row.type === 'email' ? 'Email Subscriber' : 'SMS Subscriber',
-              birthday: null,
-            }
-      );
-    },
-    { clerkUserId: userId }
+  const gatedRows = await withTimeout(
+    withDbSessionTx(
+      async tx => {
+        const keys = await loadSharedContactKeys(
+          tx,
+          selectedProfileId,
+          cached.rows
+        );
+        const gated = applyShareGate(cached.rows, keys);
+        if (cached.mode !== 'subscribers') return gated;
+        // Names and birthdays are gated with the contact for subscribers.
+        return gated.map(row =>
+          row.emailVisibleToArtist
+            ? row
+            : {
+                ...row,
+                displayName:
+                  row.type === 'email' ? 'Email Subscriber' : 'SMS Subscriber',
+                birthday: null,
+              }
+        );
+      },
+      { clerkUserId: userId }
+    ),
+    { timeoutMs: 10_000, context: 'Audience share gate' }
   );
   return { ...cached, rows: gatedRows };
 }
