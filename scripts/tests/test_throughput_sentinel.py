@@ -464,6 +464,96 @@ class QueueBreakerTest(unittest.TestCase):
         self.assertIn("released-shared-failure", log)
         self.assertEqual(state, {})
 
+    def _cluster_world(self, calls, *, peers=(24105, 24106), peer_test="tests/unit/brand/agent-display-name.test.ts",
+                       labels=(), removed=None):
+        """Peers whose groups all CONTAIN #24111 (so the peer rule can say nothing) and whose first error line is the
+        generic exit-code line: only the shared top failing test links them (2026-11-01 routing.json poison)."""
+        removed = [] if removed is None else removed
+        runs = [{"id": 31, "head_branch": "gh-readonly-queue/main/pr-24111-aaa", "conclusion": "failure",
+                 "created_at": iso(NOW - 700), "updated_at": iso(NOW - 600), "head_sha": "p" * 40},
+                {"id": 32, "head_branch": "gh-readonly-queue/main/pr-24111-bbb", "conclusion": "failure",
+                 "created_at": iso(NOW - 1300), "updated_at": iso(NOW - 1200), "head_sha": "q" * 40}]
+        runs += [{"id": 40 + i, "head_branch": f"gh-readonly-queue/main/pr-{pr}-ccc", "conclusion": "failure",
+                  "created_at": iso(NOW - 1000), "updated_at": iso(NOW - 900 - i), "head_sha": "e" * 40} for i, pr in enumerate(peers)]
+
+        def run(args, **kwargs):
+            calls.append(args)
+            flat = " ".join(args)
+            path = args[-1] if args and args[0] == "api" else ""
+            if "branch=main" in flat:
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"workflow_runs": []}))
+            if "workflows/ci.yml/runs" in flat:
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"workflow_runs": runs}))
+            if "mergeQueue" in flat:
+                nodes = [{"state": "AWAITING_CHECKS", "headCommit": {"oid": "z" * 40},
+                          "pullRequest": {"id": "PR_V", "number": 24111, "headRefOid": "a" * 40}}]
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"data": {"repository": {"mergeQueue": {"entries": {"nodes": nodes}}}}}))
+            if "/compare/" in flat:
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"commits": [{"commit": {"message": "carries (#24111)"}}]}))
+            if path.endswith("/jobs?per_page=100"):
+                run_id = int(path.split("/runs/")[1].split("/")[0])
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"jobs": [
+                    {"id": run_id, "name": "Unit Tests (7/14)", "conclusion": "failure", "steps": [{"name": "Run unit tests", "conclusion": "failure"}]}]}))
+            if path.endswith("/logs"):
+                job_id = int(path.split("/jobs/")[1].split("/")[0])
+                test = peer_test if job_id >= 40 else "tests/unit/brand/agent-display-name.test.ts"
+                return SimpleNamespace(returncode=0, stderr="", stdout=f"\x1b[31m FAIL \x1b[0m unit {test} > brand\n##[error]Process completed with exit code {job_id}.\n")
+            if "-X" in args and "DELETE" in args:
+                removed.append(flat)
+                return SimpleNamespace(returncode=0, stderr="", stdout="[]")
+            if "/pulls/24111" in flat:
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"state": "open", "head": {"sha": "a" * 40},
+                                                                                   "labels": [{"name": n} for n in labels]}))
+            return SimpleNamespace(returncode=0, stderr="", stdout="{}")
+
+        return run
+
+    def test_three_pr_groups_failing_the_same_top_test_skip_the_trip(self):
+        calls = []
+        qb = self._breaker()
+        run = self._cluster_world(calls)
+        with tempfile.TemporaryDirectory() as raw:
+            out = qb.sweep(Path(raw), run, NOW)
+            log = (Path(raw) / qb.LOG_FILE).read_text()
+        flat = "\n".join(" ".join(c) for c in calls)
+        self.assertEqual((out["tripped"], out.get("skipped-shared")), ([], [24111]))
+        self.assertNotIn("dequeuePullRequest", flat)
+        self.assertIn('"kind": "cluster"', log)
+        self.assertIn("agent-display-name.test.ts", log)
+
+    def test_two_pr_groups_on_one_test_is_not_a_cluster(self):
+        calls = []
+        qb = self._breaker()
+        run = self._cluster_world(calls, peers=(24105,))
+        with tempfile.TemporaryDirectory() as raw:
+            out = qb.sweep(Path(raw), run, NOW)
+        self.assertEqual(out["tripped"], [24111])
+
+    def test_peers_failing_other_tests_do_not_make_a_cluster(self):
+        calls = []
+        qb = self._breaker()
+        run = self._cluster_world(calls, peer_test="tests/unit/other.test.ts")
+        with tempfile.TemporaryDirectory() as raw:
+            out = qb.sweep(Path(raw), run, NOW)
+        self.assertEqual(out["tripped"], [24111])
+
+    def test_a_held_pr_with_a_shared_signature_loses_its_label_and_gets_a_receipt(self):
+        calls, removed = [], []
+        qb = self._breaker()
+        run = self._cluster_world(calls, labels=("lane-fix-red",), removed=removed)
+        with tempfile.TemporaryDirectory() as raw:
+            (Path(raw) / qb.STATE_FILE).write_text(json.dumps(
+                {"24111": {"head": "a" * 40, "at": NOW - 2000, "check": {"job": "Unit Tests (7/14)", "line": "x",
+                                                                        "test": "tests/unit/brand/agent-display-name.test.ts"}}}))
+            out = qb.sweep(Path(raw), run, NOW)
+            log = [json.loads(l) for l in (Path(raw) / qb.LOG_FILE).read_text().splitlines()]
+            state = json.loads((Path(raw) / qb.STATE_FILE).read_text())
+        self.assertEqual(out.get("released-shared"), [24111])
+        self.assertEqual(len(removed), 1)
+        self.assertIn("issues/24111/labels/lane-fix-red", removed[0])
+        self.assertEqual((log[-1]["action"], log[-1]["label_removed"], log[-1]["shared"]["kind"]), ("released-shared-failure", True, "cluster"))
+        self.assertEqual(state, {})
+
 
 class QueueTimingsTest(unittest.TestCase):
     def test_queue_timings_report_group_ci_and_enqueue_to_merge(self):
