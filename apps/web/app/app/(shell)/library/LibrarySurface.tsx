@@ -181,6 +181,7 @@ import {
   type RowSelectionState,
 } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
+import { pluralize } from '@/lib/utils/pluralize';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 import {
   LIBRARY_CATALOG_ROW_MODE,
@@ -2860,7 +2861,7 @@ function LibraryStatusBar({
   return (
     <div className='system-b-library-status-bar hidden h-(--app-shell-footer-row-height) shrink-0 items-center justify-between gap-3 border-t border-(--app-shell-frame-seam) px-(--app-shell-header-padding-x) sm:flex'>
       <span className='min-w-0 truncate'>
-        {visibleCount} of {totalCount} Items
+        {visibleCount} of {pluralize(totalCount, 'Item')}
       </span>
       {activePreviewTitle ? (
         <span className='min-w-0 truncate text-right'>
