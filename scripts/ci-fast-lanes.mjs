@@ -1057,6 +1057,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/pr-fleet-rules-workflow.test.mjs',
   'scripts/lib/__tests__/wake-fanout-contract.test.mjs',
   'scripts/design-system-source-ratchet.test.mjs',
+  'scripts/review-escapes.test.mjs',
 ]);
 export const DEPRECATION_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/deprecation-clearance.mjs --test-coverage-include=scripts/lib/deprecation-observation.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=90 scripts/deprecation-clearance.test.mjs';
