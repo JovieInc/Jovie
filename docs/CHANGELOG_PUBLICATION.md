@@ -31,6 +31,8 @@ The release PR changes only CHANGELOG.md and follows exact-head source CI, the n
 No CalVer, package version, tag, desktop release or alias is mutated. Implementation-branch restrictions remain.
 The draft follows the same path as every other PR: Auto-Ready green-source undrafts it once every required check passes at the observed head, and Merge Queue Green Enroll admits it. The production publisher is not a second merge owner.
 
+Because Auto-Ready green-source only undrafts a draft whose body carries a complete `jovie-writer-pr-proof/v1` receipt bound to the exact head and PR author (JOV-INV-022), the publisher attaches that receipt right after `gh pr create` with `scripts/attach-changelog-writer-proof.mjs` (JOV-10216). The Production Controller is the release PR's writer and its verified publication plan is the receipt's evidence, so the documented undraft path can complete without a manual click; the source CI, undraft conditions and queue admission are unchanged. Without the receipt the release PR could only be undrafted manually, which froze publication 2026-10-25..29 and again 2026-10-29..11-01.
+
 At most three grouped outcomes per UTC date. Later changes append to that post, preserving copy, source/runtime provenance and whole-post dismissal. Overflow remains pending for the next date. Source IDs are persisted in receipts.
 No-change/deferral plans are retained as workflow artifacts; validation failures fail the job.
 Recovered work is dated when its path is verified, never its merge date. `--seed <file>` accepts reviewed `{number, note}` records for recovery without modifying historical PR bodies.
