@@ -3035,6 +3035,7 @@ class SearchPopulationCoverageTest(unittest.TestCase):
                 mock.patch.object(doctor, "automation_observation", return_value={}), \
                 mock.patch.object(doctor.fleet_ledger, "record_ready"), \
                 mock.patch.object(doctor.deploy_health, "sample", return_value=(None, None)), \
+                mock.patch.object(doctor.release_evidence, "sample", return_value=(None, None)), \
                 mock.patch.object(doctor.throughput_sentinel, "observe", return_value={}):
             host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "absent")
             observed = doctor.observe(host, lane, SimpleNamespace(status=lambda: {}), now=self.END)
