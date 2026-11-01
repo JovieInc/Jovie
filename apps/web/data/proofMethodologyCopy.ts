@@ -1,3 +1,5 @@
+import { APP_ROUTES } from '@/constants/routes';
+
 /** Copy for the /proof/methodology page (rules and methods, never values). */
 export const PROOF_METHODOLOGY_COPY = {
   rules: {
@@ -15,5 +17,14 @@ export const PROOF_METHODOLOGY_COPY = {
   },
   meanings: {
     heading: 'What Each Number Means',
+  },
+  related: {
+    heading: 'Related Pages',
+    links: [
+      { href: APP_ROUTES.PRICING, label: 'Pricing' },
+      { href: APP_ROUTES.PRODUCT, label: 'Product' },
+      { href: APP_ROUTES.SMART_LINKS, label: 'Smart Links' },
+      { href: APP_ROUTES.CHANGELOG, label: 'Changelog' },
+    ],
   },
 } as const;
