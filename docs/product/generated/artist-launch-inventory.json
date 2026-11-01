@@ -3441,6 +3441,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/summer-company/stuck-signups/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-company/stuck-signups",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/summer-shadow/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-shadow",
@@ -3956,6 +3964,14 @@
       "source": "apps/web/app/api/onboarding/presence-build/route.ts",
       "kind": "handler",
       "route": "/api/onboarding/presence-build",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/onboarding/replay/route.ts",
+      "kind": "handler",
+      "route": "/api/onboarding/replay",
       "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
