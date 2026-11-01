@@ -14,12 +14,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import {
-  callRelay,
-  contaminated,
-  parseAnswer,
-  usdFor,
-} from '../buyer-eval/judge.mjs';
+import { callRelay, parseAnswer, usdFor } from '../buyer-eval/judge.mjs';
 import { ANCHOR, HOLDOUTS } from './calibration.mjs';
 import { PERSONA_LABEL, PERSONAS } from './personas.mjs';
 import {
@@ -49,6 +44,28 @@ export function investRoute(routing = ROUTING) {
     baseUrl: routing.providers['workers-ai'].relayBaseUrl,
   };
 }
+
+/**
+ * Words only company memory holds. Narrower than buyer-eval's list: investors
+ * say "ICP" and "summer" in normal speech (2026-11-01: "icp" voided 5 valid samples).
+ */
+export const INVEST_CONTAMINATION = Object.freeze([
+  'ovie',
+  'gbrain',
+  '$300/mo',
+  'premium pricing',
+]);
+
+export function investContaminated(raw, prompt) {
+  const out = JSON.stringify(raw ?? '').toLowerCase();
+  const inPrompt = prompt.toLowerCase();
+  return INVEST_CONTAMINATION.filter(
+    word => out.includes(word) && !inPrompt.includes(word)
+  );
+}
+
+/** The relay caps output at 16,384; reasoning answers truncated at 12,000. */
+export const INVEST_MAX_TOKENS = 16_000;
 
 /** Max relay calls in flight: 84 at once opened the breaker on a secondary limit (2026-11-01). */
 export const MAX_IN_FLIGHT = 8;
@@ -85,7 +102,8 @@ export async function judgeDeck({
           baseUrl: route.baseUrl,
           content: [{ type: 'text', text: prompt }],
           schema,
-          timeoutMs: 240_000,
+          timeoutMs: 300_000,
+          maxTokens: INVEST_MAX_TOKENS,
         })
       )
     )
@@ -103,7 +121,7 @@ export async function judgeDeck({
     costUsd += usdFor(result.value.usage);
     try {
       const answer = parseAnswer(result.value.text);
-      const leaks = contaminated(answer, prompt);
+      const leaks = investContaminated(answer, prompt);
       if (leaks.length) throw new Error(`contaminated: ${leaks.join(',')}`);
       parsed.push(parseInvestSample(answer));
     } catch (error) {
@@ -118,19 +136,53 @@ export async function judgeDeck({
   };
 }
 
-/** Calibration: holdouts must pass for all personas, anchor must be invest for a majority. */
+/**
+ * Calibration (policy, not probability). Under low base rates a judge gives
+ * even a deck YC funded p < 0.5 (2026-11-01: anchor 0.09 to 0.43), so the bar
+ * is relative: per persona, every known-bad holdout must score below the
+ * funded anchor (separation). At most one persona may fail separation; that
+ * persona's vote is not counted.
+ */
 export function calibrationHolds(rows) {
-  const holdoutYes = rows.filter(
-    r => r.kind === 'holdout' && r.verdict === 'invest'
-  );
-  const anchor = rows.filter(r => r.kind === 'anchor');
-  const anchorYes = anchor.filter(r => r.verdict === 'invest').length;
+  const perPersona = {};
+  for (const row of rows) {
+    const entry = (perPersona[row.persona] ??= {
+      anchorP: null,
+      holdoutPs: [],
+    });
+    if (row.kind === 'anchor')
+      entry.anchorP = row.verdict === 'abstain' ? null : row.p;
+    else if (row.verdict !== 'abstain') entry.holdoutPs.push(row.p);
+  }
+  const personas = Object.entries(perPersona).map(([persona, e]) => ({
+    persona,
+    anchorP: e.anchorP,
+    maxHoldoutP: e.holdoutPs.length ? Math.max(...e.holdoutPs) : null,
+    separated:
+      e.anchorP !== null &&
+      e.holdoutPs.length >= 2 &&
+      Math.max(...e.holdoutPs) < e.anchorP,
+  }));
+  const unseparated = personas.filter(p => !p.separated).map(p => p.persona);
   return {
-    ok: holdoutYes.length === 0 && anchorYes * 2 > anchor.length,
-    holdoutYes: holdoutYes.map(r => `${r.deck}/${r.persona}`),
-    anchorYes,
-    anchorTotal: anchor.length,
+    ok: personas.length > 0 && unseparated.length <= 1,
+    unseparated,
+    personas,
   };
+}
+
+/** A persona says invest when its p for this deck reaches its p for the funded anchor. */
+export function relativeVerdicts(personas, calibration) {
+  return personas.map(p => {
+    const cal = calibration?.personas.find(c => c.persona === p.persona);
+    if (!cal?.separated || p.p === null)
+      return { ...p, relative: 'unscored', anchorP: cal?.anchorP ?? null };
+    return {
+      ...p,
+      relative: p.p >= cal.anchorP ? 'invest' : 'pass',
+      anchorP: cal.anchorP,
+    };
+  });
 }
 
 async function main() {
@@ -139,6 +191,7 @@ async function main() {
       deck: { type: 'string' },
       samples: { type: 'string', default: '3' },
       'skip-calibration': { type: 'boolean', default: false },
+      'reuse-calibration': { type: 'string' },
     },
   });
   if (!values.deck) throw new Error('--deck <build output dir> is required');
@@ -155,24 +208,39 @@ async function main() {
       ...(await judgeDeck({ persona, deck, samples })),
     }))
   );
-  const calibration = [];
-  if (!values['skip-calibration']) {
+  let calibration = [];
+  const reuse = values['reuse-calibration']
+    ? JSON.parse(readFileSync(values['reuse-calibration'], 'utf8'))
+    : null;
+  if (
+    reuse &&
+    reuse.rubric === RUBRIC_VERSION &&
+    reuse.model === investRoute().model &&
+    reuse.calibrationRows?.length
+  )
+    calibration = reuse.calibrationRows;
+  else if (!values['skip-calibration']) {
     const decks = [
-      ...HOLDOUTS.map(h => ({ ...h, kind: 'holdout' })),
-      { ...ANCHOR, kind: 'anchor' },
+      ...HOLDOUTS.map(h => ({ ...h, kind: 'holdout', samples: 2 })),
+      { ...ANCHOR, kind: 'anchor', samples: 3 },
     ];
-    const rows = await Promise.all(
+    calibration = await Promise.all(
       decks.flatMap(fixture =>
         PERSONAS.map(async persona => ({
           deck: fixture.id,
           kind: fixture.kind,
           persona: persona.id,
-          ...(await judgeDeck({ persona, deck: fixture.deck, samples: 2 })),
+          ...(await judgeDeck({
+            persona,
+            deck: fixture.deck,
+            samples: fixture.samples,
+          })),
         }))
       )
     );
-    calibration.push(...rows);
   }
+  const cal = calibration.length ? calibrationHolds(calibration) : null;
+  const scored = relativeVerdicts(personas, cal);
   const report = {
     schema: 'jovie.investor-deck.invest-eval/v1',
     label: PERSONA_LABEL,
@@ -181,11 +249,11 @@ async function main() {
     model: investRoute().model,
     deckSha256: build.deckSha256,
     deckTextSha256: createHash('sha256').update(deck).digest('hex'),
-    personas,
-    yes: personas.filter(p => p.verdict === 'invest').length,
-    calibration: values['skip-calibration']
-      ? null
-      : calibrationHolds(calibration),
+    personas: scored,
+    yes: scored.filter(p => p.relative === 'invest').length,
+    absoluteYes: personas.filter(p => p.verdict === 'invest').length,
+    calibration: cal,
+    calibrationReused: Boolean(reuse && calibration === reuse.calibrationRows),
     calibrationRows: calibration.map(({ deck, kind, persona, verdict, p }) => ({
       deck,
       kind,
@@ -194,7 +262,7 @@ async function main() {
       p,
     })),
     costUsd: [...personas, ...calibration].reduce(
-      (sum, r) => sum + r.costUsd,
+      (sum, r) => sum + (r.costUsd ?? 0),
       0
     ),
     ms: Date.now() - started,
@@ -205,12 +273,12 @@ async function main() {
     `${JSON.stringify(report, null, 2)}\n`,
     { mode: 0o600 }
   );
-  for (const p of personas)
+  for (const p of scored)
     process.stdout.write(
-      `${p.persona.padEnd(28)} ${p.verdict.padEnd(7)} p=${p.p?.toFixed(2) ?? '-'} n=${p.samples}  fix: ${p.mostFixable?.objection ?? '-'}\n`
+      `${p.persona.padEnd(28)} ${p.relative.padEnd(8)} p=${p.p?.toFixed(2) ?? '-'} anchor=${p.anchorP?.toFixed(2) ?? '-'} n=${p.samples}  fix: ${String(p.mostFixable?.objection ?? '-').slice(0, 140)}\n`
     );
   process.stdout.write(
-    `yes ${report.yes}/${personas.length}  calibration ${report.calibration ? JSON.stringify(report.calibration) : 'skipped'}  $${report.costUsd.toFixed(3)}  ${Math.round(report.ms / 1000)}s\n`
+    `yes ${report.yes}/${personas.length} (absolute ${report.absoluteYes})  calibration ${report.calibration ? `ok=${report.calibration.ok} unseparated=${report.calibration.unseparated.join(',') || 'none'}` : 'skipped'}  $${report.costUsd.toFixed(3)}  ${Math.round(report.ms / 1000)}s\n`
   );
 }
 

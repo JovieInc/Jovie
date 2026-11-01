@@ -3,9 +3,10 @@
 // investor deck, Jovie or LYB, passes this before it leaves the building).
 // Open only when, for the SAME deck sha:
 //   1. the generator + consistency build has no issues (build.json);
-//   2. calibration holds: every known-bad holdout is `pass`, the positive
-//      anchor is `invest` for a majority of personas;
-//   3. at least THRESHOLD simulated personas say `invest`;
+//   2. calibration holds: for at least 5 of 6 personas every known-bad
+//      holdout scores below the YC-funded anchor deck;
+//   3. at least THRESHOLD simulated personas score this deck at or above
+//      their own score for the funded anchor;
 //   4. the eval is fresher than MAX_AGE_DAYS.
 // The open gate means "ask Tim to send", never "send".
 //
@@ -35,7 +36,7 @@ export function gateDecision({
     if (!evalReport.calibration) reasons.push('calibration was skipped');
     else if (!evalReport.calibration.ok)
       reasons.push(
-        `calibration failed (holdout yes: ${evalReport.calibration.holdoutYes.join(', ') || 'none'}; anchor ${evalReport.calibration.anchorYes}/${evalReport.calibration.anchorTotal})`
+        `calibration failed: holdouts not below the funded anchor for ${evalReport.calibration.unseparated.join(', ')}`
       );
     const abstain = evalReport.personas.filter(
       p => p.verdict === 'abstain'

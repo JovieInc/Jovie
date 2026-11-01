@@ -96,7 +96,7 @@
       "apps/web/lib/investors/**",
       "apps/web/components/features/pitch/**"
     ],
-    "bodySha256": "409b4707cb53278ecb239a408b8969aae261f24717ad1c807cc845a3bffdb2a1"
+    "bodySha256": "ebd4fe95307adefcf3ce0f8bf7ad5e5ff7ed876aa58a3ea6182b26d88daebabd"
   },
   {
     "file": ".claude/rules/ios.md",

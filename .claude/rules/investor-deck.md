@@ -24,8 +24,10 @@ Company-wide (Jovie, LYB, any future product). Decided 2026-11-01.
 - **"Would you invest" gate.** `node scripts/investor-deck/eval.mjs --deck <dir>`
   then `gate.mjs`. Six persona SIMULATIONS built from partners' public stated
   criteria (never contact them, never present a verdict as theirs), on the
-  Workers AI route `dev.investor-eval` (never `claude -p`). The gate opens only
-  when calibration holds (known-bad holdouts all pass, positive anchor invests)
-  and at least 4 of 6 personas say invest, for the same deck sha, within 3 days.
+  Workers AI route `dev.investor-eval` (never `claude -p`). Under low base rates
+  a judge scores even a YC-funded deck below 0.5, so the bar is relative: a
+  persona says invest when this deck scores at or above its score for the funded
+  anchor, and calibration needs every known-bad holdout below the anchor for at
+  least 5 of 6 personas. The gate opens at 4 of 6, same deck sha, within 3 days.
   Fix the top fixable objection in the story or ledger evidence, never by
   inventing facts; objections only traction can fix are reported, not argued.

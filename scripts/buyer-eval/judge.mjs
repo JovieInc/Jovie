@@ -201,6 +201,7 @@ export async function callRelay({
   env = process.env,
   baseUrl = strongRoute().baseUrl,
   createClient = createApiClient,
+  maxTokens = MAX_OUTPUT_TOKENS,
 }) {
   const token = env.WORKERS_AI_TOKEN?.trim();
   if (!token) throw new Error('WORKERS_AI_TOKEN not set (doppler jovie-web)');
@@ -221,7 +222,7 @@ export async function callRelay({
     headers: { 'Content-Type': 'application/json' },
     body: {
       model,
-      max_tokens: MAX_OUTPUT_TOKENS,
+      max_tokens: maxTokens,
       response_format: {
         type: 'json_schema',
         json_schema: { name: 'buyer_forecast', strict: true, schema },

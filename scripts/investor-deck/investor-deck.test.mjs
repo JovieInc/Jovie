@@ -9,7 +9,13 @@ import {
 } from '../../apps/web/lib/investors/yc-deck.ts';
 import { ANCHOR, HOLDOUTS } from './calibration.mjs';
 import { checkConsistency, retiredValues } from './consistency.mjs';
-import { calibrationHolds, investRoute, judgeDeck } from './eval.mjs';
+import {
+  calibrationHolds,
+  investContaminated,
+  investRoute,
+  judgeDeck,
+  relativeVerdicts,
+} from './eval.mjs';
 import { gateDecision } from './gate.mjs';
 import { PERSONA_LABEL, PERSONAS } from './personas.mjs';
 import { DECK_CSS, renderDeckHtml, tokenCss } from './render.mjs';
@@ -232,18 +238,61 @@ test('a relay failure abstains, it never yields invest', async () => {
   assert.equal(result.failures.length, 3);
 });
 
-test('calibration and gate fail closed', () => {
-  assert.equal(
-    calibrationHolds([
-      { kind: 'holdout', deck: 'h', persona: 'a', verdict: 'invest' },
-      { kind: 'anchor', deck: 'a', persona: 'a', verdict: 'invest' },
-    ]).ok,
-    false
+test('calibration needs holdouts below the funded anchor; verdicts are anchor-relative', () => {
+  const rows = [];
+  for (const persona of ['a', 'b', 'c']) {
+    rows.push({
+      kind: 'anchor',
+      deck: 'anc',
+      persona,
+      verdict: 'pass',
+      p: 0.3,
+    });
+    rows.push({
+      kind: 'holdout',
+      deck: 'h1',
+      persona,
+      verdict: 'pass',
+      p: 0.02,
+    });
+    rows.push({
+      kind: 'holdout',
+      deck: 'h2',
+      persona,
+      verdict: 'pass',
+      p: persona === 'c' ? 0.4 : 0.1,
+    });
+  }
+  const cal = calibrationHolds(rows);
+  assert.equal(cal.ok, true);
+  assert.deepEqual(cal.unseparated, ['c']);
+  rows.push({
+    kind: 'anchor',
+    deck: 'anc',
+    persona: 'b',
+    verdict: 'abstain',
+    p: null,
+  });
+  assert.equal(calibrationHolds(rows).ok, false);
+  const scored = relativeVerdicts(
+    [
+      { persona: 'a', p: 0.35 },
+      { persona: 'b', p: 0.2 },
+      { persona: 'c', p: 0.9 },
+    ],
+    cal
   );
+  assert.deepEqual(
+    scored.map(s => s.relative),
+    ['invest', 'pass', 'unscored']
+  );
+});
+
+test('gate fails closed', () => {
   const build = { deckSha256: 'abc', issues: [] };
   const evalReport = {
     deckSha256: 'abc',
-    calibration: { ok: true, holdoutYes: [], anchorYes: 4, anchorTotal: 6 },
+    calibration: { ok: true, unseparated: [] },
     personas: Array.from({ length: 6 }, (_, i) => ({
       verdict: i < 4 ? 'invest' : 'pass',
     })),
@@ -267,5 +316,23 @@ test('calibration and gate fail closed', () => {
       .open,
     false
   );
+  assert.match(
+    gateDecision({
+      build,
+      evalReport: {
+        ...evalReport,
+        calibration: { ok: false, unseparated: ['x', 'y'] },
+      },
+    }).reasons.join(),
+    /x, y/u
+  );
   assert.equal(gateDecision({ build, evalReport: null }).open, false);
+});
+
+test('investor contamination ignores ordinary investor words', () => {
+  assert.deepEqual(
+    investContaminated({ t: 'ICP is unclear this summer' }, 'prompt'),
+    []
+  );
+  assert.deepEqual(investContaminated({ t: 'like Ovie' }, 'prompt'), ['ovie']);
 });
