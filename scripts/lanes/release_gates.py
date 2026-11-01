@@ -115,6 +115,29 @@ def derive_gates(root: Path = ROOT) -> dict:
     return {"controllerJobs": jobs, "mainChecks": checks, "journeys": journeys}
 
 
+def workflow_for_check(root: Path, check: str) -> str | None:
+    """The workflow file that has a job named `check` and can be dispatched (workflow_dispatch), else None."""
+    for path in sorted((root / ".github/workflows").glob("*.yml")):
+        try:
+            text = path.read_text()
+        except OSError:
+            continue
+        if re.search(r"^on:\s*$[\s\S]*?^  workflow_dispatch:", text, re.M) and check in controller_jobs(text):
+            return path.name
+    return None
+
+
+def stale_red_checks(commits: list[dict], conclusions: dict[str, dict], streaks: dict[str, dict]) -> dict[str, dict]:
+    """Red required checks that have not run on any commit newer than the red one (a path-filtered workflow that the
+    fix never triggered, 2026-11-01 deadlock): the gate stays blocked until something else happens to touch the paths."""
+    out = {}
+    for key, streak in streaks.items():
+        ran = [c["sha"] for c in commits if streak["gate"] in conclusions.get(c["sha"], {})]
+        if ran and ran[0] == streak["newestSha"] and commits and commits[0]["sha"] != streak["newestSha"]:
+            out[key] = streak
+    return out
+
+
 def normalize_reason(text: str) -> str:
     text = re.sub(r"^\S*Z\s+", "", text.strip())
     text = re.sub(r"\b[0-9a-f]{40}\b", "<sha>", text)
@@ -245,7 +268,7 @@ def sample(state_dir: Path, now: float, run=None, root: Path = ROOT) -> tuple[di
     check_cache: dict = dict(cached.get("checkCache") or {})
     out = {"observedAt": now, "evidenceReadAt": cached.get("evidenceReadAt"), "firstObservedAt": cached.get("firstObservedAt") or now,
            "gates": cached.get("gates") or {}, "checks": cached.get("checks") or {}, "newBlockers": cached.get("newBlockers") or {},
-           "derived": cached.get("derived") or {}}
+           "derived": cached.get("derived") or {}, "dispatches": cached.get("dispatches") or {}}
     budget = [LOG_READS_PER_TICK]
     seen_runs: set[str] = set()
     seen_jobs: set[str] = set()
@@ -356,6 +379,24 @@ def sample(state_dir: Path, now: float, run=None, root: Path = ROOT) -> tuple[di
             if key not in checks and not green and now - float(prior.get("lastRedSeenAt") or now) <= CARRY_TTL_S:
                 checks[key] = prior
         out["checks"] = checks
+        # Self-heal: dispatch the stalled workflow on main once per red check run, with a receipt.
+        receipts = dict(cached.get("dispatches") or {})
+        for key, streak in stale_red_checks(commits, conclusions, checks).items():
+            receipt_key = f"{streak['gate']}:{streak['newestJobId']}"
+            workflow = workflow_for_check(root, streak["gate"])
+            if receipt_key in receipts or not workflow:
+                continue
+            try:
+                done = (run or sentinel._budgeted_gh)(["api", "-X", "POST", f"repos/{REPO}/actions/workflows/{workflow}/dispatches",
+                                                      "-f", "ref=main"], capture_output=True, text=True, timeout=60)
+                ok = done.returncode == 0
+            except Exception:  # noqa: BLE001
+                ok = False
+            if ok:  # a failed dispatch leaves no receipt and is retried next tick
+                receipts[receipt_key] = {"at": now, "workflow": workflow, "check": streak["gate"], "redCheckRunId": streak["newestJobId"],
+                                         "redSha": streak["newestSha"], "mainSha": commits[0]["sha"],
+                                         "reason": "required check red and never re-run on newer commits"}
+        out["dispatches"] = {k: v for k, v in receipts.items() if any(k == f"{c['gate']}:{c['newestJobId']}" for c in checks.values()) or now - v["at"] < CARRY_TTL_S}
         out["evidenceReadAt"] = now
         check_cache = {k: v for k, v in check_cache.items() if k.split(":")[0] in shas}
     except Exception as error:  # noqa: BLE001
