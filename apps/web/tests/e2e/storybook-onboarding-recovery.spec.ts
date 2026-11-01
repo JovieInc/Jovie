@@ -42,13 +42,18 @@ for (const scenario of cases) {
     await input.fill('https://open.spotify.com/artist/1ZlSI1juLMMN1HU8X7RViN');
     await send.click();
     await expect(page.getByTestId('submitted-turn-count')).toHaveText('1');
-    await expect(
-      page.getByTestId(
-        scenario.width >= 1024
-          ? 'onboarding-profile-rail'
-          : 'onboarding-profile-rail-inline'
-      )
-    ).toBeVisible();
+    // The confirm-artist turn ships the handle card in the same turn
+    // (JOV-10168), so the handle turn is reachable without typing a reply.
+    await expect(page.getByTestId('onboarding-edit-handle')).toBeVisible();
+    // The preview renders the confirmed artist with the real proposed
+    // handle, never the fabricated jov.ie/your-handle identity (JOV-10169).
+    const rail = page.getByTestId(
+      scenario.width >= 1024
+        ? 'onboarding-profile-rail'
+        : 'onboarding-profile-rail-inline'
+    );
+    await expect(rail).toBeVisible();
+    await expect(rail).not.toContainText('your-handle');
     await input.fill('Set my profile handle');
     await expect(send).toBeEnabled();
     await send.scrollIntoViewIfNeeded();
