@@ -164,12 +164,16 @@
     },
     ".claude/rules/ios.md": {
       "owner": "@itstimwhite",
-      "claim": "The hard-invariant table is implemented by the existing iOS lint.",
-      "documentSha256": "575fd3bc9e10fd68ab624b374accd15510cce7c821aab7af5552a9f72382b81f",
+      "claim": "The hard-invariant table is implemented by the existing iOS lint; the data-architecture section is enforced by the swift-arch guard.",
+      "documentSha256": "242ab1f217c0e3303f74e2e8539bcb8bebbee9c79e07fa850bc584069cea6f72",
       "sources": [
         {
           "path": "scripts/ios-best-practices-lint.sh",
           "sha256": "1baf41ad81fdfedfd05156140d7d44fde155798d1849e9915659bd64f1875ad7"
+        },
+        {
+          "path": "scripts/swift-arch/guard.mjs",
+          "sha256": "aa3502719ec63fe73659d6932b3cf6f9b68f9200366423e138b0c9d357297081"
         }
       ]
     },
