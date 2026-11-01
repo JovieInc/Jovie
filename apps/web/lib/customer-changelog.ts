@@ -96,6 +96,8 @@ export const CustomerChangelogEntrySchema = /* @__PURE__ */ (() =>
     supporting: z.array(z.string()),
     technical: z.array(z.string()),
     prominence: z.enum(CUSTOMER_CHANGELOG_PROMINENCE),
+    /** Release-day consolidation of non-story work; set on one entry per day. */
+    underTheHood: z.string().optional(),
   }))();
 
 export type CustomerChangelogEntry = z.infer<
@@ -374,6 +376,14 @@ export function projectCustomerChangelogArchive(
           })
         );
       }
+    }
+
+    const last = entries.at(-1);
+    if (release.underTheHood && last && last.date === release.date) {
+      entries[entries.length - 1] = {
+        ...last,
+        underTheHood: release.underTheHood,
+      };
     }
 
     for (const publication of publications) {

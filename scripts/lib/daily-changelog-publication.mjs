@@ -1,5 +1,10 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import {
+  classifyLedgerEntry,
+  readLedgerNote,
+  toReceiptRow,
+} from '../../apps/web/lib/release-ledger.ts';
 import { isCustomerCopy } from './changelog-filter-rules.mjs';
 import {
   DAILY_MAX_BULLETS,
@@ -615,6 +620,34 @@ export function planDailyPublication({
   result.receipt.stories = result.stories;
   result.receipt.publicationHead = marker.sha;
   result.receipt.audit = audit;
+  // One classified row per verified merge, so non-customer work is consolidated
+  // and ops can see it instead of it vanishing into the audit list.
+  const storyBySource = new Map(
+    result.stories.flatMap(story => story.sourceIds.map(id => [id, story.id]))
+  );
+  result.receipt.ledger = candidates
+    .filter(
+      candidate =>
+        candidate.pr?.state === 'MERGED' &&
+        SHA_RE.test(candidate.pr?.mergeCommit?.oid ?? '') &&
+        !processed.has(
+          `JovieInc/Jovie#${candidate.pr.number}@${candidate.pr.mergeCommit.oid}`
+        ) &&
+        typeof candidate.pr.title === 'string'
+    )
+    .map(candidate =>
+      toReceiptRow(
+        classifyLedgerEntry({
+          number: candidate.pr.number,
+          title: candidate.pr.title,
+          storyId:
+            storyBySource.get(
+              `JovieInc/Jovie#${candidate.pr.number}@${candidate.pr.mergeCommit.oid}`
+            ) ?? null,
+          ...readLedgerNote(candidate.pr.body),
+        })
+      )
+    );
   result.receipt.deferred = deferred;
   result.receipt.pending = audit
     .filter(item => item.reason === 'unavailable')

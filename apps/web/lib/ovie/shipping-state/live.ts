@@ -72,7 +72,7 @@ const LANE_PR_FIELDS =
   'issueCount nodes{... on PullRequest{number title url createdAt headRefName headRefOid isDraft mergeable reviewDecision updatedAt mergeQueueEntry{position state} author{login} commits(last:1){nodes{commit{statusCheckRollup{state contexts(first:50){nodes{__typename ... on CheckRun{name status conclusion} ... on StatusContext{context state}}}}}}}}}';
 const LANE_PULL_REQUESTS_QUERY = `query ShippingStateLanePullRequests($query:String!){search(type:ISSUE,first:100,query:$query){${LANE_PR_FIELDS}}}`;
 const MERGES_QUERY =
-  'query ShippingStateMerges($org:String!,$jovie:String!,$lyb:String!,$summer:String!,$last7:String!,$prior7:String!){org:search(type:ISSUE,query:$org,first:12){issueCount nodes{... on PullRequest{number title url mergedAt repository{name}}}}jovie:search(type:ISSUE,query:$jovie,first:1){issueCount}lyb:search(type:ISSUE,query:$lyb,first:1){issueCount}summer:search(type:ISSUE,query:$summer,first:1){issueCount}last7:search(type:ISSUE,query:$last7,first:1){issueCount}prior7:search(type:ISSUE,query:$prior7,first:1){issueCount}}';
+  'query ShippingStateMerges($org:String!,$jovie:String!,$lyb:String!,$summer:String!,$last7:String!,$prior7:String!){org:search(type:ISSUE,query:$org,first:50){issueCount nodes{... on PullRequest{number title url mergedAt repository{name}}}}jovie:search(type:ISSUE,query:$jovie,first:1){issueCount}lyb:search(type:ISSUE,query:$lyb,first:1){issueCount}summer:search(type:ISSUE,query:$summer,first:1){issueCount}last7:search(type:ISSUE,query:$last7,first:1){issueCount}prior7:search(type:ISSUE,query:$prior7,first:1){issueCount}}';
 const BEHIND_MAIN_QUERY =
   'query ShippingStateBehindMain($owner:String!,$name:String!,$sha:String!){repository(owner:$owner,name:$name){ref(qualifiedName:"main"){compare(headRef:$sha){behindBy}}}}';
 const PRODUCTION_VERIFIED_JOB_NAME = 'Production Verified';
@@ -1377,7 +1377,7 @@ function recentMerged(
       return [{ repo, number: Number(node.number), title, url, mergedAt }];
     })
     .sort((a, b) => Date.parse(b.mergedAt) - Date.parse(a.mergedAt))
-    .slice(0, 12);
+    .slice(0, 50);
 }
 
 function issueCount(data: Record<string, unknown>, alias: string) {

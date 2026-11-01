@@ -3,6 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { draftEditorial, gatewayComplete } from './lib/changelog-editorial.mjs';
 import { collectCustomerCandidates } from './lib/daily-changelog-collector.mjs';
 import {
   checkPublicationBinding,
@@ -194,6 +195,21 @@ writeFileSync(
   `${JSON.stringify({ ...plan, content: undefined }, null, 2)}\n`
 );
 writeFileSync(resolve(output, 'CHANGELOG.md'), plan.content);
+// Reviewable model drafts for changes with no approved copy. Advisory only:
+// never published, never fails the job, an author's decision block always wins.
+if (process.env.AI_GATEWAY_API_KEY) {
+  try {
+    const editorial = await draftEditorial(candidates, {
+      complete: gatewayComplete({ apiKey: process.env.AI_GATEWAY_API_KEY }),
+    });
+    writeFileSync(
+      resolve(output, 'editorial-drafts.json'),
+      `${JSON.stringify(editorial, null, 2)}\n`
+    );
+  } catch (error) {
+    console.error(`Editorial drafting skipped: ${error.message}`);
+  }
+}
 process.stdout.write(
   `${JSON.stringify({ status: plan.status, outcomes: plan.result.stories.length, audit: plan.audit.length, deferred: plan.deferred.length, output })}\n`
 );

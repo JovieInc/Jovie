@@ -68,6 +68,46 @@ const input = overrides => ({
   observedAt,
   ...overrides,
 });
+describe('release ledger receipt', () => {
+  const other = (number, title, extra = '') => ({
+    pr: {
+      number,
+      title,
+      state: 'MERGED',
+      baseRefName: 'main',
+      mergeCommit: { oid: String(number % 10).repeat(40) },
+      url: `https://github.com/JovieInc/Jovie/pull/${number}`,
+      body: extra,
+    },
+    ancestor: true,
+    evidencePassed: true,
+  });
+  it('classifies every verified merge and links story-backed ones', () => {
+    const plan = planDailyPublication(
+      input({
+        candidates: [
+          candidate({
+            pr: { ...candidate().pr, title: 'feat(profile): claim link' },
+          }),
+          other(20, 'chore(deps): bump zod'),
+          other(21, 'fix(security): patch SSRF'),
+          other(
+            22,
+            'fix(security): patch CSRF',
+            '<!-- release-ledger/v1 {"embargoUntil":"2026-10-01T00:00:00Z"} -->'
+          ),
+        ],
+      })
+    );
+    const rows = plan.result.receipt.ledger;
+    expect(rows.map(row => row.n)).toEqual([1, 20, 21, 22]);
+    expect(rows[0]).toMatchObject({ k: 'feature', s: 'profile-claim' });
+    expect(rows[1]).toMatchObject({ k: 'maintenance', a: 'dependencies' });
+    expect(rows[2].e).toBeUndefined();
+    expect(rows[3].e).toBe('2026-10-01T00:00:00Z');
+    expect(JSON.stringify(rows)).not.toContain('SSRF');
+  });
+});
 describe('customer release metadata', () => {
   it.each([
     'Codex shipper: safer dispatch.',

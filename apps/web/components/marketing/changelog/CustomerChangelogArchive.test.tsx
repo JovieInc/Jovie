@@ -183,6 +183,20 @@ describe('CustomerChangelogArchive', () => {
     );
     expect(screen.getByText('Engineering history')).not.toBeVisible();
   });
+  it('shows the consolidated under-the-hood line on the entry that carries it', () => {
+    const [group] = buildMonthFixture(1);
+    const entry = {
+      ...group.entries[0],
+      underTheHood: 'Under the hood: Faster pages and actions.',
+    };
+    render(
+      <CustomerChangelogArchive months={[{ ...group, entries: [entry] }]} />
+    );
+    expect(
+      screen.getByText('Under the hood: Faster pages and actions.')
+    ).toBeTruthy();
+  });
+
   it('leads with outcome titles and keeps version tertiary', () => {
     render(<CustomerChangelogArchive months={MONTHS.slice(0, 1)} />);
 

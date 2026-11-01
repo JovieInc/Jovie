@@ -221,6 +221,33 @@ describe('customer publication integrity', () => {
     ).not.toMatch(/PersistentAudioBar|Codex|shipper|unit tests?|JOV-\d+/);
     expect(releases.some(release => release.version === '26.6.50')).toBe(true);
   });
+
+  it('consolidates non-story merges into one under-the-hood line and never counts embargoed security', () => {
+    const row = (n: number, k: string, a: string, extra = {}) => ({
+      n,
+      k,
+      a,
+      ...extra,
+    });
+    const receipt = {
+      ...publication(),
+      ledger: [
+        row(1, 'feature', 'app', { s: 'artist-news' }),
+        row(2, 'perf', 'app'),
+        row(3, 'maintenance', 'delivery'),
+        row(4, 'security', 'app'),
+      ],
+    };
+    const [entry] = projectCustomerChangelog(parseChangelog(markdown(receipt)));
+    expect(entry.underTheHood).toBe(
+      'Under the hood: Faster pages and actions.'
+    );
+    expect(entry.underTheHood).not.toMatch(/secur/i);
+    const [legacy] = projectCustomerChangelog(
+      parseChangelog(markdown(publication()))
+    );
+    expect(legacy.underTheHood).toBeUndefined();
+  });
 });
 
 describe('newest-first ordering', () => {
