@@ -69,7 +69,7 @@ export function ProofMethodology({ stats, className }: ProofMethodologyProps) {
       stat.visibility === 'public' && stat.publicMethod && stat.methodology
   );
   return (
-    <div className={cn('flex flex-col gap-12', className)}>
+    <div data-accent='ion' className={cn('flex flex-col gap-12', className)}>
       <section className='flex flex-col gap-3'>
         <h2 className='text-lg font-medium text-primary-token text-balance'>
           {PROOF_METHODOLOGY_COPY.rules.heading}
