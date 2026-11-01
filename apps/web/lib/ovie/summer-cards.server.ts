@@ -242,6 +242,53 @@ export async function decideSummerCard(
     : { outcome: 'not_found' };
 }
 
+export const SUMMER_CARD_SUPERSEDER = 'premise-superseded';
+export type SummerCardSupersedeResult =
+  | { readonly outcome: 'superseded'; readonly card: SummerCard }
+  | { readonly outcome: 'already_decided'; readonly card: SummerCard }
+  | { readonly outcome: 'reserved'; readonly kind: string }
+  | { readonly outcome: 'not_found' };
+
+/**
+ * Closes a pending ask whose premise is gone (a human hold that no longer exists, a decision another
+ * decision replaced). The system records the close with a reason; nobody decides on the founder's
+ * behalf, nothing is approved, and no action follows. Spend, outbound and cards that explicitly
+ * require a founder decision are never superseded this way.
+ */
+export async function supersedeSummerCard(
+  input: { readonly id: string; readonly reason: string },
+  now = new Date()
+): Promise<SummerCardSupersedeResult> {
+  const current = await readStoredRow(input.id);
+  if (!current) return { outcome: 'not_found' };
+  if (current.card.status !== 'pending') {
+    return { outcome: 'already_decided', card: toCard(current.card) };
+  }
+  if (
+    current.card.kind === 'spend' ||
+    current.card.kind === 'outbound' ||
+    current.card.defaultDecision === 'none'
+  ) {
+    return { outcome: 'reserved', kind: current.card.kind };
+  }
+  const result = await decideSummerCard(
+    {
+      id: input.id,
+      decision: 'reject',
+      comment: `Closed by the system, premise superseded: ${input.reason}. No action taken.`,
+      decidedBy: SUMMER_CARD_SUPERSEDER,
+      resolution: 'default',
+    },
+    now
+  );
+  if (result.outcome === 'decided') {
+    return { outcome: 'superseded', card: result.card };
+  }
+  return result.outcome === 'already_decided'
+    ? { outcome: 'already_decided', card: result.card }
+    : { outcome: 'not_found' };
+}
+
 export type SummerCardDefaultsResult = {
   readonly checked: number;
   readonly defaulted: number;
