@@ -103,6 +103,17 @@
       ]
     },
     {
+      "id": "ai-routing",
+      "title": "Which provider serves which model call (Gateway vs Workers AI)",
+      "owner": {
+        "kind": "file",
+        "ref": "apps/web/lib/ai/routing.json",
+        "note": "Per-caller route (workers-first, gateway-first, gateway-only), models, Gateway key and $/day ceiling. Runtime routing reads it; docs, memory and prose must not restate it."
+      },
+      "derived": ["apps/web/lib/ai/routing.ts", "apps/web/lib/ai/sdk.ts"],
+      "liveAuthority": "(Summer mirror: apps/summer/PROVIDER_FALLBACK.md in summer-config) AI Gateway /v1/report, Cloudflare Workers AI analytics, relay /health and Vercel env flags, proven by scripts/ai-routing-check.mjs"
+    },
+    {
       "id": "credentials-spend",
       "title": "Credentials and spend",
       "owner": {

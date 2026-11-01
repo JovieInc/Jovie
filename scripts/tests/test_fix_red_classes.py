@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -24,7 +25,7 @@ class ClassifyTest(unittest.TestCase):
             "This PR conflicts with main in: scripts/preflight-changed.mjs . Resolve the conflict (lane-fix-conflict).": ("narrowed-preflight", "merge-narrowed-preflight"),
             "AssertionError: off-grid 10px/14px spacing steps (*-2.5, *-3.5) grew: 591 > baseline 590.": ("spacing-scale", "snap-spacing"),
             "Error: apps/web/app/(marketing)/pricing/page.tsx: source changed; renew certification evidence": ("census-certification", "sync-main"),
-            "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "agent"),
+            "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "atomic-write"),
             "red-before-green: include Failing command:": ("pr-body", "agent"),
             "AssertionError: expected 1": ("other", "agent"),
         }
@@ -266,6 +267,62 @@ class AndChainMergeTest(unittest.TestCase):
         self.assertIsNone(classes.resolve_and_chain_text(edited))
         unknown = text.replace(f'    "ci:control:test": "{self.OURS}",\n', "    const drifted = true;\n")
         self.assertIsNone(classes.resolve_and_chain_text(unknown))
+
+
+class AtomicWriteRepairTest(unittest.TestCase):
+    LOG = "use atomic_state.atomic_write_text for whole-file state: [('sample.py', 'save', 'write_text')]"
+
+    def test_repairs_the_reported_function_and_preserves_whole_file_until_replace(self):
+        source = ('from pathlib import Path\nfrom atomic_state import atomic_write_text\n'
+                  'def save(path):\n    label = "é"; path.write_text(label, encoding="utf-8")\n'
+                  'def other(path):\n    path.write_text("untouched")\n')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lanes = root / "scripts/lanes"
+            lanes.mkdir(parents=True)
+            target = lanes / "sample.py"
+            target.write_text(source)
+            self.assertEqual(classes.repair_atomic_state_writes(root, self.LOG), ["scripts/lanes/sample.py"])
+            namespace = {}
+            exec(compile(target.read_text(), str(target), "exec"), namespace)
+            state = root / "state.json"
+            state.write_text("old")
+            from unittest.mock import patch
+            import atomic_state
+            replace = os.replace
+            def observe(staged, dest):
+                self.assertEqual(state.read_text(), "old")
+                self.assertEqual(Path(staged).read_text(), "é")
+                replace(staged, dest)
+            with patch.object(atomic_state.os, "replace", side_effect=observe) as swapped:
+                namespace["save"](state)
+            swapped.assert_called_once()
+            self.assertEqual(state.read_text(), "é")
+            self.assertIn('path.write_text("untouched")', target.read_text())
+            self.assertEqual(classes.repair_atomic_state_writes(root, self.LOG), [])
+
+    def test_unknown_imports_signatures_shadowing_and_symlinks_are_unchanged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lanes = root / "scripts/lanes"
+            lanes.mkdir(parents=True)
+            target = lanes / "sample.py"
+            for source in ('def save(p):\n    p.write_text("x")\n',
+                           'from atomic_state import atomic_write_text\natomic_write_text = None\ndef save(p):\n    p.write_text("x")\n',
+                           'from atomic_state import atomic_write_text\ndef save(p):\n    return p.write_text("x")\n',
+                           'from atomic_state import atomic_write_text\ndef save(p):\n    p.write_text(str(p.write_text("x")))\n',
+                           'from atomic_state import atomic_write_text\ndef save(p):\n    p.write_text("x", newline="")\n',
+                           'from atomic_state import atomic_write_text\ndef save(p, atomic_write_text):\n    p.write_text("x")\n',
+                           'from atomic_state import atomic_write_text\ndef save(p):\n    def nested():\n        p.write_text("x")\n'):
+                target.write_text(source)
+                self.assertEqual(classes.repair_atomic_state_writes(root, self.LOG), [])
+                self.assertEqual(target.read_text(), source)
+            outside = root / "outside.py"
+            outside.write_text('from atomic_state import atomic_write_text\ndef save(p):\n    p.write_text("x")\n')
+            target.unlink()
+            target.symlink_to(outside)
+            self.assertEqual(classes.repair_atomic_state_writes(root, self.LOG), [])
+            self.assertIn('p.write_text("x")', outside.read_text())
 
 
 class SpacingSnapTest(unittest.TestCase):

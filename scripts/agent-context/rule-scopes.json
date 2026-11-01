@@ -92,7 +92,7 @@
   {
     "file": ".claude/rules/ios.md",
     "paths": ["apps/ios/**", "**/*.swift"],
-    "bodySha256": "8064a84295f7bac353ab5ca2858863bee4f7e82be6e12c0e8c2df8b7d305ad7d"
+    "bodySha256": "030e26d1dbf17cde238efb27e147635a2a90ddd6434eb2196420779fb2af5135"
   },
   {
     "file": ".claude/rules/linear.md",
