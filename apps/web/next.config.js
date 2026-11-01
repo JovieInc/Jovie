@@ -664,6 +664,12 @@ const nextConfig = {
 
     return {
       beforeFiles: [
+        // Content-Signal needs a custom robots.txt body, which the metadata route
+        // type cannot express. app/robots.ts stays the single source of rules.
+        {
+          source: '/robots.txt',
+          destination: '/.well-known/robots.txt',
+        },
         {
           source: '/hud/wiki',
           destination: '/app/ov/wiki',
