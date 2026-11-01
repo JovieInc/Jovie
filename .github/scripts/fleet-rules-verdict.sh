@@ -3,8 +3,9 @@
 # github.token for the policy read only). The job result IS the verdict PR Ready reads (from this
 # workflow's own runs, which only main's copy of this file can produce):
 # success = fleet rules passed, 75 = deferred (quota/outage, never a pass),
-# 1 = policy red. After a decisive verdict, the latest completed failed Source
-# Validation run for this head is re-run so PR Ready re-reads it.
+# 1 = policy red. After a passing verdict, the latest completed failed Source
+# Validation run for this head can re-read recovered evidence. A still-red
+# policy cannot be repaired by re-reading it.
 #
 # No commit status is posted. It was informational (nothing read it) and it was
 # written with github.token, so an empty repo-wide GITHUB_TOKEN bucket turned a
@@ -55,11 +56,13 @@ esac
 # verdict had already been read on the App budget. Without an App token they are
 # skipped (the workflow_run hop re-runs PR Ready once the verdict exists). Only the
 # rerun POST, which needs actions:write, uses github.token.
-if [ "$state" != error ] && [ -n "${FLEET_TOKEN:-}" ]; then
+if [ "$state" = success ] && [ -n "${FLEET_TOKEN:-}" ]; then
   run_id="$(GH_TOKEN="$FLEET_TOKEN" ghx repair api "repos/$REPOSITORY/actions/workflows/source-validation.yml/runs?head_sha=$HEAD_SHA&event=pull_request&status=completed&per_page=10" \
     --jq '[.workflow_runs[] | select(.conclusion == "failure" and .run_attempt < 4)] | sort_by(.created_at) | last | .id // empty' 2>/dev/null || true)"
   [ -z "$run_id" ] || GH_READ_TOKEN="$FLEET_TOKEN" bash .github/scripts/fleet-rules-rerun.sh "$run_id" || true
-elif [ "$state" != error ]; then
+elif [ "$state" = success ]; then
   echo "::notice::No CI App token; skipping the Source Validation re-run lookup (the re-run hop covers it)."
+elif [ "$state" = failure ]; then
+  echo "::notice::Fleet policy remains red; not re-running Source Validation for an unchanged failing verdict."
 fi
 case "$state" in success) exit 0 ;; error) exit 75 ;; *) exit 1 ;; esac
