@@ -15534,6 +15534,12 @@ class RepositoryBindingTest(unittest.TestCase):
         self.assertEqual([(kind, pr["number"]) for kind, pr in actions],
                          [("enqueue", 3), ("ready", 5), ("rebase", 8)])
 
+    def test_a_compounding_pr_is_left_to_green_enroll_for_its_jump(self):
+        # 2026-11-01: a plain lane enqueue of #24141 beat green enroll's compounding jump.
+        rows = [self.row(3, labels=["compounding"]), self.row(4, labels=["Compounding"]), self.row(5)]
+        actions = lane.bindings.maintenance_actions(self.binding, rows, time.time())
+        self.assertEqual([(kind, pr["number"]) for kind, pr in actions], [("enqueue", 5)])
+
     def test_maintain_writes_once_per_head_and_retries_a_failed_write_later(self):
         (self.host.state / "bindings" / "LYB").mkdir(parents=True)
         rows = [self.row(3), self.row(1, queue={"state": "QUEUED", "enqueuer": {"login": "github-actions[bot]"}})]
