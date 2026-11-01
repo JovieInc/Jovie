@@ -287,17 +287,17 @@ class HyperagentRepairTest(unittest.TestCase):
         self.assertNotIn("endedAt", record)  # local lanes keep skipping it (in_flight) until FIX_LEASE_S
         self.assertTrue(any("lane claim kind=fix" in c["body"] for c in self.world.comments.values()))
 
-    def test_a_remote_service_error_is_nudged_once_on_the_same_thread(self):
+    def test_remote_service_errors_are_nudged_on_the_same_thread(self):
         self.world.add_pr(57)
-        self.world.remote_errors = 1
+        self.world.remote_errors = 2
         receipt = repair.repair(self.deps())
         self.assertEqual(receipt["verdict"], "repaired")
         self.assertEqual(len(self.created()), 1)
-        self.assertEqual(self.world.calls.count(("hyperagent", "send_message")), 1)
+        self.assertEqual(self.world.calls.count(("hyperagent", "send_message")), 2)
 
     def test_a_persistent_remote_error_is_recorded_and_releases_the_lease(self):
         self.world.add_pr(58)
-        self.world.remote_errors = 5
+        self.world.remote_errors = 9
         receipt = repair.repair(self.deps())
         self.assertEqual(receipt["verdict"], "remote-error")
         self.assertIn("timed out", receipt["remoteError"])

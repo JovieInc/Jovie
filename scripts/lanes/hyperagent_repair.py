@@ -54,7 +54,7 @@ REMOTE_TIMEOUT_S = 1800
 CHECK_WAIT_S = 90 * 60
 SCAN_LIMIT = 25
 POLL_S = 120
-MAX_NUDGES = 1
+MAX_NUDGES = 3  # GLM turns time out intermittently (~5 min); same thread, no new daily run
 CONTINUE = ("The previous turn stopped on a service error. Continue the repair task above from where you "
             "left off and finish with the one-line reply it asks for.")
 TRAILER = "Hyperagent-Repair"
