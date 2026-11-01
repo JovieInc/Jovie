@@ -44,6 +44,7 @@
     {"id": "workflow:fixed-runner-canary", "kind": "workflow", "owner": "gem-hostops", "status": "active", "ref": ".github/workflows/fixed-runner-canary.yml"},
     {"id": "workflow:fleet-gate-refresh", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/fleet-gate-refresh.yml"},
     {"id": "workflow:fleet-rules-evidence", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/fleet-rules-evidence.yml", "note": "Base-branch-only PR fleet-rule evidence read on the CI App budget; PR Ready reads its runs."},
+    {"id": "workflow:fleet-rules-ready-rerun", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/fleet-rules-ready-rerun.yml", "note": "Re-runs PR Ready when a completed Fleet Rules Evidence run is the only blocker."},
     {"id": "workflow:fork-pr-gate", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/fork-pr-gate.yml"},
     {"id": "workflow:golden-path-nightly", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/golden-path-nightly.yml"},
     {"id": "workflow:golden-path-prod-autofix", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/golden-path-prod-autofix.yml"},

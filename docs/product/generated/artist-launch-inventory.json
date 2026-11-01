@@ -3449,6 +3449,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/summer-company/golden-path/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-company/golden-path",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/summer-company/revenue/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/revenue",

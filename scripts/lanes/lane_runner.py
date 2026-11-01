@@ -61,6 +61,7 @@ import execution_attempt  # noqa: E402
 import file_overlap  # noqa: E402
 import claude_lane  # noqa: E402  (subscription quota bank read by the router)
 import hyperagent_lane  # noqa: E402
+import hyperagent_repair  # noqa: E402
 import migration_renumber  # noqa: E402  (no-model fix for migration number collisions)
 import fix_red_classes  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
 from gh_budget import gh_call  # noqa: E402  (budgeted gh for new lane code)
@@ -141,7 +142,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_migration_renumber.py",
+LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_migration_renumber.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -3170,8 +3171,16 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
                               f"{type(failure).__name__}: {failure}\n")
                 except (AttributeError, OSError):
                     pass
+        stop_failure = None
+        if _lifecycle_helper:
+            _HELD_CLEANUP[:] = [owned, proc]
         try:
             owned.stop(proc)
+        except RuntimeError as failure:
+            # A failed tracked-descendant stop must not skip the process-group sweep below
+            # or replace the stop cause with a permanent cleanup hold (Gem, 2026-10-29: a
+            # `--timeout 600` trufflehog gate lived 2d17h). Re-verify drainage afterwards.
+            stop_failure = failure
         finally:
             for sig, grace in ((signal.SIGTERM, 15), (signal.SIGKILL, 5)):
                 # A reaped leader's PID/PGID may now belong to an unrelated job.
@@ -3195,6 +3204,8 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
                 else:
                     continue
                 break
+        if stop_failure is not None and not _cleanup_drained(owned, proc):
+            raise stop_failure
         raise
     finally:
         for signo, previous in restored.items():
@@ -3202,6 +3213,36 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
                 signal.signal(signo, previous)
             except (ValueError, OSError):
                 pass
+
+
+_HELD_CLEANUP: list = []  # [AgentProcesses, Popen] of the helper's last stopped run
+
+
+def _cleanup_drained(owned, proc) -> bool:
+    """True only when no owned descendant and no process-group member remains."""
+    try:
+        proc.poll()
+        return not owned.observe() and not process_group_alive(proc.pid)
+    except Exception:
+        return False  # unreadable membership cannot prove drainage
+
+
+def retry_held_cleanup() -> bool:
+    """One more TERM/KILL sweep over the helper's owned tree and its process group."""
+    import signal
+    if len(_HELD_CLEANUP) != 2:
+        return False
+    owned, proc = _HELD_CLEANUP
+    try:
+        owned.stop(proc)
+    except Exception:
+        pass
+    if proc.returncode is None:  # unreaped leader: its PID/PGID cannot belong to anyone else
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except OSError:
+            pass
+    return _cleanup_drained(owned, proc)
 
 
 PROVIDER_HANDOFFS = 2
@@ -4795,8 +4836,12 @@ def escalate_exhausted(host: Host, prs: list[dict], linear, *, model_only=False,
     data = load_escalation(host)
     now = time.time()
 
-    def healthy(_name, spec):
-        return provider_healthy(spec)
+    health_seen = {}  # one probe per provider per pass: a per-PR probe cost ~460 `grok models` calls (~400s) per tick
+
+    def healthy(name, spec):
+        if name not in health_seen:
+            health_seen[name] = provider_healthy(spec)
+        return health_seen[name]
 
     def plan_next(classified, record, now, head):
         if routing_context is REPAIR_ROUTING_UNSET:
@@ -5628,8 +5673,12 @@ def claim_remediation_events(host: Host, linear) -> dict:
     providers = load_providers()
     cooled = {name for name in providers if cooling(host, name)}
 
-    def healthy(_name, spec):
-        return provider_healthy(spec)
+    health_seen = {}  # one probe per provider per pass: a per-PR probe cost ~460 `grok models` calls (~400s) per tick
+
+    def healthy(name, spec):
+        if name not in health_seen:
+            health_seen[name] = provider_healthy(spec)
+        return health_seen[name]
 
     delivery_lock = Locked(host.state / "event-delivery.lock", blocking=False)
     if not delivery_lock.held:
@@ -9524,6 +9573,21 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     if bound is not None:
         slot.release()
         return 1 if bound == "disk-held" else reexec(host, name)
+    if name == "hyperagent":
+        # Remote repair of existing PRs comes before new issues, and the shared 24/day thread
+        # cap (bridge + issues + repairs) gates both: a spent cap ends the turn here.
+        try:
+            turn, _receipt = hyperagent_repair.lane_turn(host.state, spec)
+        except Exception as error:
+            turn = "idle"
+            print(f"hyperagent repair pass failed: {type(error).__name__}: {error}"[:300], file=sys.stderr)
+        if turn == "capped":
+            record_idle_exit(host, name, "hyperagent-daily-cap")
+            slot.release()
+            return 0
+        if turn == "ran":
+            slot.release()
+            return reexec(host, name)
     linear = None
     # Publication can await canonical policy and native queue reads. Keep those
     # outside the global claim lock, then refresh inventory for ordinary admission.
@@ -11549,8 +11613,12 @@ def guarded_main(argv: list[str] | None = None) -> int:
                       file=sys.stderr, flush=True)
             except OSError:
                 pass
-            while True:
-                time.sleep(60)
+            # Keep the locks only while descendants are provably alive: retry the sweep and
+            # release the moment the tree drains, instead of holding them until an operator.
+            while not retry_held_cleanup():
+                time.sleep(float(os.environ.get("LANES_GATE_CLEANUP_RETRY_S", 10)))
+            report_outcome({"returncode": None, "timeout": True})
+            return 124
     if args.command == "context-manifest":
         path = HERE / "context-manifest.json"
         generated = context_manifest_json()

@@ -157,7 +157,7 @@
 
 .ap-how-it-works__setup-stage-header {
   display: grid;
-  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-3);
   align-items: baseline;
   padding: var(--space-3) var(--space-4);
@@ -248,11 +248,11 @@
 
 @media (max-width: 47.99rem) {
   .ap-how-it-works__setup-stage-header {
-    grid-template-columns: 1.75rem minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .ap-how-it-works__setup-stage-detail {
-    grid-column: 2;
+    grid-column: 1;
   }
 
   .ap-how-it-works__setup-media {

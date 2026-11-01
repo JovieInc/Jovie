@@ -12,7 +12,6 @@ describe('about footer refresh copy', () => {
       '/pricing',
       '/artist-profiles',
       '/smart-links',
-      '/card',
     ]);
 
     for (const link of PUBLIC_COMMERCIAL_FOOTER_LINKS) {

@@ -480,7 +480,7 @@ describe('POST /api/chat guard wiring', () => {
     expect(body?.errorCode).not.toBe('RATE_LIMITED');
   });
 
-  it('keeps the returning canary metered: no weekly skip (JOV-9625)', async () => {
+  it('skips the weekly quota for the returning canary so synthetic checks cannot lock it out (JOV-9625)', async () => {
     hoisted.resolveChatAccountContextMock.mockResolvedValue(
       makeAccountContext({ email: 'browse-ready+clerk_test@jov.ie' })
     );
@@ -493,12 +493,13 @@ describe('POST /api/chat guard wiring', () => {
 
     await POST(chatRequest(validBody()));
 
-    // Only the dedicated chat-health canary skips the weekly quota; the
-    // golden-path-walk identity stays metered (#23703).
+    // Both fixed certification canaries skip the weekly quota (the
+    // golden-path first-use step was blocked by a spent 15/15); the burst
+    // limiter still applies. This reverses the #23703 metering decision.
     expect(hoisted.checkAiChatRateLimitForPlanMock).toHaveBeenCalledWith(
       '00000000-0000-4000-8000-000000000123',
       'pro',
-      { skipWeeklyQuota: false }
+      { skipWeeklyQuota: true }
     );
   });
 
