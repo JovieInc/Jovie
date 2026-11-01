@@ -155,6 +155,27 @@ describe('GET /api/chat/usage', () => {
     expect(body.isExhausted).toBe(false);
   });
 
+  it('never shows a quota-exempt canary as out of messages (prod walk 2026-11-01)', async () => {
+    const { PRODCERT_RETURNING_CANARY_EMAIL } = await import(
+      '@/lib/synthetic/prodcert-identities'
+    );
+    hoisted.getCurrentUserEntitlementsMock.mockResolvedValue({
+      ...makeEntitlements({ plan: 'free' }),
+      email: PRODCERT_RETURNING_CANARY_EMAIL,
+    });
+    hoisted.readStatusMock.mockResolvedValue(liveStatus(0));
+
+    const body = await (await request()).json();
+    expect(body.isExhausted).toBe(false);
+    expect(body.remaining).toBe(15);
+  });
+
+  it('still reports exhaustion for a real account', async () => {
+    hoisted.readStatusMock.mockResolvedValue(liveStatus(0));
+    const body = await (await request()).json();
+    expect(body.isExhausted).toBe(true);
+  });
+
   it('returns trial plan with the trial weekly quota instead of Free copy', async () => {
     hoisted.getCurrentUserEntitlementsMock.mockResolvedValue(
       makeEntitlements({ plan: 'trial' })
