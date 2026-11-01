@@ -11,6 +11,10 @@ const WEB_ROOT = path.resolve(import.meta.dirname, '../../..');
 
 const read = (rel: string) => readFileSync(path.join(WEB_ROOT, rel), 'utf8');
 
+/** Screen-reader-only order hints are allowed; only visible numbering is banned. */
+const visibleSource = (source: string) =>
+  source.replace(/<span className='sr-only'>[^<]*<\/span>/g, '');
+
 const STEP_NUMBER_TOKENS: readonly { name: string; pattern: RegExp }[] = [
   { name: 'Step {n} label', pattern: /Step \{(?:i|index|idx)\s*\+\s*1\}/ },
   { name: '0{index + 1} numeral', pattern: /0\{(?:i|index|idx)\s*\+\s*1\}/ },
@@ -35,7 +39,7 @@ const STEP_FREE_FILES = [
 describe('marketing step numbering guard', () => {
   for (const file of STEP_FREE_FILES) {
     it(`${file} renders no step-number tokens`, () => {
-      const source = read(file);
+      const source = visibleSource(read(file));
       const hits = STEP_NUMBER_TOKENS.filter(t => t.pattern.test(source)).map(
         t => t.name
       );

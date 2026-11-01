@@ -27,8 +27,13 @@ const directPrimaryActionPattern = /public-action-primary|Claim Your Handle/;
 describe('pay landing System B source contract', () => {
   it('does not number its how-it-works steps', async () => {
     const source = await readFile(sourcePath, 'utf8');
+    // The sr-only order hint is for assistive tech, never visible text.
+    const visible = source.replace(
+      /<span className='sr-only'>[^<]*<\/span>/g,
+      ''
+    );
 
-    expect(source).not.toMatch(/Step \{/);
+    expect(visible).not.toMatch(/Step \{/);
   });
 
   it('keeps the claim handle surface on shared System B primitives', async () => {
