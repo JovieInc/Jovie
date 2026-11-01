@@ -61,12 +61,8 @@ export default function ProofMethodologyPage() {
         that list.
       </p>
       <ProofMethodology className='mt-16' stats={listProofStats()} />
-      <nav
-        aria-labelledby='proof-related-heading'
-        className='mt-16 border-t border-subtle pt-8'
-      >
+      <div className='mt-16 border-t border-subtle pt-8'>
         <h2
-          id='proof-related-heading'
           data-wrap='editorial-title'
           className='text-lg font-medium text-primary-token text-balance'
         >
@@ -84,7 +80,7 @@ export default function ProofMethodologyPage() {
             </li>
           ))}
         </ul>
-      </nav>
+      </div>
       <script type='application/ld+json'>
         {safeJsonLdStringify(PAGE_SCHEMA)}
       </script>
