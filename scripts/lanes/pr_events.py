@@ -1096,6 +1096,10 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
     if win_section is not None and win_section != "":
         if not isinstance(win_section, str) or not re.match(r"\A## Win\s*\n", win_section):
             raise ValueError("measured win requires a complete ## Win section")
+        win_heading = re.compile(r"^#{2,3}\s*Win\s*$", re.I)
+        win_lines = win_section.split("\n")
+        if red_section_bounds(win_lines, win_heading) != (0, len(win_lines)):
+            raise ValueError("measured win requires a complete ## Win section without other sections")
         if red_section_bounds(updated.split("\n"), re.compile(r"^#{2,3}\s*Win\s*$", re.I)) is None:
             updated = updated.rstrip("\n") + "\n\n" + win_section.rstrip("\n") + "\n"
     if premise is not None:
