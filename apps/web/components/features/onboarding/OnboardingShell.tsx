@@ -40,6 +40,7 @@ import {
 } from './OnboardingTurnstile';
 import { endsInTerminalNextStep } from './onboardingChatHelpers';
 import { useOnboardingClaim } from './useOnboardingClaim';
+import { useOnboardingTurnstileFailOpen } from './useOnboardingTurnstileFailOpen';
 
 const SIGN_IN_LABEL = 'Sign in';
 
@@ -213,15 +214,12 @@ export function OnboardingShell({
     turnstileSiteKey
   );
 
-  const isTurnstileUnavailable =
-    turnstileState.status === 'error' ||
-    turnstileState.status === 'timeout' ||
-    turnstileState.status === 'unsupported' ||
-    turnstileState.status === 'unconfigured';
-  const turnstileFailureMessage = isTurnstileUnavailable
-    ? (turnstileState.message ??
-      "We couldn't start your chat. Refresh the page to try again.")
-    : null;
+  // No dead end: a failed check sends anyway on the unverified budget.
+  const failOpen = useOnboardingTurnstileFailOpen({
+    state: turnstileState,
+    token: turnstileToken,
+    instruction: turnstileInstruction,
+  });
 
   const handleTurnstileRequired = useCallback(
     (message?: string) => {
@@ -230,9 +228,11 @@ export function OnboardingShell({
     [requestTurnstileVerification]
   );
 
+  const { onServerRejected } = failOpen;
   const handleTurnstileRejected = useCallback(() => {
+    onServerRejected();
     resetTurnstileVerification('One quick check before we send');
-  }, [resetTurnstileVerification]);
+  }, [onServerRejected, resetTurnstileVerification]);
 
   // Auto-claim any anonymous transcript once Better Auth reports the user is
   // authenticated, then retry after completed chat turns. Durable waitlist
@@ -336,8 +336,8 @@ export function OnboardingShell({
                 onProfileBuilderChange={setProfileBuilderState}
                 starterHandoff={starterHandoff}
                 entryProfile={entryProfile}
-                turnstileToken={turnstileToken}
-                turnstileStatus={turnstileState.status}
+                turnstileToken={failOpen.token}
+                turnstileStatus={failOpen.status}
                 turnstilePanel={turnstilePanel}
                 turnstilePanelVisible={turnstilePanelVisible}
                 turnstileHasSiteKey={Boolean(turnstileSiteKey)}
@@ -351,11 +351,6 @@ export function OnboardingShell({
                 visible={Boolean(actionError)}
               />
 
-              <OnboardingShellStatus
-                kind='error'
-                message={turnstileFailureMessage}
-                visible={Boolean(turnstileFailureMessage)}
-              />
               <OnboardingShellStatus
                 kind='status'
                 message='Saving this conversation to your account…'
