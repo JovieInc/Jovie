@@ -5,7 +5,6 @@ import {
   BadgeCheck,
   BarChart3,
   CalendarClock,
-  Download,
   Loader2,
   Mail,
   PartyPopper,
@@ -20,8 +19,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ConfettiOverlay } from '@/components/atoms/Confetti';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { CopyableUrlRow } from '@/components/molecules/CopyableUrlRow';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
+import { CheckoutUnlockCards } from '@/components/organisms/billing/CheckoutUnlockCards';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 import { APP_ROUTES } from '@/constants/routes';
 import { page, track } from '@/lib/analytics';
@@ -31,7 +30,6 @@ import { useBillingStatusQuery } from '@/lib/queries';
 import {
   ARTIST_VISIBILITY_ACTIVATION_COPY,
   ARTIST_VISIBILITY_ACTIVATION_STEPS,
-  ARTIST_VISIBILITY_FAN_LIST_UNLOCK,
   ARTIST_VISIBILITY_SHARE_PROMPT,
   CHECKOUT_PENDING_COPY,
   CHECKOUT_RECOVERY_COPY,
@@ -442,57 +440,12 @@ export default function CheckoutSuccessPage() {
               <p className='text-app font-semibold text-primary-token'>
                 {ARTIST_VISIBILITY_ACTIVATION_COPY.status}
               </p>
-              {shareUrl ? (
-                <ContentSurfaceCard
-                  surface='nested'
-                  className='space-y-3 p-4 text-left'
-                  data-testid='paid-share-prompt'
-                >
-                  <p className='text-app font-semibold text-primary-token'>
-                    {ARTIST_VISIBILITY_SHARE_PROMPT.title}
-                  </p>
-                  <CopyableUrlRow
-                    url={shareUrl}
-                    displayValue={shareUrl.replace(/^https?:\/\//u, '')}
-                    testId='paid-share-link'
-                  />
-                  {canNativeShare ? (
-                    <Button
-                      type='button'
-                      size='sm'
-                      onClick={() => handleNativeShare(shareUrl)}
-                    >
-                      {ARTIST_VISIBILITY_SHARE_PROMPT.shareLabel}
-                    </Button>
-                  ) : null}
-                </ContentSurfaceCard>
-              ) : null}
-              {needsProfile ? null : (
-                <ContentSurfaceCard
-                  surface='nested'
-                  className='space-y-3 p-4 text-left'
-                  data-testid='paid-unlock-fan-list'
-                >
-                  <Download
-                    className='h-5 w-5 text-accent'
-                    aria-hidden='true'
-                  />
-                  <p className='text-2xs font-medium text-secondary-token'>
-                    {ARTIST_VISIBILITY_FAN_LIST_UNLOCK.header}
-                  </p>
-                  <p className='text-app font-semibold text-primary-token'>
-                    {ARTIST_VISIBILITY_FAN_LIST_UNLOCK.title}
-                  </p>
-                  <p className='text-xs leading-5 text-tertiary-token'>
-                    {ARTIST_VISIBILITY_FAN_LIST_UNLOCK.description}
-                  </p>
-                  <Button asChild variant='secondary' size='sm'>
-                    <Link href={ARTIST_VISIBILITY_FAN_LIST_UNLOCK.href}>
-                      {ARTIST_VISIBILITY_FAN_LIST_UNLOCK.cta}
-                    </Link>
-                  </Button>
-                </ContentSurfaceCard>
-              )}
+              <CheckoutUnlockCards
+                shareUrl={shareUrl}
+                showFanListExport={!needsProfile}
+                canNativeShare={canNativeShare}
+                onNativeShare={handleNativeShare}
+              />
               <div className='grid gap-4 sm:grid-cols-2'>
                 {ARTIST_VISIBILITY_ACTIVATION_STEPS.map(step => (
                   <FeatureCard
