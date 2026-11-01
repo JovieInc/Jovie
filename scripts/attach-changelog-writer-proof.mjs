@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /**
- * Attach the JOV-INV-022 writer-proof receipt to the daily-changelog release PR.
+ * Attach the JOV-INV-022 writer-proof receipt
+ *
+ * api-budget: github-app-core 6/hr - one release-PR read and at most one body write per publish attempt (a few Production Controller runs per day) to the daily-changelog release PR.
  *
  * The `publish-customer-changelog` job opens the release PR as a draft, and
  * Auto-Ready green-source undrafts a draft only when its body carries a
@@ -15,12 +17,12 @@
  * The Production Controller IS the writer of the release PR: its verified
  * publication plan (approved copy binding, customer-path evidence, deployment
  * ancestry, public readback identity) is the receipt's evidence. This attaches
- * that proof right after `gh pr create`, inside the same step, so Auto-Ready
+ * that proof right after the release PR is created, inside the same step, so Auto-Ready
  * can complete the documented draft -> ready -> Merge Queue Green Enroll path.
  * It grants nothing new: every source check, the undraft conditions and queue
  * admission still apply unchanged.
  *
- * Usage (from the publish step, after `gh pr create`):
+ * Usage (from the publish step, right after the release PR is created):
  *   node scripts/attach-changelog-writer-proof.mjs --pr <number> --head <sha>
  *
  * Fail-closed: exits non-zero when the PR is not the publisher's own release
@@ -29,7 +31,7 @@
  * the head or evidence changed.
  */
 
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { isTrustedBotAuthor } from './lib/auto-ready-provenance.mjs';
 import {
   attachWriterProofReceipt,
@@ -126,12 +128,26 @@ export function attachReceiptToReleaseBody({
   };
 }
 
-function gh(args, { input } = {}) {
-  return execFileSync('gh', args, {
-    encoding: 'utf8',
-    input: input === undefined ? undefined : JSON.stringify(input),
-    maxBuffer: 32 * 1024 * 1024,
-  });
+// GitHub reads/writes go through the shared budgeted client
+// (packages/api-client/cli.ts gh) per .claude/rules/external-apis.md and the
+// external-api-guard ratchet — never a bare `gh` subprocess. Exit 75 is the
+// client's quota deferral: fail closed so the next controller run retries.
+const API_CLIENT_CLI = 'packages/api-client/cli.ts';
+
+function gh(args) {
+  const result = spawnSync(
+    process.execPath,
+    [API_CLIENT_CLI, 'gh', '--priority', 'default', '--', ...args],
+    { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }
+  );
+  if (result.error) throw result.error;
+  if (result.status === 75)
+    throw new Error('GitHub quota deferred by the shared api-client ledger');
+  if (result.status !== 0)
+    throw new Error(
+      `gh ${args[0]} failed (exit ${result.status}): ${result.stderr.slice(-400)}`
+    );
+  return result.stdout;
 }
 
 function main(argv) {
