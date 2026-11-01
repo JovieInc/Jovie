@@ -254,6 +254,59 @@ def automation_registry(repo: Path, run=subprocess.run) -> list[dict] | None:
     return rows
 
 
+INVARIANT_REGISTRY = "canon/invariants.jsonl"
+HARNESS_INVARIANT_ID = "JOV-INV-024"
+HARNESS_EXPIRY_WARNING_S = 72 * 3600
+
+
+def harness_exceptions(repo: Path, run=subprocess.run) -> list[dict] | None:
+    """JOV-INV-024 partial-principle exceptions as merged on origin/main, or None when unreadable."""
+    try:
+        shown = run(["git", "-C", str(repo), "show", f"origin/main:{INVARIANT_REGISTRY}"],
+                    capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if getattr(shown, "returncode", 1) != 0:
+        return None
+    for line in (shown.stdout or "").splitlines():
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(row, dict) or row.get("id") != HARNESS_INVARIANT_ID:
+            continue
+        principles = (((row.get("policy") or {}).get("value") or {}).get("principles")) or []
+        return [{"principle": item.get("id"), **item["exception"]} for item in principles
+                if isinstance(item, dict) and isinstance(item.get("exception"), dict)]
+    return None
+
+
+def harness_exception_alerts(rows: list[dict] | None, now: float) -> dict[str, str]:
+    """An exception within 72h of expiry, or past it, opens one issue routed to its owner.
+
+    The validator only warns outside the principle's scope, so this issue is what makes
+    someone close or renew it before (not after) it can block a change (2026-11-01).
+    """
+    alerts = {}
+    for row in rows or []:
+        try:
+            expires = datetime.strptime(str(row.get("expires")), "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+        # Valid through the whole expiry day (the validator compares UTC days).
+        left = expires.timestamp() + 86400 - now
+        if left > HARNESS_EXPIRY_WARNING_S:
+            continue
+        when = (f"expired on {row.get('expires')}" if left <= 0
+                else f"expires {row.get('expires')} ({int(left // 3600)}h left)")
+        alerts[f"harness-exception-expiring:{row.get('id')}"] = (
+            f"harness exception {row.get('id')} ({row.get('principle')}) {when}; owner {row.get('owner')} "
+            f"must close or renew it in canon/invariants.jsonl"
+            + (f" (tracking {row['linearIssue']})" if row.get("linearIssue") else "")
+            + f"; next: {str(row.get('nextAction') or '')[:160]}")
+    return alerts
+
+
 TEAM_RECEIPT = re.compile(r"^[A-Z][A-Z0-9]*$")
 
 
@@ -334,7 +387,11 @@ def automation_observation(host, lane, now: float) -> dict:
         liveness = automation_liveness(lane, now)
     except Exception as error:
         liveness = {"installed": None, "error": type(error).__name__}
-    return {"automation": watch, "automationLiveness": liveness}
+    try:
+        exceptions = harness_exceptions(host.repo)
+    except Exception:
+        exceptions = None
+    return {"automation": watch, "automationLiveness": liveness, "harnessExceptions": exceptions}
 
 
 def qualified_pool(host, lane, capacity: dict, now: float) -> tuple[dict, int, dict, dict, dict]:
@@ -1329,6 +1386,8 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     if obs.get("hudExpected") and (obs.get("hudBeatAge") is None or obs["hudBeatAge"] > HUD_STALE_S):
         beat = "never" if obs.get("hudBeatAge") is None else f"{int(obs['hudBeatAge'])}s ago"
         alerts["hud-stale"] = f"tty1 HUD heartbeat {beat}; the console is not showing current truth"
+    if obs.get("now"):
+        alerts.update(harness_exception_alerts(obs.get("harnessExceptions"), obs["now"]))
     return alerts
 
 

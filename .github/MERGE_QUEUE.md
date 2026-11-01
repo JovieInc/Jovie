@@ -7,6 +7,9 @@ also the supported stack-construction path: dependent PRs may temporarily target
 their immediate parent, then are retargeted and rebased onto `main` after that
 parent lands. There is no second landing transport.
 
+Steward decisions (proven-culprit dequeue, flake handling, failure class to guard) live in
+[`canon/MERGE_QUEUE_STEWARD.md`](../canon/MERGE_QUEUE_STEWARD.md).
+
 ## How a PR lands
 
 1. Open a root PR against `main`. A dependent child may instead target its
