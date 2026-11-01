@@ -15,8 +15,8 @@
      captured image stays fully opaque — glass lives only on the frame's own
      presentation layer (padding + border), never on the screenshot. */
   background: color-mix(in oklab, var(--noir-ion-shell) 82%, transparent);
-  backdrop-filter: blur(20px) saturate(165%);
-  -webkit-backdrop-filter: blur(20px) saturate(165%);
+  backdrop-filter: blur(var(--blur-header)) saturate(165%);
+  -webkit-backdrop-filter: blur(var(--blur-header)) saturate(165%);
 }
 
 /* Asymmetric illumination: light enters from the upper-left and falls off
@@ -54,6 +54,10 @@
     rgb(255 255 255 / 0.04) 38%,
     transparent 62%
   );
+}
+
+.psf--dark-glass .psf__image {
+  z-index: 3;
 }
 
 /* Opaque fallback: without backdrop-filter the 82% shell mix still resolves
@@ -144,7 +148,7 @@
 .psf-focus {
   position: absolute;
   inset: 0;
-  z-index: 3;
+  z-index: 4;
   pointer-events: none;
   --psf-x: var(--psf-fx);
   --psf-y: var(--psf-fy);
@@ -221,8 +225,8 @@
   border-radius: 999px;
   padding: 0.125rem 0.625rem;
   background: color-mix(in oklab, var(--noir-ion-shell) 88%, transparent);
-  backdrop-filter: blur(20px) saturate(165%);
-  -webkit-backdrop-filter: blur(20px) saturate(165%);
+  backdrop-filter: blur(var(--blur-header)) saturate(165%);
+  -webkit-backdrop-filter: blur(var(--blur-header)) saturate(165%);
   font-size: 0.75rem;
   line-height: 1.25rem;
   color: var(--noir-ion-text-primary);

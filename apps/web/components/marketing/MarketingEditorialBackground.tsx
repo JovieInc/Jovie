@@ -59,17 +59,17 @@ export function MarketingEditorialBackground({
             >
               <stop
                 offset='0'
-                stopColor='var(--system-b-accent-cyan)'
+                stopColor='var(--noir-ion-ion)'
                 stopOpacity='0'
               />
               <stop
                 offset='0.62'
-                stopColor='var(--system-b-accent-cyan)'
+                stopColor='var(--noir-ion-ion)'
                 stopOpacity='0.5'
               />
               <stop
                 offset='1'
-                stopColor='var(--system-b-accent-cyan)'
+                stopColor='var(--noir-ion-ion)'
                 stopOpacity='0'
               />
             </linearGradient>
