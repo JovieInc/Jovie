@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { invalidateSocialLinksCache } from '@/lib/cache';
 import { chatToolSchema } from '@/lib/chat/strict-schema';
 import { db } from '@/lib/db';
 import { chatAuditLog } from '@/lib/db/schema/chat';
@@ -57,7 +58,7 @@ export async function POST(req: Request) {
     // Verify profile ownership (same pattern as confirm-edit)
     const profile = await db.query.creatorProfiles.findFirst({
       where: eq(creatorProfiles.id, profileId),
-      columns: { id: true, userId: true },
+      columns: { id: true, userId: true, usernameNormalized: true },
     });
 
     if (!profile) {
@@ -108,6 +109,7 @@ export async function POST(req: Request) {
       .where(eq(socialLinks.id, linkId));
 
     await syncPrimaryMusicUrlsFromSocialLinks(db, profileId);
+    await invalidateSocialLinksCache(profileId, profile.usernameNormalized);
 
     // Audit log
     const ipAddress = getClientIP(req);

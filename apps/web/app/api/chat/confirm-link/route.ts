@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSessionTx } from '@/lib/auth/session';
+import { invalidateSocialLinksCache } from '@/lib/cache';
 import { chatToolSchema } from '@/lib/chat/strict-schema';
 import { chatAuditLog } from '@/lib/db/schema/chat';
 import { socialLinks } from '@/lib/db/schema/links';
@@ -124,8 +125,14 @@ export async function POST(req: Request) {
     );
   }
 
+  // Set once the link write commits; the public-profile cache is invalidated
+  // after the transaction, as the dashboard route does.
+  const committed: { usernameNormalized: string | null } | { none: true } = {
+    none: true,
+  };
+
   try {
-    return await withDbSessionTx(
+    const response = await withDbSessionTx(
       async tx => {
         const lockKey = `confirm-link:${detected.platform.id}`;
         await tx.execute(
@@ -138,6 +145,7 @@ export async function POST(req: Request) {
           .select({
             id: creatorProfiles.id,
             internalUserId: creatorProfiles.userId,
+            usernameNormalized: creatorProfiles.usernameNormalized,
           })
           .from(creatorProfiles)
           .where(eq(creatorProfiles.id, profileId))
@@ -305,6 +313,9 @@ export async function POST(req: Request) {
         }
 
         await syncPrimaryMusicUrlsFromSocialLinks(tx, profileId);
+        Object.assign(committed, {
+          usernameNormalized: profile.usernameNormalized,
+        });
 
         const result = {
           success: true as const,
@@ -358,6 +369,10 @@ export async function POST(req: Request) {
       },
       { clerkUserId: userId }
     );
+    if ('usernameNormalized' in committed) {
+      await invalidateSocialLinksCache(profileId, committed.usernameNormalized);
+    }
+    return response;
   } catch (error) {
     logger.error('[confirm-link] Error adding link:', error);
     Sentry.captureException(error, {
