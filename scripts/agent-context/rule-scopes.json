@@ -90,6 +90,15 @@
     "bodySha256": "164b4bac543f555d7584cfdf8ba8e3d62767b14bbaae1f8128f98d1220470d3d"
   },
   {
+    "file": ".claude/rules/investor-deck.md",
+    "paths": [
+      "scripts/investor-deck/**",
+      "apps/web/lib/investors/**",
+      "apps/web/components/features/pitch/**"
+    ],
+    "bodySha256": "409b4707cb53278ecb239a408b8969aae261f24717ad1c807cc845a3bffdb2a1"
+  },
+  {
     "file": ".claude/rules/ios.md",
     "paths": ["apps/ios/**", "**/*.swift"],
     "bodySha256": "030e26d1dbf17cde238efb27e147635a2a90ddd6434eb2196420779fb2af5135"

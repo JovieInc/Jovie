@@ -71,6 +71,16 @@
       "note": "Through the Workers AI relay (WORKERS_AI_TOKEN). Flash is the vision model: @cf/zai-org/glm-5.3 on Workers AI drops image parts (measured 2026-10-31, JOV-10091). Replaced the claude -p subscription route."
     },
     {
+      "id": "dev.investor-eval",
+      "label": "Would-you-invest eval (simulated investor personas over a generated deck's text)",
+      "repo": "JovieInc/Jovie",
+      "route": "workers-ai-only",
+      "fallback": null,
+      "models": ["@cf/zai-org/glm-5.3"],
+      "gatewayKey": null,
+      "note": "Through the Workers AI relay (WORKERS_AI_TOKEN). Text only, so the non-flash model. scripts/investor-deck/eval.mjs; never a subscription CLI."
+    },
+    {
       "id": "summer.agent-turns",
       "label": "Summer agent turns and fast chat",
       "repo": "JovieInc/summer-config",
