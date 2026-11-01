@@ -11,13 +11,6 @@ export const revalidate = 3600;
 
 import { AskJovieWidget } from '@/components/features/ask-jovie/AskJovieWidget';
 import type { ProfileMode } from '@/components/features/profile/contracts';
-import {
-  DeferredAliasCollisionRecovery,
-  DeferredJoviePixel,
-  DeferredMetaPixel,
-  DeferredProfileViewTracker,
-  DeferredSignupFunnelBeacon,
-} from '@/components/features/profile/ProfileDeferredIslands';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import { UnfazedProfileClient } from '@/components/features/profile/UnfazedProfileClient';
 import { BASE_URL } from '@/constants/app';
@@ -86,6 +79,13 @@ import {
 } from '@/lib/validation/username-core';
 import type { PublicContact } from '@/types/contacts';
 import { convertCreatorProfileToArtist } from '@/types/db';
+import {
+  DeferredAliasCollisionRecovery,
+  DeferredJoviePixel,
+  DeferredMetaPixel,
+  DeferredProfileViewTracker,
+  DeferredSignupFunnelBeacon,
+} from './_components/ProfileDeferredIslands';
 import { PublicClaimBanner } from './_components/PublicClaimBanner';
 import { PublicProfileErrorState } from './_components/PublicProfileErrorState';
 import { getProfileStaticParams } from './_lib/profile-static-params';

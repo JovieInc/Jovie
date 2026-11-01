@@ -22,9 +22,7 @@ describe('public profile entry bundle (JOV-10246)', () => {
   const template = read(
     'components/features/profile/templates/ProfileCompactTemplate.tsx'
   );
-  const islands = read(
-    'components/features/profile/ProfileDeferredIslands.tsx'
-  );
+  const islands = read('app/[username]/_components/ProfileDeferredIslands.tsx');
 
   it.each([
     '@/features/profile/ProfileViewTracker',
