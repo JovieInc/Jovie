@@ -614,7 +614,16 @@ export async function assessTriageSweep(
     1000,
     ['Triage']
   );
-  issues.sort((a, b) => Date.parse(a.updatedAt) - Date.parse(b.updatedAt));
+  // Rank current Linear priority before the paid bound; age remains fair within a tier.
+  const priorityRank = issue =>
+    validLinearPriority(issue.priority) && issue.priority !== 0
+      ? issue.priority
+      : 5;
+  issues.sort(
+    (a, b) =>
+      priorityRank(a) - priorityRank(b) ||
+      Date.parse(a.updatedAt) - Date.parse(b.updatedAt)
+  );
   const results = [];
   for (const issue of issues) {
     if (results.length >= maxIssues || now() - started >= timeBudgetMs) break;
