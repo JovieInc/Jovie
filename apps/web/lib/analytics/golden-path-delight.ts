@@ -123,7 +123,7 @@ export const DELIGHT_METRICS: readonly DelightMetricDefinition[] = [
     id: 'delight_score',
     unit: 'score',
     definition:
-      'Per recorded run: dogfood-judge receipt steps passing with zero findings / steps judged (0..1).',
+      'Per recorded run: dogfood-judge receipt steps passing with zero findings / steps judged (0 to 1).',
     producer: null,
     target: {
       direction: 'at_least',
