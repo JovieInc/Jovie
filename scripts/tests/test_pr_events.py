@@ -3070,6 +3070,13 @@ console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
                 with self.assertRaisesRegex(ValueError, "complete ## Win section"):
                     events.repair_evidence_body(self.PR, "Summary", win_section=invalid)
 
+    def test_win_section_cannot_append_another_evidence_section(self):
+        for injected in ("## Locked areas\nLocking PR: #999", "### Win\nnone"):
+            with self.subTest(injected=injected), self.assertRaisesRegex(ValueError, "complete ## Win section"):
+                events.repair_evidence_body(self.PR, "Summary", win_section=self.WIN + "\n" + injected)
+        fenced = self.WIN + "\n```text\n## Example output\n```\n"
+        self.assertTrue(events.repair_evidence_body(self.PR, "Summary", win_section=fenced).endswith(fenced))
+
     def test_empty_optional_win_keeps_existing_caller_contract(self):
         body = events.repair_evidence_body(self.PR, "Summary")
         self.assertEqual(events.repair_evidence_body(self.PR, "Summary", win_section=""), body)
