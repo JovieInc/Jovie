@@ -42,6 +42,7 @@ import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load as yamlLoad } from 'js-yaml';
+import { guardNested, withPreflightDepth } from './lib/preflight-depth.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const WORKFLOW_PATH = '.github/workflows/source-validation.yml';
@@ -367,7 +368,7 @@ export async function main({
     log('[preflight] skipped (JOVIE_PREFLIGHT=0)');
     return 0;
   }
-  const childEnv = buildPreflightEnv(env, cwd);
+  const childEnv = withPreflightDepth(buildPreflightEnv(env, cwd));
   const workflowFile = path.resolve(cwd, args.workflow ?? WORKFLOW_PATH);
   // A branch behind base fails CI on files it never saw (#23313: a missing
   // scripts/anti-slop/run.mjs). Bring base in first; the hook only reports.
@@ -580,4 +581,4 @@ if (
   existsSync(process.argv[1]) &&
   realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1])
 )
-  process.exitCode = await main();
+  process.exitCode = guardNested('preflight') ?? (await main());
