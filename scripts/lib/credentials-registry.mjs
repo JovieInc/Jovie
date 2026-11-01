@@ -24,6 +24,8 @@ export const DEFAULT_THRESHOLDS = Object.freeze({
   expiryWarnDays: 7,
   expiryCriticalDays: 1,
   runwayAlertDays: 14,
+  /** Under this many days of runway the provider is paged: failover to the other provider must already be live. */
+  runwayPageDays: 3,
   capAlertPercents: [50, 80, 100],
   observationMaxAgeDays: 8,
 });
@@ -422,6 +424,19 @@ export function evaluateSpend(ledger, nowMs, live = {}, thresholds = {}) {
           owner: entry.owner ?? null,
           runwayDays: round(runwayDays, 1),
           message: `${entry.label ?? entry.id}: $${round(balance)} left at $${round(burn.value)}/day (${burn.source}) is ${round(runwayDays, 1)} days of runway, under ${t.runwayAlertDays}.`,
+        })
+      );
+    }
+    if (runwayDays !== null && runwayDays < t.runwayPageDays) {
+      findings.push(
+        finding({
+          fingerprint: `spend-runway-page:${entry.id}`,
+          type: 'runway-page',
+          severity: 'critical',
+          subject: entry.id,
+          owner: entry.owner ?? null,
+          runwayDays: round(runwayDays, 1),
+          message: `PAGE: ${entry.label ?? entry.id} has ${round(runwayDays, 1)} days of runway, under ${t.runwayPageDays}. Confirm model failover to the other provider is live before it hits zero.`,
         })
       );
     }
