@@ -49,6 +49,7 @@ import ledger_archive  # noqa: E402  (bounded runs/ledger.jsonl)
 import throughput_sentinel  # noqa: E402
 import deploy_health  # noqa: E402  (production deploy failure and lag incidents, Jovie + LogYourBody)
 import release_evidence  # noqa: E402  (release-evidence job red on main; production build stale)
+import release_gates  # noqa: E402  (every controller-derived release gate red 2+ runs; new blocker reasons)
 
 COOL_OFF_S = 6 * 3600
 # High (P1), not Urgent, though under an Urgent prefix: a stale build is a lag signal, not an outage.
@@ -622,6 +623,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "outcomeQueue": read_json(state / "outcome-queue.json", {}),
         "deployHealth": deploy_health.sample(state, now)[0] if not os.environ.get("LANES_SELFTEST") else None,
         "releaseEvidence": release_evidence.sample(state, now)[0] if not os.environ.get("LANES_SELFTEST") else None,
+        "releaseGates": release_gates.sample(state, now)[0] if not os.environ.get("LANES_SELFTEST") else None,
         "sentinel": throughput_sentinel.observe(
             state, now, receipts,
             {"inventoryBytes": getattr(lane, "REPAIR_INVENTORY_MAX_BYTES", 16 * 1024 * 1024)},
@@ -1206,6 +1208,7 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     alerts.update(throughput_sentinel.judge(obs))
     alerts.update(deploy_health.judge(obs.get("deployHealth"), obs.get("now") or time.time()))
     alerts.update(release_evidence.judge(obs.get("releaseEvidence"), obs.get("now") or time.time()))
+    alerts.update(release_gates.judge(obs.get("releaseGates"), obs.get("now") or time.time()))
     # Closed loop, last hop: Validating issues owing an `outcome` receipt wait on the outcome
     # lane. Its daily budget exhausted (or the drain gone silent) with owed receipts older than
     # OUTCOME_OWED_MAX_S used to stall in silence for the rest of the UTC day.
