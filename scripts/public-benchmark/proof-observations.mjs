@@ -188,6 +188,11 @@ function argValue(argv, flag) {
 
 const readJson = path => JSON.parse(readFileSync(path, 'utf8'));
 
+/**
+ * @param {string[]} [argv]
+ * @param {Record<string, string | undefined>} [env]
+ * @param {(url: string, init: RequestInit) => Promise<{ ok: boolean, status?: number, text?: () => Promise<string> }>} [fetchImpl]
+ */
 export async function main(
   argv = process.argv.slice(2),
   env = process.env,
@@ -246,7 +251,7 @@ export async function main(
   });
   if (!response.ok) {
     process.stderr.write(
-      `proof-observations: intake answered ${response.status}: ${(await response.text()).slice(0, 500)}\n`
+      `proof-observations: intake answered ${response.status}: ${((await response.text?.()) ?? '').slice(0, 500)}\n`
     );
     return 1;
   }
