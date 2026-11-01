@@ -1451,6 +1451,22 @@
     line-height: 48px;
   }
 
+  /* The 320px identity column at 40px type cannot hold a full display name on
+     one line; wrap it instead of ellipsizing ("Browse Ready ..."). */
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    [data-testid="profile-identity-link"]
+    > span {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+  }
+
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )

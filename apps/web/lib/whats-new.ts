@@ -96,6 +96,35 @@ export function projectWhatsNew(
   };
 }
 
+/** What the viewer has already done; gates entries that ask for an action. */
+export interface WhatsNewUserState {
+  readonly hasClaimedHandle: boolean;
+}
+
+/**
+ * Entries whose headline asks the viewer to do something. Once the viewer has
+ * done it, the entry is stale for them. Add a rule here, not a one-off check.
+ */
+const WHATS_NEW_ACTION_RULES: readonly {
+  readonly pattern: RegExp;
+  readonly isComplete: (state: WhatsNewUserState) => boolean;
+}[] = [
+  {
+    pattern:
+      /\b(choose|claim|pick|reserve|get)\b.*\b(jovie link|handle|username)\b/i,
+    isComplete: state => state.hasClaimedHandle,
+  },
+];
+
+export function isWhatsNewActionComplete(
+  entry: Pick<WhatsNewEntry, 'title'>,
+  state: WhatsNewUserState
+): boolean {
+  return WHATS_NEW_ACTION_RULES.some(
+    rule => rule.pattern.test(entry.title) && rule.isComplete(state)
+  );
+}
+
 export interface UnseenWhatsNew {
   /** Newest unseen entry; the one a surface presents. */
   readonly entry: WhatsNewEntry;
