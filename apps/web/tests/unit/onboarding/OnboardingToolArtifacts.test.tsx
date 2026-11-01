@@ -77,15 +77,19 @@ describe('onboarding tool artifacts', () => {
       />
     );
 
-    expect(screen.getByTestId('onboarding-artist-picker')).toBeDefined();
-    expect(screen.getByDisplayValue('Test Artist')).toBeDefined();
+    // Pen R6As7U: the top match is proposed with one confirm, no list.
+    const picker = screen.getByTestId('onboarding-artist-picker');
+    expect(picker).toHaveAttribute('data-mode', 'proposal');
+    expect(screen.getByText('Is This You?')).toBeDefined();
     expect(screen.getByText('Test Artist')).toBeDefined();
     expect(screen.getByText(/12\.3K followers/)).toBeDefined();
-    // No internal Spotify popularity score in the row (2026-10-31 walk).
+    // No internal Spotify popularity score (2026-10-31 walk).
     expect(screen.queryByText(/Pop 48/)).toBeNull();
     expect(screen.queryByText('searchSpotifyArtist')).toBeNull();
+    expect(screen.queryByText('Use')).toBeNull();
+    expect(screen.queryByDisplayValue('Test Artist')).toBeNull();
 
-    fireEvent.click(screen.getByText('Use'));
+    fireEvent.click(screen.getByRole('button', { name: "That's Me" }));
 
     expect(onSelectArtist).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -473,6 +477,12 @@ describe('onboarding tool artifacts', () => {
         onNoneOfThese={onNoneOfThese}
       />
     );
+
+    // The list, search and None of These sit behind Not Me.
+    expect(screen.queryByRole('button', { name: 'None of These' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Not Me' }));
+    expect(screen.getByDisplayValue('Test Artist')).toBeDefined();
+    expect(screen.getByText('Use')).toBeDefined();
 
     fireEvent.click(screen.getByRole('button', { name: 'None of These' }));
     expect(onNoneOfThese).toHaveBeenCalled();

@@ -50,6 +50,8 @@ The post-promotion golden-path certification (`.github/workflows/postdeploy-prob
 - **Anonymous first touch (claim/start)**: no account at all. The `/start` visit carries a short-lived, single-use canary passage token (`PASSAGE_TOKEN_HEADER`) minted in CI from `SYNTHETIC_PASSAGE_KEY` — an HKDF derivative of `CRON_SECRET` produced by `scripts/synthetic-passage-key.mjs`; the spec never sees `CRON_SECRET` itself. The server verifies the token in Cloudflare Turnstile test mode for that visit only.
 - **Admin certifications readback**: `/app/admin/certifications` and `GET /api/ovie/certifications` are admin-gated (`authorizeSummerControl`). The signed-in readback fixture is the documented admin test account `browse-admin+clerk_test@jov.ie` (the `admin` persona of `DEFAULT_DEV_TEST_AUTH_EMAILS`), signed in through the same rendered email-code path with the OTP read from `ba_verifications`. Never create new accounts or rotate anything for the readback.
 
+**Weekly AI quota at release gates (JOV-9625 outcome rework):** the dedicated chat-health canary (`browse-ready+chat-health@jov.ie`, #23703) is the one identity whose weekly AI quota the server skips (burst limiter still enforced) — the returning golden-path canary stays metered. The browser chat-turn certification signs in as that chat-health canary in its own serial spec test, so an exhausted weekly counter can never block a promotion run's chat certification, and the exact-build perf lane's authenticated setup (`--grep "sign-in works and dashboard loads"`) never performs a chat turn at all.
+
 Fixture-artist selection for the claim surface is read-only and idempotent per run (`selectUnclaimedCertArtist`, JOV-9928): each run picks the first `SHARED_E2E_ARTIST_POOL` candidate with no bound `creator_profiles` row and blocks the claim steps with the exact reason when none is free. The `confirm_artist:` assertion is never weakened to accommodate stale fixture state.
 
 ## Keep Tests Aligned With Removed UI And Hook Contracts
@@ -174,6 +176,17 @@ Never mark a task complete without confirming the fix works:
 
 - Full E2E details: `apps/web/tests/TESTING.md`
 - Testing philosophy: `docs/TESTING_GUIDELINES.md`
+
+## PR size counts production code
+
+PR Size Guard caps changed lines and files in production code only. Tests and
+fixtures (`*.test.*`, `*.spec.*`, `__tests__/`, `fixtures/`, `test_*.py`,
+`*_test.py`, `*Tests.swift`) do not count, along with generated, lock and
+snapshot files. The coverage floors require tests, so the size cap must not
+penalise them (#23956 went over 1500 lines only because of required coverage
+tests). The one list is `scripts/lib/pr-size-exclusions.mjs`, and the workflows
+run it from the base tip. Repository-hygiene byte and path budgets still apply
+to every file. Do not split production code into fixture paths to dodge the cap.
 
 ## Gate weakening (JOV-INV-045)
 

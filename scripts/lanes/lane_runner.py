@@ -181,6 +181,7 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", # Shared client layer (budgeted 
                   "scripts/lib/merge-group-admission.mjs",
                   "scripts/lib/source-admission-policy.mjs", "scripts/pr-fleet-rules.mjs", "scripts/lib/wins-ledger.mjs",
                   "scripts/lib/merge-group-member-policy.mjs",
+                  "scripts/lib/pr-size-exclusions.mjs",
                   "scripts/lib/product-lane-classifier.mjs",
                   "scripts/lib/pr-size-guard-policy.mjs", "scripts/lib/repo-hygiene-limits.mjs",
                   "scripts/lib/pre-land-changelog.mjs", "scripts/version-fanout-guard.mjs",
@@ -1338,7 +1339,8 @@ def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | 
         "- You are unattended: nobody will answer a question. Never stop to ask; choose the",
         "  non-interactive path. Apart from `/autoplan`, do not run gstack or other skill",
         "  workflows (ship, review, qa, upgrade) and do not upgrade any tooling: commit with git",
-        "  and open the PR with `gh pr create --draft`.",
+        "  and open the PR with `pnpm pr:open open --draft` (drafts a gate-compliant body from the diff,",
+        "  runs the Fleet Rules and Source Validation body gates, refuses a failing PR; never raw `gh pr create`).",
         "- Remove any git worktrees you create when done (`git worktree remove`); the host",
         "  reclaims idle ones, but ENOSPC once took every lane down at once.",
         *sensitive_contract,
@@ -5127,6 +5129,100 @@ def partial_main_sync(host: Host, pr: dict) -> str | None:
     return target if result.returncode == 0 else None
 
 
+DETERMINISTIC_CONFLICT_PER_PASS = 4
+CONFLICT_PASS_MIN_INTERVAL_S = 120
+
+
+def conflict_files(host: Host, pr: dict) -> list[str] | None:
+    """Files a DIRTY head conflicts with main in (`git merge-tree`, no checkout); None when
+    unknown, [] when it merges cleanly."""
+    number, head = pr["number"], pr["headRefOid"]
+    main_ref, pr_ref = f"{SYNC_REF}main", f"{SYNC_REF}pr-{number}"
+    git = lambda *args, timeout=300: sh(["git", *args], cwd=host.repo, timeout=timeout)
+    if git("fetch", "-q", "--no-tags", "origin", f"+refs/heads/main:{main_ref}",
+           f"+refs/pull/{number}/head:{pr_ref}", timeout=600).returncode \
+            or (git("rev-parse", pr_ref).stdout or "").strip() != head:
+        return None
+    merged = git("merge-tree", "--write-tree", "--name-only", "--no-messages", head, main_ref)
+    if merged.returncode == 0:
+        return []
+    if merged.returncode != 1:
+        return None
+    return [line for line in (merged.stdout or "").splitlines()[1:] if line.strip()]
+
+
+def deterministic_conflict_pass(host: Host, prs: list[dict], now: float | None = None) -> list[int]:
+    """Model-free, attempt-free conflict repair for every DIRTY PR whose conflict is confined to
+    generated or append-only files (remediation.RESOLVABLE_CONFLICT_FILES): merge main, take
+    main's copy, run the generator, push (no force). It costs no seat and no fix attempt, so a
+    spent or escalated PR is not left DIRTY by the thing a script can do. Each (PR, head, main)
+    is tried once; every try is ledgered with the time the PR has been DIRTY-visible."""
+    now = time.time() if now is None else now
+    path = host.state / "deterministic-conflict.json"
+    visits = read_json(path)
+    acted = []
+    due = sorted((pr for pr in prs if pr.get("mergeStateStatus") == "DIRTY" and not pr.get("isDraft")
+                  and pr.get("isCrossRepository") is False and pr.get("isInMergeQueue") is not True
+                  and not ({label.lower() for label in pr_events.label_names(pr)} & pr_events.HOLD_LABELS)
+                  and not (pr.get("headRefName") or "").startswith("dependabot/")),
+                 key=lambda pr: (float((visits.get(str(pr["number"])) or {}).get("at") or 0), pr["number"]))
+    if not due:
+        return []
+    listed = sh(["git", "ls-remote", "origin", "refs/heads/main"], cwd=host.repo, timeout=60)
+    main = (listed.stdout or "").split()[0] if listed.returncode == 0 and (listed.stdout or "").split() else None
+    if not main:
+        return []
+    for pr in due:
+        if len(acted) >= DETERMINISTIC_CONFLICT_PER_PASS:
+            break
+        last = visits.get(str(pr["number"])) or {}
+        if (last.get("head") == pr["headRefOid"] and last.get("main") == main) \
+                or now - float(last.get("at") or 0) < CONFLICT_PASS_MIN_INTERVAL_S \
+                or claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
+            continue
+        files = conflict_files(host, pr)
+        outcome = "skipped"
+        if files is not None and files and set(files) <= remediation.RESOLVABLE_CONFLICT_FILES:
+            repair_lock = Locked(host.state / "locks" / f"repair-pr-{pr['number']}.lock", blocking=False)
+            if not repair_lock.held:
+                repair_lock.release()
+                continue
+            worktree = host.state / "worktrees" / f"detconflict-pr{pr['number']}"
+            outcome = "failed"
+            preserve, added = False, False
+            try:
+                fetched = sh(["git", "fetch", "-q", "origin", "main", pr["headRefName"]], cwd=host.repo, timeout=600)
+                added = fetched.returncode == 0 and sh(
+                    ["git", "worktree", "add", "-q", "--detach", str(worktree), f"origin/{pr['headRefName']}"],
+                    cwd=host.repo).returncode == 0
+                if added and sh(["git", "rev-parse", "HEAD"], cwd=worktree).stdout.strip() == pr["headRefOid"]:
+                    with open(os.devnull, "a") as log:
+                        guard = lambda: require_fix_target(pr, "deterministic-conflict", worktree=worktree, repair=True)
+                        outcome = "resolved" if resolve_generated_conflict(
+                            worktree, pr["headRefName"], log, guard=guard) else "failed"
+            except RepairStopped:
+                preserve, outcome = True, "target-changed"
+            finally:
+                if added and not preserve:
+                    sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+                repair_lock.release()
+            acted.append(pr["number"])
+        elif files is not None:
+            outcome = "not-deterministic" if files else "clean"
+        visit = {"at": now, "head": pr["headRefOid"], "main": main, "outcome": outcome, "files": (files or [])[:8]}
+        if outcome == "target-changed":
+            visit["worktree"] = str(worktree)
+        update_json(path, lambda rows, key=str(pr["number"]), visit=visit: rows.update({key: visit}))
+        if outcome in ("resolved", "failed"):
+            pr_events.ledger(host, {"schema": "jovie-lane-run/v1", "kind": "deterministic-conflict",
+                                    "origin": AUTONOMOUS_ORIGIN,
+                                    "attribution": {"category": "finalizer-only", "provider": "lane-event"},
+                                    "pr": pr["number"], "headBefore": pr["headRefOid"], "main": main,
+                                    "action": "generated-conflict", "verdict": outcome,
+                                    "files": files, "endedAt": now_iso()})
+    return acted
+
+
 RERUN_RUNS_LIMIT = 5
 
 
@@ -6177,6 +6273,37 @@ def regenerate_merged_generated(worktree: Path, paths, log, *, guard=lambda: Non
     return sh(["git", "add", *generated], cwd=worktree, log=log).returncode == 0
 
 
+def union_merge_file(worktree: Path, path: str, log) -> bool:
+    """Resolve an append-only file by keeping both sides' lines (`git merge-file --union`)."""
+    stages = {}
+    for stage in (1, 2, 3):
+        shown = sh(["git", "show", f":{stage}:{path}"], cwd=worktree)
+        if stage != 1 and shown.returncode:
+            return False
+        stages[stage] = shown.stdout if shown.returncode == 0 else ""
+    with tempfile.TemporaryDirectory() as tmp:
+        names = {}
+        for stage, text in stages.items():
+            names[stage] = str(Path(tmp) / f"s{stage}")
+            atomic_write_text(Path(names[stage]), text)
+        merged = sh(["git", "merge-file", "--union", "-p", names[2], names[1], names[3]], cwd=worktree)
+    if merged.returncode < 0 or merged.returncode >= 128:
+        return False
+    try:
+        rows = [json.loads(line) for line in merged.stdout.splitlines() if line.strip()]
+        header = json.loads(next(iter(stages[3].splitlines()), "null"))
+        if not isinstance(header, dict) or not header.get("schema") or not rows or rows[0] != header:
+            return False
+        rows = rows[1:]
+        ids = [row["id"] for row in rows]
+        if any(not isinstance(key, str) for key in ids) or len(set(ids)) != len(ids):
+            return False
+    except (ValueError, TypeError, KeyError):
+        return False
+    atomic_write_text(worktree / path, merged.stdout)
+    return sh(["git", "add", path], cwd=worktree, log=log).returncode == 0
+
+
 def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
     """JOV-6837/JOV-7594: a PR that conflicts with main only in machine-derived files needs
     no model. Merge main, take its copy of each conflicted generated file, run each file's
@@ -6188,9 +6315,14 @@ def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda
     merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
     if merged.returncode != 0:
         conflicted = set(sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout.split())
-        if not conflicted or not conflicted <= remediation.GENERATED_RESOLVERS.keys():
+        if not conflicted or not conflicted <= remediation.RESOLVABLE_CONFLICT_FILES:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
+        for path in sorted(conflicted & remediation.UNION_MERGE_FILES):
+            if not union_merge_file(worktree, path, log):
+                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+                return False
+        conflicted -= remediation.UNION_MERGE_FILES
         changed = sh(["git", "diff", "--name-only", "HEAD"], cwd=worktree)
         if changed.returncode or not regenerate_merged_generated(
                 worktree, conflicted | set(changed.stdout.splitlines()), log, guard=guard):
@@ -6910,6 +7042,29 @@ def register_domain_writes_fix(host: Host, pr: dict, route: dict, worktree: Path
         if sh(step, cwd=worktree, log=log, timeout=900).returncode:
             return None
     receipt.update(resolution="registered-domain-writes", registeredModules=added)
+    return types.SimpleNamespace(returncode=0)
+
+
+def atomic_state_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """Repair reported writes, verify them and publish through the existing repair route."""
+    logs = failed_logs(host, pr)
+    changed = fix_red_classes.repair_atomic_state_writes(worktree, "\n".join(logs.values()))
+    if not changed:
+        return None
+    check = sh(["python3", "-m", "unittest", "scripts.tests.test_lanes_atomic_state"],
+               cwd=worktree, log=log, timeout=300)
+    if check.returncode:
+        return None
+    steps = [["pnpm", "preflight:changed"], ["git", "add", "--", *changed],
+             ["git", "commit", "-q", "-m", "fix(lanes): publish state through the atomic writer"]]
+    for step in steps:
+        if sh(step, cwd=worktree, log=log, timeout=900).returncode:
+            return None
+    require_fix_target(pr, "before-atomic-push", worktree=worktree, repair=True)
+    if sh(["git", "push", "-q", "origin", f"HEAD:{pr['headRefName']}"],
+          cwd=worktree, log=log, timeout=900).returncode:
+        return None
+    receipt.update(resolution="atomic-state-writes", atomicFiles=changed)
     return types.SimpleNamespace(returncode=0)
 
 
@@ -7982,6 +8137,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 1, "mutations": 1}, coordination=coordination, boundary_id="repair-dispatch")
                 fixer = {fix_red_classes.WIRE_CI_FAST: wire_ci_fast_fix,
+                         fix_red_classes.ATOMIC_WRITE: atomic_state_fix,
                          fix_red_classes.RENUMBER: renumber_migrations_fix,
                          fix_red_classes.SNAP_SPACING: snap_spacing_fix,
                          fix_red_classes.MERGE_NARROWED: merge_narrowed_preflight_fix,
@@ -9556,6 +9712,10 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             revisit_terminal_prs(host, candidates)
         except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
             pass  # Retried next pass; it never blocks the claimed repair.
+        try:
+            deterministic_conflict_pass(host, candidates)
+        except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+            pass  # Same contract: a script-only rung never blocks the claimed repair.
     if routing_refresh_reason and red is None and adopt is None and issue is None:
         record_idle_exit(host, name, "routing-preflight-required:" + routing_refresh_reason)
         slot.release()
@@ -10406,13 +10566,43 @@ def install_lag(host: Host, before: str | None, error: str | None) -> dict:
             "behindCommit": bundle["sourceCommit"], "why": error}
 
 
+def release_paths(repo: Path, revision: str) -> list[str]:
+    """Managed bundle paths that exist at `revision`. The installed LANE_TESTS and RELEASE_EXTRAS
+    describe the installed release, not the incoming one: a file deleted upstream (#23510 removed
+    ops/registry/third-party-grants.jsonl on 2026-10-28) made every later update refuse with
+    release-bundle-incomplete for good, because the old updater could never install the release
+    that no longer lists it. Missing extras and tests drop out of the bundle; scripts/lanes is mandatory."""
+    wanted = sorted({"scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS})
+    listing = subprocess.run(["git", "ls-tree", "--name-only", revision, "--", *wanted], cwd=repo,
+                             capture_output=True, text=True)
+    present = set(listing.stdout.splitlines())
+    if listing.returncode or "scripts/lanes" not in present:
+        raise RuntimeError("release-bundle-incomplete")
+    return [path for path in wanted if path in present]
+
+
+def ensure_dependency_pool(host: Host) -> bool:
+    """The mesh runtime compiles against a pool slot restored from a recent lock; slots age out after
+    three days and an aged pool made every release refuse 'mesh runtime dependency closure failed'
+    (Gem, 2026-10-26 to 10-29). Refill before building when no ready slot remains. True when a fill ran."""
+    try:
+        if not worktree_pool.enabled() or worktree_pool.ready_slots(worktree_pool.pool_dir(host.repo)):
+            return False
+        print("lane update: dependency pool has no ready slot; refilling before the release build", file=sys.stderr)
+        worktree_pool.fill(host.repo, warm=False, log=sys.stderr)
+        return True
+    except (OSError, subprocess.SubprocessError) as error:
+        print(f"lane update: dependency pool refill failed: {error}", file=sys.stderr)
+        return False
+
+
 def release_identity(host: Host) -> dict:
     """Pin one main commit, then fingerprint exactly the managed release contents."""
     read = sh(["git", "rev-parse", "--verify", "origin/main^{commit}"], cwd=host.repo)
     revision = read.stdout.strip()
     if read.returncode or not re.fullmatch(r"[0-9a-f]{40}", revision):
         raise RuntimeError("release-source-unavailable")
-    paths = sorted({"scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS})
+    paths = release_paths(host.repo, revision)
     read = sh(["git", "rev-parse", *(f"{revision}:{path}" for path in paths)], cwd=host.repo)
     objects = read.stdout.splitlines()
     if read.returncode or len(objects) != len(paths) or any(not re.fullmatch(r"[0-9a-f]{40}", oid) for oid in objects):
@@ -10877,13 +11067,18 @@ def complete_staged_bundle(host: Host, staging: Path) -> str | None:
     staged without it and refused forever (2026-10-11: test_lifecycle.py from #21225 kept Gem on
     a 10-10 release). Fill missing bundle paths from origin/main only when its scripts/lanes is
     byte-identical to the staged tree; anything else stays a refusal."""
-    missing = [path for path in sorted({"scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS})
-               if not (staging / path).exists()]
+    head = subprocess.run(["git", "rev-parse", "--verify", "origin/main^{commit}"], cwd=host.repo,
+                          capture_output=True, text=True).stdout.strip()
+    try:
+        managed = release_paths(host.repo, head)
+    except RuntimeError:
+        return "release-bundle-incomplete"
+    missing = [path for path in managed if not (staging / path).exists()]
     if not missing:
         return None
     def git(*args, **kwargs):
         return subprocess.run(["git", *args], cwd=host.repo, capture_output=True, **kwargs)
-    revision = git("rev-parse", "--verify", "origin/main^{commit}", text=True).stdout.strip()
+    revision = head
     listing = git("ls-tree", "-r", revision, "scripts/lanes", text=True)
     expected = {line.split("\t", 1)[1]: line.split()[2] for line in listing.stdout.splitlines()}
     lanes = staging / "scripts/lanes"
@@ -11123,6 +11318,11 @@ def install_release(host: Host, *, operator=None) -> int:
     release = host.state / "releases" / tree
     refused_path = host.state / "update-refused.json"
     refused = json.loads(refused_path.read_text()) if refused_path.exists() else {}
+    if operator is None and not release.exists() and ensure_dependency_pool(host):
+        # The cause the marker recorded (an aged dependency pool) was just repaired: retry now.
+        if refused.get("why") == "mesh runtime dependency closure failed":
+            refused = {}
+            refused_path.unlink(missing_ok=True)
     if not release.exists() and refused.get("tree") == tree and time.time() - refused.get("at", 0) < UPDATE_RETRY_S:
         print(f"lane update backing off: tree {tree[:7]} was refused {refused.get('why')}", file=sys.stderr)
         return 1
@@ -11135,7 +11335,7 @@ def install_release(host: Host, *, operator=None) -> int:
             elif staging.exists() or staging.is_symlink():
                 raise lifecycle.AdmissionHeld("operator proof staging already exists; reconcile its owner")
             staging.mkdir(parents=True, mode=0o700)
-            archive = lifecycle.run(["git", "archive", bundle["sourceCommit"], "scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS],
+            archive = lifecycle.run(["git", "archive", bundle["sourceCommit"], *sorted(bundle["objects"])],
                                      cwd=host.repo, capture_output=True, check=True)
             lifecycle.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
             def refuse(why: str) -> int:
@@ -11194,6 +11394,7 @@ def install_release(host: Host, *, operator=None) -> int:
         link.unlink()
     link.symlink_to(release / "scripts/lanes")
     os.replace(link, current)
+    refused_path.unlink(missing_ok=True)  # the refusal that marker recorded is resolved by this activation
     return 0
 
 

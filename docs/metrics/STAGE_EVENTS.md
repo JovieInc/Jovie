@@ -13,7 +13,7 @@ One row per entity per stage. Stage dwell time is `exitedAt - enteredAt`.
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `schema` | `"jovie-stage-event/v1"` | Contract version. Breaking changes bump it. |
-| `entityType` | manifest key | `shipping`, `remediation`, `release`, `release-replay`, `ios-release`, `revenue-funnel`, `summer-turn`, `linear-intake`, `automation-run` |
+| `entityType` | manifest key | `shipping`, `remediation`, `release`, `release-replay`, `ios-release`, `revenue-funnel`, `summer-turn`, `linear-intake`, `detector-issue`, `automation-run` |
 | `entityId` | string | Stable id; the format is declared per entity in the manifest. |
 | `stage` | manifest stage id | Must be registered for the entity type. Unregistered stages are rejected. |
 | `enteredAt` | ISO-8601 | When the entity entered the stage. |
@@ -141,6 +141,27 @@ failed, pre-fix; fixed in summer-config #270).
 
 `entityId` = `<conversation>:<turn>`, both hashed by summer-config. `outcome` on the terminal row: `completed`,
 `failed` or `abandoned`. Backfill from the existing receipt blobs.
+
+### Detector issue loop (`detector-issue`, summer-config)
+
+Live emitter: summer-config `agent/lib/detector-loop.ts`. It writes one create-only
+marker per stage, `summer-company/stage-events/detector/<month>/<JOV-n>/c<cycle>/<stage>.<class>.<ms>.json`,
+and the same Summer stage feed turns those markers into rows. Detector issues are routed
+model-free from the Linear webhook, dispatched as leased mesh board tasks (or one
+founder card for reserved items), and close only on the detector's own `cleared`
+receipt.
+
+| Stage | Timestamp |
+| --- | --- |
+| `detector-issue:filed` | issue created by the doctor or capacity tracker (reopen: the reopen time) |
+| `detector-issue:owned` | first board claim, lane start (In Progress), or founder card for reserved items |
+| `detector-issue:pr` | first In Review or Merging |
+| `detector-issue:fixed` | merge (Merging, Validating or Done) or board task `done` for an ops fix |
+| `detector-issue:verified` | Done with the detector's `🤖 doctor: cleared` comment |
+
+`entityId` = `JOV-<n>#<cycle>`, `actor` = `detector:<class>`. Per-class p50/p95 and
+the counts that must stay at 0 (`unownedPastSla`, `agedPastFixSla`) are at
+`https://summer.jov.ie/runtime/v1/detector-loop.json`, refreshed every 10 minutes.
 
 ### Controller replay (`release-replay`)
 

@@ -329,6 +329,9 @@ export function OnboardingSpotifyArtistPickerCard({
   const fieldId = useId();
   const [query, setQuery] = useState(initialQuery);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Pen R6As7U: the agent proposes its top match with one confirm; the full
+  // list and search sit behind "Not Me".
+  const [browsing, setBrowsing] = useState(false);
   const artistSearch = useArtistSearchQuery({
     debounceMs: 250,
     limit: 5,
@@ -382,6 +385,29 @@ export function OnboardingSpotifyArtistPickerCard({
   const isSearching =
     selectedId === null &&
     (artistSearch.state === 'loading' || artistSearch.isPending);
+  const selectArtist = (artist: SpotifyArtistResult) => {
+    setSelectedId(artist.id);
+    onSelectArtist(selectionFromSpotifyResult(artist));
+  };
+  const proposal = results[0];
+  // Hold the proposal frame while the prefilled query resolves so the card
+  // does not swap layouts under the reader.
+  const proposing =
+    !browsing &&
+    hasQuery &&
+    !artistSearch.error &&
+    (isSearching || proposal !== undefined);
+
+  if (proposing) {
+    return (
+      <OnboardingArtistProposal
+        artist={isSearching ? null : (proposal ?? null)}
+        disabled={disabled}
+        onConfirm={selectArtist}
+        onNotMe={() => setBrowsing(true)}
+      />
+    );
+  }
 
   return (
     <div
@@ -463,10 +489,7 @@ export function OnboardingSpotifyArtistPickerCard({
             artist={artist}
             disabled={disabled || selectedId !== null}
             selected={selectedId === artist.id}
-            onSelect={() => {
-              setSelectedId(artist.id);
-              onSelectArtist(selectionFromSpotifyResult(artist));
-            }}
+            onSelect={() => selectArtist(artist)}
           />
         ))}
 
@@ -485,6 +508,89 @@ export function OnboardingSpotifyArtistPickerCard({
             {NONE_OF_THESE_CTA_LABEL}
           </Button>
         ) : null}
+      </div>
+    </div>
+  );
+}
+
+function OnboardingArtistProposal({
+  artist,
+  disabled,
+  onConfirm,
+  onNotMe,
+}: {
+  readonly artist: SpotifyArtistResult | null;
+  readonly disabled: boolean;
+  readonly onConfirm: (artist: SpotifyArtistResult) => void;
+  readonly onNotMe: () => void;
+}) {
+  const followers = artist
+    ? formatFollowers(
+        getDisplaySpotifyFollowers(
+          normalizeArtistMetrics(
+            { followers: artist.followers },
+            { source: 'spotify_search' }
+          )
+        )
+      )
+    : null;
+
+  return (
+    <div
+      className='min-h-42 w-full max-w-110 py-1'
+      data-testid='onboarding-artist-picker'
+      data-mode='proposal'
+    >
+      <p className='text-sm font-semibold leading-5 tracking-[-0.01em] text-primary-token'>
+        Is This You?
+      </p>
+      {artist ? (
+        <div
+          className='mt-3 flex items-center gap-3'
+          data-testid='onboarding-artist-proposal'
+        >
+          <ArtistAvatar imageUrl={artist.imageUrl} name={artist.name} />
+          <span className='min-w-0 flex-1'>
+            <span className='block truncate text-sm font-medium leading-5 text-primary-token'>
+              {artist.name}
+            </span>
+            {followers ? (
+              <span className='block truncate text-xs leading-5 tabular-nums text-secondary-token'>
+                {followers}
+              </span>
+            ) : null}
+          </span>
+        </div>
+      ) : (
+        <div
+          className='mt-3 flex h-10.5 items-center gap-2 text-xs text-secondary-token'
+          role='status'
+        >
+          <Loader2 className='h-3.5 w-3.5 animate-spin motion-reduce:animate-none' />
+          Searching Spotify
+        </div>
+      )}
+      <div className='mt-3 flex items-center gap-2'>
+        <Button
+          type='button'
+          data-testid='onboarding-artist-confirm'
+          disabled={disabled || !artist}
+          onClick={() => {
+            if (artist) onConfirm(artist);
+          }}
+        >
+          That&apos;s Me
+        </Button>
+        <Button
+          type='button'
+          variant='ghost'
+          size='sm'
+          data-testid='onboarding-artist-not-me'
+          disabled={disabled}
+          onClick={onNotMe}
+        >
+          Not Me
+        </Button>
       </div>
     </div>
   );

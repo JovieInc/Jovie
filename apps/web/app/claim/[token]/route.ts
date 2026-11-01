@@ -81,6 +81,7 @@ export async function GET(
   }
 
   const lead = await lookupLeadByClaimToken(token);
+
   const claimTokenHash = await hashClaimToken(token);
 
   // Golden-path entry cohort. Consent-gated: no journey id, nothing recorded.
@@ -99,13 +100,16 @@ export async function GET(
     expectedSpotifyArtistId: profile.spotifyId ?? null,
   });
 
+  // A held lead-built page is private, so the claim link cannot land on a
+  // preview of it. Hand off to the claim route, which starts auth with the
+  // pending claim context; the page publishes when the artist claims.
+  const destination =
+    profile.isPublic !== false
+      ? `/${encodeURIComponent(profile.usernameNormalized)}?claim=1`
+      : `/${encodeURIComponent(profile.usernameNormalized)}/claim?token=${encodeURIComponent(token)}&next=auth`;
+
   return applyPendingClaimCookie(
-    NextResponse.redirect(
-      buildAbsoluteUrl(
-        request,
-        `/${encodeURIComponent(profile.usernameNormalized)}?claim=1`
-      )
-    ),
+    NextResponse.redirect(buildAbsoluteUrl(request, destination)),
     context
   );
 }

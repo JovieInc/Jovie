@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -24,7 +25,7 @@ class ClassifyTest(unittest.TestCase):
             "This PR conflicts with main in: scripts/preflight-changed.mjs . Resolve the conflict (lane-fix-conflict).": ("narrowed-preflight", "merge-narrowed-preflight"),
             "AssertionError: off-grid 10px/14px spacing steps (*-2.5, *-3.5) grew: 591 > baseline 590.": ("spacing-scale", "snap-spacing"),
             "Error: apps/web/app/(marketing)/pricing/page.tsx: source changed; renew certification evidence": ("census-certification", "sync-main"),
-            "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "agent"),
+            "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "atomic-write"),
             "red-before-green: include Failing command:": ("pr-body", "agent"),
             "AssertionError: expected 1": ("other", "agent"),
         }
@@ -268,6 +269,62 @@ class AndChainMergeTest(unittest.TestCase):
         self.assertIsNone(classes.resolve_and_chain_text(unknown))
 
 
+class AtomicWriteRepairTest(unittest.TestCase):
+    LOG = "use atomic_state.atomic_write_text for whole-file state: [('sample.py', 'save', 'write_text')]"
+
+    def test_repairs_the_reported_function_and_preserves_whole_file_until_replace(self):
+        source = ('from pathlib import Path\nfrom atomic_state import atomic_write_text\n'
+                  'def save(path):\n    label = "é"; path.write_text(label, encoding="utf-8")\n'
+                  'def other(path):\n    path.write_text("untouched")\n')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lanes = root / "scripts/lanes"
+            lanes.mkdir(parents=True)
+            target = lanes / "sample.py"
+            target.write_text(source)
+            self.assertEqual(classes.repair_atomic_state_writes(root, self.LOG), ["scripts/lanes/sample.py"])
+            namespace = {}
+            exec(compile(target.read_text(), str(target), "exec"), namespace)
+            state = root / "state.json"
+            state.write_text("old")
+            from unittest.mock import patch
+            import atomic_state
+            replace = os.replace
+            def observe(staged, dest):
+                self.assertEqual(state.read_text(), "old")
+                self.assertEqual(Path(staged).read_text(), "é")
+                replace(staged, dest)
+            with patch.object(atomic_state.os, "replace", side_effect=observe) as swapped:
+                namespace["save"](state)
+            swapped.assert_called_once()
+            self.assertEqual(state.read_text(), "é")
+            self.assertIn('path.write_text("untouched")', target.read_text())
+            self.assertEqual(classes.repair_atomic_state_writes(root, self.LOG), [])
+
+    def test_unknown_imports_signatures_shadowing_and_symlinks_are_unchanged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lanes = root / "scripts/lanes"
+            lanes.mkdir(parents=True)
+            target = lanes / "sample.py"
+            for source in ('def save(p):\n    p.write_text("x")\n',
+                           'from atomic_state import atomic_write_text\natomic_write_text = None\ndef save(p):\n    p.write_text("x")\n',
+                           'from atomic_state import atomic_write_text\ndef save(p):\n    return p.write_text("x")\n',
+                           'from atomic_state import atomic_write_text\ndef save(p):\n    p.write_text(str(p.write_text("x")))\n',
+                           'from atomic_state import atomic_write_text\ndef save(p):\n    p.write_text("x", newline="")\n',
+                           'from atomic_state import atomic_write_text\ndef save(p, atomic_write_text):\n    p.write_text("x")\n',
+                           'from atomic_state import atomic_write_text\ndef save(p):\n    def nested():\n        p.write_text("x")\n'):
+                target.write_text(source)
+                self.assertEqual(classes.repair_atomic_state_writes(root, self.LOG), [])
+                self.assertEqual(target.read_text(), source)
+            outside = root / "outside.py"
+            outside.write_text('from atomic_state import atomic_write_text\ndef save(p):\n    p.write_text("x")\n')
+            target.unlink()
+            target.symlink_to(outside)
+            self.assertEqual(classes.repair_atomic_state_writes(root, self.LOG), [])
+            self.assertIn('p.write_text("x")', outside.read_text())
+
+
 class SpacingSnapTest(unittest.TestCase):
     DIFF = """diff --git a/apps/web/components/Card.tsx b/apps/web/components/Card.tsx
 --- a/apps/web/components/Card.tsx
@@ -484,6 +541,54 @@ class MeasureTest(unittest.TestCase):
         rows = self.rows()
         self.assertEqual(classes.breaker_n(rows), 2)
         self.assertEqual(classes.breaker_n([]), classes.DEFAULT_BREAKER_N)
+
+
+class ReleaseIdentityStubTest(unittest.TestCase):
+    SNIPPET = """
+class T(unittest.TestCase):
+    def test_backoff(self):
+        identity = patch.object(lane, "release_identity", return_value={"bundleDigest": "t1", "sourceCommit": "a" * 40})
+        lane.install_release(host)
+
+    def test_custody(self):
+        bundle = {"bundleDigest": "b" * 64, "sourceCommit": "a" * 40}
+        patch.object(lane, "release_identity", return_value=bundle)
+        lane.install_release(self.host)
+
+    def test_multiline(self):
+        bundle = {
+            "bundleDigest": "b" * 64,
+        }
+        patch.object(lane, "release_identity", return_value=bundle)
+        lane.install_release(self.host)
+
+    def test_other(self):
+        bundle = {"bundleDigest": "keep"}
+        patch.object(lane, "release_identity", return_value=bundle)
+
+    def test_spread(self):
+        with patch.object(lane, "release_identity", return_value={**self.manifest, "sourceCommit": "b" * 40}):
+            lane.install_release(self.host)
+"""
+
+    def test_stubs_that_reach_install_release_gain_objects_once(self):
+        once = classes.complete_release_identity_stubs(self.SNIPPET)
+        self.assertEqual(classes.complete_release_identity_stubs(once), once)
+        self.assertIn(
+            'return_value={"bundleDigest": "t1", "sourceCommit": "a" * 40, "objects": {"scripts/lanes": "f" * 40}}',
+            once)
+        self.assertIn(
+            'bundle = {"bundleDigest": "b" * 64, "sourceCommit": "a" * 40, "objects": {"scripts/lanes": "f" * 40}}',
+            once)
+        self.assertIn('bundle = {\n            "bundleDigest": "b" * 64,\n        }', once)
+        self.assertIn('bundle = {"bundleDigest": "keep"}', once)
+        self.assertIn('{**self.manifest, "sourceCommit": "b" * 40}', once)
+        self.assertEqual(once.count('"objects"'), 2)
+
+    def test_checked_in_lane_runner_tests_need_no_further_stub_completion(self):
+        path = Path(__file__).resolve().parents[1] / "tests" / "test_lane_runner.py"
+        text = path.read_text()
+        self.assertEqual(classes.complete_release_identity_stubs(text), text)
 
 
 if __name__ == "__main__":

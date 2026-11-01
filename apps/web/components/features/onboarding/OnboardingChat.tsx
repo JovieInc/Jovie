@@ -214,6 +214,8 @@ type OnboardingToolRendererArgs = {
   readonly selectedArtistId: string | null;
   readonly handleStepDone: boolean;
   readonly socialStepDone: boolean;
+  /** Handle the conversation settled on; the sign-up card claims this one. */
+  readonly claimHandle: string | null;
 };
 
 type OnboardingToolRenderer = (
@@ -322,14 +324,21 @@ const renderProposeSocialLink: OnboardingToolRenderer = ({
   );
 };
 
-const renderProposeNextStep: OnboardingToolRenderer = ({ part, key }) => {
+const renderProposeNextStep: OnboardingToolRenderer = ({
+  part,
+  key,
+  claimHandle,
+}) => {
   if (!isNextStepPayload(part.output)) {
     return null;
   }
 
   return (
     <div key={key} className='w-full max-w-110'>
-      <ChatProposeNextStepCard payload={part.output} />
+      <ChatProposeNextStepCard
+        payload={part.output}
+        claimHandle={claimHandle}
+      />
     </div>
   );
 };
@@ -370,6 +379,7 @@ function renderOnboardingTools({
   selectedArtistId,
   handleStepDone,
   socialStepDone,
+  claimHandle,
 }: {
   readonly messageId: string;
   readonly toolParts: readonly ToolPart[];
@@ -383,6 +393,7 @@ function renderOnboardingTools({
   readonly selectedArtistId: string | null;
   readonly handleStepDone: boolean;
   readonly socialStepDone: boolean;
+  readonly claimHandle: string | null;
 }) {
   const genericParts: ToolPart[] = [];
   const cards: ReactNode[] = [];
@@ -413,6 +424,7 @@ function renderOnboardingTools({
         selectedArtistId,
         handleStepDone,
         socialStepDone,
+        claimHandle,
       });
       if (card) {
         cards.push(card);
@@ -488,6 +500,14 @@ function OnboardingMessageList({
       WIDGET_COMPLETION_ACTIONS.SOCIAL_ATTACHED
     ) ||
     hasWidgetEvent(displayMessages, ONBOARDING_WIDGET_EVENTS.SOCIAL_ATTACHED);
+  // The sign-up card must claim the handle the chat settled on, not the
+  // homepage `?handle=` the visitor later changed (golden-path cert
+  // 2026-10-31 pm: card said "Claim @gpwo879d" after @unmarkedpave locked).
+  const claimHandle = deriveProfileBuilderState({
+    handleDraft: null,
+    messages: displayMessages,
+    selectedArtist: null,
+  }).handle;
 
   return (
     <div className='flex flex-col pb-4'>
@@ -536,6 +556,7 @@ function OnboardingMessageList({
                   selectedArtistId,
                   handleStepDone,
                   socialStepDone,
+                  claimHandle,
                 })
               : null}
           </div>
@@ -928,8 +949,13 @@ export function OnboardingChat({
   const shouldShowThinking = isBusy && lastMessage?.role === 'user';
   const displayMessages = getDisplayMessages(messages, shouldShowThinking);
   const lastAssistantMessageId = findLastAssistantMessageId(displayMessages);
-  const { isStuckToBottom, onScroll, totalSizeRef, scrollContainerRef } =
-    useStickToBottom();
+  const {
+    isStuckToBottom,
+    onScroll,
+    setStuckToBottom,
+    totalSizeRef,
+    scrollContainerRef,
+  } = useStickToBottom();
   const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
   const { onSend: notifyJankSend } = useChatJankMonitor({
     conversationId: 'onboarding',
@@ -1246,6 +1272,16 @@ export function OnboardingChat({
     }
     scrollContainer.scrollTop = 0;
   }, [displayMessages.length, scrollContainerRef, shouldDockComposer, status]);
+  // Docking hands the transcript to stick-to-bottom while it is still at the
+  // top (the undocked thread is pinned up). Re-pin on dock and on every user
+  // turn so the active tool card scrolls above the composer (JOV-10131).
+  useLayoutEffect(() => {
+    if (!shouldDockComposer || userTurnCount === 0) return;
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    setStuckToBottom(true);
+  }, [scrollContainerRef, setStuckToBottom, shouldDockComposer, userTurnCount]);
 
   // Card drafts and user confirmation taps are provisional. A persisted tool
   // confirmation keeps later questions from inheriting the old handle prompt.

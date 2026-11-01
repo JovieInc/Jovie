@@ -483,11 +483,9 @@ test('records David Guetta Spotify-first onboarding demo', async ({
   await expect(
     page.getByTestId('onboarding-artist-picker').getByText('David Guetta')
   ).toBeVisible();
-  await expect(
-    page
-      .getByTestId('onboarding-artist-picker')
-      .getByText('Use', { exact: true })
-  ).toBeVisible();
+  // Pen R6As7U: the top match is proposed with one confirm.
+  await expect(page.getByText('Is This You?')).toBeVisible();
+  await expect(page.getByTestId('onboarding-artist-confirm')).toBeVisible();
   const pickerImage = page
     .getByTestId('onboarding-artist-picker')
     .locator('img')
@@ -502,10 +500,7 @@ test('records David Guetta Spotify-first onboarding demo', async ({
     )
     .toBe(true);
   await attachDemoScreenshot(page, testInfo, 'spotify-picker');
-  await page
-    .getByTestId('onboarding-artist-picker')
-    .getByText('Use', { exact: true })
-    .click();
+  await page.getByTestId('onboarding-artist-confirm').click();
 
   const sideRail = page.getByTestId('onboarding-profile-rail');
   await expect(sideRail).toBeVisible();

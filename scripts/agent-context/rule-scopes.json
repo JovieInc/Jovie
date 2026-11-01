@@ -12,12 +12,12 @@
   {
     "file": ".claude/rules/ci-branching.md",
     "paths": [".github/**", "scripts/ci-*", "scripts/lib/ci-*"],
-    "bodySha256": "5fabc1298ed53a98b1841258926c05b2a001435651388c5f414d2b3bb145bd54"
+    "bodySha256": "9c9c6f8e5771a1c18794a77ae8ddba4aa914a2d785a143cf54bb4c8545f8446d"
   },
   {
     "file": ".claude/rules/code-style.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "e432bd7b9d223fec22c3eb84bc978c5faa11c3176cfa80c7d7fed3c570e6195f"
+    "bodySha256": "906cb63c08cbdaf6eb1fd6988470fc5f706896c3421485337a921e0d6333e67e"
   },
   {
     "file": ".claude/rules/db.md",
@@ -92,7 +92,7 @@
   {
     "file": ".claude/rules/ios.md",
     "paths": ["apps/ios/**", "**/*.swift"],
-    "bodySha256": "8064a84295f7bac353ab5ca2858863bee4f7e82be6e12c0e8c2df8b7d305ad7d"
+    "bodySha256": "030e26d1dbf17cde238efb27e147635a2a90ddd6434eb2196420779fb2af5135"
   },
   {
     "file": ".claude/rules/linear.md",
@@ -194,7 +194,7 @@
       "scripts/backlog-orchestrator/**",
       ".claude/commands/qa-swarm*"
     ],
-    "bodySha256": "7cbdca7e2c0d7146e1e97cb310e271a00ee3aba4c6f3a5a06ea471e9e955d3e6"
+    "bodySha256": "b32eee913c7046abbf51b40b5601111d73e5054088d1c2150aba3827e09ddbb9"
   },
   {
     "file": ".claude/rules/testing.md",
@@ -205,7 +205,7 @@
       "**/vitest.config.*",
       "**/playwright.config.*"
     ],
-    "bodySha256": "245b0404c1d52ce4abe9f9f6a3a68c80036f415026b73e80d8afd5e7e2ec4de0"
+    "bodySha256": "399d49cf600940a408d99bd989415330ba811f4d3735574b54aa737bb4bb166a"
   },
   {
     "file": ".claude/rules/ui.md",

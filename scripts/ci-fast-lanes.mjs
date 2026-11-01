@@ -175,6 +175,11 @@ export const LANES_SELFTEST_CHANGED_TESTS_SCRIPT = [
   'lanes_py=0; for f in $files; do case "$f" in scripts/lanes/*.py) lanes_py=1;; esac; done',
   'extra=""',
   'if [ "$lanes_py" = 1 ]; then case " $tests " in *" scripts/tests/test_lanes_atomic_state.py "*) ;; *) tests="$tests scripts/tests/test_lanes_atomic_state.py";; esac; extra="scripts.tests.test_lane_runner.UpdateTest"; fi',
+  // A changed release test also runs inside the staged release bundle (UpdateTest). Tests that read repo
+  // files outside LANE_TESTS/RELEASE_EXTRAS (canon/automation-registry.jsonl in #23706, .github/pull_request_template.md
+  // in a group ahead of #23665) pass here and in the checkout, then fail only in the merge group and eject
+  // unrelated PRs. Deterministic, not a flake: shift it left so the author sees it on the PR.
+  'if [ -n "${tests// /}" ]; then case " $tests $extra " in *" scripts/tests/test_lane_runner.py "*|*" scripts.tests.test_lane_runner.UpdateTest "*) ;; *) extra="$extra scripts.tests.test_lane_runner.UpdateTest";; esac; fi',
   // Read the one release inventory as data, never execute lane_runner just to select tests.
   // Shipped JS/TS edits otherwise skip this guard and first fail inside the native queue.
   `release_closure="$(python3 -c ${shellQuote(
@@ -404,9 +409,11 @@ export const SOURCE_GUARDS = Object.freeze([
     // Also runs model-id-guard (same inputs): a concrete OpenAI model id lives only in
     // ops/registry/capacity.json modelFamilies; grandfathered sites only shrink.
     // Also runs ai-call-guard: model calls go through apps/web/lib/ai/sdk.ts so Gateway spend is tagged.
-    command: `node ${shellQuote(fileURLToPath(new URL('./external-api-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./model-id-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./ai-call-guard.mjs', import.meta.url)))}`,
+    // Also runs subscription-cli-guard: no `claude -p` / `codex exec` from automation, evals or CI
+    // outside the allowlisted mesh executors (JOV-10091).
+    command: `node ${shellQuote(fileURLToPath(new URL('./external-api-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./model-id-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./ai-call-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./subscription-cli-guard.mjs', import.meta.url)))}`,
     inputs:
-      /(?:\.(?:ts|tsx|js|mjs|cjs|mts|cts|py|sh|bash|ya?ml)$|^packages\/api-client\/providers\.json$|^scripts\/lib\/external-api-guard\.)/u,
+      /(?:\.(?:ts|tsx|js|mjs|cjs|mts|cts|py|sh|bash|ya?ml)$|^packages\/api-client\/providers\.json$|^scripts\/lib\/external-api-guard\.|^scripts\/lib\/subscription-cli-guard\.json$)/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -891,8 +898,10 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/lib/__tests__/spend-guard.test.mjs',
   'scripts/lib/__tests__/wins-ledger.test.mjs',
   'scripts/lib/__tests__/wins-store.test.mjs',
+  'scripts/pr-open.test.mjs',
   'scripts/lib/__tests__/sources-of-truth.test.mjs',
   'scripts/invariants/duplicate-literals.test.mjs',
   'scripts/lib/__tests__/source-drift.test.mjs',
@@ -953,6 +962,8 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/evals/release-task-cluster.test.mjs',
   'scripts/evals/summer-ops-card-copy.test.mjs',
   'scripts/buyer-eval/buyer-eval.test.mjs',
+  'scripts/buyer-eval/gate.test.mjs',
+  'scripts/positioning/positioning.test.mjs',
   'scripts/funnel-judge/preview-gate.test.mjs',
   'scripts/funnel-judge/proof-gate.test.mjs',
   'scripts/funnel-judge/rubric.test.mjs',
@@ -1047,6 +1058,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/pr-fleet-rules-workflow.test.mjs',
   'scripts/lib/__tests__/wake-fanout-contract.test.mjs',
   'scripts/design-system-source-ratchet.test.mjs',
+  'scripts/review-escapes.test.mjs',
 ]);
 export const DEPRECATION_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/deprecation-clearance.mjs --test-coverage-include=scripts/lib/deprecation-observation.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=90 scripts/deprecation-clearance.test.mjs';
@@ -1054,7 +1066,10 @@ export const DEPRECATION_COVERAGE_COMMAND =
 // structural CI executes it once with measured coverage and a fixed floor.
 export const ASSURANCE_MATRIX_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/invariants/assurance-matrix.mjs --test-coverage-lines=90 --test-coverage-branches=55 --test-coverage-functions=100 scripts/invariants/assurance-matrix.test.mjs';
-export const SCRIPT_CONTRACT_NODE_COMMAND = `${DEPRECATION_COVERAGE_COMMAND} && ${CODEX_BOOTSTRAP_COVERAGE_COMMAND} && ${ASSURANCE_MATRIX_COVERAGE_COMMAND} && node --import tsx --test --test-isolation=none scripts/content-os/project.test.mts scripts/lib/__tests__/lesson-analysis.test.mjs && pnpm --filter @jovie/copy exec vitest run --config vitest.config.mts transport.test.ts judge.test.ts && node --test ${SCRIPT_CONTRACT_NODE_TESTS.filter(test => test !== 'scripts/invariants/assurance-matrix.test.mjs').join(' ')}`;
+export const PR_OPEN_COVERAGE_COMMAND =
+  'node --test --experimental-test-coverage --test-coverage-include=scripts/pr-open.mjs --test-coverage-lines=90 --test-coverage-branches=75 --test-coverage-functions=90 scripts/pr-open.test.mjs';
+
+export const SCRIPT_CONTRACT_NODE_COMMAND = `${PR_OPEN_COVERAGE_COMMAND} && ${DEPRECATION_COVERAGE_COMMAND} && ${CODEX_BOOTSTRAP_COVERAGE_COMMAND} && ${ASSURANCE_MATRIX_COVERAGE_COMMAND} && node --import tsx --test --test-isolation=none scripts/content-os/project.test.mts scripts/lib/__tests__/lesson-analysis.test.mjs && pnpm --filter @jovie/copy exec vitest run --config vitest.config.mts transport.test.ts judge.test.ts && node --test ${SCRIPT_CONTRACT_NODE_TESTS.filter(test => test !== 'scripts/invariants/assurance-matrix.test.mjs').join(' ')}`;
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
@@ -1108,11 +1123,14 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/component-rendered-invariant-policy.test.mjs',
   'scripts/lib/__tests__/daily-changelog.test.mjs',
   'scripts/lib/__tests__/daily-changelog-publication.test.mjs',
+  'scripts/lib/__tests__/changelog-staleness.test.mjs',
   'scripts/lib/__tests__/changelog-source-guard.test.mjs',
+  'scripts/lib/__tests__/attach-changelog-writer-proof.test.mjs',
   'scripts/lib/__tests__/delivery-control-receipts-workflow.test.mjs',
   'scripts/lib/__tests__/dependabot-update-policy.test.mjs',
   'scripts/lib/__tests__/design-surface-census.test.mjs',
   'scripts/lib/__tests__/main-red-eject.test.mjs',
+  'scripts/lib/__tests__/main-red-eject-failing-head.test.mjs',
   'scripts/lib/__tests__/doc-freshness.test.mjs',
   'scripts/lib/__tests__/flaky-test-filing.test.mjs',
   'scripts/lib/__tests__/gbrain-pool-env.test.mjs',
@@ -1143,6 +1161,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/pr-review-rank.test.mjs',
   'scripts/lib/__tests__/pr-size-guard-base-tip.test.mjs',
   'scripts/lib/__tests__/pr-size-guard-label-override.test.mjs',
+  'scripts/lib/__tests__/pr-size-exclusions.test.mjs',
   'scripts/lib/__tests__/pr-size-guard-policy.test.mjs',
   'scripts/lib/__tests__/pre-push-gate.test.mjs',
   'scripts/lib/__tests__/production-unbound-repair-attestation.test.mjs',
@@ -1154,6 +1173,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/queue-deferred-release.test.mjs',
   'scripts/lib/__tests__/ratchet-core.test.mjs',
   'scripts/lib/__tests__/domain-expiry.test.mjs',
+  'scripts/lib/__tests__/ai-routing-drift.test.mjs',
   'scripts/lib/__tests__/credentials-registry.test.mjs',
   'scripts/lib/__tests__/credentials-spend-check.test.mjs',
   'scripts/lib/__tests__/secrets-tooling.test.mjs',
@@ -1170,6 +1190,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/rolling-ci-remediation-concurrency.test.mjs',
   'scripts/lib/__tests__/safe-pr-remediation.test.mjs',
   'scripts/lib/__tests__/dependabot-pin-sync.test.mjs',
+  'scripts/lib/__tests__/merge-to-live.test.mjs',
   'scripts/lib/__tests__/scope-governor.test.mjs',
   'scripts/lib/__tests__/scripts-typecheck.test.mjs',
   'scripts/lib/__tests__/seo-certify-workflow-contract.test.mjs',
@@ -1203,9 +1224,11 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/workflow-triggers.test.mjs',
   'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
   'scripts/lib/__tests__/external-api-guard.test.mjs',
+  'scripts/lib/__tests__/source-validation-manifest.test.mjs',
   'scripts/lib/__tests__/model-id-guard.test.mjs',
   'scripts/lib/__tests__/ai-gateway-report.test.mjs',
   'scripts/lib/__tests__/ai-call-guard.test.mjs',
+  'scripts/lib/__tests__/subscription-cli-guard.test.mjs',
   'scripts/lib/__tests__/api-budget.test.mjs',
   'scripts/lib/__tests__/domain-write-guard.test.mjs',
   'scripts/lib/__tests__/screen-audit-receipts.test.mjs',
@@ -2315,6 +2338,7 @@ export const GUARDRAIL_OPERATIONS_TESTS = Object.freeze([
   'scripts/desktop-installed-apps-audit.test.mjs',
   'scripts/dev-web-fast.test.mjs',
   'scripts/ios-guardrail-rollout-audit.test.mjs',
+  'scripts/swift-arch/guard.test.mjs',
   'scripts/version-fanout-guard.test.mjs',
   'scripts/version-stamp.test.mjs',
   'scripts/agent/preflight.test.mjs',
@@ -2525,6 +2549,8 @@ function runIosFast() {
     'apps/web/design/ziawi-color-sot.json',
     'apps/web/styles/design-system.css',
     'scripts/invariants/native-spacing-scale*',
+    'scripts/swift-arch/**',
+    'apps/macos/**',
     '.github/workflows/ios-ci.yml',
     '.github/workflows/ios-testflight.yml',
   ]);

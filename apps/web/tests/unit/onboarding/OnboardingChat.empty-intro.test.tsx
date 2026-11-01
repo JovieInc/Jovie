@@ -59,6 +59,7 @@ vi.mock('@/components/jovie/hooks', () => ({
     isStuckToBottom: true,
     onScroll: vi.fn(),
     scrollContainerRef: { current: null },
+    setStuckToBottom: vi.fn(),
     totalSizeRef: { current: null },
   }),
 }));
@@ -86,6 +87,12 @@ vi.mock('@/components/jovie/utils', () => ({
 }));
 
 vi.mock('@/components/features/onboarding/OnboardingToolArtifacts', () => ({
+  // A known handle now renders the draft profile preview (Pen R6As7U), which
+  // reads these formatters from the same module.
+  formatCompactCount: () => null,
+  formatExactCount: () => null,
+  formatGenreLabel: (value: string) => value,
+  getSafeSpotifyArtistUrl: () => null,
   OnboardingArtistConfirmedCard: () => null,
   OnboardingHandleCheckCard: () => null,
   OnboardingSocialLinkCard: () => null,
@@ -131,7 +138,70 @@ vi.mock('@/components/jovie/components', () => ({
   }) => <div data-testid='chat-message'>{parts[0]?.text}</div>,
 }));
 
+vi.mock('@/components/features/onboarding/ChatProposeNextStepCard', () => ({
+  ChatProposeNextStepCard: ({
+    claimHandle,
+  }: {
+    readonly claimHandle?: string | null;
+  }) => (
+    <div data-testid='next-step-card' data-claim-handle={claimHandle ?? ''} />
+  ),
+}));
+
 describe('OnboardingChat empty intro', () => {
+  it('gives the sign-up card the handle locked in chat, not the homepage one (JOV-10127)', () => {
+    const initialMessages: UIMessage[] = [
+      {
+        id: 'u1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'I want to claim jov.ie/gpwo879d.' }],
+      },
+      {
+        id: 'confirmation',
+        role: 'assistant',
+        parts: [
+          {
+            type: 'dynamic-tool',
+            toolName: 'checkHandle',
+            toolCallId: 'confirmation',
+            state: 'output-available',
+            input: { handle: 'unmarkedpave' },
+            output: { action: 'handle_confirmed', handle: 'unmarkedpave' },
+          },
+        ],
+      },
+      {
+        id: 'next-step',
+        role: 'assistant',
+        parts: [
+          {
+            type: 'dynamic-tool',
+            toolName: 'proposeNextStep',
+            toolCallId: 'next-step',
+            state: 'output-available',
+            input: {},
+            output: {
+              action: 'propose_next_step',
+              decision: { kind: 'waitlist', rationale: 'r', score: 30 },
+            },
+          },
+        ],
+      },
+    ];
+    render(
+      <OnboardingChat
+        conversationId='saved-conversation'
+        initialMessages={initialMessages}
+        turnstileToken='token'
+        turnstileStatus='verified'
+      />
+    );
+    expect(screen.getByTestId('next-step-card')).toHaveAttribute(
+      'data-claim-handle',
+      'unmarkedpave'
+    );
+  });
+
   it('restores the confirmed handle over stale proposals without reopening composer intent', () => {
     const onProfileBuilderChange = vi.fn();
     const initialMessages: UIMessage[] = [

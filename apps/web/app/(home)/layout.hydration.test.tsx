@@ -39,6 +39,7 @@ describe('(home) layout hydration', () => {
 
   it('renders identical markup whatever usePathname() returns', async () => {
     const server = await renderHtml(null);
+    expect(await renderHtml('/index')).toBe(server);
     expect(await renderHtml('/__prerender__')).toBe(server);
     expect(await renderHtml('/')).toBe(server);
   });

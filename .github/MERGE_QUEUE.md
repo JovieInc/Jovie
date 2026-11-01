@@ -7,6 +7,9 @@ also the supported stack-construction path: dependent PRs may temporarily target
 their immediate parent, then are retargeted and rebased onto `main` after that
 parent lands. There is no second landing transport.
 
+Steward decisions (proven-culprit dequeue, flake handling, failure class to guard) live in
+[`canon/MERGE_QUEUE_STEWARD.md`](../canon/MERGE_QUEUE_STEWARD.md).
+
 ## How a PR lands
 
 1. Open a root PR against `main`. A dependent child may instead target its
@@ -176,6 +179,11 @@ The finishing agent requests GitHub Merge when ready against the exact PR head.
 GitHub owns queue membership, combined-head checks, and merge ordering. A
 one-shot `gh pr merge --auto --match-head-commit` request is not a queue receipt;
 read `mergeQueueEntry` before claiming admission.
+
+Never dequeue to re-prioritize; label `compounding` and let green-enroll re-route.
+A queued `compounding` PR with a non-compounding entry ahead of it is dequeued and
+re-enqueued with `jump` by Merge Queue Green Enroll (receipt `relabel-jump`), under
+the same caps as a fresh enqueue: `MAX_JUMPED`, `JUMP_MAX_BUILD_S`, `JUMP_BATCH_S`.
 
 `drain-pr-queue.sh` remains a guarded manual maintenance tool. Its legacy
 source-admission and rebase path has no automatic caller. Hard-gate labels block

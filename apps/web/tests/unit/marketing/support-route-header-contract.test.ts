@@ -139,3 +139,16 @@ describe('support route header contract', () => {
     expect(headerSource).toContain('links: plainLinks(chromeNav.customers)');
   });
 });
+
+describe('prerendered homepage pathname', () => {
+  it('MarketingHeader.tsx reads "/index" as "/" via usePublicPathname', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(
+      resolve(process.cwd(), 'components/site/MarketingHeader.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('usePublicPathname');
+    expect(source).not.toMatch(/\busePathname\b/);
+  });
+});

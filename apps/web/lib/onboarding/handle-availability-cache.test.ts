@@ -16,6 +16,7 @@ vi.mock('@/lib/error-tracking', () => ({
 
 import {
   cacheHandleAvailability,
+  getCachedHandleAvailability,
   invalidateHandleCache,
 } from './handle-availability-cache';
 
@@ -50,5 +51,18 @@ describe('handle availability Redis contract', () => {
     expect(redis.del).toHaveBeenCalledExactlyOnceWith(
       'onboarding:handle-availability:oldartist'
     );
+  });
+
+  it('reads Upstash-deserialized values: number 1 is available, 0 is taken', async () => {
+    redis.get.mockResolvedValueOnce(1);
+    await expect(getCachedHandleAvailability('newartist')).resolves.toBe(true);
+    redis.get.mockResolvedValueOnce('1');
+    await expect(getCachedHandleAvailability('newartist')).resolves.toBe(true);
+    redis.get.mockResolvedValueOnce(0);
+    await expect(getCachedHandleAvailability('newartist')).resolves.toBe(false);
+    redis.get.mockResolvedValueOnce(null);
+    await expect(getCachedHandleAvailability('newartist')).resolves.toBeNull();
+    redis.get.mockResolvedValueOnce('garbage');
+    await expect(getCachedHandleAvailability('newartist')).resolves.toBeNull();
   });
 });

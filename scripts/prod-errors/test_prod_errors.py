@@ -5,6 +5,8 @@ import subprocess
 import tempfile
 import time
 import unittest
+from contextlib import redirect_stderr
+from io import StringIO
 from unittest import mock
 from pathlib import Path
 
@@ -59,7 +61,7 @@ class LoopTest(unittest.TestCase):
     def ghrun(self, n, **kw):
         base = {"databaseId": n, "workflowName": "E2E Full Browser Matrix", "conclusion": "success",
                 "status": "completed", "event": "push", "createdAt": pe.iso(self.t + n * 60),
-                "runStartedAt": pe.iso(self.t + n * 60), "headSha": f"sha{n}",
+                "startedAt": pe.iso(self.t + n * 60), "headSha": f"sha{n}",
                 "url": f"https://example.com/runs/{n}"}
         return {**base, **kw}
 
@@ -363,9 +365,9 @@ class LoopTest(unittest.TestCase):
 
     def test_ci_newest_run_stuck_past_timeout_flags_once(self):
         stuck = [self.ghrun(7, status="in_progress", conclusion=None, headSha="sha-new",
-                          createdAt=pe.iso(self.t - 3 * 3600), runStartedAt=pe.iso(self.t - 3 * 3600))]
+                          createdAt=pe.iso(self.t - 3 * 3600), startedAt=pe.iso(self.t - 3 * 3600))]
         young = [self.ghrun(8, status="in_progress", conclusion=None, headSha="sha-new2",
-                          createdAt=pe.iso(self.t - 60), runStartedAt=pe.iso(self.t - 60))]
+                          createdAt=pe.iso(self.t - 60), startedAt=pe.iso(self.t - 60))]
         self.ci_sweeps([stuck, stuck, young])
         self.assertEqual(len(self.l.created), 1)
         self.assertIn("never finished within its timeout", self.l.created[0]["title"])
@@ -383,6 +385,268 @@ class LoopTest(unittest.TestCase):
         self.assertTrue(pe.verify_signature("k", b"{}", sig))
         self.assertFalse(pe.verify_signature("k", b"{}", "bad"))
         self.assertFalse(pe.verify_signature("k", b"{}", ""))
+
+
+    def test_linear_gql_classifies_not_found_as_relinkable(self):
+        # "Entity not found" from a deleted/invisible Linear id is a relinkable LinearIssueMissing;
+        # every other Linear GraphQL error stays a fatal RuntimeError.
+        lin = object.__new__(pe.Linear)
+        lin.client = mock.Mock()
+        lin.client.graphql = mock.Mock(side_effect=pe.LinearGraphQLError([{"message": "Entity not found: Issue"}]))
+        with self.assertRaises(pe.LinearIssueMissing):
+            lin.gql("query{}", {})
+        lin.client.graphql = mock.Mock(side_effect=pe.LinearGraphQLError([{"message": "internal server error"}]))
+        with self.assertRaises(RuntimeError) as cm:
+            lin.gql("query{}", {})
+        self.assertNotIsInstance(cm.exception, pe.LinearIssueMissing)
+
+    def test_stale_adopted_rollup_link_files_fresh_issue(self):
+        # A rollup/adopted id that no longer exists must not kill the sweep: file a fresh issue
+        # with the SAME body, relink the ledger entry, say so on stderr.
+        class L(FakeLinear):
+            def comment(self_, ident, body):
+                if ident == "JOV-404":
+                    raise pe.LinearIssueMissing("linear: Entity not found: Issue")
+                super().comment(ident, body)
+        l = L()
+        err = StringIO()
+        with redirect_stderr(err):
+            r = pe.handle_issue(self.issue(), self.ledger, self.s, l, [], self.t, self.dir, rollup="JOV-404")
+        self.assertEqual(r, "relinked")
+        self.assertEqual(len(l.created), 1)
+        self.assertIn("regression test", l.created[0]["body"])  # full issue body, not a stub
+        self.assertEqual(self.ledger["101"]["linear"], l.created[0]["id"])
+        self.assertEqual(self.ledger["101"]["relinkedFrom"], "JOV-404")
+        self.assertFalse(self.ledger["101"]["adopted"])
+        self.assertIn("stale Linear link JOV-404", err.getvalue())
+
+    def test_stale_link_on_reopen_files_fresh_issue(self):
+        class L(FakeLinear):
+            def set_state(self_, ident, t):
+                if ident == "JOV-404":
+                    raise pe.LinearIssueMissing("linear: Entity not found: Issue")
+                super().set_state(ident, t)
+        self.ledger["101"] = {"sentryId": "101", "linear": "JOV-404", "status": "closed", "flow": "checkout",
+                              "gate": None, "title": "TypeError in track page release credits", "users": 3,
+                              "openedAt": self.t - 7200, "closedAt": self.t - 60, "lastSeen": self.t - 30}
+        l = L()
+        err = StringIO()
+        with redirect_stderr(err):
+            r = pe.handle_issue(self.issue(lastSeen=iso(self.t)), self.ledger, self.s, l, [], self.t, self.dir)
+        self.assertEqual(r, "relinked")
+        fresh = next(c for c in l.created if "sentry:101" in c["labels"])  # alert() may file its own tim-alert issue too
+        self.assertEqual(self.ledger["101"]["linear"], fresh["id"])
+        self.assertEqual(self.ledger["101"]["relinkedFrom"], "JOV-404")
+        self.assertEqual(self.ledger["101"]["status"], "claimed")
+        self.assertIn("stale Linear link", err.getvalue())
+
+    def test_stale_link_at_claim_expiry_relinks_and_keeps_escalating(self):
+        class L(FakeLinear):
+            def comment(self_, ident, body):
+                if ident == "JOV-404":
+                    raise pe.LinearIssueMissing("linear: Entity not found: Issue")
+                super().comment(ident, body)
+        led = {"101": {"sentryId": "101", "linear": "JOV-404", "status": "claimed", "flow": None, "gate": None,
+                       "title": "TypeError in track page release credits", "users": 3, "lastSeen": self.t - 30,
+                       "openedAt": self.t - pe.CLAIM_S - 100, "claimExpiresAt": self.t - 10}}
+        l = L()
+        stale = pe.advance(led, l, self.s, [], self.t, self.dir)
+        self.assertEqual(stale, 1)
+        self.assertNotEqual(led["101"]["linear"], "JOV-404")
+        self.assertEqual(led["101"]["relinkedFrom"], "JOV-404")
+        self.assertEqual(led["101"]["escalations"], 1)
+        self.assertIn("Claim expired", l.created[0]["body"])  # escalation carried by the fresh issue
+
+    def test_stale_link_at_close_stays_closed_and_logs(self):
+        # At close the Linear issue is already gone: nothing to refile -- stay closed, log loudly.
+        class L(FakeLinear):
+            def set_state(self_, ident, t):
+                if ident == "JOV-404":
+                    raise pe.LinearIssueMissing("linear: Entity not found: Issue")
+                super().set_state(ident, t)
+        led = {"101": {"sentryId": "101", "linear": "JOV-404", "status": "deployed", "flow": None, "gate": None,
+                       "title": "x", "users": 3, "lastSeen": self.t - 26 * 3600, "openedAt": self.t - 90 * 3600,
+                       "deployedAt": self.t - 25 * 3600}}
+        l = L()
+        err = StringIO()
+        with redirect_stderr(err):
+            stale = pe.advance(led, l, self.s, [], self.t, self.dir)
+        self.assertEqual(stale, 1)
+        self.assertEqual(led["101"]["status"], "closed")
+        self.assertEqual(led["101"]["linear"], "JOV-404")  # kept for forensics
+        self.assertEqual(l.created, [])  # no fresh issue just to close it
+        self.assertIn("stale Linear link JOV-404 at close", err.getvalue())
+
+    def test_sweep_survives_a_stale_ledger_link_end_to_end(self):
+        # The 2026-10-31 gem incident, end to end: sweep exited 1 on 'linear: Entity not found:
+        # Issue' from a stale ledger id. The sweep must relink, complete, and surface the event.
+        class L(FakeLinear):
+            def _stale(self_, ident):
+                return ident == "JOV-404"
+            def set_state(self_, ident, t):
+                if self_._stale(ident):
+                    raise pe.LinearIssueMissing("linear: Entity not found: Issue")
+                super().set_state(ident, t)
+            def comment(self_, ident, body):
+                if self_._stale(ident):
+                    raise pe.LinearIssueMissing("linear: Entity not found: Issue")
+                super().comment(ident, body)
+        led = {"101": {"sentryId": "101", "linear": "JOV-404", "status": "closed", "flow": None, "gate": None,
+                       "title": "TypeError in track page release credits", "users": 3,
+                       "openedAt": self.t - 7200, "closedAt": self.t - 3600, "lastSeen": self.t - 3660}}
+        (self.dir / "ledger.json").write_text(json.dumps(led))
+
+        class S(FakeSentry):
+            def top_issues(self_):
+                return [self.issue(lastSeen=iso(self.t))]  # new event after close -> reopen path
+        l = L()
+        err = StringIO()
+        with mock.patch.object(pe, "gh_json", return_value=[]), redirect_stderr(err):
+            counts = pe.sweep(S(), l, self.dir)
+        self.assertEqual(counts.get("relinked"), 1)  # sweep COMPLETED; no exception escaped
+        led2 = json.loads((self.dir / "ledger.json").read_text())
+        self.assertNotEqual(led2["101"]["linear"], "JOV-404")
+        self.assertEqual(led2["101"]["relinkedFrom"], "JOV-404")
+        self.assertIn("stale Linear link JOV-404", err.getvalue())
+
+    def test_sweep_surfaces_stale_link_count_from_advance(self):
+        # Claim expiry inside a full sweep: the relink is visible as counts["stale-link"], not
+        # just as a stderr line.
+        class L(FakeLinear):
+            def comment(self_, ident, body):
+                if ident == "JOV-404":
+                    raise pe.LinearIssueMissing("linear: Entity not found: Issue")
+                super().comment(ident, body)
+        led = {"101": {"sentryId": "101", "linear": "JOV-404", "status": "claimed", "flow": None, "gate": None,
+                       "title": "TypeError in track page release credits", "users": 3, "lastSeen": self.t - 30,
+                       "openedAt": self.t - pe.CLAIM_S - 100, "claimExpiresAt": self.t - 10}}
+        (self.dir / "ledger.json").write_text(json.dumps(led))
+
+        class S(FakeSentry):
+            def top_issues(self_):
+                return [self.issue(lastSeen=iso(self.t - 30))]
+        with mock.patch.object(pe, "gh_json", return_value=[]):
+            counts = pe.sweep(S(), L(), self.dir)
+        self.assertEqual(counts.get("tracked"), 1)
+        self.assertEqual(counts.get("stale-link"), 1)
+
+    def test_bot_threads_relinks_a_stale_thread_issue(self):
+        graph = {"data": {"repository": {"pullRequest": {"reviewThreads": {"nodes": [
+            {"id": "T1", "isResolved": False, "isOutdated": False, "path": "a.ts", "line": 3,
+             "comments": {"nodes": [{"author": {"login": "sentry"}, "body": "**Bug:** x"}]}}]}}}}}
+        key = f"threads:{pe.THREAD_REPOS[0]}#9"
+        (self.dir / "threads.json").write_text(json.dumps({key: {"sig": "other", "linear": "JOV-404",
+                                                                 "open": True, "at": iso(self.t)}}))
+
+        class L(FakeLinear):
+            def comment(self_, ident, body):
+                if ident == "JOV-404":
+                    raise pe.LinearIssueMissing("linear: Entity not found: Issue")
+                super().comment(ident, body)
+        def gh(args):
+            return [{"number": 9, "title": "t", "mergeStateStatus": "BLOCKED"}] if args[0] == "pr" else graph
+        l = L()
+        err = StringIO()
+        with mock.patch.object(pe, "gh_json", side_effect=gh), redirect_stderr(err):
+            r = pe.bot_threads(l, self.dir)
+        self.assertEqual(r["threads-filed"], 1)
+        self.assertEqual(len(l.created), 1)  # fresh issue instead of the dead JOV-404
+        seen = json.loads((self.dir / "threads.json").read_text())
+        self.assertNotEqual(seen[key]["linear"], "JOV-404")
+        self.assertIn("stale Linear link JOV-404", err.getvalue())
+
+    def test_ci_green_recovery_survives_a_stale_link(self):
+        # ci-main's closer hits the same stale-id class from ci-ledger.json; it must not crash.
+        class L(FakeLinear):
+            def set_state(self_, ident, t):
+                if ident == "JOV-404":
+                    raise pe.LinearIssueMissing("linear: Entity not found: Issue")
+                super().set_state(ident, t)
+        wf = "E2E Full Browser Matrix"
+        key = f"ci:{pe.hashlib.sha1(wf.encode()).hexdigest()[:10]}"
+        (self.dir / "ci-ledger.json").write_text(json.dumps({key: {"workflow": wf, "state": "red",
+                                                                   "linear": "JOV-404"}}))
+        old_expected = pe.EXPECTED_RUNS
+        pe.EXPECTED_RUNS = {}
+        try:
+            with self.ci({wf: [self.ghrun(1, conclusion="success")]}):
+                pe.ci_main(L(), self.dir)
+        finally:
+            pe.EXPECTED_RUNS = old_expected
+        seen = json.loads((self.dir / "ci-ledger.json").read_text())
+        self.assertEqual(seen[key]["state"], "green")
+        self.assertIsNone(seen[key]["linear"])  # dead link dropped; next red episode files fresh
+
+    def test_gh_json_fields_are_supported_by_the_pinned_gh_sets(self):
+        # gh 2.96.0 (gem) rejects 'runStartedAt' with 'Unknown JSON field', blinding the ci-main
+        # watcher -- and the test fixtures mirrored the source's field list, so no fake runner
+        # caught it. Every --json field the watchers request must be in the pinned gh-supported
+        # sets (verified against cli/cli v2.96.0 RunFields / PullRequestFields), whatever the
+        # fake returns.
+        asked = []
+
+        def fake(args):
+            if "--json" in args:
+                asked.append((args[0], args[args.index("--json") + 1].split(",")))
+            if args[0] == "run":
+                return [self.ghrun(1, conclusion="success")]
+            return []
+
+        class S(FakeSentry):
+            def top_issues(self_):
+                return []
+        with mock.patch.object(pe, "gh_json", side_effect=fake):
+            pe.ci_main(self.l, self.dir)
+            pe.sweep(S(), self.l, self.dir)
+        run_fields = [f for cmd, fs in asked if cmd == "run" for f in fs]
+        pr_fields = [f for cmd, fs in asked if cmd == "pr" for f in fs]
+        self.assertTrue(run_fields)
+        self.assertTrue(pr_fields)
+        self.assertNotIn("runStartedAt", run_fields)
+        for f in run_fields:
+            self.assertIn(f, pe.GH_RUN_LIST_FIELDS, f"run list does not support field {f!r}")
+        for f in pr_fields:
+            self.assertIn(f, pe.GH_PR_LIST_FIELDS, f"pr list does not support field {f!r}")
+
+    def test_sweep_deferral_is_visible_and_keeps_sweeping(self):
+        # apiclient budget deferral (exit 75, 'retry later, not a verdict'): the sweep must not
+        # exit 1. The Sentry sweep still runs, the deferral is visible in counts/stderr, and
+        # claim expiry + thread watch are SKIPPED -- with no PR list, 'no PR' cannot be told from
+        # 'did not check', so advancing claims would file false escalations.
+        led = {"101": {"sentryId": "101", "linear": "JOV-1", "status": "claimed", "flow": None, "gate": None,
+                       "title": "x", "users": 3, "lastSeen": self.t - 30,
+                       "openedAt": self.t - pe.CLAIM_S - 100, "claimExpiresAt": self.t - 10}}
+        (self.dir / "ledger.json").write_text(json.dumps(led))
+
+        def fake(args):
+            if args[0] == "pr":
+                raise pe.GhDeferred("pr list deferred: waits past budget (budget-reserve:graphql)")
+            return []
+
+        class S(FakeSentry):
+            def top_issues(self_):
+                return [self.issue()]
+        err = StringIO()
+        with mock.patch.object(pe, "gh_json", side_effect=fake), redirect_stderr(err):
+            counts = pe.sweep(S(), self.l, self.dir)
+        self.assertIn("budget-reserve:graphql", counts.get("deferred", ""))
+        self.assertEqual(counts.get("tracked"), 1)  # the Sentry sweep still ran
+        led2 = json.loads((self.dir / "ledger.json").read_text())
+        self.assertNotIn("escalations", led2["101"])  # no FALSE claim-expiry escalation
+        self.assertFalse(any("Claim expired" in c[1] for c in self.l.comments))
+        self.assertEqual(self.l.created, [])  # thread watch skipped
+        self.assertIn("deferred gh lists", err.getvalue())
+
+    def test_ci_main_deferral_is_visible_not_fatal(self):
+        # Same class on the ci-main watcher: a deferred run list skips the tick visibly instead
+        # of exiting 1 and tripping the dead-man's error streak.
+        def fake(args):
+            raise pe.GhDeferred("run list deferred: waits past budget (budget-reserve:graphql)")
+        err = StringIO()
+        with mock.patch.object(pe, "gh_json", side_effect=fake), redirect_stderr(err):
+            r = pe.ci_main(self.l, self.dir)
+        self.assertIn("budget-reserve:graphql", r.get("deferred", ""))
+        self.assertIn("ci-main deferred this tick", err.getvalue())
 
     def test_sandbox_binds_the_shared_api_ledger_writable(self):
         # The units run bwrap with a read-only root; the apiclient budget ledger lives under the

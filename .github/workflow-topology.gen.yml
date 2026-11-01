@@ -281,8 +281,8 @@ nodes:
       - repository_dispatch
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:evaluate
-    jobCount: 1
+    terminalReceipt: job:ai-routing-drift
+    jobCount: 2
   - name: Native Security Advisory
     path: .github/workflows/deepsec-native.yml
     active: true
@@ -713,7 +713,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:land
-    jobCount: 2
+    jobCount: 3
   - name: Marketing Certification Producer
     path: .github/workflows/marketing-certification-producer.yml
     active: true
@@ -1105,7 +1105,7 @@ nodes:
     triggeringStateTransition:
       - workflow_run
     terminalReceipt: job:heal-interrupted-marker
-    jobCount: 14
+    jobCount: 15
   - name: Production Marker Recovery
     path: .github/workflows/production-marker-recovery.yml
     active: true
@@ -1378,6 +1378,18 @@ nodes:
       - pull_request
     terminalReceipt: job:ready
     jobCount: 7
+  - name: Spend Guard
+    path: .github/workflows/spend-guard.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - repository_dispatch
+      - workflow_dispatch
+    terminalReceipt: job:guard
+    jobCount: 1
   - name: Staging Controller
     path: .github/workflows/staging-controller.yml
     active: true
