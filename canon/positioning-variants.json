@@ -11,14 +11,14 @@
       "register": "founder-tim",
       "maxChars": 50,
       "line": "one_liner",
-      "active": "v1-artist-profiles",
+      "active": "v10-owned-fan-list-then-vision",
       "consumers": ["fundraising registry answers.yaml one_liner.c50 (private)"]
     },
     "application.what_building": {
       "audience": "investor",
       "register": "founder-tim",
       "line": "what_building",
-      "active": "v1-artist-profiles",
+      "active": "v10-owned-fan-list-then-vision",
       "consumers": [
         "fundraising registry answers.yaml what_building.short (private)"
       ]
@@ -27,7 +27,7 @@
       "audience": "investor",
       "register": "founder-tim",
       "line": "deck_title",
-      "active": "v1-artist-profiles",
+      "active": "v10-owned-fan-list-then-vision",
       "consumers": ["fundraising registry deck.yaml cover (private)"]
     },
     "homepage.hero": {
@@ -52,7 +52,7 @@
       "id": "v1-artist-profiles",
       "frame": "concrete",
       "icp": "independent-artists",
-      "status": "active",
+      "status": "control",
       "lines": {
         "one_liner": "Artist profiles that turn each release into fans",
         "what_building": "Jovie is the system around a release for independent musicians. Connect Spotify and Jovie builds your profile, smart links to every streaming service and a page for each release. Fans who sign up are yours, and Jovie emails them when the next song drops.",
@@ -104,7 +104,7 @@
       "id": "v10-owned-fan-list-then-vision",
       "frame": "wedge-vision",
       "icp": "independent-artists",
-      "status": "candidate",
+      "status": "active",
       "lines": {
         "one_liner": "The fan list every independent artist owns",
         "what_building": "Independent musicians have listeners on Spotify and no way to reach them when the next song comes out. Jovie fixes that: connect Spotify and it builds your profile and a page for each release, collects fans who sign up into a list you own, and emails them when you release again. Where it's going: the same loop for every creator who releases work on a schedule.",
