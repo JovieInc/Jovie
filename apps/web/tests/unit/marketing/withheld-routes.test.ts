@@ -24,6 +24,8 @@ const PAGE_LOADERS: Record<string, () => Promise<{ metadata?: unknown }>> = {
   '/integrations': () => import('@/app/(marketing)/integrations/page'),
   '/compare': () => import('@/app/(marketing)/compare/page'),
   '/alternatives': () => import('@/app/(marketing)/alternatives/page'),
+  '/proof/methodology': () =>
+    import('@/app/(marketing)/proof/methodology/page'),
 };
 
 const withheld = new Set(WITHHELD_MARKETING_ROUTES.map(entry => entry.route));
@@ -50,6 +52,7 @@ describe('withheld marketing routes', () => {
         APP_ROUTES.INTEGRATIONS,
         APP_ROUTES.COMPARE,
         APP_ROUTES.ALTERNATIVES,
+        APP_ROUTES.PROOF_METHODOLOGY,
       ].sort()
     );
     for (const entry of WITHHELD_MARKETING_ROUTES) {

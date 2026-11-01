@@ -63,6 +63,43 @@ export async function getPublicProofStats(
   }
   return out;
 }
+
+/**
+ * A comparative stat and its ranked entrants, for ProofRankedBarChart. Null
+ * unless the stat is publishable (fresh, founder-approved) and has data.
+ */
+export async function getPublicProofComparison(
+  id: string,
+  now = new Date()
+): Promise<{
+  readonly stat: ResolvedProofStat;
+  readonly entries: readonly {
+    readonly id: string;
+    readonly label: string;
+    readonly value: number;
+    readonly self: boolean;
+  }[];
+} | null> {
+  const definition = getProofStat(id);
+  if (!definition || definition.legalClass !== 'comparative') return null;
+  const { record } = await getProofStatsRecord();
+  const observation = record.observations[id];
+  const stat = resolveProofStat(definition, observation, {
+    now,
+    surface: 'public',
+  });
+  if (stat.state !== 'publishable' || !observation?.breakdown?.length) {
+    return null;
+  }
+  return {
+    stat,
+    entries: observation.breakdown.map((entry, index) => ({
+      id: `${id}-${index}`,
+      ...entry,
+    })),
+  };
+}
+
 export interface ProofStatUpdate {
   readonly id: string;
   readonly observation: ProofStatObservation;
@@ -161,7 +198,14 @@ export interface RecordResult {
   readonly changed: readonly string[];
   readonly events: readonly ProofStatEvent[];
 }
-/** Publish changed observations; carry approval only while the value is unchanged. */
+function sameBreakdown(
+  a: ProofStatObservation['breakdown'],
+  b: ProofStatObservation['breakdown']
+): boolean {
+  return JSON.stringify(a ?? []) === JSON.stringify(b ?? []);
+}
+
+/** Publish changed observations; carry approval only while the claim is unchanged. */
 export async function recordProofObservations(
   updates: readonly ProofStatUpdate[],
   input: {
@@ -176,9 +220,13 @@ export async function recordProofObservations(
   const changed: string[] = [];
   for (const update of updates) {
     const before = observations[update.id];
+    // An approval covers the exact claim the founder saw: the value and, for
+    // comparative stats, every entrant in the breakdown.
     const carried =
       update.observation.approval ??
-      (before && before.value === update.observation.value
+      (before &&
+      before.value === update.observation.value &&
+      sameBreakdown(before.breakdown, update.observation.breakdown)
         ? before.approval
         : null);
     const after: ProofStatObservation = {

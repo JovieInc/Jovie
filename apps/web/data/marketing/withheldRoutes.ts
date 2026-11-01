@@ -59,6 +59,14 @@ export const WITHHELD_MARKETING_ROUTES: readonly WithheldMarketingRoute[] = [
     returnsWhen: 'The hub lists published alternatives with real content.',
     note: 'Leaf pages under /alternatives/* stay published; only the hub is withheld.',
   },
+  {
+    route: '/proof/methodology',
+    reason:
+      'Explains public proof numbers, but no proof stat is published yet.',
+    returnsWhen:
+      'A proof stat renders on a published marketing page and links here.',
+    note: 'Restore to the sitemap when the first bound proof stat ships.',
+  },
 ];
 
 const WITHHELD_PATHS: ReadonlySet<string> = new Set(
