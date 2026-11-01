@@ -59,6 +59,7 @@ vi.mock('@/components/jovie/hooks', () => ({
     isStuckToBottom: true,
     onScroll: vi.fn(),
     scrollContainerRef: { current: null },
+    setStuckToBottom: vi.fn(),
     totalSizeRef: { current: null },
   }),
 }));

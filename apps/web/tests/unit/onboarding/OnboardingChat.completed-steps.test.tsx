@@ -28,6 +28,8 @@ const chatMocks = vi.hoisted(() => ({
   setMessages: vi.fn(),
   status: 'ready' as 'ready' | 'submitted' | 'streaming',
   stop: vi.fn(),
+  scrollContainerRef: { current: null as HTMLDivElement | null },
+  setStuckToBottom: vi.fn(),
 }));
 
 vi.mock('ai', () => ({
@@ -95,7 +97,8 @@ vi.mock('@/components/jovie/hooks', () => ({
   useStickToBottom: () => ({
     isStuckToBottom: true,
     onScroll: vi.fn(),
-    scrollContainerRef: { current: null },
+    scrollContainerRef: chatMocks.scrollContainerRef,
+    setStuckToBottom: chatMocks.setStuckToBottom,
     totalSizeRef: { current: null },
   }),
 }));
@@ -417,5 +420,60 @@ describe('OnboardingChat Pen transcript anatomy (R6As7U)', () => {
     // Widget column starts at the agent text edge (no avatar-gutter indent).
     const widgetColumn = screen.getByTestId('handle-card').parentElement;
     expect(widgetColumn?.className).not.toMatch(/\bpl-\d/);
+  });
+});
+
+describe('OnboardingChat docked composer scroll (JOV-10131)', () => {
+  beforeEach(() => {
+    chatMocks.messages = [];
+    chatMocks.status = 'ready';
+    chatMocks.setStuckToBottom.mockClear();
+  });
+
+  it('re-pins the transcript to the bottom when the composer docks and on each user turn', () => {
+    const writes: number[] = [];
+    const scrollHeight = vi
+      .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+      .mockReturnValue(900);
+    const scrollTop = vi
+      .spyOn(HTMLElement.prototype, 'scrollTop', 'set')
+      .mockImplementation(value => {
+        writes.push(value);
+      });
+    const userTurn = (id: string, text: string) => ({
+      id,
+      role: 'user' as const,
+      parts: [{ type: 'text', text }],
+    });
+    chatMocks.messages = [
+      userTurn('u1', 'I want to claim jov.ie/gpwoaiyp.'),
+      {
+        id: 'a1',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'Tell me your name.' }],
+      },
+      userTurn('u2', 'unmarkedpavement'),
+      handleMessage('a2', 'check_handle', 'unmarkedpavement'),
+    ];
+
+    const { rerender } = renderChat();
+
+    // Docked (two user turns): the thread was pinned to the top while
+    // centered, so the dock must move it to the bottom and re-arm sticking.
+    expect(writes.at(-1)).toBe(900);
+    expect(chatMocks.setStuckToBottom).toHaveBeenLastCalledWith(true);
+
+    chatMocks.setStuckToBottom.mockClear();
+    chatMocks.messages = [
+      ...chatMocks.messages,
+      userTurn('u3', 'unmarkedpave'),
+    ];
+    rerender(
+      <OnboardingChat turnstileToken='token' turnstileStatus='verified' />
+    );
+    expect(chatMocks.setStuckToBottom).toHaveBeenCalledExactlyOnceWith(true);
+
+    scrollHeight.mockRestore();
+    scrollTop.mockRestore();
   });
 });
