@@ -44,7 +44,7 @@ function shownWhenText(stat: ProofStatDefinition): string {
     parts.push(
       `at ${stat.ceiling.toLocaleString('en-US')}${UNIT[stat.unit]} or less`
     );
-  if (stat.legalClass !== 'plain') parts.push('after founder review');
+  if (stat.legalClass !== 'plain') parts.push('after human review');
   return parts.length ? `Shown ${parts.join(', ')}` : 'Shown whenever current';
 }
 
@@ -85,7 +85,7 @@ export function ProofMethodology({ stats, className }: ProofMethodologyProps) {
           </li>
           <li>
             Comparisons with other platforms use public pages only and appear
-            after founder review.
+            after human review.
           </li>
         </ul>
       </section>

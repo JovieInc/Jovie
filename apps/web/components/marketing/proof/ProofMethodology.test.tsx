@@ -23,7 +23,7 @@ describe('ProofMethodology', () => {
     expect(ttfb).toHaveTextContent('Shown at 200 ms or less');
     expect(ttfb).toHaveTextContent('Hidden if older than 9 days');
     expect(document.getElementById('profile_lcp_rank')).toHaveTextContent(
-      'after founder review'
+      'after human review'
     );
     expect(document.getElementById('security_open_critical')).toHaveTextContent(
       'Shown exactly'
