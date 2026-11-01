@@ -16,6 +16,7 @@ import {
   disableSummerTransport,
   resetSummerTransportRuntime,
 } from '@/lib/ovie/summer-transport';
+import { PRODCERT_CHAT_HEALTH_CANARY_EMAIL } from '@/lib/synthetic/prodcert-identities';
 
 const hoisted = vi.hoisted(() => ({
   tryHandleAnonymousOnboardingChatMock: vi.fn(),
@@ -132,6 +133,12 @@ vi.mock('@/lib/chat/turns', () => ({
 
 vi.mock('@/lib/db', () => ({
   db: {},
+}));
+// The canary-exemption tests proceed past rate limiting; the profile access
+// check is denied shallowly so the turn never reaches the model or a deep
+// database mock.
+vi.mock('@/lib/auth/profile-access', () => ({
+  getExactProfileAccess: vi.fn(async () => ({ ok: false, reason: 'denied' })),
 }));
 
 vi.mock('@/lib/utils/logger', () => ({
@@ -276,6 +283,7 @@ function makeAccountContext(
   overrides: Partial<{
     plan: 'free' | 'pro' | 'max';
     billingVerification: 'verified' | 'unavailable';
+    email: string;
   }> = {}
 ): ChatAccountContext {
   const billingVerification = overrides.billingVerification ?? 'verified';
@@ -293,7 +301,7 @@ function makeAccountContext(
           ? 'Pro'
           : 'Free';
   return {
-    email: 'artist@example.com',
+    email: overrides.email ?? 'artist@example.com',
     plan,
     displayPlan,
     isPro,
@@ -443,6 +451,77 @@ describe('POST /api/chat guard wiring', () => {
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
   });
 
+  it('passes skipWeeklyQuota for the chat-health canary and never bypasses the limiter (JOV-9625)', async () => {
+    hoisted.resolveChatAccountContextMock.mockResolvedValue(
+      makeAccountContext({ email: PRODCERT_CHAT_HEALTH_CANARY_EMAIL })
+    );
+    hoisted.checkAiChatRateLimitForPlanMock.mockResolvedValue({
+      success: true,
+      limit: 30,
+      remaining: 29,
+      reset: new Date(Date.now() + 60_000),
+    });
+
+    const response = await POST(chatRequest(validBody()));
+
+    // The limiter IS still consulted — the route never returns a literal
+    // success without it — and the weekly-only skip is requested for the
+    // canary identity. The skip's semantics (weekly never charged, burst
+    // still enforced) are pinned in tests/unit/lib/rate-limit/limiters.test.ts.
+    expect(hoisted.checkAiChatRateLimitForPlanMock).toHaveBeenCalledWith(
+      '00000000-0000-4000-8000-000000000123',
+      'pro',
+      { skipWeeklyQuota: true }
+    );
+    // The turn proceeds past rate limiting (the denied profile access below
+    // is the shallow stop; the response is never the rate-limit rejection).
+    expect(response.status).not.toBe(429);
+    const body = await response.json().catch(() => null);
+    expect(body?.errorCode).not.toBe('RATE_LIMITED');
+  });
+
+  it('keeps the returning canary metered: no weekly skip (JOV-9625)', async () => {
+    hoisted.resolveChatAccountContextMock.mockResolvedValue(
+      makeAccountContext({ email: 'browse-ready+clerk_test@jov.ie' })
+    );
+    hoisted.checkAiChatRateLimitForPlanMock.mockResolvedValue({
+      success: true,
+      limit: 30,
+      remaining: 29,
+      reset: new Date(Date.now() + 60_000),
+    });
+
+    await POST(chatRequest(validBody()));
+
+    // Only the dedicated chat-health canary skips the weekly quota; the
+    // golden-path-walk identity stays metered (#23703).
+    expect(hoisted.checkAiChatRateLimitForPlanMock).toHaveBeenCalledWith(
+      '00000000-0000-4000-8000-000000000123',
+      'pro',
+      { skipWeeklyQuota: false }
+    );
+  });
+
+  it('does not request the weekly skip for a non-canary identity (JOV-9625)', async () => {
+    hoisted.resolveChatAccountContextMock.mockResolvedValue(
+      makeAccountContext({ email: 'artist@example.com' })
+    );
+    hoisted.checkAiChatRateLimitForPlanMock.mockResolvedValue({
+      success: true,
+      limit: 30,
+      remaining: 29,
+      reset: new Date(Date.now() + 60_000),
+    });
+
+    await POST(chatRequest(validBody()));
+
+    expect(hoisted.checkAiChatRateLimitForPlanMock).toHaveBeenCalledWith(
+      '00000000-0000-4000-8000-000000000123',
+      'pro',
+      { skipWeeklyQuota: false }
+    );
+  });
+
   it('returns 429 with Retry-After and rate-limit headers when the plan-aware limiter is exhausted, without dispatching the LLM', async () => {
     const reset = new Date(Date.now() + 60_000);
     hoisted.checkAiChatRateLimitForPlanMock.mockResolvedValue({
@@ -474,7 +553,8 @@ describe('POST /api/chat guard wiring', () => {
     // from the entitlement resolver, not values from the request body.
     expect(hoisted.checkAiChatRateLimitForPlanMock).toHaveBeenCalledWith(
       '00000000-0000-4000-8000-000000000123',
-      'pro'
+      'pro',
+      { skipWeeklyQuota: false }
     );
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
     expect(hoisted.reserveChatTurnMock).not.toHaveBeenCalled();
@@ -503,7 +583,8 @@ describe('POST /api/chat guard wiring', () => {
     expect(body.message).toMatch(/billing/i);
     expect(hoisted.checkAiChatRateLimitForPlanMock).toHaveBeenCalledWith(
       '00000000-0000-4000-8000-000000000123',
-      'free'
+      'free',
+      { skipWeeklyQuota: false }
     );
   });
 

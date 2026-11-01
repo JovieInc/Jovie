@@ -31,11 +31,21 @@ The release PR changes only CHANGELOG.md and follows exact-head source CI, the n
 No CalVer, package version, tag, desktop release or alias is mutated. Implementation-branch restrictions remain.
 The draft follows the same path as every other PR: Auto-Ready green-source undrafts it once every required check passes at the observed head, and Merge Queue Green Enroll admits it. The production publisher is not a second merge owner.
 
+Because Auto-Ready green-source only undrafts a draft whose body carries a complete `jovie-writer-pr-proof/v1` receipt bound to the exact head and PR author (JOV-INV-022), the publisher attaches that receipt right after `gh pr create` with `scripts/attach-changelog-writer-proof.mjs` (JOV-10216). The Production Controller is the release PR's writer and its verified publication plan is the receipt's evidence, so the documented undraft path can complete without a manual click; the source CI, undraft conditions and queue admission are unchanged. Without the receipt the release PR could only be undrafted manually, which froze publication 2026-10-25..29 and again 2026-10-29..11-01.
+
 At most three grouped outcomes per UTC date. Later changes append to that post, preserving copy, source/runtime provenance and whole-post dismissal. Overflow remains pending for the next date. Source IDs are persisted in receipts.
 No-change/deferral plans are retained as workflow artifacts; validation failures fail the job.
 Recovered work is dated when its path is verified, never its merge date. `--seed <file>` accepts reviewed `{number, note}` records for recovery without modifying historical PR bodies.
 
 The customer archive, release detail, hero, and customer-entry feeds use the persisted slug. Alias anchors resolve to the same entry. If a receipted entry is withdrawn from public sections, its fragments resolve to an explicit unpublished tombstone and never to another update. Daily-post dismissal stays keyed to the existing date/version post identity.
+
+## Catch-up mode
+
+After a long gap, `publish-daily-changelog.mjs --catch-up` (workflow: repo variable `CHANGELOG_CATCH_UP=1` for one run) folds the backlog into one post of at most three area stories (Mac app, Sidebar and inbox, Profiles, releases and onboarding), each a lead outcome plus up to three bullets. Every line is an outcome's own approved copy mapped to its own claim; outcomes that do not fit stay deferred. Ongoing releases keep the three-outcomes-per-day cap. Catch-up never sends email.
+
+## Stuck-publication guard and staleness alarm
+
+One open `release/daily-changelog-*` PR owns publication. If it has been open 6 hours and is not in the merge queue, the publish job closes it and regenerates from the last merged receipt, so a stuck draft can no longer freeze the changelog (the 2026-10-25..29 gap). `changelog-staleness` (Production Controller, after each Production Verified) files a `production-monitor-customer-changelog-stale` Summer signal when release-worthy changes have been live in production for over 24 hours with no entry, and resolves it when one lands. Customer surfaces list entries newest first regardless of where a post sits in CHANGELOG.md.
 
 ## Verification and cost
 

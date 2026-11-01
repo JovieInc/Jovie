@@ -30,14 +30,14 @@ describe('lead build hold', () => {
   });
 });
 
-describe('migration 0152 guard', () => {
+describe('migration 0162 guard', () => {
   it('keeps the trigger and the live backfill', async () => {
     const { readFileSync } = await import('node:fs');
     const { fileURLToPath } = await import('node:url');
     const sql = readFileSync(
       fileURLToPath(
         new URL(
-          '../../drizzle/migrations/0152_lead_build_hold.sql',
+          '../../drizzle/migrations/0162_lead_build_hold.sql',
           import.meta.url
         )
       ),

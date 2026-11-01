@@ -69,7 +69,16 @@ describe('readPacketFilesWithGoldenPath', () => {
       ],
     });
     const read = await readPacketFilesWithGoldenPath(() => backend);
-    expect(read.files.map(f => f.domain)).toEqual(['public_profiles']);
+    // Every launch surface projects a row; unrecorded surfaces carry the
+    // explicit missing state instead of vanishing (JOV-9625 outcome rework).
+    expect(read.files).toHaveLength(8);
+    expect(read.files.find(f => f.surface === 'Public profile')?.domain).toBe(
+      'public_profiles'
+    );
+    const missing = read.files.find(f => f.surface === 'Landing');
+    expect(missing?.packet.operational?.runtimeDogfood?.[0]?.summary).toContain(
+      'state=missing'
+    );
   });
 
   it('reports a broken ledger as an issue instead of hiding committed packets', async () => {

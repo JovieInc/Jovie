@@ -1463,6 +1463,41 @@ describe('production marker attempt state', () => {
       });
     });
 
+    it('stays verified when the run was cancelled during publication only', () => {
+      const jobs: Array<[string, string]> = [
+        ...run37144574062.slice(0, -1),
+        ['Publish verified customer changelog', 'cancelled'],
+      ];
+      const marker = replayMarker(jobs, sha);
+      marker.attemptRun.conclusion = 'cancelled';
+      expect(
+        classifyProductionMarkerEvidence(
+          evidence({
+            markers: [marker],
+            latestRun: run(1, 'completed', 'cancelled'),
+          })
+        )
+      ).toMatchObject({ state: 'verified' });
+    });
+
+    it('keeps a cancelled run interrupted when a deploy job was cancelled', () => {
+      const jobs = run37144574062.map(([n, c]): [string, string] =>
+        n === 'Production Release / Promote to Production'
+          ? [n, 'cancelled']
+          : [n, c]
+      );
+      const marker = replayMarker(jobs, sha);
+      marker.attemptRun.conclusion = 'cancelled';
+      expect(
+        classifyProductionMarkerEvidence(
+          evidence({
+            markers: [marker],
+            latestRun: run(1, 'completed', 'cancelled'),
+          })
+        ).state
+      ).toBe('recovery_available');
+    });
+
     it('stays verified when the publication remediation filer also failed', () => {
       const jobs: Array<[string, string]> = [
         ...run37144574062,
@@ -2196,6 +2231,95 @@ describe('recovered production marker state', () => {
       state: 'manual',
       reason: 'recovery_evidence_after_verified_primary',
     });
+  });
+
+  // JOV-9971: the exact store state left by Production Marker Recovery run
+  // 40976011313 for 5cbe0cb — an interrupted primary whose producer run was
+  // cancelled during post-verification publication, plus the recovery
+  // receipt bound to that exact producer attempt. #23801 reclassified the
+  // primary as verified, which broke the interrupted-only replacement
+  // pairing and froze every later release (run 40994378769,
+  // duplicate_primary_marker). The pairing must follow the reclassification.
+  const cancelledPublicationJobs = (): Array<[string, string]> => [
+    ['Production Release / Migrate production database', 'success'],
+    ['Production Release / Promote to Production', 'success'],
+    ['Production Release / Sentry Error Gate (production)', 'success'],
+    ['Production Release / Centralized production rollback', 'skipped'],
+    ['Production Verified', 'success'],
+    ['Publish verified customer changelog', 'cancelled'],
+  ];
+
+  function cancelledPublicationPrimary() {
+    const marker = primaryMarker('completed', 'cancelled');
+    marker.attemptJobs = cancelledPublicationJobs().map(([name, conclusion]) =>
+      job(name, 1, 'completed', conclusion)
+    );
+    return marker;
+  }
+
+  function healedPair() {
+    const primary = cancelledPublicationPrimary();
+    const recovered = recoveredMarker();
+    recovered.payload.deploymentId = primary.payload.deploymentId;
+    recovered.originalRun = run(1, 'completed', 'cancelled');
+    return { primary, recovered };
+  }
+
+  it('resolves a recovery receipt bound to a cancelled-publication primary as verified', () => {
+    const { primary, recovered } = healedPair();
+    expect(
+      classifyProductionMarkerEvidence(
+        evidence({ markers: [primary, recovered], latestRun: undefined })
+      )
+    ).toMatchObject({
+      state: 'verified',
+      reason: 'exact_recovered_generation_verified',
+      controllerRun: recoveryRunId,
+      deploymentId: 'dpl_primary123',
+    });
+  });
+
+  it('still refuses a recovery receipt bound to a different source attempt', () => {
+    const { primary, recovered } = healedPair();
+    recovered.payload.recoveredFromControllerAttempt = '2';
+    recovered.originalRun = run(2, 'completed', 'cancelled');
+    recovered.originalJobs = [
+      job(
+        'Production Release / Centralized production rollback',
+        2,
+        'completed',
+        'skipped'
+      ),
+    ];
+    expect(
+      classifyProductionMarkerEvidence(
+        evidence({ markers: [primary, recovered], latestRun: undefined })
+      ).state
+    ).toBe('manual');
+  });
+
+  it('still refuses a recovery receipt beside a genuinely successful primary', () => {
+    const primary = primaryMarker('completed', 'success');
+    const recovered = recoveredMarker();
+    recovered.payload.deploymentId = primary.payload.deploymentId;
+    expect(
+      classifyProductionMarkerEvidence(
+        evidence({ markers: [primary, recovered], latestRun: undefined })
+      )
+    ).toMatchObject({
+      state: 'manual',
+      reason: 'duplicate_primary_marker',
+    });
+  });
+
+  it('still refuses a recovery receipt when the deployment binding diverges', () => {
+    const { primary, recovered } = healedPair();
+    recovered.payload.deploymentId = 'dpl_other999';
+    expect(
+      classifyProductionMarkerEvidence(
+        evidence({ markers: [primary, recovered], latestRun: undefined })
+      ).state
+    ).toBe('manual');
   });
 });
 

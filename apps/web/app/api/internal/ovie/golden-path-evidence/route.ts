@@ -11,6 +11,7 @@ import {
   ProdGoldenPathPersistenceError,
   type ProdGoldenPathReceipt,
   recordProdGoldenPathRun,
+  recordQualityContractObservations,
 } from '@/lib/ovie/certifications/prod-golden-path-ledger';
 import { postgresRecordBackend } from '@/lib/ovie/mcp/postgres-backend';
 import { logger } from '@/lib/utils/logger';
@@ -25,7 +26,9 @@ import { logger } from '@/lib/utils/logger';
 export const runtime = 'nodejs';
 
 const ROUTE = '/api/internal/ovie/golden-path-evidence';
-const MAX_BODY_BYTES = 256 * 1024;
+// Eight per-surface receipts, each possibly carrying a JPEG evidence frame
+// (JOV-9625): 8 × ~250KB data-URL ceiling leaves headroom under ~4MB.
+const MAX_BODY_BYTES = 4 * 1024 * 1024;
 
 const text = z.string().min(1).max(2_000);
 const iso = z.string().datetime({ offset: true });
@@ -71,6 +74,27 @@ const receiptSchema = z
           .strict()
       )
       .max(40),
+    // Per-surface browser evidence (JOV-9625). Null/absent means the surface
+    // was not browser-exercised — recorded as absent, never as a clean zero.
+    consoleErrorCount: z.number().int().nonnegative().nullish(),
+    networkErrorCount: z.number().int().nonnegative().nullish(),
+    screenshot: z
+      .object({
+        format: z.literal('jpeg'),
+        dataUrl: z.string().startsWith('data:image/jpeg;base64,').max(400_000),
+      })
+      .strict()
+      .nullish(),
+    // One admin certifications-inventory readback per run, carried on the
+    // landing receipt. Evidence only: a not-viable admin fixture records
+    // 'blocked' with the exact reason and never turns a surface red.
+    adminInventoryReadback: z
+      .object({
+        status: z.enum(['passed', 'blocked', 'failed']),
+        detail: z.string().max(2_000),
+      })
+      .strict()
+      .nullish(),
   })
   .strict();
 
@@ -87,6 +111,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     handle: async data => {
       try {
         const result = await recordProdGoldenPathRun({
+          backend: postgresRecordBackend(),
+          receipts: data.receipts as unknown as ProdGoldenPathReceipt[],
+        });
+        // JOV-9625 outcome rework: fold the run's quality-contract
+        // observations into the observations ledger so the six contracts'
+        // observed values are populated from evidence.
+        await recordQualityContractObservations({
           backend: postgresRecordBackend(),
           receipts: data.receipts as unknown as ProdGoldenPathReceipt[],
         });

@@ -9,8 +9,10 @@ import { render, screen } from '@testing-library/react';
 import { createElement } from 'react';
 import * as ts from 'typescript';
 import { describe, expect, it, vi } from 'vitest';
+import { ArtistNotificationsLanding } from '@/components/marketing/artist-notifications/ArtistNotificationsLanding';
 import { ArtistProfileSectionShell } from '@/components/marketing/artist-profile/ArtistProfileSectionShell';
 import { HomepageV2Route } from '@/components/marketing/homepage-v2/HomepageV2Route';
+import { ARTIST_NOTIFICATIONS_COPY } from '@/data/artistNotificationsCopy';
 import {
   BUTTON_PEN_PROPAGATION_FIXTURES,
   DESIGN_SYSTEM_COMPONENT_IDS,
@@ -1772,6 +1774,20 @@ it('preserves the mounted homepage front-door auth boundary and public secondary
   const publicLink = container.querySelector('a.public-action-secondary');
   expect(publicLink).toHaveAttribute('href', '/artist-profiles');
   expect(publicLink).toHaveAttribute('data-test-prefetch', 'undefined');
+});
+
+// JOV-8780: the artist-notifications landing is a night-stage page root —
+// the certified light-mode token scopes in design-system.css key on this
+// class, so it must survive refactors of the landing composition.
+it('renders the artist-notifications landing on its night-stage page-root hook', () => {
+  const { container } = render(
+    createElement(ArtistNotificationsLanding, {
+      copy: ARTIST_NOTIFICATIONS_COPY,
+    })
+  );
+  expect(container.firstElementChild).toHaveClass(
+    'artist-notifications-landing'
+  );
 });
 
 const OWN_WIDTH_CAP =

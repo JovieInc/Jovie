@@ -57,8 +57,8 @@ export function isPendingNativeCohortCutoverField(field) {
 }
 
 export const NATIVE_QUEUE_POLICY = Object.freeze({
-  // Synced to live ruleset 10512119 on 2026-10-29 (.github/MERGE_QUEUE.md
-  // tuning log, Tim-approved): HEADGREEN grouping, eight groups build at once,
+  // Synced to live ruleset 10512119 on 2026-10-31 (.github/MERGE_QUEUE.md
+  // tuning log, Tim-approved): HEADGREEN grouping, four groups build at once,
   // up to ten green entries land per push. Every lower live build count stays
   // supported for rollback. Group CI spends repo GITHUB_TOKEN quota, so raise
   // this and the live ruleset together. Preserve HEADGREEN: only the group
@@ -67,7 +67,7 @@ export const NATIVE_QUEUE_POLICY = Object.freeze({
   // instead of holding the queue head for an hour.
   check_response_timeout_minutes: 30,
   grouping_strategy: 'HEADGREEN',
-  max_entries_to_build: 8,
+  max_entries_to_build: 4,
   max_entries_to_merge: 10,
   merge_method: 'SQUASH',
   min_entries_to_merge: NATIVE_QUEUE_COHORT_POLICY.minEntriesToMerge,

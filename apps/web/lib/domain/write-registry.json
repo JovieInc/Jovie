@@ -53,6 +53,7 @@
       "exports": [
         "updateProfileById",
         "updateProfileByClerkId",
+        "holdLeadBuiltProfileInTx",
         "publishProfile"
       ],
       "tables": ["creatorProfiles"]
@@ -159,6 +160,13 @@
       "module": "apps/web/lib/youtube-library/thumbnail-review.ts",
       "exports": ["registerThumbnailCandidateReview"],
       "tables": []
+    },
+    {
+      "id": "leads.lead-claim-token",
+      "entity": "lead claim token",
+      "module": "apps/web/lib/leads/lead-claim-token.ts",
+      "exports": ["persistLeadClaimToken"],
+      "tables": ["creatorProfiles"]
     }
   ],
   "agentTools": {

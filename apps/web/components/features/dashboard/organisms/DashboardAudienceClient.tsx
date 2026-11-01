@@ -86,20 +86,26 @@ export function DashboardAudienceClient({
       mode={panelMode}
       onModeChange={setPanelMode}
     >
-      <DashboardAudienceClientInner
-        mode={mode}
-        view={view}
-        initialRows={initialRows}
-        total={total}
-        sort={sort}
-        direction={direction}
-        profileUrl={profileUrl}
-        profileId={profileId}
-        subscriberCount={subscriberCount}
-        totalAudienceCount={totalAudienceCount}
-        filters={initialFilters}
-        tourDates={tourDates}
-      />
+      {/* The boundary must live ABOVE DashboardAudienceClientInner:
+          useAudienceInfiniteQuery (throwOnError) throws during Inner's own
+          render, so a boundary inside Inner's returned JSX never mounts and
+          the throw blanks the whole route (resilience.spec.ts, JOV-8791). */}
+      <QueryErrorBoundary fallback={DashboardErrorFallback}>
+        <DashboardAudienceClientInner
+          mode={mode}
+          view={view}
+          initialRows={initialRows}
+          total={total}
+          sort={sort}
+          direction={direction}
+          profileUrl={profileUrl}
+          profileId={profileId}
+          subscriberCount={subscriberCount}
+          totalAudienceCount={totalAudienceCount}
+          filters={initialFilters}
+          tourDates={tourDates}
+        />
+      </QueryErrorBoundary>
     </ControlledAudiencePanelProvider>
   );
 }
@@ -214,35 +220,33 @@ function DashboardAudienceClientInner({
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   return (
-    <QueryErrorBoundary fallback={DashboardErrorFallback}>
-      <div
-        data-testid='dashboard-audience-client'
-        className='flex h-full min-h-0 flex-col'
-      >
-        <NavigationDestinationReady destination='contacts' />
-        <div className='flex-1 min-h-0 flex flex-col'>
-          <DashboardAudienceWorkspace
-            mode={mode}
-            view={view}
-            rows={rows}
-            total={totalCount}
-            sort={sort}
-            direction={direction}
-            onSortChange={handleSortChange}
-            onViewChange={handleViewChange}
-            onFiltersChange={handleFiltersChange}
-            profileUrl={profileUrl}
-            profileId={profileId}
-            subscriberCount={subscriberCount}
-            totalAudienceCount={totalAudienceCount}
-            filters={initialFilters}
-            hasNextPage={hasNextPage}
-            isFetchingNextPage={isFetchingNextPage}
-            onLoadMore={handleLoadMore}
-            tourDates={tourDates}
-          />
-        </div>
+    <div
+      data-testid='dashboard-audience-client'
+      className='flex h-full min-h-0 flex-col'
+    >
+      <NavigationDestinationReady destination='contacts' />
+      <div className='flex-1 min-h-0 flex flex-col'>
+        <DashboardAudienceWorkspace
+          mode={mode}
+          view={view}
+          rows={rows}
+          total={totalCount}
+          sort={sort}
+          direction={direction}
+          onSortChange={handleSortChange}
+          onViewChange={handleViewChange}
+          onFiltersChange={handleFiltersChange}
+          profileUrl={profileUrl}
+          profileId={profileId}
+          subscriberCount={subscriberCount}
+          totalAudienceCount={totalAudienceCount}
+          filters={initialFilters}
+          hasNextPage={hasNextPage}
+          isFetchingNextPage={isFetchingNextPage}
+          onLoadMore={handleLoadMore}
+          tourDates={tourDates}
+        />
       </div>
-    </QueryErrorBoundary>
+    </div>
   );
 }

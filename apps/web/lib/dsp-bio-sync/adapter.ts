@@ -77,6 +77,9 @@ export function createBioSubmissionAdapter(input: {
       });
       const result = await withTimeout(
         input.send({
+          stream: 'transactional',
+          purpose: 'dsp-bio-update',
+          consent: 'artist-request',
           to: manifest.recipient,
           ...content,
           idempotencyKey,

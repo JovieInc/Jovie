@@ -673,6 +673,27 @@ class StandaloneAndHeadroomTest(unittest.TestCase):
         self.assertEqual(set(report["kept"]), {"dirty", "1-unpublished", "stash", "linked-worktrees",
                                               "keep-marker", "state-referenced", "busy"})
 
+    def test_unpublished_retired_clone_loses_build_output_but_keeps_work(self):
+        path = self.clone("grok-ship-workspaces/JOV/JOV-9")
+        (path / "b.txt").write_text("b\n")
+        git(path, "add", ".")
+        git(path, "commit", "-qm", "local only")
+        (path / "node_modules/x").mkdir(parents=True)
+        (path / "node_modules/x/big.bin").write_bytes(b"0" * 4096)
+        report = sweeper.sweep_standalone(self.home, self.state, [], [], now=self.now, run=no_processes)
+        self.assertTrue(path.exists())
+        self.assertTrue((path / "b.txt").exists())
+        self.assertFalse((path / "node_modules").exists())
+        self.assertGreater(report["artifactsFreedKiB"], 0)
+
+    def test_archive_branch_counts_as_published(self):
+        path = self.clone("grok-wt/archived")
+        (path / "c.txt").write_text("c\n")
+        git(path, "add", ".")
+        git(path, "commit", "-qm", "work")
+        git(path, "push", "-q", "origin", "HEAD:refs/heads/archive/grok-ship/archived")
+        self.assertEqual(self.sweep()["removed"], [str(path)])
+
     def test_recent_clone_and_unreadable_process_inventory_keep_everything(self):
         path = self.clone("wt-fresh")
         self.assertEqual(self.sweep(idle_s=30 * DAY)["kept"], {"recent": 1})

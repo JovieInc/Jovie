@@ -4,6 +4,11 @@ import type { ZodType } from 'zod';
 import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import { captureError } from '@/lib/error-tracking';
+import {
+  SUBSCRIPTION_MANAGEMENT_COOKIE,
+  verifySubscriptionManagementToken,
+} from '@/lib/notifications/management-token';
+import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
 import { generalLimiter, getClientIP } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 import {
@@ -12,7 +17,10 @@ import {
   createServerErrorResponse,
 } from './route-helpers';
 
-/** Only allow field updates within 5 minutes of subscription creation. */
+/**
+ * Field updates also stay limited to 5 minutes after subscription creation,
+ * on top of the signup-session token.
+ */
 const UPDATE_WINDOW_MS = 5 * 60 * 1000;
 
 interface FieldUpdateOptions {
@@ -63,7 +71,25 @@ export async function handleSubscriberFieldUpdate(
   }
 
   const data = parsed.data as Record<string, string>;
-  const { artist_id, email } = data;
+  const { artist_id } = data;
+  const email = normalizeSubscriptionEmail(data.email);
+
+  // Holding an address is not proof of owning the subscription. The signed
+  // cookie is issued only when the signup proved mailbox control (email OTP),
+  // bound to this (artist, email) pair.
+  const sessionToken = request.cookies.get(
+    SUBSCRIPTION_MANAGEMENT_COOKIE
+  )?.value;
+  if (
+    !email ||
+    !verifySubscriptionManagementToken(sessionToken, artist_id, email)
+  ) {
+    return createNotificationJsonResponse(
+      { success: false, error: 'Verify your email to update your details' },
+      403,
+      rateLimitResult
+    );
+  }
   const fieldValues = options.extractField(data);
 
   if (options.sanitize) {

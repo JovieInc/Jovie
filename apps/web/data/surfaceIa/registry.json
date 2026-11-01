@@ -1,0 +1,174 @@
+{
+  "$schema": "jovie.surface-ia/v1",
+  "_comment": "One canonical shell and IA registry for every Jovie surface (app, Ovie, public profile, smart link, marketing). Human contract: docs/design-system/shell-ia.md. Enforced by JOV-INV-047 (scripts/invariants/shell-ia.mjs). Paths are relative to apps/web. App screen recipes stay in data/appScreens; route scaffolds stay in docs/design-system/app-shell-route-scaffold-matrix.md.",
+  "northStar": {
+    "source": "https://linear.app/jovie/issue/JOV-9748",
+    "statement": "The main content area is a living canvas. Chrome recedes; one motion grammar (circle, composer, voice) carries presence.",
+    "motionGrammar": {
+      "circle": {
+        "source": "../../packages/ui/brand/JovieO.tsx",
+        "export": "JovieO"
+      },
+      "composer": {
+        "source": "components/features/chat/Composer.tsx",
+        "export": "ComposerFocusProvider"
+      }
+    }
+  },
+  "primitives": {
+    "appShell": {
+      "source": "components/organisms/AuthShell.tsx",
+      "export": "AuthShell"
+    },
+    "appFrame": {
+      "source": "components/organisms/AppShellFrame.tsx",
+      "export": "AppShellFrame"
+    },
+    "appContent": {
+      "source": "components/organisms/AppShellContentPanel.tsx",
+      "export": "AppShellContentPanel"
+    },
+    "appContentAdapter": {
+      "source": "components/organisms/PageShell.tsx",
+      "export": "PageShell"
+    },
+    "workspacePage": {
+      "source": "components/organisms/WorkspacePage.tsx",
+      "export": "WorkspacePage"
+    },
+    "pageHeader": {
+      "source": "components/features/dashboard/organisms/DashboardHeader.tsx",
+      "export": "DashboardHeader"
+    },
+    "pageToolbar": {
+      "source": "components/organisms/table/molecules/PageToolbar.tsx",
+      "export": "PageToolbar"
+    },
+    "subNavRoute": {
+      "source": "components/molecules/RouteSegmentControl.tsx",
+      "export": "RouteSegmentControl",
+      "required": {
+        "surface": "ghost"
+      }
+    },
+    "subNavLocal": {
+      "source": "components/organisms/table/molecules/PageToolbar.tsx",
+      "export": "PageToolbarTabButton"
+    },
+    "sidebarRow": {
+      "source": "components/shell/SidebarNavItem.tsx",
+      "export": "SidebarNavItem"
+    },
+    "emptyState": {
+      "source": "components/molecules/EmptyState.tsx",
+      "export": "EmptyState",
+      "canvasPresentation": "quiet"
+    },
+    "routeSkeleton": {
+      "source": "components/shell/DashboardSegmentSkeleton.tsx",
+      "export": "DashboardSegmentSkeleton"
+    },
+    "shellSkeleton": {
+      "source": "components/organisms/AppShellSkeleton.tsx",
+      "export": "AppShellSkeleton"
+    },
+    "publicShell": {
+      "source": "components/site/PublicPageShell.tsx",
+      "export": "PublicPageShell"
+    },
+    "marketingHeader": {
+      "source": "components/site/MarketingHeader.tsx",
+      "export": "MarketingHeader"
+    },
+    "marketingFooter": {
+      "source": "components/site/MarketingFooter.tsx",
+      "export": "MarketingFooter"
+    },
+    "profileShell": {
+      "source": "components/features/profile/templates/ProfileCompactTemplate.tsx",
+      "export": "ProfileCompactTemplate"
+    },
+    "smartLinkShell": {
+      "source": "components/features/profile/ProfileDrawerShell.tsx",
+      "export": "ProfileDrawerShell"
+    }
+  },
+  "surfaces": [
+    {
+      "id": "app",
+      "label": "Jovie app",
+      "shell": "appShell",
+      "navigation": {
+        "source": "components/features/dashboard/dashboard-nav/config.ts",
+        "export": "primaryNavigation",
+        "model": "rail",
+        "maxRootItems": 4
+      },
+      "header": "pageHeader",
+      "routes": [
+        "/app",
+        "/app/chat",
+        "/app/presence",
+        "/app/library",
+        "/app/contacts",
+        "/app/releases",
+        "/app/settings/account"
+      ]
+    },
+    {
+      "id": "ovie",
+      "label": "Ovie",
+      "shell": "appShell",
+      "navigation": {
+        "source": "components/organisms/operator-navigation.ts",
+        "export": "OPERATOR_NAV_ITEMS",
+        "model": "rail"
+      },
+      "header": "pageHeader",
+      "routes": ["/app/admin", "/app/admin/inbox"],
+      "publicPath": "/app/ov"
+    },
+    {
+      "id": "public-profile",
+      "label": "Public profile",
+      "shell": "profileShell",
+      "navigation": {
+        "source": "lib/profile/route-config.ts",
+        "export": "PUBLIC_PROFILE_NAVIGATION",
+        "model": "profile-tabs"
+      },
+      "header": null,
+      "routes": ["/tim"]
+    },
+    {
+      "id": "smart-link",
+      "label": "Smart link",
+      "shell": "smartLinkShell",
+      "navigation": null,
+      "header": null,
+      "routes": ["/r/release"]
+    },
+    {
+      "id": "marketing",
+      "label": "Marketing site",
+      "shell": "publicShell",
+      "navigation": {
+        "source": "lib/content-records/site-chrome.ts",
+        "export": "SiteChromeSchema",
+        "model": "header-footer"
+      },
+      "header": "marketingHeader",
+      "routes": ["/pricing", "/product", "/artist-profiles"]
+    }
+  ],
+  "chromeOwners": [
+    "components/organisms/",
+    "components/shell/",
+    "components/site/",
+    "components/molecules/",
+    "components/features/dashboard/dashboard-nav/",
+    "components/features/profile/",
+    "components/marketing/",
+    "packages/ui/"
+  ]
+}

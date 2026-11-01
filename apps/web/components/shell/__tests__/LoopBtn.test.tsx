@@ -8,7 +8,7 @@ describe('LoopBtn', () => {
     const btn = container.querySelector('button');
     expect(btn?.getAttribute('aria-label')).toBe('Loop: off');
     // Active dot only appears when mode !== 'off'.
-    expect(container.querySelectorAll('span').length).toBe(0);
+    expect(container.querySelectorAll('span.bg-primary-token').length).toBe(0);
   });
 
   it('renders the "1" badge when mode is track', () => {

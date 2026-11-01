@@ -153,4 +153,61 @@ describe.each(OTP_PATHS)('email-OTP rate-limit rule (%s)', path => {
       resolveOtpRule(path, makeOtpRequest(path, { type: 'sign-in' }))
     ).resolves.toEqual({ window: 60, max: 3 });
   });
+
+  it('gives the production certification canaries a bounded raised budget on production', async () => {
+    vi.stubEnv('E2E_TEST_MODE', '1');
+    vi.stubEnv('VERCEL_ENV', 'production');
+    // Seeded returning canary (JOV-9625).
+    await expect(
+      resolveOtpRule(
+        path,
+        makeOtpRequest(path, { email: 'browse-ready+clerk_test@jov.ie' })
+      )
+    ).resolves.toEqual({ window: 60, max: 10 });
+    // Per-run new-user canary (JOV-9625).
+    await expect(
+      resolveOtpRule(
+        path,
+        makeOtpRequest(path, {
+          email: 'browse-ready+synthetic-prodcert-411474858891@jov.ie',
+        })
+      )
+    ).resolves.toEqual({ window: 60, max: 10 });
+  });
+
+  it('keeps the raised canary budget bounded — it is a limit, never a bypass', async () => {
+    vi.stubEnv('E2E_TEST_MODE', '1');
+    vi.stubEnv('VERCEL_ENV', 'production');
+    const rule = await resolveOtpRule(
+      path,
+      makeOtpRequest(path, { email: 'browse-ready+clerk_test@jov.ie' })
+    );
+    expect(rule).not.toBe(false);
+    expect(rule).toEqual({ window: 60, max: 10 });
+  });
+
+  it('does not extend the canary budget to lookalike or other addresses', async () => {
+    vi.stubEnv('E2E_TEST_MODE', '1');
+    vi.stubEnv('VERCEL_ENV', 'production');
+    await expect(
+      resolveOtpRule(
+        path,
+        makeOtpRequest(path, {
+          email: 'browse-ready+synthetic-prodcert-not-a-run@jov.ie',
+        })
+      )
+    ).resolves.toEqual({ window: 60, max: 3 });
+    await expect(
+      resolveOtpRule(
+        path,
+        makeOtpRequest(path, { email: 'browse-ready+clerk_test@example.com' })
+      )
+    ).resolves.toEqual({ window: 60, max: 3 });
+    await expect(
+      resolveOtpRule(
+        path,
+        makeOtpRequest(path, { email: 'browse-ready@jov.ie' })
+      )
+    ).resolves.toEqual({ window: 60, max: 3 });
+  });
 });

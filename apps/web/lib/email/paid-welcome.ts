@@ -224,6 +224,9 @@ export async function maybeSendPaidWelcomeAfterEntitlement(input: {
   const idempotencyKey = buildPaidWelcomeDedupKey(input.subscription.id);
 
   const sendResult = await sendEmail({
+    stream: 'transactional',
+    purpose: 'paid-welcome',
+    consent: 'account-transaction',
     to: recipient.email,
     subject: emailContent.subject,
     text: emailContent.text,

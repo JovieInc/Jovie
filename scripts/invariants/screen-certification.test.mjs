@@ -250,6 +250,32 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       'coherent labels do not grant artifact trust'
     );
   });
+  it('registers each profile representation without borrowing canonical profile proof', () => {
+    const routes = ['alerts', 'notifications', 'shop'];
+    const paths = routes.map(
+      route => `apps/web/app/[username]/${route}/page.tsx`
+    );
+    for (const [index, path] of paths.entries()) {
+      const classified = classifyScreenPath(path);
+      assert.equal(classified.kind, 'registered');
+      assert.equal(classified.entry.id, `web.public-profile-${routes[index]}`);
+      assert.equal(classified.entry.owner, 'public-profile');
+      assert.deepEqual(classified.entry.viewports, ['desktop', 'mobile']);
+    }
+    const result = evaluateChangedScreens({
+      changedFiles: paths,
+      headSha: HEAD,
+      requireExternalEvidence: true,
+    });
+    assert.deepEqual(
+      result.issues,
+      routes.map(
+        route => `missing exact-head proof for web.public-profile-${route}`
+      )
+    );
+    assert.deepEqual(result.excludedChanges, []);
+  });
+
   it('registers integrations while requiring separate public and operator proofs', () => {
     for (const [path, id] of [
       [
@@ -491,6 +517,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
   it('registers every founder cockpit route for changed-surface certification', () => {
     const sources = [
       'apps/web/app/app/(shell)/admin/activity/page.tsx',
+      'apps/web/app/app/(shell)/admin/activity/loading.tsx',
       'apps/web/app/app/(shell)/admin/growth/page.tsx',
       'apps/web/app/app/(shell)/admin/operations/page.tsx',
       'apps/web/app/app/(shell)/admin/product/page.tsx',
@@ -506,7 +533,21 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       sources,
       viewports: ['desktop', 'mobile'],
     });
-    for (const source of sources) assert.equal(kindOf(source), 'registered');
+    for (const source of sources) {
+      assert.equal(kindOf(source), 'registered');
+      const result = evaluateChangedScreens({
+        changedFiles: [{ path: source, status: 'M' }],
+        headSha: HEAD,
+      });
+      assert.deepEqual(result.issues, []);
+      assert.deepEqual(result.changedScreens, [
+        {
+          id: 'web.ov-founder-cockpit',
+          verdict: 'evidence-required',
+          findings: [],
+        },
+      ]);
+    }
   });
 
   it('registers the public artists directory for changed-surface certification', () => {

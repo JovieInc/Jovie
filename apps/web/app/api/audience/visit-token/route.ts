@@ -5,7 +5,12 @@ import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
-import { publicVisitLimiter } from '@/lib/rate-limit';
+import {
+  createRateLimitHeaders,
+  publicVisitLimiter,
+  rateLimitDenialMessage,
+  rateLimitDenialStatus,
+} from '@/lib/rate-limit';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
 
@@ -35,6 +40,27 @@ export async function GET(request: NextRequest) {
   const clientIP = extractClientIP(request.headers);
   const rateLimitResult = await publicVisitLimiter.limit(clientIP);
   if (!rateLimitResult.success) {
+    // Distinguish backend unavailability from genuine exhaustion so an
+    // outage is never mislabeled as a 429 (JOV-5132 WS3).
+    if (rateLimitResult.unavailable) {
+      return NextResponse.json(
+        {
+          error: rateLimitDenialMessage(
+            rateLimitResult,
+            'Rate limit exceeded',
+            'Visit tracking is temporarily unavailable.'
+          ),
+          reason: rateLimitResult.reason,
+        },
+        {
+          status: rateLimitDenialStatus(rateLimitResult),
+          headers: {
+            ...NO_STORE_HEADERS,
+            ...createRateLimitHeaders(rateLimitResult),
+          },
+        }
+      );
+    }
     const retryAfterSeconds = Math.max(
       Math.ceil((rateLimitResult.reset.getTime() - Date.now()) / 1000),
       1

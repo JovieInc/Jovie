@@ -54,4 +54,21 @@ describe('production auth smoke session contract', () => {
     expect(tabNavigation).toBeDefined();
     expect(tabNavigation).not.toContain('.isVisible({ timeout:');
   });
+
+  it('sends the profile save route contract for the edit-readback step', () => {
+    const source = fs.readFileSync(PRODUCTION_AUTH_SMOKE_PATH, 'utf8');
+
+    // PUT /api/dashboard/profile requires { profileId, updates } and rejects
+    // a bare field payload 400 before any write (2026-10-30 promote freeze:
+    // the JOV-9625 edit-readback step shipped a bare { bio } PUT).
+    expect(source).toContain('data: { profileId, updates: { bio: marker } }');
+    expect(source).toContain(
+      'data: { profileId, updates: { bio: originalBio } }'
+    );
+    expect(source).not.toContain('data: { bio: marker }');
+    expect(source).not.toContain('data: { bio: originalBio }');
+    expect(source).toContain(
+      'Profile edit save requires the claimed profile id'
+    );
+  });
 });

@@ -4,7 +4,7 @@
  * The lead pipeline builds pages for real prospect artists from public data.
  * A page nobody has vouched for must not be reachable or indexed under a real
  * artist's name. The hold is stored on the profile (`settings.leadBuild`) and
- * enforced by the `creator_profiles_lead_build_hold` trigger (migration 0152),
+ * enforced by the `creator_profiles_lead_build_hold` trigger (migration 0162),
  * so no writer can publish around it. A claim (user_id / is_claimed) or an
  * explicit release after certification lifts it.
  */

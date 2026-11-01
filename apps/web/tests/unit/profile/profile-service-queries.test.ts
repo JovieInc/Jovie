@@ -481,6 +481,69 @@ describe('Profile Service Queries', () => {
       expect(mockRedisSet).not.toHaveBeenCalled();
     });
 
+    it('propagates storage failures when an authoritative reader requires an error', async () => {
+      const error = new Error('database unavailable');
+      const chain = createSelectChain();
+      chain.limit.mockRejectedValue(error);
+
+      const { getProfileWithLinks } = await import(
+        '@/lib/services/profile/queries'
+      );
+
+      await expect(
+        getProfileWithLinks('testartist', {
+          skipCache: true,
+          throwOnError: true,
+        })
+      ).rejects.toThrow(error);
+      expect(mockRedisGet).not.toHaveBeenCalled();
+    });
+
+    it('keeps absent profiles distinct from storage failures for authoritative readers', async () => {
+      createSelectChain([]);
+      const { getProfileWithLinks } = await import(
+        '@/lib/services/profile/queries'
+      );
+
+      await expect(
+        getProfileWithLinks('nobody', { skipCache: true, throwOnError: true })
+      ).resolves.toBeNull();
+    });
+
+    it('propagates query timeouts to authoritative readers', async () => {
+      vi.useFakeTimers();
+      try {
+        const chain = createSelectChain();
+        chain.limit.mockImplementation(() => new Promise(() => {}));
+        const { getProfileWithLinks } = await import(
+          '@/lib/services/profile/queries'
+        );
+        const failure = expect(
+          getProfileWithLinks('testartist', {
+            skipCache: true,
+            throwOnError: true,
+          })
+        ).rejects.toThrow('Profile query timeout');
+
+        await vi.advanceTimersByTimeAsync(30000);
+        await failure;
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('preserves the tolerant error contract for other readers', async () => {
+      const chain = createSelectChain();
+      chain.limit.mockRejectedValue(new Error('database unavailable'));
+      const { getProfileWithLinks } = await import(
+        '@/lib/services/profile/queries'
+      );
+
+      await expect(
+        getProfileWithLinks('testartist', { skipCache: true })
+      ).resolves.toBeNull();
+    });
+
     it('handles Redis read failure gracefully', async () => {
       mockRedisGet.mockRejectedValue(new Error('Redis connection lost'));
       mockGetLatestRelease.mockResolvedValue(null);

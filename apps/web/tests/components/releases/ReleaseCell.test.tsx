@@ -22,9 +22,13 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
 }));
 
 vi.mock('@/components/atoms/TruncatedText', () => ({
-  TruncatedText: ({ children }: { children: ReactNode }) => (
-    <span>{children}</span>
-  ),
+  TruncatedText: ({
+    children,
+    title,
+  }: {
+    children: ReactNode;
+    title?: string;
+  }) => <span title={title}>{children}</span>,
 }));
 
 const baseRelease: ReleaseViewModel = {
@@ -101,6 +105,44 @@ describe('ReleaseCell', () => {
       expect(screen.getByText('·')).toHaveAttribute('aria-hidden', 'true');
     }
   );
+
+  it('truncates long credit lists to "A, B and N more" with the full list on title', () => {
+    const multiArtistRelease = {
+      ...baseRelease,
+      artistNames: ['Vigel', 'Cosmic Gate', 'LYNX', 'Tim White'],
+    };
+
+    // ds-cert:credit-format: dense rows truncate through the canonical
+    // formatter and keep the full credit list reachable via title.
+    const { unmount } = render(
+      <ReleaseCell
+        release={multiArtistRelease}
+        artistName='Vigel'
+        artistPlacement='stacked'
+      />
+    );
+    expect(
+      screen.getByText('Vigel, Cosmic Gate and 2 more')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTitle('Vigel, Cosmic Gate, LYNX and Tim White')
+    ).toBeInTheDocument();
+    unmount();
+
+    render(
+      <ReleaseCell
+        release={multiArtistRelease}
+        artistName='Vigel'
+        artistPlacement='inline'
+      />
+    );
+    expect(
+      screen.getByText('Vigel, Cosmic Gate and 2 more')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTitle('Vigel, Cosmic Gate, LYNX and Tim White')
+    ).toBeInTheDocument();
+  });
 
   it('omits the inline separator when the release has no artist', () => {
     render(<ReleaseCell release={baseRelease} artistPlacement='inline' />);

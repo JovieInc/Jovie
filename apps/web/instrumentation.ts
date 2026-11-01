@@ -166,6 +166,19 @@ async function runEnvironmentValidationWithRetry() {
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
+    // JOV-9959: staging/preview must never boot against the production DB.
+    // Throws (crashing boot loudly) on a host collision; warns when the prod
+    // host reference is not yet provisioned so the gap stays visible.
+    try {
+      const { assertStagingDatabaseIsolation } = await import(
+        '@/lib/startup/db-host-guard'
+      );
+      assertStagingDatabaseIsolation(process.env);
+    } catch (error) {
+      console.error('[STARTUP] DB host isolation guard failed:', error);
+      throw error;
+    }
+
     const { musicResolverCutoverReceipt } = await import(
       '@/lib/music-resolver/musicfetch-gate'
     );

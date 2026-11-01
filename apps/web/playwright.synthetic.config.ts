@@ -22,6 +22,8 @@ export default defineConfig({
     '**/synthetic-production-waitlist.spec.ts',
     '**/onboarding-robot.full.spec.ts',
     '**/public-profile-smoke.spec.ts',
+    // Fail-open /start guard: desktop + Instagram webview as plain visitors.
+    '**/synthetic-start-chat.spec.ts',
     // Production Journey Auditor: anonymous signup→interview initialization
     // probe. Prod gates the full turn behind Turnstile, so the smoke verifies
     // the interview *initializes* (the gap the prod break fell through).

@@ -67,7 +67,20 @@ function formatFailure(failure, samples) {
     })
     .join('\n');
 }
-function writeBaseline(repoRoot, ids) {
+export function writeBaseline(repoRoot, ids) {
+  // This is a repair command, not permission to record new debt. Validate
+  // against both the existing file and trusted main before touching the file.
+  const recorded = readBaseline(repoRoot);
+  const ancestor = ancestorJson(repoRoot, BASELINE_RELATIVE);
+  if (!ancestor.ok) throw new Error(ancestor.error);
+  if (recorded.count !== recorded.ids.length) {
+    throw new Error('baseline count does not match ids');
+  }
+  const failures = [recorded.ids, ancestor.ancestor?.ids ?? null].flatMap(
+    allowed =>
+      evaluateRatchet({ current: ids, recorded: ids, ancestor: allowed })
+  );
+  if (failures.length > 0) throw new Error(failures.join('\n'));
   const body = {
     schema: 'jovie.icp-language-baseline/v1',
     count: ids.length,

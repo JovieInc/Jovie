@@ -1,5 +1,7 @@
 import { getProfileUrl } from '@/constants/domains';
 import { buildPromptSecuritySection } from '@/lib/chat/prompt-disclosure-guard';
+import { buildSegmentPromptSection } from '@/lib/creator/segment-registry';
+import { inferSegment, type ResolvedSegment } from '@/lib/creator/segments';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { PITCH_GRILL_PROCEDURE } from '@/lib/services/pitch/curator-checklist';
 import { formatAmount } from '@/lib/utils/format-number';
@@ -48,7 +50,6 @@ interface ReleasePromptContext {
 }
 
 interface AccountPromptContext {
-  readonly email: string | null;
   readonly plan: string;
   readonly displayPlan: string;
   readonly isPro: boolean;
@@ -188,11 +189,23 @@ export function buildSystemPromptParts(
       readonly label: string;
       readonly planRequired: string;
     }[];
+    /**
+     * Resolved creator segment (JOV-9679). Omitted: inferred from the bio,
+     * releases and music links already in this context.
+     */
+    segment?: ResolvedSegment;
     /** Clock for release timing. Defaults to now; tests and evals pin it. */
     now?: Date;
   }
 ): SystemPromptParts {
   const now = options?.now ?? new Date();
+  const segment =
+    options?.segment ??
+    inferSegment({
+      bio: context.bio,
+      hasMusicCatalog: releases.length > 0 || context.hasMusicLinks,
+      platforms: context.hasMusicLinks ? ['spotify'] : [],
+    }).segment;
   const stable = `You are Jovie, an AI music career assistant. You help independent artists understand their data and make smart career decisions.
 ${buildPromptSecuritySection()}
 ## About This Artist
@@ -218,6 +231,8 @@ Everything you say about this artist's own accounts, connections, releases, song
 ## Discography Context
 - **Total Releases:** ${releases.length}
 ${buildDiscographySection(releases, now)}
+
+${buildSegmentPromptSection(segment)}
 
 ## Tipping & Monetization
 - **Tip Link Clicks:** ${context.tippingStats.tipClicks}
@@ -446,7 +461,6 @@ function buildAccountAccessSection(
 
   return `
 ## Account & Access
-- **Account Email:** ${accountContext.email ?? 'Not available'}
 - **Plan:** ${accountContext.displayPlan}
 ${billingLine}
 - **AI Usage This Week:** ${usageLine}
