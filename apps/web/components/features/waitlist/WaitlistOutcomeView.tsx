@@ -183,7 +183,7 @@ function StartProNote() {
   const claim = getPublicPriceClaim('pro');
   return (
     <p
-      className='mt-4 text-sm leading-6 text-white/62'
+      className='mt-4 text-sm leading-6 text-white/62 tabular-nums'
       data-testid='waitlist-start-pro-note'
     >
       {`Want in now? ${claim.displayName} (${formatPublicPriceDisplay(claim)}) lets you skip the waitlist: setup opens as soon as payment clears.`}
