@@ -91,6 +91,7 @@ export const STATIC_TOP_LEVEL_ROUTE_SEGMENTS: ReadonlySet<string> = new Set([
   'pricing',
   'product',
   'product-screenshots',
+  'proof',
   'r',
   'renders',
   'report',
