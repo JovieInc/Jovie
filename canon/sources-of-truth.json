@@ -165,6 +165,17 @@
       ]
     },
     {
+      "id": "positioning-lines",
+      "title": "Positioning lines per surface (one-liner, what-we-build, deck title, heroes, bios)",
+      "owner": {
+        "kind": "file",
+        "ref": "canon/positioning-variants.json",
+        "note": "Meaning and message roles stay in canon/POSITIONING.md (founder-locked). This file holds the concrete lines, the competing variants and the active id per surface. It changes only through scripts/positioning/rank.mjs (gates plus persona panel) and live experiments logged in canon/growth-experiments.jsonl. Private consumers (fundraising answers.yaml, deck.yaml) bind with {p:<surface>}."
+      },
+      "derived": ["scripts/positioning/rank.mjs"],
+      "liveAuthority": "live experiment results (content-record experiment funnel, Statsig), recorded in gbrain experiments/*"
+    },
+    {
       "id": "product-claims",
       "title": "Product claims and proof",
       "owner": {
