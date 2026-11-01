@@ -92,6 +92,31 @@ class CarryStreak(unittest.TestCase):
         self.assertEqual(release_evidence.carry_streak(current, {"firstBadSha": "old", "count": 9})["firstBadSha"], rows[1]["head_sha"])
 
 
+class LogRetry(unittest.TestCase):
+    def test_a_failed_log_read_is_retried_next_tick(self):
+        rows = runs("failure", "failure")
+        log_ok = [False]
+
+        def gh(args, **_):
+            path = args[1]
+            if "workflows/ci.yml/runs" in path:
+                body = {"workflow_runs": [{k: v for k, v in r.items() if k != "_job"} for r in rows]}
+            elif "/jobs?" in path:
+                body = {"jobs": jobs_of_factory(rows)(int(path.split("/runs/")[1].split("/")[0]))}
+            elif path.endswith("/logs"):
+                return SimpleNamespace(returncode=0 if log_ok[0] else 1, stdout="✘ 1 › tests/e2e/x.spec.ts:5:1" if log_ok[0] else "", stderr="")
+            else:
+                body = {"sha": "f" * 40}
+            return SimpleNamespace(returncode=0, stdout=json.dumps(body), stderr="")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out, _ = release_evidence.sample(Path(tmp), 1_000_000.0, run=gh, version=lambda: "a163bac")
+            self.assertIsNone(out["streaks"]["golden-path"]["specs"])
+            log_ok[0] = True
+            out, _ = release_evidence.sample(Path(tmp), 1_000_400.0, run=gh, version=lambda: "a163bac")
+            self.assertEqual(out["streaks"]["golden-path"]["specs"], ["tests/e2e/x.spec.ts:5"])
+
+
 class BuildStale(unittest.TestCase):
     def test_stale_only_after_two_hours_with_main_advanced(self):
         t0 = 1_000_000.0

@@ -171,9 +171,10 @@ def sample(state_dir: Path, now: float, run=None, version=read_version) -> tuple
                 try:  # one log read per new failing job, only once the streak is an incident
                     log = (run or sentinel._budgeted_gh)(["api", f"repos/{REPO}/actions/jobs/{streak['newestJobId']}/logs"],
                                                          capture_output=True, text=True, timeout=60)
-                    streak["specs"] = failing_specs(log.stdout or "") if log.returncode == 0 else []
+                    # None (not []) on a failed read, so the next tick retries the log for the same job.
+                    streak["specs"] = failing_specs(log.stdout or "") if log.returncode == 0 else None
                 except Exception:  # noqa: BLE001
-                    streak["specs"] = []
+                    streak["specs"] = None
         out["streaks"] = streaks
         keys = {f"{r['id']}:{r.get('run_attempt') or 1}" for r in runs[:RUNS_READ]}
         out["jobsCache"] = {k: v for k, v in jobs_cache.items() if k in keys}
