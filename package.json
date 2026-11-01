@@ -114,6 +114,8 @@
     }
   },
   "scripts": {
+    "eval:intent": "node scripts/output-quality/intent-eval.mjs",
+    "output:check": "node scripts/output-quality/output-check.mjs",
     "agent-readiness:receipt": "node scripts/weekly-agent-readiness.mjs receipt",
     "dev": "bash scripts/dev-web-fast.sh",
     "dev:all": "turbo dev",

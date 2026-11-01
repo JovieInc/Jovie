@@ -71,6 +71,26 @@
       "note": "Through the Workers AI relay (WORKERS_AI_TOKEN). Flash is the vision model: @cf/zai-org/glm-5.3 on Workers AI drops image parts (measured 2026-10-31, JOV-10091). Replaced the claude -p subscription route."
     },
     {
+      "id": "dev.intent-eval",
+      "label": "Audience-intent eval, routine outputs (system-1 judge that role-plays the audience; canon OUTPUT-QUALITY-LOOP)",
+      "repo": "JovieInc/Jovie",
+      "route": "workers-ai-only",
+      "fallback": null,
+      "models": ["@cf/zai-org/glm-5.3-flash", "@cf/zai-org/glm-5.3"],
+      "gatewayKey": null,
+      "note": "scripts/output-quality/intent-eval.mjs through the Workers AI relay. Flash judges (vision); glm-5.3 revises text."
+    },
+    {
+      "id": "dev.intent-eval-strong",
+      "label": "Audience-intent eval, high-stakes outputs (investor, legal, public launch): 3 samples, all must pass",
+      "repo": "JovieInc/Jovie",
+      "route": "workers-ai-only",
+      "fallback": null,
+      "models": ["@cf/zai-org/glm-5.3", "@cf/zai-org/glm-5.3-flash"],
+      "gatewayKey": null,
+      "note": "glm-5.3 judges text-only artifacts; flash judges rendered images (glm-5.3 drops image parts, JOV-10091). No paid escalation: a stronger paid model is new spend and needs Tim."
+    },
+    {
       "id": "summer.agent-turns",
       "label": "Summer agent turns and fast chat",
       "repo": "JovieInc/summer-config",

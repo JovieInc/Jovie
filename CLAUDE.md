@@ -100,6 +100,10 @@ Docs use [parity](docs/DOCUMENTATION.md), policy, link and context evals; do not
 present them as live model or UI proof. UI changes require state coverage
 and layout stability; DESIGN.md lists bounded disclosure exceptions.
 
+Every output (memo, text, email, post, video, deck, UI, artifact) passes `pnpm output:check`
+(mission + audience, brand/DS, slop, claims, harm, then an intent-eval loop) and carries
+the receipt line: JovieInc/ci canon/OUTPUT-QUALITY-LOOP.md.
+
 Run narrow checks first; broaden for changed boundaries, failures, or required CI
 coverage. Report changes, exact checks, failures, and
 limitations. Do not infer local source, hosted CI, merge queue, deployed
