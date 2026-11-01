@@ -150,4 +150,24 @@ describe('golden-path steps from checks[] (prod-cert receipts, 2026-11-01 run on
     expect(by['paid-value']).toMatchObject({ status: 'failed', fixPr: null });
     expect(by['first-use']?.status).toBe('failed');
   });
+  it('a blocked check is blocked, not a failure', () => {
+    const at = '2026-11-01T11:00:00.000Z';
+    const rec = {
+      ...receipt('chat', 'failed', at, { blocker: 'canary quota' }),
+      checks: [
+        {
+          id: 'first-use',
+          status: 'blocked',
+          startedAt: at,
+          endedAt: at,
+          summary: '',
+        },
+      ],
+    } as unknown as ProdGoldenPathReceipt;
+    const out = goldenPathStatus(ledger({ chat: rec }), NOW);
+    expect(out.steps.find(s => s.id === 'first-use')).toMatchObject({
+      status: 'blocked',
+      fixPr: null,
+    });
+  });
 });

@@ -43,6 +43,7 @@ export const GOLDEN_PATH_STEPS = [
 export type GoldenPathStepStatus =
   | 'passed'
   | 'failed'
+  | 'blocked'
   | 'held'
   | 'expired'
   | 'missing';
@@ -114,14 +115,17 @@ export function goldenPathStatus(
       if (!check) continue;
       const stale =
         nowMs - Date.parse(receipt.endedAt) > PROD_GOLDEN_PATH_FRESHNESS_MS;
+      // blocked = could not be exercised on production; never a measured failure.
       const status: GoldenPathStepStatus =
         check.status === 'skipped'
           ? 'held'
-          : check.status === 'passed'
-            ? stale
-              ? 'expired'
-              : 'passed'
-            : 'failed';
+          : check.status === 'blocked'
+            ? 'blocked'
+            : check.status === 'passed'
+              ? stale
+                ? 'expired'
+                : 'passed'
+              : 'failed';
       const pr =
         /\/pull\/(\d+)/u.exec(receipt.issueUrl ?? '')?.[1] ??
         /fix #(\d+)/u.exec(receipt.blocker ?? '')?.[1];
