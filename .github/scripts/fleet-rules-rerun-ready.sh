@@ -6,6 +6,7 @@
 # after the evidence run completed. The run's head_sha is the BASE sha for
 # `edited` events, so the PR is resolved from the run title, never the sha.
 # Usage: fleet-rules-rerun-ready.sh   (env: RUN_TITLE, REPOSITORY, GH_READ_TOKEN, GH_TOKEN)
+# api-budget: github-app-core 30/hr - one PR read and one Source Validation run list per evidence-run completion (a few PRs per hour), then fleet-rules-rerun.sh
 set -euo pipefail
 API_CLIENT="${API_CLIENT:-packages/api-client/cli.ts}"
 ghx() { local priority="$1"; shift; node "$API_CLIENT" gh --priority "$priority" -- "$@"; }
