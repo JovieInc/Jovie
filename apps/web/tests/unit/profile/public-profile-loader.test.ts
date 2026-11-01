@@ -124,7 +124,10 @@ async function mockPublicationAuthority(
 ) {
   const { db } = await import('@/lib/db');
   vi.mocked(db.select).mockImplementation((() => ({
-    from: () => ({ where: () => ({ limit: async () => rows }) }),
+    from: () => {
+      const where = () => ({ limit: async () => rows });
+      return { where, leftJoin: () => ({ where }) };
+    },
   })) as never);
 }
 

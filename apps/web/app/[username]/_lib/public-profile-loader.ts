@@ -11,6 +11,7 @@ import {
 import { db } from '@/lib/db';
 // eslint-disable-next-line no-restricted-imports -- Schema barrel import needed for the contact type alias
 import type { CreatorContact as DbCreatorContact } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
 import type { DiscogRelease } from '@/lib/db/schema/content';
 import { creatorPixels } from '@/lib/db/schema/pixels';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -268,6 +269,10 @@ const PROFILE_BODY_CACHE_TTL_SECONDS = 3600;
 interface PublicationAuthority {
   readonly id: string;
   readonly isPublic: unknown;
+  readonly isClaimed: boolean | null;
+  readonly userIsPro: boolean | null;
+  readonly userClerkId: string | null;
+  readonly userPlan: string | null;
 }
 
 /**
@@ -282,8 +287,16 @@ async function readPublicationAuthority(
   try {
     const rows = await Promise.race([
       db
-        .select({ id: creatorProfiles.id, isPublic: creatorProfiles.isPublic })
+        .select({
+          id: creatorProfiles.id,
+          isPublic: creatorProfiles.isPublic,
+          isClaimed: creatorProfiles.isClaimed,
+          userIsPro: users.isPro,
+          userClerkId: users.clerkId,
+          userPlan: users.plan,
+        })
         .from(creatorProfiles)
+        .leftJoin(users, eq(users.id, creatorProfiles.userId))
         .where(eq(creatorProfiles.usernameNormalized, username))
         .limit(1),
       new Promise<never>((_, reject) => {
@@ -338,6 +351,32 @@ async function readCachedProfileBody(
   }
 }
 
+/**
+ * Plan, ownership and pixel facts change outside profile edits (checkout and
+ * billing webhooks, claims, pixel settings) and never go through
+ * invalidateProfileCache. They come from the fresh authority row, never from
+ * the cached body, so a just-upgraded artist sees Pro behavior immediately.
+ */
+async function withFreshEntitlements(
+  body: PublicProfileLoaderResult,
+  authority: PublicationAuthority
+): Promise<PublicProfileLoaderResult> {
+  const profile = body.profile
+    ? { ...body.profile, is_claimed: !!authority.isClaimed }
+    : body.profile;
+  return {
+    ...body,
+    profile,
+    creatorIsPro: Boolean(authority.userIsPro),
+    creatorClerkId:
+      typeof authority.userClerkId === 'string' ? authority.userClerkId : null,
+    creatorMetaPixelId: await getCreatorMetaPixelId(
+      authority.id,
+      authority.userPlan ?? null
+    ),
+  };
+}
+
 function shouldBypassProfileBodyCache(): boolean {
   return (
     process.env.NODE_ENV === 'test' ||
@@ -378,7 +417,7 @@ async function loadPublicProfile(
     return NOT_FOUND_RESULT;
   }
   if (cachedBody?.profile?.id === authority.value.id) {
-    return cachedBody;
+    return withFreshEntitlements(cachedBody, authority.value);
   }
   // Cache miss, store failure, or a handle now owned by a different profile.
   return fetchProfileAndLinks(username);

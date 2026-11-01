@@ -57,6 +57,11 @@ beforeEach(() => {
     }),
   }));
   mocks.pixel.mockResolvedValue([]);
+  mocks.select.mockImplementation((columns: Record<string, unknown>) => {
+    const limit = 'isPublic' in columns ? mocks.authority : mocks.pixel;
+    const where = () => ({ limit });
+    return { from: () => ({ where, leftJoin: () => ({ where }) }) };
+  });
   mocks.authority.mockResolvedValue([{ id: 'profile-1', isPublic: true }]);
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -252,6 +257,30 @@ describe('fresh public authority after a warm response', () => {
     expect((await getProfileAndLinks('testartist')).status).toBe('ok');
     expect(mocks.profile).toHaveBeenCalledTimes(1);
     expect(mocks.authority).toHaveBeenCalledTimes(2);
+  });
+
+  it('reads plan, ownership and pixel fresh instead of from the cached body', async () => {
+    expect((await getProfileAndLinks('testartist')).creatorIsPro).toBe(false);
+    mocks.authority.mockResolvedValueOnce([
+      {
+        id: 'profile-1',
+        isPublic: true,
+        isClaimed: true,
+        userIsPro: true,
+        userClerkId: 'identity-9',
+        userPlan: 'pro',
+      },
+    ]);
+    mocks.pixel.mockResolvedValueOnce([{ facebookPixelId: '999' }]);
+    const upgraded = await getProfileAndLinks('testartist');
+    expect(upgraded).toMatchObject({
+      status: 'ok',
+      creatorIsPro: true,
+      creatorClerkId: 'identity-9',
+      creatorMetaPixelId: '999',
+    });
+    expect(upgraded.profile?.is_claimed).toBe(true);
+    expect(mocks.profile).toHaveBeenCalledTimes(1);
   });
 
   it.each([false, null])(
