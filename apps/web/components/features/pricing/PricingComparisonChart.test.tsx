@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ARTIST_VISIBILITY_OFFER_CONTRACT_ID } from '@/lib/billing/offer-truth';
+import { getPaidPlanAdditionNames } from '@/lib/billing/public-pricing-features';
 import { PricingComparisonChart } from './PricingComparisonChart';
 
 describe('PricingComparisonChart', () => {
@@ -35,7 +36,7 @@ describe('PricingComparisonChart', () => {
     }
 
     const feature = within(mobileTable).getByRole('rowheader', {
-      name: 'Fan email capture',
+      name: 'Audience email capture',
     });
     expect(feature).toHaveAttribute('scope', 'row');
     expect(feature).toHaveAttribute('data-wrap', 'feature-label');
@@ -96,5 +97,12 @@ describe('PricingComparisonChart', () => {
     expect(within(mobileTable).getByText('$12')).toBeInTheDocument();
     expect(within(mobileTable).getByText('/mo')).toBeInTheDocument();
     expect(within(mobileTable).getByText('Unlimited')).toBeInTheDocument();
+  });
+
+  it('renders every paid-plan addition the pricing card lists', () => {
+    render(<PricingComparisonChart />);
+    for (const name of getPaidPlanAdditionNames()) {
+      expect(screen.getAllByText(name).length).toBeGreaterThan(0);
+    }
   });
 });

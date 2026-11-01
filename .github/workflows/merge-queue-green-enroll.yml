@@ -59,6 +59,11 @@ on:
   # `reconcile` concurrency slot.
   push:
     branches: [main]
+  # No cron here (JOV-INV-042: admission never runs from a schedule). The backstop
+  # for a lost wake is the Gem lanes tick: scripts/lanes/throughput_sentinel.py
+  # dispatches this workflow (an unnamed dispatch is the roster sweep) when a
+  # CLEAN unqueued PR has waited 10 minutes, and alarms `queue starved` and
+  # per-state supply dwell when the SLO is still missed.
   workflow_dispatch:
     inputs:
       dry_run:
@@ -666,6 +671,7 @@ jobs:
               const ownerHoldRelease = failurePolicy.ownerHoldReleaseIntent({
                 eventName: context.eventName, event: context.payload,
               });
+              const failureBeforeReenroll = failure.action;
               if (!releasedAfterManualRemoval) {
                 failure = failurePolicy.reenrollmentDisposition({
                   failure, statuses, repository: `${owner}/${repo}`, prNumber: pr.number, lastRemoval, headCommittedAt,
@@ -679,11 +685,31 @@ jobs:
               const removalActor = pr.timelineItems.nodes[0]?.actor;
               const humanDequeued = Boolean(removedUnchangedHead) && removalReason === 'manual' &&
                 removalActor?.__typename === 'User' && !/\[bot\]$/i.test(String(removalActor?.login || ''));
+              // Ejection re-enroll (2026-10-29): a head GitHub or a bot removed from
+              // the queue with no revision-failure hold on record (failure was
+              // 'allow' before the recovery-intent check) is still green and
+              // CLEAN, so it is admitted again instead of waiting for a human.
+              // Bounded: never a human dequeue, at most REENROLL_MAX_REMOVALS
+              // removals on this head, and REENROLL_DWELL_MS after the last
+              // removal. A merge-group failure at the head writes a failure
+              // hold, which still blocks above (JOV-6620 is untouched).
+              const REENROLL_MAX_REMOVALS = 3, REENROLL_DWELL_MS = 5 * 60 * 1000;
+              const removalsOnHead = (pr.breakerEvents?.nodes || []).filter(event =>
+                event.__typename === 'RemovedFromMergeQueueEvent' &&
+                (!headCommittedAt || event.createdAt > headCommittedAt)).length;
+              const automaticRemoval = removalReason === 'failed_checks' ||
+                (removalReason === 'manual' && (removalActor?.__typename === 'Bot' || /\[bot\]$/i.test(String(removalActor?.login || ''))));
+              const ejectionReenroll = Boolean(removedUnchangedHead) && automaticRemoval && !humanDequeued &&
+                failureBeforeReenroll === 'allow' && failure.action === 'block' &&
+                ['removed-without-recovery-intent', 'no-current-admission-recovery'].includes(failure.reason) &&
+                removalsOnHead < REENROLL_MAX_REMOVALS &&
+                Date.now() - Date.parse(lastRemoval) >= REENROLL_DWELL_MS;
+              if (ejectionReenroll) failure = { action: 'allow', reason: 'ejection-reenroll' };
               if (failure.action === 'block' ||
                   (humanDequeued && failure.action === 'retry-once' &&
                    failure.reason !== 'human-failure-release') ||
                   (removedUnchangedHead && failure.action !== 'retry-once' &&
-                   failure.reason !== 'owner-hold-release' && !releasedAfterManualRemoval)) {
+                   failure.reason !== 'owner-hold-release' && !releasedAfterManualRemoval && !ejectionReenroll)) {
                 core.info(`skip #${pr.number}: head unchanged since queue removal (${removalReason}; ${failure.reason})`);
                 receipt(pr, 'skip', `head-unchanged-since-removal:${removalReason}:${failure.reason}`);
                 continue;
@@ -870,7 +896,7 @@ jobs:
                 }
                 enqueued += 1;
                 core.notice(`ENQUEUED #${pr.number} at position ${r.enqueuePullRequest.mergeQueueEntry.position}`);
-                receipt(pr, jump ? 'enqueued-jump' : 'enqueued', `position=${r.enqueuePullRequest.mergeQueueEntry.position}`);
+                receipt(pr, jump ? 'enqueued-jump' : 'enqueued', `position=${r.enqueuePullRequest.mergeQueueEntry.position};basis=${failure.reason}`);
                 if (breakerMarked && !breakerRestore) {
                   await github.rest.issues.removeLabel({
                     owner, repo, issue_number: pr.number, name: BREAKER_LABEL,
@@ -1125,6 +1151,7 @@ jobs:
           sparse-checkout: |
             .nvmrc
             scripts/merge-group-victim-rearm.mjs
+            scripts/lib/merge-group-ahead-attribution.mjs
             scripts/lib/admission-hold-labels.json
             scripts/lib/admission-hold-labels.mjs
             .github/actions/prime-node-toolcache/action.yml

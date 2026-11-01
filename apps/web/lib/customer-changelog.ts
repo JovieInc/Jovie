@@ -389,6 +389,9 @@ export function projectCustomerChangelogArchive(
   }
 
   assertUniqueCustomerPermalinks(entries, tombstones);
+  // Newest first regardless of where a post sits in CHANGELOG.md; Array.sort
+  // is stable, so same-day entries keep their published order.
+  entries.sort((left, right) => right.date.localeCompare(left.date));
   return { entries, tombstones };
 }
 

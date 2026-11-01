@@ -1,6 +1,7 @@
 import type { LogoVariant } from '@/components/atoms/Logo';
 import { SkipToContent } from '@/components/atoms/SkipToContent';
 import type { MarketingHeaderBrand } from '@/data/marketing/headerBrand';
+import type { MarketingPageContract } from '@/data/marketing/pageContracts';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import type { ResolvedSiteChrome } from '@/lib/content-records/site-chrome.resolve';
 import { cn } from '@/lib/utils';
@@ -23,6 +24,8 @@ export interface PublicPageShellProps {
   readonly chrome?: ResolvedSiteChrome;
   readonly className?: string;
   readonly footerClassName?: string;
+  /** Set false when the route owns its final CTA (the homepage). */
+  readonly footerShowCta?: boolean;
   readonly footerVariant?: 'auto' | 'expanded' | 'minimal';
   readonly headerVariant?: MarketingHeaderVariant;
   /** Overrides the per-page header brand config (icon-only vs lockup). */
@@ -38,6 +41,12 @@ export interface PublicPageShellProps {
    */
   readonly mainOffset?: boolean;
   readonly navLinks?: readonly MarketingHeaderNavLink[];
+  /**
+   * Route-owned page contract for the hidden markers. Pass it from layouts
+   * whose SSR `usePathname()` is not the browser pathname (the homepage), so
+   * server and client render the same markers.
+   */
+  readonly pageContract?: MarketingPageContract;
   readonly showHomepageCenterNav?: boolean;
   readonly skipToContent?: boolean;
 }
@@ -47,6 +56,7 @@ export function PublicPageShell({
   chrome,
   className,
   footerClassName,
+  footerShowCta,
   footerVariant,
   headerBrand,
   headerCta,
@@ -56,6 +66,7 @@ export function PublicPageShell({
   mainClassName,
   mainOffset = true,
   navLinks,
+  pageContract,
   showHomepageCenterNav,
   skipToContent = true,
 }: Readonly<PublicPageShellProps>) {
@@ -87,12 +98,13 @@ export function PublicPageShell({
           mainClassName
         )}
       >
-        <MarketingPageContractMarkers />
+        <MarketingPageContractMarkers contract={pageContract} />
         {children}
       </main>
       <MarketingFooter
         className={footerClassName}
         columns={chrome?.footerColumns}
+        showCta={footerShowCta}
         legalLinks={chrome?.legalLinks}
         variant={footerVariant}
       />

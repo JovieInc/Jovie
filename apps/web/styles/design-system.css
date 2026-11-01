@@ -1130,6 +1130,29 @@
     --cover-height: clamp(200px, 45%, 340px);
     height: min(740px, calc(100dvh - (var(--page-pad) * 2)));
   }
+
+  /* The shell height is floored/fixed at md+ (canvas min-height at 1024px+,
+     md card height below), so the compact surface must stretch to fill the
+     slot: bottom-anchored drawer sheets position against the surface root,
+     and a content-sized root stops 8px short of the shell bottom once the
+     floor exceeds the content height - failing the profile-drawers spec
+     'menu sheet spans the phone column' (2px tolerance, first red run
+     41005969193). Validated live: sheet/shell bottom delta 8px -> 0. */
+  .profile-viewport:not(.profile-viewport--embedded):not(
+    .profile-viewport--desktop-surface
+  ) .profile-compact-surface-slot {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .profile-compact-surface-slot
+    > div {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
 }
 
 @media (min-width: 1180px) {
@@ -1191,6 +1214,20 @@
     .public-profile-layout-frame--compact {
     max-width: none;
     padding-inline: 0;
+  }
+  /* The canvas starts at the top of the stage. Once #23662 made the shell
+     height follow content, frame-level vertical centering re-centered the
+     canvas between profile modes (the tab row moved ~158px between Events
+     and Home — the JOV-6571/6572 mode-history contract) and re-centered it
+     again when fan-capture content mounted after assignment resolution
+     (public-profile CLS). Optical vertical centering stays owned by the
+     Home grid inside the shell. The 32px start padding keeps the canvas
+     inside the visual-audit shell bounds (y >= 24 at 1280x900). */
+  .profile-viewport:not(.profile-viewport--embedded):not(
+    .profile-viewport--desktop-surface
+  ) .public-profile-layout-frame--compact {
+    align-items: flex-start;
+    padding-block-start: 32px;
   }
 
   /* Drop the phone chrome: the page is the canvas. */

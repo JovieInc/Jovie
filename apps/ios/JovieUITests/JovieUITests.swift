@@ -37,6 +37,8 @@ final class JovieUITests: XCTestCase {
       $0.staticTexts["What’s New"]
     }
 
+    XCTAssertTrue(app.buttons["whats-new-read-post"].exists)
+    XCTAssertGreaterThanOrEqual(app.buttons["whats-new-got-it"].frame.height, 44)
     XCTAssertTrue(app.staticTexts["Chat is home"].waitForExistence(timeout: 3))
     XCTAssertTrue(
       app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Ask Jovie")).firstMatch.exists
@@ -48,14 +50,33 @@ final class JovieUITests: XCTestCase {
       shellControlExists(app, identifier: "shell-tab-bar"),
       "What’s New launch must not restore the bottom tab bar.\n\(app.debugDescription)"
     )
-    attachScreenshot(named: "whats-new-test-card", app: app)
+    attachScreenshot(named: "whats-new-production-sheet", app: app)
 
-    app.buttons["whats-new-done"].tap()
+    app.buttons["whats-new-got-it"].tap()
     XCTAssertTrue(
       app.textFields["chat-composer-input"].waitForExistence(timeout: 5),
       "Dismissing What’s New must land on chat home.\n\(app.debugDescription)"
     )
     attachScreenshot(named: "chat-first-home", app: app)
+  }
+
+  func testProductionWhatsNewLongMultipleAndEmptyDogfood() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-whats-new",
+      additionalLaunchArguments: ["-ui-testing-whats-new-multiple", "-ui-testing-whats-new-long", "-ui-testing-whats-new-no-dogfood", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"],
+      expectedElementDescription: "production What's New dismissal",
+      timeout: 8
+    ) { $0.buttons["whats-new-got-it"] }
+    XCTAssertTrue(app.buttons["whats-new-read-post"].exists)
+    XCTAssertFalse(app.staticTexts["Try This"].exists)
+    XCTAssertTrue(app.buttons["whats-new-got-it"].isHittable)
+    XCTAssertGreaterThanOrEqual(app.buttons["whats-new-got-it"].frame.height, 44)
+    attachScreenshot(named: "whats-new-production-accessibility-medium", app: app)
+    app.swipeUp()
+    XCTAssertTrue(app.buttons["whats-new-got-it"].isHittable)
+    attachScreenshot(named: "whats-new-production-accessibility-large", app: app)
+    app.buttons["whats-new-got-it"].tap()
+    XCTAssertTrue(app.textFields["chat-composer-input"].waitForExistence(timeout: 5))
   }
 
   func testSignedOutLaunchPerformance() throws {

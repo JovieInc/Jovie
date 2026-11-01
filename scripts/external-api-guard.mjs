@@ -13,6 +13,11 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import {
+  addedFiles,
+  checkNewConsumers,
+  loadRateLimits,
+} from './lib/api-budget.mjs';
+import {
   ALLOWLIST_PATH,
   baseCountsAt,
   baseProvidersAt,
@@ -112,6 +117,15 @@ export function main(argv = process.argv.slice(2)) {
       ...Object.keys(ratchet),
     ]),
   });
+  if (existsSync(join(repoRoot, 'ops/registry/rate-limits.json'))) {
+    errors.push(
+      ...checkNewConsumers({
+        added: addedFiles(base, repoRoot),
+        read: path => readFileSync(join(repoRoot, path), 'utf8'),
+        limitIds: new Set(loadRateLimits(repoRoot).limits.map(l => l.id)),
+      })
+    );
+  }
   for (const error of errors)
     process.stderr.write(`external-api-guard: ${error}\n`);
   const sites = Object.values(ratchet).reduce(

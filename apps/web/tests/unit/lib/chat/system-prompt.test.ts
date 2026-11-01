@@ -92,6 +92,32 @@ describe('buildSystemPrompt', () => {
     );
   });
 
+  it('keeps an explicit creator segment together with the pinned release clock', () => {
+    const prompt = buildSystemPrompt(
+      baseContext,
+      [
+        {
+          title: 'Night Swim',
+          releaseType: 'single',
+          releaseDate: '2026-10-30',
+          totalTracks: 1,
+        },
+      ],
+      {
+        aiCanUseTools: true,
+        aiWeeklyMessageLimit: 10,
+        segment: 'comedian',
+        now: new Date('2026-10-28T15:00:00Z'),
+      }
+    );
+
+    expect(prompt).toContain('- **Today:** 2026-10-28 (Wednesday)');
+    expect(prompt).toContain('UPCOMING, out Friday 2026-10-30, in 2 days');
+    expect(prompt).toContain('## Creator Segment');
+    expect(prompt).toContain('show date');
+    expect(prompt).not.toContain('Friday is the standard release day');
+  });
+
   it('includes the analytics tool guidance when insights are enabled', () => {
     const prompt = buildSystemPrompt(baseContext, [], {
       aiCanUseTools: true,

@@ -193,7 +193,6 @@ export async function GET(request: NextRequest) {
           representationSignal: leads.representationSignal,
           outreachRoute: leads.outreachRoute,
           outreachStatus: leads.outreachStatus,
-          claimToken: leads.claimToken,
           claimTokenHash: leads.claimTokenHash,
           claimTokenExpiresAt: leads.claimTokenExpiresAt,
           instantlyLeadId: leads.instantlyLeadId,

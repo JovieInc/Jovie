@@ -151,9 +151,6 @@
     "apps/web/components/features/dashboard/organisms/release-provider-matrix/SmartLinkGateBanner.tsx": {
       "icon-tile": 1
     },
-    "apps/web/components/features/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog.tsx": {
-      "icon-tile": 1
-    },
     "apps/web/components/features/dashboard/organisms/shopify/ShopifyStoreCard.tsx": {
       "icon-tile": 1
     },

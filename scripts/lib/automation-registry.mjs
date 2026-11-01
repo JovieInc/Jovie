@@ -61,6 +61,7 @@ export const TRIGGER_KINDS = Object.freeze([
 ]);
 export const RECEIPT_KINDS = Object.freeze([
   'github-workflow',
+  'workflow-failure-streak',
   'json-timestamp',
   'production-freshness',
   'merge-queue-progress',
@@ -72,6 +73,7 @@ export const RECEIPT_KINDS = Object.freeze([
 // Receipts the hosted liveness job can read without host access.
 export const HOSTED_RECEIPT_KINDS = Object.freeze([
   'github-workflow',
+  'workflow-failure-streak',
   'json-timestamp',
   'production-freshness',
   'merge-queue-progress',
@@ -149,6 +151,14 @@ export function validateRegistry(registry) {
       (!nonEmpty(receipt.repo) || !nonEmpty(receipt.workflow))
     ) {
       errors.push(`${at}: github-workflow receipts need repo and workflow`);
+    }
+    if (
+      receipt.kind === 'workflow-failure-streak' &&
+      (!nonEmpty(receipt.repo) || !nonEmpty(receipt.workflow))
+    ) {
+      errors.push(
+        `${at}: workflow-failure-streak receipts need repo and workflow`
+      );
     }
     if (
       receipt.kind === 'json-timestamp' &&

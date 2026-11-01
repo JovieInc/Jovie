@@ -47,7 +47,7 @@ export function statusFromChecks(checks) {
 }
 
 /**
- * @param {{ surface: string, checks: any[], sha: any, deploymentId?: any, runUrl?: any, startedAt: any, endedAt: any, identity?: any, observations?: any[] }} input
+ * @param {{ surface: string, checks: any[], sha: any, deploymentId?: any, runUrl?: any, startedAt: any, endedAt: any, identity?: any, observations?: any[], consoleErrorCount?: number | null, networkErrorCount?: number | null, screenshot?: { format: string, dataUrl: string } | null, adminInventoryReadback?: { status: string, detail: string } | null }} input
  */
 export function buildReceipt({
   surface,
@@ -59,6 +59,10 @@ export function buildReceipt({
   endedAt,
   identity,
   observations = [],
+  consoleErrorCount = null,
+  networkErrorCount = null,
+  screenshot = null,
+  adminInventoryReadback = null,
 }) {
   const meta = SURFACES[surface];
   if (!meta) throw new Error(`unknown surface ${surface}`);
@@ -87,6 +91,12 @@ export function buildReceipt({
         : null,
     issueUrl: null,
     observations,
+    // Per-surface browser evidence (JOV-9625): null when the surface was not
+    // browser-exercised, so "not measured" is never presented as a clean zero.
+    consoleErrorCount,
+    networkErrorCount,
+    screenshot,
+    adminInventoryReadback,
   };
 }
 
@@ -299,6 +309,9 @@ export function stepChecks(
 ) {
   const bySurface = {};
   const observationsBySurface = {};
+  const telemetryBySurface = {};
+  const screenshotBySurface = {};
+  let readback = null;
   for (const step of steps ?? []) {
     if (step.kind === 'observation') {
       (observationsBySurface[step.surface] ??= []).push({
@@ -308,6 +321,28 @@ export function stepChecks(
         unit: step.unit,
         sampleSize: step.sampleSize ?? 1,
       });
+      continue;
+    }
+    if (step.kind === 'telemetry') {
+      telemetryBySurface[step.surface] = {
+        consoleErrorCount: step.consoleErrors,
+        networkErrorCount: step.networkErrors,
+      };
+      continue;
+    }
+    if (step.kind === 'screenshot') {
+      screenshotBySurface[step.surface] = {
+        format: step.format,
+        dataUrl: step.dataUrl,
+      };
+      continue;
+    }
+    if (step.kind === 'readback') {
+      // One admin inventory-readback attempt per run; the latest wins.
+      readback = {
+        status: step.status,
+        detail: step.detail,
+      };
       continue;
     }
     // A Playwright retry re-records the same check. The latest attempt is
@@ -327,7 +362,15 @@ export function stepChecks(
       checks[prior] = record;
     }
   }
-  return { bySurface, observationsBySurface, authStatus, now };
+  return {
+    bySurface,
+    observationsBySurface,
+    telemetryBySurface,
+    screenshotBySurface,
+    adminInventoryReadback: readback,
+    authStatus,
+    now,
+  };
 }
 
 /** The browser-owned checks every surface is expected to carry. */
@@ -338,9 +381,12 @@ export const EXPECTED_BROWSER_CHECKS = Object.freeze({
     'start-chat-first-reply',
     'golden-path-preview-has-release',
   ],
-  onboarding: ['dashboard-first-value'],
+  onboarding: ['dashboard-first-value', 'fresh-user-onboarding-first-value'],
   chat: ['composer-ready', 'first-reply'],
-  'public-profile': ['owned-profile-renders-publicly'],
+  'public-profile': [
+    'owned-profile-renders-publicly',
+    'profile-edit-save-readback',
+  ],
   smartlink: ['click-analytics-capture'],
   checkout: ['checkout-entry-renders'],
 });
@@ -430,6 +476,16 @@ export async function runProductionCertification({
         startedAt,
         endedAt: now(),
         observations: stepState.observationsBySurface[surface] ?? [],
+        consoleErrorCount:
+          stepState.telemetryBySurface[surface]?.consoleErrorCount ?? null,
+        networkErrorCount:
+          stepState.telemetryBySurface[surface]?.networkErrorCount ?? null,
+        screenshot: stepState.screenshotBySurface[surface] ?? null,
+        // One readback per run, carried on the front-door receipt only.
+        adminInventoryReadback:
+          surface === 'landing'
+            ? (stepState.adminInventoryReadback ?? null)
+            : undefined,
       })
     );
   }

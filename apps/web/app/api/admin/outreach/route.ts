@@ -95,7 +95,7 @@ function getPendingEmailWhereClause(
     outreachApprovedWhere(),
     eq(leads.emailInvalid, false),
     isNotNull(leads.contactEmail),
-    isNotNull(leads.claimToken),
+    isNotNull(leads.claimTokenHash),
     ...(includeConsentGate ? [isNotNull(leads.outreachConsentAt)] : []),
     or(isNull(leads.outreachQueuedAt), lt(leads.outreachQueuedAt, claimCutoff))
   );
@@ -287,7 +287,6 @@ export async function GET(request: NextRequest) {
             representationSignal: leads.representationSignal,
             outreachRoute: leads.outreachRoute,
             outreachStatus: leads.outreachStatus,
-            claimToken: leads.claimToken,
             claimTokenHash: leads.claimTokenHash,
             claimTokenExpiresAt: leads.claimTokenExpiresAt,
             instantlyLeadId: leads.instantlyLeadId,
