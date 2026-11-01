@@ -813,6 +813,38 @@ describe('production verification sources (JOV-8082)', () => {
     expect(report.flat['throughput.verified_per_day']).toBeCloseTo(1 / 7);
   });
 
+  it("carries the merge-queue speed digest into Summer's slo block", () => {
+    const raw = {
+      runs: { pull_request: [], merge_group: [], main: [] },
+      mergedPrs: [],
+      timelines: {},
+      deployments: [],
+    };
+    const mergeQueueSpeed = {
+      generatedAt: ago(0),
+      mergesPerHour: 4.08,
+      groupSuccessRate: 0.409,
+      batchSizeGate: { success2h: 0.524 },
+      mergeGroupCiSeconds: { p50: 798 },
+      queueWaitSeconds: { p50: 3636 },
+    };
+    const report = buildReport(raw, verifiedBaseline(), {
+      now: NOW,
+      mergeQueueSpeed,
+    });
+    expect(report.gistSlo.mergeQueueSpeed).toEqual({
+      mergesPerHour: 4.08,
+      groupSuccessRate: 0.409,
+      groupSuccessRate2h: 0.524,
+      mergeGroupP50Seconds: 798,
+      queueWaitP50Seconds: 3636,
+      generatedAt: mergeQueueSpeed.generatedAt,
+    });
+    expect(
+      buildReport(raw, verifiedBaseline(), { now: NOW }).gistSlo
+    ).not.toHaveProperty('mergeQueueSpeed');
+  });
+
   it('honours per-PR Production Verified check evidence', () => {
     const report = buildReport(
       {

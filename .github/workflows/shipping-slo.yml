@@ -99,6 +99,14 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: node scripts/ci-capacity-slo.mjs --minutes 15 --max-runs 120 >> "$GITHUB_STEP_SUMMARY" || true
 
+      # Merge-queue speed (24h): group success, merges/h, merge-group p50,
+      # critical-path jobs. Its digest block rides the slo block to Summer.
+      - name: Measure merge-queue speed
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/merge-queue-speed.mjs --hours 24 --max-jobs 200 >> "$GITHUB_STEP_SUMMARY" || true
+
       - name: Measure and evaluate
         id: slo
         env:
@@ -137,6 +145,7 @@ jobs:
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
           git switch -c "$BRANCH"
           git add docs/metrics/shipping-slo-latest.json docs/metrics/blog-publish-latency-latest.json docs/metrics/stage-timings-latest.json
+          [ ! -f docs/metrics/merge-queue-speed-latest.json ] || git add docs/metrics/merge-queue-speed-latest.json
           if git diff --staged --quiet; then
             echo "Snapshot unchanged — nothing to commit."
             exit 0

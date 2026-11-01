@@ -1,0 +1,106 @@
+{
+  "schema": "jovie-merge-queue-speed/v1",
+  "generatedAt": "2026-11-01T00:02:14.905Z",
+  "windowHours": 24,
+  "prCiSeconds": {
+    "n": 671,
+    "p50": 573,
+    "p95": 1443
+  },
+  "mergeGroupCiSeconds": {
+    "n": 134,
+    "p50": 798,
+    "p95": 1439
+  },
+  "groupOutcomes": {
+    "2h": {
+      "success": 11,
+      "failure": 10,
+      "cancelled": 16,
+      "other": 0,
+      "successRate": 0.524,
+      "successRateInclCancelled": 0.297
+    },
+    "6h": {
+      "success": 54,
+      "failure": 32,
+      "cancelled": 47,
+      "other": 0,
+      "successRate": 0.628,
+      "successRateInclCancelled": 0.406
+    },
+    "24h": {
+      "success": 134,
+      "failure": 194,
+      "cancelled": 263,
+      "other": 0,
+      "successRate": 0.409,
+      "successRateInclCancelled": 0.227
+    }
+  },
+  "groupSuccessRate": 0.409,
+  "mergesPerHour": 4.08,
+  "merges": 98,
+  "queueWaitSeconds": {
+    "n": 96,
+    "p50": 3638,
+    "p95": 18624
+  },
+  "criticalPath": [
+    {
+      "name": "iOS Fast Unit + Coverage (combined) / Fast Unit + Coverage",
+      "n": 1,
+      "p50": 702,
+      "p95": 702,
+      "lastShare": 0
+    },
+    {
+      "name": "ci-fast (remaining)",
+      "n": 16,
+      "p50": 515,
+      "p95": 620,
+      "lastShare": 0
+    },
+    {
+      "name": "Storybook Surface Matrix (combined) (1)",
+      "n": 14,
+      "p50": 305,
+      "p95": 575,
+      "lastShare": 0.08
+    },
+    {
+      "name": "Storybook Surface Matrix (combined) (2)",
+      "n": 14,
+      "p50": 300,
+      "p95": 578,
+      "lastShare": 0.04
+    },
+    {
+      "name": "Mac Build + Test (combined) / Build + Test",
+      "n": 1,
+      "p50": 271,
+      "p95": 271,
+      "lastShare": 0
+    },
+    {
+      "name": "Lighthouse (dashboard gate)",
+      "n": 13,
+      "p50": 257,
+      "p95": 289,
+      "lastShare": 0.13
+    }
+  ],
+  "mergeGroupRunnerMinutesPerMerge": 398.9,
+  "sampled": {
+    "prRuns": 1000,
+    "groupRuns": 601,
+    "groupRunsWithJobs": 119,
+    "mergedPrs": 98
+  },
+  "batchSizeGate": {
+    "target": 0.85,
+    "success2h": 0.524,
+    "eligible": false
+  },
+  "repo": "JovieInc/Jovie"
+}

@@ -37,6 +37,7 @@ import {
 } from './lib/blog-publish-latency.mjs';
 import { ciRoundsMetrics, flattenCiRounds } from './lib/ci-rounds.mjs';
 import { formatBiomeJson } from './lib/format-biome-json.mjs';
+import { digestBlock } from './lib/merge-queue-speed.mjs';
 import {
   buildGistSloBlock,
   ciWalltimeByEvent,
@@ -413,7 +414,12 @@ export function collectRaw({ workflows, days }) {
 export function buildReport(
   raw,
   baseline,
-  { now = Date.now(), stageManifest = null, ciCapacity = null } = {}
+  {
+    now = Date.now(),
+    stageManifest = null,
+    ciCapacity = null,
+    mergeQueueSpeed = null,
+  } = {}
 ) {
   const nowMs = typeof now === 'number' ? now : Date.parse(now);
   const weekMs = 7 * 86_400_000;
@@ -551,6 +557,10 @@ export function buildReport(
   // Hosted-runner capacity (scripts/ci-capacity-slo.mjs): queue wait p50/p95
   // and control-plane job-minutes/hour, with the p95 > 120s alarm flag.
   if (ciCapacity) gistSlo.ciCapacity = ciCapacity;
+  // Merge-queue speed (scripts/merge-queue-speed.mjs): merges/h, group
+  // success and merge-group p50 for Summer's digest.
+  const mqDigest = digestBlock(mergeQueueSpeed);
+  if (mqDigest) gistSlo.mergeQueueSpeed = mqDigest;
 
   return {
     schemaVersion: 1,
@@ -801,7 +811,22 @@ async function main() {
   } catch {
     // No capacity sample this run; the SLO report is unaffected.
   }
-  const report = buildReport(raw, baseline, { stageManifest, ciCapacity });
+  let mergeQueueSpeed = null;
+  try {
+    mergeQueueSpeed = JSON.parse(
+      readFileSync(
+        resolve(REPO_ROOT, 'docs/metrics/merge-queue-speed-latest.json'),
+        'utf8'
+      )
+    );
+  } catch {
+    // No merge-queue speed sample this run; the SLO report is unaffected.
+  }
+  const report = buildReport(raw, baseline, {
+    stageManifest,
+    ciCapacity,
+    mergeQueueSpeed,
+  });
 
   if (hasArg(args, '--ratchet')) {
     const { next, tightened } = ratchetBaseline(
