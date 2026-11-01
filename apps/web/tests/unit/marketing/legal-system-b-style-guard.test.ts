@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -14,9 +14,9 @@ import { describe, expect, it } from 'vitest';
  * lives in `MarketingRouteHero.css`, which this guard does not scan, and is
  * itself checked by `design-system-source-ratchet.mjs`).
  *
- * 2026-10-29 marketing critic sweep: every legal route shares one segment
- * layout with the full docked MarketingHeader and expanded footer, and no
- * route hero. The texture hero repeated the document title above the real
+ * 2026-10-29 marketing critic sweep: every legal route renders one shell
+ * (legal-document-shell.tsx, from each route's own layout) with the full
+ * docked MarketingHeader and expanded footer, and no route hero. The texture hero repeated the document title above the real
  * H1 over off-palette wallpaper; cookies/dmca ran a different header.
  */
 
@@ -24,6 +24,7 @@ const legalRoutes = ['privacy', 'terms', 'cookies', 'dmca'] as const;
 
 const sharedSources = [
   'app/(dynamic)/legal/layout.tsx',
+  'app/(dynamic)/legal/legal-document-shell.tsx',
   'app/(dynamic)/legal/privacy/page.tsx',
   'app/(dynamic)/legal/terms/page.tsx',
   'app/(dynamic)/legal/cookies/page.tsx',
@@ -62,10 +63,9 @@ describe('legal pages System B source contract', () => {
   });
 
   it('gives every legal route one shell: full header, expanded footer, no hero', () => {
-    const layout = readSource('app/(dynamic)/legal/layout.tsx');
+    const layout = readSource('app/(dynamic)/legal/legal-document-shell.tsx');
 
     expect(layout).toContain('<PublicPageShell');
-    expect(layout).toContain('export const revalidate = false');
     expect(layout).not.toContain("headerVariant='minimal'");
     expect(layout).toContain("footerVariant='expanded'");
     expect(layout).not.toContain('mainOffset={false}');
@@ -79,13 +79,15 @@ describe('legal pages System B source contract', () => {
     ]) {
       expect(layout).not.toContain(heroResidue);
     }
+    // Per-route layouts render the one shell; hoisting it into the segment
+    // layout regrouped client chunks past the /demo and /p/[token] budgets.
     for (const route of legalRoutes) {
-      expect(
-        existsSync(
-          resolve(process.cwd(), `app/(dynamic)/legal/${route}/layout.tsx`)
-        ),
-        `${route} must inherit the shared legal layout`
-      ).toBe(false);
+      const routeLayout = readSource(`app/(dynamic)/legal/${route}/layout.tsx`);
+      expect(routeLayout, `${route} must render LegalDocumentShell`).toContain(
+        '<LegalDocumentShell>'
+      );
+      expect(routeLayout).toContain('export const revalidate = false');
+      expect(routeLayout).not.toContain('<PublicPageShell');
     }
   });
 
