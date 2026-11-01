@@ -1057,6 +1057,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/pr-fleet-rules-workflow.test.mjs',
   'scripts/lib/__tests__/wake-fanout-contract.test.mjs',
   'scripts/design-system-source-ratchet.test.mjs',
+  'scripts/review-escapes.test.mjs',
 ]);
 export const DEPRECATION_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/deprecation-clearance.mjs --test-coverage-include=scripts/lib/deprecation-observation.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=90 scripts/deprecation-clearance.test.mjs';
@@ -1121,6 +1122,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/component-rendered-invariant-policy.test.mjs',
   'scripts/lib/__tests__/daily-changelog.test.mjs',
   'scripts/lib/__tests__/daily-changelog-publication.test.mjs',
+  'scripts/lib/__tests__/changelog-staleness.test.mjs',
   'scripts/lib/__tests__/changelog-source-guard.test.mjs',
   'scripts/lib/__tests__/delivery-control-receipts-workflow.test.mjs',
   'scripts/lib/__tests__/dependabot-update-policy.test.mjs',
@@ -1169,6 +1171,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/queue-deferred-release.test.mjs',
   'scripts/lib/__tests__/ratchet-core.test.mjs',
   'scripts/lib/__tests__/domain-expiry.test.mjs',
+  'scripts/lib/__tests__/ai-routing-drift.test.mjs',
   'scripts/lib/__tests__/credentials-registry.test.mjs',
   'scripts/lib/__tests__/credentials-spend-check.test.mjs',
   'scripts/lib/__tests__/secrets-tooling.test.mjs',

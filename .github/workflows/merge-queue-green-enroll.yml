@@ -1151,6 +1151,7 @@ jobs:
           sparse-checkout: |
             .nvmrc
             scripts/merge-group-victim-rearm.mjs
+            scripts/lib/merge-group-ahead-attribution.mjs
             scripts/lib/admission-hold-labels.json
             scripts/lib/admission-hold-labels.mjs
             .github/actions/prime-node-toolcache/action.yml

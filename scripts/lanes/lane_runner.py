@@ -10566,13 +10566,43 @@ def install_lag(host: Host, before: str | None, error: str | None) -> dict:
             "behindCommit": bundle["sourceCommit"], "why": error}
 
 
+def release_paths(repo: Path, revision: str) -> list[str]:
+    """Managed bundle paths that exist at `revision`. The installed LANE_TESTS and RELEASE_EXTRAS
+    describe the installed release, not the incoming one: a file deleted upstream (#23510 removed
+    ops/registry/third-party-grants.jsonl on 2026-10-28) made every later update refuse with
+    release-bundle-incomplete for good, because the old updater could never install the release
+    that no longer lists it. Missing extras and tests drop out of the bundle; scripts/lanes is mandatory."""
+    wanted = sorted({"scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS})
+    listing = subprocess.run(["git", "ls-tree", "--name-only", revision, "--", *wanted], cwd=repo,
+                             capture_output=True, text=True)
+    present = set(listing.stdout.splitlines())
+    if listing.returncode or "scripts/lanes" not in present:
+        raise RuntimeError("release-bundle-incomplete")
+    return [path for path in wanted if path in present]
+
+
+def ensure_dependency_pool(host: Host) -> bool:
+    """The mesh runtime compiles against a pool slot restored from a recent lock; slots age out after
+    three days and an aged pool made every release refuse 'mesh runtime dependency closure failed'
+    (Gem, 2026-10-26 to 10-29). Refill before building when no ready slot remains. True when a fill ran."""
+    try:
+        if not worktree_pool.enabled() or worktree_pool.ready_slots(worktree_pool.pool_dir(host.repo)):
+            return False
+        print("lane update: dependency pool has no ready slot; refilling before the release build", file=sys.stderr)
+        worktree_pool.fill(host.repo, warm=False, log=sys.stderr)
+        return True
+    except (OSError, subprocess.SubprocessError) as error:
+        print(f"lane update: dependency pool refill failed: {error}", file=sys.stderr)
+        return False
+
+
 def release_identity(host: Host) -> dict:
     """Pin one main commit, then fingerprint exactly the managed release contents."""
     read = sh(["git", "rev-parse", "--verify", "origin/main^{commit}"], cwd=host.repo)
     revision = read.stdout.strip()
     if read.returncode or not re.fullmatch(r"[0-9a-f]{40}", revision):
         raise RuntimeError("release-source-unavailable")
-    paths = sorted({"scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS})
+    paths = release_paths(host.repo, revision)
     read = sh(["git", "rev-parse", *(f"{revision}:{path}" for path in paths)], cwd=host.repo)
     objects = read.stdout.splitlines()
     if read.returncode or len(objects) != len(paths) or any(not re.fullmatch(r"[0-9a-f]{40}", oid) for oid in objects):
@@ -11037,13 +11067,18 @@ def complete_staged_bundle(host: Host, staging: Path) -> str | None:
     staged without it and refused forever (2026-10-11: test_lifecycle.py from #21225 kept Gem on
     a 10-10 release). Fill missing bundle paths from origin/main only when its scripts/lanes is
     byte-identical to the staged tree; anything else stays a refusal."""
-    missing = [path for path in sorted({"scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS})
-               if not (staging / path).exists()]
+    head = subprocess.run(["git", "rev-parse", "--verify", "origin/main^{commit}"], cwd=host.repo,
+                          capture_output=True, text=True).stdout.strip()
+    try:
+        managed = release_paths(host.repo, head)
+    except RuntimeError:
+        return "release-bundle-incomplete"
+    missing = [path for path in managed if not (staging / path).exists()]
     if not missing:
         return None
     def git(*args, **kwargs):
         return subprocess.run(["git", *args], cwd=host.repo, capture_output=True, **kwargs)
-    revision = git("rev-parse", "--verify", "origin/main^{commit}", text=True).stdout.strip()
+    revision = head
     listing = git("ls-tree", "-r", revision, "scripts/lanes", text=True)
     expected = {line.split("\t", 1)[1]: line.split()[2] for line in listing.stdout.splitlines()}
     lanes = staging / "scripts/lanes"
@@ -11283,6 +11318,11 @@ def install_release(host: Host, *, operator=None) -> int:
     release = host.state / "releases" / tree
     refused_path = host.state / "update-refused.json"
     refused = json.loads(refused_path.read_text()) if refused_path.exists() else {}
+    if operator is None and not release.exists() and ensure_dependency_pool(host):
+        # The cause the marker recorded (an aged dependency pool) was just repaired: retry now.
+        if refused.get("why") == "mesh runtime dependency closure failed":
+            refused = {}
+            refused_path.unlink(missing_ok=True)
     if not release.exists() and refused.get("tree") == tree and time.time() - refused.get("at", 0) < UPDATE_RETRY_S:
         print(f"lane update backing off: tree {tree[:7]} was refused {refused.get('why')}", file=sys.stderr)
         return 1
@@ -11295,7 +11335,7 @@ def install_release(host: Host, *, operator=None) -> int:
             elif staging.exists() or staging.is_symlink():
                 raise lifecycle.AdmissionHeld("operator proof staging already exists; reconcile its owner")
             staging.mkdir(parents=True, mode=0o700)
-            archive = lifecycle.run(["git", "archive", bundle["sourceCommit"], "scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS],
+            archive = lifecycle.run(["git", "archive", bundle["sourceCommit"], *sorted(bundle["objects"])],
                                      cwd=host.repo, capture_output=True, check=True)
             lifecycle.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
             def refuse(why: str) -> int:
@@ -11354,6 +11394,7 @@ def install_release(host: Host, *, operator=None) -> int:
         link.unlink()
     link.symlink_to(release / "scripts/lanes")
     os.replace(link, current)
+    refused_path.unlink(missing_ok=True)  # the refusal that marker recorded is resolved by this activation
     return 0
 
 

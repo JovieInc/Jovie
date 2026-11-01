@@ -784,3 +784,88 @@ describe('controller run trust replay: run 37144574062 (#20386)', () => {
     ).toBe(false);
   });
 });
+
+describe('catch-up publication', () => {
+  const texts = [
+    [
+      'mac-even-gutters',
+      'Fixed',
+      'The Mac app keeps even spacing around the window.',
+    ],
+    [
+      'mac-sidebar-toggle',
+      'Fixed',
+      'Show or hide the sidebar in the Mac app with Cmd+B.',
+    ],
+    [
+      'sidebar-hover',
+      'Changed',
+      'Sidebar hover highlights are more consistent.',
+    ],
+    [
+      'inbox-notes',
+      'Changed',
+      'Keep your Inbox focused: open Notes when you need them.',
+    ],
+    ['account-menu', 'Fixed', 'Your account menu fits the expanded sidebar.'],
+    ['work-filters', 'Fixed', 'Filter your work without losing your toolbar.'],
+    [
+      'profile-mark',
+      'Fixed',
+      'Public profiles show a small Jovie mark at the bottom.',
+    ],
+    [
+      'composer-send',
+      'Fixed',
+      'The composer keeps Send visible with enlarged text.',
+    ],
+    [
+      'onboarding-handle',
+      'Fixed',
+      'Onboarding keeps your preview in sync after you confirm your handle.',
+    ],
+    [
+      'destination-icons',
+      'Changed',
+      'Destination lists stay quieter until you hover a service.',
+    ],
+  ];
+  const many = texts.map(([outcomeKey, section, text], index) =>
+    candidate({
+      pr: {
+        number: index + 1,
+        state: 'MERGED',
+        baseRefName: 'main',
+        mergeCommit: { oid: String(index).padStart(40, 'c') },
+        url: `https://github.com/JovieInc/Jovie/pull/${index + 1}`,
+        body: body({ ...note, outcomeKey, section, text }),
+      },
+    })
+  );
+  it('keeps the 3 per day cap by default', () => {
+    const plan = planDailyPublication(input({ candidates: many }));
+    expect(plan.result.stories).toHaveLength(3);
+    expect(plan.deferred.length).toBeGreaterThan(0);
+  });
+  it('folds a backlog into at most three area stories, keeping each approved line', () => {
+    const plan = planDailyPublication(
+      input({ candidates: many, catchUp: true })
+    );
+    expect(plan.status).toBe('publish');
+    const stories = plan.result.stories;
+    expect(stories.length).toBeLessThanOrEqual(3);
+    expect(stories.map(story => story.summary.split(':')[0]).sort()).toEqual([
+      'Mac app',
+      'Profiles, releases and onboarding',
+      'Sidebar and inbox',
+    ]);
+    const shown = stories.flatMap(story => [
+      story.summary,
+      ...(story.bullets ?? []).map(b => b.text),
+    ]);
+    expect(shown.length + plan.deferred.length).toBeGreaterThanOrEqual(
+      texts.length
+    );
+    expect(plan.content).toContain('Mac app: ');
+  });
+});
