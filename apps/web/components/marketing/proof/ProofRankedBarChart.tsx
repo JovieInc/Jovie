@@ -88,11 +88,11 @@ export function ProofRankedBarChart({
             <li
               key={entry.id}
               data-self={entry.self ? 'true' : undefined}
-              className='grid grid-cols-[minmax(6rem,9rem)_1fr_auto] items-center gap-3'
+              className='flex items-center gap-3'
             >
               <span
                 className={cn(
-                  'truncate text-sm',
+                  'w-24 shrink-0 truncate text-sm sm:w-36',
                   entry.self
                     ? 'font-medium text-primary-token'
                     : 'text-secondary-token'
@@ -102,7 +102,7 @@ export function ProofRankedBarChart({
               </span>
               <span
                 aria-hidden='true'
-                className='h-2 overflow-hidden rounded-full bg-surface-1'
+                className='h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-surface-1'
               >
                 <span
                   className={cn(
@@ -114,7 +114,7 @@ export function ProofRankedBarChart({
               </span>
               <span
                 className={cn(
-                  'text-sm tabular-nums',
+                  'shrink-0 text-sm tabular-nums',
                   entry.self ? 'text-primary-token' : 'text-tertiary-token'
                 )}
               >
