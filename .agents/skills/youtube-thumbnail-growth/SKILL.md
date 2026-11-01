@@ -1,6 +1,6 @@
 ---
 name: youtube-thumbnail-growth
-description: Create, review, revise, and compare YouTube thumbnail challengers intended to improve qualified clicks and channel growth. Use for thumbnail concepts, approval portfolios, model bake-offs, VideoContextPack preparation, portrait and skin-tone QA, mobile-legibility review, controlled experiments, and evidence-backed thumbnail refreshes for existing or new videos.
+description: "Create, review and A/B YouTube thumbnail challengers with mobile-legibility QA."
 ---
 
 # YouTube Thumbnail Growth

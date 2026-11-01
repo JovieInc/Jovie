@@ -2,14 +2,7 @@
 name: design-html
 preamble-tier: 2
 version: 1.0.0
-description: |
-  Design finalization: takes an approved AI mockup from /design-shotgun and
-  generates production-quality Pretext-native HTML/CSS. Text actually reflows,
-  heights are computed, layouts are dynamic. 30KB overhead, zero deps.
-  Smart API routing: picks the right Pretext patterns for each design type.
-  Use when: "finalize this design", "turn this mockup into HTML", "implement
-  this design", or after /design-shotgun approves a direction.
-  Proactively suggest when user has approved a design in /design-shotgun. (gstack)
+description: "Turn an approved /design-shotgun mockup into production Pretext HTML/CSS. Use for \"finalize this design\"."
 allowed-tools:
   - Bash
   - Read

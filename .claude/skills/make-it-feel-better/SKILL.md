@@ -1,6 +1,6 @@
 ---
 name: make-it-feel-better
-description: UI-feel pass for Jovie surfaces — the sixteen details that separate a page that merely works from one that feels finished, plus a pre-ship review checklist and common-mistakes table. Use when building, reviewing, or polishing user-facing UI, or when a change looks correct but reads as rough. Cross-references the enforced guardrails (ui-feel ratchet, contrast ratchet, @jovie/copy slop rules) instead of restating them.
+description: "UI-feel pass: sixteen finishing details and a pre-ship checklist for UI that works but feels rough."
 ---
 
 # Make it feel better

@@ -1,12 +1,6 @@
 ---
 name: tool-discovery
-description: |
-  Research how to source a capability, or evaluate a tool/product Tim shares (a link, a screenshot, or just a name) without
-  asking him to do the legwork. Use whenever a message shares a tool/repo/product
-  and expects an opinion or evaluation — "check this out", "is this worth using",
-  "what does this do", a bare link with no context. Extracts search terms, finds
-  the GitHub repo and docs/pricing/reviews via gh search + WebSearch/WebFetch, and
-  returns a structured evaluation instead of asking Tim to fetch info first.
+description: "Evaluate a tool, repo or product Tim shares (link, screenshot, name) and return a verdict without asking him."
 ---
 
 # Tool Discovery

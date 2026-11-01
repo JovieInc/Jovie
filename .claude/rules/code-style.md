@@ -303,7 +303,7 @@ import { db } from '@/lib/db';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 ```
 
-For component patterns, see `.claude/rules/ui.md` → "New Component Pattern".
+For component patterns, see `docs/design-system/UI_REFERENCE.md` → "New Component Pattern".
 
 ## Plan Before Executing Complex Tasks
 

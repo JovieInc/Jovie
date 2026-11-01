@@ -1,11 +1,6 @@
 ---
 name: load-investors
-description: |
-  Load investor records (angels, VCs, funds, fundraising contacts) into the Jovie
-  fundraising Airtable base. Use when the user pastes a list and asks to add them.
-  Upserts by LinkedIn URL primary, Name fallback. Reads AIRTABLE_API_KEY from
-  Doppler (jovie-web/dev). Handles plain CSV, fenced markdown CSV blocks, and
-  plain markdown tables (with confirmation).
+description: "Upsert pasted investor lists into the fundraising Airtable base (LinkedIn URL, then name)."
 ---
 
 # /load-investors

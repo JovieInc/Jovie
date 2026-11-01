@@ -12559,11 +12559,14 @@ class LockfileConflictTest(unittest.TestCase):
         return subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", *args], cwd=cwd,
                               check=True, capture_output=True, text=True).stdout.strip()
 
-    def repo(self, tmp: Path, pr_changes: dict, main_changes: dict | None = None):
+    def repo(self, tmp: Path, pr_changes: dict, main_changes: dict | None = None,
+             base_changes: dict | None = None):
         origin, work = tmp / "origin.git", tmp / "work"
         self.git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp)
         self.git("clone", "-q", str(origin), str(work), cwd=tmp)
-        for name, text in {"package.json": "{}\n", "pnpm-lock.yaml": "base\n", "a.ts": "a\n"}.items():
+        for name, text in {"package.json": "{}\n", "pnpm-lock.yaml": "base\n", "a.ts": "a\n",
+                           **(base_changes or {})}.items():
+            (work / name).parent.mkdir(parents=True, exist_ok=True)
             (work / name).write_text(text)
         self.git("add", "-A", cwd=work)
         self.git("commit", "-qm", "base", cwd=work)
@@ -12656,6 +12659,37 @@ class LockfileConflictTest(unittest.TestCase):
         self.assertEqual(lane.remediation.GENERATED_RESOLVERS["scripts/agent-context/rule-scopes.json"],
                          ("node", "scripts/agent-context/rule-scopes.mjs", "--write"))
         self.assertIn("canon/automation-registry.jsonl", lane.remediation.RESOLVABLE_CONFLICT_FILES)
+
+    def test_rule_scopes_conflict_regenerates_both_sides_rules_and_pushed_hashes(self):
+        record = "scripts/agent-context/rule-scopes.json"
+        generator = "scripts/agent-context/rule-scopes.mjs"
+        rule = ".claude/rules/ui.md"
+        marketing = ".claude/rules/marketing-ui.md"
+        body = "".join(f"rule {index}\n" for index in range(24))
+        frontmatter = '---\npaths: ["**/*.tsx"]\n---\n\n'
+        head_body = body.replace("rule 2\n", "head rule 2\n")
+        main_body = body.replace("rule 20\n", "main rule 20\n")
+        merged_body = head_body.replace("rule 20\n", "main rule 20\n")
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, work = self.repo(Path(tmp),
+                {record: "head record\n", rule: frontmatter + head_body,
+                 marketing: '---\npaths: ["marketing/**"]\n---\n\nMarketing guidance\n'},
+                main_changes={record: "main record\n", rule: frontmatter + main_body},
+                base_changes={record: "base record\n", rule: frontmatter + body,
+                              generator: (ROOT / generator).read_text()})
+            ok, calls = self.run_resolve(work)
+            self.assertTrue(ok)
+            self.assertEqual(calls.count(["node", generator, "--write"]), 1)
+            self.assertLess(calls.index(["git", "checkout", "origin/main", "--", record]),
+                            calls.index(["node", generator, "--write"]))
+            records = json.loads(self.git("show", f"devin/jov-1-20260927:{record}", cwd=origin))
+            self.assertEqual([row["file"] for row in records], [marketing, rule])
+            self.assertEqual(records[0]["paths"], ["marketing/**"])
+            self.assertEqual(records[0]["bodySha256"], hashlib.sha256(b"Marketing guidance\n").hexdigest())
+            self.assertEqual(records[1]["bodySha256"], hashlib.sha256(merged_body.encode()).hexdigest())
+            self.assertEqual(self.git("show", f"devin/jov-1-20260927:{rule}", cwd=origin),
+                             (frontmatter + merged_body).strip())
+            self.assertEqual(subprocess.run(["node", generator], cwd=work, capture_output=True).returncode, 0)
 
     def test_registry_edits_to_the_same_id_stay_unresolved(self):
         path = "canon/automation-registry.jsonl"

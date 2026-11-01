@@ -1,6 +1,6 @@
 ---
 name: copywriting
-description: Write, rewrite, review, or gate any Jovie words, including landing pages, marketing sections, product UI strings, lifecycle email and SMS, Jovie persona replies, founder drafts in Tim's voice, and copy written on behalf of customers (bios, release posts, fan emails). Runs the canonical @jovie/copy lint, tiered multi-model judge panel, and rewrite loop, and compiles landing pages stage by stage (capabilities, outcomes, copy, layout, style, design system, proof, stats and quotes). Use whenever an agent produces text a customer, fan, investor, or the public will read.
+description: "Write or gate any Jovie words (marketing, UI, email/SMS, persona, customer copy) via the @jovie/copy lint and judges."
 ---
 
 # Copywriting

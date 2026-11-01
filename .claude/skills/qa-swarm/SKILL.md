@@ -1,10 +1,6 @@
 ---
 name: qa-swarm
-description: |
-  Agent-swarm QA recipes for continuous objective flaw discovery. Six recipes
-  (diff-review, explore, vision-critique, design-jury, test-gen, flaky-hunter)
-  propose enriched Linear issues, write findings to gbrain, and fast-track P0
-  remediation without requiring Eve.
+description: "Agent-swarm QA recipes (diff review, explore, vision, design jury, test gen, flaky hunter) that file Linear issues."
 version: 2026-06-20
 scope: JovieInc/Jovie
 owner: ops-agent

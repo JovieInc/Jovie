@@ -1,6 +1,6 @@
 ---
 name: throughput-diagnosis
-description: Find and fix why Jovie shipping throughput stalled (no lane pushes, no merges, slow releases). Use when merges/hour, lane runs/hour or merge→production time drop, or a sentinel alarm fires. Follow the work item, not the symptom.
+description: "Find why shipping throughput stalled (no lane pushes, merges or releases); follow the work item."
 ---
 
 # Throughput diagnosis

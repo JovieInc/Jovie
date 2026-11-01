@@ -1,9 +1,6 @@
 ---
 name: jovie-performance-hardening
-description: |
-  Measurement-first performance hardening for Jovie. Use when app runtime,
-  database, bundle, CI, Vitest, Playwright, or route-budget performance needs
-  continuous optimization with validated before/after metrics.
+description: "Measurement-first performance hardening (runtime, DB, bundle, CI, tests) with validated before/after."
 version: 2026-05-07
 owner: ops-agent
 scope: JovieInc/Jovie

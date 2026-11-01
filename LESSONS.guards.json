@@ -194,7 +194,7 @@
       "guards": [
         {
           "kind": "scoped-rule",
-          "path": ".claude/rules/ui.md",
+          "path": ".claude/rules/marketing-ui.md",
           "anchor": "- Marketing copy must not invent adoption metrics, customer counts, waitlist sizes, or traction claims.",
           "reason": "Requires current verified numbers or qualitative copy."
         }
@@ -236,7 +236,7 @@
       "guards": [
         {
           "kind": "scoped-rule",
-          "path": ".claude/rules/ui.md",
+          "path": ".claude/rules/marketing-ui.md",
           "anchor": "- Calvin Harris demo fixtures must not include `Blessings`, Clementine Douglas, or any Tim White credit.",
           "reason": "Forbids the specific founder/Calvin identity collision across fixtures."
         }
@@ -566,7 +566,7 @@
         },
         {
           "kind": "scoped-rule",
-          "path": ".claude/rules/ui.md",
+          "path": ".claude/rules/marketing-ui.md",
           "anchor": "- Marketing plan prices render only through `MarketingOfferSummary` or",
           "reason": "Directs marketing pages to render plan prices from offer truth only."
         }
@@ -584,7 +584,7 @@
         },
         {
           "kind": "scoped-rule",
-          "path": ".claude/rules/ui.md",
+          "path": ".claude/rules/marketing-ui.md",
           "anchor": "- Marketing pages share one spine and one type ramp: sections use",
           "reason": "Names the shared section shell, hero container, and type classes."
         }

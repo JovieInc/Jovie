@@ -1,6 +1,6 @@
 ---
 name: find-skills
-description: Discover, inspect, and install third-party Agent Skills for Jovie. Use when a user asks to find, compare, add, update, or audit skills, plugins, reusable agent workflows, or packages from skills.sh or a GitHub repository.
+description: "Find, compare, install or audit third-party Agent Skills."
 ---
 
 # Find Skills for Jovie

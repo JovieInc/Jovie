@@ -2,12 +2,7 @@
 name: ship
 preamble-tier: 4
 version: 1.0.0
-description: |
-  Ship workflow: detect + merge base branch, run tests, review diff, commit,
-  push, create or update a PR. Never edit CHANGELOG before land. Use when asked to "ship", "deploy",
-  "push to main", "create a PR", "merge and push", or "get it deployed".
-  Proactively invoke this skill (do NOT push/PR directly) when the user says code
-  is ready, asks about deploying, wants to push code up, or asks to create a PR. (gstack)
+description: "Ship a branch: merge base, test, review, commit, push, open or update the PR. Never edits CHANGELOG."
 allowed-tools:
   - Bash
   - Read

@@ -1,9 +1,6 @@
 ---
 name: autoplan
-description: |
-  Auto-review pipeline with deterministic preflight receipt (JOV-4183).
-  Runs scripts/agent/preflight.sh once, then the full gstack autoplan reviews.
-  Use when asked to "auto review", "autoplan", "run all reviews".
+description: "Run the CEO, design and eng plan reviews after one preflight receipt."
 ---
 
 # /autoplan — Jovie wrapper (preflight + gstack)

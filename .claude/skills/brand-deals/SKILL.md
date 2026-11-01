@@ -1,6 +1,6 @@
 ---
 name: brand-deals
-description: Run one high-integrity creator brand partnership from evidence through deposit, fulfillment, and reporting. Use for sponsor evidence, personal deal-history mining, Backstage opportunities, buyer qualification, opportunity scoring, Inbox approve or reject decisions, SOWs, rights negotiation, campaign preparation, tracking, invoicing, and repeat-demand analysis.
+description: "Run a creator brand deal end to end: evidence, scoring, approval, SOW, rights, tracking, invoicing."
 ---
 
 # Brand Deals
