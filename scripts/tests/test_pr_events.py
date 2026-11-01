@@ -3056,6 +3056,51 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
            "- Metric: missing evidence fields | count | lower | 1 | 0 | Fleet policy | node --test\n"
            "- Verify: https://github.com/JovieInc/Jovie/actions/runs/123\n")
 
+    PREMISE = {
+        "Assumption": "The new hold block adds the third direct profile write.",
+        "Falsifying test": "node /tmp/compare-profile-writes.mjs",
+        "Result": "Main: 2; head: 3; head without hold block: 2.",
+    }
+
+    def test_explicit_premise_repairs_body_and_passes_canonical_policy(self):
+        body = events.red_before_green_block(self.PR)
+        updated = events.repair_evidence_body(self.PR, body, premise=self.PREMISE)
+        self.assertIn(body, updated)
+        self.assertEqual(updated.count("## Premise check"), 1)
+        self.assertEqual(events.repair_evidence_body(self.PR, updated, premise=self.PREMISE), updated)
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { hasPremiseEvidence } from './scripts/pr-fleet-rules.mjs';
+console.log(hasPremiseEvidence(readFileSync(0, 'utf8')));
+"""], cwd=ROOT, input=updated, text=True, capture_output=True, check=True)
+        self.assertEqual(checked.stdout.strip(), "true")
+
+    def test_premise_is_explicit_preserves_existing_and_rejects_invalid_fields(self):
+        body = events.red_before_green_block(self.PR)
+        self.assertNotIn("## Premise check", events.repair_evidence_body(self.PR, body))
+        original = body + "\n## Premise check\n\nOriginal observation\n"
+        self.assertEqual(events.repair_evidence_body(self.PR, original, premise=self.PREMISE), original)
+        for invalid in ({}, {**self.PREMISE, "Result": ""},
+                        {**self.PREMISE, "Result": "passed\n## Win"},
+                        {**self.PREMISE, "Result": 1}, "observed pass"):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                events.repair_evidence_body(self.PR, body, premise=invalid)
+
+    def test_ensure_repairs_premise_without_a_red_check_and_preserves_other_evidence(self):
+        body = self.WIN + '<!-- customer-changelog/v1 {"releaseWorthy":false} -->\n'
+        written = []
+
+        def shell(args):
+            if args[:2] == ["pr", "view"]:
+                return SimpleNamespace(returncode=0, stdout=body)
+            written.append(Path(args[args.index("--body-file") + 1]).read_text())
+            return SimpleNamespace(returncode=0, stdout="")
+
+        self.assertTrue(events.ensure_red_before_green({"number": 7}, sh=shell, premise=self.PREMISE))
+        self.assertEqual(len(written), 1)
+        self.assertTrue(written[0].startswith(body))
+        self.assertIn("- Falsifying test: " + self.PREMISE["Falsifying test"], written[0])
+
     def test_explicit_measured_win_repairs_compounding_body_and_passes_fleet(self):
         body = events.red_before_green_block(self.PR)
         updated = events.repair_evidence_body(self.PR, body, win_section=self.WIN,

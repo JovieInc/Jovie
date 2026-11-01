@@ -1063,12 +1063,14 @@ def with_red_section(body: str, block: str) -> str:
 
 
 def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None,
-                         locking_pr: int | None = None, win_section: str | None = None) -> str:
+                         locking_pr: int | None = None, win_section: str | None = None,
+                         premise: dict | None = None) -> str:
     """Complete repair metadata without replacing existing evidence or customer decisions.
 
     The caller chooses the customer outcome and supplies any locking PR provenance;
     never infer either from a failed check. Existing locked-area decisions are preserved.
     Measured wins must be supplied by the caller, never inferred from a red check.
+    Premise evidence must describe the caller's actual falsifying test and observation.
     The canonical Fleet/changelog guards still validate the resulting body.
     """
     updated = body
@@ -1096,6 +1098,15 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
             raise ValueError("measured win requires a complete ## Win section")
         if red_section_bounds(updated.split("\n"), re.compile(r"^#{2,3}\s*Win\s*$", re.I)) is None:
             updated = updated.rstrip("\n") + "\n\n" + win_section.rstrip("\n") + "\n"
+    if premise is not None:
+        fields = ("Assumption", "Falsifying test", "Result")
+        if not isinstance(premise, dict) or any(
+                not isinstance(premise.get(field), str) or not premise[field].strip()
+                or "\n" in premise[field] or "\r" in premise[field] for field in fields):
+            raise ValueError("premise requires explicit single-line Assumption, Falsifying test and Result")
+        if red_section_bounds(updated.split("\n"), re.compile(r"^#{2,3}\s*Premise check\s*$", re.I)) is None:
+            block = "## Premise check\n\n" + "\n".join(f"- {field}: {premise[field]}" for field in fields)
+            updated = updated.rstrip("\n") + "\n\n" + block + "\n"
     return updated
 
 
@@ -1110,17 +1121,19 @@ def api_gh(args, **_):
 
 
 def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_decision: dict | None = None,
-                            locking_pr: int | None = None, win_section: str | None = None) -> bool:
+                            locking_pr: int | None = None, win_section: str | None = None,
+                            premise: dict | None = None) -> bool:
     """Complete repair evidence and an optional caller-selected customer decision."""
     if not isinstance(pr.get("number"), int) or (
-            customer_decision is None and locking_pr is None and win_section is None and red_before_green_block(pr, excerpt) is None):
+            customer_decision is None and locking_pr is None and win_section is None and premise is None
+            and red_before_green_block(pr, excerpt) is None):
         return False
     viewed = sh(["pr", "view", str(pr["number"]), "--repo", REPO, "--json", "body", "--jq", ".body"])
     if viewed.returncode != 0:
         return False
     body = viewed.stdout or ""
     updated = repair_evidence_body(pr, body, excerpt, customer_decision=customer_decision, locking_pr=locking_pr,
-                                   win_section=win_section)
+                                   win_section=win_section, premise=premise)
     if updated == body:
         return False
     with tempfile.TemporaryDirectory(prefix="red-before-green-") as tmp:
