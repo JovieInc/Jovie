@@ -80,9 +80,11 @@ import {
   extractLastUserImageUrl,
   extractLastUserText,
 } from '@/lib/chat/message-text';
+import { resolveHasMusicLinks } from '@/lib/chat/music-link-presence';
 import { canUseOvChatMode, parseChatMode } from '@/lib/chat/ov-mode';
 import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
 import { buildRelatedSuggestionsFraming } from '@/lib/chat/related-recommendations';
+import { countVisibleReleaseListenLinks } from '@/lib/chat/release-listen-links';
 import {
   updateOwnedReleaseGeneratedPitches,
   updateOwnedReleaseMetadata,
@@ -294,6 +296,8 @@ async function fetchArtistContext(
   startOfMonth.setUTCHours(0, 0, 0, 0);
   const startOfMonthISO = startOfMonth.toISOString();
 
+  // Release listen links render on the public profile too.
+  const releaseListenCount = countVisibleReleaseListenLinks(profileId);
   const [linkCounts, tipTotals, clickStats, profileViews] = await Promise.all([
     db
       .select({
@@ -349,7 +353,12 @@ async function fetchArtistContext(
     appleMusicUrl: result.appleMusicUrl,
     profileViews,
     hasSocialLinks: Number(linkCounts?.totalActive ?? 0) > 0,
-    hasMusicLinks: Number(linkCounts?.musicActive ?? 0) > 0,
+    hasMusicLinks: resolveHasMusicLinks({
+      dspSocialLinkCount: Number(linkCounts?.musicActive ?? 0),
+      releaseListenLinkCount: await releaseListenCount,
+      spotifyUrl: result.spotifyUrl,
+      appleMusicUrl: result.appleMusicUrl,
+    }),
     tippingStats: {
       tipClicks: Number(clickStats?.total ?? 0),
       tipsSubmitted: Number(tipTotals?.tipsSubmitted ?? 0),

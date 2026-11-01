@@ -27,6 +27,7 @@ import {
   recordPlaywrightSensitiveValues,
   requireExactNavigationOrigin,
 } from '../helpers/vercel-preview';
+import { deleteSyntheticChats } from './helpers/synthetic-chat-cleanup';
 import { primeOriginBoundVercelBypass } from './utils/prime-vercel-bypass';
 import {
   certStep,
@@ -1384,14 +1385,12 @@ test.describe('Production Auth Smoke @production-smoke', () => {
           `assistant replied; message echo ${echoMs}ms, first reply ${replyMs}ms`
       );
     } finally {
-      if (conversationId) {
-        await page
-          .context()
-          .request.delete(
-            `${expectedOrigin}/api/chat/conversations/${conversationId}`
-          )
-          .catch(() => undefined);
-      }
+      // Sweep by title: the URL id above is null when the router has not
+      // swapped to /app/chat/<id> yet, which left synthetic chats behind.
+      await deleteSyntheticChats(page.context().request, expectedOrigin).catch(
+        () => undefined
+      );
+      void conversationId;
       void chatStartedAt;
     }
 
