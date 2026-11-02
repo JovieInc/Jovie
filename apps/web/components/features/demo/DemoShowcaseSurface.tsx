@@ -1,6 +1,7 @@
 'use client';
-// @coverage-via apps/web/tests/unit/demo/demo-showcase-onboarding-copy.test.tsx
+// @coverage-via apps/web/components/features/demo/DemoShowcaseSurface.lazy.test.tsx
 
+import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -20,7 +21,6 @@ import { ONBOARDING_STEPS } from '@/features/dashboard/organisms/onboarding-v2/s
 import { ReleasesEmptyState } from '@/features/dashboard/organisms/release-provider-matrix/ReleasesEmptyState';
 import { ShellReleasesView } from '@/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
 import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
-import { getDesignStudioItem } from '@/lib/design-studio/registry';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import type { InsightCategory } from '@/types/insights';
 import { DemoAuthShell } from './DemoAuthShell';
@@ -49,6 +49,11 @@ import { SettingsDemoHarness } from './SettingsDemoHarness';
 import type { DemoShowcaseSurfaceId } from './showcase-surfaces';
 
 type DemoRenderableSurfaceId = Exclude<DemoShowcaseSurfaceId, 'public-profile'>;
+
+// Studio previews pull in the full registry; other demo surfaces do not need it.
+const DemoDesignStudioShowcase = dynamic(() =>
+  import('./DemoDesignStudioShowcase').then(mod => mod.DemoDesignStudioShowcase)
+);
 
 const RELEASE_SHOWCASE_STATES = [
   'populated',
@@ -161,26 +166,6 @@ function DemoReleasesShowcaseState({
         })}
       />
     </DemoAuthShell>
-  );
-}
-
-function DemoDesignStudioShowcase({
-  itemId,
-  testId,
-}: Readonly<{
-  itemId: string;
-  testId: string;
-}>) {
-  const item = getDesignStudioItem(itemId);
-
-  if (!item) {
-    throw new Error(`Missing Design Studio item: ${itemId}`);
-  }
-
-  return (
-    <div className='min-h-screen bg-surface-1 p-4 sm:p-6' data-testid={testId}>
-      {item.preview()}
-    </div>
   );
 }
 
