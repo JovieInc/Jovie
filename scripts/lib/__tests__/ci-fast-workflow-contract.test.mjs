@@ -2607,10 +2607,11 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
-  it('runs actionlint from checksum-pinned binaries instead of a Docker action', () => {
+  it('runs the verified upstream actionlint fix without Docker rebuilds', () => {
     // A Docker action's image is built at job start even when its step is
     // skipped (~30s on the merge-queue critical path). The script pins the
-    // exact toolchain the image shipped and must fail closed on any drift.
+    // shellcheck/pyflakes versions the image shipped, plus actionlint's
+    // exact upstream stdin fix, must fail closed on any verification drift.
     const script = readFileSync(
       resolve(REPO_ROOT, '.github/scripts/run-actionlint.sh'),
       'utf8'
@@ -2628,13 +2629,22 @@ describe('ci-fast bounded parallel workflow', () => {
     ).toContain('run: bash .github/scripts/run-actionlint.sh');
 
     expect(script).toMatch(/^set -euo pipefail$/m);
-    expect(script).toContain("readonly ACTIONLINT_VERSION='1.7.12'");
+    expect(script).toContain(
+      "readonly ACTIONLINT_VERSION='1.7.12+fd33e9f582a0'"
+    );
+    expect(script).toContain(
+      "readonly ACTIONLINT_COMMIT='fd33e9f582a01a02885c93ae3775e1190cf63653'"
+    );
+    expect(script).toContain('GOTOOLCHAIN=local GOWORK=off');
+    expect(script).toContain('-mod=readonly');
+    expect(script).toContain('^TestProcessConcurrentStdinDoesNotDeadlock$');
+    expect(script).toContain('upstream stdin regression did not cover the fix');
     expect(script).toContain("readonly SHELLCHECK_VERSION='0.11.0'");
     expect(script).toContain("readonly PYFLAKES_VERSION='3.4.0'");
     // Release-download 5xx bursts outlast a 3-retry window (10-12 ejection).
     expect(script).toMatch(/--retry 6 --retry-all-errors --max-time 120/);
     for (const name of [
-      'ACTIONLINT_SHA256',
+      'ACTIONLINT_SOURCE_SHA256',
       'SHELLCHECK_TARBALL_SHA256',
       'SHELLCHECK_BINARY_SHA256',
       'PYFLAKES_WHEEL_SHA256',
