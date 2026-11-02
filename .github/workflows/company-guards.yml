@@ -1,0 +1,14 @@
+# Shared company guard suite from JovieInc/ci (canon/COMPANY.md). Pin is bumped by a bot PR;
+# a pin more than 72h behind the newest canon/guard commit fails this check.
+name: Company Guards
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  company-guards:
+    uses: JovieInc/ci/.github/workflows/company-guards.yml@e9a2c8a5f9dc7e2f83f051e67cb6edb02904eda7
+    with:
+      ci-ref: e9a2c8a5f9dc7e2f83f051e67cb6edb02904eda7

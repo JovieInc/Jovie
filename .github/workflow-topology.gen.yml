@@ -247,6 +247,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:analyze
     jobCount: 1
+  - name: Company Guards
+    path: .github/workflows/company-guards.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - push
+    terminalReceipt: job:company-guards
+    jobCount: 1
   - name: Component Certificate
     path: .github/workflows/component-certificate.yml
     active: true
