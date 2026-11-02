@@ -181,6 +181,22 @@
           "owner": "lanes worker"
         },
         {
+          "id": "learning-retrieval",
+          "meaning": "specific repair history and GBrain retrieval before model start",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
+          "id": "learning-record",
+          "meaning": "finished repair source/guard and independent GBrain readback binding; CI is a separate proof",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
           "id": "green",
           "meaning": "first later commit whose check rollup is SUCCESS",
           "producer": "github",
