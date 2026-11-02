@@ -5595,8 +5595,22 @@ jobs:
             pnpm turbo test:fast --filter=@jovie/web -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
           elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
             echo "🔍 Merge group: Running affected test suite"
-            # Run affected tests against the merge-group base SHA.
-            pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
+            # run_web includes Ovie/CLI and inputs outside Turbo's graph.
+            # Keep affected tasks; explicitly run web if it was not selected.
+            pnpm turbo test:fast --affected --dry=json > "$RUNNER_TEMP/unit-selection-$SHARD_SLUG.json"
+            UNIT_SELECTION_MODE="$(node scripts/ci-unit-selection.mjs < "$RUNNER_TEMP/unit-selection-$SHARD_SLUG.json")"
+            # Preserve sibling packages' existing empty-shard policy.
+            pnpm turbo test:fast --affected --filter='!@jovie/web' -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
+            WEB_CACHE_FLAG=""
+            if [[ "$UNIT_SELECTION_MODE" == "affected-and-web" ]]; then
+              echo "Affected graph omitted web; running the selected web lane explicitly"
+              pnpm turbo test:fast --filter=@jovie/web --dry=json > "$RUNNER_TEMP/unit-selection-$SHARD_SLUG.json"
+              node scripts/ci-unit-selection.mjs --require-web < "$RUNNER_TEMP/unit-selection-$SHARD_SLUG.json"
+              # Unknown dependency edges are also absent from cache inputs.
+              WEB_CACHE_FLAG="--force"
+            fi
+            # Override the wrapper's empty-suite success only for web shards.
+            pnpm turbo test:fast --filter=@jovie/web $WEB_CACHE_FLAG -- $VITEST_CI_FLAGS $RETRY_FLAG --passWithNoTests=false --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
           else
             echo "🔍 Manual dispatch: Running critical + interaction tests (no base_ref available)"
             # Non-main manual dispatches have no base_ref. Run the critical and
