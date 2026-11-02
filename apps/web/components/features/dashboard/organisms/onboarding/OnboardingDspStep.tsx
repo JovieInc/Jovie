@@ -13,7 +13,7 @@ import {
   type ReleasesEmptyStateAction,
   type ReleasesEmptyStateState,
 } from '@/features/dashboard/organisms/release-provider-matrix/releases-empty-state/types';
-import { AUTH_CLASSES, AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
+import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { env } from '@/lib/env-client';
 import { presentUnmanagedListing } from '@/lib/profile/artist-status-presentation';
@@ -125,8 +125,10 @@ export function OnboardingDspStep({
           {prompt ? <p className={FORM_LAYOUT.hint}>{prompt}</p> : null}
         </div>
 
-        <ContentSurfaceCard className='p-4 sm:p-5'>
-          <div className={cn(FORM_LAYOUT.formInner, 'space-y-2.5')}>
+        {/* No card frame: the search field and the skip action sit directly
+            on the onboarding stage (Tim: no bordered cards, no clutter). */}
+        <div>
+          <div className={cn(FORM_LAYOUT.formInner, 'space-y-3')}>
             <div className='relative'>
               <div
                 className={cn(
@@ -231,17 +233,22 @@ export function OnboardingDspStep({
               </p>
             )}
 
-            <Button
-              onClick={onSkip}
-              variant='secondary'
-              className={AUTH_CLASSES.authCta}
-              static
-              disabled={isTransitioning}
-            >
-              Skip For Now
-            </Button>
+            {/* Skipping is the way out, not the task: a quiet text action
+                under the search, never a filled button that outranks it. */}
+            <div className='flex justify-center'>
+              <Button
+                onClick={onSkip}
+                variant='ghost'
+                size='sm'
+                static
+                disabled={isTransitioning}
+                data-testid='onboarding-dsp-skip'
+              >
+                Skip For Now
+              </Button>
+            </div>
           </div>
-        </ContentSurfaceCard>
+        </div>
 
         <div className={cn(FORM_LAYOUT.footerHint, 'mt-4')}>
           You can always connect your music later from the dashboard.

@@ -166,3 +166,21 @@ describe('OnboardingDspStep truthful artist status', () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe('OnboardingDspStep hierarchy', () => {
+  it('keeps search as the task and skip as a quiet text action, with no card frame', () => {
+    renderComponent();
+    const input = screen.getByTestId('spotify-link-input');
+    const skip = screen.getByTestId('onboarding-dsp-skip');
+
+    // No bordered card around the search (Tim: no bordered cards, no clutter).
+    expect(input.closest('.rounded-xl')).toBeNull();
+    // Skip is a ghost text action, never a full-width filled pill.
+    expect(skip).toHaveTextContent('Skip For Now');
+    // Whole class tokens: `before:w-full` is the invisible 44px hit target.
+    expect(skip.className.split(/\s+/)).not.toContain('w-full');
+    expect(skip.getAttribute('data-variant') ?? skip.className).not.toMatch(
+      /secondary|primary/
+    );
+  });
+});
