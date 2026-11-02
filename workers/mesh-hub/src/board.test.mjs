@@ -305,3 +305,85 @@ test('mesh sends: JSON op, or a plain reply to a notice becomes done/answer', ()
     /board_needs_op_or_reply/
   );
 });
+
+test('reassign: poster or orchestrator moves an open task and only the new assignee hears', () => {
+  const store = board();
+  store.post(
+    'codex',
+    { id: 'ra-1', title: 'Check', caps: ['research'] },
+    ACTIVE,
+    1
+  );
+  for (const n of notices(store)) store.markSent(n.correlationId, n.to, 1);
+  const out = store.reassign('summer', { id: 'ra-1', to: 'grokbot' }, 5);
+  assert.equal(out.task.assignee, 'grokbot');
+  const fresh = notices(store);
+  assert.deepEqual(
+    fresh.map(n => n.to),
+    ['grokbot']
+  );
+  const body = JSON.parse(fresh[0].body);
+  assert.equal(body.event, 'task.open');
+  assert.deepEqual(body.reassigned, {
+    from: null,
+    to: 'grokbot',
+    by: 'summer',
+  });
+  const stage = store.stages('ra-1').find(s => s.stage === 'reassigned');
+  assert.equal(stage.actor, 'summer');
+  assert.equal(stage.note, 'from=pool to=grokbot');
+  // The poster may reassign its own task; a repeat is a replay with no new notice.
+  store.reassign('codex', { id: 'ra-1', to: 'aeon' }, 6);
+  assert.equal(store.get('ra-1').assignee, 'aeon');
+  const before = notices(store).length;
+  assert.equal(
+    store.apply('codex', 'reassign', { id: 'ra-1', to: 'aeon' }, ACTIVE, 7)
+      .replay,
+    true
+  );
+  assert.equal(notices(store).length, before);
+  // A new claim goes to the assignee only.
+  assert.throws(
+    () => store.claim('claude', { id: 'ra-1' }, 8),
+    /assigned_elsewhere/
+  );
+});
+
+test('reassign refuses non-poster non-orchestrators, claimed tasks and bad targets', () => {
+  const store = board();
+  store.post(
+    'codex',
+    { id: 'ra-2', title: 'Check', caps: ['research'] },
+    ACTIVE,
+    1
+  );
+  assert.throws(
+    () => store.reassign('aeon', { id: 'ra-2', to: 'grokbot' }, 2),
+    /only_poster_or_orchestrator_reassigns/
+  );
+  assert.throws(
+    () => store.reassign('summer', { id: 'ra-2', to: 'Not A Kind' }, 2),
+    /invalid_to/
+  );
+  assert.throws(
+    () => store.reassign('summer', { id: 'ra-2', to: 'board' }, 2),
+    /invalid_to/
+  );
+  assert.throws(
+    () => store.reassign('summer', { id: 'ra-2' }, 2),
+    /invalid_to/
+  );
+  store.claim('aeon', { id: 'ra-2' }, 3);
+  assert.throws(
+    () => store.reassign('summer', { id: 'ra-2', to: 'grokbot' }, 4),
+    /task_not_open/
+  );
+  assert.throws(
+    () => store.reassign('claude', { id: 'missing', to: 'grokbot' }, 4),
+    /task_not_found/
+  );
+  assert.equal(
+    store.stages('ra-2').some(s => s.stage === 'reassigned'),
+    false
+  );
+});
