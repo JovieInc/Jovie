@@ -188,6 +188,7 @@ test('typecheck targets are the affected packages only', () => {
     'pkg:@jovie/ovie',
     'scripts',
     'web',
+    'web-stories',
     'web-tests',
   ]);
 });
@@ -214,7 +215,7 @@ test('web source changes typecheck test consumers without a changed test file', 
       [file('apps/web/lib/leads/route-lead.ts')],
       process.cwd()
     ).sort(),
-    ['pkg:@jovie/ovie', 'web', 'web-tests']
+    ['pkg:@jovie/ovie', 'web', 'web-stories', 'web-tests']
   );
   assert.deepEqual(
     typecheckTargets(
@@ -229,6 +230,22 @@ test('web source changes typecheck test consumers without a changed test file', 
       process.cwd()
     ),
     []
+  );
+});
+
+test('story changes select the story compiler omitted by the app and test projects', () => {
+  const story =
+    'apps/web/components/features/opportunity-inbox/OpportunityInboxEmptyState.stories.tsx';
+  assert.ok(
+    typecheckTargets([file(story)], process.cwd()).includes('web-stories')
+  );
+  assert.deepEqual(
+    typecheckTargets([file(story, 'removed')], process.cwd()),
+    []
+  );
+  assert.deepEqual(
+    typecheckTargets([file('apps/web/tests/unit/a.test.ts')], process.cwd()),
+    ['web-tests']
   );
 });
 
