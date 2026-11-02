@@ -50,6 +50,7 @@ import throughput_sentinel  # noqa: E402
 import deploy_health  # noqa: E402  (production deploy failure and lag incidents, Jovie + LogYourBody)
 import release_evidence  # noqa: E402  (release-evidence job red on main; production build stale)
 import release_gates  # noqa: E402  (every controller-derived release gate red 2+ runs; new blocker reasons)
+import integration_probes  # noqa: E402  (synthetic probes of the Gem integrations fleet work depends on)
 
 COOL_OFF_S = 6 * 3600
 # High (P1), not Urgent, though under an Urgent prefix: a stale build is a lag signal, not an outage.
@@ -621,6 +622,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "fileOverlap": file_overlap.doctor_view(state),
         **automation_observation(host, lane, now),
         "outcomeQueue": read_json(state / "outcome-queue.json", {}),
+        "integrationProbes": integration_probes.observe(state, lane.HOST, now),
         "deployHealth": deploy_health.sample(state, now)[0] if not os.environ.get("LANES_SELFTEST") else None,
         "releaseEvidence": release_evidence.sample(state, now)[0] if not os.environ.get("LANES_SELFTEST") else None,
         "releaseGates": release_gates.sample(state, now)[0] if not os.environ.get("LANES_SELFTEST") else None,
@@ -1201,7 +1203,12 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["linear-app-credential-missing"] = (
             "no Jovie Lanes Linear app credential (~/.config/jovie-lanes/linear-app.env); lanes Linear "
             "access fails closed (no personal-key fallback) until the lanes host owner reinstalls it")
+    probed = obs.get("integrationProbes")
+    # A red probe of the same component is the more specific incident: one issue, not two.
+    same_incident = integration_probes.suppressed_silence(probed)
     for automation_id, row in sorted(((obs.get("automation") or {}).get("silent") or {}).items()):
+        if automation_id in same_incident:
+            continue
         age = row.get("ageS")
         alerts[f"automation-silent:{automation_id}"] = (
             f"registered automation {automation_id} left no fresh receipt at {row.get('location')} "
@@ -1211,6 +1218,7 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["automation-registry-unreadable"] = (
             f"origin/main:{AUTOMATION_REGISTRY} is unreadable ({watched.get('error') or 'missing or not JSONL'}); "
             "no Gem host-local automation receipt is being watched")
+    alerts.update(integration_probes.alerts(probed, obs.get("now") or time.time()))
     alerts.update(throughput_sentinel.judge(obs))
     alerts.update(deploy_health.judge(obs.get("deployHealth"), obs.get("now") or time.time()))
     alerts.update(release_evidence.judge(obs.get("releaseEvidence"), obs.get("now") or time.time()))
@@ -1486,6 +1494,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
                      obs.get("tickAge") if key.startswith(("tick-", "provider-", "spawn-")) else 0)
         action = ("dispatch-provider-workers" if key.startswith("provider-idle:") else
                   "retry-provider-health-probe" if key.startswith("provider-down:") else
+                  "bounded-unit-heal-then-verify-probe" if key.startswith("probe-red:") else
                   actions.get(key, "reconcile-control-plane-condition"))
         affected = resources.get(key) or ([provider] if provider else [key])
         receipts[key] = {
