@@ -231,6 +231,45 @@ class CadenceClocksTest(unittest.TestCase):
     def posts(self):
         return [call[-1] for call in self.calls if "POST" in call]
 
+    def test_daily_evidence_clocks_preserve_manual_runs_and_deadman_receipts(self):
+        registry = {row["id"]: row for row in map(json.loads,
+            (ROOT / "canon/automation-registry.jsonl").read_text().splitlines()) if "id" in row}
+        daily = {"nightlyTests", "e2eFullMatrix", "testCoverageAudit"}
+        selected = [c for c in clock.CLOCKS if c.name in daily]
+        self.assertEqual({c.name for c in selected}, daily)
+        for c in selected:
+            with self.subTest(workflow=c.workflow):
+                self.assertEqual(c.interval_s, 86400)
+                self.assertFalse(c.github_cron)
+                workflow = (ROOT / ".github/workflows" / c.workflow).read_text()
+                triggers = workflow.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
+                self.assertIn("  workflow_dispatch:\n", triggers)
+                self.assertNotIn("  push:\n", triggers)
+                self.assertNotIn("  schedule:\n", triggers)
+                row = registry[f"lanes-clock:{c.workflow.removesuffix('.yml')}"]
+                self.assertEqual(row["trigger"]["clock"], c.name)
+                self.assertEqual(row["clock"]["scheduler"], "gem:lanes-tick")
+                self.assertGreaterEqual(len(row["clock"]["whyNotEvent"]), 30)
+                self.assertEqual(row["receipt"]["workflow"], c.workflow)
+                self.assertEqual(row["maxStalenessMinutes"], 36 * 60)
+                self.assertIn(c.state_file, row["receipt"]["location"])
+
+    def test_daily_evidence_dispatches_when_due_and_manual_run_refreshes_cadence(self):
+        for c in clock.CLOCKS:
+            if c.name not in {"nightlyTests", "e2eFullMatrix", "testCoverageAudit"}:
+                continue
+            with self.subTest(workflow=c.workflow):
+                self.calls.clear()
+                self.age[c.workflow] = 25 * 3600
+                result = clock.tick(self.path, "gem", self.api, NOW, clocks=(c,))
+                self.assertEqual(result["clocks"][c.name]["status"], "dispatch-requested")
+                self.assertEqual(self.posts(), [f"event_type={c.event_type}"])
+                self.assertTrue((self.path / c.state_file).exists())
+                page = lambda run, args: json.dumps({"workflow_runs": [
+                    run_row(30, event="workflow_dispatch")]})
+                with patch.object(clock, "api", side_effect=page):
+                    self.assertEqual(clock.observe(None, NOW, c)["status"], "current")
+
     @unittest.skipUnless((ROOT / ".github/workflows").is_dir(), "release trees carry no workflows")
     def test_each_workflow_has_a_listening_trigger_and_a_kept_backstop_cron(self):
         # Plain text, no PyYAML: the Gem release self-test runs this file too.
