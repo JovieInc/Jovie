@@ -4,9 +4,9 @@
     "home-capture": {
       "width": 720,
       "height": 689,
-      "sourceHash": "2a81776ea1b3a660c8f3558e05f5a3ca9d11f71281a59c500c6335d0e57670ef",
+      "sourceHash": "87d10d421a2c744f3ae2d4769aa1a21841e172ba9d325240086d17a3bc601301",
       "specHash": "4d08f253dee4416a4af036fb29a971db2669ce5b50084fd2944bb11305ccb3ee",
-      "renderedAt": "2026-11-02T13:40:45.527Z",
+      "renderedAt": "2026-11-02T13:55:05.688Z",
       "sources": [
         "apps/web/components/features/demo/DemoHomepageMomentSurface.tsx",
         "apps/web/components/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA.tsx",
@@ -21,9 +21,9 @@
     "home-catalog": {
       "width": 1440,
       "height": 176,
-      "sourceHash": "ab7f4fdaa212d4e7de3bb7810b99889644dfe3902a7b4aedc0e0c491a5fe9b1f",
+      "sourceHash": "191e2afbf551bbacd027c7ed1f7ae97e884773518a26c58fcf06f5c93c403366",
       "specHash": "6c1dede715f31e830771b61e9d49797696b118c35dd2310f0401f4666cb0c89f",
-      "renderedAt": "2026-11-02T13:40:58.297Z",
+      "renderedAt": "2026-11-02T13:55:12.769Z",
       "sources": [
         "apps/web/components/features/demo/DemoHomepageMomentSurface.tsx",
         "apps/web/components/features/demo/DemoReleasesExperience.tsx",
@@ -37,9 +37,9 @@
     "home-catalog-phone": {
       "width": 410,
       "height": 178,
-      "sourceHash": "ab7f4fdaa212d4e7de3bb7810b99889644dfe3902a7b4aedc0e0c491a5fe9b1f",
+      "sourceHash": "191e2afbf551bbacd027c7ed1f7ae97e884773518a26c58fcf06f5c93c403366",
       "specHash": "bd8968ce34c9b2f1abf307fdd506e3e733d32858e0ceb6a4bea2030560861b4f",
-      "renderedAt": "2026-11-02T13:41:03.834Z",
+      "renderedAt": "2026-11-02T13:55:17.030Z",
       "sources": [
         "apps/web/components/features/demo/DemoHomepageMomentSurface.tsx",
         "apps/web/components/features/demo/DemoReleasesExperience.tsx",
@@ -87,9 +87,9 @@
     "home-smart-link": {
       "width": 720,
       "height": 333,
-      "sourceHash": "4aa81218dae3dcdc6ebc79b49649b1e3bda8beb470592c8d658fcf42b997c75f",
+      "sourceHash": "e8c0989284edea88eb63fbcdad35cd472ec0e746f61c1d0ffae9f477bf67df21",
       "specHash": "d2707228bbe39575b544a0f871d35272f98e3cba9ea59b1c68bf32304485181d",
-      "renderedAt": "2026-11-02T13:40:42.088Z",
+      "renderedAt": "2026-11-02T13:55:00.196Z",
       "sources": [
         "apps/web/components/features/demo/DemoHomepageMomentSurface.tsx",
         "apps/web/components/features/demo/homepage-moment-fixtures.ts",
@@ -105,9 +105,9 @@
     "home-subscriber-list": {
       "width": 1440,
       "height": 376,
-      "sourceHash": "97d4cad5c063a4164c8f5f12d061a5ec1a71276f7e45f9a1de7c7e461753fde0",
+      "sourceHash": "052fd6355b697250ad65b2f21c8f9036884c499ca813be588b845808f914c33a",
       "specHash": "db3f85858a688f822fe79770a4409ce91a93890653b22134f331d014cc3cf536",
-      "renderedAt": "2026-11-02T13:40:54.125Z",
+      "renderedAt": "2026-11-02T13:55:10.454Z",
       "sources": [
         "apps/web/components/features/demo/DemoHomepageMomentSurface.tsx",
         "apps/web/components/features/demo/homepage-moment-fixtures.ts",
@@ -121,9 +121,9 @@
     "home-subscriber-list-phone": {
       "width": 716,
       "height": 280,
-      "sourceHash": "97d4cad5c063a4164c8f5f12d061a5ec1a71276f7e45f9a1de7c7e461753fde0",
+      "sourceHash": "052fd6355b697250ad65b2f21c8f9036884c499ca813be588b845808f914c33a",
       "specHash": "23ea68e40017acdb03f81c19387a5da331d0e913b2d23375d7764284dfe269fd",
-      "renderedAt": "2026-11-02T13:41:01.425Z",
+      "renderedAt": "2026-11-02T13:55:14.919Z",
       "sources": [
         "apps/web/components/features/demo/DemoHomepageMomentSurface.tsx",
         "apps/web/components/features/demo/homepage-moment-fixtures.ts",

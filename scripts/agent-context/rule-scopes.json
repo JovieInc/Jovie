@@ -146,7 +146,7 @@
       "workers/**",
       "tools/**"
     ],
-    "bodySha256": "e6284b5f534708944ad49285fdf6e02e3992001a1f34edfb3fd80eaca1fe60dd"
+    "bodySha256": "c7da1fd3f6b8e7274425e421cfcc49d402b247f44246fdcbd96ffaa2837236f7"
   },
   {
     "file": ".claude/rules/release.md",
