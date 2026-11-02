@@ -1409,6 +1409,19 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     return alerts
 
 
+def last_good_epoch(key: str, obs: dict, now: float) -> float | None:
+    """Last proof of life before a condition, where the doctor knows it (start of incident:undetected)."""
+    if key.startswith("probe-red:"):
+        entry = ((obs.get("integrationProbes") or {}).get("probes") or {}).get(key.split(":", 1)[1]) or {}
+        value = entry.get("lastGoodAt")
+        return float(value) if type(value) in (int, float) else None
+    if key.startswith("automation-silent:"):
+        row = ((obs.get("automation") or {}).get("silent") or {}).get(key.split(":", 1)[1]) or {}
+        age = row.get("ageS")
+        return now - age if type(age) in (int, float) else None
+    return None
+
+
 def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_name: str) -> dict[str, dict]:
     """Typed, generation-deduped evidence for every actionable doctor condition."""
     prior = previous.get("conditions") or {}
@@ -1481,6 +1494,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
             "affectedResources": affected,
             "firstObservedAt": epoch_iso(first),
             "firstObservedEpoch": first,
+            "lastGoodEpoch": old.get("lastGoodEpoch") if continuing else last_good_epoch(key, obs, now),
             "source": {"producer": "scripts/lanes/doctor.py", "status": source_status,
                        "observedAt": epoch_iso(now), "freshnessSeconds": freshness},
             "deadlineAt": epoch_iso(first + ESCALATION_S),
@@ -2580,6 +2594,10 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
         except Exception:
             tracker = None
     result = reconcile(alerts, previous, tracker, obs["now"], conditions)
+    try:  # incident stage events (detected, filed, cleared); a lost row only drops a sample
+        stage_events.journal_incidents(host.state, previous, result, lane.HOST, obs["now"])
+    except Exception:  # noqa: BLE001
+        pass
     if getattr(tracker, "linear", None) is not None:
         try:
             factory_signals.write(host.state, factory_signals.sentinel_signals(host.state))
