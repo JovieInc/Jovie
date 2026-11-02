@@ -354,7 +354,7 @@ export const PRODUCT_SHOTS = [
       '[data-testid="homepage-moment-catalog"] :text("The Deep End")',
       '[data-testid="homepage-moment-catalog"] :nth-match(:text-is("Single"), 2)',
     ],
-    padding: { top: 18, right: 20, bottom: 18, left: 44 },
+    padding: { top: 18, right: 6, bottom: 18, left: 44 },
     frame: 'window',
     displayWidth: 358,
     sources: [
