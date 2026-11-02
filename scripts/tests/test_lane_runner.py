@@ -12993,7 +12993,7 @@ class TimerInstallerNodePathTests(unittest.TestCase):
         source = (Path(__file__).resolve().parents[1] / "lanes/install.sh").read_text()
         for platform, with_gbrain, temp_case in ((p, g, t) for p in ("Linux", "Darwin")
                                                 for g in (False, True)
-                                                for t in (("unset", "private", "insecure", "relative", "specifier", "symlink")
+                                                for t in (("unset", "private", "insecure", "relative", "specifier", "symlink", "shared-policy", "unsafe-policy", "collision-policy", "specifier-policy", "escaped-policy", "unicode-policy", "octal-policy")
                                                           if p == "Linux" else ("unset",))):
             with self.subTest(platform=platform, with_gbrain=with_gbrain, temp_case=temp_case), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
@@ -13004,11 +13004,35 @@ class TimerInstallerNodePathTests(unittest.TestCase):
                     target = root / "real-temp"
                     target.mkdir(mode=0o700)
                     temp_dir.symlink_to(target, target_is_directory=True)
-                configured_temp = {"unset": "", "relative": "relative-temp", "specifier": str(root / "bad%h")}.get(temp_case, str(temp_dir))
+                configured_temp = {"unset": "", "shared-policy": "", "unsafe-policy": "", "collision-policy": "", "specifier-policy": "", "escaped-policy": "", "unicode-policy": "", "octal-policy": "", "relative": "relative-temp", "specifier": str(root / "bad%h")}.get(temp_case, str(temp_dir))
                 bin_dir = root / "selected-node-bin"
                 bin_dir.mkdir()
                 units = root / "units"
                 units.mkdir()
+                main_policy = units / "jovie-lanes.service.d"
+                if temp_case.endswith("policy"):
+                    main_policy.mkdir()
+                    (main_policy / "20-current-login.conf").write_text("[Service]\nEnvironment=CODEX_LANE_AUTH_MODE=current-login\n")
+                    (main_policy / "40-subscription-pool.conf").write_text('[Service]\nEnvironment=CODEX_LANE_AUTH_MODE=subscription-pool\nEnvironment="CODEX_LANE_SUBSCRIPTION_PROFILES={\\"fixture\\":{\\"home\\":\\"/private/fixture\\",\\"slots\\":2}}"\n')
+                    (main_policy / "50-environment-file.conf").write_text("[Service]\nEnvironmentFile=-/private/fixture/existing.env\nUnsetEnvironment=FIXTURE_UNUSED\n")
+                    (main_policy / "claude-slots.conf").write_text("[Service]\nEnvironment=LANES_SLOTS_CLAUDE=0\n")
+                    resource_policy = "[Service]\nSlice=agent-lanes.slice\nCPUWeight=20\nNice=10\n"
+                    if temp_case == "shared-policy":
+                        resource_policy += "CPUQuota=50%\nMemoryHigh=60%\nMemoryMax=75%\n"
+                        escaped_literal = chr(92) * 2 + "x25n"
+                        (main_policy / "55-literal-escape.conf").write_text(f'[Service]\nEnvironment="FIXTURE_LITERAL={escaped_literal}"\n')
+                    (main_policy / "cpu-weight.conf").write_text(resource_policy)
+                    if temp_case == "unsafe-policy":
+                        (main_policy / "70-command.conf").write_text("[Service]\nExecStart=/bin/false\n")
+                    if temp_case == "specifier-policy":
+                        (main_policy / "70-unit-identity.conf").write_text("[Service]\nEnvironment=FIXTURE_SENDER=%n\n")
+                    if temp_case in ("escaped-policy", "unicode-policy", "octal-policy"):
+                        escape = {"escaped-policy": r"\x25n", "unicode-policy": r"\u0025n", "octal-policy": r"\045n"}[temp_case]
+                        (main_policy / "70-escaped-identity.conf").write_text(f'[Service]\nEnvironment="FIXTURE_SENDER={escape}"\n')
+                    if temp_case == "collision-policy":
+                        protected = units / "jovie-lanes-wake.service.d/50-main-40-subscription-pool.conf"
+                        protected.parent.mkdir()
+                        protected.write_text("operator-owned\n")
                 plist = root / "lanes.plist"
                 watchdog_plist = root / "lanes-watchdog.plist"
                 # Redirect only service output destinations; keep HOME and the
@@ -13062,11 +13086,13 @@ with open(os.environ['INSTALL_COMMAND_LOG'], 'a') as log:
                          "LANES_STATE": str(root / "state"), "LANES_REPO": str(root / "repo"),
                          "LANES_TMPDIR": configured_temp, "LANES_HUD": "0", "INSTALL_COMMAND_LOG": str(commands)},
                 )
-                if temp_case in ("insecure", "relative", "specifier", "symlink"):
+                if temp_case in ("insecure", "relative", "specifier", "symlink", "unsafe-policy", "collision-policy", "specifier-policy", "escaped-policy", "unicode-policy", "octal-policy"):
                     self.assertNotEqual(result.returncode, 0, "Unsafe temporary placement was accepted")
                     self.assertNotIn("--user enable", commands.read_text())
                     if temp_case == "insecure":
                         self.assertEqual(temp_dir.stat().st_mode & 0o777, 0o755)
+                    if temp_case == "collision-policy":
+                        self.assertEqual(protected.read_text(), "operator-owned\n")
                     continue
                 self.assertEqual(result.returncode, 0, result.stderr)
                 if platform == "Darwin":
@@ -13090,6 +13116,26 @@ with open(os.environ['INSTALL_COMMAND_LOG'], 'a') as log:
                     self.assertNotIn("After=jovie-lanes.service", watchdog_service)
                     self.assertIn("OnUnitActiveSec=60s", watchdog_timer)
                     self.assertIn("OnCalendar=minutely", watchdog_timer)
+                    if temp_case == "shared-policy":
+                        wake_policy = units / "jovie-lanes-wake.service.d"
+                        expected = sorted(main_policy.glob("*.conf"))
+                        self.assertEqual([p.name for p in sorted(wake_policy.glob("50-main-*.conf"))],
+                                         ["50-main-" + p.name for p in expected])
+                        for policy in expected:
+                            shared = wake_policy / ("50-main-" + policy.name)
+                            self.assertTrue(shared.is_symlink())
+                            self.assertEqual(shared.resolve(), policy.resolve())
+                            self.assertEqual(shared.read_text(), policy.read_text())
+                        (main_policy / "20-current-login.conf").unlink()
+                        pool = main_policy / "40-subscription-pool.conf"
+                        pool.write_text(pool.read_text() + "Environment=CODEX_LANE_LOGIN_SLOTS=2\n")
+                        repeated = subprocess.run(["/bin/bash", str(installer)], capture_output=True, text=True,
+                                                  env={**os.environ, "PATH": f"{bin_dir}:{brain_bin}:/usr/bin:/bin",
+                                                       "LANES_STATE": str(root / "state"), "LANES_REPO": str(root / "repo"),
+                                                       "LANES_TMPDIR": "", "LANES_HUD": "0", "INSTALL_COMMAND_LOG": str(commands)})
+                        self.assertEqual(repeated.returncode, 0, repeated.stderr)
+                        self.assertFalse((wake_policy / "50-main-20-current-login.conf").is_symlink())
+                        self.assertIn("CODEX_LANE_LOGIN_SLOTS=2", (wake_policy / "50-main-40-subscription-pool.conf").read_text())
                     for name in ("jovie-lanes", "jovie-lanes-watchdog", "jovie-lanes-wake"):
                         placement = units / f"{name}.service.d/65-temp-placement.conf"
                         if temp_case == "private":

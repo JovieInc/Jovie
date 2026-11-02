@@ -626,6 +626,8 @@ nodes:
       - remediation-dispatch
     allowedConsumers: []
     triggeringStateTransition:
+      - check_run
+      - check_suite
       - deployment_status
       - pull_request_review
       - pull_request_review_comment
@@ -634,8 +636,8 @@ nodes:
       - repository_dispatch
       - workflow_dispatch
       - workflow_run
-    terminalReceipt: job:relay
-    jobCount: 2
+    terminalReceipt: job:wake-gem
+    jobCount: 3
   - name: Legacy Human Hold Scrub
     path: .github/workflows/legacy-human-hold-scrub.yml
     active: true
