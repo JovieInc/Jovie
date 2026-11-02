@@ -72,7 +72,22 @@ export async function authorized(request: Request, env: Env): Promise<boolean> {
 // Workers AI streams per-chunk usage deltas and ends with a non-OpenAI
 // `{response, usage}` frame. OpenAI clients take the last usage as the total, so
 // drop the deltas and emit that final frame as a standard usage-only chunk.
-export function normalizeFrame(frame: string, model: string): string {
+// JOV-10361: one stream carries one completion identity. The upstream text and
+// tool chunks already carry the upstream completion id; the final usage chunk
+// must reuse it. It previously hardcoded `chatcmpl-wai`, so strict Chat
+// Completions clients (pinned fx) saw two ids in one stream and exited 1 with
+// ConflictingIdentity, an empty final_output and missing usage. The id is now
+// tracked per stream (first upstream id wins) and only falls back to the
+// constant when no upstream frame ever carried an id.
+export interface StreamIdentity {
+  completionId?: string;
+}
+
+export function normalizeFrame(
+  frame: string,
+  model: string,
+  identity?: StreamIdentity
+): string {
   if (!frame.startsWith('data: ') || frame === 'data: [DONE]') return frame;
   try {
     const obj = JSON.parse(frame.slice(6));
@@ -86,7 +101,7 @@ export function normalizeFrame(frame: string, model: string): string {
       return (
         'data: ' +
         JSON.stringify({
-          id: 'chatcmpl-wai',
+          id: identity?.completionId ?? 'chatcmpl-wai',
           object: 'chat.completion.chunk',
           model,
           choices: [],
@@ -100,6 +115,14 @@ export function normalizeFrame(frame: string, model: string): string {
       );
     }
     if (obj.choices.length === 0) return '';
+    if (
+      identity &&
+      identity.completionId === undefined &&
+      typeof obj.id === 'string' &&
+      obj.id !== ''
+    ) {
+      identity.completionId = obj.id;
+    }
     delete obj.usage;
     delete obj.p;
     return 'data: ' + JSON.stringify(obj);
@@ -114,12 +137,15 @@ export function normalizeSse(
   const decoder = new TextDecoder(),
     encoder = new TextEncoder();
   let buffer = '';
+  // Per-stream completion identity (JOV-10361): every normalizeSse call is one
+  // response, so two concurrent streams can never share or leak an id.
+  const identity: StreamIdentity = {};
   const emit = (
     controller: TransformStreamDefaultController<Uint8Array>,
     frames: string[]
   ) => {
     for (const f of frames) {
-      const out = normalizeFrame(f.trim(), model);
+      const out = normalizeFrame(f.trim(), model, identity);
       if (out) controller.enqueue(encoder.encode(out + '\n\n'));
     }
   };
