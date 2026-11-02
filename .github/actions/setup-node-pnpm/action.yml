@@ -18,6 +18,63 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    # Cloudflare R2 Turbo cache with automatic fallback. Runs only when the
+    # caller exported CF_TURBO_* (ci.yml); a failed probe leaves the legacy
+    # TURBO_* values untouched. Roles: rw (push, dispatch, merge group) or ro
+    # (pull_request). TURBO_CACHE_READ is the read-only form for steps that must
+    # never write (they set TURBO_CACHE to it instead of hard-coding local:r,
+    # which would also switch remote reads off). The "turbo-cache:" log line is
+    # parsed by scripts/lib/turbo-cache-stats.mjs; keep its format.
+    - name: Select Turbo remote cache
+      shell: bash
+      env:
+        CF_TURBO_URL: ${{ env.CF_TURBO_URL }}
+        CF_TURBO_TOKEN: ${{ env.CF_TURBO_TOKEN }}
+        CF_TURBO_ROLE: ${{ env.CF_TURBO_ROLE }}
+        CF_TURBO_SIGNATURE_KEY: ${{ env.CF_TURBO_SIGNATURE_KEY }}
+      run: |
+        if [ -z "${CF_TURBO_URL:-}" ] || [ -z "${CF_TURBO_TOKEN:-}" ]; then
+          echo "TURBO_CACHE_READ=local:r" >> "$GITHUB_ENV"
+          echo "turbo-cache: backend=legacy (no Cloudflare credentials)"
+          exit 0
+        fi
+        code=$(curl -s -o /dev/null -m 5 -w '%{http_code}' \
+          -H "Authorization: Bearer ${CF_TURBO_TOKEN}" \
+          "${CF_TURBO_URL%/}/v8/artifacts/status" || true)
+        if [ "$code" != "200" ]; then
+          echo "::warning::Cloudflare Turbo cache probe returned ${code:-none}; using legacy cache."
+          echo "TURBO_CACHE_READ=local:r" >> "$GITHUB_ENV"
+          echo "turbo-cache: backend=legacy (probe ${code:-none})"
+          exit 0
+        fi
+        # Signing: artifacts are HMAC-signed with a key every reader and writer
+        # holds; unsigned or wrongly-signed artifacts are rejected. Without a
+        # key nothing may write (unsigned writes could be forged).
+        role="$CF_TURBO_ROLE"
+        signed_json=""
+        if [ -n "${CF_TURBO_SIGNATURE_KEY:-}" ]; then
+          signed_json="${RUNNER_TEMP}/turbo.signed.json"
+          perl -0pe 's/\{/{\n  "remoteCache": { "signature": true },/' turbo.json > "$signed_json"
+        else
+          role="ro"
+        fi
+        {
+          echo "TURBO_API=${CF_TURBO_URL%/}"
+          echo "TURBO_TOKEN=${CF_TURBO_TOKEN}"
+          echo "TURBO_TEAM=jovie"
+          echo "TURBO_CACHE_READ=local:r,remote:r"
+          if [ -n "$signed_json" ]; then
+            echo "TURBO_ROOT_TURBO_JSON=${signed_json}"
+            echo "TURBO_REMOTE_CACHE_SIGNATURE_KEY=${CF_TURBO_SIGNATURE_KEY}"
+          fi
+          if [ "$role" = "rw" ]; then
+            echo "TURBO_CACHE=local:rw,remote:rw"
+          else
+            echo "TURBO_CACHE=local:rw,remote:r"
+          fi
+        } >> "$GITHUB_ENV"
+        echo "turbo-cache: backend=cloudflare-r2 role=${role} signed=$([ -n "$signed_json" ] && echo yes || echo no)"
+
     # Self-hosted runners reuse a workspace whose owner can differ from the job
     # user, tripping git's dubious-ownership guard. That makes turbo's SCM probe
     # report the checkout as "not part of a Git repository" and breaks

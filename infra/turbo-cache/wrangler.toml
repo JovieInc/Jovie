@@ -1,0 +1,15 @@
+name = "jovie-turbo-cache"
+main = "src/index.ts"
+compatibility_date = "2026-09-29"
+workers_dev = true
+
+[[r2_buckets]]
+binding = "CACHE"
+bucket_name = "jovie-turbo-cache"
+
+[[analytics_engine_datasets]]
+binding = "METRICS"
+dataset = "jovie_turbo_cache"
+
+# TURBO_CACHE_RW_TOKEN and TURBO_CACHE_RO_TOKEN are Worker secrets
+# (wrangler secret put), never vars in this file.
