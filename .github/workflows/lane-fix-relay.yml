@@ -48,12 +48,18 @@ concurrency:
   # Pushes to main supersede each other. Successful completions of every
   # required workflow for one PR share one slot, so a burst keeps a single
   # pending run and the newer one cancels the waiter before a Jovie Bot token
-  # is minted. Failures keep a per-workflow slot: a green wake must not cancel
-  # a red one, and a second workflow's success must not drop a failure signal.
+  # is minted. Every other wake (failures, deployment_status, reviews) shares ONE
+  # slot per PR: GitHub keeps one running and one pending run per group, so a
+  # branch-update storm queues at most two relay runs per PR instead of one per
+  # (event, workflow). 2026-10-28: 117 branch updates queued 166 relay runs ahead
+  # of required checks. The success slot stays separate, so a green wake never
+  # cancels a red one. Repair wakes leave the running event intact; only green
+  # completions and main pushes cancel in progress. Unscoped backfills also
+  # share one stable slot.
   # workflow_dispatch declares no inputs. event.inputs.pr_number is an
   # actionlint error (object type {}) and ejected the merge group.
-  group: ${{ github.event_name == 'push' && 'lane-fix-relay-push-main' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && format('lane-fix-relay-success-{0}', github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha || github.event.workflow_run.id)) || format('lane-fix-relay-{0}-{1}-{2}', github.event_name, github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha || github.event.deployment.sha || 'unscoped', github.event.workflow_run.name || github.event.workflow_run.conclusion || github.event.review.state || github.event.action || 'signal') }}
-  cancel-in-progress: ${{ github.event_name == 'push' || github.event_name == 'workflow_run' }}
+  group: ${{ github.event_name == 'push' && 'lane-fix-relay-push-main' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && format('lane-fix-relay-success-{0}', github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha || github.event.workflow_run.id)) || format('lane-fix-relay-{0}', github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha || github.event.deployment.sha || 'unscoped') }}
+  cancel-in-progress: ${{ github.event_name == 'push' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
 
 jobs:
   # A pull_request job GitHub never handed to a hosted runner is cancelled after
@@ -138,8 +144,9 @@ jobs:
       statuses: read
     steps:
       - name: Debounce repeated workflow completions
-        # Every workflow_run sleeps before checkout and token mint. Cancel-in-progress
-        # then drops the older run in a burst before create-github-app-token runs.
+        # Every workflow_run sleeps before checkout and token mint. Successful
+        # completions cancel older green wakes before create-github-app-token;
+        # repair wakes keep the running event and coalesce only the pending slot.
         if: github.event_name == 'workflow_run'
         run: sleep 20
 
