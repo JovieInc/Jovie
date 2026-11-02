@@ -28,6 +28,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { buildInstinctOpener } from '@/lib/chat/instinct-opener';
 import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
 import {
   buildSystemPromptParts,
@@ -205,6 +206,22 @@ async function askJovie(
   ms: number;
 }> {
   const fixture = buildFixture(testCase.fixture, now);
+  // Mirror the production route: a bare greeting is answered by the
+  // deterministic opener before any model call.
+  const openerStarted = Date.now();
+  const opener = buildInstinctOpener({
+    text: testCase.ask,
+    artist: fixture.artist,
+    releases: fixture.releases,
+    now,
+  });
+  if (opener) {
+    return {
+      reply: { text: opener.text, toolCalls: [], persistedAsFallback: false },
+      usage: { input: 0, output: 0 },
+      ms: Date.now() - openerStarted,
+    };
+  }
   const knowledge = selectKnowledgeContext(
     [
       testCase.ask,
