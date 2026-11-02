@@ -551,6 +551,15 @@ puts that Node directory first in the timer PATH on both Linux and macOS.
 After changing the host's Node installation, rerun the installer so the timer
 does not retain a removed runtime directory.
 
+On Linux, set `LANES_TMPDIR` when installing to place scanner clones and worker
+temporaries on a volume with sufficient headroom. The installer creates a private
+mode-700 directory or validates an existing one without changing its permissions,
+then writes `65-temp-placement.conf` for the lanes, watchdog and wake services.
+Relative paths, symlinks, shared directories and unit specifiers are rejected.
+Unset preserves existing placement. To roll back, remove only those three
+drop-ins and reload the user systemd configuration; active workers keep their
+existing environment until they finish. Security scans and disk guards are unchanged.
+
 Per-host knobs: `LANES_SLOTS_<PROVIDER>`, `LANES_LINEAR_ENV`, `LANES_AGENT_TIMEOUT_S`,
 `LANES_GATE_TIMEOUT_S`, `LANES_GATE_SLOTS`. A host-specific GitHub token in
 `~/.config/jovie-lanes/github.env` (`GH_TOKEN=...`) gives that host its own API budget.

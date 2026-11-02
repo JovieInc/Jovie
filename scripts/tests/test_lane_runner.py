@@ -12918,9 +12918,20 @@ class TimerInstallerNodePathTests(unittest.TestCase):
         import plistlib
 
         source = (Path(__file__).resolve().parents[1] / "lanes/install.sh").read_text()
-        for platform, with_gbrain in ((p, g) for p in ("Linux", "Darwin") for g in (False, True)):
-            with self.subTest(platform=platform, with_gbrain=with_gbrain), tempfile.TemporaryDirectory() as tmp:
+        for platform, with_gbrain, temp_case in ((p, g, t) for p in ("Linux", "Darwin")
+                                                for g in (False, True)
+                                                for t in (("unset", "private", "insecure", "relative", "specifier", "symlink")
+                                                          if p == "Linux" else ("unset",))):
+            with self.subTest(platform=platform, with_gbrain=with_gbrain, temp_case=temp_case), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
+                temp_dir = root / "private temp"
+                if temp_case == "insecure":
+                    temp_dir.mkdir(mode=0o755)
+                if temp_case == "symlink":
+                    target = root / "real-temp"
+                    target.mkdir(mode=0o700)
+                    temp_dir.symlink_to(target, target_is_directory=True)
+                configured_temp = {"unset": "", "relative": "relative-temp", "specifier": str(root / "bad%h")}.get(temp_case, str(temp_dir))
                 bin_dir = root / "selected-node-bin"
                 bin_dir.mkdir()
                 units = root / "units"
@@ -12976,8 +12987,14 @@ with open(os.environ['INSTALL_COMMAND_LOG'], 'a') as log:
                     ["/bin/bash", str(installer)], capture_output=True, text=True,
                     env={**os.environ, "PATH": f"{bin_dir}:{brain_bin}:/usr/bin:/bin",
                          "LANES_STATE": str(root / "state"), "LANES_REPO": str(root / "repo"),
-                         "LANES_HUD": "0", "INSTALL_COMMAND_LOG": str(commands)},
+                         "LANES_TMPDIR": configured_temp, "LANES_HUD": "0", "INSTALL_COMMAND_LOG": str(commands)},
                 )
+                if temp_case in ("insecure", "relative", "specifier", "symlink"):
+                    self.assertNotEqual(result.returncode, 0, "Unsafe temporary placement was accepted")
+                    self.assertNotIn("--user enable", commands.read_text())
+                    if temp_case == "insecure":
+                        self.assertEqual(temp_dir.stat().st_mode & 0o777, 0o755)
+                    continue
                 self.assertEqual(result.returncode, 0, result.stderr)
                 if platform == "Darwin":
                     config = plistlib.loads(plist.read_bytes())
@@ -13000,6 +13017,13 @@ with open(os.environ['INSTALL_COMMAND_LOG'], 'a') as log:
                     self.assertNotIn("After=jovie-lanes.service", watchdog_service)
                     self.assertIn("OnUnitActiveSec=60s", watchdog_timer)
                     self.assertIn("OnCalendar=minutely", watchdog_timer)
+                    for name in ("jovie-lanes", "jovie-lanes-watchdog", "jovie-lanes-wake"):
+                        placement = units / f"{name}.service.d/65-temp-placement.conf"
+                        if temp_case == "private":
+                            self.assertEqual(temp_dir.stat().st_mode & 0o777, 0o700)
+                            self.assertIn(f'Environment="TMPDIR={temp_dir}"', placement.read_text())
+                        else:
+                            self.assertFalse(placement.exists())
                 self.assertEqual(timer_path.split(":")[0], str(bin_dir))
                 if with_gbrain:
                     self.assertEqual(shutil.which("gbrain", path=timer_path), str(brain))
