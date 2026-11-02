@@ -1838,9 +1838,10 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
     attempts = json.loads(path.read_text()) if path.exists() else {}
     held_file = lane.held_path(host)
     held = json.loads(held_file.read_text()) if held_file.exists() else {}
-    providers = lane.repair_providers()
+    custody_providers = lane.load_providers()
+    providers = lane.repair_providers(custody_providers)
     order = cost_order(providers)
-    disabled = set(providers) - set(order)
+    disabled = disabled_lanes(custody_providers)
     for pr in sorted(prs, key=lambda item: item["number"]):
         if pr.get("isInMergeQueue") is True:
             continue  # Preserve events while native landing owns the target.
@@ -1905,8 +1906,9 @@ def cleanup_one_event(host, lane, prs: list[dict], now: float | None = None) -> 
         attempts = json.loads(path.read_text()) if path.exists() else {}
         if not isinstance(attempts, dict):
             return None
-        providers = lane.repair_providers()
-        disabled = set(providers) - set(cost_order(providers))
+        custody_providers = lane.load_providers()
+        providers = lane.repair_providers(custody_providers)
+        disabled = disabled_lanes(custody_providers)
         candidates = sorted((pr for pr in prs if pr.get("isInMergeQueue") is not True
                              and set(pr.get("eventKinds") or []) & set(FIX_KINDS)
                              and (not in_scope(pr, "red", disabled) or not needs_work(lane, pr))),
@@ -2632,7 +2634,7 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
     prune_held = getattr(lane, "prune_held", None)
     if prune_held is not None:
         prune_held(host, prs, now, complete=bool(report.get("complete")))
-    providers = lane.repair_providers()
+    providers = lane.load_providers()
     disabled = set(providers) - set(cost_order(providers))
     deps = open_dependencies(prs, now, lane.sh)
     attempts = read_state(host, "fix-attempts.json")
