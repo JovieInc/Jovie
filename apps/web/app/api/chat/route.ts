@@ -125,6 +125,7 @@ import {
 import { createProposeVideoRecordingTool } from '@/lib/chat/tools/propose-video-recording';
 import { createRetouchImageTool } from '@/lib/chat/tools/retouch-image';
 import { createManageTasksTool } from '@/lib/chat/tools/tasks';
+import { createAuditYouTubeChannelTool } from '@/lib/chat/tools/youtube-audit';
 import {
   type ChatTurnSource,
   markChatTurnStreaming,
@@ -2040,6 +2041,11 @@ function buildChatTools(
     importBioFromUrl: createImportBioFromUrlTool({ userId: clerkUserId }),
     inspectPressSource: createInspectPressSourceTool({ userId: clerkUserId }),
     checkCanvasStatus: createCheckCanvasStatusTool(resolvedProfileId, releases),
+    auditYouTubeChannel: createAuditYouTubeChannelTool({
+      profileId: resolvedProfileId,
+      artistContext,
+      releases,
+    }),
     suggestRelatedArtists: createSuggestRelatedArtistsTool(artistContext),
     writeWorldClassBio: createWorldClassBioTool(
       artistContext,

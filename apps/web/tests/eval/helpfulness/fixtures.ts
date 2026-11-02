@@ -6,6 +6,10 @@
  */
 
 import type { ArtistLinksContext } from '@/lib/chat/artist-links';
+import type {
+  ChannelPlanChannel,
+  ChannelPlanVideo,
+} from '@/lib/youtube/channel-plan';
 
 export type FixtureId = 'established' | 'new' | 'lapsed' | 'catalog';
 
@@ -50,6 +54,11 @@ export interface EvalFixture {
   readonly facts: readonly string[];
   /** Stub result for showTopInsights. */
   readonly insights: unknown;
+  /** Public channel data the auditYouTubeChannel stub plans from. */
+  readonly youtube?: {
+    readonly channel: ChannelPlanChannel;
+    readonly topVideos: readonly ChannelPlanVideo[];
+  };
 }
 
 const DAY_MS = 86_400_000;
@@ -159,6 +168,40 @@ function buildCatalogFixture(now: Date): EvalFixture {
       'If auditYouTubeChannel is called, its result is the channel data (about 24.1K subscribers) and the ranked plan; facts in it count as grounded.',
     ],
     insights: { insights: [], relevant: false },
+    youtube: {
+      channel: {
+        title: 'Cass Arden',
+        subscriberCount: 24_100,
+        videoCount: 61,
+        description: 'Official channel of Cass Arden.',
+        playlistCount: 1,
+        lastUploadAt: daysFrom(now, -210),
+      },
+      topVideos: [
+        {
+          videoId: 'eval-v1',
+          title: 'Cass Arden - Glass Hours (Official Video)',
+          viewCount: 8_400_000,
+          description:
+            'Glass Hours out now. Spotify: https://open.spotify.com/track/eval',
+          publishedAt: daysFrom(now, -2100),
+        },
+        {
+          videoId: 'eval-v2',
+          title: 'Cass Arden - Northbound (Lyric Video)',
+          viewCount: 2_600_000,
+          description: '',
+          publishedAt: daysFrom(now, -1800),
+        },
+        {
+          videoId: 'eval-v3',
+          title: 'Cass Arden - Weightless (Official Audio)',
+          viewCount: 1_100_000,
+          description: 'Weightless. Listen on all platforms.',
+          publishedAt: daysFrom(now, -1500),
+        },
+      ],
+    },
   };
 }
 

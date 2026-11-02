@@ -229,6 +229,9 @@
     "chat:inspectPressSource": {
       "kind": "read"
     },
+    "chat:auditYouTubeChannel": {
+      "kind": "read"
+    },
     "chat:checkCanvasStatus": {
       "kind": "read"
     },
