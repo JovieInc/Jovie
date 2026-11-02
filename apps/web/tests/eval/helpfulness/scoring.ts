@@ -62,16 +62,26 @@ const EMOJI = /\p{Extended_Pictographic}/u;
 
 /**
  * JOV-INV-046 on replies: the UI dead-end rules plus the conversational ones.
- * A sentence that offers a retry is a transient error, not a dead end.
+ * A sentence that offers a retry is a transient error, not a dead end. Asking
+ * for a link is only a dead end when that platform is already on the profile.
  */
 export function findDeadEnd(
-  text: string
+  text: string,
+  profilePlatforms: readonly string[] = []
 ): { rule: string; match: string } | null {
+  const known = profilePlatforms.map(p => p.replaceAll('_', ' ').toLowerCase());
   for (const sentence of text.split(/(?<=[.!?])\s+|\n+/)) {
     if (DEAD_END_TRANSIENT.test(sentence)) continue;
     for (const rule of [...CHAT_DEAD_END_RULES, ...DEAD_END_RULES]) {
       const match = rule.pattern.exec(sentence);
-      if (match) return { rule: rule.id, match: match[0] };
+      if (!match) continue;
+      if (
+        rule.id === 'chat-dead-end-ask-known' &&
+        !known.some(platform => sentence.toLowerCase().includes(platform))
+      ) {
+        continue;
+      }
+      return { rule: rule.id, match: match[0] };
     }
   }
   return null;
@@ -83,7 +93,9 @@ export function countWords(text: string): number {
 
 export function runHardChecks(
   testCase: HelpfulnessCase,
-  reply: EvalReply
+  reply: EvalReply,
+  /** Platforms on the fixture profile; enables the ask-known dead-end check. */
+  profilePlatforms: readonly string[] = []
 ): HardCheckResult[] {
   const text = reply.text;
   const toolText = reply.toolCalls
@@ -119,7 +131,7 @@ export function runHardChecks(
 
   checks.push({ id: 'no_emoji', ok: !EMOJI.test(text) });
 
-  const deadEnd = findDeadEnd(text);
+  const deadEnd = findDeadEnd(text, profilePlatforms);
   checks.push({
     id: 'no_dead_end',
     ok: !deadEnd,

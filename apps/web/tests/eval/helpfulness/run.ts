@@ -453,8 +453,12 @@ async function main(): Promise<void> {
   const rows = await mapLimit(cases, args.concurrency, async testCase => {
     try {
       const turn = await askJovie(chat, testCase, now, args.model);
-      const hardChecks = runHardChecks(testCase, turn.reply);
       const fixture = buildFixture(testCase.fixture, now);
+      const hardChecks = runHardChecks(
+        testCase,
+        turn.reply,
+        fixture.artist.linksContext?.links.map(link => link.platform) ?? []
+      );
       const verdict = await judge(
         chat,
         judgeId,

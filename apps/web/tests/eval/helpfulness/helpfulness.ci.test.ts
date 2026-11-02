@@ -138,7 +138,10 @@ describe('2026-11-01 transcript: dead ends and blind context', () => {
       "Give me your YouTube channel URL and I'll add it to your profile.",
     ];
     for (const text of replies) {
-      const checks = runHardChecks(youtubeCase, { text, toolCalls: [] });
+      const checks = runHardChecks(youtubeCase, { text, toolCalls: [] }, [
+        'youtube',
+        'instagram',
+      ]);
       expect(checks.find(c => c.id === 'no_dead_end')?.ok).toBe(false);
       expect(checks.find(c => c.id === 'expected_tool')?.ok).toBe(false);
       expect(scoreCase(youtubeCase.id, checks, null).passed).toBe(false);
@@ -152,6 +155,30 @@ describe('2026-11-01 transcript: dead ends and blind context', () => {
       toolCalls: [{ name: 'auditYouTubeChannel', input: {} }],
     });
     expect(checks.filter(c => !c.ok)).toEqual([]);
+  });
+
+  it('allows asking for a platform the profile does not have', () => {
+    if (!youtubeCase) throw new Error('missing case');
+    const ask = 'Send me your TikTok handle and I will add it.';
+    expect(
+      runHardChecks(youtubeCase, { text: ask, toolCalls: [] }, [
+        'youtube',
+      ]).find(c => c.id === 'no_dead_end')?.ok
+    ).toBe(true);
+    expect(
+      runHardChecks(youtubeCase, { text: ask, toolCalls: [] }, ['tiktok']).find(
+        c => c.id === 'no_dead_end'
+      )?.ok
+    ).toBe(false);
+  });
+
+  it('allows a truthful limit on data Jovie does not have', () => {
+    if (!songOutFriday) throw new Error('missing case');
+    const checks = runHardChecks(songOutFriday, {
+      text: "I can't see your Spotify stream counts since that account is synced for followers only. Night Swim is out Friday.",
+      toolCalls: [],
+    });
+    expect(checks.find(c => c.id === 'no_dead_end')?.ok).toBe(true);
   });
 
   it('allows a transient retry line', () => {

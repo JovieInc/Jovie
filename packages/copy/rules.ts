@@ -540,12 +540,12 @@ export const CHAT_DEAD_END_RULES: readonly DeadEndRule[] = [
     pattern:
       /\b(?:paste|send|share|give me|drop) (?:me )?(?:your|the) (?:\w+ ){0,2}(?:url|link|handle)\b/i,
     message:
-      'Reply asks for a link the profile may already hold. Read the profile links first.',
+      'Reply asks for a link the profile already holds. Read the profile links first. Only a dead end when that platform is on the profile (the eval passes the links).',
   },
   {
     id: 'chat-dead-end-blind',
     pattern:
-      /\bI (?:can['’]?t|cannot|can not|don['’]?t|do not) (?:see|view|access|tell)\b[^.]{0,40}\b(?:platform|account|link|channel|connected)/i,
+      /\bI (?:can['’]?t|cannot|can not|don['’]?t|do not) (?:see|view|access|tell)\b[^.]{0,20}\b(?:which platforms?|your (?:social )?links|your (?:\w+ )?channel|(?:your |the )?connected accounts)/i,
     message:
       'Reply claims blindness to the artist’s own accounts. Those facts are in context.',
   },
