@@ -2150,6 +2150,15 @@ PUBLIC_OVERLAP_TOP = 10
 PUBLIC_FEED_WARN_RATIO = 0.70
 PUBLIC_REMEDIATION_FIELDS = ("state", "issue", "cls", "lane")
 
+# Top-level heartbeat paths hosted dead-man receipts read straight from the lanes gist
+# (canon/automation-registry.jsonl, live json-timestamp entries on this feed): gem:lanes-tick
+# reads `at`, gem:deploy-health reads `deployHealth.observedAt`/`deployHealth.healthy`, and the
+# production-promotion silence budget reads `deployHealth.limits`. The oversize refusal keeps
+# them: during the 2026-10-25 13:50-17:41Z oversize window it dropped every heartbeat path and
+# both gist-backed entries false-alerted "heartbeat-source-missing" while the tick kept
+# publishing on schedule (JOV-9115). A registry test pins this list against new gist receipts.
+HEARTBEAT_FEED_KEYS = ("at", "deployHealth")
+
 
 def _compact_overlap(public: dict) -> None:
     overlap = public.get("fileOverlap")
@@ -2284,12 +2293,26 @@ def public_status_projection(feed: dict, full_text: str) -> str:
         return text
     # Never trim operational ownership/hold/attempt arrays to pretend they fit.
     # Existing schema-checking readers reject this as unknown, not an empty fleet.
-    return json.dumps({
-        "schema": "symphony-lanes-status-unavailable/v1", "status": "unavailable",
-        "reason": "essential-public-feed-exceeds-byte-limit",
-        "requiredBytes": len(text.encode("utf-8")), "maxBytes": PUBLIC_FEED_MAX_BYTES,
-        "fullEvidence": evidence,
-    }, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+    def unavailable():
+        return {
+            "schema": "symphony-lanes-status-unavailable/v1", "status": "unavailable",
+            "reason": "essential-public-feed-exceeds-byte-limit",
+            "requiredBytes": len(text.encode("utf-8")), "maxBytes": PUBLIC_FEED_MAX_BYTES,
+            "fullEvidence": evidence,
+        }
+
+    def fits(payload):
+        return len(json.dumps(payload, ensure_ascii=False, separators=(",", ":"),
+                              allow_nan=False).encode("utf-8")) <= PUBLIC_FEED_MAX_BYTES
+
+    # Carry each heartbeat block that fits whole: a fat operational feed still reads as its
+    # real heartbeats to the hosted dead-man, not "heartbeat-source-missing" (JOV-9115); a
+    # heartbeat block too big to carry is refused whole, never trimmed to a half reading.
+    payload = unavailable()
+    for key in HEARTBEAT_FEED_KEYS:
+        if key in public and fits({**payload, key: public[key]}):
+            payload[key] = public[key]
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
 
 
 def _status_gist_raw_readback(stored: dict, name: str, expected: str, deadline: float) -> None:
