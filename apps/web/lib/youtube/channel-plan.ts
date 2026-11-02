@@ -68,6 +68,8 @@ export interface ChannelMove {
 
 export interface ChannelPlan {
   readonly channelUrl: string;
+  /** "@handle" when the URL has one; name it so the artist sees it is known. */
+  readonly channelHandle: string | null;
   readonly dataSource: 'youtube_data_api' | 'profile_and_catalog';
   readonly channel: ChannelPlanChannel | null;
   readonly moves: readonly ChannelMove[];
@@ -264,8 +266,10 @@ export function buildChannelPlan(input: ChannelPlanInput): ChannelPlan {
   const moves = candidates
     .slice(0, MAX_MOVES)
     .map((move, index) => ({ ...move, rank: index + 1 }));
+  const handle = /\/@([^/?#]+)/.exec(input.channelUrl)?.[1];
   return {
     channelUrl: input.channelUrl,
+    channelHandle: handle ? `@${handle}` : null,
     dataSource: input.channel ? 'youtube_data_api' : 'profile_and_catalog',
     channel: input.channel,
     moves,

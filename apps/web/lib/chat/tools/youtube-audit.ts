@@ -97,7 +97,7 @@ export function createAuditYouTubeChannelTool(input: {
         ...plan,
         ...(data.ok ? {} : { publicDataReason: data.reason }),
         instructions:
-          'Lead with the channel and subscriber count when present. Give the moves in rank order, each in one line with its first example. Say what you can do right now, then put the connect link as a markdown link if connect.url is set. Never ask for the channel URL.',
+          'Open by naming the channel (channelHandle, else channelUrl) and its subscriber count when present. Give the moves in rank order, each in one line with its first example. Say what you can do right now, then put the connect link as a markdown link if connect.url is set. Never ask for the channel URL.',
       };
     },
   });

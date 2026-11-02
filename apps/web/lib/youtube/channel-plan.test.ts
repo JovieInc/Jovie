@@ -71,6 +71,7 @@ describe('buildChannelPlan', () => {
   it('ranks description links first with the real song links and views', () => {
     const plan = buildChannelPlan(input());
     expect(plan.dataSource).toBe('youtube_data_api');
+    expect(plan.channelHandle).toBe('@cassarden');
     expect(plan.moves[0]?.id).toBe('description_links');
     expect(plan.moves[0]?.title).toContain('1 most-viewed video');
     expect(plan.moves[0]?.examples[0]).toBe(
