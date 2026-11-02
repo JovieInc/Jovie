@@ -84,3 +84,19 @@ describe('OnboardingHandleStep keyboard focus', () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 });
+
+describe('OnboardingHandleStep handle URL', () => {
+  it('groups the jov.ie/ prefix with the input so the URL reads as one string', () => {
+    renderStep();
+    const input = screen.getByRole('textbox', { name: 'Claim Your Handle' });
+    const group = input.parentElement;
+
+    // Prefix and handle share a gapless group; the submit button keeps the
+    // outer row's gap. A gap here rendered as "jov.ie/ sashawaves".
+    expect(group?.firstElementChild).toHaveTextContent('jov.ie/');
+    expect(group?.className).not.toMatch(/\bgap-/);
+    expect(
+      group?.contains(screen.getByTestId('onboarding-handle-submit'))
+    ).toBe(false);
+  });
+});
