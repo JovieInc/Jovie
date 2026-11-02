@@ -67,19 +67,28 @@ class FakeLinear:
         self.moved.append((issue_id, state))
 
 
-def gh_with(states):
+def gh_with(states, calls=None):
     def gh(args, priority="default"):
+        if calls is not None:
+            calls.append(args)
+        if args[:2] == ["pr", "merge"]:
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
         query = args[-1]
-        nodes = {f"p{n}": {"state": s, "mergeCommit": {"oid": "abc"} if s == "MERGED" else None}
-                 for n, s in states.items() if f"pullRequest(number:{n})" in query}
+        nodes = {}
+        for n, s in states.items():
+            if f"pullRequest(number:{n})" not in query:
+                continue
+            state, merge_state, auto = (s, None, False) if isinstance(s, str) else s
+            nodes[f"p{n}"] = {"state": state, "mergeCommit": {"oid": "abc"} if state == "MERGED" else None,
+                              "mergeStateStatus": merge_state, "autoMergeRequest": {"enabledAt": "x"} if auto else None}
         return SimpleNamespace(returncode=0, stdout=json.dumps({"data": {"repository": nodes}}), stderr="")
     return gh
 
 
 class PolicyTest(unittest.TestCase):
     def test_classify_maps_stall_detector_and_goal_tasks(self):
-        self.assertEqual(bi.classify(task("stall-jovie-23744-e4ddc31-a2")),
-                         {"kind": "pr", "repo": "JovieInc/Jovie", "number": 23744})
+        self.assertEqual(bi.classify(task("stall-jovie-23744-e4ddc31-a2", body="Diagnosis: review-threads (5).")),
+                         {"kind": "pr", "repo": "JovieInc/Jovie", "number": 23744, "cause": "review-threads"})
         self.assertEqual(bi.classify(task("jov-10167-c2-e1")), {"kind": "linear", "identifier": "JOV-10167"})
         self.assertEqual(bi.classify(task("goal-mq-merge-rate-2026110203")), {"kind": "goal"})
 
@@ -168,6 +177,56 @@ class TickTest(unittest.TestCase):
         (done,) = hub.ops("done")
         self.assertEqual(done["status"], "failed")
         self.assertIn("escalate", done["result"])
+
+    def test_stuck_prs_are_claimed_before_older_detector_and_goal_backlog(self):
+        old = (NOW - 7 * 86400) * 1000
+        hub = FakeHub([task(f"jov-{n}", postedAt=old + n) for n in range(1, 7)] + [task("goal-y", postedAt=old)]
+                      + [task("stall-jovie-9-aaaaaaa-a1"), task("stall-jovie-8-bbbbbbb-a2")])
+        receipt = self.run_tick(hub, FakeLinear())
+        self.assertEqual(receipt["claimed"][:2], ["stall-jovie-9-aaaaaaa-a1", "stall-jovie-8-bbbbbbb-a2"])
+        self.assertEqual(len(receipt["claimed"]), bi.MAX_CLAIMS_PER_TICK)
+        self.assertNotIn("goal-y", receipt["claimed"])
+
+    def test_a_held_stuck_pr_gets_its_lanes_repair_label_once(self):
+        hub = FakeHub([task("stall-jovie-7-ccccccc-a1", body="Diagnosis: conflict (DIRTY).\nNext action: x"),
+                       task("stall-jovie-6-ddddddd-a1", body="Diagnosis: review-threads (5 unresolved).")])
+        self.run_tick(hub, FakeLinear())
+        calls = []
+        gh = gh_with({7: ("OPEN", "DIRTY", False), 6: ("OPEN", "CLEAN", False)}, calls)
+        receipt = self.run_tick(hub, FakeLinear(), gh=gh, now=NOW + 60)
+        self.assertIn(["pr", "edit", "7", "--repo", "JovieInc/Jovie", "--add-label", "lane-fix-conflict"], calls)
+        # A green PR with open review findings is repaired, never pushed into the queue.
+        self.assertIn(["pr", "edit", "6", "--repo", "JovieInc/Jovie", "--add-label", "lane-fix-review"], calls)
+        self.assertFalse(any(c[:2] == ["pr", "merge"] for c in calls))
+        self.assertEqual(len(receipt["handoffs"]), 2)
+        calls.clear()
+        self.run_tick(hub, FakeLinear(), gh=gh, now=NOW + 120)
+        self.assertFalse(any(c[:2] in (["pr", "edit"], ["pr", "merge"]) for c in calls))
+
+    def test_a_row_held_before_causes_were_recorded_reads_its_diagnosis_once(self):
+        hub = FakeHub([task("stall-jovie-4-fffffff-a1", body="Diagnosis: red-checks (1 red).")])
+        self.run_tick(hub, FakeLinear())
+        path = self.state / "board-intake.json"
+        held = json.loads(path.read_text())
+        held["tasks"]["stall-jovie-4-fffffff-a1"].pop("cause")
+        path.write_text(json.dumps(held))
+        original = hub.__call__
+
+        def with_lookup(method, path_, body=None):
+            if path_.startswith("/v1/board/task?id="):
+                return {"ok": True, "task": hub.tasks["stall-jovie-4-fffffff-a1"]}
+            return original(method, path_, body)
+        calls = []
+        bi.tick(self.state, FakeLinear(), now=NOW + 60, call=with_lookup, gh=gh_with({4: ("OPEN", "BLOCKED", False)}, calls))
+        self.assertIn(["pr", "edit", "4", "--repo", "JovieInc/Jovie", "--add-label", "lane-fix-red"], calls)
+
+    def test_only_a_not_enqueued_green_stall_gets_auto_merge(self):
+        hub = FakeHub([task("stall-jovie-5-eeeeeee-a1", body="Diagnosis: not-enqueued (green but not enqueued).")])
+        self.run_tick(hub, FakeLinear())
+        calls = []
+        receipt = self.run_tick(hub, FakeLinear(), gh=gh_with({5: ("OPEN", "CLEAN", False)}, calls), now=NOW + 60)
+        self.assertIn(["pr", "merge", "5", "--repo", "JovieInc/Jovie", "--auto"], calls)
+        self.assertEqual(receipt["handoffs"], ["https://github.com/JovieInc/Jovie/pull/5 auto-merge"])
 
     def test_hub_outage_keeps_held_tasks_and_never_raises(self):
         hub = FakeHub([task("stall-jovie-5-eeeeeee-a1")])

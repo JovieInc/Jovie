@@ -46,6 +46,11 @@ PR_REF = re.compile(r"https://github\.com/(JovieInc/[\w.-]+)/pull/(\d+)")
 STALL_ID = re.compile(r"^stall-([a-z0-9-]+?)-(\d+)-[0-9a-f]{7}-a\d+$")
 LINEAR_ID = re.compile(r"^(jov)-(\d+)(?:-c\d+)?(?:-e\d+)?$")
 REPOS = {"jovie": "JovieInc/Jovie", "logyourbody": "JovieInc/LogYourBody"}
+DIAGNOSIS = re.compile(r"^Diagnosis: ([a-z-]+)", re.M)
+# Stall diagnosis -> the lanes' own repair signal (pr_events.py: a `lane-fix-<kind>` label makes a worker
+# take the PR ahead of everything else). `not-enqueued` is green: it only needs auto-merge.
+REPAIR_LABEL = {"conflict": "lane-fix-conflict", "red-checks": "lane-fix-red", "review-threads": "lane-fix-review",
+                "missing-evidence": "lane-fix-stale", "held": "lane-fix-stale"}
 
 
 # ------------------------------------------------------------------ policy (pure)
@@ -54,8 +59,10 @@ def classify(task: dict) -> dict:
     """What lanes work a task maps to: a PR, a Linear issue, or a free-form goal."""
     tid = str(task.get("id") or "")
     stall = STALL_ID.match(tid)
+    cause = DIAGNOSIS.search(str(task.get("body") or ""))
     if stall and stall.group(1) in REPOS:
-        return {"kind": "pr", "repo": REPOS[stall.group(1)], "number": int(stall.group(2))}
+        return {"kind": "pr", "repo": REPOS[stall.group(1)], "number": int(stall.group(2)),
+                "cause": cause.group(1) if cause else None}
     found = PR_REF.search(str(task.get("body") or ""))
     if found and tid.startswith(("stall-", "pr-")):
         return {"kind": "pr", "repo": found.group(1), "number": int(found.group(2))}
@@ -95,6 +102,13 @@ def goal_prompt(task: dict) -> str:
         "- The board task closes from the lanes when this issue completes; a detector issue closes only on the",
         "  doctor's own `cleared` comment.",
     ])
+
+
+def claim_order(task: dict) -> tuple:
+    """Stuck PRs first (they block merges now), then detector issues, then goals; oldest first within each.
+    2026-11-02: oldest-first claimed a week of detector backlog five per tick while fresh `Unstick` tasks waited."""
+    rank = {"pr": 0, "linear": 1, "goal": 2}[classify(task)["kind"]]
+    return (rank, task.get("postedAt") or 0)
 
 
 def sla_breached(row: dict, now: float) -> bool:
@@ -149,7 +163,8 @@ def pr_states(refs: list[tuple[str, int]], gh=None) -> dict:
     for repo in sorted({r for r, _ in refs}):
         owner, name = repo.split("/")
         nums = sorted({n for r, n in refs if r == repo})
-        fields = " ".join(f"p{n}:pullRequest(number:{n}){{state mergeCommit{{oid}}}}" for n in nums)
+        fields = " ".join(f"p{n}:pullRequest(number:{n}){{state mergeStateStatus autoMergeRequest{{enabledAt}} "
+                          f"mergeCommit{{oid}}}}" for n in nums)
         result = gh(["api", "graphql", "-f", f'query=query{{repository(owner:"{owner}",name:"{name}"){{{fields}}}}}'],
                     priority="repair")
         if result.returncode != 0:
@@ -158,8 +173,34 @@ def pr_states(refs: list[tuple[str, int]], gh=None) -> dict:
         for n in nums:
             node = data.get(f"p{n}") or {}
             if node.get("state"):
-                out[(repo, n)] = {"state": node["state"], "mergeSha": (node.get("mergeCommit") or {}).get("oid")}
+                out[(repo, n)] = {"state": node["state"], "mergeSha": (node.get("mergeCommit") or {}).get("oid"),
+                                  "mergeState": node.get("mergeStateStatus"), "autoMerge": bool(node.get("autoMergeRequest"))}
     return out
+
+
+def handoff(row: dict, seen: dict, gh=None) -> str | None:
+    """Point the lanes at a held stuck PR: its repair label, or auto-merge when the stall is only `not-enqueued`.
+    Returns the action taken, or None when nothing applies (the lanes' own PR sweep still covers it)."""
+    if gh is None:
+        from gh_budget import gh_call as gh
+    cause = row.get("cause")
+    if cause == "not-enqueued":
+        if seen.get("mergeState") in ("CLEAN", "HAS_HOOKS", "UNSTABLE") and not seen.get("autoMerge") \
+                and enqueue(row["repo"], row["number"], gh=gh):
+            return "auto-merge"
+        return None
+    label = REPAIR_LABEL.get(cause or "")
+    if label and gh(["pr", "edit", str(row["number"]), "--repo", row["repo"], "--add-label", label],
+                    priority="repair").returncode == 0:
+        return label
+    return None
+
+
+def enqueue(repo: str, number: int, gh=None) -> bool:
+    """Turn on auto-merge for a green PR: it joins the merge queue in order (never a jump)."""
+    if gh is None:
+        from gh_budget import gh_call as gh
+    return gh(["pr", "merge", str(number), "--repo", repo, "--auto"], priority="merge").returncode == 0
 
 
 def issue_state(linear, identifier: str) -> dict | None:
@@ -250,6 +291,14 @@ def tick(state: Path, linear, *, now: float | None = None, call=hub, gh=None) ->
                 if seen.get("state") == "CLOSED":
                     close(tid, row, "failed", f"{url} closed unmerged; nothing to land")
                     continue
+                if seen.get("state") == "OPEN" and not row.get("handoffEpoch") and "cause" not in row:
+                    found = (call("GET", f"/v1/board/task?id={tid}").get("task") or {})
+                    row["cause"] = classify(found).get("cause") if found else None
+                if seen.get("state") == "OPEN" and not row.get("handoffEpoch"):
+                    action = handoff(row, seen, gh=gh)
+                    if action:
+                        row["handoffEpoch"], row["handoff"] = now, action
+                        receipt.setdefault("handoffs", []).append(f"{url} {action}")
             elif row.get("issue"):
                 issue = issue_state(linear, row["issue"])
                 if issue and issue["type"] == "completed":
@@ -275,7 +324,7 @@ def tick(state: Path, linear, *, now: float | None = None, call=hub, gh=None) ->
             receipt["errors"].append(f"{tid}:{type(error).__name__}")
 
     board = call("GET", "/v1/board?status=open&limit=500")
-    for task in sorted(filter(eligible, board.get("tasks") or []), key=lambda t: t.get("postedAt") or 0):
+    for task in sorted(filter(eligible, board.get("tasks") or []), key=claim_order):
         if len(receipt["claimed"]) >= MAX_CLAIMS_PER_TICK:
             break
         if task["id"] in tasks:
