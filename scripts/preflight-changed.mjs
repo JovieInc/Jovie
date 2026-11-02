@@ -400,6 +400,17 @@ export function typecheckTargets(files, cwd) {
   return [...out];
 }
 
+/**
+ * Gem's host semaphore (scripts/typecheck-slot.mjs, GEM_TYPECHECK_SLOTS from environment.d) for
+ * preflight's heavy checks. Unset off Gem, so CI and laptops run the command untouched.
+ * 2026-11-02: every agent's pre-push preflight ran tsc and vitest outside the slot (only
+ * apps/web's own `typecheck` script used it), load reached 25-40 on 16 cores and autoscale
+ * halved the Codex lanes.
+ */
+export function hostSlotted(command) {
+  return `node scripts/typecheck-slot.mjs -- bash -c '${command.replace(/'/g, `'\\''`)}'`;
+}
+
 function typecheckCommand(target, cwd) {
   const cap = `NODE_OPTIONS=--max-old-space-size=${target.startsWith('web') ? WEB_HEAP_MB : HEAP_MB}`;
   if (target === 'web')
@@ -629,7 +640,9 @@ export async function main({
           JOVIE_COVERAGE_RELATED_TESTS: (parsed.relatedTests ?? []).join('\n'),
         };
         const run = await sh(
-          `pnpm --filter @jovie/web test:coverage --changed ${mergeBase} --bail 1 --testTimeout=60000 --retry=1 && node scripts/check-changed-test-coverage.mjs --base ${mergeBase} --head ${head} --coverage apps/web/coverage/coverage-final.json`,
+          hostSlotted(
+            `pnpm --filter @jovie/web test:coverage --changed ${mergeBase} --bail 1 --testTimeout=60000 --retry=1 && node scripts/check-changed-test-coverage.mjs --base ${mergeBase} --head ${head} --coverage apps/web/coverage/coverage-final.json`
+          ),
           { cwd, env: e, timeoutMs: 900_000 }
         );
         return {
@@ -649,7 +662,7 @@ export async function main({
         `tsc:${t}`,
         `typecheck ${t}`,
         async () => {
-          const r = await sh(typecheckCommand(t, cwd), {
+          const r = await sh(hostSlotted(typecheckCommand(t, cwd)), {
             cwd,
             env: childEnv,
             timeoutMs: 900_000,
