@@ -669,6 +669,7 @@ export const TIMER_KINDS = Object.freeze([
   'claude-routine',
 ]);
 export const WHY_NOT_EVENT_MIN = 30;
+export const MAC_HOSTS = Object.freeze(['mac', 'tims-macbook-pro']);
 
 export function loadSchedulers(repoRoot) {
   return JSON.parse(readFileSync(join(repoRoot, SCHEDULERS_PATH), 'utf8'));
@@ -716,6 +717,16 @@ export function validateScheduling(registry, schedulers) {
       continue;
     }
     for (const problem of problems) errors.push(`${entry.id}: ${problem}`);
+  }
+  // Nothing critical may depend on the Mac (Tim 2026-10-31): a critical job on
+  // the Mac needs a live non-Mac twin that does the same work.
+  for (const entry of live.values()) {
+    if (entry.critical !== true || !MAC_HOSTS.includes(entry.host)) continue;
+    const twin = live.get(entry.twin);
+    if (!twin || MAC_HOSTS.includes(twin.host))
+      errors.push(
+        `${entry.id}: critical job hosted on the Mac needs \`twin\` naming a live entry on cloud or Gem (or move it off the Mac)`
+      );
   }
   for (const id of grandfathered) {
     const entry = live.get(id);

@@ -28,9 +28,9 @@
     },
     "mac": {
       "id": "mac:ops-tick",
-      "status": "planned",
-      "source": "scripts/capacity/install-launchd.sh",
-      "how": "One launchd agent that runs registered tasks; until it lands, a new Mac timer must say why in clock.whyNotEvent."
+      "status": "live",
+      "source": "scripts/mac-tick/install.sh",
+      "how": "Add a task to scripts/mac-tick/tasks.json; do not add a LaunchAgent or crontab line. Nothing critical may depend on the Mac: a critical job needs a non-Mac twin."
     },
     "cloudflare": {
       "id": "cloudflare:cron-hub",
@@ -93,7 +93,6 @@
     "mac:gbrain-worker",
     "mac:jovie-desktop-nightly-update",
     "mac:codex-fast-reset-monitor",
-    "mac:disk-guard",
     "codex:keep-company-missions-moving",
     "codex:marketing-priority-certification",
     "codex:ship-logyourbody-project",
@@ -104,7 +103,6 @@
     "github:jovie:security-advisory-loop",
     "worker:fleet-audit:cron",
     "gem:capacity-collector",
-    "mac:capacity-collector",
     "worker:knowledge-ingest:cron",
     "gem:ci-runner-capacity-reconcile"
   ]

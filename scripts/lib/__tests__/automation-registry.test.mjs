@@ -328,4 +328,30 @@ describe('shared scheduling', () => {
     expect(runsPerDay('17 */6 * * *; 47 7 * * *')).toBe(5);
     expect(runsPerDay('continuous')).toBeNull();
   });
+
+  it('negative control: a critical Mac job without a non-Mac twin fails; with one it passes', () => {
+    const mac = timer({
+      id: 'mac:critical',
+      host: 'mac',
+      critical: true,
+      clock: {
+        scheduler: 'mac:ops-tick',
+        whyNotEvent: 'The upstream provider sends no webhook for this state.',
+      },
+    });
+    const gem = timer({ id: 'gem:twin', clock: mac.clock });
+    expect(validateScheduling({ entries: [mac] }, bare).join('\n')).toMatch(
+      /needs `twin`/
+    );
+    expect(
+      validateScheduling({ entries: [{ ...mac, twin: 'gem:twin' }, gem] }, bare)
+    ).toEqual([]);
+    const macTwin = { ...gem, host: 'tims-macbook-pro' };
+    expect(
+      validateScheduling(
+        { entries: [{ ...mac, twin: 'gem:twin' }, macTwin] },
+        bare
+      ).length
+    ).toBe(1);
+  });
 });

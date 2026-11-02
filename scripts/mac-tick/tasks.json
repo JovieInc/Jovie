@@ -1,0 +1,28 @@
+{
+  "schema": "jovie-mac-tick-tasks/v1",
+  "_comment": "The one Mac launchd agent (co.jovie.ops.tick, every 5 min) runs these. Nothing critical may depend on the Mac: a critical job needs a cloud or Gem twin (validateScheduling). Add a task here instead of a new LaunchAgent or crontab line.",
+  "tasks": [
+    {
+      "id": "mac:disk-guard",
+      "everyMin": 15,
+      "timeoutS": 2400,
+      "argv": ["/usr/bin/python3", "{share}/mac-disk-guard/mac_disk_guard.py"],
+      "disabledFile": "{state}/mac-disk-guard/disabled"
+    },
+    {
+      "id": "mac:capacity-collector",
+      "everyMin": 30,
+      "timeoutS": 300,
+      "okCodes": [0, 2],
+      "env": {
+        "CAPACITY_HOST": "{capacity_host}"
+      },
+      "argv": [
+        "/usr/bin/python3",
+        "{share}/capacity/scripts/capacity/forecast.py",
+        "collect"
+      ],
+      "disabledFile": "{state}/capacity/disabled"
+    }
+  ]
+}

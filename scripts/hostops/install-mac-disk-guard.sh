@@ -9,6 +9,11 @@
 # ~/.local/state/mac-disk-guard/{receipt.json,ledger.jsonl}.
 # Kill switch: touch ~/.local/state/mac-disk-guard/disabled, or --uninstall.
 set -euo pipefail
+# Superseded 2026-10-31: every periodic Mac job runs from the one co.jovie.ops.tick agent.
+if [[ "${1:-}" != "--uninstall" ]]; then
+  echo "note: disk guard now installs via scripts/mac-tick/install.sh" >&2
+  exec "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../mac-tick/install.sh"
+fi
 
 LABEL="co.jovie.ops.mac-disk-guard"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
