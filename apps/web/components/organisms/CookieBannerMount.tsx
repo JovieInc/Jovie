@@ -15,6 +15,7 @@ import {
   GPC_CONFIRMATION,
   PRIVACY_CHOICES_HREF,
 } from '@/lib/cookies/consent-state';
+import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
 import { isGPCEnabled, setConsentState } from '@/lib/tracking/consent';
 
 type CookieModalComponent = ComponentType<{
@@ -64,6 +65,7 @@ export function CookieBannerMount() {
   }> | null>(null);
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [gpc, setGpc] = useState(false);
+  const pathname = usePublicPathname();
   const listenersRef = useRef(new Set<(v: unknown) => void>());
 
   const openPreferences = useCallback(() => {
@@ -164,7 +166,9 @@ export function CookieBannerMount() {
 
   return (
     <>
-      {gpc && !privacyOpen ? (
+      {gpc &&
+      !privacyOpen &&
+      !shouldSuppressCookieBannerForPathname(pathname) ? (
         <aside
           aria-label='Privacy Signal'
           className='fixed bottom-24 left-4 right-4 z-banner max-w-85 sm:left-auto rounded-xl border border-subtle bg-surface-1 px-4 py-3 text-xs text-secondary-token shadow-card'
