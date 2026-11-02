@@ -263,8 +263,23 @@ function parseSyntheticTestResults({
     ...(skipped.length > 0
       ? [
           'Skipped tests:',
-          ...skipped.map(({ source, spec }) => `${source}: ${spec.title}`),
+          ...skipped.map(({ source, spec, testCase }) => {
+            // A skip that fails the run must name its cause inline: the
+            // Slack "Failed Tests" block and the Linear intake body are the
+            // only surfaces most readers see (JOV-6813 — a waitlist skip
+            // used to report as a bare "Skipped tests" line with no reason).
+            const reason = acknowledgedSkipText(testCase);
+            return reason
+              ? `${source}: ${spec.title} (skip reason: ${reason})`
+              : `${source}: ${spec.title}`;
+          }),
         ]
+      : []),
+    // The resolver's OTP_SKIP_REASON is the authoritative cause (it knows
+    // whether secrets were verified absent vs. a Doppler read failure) —
+    // attach it whenever a required skip is what failed the run.
+    ...(requiredSkipped.length > 0 && otpReason
+      ? [`Skip cause: ${otpReason}`]
       : []),
   ];
 

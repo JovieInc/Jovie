@@ -666,3 +666,110 @@ test('formatGithubOutput emits a JSON-safe failed_tests_slack line', () => {
   const parsed = JSON.parse(`"${escaped}"`);
   assert.equal(parsed, 'suite: "quoted" title\nsuite: second\nline');
 });
+
+// JOV-6813 regression: a waitlist skip that fails the run must name its cause
+// in failed_tests — the Slack "Failed Tests" block and the Linear intake body
+// are the only surfaces most readers see.
+
+function waitlistReportWithOtpSkip() {
+  const reason =
+    'synthetic-otp-unavailable: missing E2E_PROD_OTP_CHECK_TOKEN (Tim-only Cloudflare mailbox secrets)';
+  return {
+    fileSystem: createMemoryFileSystem({
+      'waitlist.json': JSON.stringify({
+        suites: [
+          {
+            specs: [
+              {
+                title: 'reads the production waitlist preflight receipt',
+                tests: [
+                  {
+                    status: 'expected',
+                    results: [{ status: 'passed' }],
+                  },
+                ],
+              },
+              {
+                title: 'retains identity and proves waitlist suppression',
+                tests: [
+                  {
+                    status: 'skipped',
+                    annotations: [{ type: 'skip', description: reason }],
+                    results: [],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    }),
+  };
+}
+
+test('failedTests carry the waitlist skip cause inline (JOV-6813)', () => {
+  const { fileSystem } = waitlistReportWithOtpSkip();
+  const result = parseSyntheticTestResults({
+    resultFiles: [
+      {
+        name: 'synthetic-production-waitlist',
+        path: 'waitlist.json',
+        required: true,
+      },
+    ],
+    fileSystem,
+    otpSkipReason:
+      'Skipping OTP-dependent synthetic steps: missing E2E_PROD_OTP_CHECK_TOKEN (Tim-only Cloudflare mailbox secrets).',
+  });
+
+  assert.equal(result.testStatus, 'failed');
+  assert.ok(
+    result.failedTests.includes(
+      'synthetic-production-waitlist: retains identity and proves waitlist suppression (skip reason: synthetic-otp-unavailable: missing E2E_PROD_OTP_CHECK_TOKEN (Tim-only Cloudflare mailbox secrets))'
+    ),
+    `failedTests should carry the skip reason inline, got: ${JSON.stringify(result.failedTests)}`
+  );
+  assert.ok(
+    result.failedTests.some(line =>
+      line.startsWith(
+        'Skip cause: Skipping OTP-dependent synthetic steps: missing E2E_PROD_OTP_CHECK_TOKEN'
+      )
+    ),
+    'failedTests should carry the resolver-provided skip cause'
+  );
+});
+
+test('a Doppler read failure is reported as the skip cause, not as missing secrets', () => {
+  const { fileSystem } = waitlistReportWithOtpSkip();
+  const result = parseSyntheticTestResults({
+    resultFiles: [
+      {
+        name: 'synthetic-production-waitlist',
+        path: 'waitlist.json',
+        required: true,
+      },
+    ],
+    fileSystem,
+    otpSkipReason:
+      'synthetic-otp-unavailable: could not read E2E_PROD_OTP_CHECK_TOKEN from Doppler jovie-web/prd after 3 attempts (exit-7) — Doppler resolution failure, not a verified missing secret. Re-run the workflow.',
+  });
+
+  assert.equal(result.testStatus, 'failed');
+  assert.ok(
+    result.failedTests.some(line =>
+      line.startsWith(
+        'Skip cause: synthetic-otp-unavailable: could not read E2E_PROD_OTP_CHECK_TOKEN'
+      )
+    ),
+    'the resolution-failure cause must reach failed_tests'
+  );
+  assert.ok(
+    result.failedTests.every(
+      line =>
+        !line.startsWith(
+          'Skip cause: Skipping OTP-dependent synthetic steps: missing'
+        )
+    ),
+    'the misleading "missing secrets" wording must not be the reported cause'
+  );
+});
