@@ -57,7 +57,9 @@ export function exportRefs(
     const guard = renderGuard(
       [{ id, md5: r.md5, img }],
       {},
-      { dark: true }
+      // Canonical frames mix light and dark themes; the garble and glyph
+      // checks hold for both, the dark-only white-noise heuristic does not.
+      { dark: false }
     ).map(g => g.reason);
     const html = join(out, surface, `${id}.html`);
     mkdirSync(join(out, surface), { recursive: true });

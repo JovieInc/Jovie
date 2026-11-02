@@ -216,7 +216,7 @@ export function fixPrompt(frame, issue, brief) {
       ? `Nodes: ${issue.nodes.join(', ')}\nDetail: ${JSON.stringify(issue.detail ?? []).slice(0, 2500)}`
       : '',
     'Rules: edit only nodes inside this frame (never a reusable component master, never another frame, never variables). Use the existing $tokens for colour, type size and radius; spacing on the 4px grid; whole-pixel geometry; one content axis; one filled primary action per screen; sentence-case, plain copy with no em dashes. Keep the design language; do not redesign the screen.',
-    'Read the frame first (Get with depth or a visitor), make the smallest change that fixes the issue everywhere it applies, then TakeScreenshot the frame and confirm. Do not save, do not open or switch documents. Reply with one line saying what you changed.',
+    'Read the frame first (Get with depth or a visitor), make the smallest change that fixes the issue everywhere it applies, then confirm it with a Get visitor (ctx.bounds, ctx.problems). Do not use TakeScreenshot: the app raster output is unreliable and the loop re-renders out of process. Do not save, do not open or switch documents. Reply with one line saying what you changed.',
   ]
     .filter(Boolean)
     .join('\n');
