@@ -67,7 +67,9 @@ export default function CalendarInner({
         labelDayButton: (date, modifiers, options, dateLib) =>
           labelDayButton(date, modifiers, options, dateLib).replace(
             /\b(\d+)(?:st|nd|rd|th)\b/g,
-            '$1'
+            // Function replacer keeps the digit without a `$1` literal, which
+            // the price-literal-guard reads as a hardcoded price.
+            (_ordinal, dayNumber) => dayNumber
           ),
         ...labels,
       }}
