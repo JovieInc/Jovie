@@ -218,11 +218,22 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
-    // Compliance loop: privacy rules + negative controls, tracker registry
-    // shape, and no tracker component on input routes.
+    // Compliance: no third-party tracker component on routes where people
+    // type (CIPA wiretap exposure). Canon: gbrain
+    // decisions/company/privacy-tracking-compliance-guidelines-2026-10-31.
+    id: 'privacy-input-route-trackers',
+    command:
+      'node --test --test-isolation=none scripts/compliance/input-page-trackers.test.mjs',
+    inputs:
+      /^(?:apps\/web\/app\/|apps\/web\/components\/features\/tracking\/|scripts\/compliance\/|scripts\/ci-fast-lanes\.mjs$)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
+    // Compliance loop: privacy rules with negative controls and the tracker
+    // registry shape. The input-route tracker guard stays its own source guard.
     id: 'privacy-compliance',
     command:
-      'node --test --test-isolation=none scripts/compliance/privacy-rules.test.mjs scripts/compliance/input-page-trackers.test.mjs',
+      'node --test --test-isolation=none scripts/compliance/privacy-rules.test.mjs',
     inputs:
       /^(?:apps\/web\/app\/|apps\/web\/components\/features\/tracking\/|apps\/web\/content\/legal\/|canon\/privacy\/|scripts\/compliance\/|scripts\/ci-fast-lanes\.mjs$)/u,
     prOnly: false,
@@ -281,9 +292,9 @@ export const SOURCE_GUARDS = Object.freeze([
     // rejected; coverage floors keep the verifier itself fully exercised.
     id: 'outcome-verifier',
     command:
-      'pnpm exec vitest --root scripts --config vitest.config.mts run --coverage --coverage.include=lib/outcome-verifier.mjs --coverage.reporter=text --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-outcome-verifier-coverage" --coverage.thresholds.lines=100 --coverage.thresholds.functions=100 --coverage.thresholds.branches=90 lib/__tests__/outcome-verifier.test.mjs',
+      'pnpm exec vitest --root scripts --config vitest.config.mts run --coverage --coverage.include=lib/outcome-verifier.mjs --coverage.reporter=text --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-outcome-verifier-coverage" --coverage.thresholds.lines=100 --coverage.thresholds.functions=100 --coverage.thresholds.branches=90 lib/__tests__/outcome-verifier.test.mjs lib/__tests__/ship-verify-receipt.test.mjs',
     inputs:
-      /^(?:scripts\/lib\/(?:outcome-verifier\.mjs|__tests__\/outcome-verifier\.test\.mjs)|apps\/web\/app\/api\/chat\/(?:route|onboarding-handler)\.ts|apps\/web\/lib\/rate-limit\/limiters\.ts|scripts\/ci-fast-lanes\.mjs)$/u,
+      /^(?:scripts\/lib\/(?:outcome-verifier\.mjs|__tests__\/(?:outcome-verifier|ship-verify-receipt)\.test\.mjs)|apps\/web\/app\/api\/chat\/(?:route|onboarding-handler)\.ts|apps\/web\/lib\/rate-limit\/limiters\.ts|scripts\/ship-verify\.mjs|scripts\/ci-fast-lanes\.mjs)$/u,
     prOnly: false,
   }),
   Object.freeze({
