@@ -19,6 +19,7 @@
     "agent-distribution:generate": "NODE_OPTIONS=--conditions=react-server tsx scripts/generate-agent-distribution.ts",
     "agent-distribution:check": "NODE_OPTIONS=--conditions=react-server tsx scripts/generate-agent-distribution.ts --check",
     "agent-path:cert": "NODE_OPTIONS=--conditions=react-server tsx scripts/agent-path-cert.ts",
+    "admitted-canary:reconcile": "NODE_OPTIONS=--conditions=react-server tsx scripts/admitted-canary-reconcile.ts",
     "agent-distribution:icons": "tsx scripts/render-agent-icons.ts",
     "agent-distribution:ready": "NODE_OPTIONS=--conditions=react-server tsx scripts/agent-listing-ready.ts",
     "validate-env": "tsx scripts/validate-env.ts",
