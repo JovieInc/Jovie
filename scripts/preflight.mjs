@@ -484,6 +484,9 @@ export async function main({
       {
         ...step.stepEnv,
         RUNNER_TEMP: runnerTemp,
+        ...(step.name === 'Preserve merged action generation'
+          ? { SOURCE_GUARD_ACTION_WORKSPACE: runnerTemp }
+          : {}),
         GITHUB_BASE_REF: args.base,
         GITHUB_EVENT_NAME: 'pull_request',
       },

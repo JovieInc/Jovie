@@ -1086,7 +1086,37 @@ export const ASSURANCE_MATRIX_COVERAGE_COMMAND =
 export const PR_OPEN_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/pr-open.mjs --test-coverage-lines=90 --test-coverage-branches=75 --test-coverage-functions=90 scripts/pr-open.test.mjs';
 
-export const SCRIPT_CONTRACT_NODE_COMMAND = `${PR_OPEN_COVERAGE_COMMAND} && ${DEPRECATION_COVERAGE_COMMAND} && ${CODEX_BOOTSTRAP_COVERAGE_COMMAND} && ${ASSURANCE_MATRIX_COVERAGE_COMMAND} && node --import tsx --test --test-isolation=none scripts/content-os/project.test.mts scripts/lib/__tests__/lesson-analysis.test.mjs && pnpm --filter @jovie/copy exec vitest run --config vitest.config.mts transport.test.ts judge.test.ts && node --test ${SCRIPT_CONTRACT_NODE_TESTS.filter(test => test !== 'scripts/invariants/assurance-matrix.test.mjs').join(' ')}`;
+const PREFLIGHT_COVERAGE_TESTS = [
+  'scripts/preflight.test.mjs',
+  'scripts/verify-workflow-references.test.mjs',
+];
+const PREFLIGHT_COVERAGE_ARGS = [
+  '--test',
+  '--experimental-test-coverage',
+  '--test-coverage-include=scripts/preflight.mjs',
+  '--test-coverage-include=scripts/lib/source-guard-action-snapshot.mjs',
+];
+
+/** Keep unrelated scanners outside V8 instrumentation; run every selection once.
+ * @param {readonly string[]} tests
+ * @returns {string[][]}
+ */
+export function scriptContractNodeArgs(tests) {
+  const focused = tests.filter(test => PREFLIGHT_COVERAGE_TESTS.includes(test));
+  const plain = tests.filter(test => !PREFLIGHT_COVERAGE_TESTS.includes(test));
+  const batches = [];
+  if (focused.length) batches.push([...PREFLIGHT_COVERAGE_ARGS, ...focused]);
+  if (plain.length) batches.push(['--test', ...plain]);
+  return batches;
+}
+
+export const SCRIPT_CONTRACT_NODE_COMMAND = `${PR_OPEN_COVERAGE_COMMAND} && ${DEPRECATION_COVERAGE_COMMAND} && ${CODEX_BOOTSTRAP_COVERAGE_COMMAND} && ${ASSURANCE_MATRIX_COVERAGE_COMMAND} && node --import tsx --test --test-isolation=none scripts/content-os/project.test.mts scripts/lib/__tests__/lesson-analysis.test.mjs && pnpm --filter @jovie/copy exec vitest run --config vitest.config.mts transport.test.ts judge.test.ts && ${scriptContractNodeArgs(
+  SCRIPT_CONTRACT_NODE_TESTS.filter(
+    test => test !== 'scripts/invariants/assurance-matrix.test.mjs'
+  )
+)
+  .map(args => `node ${args.join(' ')}`)
+  .join(' && ')}`;
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
@@ -3135,9 +3165,9 @@ export async function runStructural(opts = {}) {
         ]
       : []),
     ...invariantParts,
-    ...(dependentScriptTests.length
-      ? [`node --test ${dependentScriptTests.join(' ')}`]
-      : []),
+    ...scriptContractNodeArgs(dependentScriptTests).map(
+      args => `node ${args.join(' ')}`
+    ),
     ...(selected.has('operations') ? operationsParts : []),
     ...(selected.has('web') ? webParts : []),
     ...(selected.has('mac') ? macParts : []),
