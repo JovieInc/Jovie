@@ -1119,7 +1119,7 @@ class SubscriptionPoolTest(Isolated):
                     patch.object(codex.subprocess, "Popen", side_effect=AssertionError("no depleted execution")):
                 self.assertEqual(codex.run_account("current-login", handle, ["fake"], "fixture",
                                                   self.tmp.name, self.NOW),
-                                 (codex.NO_ACCOUNT_EXIT, "limit", self.NOW + 7200))
+                                 (codex.NO_ACCOUNT_EXIT, "held", self.NOW + 7200))
             self.assertTrue(handle.closed)
             state = codex.read_state()
             self.assertEqual(codex.pick(state, self.NOW, ["current-login"]), (None, None))
@@ -1408,7 +1408,7 @@ class SubscriptionPoolTest(Isolated):
         with patch.object(codex,"current_subscription_snapshot",return_value=value), \
                 patch.object(codex.subprocess,"Popen",side_effect=AssertionError("no exhausted execution")):
             self.assertEqual(codex.run_account("lyb-pro",handle,["fake"],"fixture",self.tmp.name,self.NOW),
-                             (codex.NO_ACCOUNT_EXIT,"limit",self.NOW+7200))
+                             (codex.NO_ACCOUNT_EXIT,"held",self.NOW+7200))
         self.assertTrue(codex.available("current-login",codex.read_state(),self.NOW))
         self.assertFalse(codex.available("lyb-pro",codex.read_state(),self.NOW))
 
@@ -1576,6 +1576,175 @@ class SubscriptionPoolTest(Isolated):
         codex.reconcile(self.NOW+31,fetch=fail);codex.reconcile(self.NOW+32,fetch=fail)
         self.assertEqual(seen,["lyb-pro"])
 
+
+    # ---- burn before reset (Tim 2026-11-01): use-it-or-lose-it order, 1% floor, failover, one proposal
+
+    def set_capacity(self, name, remaining, resets_in, banked=None, last_used=0):
+        def change(state):
+            row = state[name]
+            row["capacityLease"]["usableCapacityRemaining"] = {
+                "primary": {"remainingPercent": remaining, "resetsAt": self.NOW + resets_in, "windowDurationMins": 10080}}
+            row["capacityLease"]["credits"] = {"availableCount": banked}
+            row["lastUsed"] = last_used
+        codex.update_state(change)
+
+    def test_floor_policy_comes_from_routing_json(self):
+        policy = codex.subsidy_policy()
+        self.assertEqual(policy["source"], "routing.json")
+        self.assertEqual(policy["floorPercent"], 1)
+        self.assertEqual(policy["aliases"], ["current-login", "jovie-pro", "lyb-pro"])
+
+    def test_burn_order_takes_most_left_with_soonest_reset_first(self):
+        self.reconcile()
+        names = list(self.profiles)
+        # lyb-pro: 40% left, resets in a day -> 1.6%/h to burn; current-login: 60% over six days -> 0.4%/h.
+        self.set_capacity("current-login", 60, 6 * 86400)
+        self.set_capacity("lyb-pro", 40, 86400, last_used=self.NOW)
+        name, handle = codex.pick(codex.read_state(), self.NOW, names, deltas={})
+        handle.close()
+        self.assertEqual(name, "lyb-pro", "the window that expires soonest with the most left burns first")
+        self.set_capacity("lyb-pro", 5, 6 * 86400)
+        name, handle = codex.pick(codex.read_state(), self.NOW, names, deltas={})
+        handle.close()
+        self.assertEqual(name, "current-login")
+        ledger = codex.status(self.NOW, names=names)["subsidyLedger"]
+        self.assertEqual(ledger["burnOrder"], ["current-login", "lyb-pro"])
+        self.assertFalse(ledger["allAtFloor"])
+
+    def test_one_percent_floor_takes_no_new_run_and_no_fifteen_percent_pause(self):
+        self.reconcile()
+        for remaining, expected in ((15, True), (2, True), (1.5, True), (1, False), (0, False)):
+            with self.subTest(remaining=remaining):
+                self.set_capacity("lyb-pro", remaining, 86400)
+                self.assertEqual(codex.available("lyb-pro", codex.read_state(), self.NOW), expected)
+        row = codex.status(self.NOW, names=list(self.profiles))["accounts"]["lyb-pro"]
+        self.assertTrue(row["atFloor"])
+        self.assertEqual(row["floorUntil"], codex.iso(self.NOW + 86400))
+
+    def test_run_at_floor_holds_before_launch(self):
+        self.reconcile()
+        value = self.snapshot("lyb-pro")
+        value["rateLimits"]["rateLimits"]["primary"]["usedPercent"] = 99
+        handle = codex.lease("lyb-pro")
+        with patch.object(codex, "current_subscription_snapshot", return_value=value), \
+                patch.object(codex.subprocess, "Popen", side_effect=AssertionError("no run at the floor")):
+            self.assertEqual(codex.run_account("lyb-pro", handle, ["fake"], "fixture", self.tmp.name, self.NOW),
+                             (codex.NO_ACCOUNT_EXIT, "held", self.NOW + 7200))
+        row = codex.read_state()["lyb-pro"]
+        self.assertEqual((row["lastKind"], row["lastError"]), ("limit", codex.METADATA_HOLD))
+
+    def test_alias_at_floor_fails_over_to_the_next_signed_in_alias_on_the_same_job(self):
+        self.reconcile()
+        codex.update_state(lambda st: st["lyb-pro"].update(lastUsed=self.NOW))
+
+        def snapshot(name, **_):
+            value = self.snapshot(name)
+            if name == "current-login":  # live reading: this alias reached the floor since the last reconcile
+                value["rateLimits"]["rateLimits"]["primary"]["usedPercent"] = 99
+            return value
+        prompt = Path(self.tmp.name) / "prompt.txt"; prompt.write_text("fixture")
+        proc = SimpleNamespace(pid=123, stdin=io.StringIO(), stdout=io.StringIO("OK\n"), wait=lambda: 0)
+        with patch.object(codex, "current_login_available", return_value=True), \
+                patch.object(codex, "pace_deltas", return_value={}), \
+                patch.object(codex, "current_subscription_snapshot", side_effect=snapshot), \
+                patch.object(codex, "maybe_redeem", side_effect=AssertionError("no reset authority")), \
+                patch.object(codex.subprocess, "Popen", return_value=proc) as spawn, redirect_stdout(io.StringIO()):
+            code = codex.run(SimpleNamespace(prompt_file=str(prompt), cwd=self.tmp.name, model=None, reasoning_effort=None))
+        self.assertEqual(code, 0)
+        self.assertEqual(spawn.call_count, 1)
+        self.assertEqual(spawn.call_args.kwargs["env"]["CODEX_HOME"], str(self.homes["lyb-pro"]))
+        self.assertNotIn("OPENAI_API_KEY", spawn.call_args.kwargs["env"])
+        self.assertFalse(codex.available("current-login", codex.read_state(), self.NOW))
+
+    def test_every_alias_at_floor_records_one_reset_proposal_instead_of_redeeming(self):
+        self.reconcile()
+        self.set_capacity("current-login", 1, 2 * 86400, banked=2)
+        self.set_capacity("lyb-pro", 0, 5 * 86400, banked=1)
+        quiet = {"reconciled": False, "reason": "cadence"}
+        with patch.object(codex, "reconcile_current_subscription", return_value=quiet), \
+                patch.object(codex, "maybe_redeem", side_effect=AssertionError("never redeem")), \
+                patch.object(codex, "app_server_calls", side_effect=AssertionError("no provider call")):
+            first = codex.reconcile(self.NOW)["resetProposal"]
+            second = codex.reconcile(self.NOW + 60)["resetProposal"]
+        self.assertEqual(first["id"], second["id"])
+        rows = codex.read_reset_proposals()
+        self.assertEqual(len(rows), 1, "one card per situation, not one per tick")
+        card = rows[0]
+        self.assertEqual(card["pools"], [
+            {"alias": "current-login", "remainingPercent": 1, "resetsAt": codex.iso(self.NOW + 2 * 86400), "bankedResets": 2},
+            {"alias": "lyb-pro", "remainingPercent": 0, "resetsAt": codex.iso(self.NOW + 5 * 86400), "bankedResets": 1}])
+        self.assertEqual(card["recommendation"], {"alias": "lyb-pro", "action": "redeem-one-banked-reset"})
+        self.assertEqual((card["autoRedeem"], card["neverBuy"], card["deadlineAt"]),
+                         (False, True, codex.iso(self.NOW + 2 * 86400)))
+        self.assertIn("current-login 1% left", card["body"])
+        ledger = codex.status(self.NOW, names=list(self.profiles))["subsidyLedger"]
+        self.assertTrue(ledger["allAtFloor"])
+        self.assertEqual(ledger["resetProposal"]["id"], card["id"])
+        self.assertEqual(ledger["metrics"]["resetProposals7d"], 1)
+        self.assertIsNone(ledger["metrics"]["costAvoidedUsd"])
+
+    def test_no_proposal_while_any_alias_is_above_the_floor_or_unmeasured(self):
+        self.reconcile()
+        self.set_capacity("current-login", 2, 2 * 86400, banked=2)
+        self.set_capacity("lyb-pro", 0, 5 * 86400, banked=1)
+        self.assertIsNone(codex.propose_reset_if_all_at_floor(self.NOW))
+        self.set_capacity("current-login", 1, 2 * 86400, banked=2)
+        codex.update_state(lambda st: st["lyb-pro"].pop("capacityLease"))
+        self.assertIsNone(codex.propose_reset_if_all_at_floor(self.NOW))
+        self.assertEqual(codex.read_reset_proposals(), [])
+
+    def test_all_at_floor_run_hands_off_and_proposes_without_launching(self):
+        self.reconcile()
+        self.set_capacity("current-login", 1, 2 * 86400, banked=2)
+        self.set_capacity("lyb-pro", 1, 5 * 86400, banked=0)
+        prompt = Path(self.tmp.name) / "prompt.txt"; prompt.write_text("fixture")
+        with patch.object(codex, "current_login_available", return_value=True), \
+                patch.object(codex, "reconcile", return_value={}), \
+                patch.object(codex, "current_subscription_snapshot", side_effect=AssertionError("no lease at the floor")), \
+                patch.object(codex.subprocess, "Popen", side_effect=AssertionError("nothing launches")), \
+                redirect_stdout(io.StringIO()), patch("sys.stderr", io.StringIO()):
+            code = codex.run(SimpleNamespace(prompt_file=str(prompt), cwd=self.tmp.name, model=None, reasoning_effort=None))
+        self.assertEqual(code, codex.NO_ACCOUNT_EXIT)
+        self.assertEqual(len(codex.read_reset_proposals()), 1)
+
+    def test_window_use_before_reset_is_measured_from_capacity_observations(self):
+        self.reconcile()
+
+        def rolled(name):
+            value = self.snapshot(name)
+            limits = value["rateLimits"]["rateLimits"]
+            limits["primary"].update(usedPercent=3, resetsAt=self.NOW + 7200 + 604800)
+            limits["secondary"].update(usedPercent=0, resetsAt=self.NOW + 7300 + 18000)
+            return value
+        codex.reconcile(self.NOW + 7300, if_due=0, fetch=rolled)
+        history = codex.read_state()["lyb-pro"]["windowHistory"]
+        self.assertEqual(sorted((w["window"], w["usedBeforeResetPercent"], w["endedBy"]) for w in history),
+                         [("primary", 50, "natural-reset"), ("secondary", 80, "natural-reset")])
+        metrics = codex.status(self.NOW + 7300, names=list(self.profiles))["subsidyLedger"]["metrics"]
+        self.assertEqual((metrics["windowsClosed"], metrics["windowUsedBeforeResetPercentMean"],
+                          metrics["windowsAtOrAboveTarget"], metrics["targetPercent"]), (4, 65.0, 0, 90))
+        early = codex.closed_windows({"usableCapacityRemaining": {"primary": {"remainingPercent": 30, "resetsAt": self.NOW + 99}}},
+                                     {"usableCapacityRemaining": {"primary": {"remainingPercent": 100, "resetsAt": self.NOW + 604800}}},
+                                     self.NOW)
+        self.assertEqual(early[0]["endedBy"], "early-reset", "a redeemed reset is not a natural window close")
+        drift = codex.closed_windows(
+            {"usableCapacityRemaining": {"primary": {"remainingPercent": 100, "resetsAt": self.NOW + 604800,
+                                                     "windowDurationMins": 10080}}},
+            {"usableCapacityRemaining": {"primary": {"remainingPercent": 100, "resetsAt": self.NOW + 605386}}},
+            self.NOW)
+        self.assertEqual(drift, [], "a re-reported reset that drifts by minutes is the same window")
+
+    def test_window_history_replays_capacity_events(self):
+        path = Path(self.tmp.name) / "capacity-events.jsonl"
+        lease = lambda used, reset: {"account": "lyb-pro", "usableCapacityRemaining": {
+            "primary": {"remainingPercent": 100 - used, "resetsAt": reset, "windowDurationMins": 10080}}}
+        rows = [{"at": codex.iso(self.NOW), "lease": lease(40, self.NOW + 100)},
+                {"at": codex.iso(self.NOW + 50), "lease": lease(93, self.NOW + 100)},
+                {"at": codex.iso(self.NOW + 200), "lease": lease(1, self.NOW + 604900)}]
+        path.write_text("\n".join(json.dumps(r) for r in rows) + "\nnot json\n")
+        history = codex.window_history_from_events(path)
+        self.assertEqual([(w["usedBeforeResetPercent"], w["endedBy"]) for w in history["lyb-pro"]],
+                         [(93, "natural-reset")])
 
 class LaunchIdentityTest(Isolated):
     """Exercise the real pipe/receipt boundary with a model-free CLI stand-in."""

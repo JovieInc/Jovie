@@ -66,6 +66,46 @@ CURRENT_LOGIN = "current-login"
 SUBSCRIPTION_POOL = "subscription-pool"
 
 
+# Burn-before-reset policy (Tim 2026-11-01: "burn usage before asking for resets", "don't reset
+# til 1 percent"). The single source is apps/web/lib/ai/routing.json subsidyPools (shipped in the
+# release bundle); a missing or invalid file falls back to the same 1% floor and says so.
+ROUTING_PATH = Path(os.environ.get("JOVIE_AI_ROUTING_PATH",
+                                   Path(__file__).resolve().parents[2] / "apps/web/lib/ai/routing.json"))
+DEFAULT_FLOOR_PERCENT = 1.0
+FLOOR_PERCENT_MAX = 5.0
+SUBSIDY_LEDGER_SCHEMA = "jovie.subsidy-ledger/v1"
+RESET_PROPOSAL_SCHEMA = "jovie.subsidy-reset-proposal/v1"
+WINDOW_HISTORY_MAX = 24
+_POLICY_CACHE: dict = {}
+
+
+def subsidy_policy() -> dict:
+    """{floorPercent, targetUsedPercent, aliases, source} from routing.json subsidyPools."""
+    try:
+        stamp = ROUTING_PATH.stat().st_mtime_ns
+        if _POLICY_CACHE.get("key") == (str(ROUTING_PATH), stamp):
+            return _POLICY_CACHE["value"]
+        ledger = json.loads(ROUTING_PATH.read_text())["subsidyPools"]
+        policy, pools = ledger["policy"], ledger["pools"]
+        floor = policy["floorPercent"]
+        if type(floor) not in (int, float) or not 0 <= floor <= FLOOR_PERCENT_MAX or policy.get("autoRedeemResets") is not False:
+            raise ValueError("subsidy policy invalid")
+        target = (policy.get("targets") or {}).get("windowUsedBeforeResetPercent")
+        value = {"floorPercent": float(floor), "targetUsedPercent": target if type(target) in (int, float) else None,
+                 "aliases": sorted(p["alias"] for p in pools if isinstance(p, dict)
+                                   and p.get("executor") == "scripts/lanes/codex_lane.py" and isinstance(p.get("alias"), str)),
+                 "source": "routing.json"}
+        _POLICY_CACHE.update(key=(str(ROUTING_PATH), stamp), value=value)
+        return value
+    except (OSError, ValueError, KeyError, TypeError):
+        return {"floorPercent": DEFAULT_FLOOR_PERCENT, "targetUsedPercent": None, "aliases": None,
+                "source": "default:routing-unreadable"}
+
+
+def floor_percent() -> float:
+    return subsidy_policy()["floorPercent"]
+
+
 def subscription_pool_mode() -> bool:
     return os.environ.get("CODEX_LANE_AUTH_MODE") == SUBSCRIPTION_POOL
 
@@ -385,10 +425,12 @@ def available(name: str, state: dict, now: float) -> bool:
         row = state.get(name) or {}
         verified_at = row.get("subscriptionIdentityVerifiedAt")
         capacity = (row.get("capacityLease") or {}).get("usableCapacityRemaining") or {}
+        # A window at or below the floor takes no NEW run (runs already leased finish).
+        floor = floor_percent()
         if (profile is None or row.get("subscriptionBinding") != subscription_binding(profile)
                 or type(verified_at) not in (int, float) or not 0 <= now - verified_at < LEDGER_CADENCE_S
                 or not capacity or any(type(window.get("remainingPercent")) not in (int, float)
-                                       or window["remainingPercent"] <= 0
+                                       or window["remainingPercent"] <= floor
                                        or type(window.get("resetsAt")) not in (int, float)
                                        or window["resetsAt"] <= now for window in capacity.values())):
             return False
@@ -801,6 +843,9 @@ def reconcile_current_subscription(now, if_due, fetch, name=CURRENT_LOGIN) -> di
                     entry.update(subscriptionBinding=binding, subscriptionIdentityVerifiedAt=now)
                 previous = entry.get("capacityLease") or {}
                 entry["capacityLease"] = value
+                closed = closed_windows(previous, value, now)
+                if closed:
+                    entry["windowHistory"] = ((entry.get("windowHistory") or []) + closed)[-WINDOW_HISTORY_MAX:]
                 # A quota hold outlives the window it was recorded in when the reset is
                 # redeemed outside the lane (2026-11-02: Tim redeemed a banked reset, readback
                 # showed 99%, and the stale hold kept codex at 0 seats). Only a hold this module
@@ -813,8 +858,8 @@ def reconcile_current_subscription(now, if_due, fetch, name=CURRENT_LOGIN) -> di
                 if (type(held) in (int, float) and held > now and entry.get("lastKind") == "limit"
                         and entry.get("lastError") == METADATA_HOLD
                         and not entry.get("pendingReset") and remaining
-                        and all(type(row.get("remainingPercent")) in (int, float) and row["remainingPercent"] > 0
-                                for row in remaining)):
+                        and all(type(row.get("remainingPercent")) in (int, float)
+                                and row["remainingPercent"] > floor_percent() for row in remaining)):
                     entry.pop("exhaustedUntil", None)
                     entry["staleHoldReleasedAt"] = now
                     entry["staleHoldWas"] = held
@@ -847,9 +892,14 @@ def reconcile(now: float | None = None, if_due: int = LEDGER_CADENCE_S, fetch=ac
     if subscription_pool_mode():
         now = time.time() if now is None else now
         observer = current_subscription_snapshot if fetch is account_snapshot else fetch
-        return {"authMode": SUBSCRIPTION_POOL, "profiles": {
+        result = {"authMode": SUBSCRIPTION_POOL, "profiles": {
             name: reconcile_current_subscription(now, if_due, observer, name)
             for name in subscription_profiles()}}
+        try:
+            result["resetProposal"] = propose_reset_if_all_at_floor(now)
+        except (OSError, ValueError) as error:
+            result["resetProposal"] = {"error": type(error).__name__}
+        return result
     if current_login_mode():
         return reconcile_current_subscription(time.time() if now is None else now, if_due,
                                               current_subscription_snapshot if fetch is account_snapshot else fetch)
@@ -1064,21 +1114,49 @@ def pace_deltas(now: float) -> dict:
         return {}
 
 
+def burn_rank(row: dict, now: float, floor: float | None = None) -> dict | None:
+    """How much of an account's measured allowance is lost if it is not used before it resets.
+
+    usablePercent is the tightest window's remaining percent above the floor; the deadline is the
+    reset of the longest window (the weekly allowance that disappears). burnPercentPerHour is the
+    rate needed to use it all before then: most left with the soonest reset ranks highest. None when
+    the capacity reading is missing or expired (the account then ranks after measured ones)."""
+    floor = floor_percent() if floor is None else floor
+    capacity = ((row or {}).get("capacityLease") or {}).get("usableCapacityRemaining") or {}
+    windows = [w for w in capacity.values() if isinstance(w, dict)
+               and type(w.get("remainingPercent")) in (int, float)
+               and type(w.get("resetsAt")) in (int, float) and w["resetsAt"] > now]
+    if not windows or len(windows) != len(capacity):
+        return None
+    remaining = min(w["remainingPercent"] for w in windows)
+    deadline = max(windows, key=lambda w: (w.get("windowDurationMins") or 0, w["resetsAt"]))["resetsAt"]
+    usable = max(0.0, remaining - floor)
+    return {"remainingPercent": remaining, "usablePercent": usable, "deadline": deadline,
+            "burnPercentPerHour": round(usable / max((deadline - now) / 3600, 1 / 60), 3),
+            "atFloor": remaining <= floor}
+
+
 def pick(state: dict, now: float, names: list[str] | None = None, deltas: dict | None = None):
-    """Available account that nobody else has leased right now: accounts behind their weekly pace
-    first, ahead-of-pace accounts last (they will run dry before reset), least-recently-used within
-    each group. Without a fresh live reading every account is level and this is plain LRU."""
+    """Available account that nobody else has leased right now, in burn order (use it or lose it):
+    the account that would waste the most allowance if left idle until its reset goes first
+    (burn_rank), accounts without a measured window after those, then weekly pace (behind-pace
+    first) and least-recently-used as tie-breaks. Accounts at or below the floor are not available."""
     state = reverify_auth_bank(state, now)
     names = accounts() if names is None else names
     deltas = pace_deltas(now) if deltas is None else deltas
     band = 10.0
+    floor = floor_percent()
 
     def group(n: str) -> int:
         d = deltas.get(n)
         return 0 if d is None else (-1 if d < -band else 1 if d > band else 0)
 
-    order = sorted((n for n in names if available(n, state, now)),
-                   key=lambda n: (group(n), float(state.get(n, {}).get("lastUsed") or 0)))
+    def order_key(n: str):
+        rank = burn_rank(state.get(n) or {}, now, floor)
+        return (rank is None, -(rank["burnPercentPerHour"] if rank else 0), group(n),
+                float(state.get(n, {}).get("lastUsed") or 0))
+
+    order = sorted((n for n in names if available(n, state, now)), key=order_key)
     for name in order:
         handle = lease(name)
         if handle is not None:
@@ -1134,14 +1212,23 @@ def run(args) -> int:
                 continue
             why = "leased by other runs past the wait" if busy else "all exhausted"
             print(f"codex-lane: no available account ({why})", file=sys.stderr)
+            if subscription_pool_mode() and not busy:
+                propose_reset_if_all_at_floor(time.time())
             return NO_ACCOUNT_EXIT
         tried.append(name)
         text = prompt if not attempted else (
             "A previous attempt on this worktree stopped when its account hit a limit. Continue from the "
             "current state of the worktree (check `git status` and `git diff`); do not start over.\n\n" + prompt)
-        attempted = True
+        prior_attempt, attempted = attempted, True
         code, kind, until = run_account(name, handle, base, text, args.cwd, now,
                                         getattr(args, "receipt_file", None))
+        if kind == "held":
+            # Verified metadata put this alias at or below the floor before anything launched:
+            # fail over to the next signed-in alias on the same job (nothing to preserve).
+            attempted = prior_attempt
+            print(f"codex-lane: account {name} at or below the {floor_percent():g}% floor until {iso(until)}; "
+                  "failing over", file=sys.stderr)
+            continue
         if current_login_mode():
             # Preserve the worktree for the harness's existing retry/handoff policy;
             # never rotate accounts or consume reset credits after an exhausted run.
@@ -1174,7 +1261,12 @@ def run_account(name: str, handle, cmd: list[str], prompt: str, cwd, now: float,
                                   or type(row.get("resetsAt")) is not int or row["resetsAt"] <= observed_at
                                   for row in windows.values()):
                 raise ValueError("subscription capacity metadata unavailable")
-            depleted = max((row["resetsAt"] for row in windows.values() if row["usedPercent"] == 100), default=None)
+            # At or below the floor is held like a spent window, before anything launches: the
+            # last 1% is not worth a run that dies mid-change, and nothing ran, so run() fails
+            # over to the next signed-in alias ("held") instead of handing the job off.
+            floor = floor_percent()
+            depleted = max((row["resetsAt"] for row in windows.values() if 100 - row["usedPercent"] <= floor),
+                           default=None)
             if depleted is not None:
                 def bank(st):
                     row = st.setdefault(name, {})
@@ -1182,7 +1274,7 @@ def run_account(name: str, handle, cmd: list[str], prompt: str, cwd, now: float,
                         row.update(exhaustedUntil=depleted, lastKind="limit", lastExit=NO_ACCOUNT_EXIT,
                                    lastRunAt=observed_at, lastError=METADATA_HOLD)
                 update_state(bank)
-                return NO_ACCOUNT_EXIT, "limit", depleted
+                return NO_ACCOUNT_EXIT, "held", depleted
         update_state(lambda st: st.setdefault(name, {}).update(
             lastUsed=now, runs=int(st.get(name, {}).get("runs") or 0) + 1))
         record_lease(receipt_file, name, cwd, now)
@@ -1231,6 +1323,184 @@ def run_account(name: str, handle, cmd: list[str], prompt: str, cwd, now: float,
         handle.close()
 
 
+# ---------------------------------------------------------------- subsidy ledger (burn before reset)
+
+def closed_windows(previous: dict, current: dict, now: float) -> list[dict]:
+    """Windows of `previous` that `current` no longer carries (their reset moved): the last observed
+    remaining percent before the reset is the allowance that window lost. A reset that moved before
+    its time is an early reset (a redeemed banked reset), reported apart from natural ones."""
+    before = (previous or {}).get("usableCapacityRemaining") or {}
+    after = (current or {}).get("usableCapacityRemaining") or {}
+    out = []
+    for key, old in before.items():
+        reset, remaining = (old or {}).get("resetsAt"), (old or {}).get("remainingPercent")
+        if type(reset) not in (int, float) or type(remaining) not in (int, float):
+            continue
+        moved = (after.get(key) or {}).get("resetsAt")
+        # The provider re-reports a window's reset with drift (Gem 2026-11-02: +586 s an hour after
+        # a reset); a move under an hour, or 5% of the window, is the same window.
+        duration_s = 60 * (old.get("windowDurationMins") or 0)
+        if type(moved) in (int, float) and abs(moved - reset) < max(3600, 0.05 * duration_s):
+            continue
+        out.append({"window": key, "windowDurationMins": old.get("windowDurationMins"), "resetsAt": reset,
+                    "lastObservedAt": (previous or {}).get("generatedAt"),
+                    "lastRemainingPercent": remaining,
+                    "usedBeforeResetPercent": max(0, min(100, 100 - remaining)),
+                    "endedBy": "natural-reset" if reset <= now else "early-reset"})
+    return out
+
+
+def window_history_from_events(path: Path) -> dict:
+    """{alias: [closed windows]} replayed from capacity-events.jsonl (backfill and audit)."""
+    history, last = {}, {}
+    try:
+        lines = path.read_text().splitlines()
+    except OSError:
+        return {}
+    for line in lines:
+        try:
+            event = json.loads(line)
+            lease_value = event["lease"]
+            alias = lease_value["account"]
+            at = datetime.fromisoformat(str(event["at"]).replace("Z", "+00:00")).timestamp()
+        except (ValueError, KeyError, TypeError):
+            continue
+        if alias in last:
+            history.setdefault(alias, []).extend(closed_windows(last[alias], lease_value, at))
+        last[alias] = lease_value
+    return history
+
+
+def reset_proposals_path() -> Path:
+    return STATE.parent / "subsidy-reset-proposals.jsonl"
+
+
+def read_reset_proposals() -> list[dict]:
+    try:
+        lines = reset_proposals_path().read_text().splitlines()[-500:]
+    except OSError:
+        return []
+    rows = []
+    for line in lines:
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(row, dict) and row.get("schema") == RESET_PROPOSAL_SCHEMA:
+            rows.append(row)
+    return rows
+
+
+def _iso_epoch(value) -> float | None:
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+def subsidy_ledger(state: dict, now: float, names: list[str]) -> dict:
+    """The live burn ledger for the signed-in aliases: per pool remaining %, reset, banked resets,
+    floor and burn rank; the burn order; whether every pool is at the floor (and the open reset
+    proposal, if one was recorded); and window-use metrics (share used before each reset)."""
+    policy = subsidy_policy()
+    floor = policy["floorPercent"]
+    pools, ranked = [], []
+    for name in names:
+        row = state.get(name) or {}
+        lease_value = row.get("capacityLease") or {}
+        rank = burn_rank(row, now, floor)
+        reset = rank["deadline"] if rank else lease_value.get("nextNaturalResetAt")
+        pools.append({"alias": name, "available": available(name, state, now),
+                      "remainingPercent": rank["remainingPercent"] if rank else None,
+                      "resetsAt": iso(reset) if type(reset) in (int, float) else None,
+                      "bankedResets": (lease_value.get("credits") or {}).get("availableCount"),
+                      "atFloor": bool(rank and rank["atFloor"]),
+                      "burnPercentPerHour": rank["burnPercentPerHour"] if rank else None,
+                      "measured": rank is not None})
+        if rank and not rank["atFloor"]:
+            ranked.append((-rank["burnPercentPerHour"], float(row.get("lastUsed") or 0), name))
+    all_at_floor = bool(pools) and all(p["measured"] and p["atFloor"] for p in pools)
+    proposals = read_reset_proposals()
+    open_id = _proposal_id(pools) if all_at_floor else None
+    current = next((p for p in reversed(proposals) if p.get("id") == open_id), None) if open_id else None
+    week = [p for p in proposals if (_iso_epoch(p.get("at")) or 0) >= now - 7 * 86400]
+    closed = [w for name in names for w in ((state.get(name) or {}).get("windowHistory") or [])]
+    natural = [w["usedBeforeResetPercent"] for w in closed if w.get("endedBy") == "natural-reset"]
+    target = policy["targetUsedPercent"]
+    unledgered = (sorted(set(names) - set(policy["aliases"])) if policy["aliases"] is not None else None)
+    return {
+        "schema": SUBSIDY_LEDGER_SCHEMA, "generatedAt": iso(now),
+        "policy": {"floorPercent": floor, "source": policy["source"], "burnOrder": "use-it-or-lose-it",
+                   "autoRedeemResets": False},
+        "pools": pools,
+        "burnOrder": [name for _, _, name in sorted(ranked)],
+        "allAtFloor": all_at_floor,
+        "resetProposal": current,
+        "unledgeredAliases": unledgered,
+        "metrics": {
+            "windowsClosed": len(natural),
+            "earlyResets": sum(1 for w in closed if w.get("endedBy") == "early-reset"),
+            "windowUsedBeforeResetPercentMean": round(sum(natural) / len(natural), 1) if natural else None,
+            "windowUsedBeforeResetPercentMin": min(natural) if natural else None,
+            "windowsAtOrAboveTarget": (sum(1 for v in natural if v >= target) if natural and target is not None
+                                       else None),
+            "targetPercent": target,
+            "resetProposals7d": len({p.get("id") for p in week}),
+            "costAvoidedUsd": None,
+            "costAvoidedNote": "codex runs record no token usage (launch evidence usage/costUsd stay null), "
+                               "so the API-equivalent cost of subscription work is not computed",
+        },
+    }
+
+
+def _proposal_id(pools: list[dict]) -> str:
+    key = ",".join(sorted(f"{p['alias']}@{p['resetsAt']}" for p in pools))
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"jovie:subsidy-reset:{key}"))
+
+
+def propose_reset_if_all_at_floor(now: float) -> dict | None:
+    """When every configured alias is measured at or below the floor, record ONE reset proposal
+    (a founder card for Summer) with the numbers, instead of redeeming anything. Idempotent per
+    situation: the same aliases and reset times never produce a second card."""
+    if not subscription_pool_mode():
+        return None
+    names = list(subscription_profiles())
+    ledger = subsidy_ledger(read_state(), now, names)
+    if not ledger["allAtFloor"]:
+        return None
+    if ledger["resetProposal"]:
+        return ledger["resetProposal"]
+    pools = ledger["pools"]
+    floor = ledger["policy"]["floorPercent"]
+    with_banks = [p for p in pools if type(p["bankedResets"]) is int and p["bankedResets"] > 0]
+    # A redeemed reset is worth the time until that alias would reset anyway: redeem where it is longest.
+    pick_row = max(with_banks, key=lambda p: p["resetsAt"] or "", default=None)
+    earliest = min((p["resetsAt"] for p in pools if p["resetsAt"]), default=None)
+    numbers = "; ".join(f"{p['alias']} {p['remainingPercent']:g}% left, resets {p['resetsAt']}, "
+                        f"{p['bankedResets'] if p['bankedResets'] is not None else 'unknown'} banked"
+                        for p in pools)
+    card = {"schema": RESET_PROPOSAL_SCHEMA, "kind": "subsidy-reset-proposal", "id": _proposal_id(pools),
+            "at": iso(now), "provider": "openai-codex",
+            "title": f"All {len(pools)} Codex subscriptions are at or below {floor:g}%: redeem one banked reset?",
+            "body": (f"{numbers}. Codex takes no new work until a window resets. "
+                     + (f"Recommend redeeming one banked reset on {pick_row['alias']} (latest natural reset, "
+                        f"{pick_row['resetsAt']})." if pick_row else "No banked reset is available.")),
+            "recommendation": ({"alias": pick_row["alias"], "action": "redeem-one-banked-reset"} if pick_row else None),
+            "pools": [{k: p[k] for k in ("alias", "remainingPercent", "resetsAt", "bankedResets")} for p in pools],
+            "default": f"hold: nothing is redeemed; Codex resumes at the earliest natural reset ({earliest})",
+            "deadlineAt": earliest, "channels": ["summer", "ovie-card"], "neverBuy": True, "autoRedeem": False}
+    path = reset_proposals_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path.with_suffix(".lock"), "w") as guard:
+        fcntl.flock(guard, fcntl.LOCK_EX)
+        recorded = next((p for p in read_reset_proposals() if p.get("id") == card["id"]), None)
+        if recorded:
+            return recorded
+        with open(path, "a") as stream:
+            stream.write(json.dumps(card, sort_keys=True) + "\n")
+    return card
+
+
 def status(now: float | None = None, names: list[str] | None = None, state: dict | None = None) -> dict:
     now = time.time() if now is None else now
     state = read_state() if state is None else state
@@ -1258,9 +1528,13 @@ def status(now: float | None = None, names: list[str] | None = None, state: dict
             "bankedResetCount": credit_count,
             "capacityLease": capacity_lease or None,
         }
+        rank = burn_rank(entry, now)
+        rows[name].update(atFloor=bool(rank and rank["atFloor"]),
+                          floorUntil=iso(rank["deadline"]) if rank and rank["atFloor"] else None)
     banked = [n for n, r in rows.items() if r["available"] and not r["leased"]]
     return {"generatedAt": iso(now),
-            "accounts": rows, "available": banked, "count": len(rows), "ledger": state.get("_ledger")}
+            "accounts": rows, "available": banked, "count": len(rows), "ledger": state.get("_ledger"),
+            "subsidyLedger": subsidy_ledger(state, now, list(names))}
 
 
 def _free_slots(name: str) -> int:
@@ -1292,6 +1566,9 @@ def main(argv=None) -> int:
     go.add_argument("--reasoning-effort", choices=("low", "medium", "high", "xhigh"))
     sub.add_parser("status")
     sub.add_parser("health")
+    ledger_cmd = sub.add_parser("ledger", help="burn ledger: pools, burn order, floor, reset proposal, window use")
+    ledger_cmd.add_argument("--events", action="store_true",
+                            help="also replay capacity-events.jsonl into closed windows (audit/backfill)")
     refresh = sub.add_parser("reconcile")
     refresh.add_argument("--if-due", type=int, default=LEDGER_CADENCE_S)
     receipt = sub.add_parser("install-receipt")
@@ -1302,6 +1579,15 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     if args.command == "run":
         return run(args)
+    if args.command == "ledger":
+        now = time.time()
+        names = list(subscription_profiles()) if subscription_pool_mode() else accounts()
+        report = subsidy_ledger(read_state(), now, names)
+        if args.events:
+            history = window_history_from_events(STATE.parent / "capacity-events.jsonl")
+            report["eventWindows"] = {name: history.get(name, []) for name in names}
+        print(json.dumps(report, indent=1, sort_keys=True))
+        return 0
     if args.command == "reconcile":
         print(json.dumps(reconcile(if_due=args.if_due), sort_keys=True))
         return 0

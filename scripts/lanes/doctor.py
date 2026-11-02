@@ -1020,10 +1020,13 @@ def codex_attribution(report: dict, now: float) -> dict:
         counts["unleasedAvailable"] += (free if type(free) is int and free >= 0 else int(not row["leased"])) \
             if row["available"] else 0
         if not row["available"]:
-            until = age_s(row.get("exhaustedUntil"), now)
+            # An account at or below the subsidy floor (codex_lane burn policy) is spent for new
+            # work until its window resets, like a recorded usage-limit hold.
+            floor_only = row.get("atFloor") is True and not row.get("exhaustedUntil")
+            until = age_s(row.get("floorUntil") if floor_only else row.get("exhaustedUntil"), now)
             if until is None or until >= 0:
                 return unknown
-            kind = row.get("lastKind")
+            kind = "limit" if floor_only else row.get("lastKind")
             if kind is not None and not isinstance(kind, str):
                 return unknown
             key = {"limit": "quotaBanked", "auth": "authCooldown", "rate": "rateCooldown"}.get(kind, "unknownCooldown")
@@ -2067,6 +2070,9 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "gateWaitMaxS24h": obs.get("gateWaitMaxS24h"),
             "codexAvailable": account_state.get("unleasedAvailable"),
             "codexAttribution": account_state,
+            # Burn-before-reset ledger (codex_lane.subsidy_ledger): per-pool remaining %, reset,
+            # banked resets, burn order, the open reset proposal card and window-use metrics.
+            "subsidyLedger": (obs.get("codex") or {}).get("subsidyLedger"),
             "alerts": alerts, "conditions": conditions or {},
             "delivery": obs.get("delivery"),
             "diskFreePct": obs.get("diskFreePct"), "githubRemaining": obs.get("githubRemaining"),
