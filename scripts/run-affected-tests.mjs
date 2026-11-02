@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import {
   DELIVERY_CONTROLLER_COVERAGE_ARGS,
   LANES_PYTEST_FILES,
+  SCRIPT_CONTRACT_NODE_TESTS,
   SCRIPT_CONTRACT_VITEST_TESTS,
   STRUCTURAL_PYTEST_FILES,
   STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
@@ -1293,6 +1294,24 @@ const DAILY_WORKFLOW_PYTHON_TESTS = [
   'scripts/tests/test_agent_workflow_hygiene.py',
 ];
 
+const SELECTOR_SPARSE_DISCOVERY_INPUTS = new Set([
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  '.github/workflows/rolling-ci-dispatch.yml',
+]);
+const SELECTOR_SPARSE_DISCOVERY_SCRIPT_TESTS = [
+  ...AFFECTED_TEST_SELECTOR_TESTS,
+  'scripts/lib/__tests__/sparse-checkout-import-closure.test.mjs',
+  'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
+  'scripts/lib/__tests__/rolling-ci-handoff.test.mjs',
+  'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+  'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
+];
+const SELECTOR_SPARSE_DISCOVERY_NODE_TEST =
+  'scripts/lib/__tests__/web-source-read-tests.test.mjs';
+
 export function buildAffectedTestPlan(changedFiles, options) {
   const files = unique(changedFiles.filter(Boolean));
   const plan = planAffectedTests(files, options);
@@ -1412,6 +1431,8 @@ function planAffectedTests(
     lanePytestFiles = LANES_PYTEST_FILES,
     structuralPytestFiles = STRUCTURAL_PYTEST_FILES,
     scriptContractVitestTests = SCRIPT_CONTRACT_VITEST_TESTS,
+    scriptContractNodeTests = SCRIPT_CONTRACT_NODE_TESTS,
+    controlScriptTests = CI_CONTROL_SCRIPT_TESTS,
   } = {}
 ) {
   const files = unique(changedFiles.filter(Boolean)).sort();
@@ -1468,6 +1489,54 @@ function planAffectedTests(
       pythonUnittestTests: [],
       nodeTests: [],
       scriptVitestTests: qualificationTests,
+    };
+  }
+  if (
+    files.includes('.github/workflows/rolling-ci-dispatch.yml') &&
+    files.includes('scripts/run-affected-tests.mjs') &&
+    files.every(file => SELECTOR_SPARSE_DISCOVERY_INPUTS.has(file)) &&
+    files.length !== SELECTOR_SPARSE_DISCOVERY_INPUTS.size
+  ) {
+    return fullSuitePlan(
+      'selector sparse discovery requires its complete source/test pair'
+    );
+  }
+  if (
+    files.length === SELECTOR_SPARSE_DISCOVERY_INPUTS.size &&
+    files.every(file => SELECTOR_SPARSE_DISCOVERY_INPUTS.has(file))
+  ) {
+    const selectedTests = unique([
+      ...selectSourceReadTests(files, { root: REPO_ROOT }),
+      'apps/web/tests/unit/ci/playwright-artifact-secrets.test.ts',
+    ]);
+    if (
+      ![
+        ...selectedTests,
+        ...SELECTOR_SPARSE_DISCOVERY_SCRIPT_TESTS,
+        SELECTOR_SPARSE_DISCOVERY_NODE_TEST,
+        'scripts/lib/web-source-read-tests.mjs',
+      ].every(isFileAvailable) ||
+      !SELECTOR_SPARSE_DISCOVERY_SCRIPT_TESTS.every(
+        test =>
+          scriptContractVitestTests.includes(test) ||
+          controlScriptTests.includes(test)
+      ) ||
+      !scriptContractNodeTests.includes(SELECTOR_SPARSE_DISCOVERY_NODE_TEST)
+    ) {
+      return fullSuitePlan(
+        'selector sparse discovery behavior or CI inventory proof is unavailable'
+      );
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests,
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      nodeTests: [SELECTOR_SPARSE_DISCOVERY_NODE_TEST],
+      scriptVitestTests: SELECTOR_SPARSE_DISCOVERY_SCRIPT_TESTS,
     };
   }
   const dailySelectorInputs = files.filter(file =>

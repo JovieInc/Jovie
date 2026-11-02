@@ -69,6 +69,7 @@ jobs:
             scripts/lib/git-base-ref.mjs
             scripts/lib/trusted-test-planner-snapshot.mjs
             scripts/lib/test-planner-contract-tests.mjs
+            scripts/lib/web-source-read-tests.mjs
             scripts/ci-fast-lanes.mjs
             scripts/design-conformance-paths.mjs
             scripts/lib/ci-repo-lanes.mjs
@@ -567,6 +568,7 @@ jobs:
             scripts/lib/git-base-ref.mjs
             scripts/lib/trusted-test-planner-snapshot.mjs
             scripts/lib/test-planner-contract-tests.mjs
+            scripts/lib/web-source-read-tests.mjs
             scripts/ci-fast-lanes.mjs
             scripts/design-conformance-paths.mjs
             scripts/lib/ci-repo-lanes.mjs
@@ -871,6 +873,7 @@ jobs:
             scripts/lib/git-base-ref.mjs
             scripts/lib/trusted-test-planner-snapshot.mjs
             scripts/lib/test-planner-contract-tests.mjs
+            scripts/lib/web-source-read-tests.mjs
             scripts/version-fanout-guard.mjs
           sparse-checkout-cone-mode: false
       - name: Setup Node.js for trusted policy
@@ -990,6 +993,7 @@ jobs:
             scripts/lib/git-base-ref.mjs
             scripts/lib/trusted-test-planner-snapshot.mjs
             scripts/lib/test-planner-contract-tests.mjs
+            scripts/lib/web-source-read-tests.mjs
             scripts/ci-fast-lanes.mjs
             scripts/design-conformance-paths.mjs
             scripts/lib/ci-repo-lanes.mjs

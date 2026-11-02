@@ -4903,3 +4903,55 @@ describe('daily workflow qualification closure', () => {
     ).toBe('selected');
   });
 });
+
+describe('selector sparse discovery companion', () => {
+  const inputs = [
+    'scripts/run-affected-tests.mjs',
+    'scripts/lib/__tests__/automation-verify.test.mjs',
+    '.github/workflows/rolling-ci-dispatch.yml',
+  ];
+  it('selects actual rolling behavior, sparse import closure and matching web contracts', () => {
+    const plan = buildAffectedTestPlan(inputs);
+    expect(plan.mode).toBe('selected');
+    expect(plan.scriptVitestTests).toEqual(
+      expect.arrayContaining([
+        'scripts/lib/__tests__/sparse-checkout-import-closure.test.mjs',
+        'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
+        'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
+      ])
+    );
+    expect(plan.selectedTests).toContain(
+      'apps/web/tests/unit/ci/playwright-artifact-secrets.test.ts'
+    );
+    expect(plan.nodeTests).toEqual([
+      'scripts/lib/__tests__/web-source-read-tests.test.mjs',
+    ]);
+    expect(buildSelectedTestCommands(plan, '1').length).toBeGreaterThan(0);
+  });
+  it.each([
+    'scripts/lib/web-source-read-tests.mjs',
+    'scripts/lib/__tests__/sparse-checkout-import-closure.test.mjs',
+    'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
+  ])('retains full fallback without required proof %s', missing => {
+    expect(
+      buildAffectedTestPlan(inputs, {
+        isFileAvailable: file => file !== missing,
+      }).mode
+    ).toBe('full');
+  });
+  it.each([
+    { scriptContractVitestTests: [] },
+    { scriptContractNodeTests: [] },
+    { controlScriptTests: [] },
+  ])('retains full fallback without CI test registration %j', options => {
+    expect(buildAffectedTestPlan(inputs, options).mode).toBe('full');
+  });
+  it.each([
+    { files: [inputs[0], inputs[2]] },
+    { files: [...inputs, 'apps/web/lib/unknown.ts'] },
+    { files: [...inputs, '.github/workflows/production-release.yml'] },
+    { files: [...inputs, 'scripts/unknown.py'] },
+  ])('keeps incomplete and unknown peers full %#', ({ files }) => {
+    expect(buildAffectedTestPlan(files).mode).toBe('full');
+  });
+});
