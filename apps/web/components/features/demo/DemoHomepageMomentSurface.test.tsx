@@ -55,6 +55,20 @@ describe('DemoHomepageMomentSurface', () => {
     expect(screen.getAllByText(HOMEPAGE_MOMENT_RELEASE.title).length).toBe(1);
   });
 
+  it.each(['capture', 'list', 'catalog'] as const)(
+    'renders the real %s moment selected by its capture route',
+    async moment => {
+      query.value = `moment=${moment}`;
+      render(<DemoHomepageMomentSurface />);
+      expect(
+        await screen.findByTestId(`homepage-moment-${moment}`)
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('homepage-moment-smart-link')
+      ).not.toBeInTheDocument();
+    }
+  );
+
   it('declares every moment the product shots capture', () => {
     expect(HOMEPAGE_MOMENT_IDS).toEqual([
       'smart-link',
