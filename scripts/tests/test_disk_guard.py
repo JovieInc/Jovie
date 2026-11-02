@@ -914,7 +914,11 @@ class LanesMountsTest(unittest.TestCase):
             state = Path(tmp)
             (state / "worktrees").mkdir()
             readings = {str(state): 22.6, str(state / "worktrees"): 0.0}
-            with patch.object(guard, "lanes_mounts", return_value=[state, state / "worktrees"]), \
+            # This fixture owns only its two mounts. The host may still contain
+            # retired Symphony checkouts; do not enumerate those while checking
+            # admission for a synthetic disk reading.
+            with patch.object(guard, "retired_workspace_roots", return_value=[state / "retired"]), \
+                    patch.object(guard, "lanes_mounts", return_value=[state, state / "worktrees"]), \
                     patch.object(guard, "free_pct", side_effect=lambda path: readings[str(path)]):
                 pct, rows = guard.lanes_free(state)
                 report = guard.check(SimpleNamespace(state=state, repo=state), run=ok)

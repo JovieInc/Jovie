@@ -89,6 +89,9 @@ class Isolated(unittest.TestCase):
         self.host_env.start()
         self.addCleanup(self.host_env.stop)
         os.environ.pop("CODEX_LANE_AUTH_MODE", None)
+        # Capacity tests may enter worker() on the real Gem host. Never discover
+        # production repository bindings or reexec into the installed worker.
+        os.environ["LANES_EXECUTION_BACKEND"] = "local-test"
 
     def tearDown(self):
         codex.ACCOUNTS_ROOT, codex.STATE = self.saved
@@ -118,6 +121,22 @@ class IsolatedSetUpHostModeTest(unittest.TestCase):
                 case.tearDown()
                 case.doCleanups()
             self.assertEqual(os.environ.get("CODEX_LANE_AUTH_MODE"), "subscription-pool")
+
+    def test_fixture_disables_live_bindings_even_when_host_is_gem(self):
+        from scripts.lanes import lane_runner as runner
+        with patch.dict(os.environ, {"LANES_EXECUTION_BACKEND": "production"}):
+            case = AccountsTest("test_only_chatgpt_profiles_are_accounts")
+            case.setUp()
+            try:
+                with patch.object(runner, "HOST", "gem"), \
+                        patch.object(runner, "read_json", side_effect=AssertionError("no production policy read")), \
+                        patch.object(runner, "sh", side_effect=AssertionError("no GitHub or worktree command")), \
+                        patch.object(runner.os, "execv", side_effect=AssertionError("no process replacement")):
+                    self.assertEqual(runner.bindings.extra_bindings(runner), [])
+            finally:
+                case.tearDown()
+                case.doCleanups()
+            self.assertEqual(os.environ["LANES_EXECUTION_BACKEND"], "production")
 
     def test_mode_pinned_by_a_subclass_restores_inherited_host_mode_on_cleanup(self):
         class Pinned(Isolated):
@@ -1150,7 +1169,10 @@ class SubscriptionPoolTest(Isolated):
                     patch.object(host, "slots", return_value=5) as provider_cap, \
                     patch.object(host, "intake_slots", return_value=5), \
                     patch.object(runner.autoscale, "host_ceiling", return_value=5) as global_cap, \
-                    patch.object(runner, "worker_with_slot", side_effect=admitted) as work:
+                    patch.object(runner, "worker_with_slot", side_effect=admitted) as work, \
+                    patch.object(runner, "sh", side_effect=AssertionError("no GitHub or worktree command")), \
+                    patch.object(runner.bindings, "_work_one", side_effect=AssertionError("no production binding")), \
+                    patch.object(runner.os, "execv", side_effect=AssertionError("no process replacement")):
                 self.assertEqual(runner.worker(host, "codex"), 0)  # Other providers consume the same ceiling.
                 work.assert_not_called()
                 other.release()
