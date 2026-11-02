@@ -11,6 +11,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { load as loadYaml } from 'js-yaml';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ACQUISITION_CERTIFICATION_COMMAND,
@@ -112,6 +113,30 @@ function jobBlock(jobId, nextJobId) {
     );
   }
   return WORKFLOW.slice(start, end);
+}
+
+/**
+ * @typedef {{run?: string, uses?: string, if?: string | boolean,
+ *   with?: {'go-version'?: string, cache?: boolean}}} ActionlintWorkflowStep
+ * @typedef {{jobs: Record<string, {steps?: ActionlintWorkflowStep[]}>}} ActionlintWorkflow
+ */
+function assertActionlintCompiler(steps) {
+  const lintIndex = steps.findIndex(step =>
+    step.run?.includes('bash .github/scripts/run-actionlint.sh')
+  );
+  expect(lintIndex, 'actionlint caller must exist').toBeGreaterThanOrEqual(0);
+  const setup = steps
+    .slice(0, lintIndex)
+    .filter(step => step.uses?.startsWith('actions/setup-go@'));
+  expect(setup, 'compiler setup must precede actionlint').toHaveLength(1);
+  expect(setup[0].uses).toBe(
+    'actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e'
+  );
+  expect(setup[0].with).toMatchObject({
+    'go-version': '1.26.10',
+    cache: false,
+  });
+  expect(setup[0].if).toBe(steps[lintIndex].if);
 }
 
 describe('ci-fast bounded parallel workflow', () => {
@@ -418,7 +443,8 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(34);
+    expect(LANES_PYTEST_FILES).toHaveLength(35);
+    expect(whole).toContain('scripts/tests/test_board_intake.py');
     expect(whole).toContain('scripts/tests/test_priority_admission.py');
     expect(STRUCTURAL_PYTHON_REGRESSION_COMMANDS.join(' ')).toContain(
       'priority_admission.py" --fail-under=80'
@@ -2606,10 +2632,11 @@ describe('ci-fast bounded parallel workflow', () => {
     }
   });
 
-  it('runs actionlint from checksum-pinned binaries instead of a Docker action', () => {
+  it('runs the verified upstream actionlint fix without Docker rebuilds', () => {
     // A Docker action's image is built at job start even when its step is
     // skipped (~30s on the merge-queue critical path). The script pins the
-    // exact toolchain the image shipped and must fail closed on any drift.
+    // shellcheck/pyflakes versions the image shipped, plus actionlint's
+    // exact upstream stdin fix, must fail closed on any verification drift.
     const script = readFileSync(
       resolve(REPO_ROOT, '.github/scripts/run-actionlint.sh'),
       'utf8'
@@ -2627,13 +2654,22 @@ describe('ci-fast bounded parallel workflow', () => {
     ).toContain('run: bash .github/scripts/run-actionlint.sh');
 
     expect(script).toMatch(/^set -euo pipefail$/m);
-    expect(script).toContain("readonly ACTIONLINT_VERSION='1.7.12'");
+    expect(script).toContain(
+      "readonly ACTIONLINT_VERSION='1.7.12+fd33e9f582a0'"
+    );
+    expect(script).toContain(
+      "readonly ACTIONLINT_COMMIT='fd33e9f582a01a02885c93ae3775e1190cf63653'"
+    );
+    expect(script).toContain('GOTOOLCHAIN=local GOWORK=off');
+    expect(script).toContain('-mod=readonly');
+    expect(script).toContain('^TestProcessConcurrentStdinDoesNotDeadlock$');
+    expect(script).toContain('upstream stdin regression did not cover the fix');
     expect(script).toContain("readonly SHELLCHECK_VERSION='0.11.0'");
     expect(script).toContain("readonly PYFLAKES_VERSION='3.4.0'");
     // Release-download 5xx bursts outlast a 3-retry window (10-12 ejection).
     expect(script).toMatch(/--retry 6 --retry-all-errors --max-time 120/);
     for (const name of [
-      'ACTIONLINT_SHA256',
+      'ACTIONLINT_SOURCE_SHA256',
       'SHELLCHECK_TARBALL_SHA256',
       'SHELLCHECK_BINARY_SHA256',
       'PYFLAKES_WHEEL_SHA256',
@@ -2646,6 +2682,60 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(script).toContain('--fail');
     expect(script).toContain('-shellcheck="$tool_dir/shellcheck"');
     expect(script).toContain('-pyflakes="$tool_dir/pyflakes"');
+  });
+
+  it('provisions a verified compiler before every actual actionlint caller', () => {
+    const workflowsDir = resolve(REPO_ROOT, '.github/workflows');
+    const callers = [];
+    for (const file of readdirSync(workflowsDir)) {
+      if (!/\.ya?ml$/.test(file)) continue;
+      const source = readFileSync(join(workflowsDir, file), 'utf8');
+      if (!source.includes('bash .github/scripts/run-actionlint.sh')) continue;
+      const workflow = /** @type {ActionlintWorkflow} */ (loadYaml(source));
+      for (const [jobId, job] of Object.entries(workflow.jobs)) {
+        if (
+          !job.steps?.some(step =>
+            step.run?.includes('bash .github/scripts/run-actionlint.sh')
+          )
+        ) {
+          continue;
+        }
+        assertActionlintCompiler(job.steps);
+        callers.push(`${file}:${jobId}`);
+      }
+    }
+    expect(callers.sort()).toEqual([
+      'actionlint.yml:actionlint',
+      'ci.yml:ci-fast-remaining',
+      'source-validation.yml:deterministic',
+    ]);
+  });
+
+  it.each([
+    'missing setup',
+    'setup after lint',
+    'wrong action pin',
+    'wrong compiler version',
+    'implicit dependency cache',
+    'different condition',
+  ])('rejects an actionlint compiler prerequisite with %s', fault => {
+    const workflow = /** @type {ActionlintWorkflow} */ (loadYaml(WORKFLOW));
+    const steps = structuredClone(workflow.jobs['ci-fast-remaining'].steps);
+    const setupIndex = steps.findIndex(step =>
+      step.uses?.startsWith('actions/setup-go@')
+    );
+    const setup = steps[setupIndex];
+    if (fault === 'missing setup') steps.splice(setupIndex, 1);
+    if (fault === 'setup after lint') {
+      steps.splice(setupIndex, 1);
+      steps.push(setup);
+    }
+    if (fault === 'wrong action pin') setup.uses = 'actions/setup-go@main';
+    if (fault === 'wrong compiler version')
+      setup.with['go-version'] = '1.24.13';
+    if (fault === 'implicit dependency cache') delete setup.with.cache;
+    if (fault === 'different condition') setup.if = 'false';
+    expect(() => assertActionlintCompiler(steps)).toThrow();
   });
 
   it('keeps structural setup out of typecheck and fails closed in the aggregate', () => {
@@ -2662,7 +2752,7 @@ describe('ci-fast bounded parallel workflow', () => {
     // actionlint reads only checked-out workflows, so it runs unconditionally
     // in the idle wait for the background base-branch fetch.
     expect(remaining).toMatch(
-      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+with:\n\s+reuse_merge_group_workspace: 'true'\n(?:\s+#.*\n)+\s+- name: Run actionlint\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n\s+- name: Fetch base-branch history\n/
+      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+with:\n\s+reuse_merge_group_workspace: 'true'\n(?:\s+#.*\n)+\s+- name: Set up Go for source-pinned actionlint\n\s+uses: actions\/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7\.0\.0\n\s+with:\n\s+go-version: '1\.26\.10'\n\s+cache: false\n\s+- name: Run actionlint\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n\s+- name: Fetch base-branch history\n/
     );
     expect(remaining.match(/run-actionlint\.sh/g)).toHaveLength(1);
     expect(remaining).toMatch(/actions\/setup-python/);
