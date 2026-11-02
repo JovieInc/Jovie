@@ -129,14 +129,11 @@ export async function pollSource(
         ? (await sha256Hex(`${src.id}|${seed}`)).slice(0, 24)
         : await itemId(src.id, it.url);
       const r = await env.DB.prepare(
-        'INSERT OR IGNORE INTO items (id, source, title, url, published_at, first_seen_at) VALUES (?,?,?,?,?,?)'
+        'INSERT OR IGNORE INTO items (id, source, title, url, published_at, first_seen_at, excerpt) VALUES (?,?,?,?,?,?,?)'
       )
-        .bind(id, src.id, it.title, it.url, it.publishedAt, iso)
+        .bind(id, src.id, it.title, it.url, it.publishedAt, iso, it.excerpt)
         .run();
-      if (r.meta.changes) {
-        added++;
-        pendingExcerpts.set(id, it.excerpt);
-      }
+      if (r.meta.changes) added++;
     }
     await upsertState(
       env,
@@ -164,9 +161,6 @@ export async function pollSource(
     return { source: src.id, status, added: 0, error };
   }
 }
-
-// Excerpts live only for the duration of one scheduled run.
-const pendingExcerpts = new Map<string, string>();
 
 async function upsertState(
   env: Env,
@@ -207,11 +201,16 @@ export async function triagePending(
 ): Promise<number> {
   const cutoff = new Date(now.getTime() - MAX_AGE_DAYS * 864e5).toISOString();
   const { results } = await env.DB.prepare(
-    `SELECT id, source, title FROM items WHERE triaged_at IS NULL
+    `SELECT id, source, title, excerpt FROM items WHERE triaged_at IS NULL
        AND COALESCE(published_at, first_seen_at) >= ? ORDER BY COALESCE(published_at, first_seen_at) DESC LIMIT ?`
   )
     .bind(cutoff, TRIAGE_PER_RUN)
-    .all<{ id: string; source: string; title: string }>();
+    .all<{
+      id: string;
+      source: string;
+      title: string;
+      excerpt: string | null;
+    }>();
   let done = 0;
   for (const row of results) {
     try {
@@ -219,7 +218,7 @@ export async function triagePending(
         {
           source: row.source,
           title: row.title,
-          excerpt: pendingExcerpts.get(row.id) ?? '',
+          excerpt: row.excerpt ?? '',
         },
         sources.context
       );
@@ -230,7 +229,7 @@ export async function triagePending(
       const t = parseTriage(out?.response ?? out);
       if (!t) continue;
       await env.DB.prepare(
-        `UPDATE items SET summary=?, relevance=?, surfaces=?, kind=?, adoptable_now=?, cost_saving=?, why=?, triaged_at=? WHERE id=?`
+        `UPDATE items SET summary=?, relevance=?, surfaces=?, kind=?, adoptable_now=?, cost_saving=?, why=?, triaged_at=?, excerpt=NULL WHERE id=?`
       )
         .bind(
           t.summary,

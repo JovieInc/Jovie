@@ -6,7 +6,7 @@ export interface ParsedItem {
   title: string;
   url: string;
   publishedAt: string | null;
-  excerpt: string; // triage input only, never persisted
+  excerpt: string; // triage input only: held in D1 until triaged, then cleared
   idSeed?: string; // page-watch: identity is the content fingerprint
 }
 

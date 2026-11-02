@@ -191,15 +191,22 @@ async function main() {
       entry.evidence = toObservation(item, research);
     else entry.linear = linearPayload(item, decision);
     out.push(entry);
-    if (mark) {
-      await fetch(`${base}/items/${item.id}/routed`, {
+  }
+  // Emit the routing decisions first: an item is marked routed only after its
+  // decision is out, so a network failure while marking never loses an item
+  // (it is re-emitted next run, at-least-once).
+  process.stdout.write(`${JSON.stringify(out, null, 2)}\n`);
+  if (mark) {
+    for (const entry of out) {
+      const res = await fetch(`${base}/items/${entry.id}/routed`, {
         method: 'POST',
         headers: { ...headers, 'content-type': 'application/json' },
-        body: JSON.stringify({ to: decision.destination }),
+        body: JSON.stringify({ to: entry.destination }),
       });
+      if (!res.ok)
+        throw new Error(`mark routed failed for ${entry.id}: ${res.status}`);
     }
   }
-  process.stdout.write(`${JSON.stringify(out, null, 2)}\n`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

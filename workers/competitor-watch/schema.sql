@@ -15,7 +15,8 @@ CREATE TABLE IF NOT EXISTS items (
   triaged_at TEXT,
   route_status TEXT NOT NULL DEFAULT 'new',
   routed_to TEXT,
-  routed_at TEXT
+  routed_at TEXT,
+  excerpt TEXT -- triage input only; held until triaged, then cleared
 );
 CREATE INDEX IF NOT EXISTS items_seen ON items (first_seen_at DESC);
 CREATE INDEX IF NOT EXISTS items_untriaged ON items (triaged_at) WHERE triaged_at IS NULL;
