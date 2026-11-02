@@ -3,13 +3,29 @@ import { createHash, randomUUID } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+const RUNTIME_ENV_KEYS = new Set([
+  'HOME',
+  'PATH',
+  'USER',
+  'LOGNAME',
+  'SHELL',
+  'LANG',
+  'LC_ALL',
+  'LC_CTYPE',
+  'TERM',
+  'TMPDIR',
+  'TMP',
+  'TEMP',
+  'SSH_AUTH_SOCK',
+  'CODEX_HOME',
+  'XDG_CONFIG_HOME',
+  'XDG_CACHE_HOME',
+  'XDG_DATA_HOME',
+]);
+
 export function runtimeEnvironment(env = process.env) {
   return Object.fromEntries(
-    Object.entries(env).filter(
-      ([key]) =>
-        !/^(MESH_|DOPPLER_)/.test(key) &&
-        !/(?:TOKEN|SECRET|(?:^|_)KEY(?:_|$))/.test(key)
-    )
+    Object.entries(env).filter(([key]) => RUNTIME_ENV_KEYS.has(key))
   );
 }
 

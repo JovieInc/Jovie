@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
@@ -276,4 +282,56 @@ test('startup caps failures recover through the existing loop before mailbox con
   assert.equal(urls.length, 4);
   assert.ok(urls.slice(0, 3).every(url => url.endsWith('/v1/board/caps')));
   assert.ok(urls[3].includes('/v1/mailbox'));
+});
+
+test('uncertain runtime outcome holds redelivery without another dispatch', async () => {
+  let executions = 0;
+  const execute = async () => {
+    executions++;
+    throw Error('uncertain SSH completion');
+  };
+  await assert.rejects(
+    worker.handle(message('claude:unknown'), execute),
+    /uncertain SSH/
+  );
+  await assert.rejects(
+    worker.handle(message('claude:unknown'), execute),
+    /runtime outcome unknown/
+  );
+  assert.equal(executions, 1);
+});
+
+test('durable started state precedes dispatch and completion atomically replaces it', async () => {
+  const calls = [];
+  responses([{ ok: true }], calls);
+  const id = 'claude:checkpoint';
+  const path = join(
+    state,
+    `reply-${createHash('sha256').update(id).digest('hex')}.json`
+  );
+  await worker.handle(message(id), async () => {
+    const saved = JSON.parse(readFileSync(path, 'utf8'));
+    assert.equal(saved.status, 'runtime_started');
+    assert.equal(saved.messageId, id);
+    return { code: 0, text: 'completed real output' };
+  });
+  const saved = JSON.parse(readFileSync(path, 'utf8'));
+  assert.equal(saved.status, 'reply');
+  assert.equal(saved.text, 'completed real output');
+  assert.equal(existsSync(path + '.tmp'), false);
+});
+
+test('completed legacy reply survives upgrade without dispatch', async () => {
+  const id = 'claude:legacy-reply';
+  const path = join(
+    state,
+    `reply-${createHash('sha256').update(id).digest('hex')}.txt`
+  );
+  writeFileSync(path, 'already generated');
+  const calls = [];
+  responses([{ ok: true }], calls);
+  await worker.handle(message(id), () => {
+    throw Error('must not dispatch');
+  });
+  assert.equal(calls[0].body.body, 'already generated');
 });
