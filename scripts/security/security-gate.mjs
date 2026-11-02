@@ -62,15 +62,15 @@ export function gateDecision(input) {
     };
   }
   const blocking = input.blocking ?? [];
-  if (!input.enabled) return { status: 'report-only', blocking, exitCode: 0 };
   if (input.unavailable) {
     return {
-      status: 'fail',
+      status: input.enabled ? 'fail' : 'report-only',
       reason: 'linear_unavailable',
       blocking,
-      exitCode: 1,
+      exitCode: input.enabled ? 1 : 0,
     };
   }
+  if (!input.enabled) return { status: 'report-only', blocking, exitCode: 0 };
   if (blocking.length > 0) return { status: 'fail', blocking, exitCode: 1 };
   return { status: 'pass', blocking, exitCode: 0 };
 }
@@ -118,8 +118,21 @@ async function linearIssues(apiKey, fetchImpl) {
     const body = await response.json();
     if (body?.errors?.length) throw new Error('linear_unavailable');
     const issues = body?.data?.issues;
-    nodes.push(...(issues?.nodes ?? []));
-    if (!issues?.pageInfo?.hasNextPage) break;
+    if (
+      !Array.isArray(issues?.nodes) ||
+      typeof issues?.pageInfo?.hasNextPage !== 'boolean'
+    ) {
+      throw new Error('linear_unavailable');
+    }
+    nodes.push(...issues.nodes);
+    if (!issues.pageInfo.hasNextPage) break;
+    if (
+      page === 4 ||
+      !issues.pageInfo.endCursor ||
+      issues.pageInfo.endCursor === cursor
+    ) {
+      throw new Error('linear_unavailable');
+    }
     cursor = issues.pageInfo.endCursor;
   }
   return nodes.map(node => ({
