@@ -1061,6 +1061,8 @@ export function ShellReleasesView({
         setAmPaletteOpen={setAmPaletteOpen}
         spotifySearchOpen={spotifySearchOpen}
         setSpotifySearchOpen={setSpotifySearchOpen}
+        spotifyConnected={isConnected}
+        spotifyArtistName={artistName}
         onAppleMusicConnect={handleAppleMusicConnect}
         onSpotifyConnected={handleArtistConnected}
         onSpotifyImportStart={handleImportStart}
