@@ -1,0 +1,79 @@
+{
+  "schema": "company.public-app-cert/v1",
+  "app": "should-i-make",
+  "stage": "dormant",
+  "dataClass": "standard",
+  "policy": "JovieInc/ci canon/PUBLIC-APP-CERTIFICATION.md",
+  "goldenPath": {
+    "stages": [
+      {
+        "id": "entry",
+        "kind": "entry",
+        "surface": "web",
+        "oracle": "TODO: what a first-time visitor must understand on the first screen"
+      },
+      {
+        "id": "signup",
+        "kind": "signup",
+        "surface": "web",
+        "oracle": "TODO: a canary account is created and signed in as itself"
+      },
+      {
+        "id": "onboarding",
+        "kind": "onboarding",
+        "surface": "web",
+        "oracle": "TODO: onboarding completes with the canary's own inputs reflected back"
+      },
+      {
+        "id": "first-value",
+        "kind": "first-value",
+        "surface": "web",
+        "oracle": "TODO: the canary sees the product's core value with its own data"
+      },
+      {
+        "id": "paid-conversion",
+        "kind": "paid-conversion",
+        "surface": "web",
+        "oracle": "TODO: the paywall shows the live price and a test purchase unlocks the paid plan"
+      }
+    ],
+    "flows": { "web": "canon/certification/flows/should-i-make.mjs" },
+    "accounts": {
+      "policy": "canary-only",
+      "source": "TODO: doppler:<project>/<config> keys for canary accounts (never in git)"
+    }
+  },
+  "paidOutcome": {
+    "plan": "TODO",
+    "price": 0,
+    "currency": "USD",
+    "interval": "month",
+    "priceSource": "TODO: path of the file holding the live price",
+    "freeAlternative": "TODO: what the buyer does instead of paying"
+  },
+  "buyer": {
+    "personas": "canon/certification/should-i-make-personas.json",
+    "calibration": "canon/certification/should-i-make-calibration.json",
+    "privatePersonaDir": "~/.local/state/should-i-make-buyer-eval/personas"
+  },
+  "privacy": {
+    "profile": "standard",
+    "registry": "canon/certification/should-i-make-tracker-registry.json",
+    "crawl": [{ "url": "TODO: https://<prod>/", "input": false }],
+    "policyUrl": "TODO: https://<prod>/privacy",
+    "counselSignoff": null
+  },
+  "customerVoice": {
+    "channels": [
+      {
+        "id": "support-email",
+        "kind": "email",
+        "route": "TODO: handler that captures inbound support email"
+      }
+    ],
+    "approval": "tim",
+    "sink": "SUMMER_CUSTOMER_VOICE_URL"
+  },
+  "waste": { "appId": "TODO: id in the waste registry" },
+  "capacity": { "appId": "TODO: id in the capacity collector" }
+}

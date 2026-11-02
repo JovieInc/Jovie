@@ -59,6 +59,13 @@
       "tables": ["creatorProfiles"]
     },
     {
+      "id": "profile.test-cleanup",
+      "entity": "profile",
+      "module": "apps/web/lib/services/profile/test-profile-unpublish.ts",
+      "exports": ["buildUnpublishTestProfilesQuery"],
+      "tables": ["creatorProfiles"]
+    },
+    {
       "id": "social-links",
       "entity": "link",
       "module": "apps/web/lib/services/social-links/mutations.ts",
@@ -108,6 +115,13 @@
       "module": "apps/web/lib/waitlist/invite-funnel.ts",
       "exports": ["recordInviteOpened", "recordInviteRedeemed"],
       "tables": ["waitlistEntries"]
+    },
+    {
+      "id": "synthetic.admitted-canary",
+      "entity": "admitted production canary fixture",
+      "module": "apps/web/lib/synthetic/admitted-canary.server.ts",
+      "exports": ["reconcileAdmittedCanary", "verifyAdmittedCanaryOwnership"],
+      "tables": ["creatorProfiles", "userProfileClaims"]
     },
     {
       "id": "claim.finalize",
