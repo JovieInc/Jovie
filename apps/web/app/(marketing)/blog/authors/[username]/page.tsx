@@ -7,6 +7,10 @@ import {
   buildBreadcrumbSchema,
   buildPersonSchema,
 } from '@/lib/constants/schemas';
+import {
+  defaultOpenGraphImages,
+  defaultTwitterImages,
+} from '@/lib/seo/default-og-image';
 import type { ProfileData } from '@/lib/services/profile';
 import { getProfileByUsername } from '@/lib/services/profile';
 
@@ -66,6 +70,11 @@ export async function generateMetadata({ params }: AuthorPageProps) {
       description: `Articles by ${authorName} on the Jovie blog.`,
       url: `${BASE_URL}/blog/authors/${username}`,
       type: 'profile' as const,
+      images: defaultOpenGraphImages(`${authorName} on the Jovie blog`),
+    },
+    twitter: {
+      card: 'summary_large_image' as const,
+      images: defaultTwitterImages(),
     },
   };
 }

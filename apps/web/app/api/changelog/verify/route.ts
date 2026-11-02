@@ -47,10 +47,17 @@ function htmlPage(
 </html>`;
 }
 
+// Verification tokens are minted with crypto.randomUUID() and stored in a
+// Postgres uuid column. A malformed token must be answered with the same
+// 400 "Invalid link" card as a missing one; passing it through to the query
+// makes Postgres reject the uuid syntax, which would surface as a 500.
+const UUID_TOKEN_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get('token');
 
-  if (!token) {
+  if (!token || !UUID_TOKEN_PATTERN.test(token)) {
     return new NextResponse(
       htmlPage(
         'Invalid link',

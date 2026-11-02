@@ -122,6 +122,18 @@ function prosePieces(source, file) {
     .map(piece => piece.replace(/\s+/g, ' ').trim())
     .filter(Boolean);
 }
+/** Product names such as plan names are not audience targeting; blank them before matching. */
+export function withoutAllowedPhrases(text, config) {
+  let out = text;
+  for (const entry of config.allowedPhrases ?? []) {
+    const body = escapeRegExp(entry.phrase).replace(/\s+/g, '\\s+');
+    out = out.replace(
+      new RegExp(`(?<![\\p{L}\\p{N}])${body}(?![\\p{L}\\p{N}])`, 'giu'),
+      ' '
+    );
+  }
+  return out;
+}
 export function violationsInSource(source, file, config) {
   const samples = new Map();
   if (isExemptPath(file, config)) return { ids: [], samples };
@@ -131,7 +143,7 @@ export function violationsInSource(source, file, config) {
     if (!shouldScanText(text, config.terms)) continue;
     if (config.lockedHeadline && text === config.lockedHeadline) continue;
     for (const term of matchTerms(
-      text,
+      withoutAllowedPhrases(text, config),
       config.terms,
       config.suppressedPrefixes ?? {}
     )) {

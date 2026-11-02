@@ -25,6 +25,7 @@ jobs:
           sparse-checkout: |
             .github/scripts/resolve-main-sha.sh
             .github/scripts/gh-api-hold.sh
+            .github/scripts/staging-supersession-policy.mjs
           sparse-checkout-cone-mode: false
       - name: Fetch sealed product-lane release receipt
         env: {EXPECTED_SHA: "${{ github.event.workflow_run.head_sha }}", REPOSITORY: "${{ github.repository }}", SOURCE_CI_RUN_ID: "${{ github.event.workflow_run.id }}", SOURCE_CI_RUN_ATTEMPT: "${{ github.event.workflow_run.run_attempt }}", GH_TOKEN: "${{ github.token }}"}
@@ -33,6 +34,7 @@ jobs:
           if [ ! -f "$RUNNER_TEMP/gh-api-hold.sh" ]; then
             cp .github/scripts/gh-api-hold.sh "$RUNNER_TEMP/gh-api-hold.sh"
             cp .github/scripts/resolve-main-sha.sh "$RUNNER_TEMP/resolve-main-sha.sh"
+            cp .github/scripts/staging-supersession-policy.mjs "$RUNNER_TEMP/staging-supersession-policy.mjs"
           fi
           gh_api() { bash "$RUNNER_TEMP/gh-api-hold.sh" api "$@"; }
           mkdir -p "$RUNNER_TEMP/product-lane-release"
@@ -147,9 +149,19 @@ jobs:
             if [ "$current_main" != "$EXPECTED_SHA" ]; then
               relation="$(gh_api "repos/$REPOSITORY/compare/${EXPECTED_SHA}...${current_main}" --jq '.status // empty')"
               [ "$relation" = ahead ] || { echo "::error::Staging carryover main is not on the source lineage."; exit 1; }
-              outcome=superseded
-              jq --arg replacement "$current_main" '.outcome="superseded" | .replacementSha=$replacement' "$RUNNER_TEMP/staging-lineage.json" > "$RUNNER_TEMP/staging-lineage-next.json"
-            else
+              # Anti-starvation (2026-10-29): a finished green generation does
+              # not yield to a newer unfinished one while production is stale.
+              policy="$(GH_API_HOLD_SCRIPT="$RUNNER_TEMP/gh-api-hold.sh" CURRENT_MAIN_SHA="$current_main" node "$RUNNER_TEMP/staging-supersession-policy.mjs")"
+              echo "::notice::Staging supersession $EXPECTED_SHA: $(jq -r '"\(.outcome) replacement=\(.replacementSha // "none") reason=\(.reason)"' <<<"$policy")"
+              if [ "$(jq -r '.outcome' <<<"$policy")" = superseded ]; then
+                outcome=superseded
+                jq --argjson policy "$policy" '.outcome="superseded" | .replacementSha=$policy.replacementSha | .supersession=$policy' "$RUNNER_TEMP/staging-lineage.json" > "$RUNNER_TEMP/staging-lineage-next.json"
+              else
+                jq --argjson policy "$policy" '.supersession=$policy' "$RUNNER_TEMP/staging-lineage.json" > "$RUNNER_TEMP/staging-lineage-with-policy.json"
+                mv "$RUNNER_TEMP/staging-lineage-with-policy.json" "$RUNNER_TEMP/staging-lineage.json"
+              fi
+            fi
+            if [ "$outcome" = not_applicable ]; then
               CANONICAL_STAGING_IDENTITY="$(curl --fail --silent --show-error --max-time 20 https://staging.jov.ie/api/health/build-info)"
               export CANONICAL_STAGING_IDENTITY
               node --input-type=module <<'NODE' > "$RUNNER_TEMP/staging-carryover.json"

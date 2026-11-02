@@ -89,7 +89,6 @@ Please update your payment method to keep your ${planName} features:
 ${billingUrl}
 
 What happens if you don't update:
-- Your profile branding will be restored
 - Advanced analytics will be unavailable
 - Contact export will be disabled
 
@@ -180,7 +179,6 @@ export function getPaymentFailedHtml(data: PaymentFailedTemplateData): string {
         What happens if you don't update:
       </p>
       <ul style="margin: 0; padding-left: 20px; color: #6b7280;">
-        <li>Your profile branding will be restored</li>
         <li>Advanced analytics will be unavailable</li>
         <li>Contact export will be disabled</li>
       </ul>

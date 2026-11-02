@@ -7,7 +7,7 @@ export const revalidate = false;
 
 const title = 'Smart Links';
 const description =
-  'One release link that remembers where each visitor listens. Explore the haptic streaming dial and create a Smart Link on your Jovie profile.';
+  'One release link that opens in the listener’s chosen app, with services sorted by country. Explore the haptic streaming dial and create a Smart Link on your Jovie profile.';
 const url = `${BASE_URL}${APP_ROUTES.SMART_LINKS}`;
 
 export const metadata: Metadata = {

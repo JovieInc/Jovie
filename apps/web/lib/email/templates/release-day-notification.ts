@@ -8,6 +8,10 @@ import { APP_NAME } from '@/constants/app';
 import { BASE_URL } from '@/constants/domains';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
+import {
+  getEmailPostalFooterHtml,
+  getEmailPostalFooterText,
+} from '../legal-footer';
 import { escapeHtml } from '../utils';
 
 export interface ReleaseDayNotificationData {
@@ -100,7 +104,7 @@ Or view all platforms: ${releaseUrl}
 
 ---
 You're getting this because you asked to be notified.
-To unsubscribe, visit: ${buildManageNotificationsUrl(username)}`;
+To unsubscribe, visit: ${buildManageNotificationsUrl(username)}${getEmailPostalFooterText()}`;
 }
 
 /**
@@ -213,6 +217,7 @@ export function getReleaseDayNotificationHtml(
                   Manage notifications
                 </a>
               </p>
+              ${getEmailPostalFooterHtml()}
             </td>
           </tr>
         </table>

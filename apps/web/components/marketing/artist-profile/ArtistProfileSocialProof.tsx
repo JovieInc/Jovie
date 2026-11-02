@@ -15,6 +15,7 @@ interface ArtistProfileSocialProofProps {
 
 interface ArtistProfileReleaseCycleGalleryProps {
   readonly releaseCycle: ArtistProfileLandingCopy['releaseCycle'];
+  readonly id?: string;
 }
 
 const PROFILE_STATES = [
@@ -23,7 +24,7 @@ const PROFILE_STATES = [
     label: 'Before The Drop',
     action: 'Release Alerts',
     image: getMarketingExportImage('tim-white-profile-subscribe-mobile'),
-    alt: 'Tim White artist profile inviting fans to get release updates.',
+    alt: 'Tim White artist profile inviting listeners to get release updates.',
   },
   {
     id: 'tour',
@@ -79,9 +80,11 @@ export function ArtistProfileSocialProof({
 
 export function ArtistProfileReleaseCycleGallery({
   releaseCycle,
+  id,
 }: Readonly<ArtistProfileReleaseCycleGalleryProps>) {
   return (
     <ArtistProfileSectionShell
+      id={id}
       sectionId='product-gallery'
       sectionVariant='release-rail'
       sectionOwner='apps/web/components/marketing/artist-profile/ArtistProfileSocialProof.tsx'

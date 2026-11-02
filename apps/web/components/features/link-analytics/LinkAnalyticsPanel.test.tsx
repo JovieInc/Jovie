@@ -17,6 +17,8 @@ describe('LinkAnalyticsPanel', () => {
     ).toHaveTextContent(numberFormatter.format(1842));
     expect(screen.getByText('Top: Spotify')).toBeVisible();
     expect(screen.getByText('Last Click')).toBeVisible();
+    // Clicks this week must never pair with a months-old last click.
+    expect(screen.queryByText(/\d+\s*mo/i)).toBeNull();
     expect(
       screen.getByText(`${numberFormatter.format(126)} in last 7 days`)
     ).toBeVisible();

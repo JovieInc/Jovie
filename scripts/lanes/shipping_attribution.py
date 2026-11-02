@@ -281,11 +281,15 @@ def attribute_pr(pr: dict, receipts: list[dict], repository: str) -> dict:
 
 
 def project_report(project: dict, evidence: dict, ledger: dict, generated_at: float) -> dict:
+    # Origin emitters use a sparse two-file checkout; only reporting needs the reader.
+    import merge_evidence
+
     repository, instrumented = project["repository"], project["instrumented"]
     window = evidence.get("window") if isinstance(evidence, dict) else None
     complete = isinstance(evidence, dict) and evidence.get("complete") is True
+    observed = merge_evidence.search_observations(evidence, repository)
     rows = [attribute_pr(pr, ledger.get("rows") or [], repository) for pr in evidence.get("prs") or []] \
-        if complete and instrumented else []
+        if (complete or observed) and instrumented else []
     if complete and instrumented:
         by_confidence = Counter(row["origin"]["confidence"] for row in rows)
         by_method = Counter(row["origin"]["method"] for row in rows)
@@ -313,6 +317,9 @@ def project_report(project: dict, evidence: dict, ledger: dict, generated_at: fl
         (evidence.get("reason") if isinstance(evidence, dict) else "merge-window-not-read"),
         "attributionEvidenceComplete": complete and instrumented and ledger.get("complete") is True and ingest_complete,
         "mergeCount": denominator,
+        "observedMergeCount": len(rows) if (complete or observed) and instrumented else None,
+        "populationCoverage": evidence.get("populationCoverage", "unknown") if isinstance(evidence, dict) else "unknown",
+        "providerEnumerationComplete": evidence.get("providerEnumerationComplete") if isinstance(evidence, dict) else None,
         "coverage": coverage,
         "byConfidence": dict(sorted(by_confidence.items())) if complete and instrumented else None,
         "byShippingMethod": dict(sorted(by_method.items())) if complete and instrumented else None,

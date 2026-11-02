@@ -156,7 +156,7 @@ describeProfile('Profile - Core Rendering', () => {
   // JOV-8777: free public profiles render the Jovie footer branding; the
   // paid-tier removal path is the hideJovieBranding opt-out the surfaces honor.
   test('has Jovie footer branding', async ({ page }) => {
-    const footerLink = page.getByRole('link', { name: /Jovie home/i });
+    const footerLink = page.getByRole('link', { name: /Made with Jovie/i });
     await expect(footerLink.first()).toBeVisible({ timeout: 10000 });
   });
 

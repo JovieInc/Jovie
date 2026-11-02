@@ -62,6 +62,21 @@ export function CommandPaletteSurface() {
     if (event.defaultPrevented || event.isComposing || event.keyCode === 229) {
       return;
     }
+    if (
+      (event.metaKey || event.ctrlKey) &&
+      !(event.metaKey && event.ctrlKey) &&
+      !event.altKey &&
+      !event.shiftKey &&
+      (event.key === '1' || event.key === '2' || event.key === '3')
+    ) {
+      const nextIndex = Number(event.key) - 1;
+      if (nextIndex < items.length) {
+        event.preventDefault();
+        // Match CmdKPalette: indexed shortcuts select; Enter commits.
+        setSelectedIndex(nextIndex);
+      }
+      return;
+    }
     if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
       return;
     }

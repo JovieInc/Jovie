@@ -8,7 +8,7 @@ export const PRODUCT_LANES = ['ios', 'mac', 'web'];
 /**
  * Rules whose only Mac-lane effect is the node checks (`@jovie/desktop`
  * typecheck and test). A change selected for Mac solely by these runs the Mac
- * lane on ubuntu; anything else keeps macOS for swift and package:staging.
+ * lane on ubuntu; anything else keeps macOS for swift and the MenuMonitor artifact.
  */
 export const MAC_NODE_ONLY_RULES = Object.freeze(
   new Set(['mac-desktop-node-input'])
@@ -35,9 +35,8 @@ const GATE_RECEIPTS = {
   },
   mac: {
     tests:
-      'swift build --package-path apps/macos/MenuMonitor -c release && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test && pnpm --filter @jovie/desktop run package:staging',
-    artifact:
-      'desktop-staging-<merge-group-head-sha> with MenuMonitor release binary',
+      'swift build --package-path apps/macos/MenuMonitor -c release && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test',
+    artifact: 'MenuMonitor release binary',
     releaseWorkflow: '.github/workflows/desktop-release.yml',
   },
   web: {
@@ -165,7 +164,7 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
   ],
   [
     // Files outside apps/desktop that `@jovie/desktop` test and
-    // package:staging read: prepare-icons runs apps/web's brand generator
+    // Desktop tests read apps/web's brand generator
     // (which reads the iOS AppIcon set), system-b-tokens.test reads the web
     // CSS, url-disposition.test reads the route manifest, and the dogfood
     // inventory must resolve its web sources. A guard test derives the
@@ -176,8 +175,9 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     /^apps\/ios\/Jovie\/Resources\/Assets\.xcassets\/AppIcon\.appiconset\/Contents\.json$/,
   ],
   [
-    // Web files the packaged app is built from (prepare-icons runs the brand
-    // generator): the Mac lane must package, so it needs macOS.
+    // Brand-generator inputs the desktop app is built from. They stay on the
+    // macOS lane with swift and the desktop checks. Node-only web reads are
+    // mac-desktop-node-input and do not take a macOS runner.
     'mac-consumed-web-input',
     'web',
     ['mac', 'web'],
@@ -213,7 +213,7 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     ['web'],
     // knowledge-ingest now lives in observability-ingest. First-parent ranges
     // still name the old prefix on the add and delete commits.
-    /^(apps\/(web|ovie|extension)\/|packages\/(action-contracts|audio-contracts|brand|extension-contracts|jovie-cli|ui)\/|workers\/(observability-ingest|canary-otp|knowledge-ingest)\/|app\/|content\/|lib\/|trigger\/|creator_profiles\/|vercel\.json$|\.vercelignore$|skills\/jovie\/(SKILL\.md|README\.md|LICENSE)$|\.github\/workflows\/(production-release|production-marker-recovery|postdeploy-probes|canary-health-gate)\.yml$)/,
+    /^(apps\/(web|ovie|extension)\/|packages\/(action-contracts|audio-contracts|brand|extension-contracts|jovie-cli|ui)\/|workers\/(observability-ingest|canary-otp|knowledge-ingest|mesh-hub)\/|app\/|content\/|lib\/|trigger\/|creator_profiles\/|vercel\.json$|\.vercelignore$|skills\/jovie\/(SKILL\.md|README\.md|LICENSE)$|\.github\/workflows\/(production-release|production-marker-recovery|postdeploy-probes|canary-health-gate)\.yml$)/,
   ],
   [
     // @jovie/api-client: the shared third-party API client used by scripts,
@@ -235,7 +235,7 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     'operations-tooling',
     'operations-tooling',
     [],
-    /^(\.github\/|scripts\/|apps\/(console|docs|eve-pilot|should-i-make)\/|workers\/x402-artist-resource-proxy\/wrangler\.example\.jsonc$|\.agents\/|\.claude\/|\.codex\/|\.conductor\/|\.context\/|\.cursor\/|\.design-sync(?:-marketing)?\/|\.grok\/|\.hermes\/|\.husky\/|\.lavish\/|\.neon(?:\/|$)|\.no-mistakes\/|\.orchestrator\/|\.sonarlint\/|\.vscode\/|\.windsurf\/|\.zap\/|agentos\/|architecture\/|audits\/|canon\/|creator_profiles(?:\/|$)|docs\/|github\/|ideation\/|infra\/|ops\/|prompts\/|tests\/|tools\/)/,
+    /^(\.github\/|scripts\/|apps\/(console|docs|eve-pilot|should-i-make)\/|workers\/(?:prod-liveness|competitor-watch|summer-store|cron-hub)\/|workers\/x402-artist-resource-proxy\/wrangler\.example\.jsonc$|\.agents\/|\.claude\/|\.codex\/|\.conductor\/|\.context\/|\.cursor\/|\.design-sync(?:-marketing)?\/|\.grok\/|\.hermes\/|\.husky\/|\.lavish\/|\.neon(?:\/|$)|\.no-mistakes\/|\.orchestrator\/|\.sonarlint\/|\.vscode\/|\.windsurf\/|\.zap\/|agentos\/|architecture\/|audits\/|canon\/|config\/slop-guard\/|creator_profiles(?:\/|$)|docs\/|github\/|ideation\/|infra\/|ops\/|prompts\/|tests\/|tools\/)/,
   ],
   [
     'operations-root-file',

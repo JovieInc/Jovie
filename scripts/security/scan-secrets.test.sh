@@ -23,6 +23,10 @@ case "${1:-}" in
     # Staged file list for pre-commit mode (newline-separated, repo-relative).
     printf '%s\n' "${SCAN_TEST_STAGED_FILES:-}"
     ;;
+  show)
+    [[ "${SCAN_TEST_PIN_READ_ERROR:-}" != 1 ]] || exit 42
+    cat "$SCAN_TEST_PIN_SOURCE"
+    ;;
   rev-parse)
     case "${2:-}" in
       HEAD)
@@ -74,11 +78,33 @@ case "${SCAN_TEST_SCENARIO:-}" in
     exit 183
     ;;
   widened | in-range-finding | mixed | full-allowlisted | full-blocked)
-    # Realistic human-format finding blocks; TRUFFLEHOG_FAKE_FINDING_COMMITS is
-    # a space-separated list of attributions trufflehog prints per finding.
+    # JSON findings use the same attributions as the installed scanner.
     for commit in ${TRUFFLEHOG_FAKE_FINDING_COMMITS:-}; do
-      printf 'Found unverified result\nDetector Type: Postgres\nRaw result: ***ep-xxx.region.aws.neon.tech:5432\nCommit: %s\nFile: .env.example\nLine: 7\n\n' "$commit"
+      printf '{"DetectorName":"Postgres","Raw":"fixture","Verified":false,"SourceMetadata":{"Data":{"Git":{"commit":"%s","file":".env.example","line":7}}}}\n' "$commit"
     done
+    exit 183
+    ;;
+  action-pin)
+    case "${PIN_SCANNER_ERROR:-}" in
+      malformed) echo 'not JSON'; exit 0 ;;
+      empty-failure) exit 183 ;;
+      blank-failure) printf '\n'; exit 183 ;;
+      incomplete) echo 'encountered errors during scan' >&2; exit 0 ;;
+      runtime) exit 42 ;;
+    esac
+    source=Filesystem
+    [[ "$1" != git ]] || source=Git
+    jq -cn --arg source "$source" --arg file "$SCAN_TEST_STAGED_FILES" \
+      --arg commit "${PIN_COMMIT:-dddddddddddddddddddddddddddddddddddddddd}" \
+      --arg detector "${PIN_DETECTOR:-GitHubOauth2}" --arg raw "$PIN_RAW" \
+      --arg secret "${PIN_SECRET_PART:-${PIN_RAW}287c895573f7108da1b3}" \
+      --argjson verified "${PIN_VERIFIED:-false}" --argjson line "${PIN_LINE:-2}" \
+      '{DetectorName:$detector,Raw:$raw,RawV2:($raw+$secret),Verified:$verified,SourceMetadata:{Data:{($source):{file:$file,line:$line,commit:$commit}}}}'
+    if [[ "${PIN_MIXED:-}" == 1 ]]; then
+      # A finding elsewhere in the same file and commit must still block.
+      jq -cn --arg source "$source" --arg file "$SCAN_TEST_STAGED_FILES" --arg raw "$PIN_RAW" \
+        '{DetectorName:"GitHubOauth2",Raw:$raw,Verified:false,SourceMetadata:{Data:{($source):{file:$file,line:3,commit:"dddddddddddddddddddddddddddddddddddddddd"}}}}'
+    fi
     exit 183
     ;;
   incomplete)
@@ -429,3 +455,66 @@ grep -q 'Secret scan repair refused' "$TEST_ROOT/gitleaks-corruption.publication
   || fail 'local repair refusal must explain how to run history scans'
 
 echo 'PASS: scan-secrets corruption recovery regression tests'
+
+# Exercise the shipped entry points, including scanner exit/error propagation.
+# Assemble a public SHA at runtime so test source does not itself become bait.
+PIN_ROOT="$TEST_ROOT/pin"
+mkdir -p "$PIN_ROOT"
+export PIN_RAW='3a2844b7e9c422d3c10d'
+PIN_SHA="${PIN_RAW}287c895573f7108da1b3"
+printf 'steps:\n  - uses: actions/github-script@%s # v9.0.0\n  - run: echo %s\n' "$PIN_SHA" "$PIN_RAW" >"$PIN_ROOT/wf.yml"
+cp "$PIN_ROOT/wf.yml" "$PIN_ROOT/historical.yml"
+export SCAN_TEST_PIN_SOURCE="$PIN_ROOT/historical.yml"
+export SCAN_TEST_STAGED_FILES="$PIN_ROOT/wf.yml"
+export SCAN_TEST_RANGE_COMMITS="$IN_RANGE_COMMIT"
+export SCAN_TEST_LOCAL_HEAD="$IN_RANGE_COMMIT"
+export SCAN_TEST_SCENARIO=action-pin
+export GIT_CALLS="$PIN_ROOT/git-calls"
+export GITLEAKS_CALLS="$PIN_ROOT/gitleaks-calls"
+export TRUFFLEHOG_COUNT="$PIN_ROOT/count"
+
+pin_scan() {
+  local mode="$1" expected="$2" status=0
+  PATH="$BIN_DIR:$PATH" GITLEAKS_BIN="$BIN_DIR/gitleaks" TRUFFLEHOG_BIN="$BIN_DIR/trufflehog" \
+    bash "$SCAN_SCRIPT" "$mode" origin/main >"$PIN_ROOT/output" 2>&1 || status=$?
+  if [[ "$status" -ne "$expected" ]]; then
+    cat "$PIN_ROOT/output" >&2
+    fail "$mode: expected $expected, got $status"
+  fi
+}
+
+for mode in pre-commit publication ci-pr-trufflehog full-trufflehog; do
+  pin_scan "$mode" 0
+  PIN_LINE=3 pin_scan "$mode" 183
+  PIN_VERIFIED=true pin_scan "$mode" 183
+  PIN_DETECTOR=Postgres pin_scan "$mode" 183
+  PIN_SECRET_PART=0000000000000000000000000000000000000000 pin_scan "$mode" 183
+  PIN_MIXED=1 pin_scan "$mode" 183
+  PIN_SCANNER_ERROR=runtime pin_scan "$mode" 42
+  PIN_SCANNER_ERROR=empty-failure pin_scan "$mode" 183
+  PIN_SCANNER_ERROR=blank-failure pin_scan "$mode" 183
+  PIN_SCANNER_ERROR=malformed pin_scan "$mode" 1
+  PIN_SCANNER_ERROR=incomplete pin_scan "$mode" 1
+  if [[ "$mode" == *trufflehog ]]; then
+    PIN_COMMIT=unknown pin_scan "$mode" 1
+    SCAN_TEST_PIN_READ_ERROR=1 pin_scan "$mode" 183
+  fi
+done
+
+# Ambiguous duplicate matches outside the pin, including comments, stay red.
+printf 'steps:\n  - uses: actions/github-script@%s # %s\n' "$PIN_SHA" "$PIN_RAW" >"$PIN_ROOT/wf.yml"
+pin_scan publication 183
+# A SHA mentioned in the comment is not part of the pin itself.
+printf 'steps:\n  - uses: actions/github-script@%040d # %s\n' 0 "$PIN_RAW" >"$PIN_ROOT/wf.yml"
+pin_scan publication 183
+# Git's proof must use historical source even when HEAD looks harmless.
+PIN_LINE=3 pin_scan ci-pr-trufflehog 183
+# And the current file must not turn a valid historical pin into a finding.
+pin_scan ci-pr-trufflehog 0
+cp "$PIN_ROOT/wf.yml" "$PIN_ROOT/historical.yml"
+# A pin in the current file cannot hide a secret in the attributed commit.
+printf 'steps:\n  - uses: actions/github-script@%s\n' "$PIN_SHA" >"$PIN_ROOT/wf.yml"
+pin_scan publication 0
+pin_scan ci-pr-trufflehog 183
+
+echo 'PASS: trufflehog per-line pins, historical source, same-file findings and scanner failures'

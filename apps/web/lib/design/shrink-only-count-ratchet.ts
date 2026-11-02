@@ -2,8 +2,9 @@
  * Count-floor policy for shrink-only design-system ratchets.
  *
  * Growth is always a regression. An unbaselined shrink (count dropped, baseline
- * not lowered in the same tree) is authorship debt on a source PR, but it is
- * not a combined-head regression. Native ALLGREEN merge groups run these
+ * not lowered in the same tree) passes with a notice on every event: an
+ * improvement must never fail a PR. It is not a combined-head regression.
+ * Native ALLGREEN merge groups run these
  * ratchets on a synthetic stack; a sibling that removed tokens without updating
  * the JSON floor must not fail the group and UNMERGEABLE source-green
  * changelog/UI members (JOV-5300, actions 32602957421).
@@ -152,15 +153,23 @@ export function evaluateShrinkOnlyCount(
       };
     }
 
+    // An improvement never fails a PR (Source Validation false-failure round 2:
+    // authors fixed a count and were then told to hand-edit a JSON floor).
+    // Growth still fails against the unchanged floor above; the stale floor is
+    // surfaced as a notice so the next baseline refresh locks the gain in.
+    const message =
+      `${metric} dropped to ${count} (baseline ${baseline}). ` +
+      `Great — lower the baseline to ${count} so the ratchet locks in the progress.`;
+    if (process.env.GITHUB_ACTIONS === 'true') {
+      console.log(`::notice title=ratchet improved::${message}`);
+    }
     return {
-      ok: false,
+      ok: true,
       status: SHRINK_ONLY_COUNT_STATUSES.UNBASELINED_SHRINK,
       event,
       count,
       baseline,
-      message:
-        `${metric} dropped to ${count} (baseline ${baseline}). ` +
-        `Great — lower the baseline to ${count} in this PR so the ratchet locks in the progress.`,
+      message,
     };
   }
 
