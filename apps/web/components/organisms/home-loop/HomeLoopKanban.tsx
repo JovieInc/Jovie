@@ -132,7 +132,9 @@ export function HomeLoopKanban({
 }>) {
   return (
     <div
-      className='grid min-h-0 flex-1 grid-cols-2 gap-2 @2xl:grid-cols-3 @4xl:grid-cols-6 lg:grid-rows-1'
+      // One equal lane per stage given, so a board showing only its active
+      // stages fills the width instead of leaving empty columns.
+      className='grid min-h-0 flex-1 grid-cols-2 gap-2 @2xl:grid-cols-3 @4xl:auto-cols-fr @4xl:grid-flow-col @4xl:grid-cols-none lg:grid-rows-1'
       data-testid='home-loop-kanban'
     >
       {stages.map(stage => (
