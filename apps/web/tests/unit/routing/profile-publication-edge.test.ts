@@ -1,10 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { getProfileMode } from '@/components/features/profile/registry';
 import {
   gateProfilePublicationAtEdge,
   getGatedProfileHandle,
+  type ProfilePublicationGateRequest,
 } from '@/lib/routing/profile-publication-edge';
 
 const readPublished = vi.fn<(handle: string) => Promise<boolean>>();
+
+const GATE_ORIGIN = 'https://jov.ie';
+
+function gateRequest(
+  path: string,
+  method = 'GET'
+): ProfilePublicationGateRequest {
+  return { method, nextUrl: new URL(GATE_ORIGIN + path) };
+}
 
 beforeEach(() => {
   vi.stubEnv('NODE_ENV', 'production');
@@ -41,25 +52,42 @@ describe('profile publication gate decisions', () => {
   it('serves the cached body only when storage says the handle is published now', async () => {
     readPublished.mockResolvedValueOnce(true);
     expect(
-      await gateProfilePublicationAtEdge('/DuaLipa', readPublished)
+      await gateProfilePublicationAtEdge(gateRequest('/DuaLipa'), readPublished)
     ).toBeNull();
     expect(readPublished).toHaveBeenCalledExactlyOnceWith('dualipa');
   });
 
-  it('404s withdrawn, deleted and renamed-away handles without the body', async () => {
+  it('rewrites withdrawn, deleted and renamed-away handles into the branded profile 404', async () => {
     readPublished.mockResolvedValueOnce(false);
     const response = await gateProfilePublicationAtEdge(
-      '/dualipa',
+      gateRequest('/dualipa'),
+      readPublished
+    );
+    // JOV-10267: navigation requests must get the branded
+    // app/[username]/not-found.tsx render — rewritten into the marker-guarded
+    // private destination — never a bare body and never the ISR-cached
+    // profile body.
+    expect(response?.headers.get('x-middleware-rewrite')).toBe(
+      'https://jov.ie/dualipa/profile-mode-render/__profile-miss/__profile-mode-alias'
+    );
+    expect(response?.headers.get('cache-control')).toContain('no-store');
+  });
+
+  it('keeps a bare 404 for non-navigation methods so no cached body can leak', async () => {
+    readPublished.mockResolvedValueOnce(false);
+    const response = await gateProfilePublicationAtEdge(
+      gateRequest('/dualipa', 'POST'),
       readPublished
     );
     expect(response?.status).toBe(404);
     expect(response?.headers.get('cache-control')).toContain('no-store');
+    expect(await response?.text()).toBe('Not Found');
   });
 
   it('fails closed with 503 when the storage read fails or times out', async () => {
     readPublished.mockRejectedValueOnce(new Error('timeout'));
     const response = await gateProfilePublicationAtEdge(
-      '/dualipa',
+      gateRequest('/dualipa'),
       readPublished
     );
     expect(response?.status).toBe(503);
@@ -68,9 +96,19 @@ describe('profile publication gate decisions', () => {
 
   it('never reads storage for real routes', async () => {
     expect(
-      await gateProfilePublicationAtEdge('/start', readPublished)
+      await gateProfilePublicationAtEdge(gateRequest('/start'), readPublished)
     ).toBeNull();
     expect(readPublished).not.toHaveBeenCalled();
+  });
+});
+
+describe('branded miss destination', () => {
+  // The rewrite target 404s into app/[username]/not-found.tsx only while the
+  // miss sentinel resolves to no profile mode. If a mode with this segment
+  // name is ever registered, the destination would start rendering a profile
+  // body for gated handles instead — this pin makes that regression loud.
+  it('resolves the miss sentinel to no profile mode', () => {
+    expect(getProfileMode('__profile-miss')).toBe('profile');
   });
 });
 
@@ -80,7 +118,7 @@ describe('fixture handles', () => {
     vi.stubEnv('VERCEL_ENV', '');
     for (const path of ['/unfazed', '/Unfazed', '/jovie-screen-fixture']) {
       expect(
-        await gateProfilePublicationAtEdge(path, readPublished)
+        await gateProfilePublicationAtEdge(gateRequest(path), readPublished)
       ).toBeNull();
     }
     expect(readPublished).not.toHaveBeenCalled();
@@ -93,9 +131,14 @@ describe('fixture handles', () => {
       vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
       vi.stubEnv('VERCEL_ENV', 'production');
       readPublished.mockResolvedValueOnce(false);
-      const res = await gateProfilePublicationAtEdge(path, readPublished);
+      const res = await gateProfilePublicationAtEdge(
+        gateRequest(path),
+        readPublished
+      );
       expect(readPublished).toHaveBeenCalledTimes(1);
-      expect(res?.status).toBe(404);
+      expect(res?.headers.get('x-middleware-rewrite')).toBe(
+        `${GATE_ORIGIN}${path}/profile-mode-render/__profile-miss/__profile-mode-alias`
+      );
     }
   );
 
@@ -103,7 +146,12 @@ describe('fixture handles', () => {
     vi.stubEnv('PUBLIC_NOAUTH_SMOKE', '');
     vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '');
     readPublished.mockResolvedValueOnce(false);
-    const res = await gateProfilePublicationAtEdge('/unfazed', readPublished);
-    expect(res?.status).toBe(404);
+    const res = await gateProfilePublicationAtEdge(
+      gateRequest('/unfazed'),
+      readPublished
+    );
+    expect(res?.headers.get('x-middleware-rewrite')).toBe(
+      `${GATE_ORIGIN}/unfazed/profile-mode-render/__profile-miss/__profile-mode-alias`
+    );
   });
 });

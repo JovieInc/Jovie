@@ -79,11 +79,46 @@ function unavailableResponse(): NextResponse {
   });
 }
 
-function notPublishedResponse(): NextResponse {
+/**
+ * Private rewrite destination for gated handles. The
+ * `profile-mode-render/[profileMode]/[marker]` page renders `notFound()` for
+ * any profileMode that resolves to no mode, so the miss sentinel falls
+ * through to the canonical `app/[username]/not-found.tsx` boundary — the
+ * branded profile 404 with a real 404 status (JOV-10267). The marker segment
+ * must stay `__profile-mode-alias` (matching PRIVATE_PROFILE_ALIAS_MARKER in
+ * proxy.ts, which drops direct requests carrying it), so only this
+ * server-side rewrite can reach the destination.
+ */
+const PROFILE_MISS_REWRITE_SEGMENTS =
+  'profile-mode-render/__profile-miss/__profile-mode-alias';
+
+function notPublishedResponse(
+  handle: string,
+  request: ProfilePublicationGateRequest
+): NextResponse {
+  // Navigation requests get the branded profile 404 (JOV-10267): rewrite
+  // into the guarded private render destination instead of serving a bare
+  // text body. The cached profile body is still never sent — the rewrite
+  // never touches the ISR entry for /<handle>.
+  if (request.method === 'GET' || request.method === 'HEAD') {
+    const missUrl = new URL(
+      `/${encodeURIComponent(handle)}/${PROFILE_MISS_REWRITE_SEGMENTS}`,
+      request.nextUrl.origin
+    );
+    return NextResponse.rewrite(missUrl, {
+      headers: { 'Cache-Control': 'private, no-store, max-age=0' },
+    });
+  }
   return new NextResponse('Not Found', {
     status: 404,
     headers: { 'Cache-Control': 'private, no-store, max-age=0' },
   });
+}
+
+/** The slice of the proxy request the publication gate needs. */
+export interface ProfilePublicationGateRequest {
+  readonly method: string;
+  readonly nextUrl: URL;
 }
 
 /**
@@ -97,7 +132,7 @@ function notPublishedResponse(): NextResponse {
  * profile).
  */
 export async function gateProfilePublicationAtEdge(
-  pathname: string,
+  request: ProfilePublicationGateRequest,
   readPublished: (handle: string) => Promise<boolean> = readProfilePublished
 ): Promise<NextResponse | null> {
   if (
@@ -106,11 +141,13 @@ export async function gateProfilePublicationAtEdge(
   ) {
     return null;
   }
-  const handle = getGatedProfileHandle(pathname);
+  const handle = getGatedProfileHandle(request.nextUrl.pathname);
   if (!handle) return null;
   if (FIXTURE_RENDERED_HANDLES.has(handle) && isFixtureRuntime()) return null;
   try {
-    return (await readPublished(handle)) ? null : notPublishedResponse();
+    return (await readPublished(handle))
+      ? null
+      : notPublishedResponse(handle, request);
   } catch {
     return unavailableResponse();
   }
