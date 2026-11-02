@@ -63,7 +63,8 @@ export async function fetchSummerShadow(
     throw new Error('production_origin_required');
   if (
     !path.startsWith('/ovie/v1/summer-shadow/') &&
-    !path.startsWith('/ovie/v1/summer-chat/')
+    !path.startsWith('/ovie/v1/summer-chat/') &&
+    !path.startsWith('/ovie/v1/customer-voice/')
   )
     throw new Error('invalid_shadow_path');
   let origin: string;
