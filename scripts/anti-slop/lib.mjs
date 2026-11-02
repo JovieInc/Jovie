@@ -3,6 +3,7 @@
  * is the one canonical list; this module validates it, proves every "enforced"
  * rule is really wired, and detects prose copies that drifted away from it.
  */
+import { execFileSync } from 'node:child_process';
 import { existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -241,4 +242,42 @@ export function summarize(reg) {
     by[key] = (by[key] ?? 0) + 1;
   }
   return by;
+}
+
+/** ASR-040: bounded generic heading words, preserving names such as Jovie and Apple Music. */
+export const TITLE_CASE_HEADING =
+  /\btitle=['"][^'"\n]*\s(?:Settings|Panel|Player|Tasks|Dock|Update|Timeline|Search|Results|View|Bottom|Chat|Links|Stats|Rules|Accounts|Tools|Tracking|Privacy)\b/u;
+export function findTitleCaseHeadings(root = REPO_ROOT) {
+  const files = execFileSync('git', ['ls-files', '--', 'apps/web'], {
+    cwd: root,
+    encoding: 'utf8',
+  })
+    .trim()
+    .split('\n');
+  const hits = [];
+  for (const file of files) {
+    if (!/\.tsx$/u.test(file) || /\.(?:test|spec|stories)\./u.test(file))
+      continue;
+    if (!/^apps\/web\/(?:app\/.*\/settings\/|components\/shell\/)/u.test(file))
+      continue;
+    for (const line of readFileSync(join(root, file), 'utf8').split('\n')) {
+      if (TITLE_CASE_HEADING.test(line)) hits.push(`${file}: ${line.trim()}`);
+    }
+  }
+  return hits.sort();
+}
+
+export function checkTitleCaseHeadings(root = REPO_ROOT) {
+  const legacy = JSON.parse(readFileSync(join(root, LEGACY_PATH), 'utf8'));
+  const current = findTitleCaseHeadings(root);
+  const remaining = [...(legacy.titleCaseHeadings ?? [])];
+  const errors = [];
+  for (const hit of current) {
+    const index = remaining.indexOf(hit);
+    if (index < 0) errors.push(`ASR-040: use sentence case: ${hit}`);
+    else remaining.splice(index, 1);
+  }
+  for (const hit of remaining)
+    errors.push(`ASR-040: remove stale baseline: ${hit}`);
+  return errors;
 }

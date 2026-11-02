@@ -14,7 +14,7 @@ describe('settings usage page', () => {
     render(<SettingsUsagePage />);
 
     expect(
-      screen.getByRole('heading', { name: 'Usage Stats' })
+      screen.getByRole('heading', { name: 'Usage stats' })
     ).toBeInTheDocument();
     expect(screen.getByTestId('usage-stats-section')).toBeInTheDocument();
   });

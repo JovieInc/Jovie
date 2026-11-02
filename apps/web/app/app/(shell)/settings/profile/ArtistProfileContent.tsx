@@ -169,7 +169,7 @@ export function ArtistProfileContent({
             username={artist.handle}
           />
           <SettingsPanel
-            title='Artist Rules'
+            title='Artist rules'
             description='Confirmed rules guide every draft. Memory can suggest a rule, but it cannot activate one.'
             bodyClassName='px-4 py-4 sm:px-5'
           >

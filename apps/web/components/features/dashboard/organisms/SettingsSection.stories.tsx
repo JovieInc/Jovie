@@ -22,8 +22,8 @@ const meta = {
     ),
   ],
   args: {
-    id: 'audience',
-    title: 'Audience & Tracking',
+    id: 'audience-tracking',
+    title: 'Audience & tracking',
     description: 'Fan verification, opt-ins, and tracking.',
     children: (
       <SettingsPanel

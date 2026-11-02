@@ -363,7 +363,7 @@ export const SOURCE_GUARDS = Object.freeze([
     command:
       'node scripts/anti-slop/run.mjs validate && node --test --test-isolation=none scripts/anti-slop/anti-slop.test.mjs',
     inputs:
-      /^(?:docs\/|scripts\/(?:anti-slop\/|invariants\/|design-frontend-skill-check|ci-fast-lanes\.mjs$)|packages\/copy\/|\.github\/workflows\/source-validation\.yml$|\.claude\/(?:skills|rules)\/|\.agents\/skills\/|canon\/[^/]*\.md$|package\.json$|CLAUDE\.md$|AGENTS\.md$)/u,
+      /^(?:apps\/web\/(?:components\/shell\/|app\/.*\/settings\/)|docs\/|scripts\/(?:anti-slop\/|invariants\/|design-frontend-skill-check|ci-fast-lanes\.mjs$)|packages\/copy\/|\.github\/workflows\/source-validation\.yml$|\.claude\/(?:skills|rules)\/|\.agents\/skills\/|canon\/[^/]*\.md$|package\.json$|CLAUDE\.md$|AGENTS\.md$)/u,
     prOnly: false,
   }),
   Object.freeze({

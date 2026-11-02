@@ -872,6 +872,32 @@
           }
         ]
       }
+    },
+    {
+      "id": "ASR-040",
+      "title": "Sentence case for settings and shell headings",
+      "statement": "Use sentence case for generic words in settings and app shell headings.",
+      "rationale": "Settings headings should use plain language and consistent casing.",
+      "source": { "by": "Tim White", "date": "2026-10-29", "ref": "JOV-3720" },
+      "scope": ["app", "copy"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/anti-slop/run.mjs validate",
+        "evidence": [
+          "scripts/anti-slop/lib.mjs",
+          "scripts/anti-slop/anti-slop.test.mjs"
+        ],
+        "wiredIn": [
+          {
+            "file": "scripts/ci-fast-lanes.mjs",
+            "token": "id: 'anti-slop'",
+            "commandIncludes": "anti-slop/run.mjs validate"
+          }
+        ],
+        "coverageNote": "Literal title attributes in settings routes and components/shell TSX; bounded generic words, exact-line shrink-only baseline. Dynamic labels and other copy remain under existing copy rules."
+      }
     }
   ],
   "judges": [
