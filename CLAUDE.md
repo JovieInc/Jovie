@@ -104,5 +104,3 @@ Run narrow checks first; broaden for changed boundaries, failures, or required C
 coverage. Report changes, exact checks, failures, and
 limitations. Do not infer local source, hosted CI, merge queue, deployed
 build, or runtime from each other. Keep the goal and user corrections.
-
-Company canon: JovieInc/ci canon/COMPANY.md (applies in full; this file is the repo delta).
