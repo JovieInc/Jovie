@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "4802127a34cb900b35c67f2e88f18ba49d66e18a2ed551c11a95a36b0031338e",
+  "bytes": 76898,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/48/4802127a34cb900b35c67f2e88f18ba49d66e18a2ed551c11a95a36b0031338e.png",
+  "viewport": null,
+  "capturedAt": "2026-10-12T03:16:29Z",
+  "label": "docs/screenshots/profiles-2026-10-07/inventory-source-details.png"
+}

@@ -1,0 +1,113 @@
+name: Surface Recertification
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: Main pushes recompute certified-route source fingerprints, capture fresh screenshots with a locally built app, store them in the evidence R2 bucket and open one bot PR that edits only the certification ledger (merge-queue-green-enroll arms it); it never merges, deploys, or records founder decisions.
+# removal-trigger: Remove when Production Controller emits the recertification packets after each deploy.
+#
+# Event-driven, no clock. PRs never hand-edit
+# apps/web/data/designSystem/surfaceCertifications.json: a route whose source
+# changed is reported stale until this job recaptures it (the gate keeps its
+# meaning, the bot produces the evidence). Evidence binaries go to the
+# `jovie-evidence` R2 bucket, never to the repo tree.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/app/**'
+      - 'apps/web/components/**'
+      - 'apps/web/styles/**'
+      - 'apps/web/lib/**'
+      - 'apps/web/data/designSystem/surfaceCensus.json'
+      - 'scripts/design-surface-*.mjs'
+      - 'scripts/lib/evidence-store.mjs'
+      - '.github/workflows/surface-recertify.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: surface-recertify
+  cancel-in-progress: false
+
+jobs:
+  recertify:
+    name: Recertify stale surfaces
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: List stale certifications
+        id: stale
+        run: |
+          set -euo pipefail
+          node scripts/design-surface-recertify.mjs --list-stale > "$RUNNER_TEMP/stale.json"
+          count="$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).length)" "$RUNNER_TEMP/stale.json")"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          cat "$RUNNER_TEMP/stale.json"
+
+      - name: Install Playwright Chromium
+        if: steps.stale.outputs.count != '0'
+        uses: ./.github/actions/setup-playwright
+
+      - name: Build web app
+        if: steps.stale.outputs.count != '0'
+        run: pnpm turbo build --filter=@jovie/web
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_mock
+          CLERK_SECRET_KEY: sk_test_mock
+          DATABASE_URL: postgresql://localhost/noop
+
+      - name: Start server and capture
+        if: steps.stale.outputs.count != '0'
+        run: |
+          set -euo pipefail
+          (cd apps/web && PORT=3100 DATABASE_URL=postgresql://localhost/noop NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_mock CLERK_SECRET_KEY=sk_test_mock NEXT_DISABLE_TOOLBAR=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_E2E_MODE=1 VERCEL_ENV=development HOSTNAME=localhost NEXT_PUBLIC_APP_URL=http://127.0.0.1:3100 pnpm run start) > "$RUNNER_TEMP/server.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/server.pid"
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:3100 >/dev/null 2>&1 && break; sleep 2; done
+          node scripts/design-surface-capture.mjs --base-url http://127.0.0.1:3100 --out "$RUNNER_TEMP/captures"
+          kill "$(cat "$RUNNER_TEMP/server.pid")" 2>/dev/null || true
+
+      - name: Generate Jovie Bot token
+        id: app-token
+        if: steps.stale.outputs.count != '0'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
+      # github-token-budget: 6 calls/run - one branch push, one PR create, one auto-merge enable
+      - name: Store evidence and open ledger PR
+        if: steps.stale.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_EVIDENCE_R2_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npm install --global wrangler@4.85.0
+          node scripts/design-surface-recertify.mjs --captures "$RUNNER_TEMP/captures"
+          if git diff --quiet -- apps/web/data/designSystem/surfaceCertifications.json; then
+            echo "Ledger unchanged; stale routes need a session or fixture to capture."
+            exit 0
+          fi
+          BRANCH="bot/surface-recertify-${GITHUB_SHA::12}"
+          git config user.name "jovie-bot[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          git switch -c "$BRANCH"
+          git add apps/web/data/designSystem/surfaceCertifications.json
+          git commit -m "chore(design): recertify surfaces after ${GITHUB_SHA::12}" \
+            -m "Generated by .github/workflows/surface-recertify.yml. Fingerprints and evidence-store pointers only."
+          git push -u origin "$BRANCH"
+          node packages/api-client/cli.ts gh --priority report -- pr create --repo "${{ github.repository }}" --base main --head "$BRANCH" \
+            --title "chore(design): recertify surfaces after ${GITHUB_SHA::12}" \
+            --label compounding \
+            --body "Bot-produced certification evidence for routes whose source changed in ${GITHUB_SHA}. Screenshots live in the evidence store; this PR edits only the ledger."

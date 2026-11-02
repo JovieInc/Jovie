@@ -116,6 +116,7 @@
     {"id": "workflow:sentry-autofix", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/sentry-autofix.yml"},
     {"id": "workflow:shipping-origin", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/shipping-origin.yml"},
     {"id": "workflow:shipping-slo", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/shipping-slo.yml"},
+    {"id": "workflow:surface-recertify", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/surface-recertify.yml"},
     {"id": "workflow:wins-ledger", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/wins-ledger.yml"},
     {"id": "workflow:sonarcloud", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/sonarcloud.yml"},
     {"id": "workflow:source-admission-review-signal", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/source-admission-review-signal.yml"},

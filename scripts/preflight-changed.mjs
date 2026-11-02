@@ -96,6 +96,12 @@ export const GENERATORS = [
     check: 'node scripts/generate-design-tokens-export.mjs --check',
   },
   {
+    id: 'design-section-hashes',
+    when: /^DESIGN\.md$|^docs\/design-system\/DETAILS\.md$|^scripts\/agent-context\/design-sections/,
+    write: 'node scripts/agent-context/design-sections.mjs --write',
+    check: 'node scripts/agent-context/design-sections.mjs',
+  },
+  {
     id: 'llms-design-manifest',
     when: /^DESIGN\.md$|^design\.tokens\.json$|^scripts\/generate-llms-design-manifest\.mjs$/,
     write: 'node scripts/generate-llms-design-manifest.mjs',
