@@ -1,14 +1,13 @@
+import { requireClaim } from '@/lib/billing/offer/claims';
 import { formatAmount } from '@/lib/utils/format-number';
 
 /**
  * Billing terms shown beside the checkout button and recorded with consent.
- * Every sentence here is true of the shipped billing path:
- * - Stripe Checkout `mode: 'subscription'` charges at once and renews each
- *   interval (no `trial_period_days`);
- * - cancel sets `cancel_at_period_end`, so paid features last to period end
- *   (content/legal/terms.md, "Billing and Cancellation").
- * There is deliberately no refund sentence: no refund policy is published in
- * the Terms yet. Adding one is a product/legal decision, not a copy edit.
+ * Price and date are filled from the checkout the visitor is confirming.
+ * The cancellation sentence is the registered `billing.cancel` claim, so it
+ * stays the same sentence as the published terms. This surface does not add
+ * a second refund sentence; `billing.refund` is already on the closer and
+ * in the terms.
  */
 export const CHECKOUT_TERMS_VERSION = 'checkout-terms-2026-10-25';
 
@@ -47,8 +46,7 @@ export function buildCheckoutTerms(input: {
     timing: first
       ? `Your card is saved now and you won't be charged until ${first}. Then ${price} every ${per} until you cancel.`
       : `Your card is charged ${price} today, then every ${per} until you cancel.`,
-    cancel:
-      'Cancel anytime in Settings. You keep paid features until the end of the billing period.',
+    cancel: requireClaim('billing.cancel'),
     consentLabel: first
       ? `I agree to be charged ${price} every ${per} starting ${first}, renewing automatically until I cancel.`
       : `I agree to be charged ${price} every ${per}, renewing automatically until I cancel.`,

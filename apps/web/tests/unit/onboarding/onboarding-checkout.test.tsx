@@ -182,7 +182,9 @@ describe('OnboardingCheckoutClient', () => {
     expect(terms).toHaveTextContent(
       'Your card is charged $39.00 today, then every month until you cancel.'
     );
-    expect(terms).toHaveTextContent('Cancel anytime in Settings.');
+    expect(terms).toHaveTextContent(
+      'Cancel anytime and keep Pro to the end of the paid month.'
+    );
     const consent = screen.getByRole('checkbox', {
       name: /I agree to be charged \$39\.00 every month, renewing automatically until I cancel/,
     });

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { requireClaim } from '@/lib/billing/offer/claims';
 import { PLAN_PRICES, toCents } from '@/lib/config/plan-prices';
 import { buildCheckoutTerms, CHECKOUT_TERMS_VERSION } from './checkout-terms';
 
@@ -12,6 +13,7 @@ describe('checkout billing terms', () => {
     expect(terms.price).toBe(`$${PLAN_PRICES.pro.monthly}.00/mo`);
     expect(terms.timing).toContain('charged');
     expect(terms.timing).toContain('every month until you cancel');
+    expect(terms.cancel).toBe(requireClaim('billing.cancel'));
     expect(terms.consentLabel).toContain('renewing automatically');
   });
 
