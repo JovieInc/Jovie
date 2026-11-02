@@ -117,6 +117,10 @@ export function ghShape(args: readonly string[]): {
       idempotent: !write || effective === 'PUT' || effective === 'DELETE',
       // GET /rate_limit is exempt from primary quota, never secondary limits.
       ...(effective === 'GET' &&
+      !args.includes('--hostname') &&
+      !args.some(arg =>
+        /^(?:--(?:hostname|method|field|raw-field|input)=|-X.|-[fF].)/.test(arg)
+      ) &&
       [
         'rate_limit',
         '/rate_limit',

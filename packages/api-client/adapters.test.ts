@@ -275,6 +275,15 @@ describe('gh through the ledger', () => {
       ['api', 'https://example.com/rate_limit'],
       ['api', 'rate_limit', '-X', 'POST'],
       ['api', 'rate_limit', '-X', 'HEAD'],
+      ['api', 'rate_limit', '-XPOST'],
+      ['api', 'rate_limit', '--method=POST'],
+      ['api', 'rate_limit', '-ffield=x'],
+      ['api', 'rate_limit', '-Ffield=x'],
+      ['api', 'rate_limit', '--field=field=x'],
+      ['api', 'rate_limit', '--raw-field=field=x'],
+      ['api', 'rate_limit', '--input=body.json'],
+      ['api', 'rate_limit', '--hostname', 'example.com'],
+      ['api', 'rate_limit', '--hostname=example.com'],
       ['api', 'rate_limit', '-f', 'field=x'],
     ])
       expect(await runGh(args, { ...base, priority: 'poll' })).toMatchObject({
