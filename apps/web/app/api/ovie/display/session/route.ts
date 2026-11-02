@@ -14,7 +14,6 @@ import {
 } from '@/lib/ovie/display/session';
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
 
 const NO_STORE = { 'Cache-Control': 'no-store' } as const;
 const json = (body: object, status: number) =>

@@ -5,9 +5,6 @@ import { OvieDisplayHome } from '@/components/features/admin/hud/OvieDisplayHome
 import { displayAccess } from '@/lib/ovie/display/server';
 import { DISPLAY_COOKIE } from '@/lib/ovie/display/session';
 
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
-
 /**
  * The office display: Ovie Home, Full Screen, read only, no login. Renders no
  * company data unless a valid, unrevoked display session cookie is present. A

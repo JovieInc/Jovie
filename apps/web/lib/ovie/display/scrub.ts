@@ -6,7 +6,7 @@
  */
 const FRAGMENT = /(\/display\/connect)#[^\s"'<>)]*/g;
 const PROOF = /[a-z0-9][a-z0-9-]{1,39}\.\d{9,12}\.[0-9a-f]{64}/g;
-const SCRUBBED = '[scrubbed]';
+const SCRUBBED = 'redacted';
 
 export function scrubDisplayString(value: string): string {
   return value.replace(FRAGMENT, `$1#${SCRUBBED}`).replace(PROOF, SCRUBBED);

@@ -15,7 +15,7 @@ describe('display breadcrumb scrubbing', () => {
     expect(JSON.stringify(scrubbed)).not.toContain(PROOF);
     expect(JSON.stringify(scrubbed)).not.toContain('ab'.repeat(32));
     expect(scrubbed.data?.to).toBe(
-      'https://ovie.jov.ie/display/connect#[scrubbed]'
+      'https://ovie.jov.ie/display/connect#redacted'
     );
   });
   it('removes a bare proof anywhere (message, nested data, arrays)', () => {

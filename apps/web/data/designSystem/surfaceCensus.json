@@ -364,6 +364,8 @@
         "ref": "48075f7f958"
       },
       "sources": [
+        "apps/web/app/display/connect/page.tsx",
+        "apps/web/app/display/page.tsx",
         "apps/web/app/hud-tv/page.tsx",
         "apps/web/app/hud/page.tsx",
         "apps/web/app/hud/wiki/[...slug]/page.tsx",
@@ -725,6 +727,20 @@
       "to": "holdout",
       "at": "2026-10-29T18:00:00Z",
       "evidence": "Proof-stat methodology page generated from the stat registry; source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/display/connect/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-11-02T08:00:00Z",
+      "evidence": "PR #23188 introduces the office display connect page; source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/display/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-11-02T08:01:00Z",
+      "evidence": "PR #23188 introduces the office display page; source registration only, not rendered certification."
     }
   ]
 }

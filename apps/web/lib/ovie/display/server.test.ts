@@ -154,7 +154,7 @@ describe('clientAddress', () => {
       '5.6.7.8'
     );
     expect(
-      clientAddress(new Headers({ 'x-forwarded-for': '9.9.9.9, 10.0.0.1' }))
+      clientAddress(new Headers({ 'x-forwarded-for': '9.9.9.9, 198.51.100.1' }))
     ).toBe('9.9.9.9');
     expect(clientAddress(new Headers())).toBe('unknown');
   });

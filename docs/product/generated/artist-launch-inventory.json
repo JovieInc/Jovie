@@ -4049,6 +4049,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/ovie/display/session/route.ts",
+      "kind": "handler",
+      "route": "/api/ovie/display/session",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/ovie/dogfooders/route.ts",
       "kind": "handler",
       "route": "/api/ovie/dogfooders",
@@ -7103,6 +7111,22 @@
       "source": "apps/web/app/dev/smart-links/page.tsx",
       "kind": "page",
       "route": "/dev/smart-links",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/display/connect/page.tsx",
+      "kind": "page",
+      "route": "/display/connect",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/display/page.tsx",
+      "kind": "page",
+      "route": "/display",
       "methods": [],
       "surface": "deferred",
       "classification": "C"
