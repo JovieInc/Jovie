@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -596,6 +602,65 @@ test('draft resolves the current branch explicitly for gh --repo', async () => {
         diagnose: () => {},
       }),
       0
+    );
+  } finally {
+    cleanup();
+  }
+});
+
+test('draft uses the remote base when local main is stale without borrowing upstream locked changes', async () => {
+  const { repo, cleanup } = localRepo();
+  const git = args => execFileSync('git', args, { cwd: repo, stdio: 'ignore' });
+  try {
+    git(['checkout', '-b', 'fixture/marketing-source']);
+    git(['branch', '-f', 'main', 'HEAD']);
+    mkdirSync(path.join(repo, 'apps/web/lib/auth'), { recursive: true });
+    writeFileSync(
+      path.join(repo, 'apps/web/lib/auth/current-main.ts'),
+      'export const current = true;\n'
+    );
+    git(['add', '.']);
+    git(['-c', 'core.hooksPath=/dev/null', 'commit', '-m', 'upstream auth']);
+    git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    mkdirSync(path.join(repo, 'scripts'), { recursive: true });
+    writeFileSync(
+      path.join(repo, 'scripts/marketing-source.test.mjs'),
+      'export const regression = true;\n'
+    );
+    git(['add', '.']);
+    git([
+      '-c',
+      'core.hooksPath=/dev/null',
+      'commit',
+      '-m',
+      'chore(marketing): current source',
+    ]);
+    const out = [];
+    const code = await main(
+      [
+        'draft',
+        '--repo',
+        repo,
+        '--base',
+        'main',
+        '--title',
+        'chore(marketing): current source',
+      ],
+      x => out.push(x),
+      {
+        github: () => ({
+          status: 1,
+          stdout: '',
+          stderr: 'no pull requests found',
+        }),
+        diagnose: () => {},
+      }
+    );
+    assert.equal(code, 0);
+    assert.match(out.join('\n'), /marketing-source.test.mjs/);
+    assert.doesNotMatch(
+      out.join('\n'),
+      /Locked areas|current-main.ts|canon-ownership-json/
     );
   } finally {
     cleanup();
