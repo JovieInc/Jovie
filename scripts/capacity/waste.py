@@ -13,6 +13,10 @@ Detectors: ceiling (value > max), wow (>pct growth vs ~7 days ago, above a floor
 zero-denominator (numerator >= min while the outcome denominator, e.g. active users, is 0).
 A metric with no reading is a GAP and is reported, never silently skipped. No secrets are read
 or printed; the Summer store token is only used as a bearer header.
+
+api-budget: github-user-core 24/hr - one rate read and one run list per collector pass (about 4 passes/hr, a few reads each)
+api-budget: github-search 8/hr - the merged and closed PR counts, two reads per collector pass
+api-budget: github-user-graphql 4/hr - one first-push PR gate query per collector pass
 """
 from __future__ import annotations
 
