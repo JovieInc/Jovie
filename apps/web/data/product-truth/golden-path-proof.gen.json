@@ -27,44 +27,88 @@
       "step": "homepage",
       "route": "/",
       "source": "apps/web/data/homepageCopy.ts",
-      "copy": "A free profile for your music, bio, and links. Your latest release leads, with tour dates and updates one tap away.",
+      "copy": "Smart links that turn listeners into subscribers. Jovie builds them from your Spotify name and emails your list when the next song is out.",
       "nature": "capability",
       "evidenceClass": null,
       "status": "admissible",
-      "detail": "certified: artist-profiles, public-profile, artist-notifications"
+      "detail": "certified: smart-links, artist-notifications"
     },
     {
-      "id": "homepage.fan-states.headline",
+      "id": "homepage.loop.headline",
       "step": "homepage",
       "route": "/",
-      "source": "apps/web/data/homepageFanStatesCopy.ts",
-      "copy": "Your profile leads with one clear thing.",
+      "source": "apps/web/data/homepageCopy.ts",
+      "copy": "Every listen can turn into a subscriber.",
       "nature": "capability",
       "evidenceClass": null,
       "status": "admissible",
-      "detail": "certified: artist-profiles"
+      "detail": "certified: smart-links, artist-notifications"
+    },
+    {
+      "id": "homepage.loop.open",
+      "step": "homepage",
+      "route": "/",
+      "source": "apps/web/data/homepageCopy.ts",
+      "copy": "One tap to Spotify, Apple Music, or YouTube Music. No menu of links to scan.",
+      "nature": "capability",
+      "evidenceClass": null,
+      "status": "admissible",
+      "detail": "certified: smart-links"
+    },
+    {
+      "id": "homepage.loop.ask",
+      "step": "homepage",
+      "route": "/",
+      "source": "apps/web/data/homepageCopy.ts",
+      "copy": "Get Updates takes an email in one step, on every plan.",
+      "nature": "capability",
+      "evidenceClass": null,
+      "status": "admissible",
+      "detail": "certified: artist-notifications"
+    },
+    {
+      "id": "homepage.loop.send",
+      "step": "homepage",
+      "route": "/",
+      "source": "apps/web/data/homepageCopy.ts",
+      "copy": "When the next song is out, everyone who asked gets it in their inbox.",
+      "nature": "capability",
+      "evidenceClass": null,
+      "status": "admissible",
+      "detail": "certified: artist-notifications"
+    },
+    {
+      "id": "homepage.ownership.body",
+      "step": "homepage",
+      "route": "/",
+      "source": "apps/web/data/homepageCopy.ts",
+      "copy": "Every email lands on your own list in Jovie, not a platform you rent, ready for the next release.",
+      "nature": "capability",
+      "evidenceClass": null,
+      "status": "admissible",
+      "detail": "certified: artist-notifications"
     },
     {
       "id": "homepage.offer.headline",
       "step": "homepage",
       "route": "/",
       "source": "apps/web/data/homepageCopy.ts",
-      "copy": "Free to claim. Yours to share.",
+      "copy": "Collect for free. Send when you are ready.",
       "nature": "capability",
       "evidenceClass": null,
       "status": "admissible",
-      "detail": "certified: public-profile"
+      "detail": "certified: artist-notifications"
     },
     {
-      "id": "homepage.offer.smart-links",
+      "id": "homepage.close.subhead",
       "step": "homepage",
       "route": "/",
       "source": "apps/web/data/homepageCopy.ts",
-      "copy": "Unlimited smart links",
+      "copy": "Claim your name and search for yourself. Jovie imports your releases, old and new, and gives every one a smart link.",
       "nature": "capability",
       "evidenceClass": null,
       "status": "admissible",
-      "detail": "certified: smart-links"
+      "detail": "certified: public-profile, smart-links"
     },
     {
       "id": "claim.banner.ready",
@@ -195,7 +239,7 @@
     "none": 0
   },
   "statusCounts": {
-    "admissible": 16,
+    "admissible": 20,
     "proof-gap": 0,
     "uncertified-capability": 0,
     "invented-number": 0,

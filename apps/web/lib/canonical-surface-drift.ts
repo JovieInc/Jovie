@@ -42,11 +42,7 @@ export const CANONICAL_WEB_SURFACE_OWNERSHIP = {
       // mounts the homepage section components (lib/content-records).
       'apps/web/components/homepage/HomepageSpecSections.tsx',
     ],
-    requiredTokens: [
-      'HomepageArtistHero',
-      'PublicPageShell',
-      'HomepageOfferClose',
-    ],
+    requiredTokens: ['HomepageArtistHero', 'PublicPageShell', 'HomepageClose'],
     forbiddenTokens: ['HomePageNarrative'],
     registryOwnerNeedle: 'HomepageArtistHero',
     moleculeOwners: ['PublicPageShell', 'HomepageArtistHero'],

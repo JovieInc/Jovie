@@ -1,5 +1,4 @@
 import { HOMEPAGE_COPY } from '@/data/homepageCopy';
-import { HOMEPAGE_FAN_STATES_COPY } from '@/data/homepageFanStatesCopy';
 import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
 import { expect, test } from './setup';
 import { inspectRouteDom } from './utils/route-dom-detector';
@@ -80,11 +79,11 @@ test.describe('Homepage', () => {
       '/start'
     );
     await expect(hero.getByText(HOMEPAGE_COPY.hero.supportNote)).toBeVisible();
-    // The proof is the real product: a registry capture of a live profile,
+    // The proof is the real product: a registry shot cropped to the link,
     // loaded eagerly as the LCP image.
-    const profile = hero.getByRole('img', {
-      name: HOMEPAGE_COPY.hero.profile.alt,
-    });
+    const profile = hero
+      .getByTestId(`product-shot-${HOMEPAGE_COPY.hero.proofShot}`)
+      .getByRole('img');
     await expect(profile).toBeVisible();
     expect(
       await profile.evaluate(image => (image as HTMLImageElement).naturalWidth)
@@ -116,35 +115,23 @@ test.describe('Homepage', () => {
     await startRequest;
   });
 
-  test('shows real profile states that scroll on phones without page overflow', async ({
+  test('shows the loop as three cropped product shots without page overflow', async ({
     page,
   }) => {
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 900 });
-      const gallery = page.getByTestId('homepage-fan-states');
-      await gallery.scrollIntoViewIfNeeded();
-      // #23358 keeps real faces off the homepage: states are caption-only by
-      // design (no scenarioId, so no capture and no phone frame). The gallery
-      // must paint every caption with zero image content, and its rendered
-      // count must match the shipped copy record.
-      await expect(gallery.getByRole('img')).toHaveCount(0);
-      await expect(gallery).toHaveAttribute(
-        'data-count',
-        String(HOMEPAGE_FAN_STATES_COPY.states.length)
+      const steps = page.getByTestId('homepage-loop-steps');
+      await steps.scrollIntoViewIfNeeded();
+      await expect(steps.getByRole('listitem')).toHaveCount(
+        HOMEPAGE_COPY.loop.steps.length
       );
-      for (const state of HOMEPAGE_FAN_STATES_COPY.states) {
-        // hasText is a substring match and every caption body contains the
-        // word "listen", so filter on the title's exact text instead (the
-        // title span is the only element whose full text equals it).
-        const item = gallery.getByRole('listitem').filter({
-          has: page.getByText(state.title, { exact: true }),
-        });
-        await item.scrollIntoViewIfNeeded();
-        await expect(item).toBeVisible();
+      for (const step of HOMEPAGE_COPY.loop.steps) {
+        const shot = steps.getByTestId(`product-shot-${step.shot}`);
+        await shot.scrollIntoViewIfNeeded();
+        await expect(shot.getByRole('img')).toBeVisible();
         await expect(
-          gallery.getByText(state.title, { exact: true })
+          steps.getByText(step.title, { exact: true })
         ).toBeVisible();
-        await expect(gallery.getByText(state.body)).toBeVisible();
       }
       const overflow = await page.evaluate(
         () =>
@@ -161,7 +148,7 @@ test.describe('Homepage', () => {
     }
   });
 
-  test('mounts hero, profile states, and the offer close in order', async ({
+  test('mounts the link, loop, list, offer and close in order', async ({
     page,
   }) => {
     const headings = await page
@@ -169,14 +156,19 @@ test.describe('Homepage', () => {
       .evaluateAll(nodes => nodes.map(node => node.textContent?.trim()));
     expect(headings.filter(Boolean)).toEqual([
       HOMEPAGE_COPY.hero.headline,
-      HOMEPAGE_FAN_STATES_COPY.headline,
+      HOMEPAGE_COPY.loop.headline,
+      HOMEPAGE_COPY.ownership.headline,
       HOMEPAGE_COPY.offer.headline,
+      HOMEPAGE_COPY.close.headline,
     ]);
     await expect(page.getByTestId('homepage-close-claim-cta')).toHaveText(
       HOMEPAGE_COPY.hero.claim.action
     );
-    await expect(page.getByTestId('homepage-offer-summary')).toContainText(
+    await expect(page.getByTestId('homepage-offer-summary-free')).toContainText(
       '$0'
+    );
+    await expect(page.getByTestId('homepage-offer-summary-pro')).toContainText(
+      '/mo'
     );
   });
 

@@ -7,8 +7,10 @@ import { useEffect, useRef } from 'react';
 import { ProductClaimHandleForm } from '@/app/(marketing)/product/ProductClaimHandleForm';
 import '@/components/marketing/artist-profile/ArtistProfileSectionShell.css';
 import { ProductScreenshotFrame } from '@/components/marketing/ProductScreenshotFrame';
+import { ProductShot } from '@/components/marketing/ProductShot';
 import { type HomepageCopy } from '@/data/homepageCopy';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
+import type { ProductShotId } from '@/lib/screenshots/product-shots';
 import { HomepageHeroLight } from './HomepageHeroLight';
 import './HomepageHeroCanvas.css';
 import { bindHeroCanvasScroll } from './hero-light-scroll';
@@ -43,6 +45,7 @@ export function HomepageHeroCanvas({
   claim,
   supportNote,
   profile,
+  proofShot,
   sectionOwner,
   sectionVariant = 'split-claim-card',
   headingTestId,
@@ -62,7 +65,12 @@ export function HomepageHeroCanvas({
    * (`template-profile-live-mobile`), never a real person's face on `/`
    * (Tim, 2026-10-26).
    */
-  profile?: HomepageCopy['hero']['profile'];
+  profile?: { readonly scenarioId: string; readonly alt: string };
+  /**
+   * A registry product shot (lib/screenshots/product-shots.ts) cropped to
+   * one moment. Takes precedence over `profile`; the homepage uses it.
+   */
+  proofShot?: ProductShotId;
   sectionOwner: string;
   /**
    * Registry identity for the section.hero occurrence this canvas renders.
@@ -108,7 +116,7 @@ export function HomepageHeroCanvas({
           <HomepageHeroLight />
           <div
             className='homepage-hero-canvas__copy ap-section-container'
-            data-has-proof={profile ? 'true' : undefined}
+            data-has-proof={profile || proofShot ? 'true' : undefined}
           >
             <div className='homepage-hero-canvas__lead'>
               <h1
@@ -144,7 +152,18 @@ export function HomepageHeroCanvas({
                 <p className='homepage-hero-canvas__support'>{supportNote}</p>
               </div>
             </div>
-            {profile ? (
+            {proofShot ? (
+              <div
+                className='homepage-hero-canvas__proof homepage-hero-canvas__proof--shot'
+                data-testid='homepage-hero-proof'
+              >
+                <ProductShot
+                  id={proofShot}
+                  priority
+                  sizes='(min-width: 64rem) 25rem, 90vw'
+                />
+              </div>
+            ) : profile ? (
               <div
                 className='homepage-hero-canvas__proof'
                 data-testid='homepage-hero-proof'

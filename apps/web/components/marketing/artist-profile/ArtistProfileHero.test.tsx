@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
@@ -64,5 +66,22 @@ describe('ArtistProfileHero', () => {
   it('keeps the adjacent Storybook receipt bound to the production fixture', () => {
     expect(storyMeta.component).toBe(ArtistProfileHero);
     expect(storyMeta.args?.hero).toBe(ARTIST_PROFILE_COPY.hero);
+  });
+
+  it('composes the marketing hero primitives directly, not homepage aliases', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/marketing/artist-profile/ArtistProfileHero.tsx'
+      ),
+      'utf8'
+    );
+    expect(source).toContain(
+      "from '@/components/marketing/MarketingPosterHero'"
+    );
+    expect(source).toContain(
+      "from '@/components/marketing/MarketingElectricSeam'"
+    );
+    expect(source).not.toMatch(/HomepagePosterHero|HomepageElectricSeam/);
   });
 });

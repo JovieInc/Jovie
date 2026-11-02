@@ -77,7 +77,13 @@ describe('semantic prior value requirements', () => {
     const sectionIds = composition.sections.map(section => section.sectionId);
 
     expect(composition.recipeId).toBe('homepage');
-    expect(sectionIds).toEqual(['hero', 'product-gallery', 'cta']);
+    expect(sectionIds).toEqual([
+      'hero',
+      'how-it-works',
+      'feature-split',
+      'pricing',
+      'cta',
+    ]);
     for (const [index, sectionId] of sectionIds.entries()) {
       expect(hasRequiredPrior(sectionId, sectionIds.slice(0, index))).toBe(
         true

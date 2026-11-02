@@ -15,12 +15,13 @@ import {
 const clone = <T>(value: T): T => structuredClone(value);
 
 function cleanSpec(): MarketingPageSpec {
-  const spec = clone(DEFAULT_HOME_SPEC);
-  const hero = spec.sections[0];
-  if (hero?.section !== 'hero') throw new Error('hero first');
-  hero.copy.subhead =
-    'A free profile for your work, bio, and links. Your latest release leads, with tour dates and updates one tap away.';
-  return spec;
+  return clone(DEFAULT_HOME_SPEC);
+}
+
+function loopOf(spec: MarketingPageSpec) {
+  const loop = spec.sections.find(s => s.section === 'how-it-works');
+  if (loop?.section !== 'how-it-works') throw new Error('loop');
+  return loop;
 }
 
 const validate = (data: unknown, key = 'home') =>
@@ -39,15 +40,21 @@ describe('marketing-page content kind', () => {
   it('keeps the code default in sync with the rendered homepage order', () => {
     expect(DEFAULT_HOME_SPEC.sections.map(s => s.section)).toEqual([
       'hero',
-      'product-gallery',
+      'how-it-works',
+      'feature-split',
+      'pricing',
       'cta',
     ]);
   });
 
   it('flags audience language on the general homepage (MKT-D16)', () => {
-    // The shipped default subhead still says "music"; the first publish
-    // has to clear it, and no spec can reintroduce it.
-    expect(errorsOf(DEFAULT_HOME_SPEC)).toEqual([
+    // The shipped default is clean; no spec can introduce segment words.
+    expect(errorsOf(DEFAULT_HOME_SPEC)).toEqual([]);
+    const spec = cleanSpec();
+    const hero = spec.sections[0];
+    if (hero?.section !== 'hero') throw new Error('hero first');
+    hero.copy.subhead = 'Smart links for your music.';
+    expect(errorsOf(spec)).toEqual([
       expect.stringContaining('"music" is audience language'),
     ]);
   });
@@ -83,7 +90,7 @@ describe('marketing-page content kind', () => {
   it('rejects prices typed into copy (same price everywhere)', () => {
     for (const text of ['Only $12 to start', 'Pro is 12 USD', 'Pay 9/mo']) {
       const spec = cleanSpec();
-      const cta = spec.sections[2];
+      const cta = spec.sections.at(-1);
       if (cta?.section !== 'cta') throw new Error('cta last');
       cta.copy.subhead = text;
       expect(errorsOf(spec).join(' ')).toMatch(/offer truth/);
@@ -96,9 +103,14 @@ describe('marketing-page content kind', () => {
     expect(errorsOf(swapped).join(' ')).toMatch(/hero section must come first/);
 
     const ctaMiddle = cleanSpec();
-    const [hero, gallery, cta] = ctaMiddle.sections;
-    ctaMiddle.sections = [hero!, cta!, gallery!];
+    const cta = ctaMiddle.sections.pop()!;
+    ctaMiddle.sections.splice(1, 0, cta);
     expect(errorsOf(ctaMiddle).join(' ')).toMatch(/closing cta must be last/);
+
+    // A partial homepage (an older published record) falls back to default.
+    const partial = cleanSpec();
+    partial.sections = partial.sections.filter(s => s.section !== 'pricing');
+    expect(errorsOf(partial).join(' ')).toMatch(/must place "pricing"/);
 
     const duplicate = cleanSpec();
     duplicate.sections.splice(1, 0, clone(duplicate.sections[1]!));
@@ -107,21 +119,18 @@ describe('marketing-page content kind', () => {
 
   it('rejects markup and multi-line copy', () => {
     const spec = cleanSpec();
-    const gallery = spec.sections[1];
-    if (gallery?.section !== 'product-gallery') throw new Error('gallery');
-    gallery.copy.headline = 'Bold <b>claim</b>';
+    loopOf(spec).copy.headline = 'Bold <b>claim</b>';
     expect(errorsOf(spec).join(' ')).toMatch(/Single line/);
   });
 
   it('validates experiment variants with the same rules as the control', () => {
     const spec = cleanSpec();
     const variantBody = clone(spec.sections);
-    const gallery = variantBody[1];
-    if (gallery?.section !== 'product-gallery') throw new Error('gallery');
+    const gallery = loopOf({ sections: variantBody });
     gallery.copy.headline = 'Every fan sees one clear thing.';
     spec.experiment = {
-      id: 'home-gallery-headline',
-      hypothesis: 'A sharper gallery headline lifts profile claims.',
+      id: 'home-loop-headline',
+      hypothesis: 'A sharper loop headline lifts profile claims.',
       metric: { funnel: 'artist_signup', step: 'cta_click' },
       status: 'running',
       variants: [{ id: 'sharper', weight: 50, body: variantBody }],
@@ -132,7 +141,7 @@ describe('marketing-page content kind', () => {
       ),
     ]);
 
-    gallery.copy.headline = 'Your profile leads with the one thing that fits.';
+    gallery.copy.headline = 'Every listen can become a subscriber.';
     expect(errorsOf(spec)).toEqual([]);
   });
 

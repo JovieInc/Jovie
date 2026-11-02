@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react';
 import {
   HomepageArtistHero,
-  HomepageFanStates,
-  HomepageOfferClose,
+  HomepageClose,
+  HomepageLoop,
+  HomepageOffer,
+  HomepageOwnership,
 } from '@/components/homepage/HomepageArtistProfile';
 import { HOMEPAGE_COPY } from '@/data/homepageCopy';
-import { HOMEPAGE_FAN_STATES_COPY } from '@/data/homepageFanStatesCopy';
 import type {
   MarketingPageSection,
   MarketingPageSections,
@@ -14,7 +15,8 @@ import type {
 /**
  * Renders a homepage spec (`lib/content-records/marketing-page.ts`) with the
  * registered DS section components. A spec only fills copy slots and picks
- * order; components, layout, offer facts, and locked lines stay in code.
+ * order; components, shots, layout, offer facts, and locked lines stay in
+ * code.
  */
 
 function renderSection(
@@ -38,30 +40,31 @@ function renderSection(
           }}
         />
       );
-    case 'product-gallery':
+    case 'how-it-works':
+      return <HomepageLoop key='how-it-works' headline={entry.copy.headline} />;
+    case 'feature-split':
       return (
-        <HomepageFanStates
-          key='product-gallery'
-          copy={{ ...HOMEPAGE_FAN_STATES_COPY, headline: entry.copy.headline }}
+        <HomepageOwnership
+          key='feature-split'
+          headline={entry.copy.headline}
+          body={entry.copy.body}
+        />
+      );
+    case 'pricing':
+      return (
+        <HomepageOffer
+          key='pricing'
+          headline={entry.copy.headline}
+          plansLinkLabel={entry.copy.plansLinkLabel}
         />
       );
     case 'cta':
       return (
-        <HomepageOfferClose
+        <HomepageClose
           key='cta'
-          offer={{
-            ...HOMEPAGE_COPY.offer,
-            headline: entry.copy.headline,
-            plansLink: {
-              ...HOMEPAGE_COPY.offer.plansLink,
-              label: entry.copy.plansLinkLabel,
-            },
-          }}
-          close={{ subhead: entry.copy.subhead }}
-          claim={{
-            ...HOMEPAGE_COPY.hero.claim,
-            action: claimAction,
-          }}
+          headline={entry.copy.headline}
+          subhead={entry.copy.subhead}
+          claim={{ ...HOMEPAGE_COPY.hero.claim, action: claimAction }}
         />
       );
   }

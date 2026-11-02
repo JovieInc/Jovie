@@ -1,7 +1,7 @@
 import Image from 'next/image';
-import { HomepageElectricSeam } from '@/components/homepage/HomepageElectricSeam';
-import { HomepagePosterHero } from '@/components/homepage/HomepagePosterHero';
 import { HomepageTrackedLink } from '@/components/homepage/HomepageTrackedLink';
+import { MarketingElectricSeam } from '@/components/marketing/MarketingElectricSeam';
+import { MarketingPosterHero } from '@/components/marketing/MarketingPosterHero';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
@@ -40,7 +40,7 @@ export function ArtistProfileHero({ hero }: Readonly<ArtistProfileHeroProps>) {
 
   return (
     <div className='ap-hero'>
-      <HomepagePosterHero
+      <MarketingPosterHero
         headingId='artist-profile-hero-heading'
         sectionVariant='centered-phone'
         sectionOwner='apps/web/components/marketing/MarketingPosterHero.tsx'
@@ -59,7 +59,7 @@ export function ArtistProfileHero({ hero }: Readonly<ArtistProfileHeroProps>) {
           eventProperties: { source: 'artist-profiles-hero' },
         }}
         seam={
-          <HomepageElectricSeam
+          <MarketingElectricSeam
             idSeed='artist-profile-hero-electric-seam'
             className='homepage-poster-hero__electric-seam'
           />

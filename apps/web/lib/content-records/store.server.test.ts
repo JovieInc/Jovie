@@ -88,6 +88,13 @@ const { MARKETING_PAGE_KIND, DEFAULT_HOME_SPEC } = await import(
 );
 const store = await import('./store.server');
 
+function invalidSpec() {
+  const spec = structuredClone(DEFAULT_HOME_SPEC);
+  const hero = spec.sections[0];
+  if (hero?.section === 'hero') hero.copy.subhead = 'Smart links for music.';
+  return spec;
+}
+
 function validSpec() {
   const spec = structuredClone(DEFAULT_HOME_SPEC);
   const hero = spec.sections[0];
@@ -150,7 +157,8 @@ describe('content record store', () => {
     await expect(
       store.createContentVersion(MARKETING_PAGE_KIND, {
         key: 'home',
-        data: DEFAULT_HOME_SPEC,
+        // Segment language on the general homepage fails validation.
+        data: invalidSpec(),
         author: 'agent:summer',
       })
     ).rejects.toBeInstanceOf(store.ContentValidationError);

@@ -5,8 +5,10 @@ import type { ReactNode } from 'react';
 import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
 import {
   HomepageArtistHero,
-  HomepageFanStates,
-  HomepageOfferClose,
+  HomepageClose,
+  HomepageLoop,
+  HomepageOffer,
+  HomepageOwnership,
 } from '@/components/homepage/HomepageArtistProfile';
 import {
   FaqSection,
@@ -79,7 +81,7 @@ export const homepage: Story = {
     docs: {
       description: {
         story:
-          'Proven recipe `homepage` — reference route `/`: the artist-profile hero, three real profile states, then the free offer with the same claim.',
+          'Proven recipe `homepage` — reference route `/`: the link, the loop, the list you own, the offer, and the close.',
       },
     },
   },
@@ -87,8 +89,10 @@ export const homepage: Story = {
     <RecipeChrome recipeId='homepage'>
       <PublicPageShell>
         <HomepageArtistHero />
-        <HomepageFanStates />
-        <HomepageOfferClose />
+        <HomepageLoop />
+        <HomepageOwnership />
+        <HomepageOffer />
+        <HomepageClose />
       </PublicPageShell>
     </RecipeChrome>
   ),

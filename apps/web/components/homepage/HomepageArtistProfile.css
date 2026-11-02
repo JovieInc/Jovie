@@ -1,77 +1,12 @@
 /*
- * Artist-profile homepage (EVENT 2026-10-20).
+ * Homepage sections (Tim, 2026-11-01): link, loop, list, offer, close.
  *
  * Tokens only: spacing from --space-*, type from the shared marketing scale
  * classes in the TSX, color from semantic tokens. One page spine: the hero
  * and every section use .ap-section-container (ArtistProfileSectionShell.css).
- * No scroll reveals; the only motion is the claim form's own feedback.
+ * Product imagery is <ProductShot>; its frame lives in ProductShot.css.
+ * No scroll reveals and no hover motion.
  */
-
-/* ── Hero ─────────────────────────────────────────────────────────────── */
-
-.homepage-artist-hero {
-  /* <main> already clears the shell header; this is hero rhythm only. */
-  overflow: clip;
-  padding-block: var(--space-12) var(--space-16);
-}
-
-.homepage-artist-hero__inner {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-12);
-  /* Width and gutter come from .ap-section-container, the one marketing
-     spine shared with every ArtistProfileSectionShell section below. */
-  margin-inline: auto;
-  align-items: center;
-}
-
-.homepage-artist-hero__copy {
-  max-width: 36rem;
-}
-
-.homepage-artist-hero__subhead {
-  margin-top: var(--space-6);
-  max-width: 32rem;
-}
-
-.homepage-artist-hero__claim {
-  margin-top: var(--space-8);
-  max-width: 28rem;
-}
-
-/* The form reserves its own status line; the support note sits under it. */
-.homepage-artist-hero__support {
-  padding-inline: var(--space-1);
-  font-size: var(--text-sm);
-  color: var(--color-text-tertiary-token);
-}
-
-.homepage-artist-hero__media {
-  display: flex;
-  justify-content: center;
-}
-
-.homepage-artist-hero__phone {
-  width: min(72vw, 18rem);
-}
-
-@media (min-width: 64rem) {
-  .homepage-artist-hero {
-    padding-block: var(--space-16) var(--space-24);
-  }
-
-  .homepage-artist-hero__inner {
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
-    gap: var(--space-16);
-  }
-
-  .homepage-artist-hero__phone {
-    width: 21.25rem;
-  }
-}
-
-/* ── Sections ─────────────────────────────────────────────────────────── */
-/* ArtistProfileSectionShell owns rhythm, container, and the content spine. */
 
 .homepage-artist-section {
   border-top: 1px solid var(--color-border-subtle);
@@ -81,34 +16,111 @@
   max-width: 22ch;
 }
 
-/* ── Fan states ───────────────────────────────────────────────────────── */
+/* ── Loop: three equal columns, shots on one baseline ───────────────────── */
 
-.homepage-fan-states__gallery {
-  --marketing-phone-gallery-bleed: var(--ap-page-gutter);
-
-  margin-top: var(--space-12);
-}
-
-/* ── Offer and close ──────────────────────────────────────────────────── */
-
-.homepage-offer-close__grid {
+.homepage-loop__steps {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-12);
-  align-items: start;
+  margin-top: var(--space-12);
 }
 
-.homepage-offer-close__subhead {
+.homepage-loop__step {
+  display: grid;
+  /* Media row, title row, body row: subgrid keeps all three columns'
+     titles on one line at desktop even when a body wraps. */
+  grid-template-rows: auto auto 1fr;
+  align-content: start;
+  min-width: 0;
+}
+
+/* Every media box is the same height so the three titles share a baseline;
+   staged shots center inside it on the matte card. */
+.homepage-loop__media {
+  display: flex;
+  height: 18rem;
+}
+
+.homepage-loop__media > .product-shot {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The whole moment stays visible: the shot scales down inside the stage
+   (its padding is --space-6 on each side) instead of being clipped. */
+.homepage-loop__media .product-shot__image {
+  max-height: calc(18rem - 2 * var(--space-6));
+  width: auto;
+  object-fit: contain;
+}
+
+.homepage-loop__title {
+  margin-top: var(--space-6);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-snug);
+  color: var(--color-text-primary-token);
+}
+
+.homepage-loop__body {
+  margin-top: var(--space-2);
+  max-width: 34ch;
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-secondary-token);
+}
+
+@media (min-width: 64rem) {
+  .homepage-loop__steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: var(--space-6);
+    /* Subgrid rows inherit this gap; title and body keep their own margins. */
+    row-gap: 0;
+  }
+
+  .homepage-loop__step {
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+  }
+}
+
+/* ── Ownership: copy left, the list right ─────────────────────────────── */
+
+.homepage-ownership__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-10);
+  align-items: center;
+}
+
+.homepage-ownership__body {
   margin-top: var(--space-5);
-  max-width: 30rem;
-}
-
-.homepage-offer-close__claim {
-  margin-top: var(--space-8);
   max-width: 28rem;
 }
 
-.homepage-offer-close__plans {
+.homepage-ownership__media,
+.homepage-close__media {
+  min-width: 0;
+}
+
+@media (min-width: 64rem) {
+  .homepage-ownership__grid {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: var(--space-16);
+  }
+}
+
+/* ── Offer: two plans on shared row tracks ────────────────────────────── */
+
+.homepage-offer__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.homepage-offer__plans {
   display: inline-flex;
   align-items: center;
   min-height: var(--space-11);
@@ -122,14 +134,79 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .homepage-offer-close__plans:hover {
+  .homepage-offer__plans:hover {
     color: var(--color-text-primary-token);
   }
 }
 
+.homepage-offer__plans-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+  margin-top: var(--space-10);
+}
+
+.homepage-offer__plan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.homepage-offer__plan-name {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary-token);
+}
+
+.homepage-offer__summary {
+  flex: 1;
+}
+
 @media (min-width: 64rem) {
-  .homepage-offer-close__grid {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 26rem);
+  .homepage-offer__plans-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ── Close: claim left, the Spotify search right ──────────────────────── */
+
+.homepage-close__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-10);
+  align-items: center;
+}
+
+.homepage-close__subhead {
+  margin-top: var(--space-5);
+  max-width: 30rem;
+}
+
+.homepage-close__claim {
+  margin-top: var(--space-8);
+  max-width: 28rem;
+}
+
+@media (min-width: 64rem) {
+  .homepage-close__grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: var(--space-16);
+  }
+}
+
+/* Wide shots read at desktop width only; phones get their own tighter crop
+   (a separate registry shot). The hidden lazy image never loads. */
+.homepage-shot--phone {
+  display: none;
+}
+
+@media (max-width: 47.99rem) {
+  .homepage-shot--wide {
+    display: none;
+  }
+
+  .homepage-shot--phone {
+    display: block;
   }
 }

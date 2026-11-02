@@ -306,8 +306,18 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       // an attributable permission or adoption receipt.
       approvedVariantBinding(
         'apps/web/components/homepage/HomepageArtistProfile.tsx',
-        'product-gallery',
-        'profile-grid'
+        'how-it-works',
+        '3-step-media'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/homepage/HomepageArtistProfile.tsx',
+        'feature-split',
+        'editorial'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/homepage/HomepageArtistProfile.tsx',
+        'pricing',
+        'tier-cards-neutral'
       ),
       approvedVariantBinding(
         'apps/web/components/homepage/HomepageArtistProfile.tsx',
@@ -318,9 +328,9 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     bindingEvidence: {
       status: 'verified',
       source:
-        'EVENT 2026-10-20 artist-profile homepage (HomepageArtistProfile.tsx); homepage-contract render test; marketing-route-health observer on the reviewed head',
+        'Tim 2026-11-01 five-beat homepage (HomepageArtistProfile.tsx); homepage-contract render test; marketing-route-health observer on the reviewed head',
       notes:
-        'One source owner for hero, product gallery, and the offer close. Deployment, visual certification, and Tim Taste remain separate receipts.',
+        'One source owner for hero, loop, list, offer and close; every visual is a registry product shot. Deployment, visual certification, and Tim Taste remain separate receipts.',
     },
     status: 'active',
     specVersion: '1.4.0',
