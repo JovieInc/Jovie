@@ -16,6 +16,15 @@ export function dormantReceipt({
 } = {}) {
   const startedAt = now().toISOString();
   const requestedMode = env.MODE || 'off';
+  /**
+   * @type {{
+   *   schema: string, mode: 'off', requestedMode: string,
+   *   backend: 'unconfigured', repo: string, startedAt: string,
+   *   stages: {start: string}, outcome: string, models: string[],
+   *   costUsd: 0, attempted: false, pushedSha: null,
+   *   sha?: string, pr?: number | null, runId?: number, workflow?: string
+   * }}
+   */
   const receipt = {
     schema: SCHEMA,
     mode: 'off',
