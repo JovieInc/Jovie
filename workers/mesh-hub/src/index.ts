@@ -185,6 +185,7 @@ const BOARD_OPS = new Set([
   'post',
   'claim',
   'update',
+  'note',
   'done',
   'answer',
   'cancel',
