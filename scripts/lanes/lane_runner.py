@@ -10146,6 +10146,20 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
         except Exception as error:  # the sweep never takes dispatch down
             tick["worktreeSweep"] = f"{type(error).__name__}: {error}"[:200]
         if not tick["disk"].get("admitted"):
+            if not os.environ.get("LANES_SELFTEST"):
+                try:
+                    # Drain the Linear outbox even on a denied tick (JOV-10355, four recurrences):
+                    # the outbox is the doctor's own reporting channel — the writes that raise
+                    # and clear the disk condition travel through it — and starving it during a
+                    # disk emergency blinds the board exactly then. The flush is bounded
+                    # (FLUSH_LIMIT/FLUSH_BUDGET_S) and writes only small state JSONs on the
+                    # state root, never the worktree volume that is full; `admit` here is the
+                    # Linear client's rate budget, not disk admission.
+                    client = Linear(host.linear_env)
+                    tick["linearSync"] = {"outbox": linear_sync.flush(host.state, client, client.admit,
+                                                                     (LinearRateLimited,))}
+                except (Exception, SystemExit) as error:
+                    tick["linearSyncError"] = f"{type(error).__name__}: {error}"[:200]
             raise DiskAdmissionError(tick["disk"].get("reason", "disk-unobservable"))
         ensure_full_history(host)
         if not os.environ.get("LANES_SELFTEST"):

@@ -80,6 +80,31 @@ PLIST
 else
   units="$HOME/.config/systemd/user"
   mkdir -p "$units"
+  # Keep scanner clones and validation temporaries on the operator-selected volume.
+  # Unset leaves existing placement intact; never chmod a shared temporary root.
+  if [ -n "${LANES_TMPDIR:-}" ]; then
+    temp_dir="$(python3 -c '
+import os, pathlib, sys
+value = sys.argv[1]
+path = pathlib.Path(value)
+if not path.is_absolute() or any(c in value for c in ("\"", "\\", "%", "\n", "\r", "\0")):
+    raise SystemExit("LANES_TMPDIR must be an absolute, unit-safe path")
+if not path.exists():
+    path.mkdir(mode=0o700, parents=True)
+info = path.lstat()
+if path.is_symlink() or not path.is_dir() or info.st_uid != os.getuid() or info.st_mode & 0o7777 != 0o700:
+    raise SystemExit("LANES_TMPDIR must be a private mode-700 directory owned by the installing user")
+print(path)
+' "$LANES_TMPDIR")"
+    for lane_unit in jovie-lanes jovie-lanes-watchdog jovie-lanes-wake; do
+      mkdir -p "$units/$lane_unit.service.d"
+      cat >"$units/$lane_unit.service.d/65-temp-placement.conf" <<UNIT
+[Service]
+# Managed by scripts/lanes/install.sh with LANES_TMPDIR.
+Environment="TMPDIR=$temp_dir"
+UNIT
+    done
+  fi
   cat >"$units/jovie-lanes.service" <<UNIT
 [Unit]
 Description=Jovie shipping lanes: drain-safe update, then dispatch free slots
