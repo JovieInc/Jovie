@@ -888,26 +888,15 @@
   }
 }
 
+/* Sticky table headers paint a fully opaque app-shell content surface (the
+   same surface as the sticky group header). A translucent surface plus
+   backdrop-filter is WebKit-unstable on sticky table cells: WebKit composites
+   the filter against the wrong backdrop, so scrolled rows bleed through and
+   overlap the column labels (JOV-9079). */
 :where(.system-b-table-sticky-header) {
-  background: color-mix(
-    in oklab,
-    var(--system-b-app-content-surface) 92%,
-    transparent
-  );
+  background: var(--system-b-app-content-surface);
   box-shadow: inset 0 -1px 0
     color-mix(in oklab, var(--system-b-app-shell-border) 74%, transparent);
-}
-
-@supports (backdrop-filter: blur(1px)) {
-  :where(.system-b-table-sticky-header) {
-    backdrop-filter: blur(14px);
-  }
-}
-
-@supports (-webkit-backdrop-filter: blur(1px)) {
-  :where(.system-b-table-sticky-header) {
-    -webkit-backdrop-filter: blur(14px);
-  }
 }
 
 :where(.system-b-table-sticky-group-header) {
