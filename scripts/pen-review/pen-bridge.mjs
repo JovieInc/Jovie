@@ -95,7 +95,33 @@ function plainMessages(text) {
  * @param {string[]} snippets
  * @param {{app?: string, inFile?: string, outFile?: string, timeoutMs?: number, spawn?: Function}} [opts]
  */
-export function runPen(
+export function runPen(snippets, opts = {}) {
+  // The live attach can fail transiently while another client (the MCP, a
+  // fixer) holds the app's IPC ("Cannot destructure property 'context'").
+  // Retry those only; a real execute error fails at once.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return runPenOnce(snippets, opts);
+    } catch (error) {
+      if (
+        opts.inFile ||
+        attempt >= 2 ||
+        !/IPC|context' of|Connection|ECONNRESET|no result/.test(
+          String(error.message)
+        )
+      )
+        throw error;
+      Atomics.wait(
+        new Int32Array(new SharedArrayBuffer(4)),
+        0,
+        0,
+        3000 * (attempt + 1)
+      );
+    }
+  }
+}
+
+function runPenOnce(
   snippets,
   {
     app = 'desktop',

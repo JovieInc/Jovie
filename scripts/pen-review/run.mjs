@@ -507,7 +507,25 @@ async function main(argv) {
   }
   const results = [];
   for (const id of ids) {
-    const rec = await reviewFrame(id, opts);
+    let rec;
+    try {
+      rec = await reviewFrame(id, opts);
+    } catch (error) {
+      // One frame's infrastructure failure never stops the batch.
+      ledger({
+        stage: 'pen-review-frame',
+        frame: id,
+        verdict: 'error',
+        error: String(error.message).slice(0, 200),
+        finishedAt: now(),
+      });
+      results.push({
+        id,
+        verdict: 'error',
+        error: String(error.message).slice(0, 200),
+      });
+      continue;
+    }
     results.push({
       id,
       name: rec.frame.name,
