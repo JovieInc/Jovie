@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import {
+  cpSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { load as yamlLoad } from 'js-yaml';
 import { validateEscapedDefectClosureEvidence } from './lib/escaped-defect-closure.mjs';
@@ -408,6 +415,48 @@ test('shipping SLO retains monitoring while only evidence events run post-mortem
     quality.jobs.find.steps.map(step => step.run ?? '').join('\n'),
     /postmortem-review\.mjs/
   );
+});
+
+test('--check is the offline queue gate for recurring classes without a class action', () => {
+  const run = root =>
+    spawnSync(
+      process.execPath,
+      [
+        resolve(REPO_ROOT, 'scripts/postmortem-review.mjs'),
+        '--check',
+        '--root',
+        root,
+      ],
+      { encoding: 'utf8', env: { PATH: process.env.PATH } }
+    );
+  const clean = run(REPO_ROOT);
+  assert.equal(clean.status, 0, clean.stderr);
+  assert.match(clean.stdout, /class actions ok/);
+
+  const root = mkdtempSync(join(tmpdir(), 'pm-check-'));
+  try {
+    cpSync(
+      resolve(REPO_ROOT, 'docs/postmortems'),
+      join(root, 'docs/postmortems'),
+      {
+        recursive: true,
+      }
+    );
+    const registryPath = join(
+      root,
+      'docs/postmortems/failure-class-actions.json'
+    );
+    const registry = JSON.parse(readFileSync(registryPath, 'utf8'));
+    registry.actions = registry.actions.filter(
+      action => action.failureClass !== 'serial-layer-discovery'
+    );
+    writeFileSync(registryPath, JSON.stringify(registry));
+    const drifted = run(root);
+    assert.equal(drifted.status, 1);
+    assert.match(drifted.stderr, /serial-layer-discovery/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('scheduled learning commands reject before filesystem scans or network work', () => {

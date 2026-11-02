@@ -731,7 +731,8 @@ function parseArgs(argv) {
   const args = { apply: false, compact: false, mirror: false };
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
-    if (value === '--apply') args.apply = true;
+    if (value === '--check') args.check = true;
+    else if (value === '--apply') args.apply = true;
     else if (value === '--compact') args.compact = true;
     else if (value === '--mirror') args.mirror = true;
     else if (value.startsWith('--')) args[value.slice(2)] = argv[++index];
@@ -745,6 +746,22 @@ async function main() {
   const repoRoot = args.root ? resolve(args.root) : REPO_ROOT;
   const documents = readPostmortemDocuments(repoRoot);
   const classActionRegistry = readClassActionRegistry(repoRoot);
+  if (args.check) {
+    // Offline gate (queue drift precheck): a recurring failure class with no
+    // class action fails review, so catch it before a PR enters the queue.
+    const missing = buildReviewReport({
+      documents,
+      classActionRegistry,
+      generatedAt: new Date(),
+    }).summary.recurringWithoutAction;
+    if (missing.length > 0) {
+      process.stderr.write(
+        `postmortem-review: recurring failure classes without a class action in docs/postmortems/failure-class-actions.json: ${missing.join(', ')}\n`
+      );
+      process.exitCode = 1;
+    } else process.stdout.write('postmortem-review: class actions ok\n');
+    return;
+  }
   let actionIds = unique([
     ...documents.flatMap(document => {
       const meta = parseFrontmatter(document.source) ?? {};
