@@ -300,7 +300,8 @@ export const HELPFULNESS_CASES: readonly HelpfulnessCase[] = [
     ],
     ask: 'I want my youtube channel set up properly',
     mustMentionAny: [
-      ['@cassarden', 'youtube.com/@cassarden'],
+      // The channel is known: named, or its own subscriber count cited.
+      ['@cassarden', 'youtube.com/@cassarden', '24.1k', '24,100'],
       ['description', 'pinned comment', 'playlist', 'end screen'],
     ],
     expectToolsAny: ['auditYouTubeChannel'],
@@ -326,7 +327,10 @@ export const HELPFULNESS_CASES: readonly HelpfulnessCase[] = [
       },
     ],
     ask: 'you should already have that',
-    mustMentionAny: [['@cassarden', 'youtube.com/@cassarden']],
+    mustMentionAny: [
+      // The channel is known: named, or its own subscriber count cited.
+      ['@cassarden', 'youtube.com/@cassarden', '24.1k', '24,100'],
+    ],
     expectToolsAny: ['auditYouTubeChannel'],
     great:
       'Owns it in a few words, names the channel it already has (@cassarden) and moves straight to the audit and the first concrete move. No settings-page deflection, no request for links.',
