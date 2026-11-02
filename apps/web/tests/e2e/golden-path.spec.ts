@@ -2,7 +2,7 @@ import { neon } from '@neondatabase/serverless';
 import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { productionUpstashCredentials } from '@/lib/redis-store';
-import { issueGoldenPathInvitation } from '@/lib/synthetic/golden-path-invitation-fixture';
+import { issueGoldenPathInvitation } from '@/lib/testing/golden-path-invitation-fixture';
 import {
   ensureSignedInUser,
   fillControlledInputUntilEnabled,

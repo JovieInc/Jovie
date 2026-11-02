@@ -43,11 +43,11 @@ import {
   baUsers,
   baVerifications,
 } from '@/lib/db/schema/better-auth';
-import { issueGoldenPathInvitation } from '@/lib/synthetic/golden-path-invitation-fixture';
 import {
   newProdcertUserEmail,
   PRODCERT_RETURNING_CANARY_EMAIL,
 } from '@/lib/synthetic/prodcert-identities';
+import { issueGoldenPathInvitation } from '@/lib/testing/golden-path-invitation-fixture';
 import { redeemWaitlistInviteToken } from '@/lib/waitlist/redeem';
 import { hashWaitlistInviteToken } from '@/lib/waitlist/tokens';
 import { assertNewAccountAdmission } from './signup-admission';

@@ -18,7 +18,7 @@ export async function issueGoldenPathInvitation(
   if (
     environment.E2E_TEST_MODE !== '1' ||
     environment.VERCEL_ENV !== 'development' ||
-    !/^gp-[a-z0-9]+\+e2e@test\.jovie\.com$/.test(normalized)
+    !/^gp-(?:[a-z0-9]+)\+e2e@test\.jovie\.com$/.test(normalized)
   ) {
     throw new Error(
       'Golden Path invitation requires its isolated test identity'
