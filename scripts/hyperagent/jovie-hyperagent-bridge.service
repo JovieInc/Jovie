@@ -1,0 +1,16 @@
+[Unit]
+Description=Jovie mesh board bridge to Hyperagent (canon MESH-SWARM.md)
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Environment=MESH_TOKEN_FILE=%h/.jovie/mesh/hyperagent-bridge/token
+Environment=HYPERAGENT_BIN=%h/.jovie/mesh/hyperagent-bridge/lib/jovie-hyperagent/hyperagent.py
+Environment=HYPERAGENT_MODEL=fable-5.1
+ExecStart=/usr/bin/python3 %h/.jovie/mesh/hyperagent-bridge/hyperagent-bridge.py
+Restart=always
+RestartSec=10
+Nice=10
+
+[Install]
+WantedBy=default.target
