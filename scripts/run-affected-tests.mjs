@@ -50,6 +50,10 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
   // Homepage copy modules live under data/, outside the component/app import
   // graph. Bind each one to the unit tests that import it.
   [
+    'apps/web/data/homepageSearchCopy.ts',
+    ['apps/web/components/homepage/HomepageNameSearch.test.tsx'],
+  ],
+  [
     'apps/web/data/homepageFrontDoorCta.ts',
     [
       'apps/web/components/features/waitlist/WaitlistPublicLanding.test.tsx',
