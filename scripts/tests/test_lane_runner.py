@@ -5449,6 +5449,7 @@ class DispatchTest(unittest.TestCase):
                     patch.object(lane.linear_sync, "tick", return_value={"JOV": {"outcome": "rate-limited"}}) as sync, \
                     patch.object(lane.macos_pool, "sample", return_value={}), \
                     patch.object(lane.epics, "reconcile", return_value={}), \
+                    patch.object(lane.escalation_reconcile, "due", return_value=False), \
                     patch.object(lane.pr_events, "tick", return_value={}), \
                     patch.object(lane.reason_lane, "tick", return_value={}), \
                     patch.object(lane.doctor, "run"), \
@@ -5456,6 +5457,10 @@ class DispatchTest(unittest.TestCase):
                 # The dispatch self-test guard must open only for this assertion; restore
                 # the marker after — inside a release self-test it was already set, and
                 # losing it would un-hermetic every later module in the same process.
+                # The escalation reconcile reads GitHub once per tick; this test opens the
+                # guard on purpose, so its due-check is patched like every other gh reader
+                # (JOV-10343: the unmocked read spawned a second subprocess and refused
+                # every release built from the tree).
                 previous_selftest = os.environ.get("LANES_SELFTEST")
                 os.environ.pop("LANES_SELFTEST", None)
                 try:
@@ -5474,6 +5479,35 @@ class DispatchTest(unittest.TestCase):
                     sync.assert_not_called()
                     self.assertIn("SystemExit", tick["linearSyncError"])
                 self.assertEqual(tick["linear"]["outbox"]["depth"], 0)
+
+    def test_escalation_reconcile_stays_hermetic_inside_the_release_selftest(self):
+        """JOV-10343: the reconcile's one budgeted gh read must never run inside a release self-test.
+        Its only guard is the LANES_SELFTEST marker; this pins that guard even when a reconcile is
+        due, so the dispatch tick cannot spawn a second subprocess and refuse every release."""
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"SYMPHONY_AUTOSCALE": "off"}), \
+                patch.object(lane.autoscale, "mode", return_value="off"), \
+                patch.object(lane.disk_guard, "check", return_value={"freePct": 50, "admitted": True}), \
+                patch.object(lane.worktree_sweep, "maybe_spawn", return_value="not-due"), \
+                patch.object(lane, "ensure_full_history"), \
+                patch.object(lane, "load_providers", return_value={"codex": {"slots": 1}}), \
+                patch.object(lane, "provider_healthy", return_value=True), \
+                patch.object(lane, "claim_remediation_events", return_value={}), \
+                patch.object(lane, "collect_shipping_origin", return_value={}), \
+                patch.object(lane, "Linear", side_effect=SystemExit("no LINEAR_API_KEY")), \
+                patch.object(lane.linear_sync, "tick", return_value={}), \
+                patch.object(lane.macos_pool, "sample", return_value={}), \
+                patch.object(lane.epics, "reconcile", return_value={}), \
+                patch.object(lane.pr_events, "tick", return_value={}), \
+                patch.object(lane.reason_lane, "tick", return_value={}), \
+                patch.object(lane.continuity_clock, "tick", return_value={"status": "current"}), \
+                patch.object(lane.doctor, "run", return_value={}), \
+                patch.object(lane.escalation_reconcile, "due", return_value=True), \
+                patch.object(lane.escalation_reconcile, "fetch_labeled", side_effect=AssertionError("self-test leak")) as probe, \
+                patch.object(lane.subprocess, "Popen") as spawn:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            self.assertEqual(lane.dispatch(host), 0)
+            probe.assert_not_called()
+            self.assertEqual(spawn.call_count, 1)
 
     def test_critical_or_unknown_disk_blocks_all_dispatch_and_installs(self):
         for pct in (None, 4.0):
