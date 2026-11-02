@@ -17,6 +17,8 @@ export const DEMO_SHOWCASE_SURFACE_IDS = [
   'onboarding-handle',
   'onboarding-dsp',
   'onboarding-profile-review',
+  'homepage-moment',
+  'homepage-email',
 ] as const;
 
 export type DemoShowcaseSurfaceId = (typeof DEMO_SHOWCASE_SURFACE_IDS)[number];

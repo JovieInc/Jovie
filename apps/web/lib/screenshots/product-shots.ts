@@ -182,6 +182,159 @@ export const PRODUCT_SHOTS = [
     ],
     placements: ['/artist-profiles', '/solutions/artists'],
   },
+  {
+    id: 'home-profile-release',
+    title: 'One link, release first',
+    alt: "Tim White's Jovie link leading with Take Me Over, with Get Updates beside the handle.",
+    route: '/demo/showcase/tim-white-profile?release=live',
+    viewport: 'mobile',
+    theme: 'dark',
+    waitFor: '[data-testid="profile-pac"]',
+    // From the handle down: the face stays off the homepage (approved
+    // people only), the release art stays square with its title below.
+    crop: [
+      '[data-testid="profile-identity-handle"]',
+      '[data-testid="profile-pac"]',
+    ],
+    // Top stays tight so the name above the handle never enters the crop.
+    padding: { top: 6, right: 20, bottom: 20, left: 20 },
+    frame: 'bare',
+    displayWidth: 400,
+    sources: [
+      `${DEMO}/DemoTimWhiteProfileSurface.tsx`,
+      `${PROFILE}/templates/ProfileCompactTemplate.tsx`,
+      `${PROFILE}/ProfileIdentityHeader.tsx`,
+      `${PROFILE}/pac/ProfilePacCard.tsx`,
+    ],
+    placements: ['/'],
+  },
+  {
+    id: 'home-smart-link',
+    title: 'Smart link chooser',
+    alt: 'The Take Me Over smart link opening Spotify, with Apple Music and YouTube Music below.',
+    route: '/demo/showcase/homepage-moment?moment=smart-link',
+    viewport: 'mobile',
+    theme: 'dark',
+    waitFor: '[data-testid="homepage-moment-smart-link"]',
+    // The chooser only: the page's title sits on the cover art, and the
+    // homepage never shows text on lettered art.
+    crop: [
+      '[data-testid="homepage-moment-smart-link"] :is(a,button,[role="button"]):has-text("Stream Now")',
+      'text=YouTube Music',
+    ],
+    padding: 24,
+    frame: 'bare',
+    displayWidth: 360,
+    sources: [
+      `${DEMO}/DemoHomepageMomentSurface.tsx`,
+      `${DEMO}/homepage-moment-fixtures.ts`,
+      'apps/web/app/r/[slug]/ReleaseLandingPage.tsx',
+      'apps/web/components/features/release/MusicServiceDial.tsx',
+    ],
+    placements: ['/'],
+  },
+  {
+    id: 'home-capture',
+    title: 'Get Updates email step',
+    alt: 'The Get Updates step asking for an email address on a Jovie link.',
+    route: '/demo/showcase/homepage-moment?moment=capture',
+    viewport: 'desktop',
+    theme: 'dark',
+    waitFor: '[data-testid="homepage-moment-capture"] input',
+    crop: ['text=Get New Music', 'text=Not Now'],
+    padding: 28,
+    frame: 'bare',
+    displayWidth: 360,
+    sources: [
+      `${DEMO}/DemoHomepageMomentSurface.tsx`,
+      `${PROFILE}/artist-notifications-cta/ProfileInlineNotificationsCTA.tsx`,
+      `${PROFILE}/artist-notifications-cta/shared.tsx`,
+      'apps/web/components/features/release/ReleaseNotificationsProvider.tsx',
+    ],
+    placements: ['/'],
+  },
+  {
+    id: 'home-release-email',
+    title: 'Release day email',
+    alt: 'The release day email: Tim White just dropped new music, The Deep End is out now, with Spotify and Apple Music buttons.',
+    route: '/demo/showcase/homepage-email',
+    viewport: 'desktop',
+    theme: 'dark',
+    waitFor: '[data-testid="homepage-moment-email"]',
+    crop: ['[data-testid="homepage-moment-email"]'],
+    frame: 'bare',
+    displayWidth: 400,
+    sources: [
+      `${DEMO}/DemoHomepageEmailMoment.tsx`,
+      `${DEMO}/homepage-moment-email.ts`,
+      `${DEMO}/homepage-moment-fixtures.ts`,
+      'apps/web/lib/email/templates/release-day-notification.ts',
+    ],
+    placements: ['/'],
+  },
+  {
+    id: 'home-subscriber-list',
+    title: 'Subscribers',
+    alt: 'The Jovie audience table listing new email subscribers, each marked Subscriber with email alerts on.',
+    route: '/demo/showcase/homepage-moment?moment=list',
+    viewport: 'desktop',
+    theme: 'dark',
+    // Last Seen formats after hydration; wait for the first relative time.
+    waitFor: '[data-testid="homepage-moment-list"] td:has-text("1h")',
+    crop: ['[data-testid="homepage-moment-list"] table'],
+    maxHeight: 260,
+    frame: 'window',
+    displayWidth: 720,
+    // Phones: the address and its Subscriber state, readable at 358 px.
+    mobile: {
+      crop: [
+        '[data-testid="homepage-moment-list"] th:has-text("Member")',
+        '[data-testid="homepage-moment-list"] :nth-match(:text-is("Subscriber"), 5)',
+      ],
+      padding: 12,
+      displayWidth: 358,
+    },
+    sources: [
+      `${DEMO}/DemoHomepageMomentSurface.tsx`,
+      `${DEMO}/homepage-moment-fixtures.ts`,
+      'apps/web/components/features/dashboard/organisms/dashboard-audience-table/DashboardAudienceTableUnified.tsx',
+    ],
+    placements: ['/'],
+  },
+  {
+    id: 'home-catalog',
+    title: 'Imported catalog',
+    alt: "Tim White's releases imported into Jovie: The Deep End and Take Me Over, each live.",
+    route: '/demo/showcase/homepage-moment?moment=catalog',
+    viewport: 'desktop',
+    theme: 'dark',
+    // Wait for real cover art, not the loading placeholder.
+    waitFor: '[data-testid="homepage-moment-catalog"] [style*="take-me-over"]',
+    // Title to status only: the date column is fixture-relative, so it
+    // never enters the crop (no invented dates on the homepage).
+    crop: [
+      '[data-testid="homepage-moment-catalog"] :text("The Deep End")',
+      '[data-testid="homepage-moment-catalog"] :nth-match(:text-is("Live"), 2)',
+    ],
+    padding: { top: 18, right: 20, bottom: 18, left: 44 },
+    frame: 'window',
+    displayWidth: 720,
+    // Phones: cover, title and type only.
+    mobile: {
+      crop: [
+        '[data-testid="homepage-moment-catalog"] :text("The Deep End")',
+        '[data-testid="homepage-moment-catalog"] :nth-match(:text-is("Single"), 2)',
+      ],
+      padding: { top: 18, right: 20, bottom: 18, left: 44 },
+      displayWidth: 358,
+    },
+    sources: [
+      `${DEMO}/DemoHomepageMomentSurface.tsx`,
+      `${DEMO}/DemoReleasesExperience.tsx`,
+      `${DEMO}/mock-release-data.ts`,
+    ],
+    placements: ['/'],
+  },
 ] as const satisfies readonly ProductShotSpec[];
 
 export type ProductShotId = (typeof PRODUCT_SHOTS)[number]['id'];
