@@ -106,7 +106,7 @@ export function runPen(snippets, opts = {}) {
       if (
         opts.inFile ||
         attempt >= 2 ||
-        !/IPC|context' of|Connection|ECONNRESET|no result/.test(
+        !/IPC|context' of|Connection|ECONNRESET|no result|timed out/.test(
           String(error.message)
         )
       )
@@ -178,7 +178,7 @@ const tagged = (lines, tag) =>
 /** Pen-side: every visible node with absolute bounds, raw + resolved props. */
 export function factsSnippet(id) {
   return `const F=${JSON.stringify(id)};const raw={};const refs={};Get(F,n=>{if(n.ref)refs[n.id]=n.ref});const out=[];const root=Get(F,{depth:0});
-Get(F,(n,c)=>{if(n.enabled===false){c.skipChildren();return}raw[n.id]={fill:n.fill,stroke:n.stroke,fontSize:n.fontSize,fontFamily:n.fontFamily,gap:n.gap,padding:n.padding}},{resolveInstances:true});
+Get(F,(n,c)=>{if(n.enabled===false){c.skipChildren();return}raw[n.id]={fill:n.fill,stroke:n.stroke,fontSize:n.fontSize,fontFamily:n.fontFamily,gap:n.gap,padding:n.padding,cornerRadius:n.cornerRadius}},{resolveInstances:true});
 Get(F,(n,c)=>{if(n.enabled===false){c.skipChildren();return}let x=0,y=0,p=c;while(p&&p.depth>0){x+=p.bounds.x;y+=p.bounds.y;p=p.parentCtx}
 const seg=n.id.split("/")[0];if(!(seg in refs)){try{refs[seg]=Get(seg,{depth:0}).ref||null}catch(e){refs[seg]=null}}const ref=n.ref||refs[n.id];let refName,segRefName;const nm=r=>{try{return Get(r,{depth:0}).name}catch(e){return undefined}};if(ref)refName=nm(ref);if(refs[seg])segRefName=nm(refs[seg]);
 out.push({id:n.id,t:n.type,nm:n.name,p:c.parentCtx?c.parentCtx.node.id:null,d:c.depth,x,y,w:c.bounds.width,h:c.bounds.height,r:raw[n.id],fill:n.fill,fs:n.fontSize,ff:n.fontFamily,fw:n.fontWeight,tx:n.type==="text"?n.content:undefined,op:n.opacity,ref,refName,segRefName,ic:n.iconFontName,cr:n.cornerRadius,prob:c.problems})},{resolveInstances:true,resolveVariables:true});

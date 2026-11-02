@@ -93,6 +93,103 @@ export function ratingFindings(frameName, texts) {
     }));
 }
 
+// ── DS surface, accent, radius and spacing rules (Tim, 2026-11-02) ─────────
+
+/** Dark-mode elevation rank of the semantic surface tokens: base -> raised -> overlay. */
+export const SURFACE_RANK = Object.freeze({
+  '$atom-surface-canvas': 0,
+  '$surface-0': 0,
+  '$atom-surface-shell': 1,
+  '$surface-1': 1,
+  '$atom-surface-card': 2,
+  '$atom-surface-elevated': 3,
+  '$atom-surface-floating': 4,
+});
+const ACCENT =
+  /^\$(ion|ultra|pulse|mint|orange|red|atom-accent-(focus|info|pulse|warning|success|danger))$/;
+const BRAND_ACCENT = /^\$(ion|ultra|pulse|atom-accent-(focus|info|pulse))$/;
+const rawNum = v => typeof v === 'number' && v > 0;
+const isScreen = n => n.w >= 360 && n.h >= 480;
+
+export function dsFindings(facts) {
+  const out = [];
+  const byId = new Map(facts.nodes.map(n => [n.id, n]));
+  const light = facts.theme?.['mode-2'] === 'light';
+  const owned = facts.nodes.filter(n => n.d > 0 && !n.inherited);
+  const brand = new Set();
+  const push = (check, n, message) =>
+    out.push({ check, severity: 'block', node: n.id, name: n.nm, message });
+  for (const n of owned) {
+    const fill = typeof n.r?.fill === 'string' ? n.r.fill : null;
+    if (fill && BRAND_ACCENT.test(fill))
+      brand.add(
+        fill
+          .replace('$atom-accent-focus', '$ion')
+          .replace('$atom-accent-info', '$ultra')
+          .replace('$atom-accent-pulse', '$pulse')
+      );
+    if (n.t === 'frame' || n.t === 'rectangle') {
+      if (!light && fill in SURFACE_RANK && !isScreen(n)) {
+        for (let p = byId.get(n.p); p; p = byId.get(p.p)) {
+          const pf = typeof p.r?.fill === 'string' ? p.r.fill : null;
+          if (pf in SURFACE_RANK) {
+            if (SURFACE_RANK[fill] < SURFACE_RANK[pf])
+              push(
+                'elevation',
+                n,
+                `surface ${fill} sits below its parent ${pf}; elevation runs base -> raised -> overlay`
+              );
+            break;
+          }
+          if (isScreen(p)) break;
+        }
+      }
+      if (fill && ACCENT.test(fill) && n.w > 64 && n.h > 64)
+        push(
+          'accent',
+          n,
+          `accent ${fill} on a ${Math.round(n.w)}x${Math.round(n.h)} surface; accent is a small, subtle signal, never a large surface`
+        );
+      if (rawNum(n.r?.cornerRadius))
+        push(
+          'ds-radius',
+          n,
+          `raw corner radius ${n.r.cornerRadius}; use a $radius token`
+        );
+      if (rawNum(n.r?.gap))
+        push('ds-spacing', n, `raw gap ${n.r.gap}; use an $app-space token`);
+      const pads = Array.isArray(n.r?.padding) ? n.r.padding : [n.r?.padding];
+      if (pads.some(rawNum))
+        push(
+          'ds-spacing',
+          n,
+          `raw padding ${JSON.stringify(n.r.padding)}; use $app-space tokens`
+        );
+    }
+    if (
+      n.t === 'text' &&
+      fill &&
+      ACCENT.test(fill) &&
+      String(n.tx ?? '').length > 32 &&
+      (n.fs ?? 14) < 18
+    )
+      push(
+        'accent',
+        n,
+        `accent ${fill} on body text; body copy uses text tokens`
+      );
+  }
+  if (brand.size > 1)
+    out.push({
+      check: 'accent',
+      severity: 'block',
+      node: facts.nodes[0]?.id,
+      name: facts.name,
+      message: `${brand.size} brand accents in one view (${[...brand].join(', ')}); use one`,
+    });
+  return out;
+}
+
 /** All brand checks over one frame's facts (see pen-bridge factsSnippet). */
 export function brandChecks(facts) {
   const nodes = facts.nodes.filter(n => n.d > 0);
@@ -101,5 +198,6 @@ export function brandChecks(facts) {
     ...dignityFindings(texts),
     ...logoFindings(nodes),
     ...ratingFindings(facts.name, texts),
+    ...dsFindings(facts),
   ];
 }

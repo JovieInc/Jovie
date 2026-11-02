@@ -152,3 +152,145 @@ test('taste issues go to the strong fixer, mechanical ones to the cheap one', as
   assert.equal(fixerModel({ source: 'clef-gate' }, {}), 'opus');
   assert.equal(fixerModel({ source: 'check' }, {}), 'sonnet');
 });
+
+test('DS rules: elevation inversion, accent misuse, raw radius and spacing', async () => {
+  const { dsFindings } = await import('./brand-checks.mjs');
+  const f = (nodes, theme = null) =>
+    dsFindings({
+      name: 'P',
+      theme,
+      nodes: [
+        {
+          id: 'F',
+          t: 'frame',
+          d: 0,
+          w: 1348,
+          h: 900,
+          r: { fill: '$atom-surface-canvas' },
+        },
+        ...nodes,
+      ],
+    }).map(x => x.check);
+  const card = {
+    id: 'c',
+    t: 'frame',
+    p: 'F',
+    d: 1,
+    w: 300,
+    h: 200,
+    r: { fill: '$atom-surface-card' },
+  };
+  assert.deepEqual(
+    f([
+      card,
+      {
+        id: 'w',
+        t: 'frame',
+        p: 'c',
+        d: 2,
+        w: 100,
+        h: 40,
+        r: { fill: '$atom-surface-canvas' },
+      },
+    ]),
+    ['elevation']
+  );
+  assert.deepEqual(
+    f([
+      card,
+      {
+        id: 'w',
+        t: 'frame',
+        p: 'c',
+        d: 2,
+        w: 100,
+        h: 40,
+        r: { fill: '$atom-surface-elevated' },
+      },
+    ]),
+    []
+  );
+  assert.deepEqual(
+    f(
+      [
+        card,
+        {
+          id: 'w',
+          t: 'frame',
+          p: 'c',
+          d: 2,
+          w: 100,
+          h: 40,
+          r: { fill: '$atom-surface-canvas' },
+        },
+      ],
+      { 'mode-2': 'light' }
+    ),
+    []
+  );
+  assert.deepEqual(
+    f([
+      {
+        id: 'a',
+        t: 'frame',
+        p: 'F',
+        d: 1,
+        w: 300,
+        h: 200,
+        r: { fill: '$ion' },
+      },
+    ]),
+    ['accent']
+  );
+  assert.deepEqual(
+    f([
+      { id: 'b', t: 'frame', p: 'F', d: 1, w: 120, h: 44, r: { fill: '$ion' } },
+    ]),
+    []
+  );
+  assert.deepEqual(
+    f([
+      {
+        id: 't',
+        t: 'text',
+        p: 'F',
+        d: 1,
+        w: 300,
+        h: 20,
+        fs: 14,
+        tx: 'A long paragraph of body copy set in the accent colour',
+        r: { fill: '$ion' },
+      },
+    ]),
+    ['accent']
+  );
+  assert.deepEqual(
+    f([
+      { id: 'b', t: 'frame', p: 'F', d: 1, w: 20, h: 20, r: { fill: '$ion' } },
+      {
+        id: 'b2',
+        t: 'frame',
+        p: 'F',
+        d: 1,
+        w: 20,
+        h: 20,
+        r: { fill: '$pulse' },
+      },
+    ]),
+    ['accent']
+  );
+  assert.deepEqual(
+    f([
+      {
+        id: 'r',
+        t: 'frame',
+        p: 'F',
+        d: 1,
+        w: 20,
+        h: 20,
+        r: { cornerRadius: 13, gap: 9, padding: [0, '$app-space-2'] },
+      },
+    ]).sort(),
+    ['ds-radius', 'ds-spacing']
+  );
+});
