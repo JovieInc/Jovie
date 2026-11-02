@@ -229,6 +229,16 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
+    // Compliance loop: privacy rules with negative controls and the tracker
+    // registry shape. The input-route tracker guard stays its own source guard.
+    id: 'privacy-compliance',
+    command:
+      'node --test --test-isolation=none scripts/compliance/privacy-rules.test.mjs',
+    inputs:
+      /^(?:apps\/web\/app\/|apps\/web\/components\/features\/tracking\/|apps\/web\/content\/legal\/|canon\/privacy\/|scripts\/compliance\/|scripts\/ci-fast-lanes\.mjs$)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     id: 'artist-profile-conformance',
     // Source Validation loads this module from trusted main; older heads may lack these files.
     command: `node ${shellQuote(fileURLToPath(new URL('./artist-profile-conformance.mjs', import.meta.url)))} && node --test --test-isolation=none ${shellQuote(fileURLToPath(new URL('./artist-profile-conformance.test.mjs', import.meta.url)))}`,
