@@ -1,3 +1,6 @@
+import { ARTIST_VISIBILITY_OFFER } from '@/lib/config/plan-prices';
+import { formatAmountNoCents } from '@/lib/utils/format-number';
+
 export type EvidenceStatus = 'verified' | 'internal' | 'unverified';
 export type ClaimClassification =
   | 'verified-fact'
@@ -8,7 +11,7 @@ export type SourceClassification =
   | 'first-party-artifact'
   | 'founder-authored'
   | 'external-context';
-export type OperatingStatus = 'LIVE' | 'DEMO' | 'MANUAL' | 'PLANNED';
+export type OperatingStatus = 'BUILT, NOT CERTIFIED' | 'DEMO' | 'PLANNED';
 export type RiskSeverity = 'critical' | 'high' | 'medium';
 export type ObjectionFrequency =
   | 'frequent'
@@ -38,6 +41,8 @@ export interface FundraisingClaim {
 }
 
 export interface CoreSlide {
+  readonly label: string;
+  readonly status: string;
   readonly id: string;
   readonly dominantSentence: string;
   readonly support: readonly string[];
@@ -99,7 +104,10 @@ export interface FundraisingRegistry {
   }[];
 }
 
-const AS_OF = '2026-07-11';
+const AS_OF = '2026-11-02';
+const OFFER = ARTIST_VISIBILITY_OFFER.pro;
+const PRICE = formatAmountNoCents(OFFER.monthlyUsd * 100);
+const OFFER_SENTENCE = `${OFFER.displayName} is ${PRICE}/month.`;
 
 function source(
   label: string,
@@ -123,10 +131,12 @@ function claim(
 function slide(
   id: string,
   dominantSentence: string,
-  support: string,
-  claimId: string
+  support: readonly string[],
+  claimId: string,
+  label: string,
+  status: string
 ): CoreSlide {
-  return { id, dominantSentence, support: [support], claimIds: [claimId] };
+  return { id, dominantSentence, support, claimIds: [claimId], label, status };
 }
 
 function operatingStep(
@@ -184,78 +194,78 @@ type AppendixInput = Parameters<typeof appendixItem>;
 
 // biome-ignore format: One content record per line prevents structural duplication while keeping review diffs readable.
 const CLAIM_DATA = [
-  ['product-demo-exists', 'A recorded product demonstration is available with captions and a reproducible in-product recording surface.', 'verified', [source('Demo video asset', '/demo/jovie-demo.mp4', 'first-party-artifact'), source('Caption file', '/demo/jovie-demo.vtt', 'first-party-artifact')], true, 'verified-fact'],
-  ['release-workflow-focus', 'The current product and demonstration are organized around release planning and execution surfaces.', 'verified', [source('Product demonstration', '/demo/video', 'first-party-artifact')], true, 'verified-fact'],
-  ['slide-thesis', 'The next bottleneck in music is not making a song; it is operating the release around it.', 'internal', [], true, 'thesis'],
-  ['slide-problem', 'Artists are asked to become a marketing department every time they release.', 'internal', [], true, 'thesis'],
-  ['slide-wedge', 'Jovie starts with one bounded job: turn release context into an executable launch plan.', 'internal', [], true, 'plan'],
-  ['slide-product', 'The product keeps the release, its opportunities, and the work to ship in one operating surface.', 'verified', [source('Product demonstration', '/demo/video', 'first-party-artifact')], true, 'verified-fact'],
-  ['slide-loop', 'The durable loop is context in, approved work out, outcomes back into the next release.', 'internal', [], true, 'plan'],
-  ['founder-artist-operator', 'Founder-provided account: Jovie is being built by the person who needed this operating system as an artist.', 'internal', [source('The Friday Problem by Tim White', '/blog/the-friday-problem', 'founder-authored')], true, 'founder-attested'],
-  ['slide-round', 'This round is for proving that release execution becomes a repeatable, paid creator workflow.', 'internal', [], true, 'plan'],
-  ['closed-loop-category-context', 'YC describes an AI operating system as a connective intelligence layer that can monitor outcomes, compare actual with desired results, and adjust.', 'verified', [source('YC Summer 2026 Requests for Startups', 'https://www.ycombinator.com/rfs', 'external-context')], false, 'verified-fact'],
+  ["slide-product", "Catalog import, profiles, release pages, chat, and merch to checkout are built.", "verified", [source("Built inventory, 2026-11-02", "urn:jovie:source:2026-11-02:built-inventory", "first-party-artifact")], true, "verified-fact"],
+  ["slide-problem", "The spike should leave a list.", "internal", [], true, "thesis"],
+  ["founder-artist-operator", "I am Jovie’s solo founder and its first customer.", "internal", [source("Tim White, team-final.txt and context.md, supplied 2026-11-02", "urn:jovie:source:2026-11-02:team-final", "founder-authored")], true, "founder-attested"],
+  ["slide-loop", "I work with one auto-scaling agent, Summer.", "verified", [source("memo-sources.md and team-final.txt, 2026-11-02", "urn:jovie:source:2026-11-02:memo-sources", "first-party-artifact")], true, "verified-fact"],
+  ["slide-wedge", "$0 revenue. Zero paying customers.", "internal", [source("Tim White, traction-1000.txt, supplied 2026-11-02", "urn:jovie:source:2026-11-02:traction-1000", "founder-authored")], true, "founder-attested"],
+  ["slide-thesis", OFFER_SENTENCE, "verified", [source("Canonical Artist Presence offer", "/pricing", "first-party-artifact")], true, "verified-fact"],
+  ["slide-round", "I am asking speedrun for $500K.", "internal", [], true, "plan"],
+  ['product-demo-exists', 'The historical walkthrough is not certification evidence.', 'internal', [], false, 'plan'],
+  ['release-workflow-focus', 'Release pages are built, not certified.', 'verified', [source('Built inventory, 2026-11-02', 'urn:jovie:source:2026-11-02:built-inventory', 'first-party-artifact')], true, 'verified-fact'],
+  ['closed-loop-category-context', 'Repeated customer value remains unproven.', 'internal', [], false, 'thesis'],
 ] as const satisfies readonly ClaimInput[];
 
 // biome-ignore format: One content record per line prevents structural duplication while keeping review diffs readable.
 const SLIDE_DATA = [
-  ['thesis', 'The next bottleneck in music is not making a song; it is operating the release around it.', 'Release work is fragmented across planning, creative, links, audience communication, and measurement.', 'slide-thesis'],
-  ['problem', 'Artists are asked to become a marketing department every time they release.', 'The work repeats, context is lost between tools, and execution competes with the music itself.', 'slide-problem'],
-  ['wedge', 'Jovie starts with one bounded job: turn release context into an executable launch plan.', 'A narrow release workflow makes inputs, approvals, outputs, and outcomes inspectable.', 'slide-wedge'],
-  ['product', 'The product keeps the release, its opportunities, and the work to ship in one operating surface.', 'The current demo shows the product experience; it is not presented as customer traction.', 'slide-product'],
-  ['loop', 'The durable loop is context in, approved work out, outcomes back into the next release.', 'Today that loop spans live product surfaces, demonstration states, manual execution, and planned automation.', 'slide-loop'],
-  ['founder', 'Founder-provided account: Jovie is being built by the person who needed this operating system as an artist.', 'Founder-market fit is the current advantage; repeatable distribution and retention still need proof.', 'founder-artist-operator'],
-  ['round', 'This round is for proving that release execution becomes a repeatable, paid creator workflow.', 'The next evidence is paid activation, repeated use across releases, and measurable time or revenue impact.', 'slide-round'],
+  ["product", "Catalog import, profiles, release pages, chat, and merch to checkout are built.", ["Nothing is certified. These are implemented paths, not proof of a completed customer journey.", "Release email is built but blocked. The catalog-reactivation agent is not built."], "slide-product", "What exists", "Built, not certified"],
+  ["problem", "The spike should leave a list.", ["Musicians and politicians both campaign in spikes, then go silent. I saw it running artist release strategy and voter-file targeting and email.", "The smallest question: can an old song bring a listener back for another song?"], "slide-problem", "The problem", "Founder observation"],
+  ["founder", "I am Jovie’s solo founder and its first customer.", ["I have been an artist for 15 years and ran release strategy for artists at Big Management.", "In 2016, I ran voter-file targeting and email for a large statewide PAC supporting a presidential primary campaign in New Jersey.", "I have sold software to strangers: up to eight people paid $39 a month for my Apify actor for about 15 months, with no marketing. Jovie has no paying customers yet."], "founder-artist-operator", "Why me", "Founder account"],
+  ["loop", "I work with one auto-scaling agent, Summer.", ["I give it Linear issues. It scales its coding workers to the queue, opens PRs and repairs failing CI. CI and a merge queue gate correctness; I review taste from production.", "6,818 PRs merged in 90 days. Repository count through November 2, 2026. This measures engineering output, not customer value.", "Year one went into the loop, not the product. Cost: a year of customer feedback."], "slide-loop", "How Jovie ships", "Repository evidence · 2026-11-02"],
+  ["wedge", "$0 revenue. Zero paying customers.", ["The smallest test is on my own catalog: a Jovie release page versus a plain link page on the same traffic, with two songs held out as a control. Pinned YouTube comments send listeners to each song’s page.", "Pass bar: 50 fans captured from old songs, emailed a real song they have not heard, with at least 30% clicking through.", "Pending. Release email is blocked. This tests re-engagement, not willingness to pay or an autonomous agent. No reactivation results are claimed."], "slide-wedge", "Traction and next proof", "Pre-revenue · test not run"],
+  ["thesis", OFFER_SENTENCE, ["The offer is live; willingness to pay is unproven. A fan signup is not an artist payment, and a checkout path is not a sale.", "If artists repeatedly bring listeners back, the vision is to turn a back catalog into an audience for the next release."], "slide-thesis", "Business model", "Live offer · revenue unproven"],
+  ["round", "I am asking speedrun for $500K.", ["Use-of-funds hypothesis: engineering throughput. Fund coding capacity, CI and runtime verification to turn implemented paths into certified customer journeys.", "More merged PRs alone would not validate that spend. Measure time from an observed customer problem to a verified fix, then paid activation and repeat use.", "The next proof is the catalog test and a paying artist. The ask is not a commitment, and no conversion is assumed."], "slide-round", "The ask", "Hypothesis · not committed"],
 ] as const satisfies readonly SlideInput[];
 
 // biome-ignore format: One content record per line prevents structural duplication while keeping review diffs readable.
 const OPERATING_STEP_DATA = [
-  ['catalog-context', 'LIVE', 'Collect Release Context', 'Jovie has product surfaces for creator, catalog, and release information.'],
-  ['opportunity', 'DEMO', 'Surface The Opportunity', 'The recorded walkthrough demonstrates how context becomes a release opportunity.'],
-  ['execution', 'MANUAL', 'Approve And Ship The Work', 'Human review and manual operations remain part of the current execution path.'],
-  ['learning', 'PLANNED', 'Learn From Outcomes', 'A closed outcome-to-recommendation learning loop is the product direction, not a claimed production capability.'],
+  ["catalog-context", 'BUILT, NOT CERTIFIED', "Catalog import", "Spotify catalog import is implemented."],
+  ["profile", 'BUILT, NOT CERTIFIED', "Artist profiles", "Profiles and smart links are implemented."],
+  ["release", 'BUILT, NOT CERTIFIED', "Release pages", "Pages for individual releases are implemented."],
+  ["chat", 'BUILT, NOT CERTIFIED', "Chat assistant", "The assistant and its tool routes are implemented."],
+  ["merch", 'BUILT, NOT CERTIFIED', "Merch to checkout", "Chat tools, Printful products, Stripe Checkout and order handling are implemented. No real sale is evidenced."],
 ] as const satisfies readonly OperatingStepInput[];
 
 // biome-ignore format: One content record per line prevents structural duplication while keeping review diffs readable.
 const RISK_DATA = [
-  ['product-readiness', 'How much of the agent is live today?', 'Release and creator surfaces exist. The walkthrough includes demonstration states, execution still includes manual work, and outcome-driven learning is planned.', 'critical', 'A production capability matrix verified against deployed behavior.', 'evidence', ['product-demo-exists', 'release-workflow-focus'], ['product', 'loop'], ['demo', 'operating-loop'], 'Verify each demonstrated capability against deployed behavior and record its operating status.', 'Keep the capability labels adjacent to the demo and operating loop.'],
-  ['traction', 'What customer traction is proven?', 'This portal does not claim customer, revenue, conversion, or retention metrics because current evidence has not been approved for publication.', 'critical', 'Dated customer, revenue, activation, and retention evidence.', 'evidence', [], ['product', 'round'], ['brief', 'questions'], 'Define and collect dated activation, paid usage, and repeat-release cohorts.', 'Continue stating that the demo is not traction until reviewed cohorts exist.'],
+  ['product-readiness', 'How much of the agent is live today?', 'Catalog import, profiles, release pages, chat and merch to checkout are built, not certified. Release email is built but blocked. The catalog-reactivation agent is not built.', 'critical', 'A production capability matrix verified against deployed behavior.', 'evidence', ['product-demo-exists', 'release-workflow-focus'], ['product', 'loop'], ['demo', 'operating-loop'], 'Verify each demonstrated capability against deployed behavior and record its operating status.', 'Keep the capability labels adjacent to the demo and operating loop.'],
+  ['traction', 'What customer traction is proven?', 'Jovie has $0 revenue and zero paying customers as of November 2, 2026. The catalog test has not run; the reactivation bar has not been met.', 'critical', 'Dated customer, revenue, activation, and retention evidence.', 'evidence', [], ['product', 'round'], ['brief', 'questions'], 'Define and collect dated activation, paid usage, and repeat-release cohorts.', 'Continue stating that the demo is not traction until reviewed cohorts exist.'],
   ['gtm', 'How will Jovie acquire creators?', 'Founder-led artist outreach and pre-built creator context are hypotheses to test; a repeatable paid acquisition or sales motion is not yet claimed.', 'critical', 'A defined outreach-to-paid funnel with cohort counts.', 'strategy', [], ['round'], ['questions'], 'Run a bounded founder-led outreach cohort and measure each funnel transition.', 'Describe acquisition as a hypothesis and show only observed funnel counts.'],
-  ['market', 'Is the market venture-scale?', 'The thesis is that release operations can expand into recurring creator marketing execution. This version intentionally omits unsupported top-down market arithmetic.', 'high', 'Bottom-up buyer counts, willingness to pay, and expansion sensitivity.', 'evidence', [], ['thesis', 'round'], ['brief', 'questions'], 'Build a bottom-up model from a defined buyer, observed willingness to pay, and reachable distribution.', 'Omit top-down arithmetic until its inputs and sensitivities are reviewable.'],
-  ['business-model', 'Who pays, and for what?', 'The working hypothesis is creator-paid software for recurring release operations. Pricing and packaging remain validation questions.', 'critical', 'Paid pilots and willingness-to-pay interviews tied to a specific package.', 'strategy', ['release-workflow-focus'], ['wedge', 'round'], ['brief', 'questions'], 'Test one creator-paid release-operations package through paid pilots.', 'Label pricing and packaging as a working hypothesis until payment evidence exists.'],
+  ['market', 'Is the market venture-scale?', 'No market-size claim is made. A third-party product’s users or paid subscribers do not establish Jovie’s reachable paying market.', 'high', 'Bottom-up buyer counts, willingness to pay, and expansion sensitivity.', 'evidence', [], ['thesis', 'round'], ['brief', 'questions'], 'Build a bottom-up model from a defined buyer, observed willingness to pay, and reachable distribution.', 'Omit top-down arithmetic until its inputs and sensitivities are reviewable.'],
+  ['business-model', 'Who pays, and for what?', `${OFFER_SENTENCE} The offer is live; willingness to pay and retention are unproven.`, 'critical', 'Paid pilots and willingness-to-pay interviews tied to a specific package.', 'strategy', ['release-workflow-focus'], ['wedge', 'round'], ['brief', 'questions'], 'Test one creator-paid release-operations package through paid pilots.', 'Label pricing and packaging as a working hypothesis until payment evidence exists.'],
   ['moat', 'Why will this not become a feature?', 'The proposed advantage is accumulated release context, approval history, execution reliability, and outcome data. That compounding advantage is not yet proven.', 'high', 'Evidence that repeated use improves execution or creates switching costs.', 'strategy', ['closed-loop-category-context'], ['loop'], ['operating-loop', 'questions'], 'Measure whether retained release context improves repeated execution or creates switching costs.', 'Present the compounding loop as the proposed advantage, not a proven moat.'],
   ['platform-dependency', 'How exposed is Jovie to music and social platforms?', 'Jovie depends on third-party catalog, audience, commerce, and messaging surfaces. The product must preserve first-party creator context and degrade safely when integrations change.', 'high', 'A dependency matrix with permissions, fallbacks, and owned data boundaries.', 'evidence', [], ['product', 'loop'], ['operating-loop', 'questions'], 'Document platform permissions, failure modes, fallbacks, and first-party data ownership.', 'State the dependency boundary and fallback posture without implying platform guarantees.'],
-  ['ai-commoditization', 'What remains valuable as generation gets cheaper?', 'Copy generation is not the moat. The bet is on trustworthy context, approvals, execution, and measured outcomes.', 'high', 'Production proof of execution quality and outcome capture.', 'strategy', ['closed-loop-category-context'], ['wedge', 'loop'], ['operating-loop', 'questions'], 'Prove value in context, approvals, reliable execution, and measured outcomes rather than generation.', 'Keep generative output separate from the proposed operating-system advantage.'],
+  ['ai-commoditization', 'What remains valuable as generation gets cheaper?', 'Copy generation is not the moat. The bet is on trustworthy context, approvals, execution, and measured outcomes.', 'high', 'Production proof of execution quality and outcome capture.', 'strategy', ['closed-loop-category-context'], ['wedge', 'loop'], ['operating-loop', 'questions'], 'Prove value in context, approvals, reliable execution, and measured outcomes rather than generation.', 'Keep implemented tools separate from unproven customer outcomes.'],
   ['founder-dependency', 'Can the workflow scale beyond the founder?', 'Founder expertise is currently an advantage and a concentration risk. Manual decisions must become explicit product rules and repeatable operations.', 'high', 'Non-founder operation of the workflow with consistent quality.', 'evidence', ['founder-artist-operator'], ['founder'], ['founder-letter', 'questions'], 'Have a non-founder operate the documented workflow and compare quality and completion.', 'Present founder expertise as both an advantage and a concentration risk.'],
-  ['capital', 'What does new capital prove?', 'The intended proof is paid activation, repeated release use, and measurable creator value. Round size and terms are kept out until approved evidence is current.', 'critical', 'Approved raise terms, milestone budget, and runway model.', 'evidence', [], ['round'], ['brief', 'questions'], 'Approve a milestone budget and runway model tied to paid activation and repeated release use.', 'Keep round size and terms out of the portal until the approved model is current.'],
+  ['capital', 'What does new capital prove?', 'The ask is $500K from speedrun. Engineering throughput is the use-of-funds hypothesis. The ask is not committed capital; paid activation and repeat use remain unproven.', 'critical', 'Approved raise terms, milestone budget, and runway model.', 'evidence', [], ['round'], ['brief', 'questions'], 'Approve a milestone budget and runway model tied to paid activation and repeated release use.', 'Separate the requested amount from committed capital and the use-of-funds hypothesis from a measured return.'],
 ] as const satisfies readonly RiskInput[];
 
 // biome-ignore format: One content record per line prevents structural duplication while keeping review diffs readable.
 const APPENDIX_DATA = [
   ['narrative-boundary', 'Narrative Boundary', 'The core brief distinguishes verified facts, founder-attested context, thesis, and plans.'],
   ['risk-register', 'Risk Register', 'The questions above map to explicit evidence, strategy, communication, and investor-fit gaps.'],
-  ['evidence', 'Evidence Boundary', 'Metrics, terms, market estimates, and customer outcomes remain excluded until their provenance is reviewed.'],
+  ['evidence', 'Evidence Boundary', 'The dated repository count is engineering output. Revenue and founder history are founder-attested. Product inventory proves implementation, not certification. The ask and test bar are plans.'],
 ] as const satisfies readonly AppendixInput[];
 
 export const fundraisingRegistry = {
-  version: '1.0.0',
+  version: '2.0.0',
   asOf: AS_OF,
-  thesis:
-    'Jovie is building the operating layer that turns a music release into coordinated, measurable marketing work.',
+  thesis: 'Built. Now prove it with an artist.',
   companyDefinition:
-    'An AI marketing operator for music creators, beginning with release workflows.',
+    'Catalog import, artist profiles, release pages, chat, and merch to checkout. Built, not certified.',
   claims: CLAIM_DATA.map(input =>
     claim(input[0], input[1], input[2], input[3], input[4], input[5])
   ),
   coreSlides: SLIDE_DATA.map(input =>
-    slide(input[0], input[1], input[2], input[3])
+    slide(input[0], input[1], input[2], input[3], input[4], input[5])
   ),
   operatingLoop: OPERATING_STEP_DATA.map(input =>
     operatingStep(input[0], input[1], input[2], input[3])
   ),
   founderLetter: [
-    'I started Jovie because releasing music repeatedly forced me to rebuild the same small marketing operation. The song had context, but the tools did not. Plans lived in documents, links in separate products, and the next action depended on someone remembering what mattered.',
-    'The first version of Jovie is intentionally narrower than the long-term vision. It organizes a release, surfaces the work around it, and gives the artist one place to review what should ship. Some of that experience is live, some is demonstrated, and some execution is still manual. This portal labels those boundaries directly.',
-    'The company becomes durable only if it can learn from what was approved, shipped, and effective across releases. The work of this round is to prove that loop with paying creators—not to ask investors to treat the roadmap as traction.',
+    'I am Jovie’s solo founder and its first customer: an artist for 15 years, and I ran release strategy for artists at Big Management. I also ran voter-file targeting and email for a large statewide PAC supporting a presidential primary campaign in New Jersey in 2016. Musicians and politicians both campaign in spikes, then go silent. The spike should leave a list.',
+    'I work with one agent inside Jovie, Summer. I give it Linear issues; it scales its coding workers to the queue, opens PRs and repairs failing CI. CI and a merge queue gate correctness; I review taste from production. When an artist said his preview was “just my name and a photo,” the catalog import fix shipped the next day.',
+    'I have sold software to strangers before: an Apify actor that up to eight people paid $39 a month for, for about 15 months, with no marketing. Jovie has no paying customers yet. That is the next proof.',
   ],
   risks: RISK_DATA.map(input =>
     risk(
@@ -294,14 +304,14 @@ export const fundraisingRegistry = {
     'Production capability matrix.',
     'Paid activation and retention cohorts.',
     'Bottom-up market and willingness-to-pay evidence.',
-    'Approved round terms, milestone budget, and runway.',
+    'Measured return on the engineering-throughput hypothesis.',
     'Measured outcomes from a complete release loop.',
   ],
   changeHistory: [
     {
       date: AS_OF,
       summary:
-        'Established the typed canonical registry and removed unsupported numeric claims from the core investor narrative.',
+        'Refreshed the deck from the November 2 source inventory and founder account. Labels implementation, missing certification, zero revenue, a blocked test, and the speedrun ask explicitly.',
     },
   ],
 } as const satisfies FundraisingRegistry;

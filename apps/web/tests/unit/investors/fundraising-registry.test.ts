@@ -30,21 +30,24 @@ describe('fundraising registry', () => {
 
   it('labels every step in the operating case', () => {
     expect(fundraisingRegistry.operatingLoop.map(step => step.status)).toEqual([
-      'LIVE',
-      'DEMO',
-      'MANUAL',
-      'PLANNED',
+      'BUILT, NOT CERTIFIED',
+      'BUILT, NOT CERTIFIED',
+      'BUILT, NOT CERTIFIED',
+      'BUILT, NOT CERTIFIED',
+      'BUILT, NOT CERTIFIED',
     ]);
   });
 
-  it('excludes unverified fundraising and traction numbers', () => {
+  it('excludes superseded pricing and unsourced market or traction numbers', () => {
     const serialized = JSON.stringify({
       thesis: fundraisingRegistry.thesis,
       coreSlides: fundraisingRegistry.coreSlides,
       founderLetter: fundraisingRegistry.founderLetter,
       operatingLoop: fundraisingRegistry.operatingLoop,
     });
-    expect(serialized).not.toMatch(/\$25K|90M|\$500K|\$5M|208k|184K/iu);
+    expect(serialized).not.toMatch(
+      /\$25K|90M|100M|\$299|\$199|\$5M|208k|184K|X%|Z%/iu
+    );
   });
 
   it('keeps the appendix out of the core narrative', () => {

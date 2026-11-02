@@ -1,55 +1,99 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { render, screen, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { ARTIST_VISIBILITY_OFFER } from '@/lib/config/plan-prices';
+import { fundraisingRegistry } from '@/lib/investors/fundraising-registry';
+import { InvestorBrief } from './InvestorBrief';
 
-const WEB_ROOT = join(process.cwd());
+vi.mock('./PitchEngagement', () => ({ PitchEngagement: () => null }));
 
-function read(relativePath: string) {
-  return readFileSync(join(WEB_ROOT, relativePath), 'utf8');
-}
+describe('investor deck evidence boundary', () => {
+  it('renders the built capabilities first with a status on every capability', () => {
+    const { container } = render(<InvestorBrief />);
+    const slides = container.querySelectorAll('[data-pitch-slide]');
+    expect(slides).toHaveLength(7);
+    expect(slides[0]).toHaveAttribute('data-pitch-slide', 'product');
+    const product = within(slides[0] as HTMLElement);
+    for (const capability of fundraisingRegistry.operatingLoop) {
+      const heading = product.getByRole('heading', { name: capability.title });
+      expect(
+        within(heading.closest('li') as HTMLElement).getByText(
+          'BUILT, NOT CERTIFIED'
+        )
+      ).toBeVisible();
+    }
+    expect(
+      product.getByText(/Release email is built but blocked/)
+    ).toBeVisible();
+    expect(product.getByText(/Nothing is certified/)).toBeVisible();
+  });
 
-describe('investor brief source contract', () => {
-  it('links the deck download to the gated portal route, never public/', () => {
-    const component = read('components/features/pitch/InvestorBrief.tsx');
+  it('separates revenue, the blocked experiment and the funding hypothesis', () => {
+    const { container } = render(<InvestorBrief />);
+    const traction = within(
+      container.querySelector('[data-pitch-slide="wedge"]') as HTMLElement
+    );
+    expect(
+      traction.getByRole('heading', {
+        name: '$0 revenue. Zero paying customers.',
+      })
+    ).toBeVisible();
+    expect(traction.getByText(/Pass bar: 50 fans/)).toHaveTextContent(
+      'at least 30% clicking through'
+    );
+    expect(
+      traction.getByText(/Pending. Release email is blocked/)
+    ).toBeVisible();
+    const ask = within(
+      container.querySelector('[data-pitch-slide="round"]') as HTMLElement
+    );
+    expect(ask.getByText('Hypothesis · not committed')).toBeVisible();
+    expect(
+      ask.getByText(/Use-of-funds hypothesis: engineering throughput/)
+    ).toBeVisible();
+    expect(
+      screen.getByRole('heading', {
+        name: new RegExp(`${ARTIST_VISIBILITY_OFFER.pro.displayName} is`),
+      })
+    ).toHaveTextContent(`${ARTIST_VISIBILITY_OFFER.pro.monthlyUsd}/month`);
+  });
 
-    expect(component).toContain(
-      "const PITCH_DECK_PDF_URL = '/investor-portal/deck/Jovie-Pitch-Deck.pdf'"
+  it('keeps the one-agent account and dated engineering output distinct from customer value', () => {
+    const { container } = render(<InvestorBrief investorName='Alex' />);
+    expect(screen.getByText('For Alex')).toBeVisible();
+    const shipping = within(
+      container.querySelector('[data-pitch-slide="loop"]') as HTMLElement
+    );
+    expect(
+      shipping.getByRole('heading', {
+        name: 'I work with one auto-scaling agent, Summer.',
+      })
+    ).toBeVisible();
+    expect(shipping.getByText(/6,818 PRs/)).toHaveTextContent(
+      'November 2, 2026'
+    );
+    expect(shipping.getByText(/6,818 PRs/)).toHaveTextContent(
+      'not customer value'
+    );
+    expect(shipping.getByText(/Year one went into the loop/)).toHaveTextContent(
+      'Cost: a year of customer feedback.'
     );
   });
 
-  it('keeps the shipped body bound to checked-in registry evidence', () => {
-    const component = read('components/features/pitch/InvestorBrief.tsx');
-
-    expect(component).toContain('bg-(--color-bg-base)/90');
-    expect(component).toContain('const registry = fundraisingRegistry');
-    expect(component).toContain('narrativeSlides.map');
-    expect(component).toContain('registry.operatingLoop.map');
-    expect(component).toContain('registry.risks.map');
-    expect(component).toContain('data-pitch-demo-video');
-  });
-
-  it('keeps the YC deck order behind an off-by-default flag', () => {
-    const component = read('components/features/pitch/InvestorBrief.tsx');
-    const flags = read('lib/flags/code-flags.ts');
-
-    expect(flags).toContain('INVESTOR_PORTAL_YC_DECK: false');
-    expect(component).toContain("isCodeFlagEnabled('INVESTOR_PORTAL_YC_DECK')");
-    expect(component).toContain(
-      'buildInvestorYcDeck(registry, loadInvestorSourcedMetrics())'
+  it('does not send investors to stale assets or expose placeholders and unsupported outcomes', () => {
+    const { container } = render(<InvestorBrief />);
+    expect(screen.queryByText(/^For /)).not.toBeInTheDocument();
+    expect(container.querySelector('video')).toBeNull();
+    expect(container.querySelector('a[download]')).toBeNull();
+    expect(container.textContent).not.toMatch(
+      /\$299|\$199|100M|X%|Z%|\bOS\b|\bplatform\b|\bsuite\b|—/u
     );
-    expect(component).toContain('registry.coreSlides');
-  });
-
-  it('keeps exactly one primary-variant CTA on the screen', () => {
-    const component = read('components/features/pitch/InvestorBrief.tsx');
-    const primaries =
-      component.match(
-        /<Button\b[^>]*variant='primary'[^>]*>[\s\S]*?<\/Button>/g
-      ) ?? [];
-
-    expect(primaries).toHaveLength(1);
-    expect(primaries[0]).toContain("size='md'");
-    expect(primaries[0]).toContain("<a href='#demo'>Watch The Product</a>");
-    expect(primaries[0]).not.toContain('meeting_cta_clicked');
+    expect(screen.getByRole('link', { name: 'Read The Deck' })).toHaveAttribute(
+      'href',
+      '#brief'
+    );
+    expect(screen.getByRole('link', { name: 'Email Tim' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('mailto:')
+    );
   });
 });

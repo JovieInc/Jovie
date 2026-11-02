@@ -31,8 +31,8 @@ describe('buildInvestorYcDeck', () => {
     ]);
     const traction = sections.find(section => section.id === 'traction');
     expect(traction?.support).toEqual([]);
-    expect(traction?.dominantSentence).toMatch(/does not claim/u);
-    expect(JSON.stringify(sections)).not.toMatch(/\$|90M|25K/u);
+    expect(traction?.dominantSentence).toMatch(/zero paying customers/u);
+    expect(JSON.stringify(sections)).not.toMatch(/90M|100M|25K|\$299|\$199/u);
   });
 
   it('puts only sourced stats on the traction section', () => {

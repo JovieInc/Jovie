@@ -61,17 +61,17 @@ describe('shared InvestorBrief 44px target geometry (web-188)', () => {
     );
   });
 
-  it('keeps the meeting CTA on the md Button size with its mailto and event', () => {
+  it('keeps the email CTA on the md Button size with its mailto and event', () => {
     const component = readFileSync(componentPath, 'utf8');
 
-    expect(component).not.toContain("size='sm'");
+    const buttons = component.match(/<Button\b[^>]*>/gu) ?? [];
+    expect(buttons).toHaveLength(2);
+    for (const button of buttons) expect(button).toContain("size='md'");
     expect(component).toContain("variant='primary' size='md'");
     expect(
       component.match(/data-pitch-event='meeting_cta_clicked'/gu)
-    ).toHaveLength(2);
-    expect(
-      component.match(/mailto:\$\{CONTACT_EMAIL\}/gu)?.length
-    ).toBeGreaterThanOrEqual(2);
+    ).toHaveLength(1);
+    expect(component.match(/mailto:\$\{CONTACT_EMAIL\}/gu)?.length).toBe(1);
   });
 
   it('moves disclosure padding onto each summary with a 44px floor', () => {
@@ -81,7 +81,7 @@ describe('shared InvestorBrief 44px target geometry (web-188)', () => {
     expect(component).not.toMatch(/<details[^>]*className='[^']*\bpy-\d/iu);
 
     const summaries = component.match(/<summary\b[^>]*>/gu) ?? [];
-    expect(summaries).toHaveLength(3);
+    expect(summaries).toHaveLength(2);
     for (const summary of summaries) {
       expect(summary).toContain('min-h-11');
       expect(summary).toMatch(/\bpy-[68]\b/u);

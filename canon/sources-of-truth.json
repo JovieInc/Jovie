@@ -340,6 +340,19 @@
         "docs/proof/STATS.md"
       ],
       "liveAuthority": "production database (counts), Public Profile Benchmark receipts (speed, agent score), founder-approved Summer cards (comparative claims)"
+    },
+    {
+      "id": "investor-brief-evidence",
+      "title": "Investor brief narrative and evidence status",
+      "owner": {
+        "kind": "file",
+        "ref": "apps/web/lib/investors/fundraising-registry.ts",
+        "note": "Dated source inventory, founder account, repository metric and proposed test/ask. Product implementation never implies certification. Pricing is derived from the plans-prices-offers owner."
+      },
+      "derived": [
+        "apps/web/components/features/pitch/InvestorBrief.tsx",
+        "apps/web/lib/investors/yc-deck.ts"
+      ]
     }
   ],
   "scans": [
