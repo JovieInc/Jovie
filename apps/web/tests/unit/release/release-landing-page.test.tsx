@@ -143,10 +143,10 @@ vi.mock('@/features/release/SmartLinkShell', () => ({
     'text-2xl font-semibold leading-[1.08] tracking-tight text-(--color-text-tooltip) [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]',
   SmartLinkShell: ({
     children,
-    heroOverlay,
-  }: ChildrenProps & { heroOverlay?: React.ReactNode }) => (
+    heroMeta,
+  }: ChildrenProps & { heroMeta?: React.ReactNode }) => (
     <div data-testid='smart-link-shell'>
-      {heroOverlay}
+      {heroMeta}
       {children}
     </div>
   ),
