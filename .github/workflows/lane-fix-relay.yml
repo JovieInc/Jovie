@@ -83,6 +83,7 @@ jobs:
           ref: main
           persist-credentials: false
           sparse-checkout: |
+            scripts/lib/github-rate-limit.mjs
             scripts/pr-unacquired-runner-rerun.mjs
           sparse-checkout-cone-mode: false
 
