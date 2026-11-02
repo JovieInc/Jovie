@@ -187,6 +187,16 @@ class SelftestIsolationTest(unittest.TestCase):
                     os.kill(child, 0)
                 except ProcessLookupError:
                     break
+                # Minimal container PID 1 may leave the killed orphan unreaped.
+                # kill(pid, 0) still succeeds for that zombie; it cannot run work.
+                with REAL_POPEN(["ps", "-o", "stat=", "-p", str(child)],
+                                stdout=subprocess.PIPE, text=True) as probe:
+                    state, _ = probe.communicate(timeout=2)
+                if probe.returncode == 1 and not state.strip():
+                    break
+                self.assertEqual(probe.returncode, 0, "child state probe failed")
+                if state.strip().startswith("Z"):
+                    break
                 time.sleep(.05)
             else:
                 self.fail("grandchild survived the group kill")

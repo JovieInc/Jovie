@@ -158,4 +158,21 @@ describe('RailToggleButton', () => {
       expect(icon.getAttribute('class')).not.toMatch(/lucide-(panel|chevron)-/);
     }
   );
+
+  it('lets a rail control override the mirrored rail art', () => {
+    render(
+      <RailToggleButton
+        side='left'
+        open
+        openLabel='Pin sidebar'
+        closedLabel='Expand sidebar'
+        onToggle={vi.fn()}
+        iconOverride='Pin'
+        iconTestId='toggle-icon'
+      />
+    );
+    expect(screen.getByTestId('toggle-icon').getAttribute('class')).toContain(
+      'lucide-pin'
+    );
+  });
 });

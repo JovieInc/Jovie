@@ -17,6 +17,7 @@ const memberWithoutSources: AudienceMember = {
   referrerHistory: [],
   utmParams: {},
   email: null,
+  emailVisibleToArtist: true,
   phone: null,
   spotifyConnected: false,
   purchaseCount: 0,

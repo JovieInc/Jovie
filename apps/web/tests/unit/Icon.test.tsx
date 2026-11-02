@@ -98,6 +98,13 @@ describe('Icon', () => {
     }
   });
 
+  it('renders the pin glyphs used by the sidebar flyout', () => {
+    for (const name of ['Pin', 'PinOff'] as const) {
+      render(<Icon name={name} data-testid={`icon-${name}`} />);
+      expect(screen.getByTestId(`icon-${name}`)).toBeInTheDocument();
+    }
+  });
+
   it('returns null for unknown icon', () => {
     const { container } = render(
       <Icon name={'NotRealIcon' as any} data-testid='icon' />

@@ -24,6 +24,9 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 
 GATE = Path(__file__).resolve().parents[1] / "fleet-gate" / "gem-priority-gate.py"
 STATE_FILE = "fleet-gate-emit.json"
@@ -155,7 +158,7 @@ def tick(state_dir, repo, release: str | None, *, env=None, spawn=None, now: flo
         key = _digest({**seen, "release": release})
         restamp = key == record.get("key") and restamp_due(workspace(env), key, record, now)
         if key == record.get("key") and not restamp:
-            path.write_text(json.dumps(record))
+            atomic_write_text(path, json.dumps(record))
             return {"status": "unchanged", "key": key[:12]}
         child_env = {k: v for k, v in env.items() if k not in ("FLEET_GATE_ALLOW_LIVE_PERSIST", "FLEET_GATE_DRY_RUN")}
         child_env.update(GEM_WORKSPACE=str(workspace(env)), FLEET_GATE_INPUT_GENERATION=key)
@@ -165,7 +168,7 @@ def tick(state_dir, repo, release: str | None, *, env=None, spawn=None, now: flo
         pid = (spawn or _spawn)(command, child_env, out, rc)
         reason = "restamp" if restamp else "release" if release != record.get("release") else "inputs"
         record.update(key=key, release=release, inputs=seen, pid=pid, startedAt=now, reason=reason)
-        path.write_text(json.dumps(record))
+        atomic_write_text(path, json.dumps(record))
         return {"status": "emitting", "reason": reason, "key": key[:12]}
     except Exception as error:  # noqa: BLE001 - the receipt is never on dispatch's critical path
         return {"status": "error", "error": f"{type(error).__name__}: {error}"[:200]}

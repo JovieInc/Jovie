@@ -285,28 +285,24 @@ describe('server-authorized subscriber export', () => {
     expect(mocks.capture).toHaveBeenCalled();
   });
 
-  it('preserves free owner subscriber browsing without applying the paid export gate', async () => {
-    const row = {
-      id: rowId,
-      email: 'unconfirmed@example.com',
-      phone: null,
-      name: null,
-      countryCode: null,
-      createdAt: '2020-01-01',
-      channel: 'email',
-    };
-    mocks.legacyOwnership.mockResolvedValue({ id: profileId });
-    mocks.execute
-      .mockResolvedValueOnce({ rows: [row] })
-      .mockResolvedValueOnce({ rows: [{ total: 1 }] });
-    const { GET } = await import('./route');
-    const response = await GET(
-      new Request(
-        `http://localhost/api/dashboard/audience/subscribers?profileId=${profileId}`
-      )
-    );
+  it('never exports a Level-1 subscriber who has not shared with the artist', async () => {
+    queue[1] = [
+      candidate,
+      {
+        ...candidate,
+        id: otherId,
+        email: 'level1@example.com',
+        artistEmailOptInAt: null,
+      },
+    ];
+    const response = await invoke();
+    const text = await response.text();
     expect(response.status).toBe(200);
-    expect((await response.json()).rows).toEqual([row]);
-    expect(mocks.entitlements).not.toHaveBeenCalled();
+    expect(text).not.toContain('level1@example.com');
+  });
+
+  it('has no browse (GET) handler, so Level-1 contact details cannot be listed', async () => {
+    const route = await import('./route');
+    expect('GET' in route).toBe(false);
   });
 });

@@ -33,7 +33,7 @@ const DEFAULT_CALLOUTS = [
   {
     id: 'release',
     title: 'What Is Current',
-    body: 'The newest release leads without asking fans to search for it.',
+    body: 'The newest release leads without asking listeners to search for it.',
   },
   {
     id: 'action',
@@ -226,7 +226,10 @@ export function ArtistProfileLandingPage({
         <ArtistProfileHowItWorks howItWorks={copy.howItWorks} />
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.releaseCycle}>
-        <ArtistProfileReleaseCycleGallery releaseCycle={copy.releaseCycle} />
+        <ArtistProfileReleaseCycleGallery
+          releaseCycle={copy.releaseCycle}
+          id='bring-them-back-automatically'
+        />
       </div>
       {flags.FAQ ? (
         <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.faq}>

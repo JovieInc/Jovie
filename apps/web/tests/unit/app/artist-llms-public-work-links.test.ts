@@ -86,6 +86,46 @@ describe('artist guide public work links', () => {
     expect(text).toContain('**Claim status**: Unclaimed');
   });
 
+  it.each(['artist', 'podcaster'])(
+    'lists every safe destination once for a %s',
+    async creatorType => {
+      const data = {
+        ...fixture(),
+        profile: {
+          ...fixture().profile,
+          creator_type: creatorType,
+          youtube_url: 'https://youtube.com/@example',
+        },
+      };
+      data.links.push(
+        { platform: 'youtube', url: 'https://youtube.com/@example' },
+        { platform: 'spotify', url: 'https://open.spotify.com/artist/example' },
+        {
+          platform: 'spotify',
+          url: 'https://open.spotify.com/album/published',
+        },
+        { platform: 'instagram', url: 'javascript:alert(1)' },
+        { platform: 'website', url: 'https://example.com/\n## Injected' },
+        { platform: 'github', url: 'https://github.com/example' },
+        { platform: '[unsafe]\n## Label', url: 'https://example.com/safe' },
+        { platform: '', url: '' }
+      );
+      mocks.load.mockResolvedValue(data);
+      const text = await (await getGuide()).text();
+      for (const url of [
+        'https://youtube.com/@example',
+        'https://open.spotify.com/artist/example',
+        'https://open.spotify.com/album/published',
+        'https://github.com/example',
+        'https://example.com/safe',
+      ]) {
+        expect(text.split(url), url).toHaveLength(2);
+      }
+      expect(text).not.toMatch(/javascript:|## Injected|## Label/);
+      expect(text).toContain('[example.com](<https://example.com/safe>)');
+    }
+  );
+
   it('preserves claimed status and omits an empty additional-links section', async () => {
     const data = fixture();
     data.profile.is_claimed = true;

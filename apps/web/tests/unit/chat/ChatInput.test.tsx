@@ -11,6 +11,7 @@ import {
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ComponentProps, type ReactNode, useState } from 'react';
+import { renderToString } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const desktopAuth = vi.hoisted(() => ({ isLoaded: true, isSignedIn: false }));
@@ -161,14 +162,18 @@ function removeElectronAPI() {
   delete document.documentElement.dataset.desktopRuntime;
 }
 
-function ControlledChatInputHarness() {
+function ControlledChatInputHarness({
+  onSubmit = vi.fn(),
+}: {
+  onSubmit?: () => void;
+} = {}) {
   const [value, setValue] = useState('');
 
   return (
     <ChatInput
       value={value}
       onChange={setValue}
-      onSubmit={vi.fn()}
+      onSubmit={onSubmit}
       isLoading={false}
       isSubmitting={false}
     />
@@ -189,6 +194,27 @@ describe('ChatInput', () => {
     isLoading: false,
     isSubmitting: false,
   };
+
+  it.each(['', 'I want to claim jov.ie/sam.'])(
+    'includes the draft and send action in server HTML before hydration (%s)',
+    value => {
+      const serverDocument = document.createElement('div');
+      serverDocument.innerHTML = renderToString(
+        withProviders(
+          <ChatInput {...baseProps} value={value} dictationEnabled={false} />
+        )
+      );
+      const server = within(serverDocument);
+      expect(
+        server.getByRole('textbox', { name: /chat message input/i })
+      ).toHaveValue(value);
+      const send = server.getByRole('button', {
+        name: 'Send message',
+      });
+      if (value) expect(send).toBeEnabled();
+      else expect(send).toBeDisabled();
+    }
+  );
 
   it('certifies only the opted-in loaded authenticated composer and observes focus passively', async () => {
     const frames = new Map<number, FrameRequestCallback>();
@@ -309,20 +335,29 @@ describe('ChatInput', () => {
     expect(textarea.style.height).toBe('24px');
   });
 
-  it('keeps the textarea focused when clicking send', async () => {
+  it('preserves draft and focus when sending after multiline input', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
     const { getByRole } = fastRender(
-      withProviders(<ChatInput {...baseProps} onSubmit={onSubmit} />)
+      withProviders(<ControlledChatInputHarness onSubmit={onSubmit} />)
     );
 
     const textarea = getByRole('textbox', { name: /chat message input/i });
+    const sendButton = getByRole('button', { name: /send message/i });
+    expect(sendButton).toBeDisabled();
     textarea.focus();
-    expect(textarea).toHaveFocus();
+    await user.type(textarea, 'First line{Shift>}{Enter}{/Shift}Second line');
+    expect(getByRole('textbox', { name: /chat message input/i })).toBe(
+      textarea
+    );
+    expect(textarea).toHaveValue('First line\nSecond line');
+    expect(sendButton).toBeEnabled();
+    expect(onSubmit).not.toHaveBeenCalled();
 
-    await user.click(getByRole('button', { name: /send message/i }));
+    await user.click(sendButton);
 
-    expect(onSubmit).toHaveBeenCalled();
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(textarea).toHaveValue('First line\nSecond line');
     expect(textarea).toHaveFocus();
   });
 

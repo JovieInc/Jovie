@@ -14,8 +14,8 @@ const AUTH_UNAVAILABLE_PATTERN =
 
 test.beforeEach(() => {
   test.skip(
-    process.env.NEXT_PUBLIC_CLERK_MOCK === '1' ||
-      process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1',
+    process.env.NEXT_PUBLIC_AUTH_MOCK === '1' ||
+      process.env.NEXT_PUBLIC_AUTH_PROXY_DISABLED === '1',
     'Public auth readiness requires a real Clerk runtime'
   );
 });

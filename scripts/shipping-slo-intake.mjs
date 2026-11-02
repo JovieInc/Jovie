@@ -238,7 +238,8 @@ export async function deliverReport(
     });
   const receipt = {
     schema: 'jovie-shipping-slo-delivery/v1',
-    owner: 'Devin',
+    owner: 'JOV-6783',
+    destination: 'linear',
     runUrl,
     status: 'succeeded',
     findings: [],
@@ -286,7 +287,8 @@ if (
   } catch {
     receipt = {
       schema: 'jovie-shipping-slo-delivery/v1',
-      owner: 'Devin',
+      owner: 'JOV-6783',
+      destination: 'linear',
       status: 'failed',
       reason: 'invalid_report',
       retryDecision: 'repair-input',

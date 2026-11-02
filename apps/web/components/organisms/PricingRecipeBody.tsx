@@ -12,6 +12,9 @@ import {
   type PublicPriceClaim,
 } from '@/lib/billing/offer-truth';
 
+/** Comparison lead: names the table's job without repeating card copy. */
+const PRICING_COMPARE_BODY = 'What each plan includes.';
+
 function formatMonthlyPrice(claim: PublicPriceClaim): string {
   return `${claim.priceLabel}/month`;
 }
@@ -34,7 +37,6 @@ export function PricingRecipeBody({
 }: Readonly<PricingRecipeBodyProps>) {
   const freeClaim = getPublicPriceClaim('free');
   const proClaim = getPublicPriceClaim('pro');
-  const enterpriseClaim = getPublicPriceClaim('enterprise');
   const proMonthlyPrice = formatMonthlyPrice(proClaim);
 
   return (
@@ -63,7 +65,7 @@ export function PricingRecipeBody({
 
         <section
           aria-label='Plans'
-          className='system-b-pricing-section'
+          className='system-b-pricing-section system-b-pricing-section--plans'
           data-testid='marketing-section-pricing'
           data-marketing-owner='apps/web/components/organisms/PricingRecipeBody.tsx'
           data-marketing-variant='tier-cards-neutral'
@@ -91,7 +93,7 @@ export function PricingRecipeBody({
                   Compare All Features
                 </h2>
                 <p className='system-b-pricing-section-body'>
-                  Public Jovie profile and audience capture.
+                  {PRICING_COMPARE_BODY}
                 </p>
               </div>
               <div className='system-b-pricing-chart-wrap'>
@@ -117,27 +119,15 @@ export function PricingRecipeBody({
                 Get Started
               </h2>
               <p className='system-b-pricing-final-copy'>{requestAccessCopy}</p>
+              {/* One action: hero and plan cards already offer Free and Enterprise. */}
               <div className='system-b-pricing-actions system-b-pricing-actions--center'>
-                <Link
-                  href={freeClaim.ctaHref}
-                  prefetch={false}
-                  className='system-b-pricing-secondary-link'
-                >
-                  {freeClaim.ctaLabel}
-                </Link>
                 <Link
                   href={proClaim.ctaHref}
                   prefetch={false}
-                  className='system-b-pricing-secondary-link'
+                  className='system-b-pricing-primary-link'
                 >
                   {proClaim.ctaLabel}
                 </Link>
-                <a
-                  href={enterpriseClaim.ctaHref}
-                  className='system-b-pricing-secondary-link'
-                >
-                  {enterpriseClaim.ctaLabel}
-                </a>
               </div>
             </div>
           </MarketingContainer>

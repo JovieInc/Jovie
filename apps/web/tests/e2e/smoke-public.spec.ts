@@ -91,14 +91,14 @@ test('homepage loads with hero heading, CTA, sections, and footer', async ({
   // Optional structure check: if only shell rendered, this will fail without
   // silently skipping.
   await expect(
-    page.locator('main, [role="main"], #handle-input').first(),
+    page.locator('main, [role="main"], #homepage-claim-handle').first(),
     'Homepage did not render the expected main content shell'
   ).toBeVisible({ timeout: 60_000 });
 
   // CTA must be present — if no signup entry point, users can't convert
   const cta = page
     .locator(
-      '#handle-input, a[href*="/signup"], a[href*="/sign-up"], a[href*="/start"], a:has-text("Get started"), a:has-text("Request access")'
+      '#homepage-claim-handle, a[href*="/signup"], a[href*="/sign-up"], a[href*="/start"], a:has-text("Get started"), a:has-text("Request access")'
     )
     .first();
   await expect(cta).toBeVisible({ timeout: 20_000 });

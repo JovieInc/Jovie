@@ -697,6 +697,10 @@ def current_subscription_snapshot(name: str, *, lease_handle=None, sleep=time.sl
     raise TimeoutError("unreachable")
 
 
+# The lastError of a hold derived from public rate-limit metadata (a window at 100%).
+METADATA_HOLD = "public-subscription-capacity-exhausted"
+
+
 def reconcile_current_subscription(now, if_due, fetch, name=CURRENT_LOGIN) -> dict:
     """Observe one existing login; never redeem credits, rotate or clear banks.
 
@@ -797,6 +801,23 @@ def reconcile_current_subscription(now, if_due, fetch, name=CURRENT_LOGIN) -> di
                     entry.update(subscriptionBinding=binding, subscriptionIdentityVerifiedAt=now)
                 previous = entry.get("capacityLease") or {}
                 entry["capacityLease"] = value
+                # A quota hold outlives the window it was recorded in when the reset is
+                # redeemed outside the lane (2026-11-02: Tim redeemed a banked reset, readback
+                # showed 99%, and the stale hold kept codex at 0 seats). Only a hold this module
+                # derived from the same public metadata (run_account: a window at 100%) is
+                # released by a newer verified reading of that metadata with headroom in every
+                # window. Banks from a run's own usage-limit error, auth banks and pending lane
+                # redemptions stay with their owners (test_reconciliation_keeps_..._banks).
+                remaining = list((value.get("usableCapacityRemaining") or {}).values())
+                held = entry.get("exhaustedUntil")
+                if (type(held) in (int, float) and held > now and entry.get("lastKind") == "limit"
+                        and entry.get("lastError") == METADATA_HOLD
+                        and not entry.get("pendingReset") and remaining
+                        and all(type(row.get("remainingPercent")) in (int, float) and row["remainingPercent"] > 0
+                                for row in remaining)):
+                    entry.pop("exhaustedUntil", None)
+                    entry["staleHoldReleasedAt"] = now
+                    entry["staleHoldWas"] = held
                 if _lease_digest(previous) != _lease_digest(value):
                     path = STATE.parent / "capacity-events.jsonl"
                     with path.open("a") as stream:
@@ -1034,12 +1055,30 @@ def reverify_auth_bank(state: dict, now: float) -> dict:
     return read_state()
 
 
-def pick(state: dict, now: float, names: list[str] | None = None):
-    """Least-recently-used available account that nobody else has leased right now."""
+def pace_deltas(now: float) -> dict:
+    """{account: used-minus-elapsed points} from the capacity registry's live overlay; {} when unread."""
+    try:
+        import capacity_registry
+        return capacity_registry.live_deltas(capacity_registry.load(), STATE.parent, "openai-codex", now)
+    except Exception:
+        return {}
+
+
+def pick(state: dict, now: float, names: list[str] | None = None, deltas: dict | None = None):
+    """Available account that nobody else has leased right now: accounts behind their weekly pace
+    first, ahead-of-pace accounts last (they will run dry before reset), least-recently-used within
+    each group. Without a fresh live reading every account is level and this is plain LRU."""
     state = reverify_auth_bank(state, now)
     names = accounts() if names is None else names
+    deltas = pace_deltas(now) if deltas is None else deltas
+    band = 10.0
+
+    def group(n: str) -> int:
+        d = deltas.get(n)
+        return 0 if d is None else (-1 if d < -band else 1 if d > band else 0)
+
     order = sorted((n for n in names if available(n, state, now)),
-                   key=lambda n: float(state.get(n, {}).get("lastUsed") or 0))
+                   key=lambda n: (group(n), float(state.get(n, {}).get("lastUsed") or 0)))
     for name in order:
         handle = lease(name)
         if handle is not None:
@@ -1056,7 +1095,11 @@ def run(args) -> int:
     if subscription_pool_mode():
         reconcile()
     last = Path(args.cwd or ".") / ".codex-last-message.txt"
-    base = [cli(), "exec", "--ignore-user-config", "--skip-git-repo-check", "--ephemeral",
+    # Lane runs need no connectors: the curated Stripe plugin MCP answered AuthRequired on every
+    # run and a lane fix-red run failed on it. Disable the plugin/apps surfaces instead of
+    # giving them credentials.
+    base = [cli(), "exec", "--ignore-user-config", "--disable", "plugins", "--disable", "remote_plugin",
+            "--disable", "apps", "--skip-git-repo-check", "--ephemeral",
             "--dangerously-bypass-approvals-and-sandbox", "--color", "never", "-o", str(last)]
     if current_login_mode():
         base.remove("--dangerously-bypass-approvals-and-sandbox")
@@ -1137,7 +1180,7 @@ def run_account(name: str, handle, cmd: list[str], prompt: str, cwd, now: float,
                     row = st.setdefault(name, {})
                     if float(row.get("exhaustedUntil") or 0) < depleted:
                         row.update(exhaustedUntil=depleted, lastKind="limit", lastExit=NO_ACCOUNT_EXIT,
-                                   lastRunAt=observed_at, lastError="public-subscription-capacity-exhausted")
+                                   lastRunAt=observed_at, lastError=METADATA_HOLD)
                 update_state(bank)
                 return NO_ACCOUNT_EXIT, "limit", depleted
         update_state(lambda st: st.setdefault(name, {}).update(

@@ -12,6 +12,7 @@ import {
   MARKETING_ROUTE_HEALTH_TARGETS,
   MARKETING_ROUTE_MANIFEST,
 } from '@/data/marketing';
+import { isProductionBlockedDebugPath } from '@/lib/security/production-blocked-routes';
 
 const PRODUCT_UPDATE_OWNER =
   'apps/web/app/(marketing)/changelog/ChangelogEmailSignup.tsx';
@@ -285,15 +286,18 @@ describe('marketing route health contract', () => {
     // JOV-6859: an active route must never silently 404 — its resolved health
     // target cannot be declared not-found. Wildcard routes keep their explicit
     // fixture probes (e.g. the unpublished engineering article check).
+    // Development-only routes that the proxy blocks in production are the
+    // one exception: they must declare not-found (never a certified page).
     for (const entry of MARKETING_ROUTE_MANIFEST) {
       const target = getMarketingRouteHealthTarget(entry);
+      const productionBlocked = isProductionBlockedDebugPath(target.path);
       if (entry.status === 'active' && !entry.url.includes('*')) {
         expect(
           target.expected,
           `${entry.glob} is active but declares ${target.expected}`
-        ).toBe('page');
+        ).toBe(productionBlocked ? 'not-found' : 'page');
       }
-      if (target.expected === 'not-found') {
+      if (target.expected === 'not-found' && !productionBlocked) {
         expect(
           entry.url,
           `${entry.glob} declares a not-found probe on a concrete route`

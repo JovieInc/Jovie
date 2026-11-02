@@ -31,6 +31,7 @@
 ^scripts/signals/
 ^scripts/fleet-gate/
 ^scripts/tests/test_(lane_runner|design_gate|agent_workflow_hygiene|brand_scrub|gh_retry|runner_routing|vercel_prebuilt_deploy|signal_watch)\.py
+^scripts/prod-errors/
 
 # Typed company composition must run its real coverage gate on future edits too.
 ^scripts/security/deepsec-(policy|loop)(\.test)?\.mjs$

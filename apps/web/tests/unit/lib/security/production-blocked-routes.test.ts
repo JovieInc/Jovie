@@ -69,6 +69,8 @@ describe('production-blocked debug routes', () => {
     '/api/test/onboarding-toggle',
     '/api/sentry-example-api',
     '/dev/smart-links',
+    '/engineering/preview',
+    '/engineering/preview/verified-changelog',
     '/demo',
     '/demo/audience',
     '/demo/onboarding',
@@ -142,6 +144,9 @@ describe('production-blocked debug routes', () => {
     '/hud',
     '/hud-tv',
     '/sidebar-demo',
+    '/engineering',
+    '/engineering/verified-changelog',
+    '/report',
     '/api/health/auth',
     '/api/dev/test-auth/mobile-provider-complete',
   ])('does not block public or specially gated route %s', route => {

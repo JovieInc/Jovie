@@ -137,7 +137,7 @@ Additive edits preferred. Document each change in the commit message.
 ## Related Canon
 
 - [`core-values.md`](./core-values.md) — the 10 cultural values these principles operationalize.
-- [`PRICING-PHILOSOPHY.md`](./PRICING-PHILOSOPHY.md) — pricing canon (Principle 4 connects deeply to this).
+- [`PRICING-PHILOSOPHY.md`](./PRICING-PHILOSOPHY.md) — pricing canon, public summary (full text private; Principle 4 connects deeply to this).
 - [`/LESSONS.md`](../../LESSONS.md) — post-mortems and corrections.
 - [`.claude/rules/release.md`](../../.claude/rules/release.md) — PR discipline, ship workflow.
 - [`.claude/rules/linear.md`](../../.claude/rules/linear.md) — durable follow-up contract.

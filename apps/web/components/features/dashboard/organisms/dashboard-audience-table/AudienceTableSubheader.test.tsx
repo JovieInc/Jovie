@@ -55,7 +55,7 @@ const render = (ui: ReactElement) =>
 const profileId = '11111111-1111-4111-8111-111111111111';
 const rowId = '22222222-2222-4222-8222-222222222222';
 const staleRows = [
-  { id: rowId, email: 'unconfirmed@example.com' },
+  { id: rowId, email: 'unconfirmed@example.com', emailVisibleToArtist: true },
 ] as AudienceMember[];
 const eligible = [
   {

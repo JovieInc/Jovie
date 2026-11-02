@@ -16,6 +16,16 @@ const mockCleanupFounderReviewUploadLeases = vi.hoisted(() => vi.fn());
 const mockGetLybDailyMrr = vi.hoisted(() => vi.fn());
 const mockRecordDailyGatewaySpend = vi.hoisted(() => vi.fn());
 const mockRunMusicResolverParityCorpus = vi.hoisted(() => vi.fn());
+const mockReadShadowParitySummary = vi.hoisted(() => vi.fn());
+const mockCaptureError = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/agent-acquisition/draft-purge.server', () => ({
+  purgeExpiredAgentDrafts: vi.fn(async () => ({
+    deleted: 0,
+    retentionDays: 30,
+    oldestOverdueDays: null,
+  })),
+}));
 
 vi.mock('@/lib/ai/gateway-spend', () => ({
   recordDailyGatewaySpend: mockRecordDailyGatewaySpend,
@@ -34,7 +44,7 @@ vi.mock('@/lib/analytics/data-retention', () => ({
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
-  captureError: vi.fn(),
+  captureError: mockCaptureError,
 }));
 
 vi.mock('@/lib/utils/logger', () => ({
@@ -95,6 +105,11 @@ vi.mock('@/lib/release-to-revenue/outcome-reconciliation', () => ({
 }));
 vi.mock('@/lib/music-resolver/shadow', () => ({
   runMusicResolverParityCorpus: mockRunMusicResolverParityCorpus,
+}));
+
+vi.mock('@/lib/music-resolver/resolve-parity.server', () => ({
+  FALSE_LINK_ALARM_FINGERPRINT: 'remediation:music-resolver-false-link',
+  readShadowParitySummary: mockReadShadowParitySummary,
 }));
 
 describe('GET /api/cron/daily-maintenance', () => {
@@ -188,6 +203,12 @@ describe('GET /api/cron/daily-maintenance', () => {
       alerts: [],
     });
     mockRunMusicResolverParityCorpus.mockResolvedValue([{ version: 2 }]);
+    mockReadShadowParitySummary.mockResolvedValue({
+      receipts: 6,
+      organicReceipts: 0,
+      falseLinkAlarm: { firing: false, candidateFalseLinks: 0, rate: 0 },
+      families: [],
+    });
   });
 
   afterEach(() => {
@@ -283,9 +304,40 @@ describe('GET /api/cron/daily-maintenance', () => {
     expect(mockRunMusicResolverParityCorpus).toHaveBeenCalledTimes(1);
     expect(data.results.musicResolverParity).toEqual({
       success: true,
-      data: [{ version: 2 }],
+      data: {
+        receipts: 6,
+        organicReceipts: 0,
+        falseLinkAlarm: { firing: false, candidateFalseLinks: 0, rate: 0 },
+        families: [],
+      },
     });
     expect(data.results.dataRetention.success).toBe(true);
+  });
+
+  it('raises the false-link alarm when the parity summary has a candidate false link', async () => {
+    mockReadShadowParitySummary.mockResolvedValueOnce({
+      receipts: 7,
+      organicReceipts: 1,
+      falseLinkAlarm: { firing: true, candidateFalseLinks: 1, rate: 1 },
+      families: [],
+    });
+    const { GET } = await import('@/app/api/cron/daily-maintenance/route');
+    const response = await GET(
+      new Request('http://localhost/api/cron/daily-maintenance', {
+        headers: { Authorization: 'Bearer test-secret' },
+      })
+    );
+    const data = await response.json();
+    expect(data.results.musicResolverParity.data.falseLinkAlarm.firing).toBe(
+      true
+    );
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'Music resolver false link',
+      expect.any(Error),
+      expect.objectContaining({
+        fingerprint: 'remediation:music-resolver-false-link',
+      })
+    );
   });
 
   it('reports reconciliation failure without blocking later maintenance jobs', async () => {

@@ -30,3 +30,11 @@ export const UnavailableReference: Story = {
 export const WithSkill: Story = {
   args: { content: 'Try /skill:generateAlbumArt for the next draft.' },
 };
+
+/** Markdown renders from a separate chunk; the text is visible before it loads. */
+export const MarkdownWhileStreaming: Story = {
+  args: {
+    content: 'Your **profile** is ready.\n\n- Claim the page\n- Add a release',
+    isStreaming: true,
+  },
+};

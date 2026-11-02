@@ -3,8 +3,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => {
   const state = {
     selectRows: [] as unknown[][],
+    /** Decision writes (plain values). */
     updates: [] as Array<Record<string, unknown>>,
+    /** Lease reserve/release writes (settings is a SQL expression). */
+    leaseWrites: [] as Array<Record<string, unknown>>,
+    /** Rows returned by the next lease reservation; [] = lost the race. */
+    reserveRows: [] as unknown[][],
   };
+  const isSqlValue = (value: unknown) =>
+    typeof (value as { getSQL?: unknown } | null)?.getSQL === 'function';
   const selectChain = () => {
     const rows = state.selectRows.shift() ?? [];
     const terminal = { limit: vi.fn().mockResolvedValue(rows) };
@@ -18,8 +25,19 @@ const mocks = vi.hoisted(() => {
   };
   const update = vi.fn(() => ({
     set: vi.fn((args: Record<string, unknown>) => {
-      state.updates.push(args);
-      return { where: vi.fn().mockResolvedValue(undefined) };
+      const isLease = isSqlValue(args.settings);
+      if (isLease) state.leaseWrites.push(args);
+      else state.updates.push(args);
+      // Only the reservation reads rows back; the release does not.
+      const rows = () =>
+        isLease ? (state.reserveRows.shift() ?? []) : [{ id: 'row' }];
+      return {
+        where: vi.fn(() =>
+          Object.assign(Promise.resolve(undefined), {
+            returning: vi.fn(async () => rows()),
+          })
+        ),
+      };
     }),
   }));
   return {
@@ -116,12 +134,20 @@ function queueProfile(
   record: unknown,
   subscriptionId: string | null = 'sub_1'
 ) {
+  const settings = { keep: true, claimVerification: record };
   mocks.state.selectRows.push([
+    { handle: 'requester', settings, userId: 'u1', subscriptionId },
+  ]);
+  // The reservation returns the row as locked, lease included.
+  mocks.state.reserveRows.push([
     {
-      handle: 'requester',
-      settings: { keep: true, claimVerification: record },
-      userId: 'u1',
-      subscriptionId,
+      settings: {
+        ...settings,
+        claimVerification: {
+          ...(record as object),
+          decisionLease: { id: 'lease', at: now.toISOString() },
+        },
+      },
     },
   ]);
 }
@@ -131,6 +157,8 @@ describe('claim verification review', () => {
     vi.clearAllMocks();
     mocks.state.selectRows = [];
     mocks.state.updates = [];
+    mocks.state.leaseWrites = [];
+    mocks.state.reserveRows = [];
     mocks.refund.mockResolvedValue({
       refundId: 're_1',
       amount: 1200,
@@ -159,6 +187,28 @@ describe('claim verification review', () => {
     );
     const body = mocks.submitCard.mock.calls[0]?.[0]?.body as string;
     expect(body).toContain('2,400,000 Spotify followers');
+  });
+
+  it('files an honest proof-only card with the requester email and no refund promise', async () => {
+    const proofOnly = buildClaimVerificationRequest({
+      spotifyArtistId: '06HL4z0CvFAxyc27GXpf02',
+      artistName: 'Mid Artist',
+      reach: 3_200,
+      paid: false,
+      proofOnly: true,
+      now: new Date('2026-10-21T08:00:00.000Z'),
+    });
+    await fileClaimVerificationCard({
+      profileId: PROFILE,
+      handle: 'requester',
+      record: proofOnly,
+      requesterEmail: 'artist@example.com',
+    });
+    const body = mocks.submitCard.mock.calls.at(-1)?.[0]?.body as string;
+    expect(body).toContain('artist@example.com');
+    expect(body).toContain('private until you approve');
+    expect(body).not.toContain('paid $12');
+    expect(body).not.toContain('refunds');
   });
 
   it('approve links the artist under the identity lock and records the stage', async () => {
@@ -256,9 +306,11 @@ describe('claim verification review', () => {
         })
       ).resolves.toEqual({ outcome: 'identity_conflict' });
     }
-    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.state.updates).toEqual([]);
     expect(mocks.recordStage).not.toHaveBeenCalled();
     expect(mocks.decideCard).not.toHaveBeenCalled();
+    // Each attempt reserved the claim and then released it for a retry.
+    expect(mocks.state.leaseWrites).toHaveLength(6);
   });
 
   it('reject refunds the first month, cancels, then records the decision', async () => {
@@ -305,8 +357,10 @@ describe('claim verification review', () => {
         decidedBy: 'tim@jov.ie',
       })
     ).rejects.toThrow('stripe down');
-    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.state.updates).toEqual([]);
     expect(mocks.recordStage).not.toHaveBeenCalled();
+    // Reserved, then released so the operator can retry.
+    expect(mocks.state.leaseWrites).toHaveLength(2);
   });
 
   it('never re-runs side effects for a decided or unpaid request', async () => {
@@ -324,5 +378,108 @@ describe('claim verification review', () => {
     }
     expect(mocks.refund).not.toHaveBeenCalled();
     expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it('runs no side effect when another decision holds the claim', async () => {
+    // Approve (Summer card) and reject (admin list) clicked together: both
+    // read pending, only one may reserve. The loser must not refund, cancel,
+    // link or write.
+    for (const decision of ['approve', 'reject'] as const) {
+      queueProfile(pending);
+      mocks.state.reserveRows = [[]];
+      const result = await decideClaimVerification({
+        profileId: PROFILE,
+        decision,
+        decidedBy: 'tim@jov.ie',
+        now,
+      });
+      expect(result).toEqual({ outcome: 'in_progress' });
+    }
+    expect(mocks.refund).not.toHaveBeenCalled();
+    expect(mocks.lockIdentity).not.toHaveBeenCalled();
+    expect(mocks.state.updates).toEqual([]);
+    expect(mocks.recordStage).not.toHaveBeenCalled();
+    expect(mocks.decideCard).not.toHaveBeenCalled();
+  });
+
+  it('reserves the claim before refunding and drops the lease from the record', async () => {
+    queueProfile(pending);
+    await decideClaimVerification({
+      profileId: PROFILE,
+      decision: 'reject',
+      decidedBy: 'tim@jov.ie',
+      now,
+    });
+    expect(mocks.state.leaseWrites).toHaveLength(1);
+    expect(mocks.update.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.refund.mock.invocationCallOrder[0]
+    );
+    const written = mocks.state.updates[0]?.settings as {
+      claimVerification: Record<string, unknown>;
+    };
+    expect(written.claimVerification.status).toBe('rejected');
+    expect(written.claimVerification).not.toHaveProperty('decisionLease');
+  });
+
+  it('checks the subscription before reserving a rejection', async () => {
+    queueProfile(pending, null);
+    const result = await decideClaimVerification({
+      profileId: PROFILE,
+      decision: 'reject',
+      decidedBy: 'tim@jov.ie',
+    });
+    expect(result).toEqual({ outcome: 'no_subscription' });
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  describe('proof-only requests', () => {
+    const proofOnly = buildClaimVerificationRequest({
+      spotifyArtistId: '06HL4z0CvFAxyc27GXpf02',
+      artistName: 'Mid Artist',
+      reach: 3_200,
+      paid: false,
+      proofOnly: true,
+      now: new Date('2026-10-21T08:00:00.000Z'),
+    });
+
+    it('can be rejected without a subscription and refunds nothing', async () => {
+      queueProfile(proofOnly, null);
+      const result = await decideClaimVerification({
+        profileId: PROFILE,
+        decision: 'reject',
+        decidedBy: 'tim@jov.ie',
+        now,
+      });
+      expect(result).toMatchObject({
+        outcome: 'decided',
+        record: { status: 'rejected' },
+      });
+      expect(mocks.refund).not.toHaveBeenCalled();
+    });
+
+    it('cancels and refunds a proof-only artist who paid while waiting, as the terms promise', async () => {
+      queueProfile(proofOnly, 'sub_paid_after_admission');
+      await decideClaimVerification({
+        profileId: PROFILE,
+        decision: 'reject',
+        decidedBy: 'tim@jov.ie',
+        now,
+      });
+      expect(mocks.refund).toHaveBeenCalledTimes(1);
+    });
+
+    it('approval is what publishes the page', async () => {
+      queueProfile(proofOnly, null);
+      await decideClaimVerification({
+        profileId: PROFILE,
+        decision: 'approve',
+        decidedBy: 'tim@jov.ie',
+        now,
+      });
+      expect(mocks.state.updates[0]).toMatchObject({
+        spotifyId: '06HL4z0CvFAxyc27GXpf02',
+        isPublic: true,
+      });
+    });
   });
 });

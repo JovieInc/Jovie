@@ -1,4 +1,54 @@
+import { ARTIST_VISIBILITY_OFFER, toCents } from '@/lib/config/plan-prices';
+
 /** JOV-6572 fail-closed certification of the JOV-6571 first-cohort journey. */
+
+/**
+ * Price truth for the Pro handoff. The check id `pro_handoff_199` is a stable
+ * receipt key kept for continuity (the M2 canary step is likewise still named
+ * `pro_checkout_199`); the price itself is always derived from the canonical
+ * plan prices, never typed here.
+ */
+export const CANONICAL_PRO_MONTHLY_USD = ARTIST_VISIBILITY_OFFER.pro.monthlyUsd;
+export const CANONICAL_PRO_MONTHLY_CENTS = toCents(CANONICAL_PRO_MONTHLY_USD);
+const PRO_DISPLAY_NAME = ARTIST_VISIBILITY_OFFER.pro.displayName;
+
+/**
+ * Recognizes the supported monthly Pro receipt formats, not arbitrary prose:
+ * dollar amounts, USD amounts, cents and "<plan name> [monthly] <cents>".
+ * Call only for the Pro handoff receipt; other receipts can name other amounts.
+ * Zero (free) is never a contradiction.
+ */
+export function priceClaimContradictions(text: string): string[] {
+  const found: string[] = [];
+  for (const match of text.matchAll(
+    /(?:\$\s?|\bUSD\s+)(\d[\d,]*(?:\.\d{1,2})?)/gi
+  )) {
+    const usd = Number(match[1]?.replace(/,/g, ''));
+    if (usd !== 0 && usd !== CANONICAL_PRO_MONTHLY_USD) found.push(match[0]);
+  }
+  for (const match of text.matchAll(
+    /\b(\d[\d,]*(?:\.\d{1,2})?)\s+dollars?\b/gi
+  )) {
+    const usd = Number(match[1]?.replace(/,/g, ''));
+    if (usd !== 0 && usd !== CANONICAL_PRO_MONTHLY_USD) found.push(match[0]);
+  }
+  for (const match of text.matchAll(/\b(\d[\d,]*)\s*cents?\b/gi)) {
+    const cents = Number(match[1]?.replace(/,/g, ''));
+    if (cents !== 0 && cents !== CANONICAL_PRO_MONTHLY_CENTS)
+      found.push(match[0]);
+  }
+  const escapedName = PRO_DISPLAY_NAME.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const named = new RegExp(
+    `${escapedName}\\s+(?:monthly\\s+)?(\\d[\\d,]*)\\b`,
+    'gi'
+  );
+  for (const match of text.matchAll(named)) {
+    const cents = Number(match[1]?.replace(/,/g, ''));
+    if (cents !== 0 && cents !== CANONICAL_PRO_MONTHLY_CENTS)
+      found.push(match[0]);
+  }
+  return found;
+}
 
 export const CANONICAL_ARTIST_SITE_CERTIFICATION_CONTRACT =
   'jovie.canonical-artist-site-certification/v1' as const;
@@ -53,7 +103,7 @@ claim_auth_intent state_transitions Claim candidate intent survives the auth bou
 ownership_existing_profile identity Claim attaches to the premade profile without duplication or data loss.
 refresh_back_retry state_transitions Refresh, back, retry, and failed claim states remain recoverable.
 free_state_value revenue Free keeps a durable profile and useful audience capture.
-pro_handoff_199 revenue Eligible artists see a truthful, non-coercive $199/mo handoff.
+pro_handoff_199 revenue Eligible artists see a truthful, non-coercive $${CANONICAL_PRO_MONTHLY_USD}/mo handoff.
 payment_entitlement revenue Checkout, verified entitlement, cancel, and failure states agree.
 immediate_value revenue Claim and verified payment each land in an honest next-value state.
 `.trim();
@@ -164,6 +214,18 @@ export function evaluateCanonicalArtistSiteCertification(
     matches.push(receipt);
     byCheck.set(receipt.checkId, matches);
     integrityFailures.push(...receiptEnvelopeFailures(receipt, input));
+    // Only this receipt asserts the monthly Pro price. Other receipts can carry
+    // unrelated tips, annual totals, budgets or historical amounts.
+    const contradictions =
+      receipt.checkId === 'pro_handoff_199'
+        ? priceClaimContradictions(
+            [receipt.detail, ...receipt.evidence].join('\n')
+          )
+        : [];
+    if (contradictions.length > 0)
+      integrityFailures.push(
+        `${receipt.checkId}: price claim ${[...new Set(contradictions)].join(', ')} contradicts the canonical $${CANONICAL_PRO_MONTHLY_USD}/mo (${CANONICAL_PRO_MONTHLY_CENTS} cents) offer price`
+      );
   }
 
   const promiseDependencies = new Set(input.cohortPromiseDependencies ?? []);

@@ -138,11 +138,6 @@
       "requiredMarker": "Hermes and Trigger.dev are retired Jovie tooling"
     },
     {
-      "path": "STRATEGY.md",
-      "classification": "current",
-      "requiredMarker": "Eve target unavailable until proven"
-    },
-    {
       "path": "docs/OVIE_PROGRAM.md",
       "classification": "current",
       "requiredMarker": "Hermes and Trigger.dev are retired"

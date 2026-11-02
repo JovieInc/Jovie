@@ -8,16 +8,19 @@ const workflow = readFileSync(
   'utf8'
 );
 
-describe('Mutation Diff spare-compute contract', () => {
-  it('runs every job on the gem pool with no hosted fallback', () => {
+describe('Mutation Diff hosted contract', () => {
+  // Policy 2026-10-26 (supersedes the 2026-10-24 gem-only spare-compute rule): the repo is public,
+  // hosted minutes are free, and Stryker on gem held the host at load 25-50 on 16 cores.
+  it('runs every job on GitHub-hosted runners and keeps the sweep state in an Actions cache', () => {
     const runsOn = [...workflow.matchAll(/^\s+runs-on:\s*(.+)$/gmu)].map(
       match => match[1].trim()
     );
     expect(runsOn).toHaveLength(2);
-    for (const value of runsOn) {
-      expect(value).toBe('[self-hosted, Linux, X64, jovie-fixed]');
-    }
-    expect(workflow).not.toMatch(/ubuntu-/u);
+    for (const value of runsOn)
+      expect(value).toMatch(/^ubuntu-(?:latest|24\.04)$/);
+    expect(workflow).not.toMatch(/self-hosted|jovie-fixed/u);
+    expect(workflow).toMatch(/actions\/cache\/restore@/u);
+    expect(workflow).toMatch(/actions\/cache\/save@/u);
   });
 
   it('confines its one secret to the issue-filing step and never runs on pull requests', () => {

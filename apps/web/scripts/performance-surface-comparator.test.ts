@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
+import { selectInteractionHotPaths } from './performance-interaction-manifest';
 import { buildInteractionLatencyReport } from './performance-interaction-report';
 import {
   compareSurfaceMeasurements,
@@ -219,7 +220,12 @@ describe('trusted surface regression comparator', () => {
     const f = fixture();
     const runs = candidate(candidateHead, 45, 150);
     expect(
-      buildInteractionLatencyReport({ samples: runs[0]!.samples }).status
+      buildInteractionLatencyReport({
+        samples: runs[0]!.samples,
+        scenarios: selectInteractionHotPaths({
+          scenarioIds: ['chat-message-round-trip'],
+        }),
+      }).status
     ).toBe('pass');
     expect(compare(f.load(), runs)).toMatchObject({
       status: 'fail',

@@ -4,6 +4,11 @@ const mockRequireAdmin = vi.hoisted(() => vi.fn());
 const mockAuth = vi.hoisted(() => vi.fn());
 const mockDbUpdate = vi.hoisted(() => vi.fn());
 const mockGetUserByClerkId = vi.hoisted(() => vi.fn());
+const mockUpdateBilling = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/stripe/customer-sync', () => ({
+  updateUserBillingStatus: mockUpdateBilling,
+}));
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockAuth,
@@ -65,6 +70,7 @@ describe('Admin Roles API', () => {
     it('grants admin role successfully', async () => {
       mockRequireAdmin.mockResolvedValue(null);
       mockAuth.mockResolvedValue({ userId: 'admin_123' });
+      mockUpdateBilling.mockResolvedValue({ success: true });
       mockGetUserByClerkId.mockResolvedValue({
         id: 'user_1',
         clerkId: 'user_123',
@@ -94,15 +100,21 @@ describe('Admin Roles API', () => {
 
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
-      expect(setMock).toHaveBeenCalledWith(
+      // Max is granted through the shared billing writer (version bump + audit),
+      // never by a direct plan/isPro write on the users row.
+      expect(mockUpdateBilling).toHaveBeenCalledWith(
         expect.objectContaining({
-          isAdmin: true,
+          clerkUserId: 'user_1',
           isPro: true,
           plan: 'max',
-          billingUpdatedAt: expect.any(Date),
-          updatedAt: expect.any(Date),
+          eventType: 'admin_override',
         })
       );
+      expect(setMock).toHaveBeenCalledWith(
+        expect.objectContaining({ isAdmin: true, updatedAt: expect.any(Date) })
+      );
+      expect(setMock.mock.calls[0]?.[0]).not.toHaveProperty('plan');
+      expect(setMock.mock.calls[0]?.[0]).not.toHaveProperty('isPro');
     });
   });
 

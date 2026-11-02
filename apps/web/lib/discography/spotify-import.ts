@@ -49,8 +49,9 @@ import {
   upsertRelease,
   upsertReleaseTrack,
 } from './queries';
+import { findExistingRelease } from './release-identity';
 import { classifySpotifyReleaseType } from './release-type';
-import { generateUniqueSlug } from './slug';
+import { type GenerateUniqueSlugOptions, generateUniqueSlug } from './slug';
 
 // ============================================================================
 // Constants
@@ -130,7 +131,7 @@ function getSpotifyAlbumIdentity(album: SpotifyAlbum): string {
     .sort((left, right) => left.localeCompare(right))
     .join(':');
 
-  return `${normalizeReleaseIdentity(album.name)}:${artists}`;
+  return `${normalizeReleaseIdentity(album.name)}:${artists}:${album.release_date}`;
 }
 
 function getAlbumMetadataScore(
@@ -261,7 +262,8 @@ async function importAlbumBatch(
   albumsToImport: SpotifyAlbum[],
   fullAlbumMap: Map<string, SpotifyAlbumFull>,
   maxTracksPerRelease: number,
-  result: SpotifyImportResult
+  result: SpotifyImportResult,
+  ownerSpotifyId: string
 ): Promise<void> {
   for (const album of albumsToImport) {
     try {
@@ -270,7 +272,8 @@ async function importAlbumBatch(
         creatorProfileId,
         album,
         fullAlbum,
-        maxTracksPerRelease
+        maxTracksPerRelease,
+        ownerSpotifyId
       );
       result.imported++;
     } catch (error) {
@@ -532,7 +535,8 @@ export async function importReleasesFromSpotify(
           canonicalAlbums,
           fullAlbumMap,
           effectiveMaxTracksPerRelease,
-          result
+          result,
+          spotifyArtistId
         );
 
         // Credits are now authoritative and current. Reconcile collaborator
@@ -807,7 +811,8 @@ async function processTracksForRelease(
   release: { id: string },
   creatorProfileId: string,
   fullAlbum: SpotifyAlbumFull,
-  maxTracksPerRelease: number
+  maxTracksPerRelease: number,
+  slugContext: GenerateUniqueSlugOptions = {}
 ): Promise<boolean> {
   const tracksToImport = fullAlbum.tracks.items.slice(0, maxTracksPerRelease);
   const spotifyTrackIds = [
@@ -843,7 +848,8 @@ async function processTracksForRelease(
         creatorProfileId,
         sanitizedTrackTitle,
         'track',
-        existingTrack?.id
+        existingTrack?.id,
+        slugContext
       ));
 
     const sanitizedIsrc = normalizeSpotifyIsrc(track.external_ids?.isrc);
@@ -955,18 +961,36 @@ async function importSingleRelease(
   creatorProfileId: string,
   album: SpotifyAlbum,
   fullAlbum: SpotifyAlbumFull | undefined,
-  maxTracksPerRelease: number
+  maxTracksPerRelease: number,
+  ownerSpotifyId: string
 ): Promise<void> {
   const metadata = sanitizeAlbumMetadata(album, fullAlbum);
   const normalizedTitle = normalizeReleaseIdentity(metadata.sanitizedTitle);
 
   // Spotify IDs can vary by market/edition. Reuse the existing creator release
-  // by provider ID, UPC, or normalized title so re-imports cannot create a new
-  // row merely because Spotify returned another edition identifier.
-  const [existingRelease] = await db
+  // by provider ID or UPC, or by title only when it is also the same artists on
+  // the same date (a market edition). Title alone never merges releases: a
+  // solo recording and a later collaboration can share a title.
+  const releaseDateForIdentity = parseSpotifyReleaseDate(
+    fullAlbum?.release_date ?? album.release_date,
+    fullAlbum?.release_date_precision ?? album.release_date_precision
+  );
+  const spotifyAlbumLinkExists = drizzleSql<boolean>`EXISTS (
+    SELECT 1 FROM provider_links pl
+    WHERE pl.release_id = ${discogReleases.id}
+      AND pl.owner_type = 'release'
+      AND pl.provider_id = 'spotify'
+      AND pl.url LIKE ${`%/album/${album.id}%`}
+  )`;
+  const candidateReleases = await db
     .select({
       id: discogReleases.id,
       slug: discogReleases.slug,
+      title: discogReleases.title,
+      upc: discogReleases.upc,
+      releaseDate: discogReleases.releaseDate,
+      metadata: discogReleases.metadata,
+      providerLinked: spotifyAlbumLinkExists.as('provider_linked'),
     })
     .from(discogReleases)
     .where(
@@ -974,14 +998,24 @@ async function importSingleRelease(
         eq(discogReleases.creatorProfileId, creatorProfileId),
         or(
           drizzleSql`${discogReleases.metadata} ->> 'spotifyId' = ${album.id}`,
+          spotifyAlbumLinkExists,
           metadata.sanitizedUpc
             ? eq(discogReleases.upc, metadata.sanitizedUpc)
             : undefined,
           drizzleSql`regexp_replace(lower(${discogReleases.title}), '[^a-z0-9]+', '', 'g') = ${normalizedTitle}`
         )
       )
-    )
-    .limit(1);
+    );
+  const existingRelease = findExistingRelease(
+    {
+      providerAlbumId: album.id,
+      upc: metadata.sanitizedUpc,
+      normalizedTitle,
+      artistIds: album.artists.map(a => a.id),
+      releaseDate: releaseDateForIdentity,
+    },
+    candidateReleases
+  );
 
   const effectiveAlbumType = fullAlbum?.album_type ?? album.album_type;
   const effectiveTotalTracks = fullAlbum?.total_tracks ?? album.total_tracks;
@@ -996,6 +1030,16 @@ async function importSingleRelease(
   );
   const releaseYear = releaseDate?.getUTCFullYear() ?? null;
 
+  // Other main-artist credits on the album are co-primary artists: they
+  // qualify a colliding title (`seaside-heights-with-vigel`). Version is never
+  // inferred from the title.
+  const slugContext: GenerateUniqueSlugOptions = {
+    year: releaseYear,
+    releaseDate,
+    coPrimary: album.artists
+      .filter(artist => artist.id !== ownerSpotifyId)
+      .map(artist => sanitizeName(artist.name)),
+  };
   const slug =
     existingRelease?.slug ??
     (await generateUniqueSlug(
@@ -1003,7 +1047,7 @@ async function importSingleRelease(
       metadata.sanitizedTitle,
       'release',
       existingRelease?.id,
-      { year: releaseYear }
+      slugContext
     ));
   const releaseArtistInputs = parseAlbumArtistInputs(album, fullAlbum);
   const releaseArtistCredits = parseMainArtists(releaseArtistInputs);
@@ -1064,7 +1108,8 @@ async function importSingleRelease(
       release,
       creatorProfileId,
       fullAlbum,
-      maxTracksPerRelease
+      maxTracksPerRelease,
+      slugContext
     );
   }
 

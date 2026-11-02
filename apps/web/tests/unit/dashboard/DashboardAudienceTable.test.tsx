@@ -205,6 +205,7 @@ function generateMockAudienceMembers(count: number): AudienceMember[] {
     referrerHistory: [{ url: 'https://example.com' }],
     utmParams: {},
     email: i % 3 === 0 ? `user${i + 1}@example.com` : null,
+    emailVisibleToArtist: true,
     phone: i % 3 === 1 ? `+1555000${String(i).padStart(4, '0')}` : null,
     spotifyConnected: i % 5 === 0,
     purchaseCount: Math.floor(Math.random() * 10),

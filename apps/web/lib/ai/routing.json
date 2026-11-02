@@ -1,0 +1,133 @@
+{
+  "schema": "jovie.ai-routing/v1",
+  "updatedAt": "2026-10-30",
+  "description": "Single source of truth for which provider serves which model call. Read by apps/web/lib/ai/routing.ts at runtime and by scripts/ai-routing-check.mjs, which flags drift between this file and the live Gateway report, Vercel env flags and the Workers AI relay. Change routing here, never in prose.",
+  "providers": {
+    "gateway": {
+      "label": "Vercel AI Gateway",
+      "funding": "prepaid-credit (Vercel team jovie, shared by every key and by Summer's OIDC)",
+      "registryId": "vercel-ai-gateway-credits"
+    },
+    "workers-ai": {
+      "label": "Cloudflare Workers AI",
+      "funding": "Cloudflare Startup Program credits",
+      "relayBaseUrl": "https://jovie-workers-ai.tim-fd8.workers.dev/v1",
+      "registryId": "cloudflare-credits"
+    }
+  },
+  "failover": {
+    "credit": "Either provider answering with insufficient funds, budget exceeded, 402 or an out-of-allocation message is replayed once on the other provider (apps/web/lib/ai/credit-failover.ts); the dead provider is skipped for 60 seconds.",
+    "runwayPageDays": 3
+  },
+  "callers": [
+    {
+      "id": "jovie-web.background",
+      "label": "Jovie web non-chat calls (classifiers, extractors, insights, titles, crons)",
+      "repo": "JovieInc/Jovie",
+      "route": "workers-first",
+      "fallback": "gateway",
+      "models": ["zai/glm-5.3-flash", "zai/glm-5.3"],
+      "gatewayKey": "Jovie_Production",
+      "gatewayUsdPerDayMax": 0.3
+    },
+    {
+      "id": "jovie-web.chat",
+      "label": "Jovie artist chat (user-facing, latency sensitive)",
+      "repo": "JovieInc/Jovie",
+      "route": "gateway-first",
+      "fallback": "workers-ai",
+      "models": ["zai/glm-5.3", "zai/glm-5.3-flash"],
+      "gatewayKey": "Jovie_Production",
+      "gatewayUsdPerDayMax": 0.5
+    },
+    {
+      "id": "ci.golden-path-review",
+      "label": "Golden path recorded visual review (CI vision screening)",
+      "repo": "JovieInc/Jovie",
+      "route": "workers-first",
+      "fallback": "gateway",
+      "models": ["zai/glm-5.3-flash"],
+      "gatewayKey": "jovie-golden-path-review",
+      "gatewayUsdPerDayMax": 0.1
+    },
+    {
+      "id": "dev.evals",
+      "label": "Developer evals and judge runs",
+      "repo": "JovieInc/Jovie",
+      "route": "workers-ai-only",
+      "fallback": null,
+      "models": ["@cf/zai-org/glm-5.3", "@cf/zai-org/glm-5.3-flash"],
+      "gatewayKey": "Jovie_Development_20261026",
+      "gatewayUsdPerDayMax": 0.1
+    },
+    {
+      "id": "dev.buyer-eval",
+      "label": "Buyer-eval strong tier (vision conversion forecaster over recorded walks)",
+      "repo": "JovieInc/Jovie",
+      "route": "workers-ai-only",
+      "fallback": null,
+      "models": ["@cf/zai-org/glm-5.3-flash"],
+      "gatewayKey": null,
+      "note": "Through the Workers AI relay (WORKERS_AI_TOKEN). Flash is the vision model: @cf/zai-org/glm-5.3 on Workers AI drops image parts (measured 2026-10-31, JOV-10091). Replaced the claude -p subscription route."
+    },
+    {
+      "id": "hermes.agent",
+      "label": "Hermes CLI worker (outside this repo; model glm-5.2 is off the web allowlist)",
+      "repo": "hermes",
+      "route": "gateway-only",
+      "fallback": null,
+      "models": ["zai/glm-5.2"],
+      "gatewayKey": "hermes-agent-glm-5.2",
+      "gatewayUsdPerDayMax": 0.2,
+      "note": "Follow-up: Workers AI hosts @cf/zai-org/glm-5.2 at the same list price; move Hermes to workers-first."
+    },
+    {
+      "id": "summer.agent-turns",
+      "label": "Summer agent turns and fast chat",
+      "repo": "JovieInc/summer-config",
+      "route": "workers-first",
+      "fallback": "gateway",
+      "models": ["zai/glm-5.3-flash"],
+      "gatewayKey": "oidc:jovie-eve-shadow",
+      "liveFlags": {
+        "vercelProject": "jovie-eve-shadow",
+        "envNames": [
+          "SUMMER_WORKERS_AI_PRIMARY_ENABLED",
+          "SUMMER_WORKERS_AI_BASE_URL",
+          "SUMMER_WORKERS_AI_TOKEN"
+        ]
+      }
+    },
+    {
+      "id": "summer.utility",
+      "label": "Summer utility completions (System-1 reference, compact, judgment, web conversation)",
+      "repo": "JovieInc/summer-config",
+      "route": "workers-first",
+      "fallback": "gateway",
+      "models": ["zai/glm-5.3-flash"],
+      "gatewayKey": "oidc:jovie-eve-shadow"
+    },
+    {
+      "id": "summer.planner",
+      "label": "Summer strategic planner (strong model, no Workers AI twin)",
+      "repo": "JovieInc/summer-config",
+      "route": "gateway-only",
+      "fallback": null,
+      "models": ["moonshotai/kimi-k3.1-pro"],
+      "gatewayKey": "oidc:jovie-eve-shadow"
+    },
+    {
+      "id": "summer.jev-critic",
+      "label": "Jev decision model (triage routing, per-turn critic)",
+      "repo": "JovieInc/summer-config",
+      "route": "gateway-only",
+      "fallback": null,
+      "models": ["typesafe-ai/jev"],
+      "gatewayKey": "oidc:jovie-eve-shadow",
+      "note": "Jev is Gateway-only. Cloudflare's Clef is the Workers AI decision model; it is wired for screenshots (clef-screenshot-evaluator) and is the migration target once a critic eval shows parity."
+    }
+  ],
+  "gatewayUsdPerDayMax": {
+    "oidc:jovie-eve-shadow": 0.9
+  }
+}

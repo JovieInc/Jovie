@@ -31,6 +31,7 @@ const initialRows: AudienceMember[] = [
     referrerHistory: [],
     utmParams: {},
     email: 'sasha@example.com',
+    emailVisibleToArtist: true,
     phone: null,
     spotifyConnected: false,
     purchaseCount: 0,

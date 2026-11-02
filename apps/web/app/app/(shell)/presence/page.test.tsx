@@ -35,6 +35,8 @@ vi.mock('../profiles/ProfilesWorkspace', () => ({
   ProfilesWorkspace: () => null,
 }));
 
+import LegacyPresencePage from '../dashboard/presence/page';
+import ProfilesPage from '../profiles/page';
 import PresencePage, { metadata } from './page';
 
 describe('Profiles public page route', () => {
@@ -72,10 +74,37 @@ describe('Profiles public page route', () => {
       { route: APP_ROUTES.PRESENCE }
     );
     expect(mocks.loadProfiles).not.toHaveBeenCalled();
-    expect(mocks.flag).toHaveBeenCalledWith('PROFILES_WORKSPACE', {
-      userId: 'actor-1',
-    });
+    expect(mocks.flag).not.toHaveBeenCalled();
   });
+
+  it.each([undefined, false])(
+    'loads the supported workspace without a rollout override (%s)',
+    async value => {
+      mocks.flag.mockResolvedValue(value);
+
+      const result = await PresencePage();
+
+      expect(isValidElement(result)).toBe(true);
+      expect(mocks.loadProfiles).toHaveBeenCalledWith({
+        clerkUserId: 'actor-1',
+        databaseUserId: 'database-user-1',
+        profileId: 'identity-1',
+      });
+      expect(mocks.flag).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([ProfilesPage, LegacyPresencePage])(
+    'redirects legacy bookmarks to Identity without a rollout lookup',
+    async page => {
+      mocks.flag.mockResolvedValue(false);
+
+      await expect(page()).rejects.toThrow('NEXT_REDIRECT');
+
+      expect(mocks.redirect).toHaveBeenCalledWith(APP_ROUTES.PRESENCE);
+      expect(mocks.flag).not.toHaveBeenCalled();
+    }
+  );
 
   it('keeps unauthenticated callers out of shell and profile loading', async () => {
     mocks.auth.mockResolvedValue({ userId: null });

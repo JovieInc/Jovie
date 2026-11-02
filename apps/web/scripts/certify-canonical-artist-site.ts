@@ -2,6 +2,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import {
+  CANONICAL_PRO_MONTHLY_USD,
   type CanonicalArtistSiteCheckId,
   type CanonicalArtistSiteReceipt,
   evaluateCanonicalArtistSiteCertification,
@@ -337,8 +338,8 @@ export function certifyCanonicalArtistSite(
       'pro_handoff_199',
       proPassed,
       proPassed
-        ? 'Live claim-first pricing exposed the truthful $199 monthly Pro handoff.'
-        : 'Live claim-first pricing or the $199 monthly Pro handoff failed.',
+        ? `Live claim-first pricing exposed the truthful $${CANONICAL_PRO_MONTHLY_USD} monthly Pro handoff.`
+        : `Live claim-first pricing or the $${CANONICAL_PRO_MONTHLY_USD} monthly Pro handoff failed.`,
       m2Evidence,
       'JOV-6439'
     ),

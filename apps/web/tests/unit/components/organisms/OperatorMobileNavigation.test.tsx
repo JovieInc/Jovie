@@ -101,36 +101,12 @@ describe('OperatorMobileNavigation', () => {
     });
     expect(within(menu).getByRole('link', { name: 'Home' })).toHaveFocus();
 
-    await user.tab();
-    expect(within(menu).getByRole('link', { name: 'Inbox' })).toHaveFocus();
-
-    await user.tab();
-    expect(within(menu).getByRole('link', { name: 'Growth' })).toHaveFocus();
-
-    await user.tab();
-    expect(within(menu).getByRole('link', { name: 'Product' })).toHaveFocus();
-
-    await user.tab();
-    expect(
-      within(menu).getByRole('link', { name: 'Operations' })
-    ).toHaveFocus();
-
-    await user.tab();
-    expect(within(menu).getByRole('link', { name: 'Ops' })).toHaveFocus();
-
-    await user.tab();
-    expect(
-      within(menu).getByRole('link', { name: 'Certifications' })
-    ).toHaveFocus();
-
-    await user.tab();
-    expect(within(menu).getByRole('link', { name: 'Outbound' })).toHaveFocus();
-
-    await user.tab();
-    expect(within(menu).getByRole('link', { name: 'Shipping' })).toHaveFocus();
-
-    await user.tab();
-    expect(within(menu).getByRole('link', { name: 'People' })).toHaveFocus();
+    for (const item of ADMIN_NAV_REGISTRY.slice(1, 10)) {
+      await user.tab();
+      expect(
+        within(menu).getByRole('link', { name: item.label })
+      ).toHaveFocus();
+    }
 
     await user.keyboard('{Escape}');
     expect(
