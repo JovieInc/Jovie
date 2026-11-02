@@ -21,7 +21,7 @@ export function compareToFloor(statuses, floor) {
   const improvements = [];
   for (const [name, required] of Object.entries(floor)) {
     const actual = statuses[name] ?? 'missing';
-    const have = RANK[actual] ?? -1;
+    const have = Object.hasOwn(RANK, actual) ? RANK[actual] : -1;
     if (have < RANK[required])
       regressions.push({ check: name, required, actual });
   }
@@ -54,7 +54,11 @@ export async function runScan(url, fetchImpl = fetch) {
     if (!isRecord(group))
       throw new Error('scan response check group is invalid');
     for (const check of Object.values(group)) {
-      if (!isRecord(check) || typeof check.status !== 'string') {
+      if (
+        !isRecord(check) ||
+        typeof check.status !== 'string' ||
+        !Object.hasOwn(RANK, check.status)
+      ) {
         throw new Error('scan response check result is invalid');
       }
     }

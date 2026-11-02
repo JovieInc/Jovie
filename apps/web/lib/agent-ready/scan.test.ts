@@ -40,6 +40,13 @@ describe('agent-ready scan ratchet', () => {
     ]);
   });
 
+  it('never treats inherited object properties as status ranks', () => {
+    expect(
+      compareToFloor({ robotsTxt: 'toString' }, { robotsTxt: 'pass' })
+        .regressions
+    ).toEqual([{ check: 'robotsTxt', required: 'pass', actual: 'toString' }]);
+  });
+
   it('reports passing checks above the floor as improvements to ratchet', () => {
     const { regressions, improvements } = compareToFloor(flattenScan(scan), {
       robotsTxt: 'pass',
@@ -91,6 +98,8 @@ describe('scanner response boundary', () => {
     { checks: [] },
     { checks: { discovery: null } },
     { checks: { discovery: { robotsTxt: null } } },
+    { checks: { discovery: { robotsTxt: { status: 'toString' } } } },
+    { checks: { discovery: { robotsTxt: { status: '__proto__' } } } },
   ])('rejects malformed scanner payload %j', async payload => {
     await expect(
       runScan(
@@ -113,6 +122,16 @@ describe('scanner response boundary', () => {
     ],
     [{ checks: { discovery: { robotsTxt: { status: 'fail' } } } }, 1],
     [{ checks: { discovery: null } }, 2],
+    [
+      {
+        checks: {
+          discovery: Object.fromEntries(
+            Object.keys(floor).map(name => [name, { status: 'toString' }])
+          ),
+        },
+      },
+      2,
+    ],
   ])(
     'CLI distinguishes a scan result from unavailable evidence',
     (payload, expectedExit) => {
