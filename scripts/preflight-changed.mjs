@@ -477,13 +477,14 @@ export async function main({
   });
   if (pinned.status === 0 && pinned.stdout.trim())
     childEnv.PATH = `${pinned.stdout.trim()}:${childEnv.PATH}`;
-  // Fetch the remote branch under its unqualified name; a base that arrives
-  // already remote-qualified (origin/main) maps back to 'main' (JOV-10351).
-  spawnSync(
-    'git',
-    ['fetch', '--no-tags', '-q', 'origin', args.base.replace(/^origin\//, '')],
-    { cwd }
+  // GitHub's environment contract is a logical branch name. Source guards
+  // prepend origin/ themselves; keep qualified refs only in CI_BASE_REF.
+  const branchBase = args.base.replace(
+    /^(?:refs\/remotes\/origin\/|refs\/heads\/|origin\/)/,
+    ''
   );
+  // Fetch the remote branch under its unqualified name (JOV-10351).
+  spawnSync('git', ['fetch', '--no-tags', '-q', 'origin', branchBase], { cwd });
   const baseRef = resolveBaseRef(cwd, args.base);
   if (!baseRef) {
     log(
@@ -493,7 +494,7 @@ export async function main({
   }
   Object.assign(childEnv, {
     NODE_OPTIONS: `--max-old-space-size=${HEAP_MB}`,
-    GITHUB_BASE_REF: args.base,
+    GITHUB_BASE_REF: branchBase,
     GITHUB_EVENT_NAME: 'pull_request',
     CI_BASE_REF: baseRef,
     // Copied guards compare their module URL to argv[1]; macOS /var -> /private/var
@@ -577,7 +578,7 @@ export async function main({
     pathToFileURL(path.join(cwd, 'scripts/lib/source-validation-manifest.mjs'))
       .href
   );
-  for (const g of manifest.selectManifestGuards(paths, args.base)) {
+  for (const g of manifest.selectManifestGuards(paths, branchBase)) {
     if (g.heavy && !args.thorough) {
       deferred.push(g.id);
       continue;

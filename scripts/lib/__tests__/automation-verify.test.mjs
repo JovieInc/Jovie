@@ -1,10 +1,13 @@
 import { spawn, spawnSync } from 'node:child_process';
 import {
+  chmodSync,
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -2130,9 +2133,7 @@ describe('automation-verify affected scope', () => {
   });
 
   it('fails closed on an unresolved base and retains mandatory risk policy', () => {
-    expect(script).toContain(
-      'git rev-parse --verify --quiet "${BASE_REF}^{commit}"'
-    );
+    expect(script).toContain('resolveBaseRef(process.cwd(), requested)');
     expect(script).toContain('pnpm ci:harness:check');
   });
 
@@ -4357,5 +4358,165 @@ describe('linear sync on merge selection', () => {
     expect(
       buildAffectedTestPlan([...lane, 'scripts/unrelated-peer.mjs']).mode
     ).toBe('full');
+  });
+});
+
+// These fixtures run the real entrypoints with their own refs. In particular,
+// never move a developer's local main to simulate a stale worktree pool.
+function consumerBaseFixture() {
+  const repo = mkdtempSync(resolve(tmpdir(), 'verify-base-consumer-'));
+  const root = resolve(import.meta.dirname, '../../..');
+  const write = (file, text) => {
+    mkdirSync(dirname(resolve(repo, file)), { recursive: true });
+    writeFileSync(resolve(repo, file), text);
+  };
+  const git = (...args) => {
+    const result = spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    return result.stdout.trim();
+  };
+  write('.gitignore', 'scripts/\nnode_modules/\nbin/\ncalls\n');
+  git('init', '-b', 'main');
+  git('config', 'user.email', 'fixture@example.invalid');
+  git('config', 'user.name', 'Base fixture');
+  git('add', '.');
+  git('commit', '-m', 'old local base');
+  git('checkout', '-b', 'upstream');
+  write('package.json', '{}\n');
+  write('scripts/upstream.mjs', 'export {};\n');
+  git('add', 'package.json');
+  git('commit', '-m', 'upstream global input');
+  const remote = git('rev-parse', 'HEAD');
+  git('update-ref', 'refs/remotes/origin/main', remote);
+  git('checkout', '-b', 'feature');
+  write('apps/web/lib/base-consumer.test.ts', 'export {};\n');
+  git('add', '.');
+  git('commit', '-m', 'actual narrow change');
+  // Copy the entrypoints so their repository root is this private fixture;
+  // resolve their maintained dependency graph from the real checkout.
+  for (const file of ['run-affected-tests.mjs', 'automation-verify.sh']) {
+    cpSync(resolve(root, 'scripts', file), resolve(repo, 'scripts', file));
+  }
+  for (const file of ['ci-fast-lanes.mjs', 'preflight-changed.mjs', 'lib']) {
+    symlinkSync(resolve(root, 'scripts', file), resolve(repo, 'scripts', file));
+  }
+  write('scripts/hooks/resolve-repo-node.sh', '#!/bin/sh\nexit 0\n');
+  return { repo, write, git, remote };
+}
+
+function runBaseConsumer(repo, args, env = {}) {
+  return spawnSync(process.execPath, args, {
+    cwd: repo,
+    encoding: 'utf8',
+    env: { ...buildVerificationEnv(), ...env },
+  });
+}
+
+describe('actual affected-test CLI base selection', () => {
+  it('uses remote-first bare bases, preserves qualified refs, and falls back only when remote is absent', () => {
+    const { repo, git } = consumerBaseFixture();
+    const run = base =>
+      runBaseConsumer(repo, [
+        'scripts/run-affected-tests.mjs',
+        '--base',
+        base,
+        '--dry-run',
+      ]);
+    try {
+      for (const base of ['main', 'origin/main', 'refs/remotes/origin/main']) {
+        const result = run(base);
+        expect(result.status, result.stdout + result.stderr).toBe(0);
+        const plan = JSON.parse(result.stdout);
+        expect(plan.mode).toBe('selected');
+        expect(plan.selectedTests).toEqual([
+          'apps/web/lib/base-consumer.test.ts',
+        ]);
+      }
+      git('update-ref', '-d', 'refs/remotes/origin/main');
+      expect(JSON.parse(run('main').stdout).mode).toBe('full');
+      expect(run('origin/main').status).not.toBe(0);
+      expect(run('missing-branch').status).not.toBe(0);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it('retains full fallback for real global inputs and unknown paths', () => {
+    const { repo, write, git } = consumerBaseFixture();
+    try {
+      for (const file of ['package.json', 'apps/web/lib/unknown-runtime.ts']) {
+        const head = git('rev-parse', 'HEAD');
+        write(file, 'changed\n');
+        git('add', '-f', file);
+        git('commit', '-m', file);
+        const result = runBaseConsumer(repo, [
+          'scripts/run-affected-tests.mjs',
+          '--base',
+          'main',
+          '--dry-run',
+        ]);
+        expect(result.status, result.stdout + result.stderr).toBe(0);
+        expect(JSON.parse(result.stdout).mode, file).toBe('full');
+        git('revert', '--no-edit', 'HEAD');
+        expect(git('diff', head, 'HEAD')).toBe('');
+      }
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('actual automation verify shell base selection', () => {
+  it('pins every diff consumer to the remote-first commit and fails before workloads for missing refs', () => {
+    const { repo, write, git, remote } = consumerBaseFixture();
+    const calls = resolve(repo, 'calls');
+    try {
+      write(
+        'bin/node',
+        `#!/bin/sh
+if [ "$1" = "--input-type=module" ]; then exec '${process.execPath}' "$@"; fi
+printf '%s\\n' "$TURBO_SCM_BASE:$*" >> '${calls}'
+`
+      );
+      write('bin/pnpm', `#!/bin/sh\nprintf '%s\\n' "$*" >> '${calls}'\n`);
+      for (const bin of ['node', 'pnpm']) {
+        chmodSync(resolve(repo, 'bin', bin), 0o755);
+      }
+      const run = base =>
+        spawnSync('bash', ['scripts/automation-verify.sh', 'affected'], {
+          cwd: repo,
+          encoding: 'utf8',
+          env: {
+            ...buildVerificationEnv(),
+            AUTOMATION_VERIFY_BASE: base,
+            PATH: `${resolve(repo, 'bin')}:${process.env.PATH}`,
+          },
+        });
+      for (const base of ['main', 'origin/main', 'refs/remotes/origin/main']) {
+        writeFileSync(calls, '');
+        const result = run(base);
+        expect(result.status, result.stdout + result.stderr).toBe(0);
+        const actual = readFileSync(calls, 'utf8');
+        expect(actual).toContain(
+          `${remote}:scripts/turbo-local.mjs typecheck --affected`
+        );
+        expect(actual).toContain(`--base ${remote}`);
+        expect(actual).toContain(`--diff-base=${remote}`);
+        expect(actual).toContain(`--diff-base ${remote}`);
+      }
+      git('update-ref', '-d', 'refs/remotes/origin/main');
+      writeFileSync(calls, '');
+      expect(run('main').status).toBe(0);
+      expect(readFileSync(calls, 'utf8')).toContain(
+        `--base ${git('rev-parse', 'main')}`
+      );
+      for (const base of ['origin/main', 'missing-branch']) {
+        writeFileSync(calls, '');
+        expect(run(base).status).not.toBe(0);
+        expect(readFileSync(calls, 'utf8')).toBe('');
+      }
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 });

@@ -14,6 +14,8 @@ import {
   isBlogContentCandidatePath,
 } from './lib/blog-content-ci.mjs';
 
+import { baseRefCandidates, resolveBaseRef } from './preflight-changed.mjs';
+
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Full-suite shards are deliberately independent so one Vitest process cannot
 // retain the entire suite in memory. They still need a finite wall-clock
@@ -3275,7 +3277,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (args.includes('--control')) {
     process.exit(await runControlTestCommands());
   }
-  const base = argValue(args, '--base', 'origin/main');
+  let base = argValue(args, '--base', 'origin/main');
   const maxWorkers = argValue(args, '--max-workers', '2');
   const shardConcurrency = argValue(args, '--shard-concurrency', '2');
   const shardTimeoutMs = positiveDurationMs(
@@ -3296,6 +3298,24 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     DEFAULT_PROGRESS_INTERVAL_MS
   );
   const explicitFiles = argValue(args, '--changed-files-json', '');
+  if (!explicitFiles) {
+    const resolved = resolveBaseRef(REPO_ROOT, base);
+    if (!resolved) {
+      console.error(
+        `[affected-tests] base ref '${base}' does not resolve to a commit (tried ${baseRefCandidates(base).join(', ')})`
+      );
+      process.exit(1);
+    }
+    // Use one snapshot for selection, blog classification and coverage.
+    base = execFileSync(
+      'git',
+      ['rev-parse', '--verify', `${resolved}^{commit}`],
+      {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+      }
+    ).trim();
+  }
   const files = explicitFiles ? JSON.parse(explicitFiles) : changedFiles(base);
   const prerequisitesAvailable = BLOG_CERTIFICATION_PROOFS.every(file =>
     existsSync(resolve(REPO_ROOT, file))
