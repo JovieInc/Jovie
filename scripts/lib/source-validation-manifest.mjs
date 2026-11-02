@@ -198,6 +198,11 @@ export const NOT_LOCAL = Object.freeze([
     match: 'design-frontend-skill-check',
     reason: 'needs the trusted base ref; ships with design changes in CI',
   },
+  {
+    match: 'brand-name-messages.mjs',
+    reason:
+      'requires PR title/body and a trusted base commit range; the anti-slop source guard runs repository spelling and V8 regressions locally',
+  },
   { match: 'product-lane-classifier', reason: 'classification, not a verdict' },
   { match: 'run-actionlint', reason: 'actionlint binary is CI-installed' },
   {

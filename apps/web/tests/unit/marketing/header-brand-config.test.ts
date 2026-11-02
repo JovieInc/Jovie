@@ -32,7 +32,7 @@ describe('marketing header brand config', () => {
     expect(headlineNamesBrand('Your Jovie profile.')).toBe(true);
     expect(headlineNamesBrand('Jovie vs Linktree')).toBe(true);
     expect(headlineNamesBrand('Control how the world sees you.')).toBe(false);
-    expect(headlineNamesBrand('Jovieo everywhere')).toBe(false);
+    expect(headlineNamesBrand('Jovies everywhere')).toBe(false);
   });
 
   it('lists exactly the copy-driven heroes whose H1 names Jovie', () => {

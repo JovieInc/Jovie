@@ -78,6 +78,9 @@ export const CERTIFICATION_KERNEL_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/agent-os/certification.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/agent-os/certification.ts --coverage.thresholds.lines=94 --coverage.thresholds.statements=93 --coverage.thresholds.branches=84 --coverage.thresholds.functions=96';
 export const ACQUISITION_CERTIFICATION_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts --pool=forks --maxWorkers=1 lib/acquisition/certification-store.test.ts lib/agent-os/certification-adapter.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/acquisition/certification-store.ts --coverage.include=lib/agent-os/certification-cas.ts --coverage.include=lib/agent-os/certification-adapter.ts --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=85 --coverage.thresholds.branches=80 --coverage.thresholds.functions=90 --coverage.reportsDirectory=coverage/jov-5603-acquisition';
+export const BRAND_NAME_COVERAGE_COMMAND =
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/brand-name.test.mjs --maxWorkers=1 --coverage --coverage.provider=v8 --coverage.include=anti-slop/brand-name.mjs --coverage.include=anti-slop/brand-name-messages.mjs --coverage.reporter=text --coverage.reporter=json-summary --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-brand-name-coverage" --coverage.thresholds.perFile=true --coverage.thresholds.statements=90 --coverage.thresholds.lines=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=100';
+
 export const CODEX_BOOTSTRAP_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/codex-cloud-setup.mjs --test-coverage-lines=90 --test-coverage-branches=90 --test-coverage-functions=100 scripts/codex-cloud-setup.test.mjs';
 
@@ -370,10 +373,9 @@ export const SOURCE_GUARDS = Object.freeze([
     // evidence and wiring of every enforced rule, and prose copies of the
     // anti-slop list that drifted from the registry (Tim, 2026-10-26).
     id: 'anti-slop',
-    command:
-      'node scripts/anti-slop/run.mjs validate && node scripts/anti-slop/brand-name.mjs && node --test --test-isolation=none scripts/anti-slop/anti-slop.test.mjs scripts/anti-slop/brand-name.test.mjs',
-    inputs:
-      /^(?:docs\/|scripts\/(?:anti-slop\/|invariants\/|design-frontend-skill-check|ci-fast-lanes\.mjs$)|packages\/copy\/|\.github\/workflows\/source-validation\.yml$|\.claude\/(?:skills|rules)\/|\.agents\/skills\/|canon\/[^/]*\.md$|package\.json$|CLAUDE\.md$|AGENTS\.md$)/u,
+    command: `node scripts/anti-slop/run.mjs validate && node scripts/anti-slop/brand-name.mjs && node --test --test-isolation=none scripts/anti-slop/anti-slop.test.mjs && ${BRAND_NAME_COVERAGE_COMMAND}`,
+    // Brand spelling scans tracked text regardless of directory or extension.
+    inputs: /./u,
     prOnly: false,
   }),
   Object.freeze({
@@ -1259,6 +1261,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/incident-dedupe.test.mjs',
   'scripts/lib/__tests__/ci-capacity.test.mjs',
   'scripts/lib/__tests__/source-qualification-receipt.test.mjs',
+  'scripts/lib/__tests__/brand-name.test.mjs',
 ]);
 export const MESH_HOST_ACK_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-host-ack.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-host-ack.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-host-ack-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=99 --coverage.thresholds.statements=99 --coverage.thresholds.branches=90 --coverage.thresholds.functions=100';

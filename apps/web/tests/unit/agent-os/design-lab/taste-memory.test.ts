@@ -40,7 +40,7 @@ describe('appendDesignTasteMemoryEntry', () => {
       direction: 'Use a restrained surface-1 header band.',
       decision: 'rejected',
       notes: 'Too loud for our restrained aesthetic.',
-      reviewer: 'tim@jov.ie',
+      reviewer: 'tim@jovie.com',
       linearIssueId: 'JOV-1951',
     });
 

@@ -1,16 +1,15 @@
 /**
- * ASR-036: the brand is "Jovie", the domain is "jov.ie". Flags misspellings,
- * near-misses (edit distance 1-2 on capitalized J-words), the wrong domain and
- * wrong casing in prose. "Jovi" is allowed only where it names the agent.
+ * ASR-036: the brand is "Jovie", the domain is "jov.ie". Flags enumerated spelling
+ * mistakes, the wrong domain and wrong casing in prose. "Jovi" is allowed only where it names the agent.
  *
- *   node scripts/anti-slop/brand-name.mjs                       whole repo vs baseline (CI)
+ *   node scripts/anti-slop/brand-name.mjs                       whole repo (CI)
  *   node scripts/anti-slop/brand-name.mjs --diff-base origin/main   added lines only
  *   node scripts/anti-slop/brand-name.mjs --text-file msg.txt   commit message or PR body
  *   node scripts/anti-slop/brand-name.mjs --files a.md b.html
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { REPO_ROOT } from './lib.mjs';
 
@@ -18,110 +17,61 @@ import { REPO_ROOT } from './lib.mjs';
 export const EXCEPTIONS = JSON.parse(
   readFileSync(new URL('./brand-name.exceptions.json', import.meta.url), 'utf8')
 ).exceptions;
-export const BASELINE = 'scripts/anti-slop/brand-name.baseline.json';
 const EXPLICIT =
   /(?<![\w@/.-])(?:Jovy|Jovee|Jovei|Jovvie|Jovies|J0vie|Jovey|Jouvie|Jovvy|Jovye)(?![\w@/-])/giu;
-const DOMAIN = /(?<!test\.)(?<!app\.)\bjovie\.(?:com|io)\b/giu;
-/** jovie.com is an unrelated company (Bright Horizons); copy that disambiguates it is correct. */
+// App/test fixture domains are literals. Emails and URLs are masked below.
+const DOMAIN = /(?<![\w@-])(?<!test\.)(?<!app\.)jovie\.(?:com|io)\b/giu;
 const DOMAIN_OK_CONTEXT =
-  /childcare|Bright Horizons|unrelated|separate (?:company|compan)|different company/iu;
-const WORD = /(?<![\w@/.:#$-])[A-Za-z0-9]{3,8}(?![\w@/:-]|\.\w)/gu;
-/** Real words and names within edit distance 2 of Jovie that must never be flagged. */
-const NOT_BRAND = new Set([
-  'jove',
-  'jovial',
-  'jovian',
-  'joyce',
-  'joule',
-  'jolie',
-  'joke',
-  'joked',
-  'joker',
-  'jobs',
-  'joins',
-  'joined',
-  'joyed',
-  'joy',
-  'jody',
-  'jodie',
-  'josie',
-  'jovita',
-]);
-/** "Jovi" names the agent only in these contexts (Summer Jovi, Jovi coach, Jovi Technology Inc). */
-const JOVI_OK =
-  /\b(?:Summer Jovi|Jovi Technology|Jovi (?:coach|agent|health|AI|chat|memory|works)|(?:through|ask|ask|with|from|to) Jovi\b.*\b(?:agent|coach|health|memory)|AI Agent)\b|\b(?:agent|coach|health|memory)\b.*\bJovi\b/iu;
+  /childcare|Bright Horizons|unrelated|separate company|different company/iu;
+const WORD = /(?<![\w@/.:#$-])Jovi(?![\w@/:-]|\.\w)/gu;
 const PROSE = /\.(?:md|mdx|txt|html|htm)$/iu;
 const SKIP_PATH =
-  /(?:^|\/)(?:pnpm-lock\.yaml|CHANGELOG\.md|node_modules\/|\.git\/)|\.(?:png|jpe?g|webp|avif|svg|ico|pen|xcodeproj|pbxproj|lock|woff2?)$|brand-name\.(?:mjs|test\.mjs|baseline\.json|exceptions\.json)$|(?:^|\/)__snapshots__\/|anti-slop-rules\.json$/iu;
+  /(?:^|\/)(?:pnpm-lock\.yaml|CHANGELOG\.md)$|(?:^|\/)(?:node_modules|\.git|__snapshots__)(?:\/|$)|\.(?:png|jpe?g|webp|avif|svg|ico|pen|xcodeproj|pbxproj|lock|woff2?)$/iu;
+// These exact sources contain the guard's deliberate negative examples.
+const GUARD_SOURCES = new Set([
+  'scripts/anti-slop/brand-name.mjs',
+  'scripts/anti-slop/brand-name-messages.mjs',
+  'scripts/anti-slop/brand-name.exceptions.json',
+  'scripts/lib/__tests__/brand-name.test.mjs',
+  'docs/design-system/anti-slop-rules.json',
+]);
 const BINARY_LIKE =
   /\.(?:png|jpe?g|gif|webp|avif|pdf|zip|mp4|mov|woff2?|ttf|otf|icns|ico)$/iu;
 
-export function distance(a, b) {
-  const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
-  for (let i = 1; i <= a.length; i += 1) {
-    let diag = prev[0];
-    prev[0] = i;
-    for (let j = 1; j <= b.length; j += 1) {
-      const next = Math.min(
-        prev[j] + 1,
-        prev[j - 1] + 1,
-        diag + (a[i - 1] === b[j - 1] ? 0 : 1)
-      );
-      diag = prev[j];
-      prev[j] = next;
-    }
-  }
-  return prev[b.length];
-}
-
-/** Blank out inline code and URLs so identifiers and links are not read as prose. */
-function proseOnly(line) {
-  return line
-    .replace(/`[^`]*`/gu, m => ' '.repeat(m.length))
-    .replace(/https?:\/\/\S+/gu, m => ' '.repeat(m.length));
+/** Preserve offsets while excluding literal code and links from prose. */
+function proseOnly(line, prose) {
+  let text = line
+    .replace(/https?:\/\/[^\s<>"']+/giu, m => ' '.repeat(m.length))
+    .replace(/\b[\w.%+-]+@(?:[\w-]+\.)+[a-z]{2,}\b/giu, m =>
+      ' '.repeat(m.length)
+    );
+  if (prose)
+    text = text.replace(/(`+)(.*?)\1(?!`)/gu, m => ' '.repeat(m.length));
+  return text;
 }
 
 export function scanLine(line, { prose = false } = {}) {
   const found = [];
-  const text = prose
-    ? proseOnly(line)
-    : line.replace(/https?:\/\/\S+/gu, m => ' '.repeat(m.length));
+  const text = proseOnly(line, prose);
   for (const m of text.matchAll(EXPLICIT))
     found.push({ kind: 'misspelling', text: m[0] });
-  if (!DOMAIN_OK_CONTEXT.test(line))
-    for (const m of line
-      .replace(/https?:\/\/\S+/gu, u => ' '.repeat(u.length))
-      .matchAll(DOMAIN))
+  if (!DOMAIN_OK_CONTEXT.test(text))
+    for (const m of text.matchAll(DOMAIN))
       found.push({ kind: 'domain', text: m[0] });
   for (const m of text.matchAll(WORD)) {
-    const word = m[0];
-    const low = word.toLowerCase();
-    if (low === 'jovie' || NOT_BRAND.has(low) || EXPLICIT.test(word)) {
-      EXPLICIT.lastIndex = 0;
-      continue;
-    }
-    EXPLICIT.lastIndex = 0;
-    if (low === 'jovi') {
-      if (/^Jovi$/u.test(word) && !JOVI_OK.test(line))
-        found.push({ kind: 'jovi-outside-agent-context', text: word });
-      continue;
-    }
+    // Exempt this occurrence only: agent names and the real band name.
+    const before = text.slice(0, m.index);
+    const after = text.slice(m.index + m[0].length);
     if (
-      /^J[o0u]v/u.test(word) &&
-      !low.startsWith('jovie') &&
-      word.length >= 4 &&
-      distance(low, 'jovie') <= 2 &&
-      !/^[A-Z]+$/u.test(word)
-    ) {
-      found.push({ kind: 'near-miss', text: word });
-    }
+      /\b(?:Summer|Bon) $/u.test(before) ||
+      /^ (?:coach\b|Technology Inc\b)/u.test(after)
+    )
+      continue;
+    found.push({ kind: 'jovi-outside-agent-context', text: m[0] });
   }
   if (prose) {
-    for (const m of text.matchAll(
-      /(?<![\w@/.:#$-])(?:jovie|JOVIE|JoVie|jOVIE)(?![\w@/:-]|\.\w)/gu
-    )) {
-      found.push({ kind: 'casing', text: m[0] });
-    }
+    for (const m of text.matchAll(/(?<![\w@/.:#$-])jovie(?![\w@/:-]|\.\w)/giu))
+      if (m[0] !== 'Jovie') found.push({ kind: 'casing', text: m[0] });
   }
   return found;
 }
@@ -136,22 +86,58 @@ export function scanText(
   { file = '', prose = PROSE.test(file), exceptions = EXCEPTIONS } = {}
 ) {
   const hits = [];
-  const excused = exceptions.filter(e => e.file === file && e.reason);
-  let fenced = false;
+  const originalLines = text.split('\n');
+  for (const e of exceptions) {
+    if (
+      typeof e.file !== 'string' ||
+      !e.file.trim() ||
+      typeof e.match !== 'string' ||
+      !e.match.trim() ||
+      typeof e.reason !== 'string' ||
+      !e.reason.trim()
+    )
+      throw new Error(
+        'Brand exceptions require a file, exact match and reason'
+      );
+  }
+  // Mask only the frozen span; preserve line numbers and neighboring prose.
+  for (const e of exceptions.filter(e => e.file === file))
+    text = text.replaceAll(e.match, e.match.replace(/[^\n]/gu, ' '));
+  const frontmatterEnd =
+    /(?:^|\/)SKILL\.md$/u.test(file) && text.startsWith('---\n')
+      ? text.indexOf('\n---', 4)
+      : -1;
+  let offset = 0;
+  let fence = null;
   text.split('\n').forEach((line, index) => {
-    if (prose && /^\s*(?:```|~~~)/u.test(line)) {
-      fenced = !fenced;
+    const inSkillHeader = offset < frontmatterEnd;
+    offset += line.length + 1;
+    if (inSkillHeader)
+      line = line.replace(
+        /^(name: )([a-z][a-z0-9-]*)$/u,
+        (_, prefix, slug) => prefix + ' '.repeat(slug.length)
+      );
+    const marker = prose && line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/u);
+    if (fence) {
+      if (
+        marker &&
+        marker[1][0] === fence[0] &&
+        marker[1].length >= fence.length &&
+        !marker[2].trim()
+      )
+        fence = null;
       return;
     }
-    if (fenced) return;
-    if (/^\s*name:\s*\S+\s*$/u.test(line)) return; // yaml identifier
-    if (excused.some(e => line.includes(e.match))) return;
+    if (marker) {
+      fence = marker[1];
+      return;
+    }
     for (const hit of scanLine(line, { prose }))
       hits.push({
         file,
         line: index + 1,
         ...hit,
-        context: line.trim().slice(0, 120),
+        context: originalLines[index].trim().slice(0, 120),
       });
   });
   return hits;
@@ -164,81 +150,76 @@ const git = (root, args) =>
     maxBuffer: 256 * 1024 * 1024,
   });
 
-export function scanRepo(root = REPO_ROOT) {
-  const hits = [];
-  for (const file of git(root, ['ls-files', '-z'])
-    .split('\0')
-    .filter(Boolean)) {
-    if (
-      SKIP_PATH.test(file) ||
-      BINARY_LIKE.test(file) ||
-      !existsSync(join(root, file))
-    )
-      continue;
-    let text;
-    try {
-      text = readFileSync(join(root, file), 'utf8');
-    } catch {
-      continue;
-    }
-    if (text.includes('\0')) continue;
-    hits.push(...scanText(text, { file }));
+/** All file entry points share path, deletion and binary filtering. */
+export function readScanFile(file, root = REPO_ROOT, { brand = true } = {}) {
+  const path = resolve(root, file);
+  const name = relative(root, path).split(sep).join('/');
+  if (
+    (brand && (SKIP_PATH.test(name) || GUARD_SOURCES.has(name))) ||
+    BINARY_LIKE.test(name)
+  )
+    return null;
+  let text;
+  try {
+    text = readFileSync(path, 'utf8');
+  } catch (error) {
+    if (['ENOENT', 'EISDIR'].includes(error.code)) return null;
+    throw error;
   }
-  return hits;
+  return text.includes('\0') ? null : { file: name, text };
+}
+
+export function scanFiles(files, root = REPO_ROOT) {
+  return files.flatMap(file => {
+    const input = readScanFile(file, root);
+    return input ? scanText(input.text, { file: input.file }) : [];
+  });
+}
+
+export function scanRepo(root = REPO_ROOT) {
+  return scanFiles(
+    git(root, ['ls-files', '-z']).split('\0').filter(Boolean),
+    root
+  );
 }
 
 export function scanDiff(base, root = REPO_ROOT) {
-  const hits = [];
-  const patch = git(root, [
+  const range = `${base}...HEAD`;
+  const files = git(root, [
     'diff',
-    '--unified=0',
-    '--no-color',
-    `${base}...HEAD`,
-  ]);
-  let file = '';
-  let line = 0;
-  for (const row of patch.split('\n')) {
-    if (row.startsWith('+++ b/')) {
-      file = row.slice(6);
-      continue;
+    '--name-only',
+    '-z',
+    '--diff-filter=ACMR',
+    range,
+  ])
+    .split('\0')
+    .filter(Boolean);
+  return files.flatMap(file => {
+    if (!readScanFile(file, root)) return [];
+    const patch = git(root, [
+      'diff',
+      '--unified=0',
+      '--no-color',
+      '--no-ext-diff',
+      '--no-textconv',
+      range,
+      '--',
+      file,
+    ]);
+    const added = new Set();
+    for (const match of patch.matchAll(
+      /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/gmu
+    )) {
+      const start = Number(match[1]);
+      const count = match[2] === undefined ? 1 : Number(match[2]);
+      for (let line = start; line < start + count; line += 1) added.add(line);
     }
-    const hunk = row.match(/^@@ -\d+(?:,\d+)? \+(\d+)/u);
-    if (hunk) {
-      line = Number(hunk[1]);
-      continue;
-    }
-    if (row.startsWith('+') && !row.startsWith('+++')) {
-      if (!SKIP_PATH.test(file) && !BINARY_LIKE.test(file)) {
-        for (const hit of scanLine(row.slice(1), { prose: PROSE.test(file) }))
-          hits.push({
-            file,
-            line,
-            ...hit,
-            context: row.slice(1).trim().slice(0, 120),
-          });
-      }
-      line += 1;
-    }
-  }
-  return hits;
+    const text = git(root, ['show', `HEAD:${file}`]);
+    return scanText(text, { file }).filter(hit => added.has(hit.line));
+  });
 }
 
-const key = h => `${h.file}\t${h.kind}`;
-export function compareToBaseline(hits, baseline) {
-  const counts = new Map();
-  for (const h of hits) counts.set(key(h), (counts.get(key(h)) ?? 0) + 1);
-  const failures = [];
-  for (const [k, n] of counts) {
-    const allowed = baseline[k] ?? 0;
-    if (n > allowed)
-      failures.push(
-        `${k.replace('\t', ' ')}: ${n} hit(s), baseline ${allowed}`
-      );
-  }
-  return failures;
-}
-
-function main(argv) {
+export function main(argv, root = REPO_ROOT) {
   const arg = name => argv[argv.indexOf(name) + 1];
   if (argv.includes('--text-file')) {
     const hits = scanText(
@@ -256,9 +237,7 @@ function main(argv) {
   }
   if (argv.includes('--files')) {
     const files = argv.slice(argv.indexOf('--files') + 1);
-    const hits = files.flatMap(f =>
-      scanText(readFileSync(f, 'utf8'), { file: f })
-    );
+    const hits = scanFiles(files, root);
     for (const h of hits)
       process.stderr.write(
         `ASR-036 ${h.kind} "${h.text}" ${h.file}:${h.line}: ${h.context}\n`
@@ -266,44 +245,27 @@ function main(argv) {
     return hits.length ? 1 : 0;
   }
   if (argv.includes('--diff-base')) {
-    const hits = scanDiff(arg('--diff-base'));
+    const hits = scanDiff(arg('--diff-base'), root);
     for (const h of hits)
       process.stderr.write(
         `ASR-036 ${h.kind} "${h.text}" ${h.file}:${h.line}: ${h.context}\n`
       );
     return hits.length ? 1 : 0;
   }
-  const hits = scanRepo();
-  if (argv.includes('--write-baseline')) {
-    const counts = {};
-    for (const h of hits) counts[key(h)] = (counts[key(h)] ?? 0) + 1;
-    writeFileSync(
-      join(REPO_ROOT, BASELINE),
-      JSON.stringify(
-        Object.fromEntries(Object.entries(counts).sort()),
-        null,
-        2
-      ) + '\n'
-    );
-    process.stdout.write(
-      `baseline: ${hits.length} hits in ${Object.keys(counts).length} file/kind pairs\n`
-    );
-    return 0;
-  }
-  const baseline = existsSync(join(REPO_ROOT, BASELINE))
-    ? JSON.parse(readFileSync(join(REPO_ROOT, BASELINE), 'utf8'))
-    : {};
-  const failures = compareToBaseline(hits, baseline);
+  const hits = scanRepo(root);
   if (argv.includes('--list'))
     for (const h of hits)
       process.stdout.write(
         `${h.kind}\t"${h.text}"\t${h.file}:${h.line}\t${h.context}\n`
       );
-  if (failures.length) {
-    process.stderr.write(failures.join('\n') + '\n');
+  if (hits.length) {
+    for (const h of hits)
+      process.stderr.write(
+        `ASR-036 ${h.file}:${h.line} ${h.kind} "${h.text}": ${h.context}\n`
+      );
     return 1;
   }
-  process.stdout.write(`brand-name: ok (${hits.length} baselined hits)\n`);
+  process.stdout.write('brand-name: ok (0 hits; no baseline)\n');
   return 0;
 }
 

@@ -35,7 +35,7 @@ From `gbrain: design/jovie-brand-identity-canon` (2026-07-03) and the issue's pl
 Verified against this checkout (2026-09-03):
 
 - `apps/web/lib/brand/tokens.ts:24` — `JOVIE_PATH` is a ring with a J-hook notch (1043 chars, 360×360 viewBox), **not** a clean O. `OV_PATH` (`tokens.ts:34`) reuses it as a documented placeholder; do not change OV treatment here.
-- `apps/web/lib/brand/wordmark-letters.ts` — geometric J-O-V-I-E letters, 22u uniform stem, O glyph outer R=50 / inner R=27 (evenodd) already matched to the mark ring ratio.
+- `apps/web/lib/brand/wordmark-letters.ts` — geometric JOVIE letters, 22u uniform stem, O glyph outer R=50 / inner R=27 (evenodd) already matched to the mark ring ratio.
 - `apps/web/lib/brand/primitives.tsx` — `Mark`, `Wordmark` (already supports `markAsO`, lines 113-128), `Lockup`. The layout math the wordmark→O animation needs already exists.
 - Favicon chain: `apps/web/public/favicon.svg` (dual-mode ink `#08090a` / cream `#F5F4F0`), `favicon.ico` (manual, not generated), `favicon-{16,32,96}.png`, `apple-touch-icon.png`, `web-app-manifest-{192,512}.png`, `android-chrome-{192,512}.png`; wired in `apps/web/app/layout.tsx:130-149` and `apps/web/app/manifest.ts:20-57`.
 - Stale pre-rebrand purple `#6366f1` still in `apps/web/app/layout.tsx:120` (`msapplication-TileColor`) and `:146` (mask-icon color). Fix with the favicon swap.
