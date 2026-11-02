@@ -699,7 +699,7 @@ export async function main(
       }
     } else {
       const { changedFiles } = await import('./preflight-changed.mjs');
-      files = changedFiles(a.repo, a.base).files;
+      files = changedFiles(a.repo, baseRef).files;
       subjects = git(['log', '--format=%s', `origin/${a.base}..HEAD`])
         .stdout.trim()
         .split('\n')
