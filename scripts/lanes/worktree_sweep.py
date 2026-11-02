@@ -389,21 +389,29 @@ def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecy
     if live is None:
         report["errors"].append("process-state-unavailable")
         return report
+    # Fairness cursor: least recently visited checkout first, across every repository. Without it a
+    # spent budget restarted at the first repository each interval, so the second (~/Jovie, whose
+    # worktrees are ~/wt: 334 GiB on root, 2026-11-02) was never reached.
+    visits_path = None if state is None else state / VISITS_FILE
+    visits = _read_visits(visits_path)
+    queue = []
     for repo in repos:
-        if yield_to_drain():
-            return report
         try:
             entries = linked_worktrees(repo, run)
         except (OSError, subprocess.SubprocessError) as error:
             report["errors"].append(f"list:{repo}:{type(error).__name__}")
             continue
-        for path, branch in entries:
+        queue += [(repo, path, branch) for path, branch in entries]
+    queue.sort(key=lambda item: visits.get(str(item[1]), 0.0))
+    try:
+        for repo, path, branch in queue:
             # A retirement is one unit: finish its preservation/removal before
             # yielding, retaining the inherited lifecycle lease throughout.
             if yield_to_drain():
                 return report
             if not path.exists() or not in_scope(path, roots, never):
                 continue
+            visits[str(path)] = now
             try:
                 retire(repo, path, branch, live, report, run=run, now=now, closed=closed.get(repo, set()),
                        idle_s=idle_s, preserved_ttl_s=preserved_ttl_s, prefix=prefix, date=date)
@@ -412,6 +420,9 @@ def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecy
                 # the sweep; it stays in place and is retried next interval.
                 report["kept"] += 1
                 report["errors"].append(f"{path}:{type(error).__name__}"[:200])
+    finally:
+        _write_visits(visits_path, visits, {str(path) for _, path, _ in queue})
+    for repo in repos:
         if yield_to_drain():
             return report
         try:
@@ -419,6 +430,29 @@ def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecy
         except (OSError, subprocess.SubprocessError):
             pass
     return report
+
+
+VISITS_FILE = "worktree-sweep-visits.json"
+
+
+def _read_visits(path: Path | None) -> dict:
+    if path is None:
+        return {}
+    try:
+        data = json.loads(path.read_text())
+        return {k: float(v) for k, v in data.items()} if isinstance(data, dict) else {}
+    except (OSError, ValueError, TypeError):
+        return {}
+
+
+def _write_visits(path: Path | None, visits: dict, live: set) -> None:
+    """Keep only checkouts that still exist in a repository listing; best effort."""
+    if path is None:
+        return
+    try:
+        atomic_write_text(path, json.dumps({k: v for k, v in visits.items() if k in live}, sort_keys=True))
+    except OSError:
+        pass
 
 
 def closed_branches(repo: Path, run) -> set[str]:
