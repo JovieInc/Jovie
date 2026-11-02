@@ -579,11 +579,20 @@ export async function refreshBodyChecks(
       );
   };
   try {
-    // The second event carries the exact final body; no commits, pushes or reruns.
-    edit(
-      `${body.trimEnd()}\n\n<!-- pr-open-refresh: ${Date.now()}-${process.pid} -->\n`
-    );
-    edit(body);
+    // A body or title change emits its own edited event carrying the exact
+    // final body, so one PATCH is one fresh flight. The marker round-trip is
+    // kept only for a byte-identical update, where GitHub emits no event at
+    // all and a forced mutation is the only way to request fresh checks
+    // (JOV-10354: the unconditional double PATCH doubled every update's
+    // Source Validation flights).
+    if (body === pr.body && title === pr.title) {
+      edit(
+        `${body.trimEnd()}\n\n<!-- pr-open-refresh: ${Date.now()}-${process.pid} -->\n`
+      );
+      edit(body);
+    } else {
+      edit(body);
+    }
     for (let attempt = 0; attempt < 5; attempt++) {
       const fresh = runs().filter(
         r =>
