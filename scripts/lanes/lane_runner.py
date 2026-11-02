@@ -577,7 +577,7 @@ def load_providers(path: Path = HERE / "providers.json", registry: dict | None =
 
 
 def repair_providers(providers: dict | None = None) -> dict:
-    """The repair-only view; retain disabled identities for orphan custody, never alter new-work routing."""
+    """Dispatch availability only; custody must use the unchanged configured catalog."""
     return {name: spec if provider_may_run(name, "fix-red") else {**spec, "repairs": False}
             for name, spec in (load_providers() if providers is None else providers).items()}
 
@@ -4841,7 +4841,8 @@ def escalate_exhausted(host: Host, prs: list[dict], linear, *, model_only=False,
     attempts = json.loads(path.read_text()) if path.exists() else {}
     observed = json.loads(json.dumps(attempts))
     held = json.loads(held_path(host).read_text()) if held_path(host).exists() else {}
-    providers = repair_providers()
+    custody_providers = load_providers()
+    providers = repair_providers(custody_providers)
     cooled = {name for name in providers if cooling(host, name)} if routing_context is REPAIR_ROUTING_UNSET else set()
     data = load_escalation(host)
     now = time.time()
@@ -4894,11 +4895,11 @@ def escalate_exhausted(host: Host, prs: list[dict], linear, *, model_only=False,
                 if not isinstance(pending, dict) or type(pr.get("isDraft")) is not bool \
                         or pr.get("isCrossRepository") is not False or (pr["isDraft"] and not owned):
                     continue
-                disabled = {name for name, spec in providers.items() if isinstance(spec, dict)
+                disabled = {name for name, spec in custody_providers.items() if isinstance(spec, dict)
                             and (not spec.get("enabled", True) or spec.get("repairs") is False)}
                 transfer = bool(pr.get("isDraft") and owned
                                 and owned["lane"] not in {pending.get("lane"), *disabled})
-                if transfer and (owned["lane"] not in providers or record.get("lane") != owned["lane"]
+                if transfer and (owned["lane"] not in custody_providers or record.get("lane") != owned["lane"]
                                  or pending.get("head") != pr["headRefOid"]
                                  or pr["headRefOid"] not in (record.get("sha"), record.get("pushedHead"))
                                  or record.get("repairBranch") != pr["headRefName"]
@@ -5952,7 +5953,7 @@ def _rung_stamp(value):
 
 def pending_rung_disposition(pr, record, name, providers, now, *, classified,
                              caps_allow, plan_ladder, top_rung_used, active_previous_attempt,
-                             recovery_block=None):
+                             recovery_block=None, custody_providers=None):
     """Return eligible/blocked/unknown for a local pending rung, without mutation.
 
     Same-lane/disabled-owner draft handling retains the existing scope and the
@@ -5964,7 +5965,9 @@ def pending_rung_disposition(pr, record, name, providers, now, *, classified,
     the *recorded* head; a changed remote head must not hide its original lease.
     `recovery_block` is the caller's existing preserved/revoked/custody reason.
     None means that caller's local preflight has not found such a hold; it does
-    not attest to remote ownership. All live claim fences remain mandatory.
+    not attest to remote ownership. The custody catalog is independent of dispatch
+    availability; filtering a route never releases an enabled branch owner.
+    All live claim fences remain mandatory.
     """
     if not isinstance(pr, dict) or not isinstance(record, dict) or not isinstance(providers, dict):
         return _rung_result("unknown", "rung-input-unreadable")
@@ -6026,14 +6029,17 @@ def pending_rung_disposition(pr, record, name, providers, now, *, classified,
             return _rung_result("unknown", "rung-top-authority-unreadable")
         if used:
             return _rung_result("blocked", "ladder-exhausted")
+    custody_providers = providers if custody_providers is None else custody_providers
+    if not isinstance(custody_providers, dict):
+        return _rung_result("unknown", "rung-custody-catalog-unreadable")
     owned = LANE_BRANCH.match(branch)
-    disabled = {lane for lane, provider in providers.items() if isinstance(provider, dict)
+    disabled = {lane for lane, provider in custody_providers.items() if isinstance(provider, dict)
                 and (not provider.get("enabled", True) or provider.get("repairs") is False)}
     transfer = bool(pr["isDraft"] and owned and owned["lane"] not in {name, *disabled})
     if pr["isDraft"] and not owned:
         return _rung_result("blocked", "rung-foreign-draft")
     if transfer:
-        if owned["lane"] not in providers or record.get("lane") != owned["lane"]:
+        if owned["lane"] not in custody_providers or record.get("lane") != owned["lane"]:
             return _rung_result("blocked", "rung-draft-owner-unproven")
         if pending.get("head") != head:
             return _rung_result("blocked", "rung-draft-exact-head-required")
@@ -6104,7 +6110,8 @@ def claim_escalation_pr(host: Host, name: str, prs: list[dict], *,
             return None
     except (OSError, ValueError):
         return None
-    providers = repair_providers()
+    custody_providers = load_providers()
+    providers = repair_providers(custody_providers)
     for key, record in attempts.items():
         if not isinstance(record, dict):
             continue
@@ -6147,7 +6154,7 @@ def claim_escalation_pr(host: Host, name: str, prs: list[dict], *,
         rung = pending_rung_disposition(
             live, record, name, providers, time.time(), classified=classified,
             caps_allow=remediation.caps_allow, plan_ladder=current_plan,
-            top_rung_used=remediation.top_rung_used,
+            top_rung_used=remediation.top_rung_used, custody_providers=custody_providers,
             active_previous_attempt=pr_events.in_flight(record, {"headRefOid": record.get("sha")}, time.time()))
         if rung["state"] != "eligible":
             continue
@@ -6182,7 +6189,7 @@ def claim_escalation_pr(host: Host, name: str, prs: list[dict], *,
             fresh_rung = pending_rung_disposition(
                 live, record, name, providers, now, classified=classified,
                 caps_allow=remediation.caps_allow, plan_ladder=current_plan,
-                top_rung_used=remediation.top_rung_used,
+                top_rung_used=remediation.top_rung_used, custody_providers=custody_providers,
                 active_previous_attempt=pr_events.in_flight(record, {"headRefOid": record.get("sha")}, now))
             if fresh_rung["state"] != "eligible":
                 raise RepairStopped("escalation-route-changed", live, "before-escalation-charge")
@@ -8412,7 +8419,7 @@ def lane_prs(name: str, providers: dict | None = None, fields: str = "", *, inve
     nobody else will fix or gate those, and any enabled lane can."""
     if fields and inventory is not None:
         raise ValueError("supplied-inventory-fields")
-    providers = repair_providers() if providers is None else providers
+    providers = load_providers() if providers is None else providers
     names = [name] + [other for other, spec in providers.items()
                       if (not spec.get("enabled", True) or spec.get("repairs") is False) and other != name]
     prs = []
@@ -9079,9 +9086,10 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
     path = host.state / "fix-attempts.json"
     attempts = json.loads(path.read_text()) if path.exists() else {}
     held = json.loads(held_path(host).read_text()) if held_path(host).exists() else {}
-    providers = repair_providers()
+    custody_providers = load_providers()
+    providers = repair_providers(custody_providers)
     order, now = pr_events.cost_order(providers), time.time()
-    disabled = set(providers) - set(order)
+    disabled = pr_events.disabled_lanes(custody_providers)
     prs = [pr for pr in prs if not pr_recovery_held(host, pr, now) and not pr_breaker_open(host, pr["number"], now, pr.get("headRefOid"))
            and pr_events.may_take(name, pr, attempts.get(str(pr["number"]), {}), order, now)]
     settled = []
@@ -9399,8 +9407,9 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
                 raise ValueError("maintenance-state-not-object")
             snapshots[filename] = row
         attempts, held = snapshots["fix-attempts.json"], snapshots["held.json"]
-        providers = repair_providers()
-        order, disabled = pr_events.cost_order(providers), pr_events.disabled_lanes(providers)
+        custody_providers = load_providers()
+        providers = repair_providers(custody_providers)
+        order, disabled = pr_events.cost_order(providers), pr_events.disabled_lanes(custody_providers)
         if name not in order:
             raise ValueError("maintenance-provider-disabled")
         # A preserved checkout needs its existing reconciliation/qualification path.
@@ -9474,7 +9483,7 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
                     rung = pending_rung_disposition(
                         pr, attempt, name, providers, now, classified=rung_blocker(pr, attempt, entry),
                         caps_allow=remediation.caps_allow, plan_ladder=current_plan,
-                        top_rung_used=remediation.top_rung_used,
+                        top_rung_used=remediation.top_rung_used, custody_providers=custody_providers,
                         active_previous_attempt=pr_events.in_flight(attempt, {"headRefOid": attempt.get("sha")}, now))
                     if rung["state"] == "eligible" and provider_may_run(name, "fix"):
                         eligible.add(number)

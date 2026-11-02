@@ -16214,6 +16214,16 @@ class PendingRungDispositionTest(unittest.TestCase):
         for reason in ("preserved-reconciliation-required", "publication-revoked", "secret-file", "ownership-unknown"):
             with self.subTest(reason=reason): self.assertEqual(self.run_case(recovery_block=reason)["reason"], reason)
 
+    def test_missing_custody_owner_cannot_borrow_dispatch_identity(self):
+        self.assertEqual(self.run_case(custody_providers={"grok": self.providers["grok"]})["reason"],
+                         "rung-draft-owner-unproven")
+
+    def test_unreadable_custody_catalog_never_waives_transfer(self):
+        for catalog in ([], "bad", False):
+            with self.subTest(catalog=catalog):
+                self.assertEqual(self.run_case(custody_providers=catalog),
+                                 {"state": "unknown", "reason": "rung-custody-catalog-unreadable", "crossLaneDraft": False})
+
     def test_current_target_class_and_prescription_must_agree(self):
         for changes in ({"state": "MERGED"}, {"state": "CLOSED"}, {"isCrossRepository": True},
                         {"isInMergeQueue": True}, {"headRefOid": "head-B"}):
@@ -16295,15 +16305,23 @@ class PendingRungDispositionTest(unittest.TestCase):
         self.assertEqual(self.run_case()["state"], "unknown")
 
 
+    def authorize_runtime_target(self):
+        # Keep the old owner as custody evidence; only the approved target may dispatch.
+        self.providers = {"grok": {"enabled": True, "tier": 0}, "codex": {"enabled": True, "tier": 1}}
+        self.pr["headRefName"] = "grok/jov-7-20261016"
+        self.record.update(lane="grok", repairBranch=self.pr["headRefName"])
+        self.record["pendingEscalation"]["lane"] = "codex"
+
     def routing_context(self, host):
         with patch.object(lane, "observe_repair_provider_health", return_value=True):
-            return lane.capture_repair_routing(host, self.providers,
+            return lane.capture_repair_routing(host, lane.repair_providers(self.providers),
                 {"readable": True, "sourceAt": self.now, "prs": [self.integration_pr()]})
 
     def integration_pr(self):
         return {**self.pr, "mergeStateStatus": "DIRTY", "labels": [], "statusCheckRollup": []}
 
     def test_actual_claim_charges_one_separate_rung_and_preserves_spent_history(self):
+        self.authorize_runtime_target()
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp)); pr = self.integration_pr()
             path = host.state / "fix-attempts.json"
@@ -16315,19 +16333,20 @@ class PendingRungDispositionTest(unittest.TestCase):
                     patch.object(lane, "post_claim") as posted, \
                     patch.object(lane, "sh", side_effect=AssertionError("no external mutation")), \
                     patch.object(lane.time, "time", return_value=self.now):
-                selected = lane.claim_escalation_pr(host, "grok", [pr], routing_context=self.routing_context(host))
+                selected = lane.claim_escalation_pr(host, "codex", [pr], routing_context=self.routing_context(host))
                 self.assertEqual(selected["dossier"], "existing evidence")
-                self.assertIsNone(lane.claim_escalation_pr(host, "grok", [pr], routing_context=self.routing_context(host)))
+                self.assertIsNone(lane.claim_escalation_pr(host, "codex", [pr], routing_context=self.routing_context(host)))
             rows = json.loads(path.read_text()); after = rows["7"]
             self.assertEqual(rows["8"], {"keep": True})
             for key, value in before.items():
                 if key not in {"pendingEscalation", "escalations"}: self.assertEqual(after[key], value)
             self.assertEqual(after["escalations"][:-1], before["escalations"])
-            self.assertEqual(after["escalations"][-1]["lane"], "grok")
+            self.assertEqual(after["escalations"][-1]["lane"], "codex")
             self.assertEqual(after["escalations"][-1]["kind"], "model")
             posted.assert_called_once_with(7, "head-A", "fix")
 
     def test_certified_draft_still_requires_fresh_owner_target_and_publication_fences(self):
+        self.authorize_runtime_target()
         for fault in ("owner", "queued", "head", "revoked", "secret"):
             with self.subTest(fault=fault), tempfile.TemporaryDirectory() as tmp:
                 host = lane.Host(state=Path(tmp)); pr = self.integration_pr(); live = copy.deepcopy(pr)
@@ -16344,10 +16363,11 @@ class PendingRungDispositionTest(unittest.TestCase):
                         patch.object(lane, "post_claim") as posted, \
                         patch.object(lane, "sh", side_effect=AssertionError("no external mutation")), \
                         patch.object(lane.time, "time", return_value=self.now):
-                    self.assertIsNone(lane.claim_escalation_pr(host, "grok", [pr], routing_context=self.routing_context(host)))
+                    self.assertIsNone(lane.claim_escalation_pr(host, "codex", [pr], routing_context=self.routing_context(host)))
                 self.assertEqual(path.read_bytes(), before); posted.assert_not_called()
 
     def test_dedicated_inventory_join_and_census_find_rung_absent_from_polling(self):
+        self.authorize_runtime_target()
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp)); pr = self.integration_pr()
             (host.state / "fix-attempts.json").write_text(json.dumps({"7": self.record}))
@@ -16357,18 +16377,19 @@ class PendingRungDispositionTest(unittest.TestCase):
                     patch.object(lane.time, "time", return_value=self.now), \
                     patch.object(lane, "sh", side_effect=AssertionError("no API or model")), \
                     patch.object(lane, "claimed_elsewhere", side_effect=AssertionError("no remote claim in census")):
-                self.assertEqual(lane.pending_rung_candidates(host, "grok", [pr]), [pr])
-                lane.record_maintenance_demand(host, "grok", [], [], [], set(), routing_context=self.routing_context(host))
-                sample = json.loads((host.state / "maintenance-demand.json").read_text())["lanes"]["grok"]
+                self.assertEqual(lane.pending_rung_candidates(host, "codex", [pr]), [pr])
+                lane.record_maintenance_demand(host, "codex", [], [], [], set(), routing_context=self.routing_context(host))
+                sample = json.loads((host.state / "maintenance-demand.json").read_text())["lanes"]["codex"]
                 self.assertEqual(sample["pending"], 1)
                 self.assertEqual(sample["byKind"], {"escalation": 1})
                 self.assertEqual(sample["ordinaryPrPending"], 0)
-                lane.record_maintenance_demand(host, "grok", [], [], [], {7}, routing_context=self.routing_context(host))
-                sample = json.loads((host.state / "maintenance-demand.json").read_text())["lanes"]["grok"]
+                lane.record_maintenance_demand(host, "codex", [], [], [], {7}, routing_context=self.routing_context(host))
+                sample = json.loads((host.state / "maintenance-demand.json").read_text())["lanes"]["codex"]
                 self.assertIsNone(sample["pending"])
                 self.assertEqual(sample["blockedByReason"], {"selected": 1})
 
     def test_preserved_or_revoked_rung_never_becomes_positive_demand(self):
+        self.authorize_runtime_target()
         for fault in ("preserved", "revoked"):
             with self.subTest(fault=fault), tempfile.TemporaryDirectory() as tmp:
                 host = lane.Host(state=Path(tmp)); pr = self.integration_pr()
@@ -16381,13 +16402,14 @@ class PendingRungDispositionTest(unittest.TestCase):
                 with patch.object(lane, "_SUMMARY", summary), \
                         patch.object(lane, "load_providers", return_value=self.providers), \
                         patch.object(lane.time, "time", return_value=self.now):
-                    lane.record_maintenance_demand(host, "grok", [], [], [], set(), routing_context=self.routing_context(host))
-                sample = json.loads((host.state / "maintenance-demand.json").read_text())["lanes"]["grok"]
+                    lane.record_maintenance_demand(host, "codex", [], [], [], set(), routing_context=self.routing_context(host))
+                sample = json.loads((host.state / "maintenance-demand.json").read_text())["lanes"]["codex"]
                 self.assertIsNone(sample["pending"])
                 reason = "preserved-reconciliation-required" if fault == "preserved" else "publication-revoked"
                 self.assertEqual(sample["blockedByReason"], {reason: 1})
 
     def test_repair_floor_refreshes_only_model_authority_without_linear(self):
+        self.authorize_runtime_target()
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp)); pr = self.integration_pr()
             pr.update(mergeStateStatus="BLOCKED", statusCheckRollup=[{"name": "source", "status": "COMPLETED", "conclusion": "FAILURE"}])
@@ -16404,12 +16426,13 @@ class PendingRungDispositionTest(unittest.TestCase):
             after = json.loads(path.read_text())["7"]
             self.assertEqual(after["pendingEscalation"]["cls"], "fixable-by-model")
             self.assertEqual(after["pendingEscalation"]["subtype"], "check")
-            self.assertEqual(after["pendingEscalation"]["lane"], "grok")
+            self.assertEqual(after["pendingEscalation"]["lane"], "codex")
             self.assertEqual(after["pendingEscalation"]["head"], "head-A")
             for key, value in before.items():
                 if key != "pendingEscalation": self.assertEqual(after[key], value)
 
     def test_repair_floor_refresh_stops_on_fresh_custody_and_target_races(self):
+        self.authorize_runtime_target()
         for fault in ("active", "held", "preserved", "revoked", "head"):
             with self.subTest(fault=fault), tempfile.TemporaryDirectory() as tmp:
                 host = lane.Host(state=Path(tmp)); pr = self.integration_pr()
@@ -16437,6 +16460,7 @@ class PendingRungDispositionTest(unittest.TestCase):
                 self.assertEqual(path.read_bytes(), before); label.assert_not_called()
 
     def test_repair_floor_defers_terminal_latch_until_one_ordinary_disposition(self):
+        self.authorize_runtime_target()
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp)); pr = self.integration_pr()
             pr["reviewThreads"] = [{"resolved": False, "author": "itstimwhite",
@@ -17566,6 +17590,7 @@ class RepairProviderPolicyTest(unittest.TestCase):
             self.assertEqual(lane.pr_events.cost_order(repairs), ['codex'])
             self.assertEqual(lane.pr_events.disabled_lanes(repairs), {'devin', 'claude'})
             self.assertEqual(lane.load_providers(), before)
+            self.assertEqual(lane.pr_events.disabled_lanes(lane.load_providers()), set())
         self.assertEqual(configured, before)
 
     def test_only_codex_can_execute_existing_pr_repairs_and_new_work_remains_permitted(self):

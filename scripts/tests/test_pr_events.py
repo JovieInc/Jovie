@@ -71,7 +71,7 @@ def fake_lane(shell, claimed=False):
     module = SimpleNamespace(
         sh=shell, REPO_SLUG=runner.REPO_SLUG, PR_FIELDS=runner.PR_FIELDS, RED=runner.RED,
         MAX_FIX_ATTEMPTS=runner.MAX_FIX_ATTEMPTS, held_path=runner.held_path, update_json=runner.update_json,
-        now_iso=runner.now_iso, best_per_issue=runner.best_per_issue, load_providers=lambda: PROVIDERS, repair_providers=lambda: PROVIDERS,
+        now_iso=runner.now_iso, best_per_issue=runner.best_per_issue, load_providers=lambda: PROVIDERS, repair_providers=lambda providers=None: PROVIDERS if providers is None else providers,
         claimed_elsewhere=lambda number, sha, kind, **kwargs: claimed, post_claim=lambda number, sha, kind: posted.append(number),
         publication_revocation=runner.publication_revocation,
         reconcile_fix_target=lambda pr: {**pr, "state": "OPEN"})
@@ -1360,7 +1360,7 @@ class ClaimTest(unittest.TestCase):
     def test_production_repair_catalog_never_grace_defers_codex_for_a_prohibited_lane(self):
         shell = Shell()
         module = fake_lane(shell)
-        module.repair_providers = lambda: runner.repair_providers(PROVIDERS)
+        module.repair_providers = lambda providers=None: runner.repair_providers(PROVIDERS if providers is None else providers)
         claimed = events.claim_event_pr(self.host, module, 'codex',
                                        [pr(kinds=['red'], checks=[RED_CHECK])], NOW)
         self.assertIsNotNone(claimed)
