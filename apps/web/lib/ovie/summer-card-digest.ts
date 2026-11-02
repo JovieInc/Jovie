@@ -33,6 +33,8 @@ export function summerCardPayloadDigest(input: SummerCardInput): string {
     ...(input.decideBy !== null || input.defaultDecision !== null
       ? [input.decideBy, input.defaultDecision]
       : []),
+    // Appended only when filed, for the same replay reason.
+    ...(input.facts?.length ? [input.facts] : []),
   ]);
   return createHash('sha256').update(canonical).digest('hex');
 }

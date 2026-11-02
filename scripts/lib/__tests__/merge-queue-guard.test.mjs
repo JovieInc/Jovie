@@ -2363,7 +2363,7 @@ describe('native merge-queue singleton groups (JOV-8112)', () => {
       transientFailure: 'bounded-retry',
       liveRulesetCutover: 'applied',
     });
-    expect(NATIVE_QUEUE_POLICY.max_entries_to_build).toBe(10);
+    expect(NATIVE_QUEUE_POLICY.max_entries_to_build).toBe(4);
     expect(NATIVE_QUEUE_POLICY.max_entries_to_merge).toBe(10);
     expect(NATIVE_QUEUE_POLICY.min_entries_to_merge).toBe(1);
     expect(NATIVE_QUEUE_POLICY.min_entries_to_merge_wait_minutes).toBe(0);
@@ -2510,7 +2510,7 @@ describe('native merge-queue singleton groups (JOV-8112)', () => {
         { ...NATIVE_QUEUE_POLICY },
         { checkResponseTimeout: null }
       )
-    ).toMatchObject({ check_response_timeout_minutes: 20 });
+    ).toMatchObject({ check_response_timeout_minutes: 30 });
     const secondsReadback = buildNativeQueuePolicyReadback({
       ...NATIVE_QUEUE_POLICY,
       checkResponseTimeout: 3600,

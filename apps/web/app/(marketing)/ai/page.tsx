@@ -1,7 +1,7 @@
 import { Button } from '@jovie/ui';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { MarketingContainer, MarketingHeroPhoto } from '@/components/marketing';
+import { MarketingContainer } from '@/components/marketing';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_ROUTES } from '@/constants/routes';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
@@ -13,6 +13,7 @@ export const revalidate = false;
 
 export const metadata: Metadata = {
   title: documentTitle('Jovie AI Operating System'),
+  description: 'How a Jovie profile decides what to lead with.',
   robots: NOINDEX_ROBOTS,
   twitter: {
     site: COMPANY_IDENTITY.xHandle,
@@ -22,18 +23,10 @@ export const metadata: Metadata = {
 
 const AI_HERO_INNER_CLASS = 'relative z-3 py-16 sm:py-20 lg:py-24';
 
-const AI_HERO_PHOTO = {
-  src: '/images/marketing-hero/ai.webp',
-  width: 1600,
-  height: 1067,
-  opacity: 0.2,
-} as const;
-
 export default function AiPage() {
   return (
     <main className='marketing-hero-dock marketing-hero-dock--inset relative overflow-x-clip bg-base text-primary-token'>
       <section className='relative overflow-hidden'>
-        <MarketingHeroPhoto {...AI_HERO_PHOTO} />
         <div
           aria-hidden='true'
           className='hero-glow pointer-events-none absolute inset-0'
@@ -48,10 +41,9 @@ export default function AiPage() {
               The AI operating system behind every Jovie profile
             </h1>
             <p className='max-w-2xl text-lg leading-8 text-secondary-token'>
-              Jovie turns a creator profile into an always-on decision loop:
-              identify the visitor, read context, choose the next best action,
-              and learn from the result. This public page covers the operating
-              model without exposing the private investor portal.
+              Jovie turns a creator profile into a page that leads with the
+              latest release or show. This public page covers the operating
+              model without exposing private material.
             </p>
             <div className='flex flex-wrap gap-3'>
               <Button asChild variant='primary'>
@@ -72,7 +64,7 @@ export default function AiPage() {
         <section className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
           <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
             {/* ui-casing-allow: marketing display headline */}
-            <h2 className='text-lg font-semibold line-clamp-2'>1. Identify</h2>
+            <h2 className='text-lg font-semibold line-clamp-2'>Identify</h2>
             <p className='mt-3 text-sm leading-7 text-secondary-token'>
               Recognize known visitors, captured contacts, and anonymous
               browsers with enough signal to personalize the page in real time.
@@ -80,7 +72,7 @@ export default function AiPage() {
           </article>
           <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
             {/* ui-casing-allow: marketing display headline */}
-            <h2 className='text-lg font-semibold line-clamp-2'>2. Decide</h2>
+            <h2 className='text-lg font-semibold line-clamp-2'>Decide</h2>
             <p className='mt-3 text-sm leading-7 text-secondary-token'>
               Route each visit toward the highest-value next action, whether
               that is listening, subscribing, tipping, merch, or tickets.
@@ -88,7 +80,7 @@ export default function AiPage() {
           </article>
           <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
             {/* ui-casing-allow: marketing display headline */}
-            <h2 className='text-lg font-semibold line-clamp-2'>3. Measure</h2>
+            <h2 className='text-lg font-semibold line-clamp-2'>Measure</h2>
             <p className='mt-3 text-sm leading-7 text-secondary-token'>
               Capture impressions, clicks, and downstream value events so
               creators can see what turns traffic into real relationships.
@@ -96,7 +88,7 @@ export default function AiPage() {
           </article>
           <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
             {/* ui-casing-allow: marketing display headline */}
-            <h2 className='text-lg font-semibold line-clamp-2'>4. Learn</h2>
+            <h2 className='text-lg font-semibold line-clamp-2'>Learn</h2>
             <p className='mt-3 text-sm leading-7 text-secondary-token'>
               Use those outcomes to improve routing, segmentation, and follow-up
               automation across future visits.
@@ -104,8 +96,8 @@ export default function AiPage() {
           </article>
         </section>
 
-        <section className='grid gap-8 rounded-4xl border border-subtle bg-panel px-6 py-8 lg:grid-cols-[1.2fr_0.8fr]'>
-          <div className='space-y-4'>
+        <section className='grid gap-8 rounded-4xl border border-subtle bg-panel px-6 py-8'>
+          <article className='space-y-4'>
             {/* ui-casing-allow: marketing display headline */}
             <h2 className='text-2xl font-semibold tracking-tight line-clamp-2'>
               What ships in the launch version
@@ -122,30 +114,11 @@ export default function AiPage() {
                 Instrumentation that ties profile visits to measurable lift.
               </li>
             </ul>
-          </div>
-          <div className='space-y-4'>
-            {/* ui-casing-allow: marketing display headline */}
-            <h2 className='text-2xl font-semibold tracking-tight line-clamp-2'>
-              Read the public context
-            </h2>
-            <p className='text-sm leading-7 text-secondary-token'>
-              The deeper memo and fundraising material stay private. The public
-              surfaces below explain the problem, the product shape, and the
-              creator-facing offer.
-            </p>
-            <div className='flex flex-wrap gap-3'>
-              <Button asChild variant='secondary'>
-                <Link href={APP_ROUTES.BLOG_THE_MYSPACE_PROBLEM}>
-                  Read The Memo
-                </Link>
-              </Button>
-            </div>
-          </div>
+          </article>
         </section>
       </MarketingContainer>
 
       <MarketingFooterCta
-        title='See the AI operating system on your Jovie profile.'
         ctaLabel='See Pricing'
         ctaHref={APP_ROUTES.PRICING}
         ctaAnalyticsEvent='ai_footer_cta_pricing'

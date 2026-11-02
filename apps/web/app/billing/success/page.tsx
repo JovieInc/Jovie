@@ -2,16 +2,15 @@
 
 import { Button } from '@jovie/ui';
 import {
+  BadgeCheck,
   BarChart3,
-  CircleCheck,
-  Eye,
+  CalendarClock,
   Loader2,
+  Mail,
   PartyPopper,
-  Radar,
   Rocket,
   ShieldCheck,
   Workflow,
-  Wrench,
   XCircle,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -21,6 +20,7 @@ import { ConfettiOverlay } from '@/components/atoms/Confetti';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
+import { CheckoutUnlockCards } from '@/components/organisms/billing/CheckoutUnlockCards';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 import { APP_ROUTES } from '@/constants/routes';
 import { page, track } from '@/lib/analytics';
@@ -30,6 +30,7 @@ import { useBillingStatusQuery } from '@/lib/queries';
 import {
   ARTIST_VISIBILITY_ACTIVATION_COPY,
   ARTIST_VISIBILITY_ACTIVATION_STEPS,
+  ARTIST_VISIBILITY_SHARE_PROMPT,
   CHECKOUT_PENDING_COPY,
   CHECKOUT_RECOVERY_COPY,
   getPaidSuccessPrimaryHref,
@@ -61,10 +62,10 @@ const MAX_UNLOCK_TILES = [
 ] as const;
 
 const ARTIST_VISIBILITY_STEP_ICONS = {
-  monitor: Eye,
-  surface: Radar,
-  approve: CircleCheck,
-  fix: Wrench,
+  notify: Mail,
+  prerelease: CalendarClock,
+  analytics: BarChart3,
+  verify: BadgeCheck,
 } as const;
 
 async function fetchValidatedSession(
@@ -74,23 +75,32 @@ async function fetchValidatedSession(
   plan: PaidPlanId | null;
   needsProfile: boolean;
   proofPending: boolean;
+  shareUrl: string | null;
 }> {
   const response = await fetch(
     `/api/billing/checkout-session?session_id=${encodeURIComponent(sessionId)}`,
     { cache: 'no-store', signal }
   );
   if (!response.ok) {
-    return { plan: null, needsProfile: false, proofPending: false };
+    return {
+      plan: null,
+      needsProfile: false,
+      proofPending: false,
+      shareUrl: null,
+    };
   }
   const body = (await response.json()) as {
     plan?: string | null;
     needsProfile?: boolean;
     proofPending?: boolean;
+    profileShareUrl?: string | null;
   };
   return {
     plan: resolvePaidPlan(body.plan ?? null),
     needsProfile: body.needsProfile === true,
     proofPending: body.proofPending === true,
+    shareUrl:
+      typeof body.profileShareUrl === 'string' ? body.profileShareUrl : null,
   };
 }
 
@@ -100,7 +110,7 @@ function FeatureCard({
   description,
   status,
 }: {
-  readonly icon: typeof Eye;
+  readonly icon: typeof Mail;
   readonly title: string;
   readonly description: string;
   readonly status?: string;
@@ -148,6 +158,7 @@ export default function CheckoutSuccessPage() {
   const [needsProfile, setNeedsProfile] = useState(false);
   // Private until we confirm it is the artist's: never say "live".
   const [proofPending, setProofPending] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
   const prefersReducedMotion = useReducedMotion();
   const shouldSuppressMotion = hasHydratedMotion && prefersReducedMotion;
   const isBillingPending =
@@ -181,6 +192,7 @@ export default function CheckoutSuccessPage() {
         setValidatedSessionPlan(session.plan);
         setNeedsProfile(session.needsProfile);
         setProofPending(session.proofPending);
+        setShareUrl(session.shareUrl);
       })
       .catch(error => {
         if (controller.signal.aborted) return;
@@ -270,6 +282,16 @@ export default function CheckoutSuccessPage() {
     }
   }, [checkoutSessionId, isOnboardingUpgrade, isSessionPlanPending, view]);
 
+  const canNativeShare =
+    hasHydratedMotion &&
+    typeof navigator !== 'undefined' &&
+    typeof navigator.share === 'function';
+  const handleNativeShare = (url: string) => {
+    void navigator
+      .share({ url, text: ARTIST_VISIBILITY_SHARE_PROMPT.shareText })
+      .catch(() => undefined);
+  };
+
   const handleRequestVerification = async () => {
     if (requestState === 'submitting') return;
 
@@ -336,7 +358,7 @@ export default function CheckoutSuccessPage() {
     successSubtitle = PROOF_PENDING_TERMS;
   } else if (isOnboardingUpgrade) {
     successSubtitle = isArtistVisibilitySuccess
-      ? "You're all set. Artist Visibility is ready to start."
+      ? `You're all set. ${ARTIST_VISIBILITY_ACTIVATION_COPY.status}.`
       : "You're all set. Here's what you just unlocked.";
   } else if (isArtistVisibilitySuccess) {
     successSubtitle = ARTIST_VISIBILITY_ACTIVATION_COPY.next;
@@ -418,6 +440,12 @@ export default function CheckoutSuccessPage() {
               <p className='text-app font-semibold text-primary-token'>
                 {ARTIST_VISIBILITY_ACTIVATION_COPY.status}
               </p>
+              <CheckoutUnlockCards
+                shareUrl={shareUrl}
+                showFanListExport={!needsProfile}
+                canNativeShare={canNativeShare}
+                onNativeShare={handleNativeShare}
+              />
               <div className='grid gap-4 sm:grid-cols-2'>
                 {ARTIST_VISIBILITY_ACTIVATION_STEPS.map(step => (
                   <FeatureCard

@@ -129,6 +129,10 @@ const UNBOUND_COMMERCIAL_HUB_REVISIONS = {
   '/about': '2026-10-23',
   '/support': '2026-10-23',
   '/developers': '2026-10-23',
+  // PR #23608 introduces the generated agent connector docs page.
+  '/developers/agents': '2026-10-29',
+  // Proof-stat methodology page, generated from the stat registry.
+  '/proof/methodology': '2026-10-29',
   '/api-versioning': '2026-10-23',
   '/compare': '2026-10-23',
   '/alternatives': '2026-10-23',

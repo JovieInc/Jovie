@@ -7,8 +7,6 @@ import { ProfileBentoView } from './ProfileContactSidebarSections';
 vi.mock('./ProfileSmartLinkAnalytics', () => ({
   ProfileSmartLinkAnalytics: () => null,
 }));
-const flags = vi.hoisted(() => ({ identity: true }));
-vi.mock('@/lib/flags/client', () => ({ useAppFlag: () => flags.identity }));
 
 const previewData: PreviewPanelData = {
   username: 'alex',
@@ -43,7 +41,6 @@ describe('ProfileBentoView', () => {
   });
 
   it('routes the current Identity label to its canonical destination', () => {
-    flags.identity = true;
     render(
       <ProfileBentoView
         previewData={previewData}
@@ -57,7 +54,6 @@ describe('ProfileBentoView', () => {
   });
 
   it('passes the projected destination to the host callback', async () => {
-    flags.identity = true;
     const onManageConnections = vi.fn();
     render(
       <ProfileBentoView
@@ -73,8 +69,7 @@ describe('ProfileBentoView', () => {
       APP_ROUTES.PRESENCE
     );
   });
-  it('shows the settings fallback without claiming the disabled workspace', () => {
-    flags.identity = false;
+  it('always hands off to Identity without a rollout provider', () => {
     render(
       <ProfileBentoView
         previewData={previewData}
@@ -82,9 +77,8 @@ describe('ProfileBentoView', () => {
       />
     );
     expect(
-      screen.getByRole('link', { name: 'Manage Profile' })
-    ).toHaveAttribute('href', `${APP_ROUTES.SETTINGS_PROFILE}?tab=music`);
-    expect(screen.queryByText('Manage In Identity')).not.toBeInTheDocument();
+      screen.getByRole('link', { name: 'Manage In Identity' })
+    ).toHaveAttribute('href', APP_ROUTES.PRESENCE);
   });
 });
 

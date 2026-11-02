@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProfileNotificationsContextValue } from '@/components/organisms/profile-shell/types';
+import { ProfileInlineNotificationsCTA } from '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA';
 import type { Artist } from '@/types/db';
 
 const mockUseSubscriptionForm = vi.fn();
@@ -10,8 +11,6 @@ const mockUseUserSafe = vi.fn();
 const mockUpdateSubscriberBirthdayMutation = vi.fn();
 const mockUpdateSubscriberNameMutation = vi.fn();
 const mockUpdateContentPreferencesMutation = vi.fn();
-
-let ProfileInlineNotificationsCTA: typeof import('@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA').ProfileInlineNotificationsCTA;
 
 vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
@@ -146,12 +145,6 @@ function buildFormState(overrides: Record<string, unknown> = {}) {
 }
 
 describe('ProfileInlineNotificationsCTA flow', () => {
-  beforeAll(async () => {
-    ({ ProfileInlineNotificationsCTA } = await import(
-      '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
-    ));
-  }, 30_000);
-
   beforeEach(() => {
     vi.clearAllMocks();
     document.body.innerHTML = '';
@@ -217,6 +210,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
     const view = render(
       <ProfileInlineNotificationsCTA
+        availableContent={['newMusic', 'tourDates', 'merch']}
         artist={makeArtist()}
         presentation='inline'
       />
@@ -232,6 +226,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
     view.rerender(
       <ProfileInlineNotificationsCTA
+        availableContent={['newMusic', 'tourDates', 'merch']}
         artist={makeArtist()}
         presentation='inline'
       />
@@ -278,7 +273,34 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
     expect(await screen.findByText('Back to Profile')).toBeInTheDocument();
     expect(screen.queryByText('Sent from Jovie')).not.toBeInTheDocument();
-    expect(screen.queryByText('Sent by Test Artist')).not.toBeInTheDocument();
+    expect(screen.queryByText('Optional')).not.toBeInTheDocument();
+  });
+
+  it('shows success but never the name or birthday step when sign-up has no mailbox proof', async () => {
+    // Returning verified email (or SMS): subscribe resolves 'subscribed' with no
+    // code step, so no signup-session cookie exists and the name save would 403.
+    const handleSubscribe = vi.fn().mockResolvedValue('subscribed');
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({ handleSubscribe })
+    );
+
+    render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /get alerts/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^submit$/i }));
+
+    expect(await screen.findByText(/Updates are on for/)).toBeInTheDocument();
+
+    // Wait past the success hold; the flow must close, not advance to a step.
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    expect(screen.queryByTestId('mobile-name-input')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('mobile-birthday-month')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'First Name' })
+    ).not.toBeInTheDocument();
   });
 
   it('reports overlay open state through onFlowOpenChange', async () => {
@@ -286,6 +308,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
     render(
       <ProfileInlineNotificationsCTA
+        availableContent={['newMusic', 'tourDates', 'merch']}
         artist={makeArtist()}
         onFlowOpenChange={onFlowOpenChange}
       />
@@ -360,6 +383,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
     render(
       <ProfileInlineNotificationsCTA
+        availableContent={['newMusic', 'tourDates', 'merch']}
         artist={makeArtist()}
         presentation='inline'
       />
@@ -367,7 +391,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
     expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
     expect(screen.getByText('Loading subscription form')).toBeInTheDocument();
-    expect(screen.queryByText('Get Updates')).not.toBeInTheDocument();
+    expect(screen.queryByText('Get New Music')).not.toBeInTheDocument();
   });
 
   // JOV-1986: alert mode consistency across all three entry points.
@@ -393,7 +417,12 @@ describe('ProfileInlineNotificationsCTA flow', () => {
         })
       );
 
-      render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
+      render(
+        <ProfileInlineNotificationsCTA
+          availableContent={['newMusic', 'tourDates', 'merch']}
+          artist={makeArtist()}
+        />
+      );
 
       fireEvent.click(screen.getByRole('button', { name: /manage alerts/i }));
 
@@ -428,6 +457,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
       render(
         <ProfileInlineNotificationsCTA
+          availableContent={['newMusic', 'tourDates', 'merch']}
           artist={makeArtist()}
           presentation='inline'
         />
@@ -461,6 +491,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
       const { rerender } = render(
         <ProfileInlineNotificationsCTA
+          availableContent={['newMusic', 'tourDates', 'merch']}
           artist={makeArtist()}
           presentation='inline'
           autoOpen
@@ -482,6 +513,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
       rerender(
         <ProfileInlineNotificationsCTA
+          availableContent={['newMusic', 'tourDates', 'merch']}
           artist={makeArtist()}
           presentation='inline'
           autoOpen

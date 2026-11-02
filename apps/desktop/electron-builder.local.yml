@@ -8,7 +8,6 @@ afterPack: scripts/apply-electron-fuses.cjs
 files:
   - dist-electron/**
   - assets/icon.png
-  - assets/icon-staging.png
   - package.json
 extraResources:
   - from: build/build-identity.json
@@ -35,5 +34,5 @@ mac:
     - target: dir
       arch:
         - arm64
-  icon: assets/icon-staging.icns
+  icon: assets/icon.icns
 publish: null

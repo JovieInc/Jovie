@@ -305,8 +305,9 @@ describe('draft-first rolling CI policy wiring', () => {
     const publication = read('scripts/hooks/pre-push-gate.sh')
       .split('run_publication() {', 2)[1]
       .split('\n}', 1)[0];
+    expect(publication).toContain('bash scripts/hooks/biome-pre-push.sh');
     expect(publication).not.toMatch(
-      /automation-verify|run_affected|typecheck|biome|coverage/
+      /automation-verify|run_affected|typecheck|coverage|biome check \./
     );
   });
 });

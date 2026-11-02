@@ -31,7 +31,7 @@ export const SMART_LINK_MENU_ITEM_CLASS =
   'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-[470] text-white/88 transition-colors duration-subtle active:bg-white/[0.06]';
 export const SMART_LINK_MENU_ICON_CLASS = 'h-4 w-4 text-white/40';
 // Title and artist render below clean square art, never over it ("no text on
-// text", DESIGN.md). 24/32 title, 14/20 artist, 4px between.
+// text", docs/design-system/DETAILS.md). 24/32 title, 14/20 artist, 4px between.
 export const SMART_LINK_HERO_TITLE_CLASS =
   'text-2xl font-semibold leading-8 tracking-tight text-(--color-text-tooltip)';
 export const SMART_LINK_HERO_ARTIST_CLASS =
@@ -159,7 +159,7 @@ export function SmartLinkShell({
     <PublicSurfaceShell ambientMediaUrl={artworkUrl}>
       <PublicSurfaceStage>
         {/* Hero: clean square art, then title and artist in flow. No text,
-            gradient or scrim ever sits on the art (DESIGN.md rule 8). */}
+            gradient or scrim ever sits on the art (DETAILS.md, no text on text). */}
         <header className='relative w-full shrink-0 pb-1'>
           <PublicSurfaceHeader
             className='px-5 pt-[max(env(safe-area-inset-top),20px)]'

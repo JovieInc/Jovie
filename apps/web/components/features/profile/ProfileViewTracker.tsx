@@ -36,7 +36,6 @@ export function ProfileViewTracker({
     if (hasTracked.current) return;
     hasTracked.current = true;
 
-    // Defer tracking to avoid blocking first paint
     const doTrack = () => {
       track('profile_view', {
         handle,
@@ -53,27 +52,9 @@ export function ProfileViewTracker({
       trackViewRef.current.mutate({ handle });
     };
 
-    let idleId: number | null = null;
-    let timeoutId: ReturnType<typeof globalThis.setTimeout> | null = null;
-
-    if (typeof globalThis.requestIdleCallback === 'function') {
-      idleId = globalThis.requestIdleCallback(doTrack, { timeout: 1500 });
-    } else {
-      // Safari fallback
-      timeoutId = globalThis.setTimeout(doTrack, 0);
-    }
-
-    return () => {
-      if (
-        idleId !== null &&
-        typeof globalThis.cancelIdleCallback === 'function'
-      ) {
-        globalThis.cancelIdleCallback(idleId);
-      }
-      if (timeoutId !== null) {
-        globalThis.clearTimeout(timeoutId);
-      }
-    };
+    // Fire on mount, never on idle or interaction: artists pay for this
+    // audience, bounces included. sendBeacon does not block paint.
+    doTrack();
   }, [handle, artistId, source]);
 
   // This component renders nothing - it's purely for tracking

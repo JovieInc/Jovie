@@ -38,7 +38,7 @@ export const WithLiveBadgeAndCaption: Story = {
 /** Onboarding rail: the DSP-match strip sits in flow under the phone. */
 export const WithOverlay: Story = {
   args: {
-    caption: 'Preview — not claimed yet',
+    caption: 'Preview · not claimed yet',
     overlay: (
       <div
         className='flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-2 py-1.5 text-white backdrop-blur-xl dark:text-white'

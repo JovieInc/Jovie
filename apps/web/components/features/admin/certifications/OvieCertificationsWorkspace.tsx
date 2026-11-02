@@ -52,6 +52,7 @@ import {
 } from './CertificationSummary';
 import { CertificationWalkthrough } from './CertificationWalkthrough';
 import {
+  CERTIFICATION_NEEDS_EVIDENCE_LABEL,
   CERTIFICATION_STATE_FILTERS,
   CERTIFICATION_STATE_RANK,
   type CertificationBlockerFilter,
@@ -495,7 +496,9 @@ export function OvieCertificationsWorkspace({
                     <span className='inline-flex items-center gap-1.5 whitespace-nowrap'>
                       {filter === 'all'
                         ? 'All'
-                        : OVIE_CERTIFICATION_STATE_LABELS[filter]}
+                        : filter === 'needs_evidence'
+                          ? CERTIFICATION_NEEDS_EVIDENCE_LABEL
+                          : OVIE_CERTIFICATION_STATE_LABELS[filter]}
                       <span
                         className='min-w-4 text-left tabular-nums text-quaternary-token'
                         data-testid={`certification-count-${filter}`}

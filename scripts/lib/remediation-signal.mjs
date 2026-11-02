@@ -1,5 +1,7 @@
+import { createHash } from 'node:crypto';
 import { stripVTControlCharacters } from 'node:util';
 import {
+  attachEvidenceToOpenIssue,
   findLinearLabelId,
   noteFingerprintedIssueGreen,
   remediationKey,
@@ -396,6 +398,42 @@ export function gateSteadyGreen(decision, previous, enabled) {
   return { action: 'skip', reason: 'steady_green' };
 }
 
+/**
+ * One underlying condition, one incident. Monitors that observe the same
+ * condition share the canonical fingerprint's Linear issue: the first red
+ * files it, every later red from any member comments its own evidence on it.
+ * Production not promoted / stale vs main is seen by four monitors; the
+ * release gate owns the fix (JOV-7973).
+ */
+export const INCIDENT_GROUPS = {
+  'production-not-promoted': {
+    canonical: 'production-monitor-vercel-deploy',
+    canonicalSource: 'production-release.yml',
+    // Green from these is direct proof the shared condition is gone
+    // (production verified current vs main), so it may resolve the incident.
+    resolvers: ['production-monitor-continuity'],
+    members: [
+      'production-monitor-vercel-deploy',
+      'production-monitor-continuity',
+      'production-monitor-controller-health',
+      'automation-liveness-derived-jovie-production-promotion',
+    ],
+  },
+};
+
+/** @param {string} fingerprint */
+export function incidentFor(fingerprint) {
+  for (const [incident, group] of Object.entries(INCIDENT_GROUPS)) {
+    if (group.members.includes(fingerprint)) return { incident, ...group };
+  }
+  return null;
+}
+
+/** The fingerprint whose Linear issue a signal attaches to. */
+export function canonicalFingerprint(fingerprint) {
+  return incidentFor(fingerprint)?.canonical ?? fingerprint;
+}
+
 export async function fileRemediationSignal({
   fingerprint,
   source,
@@ -404,6 +442,40 @@ export async function fileRemediationSignal({
   apiKey,
   fetchImpl,
 }) {
+  const group = incidentFor(fingerprint);
+  if (group && group.canonical !== fingerprint) {
+    const digest = createHash('sha256')
+      .update(String(detail ?? ''))
+      .digest('hex')
+      .slice(0, 8);
+    const evidenceMarker = `<!-- incident-evidence:${fingerprint}:${digest} -->`;
+    const attached = await attachEvidenceToOpenIssue({
+      fingerprint: group.canonical,
+      evidenceMarker,
+      body: [
+        evidenceMarker,
+        `Same incident (${group.incident}), also observed by \`${fingerprint}\`.`,
+        `Source-workflow: ${source}`,
+        '',
+        '## Evidence',
+        detail?.trim() || 'Red run. See the linked workflow for logs.',
+        '',
+        `Run: ${runUrl || '(run url unavailable)'}`,
+      ].join('\n'),
+      apiKey,
+      fetchImpl,
+    });
+    if (!attached.ok || attached.action !== 'none') return attached;
+    // No open canonical issue: file (or reopen) it, keeping this evidence.
+    return fileRemediationSignal({
+      fingerprint: group.canonical,
+      source: group.canonicalSource,
+      runUrl,
+      detail: `First observed by ${fingerprint} (${source}): ${detail?.trim() || 'see run'}`,
+      apiKey,
+      fetchImpl,
+    });
+  }
   // A missing ready label must not drop the P0 itself.
   const ready = apiKey
     ? await findLinearLabelId({ name: AGENT_READY_LABEL, apiKey, fetchImpl })
@@ -428,6 +500,23 @@ export async function resolveRemediationSignal({
   apiKey,
   fetchImpl,
 }) {
+  // A member going green does not prove the shared incident is over, unless it
+  // measures the condition itself (production current vs main). Other members
+  // leave the owner's issue open; the canonical owner's green resolves it.
+  const group = incidentFor(fingerprint);
+  if (group && group.canonical !== fingerprint) {
+    if (!group.resolvers?.includes(fingerprint)) {
+      return { ok: true, action: 'none', reason: 'shared_incident_member' };
+    }
+    return noteFingerprintedIssueGreen({
+      fingerprint: group.canonical,
+      source: group.canonicalSource,
+      commentMarker: GREEN_MARKER,
+      comment: `${GREEN_MARKER}\n\`${fingerprint}\` (${source}) verified the condition is gone.\nRun: ${runUrl || '(run url unavailable)'}`,
+      apiKey,
+      fetchImpl,
+    });
+  }
   const sourceLine = `Source-workflow: ${source}`;
   return noteFingerprintedIssueGreen({
     fingerprint,

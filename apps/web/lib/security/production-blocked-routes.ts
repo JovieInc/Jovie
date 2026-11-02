@@ -112,20 +112,37 @@ interface ProductionBlockedDebugPathOptions {
 
 /** Decode only for denial: encoded spellings never gain a fixture exemption. */
 function debugDenialPaths(pathname: string): string[] | null {
-  try {
-    let decoded = pathname;
-    const paths = [pathname];
-    for (let depth = 0; depth < 3; depth++) {
-      const next = decodeURIComponent(decoded);
-      if (next === decoded) {
-        return [...paths, new URL(`http://localhost${decoded}`).pathname];
-      }
-      decoded = next;
-      paths.push(decoded);
+  const paths = [pathname];
+  let decoded = pathname;
+  for (let depth = 0; depth < 3; depth++) {
+    let next: string;
+    try {
+      next = decodeURIComponent(decoded);
+    } catch {
+      // A literal "%" left after a valid decode (e.g. /tim/100%25-real ->
+      // /tim/100%-real) is the final form, not an evasion: every stage so far
+      // is still checked. A malformed first pass stays fail-closed.
+      return depth === 0 ? null : normalizedDenialPaths(paths, decoded);
     }
-    // Keep deeply encoded or malformed request paths fail-closed and bounded.
+    if (next === decoded) return normalizedDenialPaths(paths, decoded);
+    decoded = next;
+    paths.push(decoded);
+  }
+  // Keep deeply encoded request paths fail-closed and bounded.
+  try {
     if (decodeURIComponent(decoded) !== decoded) return null;
-    return [...paths, new URL(`http://localhost${decoded}`).pathname];
+  } catch {
+    return normalizedDenialPaths(paths, decoded);
+  }
+  return normalizedDenialPaths(paths, decoded);
+}
+
+function normalizedDenialPaths(
+  paths: string[],
+  decoded: string
+): string[] | null {
+  try {
+    return [...paths, new URL('http://localhost' + decoded).pathname];
   } catch {
     return null;
   }

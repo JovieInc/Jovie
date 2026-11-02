@@ -69,7 +69,7 @@ export function buildAudienceMemberColumns(mode: 'members' | 'subscribers') {
     }),
     memberColumnHelper.accessor('displayName', {
       id: 'fan',
-      header: 'Fan',
+      header: 'Member',
       cell: ({ row }) => <AudienceFanCell member={row.original} />,
       size: 9999,
       minSize: 220,

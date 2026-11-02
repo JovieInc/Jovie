@@ -7,6 +7,7 @@ import {
 import { Icon } from '@/components/atoms/Icon';
 import { APP_ROUTES } from '@/constants/routes';
 import { Mark } from '@/lib/brand/primitives';
+import { viaJovieHref } from '@/lib/growth/loop-links';
 import { cn } from '@/lib/utils';
 
 interface SmartLinkAmbientGlowProps {
@@ -129,7 +130,7 @@ export function SmartLinkPoweredByFooter({
     // Spacing groups on the 4/8 grid: 40px of air above the footer, brand line
     // first, 8px, then quiet utility links 24px apart. No separators.
     <footer className='shrink-0 px-5 pb-6 pt-10 text-center'>
-      <Link href='/' className={FOOTER_BRAND_CLASSES}>
+      <Link href={viaJovieHref('footer')} className={FOOTER_BRAND_CLASSES}>
         <Mark size={16} className='h-4 w-4' />
         <span>Made with Jovie</span>
       </Link>

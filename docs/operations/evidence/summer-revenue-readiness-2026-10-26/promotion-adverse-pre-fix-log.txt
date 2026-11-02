@@ -1,0 +1,123 @@
+✔ control: current bound positive evidence passes (1.519691ms)
+✔ control: zero executed tests blocks (0.220872ms)
+✔ control: wrong build blocks (1.008885ms)
+✖ malformed range cannot omit required journey proof (1.021061ms)
+✖ invalid failure/skip counters null cannot certify (0.270553ms)
+✖ invalid failure/skip counters -1 cannot certify (0.426407ms)
+✖ invalid failure/skip counters "unknown" cannot certify (0.142553ms)
+✖ later exact-build failed execution invalidates prior green (0.265122ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 3
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11.475816
+
+✖ failing tests:
+
+test at ../../tmp/summer-independent-gate/promotion-adverse.test.mjs:12:1
+✖ malformed range cannot omit required journey proof (1.021061ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  'pass' !== 'blocked'
+
+      at TestContext.<anonymous> (file:///tmp/summer-independent-gate/promotion-adverse.test.mjs:12:70)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'pass',
+    expected: 'blocked',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at ../../tmp/summer-independent-gate/promotion-adverse.test.mjs:13:44
+✖ invalid failure/skip counters null cannot certify (0.270553ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  'pass' !== 'blocked'
+
+      at TestContext.<anonymous> (file:///tmp/summer-independent-gate/promotion-adverse.test.mjs:13:134)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'pass',
+    expected: 'blocked',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at ../../tmp/summer-independent-gate/promotion-adverse.test.mjs:13:44
+✖ invalid failure/skip counters -1 cannot certify (0.426407ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  'pass' !== 'blocked'
+
+      at TestContext.<anonymous> (file:///tmp/summer-independent-gate/promotion-adverse.test.mjs:13:134)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'pass',
+    expected: 'blocked',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at ../../tmp/summer-independent-gate/promotion-adverse.test.mjs:13:44
+✖ invalid failure/skip counters "unknown" cannot certify (0.142553ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  'pass' !== 'blocked'
+
+      at TestContext.<anonymous> (file:///tmp/summer-independent-gate/promotion-adverse.test.mjs:13:134)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'pass',
+    expected: 'blocked',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at ../../tmp/summer-independent-gate/promotion-adverse.test.mjs:14:1
+✖ later exact-build failed execution invalidates prior green (0.265122ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  'pass' !== 'blocked'
+
+      at TestContext.<anonymous> (file:///tmp/summer-independent-gate/promotion-adverse.test.mjs:14:78)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'pass',
+    expected: 'blocked',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -61,6 +61,12 @@ export function inFlightReport(
   );
 }
 
+// The retirement inventory lists up to 1000 open PRs with full bodies, and a
+// PR body alone can reach 64 KiB, so the child_process default of 1 MiB died
+// with ENOBUFS once the fleet grew (run 41049117742). The buffer only grows to
+// the observed output; the headroom covers 1000 escaped 64 KiB bodies.
+export const GH_MAX_BUFFER = 128 * 1024 * 1024;
+
 // The audited commit stays the parent: never rebase measured data onto a
 // different source revision. Publication is a draft PR, subject to normal CI.
 function publishReport(
@@ -68,7 +74,12 @@ function publishReport(
     cwd = process.cwd(),
     env = process.env,
     gh = args =>
-      execFileSync('gh', args, { cwd, env, encoding: 'utf8' }).trim(),
+      execFileSync('gh', args, {
+        cwd,
+        env,
+        encoding: 'utf8',
+        maxBuffer: GH_MAX_BUFFER,
+      }).trim(),
     now = Date.now(),
     recordOrigin = (pr, head) =>
       execFileSync(

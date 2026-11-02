@@ -8,8 +8,7 @@
 Read this execution contract before UI work. Load only the relevant section of
 [design details](docs/design-system/DETAILS.md) for the component or surface being changed.
 Token values come from the source registries below. Historical decisions describe
-past state; the newest founder-locked decision governs. For instruction-only edits,
-verify policy preservation and links; screenshots apply when rendered UI changes.
+past state; the newest founder-locked decision governs.
 
 Current direction: one System B token foundation, compact product and editorial
 marketing languages. Inter is the body/UI face; Satoshi is the approved display
@@ -61,10 +60,6 @@ Hard product and marketing rules. Not aesthetic taste.
 5. Profile/avatar: no overlay except an approved tiny verification badge on an approved avatar component.
 6. Press photo: designed one-sheet ok only if it does not cover a face.
 7. Ad/marketing scale is not web scale. Pills and type can go larger.
-8. No text on text (founder-locked 2026-10-25). Our text never overlays artwork
-   that carries text. Release heroes show clean square art and render title and
-   artist below it in normal flow, aligned to the art edges; the h1 stays in the
-   DOM. Guard: `SmartLinkShell.test.tsx` ("no text on text").
 
 ### Logo asset normalization (founder-global 2026-08-12)
 
@@ -110,6 +105,10 @@ Follow [the Ovie guardrail](docs/design-system/DETAILS.md#ovie-ops-cockpit-guard
 ## Subtraction Principle
 
 Read [the subtraction principle reference](docs/design-system/DETAILS.md#subtraction-principle) when changing this area.
+
+## No Dead Ends (JOV-INV-046)
+
+Read [no dead ends](docs/design-system/DETAILS.md#no-dead-ends) before UI work.
 
 ## Use Tokens, Not Raw Colors
 
@@ -157,18 +156,18 @@ unless linked below.
 | `@jovie/no-hardcoded-theme-colors` | `error` | L | Yes | None (no grandfathered count) |
 | `@jovie/ui-feel` | `off` | L | No | None (enforced by the UI-feel ratchet below) |
 | `arbitrary-radius` | `error` | S + G | Yes | 14 occurrences; 8 files |
-| `arbitrary-values` | `error` | G + I | Yes | 2167 |
+| `arbitrary-values` | `error` | G + I | Yes | 2166 |
 | `component-family` | `error` | G | Yes | button=37; emptyState=6; entityHeader=1; palette=4; shell=21; status=9 |
 | `contrast (computed pairs)` | `error` | S + G | Yes | No count baseline; 4.5:1 normal text, 3:1 large text/UI |
 | `contrast (raw colors)` | `error` | S | Yes | arbitraryHex=0; bareBgBlack=0; bareBgWhite=0; bareTextBlack=0; bareTextWhite=0 |
 | `deprecated-button-alias` | `error` | G | Yes | 91 |
 | `linear-namespace` | `error` | G + I | Yes | 700 |
 | `shadcn/no-restyle` | `error` | L + G | Yes | 217 files; 3105 messages (grandfathered) |
-| `source-identity` | `error` | I | Yes | 2055 |
+| `source-identity` | `error` | I | Yes | 2054 |
 | `spacing-scale (conservative)` | `error` | S + G | Yes | 590; armed=true; marketing=46; packages/ui=11; web-other=290; web-shell=243 |
 | `spacing-scale (strict)` | `warn` | S + G | No | 2190; armed=false; marketing=143; packages/ui=60; web-other=1126; web-shell=837 |
 | `touch-target` | `error` | D | Yes | 153 |
-| `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=266; missingTabularNums=71; nonConcentricRadius=0; undersizedHitArea=71 |
+| `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=253; missingTabularNums=70; nonConcentricRadius=0; undersizedHitArea=71 |
 
 The [raw-color baseline](apps/web/contrast-ratchet.baseline.json) and
 [computed pair config](apps/web/contrast-pairs.config.json) cover separate

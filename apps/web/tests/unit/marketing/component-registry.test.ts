@@ -9,8 +9,10 @@ import { render, screen } from '@testing-library/react';
 import { createElement } from 'react';
 import * as ts from 'typescript';
 import { describe, expect, it, vi } from 'vitest';
+import { ArtistNotificationsLanding } from '@/components/marketing/artist-notifications/ArtistNotificationsLanding';
 import { ArtistProfileSectionShell } from '@/components/marketing/artist-profile/ArtistProfileSectionShell';
 import { HomepageV2Route } from '@/components/marketing/homepage-v2/HomepageV2Route';
+import { ARTIST_NOTIFICATIONS_COPY } from '@/data/artistNotificationsCopy';
 import {
   BUTTON_PEN_PROPAGATION_FIXTURES,
   DESIGN_SYSTEM_COMPONENT_IDS,
@@ -703,8 +705,8 @@ describe('canonical marketing component registry', () => {
       ArtistProfileSectionShell: expect.stringContaining(
         'export function ArtistProfileSectionShell'
       ),
-      ArtistProfileSocialProof: expect.stringContaining(
-        'export function ArtistProfileSocialProof'
+      ArtistProfileSocialProof: expect.stringMatching(
+        /export function ArtistProfileSocialProof[\s\S]*export function ArtistProfileReleaseCycleGallery\(\{[\s\S]*id,/
       ),
       ArtistProfileSpecWall: expect.stringContaining(
         'export function ArtistProfileSpecWall'
@@ -1774,6 +1776,20 @@ it('preserves the mounted homepage front-door auth boundary and public secondary
   expect(publicLink).toHaveAttribute('data-test-prefetch', 'undefined');
 });
 
+// JOV-8780: the artist-notifications landing is a night-stage page root —
+// the certified light-mode token scopes in design-system.css key on this
+// class, so it must survive refactors of the landing composition.
+it('renders the artist-notifications landing on its night-stage page-root hook', () => {
+  const { container } = render(
+    createElement(ArtistNotificationsLanding, {
+      copy: ARTIST_NOTIFICATIONS_COPY,
+    })
+  );
+  expect(container.firstElementChild).toHaveClass(
+    'artist-notifications-landing'
+  );
+});
+
 const OWN_WIDTH_CAP =
   /max-w-(?:300|315|280|4xl|6xl|linear-content)|--homepage-section-max/;
 
@@ -1785,5 +1801,41 @@ describe('single container width', () => {
   ])('%s takes its width from the shared container, not its own cap', file => {
     const source = fs.readFileSync(path.join(process.cwd(), file), 'utf8');
     expect(source).not.toMatch(OWN_WIDTH_CAP);
+  });
+});
+
+describe('artist-profile audience wording', () => {
+  const read = (name: string) =>
+    fs.readFileSync(
+      path.join(
+        repoRoot,
+        `apps/web/components/marketing/artist-profile/${name}.tsx`
+      ),
+      'utf8'
+    );
+
+  it('uses audience and listener wording in carousel, proof and spec wall', () => {
+    expect(read('ArtistProfileOutcomesCarousel')).toContain(
+      "aria-label='Audience Outcomes'"
+    );
+    expect(read('ArtistProfileOutcomesCarousel')).toContain('Listener opts in');
+    expect(read('ArtistProfileSocialProof')).toContain(
+      'inviting listeners to get release updates'
+    );
+    expect(read('ArtistProfileSpecWall')).toContain('Actual listeners');
+  });
+
+  it('keeps fan wording out of those rendered strings', () => {
+    for (const name of [
+      'ArtistProfileOutcomesCarousel',
+      'ArtistProfileSocialProof',
+      'ArtistProfileSpecWall',
+    ]) {
+      expect(read(name)).not.toMatch(/Actual Fans|Fan Outcomes|Fan Opts In/u);
+    }
+  });
+
+  it('does not number the artist profile how-it-works steps', () => {
+    expect(read('ArtistProfileHowItWorks')).not.toMatch(/padStart\(2,/u);
   });
 });

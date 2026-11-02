@@ -82,7 +82,8 @@ export default function ApiVersioningPage() {
             id='api-versioning-hero-heading'
             className='system-b-marketing-route-title mt-6 max-w-3xl text-primary-token line-clamp-2'
           >
-            API Versioning And Deprecation Policy
+            {/* ui-casing-allow: sentence-case headings per marketing plan phase 1 */}
+            API versioning and deprecation policy
           </h1>
           <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>
             The canonical lifecycle contract for Jovie&apos;s public artist API.

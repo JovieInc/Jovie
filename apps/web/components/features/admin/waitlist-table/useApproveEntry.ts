@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { toast } from '@/components/feedback';
 import type { WaitlistEntryRow } from '@/lib/admin/types';
 import {
   useApproveWaitlistMutation,
@@ -54,8 +55,18 @@ export function useApproveEntry({ onRowUpdate }: UseApproveEntryProps) {
         }
 
         setApproveStatuses(prev => ({ ...prev, [entryId]: 'success' }));
-      } catch {
+        toast.success(
+          currentlyApproved
+            ? 'Access revoked'
+            : 'Access approved, invite queued'
+        );
+      } catch (error) {
         setApproveStatuses(prev => ({ ...prev, [entryId]: 'error' }));
+        toast.error(
+          error instanceof Error && error.message
+            ? error.message
+            : 'Waitlist action failed'
+        );
       }
     },
     [approveWaitlistMutation, disapproveWaitlistMutation, onRowUpdate]
@@ -74,8 +85,13 @@ export function useApproveEntry({ onRowUpdate }: UseApproveEntryProps) {
         await resendInviteMutation.mutateAsync({ entryId });
         onRowUpdate(entryId, { updatedAt: new Date() });
         setApproveStatuses(prev => ({ ...prev, [entryId]: 'success' }));
-      } catch {
+      } catch (error) {
         setApproveStatuses(prev => ({ ...prev, [entryId]: 'error' }));
+        toast.error(
+          error instanceof Error && error.message
+            ? error.message
+            : 'Failed to resend invite'
+        );
       }
     },
     [onRowUpdate, resendInviteMutation]
