@@ -25,7 +25,7 @@ import {
   resolveWorkersAiAuth,
 } from '../invariants/clef-screenshot-evaluator.mjs';
 
-// api-budget: cloudflare-workers-ai 120/hr - Pen review panel (4 personas + verify per round, sweep-bounded)
+// api-budget: cloudflare-api 120/hr - Pen review panel (up to 5 personas plus Clef confirms per round, sweep-bounded)
 export const JUDGE_MODEL = '@cf/meta/llama-4-scout-17b-16e-instruct';
 export const CONFIRM_THRESHOLD = 0.5;
 

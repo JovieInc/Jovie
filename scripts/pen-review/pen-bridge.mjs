@@ -121,6 +121,10 @@ export function runPen(snippets, opts = {}) {
   }
 }
 
+/**
+ * @param {string[]} snippets
+ * @param {{app?: string, inFile?: string, outFile?: string, timeoutMs?: number, spawn?: Function}} [opts]
+ */
 function runPenOnce(
   snippets,
   {
