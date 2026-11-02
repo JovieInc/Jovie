@@ -641,3 +641,56 @@ test('bare public subdomains are checked while emails, fixture domains and URLs 
     []
   );
 });
+
+test('immutable commit exceptions apply only to the exact evidenced span and commit identity', () => {
+  const root = repo();
+  put(root, 'copy.md', 'Jovie');
+  commit(root);
+  const base = git(root, 'rev-parse', 'HEAD');
+  const quoted = 'Negative spelling examples: Jovy and Jovies.';
+  git(root, 'commit', '--allow-empty', '-qm', quoted);
+  const head = git(root, 'rev-parse', 'HEAD');
+  const exceptions = [
+    {
+      file: `commit ${head}`,
+      match: quoted,
+      reason: 'Exact negative examples in this immutable fixture commit.',
+    },
+  ];
+  assert.deepEqual(scanPullRequestText({ root, base, head, exceptions }), []);
+  assert.deepEqual(
+    scanPullRequestText({
+      root,
+      base,
+      head,
+      exceptions,
+      title: 'Jovy',
+      body: 'Jovies',
+    }).map(h => h.file),
+    ['PR title', 'PR body']
+  );
+  git(root, 'commit', '--allow-empty', '-qm', quoted);
+  const next = git(root, 'rev-parse', 'HEAD');
+  assert.deepEqual(
+    scanPullRequestText({ root, base: head, head: next, exceptions }).map(
+      h => h.text
+    ),
+    ['Jovy', 'Jovies']
+  );
+});
+
+test('the published implementation commit freezes only its original negative examples', () => {
+  const file = 'commit 3ce9dca0e29780a21a36e524aa251c8092abdb51';
+  const exception = EXCEPTIONS.find(e => e.file === file);
+  assert.ok(exception && exception.reason.trim());
+  assert.deepEqual(scanText(exception.match, { file, prose: true }), []);
+  assert.deepEqual(
+    scanText(exception.match + '\nJovy', { file, prose: true }).map(
+      h => h.text
+    ),
+    ['Jovy']
+  );
+  assert.ok(
+    scanText(exception.match, { file: 'PR body', prose: true }).length > 0
+  );
+});

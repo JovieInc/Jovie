@@ -2,7 +2,7 @@
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { scanText, stripCommitScopes } from './brand-name.mjs';
+import { EXCEPTIONS, scanText, stripCommitScopes } from './brand-name.mjs';
 
 export function scanPullRequestText({
   title = '',
@@ -10,6 +10,7 @@ export function scanPullRequestText({
   base,
   head,
   root = process.cwd(),
+  exceptions = EXCEPTIONS,
 }) {
   const commits = execFileSync(
     'git',
@@ -27,7 +28,7 @@ export function scanPullRequestText({
   for (let i = 0; i + 1 < commits.length; i += 2)
     sections.push([`commit ${commits[i].trim()}`, commits[i + 1]]);
   return sections.flatMap(([file, text]) =>
-    scanText(stripCommitScopes(text), { file, prose: true, exceptions: [] })
+    scanText(stripCommitScopes(text), { file, prose: true, exceptions })
   );
 }
 

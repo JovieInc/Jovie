@@ -40,6 +40,11 @@
       "file": "docs/designs/jov-5909-wordmark-o-favicon-implementation-contract.md",
       "match": "geometric JOVIE letters",
       "reason": "Source-backed glyph description of wordmark-letters.ts: uppercase letters identify the drawn glyphs, not prose brand casing. Preserve the existing implementation record."
+    },
+    {
+      "file": "commit 3ce9dca0e29780a21a36e524aa251c8092abdb51",
+      "match": "Flags Jovy, Jovee, Jovei, Jovvie, Jovies, J0vie, near-misses, jovie.com or\njovie.io and wrong casing in prose; Jovi only in agent context. Zero baseline.",
+      "reason": "Exact negative spelling examples in published PR23363 implementation commit 3ce9dca0e29780a21a36e524aa251c8092abdb51. The original immutable message describes the scanner; preserve published history. This does not exempt any other text or commit."
     }
   ]
 }
