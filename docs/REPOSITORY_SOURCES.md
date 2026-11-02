@@ -8,7 +8,7 @@ Repository: `JovieInc/Jovie`
 ## Source-owned entry points
 
 - `README.md`
-- `CLAUDE.md`
+- `AGENTS.md`
 - `docs/DOCUMENTATION.md`
 
 ## Manifest and workflow fingerprints
