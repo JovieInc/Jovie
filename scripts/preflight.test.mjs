@@ -40,6 +40,7 @@ function hookGitFixture({ behind = true, conflict = false, during = '' } = {}) {
   const origin = path.join(root, 'origin.git');
   const baseWriter = path.join(root, 'base');
   const marker = path.join(root, 'gate-ran');
+  /** @type {NodeJS.ProcessEnv} */
   const env = {
     ...buildPreflightEnv(),
     JOVIE_PREFLIGHT_LEDGER: 'off',
