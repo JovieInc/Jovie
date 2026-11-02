@@ -8,6 +8,10 @@
  * fail fast instead of rotating (JOV-7953).
  */
 
+import {
+  isStreamStallError,
+  STREAM_STALLED_ERROR_CODE,
+} from '@/lib/ai/stream-stall-guard';
 import { CHAT_MODEL_ROTATION_CHAIN } from '@/lib/constants/ai-models';
 
 export const GATEWAY_BUDGET_EXCEEDED_ERROR_CODE = 'GATEWAY_BUDGET_EXCEEDED';
@@ -45,7 +49,12 @@ export interface ChatStreamFailure {
   readonly errorCode: string;
   readonly userMessage: string;
   readonly errorMessage: string;
+  /** Terminal `chat_turns.status` for this failure. */
+  readonly terminalStatus: 'failed_model_error' | 'failed_timeout';
 }
+
+export const CHAT_STREAM_STALLED_USER_MESSAGE =
+  'Jovie took too long to answer, so this reply was stopped. Nothing was lost. Tap Retry to try again.';
 
 function readErrorString(
   error: unknown,
@@ -256,11 +265,20 @@ export function classifyGatewayAlert(error: unknown): GatewayAlert | null {
 }
 
 export function classifyChatStreamFailure(error: unknown): ChatStreamFailure {
+  if (isStreamStallError(error)) {
+    return {
+      errorCode: STREAM_STALLED_ERROR_CODE,
+      userMessage: CHAT_STREAM_STALLED_USER_MESSAGE,
+      errorMessage: error.message,
+      terminalStatus: 'failed_timeout',
+    };
+  }
   if (isGatewayInsufficientFundsError(error)) {
     return {
       errorCode: GATEWAY_INSUFFICIENT_FUNDS_ERROR_CODE,
       userMessage: GATEWAY_INSUFFICIENT_FUNDS_USER_MESSAGE,
       errorMessage: GATEWAY_INSUFFICIENT_FUNDS_USER_MESSAGE,
+      terminalStatus: 'failed_model_error',
     };
   }
   if (isGatewayBudgetExceededError(error)) {
@@ -268,6 +286,7 @@ export function classifyChatStreamFailure(error: unknown): ChatStreamFailure {
       errorCode: GATEWAY_BUDGET_EXCEEDED_ERROR_CODE,
       userMessage: GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE,
       errorMessage: GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE,
+      terminalStatus: 'failed_model_error',
     };
   }
   return {
@@ -275,6 +294,7 @@ export function classifyChatStreamFailure(error: unknown): ChatStreamFailure {
     userMessage: CHAT_STREAM_FAILED_USER_MESSAGE,
     errorMessage:
       error instanceof Error ? error.message : 'The assistant stream failed.',
+    terminalStatus: 'failed_model_error',
   };
 }
 

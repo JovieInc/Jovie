@@ -53,6 +53,7 @@
       "exports": [
         "updateProfileById",
         "updateProfileByClerkId",
+        "holdLeadBuiltProfileInTx",
         "publishProfile"
       ],
       "tables": ["creatorProfiles"]

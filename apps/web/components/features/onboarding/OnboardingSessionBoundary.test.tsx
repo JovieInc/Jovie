@@ -129,6 +129,36 @@ describe('onboarding identity boundary', () => {
       'could not be restored'
     );
   });
+  it('holds the in-tab anonymous chat while sign-up links it, instead of a blank restore screen', async () => {
+    mocks.auth.isSignedIn = false;
+    mocks.auth.userId = null;
+    mocks.fetch.mockResolvedValue(snapshot(null, history, false));
+    const { rerender } = render(
+      <OnboardingSessionBoundary sessionLabel='pending' />
+    );
+    await screen.findByText('Saved artist progress');
+    let resolve!: (response: Response) => void;
+    mocks.fetch.mockReturnValue(
+      new Promise<Response>(r => {
+        resolve = r;
+      })
+    );
+    mocks.auth.isSignedIn = true;
+    mocks.auth.userId = 'account-a';
+    rerender(<OnboardingSessionBoundary sessionLabel='pending' />);
+    // Same conversation stays on screen, frozen; no blank restore state.
+    expect(screen.getByTestId('history')).toHaveTextContent(
+      'Saved artist progress'
+    );
+    expect(screen.queryByTestId('onboarding-session-boundary')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Start over' })).toBeDisabled();
+    await act(async () => resolve(snapshot('account-a')));
+    expect(mocks.shell.mock.lastCall?.[0]).toMatchObject({
+      isSignedIn: true,
+      conversationId: 'conversation-a',
+    });
+  });
+
   it('does not read or display history until auth initialization finishes', () => {
     mocks.auth.isLoaded = false;
     render(<OnboardingSessionBoundary sessionLabel='pending' />);

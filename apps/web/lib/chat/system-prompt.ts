@@ -117,11 +117,7 @@ export function describeReleaseTiming(
 
 function formatReleaseLine(release: ReleasePromptContext, now: Date): string {
   const trackLabel = release.totalTracks === 1 ? 'track' : 'tracks';
-  const popularity =
-    typeof release.spotifyPopularity === 'number'
-      ? `, Spotify popularity ${release.spotifyPopularity}/100`
-      : '';
-  return `- ${release.title} (${release.releaseType}, ${release.totalTracks} ${trackLabel}; ${describeReleaseTiming(release.releaseDate, now)}${popularity})`;
+  return `- ${release.title} (${release.releaseType}, ${release.totalTracks} ${trackLabel}; ${describeReleaseTiming(release.releaseDate, now)})`;
 }
 
 function buildDiscographySection(
@@ -218,7 +214,6 @@ ${buildPromptSecuritySection()}
 ## Streaming Stats
 - **Spotify:** ${spotifyConnectionLine(context)}
 - **Spotify Followers:** ${context.spotifyFollowers?.toLocaleString() ?? 'not synced yet'}
-- **Spotify Popularity:** ${context.spotifyPopularity ?? 'N/A'} / 100
 
 ## Grounding (CRITICAL)
 Everything you say about this artist's own accounts, connections, releases, songs or numbers must come from this prompt or from a tool result in this turn. Never say a service is not connected unless the Spotify line above says Not connected. Never name a song, single or album as the artist's unless it appears in the Discography Context or a tool result; if you cannot verify a title, say so and ask. A missing number means "not synced yet", never "not connected".
@@ -226,7 +221,7 @@ Everything you say about this artist's own accounts, connections, releases, song
 ## Profile Analytics
 - **Profile Views:** ${context.profileViews.toLocaleString()}
 - **Has Social Links:** ${context.hasSocialLinks ? 'Yes' : 'No'}
-- **Has Music Links (DSPs):** ${context.hasMusicLinks ? 'Yes' : 'No'}
+- **Has Music Links (DSPs):** ${context.hasMusicLinks ? 'Yes (the public profile shows streaming links)' : 'No'}
 
 ## Discography Context
 - **Total Releases:** ${releases.length}
@@ -264,6 +259,9 @@ Do not echo tokens in your responses. When referring to the entity in your reply
 - When asked for something you cannot see (daily streams, saves, playlist adds), say what you can see instead and give the one check or action that answers it.
 - Point to their Jovie profile link above for smart links, pre-saves and link-in-bio; never ask which release when only one is upcoming.
 - Never state a number, price, benchmark, trend or setup status (a link is live, a pre-save exists, something synced) unless it appears above or in a tool result this turn. If you do not know whether something is set up, say where to check.
+- Spotify popularity scores and similar internal ranking numbers are not shown to the artist anywhere. Never mention a popularity score, even if a tool returns one; talk about releases, followers and listens instead.
+- Never claim the public profile or link-in-bio lacks music or streaming links unless Has Music Links above says No.
+- Proposal and confirmation cards render BELOW your message text. When pointing at one say "the card below", never "the card above".
 - You cannot send emails, post content, access external APIs, listen to tracks, or guarantee outcomes.
 
 ## Useful Pivot

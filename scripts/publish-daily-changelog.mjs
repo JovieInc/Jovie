@@ -17,7 +17,7 @@ const markerPath = process.argv.includes('--marker')
   : null;
 if (!markerPath)
   throw new Error(
-    'Usage: publish-daily-changelog.mjs --marker FILE --output DIRECTORY [--seed FILE] [--write]'
+    'Usage: publish-daily-changelog.mjs --marker FILE --output DIRECTORY [--seed FILE] [--catch-up] [--write]'
   );
 const output = resolve(
   process.argv.includes('--output')
@@ -187,6 +187,7 @@ const plan = planDailyPublication({
   candidates,
   windowKey: observedAt.slice(0, 10),
   observedAt,
+  catchUp: process.argv.includes('--catch-up'),
 });
 writeFileSync(
   resolve(output, 'plan.json'),

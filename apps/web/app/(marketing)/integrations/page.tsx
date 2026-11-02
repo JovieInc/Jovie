@@ -7,9 +7,11 @@ import { getConnectorAvailability } from '@/lib/connectors/availability.server';
 import { getAdvertisedConnectorIntegrations } from '@/lib/connectors/capabilities';
 import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
 import { documentTitle } from '@/lib/seo/document-title';
+import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 const PAGE_URL = `${BASE_URL}${APP_ROUTES.INTEGRATIONS}`;
 export const metadata: Metadata = {
+  robots: NOINDEX_ROBOTS,
   title: documentTitle('Integrations | Jovie'),
   description:
     'See the account integrations and specific capabilities available in Jovie.',

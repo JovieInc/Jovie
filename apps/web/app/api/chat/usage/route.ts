@@ -9,6 +9,7 @@ import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { aiChatWeeklyPlanAwareLimiter } from '@/lib/rate-limit/limiters';
 import { getRedis } from '@/lib/redis';
 import { withTimeout } from '@/lib/resilience/primitives';
+import { isWeeklyQuotaExemptCanaryEmail } from '@/lib/synthetic/prodcert-identities';
 import { logger } from '@/lib/utils/logger';
 import type { UserPlan } from '@/types';
 
@@ -110,6 +111,8 @@ function writeChatUsageCache(
 export async function buildChatUsageSnapshot(params: {
   readonly userId: string;
   readonly entitlementPlan: UserPlan;
+  /** The chat route skips the weekly quota for this account; say so here too. */
+  readonly quotaExempt?: boolean;
 }): Promise<ChatUsageSnapshot | null> {
   const plan = resolveChatUsagePlan(params.entitlementPlan);
   const expectedLimit = getEntitlements(params.entitlementPlan).limits
@@ -120,7 +123,7 @@ export async function buildChatUsageSnapshot(params: {
   );
   if (!status.available || status.limit !== expectedLimit) return null;
   const weeklyLimit = status.limit;
-  const remaining = status.remaining;
+  const remaining = params.quotaExempt ? weeklyLimit : status.remaining;
   const warningThreshold = Math.max(1, Math.ceil(weeklyLimit * 0.2));
   const response: ChatUsageSnapshot = {
     plan,
@@ -161,6 +164,7 @@ export async function GET() {
       const snapshot = await buildChatUsageSnapshot({
         userId,
         entitlementPlan: entitlements.plan,
+        quotaExempt: isWeeklyQuotaExemptCanaryEmail(entitlements.email),
       });
       if (snapshot) {
         writeChatUsageCache(userId, snapshot);

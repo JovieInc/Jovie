@@ -77,3 +77,43 @@ describe('selectUnclaimedCertArtist', () => {
     ).rejects.toThrow('probe unavailable');
   });
 });
+
+describe('reserved fixture artists', () => {
+  it('keeps the returning canary artist out of the shared pool', async () => {
+    const { RETURNING_CANARY_RESERVED_ARTIST, SHARED_E2E_ARTIST_POOL } =
+      await import('./prodcert-artist-fixture');
+    expect(
+      SHARED_E2E_ARTIST_POOL.some(
+        a => a.spotifyId === RETURNING_CANARY_RESERVED_ARTIST.spotifyId
+      )
+    ).toBe(false);
+  });
+
+  it('selection skips a reserved artist even when handed one and never probes it', async () => {
+    const { RETURNING_CANARY_RESERVED_ARTIST } = await import(
+      './prodcert-artist-fixture'
+    );
+    const probed: string[] = [];
+    const chosen = await selectUnclaimedCertArtist(
+      [RETURNING_CANARY_RESERVED_ARTIST, ...POOL],
+      async spotifyId => {
+        probed.push(spotifyId);
+        return false;
+      }
+    );
+    expect(chosen).toBe(POOL[0]);
+    expect(probed).not.toContain(RETURNING_CANARY_RESERVED_ARTIST.spotifyId);
+  });
+
+  it('a pool of only reserved artists is unavailable, not silently claimed', async () => {
+    const { RETURNING_CANARY_RESERVED_ARTIST } = await import(
+      './prodcert-artist-fixture'
+    );
+    await expect(
+      selectUnclaimedCertArtist(
+        [RETURNING_CANARY_RESERVED_ARTIST],
+        async () => false
+      )
+    ).rejects.toBeInstanceOf(ProdcertFixtureUnavailableError);
+  });
+});
