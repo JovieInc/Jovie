@@ -17,7 +17,7 @@
       "tables": 0,
       "rates": 1
     },
-    "app/api/chat/route.ts": {
+    "lib/chat/artist-context.ts": {
       "tables": 4,
       "rates": 0
     },
