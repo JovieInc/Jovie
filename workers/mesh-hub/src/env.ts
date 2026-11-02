@@ -1,9 +1,11 @@
+import type { Board } from './board-do.ts';
 import type { Mailbox } from './mailbox.ts';
 import type { Registry } from './registry.ts';
 
 export type Env = {
   MAILBOX: DurableObjectNamespace<Mailbox>;
   REGISTRY: DurableObjectNamespace<Registry>;
+  BOARD: DurableObjectNamespace<Board>;
   /** Registry writes only. Lives in Doppler agent-mesh/prd, never on agent hosts. */
   HUB_ADMIN_TOKEN: string;
   /** Unset until summer-config consumes /summer/v1/mesh/hub. */

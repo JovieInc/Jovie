@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { BOARD, BoardStore, taskIdFromRef } from './board.ts';
+import { BOARD, BoardStore, parseBoardSend, taskIdFromRef } from './board.ts';
 import { sqlite } from './core.test.mjs';
 
 const ACTIVE = ['summer', 'claude', 'codex', 'aeon', 'grokbot'];
@@ -161,6 +161,13 @@ test('fan-out: children, then one merge task with every result, then the parent 
   const parent = store.get('deck');
   assert.equal(parent.status, 'done');
   assert.equal(parent.result, 'final');
+  const m = store.metrics(3_600_000, 60);
+  assert.equal(m.agents.claude.done, 1);
+  assert.equal(m.agents.summer.done, 1); // the merge only, not the parent
+  assert.equal(m.agents.claude.workMs.p50, 10);
+  assert.equal(m.agents.claude.pickupMs.p50, 10);
+  assert.equal(m.agents.aeon.failed, 1);
+  assert.equal(m.agents.grokbot.workMs.p50, 0);
   assert.ok(
     store
       .stages('deck.2')
@@ -236,6 +243,10 @@ test('post is idempotent per poster; cancel closes children; validation rejects 
     /invalid_fanout/
   );
   assert.throws(
+    () => store.apply('summer', 'nope', {}, ACTIVE, 1),
+    /invalid_op/
+  );
+  assert.throws(
     () => store.claim('aeon', { id: 'missing' }, 1),
     /task_not_found/
   );
@@ -265,4 +276,32 @@ test('done replays for the same result; a closed task rejects a different one', 
     .filter(n => n.to === 'summer')
     .map(n => JSON.parse(n.body).event);
   assert.deepEqual(toPoster, ['task.done']);
+});
+
+test('mesh sends: JSON op, or a plain reply to a notice becomes done/answer', () => {
+  const store = board();
+  store.post('summer', { id: 'm', title: 't' }, ACTIVE, 1);
+  store.post('summer', { id: 'mq', type: 'question', title: 'q' }, ACTIVE, 1);
+  const lookup = id => store.get(id);
+  assert.deepEqual(parseBoardSend('{"op":"claim","id":"m"}', null, lookup), {
+    op: 'claim',
+    input: { op: 'claim', id: 'm' },
+  });
+  assert.deepEqual(
+    parseBoardSend('All 3 claims verified.', 'board:t:m:4', lookup),
+    {
+      op: 'done',
+      input: { id: 'm', result: 'All 3 claims verified.' },
+    }
+  );
+  // Summer's reply form: `${to}:${correlationId}`.
+  assert.equal(parseBoardSend('yes', 'board:t:mq:7', lookup).op, 'answer');
+  assert.throws(
+    () => parseBoardSend('hello', null, lookup),
+    /board_needs_op_or_reply/
+  );
+  assert.throws(
+    () => parseBoardSend('{not json', 'x', lookup),
+    /board_needs_op_or_reply/
+  );
 });
