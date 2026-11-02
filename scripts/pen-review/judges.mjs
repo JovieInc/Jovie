@@ -27,7 +27,13 @@ import {
 
 // api-budget: cloudflare-api 120/hr - Pen review panel (up to 5 personas plus Clef confirms per round, sweep-bounded)
 export const JUDGE_MODEL = '@cf/meta/llama-4-scout-17b-16e-instruct';
-export const CONFIRM_THRESHOLD = 0.5;
+/**
+ * Clef must be this sure a judge's issue is visible before it counts.
+ * 0.5 let noisy vision judges keep frames failing on invented or settled
+ * issues for 10 rounds (2026-11-02 receipts: nILs2, wlhsx, K8Bx3J); confirmed
+ * issues that mattered scored 0.75 and up.
+ */
+export const CONFIRM_THRESHOLD = 0.75;
 
 export const PERSONAS = Object.freeze({
   'intended-user': brief =>

@@ -1,6 +1,6 @@
 {
   "schema": "pen-review-briefs/v1",
-  "_comment": "Mission and audience per PROPOSAL family (first match on the frame name wins). The judge panel reads these; add a brief when a new proposal family lands. Personas: intended-user, premium-critic, buyer, heritage-manager.",
+  "_comment": "Mission and audience per PROPOSAL family (first match on the frame name wins). The judge panel reads these; add a brief when a new proposal family lands. Personas: intended-user, premium-critic, buyer, heritage-manager. claims:false = product frame showing the user's own data; the marketing claims-ledger check is skipped.",
   "defaults": {
     "audience": "an independent artist or their manager using Jovie",
     "mission": "make the next step obvious and trustworthy in one glance",
@@ -23,7 +23,8 @@
         "Invites are drafted by Jovie but opened and sent by the artist from their own Gmail, one at a time; Jovie never sends, nudges or follows up.",
         "The empty state is intentional: it shows how to start an import, not missing data.",
         "Credits shown to a recipient are only those Jovie is at least 90% sure of."
-      ]
+      ],
+      "claims": false
     },
     {
       "match": "Assembling profile",
@@ -34,7 +35,8 @@
       "personas": ["intended-user", "premium-critic", "buyer"],
       "decisions": [
         "Progress shows exact counts (for example 2 of 14 releases) because the import is real and the artist can keep chatting while it runs."
-      ]
+      ],
+      "claims": false
     },
     {
       "match": "Claim verification|Verify|Verification|Dispute",
@@ -50,7 +52,8 @@
       ],
       "decisions": [
         "Verification starts with one-tap OAuth (Instagram, YouTube); the page stays private until verified, and a dispute freezes edits without taking the page offline."
-      ]
+      ],
+      "claims": false
     },
     {
       "match": "Fan engine",
@@ -63,7 +66,8 @@
         "The artist sets rails once and never approves individual emails; the feed is for watching, with one-tap pause.",
         "Fans are shown by pseudonym and coarse context only.",
         "The artist and catalog on these frames are fictional by design."
-      ]
+      ],
+      "claims": false
     }
   ]
 }

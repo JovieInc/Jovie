@@ -306,6 +306,9 @@ export async function reviewFrame(
     const findings = [
       ...runChecks(facts, {
         ...CHECK_CTX,
+        // Product frames show the user's own data ("2 of 14 releases"); the
+        // claims ledger governs marketing claims. A brief opts out explicitly.
+        ...(brief.claims === false ? { claimPatterns: [] } : {}),
         typeScale: facts.typeScale,
         compact: facts.w <= 430,
       }),
