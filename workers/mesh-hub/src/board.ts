@@ -1,7 +1,7 @@
 /**
  * Fleet task board (JOV-10081): the smallest swarm layer on the mesh hub.
  * Protocol: JovieInc/ci canon/MESH-SWARM.md. Ops are post, claim, update, done, answer,
- * cancel and caps. Claims are leases; an expired lease returns the task to the pool and
+ * cancel, reassign and caps. Claims are leases; an expired lease returns the task to the pool and
  * re-notifies capable agents. A post with `fanout` makes child tasks plus a merge task
  * that opens when every child is terminal. Every stage is timestamped per task and agent.
  * Pure store over the DO SqlStorage shape so node:sqlite tests cover it.
@@ -28,6 +28,8 @@ export type TaskStatus =
   | 'failed'
   | 'cancelled';
 const TERMINAL = new Set<TaskStatus>(['done', 'failed', 'cancelled']);
+/** Orchestrators may reassign any open task, not only their own (canon MESH-SWARM.md). */
+export const ORCHESTRATORS = new Set(['summer', 'claude']);
 const TASK_ID = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 const CAP = /^[a-z][a-z0-9-]{0,31}$/;
 
@@ -664,6 +666,41 @@ export class BoardStore {
     return { task: this.get(task.id) };
   }
 
+  /**
+   * Point an open (unclaimed) task at another agent. Only the poster or an orchestrator may.
+   * The new assignee gets a `task.open` notice (so existing executors act on it unchanged)
+   * carrying `reassigned: {from, to, by}`; the stage row records from/to.
+   */
+  reassign(from: string, input: Record<string, unknown>, now: number) {
+    const task = this.mustGet(input.id);
+    if (task.poster !== from && !ORCHESTRATORS.has(from))
+      throw new HubError(403, 'only_poster_or_orchestrator_reassigns');
+    if (task.status !== 'open') throw new HubError(409, 'task_not_open');
+    const to = kindOrNull(input.to);
+    if (!to || to === BOARD_KIND) throw new HubError(422, 'invalid_to');
+    const previous = task.assignee;
+    if (previous === to) return { replay: true, task };
+    task.assignee = to;
+    task.updatedAt = now;
+    this.save(task);
+    const stageId = this.stage(
+      task.id,
+      from,
+      'reassigned',
+      now,
+      `from=${previous ?? 'pool'} to=${to}`
+    );
+    this.notify(
+      task,
+      [to],
+      task.type === 'question' ? 'question.open' : 'task.open',
+      stageId,
+      now,
+      { reassigned: { from: previous, to, by: from } }
+    );
+    return { replay: false, task };
+  }
+
   /** Expired leases go back to the pool and capable agents hear about it again. */
   sweep(active: readonly string[], now: number) {
     const expired = this.sql
@@ -842,6 +879,8 @@ export class BoardStore {
         return this.answer(from, input, now);
       case 'cancel':
         return this.cancel(from, input, now);
+      case 'reassign':
+        return this.reassign(from, input, now);
       default:
         throw new HubError(422, 'invalid_op');
     }
