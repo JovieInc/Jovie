@@ -6,6 +6,10 @@ import { getAuthenticatedAuthEntryRedirectFromParams } from '@/lib/auth/access-r
 import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
 import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { documentTitle } from '@/lib/seo/document-title';
+import {
+  isPublicSignupClosed,
+  PUBLIC_SIGNUP_CLOSED_REDIRECT,
+} from '@/lib/waitlist/public-signup-gate';
 import { SignUpPageClient } from './SignUpPageClient';
 
 export const dynamic = 'force-dynamic';
@@ -38,6 +42,12 @@ export default async function SignUpPage({
         isPaidSubscriber: authResult.context?.isPro ?? false,
       })
     );
+  }
+
+  // Closed public signup: anonymous visitors join the waitlist instead.
+  // Sign-in and invite links stay open (canon/PRODUCT.md, 2026-11-02).
+  if (isPublicSignupClosed()) {
+    redirect(PUBLIC_SIGNUP_CLOSED_REDIRECT);
   }
 
   return (

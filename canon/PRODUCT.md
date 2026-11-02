@@ -261,6 +261,24 @@ ultrawide."
 Canon boundaries still hold: Ovie is presentation, not an agent; Summer and
 Jovie remain the two agents. JOV-5959 owns the Ovie Home implementation.
 
+### Public signup closes behind the waitlist (founder decision, 2026-11-02)
+
+Tim White approved the plan on 2026-11-02: close public signup and admit
+people by invite from a role-qualifying waitlist.
+
+- **Ship now:** the `PUBLIC_SIGNUP_CLOSED` code flag
+  (`apps/web/lib/flags/code-flags.ts`, default off). With the flag on,
+  `/signup` and anonymous `/start` go to the `/waitlist` role form (role and
+  email, Turnstile-gated, no account). Sign-in and waitlist invite links still
+  create accounts and enter the golden path. The flag is turned on with
+  `FEATURE_PUBLIC_SIGNUP_CLOSED=true` once the waitlist page is live in
+  production.
+- **Re-evaluate when:** the golden path is certified and the first paying
+  artists are live. Admin People → Waitlist shows submissions by role and
+  invite conversion (sent, opened, account created, golden path entered).
+- **Then:** reopen signup by removing the env override, and delete the flag
+  once the reopened funnel is stable.
+
 ---
 
 ## Anti-Goals
