@@ -99,14 +99,24 @@ export async function runAtomicDbOperation<T>(
         const remaining = Math.floor(deadline - performance.now());
         if (remaining <= 0)
           throw new Error('Atomic database deadline exceeded');
-        await tx.execute(drizzleSql`SELECT
-      set_config('statement_timeout', ${String(remaining)}, true),
-      set_config('lock_timeout', ${String(Math.min(remaining, 1000))}, true),
-      set_config('idle_in_transaction_session_timeout', ${String(remaining)}, true)`);
+        // Pin the RLS identity BEFORE installing the residual transaction
+        // budget (JOV-8807): the deadline above includes pool checkout and any
+        // serialization retry, so under contention `remaining` can be near
+        // zero. Setting the deadlines first made the very next statement —
+        // the RLS set_config — race that doomed budget and fail with a
+        // timeout, misreported as revenue-spine:v1:rls_setup:timeout
+        // (Sentry 7806231669) even though the setup statement is instant and
+        // not the slow party. The setup stays bounded by the pool-level
+        // statement_timeout; only the operation's own statements consume the
+        // residual budget.
         await applyRlsTransactionUser(
           tx,
           options.system ? 'system_ingestion' : options.actorId
         );
+        await tx.execute(drizzleSql`SELECT
+      set_config('statement_timeout', ${String(remaining)}, true),
+      set_config('lock_timeout', ${String(Math.min(remaining, 1000))}, true),
+      set_config('idle_in_transaction_session_timeout', ${String(remaining)}, true)`);
         return atomicDbContext.run({ actorId: options.actorId }, async () => {
           const result = await operation(tx);
           if (performance.now() >= deadline)
