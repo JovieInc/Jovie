@@ -951,7 +951,13 @@ def provider_idle_with_qualified_work(obs: dict, provider: str) -> bool:
     account_ready = provider != "codex" or bool(account_state.get("unleasedAvailable"))
     slots, running = capacity.get("slots"), capacity.get("running")
     vacant = (type(slots) is int and type(running) is int and 0 <= running < slots)
-    return bool(pool and account_ready and vacant
+    # The pool is new-issue work. When autoscale closed this lane's intake by policy (WIP cap, CI
+    # runner backlog, quota deferral), that pool is unclaimable on purpose and a restart cannot
+    # change it: not an idle provider. 2026-10-26 -> 11-02 this false alarm on hyperagent (intake 0,
+    # no repair seats) exhausted the stay-up watchdog and kept the factory "unhealthy" for a week.
+    lane = (((obs.get("autoscale") or {}).get("lanes") or {}).get(provider) or {})
+    intake_closed = lane.get("intakeEffective") == 0 and bool(lane.get("intakeBlockers"))
+    return bool(pool and account_ready and vacant and not intake_closed
                 and provider in (tick.get("spawned") or []) and provider not in (tick.get("unhealthy") or []))
 
 
