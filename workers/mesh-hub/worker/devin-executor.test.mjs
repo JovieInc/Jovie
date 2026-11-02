@@ -121,6 +121,11 @@ test('provider runtimes do not receive mesh, administrative or unrelated provide
       EXA_API_KEY: 'hidden',
       SUMMER_HUB_WEBHOOK_SECRET: 'hidden',
       DOPPLER_PROJECT: 'agent-mesh',
+      DATABASE_URL: 'postgres://private',
+      DB_PASSWORD: 'private',
+      AUTHORIZATION: 'private',
+      COOKIE: 'private',
+      UNRECOGNIZED_CREDENTIAL: 'private',
     }),
     { HOME: '/home/test', PATH: '/bin', SSH_AUTH_SOCK: '/sock' }
   );
