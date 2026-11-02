@@ -5525,6 +5525,33 @@ class DispatchTest(unittest.TestCase):
             self.assertEqual(tick["admissionDenied"], "disk-critical")
             self.assertNotIn("tick-error", lane.doctor.judge({"tick": tick, "now": 0.0}))
 
+    def test_disk_denied_tick_still_drains_the_linear_outbox(self):
+        # JOV-10355: the outbox is the doctor's own reporting channel — the writes that
+        # raise and clear the disk condition travel through it — so a denied tick must
+        # still flush it (bounded; small state JSONs on the state root, never the full
+        # worktree volume). Everything after the flush stays gated.
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(lane.disk_guard, "free_pct", return_value=4.0), \
+                patch.object(lane.doctor, "run"), \
+                patch.object(lane, "Linear", return_value=SimpleNamespace(admit=lambda requests: False)) as client, \
+                patch.object(lane.linear_sync, "flush", return_value={"outcome": "drained", "delivered": []}) as flush, \
+                patch.object(lane.pr_events, "tick") as events:
+            previous_selftest = os.environ.get("LANES_SELFTEST")
+            os.environ.pop("LANES_SELFTEST", None)
+            try:
+                host = lane.Host(state=Path(tmp), repo=Path(tmp))
+                self.assertEqual(lane.dispatch(host), 1)
+            finally:
+                if previous_selftest is not None:
+                    os.environ["LANES_SELFTEST"] = previous_selftest
+            flush.assert_called_once()
+            self.assertEqual(flush.call_args.args[:2], (host.state, client.return_value))
+            events.assert_not_called()
+            tick = json.loads((Path(tmp) / "tick.json").read_text())
+            self.assertEqual(tick["linearSync"], {"outbox": {"outcome": "drained", "delivered": []}})
+            self.assertEqual(tick["admissionDenied"], "disk-critical")
+
+
     def test_critical_disk_still_starts_the_worktree_sweep(self):
         # JOV-7704: admission denial must not also deny the cleanup that would end it.
         with tempfile.TemporaryDirectory() as tmp, \
@@ -12918,9 +12945,20 @@ class TimerInstallerNodePathTests(unittest.TestCase):
         import plistlib
 
         source = (Path(__file__).resolve().parents[1] / "lanes/install.sh").read_text()
-        for platform, with_gbrain in ((p, g) for p in ("Linux", "Darwin") for g in (False, True)):
-            with self.subTest(platform=platform, with_gbrain=with_gbrain), tempfile.TemporaryDirectory() as tmp:
+        for platform, with_gbrain, temp_case in ((p, g, t) for p in ("Linux", "Darwin")
+                                                for g in (False, True)
+                                                for t in (("unset", "private", "insecure", "relative", "specifier", "symlink")
+                                                          if p == "Linux" else ("unset",))):
+            with self.subTest(platform=platform, with_gbrain=with_gbrain, temp_case=temp_case), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
+                temp_dir = root / "private temp"
+                if temp_case == "insecure":
+                    temp_dir.mkdir(mode=0o755)
+                if temp_case == "symlink":
+                    target = root / "real-temp"
+                    target.mkdir(mode=0o700)
+                    temp_dir.symlink_to(target, target_is_directory=True)
+                configured_temp = {"unset": "", "relative": "relative-temp", "specifier": str(root / "bad%h")}.get(temp_case, str(temp_dir))
                 bin_dir = root / "selected-node-bin"
                 bin_dir.mkdir()
                 units = root / "units"
@@ -12976,8 +13014,14 @@ with open(os.environ['INSTALL_COMMAND_LOG'], 'a') as log:
                     ["/bin/bash", str(installer)], capture_output=True, text=True,
                     env={**os.environ, "PATH": f"{bin_dir}:{brain_bin}:/usr/bin:/bin",
                          "LANES_STATE": str(root / "state"), "LANES_REPO": str(root / "repo"),
-                         "LANES_HUD": "0", "INSTALL_COMMAND_LOG": str(commands)},
+                         "LANES_TMPDIR": configured_temp, "LANES_HUD": "0", "INSTALL_COMMAND_LOG": str(commands)},
                 )
+                if temp_case in ("insecure", "relative", "specifier", "symlink"):
+                    self.assertNotEqual(result.returncode, 0, "Unsafe temporary placement was accepted")
+                    self.assertNotIn("--user enable", commands.read_text())
+                    if temp_case == "insecure":
+                        self.assertEqual(temp_dir.stat().st_mode & 0o777, 0o755)
+                    continue
                 self.assertEqual(result.returncode, 0, result.stderr)
                 if platform == "Darwin":
                     config = plistlib.loads(plist.read_bytes())
@@ -13000,6 +13044,13 @@ with open(os.environ['INSTALL_COMMAND_LOG'], 'a') as log:
                     self.assertNotIn("After=jovie-lanes.service", watchdog_service)
                     self.assertIn("OnUnitActiveSec=60s", watchdog_timer)
                     self.assertIn("OnCalendar=minutely", watchdog_timer)
+                    for name in ("jovie-lanes", "jovie-lanes-watchdog", "jovie-lanes-wake"):
+                        placement = units / f"{name}.service.d/65-temp-placement.conf"
+                        if temp_case == "private":
+                            self.assertEqual(temp_dir.stat().st_mode & 0o777, 0o700)
+                            self.assertIn(f'Environment="TMPDIR={temp_dir}"', placement.read_text())
+                        else:
+                            self.assertFalse(placement.exists())
                 self.assertEqual(timer_path.split(":")[0], str(bin_dir))
                 if with_gbrain:
                     self.assertEqual(shutil.which("gbrain", path=timer_path), str(brain))
