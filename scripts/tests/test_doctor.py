@@ -293,6 +293,53 @@ class FactoryStayUpWatchdogTest(unittest.TestCase):
             self.assertEqual(len(recoveries), factory_watchdog.MAX_RECOVERY_ATTEMPTS)
             self.assertEqual(len(alerts), 1)
 
+    def test_exhausted_incident_reopens_as_a_new_bounded_generation_after_the_window(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            clock = MutableClock(3000)
+            recoveries, alerts = [], []
+            dark = factory_observation(tickEpoch=2000, tickAgeSeconds=1000,
+                                       runningWorkers=0, spawnedProviders=[])
+
+            def recover():
+                recoveries.append(clock())
+                return {"action": "restart-systemd-lanes-service", "returncodes": [1], "accepted": False}
+
+            def alert(record, issue_id, resolve):
+                alerts.append((record["status"], record["incidentId"]))
+                return "linear-incident-id"
+
+            result = None
+            for _ in range(factory_watchdog.MAX_RECOVERY_ATTEMPTS):
+                result = factory_watchdog.run_once(state, clock=clock, observe=lambda *_: dark,
+                                                   recover=recover, alert=alert)
+                clock.advance(factory_watchdog.ATTEMPT_COOLDOWN_S + 1)
+            first = result["incidentId"]
+            self.assertEqual(result["status"], "exhausted")
+            clock.advance(factory_watchdog.EXHAUSTED_REOPEN_S - 600)
+            self.assertEqual(factory_watchdog.run_once(state, clock=clock, observe=lambda *_: dark,
+                                                       recover=recover, alert=alert)["status"], "exhausted")
+            self.assertEqual(len(recoveries), factory_watchdog.MAX_RECOVERY_ATTEMPTS)
+            clock.advance(3600)
+            reopened = factory_watchdog.run_once(state, clock=clock, observe=lambda *_: dark,
+                                                 recover=recover, alert=alert)
+            self.assertNotEqual(reopened["incidentId"], first)
+            self.assertEqual(reopened["generation"], result["generation"] + 1)
+            self.assertEqual(len(recoveries), factory_watchdog.MAX_RECOVERY_ATTEMPTS + 1)
+            journal = (state / "runs" / "factory-watchdog.jsonl").read_text()
+            self.assertIn("incident-superseded", journal)
+
+    def test_exhausted_incident_then_healthy_factory_clears_after_the_window(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            factory_watchdog.atomic_write(state / "factory-watchdog.json", {
+                "schema": factory_watchdog.SCHEMA, "generation": 4, "incidentId": "gem:factory-stay-up:4",
+                "status": "exhausted", "attempts": [{"requestedEpoch": 1000}], "firstObservedEpoch": 900})
+            clock = MutableClock(1000 + factory_watchdog.EXHAUSTED_REOPEN_S + 1)
+            result = factory_watchdog.run_once(state, clock=clock, observe=lambda *_: factory_observation(),
+                                               recover=mock.Mock(), alert=lambda *_: None)
+            self.assertNotIn(result["status"], factory_watchdog.ACTIVE_STATUSES)
+
     def test_zero_provider_capacity_requires_a_decision_without_blind_restart(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = Path(tmp)
@@ -662,6 +709,17 @@ class JudgeTest(unittest.TestCase):
         self.assertNotIn("devin", doctor.provider_idle_since(fully_occupied, previous))
         self.assertNotIn("provider-idle:codex", doctor.judge(
             obs(**idle), {"providerIdleSince": {"codex": 1_000_000.0 - doctor.PROVIDER_IDLE_S + 1}}))
+
+    def test_intake_closed_by_policy_is_not_an_idle_provider(self):
+        idle = {"tick": {"at": "x", "unhealthy": [], "error": None, "spawned": ["hyperagent"]},
+                "poolByProvider": {"hyperagent": 151},
+                "capacityByProvider": {"hyperagent": {"running": 0, "slots": 1}}}
+        previous = {"providerIdleSince": {"hyperagent": 1_000_000.0 - doctor.PROVIDER_IDLE_S - 1}}
+        held = {"lanes": {"hyperagent": {"intakeEffective": 0, "intakeBlockers": ["wip-cap"]}}}
+        self.assertNotIn("provider-idle:hyperagent", doctor.judge(obs(**idle, autoscale=held), previous))
+        self.assertFalse(doctor.provider_idle_with_qualified_work(obs(**idle, autoscale=held), "hyperagent"))
+        open_intake = {"lanes": {"hyperagent": {"intakeEffective": 1, "intakeBlockers": []}}}
+        self.assertIn("provider-idle:hyperagent", doctor.judge(obs(**idle, autoscale=open_intake), previous))
 
     def test_unhealthy_provider_is_named_without_false_idle_recovery(self):
         observed = obs(tick={"at": "x", "unhealthy": ["devin"], "error": None,
@@ -2052,6 +2110,23 @@ class AccountAttributionTest(unittest.TestCase):
                          [4, 1, 1, 1, 1])
         self.assertNotIn("codex-all-banked", doctor.judge(obs(codex=self.report(**rows))))
 
+    def test_account_at_the_subsidy_floor_counts_as_banked_until_its_reset(self):
+        # codex_lane: at or below the 1% floor an account takes no new run, with no recorded hold.
+        floor = {"available": False, "leased": False, "freeSlots": 1, "exhaustedUntil": None, "lastKind": "ok",
+                 "atFloor": True, "floorUntil": doctor.epoch_iso(self.NOW + 3600)}
+        result = doctor.codex_attribution(self.report(a=floor), self.NOW)
+        self.assertEqual((result["state"], result["quotaBanked"], result["earliestCooldownS"]), ("quota-banked", 1, 3600))
+        stale = {**floor, "floorUntil": doctor.epoch_iso(self.NOW - 1)}
+        self.assertEqual(doctor.codex_attribution(self.report(a=stale), self.NOW)["state"], "unknown")
+
+    def test_status_feed_publishes_the_subsidy_ledger(self):
+        ledger = {"schema": "jovie.subsidy-ledger/v1", "allAtFloor": False, "burnOrder": ["lyb-pro"]}
+        report = {**self.report(a={"available": True, "leased": False}), "subsidyLedger": ledger}
+        observation = obs(codex=report, poolByProvider={"codex": 0}, capacityByProvider={"codex": {"running": 0, "slots": 1}})
+        lane = SimpleNamespace(HOST="test", provider_throughput=throughput_stub)
+        feed = doctor.status_feed(SimpleNamespace(), lane, observation, {}, {})
+        self.assertEqual(feed["subsidyLedger"], ledger)
+
     def test_incomplete_stale_or_malformed_account_status_is_unknown(self):
         valid = self.report(a={"available": True, "leased": True})
         cases = [{}, {**valid, "count": 2}, {**valid, "count": True}, {**valid, "error": "probe failed"},
@@ -3035,6 +3110,8 @@ class SearchPopulationCoverageTest(unittest.TestCase):
                 mock.patch.object(doctor, "automation_observation", return_value={}), \
                 mock.patch.object(doctor.fleet_ledger, "record_ready"), \
                 mock.patch.object(doctor.deploy_health, "sample", return_value=(None, None)), \
+                mock.patch.object(doctor.release_evidence, "sample", return_value=(None, None)), \
+                mock.patch.object(doctor.release_gates, "sample", return_value=(None, None)), \
                 mock.patch.object(doctor.throughput_sentinel, "observe", return_value={}):
             host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "absent")
             observed = doctor.observe(host, lane, SimpleNamespace(status=lambda: {}), now=self.END)

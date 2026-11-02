@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// api-budget: github-app-core 600/hr - estimate: 60 relevant wakes/hr x 10 REST reads/writes; manual apply is exceptional.
+// api-budget: github-app-graphql 300/hr - estimate: 60 relevant wakes/hr x 5 queue reads and actor-verified dequeue calls.
+// api-budget: github-actions-token 900/hr - estimate: 60 relevant wakes/hr x 15 substituted calls, never an additional polling loop.
 // Main-red ejection driver. A failing check must never stop the queue:
 // attribute the culprit, revert it through the compounding jump path, re-land it
 // as a repair PR, and free a conflicted queue head. See scripts/lib/main-red-eject.mjs.
@@ -330,6 +333,9 @@ function isInstallationQuotaExhaustion(error) {
   return (
     error?.name === 'MergeQueueBackendError' &&
     error?.code === 'gh_command_failed' &&
+    /rate limit (already )?exceeded for installation ID \d+/i.test(
+      error.details?.stderr ?? ''
+    ) &&
     shouldFailOver(
       { code: 1, stderr: error.details?.stderr ?? '' },
       process.env.GH_FALLBACK_TOKEN
@@ -367,10 +373,18 @@ async function dequeue(number) {
     return await attempt({});
   } catch (error) {
     // The gh()-wrapper failover above covers this script's own calls only;
-    // the backend spawns its own `gh` runners. When the Jovie Bot installation
-    // bucket is exhausted, retry the whole backend call (actor verification
-    // included) on the fallback credential.
-    if (!isInstallationQuotaExhaustion(error)) throw error;
+    // the backend spawns its own `gh` runners. When actor verification hits
+    // the exhausted installation bucket, retry on the fallback credential.
+    // Actor verification is the first backend call. Only retry there: a
+    // later failed read can follow a successful mutation, whose outcome must
+    // not be reported as an untouched, deferred dequeue.
+    if (
+      !isInstallationQuotaExhaustion(error) ||
+      !error.message.startsWith(
+        'verifying the native queue mutation actor failed'
+      )
+    )
+      throw error;
     const fallback = process.env.GH_FALLBACK_TOKEN;
     if (!fallback || fallback === process.env.GH_TOKEN) throw error;
     console.error(
@@ -388,7 +402,10 @@ async function dequeue(number) {
       // trusted queue writer. Defer visibly instead of crashing.
       if (
         fallbackError?.code === 'native_mutation_actor_unauthorized' ||
-        isInstallationQuotaExhaustion(fallbackError)
+        (isInstallationQuotaExhaustion(fallbackError) &&
+          fallbackError.message.startsWith(
+            'verifying the native queue mutation actor failed'
+          ))
       )
         throw quotaDeferredError(fallbackError);
       throw fallbackError;
@@ -728,9 +745,9 @@ export async function stuckHead({ doApply = false, now = Date.now() } = {}) {
   if (deferReason !== null) {
     // Visible, honest deferred status (run 41227299023 crashed here): the
     // mutation-actor check refused the fallback credential or both credential
-    // buckets are exhausted. Nothing was mutated; the next ejector wake
+    // buckets are exhausted before a dequeue. The next ejector wake
     // retries once quota heals (the first-sighting marker is already on the PR).
-    const note = `Queue head #${head.number} is UNMERGEABLE since ${verdict.since} but the dequeue is deferred — ${deferReason}. Nothing was mutated (no labels, no conflict pass, no re-enqueue); the next ejector wake retries.`;
+    const note = `Queue head #${head.number} is UNMERGEABLE since ${verdict.since} but the dequeue is deferred — ${deferReason}. No dequeue or queue follow-up actions were performed (no labels, no conflict pass, no re-enqueue); incident reporting is attempted separately. The next ejector wake retries.`;
     console.error(`::warning::queue-mutation-deferred: ${note}`);
     await incident(
       `unmergeable:${head.number}`,

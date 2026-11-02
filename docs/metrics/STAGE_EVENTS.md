@@ -13,7 +13,7 @@ One row per entity per stage. Stage dwell time is `exitedAt - enteredAt`.
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `schema` | `"jovie-stage-event/v1"` | Contract version. Breaking changes bump it. |
-| `entityType` | manifest key | `shipping`, `remediation`, `release`, `release-replay`, `ios-release`, `revenue-funnel`, `summer-turn`, `linear-intake`, `detector-issue`, `automation-run` |
+| `entityType` | manifest key | `shipping`, `remediation`, `release`, `release-replay`, `ios-release`, `revenue-funnel`, `summer-turn`, `linear-intake`, `detector-issue`, `automation-run`, `incident`, `board-task` |
 | `entityId` | string | Stable id; the format is declared per entity in the manifest. |
 | `stage` | manifest stage id | Must be registered for the entity type. Unregistered stages are rejected. |
 | `enteredAt` | ISO-8601 | When the entity entered the stage. |
@@ -116,6 +116,21 @@ PATCH as `lanes-status.json`). Keep 28 days, drop older rows, cap at 8 MB.
 | `shipping:gate` | `shipping` / `JovieInc/Jovie#<pr>` | `startedAt + gateWaitS` | receipt `endedAt` (`advanced` landing/verified, `failed` held/timeout) | `runs/ledger.jsonl` (`kind` adopt) |
 | `shipping:outcome-receipt` | `shipping` / `JOV-<n>` | lifecycle comment that owes `outcome` | outcome lane records the receipt (`advanced` pass, `failed` fail, `abandoned` no receipt) | `runs/ledger.jsonl` (`kind` outcome-verify) |
 | `remediation:repair-start` | `remediation` / `JovieInc/Jovie#<pr>@<first 12 chars of the red head sha>` | fix-red receipt `startedAt` | receipt `endedAt` | `runs/ledger.jsonl` (`kind` fix-red) |
+
+| `incident:undetected` | `incident` / `<host>:<condition key>#<generation>` | last proof of life: the probe's last pass (`probe-red:*`) or the receipt's mtime (`automation-silent:*`) | doctor raised the condition | `runs/incidents.jsonl` `detected` |
+| `incident:unfiled` | same | condition raised | Linear issue filed or reopened (first tick doctor.json `issues[key]` holds an open id) | `runs/incidents.jsonl` `filed` |
+| `incident:open` | same | issue filed (raise time when never filed) | doctor read the condition cleared (`null` while open) | `runs/incidents.jsonl` `cleared` |
+| `incident:cleared` | same | terminal, `completed` | | |
+| `board-task:posted` | `board-task` / hub task id | `postedEpoch` | `claimedEpoch` (claim latency) | `runs/board-intake.jsonl` `claimed` |
+| `board-task:running` | same | `claimedEpoch` | `closedEpoch`; `completed` for done, `failed` for failed | `runs/board-intake.jsonl` `done`/`failed` |
+| `board-task:closed` | same | terminal; `failRate` = 1 - success rate | | |
+
+Incidents: per doctor condition, time to detect (`undetected`), time to file
+(`unfiled`) and time to fix and verify (`open`). The same Linear issue's claim,
+PR and merge split is the `detector-issue` entity below; join on the issue the
+condition key names (`Symphony doctor: <key> (<host>)`). `actor` = `doctor` for
+incidents and `lanes:<kind>` for board tasks; `sourceReceipt` =
+`doctor:<host>:<key>:<generation>` or `board-intake:<task id>`.
 
 `actor` = provider (`codex`, `claude`, ...). `outcome`: `advanced` when the run
 produced a PR or a push, `failed` for `failed`/`provider-error`/`fix-no-change`

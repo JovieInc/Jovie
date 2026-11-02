@@ -17,7 +17,7 @@ import {
  * `scripts/seed-returning-canary.ts` applies this spec idempotently. Bump
  * `CANARY_SEED_SPEC_VERSION` whenever a value below changes.
  */
-export const CANARY_SEED_SPEC_VERSION = 'canary-seed/2026-10-31.1';
+export const CANARY_SEED_SPEC_VERSION = 'canary-seed/2026-10-31.2';
 
 export interface CanarySeedIdentity {
   readonly email: string;
@@ -67,7 +67,21 @@ export interface CanaryProfileSnapshot {
   readonly spotifyId: string | null;
   readonly spotifyUrl: string | null;
   readonly avatarUrl: string | null;
+  /**
+   * A canary must stay published: the app shell treats `is_public=false` as an
+   * unfinished profile and sends the owner to /start, so the post-deploy chat
+   * check could never reach /app/chat (2026-10-31, a test-profile cleanup run
+   * unpublished the chat-health canary).
+   */
+  readonly isPublic: boolean | null;
 }
+
+export type CanarySeedValue =
+  | string
+  | number
+  | boolean
+  | readonly string[]
+  | null;
 
 export interface CanaryArtistData {
   readonly imageUrl: string | null;
@@ -79,9 +93,7 @@ export interface CanaryArtistData {
 export interface CanaryProfileUpdate {
   readonly table: 'creator_profiles';
   readonly key: { readonly id: string };
-  readonly set: Readonly<
-    Record<string, string | number | readonly string[] | null>
-  >;
+  readonly set: Readonly<Record<string, CanarySeedValue>>;
 }
 
 /**
@@ -105,11 +117,12 @@ export function planCanaryProfileUpdate(
       `Refusing to seed: Spotify id ${spec.artist.spotifyId} is bound to another profile`
     );
   }
-  const desired: Record<string, string | number | readonly string[] | null> = {
+  const desired: Record<string, CanarySeedValue> = {
     username: spec.handle,
     username_normalized: spec.handle,
     display_name: spec.displayName,
     bio: spec.bio,
+    is_public: true,
   };
   if (spec.artist) {
     desired.spotify_id = spec.artist.spotifyId;
@@ -118,7 +131,7 @@ export function planCanaryProfileUpdate(
       desired.avatar_url = artist.imageUrl;
     }
   }
-  const currentByColumn: Record<string, string | null> = {
+  const currentByColumn: Record<string, CanarySeedValue> = {
     username: current.username,
     username_normalized: current.username,
     display_name: current.displayName,
@@ -126,6 +139,7 @@ export function planCanaryProfileUpdate(
     spotify_id: current.spotifyId,
     spotify_url: current.spotifyUrl,
     avatar_url: current.avatarUrl,
+    is_public: current.isPublic,
   };
   const changed = Object.fromEntries(
     Object.entries(desired).filter(([k, v]) => currentByColumn[k] !== v)

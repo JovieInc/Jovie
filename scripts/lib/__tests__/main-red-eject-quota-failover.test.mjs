@@ -23,10 +23,10 @@ let fallbackViewerLogin = 'jovie-bot[bot]';
  * @typedef {{code: number, stdout: string, stderr: string}} GhResult
  */
 /** Router for backend calls made with the fallback credential. */
-/** @type {(line: string) => GhResult | Promise<GhResult>} */
+/** @type {(line: string) => GhResult} */
 let backendRoute = () => rateLimited;
 /** Router for gh() calls made with the fallback credential. */
-/** @type {(line: string) => GhResult | Promise<GhResult>} */
+/** @type {(line: string) => GhResult} */
 let ghRoutes = () => {
   throw new Error('unrouted gh call');
 };
@@ -42,23 +42,28 @@ vi.mock('../../../packages/api-client/gh.ts', () => ({
   }),
 }));
 
-vi.mock('../../merge-queue-backend.mjs', async importOriginal => {
-  const actual = /** @type {typeof import('../../merge-queue-backend.mjs')} */ (
+// Fake the process boundary, not the backend's exported factory: default
+// parameters inside the real module refer to its lexical createGhRunner.
+// Both primary and fallback therefore exercise the real runner and backend.
+vi.mock('node:child_process', async importOriginal => {
+  const actual = /** @type {typeof import('node:child_process')} */ (
     await importOriginal()
   );
   return {
     ...actual,
-    // Only the runner factory is faked; dequeuePullRequest and the real
-    // mutation-actor safety check run for real.
-    createGhRunner: vi.fn((options = {}) => async args => {
-      const env = options?.env ?? process.env;
-      const credential = env.GH_TOKEN ?? process.env.GH_TOKEN;
+    spawnSync: vi.fn((_command, args, options = {}) => {
+      const credential = options.env?.GH_TOKEN ?? process.env.GH_TOKEN;
       const line = args.join(' ');
       backendCalls.push({ credential, line });
-      if (credential === 'installation-token' && backendPrimaryExhausted)
-        return rateLimited;
-      if (credential === 'fallback-token') return backendRoute(line);
-      return { code: 1, stdout: '', stderr: `unknown credential` };
+      const result =
+        credential === 'installation-token' && backendPrimaryExhausted
+          ? rateLimited
+          : backendRoute(line);
+      return {
+        status: result.code,
+        stdout: result.stdout,
+        stderr: result.stderr,
+      };
     }),
   };
 });
@@ -227,15 +232,21 @@ describe('stuck-head dequeue under installation quota exhaustion (run 4122729902
     expect(backendCalls.some(c => c.line.includes('DequeuePullRequest'))).toBe(
       false
     );
-    // Only the incident write happened; no conflict pass, no re-enqueue.
-    const lines = writes().map(c => c.line);
-    expect(lines).toHaveLength(1);
-    expect(lines[0]).toContain('/issues -f');
-    expect(lines[0]).toContain('dequeue deferred');
+    // The incident POST is attempted on the exhausted primary and retried
+    // on fallback. Neither attempt performs labels or queue follow-up work.
+    const attempts = writes();
+    expect(attempts.map(c => c.credential)).toEqual([
+      'installation-token',
+      'fallback-token',
+    ]);
+    for (const attempt of attempts) {
+      expect(attempt.line).toContain('/issues -f');
+      expect(attempt.line).toContain('dequeue deferred');
+    }
   });
 
   it('defers when the fallback token bucket is exhausted too', async () => {
-    backendRoute = async () => rateLimited;
+    backendRoute = () => rateLimited;
     const out = await stuckHead({ doApply: true, now: NOW });
     expect(out).toMatchObject({ dequeued: false, deferred: true });
     const reason = /** @type {string} */ (
@@ -247,10 +258,45 @@ describe('stuck-head dequeue under installation quota exhaustion (run 4122729902
     );
   });
 
+  it('keeps the deferred result honest when incident reporting fails', async () => {
+    fallbackViewerLogin = 'github-actions[bot]';
+    const happyGh = ghRoutes;
+    ghRoutes = line =>
+      line.includes('/issues -f')
+        ? { code: 1, stdout: '', stderr: 'HTTP 403: Resource not accessible' }
+        : happyGh(line);
+    expect(await stuckHead({ doApply: true, now: NOW })).toMatchObject({
+      dequeued: false,
+      deferred: true,
+    });
+    expect(backendCalls.some(c => c.line.includes('DequeuePullRequest'))).toBe(
+      false
+    );
+    expect(writes().every(c => c.line.includes('/issues -f'))).toBe(true);
+  });
+
+  it('preserves an unrelated backend failure on the fallback credential', async () => {
+    backendRoute = () => ({
+      code: 1,
+      stdout: '',
+      stderr: 'HTTP 404: Not Found',
+    });
+    await expect(stuckHead({ doApply: true, now: NOW })).rejects.toMatchObject({
+      name: 'MergeQueueBackendError',
+      code: 'gh_command_failed',
+      details: { stderr: 'HTTP 404: Not Found' },
+    });
+    expect(backendCalls.map(c => c.credential)).toEqual([
+      'installation-token',
+      'fallback-token',
+    ]);
+    expect(writes()).toHaveLength(0);
+  });
+
   it('still throws (alert-failure path) when the failure is not installation quota exhaustion', async () => {
     primaryExhausted = false;
     backendPrimaryExhausted = false;
-    backendRoute = async () => ({
+    backendRoute = () => ({
       code: 1,
       stdout: '',
       stderr: 'HTTP 404: Not Found',
@@ -275,6 +321,89 @@ describe('stuck-head dequeue under installation quota exhaustion (run 4122729902
     expect(
       backendCalls.filter(c => c.line.includes('MergeQueueNativeMutationActor'))
     ).toHaveLength(1);
+  });
+
+  it('does not retry when the fallback is the primary credential', async () => {
+    primaryExhausted = false;
+    process.env.GH_FALLBACK_TOKEN = process.env.GH_TOKEN;
+    await expect(stuckHead({ doApply: true, now: NOW })).rejects.toMatchObject({
+      name: 'MergeQueueBackendError',
+      code: 'gh_command_failed',
+    });
+    expect(backendCalls).toHaveLength(1);
+    expect(writes()).toHaveLength(0);
+  });
+
+  it('keeps dry-run read-only even when the primary bucket is exhausted', async () => {
+    expect(await stuckHead({ doApply: false, now: NOW })).toMatchObject({
+      stuck: true,
+    });
+    expect(backendCalls).toHaveLength(0);
+    expect(writes()).toHaveLength(0);
+  });
+
+  it.each([
+    'API rate limit exceeded for user ID 123.',
+    'You have exceeded a secondary rate limit.',
+  ])('does not fail over for another quota class: %s', async stderr => {
+    primaryExhausted = false;
+    backendPrimaryExhausted = false;
+    backendRoute = () => ({ code: 1, stdout: '', stderr });
+    await expect(stuckHead({ doApply: true, now: NOW })).rejects.toMatchObject({
+      name: 'MergeQueueBackendError',
+      code: 'gh_command_failed',
+    });
+    expect(backendCalls).toHaveLength(1);
+    expect(writes()).toHaveLength(0);
+  });
+
+  it('does not retry or claim deferral when the primary mutation succeeded before its postcondition read exhausted', async () => {
+    primaryExhausted = false;
+    backendPrimaryExhausted = false;
+    let reads = 0;
+    backendRoute = line => {
+      if (line.includes('MergeQueueNativeMutationActor'))
+        return okJson({ data: { viewer: { login: 'jovie-bot[bot]' } } });
+      if (line.includes('MergeQueuePullRequestState'))
+        return ++reads === 1
+          ? okJson({ data: { repository: { pullRequest: queuedState } } })
+          : rateLimited;
+      if (line.includes('DequeuePullRequest')) return okJson({ data: {} });
+      throw new Error(`unrouted backend call: ${line}`);
+    };
+    await expect(stuckHead({ doApply: true, now: NOW })).rejects.toMatchObject({
+      name: 'MergeQueueBackendError',
+      code: 'gh_command_failed',
+    });
+    expect(
+      backendCalls.filter(c => c.line.includes('DequeuePullRequest'))
+    ).toHaveLength(1);
+    expect(backendCalls.every(c => c.credential === 'installation-token')).toBe(
+      true
+    );
+    expect(writes()).toHaveLength(0);
+  });
+
+  it('preserves uncertain fallback postcondition failures without claiming that nothing mutated', async () => {
+    let reads = 0;
+    backendRoute = line => {
+      if (line.includes('MergeQueueNativeMutationActor'))
+        return okJson({ data: { viewer: { login: 'jovie-bot[bot]' } } });
+      if (line.includes('MergeQueuePullRequestState'))
+        return ++reads === 1
+          ? okJson({ data: { repository: { pullRequest: queuedState } } })
+          : rateLimited;
+      if (line.includes('DequeuePullRequest')) return okJson({ data: {} });
+      throw new Error(`unrouted backend call: ${line}`);
+    };
+    await expect(stuckHead({ doApply: true, now: NOW })).rejects.toMatchObject({
+      name: 'MergeQueueBackendError',
+      code: 'gh_command_failed',
+    });
+    expect(
+      backendCalls.filter(c => c.line.includes('DequeuePullRequest'))
+    ).toHaveLength(1);
+    expect(writes()).toHaveLength(0);
   });
 
   it('keeps the single fast attempt when the primary token is healthy', async () => {

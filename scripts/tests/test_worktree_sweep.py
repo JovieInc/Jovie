@@ -150,6 +150,35 @@ class SweepTest(unittest.TestCase):
         self.assertTrue(first.exists())
         self.assertEqual(report["removed"], [])
 
+    def test_spent_budget_ends_the_phase_without_marking_a_drain(self):
+        # 2026-11-01: one unbounded phase starved the standalone reclaim, headroom alarm and report.
+        first = self.worktree("first")
+        state = self.base / "state"
+        state.mkdir()
+        clock = iter([0.0, 10_000.0, 10_001.0, 10_002.0, 10_003.0])
+        report = self.sweep(state=state, run=no_processes, budget_s=60, clock=lambda: next(clock))
+        self.assertTrue(report["budgetSpent"])
+        self.assertNotIn("drained", report)
+        self.assertTrue(first.exists())
+
+    def test_a_spent_budget_resumes_at_the_least_recently_visited_checkout(self):
+        # 2026-11-02: every interval restarted at the first repository and spent its budget there,
+        # so ~/Jovie's worktrees (~/wt, 334 GiB on root) were never reached.
+        first, second = self.worktree("first"), self.worktree("second")
+        state = self.base / "state"
+        state.mkdir()
+        visited = []
+
+        def one_unit_budget():
+            ticks = iter([0.0, 0.0, 0.0, 10_000.0, 10_000.0, 10_000.0, 10_000.0])
+            return lambda: next(ticks, 10_000.0)
+        with patch.object(sweeper, "retire", side_effect=lambda repo, path, *a, **k: visited.append(path.name)):
+            self.sweep(state=state, run=no_processes, budget_s=60, clock=one_unit_budget())
+            self.sweep(state=state, run=no_processes, budget_s=60, clock=one_unit_budget(), now=self.now + 60)
+        self.assertEqual(len(visited), 2)
+        self.assertEqual(set(visited), {"first", "second"})
+        self.assertTrue((state / sweeper.VISITS_FILE).exists())
+
     def test_clean_pushed_idle_worktree_is_removed_without_backup(self):
         path = self.worktree("clean")
         report = self.sweep()
@@ -760,8 +789,15 @@ class StandaloneAndHeadroomTest(unittest.TestCase):
 
     def test_default_roots_cover_the_ship_and_fleet_roots(self):
         roots = {str(r) for r in sweeper.default_roots(self.home, self.state)}
-        for rel in ("codex-worktrees", "grok-wt", "grok-ship-workspaces", "codex-ship-workspaces", "wt-*"):
+        for rel in ("codex-worktrees", "grok-wt", "grok-ship-workspaces", "codex-ship-workspaces", "wt-*", "wt"):
             self.assertIn(str(self.home / rel), roots)
+
+    def test_agent_worktrees_under_home_wt_are_in_scope_and_the_primary_clone_is_not(self):
+        roots = sweeper.default_roots(self.home, self.state)
+        never = sweeper.default_never(self.home)
+        self.assertTrue(sweeper.in_scope(self.home / "wt" / "fix-thing", roots, never))
+        self.assertFalse(sweeper.in_scope(self.home / "Jovie", roots, never))
+        self.assertIn((self.home, "wt/*"), sweeper.standalone_globs(self.home, self.state))
 
     def test_headroom_levels_and_alarm_events_on_change(self):
         usage = {Path("/a"): (100, 0, 20), Path("/b"): (100, 0, 25), Path("/c"): (100, 0, 10), Path("/d"): (100, 0, 60)}

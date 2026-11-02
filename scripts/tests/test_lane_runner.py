@@ -4968,6 +4968,41 @@ class OversizeDiffExitTest(unittest.TestCase):
 
 
 class RunAgentTest(unittest.TestCase):
+    def test_failed_tracked_stop_still_kills_the_group_and_reports_the_timeout(self):
+        # Gem 2026-10-29: a gate-command trufflehog outlived `--timeout 600` for 2d17h because a
+        # failed tracked-descendant stop replaced the timeout with a permanent cleanup hold.
+        marker = Path(tempfile.mkdtemp()) / "pids"
+        script = f"sleep 300 & echo $! > {marker}; wait"
+        with patch.object(lane.AgentProcesses, "stop", side_effect=RuntimeError("owned-processes-still-running")):
+            with self.assertRaises(subprocess.TimeoutExpired):
+                lane.run_agent(["sh", "-c", script], Path("."), None, timeout=1, guard_interval=.1)
+        child = int(marker.read_text())
+        time.sleep(.2)
+        with self.assertRaises(ProcessLookupError):
+            os.kill(child, 0)
+
+    def test_held_cleanup_retry_releases_only_after_the_tree_drains(self):
+        proc = subprocess.Popen(["sleep", "300"], start_new_session=True)
+        owned = lane.AgentProcesses(proc.pid)
+        owned.observe()
+        with patch.object(lane, "_HELD_CLEANUP", [owned, proc]):
+            self.assertTrue(lane.retry_held_cleanup())
+        self.assertIsNotNone(proc.poll())
+        with patch.object(lane, "_HELD_CLEANUP", []):
+            self.assertFalse(lane.retry_held_cleanup())
+
+    def test_gate_command_timeout_kills_a_term_ignoring_descendant(self):
+        marker = Path(tempfile.mkdtemp()) / "pids"
+        script = f"trap '' TERM; sleep 300 & echo $! > {marker}; wait"
+        started = time.monotonic()
+        result = subprocess.run([sys.executable, str(Path(lane.__file__).resolve()), "gate-command",
+                                 "--timeout", "1", "--", "sh", "-c", script], timeout=60,
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 124)
+        self.assertLess(time.monotonic() - started, 45)
+        with self.assertRaises(ProcessLookupError):
+            os.kill(int(marker.read_text()), 0)
+
     def test_cancellation_does_not_signal_a_reused_root_process_group(self):
         original = {10: (1, 10, "S", "original")}
         reused = {10: (1, 10, "S", "replacement"), 11: (10, 10, "S", "unrelated")}
@@ -8445,6 +8480,24 @@ class FixRedTest(unittest.TestCase):
         self.assertEqual(calls, [])
         self.assertEqual(linear.moves, [])
         self.assertEqual(linear.comments, [])
+
+    def test_escalation_probes_each_provider_health_once_per_pass(self):
+        prs = [{**self.pr(number=n), "mergeStateStatus": "DIRTY"} for n in (7, 8, 9)]
+        attempts = {str(n): {"sha": "h1", "count": lane.MAX_FIX_ATTEMPTS, "lane": "devin", "at": 1, "endedAt": 2}
+                    for n in (7, 8, 9)}
+        providers = {"devin": {"enabled": True, "tier": 0}, "codex": {"enabled": True, "tier": 1}}
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.dict(os.environ, {"LANES_ESCALATION": "1", "LANES_ESCALATION_STUCK_PRS": "1"}), \
+                patch.object(lane, "load_providers", return_value=providers), \
+                patch.object(lane, "provider_healthy", return_value=True) as healthy, \
+                patch.object(lane, "sh", side_effect=AssertionError("unexpected external mutation")), \
+                patch.object(lane.pr_events, "add_label", return_value=True), \
+                patch.object(lane.pr_events, "sync_main", return_value="sync-failed"):
+            host = lane.Host(state=Path(tmp))
+            (host.state / "fix-attempts.json").write_text(json.dumps(attempts))
+            lane.escalate_exhausted(host, prs, FakeLinear([]))
+        probed = [call.args[0] for call in healthy.call_args_list]
+        self.assertLessEqual(len(probed), len(providers), f"one probe per provider per pass, got {len(probed)}")
 
     def test_unknown_merge_state_waits_then_rebases_before_stronger_lane(self):
         stuck = {**self.pr(number=7), "mergeStateStatus": "UNKNOWN"}
@@ -12933,6 +12986,7 @@ with open(os.environ['INSTALL_COMMAND_LOG'], 'a') as log:
                     self.assertIn("factory_watchdog.py", watchdog_service)
                     self.assertNotIn("After=jovie-lanes.service", watchdog_service)
                     self.assertIn("OnUnitActiveSec=60s", watchdog_timer)
+                    self.assertIn("OnCalendar=minutely", watchdog_timer)
                 self.assertEqual(timer_path.split(":")[0], str(bin_dir))
                 if with_gbrain:
                     self.assertEqual(shutil.which("gbrain", path=timer_path), str(brain))
@@ -15566,6 +15620,12 @@ class RepositoryBindingTest(unittest.TestCase):
         # LYB 2026-10-12: a queued PR is never re-enqueued (it would go to the back), whoever queued it.
         self.assertEqual([(kind, pr["number"]) for kind, pr in actions],
                          [("enqueue", 3), ("ready", 5), ("rebase", 8)])
+
+    def test_a_compounding_pr_is_left_to_green_enroll_for_its_jump(self):
+        # 2026-11-01: a plain lane enqueue of #24141 beat green enroll's compounding jump.
+        rows = [self.row(3, labels=["compounding"]), self.row(4, labels=["Compounding"]), self.row(5)]
+        actions = lane.bindings.maintenance_actions(self.binding, rows, time.time())
+        self.assertEqual([(kind, pr["number"]) for kind, pr in actions], [("enqueue", 5)])
 
     def test_maintain_writes_once_per_head_and_retries_a_failed_write_later(self):
         (self.host.state / "bindings" / "LYB").mkdir(parents=True)
