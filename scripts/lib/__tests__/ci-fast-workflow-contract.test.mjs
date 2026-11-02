@@ -115,6 +115,11 @@ function jobBlock(jobId, nextJobId) {
   return WORKFLOW.slice(start, end);
 }
 
+/**
+ * @typedef {{run?: string, uses?: string, if?: string | boolean,
+ *   with?: {'go-version'?: string, cache?: boolean}}} ActionlintWorkflowStep
+ * @typedef {{jobs: Record<string, {steps?: ActionlintWorkflowStep[]}>}} ActionlintWorkflow
+ */
 function assertActionlintCompiler(steps) {
   const lintIndex = steps.findIndex(step =>
     step.run?.includes('bash .github/scripts/run-actionlint.sh')
@@ -2686,7 +2691,7 @@ describe('ci-fast bounded parallel workflow', () => {
       if (!/\.ya?ml$/.test(file)) continue;
       const source = readFileSync(join(workflowsDir, file), 'utf8');
       if (!source.includes('bash .github/scripts/run-actionlint.sh')) continue;
-      const workflow = loadYaml(source);
+      const workflow = /** @type {ActionlintWorkflow} */ (loadYaml(source));
       for (const [jobId, job] of Object.entries(workflow.jobs)) {
         if (
           !job.steps?.some(step =>
@@ -2714,9 +2719,8 @@ describe('ci-fast bounded parallel workflow', () => {
     'implicit dependency cache',
     'different condition',
   ])('rejects an actionlint compiler prerequisite with %s', fault => {
-    const steps = structuredClone(
-      loadYaml(WORKFLOW).jobs['ci-fast-remaining'].steps
-    );
+    const workflow = /** @type {ActionlintWorkflow} */ (loadYaml(WORKFLOW));
+    const steps = structuredClone(workflow.jobs['ci-fast-remaining'].steps);
     const setupIndex = steps.findIndex(step =>
       step.uses?.startsWith('actions/setup-go@')
     );
