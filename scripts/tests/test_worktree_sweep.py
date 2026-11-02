@@ -771,8 +771,15 @@ class StandaloneAndHeadroomTest(unittest.TestCase):
 
     def test_default_roots_cover_the_ship_and_fleet_roots(self):
         roots = {str(r) for r in sweeper.default_roots(self.home, self.state)}
-        for rel in ("codex-worktrees", "grok-wt", "grok-ship-workspaces", "codex-ship-workspaces", "wt-*"):
+        for rel in ("codex-worktrees", "grok-wt", "grok-ship-workspaces", "codex-ship-workspaces", "wt-*", "wt"):
             self.assertIn(str(self.home / rel), roots)
+
+    def test_agent_worktrees_under_home_wt_are_in_scope_and_the_primary_clone_is_not(self):
+        roots = sweeper.default_roots(self.home, self.state)
+        never = sweeper.default_never(self.home)
+        self.assertTrue(sweeper.in_scope(self.home / "wt" / "fix-thing", roots, never))
+        self.assertFalse(sweeper.in_scope(self.home / "Jovie", roots, never))
+        self.assertIn((self.home, "wt/*"), sweeper.standalone_globs(self.home, self.state))
 
     def test_headroom_levels_and_alarm_events_on_change(self):
         usage = {Path("/a"): (100, 0, 20), Path("/b"): (100, 0, 25), Path("/c"): (100, 0, 10), Path("/d"): (100, 0, 60)}
