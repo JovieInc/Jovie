@@ -27,6 +27,7 @@ class ClassifyTest(unittest.TestCase):
             "Error: apps/web/app/(marketing)/pricing/page.tsx: source changed; renew certification evidence": ("census-certification", "sync-main"),
             "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "atomic-write"),
             "red-before-green: include Failing command:": ("pr-body", "agent"),
+            "locked-areas: cite GBrain: <slug/page> or Locking PR: #<number> in Locked areas for apps/web/typecheck-tests-baseline.json.": ("baseline-lock", "cite-baseline-lock"),
             "AssertionError: expected 1": ("other", "agent"),
         }
         for log, (cls, action) in cases.items():
@@ -83,6 +84,31 @@ class ClassifyTest(unittest.TestCase):
         self.assertEqual(once.count("customer-changelog/v1"), 1)
         self.assertIsNone(classes.stamp_internal_changelog(once))
         self.assertEqual(classes.stamp_internal_changelog(""), classes.INTERNAL_CHANGELOG_NOTE + "\n")
+
+    def test_sole_typecheck_baseline_lock_cites_16597_and_a_second_path_does_not(self):
+        sole = (
+            "##[error]red-before-green: include Failing command: plus a red-output fence\n"
+            "##[error]locked-areas: cite GBrain: <slug/page> or Locking PR: #<number> "
+            "in Locked areas for apps/web/typecheck-tests-baseline.json. "
+            'Add to the PR body: "## Locked areas\\nGBrain: design/design-operating-system".'
+        )
+        extra = sole.replace(
+            "apps/web/typecheck-tests-baseline.json.",
+            "apps/web/typecheck-tests-baseline.json, apps/web/ui-feel-ratchet.baseline.json.",
+        )
+        later = (
+            "locked-areas: cite GBrain: <slug/page> or Locking PR: #<number> in Locked areas for "
+            "apps/web/ui-feel-ratchet.baseline.json, apps/web/typecheck-tests-baseline.json."
+        )
+        got = classes.classify(pr("Fleet Rules Evidence"), {"Fleet Rules Evidence": sole})
+        self.assertEqual((got["cls"], got["action"]), ("baseline-lock", "cite-baseline-lock"))
+        self.assertEqual(classes.baseline_locking_pr(sole), 16597)
+        self.assertIsNone(classes.baseline_locking_pr(extra))
+        self.assertIsNone(classes.baseline_locking_pr(later))
+        self.assertIsNone(classes.baseline_locking_pr(""))
+        other = classes.classify(pr("Fleet Rules Evidence"), {"Fleet Rules Evidence": extra})
+        self.assertEqual(other["action"], "agent")
+        self.assertNotEqual(other["cls"], "baseline-lock")
 
     def test_key_ignores_volatile_numbers_but_separates_failures(self):
         a = classes.classify(pr("T"), {"T": "AssertionError: expected 12 to equal 3"})
