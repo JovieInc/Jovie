@@ -710,6 +710,17 @@ class JudgeTest(unittest.TestCase):
         self.assertNotIn("provider-idle:codex", doctor.judge(
             obs(**idle), {"providerIdleSince": {"codex": 1_000_000.0 - doctor.PROVIDER_IDLE_S + 1}}))
 
+    def test_intake_closed_by_policy_is_not_an_idle_provider(self):
+        idle = {"tick": {"at": "x", "unhealthy": [], "error": None, "spawned": ["hyperagent"]},
+                "poolByProvider": {"hyperagent": 151},
+                "capacityByProvider": {"hyperagent": {"running": 0, "slots": 1}}}
+        previous = {"providerIdleSince": {"hyperagent": 1_000_000.0 - doctor.PROVIDER_IDLE_S - 1}}
+        held = {"lanes": {"hyperagent": {"intakeEffective": 0, "intakeBlockers": ["wip-cap"]}}}
+        self.assertNotIn("provider-idle:hyperagent", doctor.judge(obs(**idle, autoscale=held), previous))
+        self.assertFalse(doctor.provider_idle_with_qualified_work(obs(**idle, autoscale=held), "hyperagent"))
+        open_intake = {"lanes": {"hyperagent": {"intakeEffective": 1, "intakeBlockers": []}}}
+        self.assertIn("provider-idle:hyperagent", doctor.judge(obs(**idle, autoscale=open_intake), previous))
+
     def test_unhealthy_provider_is_named_without_false_idle_recovery(self):
         observed = obs(tick={"at": "x", "unhealthy": ["devin"], "error": None,
                              "spawned": ["devin"] * 4},
