@@ -3,6 +3,7 @@ import 'server-only';
 import { isNull } from 'drizzle-orm';
 import { cookies } from 'next/headers';
 import { db } from '@/lib/db';
+import { isUniqueViolation } from '@/lib/db/errors';
 import { acquisitionJourneys } from '@/lib/db/schema/acquisition';
 import { captureError } from '@/lib/error-tracking';
 import {
@@ -70,6 +71,12 @@ export async function attachFirstTouchReceipt(
 
     return rows.length > 0;
   } catch (error) {
+    if (isUniqueViolation(error, 'acquisition_journeys_user_id_unique')) {
+      // The user already has a receipt under a different journey id
+      // (returning user, extra device, mobile + web). Repeat activation is a
+      // documented idempotent no-op, not a persistence failure.
+      return false;
+    }
     await captureError('Failed to attach first-touch receipt', error, {
       route: 'lib/acquisition/activation-receipt',
       contextData: { appUserId },
