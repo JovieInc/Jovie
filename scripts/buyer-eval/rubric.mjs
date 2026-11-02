@@ -66,6 +66,14 @@ export const ARCHETYPES = Object.freeze([
       'Artist with 15k monthly listeners who has paid for two link-in-bio and pre-save tools and saw no measurable lift. Distrusts AI hype and fake urgency. Converts only on concrete proof about their own career, shown before paying.',
   },
   {
+    // Tim 2026-11-02: "im not gonna be able to get the bands to do this til
+    // the product is pretty". Certification needs this buyer too (gate.mjs
+    // REQUIRED_PERSONAS, ratcheted).
+    id: 'heritage-rock-manager',
+    brief:
+      'Tour and artist manager for a multi-platinum heritage rock band (catalog from the 1970s to now, millions of monthly listeners, arena tours, a label and a business manager). Answers to the band members, who are protective of their brand. Budget is not the constraint: any tool shown to the band must look premium and polished, be trustworthy with their catalog and fans, and never look cheap, broken, generic or unfinished. One rough edge means it never gets shown to the band.',
+  },
+  {
     id: 'control-link-in-bio',
     control: true,
     brief:
