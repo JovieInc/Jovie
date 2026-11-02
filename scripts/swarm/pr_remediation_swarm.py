@@ -398,6 +398,11 @@ REGEN = (
 )
 # Classes a model cannot fix by editing files in the checkout.
 NOT_MODEL_FIXABLE = frozenset({"pr-body"})
+# Fixers the lanes runner owns. The swarm must not claim these and then leave them for a model.
+LANES_OWNED = frozenset({
+    classes.RENUMBER, classes.REGISTER_DOMAIN, classes.REPAIR_EVIDENCE,
+    classes.APPLY_DETERMINISTIC, classes.SNAP_SPACING,
+})
 GATE_SKIPS = frozenset({"ci-running", "no-failing-checks", "no-concrete-error", "already-handled-sha",
                         "deterministic-unsupported->lanes", "not-model-fixable->lanes", "sensitive-paths->codex",
                         "model-budget-closed", "attempt-cap->lanes"})
@@ -436,7 +441,7 @@ def prepare_red(a, plan: dict, pr: dict) -> int:
     if regen and action == classes.AGENT:
         plan.update(action="regen", regen=regen, cls="regen")
         action = "regen"
-    elif action in {classes.RENUMBER, classes.REGISTER_DOMAIN}:
+    elif action in LANES_OWNED:
         skip = "deterministic-unsupported->lanes"
     elif action == classes.AGENT:
         if cls["cls"] in NOT_MODEL_FIXABLE:

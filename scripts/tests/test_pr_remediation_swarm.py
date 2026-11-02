@@ -57,6 +57,11 @@ class SwarmPolicyTest(unittest.TestCase):
         self.assertEqual((plan["fix"], c["claim"], c["rerun"]), ("rerun-failed-jobs", 1, 1))
         plan, c = self._gate(red, False, "generated workflow DAG is stale; run pnpm ci:topology:write\n::error::x")
         self.assertEqual((plan["action"], plan["regen"], c["claim"]), ("regen", "pnpm ci:topology:write", 1))
+        fleet = [{"name": "PR Fleet Rules", "conclusion": "failure", "id": 2}]
+        plan, c = self._gate(fleet, False, "red-before-green: include Failing command:\n::error::x")
+        self.assertEqual((plan["reason"], c["claim"]), ("deterministic-unsupported->lanes", 0))
+        plan, c = self._gate(red, False, "AssertionError: off-grid 10px/14px spacing steps (*-2.5, *-3.5) grew: 591 > baseline 590.\n::error::x")
+        self.assertEqual((plan["reason"], c["claim"]), ("deterministic-unsupported->lanes", 0))
 
     def test_launch_shepherd_prs_are_excluded(self):
         self.assertTrue({23495, 23519} <= swarm.EXCLUDED)

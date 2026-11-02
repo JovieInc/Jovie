@@ -7154,6 +7154,72 @@ def snap_spacing_fix(host: Host, pr: dict, route: dict, worktree: Path, log, rec
     return types.SimpleNamespace(returncode=0)
 
 
+def repair_evidence_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """Fill Red-before-green from the failing check URL. A section that is already complete
+    is success and does not call GitHub, so a later fixer in the same head still runs."""
+    del host, route, worktree, log
+    body = pr.get("body") if isinstance(pr.get("body"), str) else ""
+    if pr_events.red_section_complete(body):
+        receipt["evidence"] = "evidence-already-complete"
+        return types.SimpleNamespace(returncode=0)
+    if pr_events.ensure_red_before_green(pr, ""):
+        receipt["evidence"] = "repair-evidence"
+        return types.SimpleNamespace(returncode=0)
+    return None
+
+
+def fix_red_fixers():
+    """Worktree fixers a classified action can run without a model. Rerun, sync-main and
+    stamp-changelog are decided before checkout and are not in this map."""
+    return {
+        fix_red_classes.WIRE_CI_FAST: wire_ci_fast_fix,
+        fix_red_classes.ATOMIC_WRITE: atomic_state_fix,
+        fix_red_classes.RENUMBER: renumber_migrations_fix,
+        fix_red_classes.SNAP_SPACING: snap_spacing_fix,
+        fix_red_classes.MERGE_NARROWED: merge_narrowed_preflight_fix,
+        fix_red_classes.REGISTER_DOMAIN: register_domain_writes_fix,
+        fix_red_classes.REPAIR_EVIDENCE: repair_evidence_fix,
+    }
+
+
+def apply_deterministic_fixes(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """Run every deterministic fixer for this head, in check-name order. An action this map
+    cannot run, or a fixer that does not apply, returns None so the model still gets the head.
+    A complete repair-evidence section returns success, which keeps the following snap alive."""
+    actions = list((route or {}).get("actions") or [])
+    fixers = fix_red_fixers()
+    if not actions or any(action not in fixers for action in actions):
+        return None
+    agent = None
+    for action in actions:
+        agent = fixers[action](host, pr, route, worktree, log, receipt)
+        if agent is None:
+            return None
+    snapped = receipt.get("snappedFiles")
+    receipt["resolution"] = "apply-deterministic"
+    receipt["appliedActions"] = actions
+    if snapped:
+        receipt["snappedFiles"] = snapped
+    return agent
+
+
+def best_effort_spacing_snap(host: Host, pr: dict, worktree: Path, log, receipt: dict, resolution: str) -> None:
+    """After a conflict merge commits, origin/main...HEAD matches the tree, so the spacing
+    snap can see added utilities. A no-op leaves the conflict resolution in place. Unknown
+    hunks never reach here: a resolver that does not apply falls through to the model."""
+    try:
+        snapped = snap_spacing_fix(host, pr, {}, worktree, log, receipt)
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+        snapped = None
+    files = receipt.get("snappedFiles") if snapped else None
+    receipt["resolution"] = resolution
+    if files:
+        receipt["snappedFiles"] = files
+        receipt["spacingSnap"] = "snapped-spacing"
+    else:
+        receipt.pop("snappedFiles", None)
+
+
 def claim_route(host: Host, pr: dict, action: str) -> bool:
     """True once per (PR, head, action): a deterministic route is tried once, then the model gets the head."""
     taken = []
@@ -8165,6 +8231,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             agent = None
             if resolved_name:
                 receipt.update(resolution=resolved_name)
+                best_effort_spacing_snap(host, pr, worktree, log, receipt, resolved_name)
             else:
                 boundary("before-install")
                 install_dependencies(host, worktree, log)
@@ -8186,12 +8253,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 boundary("before-agent")
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 1, "mutations": 1}, coordination=coordination, boundary_id="repair-dispatch")
-                fixer = {fix_red_classes.WIRE_CI_FAST: wire_ci_fast_fix,
-                         fix_red_classes.ATOMIC_WRITE: atomic_state_fix,
-                         fix_red_classes.RENUMBER: renumber_migrations_fix,
-                         fix_red_classes.SNAP_SPACING: snap_spacing_fix,
-                         fix_red_classes.MERGE_NARROWED: merge_narrowed_preflight_fix,
-                         fix_red_classes.REGISTER_DOMAIN: register_domain_writes_fix}.get((route or {}).get("action"))
+                action = (route or {}).get("action")
+                fixer = apply_deterministic_fixes if action == fix_red_classes.APPLY_DETERMINISTIC else fix_red_fixers().get(action)
                 agent = fixer(host, pr, route, worktree, log, receipt) if fixer else None
                 agent = agent or run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree),

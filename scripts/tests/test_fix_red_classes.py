@@ -26,7 +26,7 @@ class ClassifyTest(unittest.TestCase):
             "AssertionError: off-grid 10px/14px spacing steps (*-2.5, *-3.5) grew: 591 > baseline 590.": ("spacing-scale", "snap-spacing"),
             "Error: apps/web/app/(marketing)/pricing/page.tsx: source changed; renew certification evidence": ("census-certification", "sync-main"),
             "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "atomic-write"),
-            "red-before-green: include Failing command:": ("pr-body", "agent"),
+            "red-before-green: include Failing command:": ("pr-body", "repair-evidence"),
             "AssertionError: expected 1": ("other", "agent"),
         }
         for log, (cls, action) in cases.items():
@@ -46,6 +46,28 @@ class ClassifyTest(unittest.TestCase):
         self.assertEqual((behind["cls"], behind["action"]), ("stale-branch", "sync-main"))
         still = classes.classify(pr("A", merge="BEHIND"), {"A": "API rate limit exceeded"})
         self.assertEqual(still["action"], "rerun", "a deterministic log outranks the stale-branch default")
+
+    def test_all_deterministic_actions_skip_the_model(self):
+        spacing = "AssertionError: off-grid 10px/14px spacing steps (*-2.5, *-3.5) grew: 591 > baseline 590."
+        fleet = "red-before-green: include Failing command:"
+        got = classes.classify(pr("PR Fleet Rules", "Source Validation"), {
+            "PR Fleet Rules": fleet,
+            "Source Validation": spacing,
+        })
+        self.assertEqual((got["cls"], got["action"]), ("deterministic", "apply-deterministic"))
+        self.assertEqual(got["actions"], ["repair-evidence", "snap-spacing"])
+        behind = classes.classify(pr("PR Fleet Rules", "Source Validation", merge="BEHIND"), {
+            "PR Fleet Rules": fleet,
+            "Source Validation": spacing,
+        })
+        self.assertEqual((behind["cls"], behind["action"]), ("deterministic", "apply-deterministic"))
+        self.assertEqual(behind["actions"], ["repair-evidence", "snap-spacing"])
+        needs_model = classes.classify(pr("PR Fleet Rules", "Source Validation"), {
+            "PR Fleet Rules": fleet,
+            "Source Validation": "AssertionError: expected 1",
+        })
+        self.assertEqual((needs_model["cls"], needs_model["action"]), ("mixed", "agent"))
+        self.assertNotIn("actions", needs_model)
 
     def test_stale_census_certification_syncs_main_while_checks_block_the_branch(self):
         log = (
