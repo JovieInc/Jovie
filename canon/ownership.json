@@ -86,6 +86,7 @@
     {"id": "workflow:pr-fleet-rules", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pr-fleet-rules.yml"},
     {"id": "workflow:pr-preparation-canary", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pr-preparation-canary.yml"},
     {"id": "workflow:pr-review-learn", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pr-review-learn.yml", "note": "Workflow header names Tim as accountable writer; the routine owner is the agent role here."},
+    {"id": "workflow:public-app-certification", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/public-app-certification.yml"},
     {"id": "workflow:pen-still-diff", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pen-still-diff.yml"},
     {"id": "workflow:pen-token-parity", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pen-token-parity.yml"},
     {"id": "workflow:pr-review", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pr-review.yml", "note": "Workflow header names Tim as accountable writer; the routine owner is the agent role here."},
