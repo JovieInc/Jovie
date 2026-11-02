@@ -186,6 +186,9 @@ def tick_one(state_dir: Path, clock: Clock, run, now: float) -> dict:
             result = observe(run, now, clock)
         except (OSError, subprocess.SubprocessError, ValueError, TypeError, KeyError, AttributeError, RuntimeError) as error:
             result = {"status": "failed", "error": type(error).__name__}
+            # A failed observation is not evidence of a fresh invocation. Keep
+            # short clocks bounded by their cadence, and retry long ones soon.
+            state["nextAttemptAt"] = now + min(clock.interval_s, UNCERTAIN_S)
         if result["status"] == "overdue":
             state.update(nextAttemptAt=now + UNCERTAIN_S,
                          lastResult={"status": "dispatch-uncertain", "requestedAt": now})
