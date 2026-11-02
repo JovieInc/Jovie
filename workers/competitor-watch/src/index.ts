@@ -280,7 +280,14 @@ export default {
 
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
-    if (url.pathname === '/health') return json({ ok: true });
+    if (url.pathname === '/health') {
+      const last = await env.DB.prepare(
+        'SELECT MAX(last_checked_at) AS at FROM source_state'
+      )
+        .first<{ at: string | null }>()
+        .catch(() => null);
+      return json({ ok: true, last_cron_at: last?.at ?? null });
+    }
     if (!authed(req, env)) return json({ error: 'unauthorized' }, 401);
 
     if (url.pathname === '/run' && req.method === 'POST') {
