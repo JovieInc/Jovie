@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildClaimVerificationRequest,
+  buildSelfServeClaimProof,
   CLAIM_VERIFICATION_REACH_THRESHOLD,
   CLAIM_VERIFICATION_SETTINGS_KEY,
   claimVerificationPendingMessage,
@@ -223,5 +224,67 @@ describe('isProofBlockingPublication', () => {
 
   it('records proofOnly on the request so it survives any waitlist write', () => {
     expect(proof('pending_verification').proofOnly).toBe(true);
+  });
+});
+
+describe('self-serve claim proof (Tim, 2026-11-02)', () => {
+  const proofCode = 'jovie-verify-abcdefghjk';
+  const selfServe = (settings: unknown, spotifyArtistId = 'small_artist') =>
+    buildSelfServeClaimProof({
+      settings,
+      spotifyArtistId,
+      artistName: 'Small Artist',
+      followers: null,
+      proofCode,
+      now,
+    });
+
+  it('creates a proof-only pending request that blocks publication', () => {
+    const record = selfServe({});
+    expect(record).toMatchObject({
+      status: 'pending_verification',
+      proofOnly: true,
+      proofCode,
+      spotifyArtistId: 'small_artist',
+      paidAt: null,
+      requestedAt: now.toISOString(),
+      reach: { value: 0 },
+    });
+    expect(isProofBlockingPublication(withClaimVerification({}, record!))).toBe(
+      true
+    );
+  });
+
+  it('keeps an open proof-only request as it is', () => {
+    const settings = withClaimVerification({}, selfServe({})!);
+    expect(selfServe(settings)).toBeNull();
+    expect(selfServe(settings, 'other_artist')).toBeNull();
+  });
+
+  it('keeps a verified record for the same artist, gates a new one', () => {
+    const verified = decideClaimVerificationRecord(selfServe({}), {
+      decision: 'approve',
+      decidedAt: paidAt,
+      decidedBy: 'operator',
+    })!;
+    const settings = withClaimVerification({}, verified);
+    expect(selfServe(settings)).toBeNull();
+    expect(selfServe(settings, 'other_artist')).toMatchObject({
+      spotifyArtistId: 'other_artist',
+      status: 'pending_verification',
+      proofOnly: true,
+    });
+  });
+
+  it('turns an open paid request proof-only without losing the payment', () => {
+    const paid = request(true);
+    const record = selfServe(withClaimVerification({}, paid), 'other_artist');
+    expect(record).toMatchObject({
+      spotifyArtistId: paid.spotifyArtistId,
+      status: 'pending_verification',
+      paidAt: paid.paidAt,
+      proofOnly: true,
+      proofCode,
+    });
   });
 });

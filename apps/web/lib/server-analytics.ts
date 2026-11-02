@@ -234,6 +234,11 @@ export const SERVER_ANALYTICS_EVENTS = {
     properties: ['profileId', 'source'],
     source: { property: 'profileId', type: 'creator_profile' },
   },
+  claim_private_created: {
+    category: 'funnel',
+    properties: ['profileId', 'source', 'requestedAtMs'],
+    source: { property: 'profileId', type: 'creator_profile' },
+  },
   signup_completed: {
     category: 'funnel',
     properties: ['profileId', 'source'],
@@ -404,6 +409,11 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
     path: 'app/onboarding/actions/index.ts',
     invocations: 0,
     events: ['claim_completed', 'signup_completed', 'activation_achieved'],
+  },
+  {
+    path: 'lib/claim/self-serve-claim-proof.server.ts',
+    invocations: 0,
+    events: ['claim_private_created'],
   },
   {
     path: 'lib/onboarding/catalog-import.server.ts',
@@ -867,13 +877,6 @@ export async function trackServerEvent(
 }
 
 /**
- * Emit a server analytics event inside an existing transaction so the
- * business state write and its measurement commit atomically. Use this for
- * revenue-critical transitions (claim/signup/activation) where a post-commit
- * emission could permanently lose the event. A duplicate `eventIdentity`
- * deduplicates instead of throwing.
- */
-/**
  * Best-effort transaction-scoped statement_timeout guard (JOV-8761).
  *
  * Returns the caller's previous timeout when the guard was applied, or null
@@ -940,6 +943,10 @@ async function restoreServerAnalyticsTimeout(
   }
 }
 
+/**
+ * Emit inside an existing transaction so a revenue-critical business write and
+ * its measurement commit atomically. A duplicate `eventIdentity` deduplicates.
+ */
 export async function trackServerEventTx(
   tx: DbOrTransaction,
   event: string,
