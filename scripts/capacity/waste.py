@@ -245,12 +245,30 @@ def col_fleet() -> dict:
     return out
 
 
+SUMMER_CRITIC_URL = "https://summer.jov.ie/runtime/v1/summer-turn-critic"
+
+
+def col_summer(opener=urllib.request.urlopen) -> dict:
+    """Summer self-review (summer-config #385): failure rate per turn and per class from the public
+    numbers-only critic route. Unreachable or no sweep yet means GAP, never zero."""
+    try:
+        with opener(urllib.request.Request(SUMMER_CRITIC_URL, headers={"accept": "application/json"}), timeout=10) as r:
+            sweep = (json.loads(r.read()) or {}).get("sweep") or {}
+    except (OSError, ValueError):
+        return {}
+    if not sweep.get("turns"):
+        return {}
+    rate = sweep.get("rateByClass") or {}
+    return {"turnFailureRate": sweep.get("failureRate"), "noiseToTimRate": rate.get("noise-to-tim"),
+            "missedIncidents": sweep.get("missedIncidents")}
+
+
 def collect_all(reg: dict) -> dict:
     gh = col_github()
     gw = col_gateway()
     inputs = reg.get("inputs", {})
     data = {"fleet": col_fleet(), "github": gh, "ci": col_ci(gh.get("merged7d")), "pr": col_pr_gates(), "gateway": gw, "storage": col_storage(),
-            "debt": col_debt(), "money": col_money(inputs, gh.get("merged7d"), gw),
+            "debt": col_debt(), "money": col_money(inputs, gh.get("merged7d"), gw), "summer": col_summer(),
             "inputs": {"activeUsers": inputs.get("activeUsers", {}).get("value")}}
     data["llm"] = {"gatewayUsdPerMergedPr": data["money"].get("gatewayUsdPerMergedPr")}
     return data
