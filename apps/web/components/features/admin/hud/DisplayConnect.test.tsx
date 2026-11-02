@@ -34,11 +34,15 @@ describe('DisplayConnect', () => {
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe('/api/ovie/display/session');
     expect(init.method).toBe('POST');
-    expect(JSON.parse(init.body)).toEqual({
+    const body = JSON.parse(init.body);
+    expect(body).toMatchObject({
       device: 'air-office',
       ts: 1_800_000_000,
       proof: 'ab'.repeat(32),
     });
+    expect(body.attempt).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    );
   });
 
   it('a failed connect falls back to /display so an existing valid session keeps the wall up', async () => {
@@ -78,6 +82,27 @@ describe('DisplayConnect', () => {
     expect(replace).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1_000);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(replace).toHaveBeenCalledWith('/display');
+    vi.useRealTimers();
+  });
+
+  it('retries a dropped response with the same attempt id', async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError('network'))
+      .mockResolvedValueOnce({ ok: true, status: 200 });
+    vi.stubGlobal('fetch', fetchMock);
+    setLocation(`#${PROOF}`);
+    render(<DisplayConnect />);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(replace).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const first = JSON.parse(fetchMock.mock.calls[0]![1].body);
+    const second = JSON.parse(fetchMock.mock.calls[1]![1].body);
+    expect(second.attempt).toBe(first.attempt);
     expect(replace).toHaveBeenCalledWith('/display');
     vi.useRealTimers();
   });

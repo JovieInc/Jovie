@@ -17,9 +17,11 @@ export function DisplayConnectView({ failed }: Readonly<{ failed: boolean }>) {
 /**
  * Sign-in for the office display. The proof arrives in the URL fragment (never
  * sent to a server or written to access logs); this strips it from the address
- * bar and history, POSTs it, and moves on to /display. A 503 or a network error
- * (the session store blipped) is retried with backoff while the proof is still
- * valid. Any other failure falls back to /display, which shows Home if this
+ * bar and history, POSTs it with one attempt id for this page load, and moves
+ * on to /display. A 503 or a network error (the session store blipped, or the
+ * response was dropped after the proof was claimed) is retried with that same
+ * attempt id while the proof is still valid. Any other failure falls back to
+ * /display, which shows Home if this
  * browser already holds a valid display session and "not authorized" if not:
  * a re-connect with a spent or stale proof never knocks a working wall over.
  */
@@ -38,12 +40,13 @@ export function DisplayConnect() {
       fallBack();
       return;
     }
+    const attemptId = globalThis.crypto.randomUUID();
     const attempt = async (index: number): Promise<void> => {
       try {
         const response = await fetch('/api/ovie/display/session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(proof),
+          body: JSON.stringify({ ...proof, attempt: attemptId }),
           credentials: 'same-origin',
           cache: 'no-store',
         });

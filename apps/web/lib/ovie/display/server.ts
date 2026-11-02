@@ -89,29 +89,61 @@ export async function isDisplayReadRequest(request: Request): Promise<boolean> {
   );
 }
 
+const ATTEMPT_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SESSION_TOKEN = /^[\w-]{16,400}\.[0-9a-f]{64}$/;
+
+/** One page load of `/display/connect`. Retries reuse it; a stolen proof does not have it. */
+export function isDisplayAttemptId(value: unknown): value is string {
+  return typeof value === 'string' && ATTEMPT_ID.test(value);
+}
+
+export type ProofClaim =
+  | { readonly status: 'ok'; readonly token: string }
+  | { readonly status: 'denied' }
+  | { readonly status: 'unavailable' };
+
+function readStoredClaim(
+  stored: unknown
+): { readonly attemptId: string; readonly token: string } | null {
+  if (typeof stored !== 'string') return null;
+  const splitAt = stored.indexOf('.');
+  if (splitAt < 0) return null;
+  const attemptId = stored.slice(0, splitAt);
+  const token = stored.slice(splitAt + 1);
+  if (!ATTEMPT_ID.test(attemptId) || !SESSION_TOKEN.test(token)) return null;
+  return { attemptId, token };
+}
+
 /**
- * Single use: the first caller for a device+timestamp wins ('ok'); a replay is
- * 'denied'. 'unavailable' never spends the proof, so the caller can retry
- * within the proof window.
+ * One session per device and proof timestamp. The first attempt stores its
+ * token; that same attempt redeems it again (the response was lost, the proof
+ * was already claimed). A different attempt is denied. `unavailable` never
+ * spends the proof.
  */
 export async function claimDisplayProof(
   deviceId: string,
-  ts: number
-): Promise<StoreResult> {
+  ts: number,
+  attemptId: string,
+  token: string
+): Promise<ProofClaim> {
+  if (!isDisplayAttemptId(attemptId) || !SESSION_TOKEN.test(token))
+    return { status: 'denied' };
   const redis = getRedis();
-  if (!redis) return 'unavailable';
+  if (!redis) return { status: 'unavailable' };
+  const key = `ovie-display:proof:${deviceId}:${ts}`;
   try {
-    const result = await redis.set(
-      `ovie-display:proof:${deviceId}:${ts}`,
-      '1',
-      {
-        nx: true,
-        ex: DISPLAY_PROOF_REPLAY_TTL_SECONDS,
-      }
-    );
-    return result === 'OK' ? 'ok' : 'denied';
+    const created = await redis.set(key, `${attemptId}.${token}`, {
+      nx: true,
+      ex: DISPLAY_PROOF_REPLAY_TTL_SECONDS,
+    });
+    if (created === 'OK') return { status: 'ok', token };
+    const stored = readStoredClaim(await redis.get(key));
+    if (stored?.attemptId === attemptId)
+      return { status: 'ok', token: stored.token };
+    return { status: 'denied' };
   } catch {
-    return 'unavailable';
+    return { status: 'unavailable' };
   }
 }
 

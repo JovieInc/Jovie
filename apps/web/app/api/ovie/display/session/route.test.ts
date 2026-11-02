@@ -9,7 +9,7 @@ const SECRET = 's'.repeat(40);
 const KEY = 'k'.repeat(40);
 const state = vi.hoisted(() => ({
   config: { devices: [] as unknown[], key: '' },
-  claimed: new Set<string>(),
+  claimed: new Map<string, { attempt: string; token: string }>(),
   attempts: 0,
   limit: 10,
   redisUp: true,
@@ -18,17 +18,32 @@ const state = vi.hoisted(() => ({
 vi.mock('@/lib/ovie/display/server', () => ({
   displayConfig: () => state.config,
   clientAddress: () => '203.0.113.7',
+  isDisplayAttemptId: (value: unknown) =>
+    typeof value === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value
+    ),
   allowDisplayExchangeAttempt: async (input: { deviceHint: unknown }) => {
     state.hints.push(input.deviceHint);
     if (!state.redisUp) return 'unavailable';
     return ++state.attempts <= state.limit ? 'ok' : 'denied';
   },
-  claimDisplayProof: async (device: string, ts: number) => {
-    if (!state.redisUp) return 'unavailable';
+  claimDisplayProof: async (
+    device: string,
+    ts: number,
+    attempt: string,
+    token: string
+  ) => {
+    if (!state.redisUp) return { status: 'unavailable' };
     const key = `${device}:${ts}`;
-    if (state.claimed.has(key)) return 'denied';
-    state.claimed.add(key);
-    return 'ok';
+    const existing = state.claimed.get(key);
+    if (!existing) {
+      state.claimed.set(key, { attempt, token });
+      return { status: 'ok', token };
+    }
+    if (existing.attempt === attempt)
+      return { status: 'ok', token: existing.token };
+    return { status: 'denied' };
   },
 }));
 
@@ -45,11 +60,15 @@ const post = (
       body: typeof body === 'string' ? body : JSON.stringify(body),
     })
   );
+const ATTEMPT = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const proofFor = (t: number, secret = SECRET) => ({
   device: 'air-office',
   ts: t,
   proof: displayDeviceProof(secret, 'air-office', t),
+  attempt: ATTEMPT,
 });
+const cookieValue = (response: Response) =>
+  response.headers.get('set-cookie')?.split(';', 1)[0] ?? '';
 const now = () => Math.floor(Date.now() / 1000);
 
 describe('display session exchange', () => {
@@ -85,12 +104,36 @@ describe('display session exchange', () => {
     ]);
   });
 
-  it('a proof is single use: the replay is denied (and so is a replay of a stolen one)', async () => {
+  it('the same attempt redeems the claimed session after a dropped response', async () => {
+    const body = proofFor(now());
+    const first = await post(body);
+    const retry = await post(body);
+    expect(first.status).toBe(200);
+    expect(retry.status).toBe(200);
+    expect(cookieValue(retry)).toBe(cookieValue(first));
+    expect(cookieValue(retry)).toMatch(/^ovie_display=/);
+  });
+
+  it('a different attempt cannot redeem a proof that was already claimed', async () => {
     const body = proofFor(now());
     expect((await post(body)).status).toBe(200);
-    const replay = await post(body);
-    expect(replay.status).toBe(401);
-    expect(replay.headers.get('set-cookie')).toBeNull();
+    const stolen = await post({
+      ...body,
+      attempt: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    });
+    expect(stolen.status).toBe(401);
+    expect(stolen.headers.get('set-cookie')).toBeNull();
+  });
+
+  it('a valid proof without an attempt id is denied and does not spend the proof', async () => {
+    const body = proofFor(now());
+    const withoutAttempt = {
+      device: body.device,
+      ts: body.ts,
+      proof: body.proof,
+    };
+    expect((await post(withoutAttempt)).status).toBe(401);
+    expect((await post(body)).status).toBe(200);
   });
 
   it('a store outage is a retryable 503 with no cookie, and the proof is not spent', async () => {

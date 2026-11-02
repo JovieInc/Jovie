@@ -4,6 +4,7 @@ import {
   claimDisplayProof,
   clientAddress,
   displayConfig,
+  isDisplayAttemptId,
 } from '@/lib/ovie/display/server';
 import {
   DISPLAY_COOKIE,
@@ -26,7 +27,9 @@ const deny = () => json({ error: 'denied' }, 401);
  * `/display/connect#<proof>` and that page POSTs it). One generic 401 for every
  * verification failure (unknown device, bad proof, stale clock, replay,
  * unconfigured). 429 over the per-address-and-device cap, 503 when the store
- * cannot answer (retryable; the proof is not spent). Proofs are single use.
+ * cannot answer (retryable; the proof is not spent). One session is minted per
+ * device and timestamp. The connect page's attempt id can redeem that same
+ * session again after a dropped response; a different attempt is denied.
  */
 export async function POST(request: NextRequest) {
   const type = request.headers.get('content-type') ?? '';
@@ -62,18 +65,25 @@ export async function POST(request: NextRequest) {
     nowMs,
   });
   if (!device) return deny();
-  // Spend the proof only after it verified, so garbage cannot burn real ones.
-  const claim = await claimDisplayProof(device.id, body.ts as number);
-  if (claim === 'unavailable') return json({ error: 'unavailable' }, 503);
-  if (claim === 'denied') return deny();
-
+  // An attempt id that is not this page load must not spend the proof.
+  if (!isDisplayAttemptId(body.attempt)) return deny();
   const { token } = mintDisplaySession({ device, key, nowMs });
+  const claim = await claimDisplayProof(
+    device.id,
+    body.ts as number,
+    body.attempt,
+    token
+  );
+  if (claim.status === 'unavailable')
+    return json({ error: 'unavailable' }, 503);
+  if (claim.status !== 'ok') return deny();
+
   return NextResponse.json(
     { ok: true },
     {
       headers: {
         ...NO_STORE,
-        'Set-Cookie': `${DISPLAY_COOKIE}=${token}; Path=/; Max-Age=${DISPLAY_SESSION_TTL_SECONDS}; HttpOnly; Secure; SameSite=Strict`,
+        'Set-Cookie': `${DISPLAY_COOKIE}=${claim.token}; Path=/; Max-Age=${DISPLAY_SESSION_TTL_SECONDS}; HttpOnly; Secure; SameSite=Strict`,
       },
     }
   );

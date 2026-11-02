@@ -17,10 +17,10 @@ vi.mock('@/lib/redis', () => ({
             if (store.failing) throw new Error('redis down');
             return store.values.get(key) ?? null;
           },
-          set: async (key: string, _v: string, opts: { nx: boolean }) => {
+          set: async (key: string, value: string, opts: { nx?: boolean }) => {
             if (store.failing) throw new Error('redis down');
             if (opts.nx && store.values.has(key)) return null;
-            store.values.set(key, '1');
+            store.values.set(key, value);
             return 'OK';
           },
           incr: async (key: string) => {
@@ -47,6 +47,10 @@ import {
 } from './server';
 
 const T = 1_800_000_000_000;
+const ATTEMPT = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const TOKEN = `${'a'.repeat(20)}.${'ab'.repeat(32)}`;
+const claim = (device: string, ts: number, attempt = ATTEMPT, token = TOKEN) =>
+  claimDisplayProof(device, ts, attempt, token);
 const attempt = (
   address: string,
   deviceHint: unknown = 'air-office',
@@ -81,19 +85,32 @@ describe('display runtime store', () => {
   it('reports unavailable (never ok) when Redis errors or is missing', async () => {
     store.failing = true;
     expect(await displayStillAllowed('air-office', 100)).toBe('unavailable');
-    expect(await claimDisplayProof('air-office', 1)).toBe('unavailable');
+    expect(await claim('air-office', 1)).toEqual({ status: 'unavailable' });
     expect(await attempt('1.1.1.1')).toBe('unavailable');
     store.failing = false;
     store.missing = true;
     expect(await displayStillAllowed('air-office', 100)).toBe('unavailable');
-    expect(await claimDisplayProof('air-office', 1)).toBe('unavailable');
+    expect(await claim('air-office', 1)).toEqual({ status: 'unavailable' });
     expect(await attempt('1.1.1.1')).toBe('unavailable');
   });
-  it('claims a proof exactly once per device and timestamp', async () => {
-    expect(await claimDisplayProof('air-office', 5)).toBe('ok');
-    expect(await claimDisplayProof('air-office', 5)).toBe('denied');
-    expect(await claimDisplayProof('air-office', 6)).toBe('ok');
-    expect(await claimDisplayProof('other', 5)).toBe('ok');
+  it('redeems one session per device and timestamp for the same attempt only', async () => {
+    const first = await claim('air-office', 5);
+    const retry = await claim(
+      'air-office',
+      5,
+      ATTEMPT,
+      `${'b'.repeat(20)}.${'cd'.repeat(32)}`
+    );
+    expect(first).toEqual({ status: 'ok', token: TOKEN });
+    expect(retry).toEqual({ status: 'ok', token: TOKEN });
+    expect(
+      await claim('air-office', 5, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb')
+    ).toEqual({ status: 'denied' });
+    expect((await claim('air-office', 6)).status).toBe('ok');
+    expect((await claim('other', 5)).status).toBe('ok');
+    expect(await claim('air-office', 7, 'not-a-uuid', TOKEN)).toEqual({
+      status: 'denied',
+    });
   });
 
   describe('exchange rate limit', () => {
