@@ -1,8 +1,10 @@
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { AuthLayout } from '@/components/features/auth/AuthLayout';
 import { WaitlistPublicLanding } from '@/components/features/waitlist/WaitlistPublicLanding';
 import { WaitlistSuccessView } from '@/components/features/waitlist/WaitlistSuccessView';
 import { MarketingPageContractMarkers } from '@/components/site/MarketingPageContractMarkers';
+import { APP_ROUTES } from '@/constants/routes';
 import { getWaitlistRouteRedirect } from '@/lib/auth/access-route-redirect';
 import {
   CanonicalUserState,
@@ -10,6 +12,7 @@ import {
   getWaitlistReservedHandle,
   resolveUserState,
 } from '@/lib/auth/gate';
+import { isPublicSignupClosed } from '@/lib/waitlist/public-signup-gate';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import { isWaitlistPendingStatus } from '@/lib/waitlist/state-machine';
 
@@ -23,6 +26,25 @@ function WaitlistRouteWithContract({
       <MarketingPageContractMarkers />
       {children}
     </>
+  );
+}
+
+function PublicWaitlistDestination() {
+  if (!isPublicSignupClosed()) return <WaitlistPublicLanding />;
+  return (
+    <AuthLayout
+      formTitle='Jovie is invite-only'
+      showFooterPrompt
+      footerPrompt='Already have an account?'
+      footerLinkText='Sign in'
+      footerLinkHref={APP_ROUTES.SIGNIN}
+      layoutVariant='stack'
+    >
+      <p className='text-sm text-secondary-token'>
+        Public signup is closed. If you received an invitation, open the link in
+        your email to continue.
+      </p>
+    </AuthLayout>
   );
 }
 
@@ -48,7 +70,7 @@ export default async function WaitlistPage() {
   if (process.env.PUBLIC_NOAUTH_SMOKE === '1') {
     return (
       <WaitlistRouteWithContract>
-        <WaitlistPublicLanding />
+        <PublicWaitlistDestination />
       </WaitlistRouteWithContract>
     );
   }
@@ -62,7 +84,7 @@ export default async function WaitlistPage() {
   if (authResult.state === CanonicalUserState.UNAUTHENTICATED) {
     return (
       <WaitlistRouteWithContract>
-        <WaitlistPublicLanding />
+        <PublicWaitlistDestination />
       </WaitlistRouteWithContract>
     );
   }

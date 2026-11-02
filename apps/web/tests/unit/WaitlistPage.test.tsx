@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import WaitlistPage from '@/app/waitlist/page';
 import { CanonicalUserState } from '@/lib/auth/canonical-user-state';
@@ -19,6 +21,7 @@ const {
 }));
 
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/waitlist',
   redirect: (...args: unknown[]) => {
     mockRedirect(...args);
     throw new Error('NEXT_REDIRECT');
@@ -41,8 +44,33 @@ vi.mock('@/lib/waitlist/settings', () => ({
   isWaitlistGateEnabled: mockIsWaitlistGateEnabled,
 }));
 
+vi.mock('@/components/features/auth/AuthLayout', () => ({
+  AuthLayout: ({
+    children,
+    formTitle,
+    footerLinkHref,
+    footerLinkText,
+  }: {
+    children: ReactNode;
+    formTitle: string;
+    footerLinkHref: string;
+    footerLinkText: string;
+  }) => (
+    <section>
+      <h1>{formTitle}</h1>
+      {children}
+      <a href={footerLinkHref}>{footerLinkText}</a>
+    </section>
+  ),
+}));
+
+vi.mock('@/components/features/waitlist/WaitlistPublicLanding', () => ({
+  WaitlistPublicLanding: () => <div data-public-waitlist-entry />,
+}));
+
 describe('WaitlistPage', () => {
   beforeEach(() => {
+    vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
     mockGetWaitlistAccess.mockReset();
     mockGetWaitlistReservedHandle.mockReset();
     mockGetWaitlistReservedHandle.mockResolvedValue(null);
@@ -87,7 +115,7 @@ describe('WaitlistPage', () => {
     }
   );
 
-  test('renders the public waitlist entry for signed-out visitors', async () => {
+  test('renders closed signup with sign-in recovery for signed-out visitors', async () => {
     mockRedirect.mockClear();
     mockNotFound.mockClear();
     mockResolveUserState.mockResolvedValue({
@@ -95,14 +123,14 @@ describe('WaitlistPage', () => {
       context: { email: null },
     });
 
-    const { WaitlistPublicLanding } = await import(
-      '@/components/features/waitlist/WaitlistPublicLanding'
-    );
-
     const result = await WaitlistPage();
+    const html = renderToStaticMarkup(result);
 
     expect(result.type.name).toBe('WaitlistRouteWithContract');
-    expect(result.props.children.type).toBe(WaitlistPublicLanding);
+    expect(html).toContain('Public signup is closed.');
+    expect(html).toContain('href="/signin"');
+    expect(html).toContain('invitation');
+    expect(html).not.toContain('data-public-waitlist-entry');
     expect(mockRedirect).not.toHaveBeenCalled();
     expect(mockNotFound).not.toHaveBeenCalled();
     expect(mockResolveUserState).toHaveBeenCalledWith({
@@ -117,15 +145,26 @@ describe('WaitlistPage', () => {
     mockNotFound.mockClear();
     mockResolveUserState.mockClear();
 
-    const { WaitlistPublicLanding } = await import(
-      '@/components/features/waitlist/WaitlistPublicLanding'
-    );
-
     const result = await WaitlistPage();
+    const html = renderToStaticMarkup(result);
 
     expect(result.type.name).toBe('WaitlistRouteWithContract');
-    expect(result.props.children.type).toBe(WaitlistPublicLanding);
+    expect(html).toContain('Public signup is closed.');
+    expect(html).toContain('href="/signin"');
+    expect(html).not.toContain('data-public-waitlist-entry');
     expect(mockResolveUserState).not.toHaveBeenCalled();
+    expect(mockRedirect).not.toHaveBeenCalled();
+  });
+
+  test('retains the public waitlist component only when explicitly reopened', async () => {
+    vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'false');
+    mockResolveUserState.mockResolvedValue({
+      state: CanonicalUserState.UNAUTHENTICATED,
+      context: { email: null },
+    });
+    const html = renderToStaticMarkup(await WaitlistPage());
+    expect(html).toContain('data-public-waitlist-entry');
+    expect(html).not.toContain('Public signup is closed.');
     expect(mockRedirect).not.toHaveBeenCalled();
   });
 
