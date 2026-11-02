@@ -57,6 +57,43 @@ function props(
 }
 
 describe('HomeLoopCanvas', () => {
+  it('puts the company row above the shipping verdict with its caption', () => {
+    render(
+      <HomeLoopCanvas
+        {...props({
+          company: [
+            {
+              key: 'runway',
+              label: 'Runway',
+              value: '6 days',
+              was: null,
+              tone: 'bad',
+              measured: true,
+              target: 'Default dead · $23 cash',
+            },
+          ],
+          pulseCaption: 'Shipping · compared with your visit 3h ago',
+        })}
+      />
+    );
+    const company = screen.getByRole('region', { name: 'Company' });
+    expect(company).toHaveTextContent('6 days');
+    expect(company).toHaveTextContent('Default dead · $23 cash');
+    expect(
+      company.compareDocumentPosition(
+        screen.getByTestId('home-loop-constraint')
+      ) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(screen.getByTestId('home-loop-pulse-caption')).toHaveTextContent(
+      'compared with your visit 3h ago'
+    );
+  });
+
+  it('omits the company row when the persona has none', () => {
+    render(<HomeLoopCanvas {...props()} />);
+    expect(screen.queryByRole('region', { name: 'Company' })).toBeNull();
+  });
+
   it('renders every section populated with named headings and counts', () => {
     render(<HomeLoopCanvas {...props()} />);
 
