@@ -72,6 +72,7 @@ import {
 import { fetchArtistLinksContext } from '@/lib/chat/artist-links-context';
 import { fetchCatalogTrackTitlesForChat } from '@/lib/chat/catalog-titles';
 import { assertChatToolsRegistered } from '@/lib/chat/chat-tool-inventory';
+import { buildInstinctOpener } from '@/lib/chat/instinct-opener';
 import {
   buildLockedToolPromptInfo,
   buildLockedToolSet,
@@ -3008,6 +3009,47 @@ export async function POST(req: Request) {
   const catalogTrackTitles = resolvedProfileId
     ? await fetchCatalogTrackTitlesForChat(resolvedProfileId)
     : null;
+  // System-1 opener: a bare greeting gets the most valuable known fact with
+  // no model call. Attachments, tool intents, pinned cards and OV go on.
+  const opener =
+    chatMode === 'ov' ||
+    toolIntent ||
+    pinnedOpportunity ||
+    extractLastUserImageUrl(uiMessages)
+      ? null
+      : buildInstinctOpener({
+          text: userText,
+          artist: artistContext,
+          releases,
+          now: new Date(),
+        });
+  if (opener) {
+    safeSetSentryContext(() => Sentry.setTag('chat_fast_path', opener.intent));
+    if (reservedTurn) {
+      await persistTerminalAssistantMessage({
+        ...reservedTurn,
+        status: 'completed',
+        content: opener.text,
+      });
+    }
+    return createAssistantTextStreamResponse({
+      text: opener.text,
+      requestId,
+      corsHeaders,
+      headers: {
+        'x-chat-fast-path': opener.intent,
+        ...(reservedTurn
+          ? {
+              'x-conversation-id': reservedTurn.conversationId,
+              'x-chat-turn-id': reservedTurn.turnId,
+            }
+          : {}),
+      },
+      metadata: reservedTurn
+        ? buildChatTurnMetadata({ ...reservedTurn, requestId })
+        : undefined,
+    });
+  }
   const dispatchConversationId =
     reservedTurn?.conversationId ?? resolvedConversationId;
 
