@@ -17,11 +17,54 @@
 // own token.
 
 import { execFileSync } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const REPOSITORY = process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
 const NOTICE =
   /bucket=(github-token|jovie-bot)(?: resource=(core|graphql|search))? remaining=(\d+) limit=(\d+) used=(\d+) reset=(\d+) at=(\d+)/;
+
+/** Optional telemetry: one free read supplies all resources; failures never mask policy verdicts. */
+export function sampleQuota({
+  read = () =>
+    JSON.parse(
+      execFileSync(
+        process.execPath,
+        [
+          fileURLToPath(
+            new URL('../../packages/api-client/cli.ts', import.meta.url)
+          ),
+          'gh',
+          '--priority',
+          'poll',
+          '--',
+          'api',
+          'rate_limit',
+        ],
+        { encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'pipe'] }
+      )
+    ),
+  emit = line => console.log(line),
+  now = Date.now,
+} = {}) {
+  try {
+    const { resources } = read();
+    const at = Math.floor(now() / 1000);
+    for (const resource of ['core', 'graphql', 'search']) {
+      const row = resources?.[resource];
+      if (
+        !['remaining', 'limit', 'used', 'reset'].every(
+          field => Number.isSafeInteger(row?.[field]) && row[field] >= 0
+        )
+      )
+        throw new Error('invalid quota response');
+      emit(
+        `::notice title=api-quota::bucket=github-token resource=${resource} remaining=${row.remaining} limit=${row.limit} used=${row.used} reset=${row.reset} at=${at}`
+      );
+    }
+  } catch {
+    emit('::warning::API quota sample unavailable.');
+  }
+}
 
 /** @param {string} message */
 export function parseQuotaNotice(message) {
@@ -36,6 +79,12 @@ export function parseQuotaNotice(message) {
     reset: Number(match[6]),
     at: Number(match[7]),
   };
+}
+
+function quotaBucket(sample) {
+  return sample.resource && sample.resource !== 'core'
+    ? `${sample.bucket}:${sample.resource}`
+    : sample.bucket;
 }
 
 /** Nearest-rank percentile; null for an empty series. */
@@ -60,9 +109,10 @@ export function summarizeQuota(samples, windowSeconds = 600) {
   for (const sample of samples) {
     if (!sample) continue;
     const windowStart = Math.floor(sample.at / windowSeconds) * windowSeconds;
-    const key = `${sample.bucket}@${windowStart}`;
+    const bucket = quotaBucket(sample);
+    const key = `${bucket}@${windowStart}`;
     const row = rows.get(key) ?? {
-      bucket: sample.bucket,
+      bucket,
       windowStart,
       minRemaining: Number.POSITIVE_INFINITY,
       samples: 0,
@@ -89,11 +139,13 @@ export function summarizeHeadroom(samples, windowSeconds = 3600) {
   const rows = new Map();
   for (const sample of samples) {
     if (!sample) continue;
-    const windowStart = Math.floor(sample.at / windowSeconds) * windowSeconds;
-    const bucket =
-      sample.resource && sample.resource !== 'core'
-        ? `${sample.bucket}:${sample.resource}`
-        : sample.bucket;
+    const bucket = quotaBucket(sample);
+    // A GitHub token's rate-limit window ends at its own x-ratelimit-reset (the
+    // installation's windows run :23 to :23, not on the hour), so key on that.
+    // Samples without a reset fall back to the hour they were taken in.
+    const windowStart = Number.isFinite(sample.reset)
+      ? sample.reset - windowSeconds
+      : Math.floor(sample.at / windowSeconds) * windowSeconds;
     const key = `${bucket}@${windowStart}`;
     const row = rows.get(key) ?? {
       bucket,
@@ -126,6 +178,68 @@ export function summarizeHeadroom(samples, windowSeconds = 3600) {
     );
 }
 
+/**
+ * Buckets projected to run dry before their hourly window resets, from this
+ * window's samples: consumption rate = remaining drop over elapsed time, so
+ * time-to-empty = remaining / rate. Needs `minSamples` readings spanning at least
+ * `minSpanSeconds`; a flat or refilling bucket never alerts.
+ *
+ * @param {{ at: number, bucket: string, remaining: number, limit?: number }[]} samples
+ * @param {number} nowSeconds
+ * @param {{ windowSeconds?: number, minSamples?: number, minSpanSeconds?: number }} [options]
+ */
+export function projectDrain(samples, nowSeconds, options = {}) {
+  const {
+    windowSeconds = 3600,
+    minSamples = 3,
+    minSpanSeconds = 120,
+  } = options;
+  // Each bucket's window ends at the x-ratelimit-reset its newest sample reports
+  // (not on the hour: the installation's windows run :23 to :23). Samples without
+  // a reset fall back to the hour boundary.
+  const byBucket = new Map();
+  for (const sample of samples) {
+    if (!sample || sample.at > nowSeconds) continue;
+    const bucket = quotaBucket(sample);
+    const list = byBucket.get(bucket) ?? [];
+    list.push(sample);
+    byBucket.set(bucket, list);
+  }
+  const alerts = [];
+  for (const [bucket, all] of byBucket) {
+    all.sort((a, b) => a.at - b.at);
+    const newest = all[all.length - 1];
+    const hourStart = Math.floor(nowSeconds / windowSeconds) * windowSeconds;
+    const resetAt = Number.isFinite(newest.reset)
+      ? newest.reset
+      : hourStart + windowSeconds;
+    if (resetAt <= nowSeconds) continue;
+    const windowStart = resetAt - windowSeconds;
+    const list = all.filter(sample =>
+      Number.isFinite(newest.reset)
+        ? sample.reset === newest.reset
+        : sample.at >= windowStart
+    );
+    const first = list[0];
+    const last = list[list.length - 1];
+    const span = last.at - first.at;
+    if (list.length < minSamples || span < minSpanSeconds) continue;
+    const rate = (first.remaining - last.remaining) / span;
+    if (!(rate > 0)) continue;
+    const emptyAt = last.at + last.remaining / rate;
+    if (emptyAt >= resetAt) continue;
+    alerts.push({
+      bucket,
+      remaining: last.remaining,
+      ratePerMinute: Math.round(rate * 60),
+      emptyAt: new Date(emptyAt * 1000).toISOString(),
+      resetAt: new Date(resetAt * 1000).toISOString(),
+      minutesEarly: Math.round((resetAt - emptyAt) / 60),
+    });
+  }
+  return alerts.sort((a, b) => a.bucket.localeCompare(b.bucket));
+}
+
 /** Seconds a job ran, or null when it never started or finished. */
 export function jobSeconds(job) {
   const started = Date.parse(job?.started_at);
@@ -134,13 +248,27 @@ export function jobSeconds(job) {
   return Math.max(0, (completed - started) / 1000);
 }
 
-function ghJson(path) {
-  return JSON.parse(
-    execFileSync('gh', ['api', path], {
-      encoding: 'utf8',
-      maxBuffer: 32 * 1024 * 1024,
-    })
-  );
+function ghJson(path, attempts = 3) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return JSON.parse(
+        execFileSync('gh', ['api', path], {
+          encoding: 'utf8',
+          maxBuffer: 32 * 1024 * 1024,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        })
+      );
+    } catch (error) {
+      // A transient GitHub 5xx must not crash a report that runs from the doctor.
+      if (attempt >= attempts) throw error;
+      Atomics.wait(
+        new Int32Array(new SharedArrayBuffer(4)),
+        0,
+        0,
+        attempt * 1500
+      );
+    }
+  }
 }
 
 function flag(argv, name, fallback) {
@@ -156,18 +284,18 @@ const SOURCES = [
   ['pr-fleet-rules.yml', 'PR Fleet Rules'],
 ];
 
-function collectSamples(argv) {
+export function collectSamples(argv, { read = ghJson, now = Date.now } = {}) {
   const hours = flag(argv, 'hours', 3);
   const maxSamples = flag(argv, 'max-samples', 60);
   const samples = [];
-  const end = Date.now();
+  const end = now();
   // One query per source and hour: a single newest-100 page never reached
   // back to 09:00Z when the fleet ran hundreds of runs an hour.
   for (const [workflow, jobName] of SOURCES) {
     for (let hour = 0; hour < hours; hour++) {
       const to = new Date(end - hour * 3600_000).toISOString();
       const from = new Date(end - (hour + 1) * 3600_000).toISOString();
-      const runs = ghJson(
+      const runs = read(
         `repos/${REPOSITORY}/actions/workflows/${workflow}/runs?created=${from}..${to}&status=success&per_page=100`
       ).workflow_runs;
       const perHour = Math.max(
@@ -176,12 +304,12 @@ function collectSamples(argv) {
       );
       const stride = Math.max(1, Math.ceil(runs.length / perHour));
       for (let index = 0; index < runs.length; index += stride) {
-        const jobs = ghJson(
+        const jobs = read(
           `repos/${REPOSITORY}/actions/runs/${runs[index].id}/jobs?per_page=50`
         ).jobs;
         const job = jobs.find(item => item.name === jobName);
         if (!job || job.conclusion !== 'success') continue;
-        const annotations = ghJson(
+        const annotations = read(
           `repos/${REPOSITORY}/check-runs/${job.id}/annotations?per_page=50`
         );
         for (const annotation of annotations) {
@@ -223,6 +351,25 @@ function quota(argv) {
   if (rows.length === 0) console.log('no api-quota samples in window');
 }
 
+function drain(argv) {
+  const samples = collectSamples(argv);
+  const now = Math.floor(Date.now() / 1000);
+  const alerts = projectDrain(samples, now);
+  if (argv.includes('--json'))
+    console.log(
+      JSON.stringify({
+        schema: 'jovie-actions-quota-drain/v1',
+        generatedAt: new Date(now * 1000).toISOString(),
+        alerts,
+      })
+    );
+  for (const alert of alerts)
+    console.log(
+      `::warning title=GitHub ${alert.bucket} bucket projected to drain::${alert.bucket} has ${alert.remaining} left at ~${alert.ratePerMinute}/min; empty at ${alert.emptyAt}, ${alert.minutesEarly} min before the ${alert.resetAt} reset.`
+    );
+  if (alerts.length) process.exitCode = 3;
+}
+
 function admission(argv) {
   const count = flag(argv, 'runs', 40);
   const runs = ghJson(
@@ -247,9 +394,11 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   if (command === 'quota') quota(rest);
   else if (command === 'headroom') headroom(rest);
   else if (command === 'admission') admission(rest);
+  else if (command === 'drain') drain(rest);
+  else if (command === 'sample') sampleQuota();
   else {
     console.error(
-      'usage: api-quota-report.mjs quota|headroom|admission [--hours N] [--runs N]'
+      'usage: api-quota-report.mjs quota|headroom|drain|admission|sample [--hours N] [--runs N]'
     );
     process.exit(2);
   }

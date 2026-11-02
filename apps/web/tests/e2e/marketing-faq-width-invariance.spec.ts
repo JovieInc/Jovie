@@ -26,7 +26,10 @@ interface MotionState {
   readonly boxShadow: string;
 }
 
-const ROUTES = [{ label: 'about', path: '/about' }] as const;
+// FAQ lives on /download now that /about no longer renders one (#23332).
+const ROUTES = [{ label: 'download', path: '/download' }] as const;
+
+const FOCUS_ROUTE = ROUTES[0];
 
 const VIEWPORTS = [
   { label: '1024', width: 1024, height: 1200 },
@@ -207,12 +210,12 @@ test.describe('public FAQ width invariance', () => {
   }
 
   for (const viewport of VIEWPORTS) {
-    test(`about ${viewport.label} preserves normal-motion keyboard focus without transforms`, async ({
+    test(`${FOCUS_ROUTE.label} ${viewport.label} preserves normal-motion keyboard focus without transforms`, async ({
       page,
     }) => {
       await page.setViewportSize(viewport);
       await page.emulateMedia({ reducedMotion: 'no-preference' });
-      await page.goto('/about', { waitUntil: 'networkidle' });
+      await page.goto(FOCUS_ROUTE.path, { waitUntil: 'networkidle' });
 
       const section = page.locator('[data-pen-contract="pAAhw"]');
       const triggers = section.locator('.faq-accordion__trigger');

@@ -43,12 +43,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from disk_guard import LOW_PCT as DISK_LOW_PCT, ensure_sbin_on_path  # noqa: E402  (sibling module of the release)
 import git_housekeeping  # noqa: E402  (detached git maintenance vs cleanup)
 import lifecycle  # noqa: E402
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 
 PRESERVED_REPAIR = ".jovie-preserved-repair.json"
 IDLE_S = 12 * 3600
 CLOSED_GRACE_S = 3600
 PRESERVED_TTL_S = 3 * 86400
 INTERVAL_S = 3600
+LINKED_SWEEP_BUDGET_S = 20 * 60  # linked-worktree phase; the standalone reclaim runs after it, always
 LOW_INTERVAL_S = 600
 # Regenerable output, plus per-checkout pnpm stores (never the shared store, which lives outside checkouts).
 BUILD_DIRS = frozenset({"node_modules", ".next", ".turbo", "test-results", ".build", "DerivedData",
@@ -72,7 +76,11 @@ def default_roots(home: Path, state: Path) -> list[Path]:
             home / "jovie-worktrees", home / "worktrees", home / "LogYourBody-wt",
             home / "jovie-wt-*", Path("/private/tmp/claude-501"), Path("/private/tmp/jovie-*"),
             home / "codex-worktrees", home / "grok-wt", home / "grok-ship-workspaces",
-            home / "codex-ship-workspaces", home / "wt-*", Path("/srv/worktrees/codex-worktrees")]
+            home / "codex-ship-workspaces", home / "wt-*", Path("/srv/worktrees/codex-worktrees"),
+            # ~/wt is where Gem agent sessions put worktrees (global charter: `git worktree add ... ~/wt/<name>`).
+            # It was out of scope: 75 checkouts at ~5.7 GiB each (pnpm copies, the store is on /srv/worktrees)
+            # and root at 89% on 2026-11-02 while the sweeper retired nothing there.
+            home / "wt"]
 
 
 def default_never(home: Path) -> list[Path]:
@@ -354,8 +362,10 @@ def retire(repo: Path, path: Path, branch: str | None, live: set[Path], report: 
 def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecycle.run,
           now: float | None = None, closed: dict[Path, set[str]] | None = None, idle_s: float = IDLE_S,
           preserved_ttl_s: float = PRESERVED_TTL_S, prefix: str = "sweep/mac",
-          date: str | None = None, state: Path | None = None) -> dict:
+          date: str | None = None, state: Path | None = None, budget_s: float | None = None,
+          clock=time.monotonic) -> dict:
     now = time.time() if now is None else now
+    deadline = None if budget_s is None else clock() + budget_s
     date = date or datetime.fromtimestamp(now, timezone.utc).strftime("%Y%m%d")
     closed = closed or {}
     report = {"at": datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -363,6 +373,13 @@ def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecy
     def yield_to_drain():
         if state is not None and lifecycle.draining(state):
             report["drained"] = True
+            return True
+        if deadline is not None and clock() > deadline:
+            # Retention starved 2026-10-25..11-01: this phase backs up and secret-scans dirty checkouts
+            # one by one (up to the gate timeout each) and ran for hours, so the standalone-clone
+            # reclaim, headroom alarm and daily report after it never ran. A spent budget ends the
+            # phase; the next interval resumes where it stopped.
+            report["budgetSpent"] = True
             return True
         return False
 
@@ -372,21 +389,29 @@ def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecy
     if live is None:
         report["errors"].append("process-state-unavailable")
         return report
+    # Fairness cursor: least recently visited checkout first, across every repository. Without it a
+    # spent budget restarted at the first repository each interval, so the second (~/Jovie, whose
+    # worktrees are ~/wt: 334 GiB on root, 2026-11-02) was never reached.
+    visits_path = None if state is None else state / VISITS_FILE
+    visits = _read_visits(visits_path)
+    queue = []
     for repo in repos:
-        if yield_to_drain():
-            return report
         try:
             entries = linked_worktrees(repo, run)
         except (OSError, subprocess.SubprocessError) as error:
             report["errors"].append(f"list:{repo}:{type(error).__name__}")
             continue
-        for path, branch in entries:
+        queue += [(repo, path, branch) for path, branch in entries]
+    queue.sort(key=lambda item: visits.get(str(item[1]), 0.0))
+    try:
+        for repo, path, branch in queue:
             # A retirement is one unit: finish its preservation/removal before
             # yielding, retaining the inherited lifecycle lease throughout.
             if yield_to_drain():
                 return report
             if not path.exists() or not in_scope(path, roots, never):
                 continue
+            visits[str(path)] = now
             try:
                 retire(repo, path, branch, live, report, run=run, now=now, closed=closed.get(repo, set()),
                        idle_s=idle_s, preserved_ttl_s=preserved_ttl_s, prefix=prefix, date=date)
@@ -395,6 +420,9 @@ def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecy
                 # the sweep; it stays in place and is retried next interval.
                 report["kept"] += 1
                 report["errors"].append(f"{path}:{type(error).__name__}"[:200])
+    finally:
+        _write_visits(visits_path, visits, {str(path) for _, path, _ in queue})
+    for repo in repos:
         if yield_to_drain():
             return report
         try:
@@ -402,6 +430,29 @@ def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecy
         except (OSError, subprocess.SubprocessError):
             pass
     return report
+
+
+VISITS_FILE = "worktree-sweep-visits.json"
+
+
+def _read_visits(path: Path | None) -> dict:
+    if path is None:
+        return {}
+    try:
+        data = json.loads(path.read_text())
+        return {k: float(v) for k, v in data.items()} if isinstance(data, dict) else {}
+    except (OSError, ValueError, TypeError):
+        return {}
+
+
+def _write_visits(path: Path | None, visits: dict, live: set) -> None:
+    """Keep only checkouts that still exist in a repository listing; best effort."""
+    if path is None:
+        return
+    try:
+        atomic_write_text(path, json.dumps({k: v for k, v in visits.items() if k in live}, sort_keys=True))
+    except OSError:
+        pass
 
 
 def closed_branches(repo: Path, run) -> set[str]:
@@ -434,7 +485,7 @@ def maybe_spawn(state: Path, repo: Path, free_pct: float | None, *, now: float |
     if now - last < interval:
         return "not-due"
     state.mkdir(parents=True, exist_ok=True)
-    stamp.write_text(json.dumps({"startedAt": now}))
+    atomic_write_text(stamp, json.dumps({"startedAt": now}))
     subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "--state", str(state), "--repo", str(repo)],
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                      start_new_session=True, **lifecycle.spawn_kwargs())
@@ -448,6 +499,10 @@ def maybe_spawn(state: Path, repo: Path, free_pct: float | None, *, now: float |
 # any branch, no stash, no linked worktrees, no live process, idle for STANDALONE_IDLE_S.
 STANDALONE_IDLE_S = 7 * 86400
 KEEP_MARKER = ".sweep-keep"
+ARTIFACT_IDLE_S = 24 * 3600
+# Retired lane roots: nothing dispatches there any more, so build output is dead weight even
+# when the clone itself cannot be deleted yet (unpublished work awaiting archive).
+RETIRED_ROOT_GLOBS = ("grok-ship-workspaces/*/*", "codex-ship-workspaces/*/*", "grok-wt/*")
 HEADROOM_WARN_PCT = 70
 HEADROOM_CRIT_PCT = 85
 REPORT_INTERVAL_S = 86400
@@ -456,7 +511,7 @@ STATE_REF_MAX_BYTES = 8 * 1024 * 1024
 
 def standalone_globs(home: Path, state: Path) -> list[tuple[Path, str]]:
     return [(home, "grok-ship-workspaces/*/*"), (home, "codex-ship-workspaces/*/*"), (home, "grok-wt/*"),
-            (home, "codex-worktrees/*"), (home, "wt-*"), (Path("/srv/worktrees"), "codex-worktrees/*"), (state, "bindings/*/worktrees/*"),
+            (home, "codex-worktrees/*"), (home, "wt-*"), (home, "wt/*"), (Path("/srv/worktrees"), "codex-worktrees/*"), (state, "bindings/*/worktrees/*"),
             (state, "runs/owner-*/checkout")]
 
 
@@ -570,6 +625,29 @@ def tree_kib(path: Path, run) -> int | None:
         return None
 
 
+def retired_root(home: Path, path: Path) -> bool:
+    return any(path in home.glob(pattern) for pattern in RETIRED_ROOT_GLOBS)
+
+
+def prune_artifacts(path: Path) -> int:
+    """Remove regenerable build output from a kept clone; tracked and untracked sources stay. Returns KiB freed."""
+    freed = 0
+    for root, dirs, _files in os.walk(path):
+        keep = []
+        for name in dirs:
+            if name in BUILD_DIRS:
+                target = Path(root) / name
+                try:
+                    freed += sum(f.stat().st_size for f in target.rglob("*") if f.is_file() and not f.is_symlink()) // 1024
+                except OSError:
+                    pass
+                shutil.rmtree(target, ignore_errors=True)
+            elif name != ".git":
+                keep.append(name)
+        dirs[:] = keep
+    return freed
+
+
 def sweep_standalone(home: Path, state: Path, repos: list[Path], never: list[Path], *, run=lifecycle.run,
                      now: float | None = None, idle_s: float = STANDALONE_IDLE_S,
                      remove=shutil.rmtree) -> dict:
@@ -591,6 +669,11 @@ def sweep_standalone(home: Path, state: Path, repos: list[Path], never: list[Pat
             verdict = standalone_verdict(path, live, run, now, state, idle_s)
             if verdict:
                 report["kept"][verdict] = report["kept"].get(verdict, 0) + 1
+                if verdict not in {"busy", "keep-marker", "state-referenced"} and retired_root(home, path) \
+                        and now - newest_touch(path) >= ARTIFACT_IDLE_S:
+                    freed = prune_artifacts(path)
+                    if freed:
+                        report["artifactsFreedKiB"] = report.get("artifactsFreedKiB", 0) + freed
                 continue
             size = tree_kib(path, run)
             entry = {"at": datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -644,7 +727,7 @@ def publish_headroom(state: Path, current: dict, now: float) -> None:
     except (OSError, ValueError, AttributeError, KeyError, TypeError):
         before = {}
     at = datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    path.write_text(json.dumps({"at": at, **current}, indent=1))
+    atomic_write_text(path, json.dumps({"at": at, **current}, indent=1))
     changed = [v for v in current["volumes"] if v["level"] != before.get(v["mount"], "ok")]
     if changed:
         with open(state / "host-alarms.jsonl", "a") as handle:
@@ -681,7 +764,7 @@ def daily_report(home: Path, state: Path, now: float, *, run=lifecycle.run, targ
     before = previous.get("sizes", {})
     growers = sorted(({"path": p, "gib": round(k / 2**20, 2), "deltaGiB": round((k - before.get(p, k)) / 2**20, 2)}
                       for p, k in sizes.items()), key=lambda row: row["deltaGiB"], reverse=True)
-    path.write_text(json.dumps({
+    atomic_write_text(path, json.dumps({
         "at": datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "epoch": now,
         "volumes": headroom(volumes(home, state))["volumes"], "sizes": sizes,
         "topGrowers": growers[:10], "largest": sorted(growers, key=lambda r: -r["gib"])[:10]}, indent=1))
@@ -704,8 +787,10 @@ def guarded_main(args) -> int:
                 break
             closed[repo] = closed_branches(repo, subprocess.run)
         prefix = sweep_prefix()
+        # Alarm input first: it is a few statvfs calls and must not wait behind hours of cleanup.
+        publish_headroom(args.state, headroom(volumes(home, args.state)), time.time())
         report = sweep(repos, default_roots(home, args.state), default_never(home),
-                       closed=closed, prefix=prefix, state=args.state)
+                       closed=closed, prefix=prefix, state=args.state, budget_s=LINKED_SWEEP_BUDGET_S)
         if not report.get("drained") and not lifecycle.draining(args.state):
             report["standalone"] = sweep_standalone(home, args.state, repos, default_never(home))
             now = time.time()
@@ -716,7 +801,7 @@ def guarded_main(args) -> int:
         started = json.loads(stamp.read_text()).get("startedAt")
     except (OSError, ValueError, AttributeError):
         started = None
-    stamp.write_text(json.dumps({"startedAt": started or time.time(), **report}, indent=1))
+    atomic_write_text(stamp, json.dumps({"startedAt": started or time.time(), **report}, indent=1))
     return 0
 
 

@@ -451,7 +451,21 @@ class CheckTest(unittest.TestCase):
             root = Path(tmp) / "symphony-elixir-workspaces"
             self.assertFalse(guard.reclaimable(None, roots=[root]))
             (root / "JOV-1").mkdir(parents=True)
-            self.assertTrue(guard.reclaimable(None, roots=[root]))
+            with patch.object(guard, "free_pct", return_value=guard.LOW_PCT), \
+                    patch.object(guard, "mount_points", return_value=set()):
+                self.assertTrue(guard.reclaimable(None, roots=[root]))
+            # 2026-10-25: a bind-mounted child (skipped whole by the sweep) or one on a roomy
+            # volume is not reclaimable; counting it held capacity at "disk-reclamation-pending".
+            with patch.object(guard, "free_pct", return_value=guard.LOW_PCT), \
+                    patch.object(guard, "mount_points", return_value={(root / "JOV-1").resolve()}):
+                self.assertFalse(guard.reclaimable(None, roots=[root]))
+            with patch.object(guard, "free_pct", return_value=guard.LOW_PCT + 20), \
+                    patch.object(guard, "mount_points", return_value=set()):
+                self.assertFalse(guard.reclaimable(None, roots=[root]))
+            # An unreadable mount table fails closed: this feeds a deletion decision.
+            with patch.object(guard, "free_pct", return_value=guard.LOW_PCT), \
+                    patch.object(guard, "mount_points", return_value=None):
+                self.assertFalse(guard.reclaimable(None, roots=[root]))
 
     def test_cleanup_lock_serializes_workers_and_recovers_after_release(self):
         with tempfile.TemporaryDirectory() as tmp, patch.object(guard, "free_pct", return_value=10.0), \
@@ -469,7 +483,8 @@ class CheckTest(unittest.TestCase):
 
     def test_cleanup_stops_if_disk_becomes_critical_between_steps(self):
         with tempfile.TemporaryDirectory() as tmp, \
-                patch.object(guard, "free_pct", side_effect=[10.0, 10.0, 4.0, 4.0]), \
+                patch.object(guard, "lanes_free", side_effect=[(10.0, []), (4.0, [])]), \
+                patch.object(guard, "lanes_free_pct", side_effect=[10.0, 4.0]), \
                 patch.object(guard, "sweep_derived_data") as first, \
                 patch.object(guard, "sweep_worktrees") as second:
             report = guard.check(self.host(tmp), sweep=True)
@@ -889,6 +904,38 @@ class GitHousekeepingTest(unittest.TestCase):
             git_housekeeping.remove_tree(target)
         self.assertEqual(target.read_text(), "keep")
         git_housekeeping.remove_tree(root)
+
+
+class LanesMountsTest(unittest.TestCase):
+    """JOV-10233: the state root and the bind-mounted worktree disk are different filesystems."""
+
+    def test_lowest_mount_decides_admission_and_sweep(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            (state / "worktrees").mkdir()
+            readings = {str(state): 22.6, str(state / "worktrees"): 0.0}
+            with patch.object(guard, "lanes_mounts", return_value=[state, state / "worktrees"]), \
+                    patch.object(guard, "free_pct", side_effect=lambda path: readings[str(path)]):
+                pct, rows = guard.lanes_free(state)
+                report = guard.check(SimpleNamespace(state=state, repo=state), run=ok)
+        self.assertEqual(pct, 0.0)
+        self.assertEqual({row["path"] for row in rows}, {str(state), str(state / "worktrees")})
+        self.assertTrue(report["critical"])
+        self.assertFalse(report["admitted"])
+        self.assertEqual(len(report["mounts"]), 2)
+
+    def test_mounts_are_deduplicated_by_device(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            (state / "runs").mkdir()
+            (state / "bindings" / "LYB" / "worktrees").mkdir(parents=True)
+            self.assertEqual(guard.lanes_mounts(state), [state])  # one tmpfs/dev: one row
+
+    def test_unreadable_state_root_is_unknown_not_free(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            with patch.object(guard, "free_pct", return_value=None):
+                self.assertEqual(guard.lanes_free(state)[0], None)
 
 
 if __name__ == "__main__":

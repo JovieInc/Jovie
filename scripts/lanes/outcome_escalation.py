@@ -4,7 +4,7 @@ When the model marks an acceptance item `unverifiable`, the lane tries, in order
 capability before accepting that:
 
   1. tools      a headless Playwright load of the item's URLs with a screenshot, then a vision read of the
-                screenshot. A page that loads and shows the thing means the item was observable after all.
+                screenshot. Reachability is an attempt, not evidence that the criterion passed or failed.
   2. telemetry  the model must say which signal it added or queued, or why that is not cheap.
   3. agent-help ask an agent that has the capability (mesh to Summer or Instinct when the host holds
                 mesh credentials, else the lanes escalation surface: a Linear help-request comment).
@@ -23,6 +23,9 @@ import sys
 import time
 import urllib.request
 from pathlib import Path
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 
 STEPS = ("tools", "telemetry", "agent-help", "adversarial")
 PROBE_TIMEOUT_S = 120
@@ -101,7 +104,7 @@ def browser_probe(tree: Path, url: str, out_dir: Path, run, env: dict) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     shot = out_dir / ("probe-" + re.sub(r"[^A-Za-z0-9]+", "-", url)[-60:] + ".png")
     try:
-        script.write_text(PROBE_JS)
+        atomic_write_text(script, PROBE_JS)
         done = run(["node", str(script), url, str(shot)], cwd=str(web), env={**env, "PLAYWRIGHT_BROWSERS_PATH": "/opt/ms-playwright"},
                    capture_output=True, text=True, timeout=PROBE_TIMEOUT_S)
         last = (done.stdout or "").strip().splitlines()[-1:] or [""]
@@ -118,7 +121,7 @@ def vision_read(shot: str | None, out_dir: Path, run, env: dict, codex_cmd: list
     answer = Path(out_dir) / "vision.txt"
     prompt = Path(out_dir) / "vision.prompt.md"
     answer.unlink(missing_ok=True)
-    prompt.write_text(f"Open the image file {shot} with your image viewing tool and describe, in at most 6 short lines, "
+    atomic_write_text(prompt, f"Open the image file {shot} with your image viewing tool and describe, in at most 6 short lines, "
                       f"exactly which UI states, text and layout are visible. Write only that description to {answer}. "
                       "Do nothing else.")
     try:
@@ -261,8 +264,11 @@ def evaluate_reply(item: dict, reply_text: str, urlopen=None) -> dict:
 
 def escalate(items: list[dict], *, tree: Path, out_dir: Path, run, env: dict, codex_cmd: list[str], linear, issue: dict,
              mesh_send=None, sha: str = "", urlopen=None) -> list[dict]:
-    """Attach `attempts` to every unverifiable item (the model supplies its telemetry attempt). May flip an item
-    the probe shows to be observable to `fail` ("observable but not observed")."""
+    """Attach `attempts` to every unverifiable item (the model supplies its telemetry attempt).
+
+    A reachable URL may only report build metadata or an anonymous shell. Preserve the criterion's
+    evidence and status unless the existing criterion-specific help/review supplies a verdict.
+    """
     result = []
     for item in items:
         if item.get("status") != "unverifiable":
@@ -272,14 +278,12 @@ def escalate(items: list[dict], *, tree: Path, out_dir: Path, run, env: dict, co
         attempts = [a for a in (item.get("attempts") or []) if isinstance(a, dict) and a.get("step") in STEPS and a.get("step") != "tools"
                     and a.get("step") != "agent-help" and a.get("step") != "adversarial"]  # code owns tools/help/adversarial
         urls = item_urls(item)
-        blocked = True
         probes = []
         for url in urls:
             probe = browser_probe(tree, url, out_dir, run, env)
             vision = vision_read(probe.get("screenshot"), out_dir, run, env, codex_cmd) if probe.get("ok") else None
             probes.append({"url": url, "status": probe.get("status"), "finalUrl": probe.get("finalUrl"), "error": probe.get("error"),
                            "vision": vision})
-            blocked = blocked and looks_blocked(probe)
         if urls:
             summary = "; ".join(f"{p['url']} -> {p.get('status') or 'no response'} {p.get('finalUrl') or ''} "
                                 f"{'vision: ' + p['vision'] if p.get('vision') else (p.get('error') or '')}".strip() for p in probes)
@@ -287,13 +291,6 @@ def escalate(items: list[dict], *, tree: Path, out_dir: Path, run, env: dict, co
         else:
             attempts.append({"step": "tools", "result": "no URL to load; HTTP/API reads and logs were tried by the verifier: "
                              + str(item.get("evidence") or "")[:200]})
-        if urls and not blocked:
-            item["status"] = "fail"
-            item["evidence"] = ("observable but not observed: the page loads for the lane's own browser, so this is not "
-                                "unverifiable. " + attempts[-1]["result"])[:600]
-            item["attempts"] = attempts
-            result.append(item)
-            continue
         corr = correlation_id(issue["id"], item, sha)
         item["helpCorr"] = corr
         found = find_help((issue.get("comments") or {}).get("nodes") or [], corr)
@@ -343,20 +340,24 @@ def gap_for(issue: str, item: dict) -> dict:
 
 
 def route_gaps(state: Path, linear, issue: dict, items: list[dict], now: float, sha: str = "", episode: str | None = None) -> list[dict]:
-    """Record each unverifiable item as a capability gap (state ledger + one comment) so it gets built."""
-    gaps = [gap_for(issue["identifier"], item) for item in items if item.get("status") == "unverifiable"]
-    if not gaps:
+    """Replace gaps from a complete judged verification; no gaps retires older help correlations."""
+    if not items:
         return []
+    gaps = [gap_for(issue["identifier"], item) for item in items if item.get("status") == "unverifiable"]
     path = Path(state) / GAP_FILE
     try:
         book = json.loads(path.read_text())
         book = book if isinstance(book, dict) else {}
     except (OSError, ValueError):
         book = {}
+    if not gaps and issue["identifier"] not in book:
+        return []
     book[issue["identifier"]] = {"at": now, "sha": sha, "episode": episode, "gaps": gaps}
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(book, sort_keys=True))
     os.replace(tmp, path)
+    if not gaps:
+        return []
     lines = [GAP_MARKER, f"Outcome verification left {len(gaps)} item(s) unverifiable after escalation. Each is a missing capability, not a pass:"]
     for gap in gaps:
         lines.append(f"- {gap['criterion']}: needs {gap['capability']} ({gap['build']}); owner {gap['owner']}. Tried: "
@@ -384,7 +385,8 @@ def read_gaps(state: Path) -> dict:
 def followup_replies(state: Path, linear, now: float, limit: int = 15, urlopen=None) -> list[dict]:
     """Close help loops between verifications: for each gap with an open help request, read the issue's
     comments, and when a reply arrived re-evaluate the item. Supported or contradicted resolves the gap
-    (comment + ledger). Returns the resolutions so the caller can act on a contradiction."""
+    (comment + ledger). Returns resolutions and per-issue query errors so the caller can act on
+    contradictions even when another issue cannot be read."""
     book = read_gaps(state)
     resolved, checked = [], 0
     for ident, record in sorted(book.items()):
@@ -392,7 +394,11 @@ def followup_replies(state: Path, linear, now: float, limit: int = 15, urlopen=N
             if not gap.get("helpCorr") or gap.get("resolved") or checked >= limit:
                 continue
             checked += 1
-            row = linear.gql(HELP_ISSUE_QUERY, {"id": ident}).get("issue")
+            try:
+                row = linear.gql(HELP_ISSUE_QUERY, {"id": ident}).get("issue")
+            except (OSError, ValueError, RuntimeError, KeyError) as error:
+                resolved.append({"issue": ident, "error": type(error).__name__})
+                continue  # leave this gap retryable while returning other resolutions
             if not row:
                 continue
             found = find_help((row.get("comments") or {}).get("nodes") or [], gap["helpCorr"])

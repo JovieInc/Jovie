@@ -1,6 +1,7 @@
 'use client';
 
 import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
+import { formatReleaseArtistLine } from '@/lib/discography/formatting';
 import { DemoAuthShell } from './DemoAuthShell';
 import { DEMO_RELEASE_VIEW_MODELS } from './mock-release-data';
 
@@ -38,7 +39,8 @@ export function DemoReleaseTrackedLinksSurface() {
                     {release.title}
                   </p>
                   <p className='text-xs text-secondary-token'>
-                    {release.artistNames?.join(', ') ?? 'Unknown artist'}
+                    {formatReleaseArtistLine(release.artistNames) ??
+                      'Unknown artist'}
                   </p>
                 </div>
                 <div className='rounded-full border border-subtle bg-surface-0 px-3 py-1.5 text-xs font-medium text-secondary-token'>

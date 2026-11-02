@@ -12,13 +12,13 @@ describe('rowLayout', () => {
     expect(rowLayout(0)).toEqual({ y: 0, scale: 1, opacity: 0 });
   });
   it('places adjacent rows one step away at the resting opacity', () => {
-    expect(rowLayout(1)).toEqual({ y: ROW_STEP_PX, scale: 1, opacity: 0.55 });
-    expect(rowLayout(-1)).toEqual({ y: -ROW_STEP_PX, scale: 1, opacity: 0.55 });
+    expect(rowLayout(1)).toEqual({ y: ROW_STEP_PX, scale: 1, opacity: 0.8 });
+    expect(rowLayout(-1)).toEqual({ y: -ROW_STEP_PX, scale: 1, opacity: 0.8 });
   });
   it('compresses and dims the outer rows', () => {
     const outer = rowLayout(2);
     expect(outer.y).toBe(ROW_STEP_PX + OUTER_STEP_PX);
-    expect(outer.opacity).toBeCloseTo(0.2, 12);
+    expect(outer.opacity).toBeCloseTo(0.5, 12);
     expect(outer.scale).toBeCloseTo(0.86, 12);
     expect(rowLayout(-2).y).toBe(-outer.y);
   });
@@ -40,9 +40,9 @@ describe('rowLayout', () => {
   it('interpolates between the center and the first step', () => {
     const half = rowLayout(0.5);
     expect(half.y).toBe(ROW_STEP_PX / 2);
-    expect(half.opacity).toBeCloseTo(0.275, 12);
-    expect(rowLayout(1.5).opacity).toBeCloseTo(0.375, 12);
-    expect(rowLayout(2.5).opacity).toBeCloseTo(0.1, 12);
+    expect(half.opacity).toBeCloseTo(0.4, 12);
+    expect(rowLayout(1.5).opacity).toBeCloseTo(0.65, 12);
+    expect(rowLayout(2.5).opacity).toBeCloseTo(0.25, 12);
   });
 });
 

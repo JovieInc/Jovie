@@ -41,14 +41,14 @@ import {
 /** Summer card idempotency keys for claim cards start with this. */
 export const CLAIM_VERIFICATION_CARD_PREFIX = 'claim-verification_';
 
-export function claimVerificationCardKey(profileId: string): string {
-  return `${CLAIM_VERIFICATION_CARD_PREFIX}${profileId}`;
+export function claimVerificationCardKey(profileId: string, round = 0): string {
+  return `${CLAIM_VERIFICATION_CARD_PREFIX}${profileId}${round > 0 ? `.r${round}` : ''}`;
 }
 
 /** Profile id from a claim card's idempotency key, or null for other cards. */
 export function profileIdFromClaimCardKey(key: string): string | null {
   return key.startsWith(CLAIM_VERIFICATION_CARD_PREFIX)
-    ? key.slice(CLAIM_VERIFICATION_CARD_PREFIX.length) || null
+    ? key.slice(CLAIM_VERIFICATION_CARD_PREFIX.length).split('.')[0] || null
     : null;
 }
 
@@ -64,6 +64,8 @@ export async function fileClaimVerificationCard(input: {
   readonly profileId: string;
   readonly handle: string;
   readonly record: ClaimVerificationRecord;
+  /** Lets the operator match a support email to the request. */
+  readonly requesterEmail?: string | null;
 }): Promise<void> {
   const { record } = input;
   if (record.status !== 'pending_verification') return;
@@ -74,15 +76,25 @@ export async function fileClaimVerificationCard(input: {
   ].filter((url): url is string => url !== null);
 
   const result = await submitSummerCard({
-    idempotencyKey: claimVerificationCardKey(input.profileId),
+    idempotencyKey: claimVerificationCardKey(
+      input.profileId,
+      record.reopenCount ?? 0
+    ),
     kind: 'decision',
     product: 'jov',
     title: `Verify artist claim: ${artist}`.slice(0, 120),
-    body: [
-      `@${input.handle} paid $12 and asked to link ${artist} (${record.reach.value.toLocaleString('en-US')} Spotify followers, threshold ${record.reach.threshold.toLocaleString('en-US')}).`,
-      `Requested ${record.requestedAt}, paid ${record.paidAt ?? 'unknown'}.`,
-      'Approve links the artist to their profile. Reject refunds the first month and cancels the subscription.',
-    ].join('\n'),
+    body: (record.proofOnly
+      ? [
+          `@${input.handle} was admitted free and asked to link ${artist} (${record.reach.value.toLocaleString('en-US')} Spotify followers). Their page is private until you approve.`,
+          `Account email: ${input.requesterEmail ?? 'unknown'}. Requested ${record.requestedAt}. Nothing was paid.`,
+          'Approve links the artist and publishes the page. Reject keeps the page private; there is nothing to refund.',
+        ]
+      : [
+          `@${input.handle} paid $12 and asked to link ${artist} (${record.reach.value.toLocaleString('en-US')} Spotify followers, threshold ${record.reach.threshold.toLocaleString('en-US')}).`,
+          `Requested ${record.requestedAt}, paid ${record.paidAt ?? 'unknown'}.`,
+          'Approve links the artist to their profile. Reject refunds the first month and cancels the subscription.',
+        ]
+    ).join('\n'),
     recommendation:
       'Approve only with ownership evidence (artist email domain, verified social, distributor account). Otherwise reject.',
     defaultIfSilent:
@@ -340,6 +352,9 @@ async function linkVerifiedArtist(input: {
       .set({
         spotifyId: next.spotifyArtistId,
         spotifyUrl: `https://open.spotify.com/artist/${next.spotifyArtistId}`,
+        // Proof is what publishes a free-admission page; a paid request was
+        // already public, so this is idempotent for it.
+        isPublic: true,
         settings: withClaimVerification(
           {
             ...base,
@@ -413,7 +428,14 @@ export async function decideClaimVerification(input: {
   if (snapshot.status !== 'pending_verification') {
     return { outcome: 'not_pending', record: snapshot };
   }
-  if (input.decision === 'reject' && !row.subscriptionId) {
+  // A paid high-reach request must have its subscription to refund. A
+  // proof-only request may or may not have one: it is free to admit, and the
+  // artist may have paid since (checkout is allowed while proof is pending).
+  if (
+    input.decision === 'reject' &&
+    snapshot.paidAt !== null &&
+    !row.subscriptionId
+  ) {
     return { outcome: 'no_subscription' };
   }
 
@@ -436,7 +458,14 @@ export async function decideClaimVerification(input: {
   let releasedHandles: string[] = [];
   let refundId: string | null = null;
   try {
-    if (input.decision === 'reject' && row.subscriptionId) {
+    // Paid high-reach and paying proof-only artists get the same remedy: the
+    // first month is refunded and the subscription is cancelled, as the terms
+    // at checkout promise.
+    if (
+      input.decision === 'reject' &&
+      row.subscriptionId &&
+      (current.paidAt !== null || current.proofOnly === true)
+    ) {
       const refund = await refundFirstMonthAndCancel({
         subscriptionId: row.subscriptionId,
         // Per subscription: a profile re-requested and rejected again inside
@@ -516,7 +545,9 @@ export async function decideClaimVerification(input: {
     // Keep Tim's queue truthful when the decision came from the admin API.
     try {
       await decideSummerCard({
-        id: summerCardId(claimVerificationCardKey(input.profileId)),
+        id: summerCardId(
+          claimVerificationCardKey(input.profileId, current.reopenCount ?? 0)
+        ),
         decision: input.decision,
         comment: input.reason ?? null,
         decidedBy: input.decidedBy,

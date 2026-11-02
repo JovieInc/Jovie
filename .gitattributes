@@ -16,3 +16,7 @@
 *.patch -whitespace
 # Regenerate from scripts/artist-launch-policy.mjs; never edit the inventory.
 docs/product/generated/artist-launch-inventory.json linguist-generated=true
+
+# JOV-8754: vendored third-party GitHub Actions stay byte-identical to upstream
+# (integrity-checked by scripts/vendor-actions.mjs); skip whitespace checks.
+.github/actions/vendor/** -whitespace

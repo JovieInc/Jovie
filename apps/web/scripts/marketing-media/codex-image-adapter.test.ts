@@ -6,6 +6,7 @@ import {
   type CodexExecResult,
   createCodexImageAdapter,
   pngSize,
+  promptFor,
   resolveCodexBinary,
 } from './codex-image-adapter';
 
@@ -16,6 +17,7 @@ const request = {
   width: 1600,
   height: 1000,
   brief: 'one quiet focal gradient',
+  quietZone: { position: 'left third', size: '42% of the frame width' },
 };
 
 /** A minimal PNG header: signature, IHDR length/type, width, height. */
@@ -62,6 +64,20 @@ function fakeExec(
 
 const chatgpt = () => 'Logged in using ChatGPT\n';
 
+describe('promptFor', () => {
+  it('names the quiet zone and refuses a blank one', () => {
+    expect(promptFor(request)).toContain(
+      'Quiet content zone: left third. Size: 42% of the frame width.'
+    );
+    expect(() =>
+      promptFor({
+        ...request,
+        quietZone: { position: '  ', size: '42% of the frame width' },
+      })
+    ).toThrow(/quiet content zone position and size/);
+  });
+});
+
 describe('createCodexImageAdapter', () => {
   it('generates through codex exec on the subscription with no API key in the env', async () => {
     const calls: { args: readonly string[]; env: NodeJS.ProcessEnv }[] = [];
@@ -89,6 +105,9 @@ describe('createCodexImageAdapter', () => {
       );
       expect(calls[0]?.args.at(-1)).toMatch(/built-in image_gen tool/);
       expect(calls[0]?.args.at(-1)).toMatch(/one quiet focal gradient/);
+      expect(calls[0]?.args.at(-1)).toMatch(/Quiet content zone: left third/);
+      expect(calls[0]?.args.at(-1)).toMatch(/Size: 42% of the frame width/);
+      expect(calls[0]?.args.at(-1)).toMatch(/Never blow the zone out/);
     } finally {
       delete process.env.OPENAI_API_KEY;
     }

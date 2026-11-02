@@ -50,6 +50,9 @@ import lifecycle  # noqa: E402
 import devin_free_policy  # noqa: E402
 import autoscale  # noqa: E402
 import capacity_limit  # noqa: E402
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
 import git_housekeeping  # noqa: E402  (detached git maintenance vs cleanup)
 import fleet_gate_emitter  # noqa: E402
@@ -58,8 +61,16 @@ import execution_attempt  # noqa: E402
 import file_overlap  # noqa: E402
 import claude_lane  # noqa: E402  (subscription quota bank read by the router)
 import hyperagent_lane  # noqa: E402
+import hyperagent_repair  # noqa: E402
+import migration_renumber  # noqa: E402  (no-model fix for migration number collisions)
+import fix_red_classes  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
+from gh_budget import gh_call  # noqa: E402  (budgeted gh for new lane code)
+import machine_gap  # noqa: E402
+import slot_yield  # noqa: E402  (slot ceilings from measured merged-per-dollar)  (abstraction gate: build the machine on the 3rd repeat or a costly task)
+import update_drain  # noqa: E402  (drain gate admission while an update waits)
 import linear_app_token  # noqa: E402  (Jovie Lanes OAuth app quota, separate from Tim's user)
 import linear_sync  # noqa: E402  (local issue mirror, claim ledger, write outbox)
+import board_intake  # noqa: E402  (mesh board work for codex, closed on verified outcomes)
 import ownership  # noqa: E402  (started-state live-owner invariant)
 import fleet_ledger  # noqa: E402  (external agent claims, stranded-claim view)
 import pr_events  # noqa: E402
@@ -70,9 +81,11 @@ import worktree_sweep  # noqa: E402  (idle / merged-PR checkout retirement, JOV-
 import worktree_pool  # noqa: E402  (pre-installed worktree pool, JOV-7705)
 import reason_lane  # noqa: E402
 import outcome_lane  # noqa: E402
+import throughput_sentinel  # noqa: E402
 import taste_default  # noqa: E402
 import yc_corpus  # noqa: E402
 import credentials_spend  # noqa: E402
+import model_family_sync  # noqa: E402
 import capacity_live  # noqa: E402  (live quota reads for the capacity registry)
 import capacity_registry  # noqa: E402  (caps and policies come from ops/registry/capacity.json)
 import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
@@ -80,6 +93,9 @@ import qualification_guard  # noqa: E402
 import dependency_diff  # noqa: E402  (immutable dependency-version chore evidence)
 import bindings  # noqa: E402  (extra Linear team -> repo bindings, e.g. LYB)
 import binding_refill  # noqa: E402  (Backlog -> Todo refill per extra binding)
+import priority_admission  # noqa: E402  (Urgent/Summer-ranked admission, Todo WIP sanity, claim rank; JOV-7073)
+import macos_pool  # noqa: E402  (shared hosted-macOS pool: measure, record, gate LYB iOS intake)
+import decompose_pass  # noqa: E402  (standing epic decomposition when Todo < half target)
 import epics  # noqa: E402  (epic decomposition/closure and the expiring hold)
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
 # loaders (the HUD) may later rebind sys.modules["lane_runner"] to a fresh copy.
@@ -127,7 +143,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py",
+LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_migration_renumber.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -143,21 +159,34 @@ LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_a
               "scripts/tests/test_capacity_limit.py", "scripts/tests/test_capacity_registry.py", "scripts/tests/test_fleet_gate_emitter.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
               "scripts/tests/test_epics.py",
-              "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py",
-              "scripts/tests/test_backlog_rank.py"]
+              "scripts/tests/test_board_intake.py", "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py", "scripts/tests/test_priority_admission.py", "scripts/tests/test_macos_pool.py",
+              "scripts/tests/test_backlog_rank.py", "scripts/tests/test_decompose_pass.py",
+              "scripts/tests/test_pytest_hook_names.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
-RELEASE_EXTRAS = ["scripts/shipping_origin.py", # Shared client layer (budgeted gh) used by the throughput sentinel.
+RELEASE_EXTRAS = ["scripts/shipping_origin.py",
+                  # Subsidy pool burn policy (floor, burn order) that codex_lane reads at runtime.
+                  "apps/web/lib/ai/routing.json",
+                  # Shared client layer (budgeted gh) used by the throughput sentinel.
                   "scripts/apiclient/__init__.py", "scripts/apiclient/__main__.py", "scripts/apiclient/cache.py", "scripts/apiclient/client.py", "scripts/apiclient/contract.py", "scripts/apiclient/credentials.py", "scripts/apiclient/fake.py", "scripts/apiclient/gh.py", "scripts/apiclient/github.py", "scripts/apiclient/headers.py", "scripts/apiclient/legacy.py", "scripts/apiclient/linear.py", "scripts/apiclient/policy.py", "scripts/apiclient/store.py",
                   "packages/api-client/providers.json",
+                  "scripts/lib/github-rate-limit.mjs",
+                  # The shipped failure-hold module uses the canonical Node client.
+                  "packages/api-client/gh.ts", "packages/api-client/client.ts",
+                  "packages/api-client/cache.ts", "packages/api-client/contract.ts",
+                  "packages/api-client/headers.ts", "packages/api-client/policy.ts",
+                  "packages/api-client/store.ts", "packages/api-client/cli.ts",
+                  # Headroom file for Summer/Ovie (credentials_spend.py publishes it).
+                  "scripts/rate-limit-headroom.mjs", "scripts/lib/api-budget.mjs", "ops/registry/rate-limits.json",
                   "scripts/fleet-gate/gem-priority-gate.py", "scripts/fleet-gate/closure_health.py",
                   "scripts/fleet-gate/gem_gate_contract.py", "scripts/fleet-gate/summer_ci_audit.py",
                   "scripts/fleet-gate/symphony_proof_context.py", "scripts/fleet-gate/scoped_admission.py",
                   "scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
                   "scripts/lib/merge-group-ahead-attribution.mjs",
                   "scripts/lib/merge-group-admission.mjs",
-                  "scripts/lib/source-admission-policy.mjs", "scripts/pr-fleet-rules.mjs",
+                  "scripts/lib/source-admission-policy.mjs", "scripts/pr-fleet-rules.mjs", "scripts/lib/wins-ledger.mjs",
                   "scripts/lib/merge-group-member-policy.mjs",
+                  "scripts/lib/pr-size-exclusions.mjs",
                   "scripts/lib/product-lane-classifier.mjs",
                   "scripts/lib/pr-size-guard-policy.mjs", "scripts/lib/repo-hygiene-limits.mjs",
                   "scripts/lib/pre-land-changelog.mjs", "scripts/version-fanout-guard.mjs",
@@ -182,7 +211,9 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", # Shared client layer (budgeted 
                   "scripts/credentials-spend-check.mjs", "scripts/lib/credentials-live-reads.mjs",
                   "scripts/lib/credentials-registry.mjs", "scripts/lib/linear-issue-intake.mjs",
                   "scripts/lib/linear-cooldown.mjs", "ops/registry/credentials.json",
-                  "ops/registry/spend.json", "ops/registry/capacity.json", "ops/registry/third-party-grants.jsonl",
+                  "ops/registry/spend.json", "ops/registry/capacity.json",
+                  "scripts/backlog-orchestrator/config/model-registry.json",
+                  "scripts/tests/fixtures/capacity-pricing-vectors.json",
                   "ops/registry/inventory.gen.json"]
 # Preserve legacy dated run prefixes; only Hyperagent also owns the exact
 # public 15-hex identity digest generated by run_hyperagent_issue.
@@ -525,7 +556,9 @@ class Host:
     def base_slots(self, provider: str, default: int) -> int:
         if provider == 'devin' and not devin_free_policy.admission_open(self.agent_timeout):
             return 0
-        return int(os.environ.get(f"LANES_SLOTS_{provider.upper()}", default))
+        configured = int(os.environ.get(f"LANES_SLOTS_{provider.upper()}", default))
+        # Pay-per-use lanes earn slots by measured merged PRs per dollar (slot_yield); everything else is as configured.
+        return slot_yield.ceiling(self.state, provider, configured)[0]
 
     def slots(self, provider: str, default: int) -> int:
         return autoscale.effective_slots(self.state, provider, self.base_slots(provider, default))
@@ -836,7 +869,9 @@ def admission_order(issue: Issue, now: float) -> tuple:
     labels = {label.lower() for label in issue.labels}
     tier = (-1 if {SHARED_LABEL, "dispatch-next"} <= labels
             else 0 if effective_priority == 1 or workstreams.compounding(stream) else 1)
-    return (0 if priority == 1 else 1, tier, effective_priority, workstreams.rank(stream),
+    # Summer's signed portfolio rank is the first key, then explicit Urgent, tier, aged priority, age (JOV-7073).
+    return (*priority_admission.claim_key(issue.identifier, priority_admission.summer_ranks(now=now)),
+            0 if priority == 1 else 1, tier, effective_priority, workstreams.rank(stream),
             created_at if created_at is not None else float("inf"))
 
 
@@ -912,6 +947,17 @@ def recent_lane_runs(host: "Host", name: str, window_s: float, now: float, tail_
 
 
 def quota_pressure(host: "Host", name: str, spec: dict, now: float) -> dict:
+    """quota_window_pressure plus the registry's pace adjustment (`paceAdjust`, may be negative):
+    a lane behind pace on use-or-lose quota is cheap to route to, a pool ahead of pace costs more."""
+    seen = quota_window_pressure(host, name, spec, now)
+    if seen.get("ok"):
+        pace = capacity_registry.pace_adjust(capacity_registry.load(), host.state, name, now)
+        if pace["adjust"]:
+            seen = {**seen, "paceAdjust": pace["adjust"], "why": f"{seen.get('why')}; {pace['why']}"}
+    return seen
+
+
+def quota_window_pressure(host: "Host", name: str, spec: dict, now: float) -> dict:
     """{ok, why, pressure}: how much of the lane's quota window is spent. Pressure raises the
     effective cost of subscription and credit lanes as they fill; a bank removes them."""
     quota = spec.get("quota") or {}
@@ -978,7 +1024,8 @@ def lane_availability(host: "Host", self_name: str, providers: dict, now: float 
                   and now - last_at < IDLE_BLOCK_S):
                 verdict = {"ok": False, "why": f"blocked:{last['reason']}", "pressure": 0}
             elif not slot_free(host, name, slots):
-                verdict = {"ok": False, "why": "saturated", "pressure": quota["pressure"]}
+                verdict = {"ok": False, "why": "saturated", "pressure": quota["pressure"],
+                           "paceAdjust": quota.get("paceAdjust", 0)}
         cache[name] = verdict
         return verdict
 
@@ -1195,8 +1242,35 @@ def goal_contract(issue) -> list[str]:
     ]
 
 
+def machine_gate(host: Host, subject: str, title: str, labels, text: str, provider: str | None,
+                 fp: str | None = None, receipt: dict | None = None) -> list[str]:
+    """Prompt clause of the abstraction gate for this run, after recording it in the fingerprint ledger.
+    Best effort: an unreadable ledger yields the plain reminder, never a failed run."""
+    try:
+        fp = fp or machine_gap.fingerprint(title, labels)
+        decision = machine_gap.decide(host.state, fp, text, labels, est_usd=run_cost_usd(host, provider))
+        machine_gap.record(host.state, fp, "lane-run", subject, est_usd=run_cost_usd(host, provider))
+        if receipt is not None:
+            receipt["machineGate"] = {key: decision[key] for key in ("fp", "required", "reason", "occurrences", "waived")}
+        return machine_gap.clause(decision)
+    except (OSError, ValueError, TypeError, KeyError):
+        return []
+
+
+def run_cost_usd(host: Host, provider: str | None) -> float | None:
+    """Average USD per run for this lane from the capacity metrics the doctor writes (None when unmeasured)."""
+    try:
+        data = json.loads((host.state / "capacity-metrics.json").read_text())
+    except (OSError, ValueError):
+        return None
+    names = {"codex": "openai-codex", "grok": "xai-grok", "claude": "anthropic-claude", "hyperagent": "hyperagent"}
+    row = (data.get("providers") or {}).get(names.get(str(provider), str(provider))) or {}
+    cost, runs = row.get("costUsd"), row.get("runs")
+    return cost / runs if isinstance(cost, (int, float)) and isinstance(runs, (int, float)) and runs else None
+
+
 def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | None = None,
-                  prior_attempts: str = "") -> str:
+                  prior_attempts: str = "", machine: list[str] | None = None) -> str:
     sensitive_contract = []
     if provider in IMPLEMENTATION_ONLY_PROVIDERS:
         sensitive_contract += [
@@ -1237,6 +1311,7 @@ def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | 
         "",
         *goal_contract(issue),
         *PLANNING_CONTRACT,
+        *([*machine, ""] if machine else []),
         "## Contract (the harness verifies every line; unmet items fail the run)",
         f"- Repo {REPO_SLUG}. Work on branch `{branch}` from origin/main. Read CLAUDE.md, the",
         "  rules it routes to for the files you touch, and docs/PR_FLOW.md before editing.",
@@ -1269,7 +1344,8 @@ def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | 
         "- You are unattended: nobody will answer a question. Never stop to ask; choose the",
         "  non-interactive path. Apart from `/autoplan`, do not run gstack or other skill",
         "  workflows (ship, review, qa, upgrade) and do not upgrade any tooling: commit with git",
-        "  and open the PR with `gh pr create --draft`.",
+        "  and open the PR with `pnpm pr:open open --draft` (drafts a gate-compliant body from the diff,",
+        "  runs the Fleet Rules and Source Validation body gates, refuses a failing PR; never raw `gh pr create`).",
         "- Remove any git worktrees you create when done (`git worktree remove`); the host",
         "  reclaims idle ones, but ENOSPC once took every lane down at once.",
         *sensitive_contract,
@@ -1965,7 +2041,7 @@ def _tmp_fallback_publish(scope_id: str, reset_s: float) -> None:
         _chmod_private(scope, 0o700)
         reset_ms = int(reset_s * 1000)
         record = scope / f"{reset_ms}-{uuid.uuid4()}.json"
-        record.write_text(json.dumps({"schema": 1, "resetAt": reset_ms}))
+        atomic_write_text(record, json.dumps({"schema": 1, "resetAt": reset_ms}))
         _chmod_private(record, 0o600)
     except OSError:
         pass
@@ -2007,6 +2083,7 @@ def publish_linear_cooldown(key: str, headers, now: float | None = None) -> floa
     if root is None:
         return reset_s
     scope = root / _linear_scope_id(key)
+    staging = None
     try:
         root.mkdir(parents=True, exist_ok=True)
         _chmod_private(root, 0o700)
@@ -2019,16 +2096,29 @@ def publish_linear_cooldown(key: str, headers, now: float | None = None) -> floa
                 if existing is not None and existing > reset_s:
                     reset_s = existing
                 reset_ms = int(reset_s * 1000)
-                record = scope / f"{reset_ms}-{uuid.uuid4()}.json"
-                fd = os.open(record, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                publication_id = uuid.uuid4()
+                record = scope / f"{reset_ms}-{publication_id}.json"
+                staging = scope / f".pending-{publication_id}"
+                fd = os.open(staging, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                with os.fdopen(fd, "w") as pending:
+                    json.dump({"schema": 1, "resetAt": reset_ms}, pending)
+                    pending.flush()
+                    os.fsync(pending.fileno())
+                _chmod_private(staging, 0o600)
+                os.rename(staging, record)
+                directory_fd = os.open(scope, os.O_RDONLY)
                 try:
-                    os.write(fd, json.dumps({"schema": 1, "resetAt": reset_ms}).encode())
+                    os.fsync(directory_fd)
                 finally:
-                    os.close(fd)
-                _chmod_private(record, 0o600)
+                    os.close(directory_fd)
             finally:
                 fcntl.flock(handle, fcntl.LOCK_UN)
     except Exception as error:
+        if staging is not None:
+            try:
+                staging.unlink(missing_ok=True)
+            except OSError:
+                pass  # Leftover staging still fail-closes strict JS readers.
         _cooldown_write_failed(root, scope.name, reset_s, error)
     return reset_s
 
@@ -2506,19 +2596,32 @@ def template(args: list[str], values: dict) -> list[str]:
 
 
 def process_group_alive(group: int) -> bool:
+    permission_error = None
     try:
         os.killpg(group, 0)
-        return True
     except ProcessLookupError:
         return False
-    except PermissionError:
-        # Darwin can report EPERM for an empty group after its leader is reaped.
-        # Verify membership instead of treating a real permission denial as success.
+    except PermissionError as error:
+        permission_error = error
+    # A successful signal probe also sees zombie-only groups on Linux; Darwin
+    # can report EPERM for an empty group. Neither proves a live member remains.
+    try:
         members = subprocess.run(["ps", "-axo", "pgid=,stat="], capture_output=True, text=True, timeout=5)
-        if members.returncode != 0:
-            raise
-        return any(fields[0] == str(group) and not fields[1].startswith("Z")
-                   for line in members.stdout.splitlines() if len(fields := line.split()) == 2)
+    except (OSError, subprocess.SubprocessError):
+        if permission_error is not None:
+            raise permission_error
+        return True  # unreadable membership cannot prove drainage
+    rows = [line.split() for line in (members.stdout or "").splitlines() if line.strip()] if members.returncode == 0 else []
+    # ps includes itself, so an empty or partially parsed table is unknown.
+    # Preserve Linux/BSD state modifiers instead of mistaking them for rows to drop.
+    valid = rows and all(len(fields) == 2 and re.fullmatch(r"[0-9]+", fields[0])
+                         and re.fullmatch(r"[DIRSTUWZXIt][<NLsl+>AEVWXJKCP]*", fields[1]) for fields in rows)
+    if not valid:
+        if permission_error is not None:
+            raise permission_error
+        return True
+    return any(fields[0] == str(group) and not fields[1].startswith("Z")
+               for fields in rows)
 
 
 def process_snapshot() -> dict:
@@ -3072,8 +3175,16 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
                               f"{type(failure).__name__}: {failure}\n")
                 except (AttributeError, OSError):
                     pass
+        stop_failure = None
+        if _lifecycle_helper:
+            _HELD_CLEANUP[:] = [owned, proc]
         try:
             owned.stop(proc)
+        except RuntimeError as failure:
+            # A failed tracked-descendant stop must not skip the process-group sweep below
+            # or replace the stop cause with a permanent cleanup hold (Gem, 2026-10-29: a
+            # `--timeout 600` trufflehog gate lived 2d17h). Re-verify drainage afterwards.
+            stop_failure = failure
         finally:
             for sig, grace in ((signal.SIGTERM, 15), (signal.SIGKILL, 5)):
                 # A reaped leader's PID/PGID may now belong to an unrelated job.
@@ -3097,6 +3208,8 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
                 else:
                     continue
                 break
+        if stop_failure is not None and not _cleanup_drained(owned, proc):
+            raise stop_failure
         raise
     finally:
         for signo, previous in restored.items():
@@ -3104,6 +3217,36 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
                 signal.signal(signo, previous)
             except (ValueError, OSError):
                 pass
+
+
+_HELD_CLEANUP: list = []  # [AgentProcesses, Popen] of the helper's last stopped run
+
+
+def _cleanup_drained(owned, proc) -> bool:
+    """True only when no owned descendant and no process-group member remains."""
+    try:
+        proc.poll()
+        return not owned.observe() and not process_group_alive(proc.pid)
+    except Exception:
+        return False  # unreadable membership cannot prove drainage
+
+
+def retry_held_cleanup() -> bool:
+    """One more TERM/KILL sweep over the helper's owned tree and its process group."""
+    import signal
+    if len(_HELD_CLEANUP) != 2:
+        return False
+    owned, proc = _HELD_CLEANUP
+    try:
+        owned.stop(proc)
+    except Exception:
+        pass
+    if proc.returncode is None:  # unreaped leader: its PID/PGID cannot belong to anyone else
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except OSError:
+            pass
+    return _cleanup_drained(owned, proc)
 
 
 PROVIDER_HANDOFFS = 2
@@ -3155,7 +3298,7 @@ def cool_down(host: Host, name: str, code: int | None = None) -> bool:
         return False
     path = host.state / "cooldown" / name
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(str(time.time() + PROVIDER_COOLDOWN_S))
+    atomic_write_text(path, str(time.time() + PROVIDER_COOLDOWN_S))
     return True
 
 
@@ -3340,8 +3483,10 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue, linear: Linear | 
                 if api is None:
                     raise OSError("Hyperagent transport unavailable")
                 prompt = render_prompt(issue, branch, context_pack(issue), provider="hyperagent",
-                                       prior_attempts=prior_attempts_context(host, linear, issue))
-                (runs / f"{run_id}.prompt.md").write_text(prompt)
+                                       prior_attempts=prior_attempts_context(host, linear, issue),
+                                       machine=machine_gate(host, issue.identifier, issue.title, issue.labels,
+                                                            issue.description or "", "hyperagent", receipt=receipt))
+                atomic_write_text(runs / f"{run_id}.prompt.md", prompt)
                 def boundary(spend, mutations, phase):
                     execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                                {"spend": spend, "mutations": mutations}, coordination=coordination, boundary_id=phase)
@@ -3461,7 +3606,9 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             worktree_pool.refill_in_background(host.repo)
             brain_context = context_pack(issue)
             prior_attempts = prior_attempts_context(host, linear, issue)
-            prompt = render_prompt(issue, branch, brain_context, provider=name, prior_attempts=prior_attempts)
+            prompt = render_prompt(issue, branch, brain_context, provider=name, prior_attempts=prior_attempts,
+                                   machine=machine_gate(host, issue.identifier, issue.title, issue.labels,
+                                                        issue.description or "", name, receipt=receipt))
             prompt_file = runs / f"{run_id}.prompt.md"
             receipt["contextManifests"] = [write_agent_prompt(
                 prompt_file, prompt, "issue", name,
@@ -3624,7 +3771,8 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
                 "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
                 "--body", f"Refs {issue.identifier}.\n\n"
                 f"<!-- linear-issue-id:{issue.id} -->\n"
-                f"<!-- linear-issue-identifier:{issue.identifier} -->\n\n"
+                f"<!-- linear-issue-identifier:{issue.identifier} -->\n"
+                '<!-- customer-changelog/v1 {"releaseWorthy":false} -->\n\n'
                 "Lane implementation; verification by the lane gate. "
                 "Runtime and commissioning acceptance remain with the issue owner."], cwd=worktree, log=log)
         except (subprocess.TimeoutExpired, OSError):
@@ -3640,6 +3788,10 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
     return gate_pr(host, pr, worktree, log, sensitive=sensitive)
 
 
+UPDATE_DRAIN_REASON = "update-pending-drain"
+STAGING_ADMISSION_WAIT_S = 20.0
+
+
 @contextmanager
 def gate_admission(host: Host, *, staging: bool = False):
     """Serialize seat admission with a non-waiting release proof reservation.
@@ -3650,7 +3802,18 @@ def gate_admission(host: Host, *, staging: bool = False):
     """
     if not staging and lifecycle.draining(host.state):
         raise lifecycle.AdmissionHeld("operator requested natural controller drain")
+    if not staging and update_drain.status(host.state)["active"]:
+        raise lifecycle.AdmissionHeld(UPDATE_DRAIN_REASON)
     admission = Locked(host.state / "locks" / "gate-admission.lock", blocking=False)
+    if staging:
+        # Other workers hold the admission lock for milliseconds while they take a seat; the proof used
+        # to lose to that on the first try. Wait briefly for it, then give up as before.
+        waited = 0.0
+        while not admission.held and waited < STAGING_ADMISSION_WAIT_S:
+            admission.release()
+            time.sleep(0.25)
+            waited += 0.25
+            admission = Locked(host.state / "locks" / "gate-admission.lock", blocking=False)
     seats = []
     try:
         if not admission.held:
@@ -3683,6 +3846,10 @@ def gate_slot(host: Host) -> tuple[Locked, float]:
                         return lock, time.time() - started
                     lock.release()
         except lifecycle.AdmissionHeld as error:
+            if str(error) == UPDATE_DRAIN_REASON:
+                # A pending update is draining the gate: wait in place (bounded by the drain), never cancel.
+                time.sleep(15)
+                continue
             raise RepairStopped(str(error), None, "before-gate-seat") from error
         time.sleep(15)
 
@@ -3752,8 +3919,6 @@ def gate_disposition(pr: dict, held: dict, attempts: dict) -> str | None:
 
 
 def gate_deferral(host: Host, pr: dict) -> str | None:
-    if pr_events.unconfirmed_human_hold(host, pr):
-        return "human-hold-pending"
     held, attempts = held_path(host), host.state / "fix-attempts.json"
     return gate_disposition(pr, json.loads(held.read_text()) if held.exists() else {},
                             json.loads(attempts.read_text()) if attempts.exists() else {})
@@ -4251,7 +4416,8 @@ def backlog_wake(host: Host) -> dict:
     extra = {binding.key: binding for binding in bindings.extra_bindings(THIS)}
     for team in named:
         binding = extra.get(team) or types.SimpleNamespace(key=team, excluded=("hold",), min_todo=0)
-        report[team] = {"refill": binding_refill.refill(THIS, host, binding, client, binding.min_todo),
+        report[team] = {"priority": priority_admission.run(THIS, host, team, client, floor=binding.min_todo, excluded=binding.excluded),
+                        "refill": binding_refill.refill(THIS, host, binding, client, binding.min_todo),
                         "rank": binding_refill.rank_pass(THIS, host, binding, client, force=True)}
     return report
 
@@ -4557,7 +4723,7 @@ def load_escalation(host: Host) -> dict:
 def save_escalation(host: Host, data: dict) -> None:
     path = host.state / "escalation.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data))
+    atomic_write_text(path, json.dumps(data))
 
 
 def note_failover(host: Host, previous: str, nxt: str, reason: str) -> None:
@@ -4577,6 +4743,15 @@ def _remember_class(data: dict, pr: dict, classified: dict) -> None:
                           if not (isinstance(row, dict) and row.get("pr") == number)]
     data["classified"].append({"pr": number, "cls": classified["cls"], "at": time.time()})
     data["bySource"]["pr"] = int(data["bySource"].get("pr") or 0) + 1
+    if classified.get("decisionAsk"):
+        # Non-blocking Ovie ask, one per PR head (EVENT 2026-10-28). The class above is
+        # unchanged and the PR keeps moving; Summer files the card from this durable row.
+        asks = data.setdefault("decisionAsks", [])
+        head = pr.get("headRefOid")
+        if not any(isinstance(row, dict) and row.get("pr") == number and row.get("head") == head
+                   for row in asks):
+            asks.append(remediation.decision_card(pr, classified))
+            del asks[:-200]
 
 
 def _surface_exhausted(host: Host, pr: dict, record: dict, classified: dict, reason: str,
@@ -4584,7 +4759,6 @@ def _surface_exhausted(host: Host, pr: dict, record: dict, classified: dict, rea
     """One deduped surface: PR comment, terminal disposition, exhausted label. No second queue."""
     head = pr.get("headRefOid") or ""
     number = pr["number"]
-    hold_pending = False
     already = any(isinstance(row, dict) and row.get("pr") == number and row.get("head") == head
                   for row in data.get("surfaced") or [])
     if not already:
@@ -4594,21 +4768,17 @@ def _surface_exhausted(host: Host, pr: dict, record: dict, classified: dict, rea
                                  "head": head, "at": time.time()})
         if reason == "ladder-exhausted" and number not in data["ladderExhausted"]:
             data["ladderExhausted"].append(number)
-    # Only remediation's own structured disposition creates the honoured hold; comment text never
-    # does. Applied once per surfaced head, so a human removing the label releases it for good.
+    # A needs-human-decision disposition is a non-blocking Ovie decision ask, never a hold
+    # (EVENT 2026-10-28, Tim: nothing in the shipping machinery waits on a human). It carries a
+    # default and a deadline; Summer files the card from this row and the default ships if Tim is
+    # silent. No label is applied, so every machine gate (CI, security, Migration Guard) is the
+    # only thing that decides whether the PR lands.
     if classified.get("cls") == "needs-human-decision":
         row = next((row for row in data["surfaced"] if isinstance(row, dict) and row.get("pr") == number
                     and row.get("head") == head), None)
-        if row is not None and not row.get("holdApplied"):
-            if pr_events.add_label(number, pr_events.HUMAN_DECISION_LABEL, sh, prefix=""):
-                row["holdApplied"] = True
-                row.pop("holdPending", None)
-            else:
-                # Not confirmed: stay held in every lanes path and retry on a later pass.
-                row["holdPending"] = True
-                hold_pending = True
-    if not hold_pending:
-        attempts[str(number)] = {**record, "escalated": True}
+        if row is not None and not row.get("ovieCard"):
+            row["ovieCard"] = remediation.decision_card(pr, classified)
+    attempts[str(number)] = {**record, "escalated": True}
     pr_events.add_label(number, pr_events.EXHAUSTED, sh)
     prefix = ["fix-exhausted"] if record.get("count", 0) else []
     update_json(held_path(host), lambda held, number=number, head=head, prefix=prefix: held.update(
@@ -4631,9 +4801,10 @@ def _surface_exhausted(host: Host, pr: dict, record: dict, classified: dict, rea
 
 
 def contain_history_rewrite(host: Host, pr: dict, after: str) -> dict:
-    """A rewritten head leaves the automatic path: the same needs-human-decision surface every
-    other human gate uses (symphony-surface comment, exhausted label, `tim-hold`), keyed to the
-    rewritten head so green-wake, finalizer and fix paths all refuse it."""
+    """A rewritten head leaves the automatic repair path: the same surface every other
+    needs-human-decision uses (comment, exhausted label, non-blocking Ovie card), keyed to the
+    rewritten head so green-wake, finalizer and fix paths refuse to repair it. The label is
+    the machine custody fence; no human hold is applied."""
     classified = {"cls": "needs-human-decision", "subtype": "history-rewrite-detected",
                   "evidence": [f"history-rewrite-detected: {after[:12]} does not descend from "
                                f"{pr['headRefOid'][:12]}"], "next_action": "tim-decides"}
@@ -4643,7 +4814,7 @@ def contain_history_rewrite(host: Host, pr: dict, after: str) -> dict:
     save_escalation(host, data)
     row = next((row for row in data["surfaced"] if isinstance(row, dict) and row.get("pr") == pr["number"]
                 and row.get("head") == after), {})
-    return {"surfaced": True, "holdApplied": bool(row.get("holdApplied")), "holdPending": bool(row.get("holdPending"))}
+    return {"surfaced": True, "ovieCard": bool(row.get("ovieCard"))}
 
 
 def escalate_exhausted(host: Host, prs: list[dict], linear, *, model_only=False,
@@ -4669,8 +4840,12 @@ def escalate_exhausted(host: Host, prs: list[dict], linear, *, model_only=False,
     data = load_escalation(host)
     now = time.time()
 
-    def healthy(_name, spec):
-        return provider_healthy(spec)
+    health_seen = {}  # one probe per provider per pass: a per-PR probe cost ~460 `grok models` calls (~400s) per tick
+
+    def healthy(name, spec):
+        if name not in health_seen:
+            health_seen[name] = provider_healthy(spec)
+        return health_seen[name]
 
     def plan_next(classified, record, now, head):
         if routing_context is REPAIR_ROUTING_UNSET:
@@ -5001,6 +5176,100 @@ def partial_main_sync(host: Host, pr: dict) -> str | None:
                  "-f", f"head={target}", "-f",
                  f"commit_message=Merge main@{target[:12]} into {pr['headRefName']} (newest conflict-free main)"])
     return target if result.returncode == 0 else None
+
+
+DETERMINISTIC_CONFLICT_PER_PASS = 4
+CONFLICT_PASS_MIN_INTERVAL_S = 120
+
+
+def conflict_files(host: Host, pr: dict) -> list[str] | None:
+    """Files a DIRTY head conflicts with main in (`git merge-tree`, no checkout); None when
+    unknown, [] when it merges cleanly."""
+    number, head = pr["number"], pr["headRefOid"]
+    main_ref, pr_ref = f"{SYNC_REF}main", f"{SYNC_REF}pr-{number}"
+    git = lambda *args, timeout=300: sh(["git", *args], cwd=host.repo, timeout=timeout)
+    if git("fetch", "-q", "--no-tags", "origin", f"+refs/heads/main:{main_ref}",
+           f"+refs/pull/{number}/head:{pr_ref}", timeout=600).returncode \
+            or (git("rev-parse", pr_ref).stdout or "").strip() != head:
+        return None
+    merged = git("merge-tree", "--write-tree", "--name-only", "--no-messages", head, main_ref)
+    if merged.returncode == 0:
+        return []
+    if merged.returncode != 1:
+        return None
+    return [line for line in (merged.stdout or "").splitlines()[1:] if line.strip()]
+
+
+def deterministic_conflict_pass(host: Host, prs: list[dict], now: float | None = None) -> list[int]:
+    """Model-free, attempt-free conflict repair for every DIRTY PR whose conflict is confined to
+    generated or append-only files (remediation.RESOLVABLE_CONFLICT_FILES): merge main, take
+    main's copy, run the generator, push (no force). It costs no seat and no fix attempt, so a
+    spent or escalated PR is not left DIRTY by the thing a script can do. Each (PR, head, main)
+    is tried once; every try is ledgered with the time the PR has been DIRTY-visible."""
+    now = time.time() if now is None else now
+    path = host.state / "deterministic-conflict.json"
+    visits = read_json(path)
+    acted = []
+    due = sorted((pr for pr in prs if pr.get("mergeStateStatus") == "DIRTY" and not pr.get("isDraft")
+                  and pr.get("isCrossRepository") is False and pr.get("isInMergeQueue") is not True
+                  and not ({label.lower() for label in pr_events.label_names(pr)} & pr_events.HOLD_LABELS)
+                  and not (pr.get("headRefName") or "").startswith("dependabot/")),
+                 key=lambda pr: (float((visits.get(str(pr["number"])) or {}).get("at") or 0), pr["number"]))
+    if not due:
+        return []
+    listed = sh(["git", "ls-remote", "origin", "refs/heads/main"], cwd=host.repo, timeout=60)
+    main = (listed.stdout or "").split()[0] if listed.returncode == 0 and (listed.stdout or "").split() else None
+    if not main:
+        return []
+    for pr in due:
+        if len(acted) >= DETERMINISTIC_CONFLICT_PER_PASS:
+            break
+        last = visits.get(str(pr["number"])) or {}
+        if (last.get("head") == pr["headRefOid"] and last.get("main") == main) \
+                or now - float(last.get("at") or 0) < CONFLICT_PASS_MIN_INTERVAL_S \
+                or claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
+            continue
+        files = conflict_files(host, pr)
+        outcome = "skipped"
+        if files is not None and files and set(files) <= remediation.RESOLVABLE_CONFLICT_FILES:
+            repair_lock = Locked(host.state / "locks" / f"repair-pr-{pr['number']}.lock", blocking=False)
+            if not repair_lock.held:
+                repair_lock.release()
+                continue
+            worktree = host.state / "worktrees" / f"detconflict-pr{pr['number']}"
+            outcome = "failed"
+            preserve, added = False, False
+            try:
+                fetched = sh(["git", "fetch", "-q", "origin", "main", pr["headRefName"]], cwd=host.repo, timeout=600)
+                added = fetched.returncode == 0 and sh(
+                    ["git", "worktree", "add", "-q", "--detach", str(worktree), f"origin/{pr['headRefName']}"],
+                    cwd=host.repo).returncode == 0
+                if added and sh(["git", "rev-parse", "HEAD"], cwd=worktree).stdout.strip() == pr["headRefOid"]:
+                    with open(os.devnull, "a") as log:
+                        guard = lambda: require_fix_target(pr, "deterministic-conflict", worktree=worktree, repair=True)
+                        outcome = "resolved" if resolve_generated_conflict(
+                            worktree, pr["headRefName"], log, guard=guard) else "failed"
+            except RepairStopped:
+                preserve, outcome = True, "target-changed"
+            finally:
+                if added and not preserve:
+                    sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+                repair_lock.release()
+            acted.append(pr["number"])
+        elif files is not None:
+            outcome = "not-deterministic" if files else "clean"
+        visit = {"at": now, "head": pr["headRefOid"], "main": main, "outcome": outcome, "files": (files or [])[:8]}
+        if outcome == "target-changed":
+            visit["worktree"] = str(worktree)
+        update_json(path, lambda rows, key=str(pr["number"]), visit=visit: rows.update({key: visit}))
+        if outcome in ("resolved", "failed"):
+            pr_events.ledger(host, {"schema": "jovie-lane-run/v1", "kind": "deterministic-conflict",
+                                    "origin": AUTONOMOUS_ORIGIN,
+                                    "attribution": {"category": "finalizer-only", "provider": "lane-event"},
+                                    "pr": pr["number"], "headBefore": pr["headRefOid"], "main": main,
+                                    "action": "generated-conflict", "verdict": outcome,
+                                    "files": files, "endedAt": now_iso()})
+    return acted
 
 
 RERUN_RUNS_LIMIT = 5
@@ -5408,8 +5677,12 @@ def claim_remediation_events(host: Host, linear) -> dict:
     providers = load_providers()
     cooled = {name for name in providers if cooling(host, name)}
 
-    def healthy(_name, spec):
-        return provider_healthy(spec)
+    health_seen = {}  # one probe per provider per pass: a per-PR probe cost ~460 `grok models` calls (~400s) per tick
+
+    def healthy(name, spec):
+        if name not in health_seen:
+            health_seen[name] = provider_healthy(spec)
+        return health_seen[name]
 
     delivery_lock = Locked(host.state / "event-delivery.lock", blocking=False)
     if not delivery_lock.held:
@@ -5979,6 +6252,15 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
                    "Never hand-merge generated files: take main's generated copy, then run its canonical",
                    "generator (`pnpm ci:topology:write` for workflow topology or",
                    "`pnpm --filter @jovie/web drizzle:generate` for migration metadata).",
+                   "When the only conflict is scripts/preflight-changed.mjs in the NARROWED",
+                   "merge-group-unit-guards command, union && prefixes and vitest paths with",
+                   "fix_red_classes.merge_narrowed_guard_command. Unknown hunks stay unresolved.",
+                   "Other shell && chains are unioned by fix_red_classes.merge_and_chain",
+                   "(base order, then head-only prefixes; node --test and vitest paths union).",
+                   "Unknown hunks stay unresolved.",
+                   "A one-line comma-separated identifier list is unioned by",
+                   "fix_red_classes.merge_additive_identifier_list (main order, then head-only",
+                   "tokens). Unknown hunks stay unresolved.",
                    "Run the related checks after resolving.", ""]
     else:
         problem = []
@@ -6012,6 +6294,11 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
         "  `## Premise check` (Assumption / Falsifying test / Result). A retry is not a falsifier.",
         "- For bug fixes and CI repairs, retain pre-fix red evidence in `## Red-before-green`:",
         "  Failing command plus a red-output snippet or Failing run (before fix) URL.",
+        "- Retain exactly one customer changelog decision in the PR body (docs/CHANGELOG_PUBLICATION.md).",
+        "  Explicitly choose internal metadata or a customer-visible outcome with availability and evidence;",
+        '  internal metadata is `<!-- customer-changelog/v1 {"releaseWorthy":false} -->`.',
+        "  Use pr_events.repair_evidence_body(pr, body, excerpt, customer_decision=decision) to complete",
+        "  missing repair metadata; preserve existing decisions, then run the canonical Fleet/changelog guards.",
         f"- Immediately before every install or push, use `gh api graphql` to read PR #{pr['number']} in {REPO_SLUG}:",
         "  request state, headRefOid and isInMergeQueue. The pr view JSON command does not expose queue ownership.",
         "  Continue only while OPEN with isInMergeQueue=false; otherwise stop and preserve local changes, without install or push.",
@@ -6021,6 +6308,53 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
         "- If the failure is unrelated to this PR (broken main, infra), change nothing and end with",
         "  `NOT-SHIPPABLE: <reason>`.",
     ])
+
+
+def regenerate_merged_generated(worktree: Path, paths, log, *, guard=lambda: None) -> bool:
+    """Restore main's generated copies, then regenerate from the merged source, including
+    outputs that Git merged cleanly. Also usable after an agent resolves source conflicts."""
+    generated = sorted(set(paths) & remediation.GENERATED_RESOLVERS.keys())
+    if not generated:
+        return True
+    if sh(["git", "checkout", "origin/main", "--", *generated], cwd=worktree, log=log).returncode:
+        return False
+    commands = dict.fromkeys(remediation.GENERATED_RESOLVERS[path] for path in generated)
+    for command in commands:
+        guard()
+        if sh(list(command), cwd=worktree, timeout=900, log=log).returncode:
+            return False
+    return sh(["git", "add", *generated], cwd=worktree, log=log).returncode == 0
+
+
+def union_merge_file(worktree: Path, path: str, log) -> bool:
+    """Resolve an append-only file by keeping both sides' lines (`git merge-file --union`)."""
+    stages = {}
+    for stage in (1, 2, 3):
+        shown = sh(["git", "show", f":{stage}:{path}"], cwd=worktree)
+        if stage != 1 and shown.returncode:
+            return False
+        stages[stage] = shown.stdout if shown.returncode == 0 else ""
+    with tempfile.TemporaryDirectory() as tmp:
+        names = {}
+        for stage, text in stages.items():
+            names[stage] = str(Path(tmp) / f"s{stage}")
+            atomic_write_text(Path(names[stage]), text)
+        merged = sh(["git", "merge-file", "--union", "-p", names[2], names[1], names[3]], cwd=worktree)
+    if merged.returncode < 0 or merged.returncode >= 128:
+        return False
+    try:
+        rows = [json.loads(line) for line in merged.stdout.splitlines() if line.strip()]
+        header = json.loads(next(iter(stages[3].splitlines()), "null"))
+        if not isinstance(header, dict) or not header.get("schema") or not rows or rows[0] != header:
+            return False
+        rows = rows[1:]
+        ids = [row["id"] for row in rows]
+        if any(not isinstance(key, str) for key in ids) or len(set(ids)) != len(ids):
+            return False
+    except (ValueError, TypeError, KeyError):
+        return False
+    atomic_write_text(worktree / path, merged.stdout)
+    return sh(["git", "add", path], cwd=worktree, log=log).returncode == 0
 
 
 def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
@@ -6034,26 +6368,199 @@ def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda
     merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
     if merged.returncode != 0:
         conflicted = set(sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout.split())
-        if not conflicted or not conflicted <= remediation.GENERATED_RESOLVERS.keys():
+        if not conflicted or not conflicted <= remediation.RESOLVABLE_CONFLICT_FILES:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
-        sh(["git", "checkout", "origin/main", "--", *sorted(conflicted)], cwd=worktree, log=log)
-        guard()
-        commands = []
-        for path in sorted(conflicted):
-            command = list(remediation.GENERATED_RESOLVERS[path])
-            if command not in commands:
-                commands.append(command)
-        for command in commands:
-            if sh(command, cwd=worktree, timeout=900, log=log).returncode != 0:
+        for path in sorted(conflicted & remediation.UNION_MERGE_FILES):
+            if not union_merge_file(worktree, path, log):
                 sh(["git", "merge", "--abort"], cwd=worktree, log=log)
                 return False
-        sh(["git", "add", *sorted(conflicted)], cwd=worktree, log=log)
+        conflicted -= remediation.UNION_MERGE_FILES
+        changed = sh(["git", "diff", "--name-only", "HEAD"], cwd=worktree)
+        if changed.returncode or not regenerate_merged_generated(
+                worktree, conflicted | set(changed.stdout.splitlines()), log, guard=guard):
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
         if sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
     guard()
     return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+
+
+def resolve_narrowed_preflight_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
+    """Union a NARROWED preflight command when that file is the only conflict with main.
+
+    Both sides keep their shell prefixes and vitest paths. Any other conflict, or a hunk
+    the union cannot read, aborts and leaves the PR to the model. The push is a fast-forward
+    of the PR branch; this never rebases or force-pushes."""
+    guard()
+    merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
+    if merged.returncode != 0:
+        conflicted = [path for path in (sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout or "").split() if path]
+        target = worktree / fix_red_classes.NARROWED_PREFLIGHT
+        if conflicted != [fix_red_classes.NARROWED_PREFLIGHT]:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        try:
+            resolved = fix_red_classes.resolve_preflight_narrowed_text(target.read_text())
+        except OSError:
+            resolved = None
+        if resolved is None:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        try:
+            atomic_write_text(target, resolved)
+        except OSError:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        guard()
+        if sh(["git", "add", "--", fix_red_classes.NARROWED_PREFLIGHT], cwd=worktree, log=log).returncode != 0 \
+                or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+    guard()
+    pushed = sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+    return pushed
+
+
+def resolve_and_chain_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
+    """Union shell && chains when every conflict hunk with main is that shape.
+
+    Base order, then head-only prefixes. node --test and vitest paths follow the
+    same rule. A hunk the union cannot read aborts and leaves the PR to the model.
+    The push is a fast-forward of the PR branch; this never rebases or force-pushes."""
+    guard()
+    merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
+    if merged.returncode != 0:
+        conflicted = [path for path in (sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout or "").split() if path]
+        if not conflicted:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        resolved_texts: dict[Path, str] = {}
+        for rel in conflicted:
+            target = worktree / rel
+            try:
+                outcome = fix_red_classes.resolve_and_chain_text(target.read_text())
+            except (OSError, UnicodeError):
+                outcome = None
+            if outcome is None:
+                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+                return False
+            resolved_texts[target] = outcome
+        try:
+            for target, outcome in resolved_texts.items():
+                atomic_write_text(target, outcome)
+        except OSError:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        guard()
+        if sh(["git", "add", "--", *conflicted], cwd=worktree, log=log).returncode != 0 \
+                or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+    guard()
+    return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+
+
+def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
+    """Union quoted list entries when every conflict hunk with main is only those lines.
+
+    Main's order stays, then head-only lines. A prose hunk or any other shape aborts
+    and leaves the PR to the model. The push is a fast-forward of the PR branch."""
+    guard()
+    merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
+    if merged.returncode != 0:
+        conflicted = [path for path in (sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout or "").split() if path]
+        if not conflicted:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        resolved: dict[str, str] = {}
+        for path in conflicted:
+            target = worktree / path
+            try:
+                text = fix_red_classes.resolve_additive_quoted_list_text(target.read_text())
+            except OSError:
+                text = None
+            if text is None:
+                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+                return False
+            resolved[path] = text
+        try:
+            for path, text in resolved.items():
+                atomic_write_text(worktree / path, text)
+        except OSError:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        guard()
+        if sh(["git", "add", "--", *conflicted], cwd=worktree, log=log).returncode != 0 \
+                or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+    guard()
+    return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+
+
+def resolve_identifier_list_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
+    """Union one-line identifier lists when every conflict hunk with main is that shape.
+
+    Main's order stays, then head-only tokens. Prose or any other shape aborts and
+    leaves the PR to the model. The push is a fast-forward of the PR branch."""
+    guard()
+    merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
+    if merged.returncode != 0:
+        conflicted = [path for path in (sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout or "").split() if path]
+        if not conflicted:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        resolved: dict[str, str] = {}
+        for path in conflicted:
+            target = worktree / path
+            try:
+                text = fix_red_classes.resolve_additive_identifier_list_text(target.read_text())
+            except (OSError, UnicodeError):
+                text = None
+            if text is None:
+                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+                return False
+            resolved[path] = text
+        try:
+            for path, text in resolved.items():
+                atomic_write_text(worktree / path, text)
+        except OSError:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        guard()
+        if sh(["git", "add", "--", *conflicted], cwd=worktree, log=log).returncode != 0 \
+                or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+    guard()
+    return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+
+
+def conflict_resolvers():
+    """DIRTY conflict classes in try order. Each one charges one mutation.
+
+    The repair budget is this list plus the model dispatch, so adding a class
+    cannot exhaust the budget before that class runs or before an unknown hunk
+    reaches the model."""
+    return (
+        ("repair-generated-conflict", resolve_generated_conflict, "generated-regenerated"),
+        ("repair-narrowed-preflight", resolve_narrowed_preflight_conflict, "narrowed-preflight-merged"),
+        ("repair-and-chain", resolve_and_chain_conflict, "and-chain-merged"),
+        ("repair-additive-list", resolve_additive_list_conflict, "additive-list-merged"),
+        ("repair-identifier-list", resolve_identifier_list_conflict, "identifier-list-merged"),
+    )
+
+
+def merge_narrowed_preflight_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """No-model fix when Source Validation reports only the narrowed preflight conflict."""
+    del host, route
+    if not resolve_narrowed_preflight_conflict(worktree, pr["headRefName"], log):
+        return None
+    receipt.update(resolution="narrowed-preflight-merged")
+    return types.SimpleNamespace(returncode=0)
 
 
 REPAIR_AUTHORITY_FIELDS = """number title body state mergedAt headRefName headRefOid url isDraft mergeStateStatus reviewDecision updatedAt
@@ -6443,6 +6950,396 @@ def repair_target_node(pr: dict, live) -> dict | None:
         return None
 
 
+PLATFORM_RED_TEXT = fix_red_classes.PLATFORM_TEXT
+
+
+_FAILED_LOGS: dict = {}
+FAILED_LOG_CHECKS, FAILED_LOG_CHARS = 6, 40000
+
+
+def failed_logs(host: Host, pr: dict) -> dict | None:
+    """{check name: failed-job log} for the real red checks on this head, read once per (PR, head); None when a
+    check has no job link or a log is unreadable (an unknown red is never routed around a model)."""
+    cache_key = (str(host.state), pr["number"], pr["headRefOid"])
+    if cache_key in _FAILED_LOGS:
+        return _FAILED_LOGS[cache_key]
+    logs: dict | None = {}
+    for check in fix_red_classes.real_failures(pr)[:FAILED_LOG_CHECKS]:
+        job = re.search(r"/job/(\d+)", check.get("detailsUrl") or "")
+        log = gh_call(["run", "view", "--repo", REPO_SLUG, "--job", job.group(1), "--log-failed"]) if job else None
+        if log is None or log.returncode != 0:
+            logs = None
+            break
+        logs[str(check.get("name"))] = (log.stdout or "")[-FAILED_LOG_CHARS:]
+    if len(_FAILED_LOGS) > 64:
+        _FAILED_LOGS.clear()
+    _FAILED_LOGS[cache_key] = logs
+    return logs
+
+
+def infra_only_red(host: Host, pr: dict) -> str | None:
+    """The infrastructure signature when every real red check on this head failed for a platform
+    reason (rate limit, HTTP 408, missing token, runner loss), else None. 52 of 253 fix-no-change
+    runs were an agent reading such a log and declining; a rerun costs no agent. One rerun per
+    head: a head that is still infra-red after it goes to the agent as before."""
+    kinds = set(pr.get("eventKinds") or [])
+    if pr.get("gateEvidence") or pr.get("queueFailure") or kinds & {"conflict", "review", "dequeued"} \
+            or pr.get("mergeStateStatus") == "DIRTY" or pr.get("reviewDecision") == "CHANGES_REQUESTED":
+        return None
+    if not fix_red_classes.real_failures(pr):
+        return None
+    logs = failed_logs(host, pr)
+    if not logs:
+        return None
+    found = set()
+    for text in logs.values():
+        hit = PLATFORM_RED_TEXT.search(text)
+        if not hit:
+            return None
+        found.add(re.sub(r"\W+", "-", hit.group(0).lower()).strip("-"))
+    return "+".join(sorted(found))[:60]
+
+
+def claim_infra_rerun(host: Host, pr: dict) -> bool:
+    """True once per (PR, head): the caller may rerun instead of dispatching an agent."""
+    taken = []
+    def change(data: dict) -> None:
+        if data.get(str(pr["number"])) != pr["headRefOid"]:
+            data[str(pr["number"])] = pr["headRefOid"]
+            taken.append(True)
+    try:
+        update_json(host.state / "infra-reruns.json", change)
+    except (OSError, ValueError):
+        return False
+    return bool(taken)
+
+
+OPEN_MIGRATIONS_QUERY = ('query($endCursor:String){repository(owner:"JovieInc",name:"Jovie"){pullRequests(states:OPEN,first:100,'
+                         'after:$endCursor){pageInfo{hasNextPage endCursor}nodes{number files(first:100){nodes{path}}}}}}')
+
+
+def open_pr_migrations(exclude: int) -> dict | None:
+    """{PR number: migration numbers it adds} for every other open PR; None when GitHub cannot be read."""
+    result = gh_call(["api", "graphql", "--paginate", "-f", f"query={OPEN_MIGRATIONS_QUERY}", "--jq",
+                      ".data.repository.pullRequests.nodes[]|{n:.number,f:[.files.nodes[].path]}"])
+    if result.returncode != 0:
+        return None
+    out = {}
+    for line in (result.stdout or "").splitlines():
+        try:
+            row = json.loads(line)
+        except ValueError:
+            return None
+        numbers = migration_renumber._numbers(row.get("f") or [])
+        if numbers and row.get("n") != exclude:
+            out[int(row["n"])] = numbers
+    return out
+
+
+def renumber_migrations_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """The no-model fix for a migration number collision: renumber to the next free number, rebuild the journal and
+    snapshots, merge main and push. Returns a finished-agent stand-in, or None (worktree restored) when it does not apply."""
+    git = lambda *args, **kw: sh(["git", *args], cwd=worktree, log=log, timeout=900, **kw)
+    def restore() -> None:
+        git("merge", "--abort")
+        git("reset", "--hard", f"origin/{pr['headRefName']}")
+        git("clean", "-fdq", "--", migration_renumber.MIG_DIR)
+    others = open_pr_migrations(pr["number"])
+    if others is None:
+        return None
+    def read(*args):
+        done = sh(["git", *args], cwd=worktree, timeout=300)
+        if done.returncode:
+            raise OSError(f"git {args[0]} failed")
+        return done.stdout or ""
+    try:
+        changed = migration_renumber.renumber(worktree, read, "origin/main", pr["number"], others)
+        if not changed:
+            return None
+        git("add", "-A", "--", migration_renumber.MIG_DIR)
+        if git("commit", "-q", "-m", "fix(db): renumber migration to the next free number").returncode:
+            raise OSError("commit failed")
+        if git("merge", "--no-edit", "origin/main").returncode:
+            conflicted = (sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout or "").split()
+            if conflicted != [f"{migration_renumber.META}/_journal.json"] \
+                    or git("checkout", "--ours", "--", conflicted[0]).returncode or git("add", conflicted[0]).returncode \
+                    or git("commit", "-q", "--no-edit").returncode:
+                raise OSError("merge conflict outside the journal")
+        if git("push", "-q", "origin", f"HEAD:{pr['headRefName']}").returncode:
+            raise OSError("push failed")
+    except (migration_renumber.Unmergeable, OSError, ValueError, KeyError, subprocess.SubprocessError):
+        restore()
+        return None
+    receipt.update(resolution="renumbered-migrations", renumbered=changed[:12])
+    return types.SimpleNamespace(returncode=0)
+
+
+def register_domain_writes_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """The no-model fix for an allowed-0 domain write: register the exporting module, lower the
+    ratchet, commit and push. Returns a finished-agent stand-in, or None when the edit does not apply."""
+    probe = sh(["node", "scripts/domain-write-guard.mjs"], cwd=worktree, log=log, timeout=300)
+    added = fix_red_classes.register_direct_domain_writes(
+        worktree, f"{probe.stdout or ''}\n{probe.stderr or ''}")
+    if not added:
+        return None
+    if sh(["node", "scripts/domain-write-guard.mjs", "--write"], cwd=worktree, log=log, timeout=300).returncode:
+        return None
+    if sh(["node", "scripts/domain-write-guard.mjs"], cwd=worktree, log=log, timeout=300).returncode:
+        return None
+    message = "fix(domain): register " + ", ".join(Path(name).name for name in added)[:72]
+    steps = [["git", "add", "--", "apps/web/lib/domain/write-registry.json",
+              "scripts/lib/domain-write-guard.ratchet.gen.json"],
+             ["git", "commit", "-q", "-m", message],
+             ["git", "push", "-q", "origin", f"HEAD:{pr['headRefName']}"]]
+    for step in steps:
+        if sh(step, cwd=worktree, log=log, timeout=900).returncode:
+            return None
+    receipt.update(resolution="registered-domain-writes", registeredModules=added)
+    return types.SimpleNamespace(returncode=0)
+
+
+def atomic_state_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """Repair reported writes, verify them and publish through the existing repair route."""
+    logs = failed_logs(host, pr)
+    changed = fix_red_classes.repair_atomic_state_writes(worktree, "\n".join(logs.values()))
+    if not changed:
+        return None
+    check = sh(["python3", "-m", "unittest", "scripts.tests.test_lanes_atomic_state"],
+               cwd=worktree, log=log, timeout=300)
+    if check.returncode:
+        return None
+    steps = [["pnpm", "preflight:changed"], ["git", "add", "--", *changed],
+             ["git", "commit", "-q", "-m", "fix(lanes): publish state through the atomic writer"]]
+    for step in steps:
+        if sh(step, cwd=worktree, log=log, timeout=900).returncode:
+            return None
+    require_fix_target(pr, "before-atomic-push", worktree=worktree, repair=True)
+    if sh(["git", "push", "-q", "origin", f"HEAD:{pr['headRefName']}"],
+          cwd=worktree, log=log, timeout=900).returncode:
+        return None
+    receipt.update(resolution="atomic-state-writes", atomicFiles=changed)
+    return types.SimpleNamespace(returncode=0)
+
+
+def wire_ci_fast_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """The no-model fix for an unwired script test: list it in ci-fast-lanes.mjs, commit, push. Returns a
+    finished-agent stand-in, or None when the edit does not apply (the model then gets the head)."""
+    added = fix_red_classes.wire_ci_fast(worktree, route.get("files") or [])
+    if not added:
+        return None
+    message = "fix(ci): wire " + ", ".join(Path(name).name for name in added)[:80] + " into ci-fast"
+    steps = [["git", "add", "scripts/ci-fast-lanes.mjs"], ["git", "commit", "-q", "-m", message],
+             ["git", "push", "-q", "origin", f"HEAD:{pr['headRefName']}"]]
+    for step in steps:
+        if sh(step, cwd=worktree, log=log, timeout=900).returncode:
+            return None
+    receipt.update(resolution="wired-ci-fast", wiredFiles=added)
+    return types.SimpleNamespace(returncode=0)
+
+
+def snap_spacing_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """The no-model fix for a grown spacing ratchet: snap added 10px/14px utilities onto the
+    4px grid, commit and push. Returns a finished-agent stand-in, or None when nothing applies."""
+    diff = sh(["git", "diff", "-U0", "origin/main...HEAD", "--", "apps/web", "packages/ui"],
+              cwd=worktree, log=log, timeout=300)
+    if diff.returncode:
+        return None
+    changed = fix_red_classes.snap_added_conservative_spacing(worktree, diff.stdout or "")
+    if not changed:
+        return None
+    steps = [["git", "add", "--", *changed],
+             ["git", "commit", "-q", "-m", "fix(ui): snap added off-grid spacing onto the 4px scale"],
+             ["git", "push", "-q", "origin", f"HEAD:{pr['headRefName']}"]]
+    for step in steps:
+        if sh(step, cwd=worktree, log=log, timeout=900).returncode:
+            return None
+    receipt.update(resolution="snapped-spacing", snappedFiles=changed)
+    return types.SimpleNamespace(returncode=0)
+
+
+def claim_route(host: Host, pr: dict, action: str) -> bool:
+    """True once per (PR, head, action): a deterministic route is tried once, then the model gets the head."""
+    taken = []
+    def change(data: dict) -> None:
+        row = data.setdefault(str(pr["number"]), {})
+        if row.get(action) != pr["headRefOid"]:
+            row[action] = pr["headRefOid"]
+            taken.append(True)
+    try:
+        update_json(host.state / "class-routes.json", change)
+    except (OSError, ValueError):
+        return False
+    return bool(taken)
+
+
+def route_fix_red(host: Host, pr: dict) -> dict | None:
+    """Classify this red head by its failed logs. Returns the class (always) so the receipt carries a
+    fingerprint; deterministic classes are acted on by the caller."""
+    if pr.get("mergeStateStatus") == "DIRTY" or pr.get("reviewDecision") == "CHANGES_REQUESTED":
+        return None
+    try:
+        logs = failed_logs(host, pr) or {}
+        return fix_red_classes.classify(pr, logs)
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def stamp_changelog_decision(host: Host, pr: dict) -> bool:
+    """Write the internal customer-changelog note onto the PR body. False when the body cannot
+    take one or GitHub rejects the edit (the model then gets the head)."""
+    stamped = fix_red_classes.stamp_internal_changelog(pr.get("body"))
+    if stamped is None:
+        return False
+    runs = host.state / "runs"
+    runs.mkdir(parents=True, exist_ok=True)
+    path = runs / f"changelog-{int(pr['number'])}.md"
+    atomic_write_text(path, stamped)
+    edited = gh_call(["pr", "edit", str(int(pr["number"])), "--repo", REPO_SLUG, "--body-file", str(path)],
+                     priority="repair")
+    return edited.returncode == 0
+
+
+def deterministic_route_taken(host: Host, pr: dict, route: dict | None) -> str | None:
+    """Run the no-model action for a routed class once per head; the reason on success (None: use the model)."""
+    if not route or route["action"] not in {fix_red_classes.RERUN, fix_red_classes.SYNC_MAIN, fix_red_classes.STAMP_CHANGELOG}:
+        return None
+    if route["action"] == fix_red_classes.STAMP_CHANGELOG:
+        # No body, or a note already present: do not spend the once-per-head claim. An invalid
+        # note is a different defect and still belongs to the model.
+        if fix_red_classes.stamp_internal_changelog(pr.get("body")) is None:
+            return None
+        if not claim_route(host, pr, route["action"]):
+            return None
+        return "infra-rerun:changelog-metadata" if stamp_changelog_decision(host, pr) else None
+    # One rerun per head, shared with the platform-red gate above; one sync per head.
+    if not (claim_infra_rerun(host, pr) if route["action"] == fix_red_classes.RERUN else claim_route(host, pr, route["action"])):
+        return None
+    if route["action"] == fix_red_classes.RERUN:
+        return f"infra-rerun:{route['cls']}" if _rerun_failed(pr) else None
+    return f"infra-rerun:{route['cls']}" if pr_events.sync_main(host, THIS, pr, time.time(), terminal_ok=True) == "synced" else None
+
+
+# Per-PR circuit breaker across heads. Gem ledger, 762 fix runs: after 3 consecutive unproductive
+# runs on a PR inside 24 h the next run pushed 7% of the time (13 of 192), against 27% for a first
+# run; 52% of all runs went to PRs the lane never pushed. A new head does not reset the streak.
+BREAKER_STREAK = pr_events.BREAKER_STREAK
+BREAKER_WINDOW_S = pr_events.BREAKER_WINDOW_S
+breaker_streak = pr_events.breaker_streak
+pr_breaker_open = pr_events.pr_breaker_open
+
+
+def note_breaker_run(host: Host, pr: dict, receipt: dict, now: float | None = None) -> None:
+    """Record one finished run; the run that completes the streak files one factory signal."""
+    now = time.time() if now is None else now
+    if receipt.get("attemptRefunded") or receipt.get("verdict") in ("recovery-handoff", "reconcile-unavailable", "skipped"):
+        return  # no agent work was charged to the PR
+    productive = receipt.get("verdict") in ("fix-pushed", "pr-opened")
+    opened, tripped = [], []
+    def change(data: dict) -> None:
+        entry = data.setdefault(str(pr["number"]), {"runs": []})
+        entry["runs"] = [row for row in entry.get("runs", []) if now - float(row[0]) < BREAKER_WINDOW_S]
+        entry["runs"].append([now, productive])
+        fp = (receipt.get("failureFingerprint") or {}).get("key")
+        if fp:
+            rows = entry.setdefault("fp", {})
+            rows[fp] = [row for row in rows.get(fp, []) if now - float(row[0]) < BREAKER_WINDOW_S] + [[now, productive]]
+            if productive:
+                entry.pop("fpOpenHead", None)
+            elif breaker_streak(rows[fp], now) >= fingerprint_breaker_n(host):
+                entry["fpOpenHead"] = pr["headRefOid"]
+                tripped.append(fp)
+        entry["lastRunId"] = receipt.get("runId")
+        if breaker_streak(entry["runs"], now) == BREAKER_STREAK and not entry.get("signalAt"):
+            entry["signalAt"] = now
+            opened.append(entry)
+        elif productive:
+            entry.pop("signalAt", None)
+        for stale in [k for k, v in data.items() if not v.get("runs")]:
+            del data[stale]
+    try:
+        update_json(host.state / "pr-breaker.json", change)
+        if opened:
+            (host.state / "runs").mkdir(parents=True, exist_ok=True)
+            row = {"schema": "jovie-factory-signal/v1", "at": now_iso(), "source": "pr-breaker",
+                   "fingerprint": hashlib.sha256(f"pr-breaker:{pr['number']}:{int(now // BREAKER_WINDOW_S)}".encode()).hexdigest()[:16],
+                   "ws": "ci", "subject": {"pr": pr["number"]},
+                   "evidence": {"excerpt": f"PR #{pr['number']}: {BREAKER_STREAK} consecutive unproductive fix runs in 24h; "
+                                            f"last verdict {receipt.get('verdict')} reasons {(receipt.get('reasons') or [])[:2]}; "
+                                            f"last run {receipt.get('runId')}. Lanes stopped repairing it; a human or a "
+                                            "different approach is needed."}}
+            with open(host.state / "runs" / "factory-signals.jsonl", "a") as out:
+                out.write(json.dumps(row) + "\n")
+    except (OSError, ValueError, TypeError):
+        pass
+    if tripped:
+        note_fingerprint_trip(host, pr, {**(receipt.get("failureFingerprint") or {}), "checks": []}, receipt, now)
+
+
+def fingerprint_breaker_n(host: Host) -> int:
+    """No-push model runs on one (PR, fingerprint) before the next is refused: measured from the ledger by the
+    doctor (fix_red_classes.breaker_n -> fix-red-metrics.json); the default until it has enough runs."""
+    try:
+        value = int(json.loads((host.state / "fix-red-metrics.json").read_text())["breakerN"])
+        return min(max(value, 2), fix_red_classes.MAX_BREAKER_N)
+    except (OSError, ValueError, KeyError, TypeError):
+        return fix_red_classes.DEFAULT_BREAKER_N
+
+
+def fingerprint_breaker_open(host: Host, pr: dict, key: str, now: float | None = None) -> bool:
+    now = time.time() if now is None else now
+    try:
+        entry = json.loads((host.state / "pr-breaker.json").read_text()).get(str(pr["number"])) or {}
+        return breaker_streak((entry.get("fp") or {}).get(key) or [], now) >= fingerprint_breaker_n(host)
+    except (OSError, ValueError, AttributeError, TypeError):
+        return False
+
+
+def note_fingerprint_trip(host: Host, pr: dict, route: dict, receipt: dict, now: float | None = None) -> None:
+    """One `machine-gap` factory signal per (PR, fingerprint): a model failed to move this failure class
+    repeatedly, so the next unit of work is the machine that fixes the class, not another run."""
+    now = time.time() if now is None else now
+    cls, key = route.get("cls") or "other", route.get("key") or "unknown"
+    fingerprint = f"fix-red-{cls}-{key}"
+    path = host.state / "factory-signals" / f"{fingerprint}.json"
+    if path.exists():
+        return
+    row = {"schema": "jovie-factory-signal/v1", "fingerprint": fingerprint, "source": "fix-red-fingerprint",
+           "extraLabels": ["machine-gap"],
+           "title": f"Machine gap: fix-red `{cls}` failures ({key}) keep reaching a model",
+           "problem": f"PR #{pr['number']}: {fingerprint_breaker_n(host)} model fix runs in 24h on fingerprint `{key}` "
+                      f"(class {cls}; signature {route.get('signature') or 'n/a'}) pushed nothing; last verdict "
+                      f"{receipt.get('verdict')}. Build or extend the deterministic fixer / guard for this class in "
+                      "scripts/lanes/fix_red_classes.py (or the check that emits it) instead of dispatching another run.",
+           "acceptance": ["The failure class is classified in fix_red_classes.SIGNATURES with a deterministic action "
+                          "(or a guard prevents it), with a test fed by the failing log",
+                          "A new red of this class is fixed with no model run"],
+           "metric": {"name": "model fix-red runs on this fingerprint", "baseline": fingerprint_breaker_n(host),
+                      "target": 0, "measuredBy": "python3 scripts/lanes/fix_red_classes.py measure"}}
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write_text(path, json.dumps(row, indent=1))
+    except (OSError, ValueError):
+        pass
+
+
+def file_breaker_signals(host: Host, linear) -> int:
+    """File each unfiled breaker signal as one remediation intake issue (idempotent by fingerprint)."""
+    path = host.state / "runs" / "factory-signals.jsonl"
+    if not path.exists():
+        return 0
+    rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    filed = 0
+    for row in rows:
+        if row.get("filedAt") or row.get("source") != "pr-breaker":
+            continue
+        if pr_events.ensure_linear_intake(linear, row):
+            row["filedAt"] = now_iso()
+            filed += 1
+    if filed:
+        atomic_write_text(path, "".join(json.dumps(row) + "\n" for row in rows))
+    return filed
+
+
 def fix_request_source(pr: dict) -> dict:
     """Keep the evidence that requested repair even when its target has become terminal."""
     return {
@@ -6479,7 +7376,7 @@ def unworked_fix_attempt(receipt: dict) -> str | None:
         return str((receipt.get("reasons") or ["recovery-handoff"])[0])
     if verdict == "skipped":
         reason = str((receipt.get("reasons") or [""])[0])
-        return reason if reason.startswith("worktree-unavailable") else None
+        return reason if reason.startswith(("worktree-unavailable", "infra-rerun:")) else None
     if verdict == "fix-no-change":
         # The provider wrapper died before any agent worked: the head's budget paid for nothing.
         reason = str((receipt.get("reasons") or [""])[0])
@@ -6498,7 +7395,7 @@ def unworked_fix_attempt(receipt: dict) -> str | None:
 # handoffs: the precondition (an unreadable target, a failed checkout) is host infrastructure,
 # not the PR, and an immediate next-tick re-claim would crash-loop the same failure (Gem
 # 2026-10-23: 7 target-state-unavailable + 6 worktree-unavailable stops in 24h).
-INFRA_PRECONDITION_REASONS = frozenset({"target-state-unavailable", "worktree-unavailable", "lane-crash"})
+INFRA_PRECONDITION_REASONS = frozenset({"target-state-unavailable", "worktree-unavailable", "lane-crash", "infra-rerun"})
 
 
 def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
@@ -6533,6 +7430,7 @@ def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
             requeued = handoff or refund in pr_events.UNRESUMABLE_PRESERVED \
                 or refund.split(":", 1)[0] in INFRA_PRECONDITION_REASONS
     update_json(host.state / "fix-attempts.json", finish)
+    note_breaker_run(host, pr, receipt)
     if requeued:
         try:
             path = (receipt.get("recovery") or {}).get("worktree") \
@@ -6614,8 +7512,6 @@ def require_fix_target(pr: dict, stage: str, *, worktree: Path | None = None, re
             raise RepairStopped("target-head-superseded", live, stage)
     if repair and remediation.review_authority_ask(live):
         raise RepairStopped("target-review-requires-authority", live, stage)
-    if repair and pr_events.human_holds(live):
-        raise RepairStopped("target-pr-human-hold", live, stage)
     return live
 
 
@@ -6833,7 +7729,7 @@ def preserve_repair(worktree: Path, receipt: dict) -> None:
                   "headBefore": receipt.get("headBefore"), "at": now_iso()}
         receipt["preservedWorktree"] = str(worktree)
         try:
-            (worktree / disk_guard.PRESERVED_REPAIR).write_text(json.dumps(marker, indent=1))
+            atomic_write_text(worktree / disk_guard.PRESERVED_REPAIR, json.dumps(marker, indent=1))
         except OSError as error:
             receipt["preservationError"] = str(error)[:200]
 
@@ -6861,7 +7757,30 @@ def retire_completed_repair(host: Host, worktree: Path, receipt: dict) -> bool:
     return False
 
 
-def retire_published_preserved(host: Host, number: int) -> list[str]:
+def note_preserved_recovery(observations, phase, reason, *, marker=None, custody=None) -> None:
+    """Safe refusal evidence only; never changes a recovery predicate or grants custody."""
+    reasons = {"worktree-not-idle", "source-not-fully-published", "retire-io-unavailable",
+               "retire-worktree-retained", "archive-too-fresh", "archive-head-unavailable",
+               "archive-index-unavailable", "archive-tree-unavailable", "archive-commit-unavailable",
+               "archive-ref-unavailable", "archive-worktree-retained", "archive-io-unavailable"}
+    if type(observations) is not list or type(phase) is not str or type(reason) is not str \
+            or phase not in {"retire", "archive"} or reason not in reasons:
+        return
+    row = {"schema": "jovie-preserved-recovery-observation/v1", "phase": phase, "reason": reason,
+           "authorizesRecovery": False}
+    if custody is not None:
+        row["custodyReason"] = custody if type(custody) is str and custody in {
+            "git-index-locked", "process-state-unavailable", "process-still-running"} else "unclassified"
+    if type(marker) in (str, bytes):
+        row["markerPreimageSha256"] = hashlib.sha256(marker.encode() if type(marker) is str else marker).hexdigest()
+    try:
+        row["observerSourceSha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    except OSError:
+        pass  # Missing observer identity is not a successful recovery or a custody release.
+    observations.append(row)
+
+
+def retire_published_preserved(host: Host, number: int, *, observations=None) -> list[str]:
     """Under the PR's repair lock: free this PR's preserved checkouts that hold nothing to recover.
 
     A cancelled or unreadable-target run preserves its checkout as evidence. Once that
@@ -6875,7 +7794,8 @@ def retire_published_preserved(host: Host, number: int) -> list[str]:
     for marker_path in sorted((host.state / "worktrees").glob(f"*/{disk_guard.PRESERVED_REPAIR}")):
         path = marker_path.parent
         try:
-            marker = json.loads(marker_path.read_text())
+            marker_text = marker_path.read_bytes().decode()  # Preserve line endings for the preimage digest.
+            marker = json.loads(marker_text)
         except (OSError, ValueError):
             continue
         if not isinstance(marker, dict) or marker.get("issue") is not None:
@@ -6885,20 +7805,25 @@ def retire_published_preserved(host: Host, number: int) -> list[str]:
                 marker.get("pr") is None and named and named.group(1) == str(number)):
             continue
         try:
-            if worktree_busy(path):
+            if busy := worktree_busy(path):
+                note_preserved_recovery(observations, "retire", "worktree-not-idle", marker=marker_text, custody=busy)
                 continue
             status = sh(["git", "status", "--porcelain", "--untracked-files=all", *disk_guard.SOURCE_PATHSPEC],
                         cwd=path, timeout=30)
             unpushed = sh(["git", "rev-list", "--count", "HEAD", "--not", "--remotes=origin"],
                           cwd=path, timeout=30)
             if status.returncode or status.stdout.strip() or unpushed.returncode or unpushed.stdout.strip() != "0":
+                note_preserved_recovery(observations, "retire", "source-not-fully-published", marker=marker_text)
                 continue
             marker_path.unlink()
             remove_worktree(host, path)
         except (OSError, subprocess.SubprocessError):
+            note_preserved_recovery(observations, "retire", "retire-io-unavailable", marker=marker_text)
             continue
         if not path.exists():
             retired.append(path.name)
+        else:
+            note_preserved_recovery(observations, "retire", "retire-worktree-retained", marker=marker_text)
     return retired
 
 
@@ -6951,7 +7876,7 @@ def _ended_on_its_own_terms(host: Host, run_id) -> bool:
 NEVER_RESUMED_CANCELS = frozenset({"target-head-superseded", "target-pr-merged", "target-pr-closed"})
 
 
-def archive_unresumable_preserved(host: Host, path: Path, reason: str) -> str | None:
+def archive_unresumable_preserved(host: Host, path: Path, reason: str, *, observations=None) -> str | None:
     """Keep an unresumable preserved checkout's source as a local ref, then free the PR.
 
     The archive commit is the checkout's HEAD plus every uncommitted source file (a temporary
@@ -6962,8 +7887,9 @@ def archive_unresumable_preserved(host: Host, path: Path, reason: str) -> str | 
     marker_path = path / disk_guard.PRESERVED_REPAIR
     if reason not in UNRESUMABLE_PRESERVED or path.resolve().parent != root or not marker_path.exists():
         return None
+    marker = None
     try:
-        marker = marker_path.read_text()
+        marker = marker_path.read_bytes().decode()  # Digest and restore the exact marker bytes.
         try:
             stamp = datetime.fromisoformat(str(json.loads(marker).get("at")).replace("Z", "+00:00")).timestamp()
         except (ValueError, TypeError, AttributeError):
@@ -6974,31 +7900,43 @@ def archive_unresumable_preserved(host: Host, path: Path, reason: str) -> str | 
             run_id = None
         grace = (0 if reason == "preserved-target-needs-reconciliation" and _ended_on_its_own_terms(host, run_id)
                  else PRESERVED_ARCHIVE_AFTER_S)
-        if time.time() - stamp < grace or worktree_busy(path):
+        if time.time() - stamp < grace:
+            note_preserved_recovery(observations, "archive", "archive-too-fresh", marker=marker)
+            return None
+        if busy := worktree_busy(path):
+            note_preserved_recovery(observations, "archive", "worktree-not-idle", marker=marker, custody=busy)
             return None
         head = sh(["git", "rev-parse", "--verify", "HEAD^{commit}"], cwd=path, timeout=30)
         if head.returncode:
+            note_preserved_recovery(observations, "archive", "archive-head-unavailable", marker=marker)
             return None
         with tempfile.TemporaryDirectory(dir=host.state) as scratch:
             env = {**os.environ, "GIT_INDEX_FILE": str(Path(scratch) / "index")}
             for args in (["git", "read-tree", "HEAD"], ["git", "add", "-A", *disk_guard.SOURCE_PATHSPEC]):
                 if sh(args, cwd=path, env=env, timeout=300).returncode:
+                    note_preserved_recovery(observations, "archive", "archive-index-unavailable", marker=marker)
                     return None
             tree = sh(["git", "write-tree"], cwd=path, env=env, timeout=60)
         if tree.returncode or not tree.stdout.strip():
+            note_preserved_recovery(observations, "archive", "archive-tree-unavailable", marker=marker)
             return None
         commit = sh(["git", "commit-tree", tree.stdout.strip(), "-p", head.stdout.strip(),
                      "-m", f"lanes: archive preserved repair {path.name} ({reason})"], cwd=path, timeout=60)
         ref = PRESERVED_ARCHIVE_REF + path.name
-        if commit.returncode or not commit.stdout.strip() \
-                or sh(["git", "update-ref", ref, commit.stdout.strip()], cwd=path, timeout=30).returncode:
+        if commit.returncode or not commit.stdout.strip():
+            note_preserved_recovery(observations, "archive", "archive-commit-unavailable", marker=marker)
+            return None
+        if sh(["git", "update-ref", ref, commit.stdout.strip()], cwd=path, timeout=30).returncode:
+            note_preserved_recovery(observations, "archive", "archive-ref-unavailable", marker=marker)
             return None
         marker_path.unlink()
         sh(["git", "worktree", "remove", "--force", str(path)], cwd=host.repo, timeout=600)
         if path.exists():
-            marker_path.write_text(marker)  # Not removed: keep it protected; the ref also holds it.
+            marker_path.write_bytes(marker.encode())  # Not removed: keep it protected; the ref also holds it.
+            note_preserved_recovery(observations, "archive", "archive-worktree-retained", marker=marker)
             return None
     except (OSError, subprocess.SubprocessError):
+        note_preserved_recovery(observations, "archive", "archive-io-unavailable", marker=marker)
         return None
     return ref
 
@@ -7052,8 +7990,6 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                "startedAt": now_iso()}
     receipt["targetStateReads"] = 1
     try:
-        if pr_events.unconfirmed_human_hold(host, pr):
-            raise RepairStopped("target-pr-human-hold-pending", {**pr, "state": "OPEN"}, "before-execution-claim")
         live = require_fix_target(pr, "before-execution-claim", repair=True)
     except RepairStopped as error:
         live, reason = error.live, str(error)
@@ -7080,6 +8016,28 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             ledger.write(json.dumps(receipt) + "\n")
         return receipt
     pr = live
+    infra = infra_only_red(host, pr) if branch_held else None
+    if infra and claim_infra_rerun(host, pr) and _rerun_failed(pr):
+        receipt.update(verdict="skipped", reasons=[f"infra-rerun:{infra}"], endedAt=now_iso(),
+                       result={"verdict": "skipped", "commit": None, "pr": pr["number"]})
+        end_local_fix_attempt(host, pr, receipt)
+        with open(runs / "ledger.jsonl", "a") as ledger:
+            ledger.write(json.dumps(receipt) + "\n")
+        return receipt
+    route = route_fix_red(host, pr) if branch_held else None
+    if route:
+        receipt["failureFingerprint"] = {key: route[key] for key in ("cls", "key", "action", "signature")}
+        reason = deterministic_route_taken(host, pr, route)
+        if not reason and fingerprint_breaker_open(host, pr, route["key"]):
+            reason = f"infra-rerun:breaker-{route['cls']}"
+            note_fingerprint_trip(host, pr, route, receipt)
+        if reason:
+            receipt.update(verdict="skipped", reasons=[reason], endedAt=now_iso(),
+                           result={"verdict": "skipped", "commit": None, "pr": pr["number"]})
+            end_local_fix_attempt(host, pr, receipt)
+            with open(runs / "ledger.jsonl", "a") as ledger:
+                ledger.write(json.dumps(receipt) + "\n")
+            return receipt
     failure = {"checks": [(check.get("name"), check.get("conclusion")) for check in pr.get("statusCheckRollup") or []],
                "merge": pr.get("mergeStateStatus"), "review": pr.get("reviewDecision")}
     ident = execution_attempt.identity("pr-remediation",
@@ -7087,10 +8045,11 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                                        {"headSha": pr["headRefOid"]})
     coordination = execution_coordination(pr["headRefOid"])
     preserved = None
+    preserved_observations = []
     try:
         if not branch_held:
             raise RecoveryHandoff("repair-owner-active", worktree)
-        if retired := retire_published_preserved(host, pr["number"]):
+        if retired := retire_published_preserved(host, pr["number"], observations=preserved_observations):
             receipt["retiredPreserved"] = retired
         for archive_pass in (True, False):
             try:
@@ -7100,7 +8059,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 break
             except RecoveryHandoff as error:
                 archived = archive_pass and archive_unresumable_preserved(
-                    host, Path(error.evidence["worktree"]), str(error))
+                    host, Path(error.evidence["worktree"]), str(error), observations=preserved_observations)
                 if not archived:
                     raise
                 receipt.setdefault("archivedPreserved", []).append(archived)
@@ -7108,17 +8067,22 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
     except RecoveryHandoff as error:
         receipt.update(verdict="recovery-handoff", reasons=[str(error)], recovery=error.evidence,
                        endedAt=now_iso(), result={"verdict": "recovery-handoff", "pr": pr["number"], "commit": None})
+        if preserved_observations:
+            receipt["preservedRecoveryObservations"] = preserved_observations
         if branch_held:
             end_local_fix_attempt(host, pr, receipt)
         with open(runs / "ledger.jsonl", "a") as ledger:
             ledger.write(json.dumps(receipt) + "\n")
         return receipt
+    if preserved_observations:
+        receipt["preservedRecoveryObservations"] = preserved_observations
     try:
         claimed = execution_attempt.claim(runs / "execution-attempts.jsonl", ident,
                                           {"owner": HOST, "runtime": "symphony-lanes", "provider": name,
                                            "model": spec.get("model"), "tool": "fix_red_pr", "accountPool": name},
                                           {"attempts": MAX_FIX_ATTEMPTS, "concurrency": 1, "wallSeconds": host.agent_timeout * MAX_FIX_ATTEMPTS,
-                                           "spend": MAX_FIX_ATTEMPTS, "mutations": MAX_FIX_ATTEMPTS * 2,
+                                           "spend": MAX_FIX_ATTEMPTS,
+                                           "mutations": max(MAX_FIX_ATTEMPTS * 2, len(conflict_resolvers()) + 1),
                                            "leaseSeconds": host.agent_timeout + 900, "version": "lanes-v1"},
                                           {"triggerId": run_id, "correlationId": f"pr-{pr['number']}",
                                            "causationId": pr["headRefOid"]}, coordination=coordination)
@@ -7156,8 +8120,6 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                     return None
                 receipt["targetStateReads"] += 1
                 try:
-                    if pr_events.unconfirmed_human_hold(host, pr):
-                        raise RepairStopped("target-pr-human-hold-pending", {**pr, "state": "OPEN"}, stage)
                     live = require_fix_target(target, stage, worktree=worktree, repair=True)
                 except RepairStopped as error:
                     # Mid-run, one unreadable snapshot (a check finishing between pages, a
@@ -7195,18 +8157,28 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             def boundary(stage="repair-command", allow_local_push=False):
                 require_disk(host, stage)
                 verify_target(pr, stage, worktree=worktree if allow_local_push else None)
-            resolved_generated = False
+            resolved_name = None
             if pr.get("mergeStateStatus") == "DIRTY":
-                execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
-                                           {"spend": 0, "mutations": 1}, coordination=coordination, boundary_id="repair-generated-conflict")
-                resolved_generated = resolve_generated_conflict(worktree, pr["headRefName"], log, guard=boundary)
+                for boundary_id, resolver, resolution in conflict_resolvers():
+                    execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
+                                               {"spend": 0, "mutations": 1}, coordination=coordination, boundary_id=boundary_id)
+                    if resolver(worktree, pr["headRefName"], log, guard=boundary):
+                        resolved_name = resolution
+                        break
             agent = None
-            if resolved_generated:
-                receipt.update(resolution="generated-regenerated")
+            if resolved_name:
+                receipt.update(resolution=resolved_name)
             else:
                 boundary("before-install")
                 install_dependencies(host, worktree, log)
-                prompt = render_fix_prompt(pr, failure_excerpt(pr))
+                excerpt = failure_excerpt(pr)
+                try:
+                    pr_events.ensure_red_before_green(pr, excerpt)
+                except (OSError, subprocess.SubprocessError, ValueError):
+                    pass  # evidence is best effort; the repair itself must still run
+                prompt = render_fix_prompt(pr, excerpt)
+                prompt += "\n\n" + "\n".join(machine_gate(host, f"PR{pr['number']}", "", (), excerpt, name,
+                                                           fp=machine_gap.check_fingerprint(pr), receipt=receipt))
                 if preserved:
                     prompt = ("Resume the preserved repair in this checkout. Inspect git status, diff and local commits; "
                               "retain existing edits and finish verification/publication. Never reset or start over.\n\n" + prompt)
@@ -7217,7 +8189,14 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 boundary("before-agent")
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 1, "mutations": 1}, coordination=coordination, boundary_id="repair-dispatch")
-                agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
+                fixer = {fix_red_classes.WIRE_CI_FAST: wire_ci_fast_fix,
+                         fix_red_classes.ATOMIC_WRITE: atomic_state_fix,
+                         fix_red_classes.RENUMBER: renumber_migrations_fix,
+                         fix_red_classes.SNAP_SPACING: snap_spacing_fix,
+                         fix_red_classes.MERGE_NARROWED: merge_narrowed_preflight_fix,
+                         fix_red_classes.REGISTER_DOMAIN: register_domain_writes_fix}.get((route or {}).get("action"))
+                agent = fixer(host, pr, route, worktree, log, receipt) if fixer else None
+                agent = agent or run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree),
                                                          "provider_receipt": str(provider_evidence),
                                                          "model": str(spec.get("model"))}),
@@ -7263,7 +8242,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 # summary carries no labels, so delete unconditionally (404 when absent).
                 sh(["gh", "api", "-X", "DELETE",
                     f"repos/{REPO_SLUG}/issues/{pr['number']}/labels/{pr_events.POISON_LABEL}"], log=log)
-                if pr.get("liftHold") and remediation.lift_human_holds():
+                if pr.get("liftHold"):
                     sh(["gh", "api", "-X", "DELETE",
                         f"repos/{REPO_SLUG}/issues/{pr['number']}/labels/hold"], log=log)
             if pushed and not pr.get("isDraft"):
@@ -7521,14 +8500,14 @@ def _inventory_unreadable(path, error) -> dict:
     return {"sourceAtReason": "inventory-unreadable"}
 
 
-def open_prs_summary(*, capture: list[dict] | None = None) -> list[dict]:
+def open_prs_summary(*, capture: list[dict] | None = None, refresh: bool = False) -> list[dict]:
     """Every open PR with its aggregate check state, in a few cheap GraphQL pages, cached for a
     minute. Per-check rollups over dozens of PRs 504 or trip GitHub's secondary rate limit
     (2026-09-27: devin had 43 red PRs and saw none of them, so it idled over budget). The
     aggregate state stands in as one synthetic check; `with_checks` loads the real ones for
     the single PR a worker claims. Empty when GitHub cannot be read."""
     now = time.time()
-    if now - _SUMMARY["at"] < SUMMARY_TTL_S:
+    if not refresh and now - _SUMMARY["at"] < SUMMARY_TTL_S:
         if capture is not None:
             capture.append(copy.deepcopy(_SUMMARY))
         return _SUMMARY["prs"]
@@ -7571,13 +8550,13 @@ class RepairInventoryHold(Exception):
     """The initial repair census cannot qualify this pass; exit after releasing claim.lock."""
 
 
-def capture_repair_inventory(name: str) -> dict:
+def capture_repair_inventory(name: str, *, refresh: bool = False) -> dict:
     """Copy one summary invocation's rows and provenance outside global claim.lock."""
     identity = {"repository": REPO_SLUG, "provider": name,
                 "cacheKey": "open-prs-labels-v2", "cacheRoot": str(SHARED_CACHE_DIR)}
     paired = []
     try:
-        returned = copy.deepcopy(open_prs_summary(capture=paired))
+        returned = copy.deepcopy(open_prs_summary(capture=paired, **({"refresh": True} if refresh else {})))
         summary = paired[0] if len(paired) == 1 else {}
         same = isinstance(returned, list) and isinstance(summary, dict) and returned == summary.get("prs")
     except (OSError, ValueError, TypeError, KeyError, AttributeError, subprocess.SubprocessError):
@@ -7599,6 +8578,59 @@ def repair_inventory_valid(receipt: dict, name: str) -> bool:
             and all(isinstance(pr, dict) and pr.get("labelsComplete") is True for pr in receipt["prs"])
             and type(stamp) in (int, float) and math.isfinite(stamp)
             and 0 <= time.time() - stamp < CLAIM_SCAN_TTL_S)
+
+
+def repair_inventory_cause(receipt: dict, name: str, now: float | None = None) -> str | None:
+    """The first reason `repair_inventory_valid` rejects a receipt, or None when it is valid.
+
+    Idle exits used to record one generic `repair-inventory-unknown-or-stale` for every one of
+    these, so a throughput stall could not be attributed (2026-10-24: oversize looked like stale)."""
+    if not isinstance(receipt, dict) or not isinstance(receipt.get("summary"), dict):
+        return "receipt-missing"
+    summary = receipt["summary"]
+    now = time.time() if now is None else now
+    stamp = summary.get("sourceAt")
+    if receipt.get("repository") != REPO_SLUG:
+        return "wrong-repository"
+    if receipt.get("provider") != name:
+        return "wrong-provider"
+    if receipt.get("cacheKey") != "open-prs-labels-v2":
+        return "wrong-cache-key"
+    if receipt.get("cacheRoot") != str(SHARED_CACHE_DIR):
+        return "wrong-cache-root"
+    if receipt.get("sameCallRows") is not True or not isinstance(receipt.get("prs"), list):
+        return "rows-not-same-call"
+    if receipt["prs"] != summary.get("prs"):
+        return "rows-diverged"
+    if summary.get("readable") is not True:
+        return "github-unreadable"
+    if not all(isinstance(pr, dict) and pr.get("labelsComplete") is True for pr in receipt["prs"]):
+        return "labels-incomplete"
+    if type(stamp) not in (int, float) or not math.isfinite(stamp):
+        reason = summary.get("sourceAtReason")
+        return str(reason) if isinstance(reason, str) and reason else "source-unstamped"
+    if now - stamp < 0:
+        return "source-clock-skew"
+    if now - stamp >= CLAIM_SCAN_TTL_S:
+        return "source-stale"
+    return None
+
+
+def lock_repair_inventory(host: Host, name: str, receipt: dict) -> tuple[Locked, dict]:
+    """Fence a copied census after optional preflight, then after one lock wait.
+
+    Only age can request another ordinary census outside claim.lock. A refresh
+    supplies its own rows and provenance; unreadable/mismatched receipts still
+    fail closed. Bound retries so contention cannot spin or repeat admission.
+    """
+    if repair_inventory_cause(receipt, name) == "source-stale":
+        receipt = capture_repair_inventory(name, refresh=True)
+    claim = Locked(host.state / "claim.lock", blocking=True)
+    if repair_inventory_cause(receipt, name) == "source-stale":
+        claim.release()
+        receipt = capture_repair_inventory(name, refresh=True)
+        claim = Locked(host.state / "claim.lock", blocking=True)
+    return claim, receipt
 
 
 def overlap_prs_summary() -> list[dict] | None:
@@ -7690,8 +8722,8 @@ def org_merged_prs(identifier: str) -> list[dict] | None:
 
 
 def in_flight_issues() -> frozenset[str] | None:
-    """Issues that already have an open PR (lane branch or `linear-issue-id` marker) from any
-    lane, host, or agent. GitHub is the shared truth. None when GitHub cannot be read: an
+    """Issues that already have an open PR (lane branch, canonical reference or legacy marker)
+    from any lane, host, or agent. GitHub is the shared truth. None when GitHub cannot be read: an
     unknown in-flight set is not permission to open a duplicate PR (JOV-6833). A parked PR the
     sweep requeued (`lane-rebuild`, JOV-7708) stays open but no longer holds its issue."""
     def fetch():
@@ -7708,6 +8740,7 @@ def in_flight_issues() -> frozenset[str] | None:
         branch = LANE_BRANCH.match(pr.get("headRefName") or "")
         marker = ISSUE_MARKER.search(pr.get("body") or "")
         keys |= {key.upper() for key in (branch and branch.group("issue"), marker and marker.group(1)) if key}
+        keys |= ownership.referenced(pr.get("body") or "")
     return frozenset(keys)
 
 
@@ -7806,7 +8839,7 @@ def sweep_lane_prs(host: Host, name: str, linear, now: float | None = None) -> N
     marker = host.state / f"sweep-{name}.json"
     if marker.exists() and now - json.loads(marker.read_text()).get("at", 0) < SWEEP_EVERY_S:
         return
-    marker.write_text(json.dumps({"at": now}))
+    atomic_write_text(marker, json.dumps({"at": now}))
     superseded, stale = sweep_plan(lane_prs(name, fields=LIGHT_PR_FIELDS), now, last_pushes())
     for pr, keep in superseded:
         if pr_events.maintenance_hold(host, THIS, pr, now):
@@ -8039,7 +9072,7 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
     providers = load_providers()
     order, now = pr_events.cost_order(providers), time.time()
     disabled = set(providers) - set(order)
-    prs = [pr for pr in prs if not pr_recovery_held(host, pr, now)
+    prs = [pr for pr in prs if not pr_recovery_held(host, pr, now) and not pr_breaker_open(host, pr["number"], now, pr.get("headRefOid"))
            and pr_events.may_take(name, pr, attempts.get(str(pr["number"]), {}), order, now)]
     settled = []
     for pr in prs:
@@ -8151,7 +9184,16 @@ def record_idle_exit(host: Host, name: str, reason: str, *, deferred=None) -> No
         if deferred: blocks[str(deferred["pr"]["number"])] = deferred
         else: blocks = {number: row for number, row in blocks.items() if row.get("terminal", False)}
         data[name] = {"at": now_iso(), "reason": reason, **({"deferredRequeue": blocks} if blocks else {})}
-        path.write_text(json.dumps(data))
+        # Readers (doctor, HUD, the next worker's deferred-requeue scan, test snapshots) do not take
+        # claim.lock. A truncating write_text let them read an empty file: ClaimScanCacheTest failed
+        # ~5% of runs under load with JSONDecodeError and refused the 07:39Z release on Gem.
+        temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+        try:
+            temporary.write_text(json.dumps(data))
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
+        throughput_sentinel.append_idle_exit(host.state, REPO_SLUG, name, reason)
     except (OSError, ValueError):
         pass
     finally:
@@ -8192,7 +9234,7 @@ def reserved_binding_pass(host: Host, name: str, spec: dict) -> int:
     guaranteed seat, so a full or throttled Jovie pool cannot stall another repository. Disk-critical
     hosts admit nothing: a binding run needs a local checkout like any other."""
     try:
-        pct = disk_guard.free_pct(host.state)  # observation only: cleanup stays with slot holders
+        pct = disk_guard.lanes_free_pct(host.state)  # observation only: cleanup stays with slot holders
         if pct is None or pct <= disk_guard.CRITICAL_PCT:
             return 0
         bound = bindings.reserve(THIS, host, name, spec)
@@ -8492,6 +9534,26 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
         temporary.unlink(missing_ok=True)
 
 
+def jovie_repair_pending(host: Host, now: float | None = None) -> bool:
+    """True unless a fresh maintenance-demand record from any local lane proves Jovie has no
+    repairable PR. Unknown or stale counts as pending so the Jovie path gets a turn and
+    refreshes the record (a record only goes stale when other work starves the Jovie path)."""
+    now = time.time() if now is None else now
+    lanes = read_json(host.state / "maintenance-demand.json").get("lanes")
+    # Only a lane that repairs Jovie PRs can prove Jovie has none. record_maintenance_demand runs
+    # only for such lanes (`local = spec.get("repairs") is not False`), and this filter keeps a
+    # non-repairing lane's row, should one ever be written, from unblocking LYB intake.
+    providers = read_json(HERE / "providers.json")
+    for lane_name, row in (lanes.items() if isinstance(lanes, dict) else ()):
+        if (providers.get(lane_name) or {}).get("repairs") is False:
+            continue
+        at, pending = (row or {}).get("observedAt"), (row or {}).get("pending")
+        if type(at) in (int, float) and 0 <= now - at <= MAINTENANCE_DEMAND_MAX_AGE_S \
+                and type(pending) is int and pending == 0:
+            return False
+    return True
+
+
 def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, maintenance_only=False) -> int:
     """Release ownership on every exceptional exit, including notification failures."""
     try:
@@ -8507,13 +9569,29 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     # Extra repository bindings (LYB) share this seat. Jovie-only holds below never block them,
     # and a binding fault never blocks the Jovie path. No configured binding = no reads at all.
     try:
-        bound = bindings.work(THIS, host, name, spec, maintenance_only=maintenance_only)
+        bound = bindings.work(THIS, host, name, spec, maintenance_only=maintenance_only,
+                              jovie_repair_pending=jovie_repair_pending(host))
     except Exception as error:
         bound = None
         print(f"binding pass failed: {type(error).__name__}: {error}"[:300], file=sys.stderr)
     if bound is not None:
         slot.release()
         return 1 if bound == "disk-held" else reexec(host, name)
+    if name == "hyperagent":
+        # Remote repair of existing PRs comes before new issues, and the shared 24/day thread
+        # cap (bridge + issues + repairs) gates both: a spent cap ends the turn here.
+        try:
+            turn, _receipt = hyperagent_repair.lane_turn(host.state, spec)
+        except Exception as error:
+            turn = "idle"
+            print(f"hyperagent repair pass failed: {type(error).__name__}: {error}"[:300], file=sys.stderr)
+        if turn == "capped":
+            record_idle_exit(host, name, "hyperagent-daily-cap")
+            slot.release()
+            return 0
+        if turn == "ran":
+            slot.release()
+            return reexec(host, name)
     linear = None
     # Publication can await canonical policy and native queue reads. Keep those
     # outside the global claim lock, then refresh inventory for ordinary admission.
@@ -8534,7 +9612,10 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     routing_needed = spec.get("repairs") is not False and repair_routing_needed(host, rung_inventory)
     routing_providers = load_providers() if routing_needed else {}
     routing_context = capture_repair_routing(host, routing_providers, rung_inventory) if routing_needed else None
-    claim = Locked(host.state / "claim.lock", blocking=True)
+    if repair_inventory is not None:
+        claim, repair_inventory = lock_repair_inventory(host, name, repair_inventory)
+    else:
+        claim = Locked(host.state / "claim.lock", blocking=True)
     # Bulk repair inventory fills under its per-key lock outside this global lock.
     # Current local filters and selected-head/owner/claim arbitration remain serialized.
     red = adopt = issue = route_decision = None
@@ -8550,6 +9631,12 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         local = spec.get("repairs") is not False
         if local and not repair_inventory_valid(repair_inventory, name):
             raise RepairInventoryHold()
+        if local:
+            # Project the refreshed same-call pair while claim ownership is held.
+            # Optional file witnesses retain their original binding and are
+            # revalidated by the new-issue path before use.
+            scan_summary = repair_inventory["summary"]
+            rung_inventory = {key: scan_summary.get(key) for key in ("readable", "sourceAt", "prs")}
         candidates = [pr for pr in fix_candidates(name, inventory=repair_inventory["prs"]) if not pr_recovery_held(host, pr)] if local else []
         # Reclaimed abandoned drafts (the only non-lane drafts among the fix candidates) are
         # gated and readied like this lane's own drafts. Derived from the one cached scan so
@@ -8591,6 +9678,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             if not maintenance_only:
                 linear = Linear(host.linear_env)
             if local:
+                linear_optional(file_breaker_signals, host, linear)
                 linear_optional(escalate_exhausted, host,
                                 list({pr["number"]: pr for pr in candidates + events + rung_candidates}.values()), linear,
                                 **({"model_only": True} if maintenance_only else {}),
@@ -8680,7 +9768,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
                   f"{REPAIR_INVENTORY_MAX_BYTES} byte limit", file=sys.stderr)
             record_idle_exit(host, name, "repair-inventory-oversize")
         else:
-            record_idle_exit(host, name, "repair-inventory-unknown-or-stale")
+            record_idle_exit(host, name, "repair-inventory-" + (repair_inventory_cause(repair_inventory, name)
+                                                                or "valid-at-recheck"))
         slot.release()
         return 0
     # Every local pass, including one that just claimed a repair. An idle-only sync
@@ -8691,6 +9780,10 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             revisit_terminal_prs(host, candidates)
         except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
             pass  # Retried next pass; it never blocks the claimed repair.
+        try:
+            deterministic_conflict_pass(host, candidates)
+        except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+            pass  # Same contract: a script-only rung never blocks the claimed repair.
     if routing_refresh_reason and red is None and adopt is None and issue is None:
         record_idle_exit(host, name, "routing-preflight-required:" + routing_refresh_reason)
         slot.release()
@@ -8811,7 +9904,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             count = failure_record(failures.get(issue.identifier))["count"] + 1
             failures[issue.identifier] = {"count": count, "at": time.time(), "release": release_generation(),
                                           **pr_events.failure_reason(receipt, count >= MAX_FAILURES)}
-            failures_path(host).write_text(json.dumps(failures))
+            atomic_write_text(failures_path(host), json.dumps(failures))
         finally:
             claim.release()
         exhausted = failures[issue.identifier]["count"] >= MAX_FAILURES
@@ -8921,17 +10014,69 @@ def recover_unclean_tick(host: Host) -> dict:
     return {"schema": "jovie.unclean-tick-recovery/v1", "refundedFixAttempts": sorted(refunded)}
 
 
+DOCTOR_REFRESH_S = 5 * 60
+
+
+def spawn_doctor_if_stale(host: Host, now: float | None = None) -> bool:
+    """Start a detached doctor pass when the last one is older than DOCTOR_REFRESH_S. The doctor used to run only
+    at the very end of a dispatch tick, so a slow tick left the feed, the HUD and the dead-man stale."""
+    now = time.time() if now is None else now
+    try:
+        at = datetime.fromisoformat(str(json.loads((host.state / "doctor.json").read_text())["at"]).replace("Z", "+00:00")).timestamp()
+    except (OSError, ValueError, KeyError, TypeError):
+        return False  # no doctor report at all (fresh host, fixture): the end-of-tick pass writes the first one
+    if now - at < DOCTOR_REFRESH_S:
+        return False
+    try:
+        with open(host.state / "doctor-spawn.log", "ab") as out:
+            subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "doctor"], stdin=subprocess.DEVNULL,
+                             stdout=out, stderr=out, start_new_session=True, cwd=str(host.repo))
+        return True
+    except OSError:
+        return False
+
+
+def run_doctor(host: Host) -> int:
+    """One doctor pass; a second concurrent pass exits at once (doctor-run.lock)."""
+    lock = Locked(host.state / "locks" / "doctor-run.lock", blocking=False)
+    try:
+        if not lock.held:
+            return 0
+        doctor.run(host, sys.modules[__name__], codex_lane_module())
+        return 0
+    finally:
+        lock.release()
+
+
 def dispatch(host: Host) -> int:
+    lifecycle.HEARTBEAT = host.state / "tick-heartbeat"
+    lifecycle.beat()
+    try:
+        spawn_doctor_if_stale(host)
+    except Exception:  # a doctor that cannot start never blocks dispatch
+        pass
     unclean_previous = None
     try:
         unclean_previous = _begin_tick_intent(host)
     except Exception:
         unclean_previous = {"unavailable": True}  # a failed marker write must not skip the tick
+    started = time.monotonic()
     try:
         result = _dispatch(host, unclean_previous)
     finally:
         _clear_tick_intent(host)
+        record_tick_duration(host, time.monotonic() - started)
     return result
+
+
+def record_tick_duration(host: Host, seconds: float) -> None:
+    """One row per dispatch tick: the number to drive down (it was 25-60 minutes on 2026-10-26; target under 5)."""
+    try:
+        with open(host.state / "runs" / "tick-durations.jsonl", "a") as out:
+            out.write(json.dumps({"at": now_iso(), "dispatchS": round(seconds, 1), "release": read_marker(host),
+                                  "topCommands": lifecycle.top_stats()}) + "\n")
+    except OSError:
+        pass
 
 
 def _dispatch(host: Host, unclean_previous: dict | None) -> int:
@@ -8997,6 +10142,17 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                 tick["linearSync"] = linear_sync.tick(host.state, client, client.admit, (LinearRateLimited,), teams)
             except (Exception, SystemExit) as error:  # dispatch reads the mirror at any age
                 tick["linearSyncError"] = f"{type(error).__name__}: {error}"[:200]
+        if not os.environ.get("LANES_SELFTEST") and os.environ.get("LANES_BOARD_INTAKE", "1") != "0":
+            try:
+                # Typed failures Summer posts to the mesh board (doctor issues, stuck PRs, red main)
+                # become lanes work here and close only on a verified outcome (board_intake.py).
+                tick["boardIntake"] = board_intake.tick(host.state, Linear(host.linear_env))
+            except (Exception, SystemExit) as error:  # the board never takes dispatch down
+                tick["boardIntakeError"] = f"{type(error).__name__}: {error}"[:200]
+            try:  # measure the shared hosted-macOS pool (throttled); the LYB refill below reads it
+                tick["macosPool"] = macos_pool.sample(host.state)
+            except (Exception, SystemExit) as error:  # a sampling fault never blocks dispatch
+                tick["macosPoolError"] = f"{type(error).__name__}: {error}"[:200]
             try:  # Todo below target is refilled from the Backlog the sync just refreshed, per team
                 # Every team refills on its own mirror and seats; JOV has no extra binding, so it gets the same
                 # floor-less pass (Summer's governor writes the same Todo moves idempotently).
@@ -9004,6 +10160,10 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                 tick["backlogRefill"] = {binding.key: binding_refill.refill(THIS, host, binding, client, binding.min_todo)
                                          for binding in refill_for}
                 tick["backlogRank"] = {binding.key: binding_refill.rank_pass(THIS, host, binding, client) for binding in refill_for}
+                tick["priorityAdmission"] = {binding.key: priority_admission.run(THIS, host, binding.key, client, floor=binding.min_todo,
+                                                                                  excluded=binding.excluded)
+                                             for binding in refill_for}
+                tick["backlogDecompose"] = decompose_pass.maybe_spawn(host.state, [binding.key for binding in refill_for])
             except (Exception, SystemExit) as error:  # a refill fault never blocks dispatch
                 tick["backlogRefillError"] = f"{type(error).__name__}: {error}"[:200]
         try:
@@ -9114,6 +10274,12 @@ def finish_dispatch(host: Host, tick: dict) -> int:
     except Exception as error:  # registry freshness never takes dispatch down
         tick["credentialsSpend"] = {"status": "error", "error": type(error).__name__}
     try:
+        # Daily model-family sync (model_family_sync.py): provider lists -> registry PR, stale alarm.
+        owner = os.environ.get("CREDENTIALS_SPEND_OWNER", "gem").split(".")[0]
+        tick["modelFamilySync"] = (model_family_sync.tick(host.state, host.repo) if HOST == owner else {"status": "not-owner"})
+    except Exception as error:  # registry freshness never takes dispatch down
+        tick["modelFamilySync"] = {"status": "error", "error": type(error).__name__}
+    try:
         # Live quota reads (Codex ledger, Grok /usage) for the capacity registry; metadata only.
         tick["capacityLive"] = (capacity_live.tick(host.state) if HOST == os.environ.get("CREDENTIALS_SPEND_OWNER", "gem").split(".")[0]
                                 else {"status": "not-owner"})
@@ -9121,7 +10287,7 @@ def finish_dispatch(host: Host, tick: dict) -> int:
         tick["capacityLive"] = {"status": "error", "error": type(error).__name__}
     update_json(host.state / "tick.json", lambda data: (data.clear(), data.update(tick)))
     try:
-        doctor.run(host, sys.modules[__name__], codex_lane_module())
+        run_doctor(host)
     except Exception as error:  # never let the doctor take dispatch down
         update_json(host.state / "tick.json", lambda data: data.update(doctorError=f"{type(error).__name__}: {error}"[:200]))
     return 1 if tick["error"] or tick.get("admissionDenied") else 0
@@ -9397,7 +10563,7 @@ def refresh_codex_skills(host: Host, home: Path | None = None) -> dict:
         return {"status": "timeout"}
     except OSError as error:
         return {"status": "error", "error": f"{type(error).__name__}: {error}"[:200]}
-    receipt.write_text(json.dumps({"installed": wanted, "at": now_iso()}))
+    atomic_write_text(receipt, json.dumps({"installed": wanted, "at": now_iso()}))
     return {"status": "updated", "from": head[:12], "to": wanted[:12]}
 
 
@@ -9415,6 +10581,22 @@ def update(host: Host) -> int:
     """Install origin/main's scripts/lanes as a new release after its own tests pass.
     Only the `current` symlink moves; running workers finish on their release. The outcome is
     written to update.json so a refused release is an alert, not a traceback in a journal."""
+    lifecycle.HEARTBEAT = host.state / "tick-heartbeat"  # the self-test is minutes long; its keepalive proves progress
+    lifecycle.beat()
+    # Single flight: two updaters take the gate-admission lock and the seats from each other, so each
+    # reads gate-admission-busy (3 concurrent `lane_runner update` at 17:07Z 2026-10-25, one of them a
+    # manual retry loop, kept #23268 from installing). A second caller exits without touching update.json.
+    single = Locked(host.state / "locks" / "update.lock", blocking=False)
+    if not single.held:
+        print("lane update: update already running", file=sys.stderr)
+        return 0
+    try:
+        return _update_locked(host)
+    finally:
+        single.release()
+
+
+def _update_locked(host: Host) -> int:
     mirror = host_maintenance(host, refresh_object_mirror)  # before install_release's origin fetch
     before = read_marker(host)
     try:
@@ -9427,6 +10609,7 @@ def update(host: Host) -> int:
     update_json(host.state / "update.json", lambda data: (data.clear(), data.update(
         at=now_iso(), ok=code == 0, error=error, current=read_marker(host), mirror=mirror, skills=skills,
         behindS=lag.get("behindS"), behindCommit=lag.get("behindCommit"))))
+    host_maintenance(host, lambda h: update_drain.finish(h.state, lag.get("behindS")) or {"status": "no-drain"})
     return code
 
 
@@ -9458,13 +10641,43 @@ def install_lag(host: Host, before: str | None, error: str | None) -> dict:
             "behindCommit": bundle["sourceCommit"], "why": error}
 
 
+def release_paths(repo: Path, revision: str) -> list[str]:
+    """Managed bundle paths that exist at `revision`. The installed LANE_TESTS and RELEASE_EXTRAS
+    describe the installed release, not the incoming one: a file deleted upstream (#23510 removed
+    ops/registry/third-party-grants.jsonl on 2026-10-28) made every later update refuse with
+    release-bundle-incomplete for good, because the old updater could never install the release
+    that no longer lists it. Missing extras and tests drop out of the bundle; scripts/lanes is mandatory."""
+    wanted = sorted({"scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS})
+    listing = subprocess.run(["git", "ls-tree", "--name-only", revision, "--", *wanted], cwd=repo,
+                             capture_output=True, text=True)
+    present = set(listing.stdout.splitlines())
+    if listing.returncode or "scripts/lanes" not in present:
+        raise RuntimeError("release-bundle-incomplete")
+    return [path for path in wanted if path in present]
+
+
+def ensure_dependency_pool(host: Host) -> bool:
+    """The mesh runtime compiles against a pool slot restored from a recent lock; slots age out after
+    three days and an aged pool made every release refuse 'mesh runtime dependency closure failed'
+    (Gem, 2026-10-26 to 10-29). Refill before building when no ready slot remains. True when a fill ran."""
+    try:
+        if not worktree_pool.enabled() or worktree_pool.ready_slots(worktree_pool.pool_dir(host.repo)):
+            return False
+        print("lane update: dependency pool has no ready slot; refilling before the release build", file=sys.stderr)
+        worktree_pool.fill(host.repo, warm=False, log=sys.stderr)
+        return True
+    except (OSError, subprocess.SubprocessError) as error:
+        print(f"lane update: dependency pool refill failed: {error}", file=sys.stderr)
+        return False
+
+
 def release_identity(host: Host) -> dict:
     """Pin one main commit, then fingerprint exactly the managed release contents."""
     read = sh(["git", "rev-parse", "--verify", "origin/main^{commit}"], cwd=host.repo)
     revision = read.stdout.strip()
     if read.returncode or not re.fullmatch(r"[0-9a-f]{40}", revision):
         raise RuntimeError("release-source-unavailable")
-    paths = sorted({"scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS})
+    paths = release_paths(host.repo, revision)
     read = sh(["git", "rev-parse", *(f"{revision}:{path}" for path in paths)], cwd=host.repo)
     objects = read.stdout.splitlines()
     if read.returncode or len(objects) != len(paths) or any(not re.fullmatch(r"[0-9a-f]{40}", oid) for oid in objects):
@@ -9929,13 +11142,18 @@ def complete_staged_bundle(host: Host, staging: Path) -> str | None:
     staged without it and refused forever (2026-10-11: test_lifecycle.py from #21225 kept Gem on
     a 10-10 release). Fill missing bundle paths from origin/main only when its scripts/lanes is
     byte-identical to the staged tree; anything else stays a refusal."""
-    missing = [path for path in sorted({"scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS})
-               if not (staging / path).exists()]
+    head = subprocess.run(["git", "rev-parse", "--verify", "origin/main^{commit}"], cwd=host.repo,
+                          capture_output=True, text=True).stdout.strip()
+    try:
+        managed = release_paths(host.repo, head)
+    except RuntimeError:
+        return "release-bundle-incomplete"
+    missing = [path for path in managed if not (staging / path).exists()]
     if not missing:
         return None
     def git(*args, **kwargs):
         return subprocess.run(["git", *args], cwd=host.repo, capture_output=True, **kwargs)
-    revision = git("rev-parse", "--verify", "origin/main^{commit}", text=True).stdout.strip()
+    revision = head
     listing = git("ls-tree", "-r", revision, "scripts/lanes", text=True)
     expected = {line.split("\t", 1)[1]: line.split()[2] for line in listing.stdout.splitlines()}
     lanes = staging / "scripts/lanes"
@@ -10175,6 +11393,11 @@ def install_release(host: Host, *, operator=None) -> int:
     release = host.state / "releases" / tree
     refused_path = host.state / "update-refused.json"
     refused = json.loads(refused_path.read_text()) if refused_path.exists() else {}
+    if operator is None and not release.exists() and ensure_dependency_pool(host):
+        # The cause the marker recorded (an aged dependency pool) was just repaired: retry now.
+        if refused.get("why") == "mesh runtime dependency closure failed":
+            refused = {}
+            refused_path.unlink(missing_ok=True)
     if not release.exists() and refused.get("tree") == tree and time.time() - refused.get("at", 0) < UPDATE_RETRY_S:
         print(f"lane update backing off: tree {tree[:7]} was refused {refused.get('why')}", file=sys.stderr)
         return 1
@@ -10187,11 +11410,11 @@ def install_release(host: Host, *, operator=None) -> int:
             elif staging.exists() or staging.is_symlink():
                 raise lifecycle.AdmissionHeld("operator proof staging already exists; reconcile its owner")
             staging.mkdir(parents=True, mode=0o700)
-            archive = lifecycle.run(["git", "archive", bundle["sourceCommit"], "scripts/lanes", *RELEASE_EXTRAS, *LANE_TESTS],
+            archive = lifecycle.run(["git", "archive", bundle["sourceCommit"], *sorted(bundle["objects"])],
                                      cwd=host.repo, capture_output=True, check=True)
             lifecycle.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
             def refuse(why: str) -> int:
-                refused_path.write_text(json.dumps({"tree": tree, "at": time.time(), "why": why}))
+                atomic_write_text(refused_path, json.dumps({"tree": tree, "at": time.time(), "why": why}))
                 return 1
             # The staged tree proves itself with its own installer code. On 2026-10-10 the Mac
             # refused every release for a day because the *installed* installer chose a bare
@@ -10246,6 +11469,7 @@ def install_release(host: Host, *, operator=None) -> int:
         link.unlink()
     link.symlink_to(release / "scripts/lanes")
     os.replace(link, current)
+    refused_path.unlink(missing_ok=True)  # the refusal that marker recorded is resolved by this activation
     return 0
 
 
@@ -10315,7 +11539,7 @@ def load_github_env(path: Path = Path.home() / ".config/jovie-lanes/github.env",
     # publisher uses the REST form; Gem 2026-10-20 its 403 froze the public feed). A caller that targets another host
     # (GH_HOST, e.g. the offline real-gh test harness) keeps its own credentials:
     # the Jovie Bot installation token only exists for github.com.
-    shim.write_text(f'#!/bin/sh\n[ "$1" = gist ] && exec {real} "$@"\n'
+    atomic_write_text(shim, f'#!/bin/sh\n[ "$1" = gist ] && exec {real} "$@"\n'
                     f'[ "$1" = api ] && case "$2" in gists|gists/*) exec {real} "$@";; esac\n'
                     f'[ -n "${{GH_HOST:-}}" ] && [ "$GH_HOST" != github.com ] && exec {real} "$@"\n'
                     f'GH_TOKEN="$(python3 {HERE / "gh_app_token.py"} --guard "$@")" || exit $?\n'
@@ -10342,6 +11566,7 @@ def guarded_main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("dispatch")
+    sub.add_parser("doctor", help="one doctor pass (the dispatch tick starts one when the last is stale)")
     sub.add_parser("fix-now", help="drain the relay's red wake files immediately (JOV-8931)")
     sub.add_parser("update")
     prove = sub.add_parser("prove-staging", help="prove a staged release tree with this tree's own installer")
@@ -10399,13 +11624,17 @@ def guarded_main(argv: list[str] | None = None) -> int:
                       file=sys.stderr, flush=True)
             except OSError:
                 pass
-            while True:
-                time.sleep(60)
+            # Keep the locks only while descendants are provably alive: retry the sweep and
+            # release the moment the tree drains, instead of holding them until an operator.
+            while not retry_held_cleanup():
+                time.sleep(float(os.environ.get("LANES_GATE_CLEANUP_RETRY_S", 10)))
+            report_outcome({"returncode": None, "timeout": True})
+            return 124
     if args.command == "context-manifest":
         path = HERE / "context-manifest.json"
         generated = context_manifest_json()
         if args.write:
-            path.write_text(generated, encoding="utf-8")
+            atomic_write_text(path, generated, encoding="utf-8")
         matched = context_manifest_matches(path)
         print(json.dumps({"schema": "jovie-lane-context-generation/v1", "path": str(path),
                           "sha256": hashlib.sha256(generated.encode("utf-8")).hexdigest(),
@@ -10425,6 +11654,8 @@ def guarded_main(argv: list[str] | None = None) -> int:
         return worker(host, args.provider)
     if args.command == "fix-now":
         return fix_now(host)
+    if args.command == "doctor":
+        return run_doctor(host)
     return dispatch(host)
 
 

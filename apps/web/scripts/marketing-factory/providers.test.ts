@@ -78,6 +78,7 @@ describe('liveProviders', () => {
         width: 1,
         height: 1,
         brief: 'b',
+        quietZone: { position: 'left third', size: '42% of the frame width' },
       })
     ).resolves.toMatchObject({ status: 'credentials-unavailable' });
     expect(live.label('openai/gpt-5.5')).toBe('openai/gpt-5.5');

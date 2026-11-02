@@ -604,6 +604,11 @@ function defaultSleep(delayMs) {
 }
 
 const RUNNER_EXIT_ANNOTATION = /^Process completed with exit code \d+\.$/;
+// The Fork PR Gate job only restates the size job: when PR Size Guard dies on a
+// GitHub 5xx before publishing fork_verdict, Fork PR Gate reds with this
+// derived message. It carries no verdict about the combined head.
+const DERIVED_FORK_VERDICT_ANNOTATION =
+  /^Merge-group fork policy verdict is 'missing', not pass$/;
 
 /**
  * The GitHub failure kind when every error a failed producer reported was a
@@ -615,6 +620,7 @@ async function producerInfrastructureFailure({
   deadlineMs,
   loadCheckRunAnnotations,
   state,
+  derivedPattern = null,
 }) {
   if (
     state.detail !== 'failure' ||
@@ -638,6 +644,12 @@ async function producerInfrastructureFailure({
     .map(row => String(row.message ?? '').trim())
     .filter(message => message && !RUNNER_EXIT_ANNOTATION.test(message));
   if (messages.length === 0) return null;
+  if (
+    derivedPattern &&
+    messages.every(message => derivedPattern.test(message))
+  ) {
+    return 'derived';
+  }
   const kinds = new Set(messages.map(message => classifyFailureText(message)));
   if (kinds.has('none') || kinds.size !== 1) return null;
   return [...kinds][0];
@@ -790,29 +802,40 @@ export async function waitForMergeGroupAdmission({
       if (state.state === 'success') settledChecks[index] = state;
     });
 
-    const terminalFailure = states.findIndex(
-      state => state.state === 'terminal-failure'
+    const terminalIndexes = states.flatMap((state, index) =>
+      state.state === 'terminal-failure' ? [index] : []
     );
-    if (terminalFailure >= 0) {
-      const infrastructure = await producerInfrastructureFailure({
-        classifyFailureText,
-        deadlineMs,
-        loadCheckRunAnnotations,
-        state: states[terminalFailure],
-      });
-      if (infrastructure) {
+    if (terminalIndexes.length > 0) {
+      // Judge every failed producer, not just the first: Fork PR Gate sorts
+      // ahead of PR Size Guard, and its derived red masked the size job's
+      // GitHub 5xx as a source failure (2026-10-24 22:47Z, PRs 22583/22633).
+      const causes = [];
+      for (const index of terminalIndexes) {
+        causes.push(
+          await producerInfrastructureFailure({
+            classifyFailureText,
+            deadlineMs,
+            loadCheckRunAnnotations,
+            state: states[index],
+            derivedPattern:
+              REQUIRED_CHECKS[index] === 'Fork PR Gate'
+                ? DERIVED_FORK_VERDICT_ANNOTATION
+                : null,
+          })
+        );
+      }
+      const infraAt = causes.findIndex(cause => cause && cause !== 'derived');
+      const onlyInfraOrDerived = causes.every(cause => cause);
+      if (infraAt >= 0 && onlyInfraOrDerived) {
         // Terminal for this run (the producer will not re-run), yet the failure
         // hold reads the message as infrastructure and spends no source retry.
         throw new MergeGroupAdmissionError(
-          `${REQUIRED_CHECKS[terminalFailure]} failed on GitHub ${infrastructure}, not on the combined head`,
+          `${REQUIRED_CHECKS[terminalIndexes[infraAt]]} failed on GitHub ${causes[infraAt]}, not on the combined head`,
           { rateLimit: false }
         );
       }
-      fail(
-        `${REQUIRED_CHECKS[terminalFailure]} completed with ${
-          states[terminalFailure].detail
-        }`
-      );
+      const first = terminalIndexes[0];
+      fail(`${REQUIRED_CHECKS[first]} completed with ${states[first].detail}`);
     }
 
     if (states.every(state => state.state === 'success')) {

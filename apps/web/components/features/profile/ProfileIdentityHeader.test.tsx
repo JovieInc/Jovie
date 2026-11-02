@@ -49,6 +49,17 @@ describe('ProfileIdentityHeader', () => {
     expect(portrait?.closest('.h-20.w-20')).not.toBeNull();
   });
 
+  it('asks for a 2x source for the 160px desktop portrait while phones keep 80px', () => {
+    renderHeader();
+    const portrait = screen
+      .getByTestId('profile-identity-header')
+      .querySelector('img');
+    expect(portrait).toHaveAttribute(
+      'sizes',
+      '(min-width: 1024px) 320px, 80px'
+    );
+  });
+
   it('shows the verified state as a glyph with a tooltip, never the word', () => {
     renderHeader({ isVerified: true });
 
@@ -95,6 +106,19 @@ describe('ProfileIdentityHeader', () => {
     );
     fireEvent.click(listen);
     expect(onListenClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('draws the keyboard focus ring on the 28px pill face, not the 44px hit slot', () => {
+    renderHeader();
+
+    const listen = screen.getByRole('link', { name: 'Listen' });
+    const pillFace = listen.firstElementChild;
+    expect(pillFace).toHaveClass(
+      'group-has-focus-visible:ring-2',
+      'group-has-focus-visible:ring-focus'
+    );
+    expect(listen.className).toContain('focus-visible:outline-none');
+    expect(listen.className).not.toContain('focus-visible:ring');
   });
 
   it('marks Listen as the current page while Music is open', () => {

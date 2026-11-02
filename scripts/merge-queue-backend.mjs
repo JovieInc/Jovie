@@ -1515,6 +1515,12 @@ function assertEnrollCandidate(state, expectedHeadOid) {
       `PR #${state.number} must be open and ready for review before enrollment`
     );
   }
+  if (state.baseRefName !== 'main') {
+    throw backendError(
+      'non_main_base',
+      `PR #${state.number} targets ${state.baseRefName ?? 'an unknown base'}, not main; auto-merge and enqueue are refused (a stacked child would merge into its parent branch)`
+    );
+  }
   if (state.headRefOid.toLowerCase() !== expectedHeadOid) {
     throw backendError(
       'head_changed',

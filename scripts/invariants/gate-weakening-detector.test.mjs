@@ -124,11 +124,22 @@ describe('JOV-INV-045 gate-weakening detector', () => {
     });
     assert.deepEqual(event.labels, ['codeowners-approved']);
   });
+  it('treats a new shrink-only ledger as tightening but still rejects growth of an existing one', () => {
+    const path = 'apps/web/new-guard.baseline.json';
+    assert.deepEqual(kindsOf({ path, before: null, after: '{"files":{"a.tsx":2}}' }), []);
+    assert.ok(
+      kindsOf({ path, before: '{"files":{"a.tsx":2}}', after: '{"files":{"a.tsx":3}}' }).includes('shrink-only-growth')
+    );
+    assert.ok(
+      kindsOf({ path, before: '{"files":{"a.tsx":2}}', after: '{"files":{"a.tsx":2,"b.tsx":1}}' }).includes('shrink-only-growth')
+    );
+  });
   it('rejects weakening the detector itself', () => {
     const path = 'scripts/invariants/gate-weakening-detector.config.json';
     const before = JSON.stringify(config);
     const expectKind = (after, kind) => assert.ok(kindsOf({ path, before, after }).includes(kind), kind);
     expectKind(JSON.stringify({ ...config, scanExclusions: ['scripts/hidden/'] }), 'scan-exclusion-grew');
+    expectKind(JSON.stringify({ ...config, generatedReports: [...config.generatedReports, 'scripts/ci-fast-lanes.mjs'] }), 'scan-exclusion-grew');
     expectKind(JSON.stringify({ ...config, requiredKinds: config.requiredKinds.slice(1) }), 'detector-rule-removed');
     expectKind(JSON.stringify({ ...config, override: { ...config.override, label: 'other' } }), 'override-policy-changed');
     expectKind(null, 'detector-config-deleted');
@@ -137,6 +148,11 @@ describe('JOV-INV-045 gate-weakening detector', () => {
     assert.ok(kindsOf(hidden).includes('test-skip'));
     const excluded = { ...config, scanExclusions: ['scripts/invariants/fixtures/gate-weakening/'] };
     assert.deepEqual(evaluateGateWeakening([hidden], excluded), []);
+  });
+  it('skips a listed generated report, but still flags the same edit in a gate file', () => {
+    const edit = path => ({ path, before: '{\n  "risk_score": 50\n}\n', after: '{\n  "risk_score": 42.1\n}\n' });
+    assert.deepEqual(evaluateGateWeakening([edit('apps/web/reports/test-coverage-snapshot.json')], config), []);
+    assert.ok(kindsOf(edit('apps/web/reports/other-coverage.json')).includes('threshold-loosened'));
   });
   it('accepts an unchanged copy of the real gate files', () => {
     const paths = ['.github/workflows/ci.yml', '.github/workflows/source-validation.yml', 'scripts/ci-fast-lanes.mjs'];

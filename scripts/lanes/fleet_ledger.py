@@ -26,6 +26,9 @@ import time
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 
 STRANDED_S = 3 * 3600            # active claim with no live lease for this long is stranded
 EXTERNAL_TTL_S = 30 * 60         # default external claim ttl; renewed by `heartbeat`
@@ -93,7 +96,7 @@ def external_heartbeat(state: Path, ident: str, agent: str, now: float | None = 
     if held.get("agent") != agent:
         return False
     held["heartbeatAt"] = now
-    path.write_text(json.dumps(held))
+    atomic_write_text(path, json.dumps(held))
     return True
 
 
@@ -196,7 +199,7 @@ def record_ready(state: Path, now: float, capacity: dict, ready_by_provider: dic
     try:
         if path.exists() and path.stat().st_size > READY_MAX_BYTES:
             keep = path.read_text().splitlines()[-(READY_MAX_BYTES // 400):]
-            path.write_text("\n".join(keep) + "\n")
+            atomic_write_text(path, "\n".join(keep) + "\n")
         with open(path, "a") as handle:
             handle.write(json.dumps(row, separators=(",", ":")) + "\n")
     except OSError:
@@ -240,7 +243,7 @@ def idle_while_ready(state: Path, since: float) -> dict:
 
 
 GATE_LABELS = frozenset({"needs-human-decision", "needs-human", "needs:human", "human-review-required",
-                         "quality-gap:needs-tim", "tim-hold", "hold", "gated"})
+                         "quality-gap:needs-tim", "hold", "gated"})
 APPROVED_LABELS = frozenset({"tim-approved"})   # an approved gate is no gate
 DEADLINE = re.compile(r"^\s*(?:\*\*)?deadline\s*:\s*(?:\*\*)?\s*(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}:\d{2})(?::\d{2})?)?", re.I | re.M)
 DEFAULT = re.compile(r"^\s*(?:\*\*)?default\s*:\s*(?:\*\*)?\s*(\S.*)$", re.I | re.M)

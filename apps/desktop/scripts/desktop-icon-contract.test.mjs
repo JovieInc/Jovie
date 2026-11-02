@@ -26,11 +26,8 @@ const contactSheetPath = join(
   'jovie-icon-contact-sheet.png'
 );
 const productionIcnsPath = join(assetsRoot, 'icon.icns');
-const stagingIcnsPath = join(assetsRoot, 'icon-staging.icns');
 const productionPngPath = join(assetsRoot, 'icon.png');
-const stagingPngPath = join(assetsRoot, 'icon-staging.png');
 const productionIconsetPath = join(assetsRoot, 'icon.iconset');
-const stagingIconsetPath = join(assetsRoot, 'icon-staging.iconset');
 const ICON_SIZE = 512;
 
 async function pngMetadata(filePath) {
@@ -134,7 +131,7 @@ async function assertIcnsFile(filePath) {
 }
 
 async function icnsFilesMissing() {
-  for (const filePath of [productionIcnsPath, stagingIcnsPath]) {
+  for (const filePath of [productionIcnsPath]) {
     try {
       await access(filePath);
     } catch {
@@ -166,11 +163,9 @@ test('legacy icon-source.png remains for reference but is no longer the producti
   assert.notEqual(currentLegacySha, ''); // just ensure readable
 });
 
-test('packaged production and staging icons use the rounded desktop profile', async () => {
+test('packaged production icons use the rounded desktop profile', async () => {
   await assertRoundedTransparentPng(productionPngPath, ICON_SIZE);
-  await assertRoundedTransparentPng(stagingPngPath, ICON_SIZE);
   await assertMacSafeArea(productionPngPath, ICON_SIZE);
-  await assertMacSafeArea(stagingPngPath, ICON_SIZE);
 
   // .icns files are macOS-specific; skip this assertion on other platforms.
   // They are also gitignored build artifacts of prepare:assets (macOS-only
@@ -183,20 +178,16 @@ test('packaged production and staging icons use the rounded desktop profile', as
     );
   } else {
     await assertIcnsFile(productionIcnsPath);
-    await assertIcnsFile(stagingIcnsPath);
   }
 
   const expectedProductionIcon = await readFile(canonicalIconPath);
   const productionIcon = await readFile(productionPngPath);
-  const stagingIcon = await readFile(stagingPngPath);
 
   assert.notDeepEqual(productionIcon, expectedProductionIcon);
-  assert.deepEqual(stagingIcon, productionIcon);
 });
 
 test('desktop icon generation cleans up temporary iconset caches', async () => {
   await assert.rejects(access(productionIconsetPath));
-  await assert.rejects(access(stagingIconsetPath));
 });
 
 test('generated icon contact sheet exists for visual review', async () => {
@@ -207,20 +198,14 @@ test('generated icon contact sheet exists for visual review', async () => {
 });
 
 test('electron-builder packages the Jovie app icons for every desktop target', async () => {
-  const [productionConfig, stagingConfig] = await Promise.all([
-    readFile(join(desktopRoot, 'electron-builder.yml'), 'utf8'),
-    readFile(join(desktopRoot, 'electron-builder.staging.yml'), 'utf8'),
-  ]);
+  const productionConfig = await readFile(
+    join(desktopRoot, 'electron-builder.yml'),
+    'utf8'
+  );
 
   assert.match(productionConfig, /productName: Jovie/);
   assert.match(productionConfig, /icon: assets\/icon\.icns/);
   assert.match(productionConfig, /assets\/icon\.png/);
   assert.match(productionConfig, /assets\/dmg-background\.png/);
   assert.doesNotMatch(productionConfig, /Linear/);
-
-  assert.match(stagingConfig, /productName: Jovie Staging/);
-  assert.match(stagingConfig, /icon: assets\/icon-staging\.icns/);
-  assert.match(stagingConfig, /assets\/icon-staging\.png/);
-  assert.match(stagingConfig, /assets\/dmg-background\.png/);
-  assert.doesNotMatch(stagingConfig, /Linear/);
 });
