@@ -130,10 +130,11 @@ def route(task, provider, labels, text, branch, prompt, run=subprocess.run, now=
     return {"route": "cloud", "reason": "ok", "remote": m.group(1) if m else None}
 
 
-def poll(task, provider, branch, gh=subprocess.run, now=time.time, path=None):
+def poll(task, provider, branch, gh=None, now=time.time, path=None):
     """Result capture: the cloud worker's PR on `branch` closes the task (stage pr_opened)."""
-    r = gh(["gh", "pr", "list", "--repo", "JovieInc/Jovie", "--head", branch, "--json", "number,url", "--limit", "1"],
-           capture_output=True, text=True, timeout=60)
+    if gh is None:
+        from gh_budget import gh_call as gh  # budgeted gh (external-api-guard)
+    r = gh(["pr", "list", "--repo", "JovieInc/Jovie", "--head", branch, "--json", "number,url", "--limit", "1"])
     try:
         prs = json.loads(r.stdout or "[]")
     except ValueError:
