@@ -120,6 +120,13 @@
       "tables": ["creatorProfiles", "userProfileClaims"]
     },
     {
+      "id": "claim.legacy-verification",
+      "entity": "claim",
+      "module": "apps/web/lib/claim/legacy-verification.server.ts",
+      "exports": ["runLegacyClaimVerificationSweep"],
+      "tables": ["creatorProfiles"]
+    },
+    {
       "id": "billing.status",
       "entity": "subscription/payment",
       "module": "apps/web/lib/stripe/customer-sync/update-status.ts",
