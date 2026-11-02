@@ -28,6 +28,35 @@ const RECURRENCE = readFileSync(
 );
 
 describe('Sentry autofix workflow contract', () => {
+  it('enforces actual behavior coverage in the required source CI unit job', () => {
+    const source =
+      /** @type {{jobs: Record<string, {name?: string, steps?: {name?: string, if?: string, run?: string}[]}>}} */ (
+        parseYaml(
+          readFileSync(
+            resolve(REPO_ROOT, '.github/workflows/source-validation.yml'),
+            'utf8'
+          )
+        )
+      );
+    const job = Object.values(source.jobs).find(
+      job => job.name === 'Affected Unit Tests (${{ matrix.shard }})'
+    );
+    const step = job.steps.find(
+      step => step.name === 'Enforce Sentry intake behavior coverage'
+    );
+    expect(step.if).toBe(
+      "steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.ci == 'true' && matrix.shard == '3/4'"
+    );
+    expect(step).not.toHaveProperty('continue-on-error');
+    expect(step.run).toContain('lib/__tests__/sentry-autofix-intake.test.mjs');
+    for (const flag of [
+      '--coverage.include=sentry-autofix-intake.mjs',
+      '--coverage.thresholds.lines=90',
+      '--coverage.thresholds.branches=90',
+      '--coverage.thresholds.functions=95',
+    ])
+      expect(step.run).toContain(flag);
+  });
   it('holds Sentry intake without running an unapproved code executor', () => {
     for (const test of [
       'scripts/lib/__tests__/sentry-autofix-intake.test.mjs',

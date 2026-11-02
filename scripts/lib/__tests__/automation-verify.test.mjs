@@ -1705,6 +1705,7 @@ const PLAYWRIGHT_SENTRY_ISOLATION_DIFF = [
 ];
 const SENTRY_AUTOFIX_RECURRENCE_LANE = [
   'scripts/ci-fast-lanes.mjs',
+  '.github/workflows/source-validation.yml',
   'scripts/lib/external-api-guard.ratchet.gen.json',
   '.github/workflows/sentry-autofix-recurrence.yml',
   '.github/workflows/sentry-autofix.yml',

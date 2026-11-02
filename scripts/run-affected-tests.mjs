@@ -345,6 +345,7 @@ const SENTRY_AUTOFIX_RECURRENCE_LANE = new Set([
   ...SENTRY_AUTOFIX_RECURRENCE_PRIMARY_INPUTS,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
   'scripts/ci-fast-lanes.mjs',
+  '.github/workflows/source-validation.yml',
   'scripts/tests/test_agent_workflow_hygiene.py',
   'scripts/lib/external-api-guard.ratchet.gen.json',
 ]);
