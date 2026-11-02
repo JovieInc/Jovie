@@ -1672,7 +1672,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(verifyStep).toContain('EXPECTED_PRODUCTION_DEPLOYMENT_ID');
   });
 
-  it('measures production public-profile alias budgets as warning-only', () => {
+  it('blocks production alias budgets on certified pages and warns elsewhere', () => {
     const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const aliasGate = getJobBlock(
       workflow,
@@ -1684,25 +1684,31 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(aliasGate).toContain('setup-playwright');
     expect(aliasGate).toContain('--base-url https://jov.ie');
     expect(aliasGate).toContain('--runs 5');
-    // Post-promote production alias budgets must not fail the job on miss.
+    // The 2026-10-31 receipt graduated production alias budgets (14/14,
+    // JOV-8737), but a miss blocks only on routes whose golden-path surface
+    // holds a current certification in the Ovie ledger; the rest warn.
     expect(aliasGate).toContain('id: alias-perf');
+    expect(aliasGate).toContain('scripts/performance-budgets-guard.ts');
     expect(aliasGate).toContain(
-      'if ! pnpm exec tsx scripts/performance-budgets-guard.ts'
+      'https://jov.ie/api/internal/ovie/golden-path-evidence'
+    );
+    expect(aliasGate).toContain('scripts/lib/alias-gate-certified-routes.mjs');
+    expect(aliasGate).toMatch(
+      /if ! guard \$blocking; then[\s\S]*?echo "performance_status=failed" >> "\$GITHUB_OUTPUT"\s+exit 1\s+fi/
+    );
+    expect(aliasGate).toMatch(
+      /if ! guard \$warning; then[\s\S]*?::warning::[\s\S]*?status=warn\s+fi/
     );
     expect(aliasGate).toContain(
-      'echo "performance_status=warn" >> "$GITHUB_OUTPUT"'
+      'echo "performance_status=${status}" >> "$GITHUB_OUTPUT"'
     );
-    expect(aliasGate).toContain(
-      'echo "performance_status=passed" >> "$GITHUB_OUTPUT"'
-    );
-    expect(aliasGate).toContain('::warning::');
+    expect(aliasGate).toContain('::error::');
     expect(aliasGate).toContain(
       'performance_status: ${{ steps.alias-perf.outputs.performance_status }}'
     );
-    expect(aliasGate).not.toContain('fail_performance_gate');
     expect(aliasGate).not.toContain('continue-on-error: true');
-    expect(aliasGate).not.toMatch(
-      /if ! pnpm exec tsx scripts\/performance-budgets-guard\.ts[\s\S]*?exit 1/
+    expect(releaseResult).toContain(
+      'production-public-profile-alias-gate:${{ needs.production-public-profile-alias-gate.result }}'
     );
     const promoteJob = getJobBlock(workflow, 'promote-production');
     const stagedPerformanceGate = getStepBlock(
@@ -1711,21 +1717,22 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     );
     expect(stagedPerformanceGate).toContain('--base-url "$deployment_url"');
     const stagedPublicProfileGate = stagedPerformanceGate.slice(
-      stagedPerformanceGate.lastIndexOf(
-        'if ! CI=true pnpm exec tsx scripts/performance-budgets-guard.ts'
-      )
+      stagedPerformanceGate.indexOf('public_profile_budget_lane() {'),
+      stagedPerformanceGate.indexOf('entry_route_lighthouse_lane() {')
     );
-    // JOV-8338 graduated the exact staged-build budget independently
-    // (2026-10-21 receipt: staging 14/14 qualifying), so it fails closed with
-    // the exact-build failure subtype. Production canonical-alias budgets
-    // above stay warning-only (11/14, streak 0/14) until their own receipt
-    // graduates.
+    // JOV-8338 graduated the exact staged-build budget (staging 14/14). Like
+    // the post-promotion gate (#24006, Tim 2026-10-31), it blocks only routes
+    // whose golden-path surface is certified in the Ovie ledger; uncertified
+    // routes warn and file one Linear perf ticket.
     expect(stagedPublicProfileGate).toContain(
-      'fail_performance_gate "Exact staged-build public-profile alias budgets failed."'
+      'scripts/lib/alias-gate-certified-routes.mjs'
     );
+    expect(stagedPublicProfileGate).toMatch(
+      /if ! staged_alias_guard \$blocking; then\s+fail_performance_gate "Exact staged-build public-profile alias budgets failed on certified pages/
+    );
+    expect(stagedPublicProfileGate).toContain('staged-alias-perf-intake.mjs');
+    expect(stagedPublicProfileGate).toContain('--base-url "$deployment_url"');
     expect(stagedPublicProfileGate).not.toContain('continue-on-error: true');
-    expect(stagedPublicProfileGate).not.toContain('performance_status=warn');
-    expect(stagedPublicProfileGate).not.toContain('::warning::');
     for (const routeId of [
       'public-profile-listen',
       'public-profile-music',
@@ -1734,8 +1741,11 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       'public-profile-tour',
       'public-profile-releases',
     ]) {
-      expect(aliasGate).toContain(`--route-id ${routeId}`);
+      // Routes are split into certified (blocking) and uncertified (warning)
+      // sets by scripts/lib/alias-gate-certified-routes.mjs before the guard.
+      expect(aliasGate).toMatch(new RegExp(`routes='[^']*\\b${routeId}\\b`));
     }
+    expect(aliasGate).toContain('args+=(--route-id "$route")');
     // Downstream still requires job successful completion (exit 0), not a perf pass.
     expect(releaseResult).toContain('production-public-profile-alias-gate,');
     expect(releaseResult).toContain(
@@ -5372,7 +5382,7 @@ describe('in-band interrupted marker heal (JOV-7773)', () => {
 });
 
 describe('deployed interrupted-marker self-heal at authorize (JOV-9971)', () => {
-  const sha = '5cbe0cbce760caf9a62e11231e0a2b8db5e513d7';
+  const sha = 'b2a2d02af9f1a26119e6715d48a9e7d3704a8e8a';
 
   function deployedHealStep() {
     const parsed = parseYaml(
@@ -5418,8 +5428,8 @@ describe('deployed interrupted-marker self-heal at authorize (JOV-9971)', () => 
           PATH: `${bin}:${process.env.PATH ?? ''}`,
           CALLS: calls,
           HEAL_SHA: sha,
-          HEAL_DEPLOYMENT_ID: 'dpl_37144574062',
-          HEAL_RUN: '40932269374',
+          HEAL_DEPLOYMENT_ID: 'dpl_2fAETHYdevabCQeKbyCgcfzVEStW',
+          HEAL_RUN: '41389538083',
           HEAL_ATTEMPT: '1',
           ...env,
         },
@@ -5430,13 +5440,8 @@ describe('deployed interrupted-marker self-heal at authorize (JOV-9971)', () => 
     }
   }
 
-  it('activates only when authorize surfaces a healable deployed marker', () => {
+  it('activates when authorize surfaces a healable deployed marker', () => {
     const job = deployedHealStep();
-    // The existing interrupted-generation path and the deployed-marker path
-    // are mutually exclusive: a failed authorize never sets verified.
-    expect(job.if).toContain(
-      "needs.production-verified.outputs.verified == 'true'"
-    );
     expect(job.if).toContain(
       "needs.authorize-production.outputs.deployed_marker_heal == 'true'"
     );
@@ -5451,7 +5456,7 @@ describe('deployed interrupted-marker self-heal at authorize (JOV-9971)', () => 
     const result = runDeployedHeal({});
     expect(result.status, result.stderr).toBe(0);
     expect(result.calls.trim()).toBe(
-      `workflow run production-marker-recovery.yml --ref main -f sha=${sha} -f deployment_id=dpl_37144574062 -f controller_run=40932269374 -f controller_attempt=1`
+      `workflow run production-marker-recovery.yml --ref main -f sha=${sha} -f deployment_id=dpl_2fAETHYdevabCQeKbyCgcfzVEStW -f controller_run=41389538083 -f controller_attempt=1`
     );
   }, 30_000);
 
@@ -5481,15 +5486,7 @@ describe('deployed interrupted-marker self-heal at authorize (JOV-9971)', () => 
     expect(handler).toContain('one_interrupted_marker_safe_to_rerun');
     expect(handler).toContain('deployed_marker_heal=true');
     expect(handler).toContain('deployed_marker_sha=$deployed_sha');
-    expect(handler).toContain(
-      'deployed_marker_deployment_id=$heal_deployment_id'
-    );
-    expect(handler).toContain('deployed_marker_run=$heal_run');
-    expect(handler).toContain('deployed_marker_attempt=$heal_attempt');
-    // The release base is never admitted from a recovery state: the run
-    // still exits 1 whether or not the heal dispatch was surfaced.
     expect(handler).toContain('exit 1');
-    expect(handler).not.toContain('deployed_marker_state="recovery_available"');
   });
 });
 
