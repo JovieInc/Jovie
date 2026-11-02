@@ -120,6 +120,25 @@ class FactoryStayUpWatchdogTest(unittest.TestCase):
             self.assertEqual(result["reasons"], ["factory-tick-in-progress"])
             recovery.assert_not_called()
 
+    def test_three_consecutive_admission_denied_ticks_alert_without_restart(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            streaks = []
+            for n in range(4):
+                tick = {"at": f"2026-10-30T00:0{n}:00Z", "admissionDenied": "disk-critical"}
+                streaks.append(factory_watchdog.admission_streak(state, tick))
+                factory_watchdog.admission_streak(state, tick)  # same tick observed twice counts once
+            self.assertEqual(streaks, [1, 2, 3, 4])
+            self.assertEqual(factory_watchdog.admission_streak(state, {"at": "2026-10-30T00:09:00Z"}), 0)
+        base = dict(tickEpoch=300, tickAgeSeconds=60, runningWorkers=0, admissionDenied="disk-critical",
+                    eligibleWork=4, openPullRequests=1, demandKnown=True, demand=5)
+        short = factory_watchdog.assess(factory_observation(admissionDeniedStreak=2, **base))
+        self.assertNotIn("admission-denied", short["reasons"])
+        self.assertNotIn("zero-worker", short["reasons"])
+        denied = factory_watchdog.assess(factory_observation(admissionDeniedStreak=3, **base))
+        self.assertIn("admission-denied", denied["reasons"])
+        self.assertTrue(denied["decisionRequired"])
+
     def assess_tick(self, age_s, heartbeat):
         obs = factory_observation(tickEpoch=300, tickAgeSeconds=700, runningWorkers=0,
                                   service={"active": True, "ageSeconds": age_s, "manager": "systemd"},
@@ -274,6 +293,53 @@ class FactoryStayUpWatchdogTest(unittest.TestCase):
             self.assertEqual(len(recoveries), factory_watchdog.MAX_RECOVERY_ATTEMPTS)
             self.assertEqual(len(alerts), 1)
 
+    def test_exhausted_incident_reopens_as_a_new_bounded_generation_after_the_window(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            clock = MutableClock(3000)
+            recoveries, alerts = [], []
+            dark = factory_observation(tickEpoch=2000, tickAgeSeconds=1000,
+                                       runningWorkers=0, spawnedProviders=[])
+
+            def recover():
+                recoveries.append(clock())
+                return {"action": "restart-systemd-lanes-service", "returncodes": [1], "accepted": False}
+
+            def alert(record, issue_id, resolve):
+                alerts.append((record["status"], record["incidentId"]))
+                return "linear-incident-id"
+
+            result = None
+            for _ in range(factory_watchdog.MAX_RECOVERY_ATTEMPTS):
+                result = factory_watchdog.run_once(state, clock=clock, observe=lambda *_: dark,
+                                                   recover=recover, alert=alert)
+                clock.advance(factory_watchdog.ATTEMPT_COOLDOWN_S + 1)
+            first = result["incidentId"]
+            self.assertEqual(result["status"], "exhausted")
+            clock.advance(factory_watchdog.EXHAUSTED_REOPEN_S - 600)
+            self.assertEqual(factory_watchdog.run_once(state, clock=clock, observe=lambda *_: dark,
+                                                       recover=recover, alert=alert)["status"], "exhausted")
+            self.assertEqual(len(recoveries), factory_watchdog.MAX_RECOVERY_ATTEMPTS)
+            clock.advance(3600)
+            reopened = factory_watchdog.run_once(state, clock=clock, observe=lambda *_: dark,
+                                                 recover=recover, alert=alert)
+            self.assertNotEqual(reopened["incidentId"], first)
+            self.assertEqual(reopened["generation"], result["generation"] + 1)
+            self.assertEqual(len(recoveries), factory_watchdog.MAX_RECOVERY_ATTEMPTS + 1)
+            journal = (state / "runs" / "factory-watchdog.jsonl").read_text()
+            self.assertIn("incident-superseded", journal)
+
+    def test_exhausted_incident_then_healthy_factory_clears_after_the_window(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            factory_watchdog.atomic_write(state / "factory-watchdog.json", {
+                "schema": factory_watchdog.SCHEMA, "generation": 4, "incidentId": "gem:factory-stay-up:4",
+                "status": "exhausted", "attempts": [{"requestedEpoch": 1000}], "firstObservedEpoch": 900})
+            clock = MutableClock(1000 + factory_watchdog.EXHAUSTED_REOPEN_S + 1)
+            result = factory_watchdog.run_once(state, clock=clock, observe=lambda *_: factory_observation(),
+                                               recover=mock.Mock(), alert=lambda *_: None)
+            self.assertNotIn(result["status"], factory_watchdog.ACTIVE_STATUSES)
+
     def test_zero_provider_capacity_requires_a_decision_without_blind_restart(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = Path(tmp)
@@ -421,6 +487,16 @@ class JudgeTest(unittest.TestCase):
         self.assertIn("dcfb270a", late["install-lag"])
         for lag in ({"behindS": 600}, {"behindS": 0}, {"behindS": None}, {}):
             self.assertNotIn("install-lag", doctor.judge(obs(installLag=lag)))
+
+    def test_install_lag_past_the_two_hour_slo_with_a_refusal_is_a_critical_owned_p0(self):
+        lag = {"behindS": doctor.INSTALL_LAG_P0_S + 60, "behindCommit": "423401e4f5", "error": "release-bundle-incomplete"}
+        alerts = doctor.judge(obs(installLag=lag))
+        self.assertIn("release-bundle-incomplete", alerts["install-lag-refused"])
+        self.assertIn("P0", alerts["install-lag-refused"])
+        receipt = doctor.condition_receipts(alerts, {}, obs(installLag=lag), "gem")["install-lag-refused"]
+        self.assertEqual((receipt["severity"], receipt["owner"]), ("critical", "gem-lanes-updater"))
+        self.assertNotIn("install-lag-refused", doctor.judge(obs(installLag={**lag, "error": None})))
+        self.assertNotIn("install-lag-refused", doctor.judge(obs(installLag={**lag, "behindS": 3600})))
 
     def test_failed_event_delivery_is_actionable_and_acknowledgement_clears_it(self):
         failed = obs(tick={'remediationEvents': {'deliveryFailed': 1, 'deliveryExhausted': 0, 'deliveryNextAt': 100}})
@@ -634,6 +710,17 @@ class JudgeTest(unittest.TestCase):
         self.assertNotIn("provider-idle:codex", doctor.judge(
             obs(**idle), {"providerIdleSince": {"codex": 1_000_000.0 - doctor.PROVIDER_IDLE_S + 1}}))
 
+    def test_intake_closed_by_policy_is_not_an_idle_provider(self):
+        idle = {"tick": {"at": "x", "unhealthy": [], "error": None, "spawned": ["hyperagent"]},
+                "poolByProvider": {"hyperagent": 151},
+                "capacityByProvider": {"hyperagent": {"running": 0, "slots": 1}}}
+        previous = {"providerIdleSince": {"hyperagent": 1_000_000.0 - doctor.PROVIDER_IDLE_S - 1}}
+        held = {"lanes": {"hyperagent": {"intakeEffective": 0, "intakeBlockers": ["wip-cap"]}}}
+        self.assertNotIn("provider-idle:hyperagent", doctor.judge(obs(**idle, autoscale=held), previous))
+        self.assertFalse(doctor.provider_idle_with_qualified_work(obs(**idle, autoscale=held), "hyperagent"))
+        open_intake = {"lanes": {"hyperagent": {"intakeEffective": 1, "intakeBlockers": []}}}
+        self.assertIn("provider-idle:hyperagent", doctor.judge(obs(**idle, autoscale=open_intake), previous))
+
     def test_unhealthy_provider_is_named_without_false_idle_recovery(self):
         observed = obs(tick={"at": "x", "unhealthy": ["devin"], "error": None,
                              "spawned": ["devin"] * 4},
@@ -761,6 +848,33 @@ class JudgeTest(unittest.TestCase):
         rows = doctor.automation_registry(repo, run=lambda *_a, **_k: doctor.subprocess.CompletedProcess(
             [], 0, (repo / doctor.AUTOMATION_REGISTRY).read_text(), ""))
         self.assertTrue(rows and any(row["id"] == "gem:lanes-watchdog" for row in rows))
+
+    def test_harness_exceptions_alert_72h_before_expiry_and_after(self):
+        # 2026-11-01: six JOV-INV-024 exceptions expired with no issue filed and blocked every PR.
+        row = {"principle": "H-02", "id": "H-EX-02", "owner": "Summer", "expires": "2026-11-07",
+               "nextAction": "record promotion receipts", "linearIssue": "JOV-10203"}
+        day = lambda d, h=0: doctor.datetime(2026, 11, d, h, tzinfo=doctor.timezone.utc).timestamp()
+        self.assertNotIn("harness-exception-expiring:H-EX-02",
+                         doctor.judge(obs(harnessExceptions=[row], now=day(4, 23))))
+        near = doctor.judge(obs(harnessExceptions=[row], now=day(5, 1)))["harness-exception-expiring:H-EX-02"]
+        self.assertIn("71h left", near)
+        self.assertIn("owner Summer", near)
+        self.assertIn("JOV-10203", near)
+        past = doctor.judge(obs(harnessExceptions=[row], now=day(8, 1)))["harness-exception-expiring:H-EX-02"]
+        self.assertIn("expired on 2026-11-07", past)
+        self.assertEqual(doctor.harness_exception_alerts(None, day(8)), {})
+        self.assertEqual(doctor.harness_exception_alerts([{**row, "expires": "soon"}], day(8)), {})
+
+    def test_harness_exceptions_read_the_registry_merged_on_main(self):
+        repo = Path(__file__).resolve().parents[2]
+        if not (repo / "canon").is_dir():
+            self.skipTest("staged lanes release trees carry no canon/")
+        text = (repo / doctor.INVARIANT_REGISTRY).read_text()
+        rows = doctor.harness_exceptions(repo, run=lambda *_a, **_k: doctor.subprocess.CompletedProcess(
+            [], 0, text, ""))
+        self.assertTrue(rows and all(row["id"].startswith("H-EX-") and row["expires"] for row in rows))
+        self.assertIsNone(doctor.harness_exceptions(repo, run=lambda *_a, **_k: doctor.subprocess.CompletedProcess(
+            [], 128, "", "fatal")))
 
     def test_the_hosted_liveness_check_and_the_doctor_watch_each_other(self):
         now = doctor.datetime(2026, 10, 20, 22, 0, tzinfo=doctor.timezone.utc).timestamp()
@@ -1711,11 +1825,19 @@ class StatusFeedTest(unittest.TestCase):
                                      "load_github_env": staticmethod(lambda: None), "graphql_budget": staticmethod(lambda: None),
                                      "provider_throughput": staticmethod(throughput_stub), "HOST": "gem"})
             codex = type("Codex", (), {"status": staticmethod(lambda: {})})
+            # Restore, never unconditionally pop: inside a release self-test the marker was
+            # already set by selftest_env, popping it here leaves every later module
+            # in the same process un-hermetic (their LANES_SELFTEST guards then open —
+            # e.g. dispatch ran macos_pool's GitHub probe and broke test_autoscale).
+            previous_selftest = os.environ.get("LANES_SELFTEST")
             os.environ["LANES_SELFTEST"] = "1"  # no open-PR read from a unit test
             try:
                 observed = doctor.observe(host, lane, codex)
             finally:
-                os.environ.pop("LANES_SELFTEST", None)
+                if previous_selftest is None:
+                    os.environ.pop("LANES_SELFTEST", None)
+                else:
+                    os.environ["LANES_SELFTEST"] = previous_selftest
             (state / "slots").mkdir()
             feed = doctor.status_feed(host, lane, observed, {}, {})
         self.assertEqual(feed["held_by_reason"], {"gate-timeout": 1, "missing-test": 1})
@@ -1743,12 +1865,16 @@ class StatusFeedTest(unittest.TestCase):
                                      "load_github_env": staticmethod(lambda: None), "graphql_budget": staticmethod(lambda: None),
                                      "provider_throughput": staticmethod(throughput_stub), "HOST": "gem"})
             codex = type("Codex", (), {"status": staticmethod(lambda: {})})
+            previous_selftest = os.environ.get("LANES_SELFTEST")
             os.environ["LANES_SELFTEST"] = "1"  # no open-PR read from a unit test
             try:
                 observed = doctor.observe(host, lane, codex, now=now)
                 feed = doctor.status_feed(host, lane, observed, {}, {})
             finally:
-                os.environ.pop("LANES_SELFTEST", None)
+                if previous_selftest is None:
+                    os.environ.pop("LANES_SELFTEST", None)
+                else:
+                    os.environ["LANES_SELFTEST"] = previous_selftest
         self.assertEqual(observed["gateWaits24h"], 2)
         self.assertEqual(observed["noWorkRepairs24h"], {"preserved-head-superseded": 1, "worktree-unavailable": 1})
         self.assertEqual(observed["gateWaitMedianS24h"], 210)
@@ -1983,6 +2109,23 @@ class AccountAttributionTest(unittest.TestCase):
         self.assertEqual([result[k] for k in ["leased", "authCooldown", "rateCooldown", "quotaBanked", "unknownCooldown"]],
                          [4, 1, 1, 1, 1])
         self.assertNotIn("codex-all-banked", doctor.judge(obs(codex=self.report(**rows))))
+
+    def test_account_at_the_subsidy_floor_counts_as_banked_until_its_reset(self):
+        # codex_lane: at or below the 1% floor an account takes no new run, with no recorded hold.
+        floor = {"available": False, "leased": False, "freeSlots": 1, "exhaustedUntil": None, "lastKind": "ok",
+                 "atFloor": True, "floorUntil": doctor.epoch_iso(self.NOW + 3600)}
+        result = doctor.codex_attribution(self.report(a=floor), self.NOW)
+        self.assertEqual((result["state"], result["quotaBanked"], result["earliestCooldownS"]), ("quota-banked", 1, 3600))
+        stale = {**floor, "floorUntil": doctor.epoch_iso(self.NOW - 1)}
+        self.assertEqual(doctor.codex_attribution(self.report(a=stale), self.NOW)["state"], "unknown")
+
+    def test_status_feed_publishes_the_subsidy_ledger(self):
+        ledger = {"schema": "jovie.subsidy-ledger/v1", "allAtFloor": False, "burnOrder": ["lyb-pro"]}
+        report = {**self.report(a={"available": True, "leased": False}), "subsidyLedger": ledger}
+        observation = obs(codex=report, poolByProvider={"codex": 0}, capacityByProvider={"codex": {"running": 0, "slots": 1}})
+        lane = SimpleNamespace(HOST="test", provider_throughput=throughput_stub)
+        feed = doctor.status_feed(SimpleNamespace(), lane, observation, {}, {})
+        self.assertEqual(feed["subsidyLedger"], ledger)
 
     def test_incomplete_stale_or_malformed_account_status_is_unknown(self):
         valid = self.report(a={"available": True, "leased": True})
@@ -2967,6 +3110,8 @@ class SearchPopulationCoverageTest(unittest.TestCase):
                 mock.patch.object(doctor, "automation_observation", return_value={}), \
                 mock.patch.object(doctor.fleet_ledger, "record_ready"), \
                 mock.patch.object(doctor.deploy_health, "sample", return_value=(None, None)), \
+                mock.patch.object(doctor.release_evidence, "sample", return_value=(None, None)), \
+                mock.patch.object(doctor.release_gates, "sample", return_value=(None, None)), \
                 mock.patch.object(doctor.throughput_sentinel, "observe", return_value={}):
             host = SimpleNamespace(state=Path(tmp), linear_env=Path(tmp) / "absent")
             observed = doctor.observe(host, lane, SimpleNamespace(status=lambda: {}), now=self.END)

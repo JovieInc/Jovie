@@ -387,10 +387,11 @@ test('the live repo warns only on dequeue mismatches and grants every enqueue ca
   const result = scanWorkflowTokenScopes(repoRoot);
   assert.deepEqual(
     ACKNOWLEDGED_MISMATCHES.map(item => item.call),
-    ['dequeuePullRequest', 'dequeuePullRequest']
+    ['dequeuePullRequest', 'dequeuePullRequest', 'dequeuePullRequest']
   );
   assert.deepEqual(result.warnings.map(warning => warning.job).sort(), [
     'dequeue-held',
+    'enroll',
     'hold-failed-revision',
   ]);
   for (const warning of result.warnings) {
@@ -403,14 +404,14 @@ test('the live repo warns only on dequeue mismatches and grants every enqueue ca
     reportWorkflowTokenScopes(result, line => lines.push(line)),
     0
   );
-  assert.equal(lines.filter(line => line.startsWith('::warning ')).length, 2);
+  assert.equal(lines.filter(line => line.startsWith('::warning ')).length, 3);
   assert.equal(
     lines.some(line => line.startsWith('::error ')),
     false
   );
 });
 
-test('the cli reports only the two acknowledged dequeue mismatches and exits 0', () => {
+test('the cli reports only the three acknowledged dequeue mismatches and exits 0', () => {
   const result = spawnSync(
     process.execPath,
     ['scripts/workflow-token-scope.mjs'],
@@ -418,7 +419,7 @@ test('the cli reports only the two acknowledged dequeue mismatches and exits 0',
   );
   assert.ifError(result.error);
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stderr, /2 acknowledged, 0 mismatches/);
-  assert.equal(result.stderr.split('::warning ').length - 1, 2);
+  assert.match(result.stderr, /3 acknowledged, 0 mismatches/);
+  assert.equal(result.stderr.split('::warning ').length - 1, 3);
   assert.doesNotMatch(result.stderr, /::error /);
 });

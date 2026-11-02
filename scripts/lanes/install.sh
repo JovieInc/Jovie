@@ -120,6 +120,8 @@ Description=Verify and recover Jovie shipping lanes every minute
 [Timer]
 OnActiveSec=15s
 OnUnitActiveSec=60s
+# A wall-clock trigger too: a stopped or failed oneshot chain must never silence the dead-man.
+OnCalendar=minutely
 Persistent=true
 [Install]
 WantedBy=timers.target

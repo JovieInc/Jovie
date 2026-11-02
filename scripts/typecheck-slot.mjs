@@ -23,12 +23,17 @@ const NOT_ACQUIRED = 99;
 const pollMs =
   Number.parseInt(process.env.GEM_TYPECHECK_POLL_MS ?? '', 10) || 1000;
 
-function run(argv) {
+// Re-entrant: everything under an acquired slot inherits HELD, so a nested caller (preflight
+// wrapping `pnpm --filter @jovie/web typecheck`, which wraps itself) never waits on its own slot.
+const HELD = 'GEM_TYPECHECK_SLOT_HELD';
+
+function run(argv, env = process.env) {
   return new Promise(resolve => {
     // detached: own process group, so a signal to this wrapper reaches flock and the typecheck.
     const child = spawn(argv[0], argv.slice(1), {
       stdio: 'inherit',
       detached: true,
+      env,
     });
     for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
       process.on(signal, () => {
@@ -44,7 +49,7 @@ function run(argv) {
   });
 }
 
-if (!Number.isInteger(slots) || slots < 1) {
+if (!Number.isInteger(slots) || slots < 1 || process.env[HELD] === '1') {
   process.exit(await run(command));
 }
 
@@ -55,14 +60,17 @@ mkdirSync(dir, { recursive: true });
 let announced = false;
 for (let turn = Math.floor(Math.random() * slots); ; turn++) {
   const slot = turn % slots;
-  const code = await run([
-    'flock',
-    '-n',
-    '-E',
-    String(NOT_ACQUIRED),
-    `${dir}/slot-${slot}.lock`,
-    ...command,
-  ]);
+  const code = await run(
+    [
+      'flock',
+      '-n',
+      '-E',
+      String(NOT_ACQUIRED),
+      `${dir}/slot-${slot}.lock`,
+      ...command,
+    ],
+    { ...process.env, [HELD]: '1' }
+  );
   if (code !== NOT_ACQUIRED) process.exit(code);
   if (!announced) {
     announced = true;

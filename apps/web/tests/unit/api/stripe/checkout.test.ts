@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildAgentHandoffDiscovery } from '@/lib/acquisition/agent-handoff';
 import {
   AGENT_INTENT_QUERY,
@@ -711,5 +711,58 @@ describe('POST /api/stripe/checkout', () => {
     // server error — parseJsonBody catches the parse failure and returns a
     // 400 directly, so captureCriticalError is never invoked.
     expect(mockCaptureCriticalError).not.toHaveBeenCalled();
+  });
+});
+
+describe('JOV-8805: dogfood checkout error surfacing', () => {
+  const SYNTHETIC_ERROR_MESSAGE = 'synthetic checkout failure for JOV-8805';
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('names the real error in the 500 body under E2E_TEST_MODE=1', async () => {
+    // The claim-checkout dogfood server has no Sentry DSN and the production
+    // logger is compiled out, so the 500 body is the only channel the
+    // journey can read. Under the test-mode flag it must carry the cause.
+    vi.stubEnv('E2E_TEST_MODE', '1');
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+    mockCreateCheckoutSession.mockRejectedValue(
+      new Error(SYNTHETIC_ERROR_MESSAGE)
+    );
+
+    const request = new NextRequest('http://localhost/api/stripe/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ priceId: 'price_123' }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe(
+      `Failed to create checkout session: ${SYNTHETIC_ERROR_MESSAGE}`
+    );
+  });
+
+  it('keeps the generic 500 body outside E2E_TEST_MODE', async () => {
+    vi.stubEnv('E2E_TEST_MODE', '');
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+    mockCreateCheckoutSession.mockRejectedValue(
+      new Error(SYNTHETIC_ERROR_MESSAGE)
+    );
+
+    const request = new NextRequest('http://localhost/api/stripe/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ priceId: 'price_123' }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe('Failed to create checkout session');
   });
 });

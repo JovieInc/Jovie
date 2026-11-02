@@ -1,0 +1,41 @@
+{
+  "_comment": "JOV-INV-047 shrink-only ratchet. Raw <nav>/<aside> outside registered chrome owners, and plate-rail RouteSegmentControl in app routes. Lower counts by moving chrome into the shell primitives, then run node scripts/invariants/shell-ia.mjs --update.",
+  "rawChrome": {
+    "apps/web/app/(dynamic)/legal/loading.tsx": 1,
+    "apps/web/app/(dynamic)/playlists/genre/[genre]/page.tsx": 1,
+    "apps/web/app/(dynamic)/playlists/mood/[mood]/page.tsx": 1,
+    "apps/web/app/(marketing)/changelog/[version]/page.tsx": 2,
+    "apps/web/app/(marketing)/changelog/loading.tsx": 1,
+    "apps/web/app/(marketing)/changelog/page.tsx": 1,
+    "apps/web/app/(marketing)/launch/page.tsx": 2,
+    "apps/web/app/(marketing)/product/ProductExploreLinks.tsx": 2,
+    "apps/web/app/(marketing)/renders/profile-admission/ProfileAdmissionFixtureClient.tsx": 1,
+    "apps/web/app/app/(shell)/admin/chat-playground/ChatUiPlayground.tsx": 1,
+    "apps/web/app/app/(shell)/admin/investors/updates/InvestorUpdateReview.tsx": 1,
+    "apps/web/app/app/(shell)/admin/operations/page.tsx": 1,
+    "apps/web/app/app/(shell)/calendar/CalendarPageClient.tsx": 1,
+    "apps/web/app/app/(shell)/chat/ChatEntityRightPanelHost.tsx": 3,
+    "apps/web/app/app/(shell)/links/LinksPageClient.tsx": 1,
+    "apps/web/app/investor-portal/_components/InvestorNav.tsx": 1,
+    "apps/web/app/investor-portal/_components/MemoContent.tsx": 1,
+    "apps/web/app/onboarding/loading.tsx": 1,
+    "apps/web/components/features/admin/agent-os/ArtifactDrawer.tsx": 2,
+    "apps/web/components/features/admin/capacity/CapacityBoard.tsx": 1,
+    "apps/web/components/features/admin/certifications/CertificationWalkthrough.tsx": 1,
+    "apps/web/components/features/admin/layout/OperatorRouteTabs.tsx": 1,
+    "apps/web/components/features/auth/AuthOfferSummary.tsx": 1,
+    "apps/web/components/features/chat/navigation-rail/ChatThreadNavigationRail.tsx": 1,
+    "apps/web/components/features/dashboard/organisms/LiquidGlassMenu.tsx": 2,
+    "apps/web/components/features/dashboard/organisms/onboarding-v2/OnboardingV2Form.tsx": 1,
+    "apps/web/components/features/dashboard/organisms/OnboardingFormWrapper.tsx": 1,
+    "apps/web/components/features/dashboard/organisms/OnboardingHandleOnlyForm.tsx": 1,
+    "apps/web/components/features/onboarding/OnboardingExperienceShell.tsx": 1,
+    "apps/web/components/features/onboarding/OnboardingProfileRail.tsx": 1,
+    "apps/web/components/features/pitch/InvestorBrief.tsx": 1,
+    "apps/web/components/features/visibility-audit/VisibilityAuditOffer.tsx": 1,
+    "apps/web/components/features/waitlist/WaitlistIntakeChat.tsx": 1
+  },
+  "plateSubNav": {
+    "apps/web/app/app/(shell)/contacts/page.tsx": 1
+  }
+}
