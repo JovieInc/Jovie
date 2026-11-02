@@ -870,7 +870,8 @@ const LANES_COVERAGE_RUN = `{ ${LANES_RETRY_FUNCTION}${LANES_BACKGROUND_SHARDS.m
  * command keeps its original `&&` dependencies (coverage run → report).
  */
 /** @jovie/api-client (TS) unit + conformance suite, run with the operations lane. */
-export const API_CLIENT_TS_COMMAND = 'pnpm --filter @jovie/api-client test';
+export const API_CLIENT_TS_COMMAND =
+  'pnpm --filter @jovie/api-client exec vitest run --coverage --coverage.include=gh.ts --coverage.thresholds.lines=85 --coverage.thresholds.branches=80 --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-api-client-ts-coverage" --maxWorkers=2';
 /** @jovie/research router + decision log suite, run with the operations lane. */
 export const RESEARCH_TS_COMMAND = 'pnpm --filter @jovie/research test';
 

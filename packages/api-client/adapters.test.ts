@@ -233,6 +233,86 @@ describe('Linear adapter', () => {
 });
 
 describe('gh through the ledger', () => {
+  it('reads free quota observations at core zero while charged calls remain shed', async () => {
+    const clock = new FakeClock();
+    const store = new MemoryLedgerStore();
+    let calls = 0;
+    const run: GhRunner = async () => {
+      calls += 1;
+      return {
+        code: 0,
+        stdout: `HTTP/2.0 200 OK\nX-Ratelimit-Limit: 1000\nX-Ratelimit-Remaining: 0\nX-Ratelimit-Reset: ${Math.floor(clock.now / 1000) + 900}\nX-Ratelimit-Resource: core\n\n{}`,
+        stderr: '',
+      };
+    };
+    const base = {
+      store,
+      credential: 'free-probe',
+      run,
+      now: clock.read,
+      sleep: clock.sleep,
+      log: quiet,
+      maxWaitMs: 0,
+    };
+    await runGh(['api', 'repos/o/r'], { ...base, priority: 'merge' });
+    for (const target of [
+      'rate_limit',
+      '/rate_limit',
+      'https://api.github.com/rate_limit',
+    ]) {
+      expect(
+        await runGh(['api', target], { ...base, priority: 'poll' })
+      ).toMatchObject({ code: 0, deferred: false });
+    }
+    expect(calls).toBe(4);
+    expect(
+      (await store.read('github')).credentials['free-probe'].buckets.core
+        .remaining
+    ).toBe(0);
+    for (const args of [
+      ['api', 'repos/o/r'],
+      ['api', 'rate_limit/other'],
+      ['api', 'https://example.com/rate_limit'],
+      ['api', 'rate_limit', '-X', 'POST'],
+      ['api', 'rate_limit', '-X', 'HEAD'],
+      ['api', 'rate_limit', '-f', 'field=x'],
+    ])
+      expect(await runGh(args, { ...base, priority: 'poll' })).toMatchObject({
+        code: 75,
+        deferred: true,
+      });
+    expect(calls).toBe(4);
+  });
+
+  it('still honors secondary-limit breakers for free quota reads', async () => {
+    const clock = new FakeClock();
+    const store = new MemoryLedgerStore();
+    let calls = 0;
+    const base = {
+      store,
+      credential: 'limited-probe',
+      now: clock.read,
+      sleep: clock.sleep,
+      log: quiet,
+      maxWaitMs: 0,
+      run: async () => {
+        calls += 1;
+        return {
+          code: 1,
+          stdout: '',
+          stderr: 'gh: secondary rate limit (HTTP 429)',
+        };
+      },
+    };
+    expect(
+      await runGh(['api', 'rate_limit'], { ...base, priority: 'poll' })
+    ).toMatchObject({ code: 75, deferred: true });
+    expect(
+      await runGh(['api', 'rate_limit'], { ...base, priority: 'poll' })
+    ).toMatchObject({ code: 75, deferred: true });
+    expect(calls).toBe(1);
+  });
+
   const logArgs = [
     'run',
     'view',

@@ -115,6 +115,15 @@ export function ghShape(args: readonly string[]): {
         : 'core',
       write,
       idempotent: !write || effective === 'PUT' || effective === 'DELETE',
+      // GET /rate_limit is exempt from primary quota, never secondary limits.
+      ...(effective === 'GET' &&
+      [
+        'rate_limit',
+        '/rate_limit',
+        'https://api.github.com/rate_limit',
+      ].includes(target)
+        ? { cost: 0 }
+        : {}),
     };
   }
   const read = args[0] === 'search' || READ_PORCELAIN.has(args[1] ?? '');
@@ -223,7 +232,8 @@ export async function runGh(
         s,
         {
           priority,
-          costs: { [shape.resource]: shape.cost ?? 1 },
+          // A free quota observation still passes the same circuit breaker.
+          costs: shape.cost === 0 ? {} : { [shape.resource]: shape.cost ?? 1 },
           write: shape.write,
           minWriteIntervalMs: spec.minWriteIntervalMs,
         },

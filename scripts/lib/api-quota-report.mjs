@@ -296,7 +296,7 @@ export function collectSamples(argv, { read = ghJson, now = Date.now } = {}) {
       const to = new Date(end - hour * 3600_000).toISOString();
       const from = new Date(end - (hour + 1) * 3600_000).toISOString();
       const runs = read(
-        `repos/${REPOSITORY}/actions/workflows/${workflow}/runs?created=${from}..${to}&status=success&per_page=100`
+        `repos/${REPOSITORY}/actions/workflows/${workflow}/runs?created=${from}..${to}&status=completed&per_page=100`
       ).workflow_runs;
       const perHour = Math.max(
         1,
@@ -308,7 +308,7 @@ export function collectSamples(argv, { read = ghJson, now = Date.now } = {}) {
           `repos/${REPOSITORY}/actions/runs/${runs[index].id}/jobs?per_page=50`
         ).jobs;
         const job = jobs.find(item => item.name === jobName);
-        if (!job || job.conclusion !== 'success') continue;
+        if (!job || !job.conclusion || job.conclusion === 'skipped') continue;
         const annotations = read(
           `repos/${REPOSITORY}/check-runs/${job.id}/annotations?per_page=50`
         );

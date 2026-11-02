@@ -16,6 +16,39 @@ import {
 } from '../api-quota-report.mjs';
 
 describe('api quota report', () => {
+  it('keeps notices emitted by the always sampler in failed completed runs', () => {
+    const samples = collectSamples(['--hours', '1'], {
+      now: () => 1800000000000,
+      read: path => {
+        if (path.includes('/workflows/')) {
+          expect(path).toContain('status=completed');
+          return {
+            workflow_runs: path.includes('pr-fleet-rules.yml')
+              ? [{ id: 99, conclusion: 'failure' }]
+              : [],
+          };
+        }
+        if (path.includes('/jobs?'))
+          return {
+            jobs: [{ id: 7, name: 'PR Fleet Rules', conclusion: 'failure' }],
+          };
+        return [
+          {
+            title: 'api-quota',
+            message:
+              'bucket=github-token resource=core remaining=0 limit=5000 used=5000 reset=1800003600 at=1800000000',
+          },
+        ];
+      },
+    });
+    expect(samples).toHaveLength(1);
+    expect(samples[0]).toMatchObject({
+      bucket: 'github-token',
+      resource: 'core',
+      remaining: 0,
+    });
+  });
+
   it('collects both sources in every requested hour even when newest runs crowd out older hours', () => {
     const runs = new Map();
     const queries = [];
@@ -61,12 +94,15 @@ describe('api quota report', () => {
 
   it('runs the workflow sampler with one shared-client read and survives command and JSON failures', () => {
     const root = resolve(import.meta.dirname, '../../..');
-    const workflow = load(
-      readFileSync(
-        resolve(root, '.github/workflows/pr-fleet-rules.yml'),
-        'utf8'
-      )
-    );
+    const workflow =
+      /** @type {{ jobs: { fleet: { steps: Array<{ name?: string, if?: string, run: string, 'continue-on-error'?: boolean }> } } }} */ (
+        load(
+          readFileSync(
+            resolve(root, '.github/workflows/pr-fleet-rules.yml'),
+            'utf8'
+          )
+        )
+      );
     const step = workflow.jobs.fleet.steps.find(
       step => step.name === 'Sample API quota'
     );
@@ -104,7 +140,7 @@ console.log(JSON.stringify({resources: Object.fromEntries(['core','graphql','sea
         const requests = readFileSync(calls, 'utf8')
           .trim()
           .split('\n')
-          .map(JSON.parse);
+          .map(line => JSON.parse(line));
         expect(requests).toHaveLength(1);
         expect(requests[0].filter(arg => arg !== '--include')).toEqual([
           'api',
@@ -431,6 +467,7 @@ describe('quota windows follow the reset epoch, not the clock hour', () => {
   const sample = (secondsBeforeReset, remaining, bucket = 'github-token') => ({
     at: reset - secondsBeforeReset,
     bucket,
+    resource: 'core',
     remaining,
     limit: 5000,
     used: 5000 - remaining,
