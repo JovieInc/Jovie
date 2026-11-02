@@ -514,19 +514,24 @@ HEADROOM_WARN_PCT = 70
 HEADROOM_CRIT_PCT = 85
 REPORT_INTERVAL_S = 86400
 STATE_REF_MAX_BYTES = 8 * 1024 * 1024
+DEFAULT_MOUNTED_ROOTS = (Path("/srv/worktrees"),)
 
 
-def standalone_globs(home: Path, state: Path) -> list[tuple[Path, str]]:
+def standalone_globs(home: Path, state: Path, *,
+                     mounted_roots: tuple[Path, ...] = DEFAULT_MOUNTED_ROOTS) -> list[tuple[Path, str]]:
+    """Production mounted roots are explicit so cleanup fixtures can pass an empty set."""
     return [(home, "grok-ship-workspaces/*/*"), (home, "codex-ship-workspaces/*/*"), (home, "grok-wt/*"),
-            (home, "codex-worktrees/*"), (home, "wt-*"), (home, "wt/*"), (Path("/srv/worktrees"), "codex-worktrees/*"), (state, "bindings/*/worktrees/*"),
+            (home, "codex-worktrees/*"), (home, "wt-*"), (home, "wt/*"),
+            *((root, "codex-worktrees/*") for root in mounted_roots), (state, "bindings/*/worktrees/*"),
             (state, "runs/owner-*/checkout")]
 
 
-def standalone_candidates(home: Path, state: Path, repos: list[Path]) -> list[Path]:
+def standalone_candidates(home: Path, state: Path, repos: list[Path], *,
+                          mounted_roots: tuple[Path, ...] = DEFAULT_MOUNTED_ROOTS) -> list[Path]:
     """Directories matching a standalone glob that own a `.git` directory (linked worktrees have a file)."""
     skip = {repo.resolve() for repo in repos}
     found: list[Path] = []
-    for base, pattern in standalone_globs(home, state):
+    for base, pattern in standalone_globs(home, state, mounted_roots=mounted_roots):
         for path in sorted(base.glob(pattern)):
             try:
                 if (path / ".git").is_dir() and path.resolve() not in skip and path not in found:
@@ -657,7 +662,7 @@ def prune_artifacts(path: Path) -> int:
 
 def sweep_standalone(home: Path, state: Path, repos: list[Path], never: list[Path], *, run=lifecycle.run,
                      now: float | None = None, idle_s: float = STANDALONE_IDLE_S,
-                     remove=shutil.rmtree) -> dict:
+                     remove=shutil.rmtree, mounted_roots: tuple[Path, ...] = DEFAULT_MOUNTED_ROOTS) -> dict:
     """Delete clean, fully published, idle standalone clones; log each removal (with its size) first."""
     now = time.time() if now is None else now
     report = {"removed": [], "kept": {}, "errors": [], "freedKiB": 0}
@@ -666,7 +671,7 @@ def sweep_standalone(home: Path, state: Path, repos: list[Path], never: list[Pat
         report["errors"].append("process-state-unavailable")
         return report
     log = state / "disk-reclaim.jsonl"
-    for path in standalone_candidates(home, state, repos):
+    for path in standalone_candidates(home, state, repos, mounted_roots=mounted_roots):
         if lifecycle.draining(state):
             report["drained"] = True
             break
