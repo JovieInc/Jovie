@@ -1,0 +1,116 @@
+name: Cheap Fixer
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# capability-gap: The lanes on Gem wake minutes after a red check and spend a frontier model on lint, format and snapshot failures; this hosted hop answers a failed required check within a minute with a cheap Gateway model, has Jev judge the patch, and only then pushes one ordinary commit, otherwise leaving the PR untouched for the lanes.
+# removal-trigger: Remove when the lanes themselves start a cheap-model first attempt within a minute of a red check, or when shadow results show fewer than 80 percent Jev-approved patches that go green.
+
+# First rung of the repair ladder (fleet/cheap-fixer.md). It claims a PR with the same
+# "lane claim" comment the lanes read (scripts/lanes/pr_events.py claim_active) so the two never
+# work one head together. It never pushes to main, never force-pushes, honors every hold label,
+# and never executes PR code: it reads logs and file text and sends them to a model as untrusted data.
+# Kill switch: set the repo variable CHEAP_FIXER_MODE to off. Default is shadow (record, never push).
+
+on:
+  workflow_run:
+    workflows:
+      - Source Validation
+      - CI
+      - Changed-Evidence Test Suites
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  group: cheap-fixer-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  fix:
+    name: Cheap fix attempt
+    if: >-
+      vars.CHEAP_FIXER_MODE != 'off' &&
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.pull_requests[0].number != null
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout trusted fixer
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            .github/actions/prime-node-toolcache
+            scripts/cheap-fixer
+            scripts/invariants/browser-owned-input.mjs
+            scripts/invariants/browser-owned-input-matrix.json
+            scripts/invariants/jev-ci-failure-triage.mjs
+            scripts/invariants/jev-gateway.mjs
+            scripts/invariants/jev-patch-verdict.mjs
+            scripts/invariants/jev-shadow.mjs
+            scripts/invariants/product-reference-coherence.mjs
+            scripts/invariants/run-outcome.mjs
+            scripts/invariants/screen-certification.mjs
+            scripts/invariants/screen-decision-routing.mjs
+            scripts/invariants/screen-proof-resolver.mjs
+            scripts/lib/playwright-png.mjs
+            packages/api-client
+          sparse-checkout-cone-mode: false
+
+      - name: Generate Jovie Bot read token
+        id: read-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.SYMPHONY_APP_ID }}
+          private-key: ${{ secrets.SYMPHONY_APP_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
+          permission-issues: read
+          permission-pull-requests: read
+
+      - name: Generate Jovie Bot push token
+        id: push-token
+        if: vars.CHEAP_FIXER_MODE == 'push'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: write
+
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        uses: ./.github/actions/prime-node-toolcache
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install the Jev evaluation client
+        run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund "ai-evaluation@npm:ai@7.0.105"
+
+      - name: Attempt a cheap fix
+        env:
+          GH_READ_TOKEN: ${{ steps.read-token.outputs.token }}
+          GH_TOKEN: ${{ steps.push-token.outputs.token }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          REPO: ${{ github.repository }}
+          EVENT_PATH: ${{ github.event_path }}
+          MODE: ${{ vars.CHEAP_FIXER_MODE == 'push' && 'push' || 'shadow' }}
+          PUSH_CLASSES: ${{ vars.CHEAP_FIXER_PUSH_CLASSES }}
+          OUT_DIR: ${{ runner.temp }}/cheap-fixer-out
+        run: node scripts/cheap-fixer/cheap-fixer.mjs
+
+      - name: Upload receipt
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cheap-fixer-receipt
+          path: ${{ runner.temp }}/cheap-fixer-out/receipt.json
+          if-no-files-found: ignore
+          retention-days: 30

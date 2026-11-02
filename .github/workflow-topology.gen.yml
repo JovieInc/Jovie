@@ -138,6 +138,17 @@ nodes:
       - workflow_call
     terminalReceipt: job:canary-health-gate
     jobCount: 1
+  - name: Cheap Fixer
+    path: .github/workflows/cheap-fixer.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_run
+    terminalReceipt: job:fix
+    jobCount: 1
   - name: CI Duration Ratchet
     path: .github/workflows/ci-duration-ratchet.yml
     active: true
@@ -169,6 +180,7 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
+      - Cheap Fixer
       - iOS CI
       - Mac CI
       - Component Certificate
@@ -832,6 +844,7 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
+      - Cheap Fixer
       - Lane Fix Relay
       - Test Flakiness Report
     triggeringStateTransition:
@@ -1381,6 +1394,7 @@ nodes:
       - source-validation
     allowedConsumers:
       - Auto-Ready Agent Drafts
+      - Cheap Fixer
       - Dependabot Pin Sync
       - Fleet Rules Evidence
       - Lane Fix Relay
@@ -1578,6 +1592,15 @@ nodes:
 edges:
   - from: Production Continuity Guard
     to: Automation Liveness
+    type: workflow_run
+  - from: Source Validation
+    to: Cheap Fixer
+    type: workflow_run
+  - from: CI
+    to: Cheap Fixer
+    type: workflow_run
+  - from: Changed-Evidence Test Suites
+    to: Cheap Fixer
     type: workflow_run
   - from: CI
     to: iOS CI
