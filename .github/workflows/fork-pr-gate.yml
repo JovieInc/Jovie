@@ -56,7 +56,9 @@ permissions: {}
 concurrency:
   # Include the event name so review re-evaluation does not cancel the initial
   # metadata gate for the same PR.
-  group: fork-pr-gate-${{ github.event_name }}-${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.event.pull_request.number }}
+  group: fork-pr-gate-${{ github.event_name }}-${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || format('{0}-{1}', github.event.pull_request.number, github.run_id) }}
+  # Unique per run: a shared group cancels the older PENDING run when a second
+  # queues, pinning a CANCELLED required check (same as pr-size-guard).
   # pull_request/_target/review: never cancel — duplicate same-head-SHA
   # deliveries must each reach a terminal state so this required context
   # always resolves from a completed run (same JOV-3580 race as

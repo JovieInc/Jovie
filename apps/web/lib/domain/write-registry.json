@@ -31,7 +31,8 @@
         "upsertRelease",
         "upsertTrack",
         "upsertRecording",
-        "upsertReleaseTrack"
+        "upsertReleaseTrack",
+        "purgeOrphanRecordings"
       ],
       "tables": ["discogReleases", "discogTracks", "discogRecordings"]
     },
@@ -59,6 +60,7 @@
       "exports": [
         "updateProfileById",
         "updateProfileByClerkId",
+        "holdLeadBuiltProfileInTx",
         "publishProfile"
       ],
       "tables": ["creatorProfiles"]
@@ -68,6 +70,13 @@
       "entity": "profile",
       "module": "apps/web/lib/domain/profile.ts",
       "exports": ["applyProfileUpdate"],
+      "tables": ["creatorProfiles"]
+    },
+    {
+      "id": "profile.test-cleanup",
+      "entity": "profile",
+      "module": "apps/web/lib/services/profile/test-profile-unpublish.ts",
+      "exports": ["buildUnpublishTestProfilesQuery"],
       "tables": ["creatorProfiles"]
     },
     {
@@ -100,8 +109,19 @@
       "id": "waitlist.admission",
       "entity": "waitlist/admission",
       "module": "apps/web/lib/waitlist/approval.ts",
-      "exports": ["approveWaitlistEntryInTx", "disapproveWaitlistEntryInTx"],
+      "exports": [
+        "approveWaitlistEntryInTx",
+        "disapproveWaitlistEntryInTx",
+        "stampWaitlistAcquisitionId"
+      ],
       "tables": ["waitlistEntries", "creatorProfiles"]
+    },
+    {
+      "id": "synthetic.admitted-canary",
+      "entity": "admitted production canary fixture",
+      "module": "apps/web/lib/synthetic/admitted-canary.server.ts",
+      "exports": ["reconcileAdmittedCanary", "verifyAdmittedCanaryOwnership"],
+      "tables": ["creatorProfiles", "userProfileClaims"]
     },
     {
       "id": "claim.finalize",
@@ -112,6 +132,13 @@
         "claimPrebuiltProfileForUser"
       ],
       "tables": ["creatorProfiles", "userProfileClaims"]
+    },
+    {
+      "id": "claim.legacy-verification",
+      "entity": "claim",
+      "module": "apps/web/lib/claim/legacy-verification.server.ts",
+      "exports": ["runLegacyClaimVerificationSweep"],
+      "tables": ["creatorProfiles"]
     },
     {
       "id": "billing.status",
@@ -149,6 +176,13 @@
       "tables": []
     },
     {
+      "id": "agent.draft-claim",
+      "entity": "agent draft claim",
+      "module": "apps/web/lib/agent-acquisition/draft-claim.server.ts",
+      "exports": ["claimAgentDraft"],
+      "tables": ["creatorProfiles"]
+    },
+    {
       "id": "agent.draft",
       "entity": "agent draft",
       "module": "apps/web/lib/agent-acquisition/draft-store.ts",
@@ -161,6 +195,13 @@
       "module": "apps/web/lib/youtube-library/thumbnail-review.ts",
       "exports": ["registerThumbnailCandidateReview"],
       "tables": []
+    },
+    {
+      "id": "leads.lead-claim-token",
+      "entity": "lead claim token",
+      "module": "apps/web/lib/leads/lead-claim-token.ts",
+      "exports": ["persistLeadClaimToken"],
+      "tables": ["creatorProfiles"]
     }
   ],
   "agentTools": {

@@ -39,6 +39,10 @@ import {
   readCertificationPacketFiles,
 } from './packet-files.server';
 import {
+  prodGoldenPathPacketFiles,
+  readProdGoldenPathLedger,
+} from './prod-golden-path-ledger';
+import {
   OVIE_CERTIFICATION_DOMAIN_LABELS,
   OVIE_CERTIFICATION_INVENTORY_CONTRACT,
   type OvieCertificationDecisionRequest,
@@ -124,11 +128,42 @@ export interface OvieCertificationInventoryDeps {
   >;
 }
 
+/**
+ * Committed packet files plus the production golden-path ledger (JOV-9625).
+ * A ledger read failure is reported as an inventory issue and never hides
+ * the committed packets.
+ */
+export async function readPacketFilesWithGoldenPath(
+  backend: () => CertificationRecordBackend = postgresRecordBackend
+): Promise<CertificationPacketFileRead> {
+  const committed = await readCertificationPacketFiles();
+  try {
+    const ledger = await readProdGoldenPathLedger(backend());
+    if (!ledger) return committed;
+    return {
+      ...committed,
+      files: [...committed.files, ...prodGoldenPathPacketFiles(ledger)],
+    };
+  } catch (error) {
+    return {
+      ...committed,
+      issues: [
+        ...committed.issues,
+        {
+          domain: null,
+          source: 'ledger:prod-golden-path',
+          message: `Production golden-path ledger could not be read: ${error instanceof Error ? error.message : String(error)}`,
+        },
+      ],
+    };
+  }
+}
+
 export const defaultOvieCertificationInventoryDeps: OvieCertificationInventoryDeps =
   {
     marketingStore: getMarketingCertificationStore,
     backend: postgresRecordBackend,
-    readPacketFiles: () => readCertificationPacketFiles(),
+    readPacketFiles: () => readPacketFilesWithGoldenPath(),
     featureRegistry: { list: readFeatureRegistrySource },
     acquisitionEligibility: () => getAcquisitionEligibility(),
   };

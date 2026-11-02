@@ -211,6 +211,10 @@ async function assetStage(ctx: StageContext): Promise<StageResult> {
         width: 1600,
         height: 1000,
         brief: ctx.brief.brief.businessObjective,
+        quietZone: {
+          position: `the headline and UI overlay on ${ref.sectionInstanceId}`,
+          size: 'the footprint of that headline and UI',
+        },
       },
       adapter: {
         provider: 'factory',

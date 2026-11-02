@@ -38,6 +38,10 @@ vi.mock('@/lib/synthetic/passage.server', () => ({
   resolveSyntheticPassage: vi.fn().mockResolvedValue(null),
 }));
 
+vi.mock('@/lib/synthetic/passage-token.server', () => ({
+  resolveSyntheticPassageToken: vi.fn().mockResolvedValue(null),
+}));
+
 // These access-state fixtures have no handle. Keep the server profile lookup
 // outside jsdom, as in the colocated route tests that cover handle forwarding.
 vi.mock('@/lib/onboarding/start-entry-profile.server', () => ({

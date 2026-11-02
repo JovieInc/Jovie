@@ -40,6 +40,14 @@ jobs:
       eligible: ${{ steps.source.outputs.eligible }}
       staging_artifact_id: ${{ steps.source.outputs.staging_artifact_id }}
     steps:
+      - name: Mint read-only Jovie Bot token for release reads
+        id: read-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
@@ -49,7 +57,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
         with: {node-version: 24.22.1}
       - id: source
-        env: {GH_TOKEN: "${{ github.token }}"}
+        env: {GH_TOKEN: "${{ steps.read-token.outputs.token }}"}
         run: node .github/scripts/staging-release-source.mjs
   # Event-driven supersession, with no wait: main itself is the
   # release-lineage event log. This generation proceeds the moment its exact
@@ -80,6 +88,14 @@ jobs:
     outputs:
       is_current: ${{ steps.coalesce.outputs.is_current }}
     steps:
+      - name: Mint read-only Jovie Bot token for release reads
+        id: read-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
@@ -91,7 +107,7 @@ jobs:
       - name: Evaluate event-driven supersession
         id: coalesce
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.read-token.outputs.token }}
           EXPECTED_SHA: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}
           REPOSITORY: ${{ github.repository }}
           # Starvation bound for the forward-only lineage gate: once main has
@@ -201,6 +217,20 @@ jobs:
 
           echo "is_current=true" >> "$GITHUB_OUTPUT"
           record_receipt "proceed" "exact SHA is current" "$EXPECTED_SHA" 0 "authorize exact CI evidence"
+      - name: Summarize the release decision
+        if: ${{ always() }}
+        env:
+          DECISION: ${{ steps.coalesce.outputs.decision }}
+          IS_CURRENT: ${{ steps.coalesce.outputs.is_current }}
+          REPLACEMENT: ${{ steps.coalesce.outputs.replacement_sha }}
+          EXPECTED_SHA: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}
+        run: |
+          if [ "$IS_CURRENT" = true ]; then
+            echo "### Release attempted: $EXPECTED_SHA is current, proceeding to authorize and release" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### No release attempted: superseded (decision=$DECISION, replacement=$REPLACEMENT)" >> "$GITHUB_STEP_SUMMARY"
+            echo "A green run here means nothing shipped. Production advances only when a run's Production Release job succeeds." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   fleet-promotion:
     name: Authorize fleet deployment state
@@ -222,6 +252,16 @@ jobs:
           permission-actions: read
           permission-contents: read
           permission-pull-requests: read
+      - name: Reset workspace git state (self-hosted)
+        if: runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          # Fixed runners reuse one workspace; a sparse checkout left by a merge_group gate job hides
+          # .github/scripts and .github/actions from the next full checkout (Production Controller 40893280985).
+          if [[ -d .git ]]; then
+            git sparse-checkout disable 2>/dev/null || true
+            rm -f .git/info/sparse-checkout
+          fi
       - name: Checkout exact main policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -313,6 +353,14 @@ jobs:
       release_certification_required: ${{ steps.authorize.outputs.release_certification_required }}
       release_requires_smoke: ${{ steps.authorize.outputs.release_requires_smoke }}
     steps:
+      - name: Mint read-only Jovie Bot token for release reads
+        id: read-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}
@@ -376,7 +424,7 @@ jobs:
       - name: Cross-prove exact successful push CI
         id: authorize
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.read-token.outputs.token }}
           EXPECTED_SHA: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}
           REPOSITORY: ${{ github.repository }}
           EXACT_STAGING_ARTIFACT_ID: ${{ needs.release-source.outputs.staging_artifact_id }}
@@ -861,6 +909,7 @@ jobs:
     with:
       expected_sha: ${{ needs.authorize-production.outputs.expected_sha }}
       release_mode: production
+      predecessor_sha: ${{ needs.authorize-production.outputs.deployed_sha }}
       staging_verified: ${{ needs.authorize-production.outputs.staging_verified == 'true' }}
       full_runtime_proof: ${{ needs.authorize-production.outputs.release_lane == 'high' }}
     secrets: inherit
@@ -931,7 +980,7 @@ jobs:
     name: Post-Deploy Auth Smoke (Production)
     needs: [authorize-production, production-release]
     if: ${{ always() && needs.production-release.result == 'success' && needs.production-release.outputs.released == 'true' && needs.authorize-production.outputs.release_requires_smoke == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
@@ -1043,7 +1092,7 @@ jobs:
     needs: [authorize-production, production-release]
     # Run after successful deploy (tests homepage + /tim profile)
     if: ${{ always() && needs.production-release.result == 'success' && needs.production-release.outputs.released == 'true' && needs.authorize-production.outputs.release_lane == 'high' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -1157,6 +1206,14 @@ jobs:
     outputs:
       verified: ${{ steps.finalize.outputs.verified || 'false' }}
     steps:
+      - name: Mint read-only Jovie Bot token for release reads
+        id: read-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -1169,7 +1226,7 @@ jobs:
       - name: Resolve current main before final verification
         id: current
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.read-token.outputs.token }}
           EXPECTED_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
           PRODUCTION_BUILD_INFO_URL: https://jov.ie/api/health/build-info
           RUN_WEB: ${{ needs.authorize-production.outputs.run_web }}
@@ -1211,7 +1268,7 @@ jobs:
         if: ${{ (steps.current.outputs.is_current == 'true' || steps.current.outputs.superseded_before_marker == 'true') && needs.authorize-production.outputs.release_lane != 'not_applicable' && needs.authorize-production.outputs.release_unattended_allowed == 'true' }}
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.read-token.outputs.token }}
           EXPECTED_COMMIT_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
           EXPECTED_PRODUCTION_DEPLOYMENT_ID: ${{ needs.production-release.outputs.production_deployment_id }}
           PRODUCTION_DEPLOYMENT_URL_B64: ${{ needs.production-release.outputs.production_deployment_url_b64 }}
@@ -1316,7 +1373,7 @@ jobs:
         id: finalize
         if: ${{ always() && needs.production-release.outputs.superseded_before_promotion != 'true' && (steps.current.outputs.is_current == 'true' || steps.verify.outputs.canonical_verified == 'true') }}
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.read-token.outputs.token }}
           EXPECTED_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
           DEPLOYMENT_ID: ${{ needs.production-release.outputs.production_deployment_id }}
           AUTH_SMOKE_STATUS: ${{ needs.ci-post-deploy-auth-smoke.outputs.auth_smoke_status }}
@@ -1577,6 +1634,8 @@ jobs:
           GH_TOKEN: ${{ steps.changelog-token.outputs.token }}
           GH_API_HOLD_BUDGET_SECONDS: '480'
           JOVIE_AGENT_PROFILE: coder
+          # Set repo variable CHANGELOG_CATCH_UP=1 for one run to fold a backlog into one post.
+          CHANGELOG_CATCH_UP: ${{ vars.CHANGELOG_CATCH_UP == '1' && '1' || '' }}
         run: |
           set -euo pipefail
           # The release-writer token has an independent REST quota; avoid making
@@ -1589,8 +1648,19 @@ jobs:
           test "$(jq length <<<"$open_notes")" -le 1 || { echo '::error::Multiple customer-note writers'; exit 1; }
           if [ "$(jq length <<<"$open_notes")" = 1 ]; then
             pr="$(jq -r '.[0].number' <<<"$open_notes")"
-            echo "Existing release PR owns publication: #$pr"
-            exit 0
+            # A release PR that sat open for hours is stuck, not in flight. It used to
+            # block every later publication silently (#23057 froze the changelog
+            # 2026-10-25..29). Close it and regenerate: the publisher recollects
+            # from the last merged receipt, so nothing is lost.
+            age_hours="$(jq -r '((now - (.[0].created_at | fromdateiso8601)) / 3600) | floor' <<<"$open_notes")"
+            in_queue="$(node packages/api-client/cli.ts gh --priority default -- api graphql -f query='query($n:Int!){repository(owner:"JovieInc",name:"Jovie"){pullRequest(number:$n){isInMergeQueue}}}' -F n="$pr" --jq .data.repository.pullRequest.isInMergeQueue)"
+            if [ "$in_queue" = true ] || [ "$age_hours" -lt 6 ]; then
+              echo "Existing release PR owns publication: #$pr (${age_hours}h old)"
+              exit 0
+            fi
+            echo "::warning title=Stale customer changelog PR::#$pr open ${age_hours}h; closing so publication continues"
+            node packages/api-client/cli.ts gh --priority default -- pr close "$pr" --delete-branch \
+              --comment "Closing: open ${age_hours}h without merging, which blocks later customer changelog publication. A fresh release PR is generated from the last merged receipt."
           fi
           branch="release/daily-changelog-$(date -u +%F)-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
@@ -1600,7 +1670,8 @@ jobs:
           git checkout -b "$branch"
           node scripts/publish-daily-changelog.mjs \
             --marker "$RUNNER_TEMP/changelog-marker/production-generation-verified.json" \
-            --output "$RUNNER_TEMP/customer-changelog" --write
+            --output "$RUNNER_TEMP/customer-changelog" --write \
+            ${CHANGELOG_CATCH_UP:+--catch-up}
           [ "$(jq -r .status "$RUNNER_TEMP/customer-changelog/plan.json")" = publish ] || exit 0
           git config user.name 'jovie-bot[bot]'
           git config user.email 'jovie-bot[bot]@users.noreply.github.com'
@@ -1665,6 +1736,52 @@ jobs:
           REMEDIATION_FINGERPRINT: production-monitor-customer-changelog
           REMEDIATION_SOURCE: production-controller.yml:customer-changelog
           REMEDIATION_CONCLUSION: ${{ needs.publish-customer-changelog.result }}
+          REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/remediation-signal-intake.mjs
+
+  # Staleness alarm: release-worthy changes live in production for more than
+  # 24h with no customer changelog entry raise a Summer signal (Linear
+  # remediation issue); it resolves itself once an entry lands.
+  changelog-staleness:
+    name: Customer changelog staleness
+    needs: [production-verified, publish-customer-changelog]
+    if: ${{ always() && needs.production-verified.outputs.verified == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Generate existing release-writer token
+        id: stale-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+      - name: Check unpublished release-worthy changes
+        id: stale
+        env:
+          GH_TOKEN: ${{ steps.stale-token.outputs.token }}
+        run: node scripts/changelog-staleness.mjs
+      - name: File or resolve staleness remediation
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          REMEDIATION_MODE: monitor
+          REMEDIATION_FINGERPRINT: production-monitor-customer-changelog-stale
+          REMEDIATION_SOURCE: production-controller.yml:customer-changelog-stale
+          REMEDIATION_CONCLUSION: ${{ steps.stale.outputs.conclusion }}
+          REMEDIATION_DETAIL: ${{ steps.stale.outputs.detail }}
           REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: node scripts/remediation-signal-intake.mjs
 

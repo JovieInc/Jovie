@@ -7,6 +7,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { REPO_ROOT } from './paths.mjs';
+import { checkCalibration } from './vision-calibration.mjs';
 
 export const VISION_CONFIG =
   'scripts/invariants/art-direction/vision.config.json';
@@ -44,5 +45,12 @@ export function judgeVision(config) {
 export const check = checkVision;
 
 export function checkVision(repoRoot = REPO_ROOT) {
-  return judgeVision(readVisionConfig(repoRoot));
+  const config = readVisionConfig(repoRoot);
+  const base = judgeVision(config);
+  // Measured numbers per criterion; a judge set to blocking must pass the floors.
+  const calibration = checkCalibration(repoRoot, config);
+  return {
+    failures: [...base.failures, ...calibration.failures],
+    shadow: [...base.shadow, ...calibration.shadow],
+  };
 }

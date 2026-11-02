@@ -70,6 +70,7 @@ import {
   detectAlbumArtGenerationIntent,
   resolveAlbumArtCapability,
 } from '@/lib/chat/album-art-capability';
+import { fetchCatalogTrackTitlesForChat } from '@/lib/chat/catalog-titles';
 import { assertChatToolsRegistered } from '@/lib/chat/chat-tool-inventory';
 import {
   buildLockedToolPromptInfo,
@@ -80,9 +81,11 @@ import {
   extractLastUserImageUrl,
   extractLastUserText,
 } from '@/lib/chat/message-text';
+import { resolveHasMusicLinks } from '@/lib/chat/music-link-presence';
 import { canUseOvChatMode, parseChatMode } from '@/lib/chat/ov-mode';
 import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
 import { buildRelatedSuggestionsFraming } from '@/lib/chat/related-recommendations';
+import { countVisibleReleaseListenLinks } from '@/lib/chat/release-listen-links';
 import {
   updateOwnedReleaseGeneratedPitches,
   updateOwnedReleaseMetadata,
@@ -100,6 +103,7 @@ import {
 import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
 import { isShowTopInsightsTurnRelevant } from '@/lib/chat/show-top-insights-relevance';
 import { chatToolSchema } from '@/lib/chat/strict-schema';
+import { resolveSummerHandoff } from '@/lib/chat/summer-summon';
 import {
   canUsePaidChatTools,
   resolveChatTurnPlanLimits,
@@ -226,6 +230,7 @@ import {
 } from '@/lib/services/pitch';
 import { isRetouchConfigured } from '@/lib/services/retouching/provider-gemini';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
+import { isWeeklyQuotaExemptCanaryEmail } from '@/lib/synthetic/prodcert-identities';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 
@@ -290,6 +295,8 @@ async function fetchArtistContext(
   startOfMonth.setUTCHours(0, 0, 0, 0);
   const startOfMonthISO = startOfMonth.toISOString();
 
+  // Release listen links render on the public profile too.
+  const releaseListenCount = countVisibleReleaseListenLinks(profileId);
   const [linkCounts, tipTotals, clickStats, profileViews] = await Promise.all([
     db
       .select({
@@ -345,7 +352,12 @@ async function fetchArtistContext(
     appleMusicUrl: result.appleMusicUrl,
     profileViews,
     hasSocialLinks: Number(linkCounts?.totalActive ?? 0) > 0,
-    hasMusicLinks: Number(linkCounts?.musicActive ?? 0) > 0,
+    hasMusicLinks: resolveHasMusicLinks({
+      dspSocialLinkCount: Number(linkCounts?.musicActive ?? 0),
+      releaseListenLinkCount: await releaseListenCount,
+      spotifyUrl: result.spotifyUrl,
+      appleMusicUrl: result.appleMusicUrl,
+    }),
     tippingStats: {
       tipClicks: Number(clickStats?.total ?? 0),
       tipsSubmitted: Number(tipTotals?.tipsSubmitted ?? 0),
@@ -2369,7 +2381,14 @@ export async function POST(req: Request) {
       { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
     );
   }
-  const chatMode = chatModeResult.chatMode;
+  // Typing "Summer" (any spelling, @summer) in the founder's chat hands the
+  // operator account to Summer instead of the artist agent (Tim, 2026-10-25).
+  const chatMode = resolveSummerHandoff({
+    chatMode: chatModeResult.chatMode,
+    text: extractLastUserText(uiMessages),
+    founderAuthorized: authorizeFounderSummerUser(userId) === 'authorized',
+    transportEnabled: isSummerTransportEnabled(),
+  });
   if (chatMode === 'ov' && !(await canUseOvChatMode(userId))) {
     return NextResponse.json(
       { error: 'Admin role required for OV chat mode', requestId },
@@ -2775,7 +2794,9 @@ export async function POST(req: Request) {
 
   // Rate limiting - plan-aware weekly quota + burst protection. For clients
   // that send clientTurnId, reservation/replay happens before quota charging.
-  const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan);
+  const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan, {
+    skipWeeklyQuota: isWeeklyQuotaExemptCanaryEmail(accountContext.email),
+  });
   if (!rateLimitResult.success) {
     const rateLimitMessage =
       accountContext.billingVerification === 'unavailable'
@@ -2885,6 +2906,9 @@ export async function POST(req: Request) {
   const artistContext = contextResult.context;
 
   const releases = await fetchOptionalReleases(resolvedProfileId);
+  const catalogTrackTitles = resolvedProfileId
+    ? await fetchCatalogTrackTitlesForChat(resolvedProfileId)
+    : null;
   const dispatchConversationId =
     reservedTurn?.conversationId ?? resolvedConversationId;
 
@@ -2996,7 +3020,7 @@ export async function POST(req: Request) {
       const failure = classifyChatStreamFailure(error);
       await markChatTurnTerminal({
         turnId: reservedTurn.turnId,
-        status: 'failed_model_error',
+        status: failure.terminalStatus,
         errorCode: failure.errorCode,
         errorMessage: failure.errorMessage,
       });
@@ -3053,6 +3077,7 @@ export async function POST(req: Request) {
       uiMessages,
       artistContext,
       releases,
+      catalogTrackTitles,
       resolvedProfileId,
       resolvedConversationId: dispatchConversationId,
       userId,
@@ -3096,6 +3121,8 @@ export async function POST(req: Request) {
     }
 
     return turn.streamResult.toUIMessageStreamResponse({
+      // Model reasoning restates prompt rules and is never rendered.
+      sendReasoning: false,
       headers: {
         ...corsHeaders,
         'x-request-id': requestId,
@@ -3219,7 +3246,7 @@ export async function POST(req: Request) {
       const failure = classifyChatStreamFailure(error);
       await markChatTurnTerminal({
         turnId: reservedTurn.turnId,
-        status: 'failed_model_error',
+        status: failure.terminalStatus,
         errorCode: failure.errorCode,
         errorMessage: failure.errorMessage,
       }).catch(() => null);

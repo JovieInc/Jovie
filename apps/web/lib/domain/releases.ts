@@ -14,7 +14,7 @@ import { generateUniqueSlug } from '@/lib/discography/slug';
  * chat tool upserted with a different slug and none of those), so the same
  * request saved different rows. Anything that creates a release goes through
  * here; `tests/unit/domain/release-paths.test.ts` pins that both paths store
- * identical rows and `chat-tools-use-domain.test.ts` pins that no chat tool
+ * identical rows and `write-registry.test.ts` pins that no chat tool
  * writes the tables directly.
  */
 export type ReleaseStatusValue = 'draft' | 'scheduled' | 'released';

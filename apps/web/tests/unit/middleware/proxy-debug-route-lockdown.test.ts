@@ -197,6 +197,8 @@ describe('proxy debug/test route lockdown', () => {
 
     expect(rewriteUrl).toBeTruthy();
     expect(new URL(rewriteUrl!).pathname).toBe('/404');
+    // Soft-404 guard: the blocked route must answer HTTP 404, not 200.
+    expect(response.status).toBe(404);
   });
 
   it('allows shell-v1 product screenshots on loopback automation', async () => {

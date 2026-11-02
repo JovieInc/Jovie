@@ -4,6 +4,13 @@ const OTP_SKIP_MARKER = 'synthetic-otp-unavailable';
 const ROBOT_SKIP_MARKER = 'synthetic-robot-auth-unavailable';
 const ACKNOWLEDGED_SKIP_MARKERS = [OTP_SKIP_MARKER, ROBOT_SKIP_MARKER];
 const ROBOT_RESULT_NAME = 'onboarding-robot-full';
+/**
+ * Suites whose skip is never acknowledged: a skip there means the canary did
+ * not exercise its path, so it reports as a failure, not a pass. The waitlist
+ * canary skipped its signup leg on every run (missing OTP mailbox secrets)
+ * while the workflow read green (2026-10-29 waitlist audit).
+ */
+const SKIP_IS_FAILURE_SOURCES = new Set(['synthetic-production-waitlist']);
 
 const DEFAULT_RESULT_FILES = (
   legacyCanaryEnabled,
@@ -32,6 +39,11 @@ const DEFAULT_RESULT_FILES = (
   {
     name: 'public-profile-smoke',
     path: 'apps/web/test-results/public-profile-smoke-results.json',
+    required: true,
+  },
+  {
+    name: 'synthetic-start-chat',
+    path: 'apps/web/test-results/synthetic-start-chat-results.json',
     required: true,
   },
   {
@@ -89,7 +101,9 @@ function classifySyntheticTests(tests) {
       (testCase.results ?? []).some(result => result.status === 'skipped')
   );
   const requiredSkipped = skipped.filter(
-    ({ required, testCase }) => required && !acknowledgedSkipText(testCase)
+    ({ required, source, testCase }) =>
+      required &&
+      (SKIP_IS_FAILURE_SOURCES.has(source) || !acknowledgedSkipText(testCase))
   );
   const warnings = tests.flatMap(({ source, spec, testCase }) => {
     const logged = (testCase.results ?? []).flatMap(result =>
@@ -290,6 +304,7 @@ function formatGithubOutput(result) {
 
 module.exports = {
   ACKNOWLEDGED_SKIP_MARKERS,
+  SKIP_IS_FAILURE_SOURCES,
   DEFAULT_RESULT_FILES,
   classifySyntheticTests,
   collectSpecs,

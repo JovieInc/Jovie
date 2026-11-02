@@ -889,6 +889,11 @@ const ANNOTATION_MAX_TITLE_LENGTH = 250;
 const ANNOTATION_MAX_ERROR_LINES = 4;
 const ANNOTATION_MAX_MESSAGE_LENGTH = 2000;
 const ANNOTATION_FAILURE_HEADER = /^\s*\d+\)\s+(.+)$/;
+const FAILURE_TAIL_LINE_COUNT = 30;
+const FAILURE_TAIL_MAX_LENGTH = 2800;
+const DIAGNOSTIC_LINE_PATTERNS = [/returned \d{3}:/, /\[claim-dogfood\]/];
+const DIAGNOSTIC_MAX_LINES = 4;
+const DIAGNOSTIC_MAX_LINE_LENGTH = 1200;
 
 function truncateAnnotation(value, maxLength) {
   if (value.length <= maxLength) return value;
@@ -997,6 +1002,72 @@ export function collectPlaywrightFailureAnnotations(
   return { annotations, total: failures.length, omitted };
 }
 
+/**
+ * Bounded, redacted tail annotation for runs that exited non-zero without
+ * any parseable per-test failure block (JOV-8805): crashes before/around
+ * the reporter (config errors, browser launch failures, wrapper exits)
+ * otherwise leave only "Process completed with exit code 1" on an
+ * admin-gated job log that no remediation sandbox can read.
+ */
+export function formatPlaywrightFailureTailAnnotation(
+  output,
+  {
+    redact,
+    lineCount = FAILURE_TAIL_LINE_COUNT,
+    maxLength = FAILURE_TAIL_MAX_LENGTH,
+  } = {}
+) {
+  const tail = String(output ?? '')
+    .split('\n')
+    .filter(line => line.trim().length > 0)
+    .slice(-lineCount)
+    .join('\n')
+    .trim();
+  if (!tail) return null;
+  const safe = redact ?? (value => value);
+  const message = safe(truncateAnnotation(tail, maxLength)).replaceAll(
+    '\n',
+    '%0A'
+  );
+  return `::error title=E2E run failed without parseable test failures ::${message}`;
+}
+
+/**
+ * Lines from the captured output that name the actual failure even when no
+ * per-test failure block was parseable (JOV-8805): the spec's assertion
+ * message (`... returned 500: {"error":"Failed to create checkout
+ * session: <cause>"}`) and the server's `[claim-dogfood]` console sink both
+ * appear in stdout but can sit thousands of lines above the tail, inside
+ * the JSON reporter blob. Diagnostic lines beat the tail: they carry the
+ * response body with the surfaced cause.
+ */
+export function collectDiagnosticLines(
+  output,
+  { patterns = DIAGNOSTIC_LINE_PATTERNS, limit = DIAGNOSTIC_MAX_LINES } = {}
+) {
+  const hits = [];
+  for (const line of String(output ?? '').split('\n')) {
+    if (!patterns.some(pattern => pattern.test(line))) continue;
+    if (hits.includes(line)) continue;
+    hits.push(line);
+    if (hits.length >= limit) break;
+  }
+  return hits;
+}
+
+/** Format captured diagnostic lines as one bounded `::error` annotation. */
+export function formatDiagnosticLinesAnnotation(
+  hits,
+  { redact, maxLength = DIAGNOSTIC_MAX_LINE_LENGTH } = {}
+) {
+  if (!hits.length) return null;
+  const safe = redact ?? (value => value);
+  const message = hits
+    .map(line => safe(truncateAnnotation(line.trim(), maxLength)))
+    .join('%0A%0A');
+  return `::error title=E2E checkout failure diagnostics ::${message}`;
+}
+
 async function runProducer(command) {
   // Runs the wrapped Playwright command under the producer's artifact
   // policy. The captured child output is parsed into bounded, secret-redacted
@@ -1032,7 +1103,24 @@ async function runProducer(command) {
     });
     maskValues(dynamicValues);
     const scanEnvironment = withDynamicSecretValues(process.env, dynamicValues);
+    const { total: parsedFailures } = collectPlaywrightFailureAnnotations(
+      childResult.stdout,
+      { redact: text => redactSecretValues(text, scanEnvironment) }
+    );
     reportPlaywrightFailureAnnotations(childResult.stdout, scanEnvironment);
+    if (childStatus !== 0) {
+      const diagnostics = formatDiagnosticLinesAnnotation(
+        collectDiagnosticLines(childResult.stdout),
+        { redact: text => redactSecretValues(text, scanEnvironment) }
+      );
+      if (diagnostics) writeSync(process.stdout.fd, `${diagnostics}\n`);
+      else if (parsedFailures === 0) {
+        const tail = formatPlaywrightFailureTailAnnotation(childResult.stdout, {
+          redact: text => redactSecretValues(text, scanEnvironment),
+        });
+        if (tail) writeSync(process.stdout.fd, `${tail}\n`);
+      }
+    }
     const configured = configuredPaths();
     const producerOptions = options();
     // Producer stages omit images by default, even when a job permits image

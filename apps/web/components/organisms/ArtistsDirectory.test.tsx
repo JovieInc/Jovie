@@ -42,9 +42,15 @@ describe('ArtistsDirectory', () => {
     render(<ArtistsDirectory profiles={ARTISTS_DIRECTORY_STORY_PROFILES} />);
 
     expect(
-      screen.getByRole('heading', { level: 1, name: 'All artists' })
+      screen.getByRole('heading', { level: 1, name: 'Artists' })
     ).toBeInTheDocument();
-    expect(screen.getByText('1')).toBeInTheDocument();
+    // Quiet directory: no stat or explainer cards, no filler bio.
+    expect(screen.queryByText('Public profiles')).not.toBeInTheDocument();
+    expect(screen.queryByText('Discover artists')).not.toBeInTheDocument();
+    expect(screen.queryByText('Jump straight in')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Public creator profile on Jovie.')
+    ).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Tim White/ })).toHaveAttribute(
       'href',
       '/tim'
@@ -54,7 +60,7 @@ describe('ArtistsDirectory', () => {
   it('keeps the empty state in the same component body', () => {
     render(<ArtistsDirectory profiles={[]} />);
 
-    expect(screen.getByText('No profiles found')).toBeInTheDocument();
+    expect(screen.getByText('No profiles yet.')).toBeInTheDocument();
   });
 
   it('renders a load-more link and a total distinct from the page size (JOV-6451)', () => {
@@ -66,10 +72,6 @@ describe('ArtistsDirectory', () => {
       />
     );
 
-    expect(screen.getByText('5000')).toBeInTheDocument();
-    expect(screen.getByTestId('artists-directory-page-note')).toHaveTextContent(
-      'Showing 1 of 5000 public profiles.'
-    );
     expect(screen.getByTestId('artists-directory-next-page')).toHaveAttribute(
       'href',
       '/artists?cursor=opaque-cursor-token'

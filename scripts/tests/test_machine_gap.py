@@ -1,3 +1,4 @@
+import hashlib
 import sys
 import tempfile
 import unittest
@@ -14,6 +15,25 @@ NOW = 2_000_000_000.0
 
 
 class GateTest(unittest.TestCase):
+    def test_a_cancelled_sibling_does_not_define_a_second_fix_red_class(self):
+        failed = {"statusCheckRollup": [
+            {"name": "Source Validation", "conclusion": "FAILURE"},
+            {"name": "PR Ready", "conclusion": "FAILURE"},
+        ]}
+        mixed = {"statusCheckRollup": [
+            {"name": "Source Validation", "conclusion": "FAILURE"},
+            {"name": "Fleet Rules Evidence", "conclusion": "CANCELLED"},
+            {"name": "PR Ready", "conclusion": "FAILURE"},
+        ]}
+        cancelled = {"statusCheckRollup": [{"name": "Fleet Rules Evidence", "conclusion": "CANCELLED"}]}
+        solo = gap.check_fingerprint(failed)
+        self.assertEqual(gap.check_fingerprint(mixed), solo)
+        self.assertNotEqual(gap.check_fingerprint(cancelled), solo)
+        self.assertEqual(solo, "fix-red-" + hashlib.sha256(b"Source Validation").hexdigest()[:10])
+        pair = "fix-red-" + hashlib.sha256(b"Fleet Rules Evidence|Source Validation").hexdigest()[:10]
+        self.assertEqual(pair, "fix-red-6c3efaf400")
+        self.assertNotEqual(solo, pair)
+
     def test_fingerprint_ignores_ids_and_numbers_and_honours_explicit_labels(self):
         a = gap.fingerprint("fix: JOV-9001 sentry error 42 in profile page", [])
         b = gap.fingerprint("Fix Sentry error 77 in profile page (JOV-9100)", [])
@@ -92,6 +112,22 @@ class PromptTest(unittest.TestCase):
             pr = {"number": 4, "statusCheckRollup": [{"name": "Source Validation", "conclusion": "FAILURE"}]}
             fix = lane.machine_gate(host, "PR4", "", (), "", "codex", fp=gap.check_fingerprint(pr))
             self.assertTrue(any("Abstraction gate" in line for line in fix))
+
+    def test_binding_and_epic_prompts_carry_the_gate_too(self):
+        import bindings
+        import epics
+        binding = SimpleNamespace(slug="JovieInc/LogYourBody", key="LYB")
+        pr = {"number": 3, "headRefOid": "h", "statusCheckRollup": [{"name": "Lint", "conclusion": "FAILURE"}]}
+        clause = ["## Abstraction gate (build the machine, not the thing)", "- REQUIRED: x"]
+        repair = bindings.render_prompt(binding, "fix/x", pr=pr, machine=clause)
+        issue = SimpleNamespace(title="t", identifier="LYB-1", description="d")
+        coder = bindings.render_prompt(binding, "b", issue=issue, machine=clause)
+        for prompt in (repair, coder):
+            self.assertIn("## Abstraction gate", prompt)
+            self.assertLess(prompt.index("Abstraction gate"), prompt.index("## Contract"))
+        plan = epics.render_prompt(SimpleNamespace(identifier="JOV-1", title="e", description="d"), [])
+        self.assertIn("Build the machine, not the thing", plan)
+        self.assertIn("machine-gap", plan)
 
     def test_a_broken_ledger_never_fails_the_run(self):
         import lane_runner as lane

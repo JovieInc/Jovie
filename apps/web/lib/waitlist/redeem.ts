@@ -1,3 +1,4 @@
+import { resolveNewAccountClass } from '@/lib/accounts/internal-account';
 import 'server-only';
 
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
@@ -40,6 +41,7 @@ async function upsertApprovedUser(params: {
       email: params.email,
       userStatus: 'waitlist_approved',
       waitlistEntryId: params.entryId,
+      accountClass: resolveNewAccountClass({ email: params.email }),
     });
     return;
   }
@@ -115,7 +117,12 @@ export async function redeemWaitlistInviteToken(input: {
             inviteTokenRedeemedAt: waitlistEntries.inviteTokenRedeemedAt,
           })
           .from(waitlistEntries)
-          .where(eq(waitlistEntries.inviteTokenHash, tokenHash))
+          .where(
+            and(
+              eq(waitlistEntries.inviteTokenHash, tokenHash),
+              eq(waitlistEntries.canonical, true)
+            )
+          )
           .for('update')
           .limit(1);
 

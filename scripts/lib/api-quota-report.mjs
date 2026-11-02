@@ -88,7 +88,12 @@ export function summarizeHeadroom(samples, windowSeconds = 3600) {
   const rows = new Map();
   for (const sample of samples) {
     if (!sample) continue;
-    const windowStart = Math.floor(sample.at / windowSeconds) * windowSeconds;
+    // A GitHub token's rate-limit window ends at its own x-ratelimit-reset (the
+    // installation's windows run :23 to :23, not on the hour), so key on that.
+    // Samples without a reset fall back to the hour they were taken in.
+    const windowStart = Number.isFinite(sample.reset)
+      ? sample.reset - windowSeconds
+      : Math.floor(sample.at / windowSeconds) * windowSeconds;
     const key = `${sample.bucket}@${windowStart}`;
     const row = rows.get(key) ?? {
       bucket: sample.bucket,
@@ -137,18 +142,31 @@ export function projectDrain(samples, nowSeconds, options = {}) {
     minSamples = 3,
     minSpanSeconds = 120,
   } = options;
-  const windowStart = Math.floor(nowSeconds / windowSeconds) * windowSeconds;
-  const resetAt = windowStart + windowSeconds;
+  // Each bucket's window ends at the x-ratelimit-reset its newest sample reports
+  // (not on the hour: the installation's windows run :23 to :23). Samples without
+  // a reset fall back to the hour boundary.
   const byBucket = new Map();
   for (const sample of samples) {
-    if (!sample || sample.at < windowStart || sample.at > nowSeconds) continue;
+    if (!sample || sample.at > nowSeconds) continue;
     const list = byBucket.get(sample.bucket) ?? [];
     list.push(sample);
     byBucket.set(sample.bucket, list);
   }
   const alerts = [];
-  for (const [bucket, list] of byBucket) {
-    list.sort((a, b) => a.at - b.at);
+  for (const [bucket, all] of byBucket) {
+    all.sort((a, b) => a.at - b.at);
+    const newest = all[all.length - 1];
+    const hourStart = Math.floor(nowSeconds / windowSeconds) * windowSeconds;
+    const resetAt = Number.isFinite(newest.reset)
+      ? newest.reset
+      : hourStart + windowSeconds;
+    if (resetAt <= nowSeconds) continue;
+    const windowStart = resetAt - windowSeconds;
+    const list = all.filter(sample =>
+      Number.isFinite(newest.reset)
+        ? sample.reset === newest.reset
+        : sample.at >= windowStart
+    );
     const first = list[0];
     const last = list[list.length - 1];
     const span = last.at - first.at;
@@ -177,13 +195,27 @@ export function jobSeconds(job) {
   return Math.max(0, (completed - started) / 1000);
 }
 
-function ghJson(path) {
-  return JSON.parse(
-    execFileSync('gh', ['api', path], {
-      encoding: 'utf8',
-      maxBuffer: 32 * 1024 * 1024,
-    })
-  );
+function ghJson(path, attempts = 3) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return JSON.parse(
+        execFileSync('gh', ['api', path], {
+          encoding: 'utf8',
+          maxBuffer: 32 * 1024 * 1024,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        })
+      );
+    } catch (error) {
+      // A transient GitHub 5xx must not crash a report that runs from the doctor.
+      if (attempt >= attempts) throw error;
+      Atomics.wait(
+        new Int32Array(new SharedArrayBuffer(4)),
+        0,
+        0,
+        attempt * 1500
+      );
+    }
+  }
 }
 
 function flag(argv, name, fallback) {

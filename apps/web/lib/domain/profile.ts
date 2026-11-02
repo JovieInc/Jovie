@@ -27,7 +27,7 @@ import { refreshAppleWalletProfilePassForProfileId } from '@/lib/wallet/apple/pr
  * `creator_profiles` itself: no field validation, no `profileEditVersion` bump
  * (so it could silently clobber a concurrent form edit), no Clerk name sync, no
  * cache invalidation. Anything that edits a profile goes through here;
- * `chat-tools-use-domain.test.ts` pins that no chat route writes the table.
+ * `write-registry.test.ts` pins that no chat route writes the table.
  *
  * Callers authenticate and pass the Clerk user id; ownership is enforced by the
  * same row-level checks the form always used.

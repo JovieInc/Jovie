@@ -3,6 +3,7 @@ import '../../../styles/system-b-app.css';
 import { headers } from 'next/headers';
 import { redirect, unstable_rethrow } from 'next/navigation';
 import { Suspense } from 'react';
+import { OvieRouteUsageBeacon } from '@/components/features/admin/OvieRouteUsageBeacon';
 import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
 import { PersistentAudioBar } from '@/components/organisms/PersistentAudioBar';
 import { NuqsProvider } from '@/components/providers/NuqsProvider';
@@ -154,6 +155,7 @@ export default async function AppShellLayout({
     // during SSR and hydration, regardless of how CoreProviders resolves above.
     return (
       <NuqsProvider>
+        {mode === 'ov' ? <OvieRouteUsageBeacon /> : null}
         <Suspense fallback={shellFallback}>
           <DashboardShellContent
             userId={auth.userId}

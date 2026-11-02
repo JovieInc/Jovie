@@ -189,7 +189,7 @@ describe('test-user-provision.server', () => {
   });
 
   it('does not call Clerk when mock auth is enabled', async () => {
-    vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
     const { ensureClerkTestUser } = await import(
       '@/lib/testing/test-user-provision.server'
     );

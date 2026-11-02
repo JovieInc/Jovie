@@ -2,20 +2,20 @@
 
 import './MarketingFooter.css';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import {
-  getMarketingFooterColumns,
   getPublicCommercialFooterColumn,
-  MARKETING_CLI_LINK,
   MARKETING_DEVELOPER_LINK,
+  MARKETING_FOOTER_COLUMNS,
   MARKETING_LEGAL_LINKS,
+  type MarketingFooterColumn,
   type MarketingFooterLink,
 } from '@/data/marketingNavigation';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { isEditorialFooterCtaPath } from '@/lib/marketing/editorial-content-routes';
+import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
 import { isThemeRoute } from '@/lib/theme/route-policy';
 import { cn } from '@/lib/utils';
 import { MarketingFooterControls } from './MarketingFooterControls';
@@ -67,8 +67,13 @@ interface MarketingFooterProps {
   readonly variant?: 'auto' | 'expanded' | 'minimal';
   readonly className?: string;
   readonly showCta?: boolean;
-  /** JOV-7580. Server passes the code flag. Default keeps the Music column. */
-  readonly genericCreatorNav?: boolean;
+  /**
+   * Published footer columns (content record `site-chrome/main`). Falls back
+   * to the code-default columns when not provided.
+   */
+  readonly columns?: readonly MarketingFooterColumn[];
+  /** Published legal row (Privacy and Terms are required by the record). */
+  readonly legalLinks?: readonly MarketingFooterLink[];
 }
 
 type ResolvedVariant = 'expanded' | 'minimal';
@@ -92,7 +97,7 @@ function resolveFooterVariant(
 const markLinkClassName =
   'mf-logo-link -m-1.5 inline-flex rounded-full p-1.5 transition-opacity duration-subtle hover:opacity-75';
 const footerLinkClassName =
-  'mf-link inline-flex w-fit rounded-md text-mid leading-[1.45] tracking-[-0.005em] transition-colors duration-subtle';
+  'mf-link inline-flex w-fit whitespace-nowrap rounded-md text-mid leading-[1.45] tracking-[-0.005em] transition-colors duration-subtle';
 const footerLegalLinkClassName =
   'mf-legal-link inline-flex w-fit rounded-md text-xs leading-5 tracking-tight transition-colors duration-subtle';
 
@@ -110,6 +115,54 @@ function FooterLink({ link }: Readonly<{ link: MarketingFooterLink }>) {
   );
 }
 
+export function FooterColumnsNav({
+  columns: footerColumns,
+  hasCta,
+}: Readonly<{
+  columns: readonly MarketingFooterColumn[];
+  hasCta: boolean;
+}>) {
+  return (
+    <nav
+      className={cn(
+        'grid gap-x-8 gap-y-10 lg:gap-x-12 xl:gap-x-16',
+        footerColumns.length === 1
+          ? 'grid-cols-1'
+          : 'grid-cols-2 sm:grid-cols-3',
+        footerColumns.length === 1
+          ? 'lg:grid-cols-1'
+          : footerColumns.length === 3
+            ? 'lg:grid-cols-3'
+            : footerColumns.length === 4
+              ? 'lg:grid-cols-4'
+              : 'lg:grid-cols-5',
+        hasCta && 'mt-[clamp(3.25rem,5vw,4.6rem)]'
+      )}
+      aria-label='Footer'
+    >
+      {footerColumns.map(column => {
+        const columnLabelId = `footer-column-${column.title
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')}`;
+        return (
+          <section key={column.title} aria-labelledby={columnLabelId}>
+            <p id={columnLabelId} className='mf-eyebrow'>
+              {column.title}
+            </p>
+            <ul className='flex list-none flex-col gap-3 p-0'>
+              {column.links.map(link => (
+                <li key={`${link.href}-${link.label}`}>
+                  <FooterLink link={link} />
+                </li>
+              ))}
+            </ul>
+          </section>
+        );
+      })}
+    </nav>
+  );
+}
+
 function FooterBrandMark() {
   return (
     <Link
@@ -123,10 +176,12 @@ function FooterBrandMark() {
   );
 }
 
-function FooterLegalNav() {
+function FooterLegalNav({
+  links = MARKETING_LEGAL_LINKS,
+}: Readonly<{ links?: readonly MarketingFooterLink[] }>) {
   return (
     <nav aria-label='Legal' className='flex flex-wrap items-center gap-6'>
-      {MARKETING_LEGAL_LINKS.map(link => (
+      {links.map(link => (
         <Link
           key={link.href}
           href={link.href}
@@ -144,9 +199,10 @@ export function MarketingFooter({
   variant = 'auto',
   className,
   showCta = true,
-  genericCreatorNav = false,
+  columns,
+  legalLinks,
 }: Readonly<MarketingFooterProps>) {
-  const pathname = usePathname();
+  const pathname = usePublicPathname();
   const resolvedVariant = resolveFooterVariant(variant, pathname);
   const isMinimal = resolvedVariant === 'minimal';
   const pageOwnsFinalCta =
@@ -155,8 +211,8 @@ export function MarketingFooter({
       isEditorialFooterCtaPath(pathname));
   const shouldShowCta = showCta && !isMinimal && !pageOwnsFinalCta;
   const footerColumns = FEATURE_FLAGS.SHOW_PUBLIC_ABOUT_FOOTER_REFRESH
-    ? [getPublicCommercialFooterColumn(genericCreatorNav)]
-    : getMarketingFooterColumns(genericCreatorNav);
+    ? [getPublicCommercialFooterColumn()]
+    : (columns ?? MARKETING_FOOTER_COLUMNS);
 
   return (
     <footer
@@ -187,41 +243,7 @@ export function MarketingFooter({
               <FooterBrandMark />
             </div>
 
-            <nav
-              className={cn(
-                'grid gap-x-8 gap-y-10 lg:gap-x-12 xl:gap-x-16',
-                footerColumns.length === 1
-                  ? 'grid-cols-1'
-                  : 'grid-cols-2 sm:grid-cols-3',
-                footerColumns.length === 1
-                  ? 'lg:grid-cols-1'
-                  : footerColumns.length === 4
-                    ? 'lg:grid-cols-4'
-                    : 'lg:grid-cols-5',
-                shouldShowCta && 'mt-[clamp(3.25rem,5vw,4.6rem)]'
-              )}
-              aria-label='Footer'
-            >
-              {footerColumns.map(column => {
-                const columnLabelId = `footer-column-${column.title
-                  .toLowerCase()
-                  .replace(/[^a-z0-9]+/g, '-')}`;
-                return (
-                  <section key={column.title} aria-labelledby={columnLabelId}>
-                    <p id={columnLabelId} className='mf-eyebrow line-clamp-2'>
-                      {column.title}
-                    </p>
-                    <ul className='flex list-none flex-col gap-3 p-0'>
-                      {column.links.map(link => (
-                        <li key={`${link.href}-${link.label}`}>
-                          <FooterLink link={link} />
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
-                );
-              })}
-            </nav>
+            <FooterColumnsNav columns={footerColumns} hasCta={shouldShowCta} />
           </div>
         )}
 
@@ -233,7 +255,8 @@ export function MarketingFooter({
         >
           {isMinimal ? <FooterBrandMark /> : null}
           <span className='mf-copyright'>
-            © {new Date().getFullYear()} Jovie Technology Inc.
+            {/* copy-allow: legal entity line, owned by code */}©{' '}
+            {new Date().getFullYear()} Jovie Technology Inc.
           </span>
           <div className='mf-baseband__meta'>
             {isMinimal ? (
@@ -242,10 +265,9 @@ export function MarketingFooter({
                 className='flex flex-wrap items-center gap-6'
               >
                 <FooterLink link={MARKETING_DEVELOPER_LINK} />
-                <FooterLink link={MARKETING_CLI_LINK} />
               </nav>
             ) : null}
-            <FooterLegalNav />
+            <FooterLegalNav links={legalLinks} />
             <MarketingFooterControls enabled={isThemeRoute(pathname ?? '')} />
           </div>
         </div>

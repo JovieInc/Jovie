@@ -186,7 +186,8 @@ vi.mock('@/lib/env-public', () => ({
   publicEnv: { NEXT_PUBLIC_APP_URL: 'http://localhost:3000' },
 }));
 
-vi.mock('drizzle-orm', () => ({
+vi.mock('drizzle-orm', async importOriginal => ({
+  ...(await importOriginal<typeof import('drizzle-orm')>()),
   and: vi.fn((...args: unknown[]) => args),
   eq: vi.fn((a: unknown, b: unknown) => [a, b]),
   ne: vi.fn((a: unknown, b: unknown) => [a, b]),

@@ -15,7 +15,7 @@ export const solutionsArtistsPage = definePage({
   status: 'indexed',
   brief: {
     audience: 'independent artists',
-    job: 'show artists how profiles connect music, links, and permissioned fan updates',
+    job: 'show artists how profiles connect music, links, and permissioned listener updates',
     successEvent: 'artist claims a profile',
     copyScope: 'music',
   },
@@ -45,10 +45,10 @@ export const solutionsArtistsPage = definePage({
   heroVariant: 'split-link-claim',
   proof: ['product-profile-subscribe-capture'],
   seo: {
-    title: 'Music links and fan updates for artists',
+    title: 'Music links and listener updates for artists',
     socialTitle: `For Artists | ${APP_NAME}`,
     description:
-      'Bring your music, tour dates, and fan signups together on Jovie. Give listeners one artist link for releases, shows, and updates they choose to receive.',
+      'Bring your music, tour dates, and listener signups together on Jovie. Give listeners one artist link for releases, shows, and updates they choose to receive.',
     keywords: [...ARTIST_PROFILE_COPY.seo.keywords],
     schema: ['SoftwareApplication'],
     siblings: [],

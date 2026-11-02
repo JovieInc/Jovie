@@ -75,7 +75,7 @@ import { copyTextToClipboard, downloadVCard } from './utils';
 
 function getSrDescription(isEmpty: boolean): string {
   if (isEmpty) {
-    return 'Track visitors and grow your fan base';
+    return 'Track visitors and grow your audience';
   }
   return 'Every visitor, anonymous or identified, lives in this table.';
 }
