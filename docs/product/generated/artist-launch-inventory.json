@@ -3449,6 +3449,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/summer-company/default-alive/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-company/default-alive",
+      "methods": ["GET", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/summer-company/demand-allocation/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/demand-allocation",

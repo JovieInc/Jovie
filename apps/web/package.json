@@ -21,6 +21,7 @@
     "agent-distribution:icons": "tsx scripts/render-agent-icons.ts",
     "agent-distribution:ready": "NODE_OPTIONS=--conditions=react-server tsx scripts/agent-listing-ready.ts",
     "validate-env": "tsx scripts/validate-env.ts",
+    "ovie:default-alive": "tsx scripts/ovie-default-alive.ts",
     "check:signup-readiness": "tsx scripts/check-signup-readiness.ts",
     "check:stripe-price-ids": "node scripts/check-stripe-price-ids.mjs",
     "visibility-audit": "tsx scripts/visibility-audit.ts",
