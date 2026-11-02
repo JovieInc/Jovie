@@ -133,3 +133,51 @@ test("gate fails closed and only opens on the user's own pay walk", () => {
     /stale/
   );
 });
+
+test('required personas are report-only until 3 straight passes, then enforce', async () => {
+  const { personaRatchet, buyerReady } = await import('./gate.mjs');
+  const row = (verdict, sha = 's1') => ({
+    rubric: RUBRIC_VERSION,
+    at: '2026-11-02T00:00:00Z',
+    sha,
+    subject: 'heritage-rock-manager',
+    persona: { id: 'heritage-rock-manager', tier: 'A' },
+    verdict,
+    pPay: verdict === 'pay' ? 0.7 : 0.1,
+  });
+  assert.equal(personaRatchet([], 'heritage-rock-manager'), 'report');
+  assert.equal(
+    personaRatchet(
+      [row('pay'), row('no_pay'), row('pay'), row('pay')],
+      'heritage-rock-manager'
+    ),
+    'report'
+  );
+  const graduated = [row('pay'), row('pay'), row('pay'), row('no_pay')];
+  assert.equal(personaRatchet(graduated, 'heritage-rock-manager'), 'enforce');
+
+  const reportOnly = buyerReady({
+    subject: 'x',
+    sha: 's1',
+    receipts: [row('no_pay')],
+    cert: { allow: true },
+  });
+  assert.ok(
+    reportOnly.advisories.some(a =>
+      a.startsWith('report-only:persona-verdict:heritage-rock-manager')
+    )
+  );
+  assert.ok(!reportOnly.reasons.some(r => r.startsWith('persona-')));
+
+  const enforced = buyerReady({
+    subject: 'x',
+    sha: 's1',
+    receipts: graduated,
+    cert: { allow: true },
+  });
+  assert.ok(
+    enforced.reasons.includes(
+      'persona-verdict:heritage-rock-manager:no_pay(p=0.1)'
+    )
+  );
+});

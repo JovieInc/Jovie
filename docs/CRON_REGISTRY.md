@@ -10,6 +10,10 @@
 > **JOV-5852:** execution follows information, not time. A GitHub Actions cron must declare `# clock-class:` (`skip-if-unchanged` | `production-liveness` | `temporal-resource` | `upstream-advisory`). Do not add a clock when a causal event already exists.
 > **JOV-INV-042 (2026-10-11):** GitHub cron is frozen. `scripts/lib/ci-schedule-inventory.mjs` keeps `CRON_KEEP_REASONS` (since 2026-10-12 every kept clock names its time-bound external fact, calendar window, real resource limit, or owner-tracked replacement), `ADMISSION_CRON_DEBT`, and `POLLING_DEBT`; each list only shrinks. Admission and landing are event-driven or run from the Gem lanes tick; no workflow polls GitHub state.
 
+## Shared scheduler rule (2026-10-31)
+
+One scheduler per platform ([`canon/schedulers.json`](../canon/schedulers.json)): Vercel `frequent`, Gem lanes tick, GitHub Production Continuity Guard (follow it with `workflow_run`), Summer heartbeat; Mac and Cloudflare are planned. A new timer-driven entry in `canon/automation-registry.jsonl` must set `clock.scheduler` to its platform's scheduler and `clock.whyNotEvent` to why no event (webhook, queue insert, deploy hook, relay connect) can do the job; `validateScheduling` fails CI otherwise. Pre-existing timers are `grandfathered` and that list only shrinks. Inventory with runs per day: `node scripts/automation-schedule-inventory.mjs`.
+
 ## Codex Workspace Automations
 
 Codex automations are heartbeats that wake one live goal thread; Codex is on-demand and is not a scheduler. The active ones are registered as `codex:*` in the registry with a migrate note (pause when the goal closes). The 2026-10-20 sweep archived 16 paused heartbeats to `~/.local/state/retired-loops/2026-10-20/codex-automations/` on the ops Mac. The `pr-comment-hardening-retro` and `weekly-agent-readiness` automations this page used to list were not installed there; their scripts (`scripts/pr-comment-retro.mjs`, `scripts/weekly-agent-readiness.mjs`) run on demand. Recurring needs go to the lanes tick, not a new Codex heartbeat.

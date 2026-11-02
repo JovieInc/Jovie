@@ -283,6 +283,9 @@ export async function resetDogfoodBilling(email: string): Promise<void> {
  */
 export const GOLDEN_PATH_TEST_EMAIL_LIKE = 'gp-%+e2e@test.jovie.com';
 
+/** Broader golden-path account pattern (Clerk may rewrite +e2e to +clerk_test). */
+export const GOLDEN_PATH_TEST_PROFILE_EMAIL_LIKE = 'gp-%@test.jovie.com';
+
 /**
  * Release all creator_profiles spotify bindings owned by golden-path test
  * accounts. Called in beforeAll (to clear stale runs) and afterAll (teardown).
@@ -297,6 +300,25 @@ export async function releaseGoldenPathTestBindings(
     WHERE spotify_id IS NOT NULL
       AND user_id IN (
         SELECT id FROM users WHERE email LIKE ${GOLDEN_PATH_TEST_EMAIL_LIKE}
+      )
+  `;
+}
+
+/**
+ * Unpublish profiles owned by golden-path test accounts so finished runs never
+ * leave public test profiles behind. Idempotent, never deletes, never touches
+ * non-golden-path rows. The broader sweep (all test-account classes) is
+ * `scripts/cleanup-test-profiles.ts`.
+ */
+export async function unpublishGoldenPathTestProfiles(
+  sql: ReturnType<typeof neon>
+): Promise<void> {
+  await sql`
+    UPDATE creator_profiles
+    SET is_public = false, updated_at = NOW()
+    WHERE is_public = true
+      AND user_id IN (
+        SELECT id FROM users WHERE email LIKE ${GOLDEN_PATH_TEST_PROFILE_EMAIL_LIKE}
       )
   `;
 }
