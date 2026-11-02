@@ -89,6 +89,9 @@ class Isolated(unittest.TestCase):
         self.host_env.start()
         self.addCleanup(self.host_env.stop)
         os.environ.pop("CODEX_LANE_AUTH_MODE", None)
+        # Capacity tests may enter worker() on the real Gem host. Never discover
+        # production repository bindings or reexec into the installed worker.
+        os.environ["LANES_EXECUTION_BACKEND"] = "local-test"
 
     def tearDown(self):
         codex.ACCOUNTS_ROOT, codex.STATE = self.saved
@@ -118,6 +121,22 @@ class IsolatedSetUpHostModeTest(unittest.TestCase):
                 case.tearDown()
                 case.doCleanups()
             self.assertEqual(os.environ.get("CODEX_LANE_AUTH_MODE"), "subscription-pool")
+
+    def test_fixture_disables_live_bindings_even_when_host_is_gem(self):
+        from scripts.lanes import lane_runner as runner
+        with patch.dict(os.environ, {"LANES_EXECUTION_BACKEND": "production"}):
+            case = AccountsTest("test_only_chatgpt_profiles_are_accounts")
+            case.setUp()
+            try:
+                with patch.object(runner, "HOST", "gem"), \
+                        patch.object(runner, "read_json", side_effect=AssertionError("no production policy read")), \
+                        patch.object(runner, "sh", side_effect=AssertionError("no GitHub or worktree command")), \
+                        patch.object(runner.os, "execv", side_effect=AssertionError("no process replacement")):
+                    self.assertEqual(runner.bindings.extra_bindings(runner), [])
+            finally:
+                case.tearDown()
+                case.doCleanups()
+            self.assertEqual(os.environ["LANES_EXECUTION_BACKEND"], "production")
 
     def test_mode_pinned_by_a_subclass_restores_inherited_host_mode_on_cleanup(self):
         class Pinned(Isolated):
@@ -402,7 +421,9 @@ for line in sys.stdin:
         self.assertEqual({k: after['current-login'][k] for k in before}, before)
         self.assertEqual(after['other-existing-row'], {'exhaustedUntil': 2_000_000})
         self.assertFalse(codex.available('current-login', after, 1_000_000))
-        self.assertEqual(len((codex.STATE.parent / 'capacity-events.jsonl').read_text().splitlines()), 1)
+        events = [json.loads(line) for line in (codex.STATE.parent / 'capacity-events.jsonl').read_text().splitlines()]
+        self.assertEqual([row['schema'] for row in events],
+                         ['jovie.codex-headroom-alarm/v1', 'jovie.capacity-lease-change/v1'])
 
     def test_active_execution_lease_prevents_any_metadata_call(self):
         handle = codex.lease('current-login')
@@ -1150,7 +1171,10 @@ class SubscriptionPoolTest(Isolated):
                     patch.object(host, "slots", return_value=5) as provider_cap, \
                     patch.object(host, "intake_slots", return_value=5), \
                     patch.object(runner.autoscale, "host_ceiling", return_value=5) as global_cap, \
-                    patch.object(runner, "worker_with_slot", side_effect=admitted) as work:
+                    patch.object(runner, "worker_with_slot", side_effect=admitted) as work, \
+                    patch.object(runner, "sh", side_effect=AssertionError("no GitHub or worktree command")), \
+                    patch.object(runner.bindings, "_work_one", side_effect=AssertionError("no production binding")), \
+                    patch.object(runner.os, "execv", side_effect=AssertionError("no process replacement")):
                 self.assertEqual(runner.worker(host, "codex"), 0)  # Other providers consume the same ceiling.
                 work.assert_not_called()
                 other.release()
@@ -1366,13 +1390,15 @@ class SubscriptionPoolTest(Isolated):
         self.assertFalse({"OPENAI_API_KEY","OPENAI_BASE_URL","CODEX_API_KEY"}.intersection(call.kwargs["env"]))
         self.assertEqual(call.kwargs["pass_fds"], (descriptor,))
 
-    def test_no_same_run_rotation_or_credit_redemption_after_limit(self):
+    def test_busy_pool_hands_off_without_credit_redemption_after_limit(self):
         self.reconcile()
         busy = [codex.lease("current-login") for _ in range(3)]
         prompt = Path(self.tmp.name) / "prompt.txt"; prompt.write_text("fixture")
         proc = SimpleNamespace(pid=123, stdin=io.StringIO(), stdout=io.StringIO("usage limit. Try again in 1 hour.\n"), wait=lambda:1)
         try:
-            with patch.object(codex, "current_login_available", return_value=True), \
+            with patch.object(codex, "LEASE_WAIT_S", 0), \
+                    patch.object(codex.time, "sleep"), \
+                    patch.object(codex, "current_login_available", return_value=True), \
                     patch.object(codex, "current_subscription_snapshot", side_effect=lambda name, **_: self.snapshot(name)), \
                     patch.object(codex, "maybe_redeem", side_effect=AssertionError("no reset authority")), \
                     patch.object(codex.subprocess, "Popen", return_value=proc) as spawn, redirect_stdout(io.StringIO()):
@@ -1587,6 +1613,112 @@ class SubscriptionPoolTest(Isolated):
             row["capacityLease"]["credits"] = {"availableCount": banked}
             row["lastUsed"] = last_used
         codex.update_state(change)
+
+    def run_failover_fixture(self, outcomes, model="gpt-6-astra"):
+        self.reconcile()
+        prompt = Path(self.tmp.name) / "prompt.txt"
+        prompt.write_text("finish the existing worktree")
+        observed = []
+
+        def execute(name, handle, argv, text, cwd, now, receipt):
+            observed.append((name, argv[argv.index("-m") + 1], text, cwd))
+            handle.close()
+            return outcomes[len(observed) - 1]
+
+        with patch.object(codex, "current_login_available", return_value=True), \
+                patch.object(codex, "pace_deltas", return_value={}), \
+                patch.object(codex.time, "sleep"), \
+                patch.object(codex, "run_account", side_effect=execute), \
+                patch.object(codex, "maybe_redeem", side_effect=AssertionError("never redeem")):
+            result = codex.run(SimpleNamespace(prompt_file=str(prompt), cwd=self.tmp.name,
+                                              model=model, reasoning_effort=None))
+        return result, observed
+
+    def test_subscription_limit_continues_same_worktree_on_next_bound_account(self):
+        result, seen = self.run_failover_fixture([(1, "limit", self.NOW + 3600), (0, "ok", None)])
+        self.assertEqual(result, 0)
+        self.assertEqual([row[0] for row in seen], ["current-login", "lyb-pro"])
+        self.assertEqual([row[1] for row in seen], ["gpt-6-astra", "gpt-6-astra"])
+        self.assertIn("do not start over", seen[1][2])
+        self.assertEqual([row[3] for row in seen], [self.tmp.name, self.tmp.name])
+        for name in self.profiles:
+            handle = codex.lease(name)
+            self.assertIsNotNone(handle)
+            handle.close()
+
+    def test_rate_and_auth_failure_rotate_only_to_another_bound_pool(self):
+        for kind in ("rate", "auth"):
+            with self.subTest(kind=kind):
+                result, seen = self.run_failover_fixture([(1, kind, self.NOW + 120), (0, "ok", None)])
+                self.assertEqual(result, 0)
+                self.assertEqual([row[0] for row in seen], ["current-login", "lyb-pro"])
+                self.assertEqual([row[1] for row in seen], ["gpt-6-astra"] * 2)
+
+    def test_account_quota_exhaustion_never_retries_other_models_on_same_quota(self):
+        result, seen = self.run_failover_fixture([(1, "limit", self.NOW + 3600)] * 2)
+        self.assertEqual(result, codex.NO_ACCOUNT_EXIT)
+        self.assertEqual(len(seen), 2)
+        self.assertEqual([row[1] for row in seen], ["gpt-6-astra"] * 2)
+
+    def test_invalid_capacity_cannot_emit_or_clear_a_headroom_alarm(self):
+        for remaining in (None, True, "20", float("nan"), -1, 101):
+            state = {"lyb-pro": {"headroomAlarm": {"at": "preserved"}}}
+            value = {"usableCapacityRemaining": {"primary": {"remainingPercent": remaining}}}
+            codex.observe_headroom(state, "lyb-pro", value, self.NOW)
+            self.assertEqual(state, {"lyb-pro": {"headroomAlarm": {"at": "preserved"}}})
+        for malformed in (None, [], "unknown", 20):
+            state = {"lyb-pro": {"headroomAlarm": {"at": "preserved"}}}
+            codex.observe_headroom(state, "lyb-pro", {"usableCapacityRemaining": {"primary": malformed}}, self.NOW)
+            self.assertEqual(state, {"lyb-pro": {"headroomAlarm": {"at": "preserved"}}})
+        self.assertFalse((codex.STATE.parent / "capacity-events.jsonl").exists())
+
+    def test_model_capacity_uses_bounded_astra_sol_luna_chain(self):
+        result, seen = self.run_failover_fixture([(1, "capacity", None), (1, "capacity", None), (0, "ok", None)])
+        self.assertEqual(result, 0)
+        self.assertEqual([row[1] for row in seen], ["gpt-6-astra", "gpt-6.1-sol", "gpt-6-luna"])
+        self.assertEqual([row[0] for row in seen], ["current-login"] * 3)
+
+    def test_ordinary_source_error_never_rotates_account_or_model(self):
+        result, seen = self.run_failover_fixture([(1, "error", None)])
+        self.assertEqual(result, 1)
+        self.assertEqual(len(seen), 1)
+
+    def test_exhausted_model_chain_returns_temporary_failure(self):
+        result, seen = self.run_failover_fixture([(1, "capacity", None)] * 6)
+        self.assertEqual(result, codex.NO_ACCOUNT_EXIT)
+        self.assertEqual(len(seen), 6)
+        self.assertEqual(len({(r[0], r[1]) for r in seen}), 6)
+
+    def test_only_models_advertised_by_verified_subscription_can_launch(self):
+        self.reconcile()
+        handle = codex.lease("lyb-pro")
+        with patch.object(codex, "current_subscription_snapshot", return_value=self.snapshot("lyb-pro")), \
+                patch.object(codex.subprocess, "Popen", side_effect=AssertionError("unadvertised model must not launch")):
+            result = codex.run_account("lyb-pro", handle, ["fake", "-m", "gpt-6-astra"],
+                                       "fixture", self.tmp.name, self.NOW)
+        self.assertEqual(result, (codex.NO_ACCOUNT_EXIT, "capacity", None))
+        self.assertTrue(handle.closed)
+        self.assertNotIn("exhaustedUntil", codex.read_state()["lyb-pro"])
+
+    def test_twenty_percent_alarm_is_deduplicated_until_recovery(self):
+        def snapshot(remaining):
+            value = self.snapshot("lyb-pro")
+            value["rateLimits"]["rateLimits"].pop("secondary", None)
+            value["rateLimits"]["rateLimits"]["primary"]["usedPercent"] = 100 - remaining
+            return value
+        for index, remaining in enumerate((21, 20, 19, 1, 80, 20)):
+            codex.reconcile(self.NOW + index, if_due=0, fetch=lambda name: snapshot(remaining) if name == "lyb-pro" else self.snapshot(name))
+        events = [json.loads(line) for line in (codex.STATE.parent / "capacity-events.jsonl").read_text().splitlines()]
+        alarms = [e for e in events if e.get("schema") == "jovie.codex-headroom-alarm/v1" and e["account"] == "lyb-pro"]
+        self.assertEqual([e["remainingPercent"] for e in alarms], [20, 20])
+        self.assertTrue(all(e["thresholdPercent"] == 20 for e in alarms))
+        self.assertEqual(codex.status(self.NOW + 5, names=list(self.profiles))["accounts"]["lyb-pro"]["headroomAlarm"]["remainingPercent"], 20)
+
+    def test_capacity_classifier_does_not_mistake_success_or_source_errors(self):
+        self.assertEqual(codex.classify("ERROR: gpt-6-astra is at capacity, please try again", 1, self.NOW), ("capacity", None))
+        self.assertEqual(codex.classify("model is at capacity", 0, self.NOW), ("ok", None))
+        self.assertEqual(codex.classify("AssertionError: expected capacity = 20", 1, self.NOW), ("error", None))
+        self.assertEqual(codex.classify("usage limit reached; model at capacity", 1, self.NOW)[0], "limit")
 
     def test_floor_policy_comes_from_routing_json(self):
         policy = codex.subsidy_policy()
