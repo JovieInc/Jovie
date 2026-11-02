@@ -65,6 +65,7 @@ const COVERED_PRODUCTION_SOURCES = [
   'packages/ui/lib/overlay-focus.ts',
   'packages/ui/atoms/founder-pen-atoms.ts',
   'packages/ui/atoms/status-glyph.tsx',
+  'packages/ui/atoms/inline-subscribe.tsx',
   'packages/ui/brand/JovieO.tsx',
   'packages/ui/brand/JovieWordmark.tsx',
 ];
@@ -75,6 +76,8 @@ const EXCLUDED_NON_PRODUCTION_SOURCES = [
   'packages/ui/vitest.setup.ts',
   'packages/ui/media/logo-normalization.test.ts',
   'packages/ui/theme/motion-policy.test.ts',
+  'packages/ui/atoms/inline-subscribe.stories.tsx',
+  'packages/ui/atoms/inline-subscribe.test.tsx',
   'packages/ui/atoms/fixtures/cropped-artwork-avatar.tsx',
   'packages/ui/atoms/fixtures/badge-geometry-drift-fixtures.tsx',
   'packages/ui/generated/red.tsx',
@@ -154,7 +157,7 @@ test('repo shared-UI visual arbitrary findings match the shrink-only baseline', 
   assert.equal(result.status, 'pass');
   assert.equal(result.totalFindings, 0);
   assert.deepEqual(result.findings, []);
-  assert.equal(result.scannedFiles.length, 69);
+  assert.equal(result.scannedFiles.length, 71);
   for (const relativePath of COVERED_PRODUCTION_SOURCES) {
     assert.equal(
       result.scannedFiles.includes(relativePath),
@@ -489,7 +492,7 @@ test('zero baseline rejects the first visual arbitrary in every event', () => {
   }
 });
 
-test('unbaselined shrink fails locally and is sibling-safe on merge_group', () => {
+test('unbaselined shrink passes locally and on merge_group (growth still fails)', () => {
   const baseline = toVisualArbitraryBaseline([
     { file: ATOM, value: 'text-[13px]', count: 2 },
   ]);
@@ -497,8 +500,13 @@ test('unbaselined shrink fails locally and is sibling-safe on merge_group', () =
   const local = compareVisualArbitraryBaseline(current, baseline, {
     eventName: 'local',
   });
-  assert.equal(local.ok, false);
+  assert.equal(local.ok, true);
   assert.equal(local.status, 'unbaselined_shrink');
+  const grown = compareVisualArbitraryBaseline(
+    [{ file: ATOM, value: 'text-[13px]', count: 3 }],
+    baseline
+  );
+  assert.equal(grown.status, 'regression');
   const mergeGroup = compareVisualArbitraryBaseline(current, baseline, {
     eventName: 'merge_group',
   });

@@ -1,4 +1,5 @@
 import type { MarketingCopyClaim } from '@/data/marketing/copy';
+import { COMPARATIVE_CLAIM_RECEIPTS } from './comparative-claims';
 
 /**
  * Publish-safe evidence receipts for the factual claims on the comparison,
@@ -353,6 +354,7 @@ export const PUBLISHED_CLAIM_RECEIPTS = {
     verifiedAt: '2026-10-01',
     reviewAfter: '2026-12-15',
   },
+  ...COMPARATIVE_CLAIM_RECEIPTS,
 } as const satisfies Readonly<Record<string, PublishedClaimReceipt>>;
 
 export type PublishedClaimId = keyof typeof PUBLISHED_CLAIM_RECEIPTS;
@@ -456,7 +458,7 @@ export function validatePublishedClaimReceipts(
  */
 export const SCOPED_CLAIM_SURFACE_HASHES = {
   '/compare/linktree':
-    '515e0a4c0437680b5b264fb2b3829a8b9486eb1371d3a20112811396911e4cd7',
+    '570a49b472f1f28edbe5e5dca9d9f70fe81990050166afd91fab86418183d6dc',
   '/compare/linkfire':
     '0974d7e2ab63e31a3048640fc074e08dd686994eaf18f25ed3d336338e0177b1',
   '/alternatives/linktree':
@@ -466,5 +468,5 @@ export const SCOPED_CLAIM_SURFACE_HASHES = {
   '/llms.txt':
     '2bc4a4c5e14ec0e63d188d161392bb104d807118a74cedad5b03dc3144aa2bc1',
   '/llms-full.txt':
-    '023ca1f4ffef1ed1ffe4ab1fb897de8ffd41ee877c60c3bf705c5b09a80c68cf',
+    'f7a5901a15cb4cb68f5552bb6d8862c1dcc0353f6624fe19b01834868725757b',
 } as const;

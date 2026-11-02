@@ -1,0 +1,31 @@
+{
+  "files": {
+    "apps/web/app/[username]/[slug]/download/PromoDownloadGate.tsx": 1,
+    "apps/web/app/app/(shell)/admin/ops/HudDashboardClient.tsx": 1,
+    "apps/web/app/app/(shell)/library/CreatorDocumentsWorkspace.tsx": 3,
+    "apps/web/app/demo/dropdowns/DropdownShowcase.tsx": 1,
+    "apps/web/app/ui/dropdowns/DropdownShowcase.tsx": 1,
+    "apps/web/components/atoms/SegmentedDigitBox.tsx": 1,
+    "apps/web/components/features/admin/design-lab/DesignProposalReviewPanel.tsx": 1,
+    "apps/web/components/features/auth/atoms/otp-input/OtpInput.tsx": 1,
+    "apps/web/components/features/dashboard/atoms/CopyLinkInput.tsx": 1,
+    "apps/web/components/features/dashboard/molecules/UniversalLinkInputUrlMode.tsx": 1,
+    "apps/web/components/features/dashboard/molecules/artist-search-mode/UniversalLinkInputArtistSearchMode.tsx": 1,
+    "apps/web/components/features/dashboard/organisms/onboarding-v2/OnboardingV2Form.tsx": 2,
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog.tsx": 1,
+    "apps/web/components/features/dashboard/tasks/TasksPageClient.tsx": 1,
+    "apps/web/components/features/demo/DemoReleaseDetail.tsx": 1,
+    "apps/web/components/features/dev/DevToolbar.tsx": 1,
+    "apps/web/components/features/onboarding/OnboardingToolArtifacts.tsx": 3,
+    "apps/web/components/features/profile/artist-notifications-cta/ProfileMobileNotificationsFlow.tsx": 1,
+    "apps/web/components/jovie/components/ChatInput.tsx": 1,
+    "apps/web/components/jovie/components/SlashCommandMenu.tsx": 1,
+    "apps/web/components/molecules/GenrePicker.tsx": 1,
+    "apps/web/components/molecules/LocationPicker.tsx": 1,
+    "apps/web/components/molecules/PaySelector.tsx": 1,
+    "apps/web/components/organisms/CmdKMainPlaneSearchInput.tsx": 1,
+    "apps/web/components/organisms/CmdKPalette.tsx": 1,
+    "apps/web/components/shell/HeaderSearchSurface.tsx": 1,
+    "apps/web/components/shell/LyricRow.tsx": 1
+  }
+}

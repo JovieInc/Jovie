@@ -26,8 +26,20 @@ export interface ContentKindDefinition<T> {
    * fields, legal guards). Returns human-readable violations; empty = valid.
    */
   readonly validate?: (data: T, key: string) => readonly string[];
+  /**
+   * Render smoke test, run on draft and on the API dry run (not on reads).
+   * Renders the record through its real renderer and returns problems; a
+   * record that throws or drops content cannot be stored.
+   */
+  readonly smoke?: (data: T, key: string) => readonly string[];
   /** Paths to revalidate after the live pointer moves for `key`. */
   readonly livePaths: (key: string) => readonly string[];
+  /**
+   * false: drafts and publishes come only from the kind's own producer (a
+   * measured value must not be typed in through the API). History and
+   * rollback stay available. Default true.
+   */
+  readonly apiWritable?: boolean;
 }
 
 export type AnyContentKind = ContentKindDefinition<unknown>;
@@ -65,4 +77,23 @@ export function validateContentRecord<T>(
   return errors.length > 0
     ? { ok: false, errors }
     : { ok: true, data: parsed.data };
+}
+
+/** Publish gate: schema + cross-record rules + the kind's render smoke test. */
+export function gateContentRecord<T>(
+  definition: ContentKindDefinition<T>,
+  key: string,
+  input: unknown
+): ContentValidationResult<T> {
+  const validated = validateContentRecord(definition, key, input);
+  if (!validated.ok || !definition.smoke) return validated;
+  let errors: readonly string[];
+  try {
+    errors = definition.smoke(validated.data, key);
+  } catch (error) {
+    errors = [
+      `render smoke test threw: ${error instanceof Error ? error.message : String(error)}`,
+    ];
+  }
+  return errors.length > 0 ? { ok: false, errors } : validated;
 }

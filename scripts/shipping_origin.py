@@ -35,6 +35,7 @@ WORKFLOWS = {
     "shipping-origin.yml": {"workflow_dispatch"},
     "shipping-slo.yml": {"schedule", "workflow_dispatch"},
     "test-coverage-audit.yml": {"push", "schedule", "workflow_dispatch"},
+    "wins-ledger.yml": {"pull_request_target", "workflow_dispatch"},
 }
 
 

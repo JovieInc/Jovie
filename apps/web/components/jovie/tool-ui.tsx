@@ -239,6 +239,22 @@ function getActivityTimelineEdge(
   return 'middle';
 }
 
+/**
+ * A tool whose completion was never confirmed is internal bookkeeping, not
+ * something to show a user ("Merch source: status unknown / Completion has not
+ * been confirmed" was a reported defect). Hidden unless verbose mode is on.
+ */
+export function isUnconfirmedToolStatus(
+  event: PersistedToolEvent,
+  status: OperationStatus
+): boolean {
+  return (
+    !isLockedToolEvent(event) &&
+    (status === 'unknown' ||
+      (event.state === 'succeeded' && status === 'pending'))
+  );
+}
+
 function ToolActivityRow({
   event,
   status,
@@ -254,10 +270,7 @@ function ToolActivityRow({
   count: number;
   feedback?: ChatToolFeedbackContext;
 }>) {
-  const unconfirmed =
-    !isLockedToolEvent(event) &&
-    (status === 'unknown' ||
-      (event.state === 'succeeded' && status === 'pending'));
+  const unconfirmed = isUnconfirmedToolStatus(event, status);
   const title = unconfirmed
     ? `${getToolUiConfig(event.toolName).label}: ${status === 'pending' ? 'saving result' : 'status unknown'}`
     : getToolStatusTitle(event);
@@ -344,7 +357,7 @@ function ToolActivityRow({
 }
 
 function ToolActivityFeed({
-  events,
+  events: allEvents,
   statuses,
   variant,
   feedback,
@@ -354,6 +367,16 @@ function ToolActivityFeed({
   variant: ToolRendererVariant;
   feedback?: ChatToolFeedbackContext;
 }>) {
+  const showVerbose = isVerboseToolModeEnabled();
+  const events = showVerbose
+    ? allEvents
+    : allEvents.filter(
+        event =>
+          !isUnconfirmedToolStatus(
+            event,
+            statuses.get(event.toolCallId) ?? 'unknown'
+          )
+      );
   if (events.length === 0) {
     return null;
   }

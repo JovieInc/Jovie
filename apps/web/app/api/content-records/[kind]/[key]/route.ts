@@ -25,7 +25,7 @@ import {
   resolveContentWriter,
   signPreviewToken,
 } from '@/lib/content-records/access.server';
-import { validateContentRecord } from '@/lib/content-records/kind';
+import { gateContentRecord } from '@/lib/content-records/kind';
 import { getContentKind } from '@/lib/content-records/registry';
 import {
   ContentConflictError,
@@ -131,11 +131,19 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
   const input = parsed.data;
+  if (definition.apiWritable === false && input.action !== 'rollback') {
+    return json(
+      {
+        error: `${kind} is written only by its producer; the API can read history and roll back`,
+      },
+      403
+    );
+  }
 
   try {
     switch (input.action) {
       case 'validate': {
-        const result = validateContentRecord(definition, key, input.data);
+        const result = gateContentRecord(definition, key, input.data);
         return json(
           result.ok ? { ok: true } : { ok: false, errors: result.errors },
           result.ok ? 200 : 422

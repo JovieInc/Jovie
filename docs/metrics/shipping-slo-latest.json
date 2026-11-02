@@ -1,81 +1,52 @@
 {
-  "at": "2026-10-28T14:19:21.207Z",
+  "at": "2026-10-31T13:43:50.328Z",
   "ciP95Seconds": {
-    "pull_request": 1229,
-    "merge_group": 745
+    "pull_request": 1000,
+    "merge_group": 1561
   },
-  "queueWaitP95Seconds": 3692,
-  "queueEjectionRate": 0.5046728971962616,
+  "queueWaitP95Seconds": 14845,
+  "queueEjectionRate": 0.6068376068376068,
   "leadTimeP95Seconds": {
     "devin": null,
-    "codex": 416274,
-    "other": 89385
+    "codex": 694633,
+    "other": 382992
   },
   "remediationP95Seconds": {
-    "prRedToGreen": 1847,
+    "prRedToGreen": 693,
     "mainRedToGreen": null,
     "productionPromoteHold": null
   },
-  "productionLagP95Seconds": 18832,
+  "productionLagP95Seconds": 503930,
   "throughput": {
-    "mergesPerDay": 96.14285714285714,
-    "verifiedPerDay": null,
-    "wowGrowth": 0.10327868852459021,
+    "mergesPerDay": 90.28571428571429,
+    "verifiedPerDay": 88.71428571428571,
+    "wowGrowth": 0.08404802744425388,
     "growthTrend": "accelerating"
   },
   "regressions": [
-    "ci_walltime.pull_request.p95",
+    "ci_walltime.merge_group.p95",
     "merge_queue.wait.p95",
     "merge_queue.ejection_rate",
     "lead_time.codex.p95",
+    "lead_time.other.p95",
     "production_lag.merged_to_verified.p95"
   ],
   "flatStall": false,
   "stages": {
     "schema": "jovie-stage-summary/v1",
-    "at": "2026-10-28T14:19:21.207Z",
+    "at": "2026-10-31T13:43:50.328Z",
     "coverage": {
-      "stagesTotal": 54,
-      "stagesWithData": 37,
-      "events": 35740
+      "stagesTotal": 58,
+      "stagesWithData": 25,
+      "events": 12668
     },
-    "regressions": [
-      "shipping:worker-start.p95",
-      "shipping:pr-open.p95",
-      "shipping:gate-seat.p95",
-      "shipping:gate.p95",
-      "shipping:ready.p95",
-      "shipping:queued.p95",
-      "shipping:verified.p95",
-      "shipping:pr-open->merged.p95",
-      "shipping:verified->closed.p95",
-      "shipping:merged->closed.p95",
-      "remediation:classified.p95",
-      "remediation:repair-start.p95",
-      "release:staging.p95",
-      "release:canary.p95",
-      "release:staging->verified.p95",
-      "ios-release:merge.p95",
-      "ios-release:merge->testflight.p95"
-    ],
+    "regressions": [],
     "slowestP95_7d": [
       {
-        "stage": "shipping:verified",
-        "p50": 338655.188,
-        "p95": 1830240.636,
-        "n": 137
-      },
-      {
-        "stage": "shipping:issue",
-        "p50": 36983.622,
-        "p95": 1796922.213,
-        "n": 122
-      },
-      {
         "stage": "shipping:outcome-receipt",
-        "p50": 555290,
-        "p95": 1224277,
-        "n": 175
+        "p50": 207674,
+        "p95": 1190998,
+        "n": 141
       },
       {
         "stage": "taste-decision:waiting",
@@ -84,47 +55,59 @@
         "n": 39
       },
       {
-        "stage": "shipping:eligible",
-        "p50": 1115.479,
-        "p95": 789483.184,
-        "n": 35
+        "stage": "linear-mirror:stale",
+        "p50": 778,
+        "p95": 1690,
+        "n": 286
+      },
+      {
+        "stage": "linear-intake:triage",
+        "p50": 46.188,
+        "p95": 1593.769,
+        "n": 705
+      },
+      {
+        "stage": "summer-turn:action",
+        "p50": 34,
+        "p95": 92,
+        "n": 934
       }
     ],
     "endToEnd7d": {
       "shipping:issue->verified": {
-        "p50": 223913.383,
-        "p95": 2702831.777,
-        "n": 164
+        "p50": null,
+        "p95": null,
+        "n": 0
       },
       "shipping:pr-open->merged": {
-        "p50": 6446,
-        "p95": 277419,
-        "n": 673
+        "p50": null,
+        "p95": null,
+        "n": 0
       },
       "shipping:merged->verified": {
-        "p50": 5133,
-        "p95": 18832,
-        "n": 557
+        "p50": null,
+        "p95": null,
+        "n": 0
       },
       "shipping:verified->closed": {
-        "p50": 338655.188,
-        "p95": 1830240.636,
-        "n": 137
+        "p50": null,
+        "p95": null,
+        "n": 0
       },
       "shipping:merged->closed": {
-        "p50": 343124.188,
-        "p95": 1838357.636,
-        "n": 137
+        "p50": null,
+        "p95": null,
+        "n": 0
       },
       "remediation:red->green": {
-        "p50": 7085,
-        "p95": 174731,
-        "n": 287
+        "p50": null,
+        "p95": null,
+        "n": 0
       },
       "release:staging->verified": {
-        "p50": 2830,
-        "p95": 4903,
-        "n": 123
+        "p50": null,
+        "p95": null,
+        "n": 0
       },
       "release-replay:blocked->replayed": {
         "p50": null,
@@ -132,9 +115,9 @@
         "n": 0
       },
       "ios-release:merge->testflight": {
-        "p50": 2285,
-        "p95": 10706,
-        "n": 21
+        "p50": null,
+        "p95": null,
+        "n": 0
       },
       "ios-release:merge->released": {
         "p50": null,
@@ -152,24 +135,29 @@
         "n": 0
       },
       "automation-run:started->finished": {
-        "p50": 39,
-        "p95": 520,
-        "n": 365
+        "p50": null,
+        "p95": null,
+        "n": 0
       },
       "linear-intake:triage->classified": {
-        "p50": 48.107,
-        "p95": 87978.38,
-        "n": 532
+        "p50": 46.188,
+        "p95": 1593.769,
+        "n": 705
       },
       "summer-turn:event->outcome": {
         "p50": 38,
-        "p95": 113,
-        "n": 810
+        "p95": 102,
+        "n": 1010
       },
       "summer-turn:model-turn->outcome": {
         "p50": 38,
-        "p95": 113,
-        "n": 810
+        "p95": 102,
+        "n": 1010
+      },
+      "linear-mirror:stale->mirrored": {
+        "p50": 8,
+        "p95": 2948,
+        "n": 2
       },
       "taste-decision:waiting->decided": {
         "p50": 370643,
@@ -177,15 +165,75 @@
         "n": 14
       },
       "claim-dogfood:wait->journey": {
-        "p50": 276,
-        "p95": 577,
-        "n": 17
+        "p50": null,
+        "p95": null,
+        "n": 0
       },
       "market-signal:published->delivered": {
         "p50": null,
         "p95": null,
         "n": 0
+      },
+      "marketing-change:data-edit->data-live": {
+        "p50": 2.019,
+        "p95": 2.019,
+        "n": 1
       }
     }
+  },
+  "ciCapacity": {
+    "schemaVersion": 1,
+    "generatedAt": "2026-10-31T13:37:02.519Z",
+    "windowHours": 0.25,
+    "sampleRatio": 0.2505800464037123,
+    "hostedQueueSeconds": {
+      "n": 139,
+      "p50": 3,
+      "p95": 8,
+      "max": 113
+    },
+    "selfHostedQueueSeconds": {
+      "n": 11,
+      "p50": 2,
+      "p95": 67,
+      "max": 67
+    },
+    "controlPlane": {
+      "Merge Queue Green Enroll": {
+        "jobsPerHour": 574.7,
+        "jobMinutesPerHour": 109.9,
+        "noopJobsPerHour": 0
+      },
+      "PR Fleet Rules": {
+        "jobsPerHour": 111.7,
+        "jobMinutesPerHour": 24.7,
+        "noopJobsPerHour": 0
+      },
+      "PR Size Guard Label Override": {
+        "jobsPerHour": 95.8,
+        "jobMinutesPerHour": 5.1,
+        "noopJobsPerHour": 95.8
+      },
+      "Lane Fix Relay": {
+        "jobsPerHour": 79.8,
+        "jobMinutesPerHour": 23.4,
+        "noopJobsPerHour": 0
+      },
+      "Linear Sync on Merge": {
+        "jobsPerHour": 16,
+        "jobMinutesPerHour": 0,
+        "noopJobsPerHour": 0
+      }
+    },
+    "controlPlaneJobMinutesPerHour": 163.1,
+    "totalHostedJobMinutesPerHour": 1687.3,
+    "controlPlaneShare": 0.097,
+    "alarm": {
+      "metric": "hosted_queue_wait_p95_seconds",
+      "threshold": 120,
+      "firing": false
+    },
+    "sampledRuns": 108,
+    "totalRuns": 431
   }
 }

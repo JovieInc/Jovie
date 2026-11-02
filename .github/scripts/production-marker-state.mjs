@@ -716,7 +716,11 @@ function classifyMarkerEntry(entry, context) {
   }
   if (
     status === 'completed' &&
-    conclusion === 'failure' &&
+    // A cancelled run (e.g. concurrency cancelling the changelog publication)
+    // is judged by the same job-level proof: Production Verified succeeded,
+    // rollback skipped, only publication jobs unsuccessful. Run 40932269374
+    // (5cbe0cb) froze every release for 3h by being classified interrupted.
+    (conclusion === 'failure' || conclusion === 'cancelled') &&
     verifiedBeforePublicationFailure(entry.attemptJobs, markerContext, attempt)
   ) {
     return {
@@ -726,6 +730,11 @@ function classifyMarkerEntry(entry, context) {
       deploymentId: entry.payload.deploymentId,
       markerContext,
       normalRerun,
+      // The producer run itself still ended in an interrupted conclusion, so
+      // a recovery receipt bound to this exact attempt replaces this receipt
+      // (same strict pairing as the interrupted-primary case below) instead
+      // of reading as a competing primary.
+      producerConclusion: conclusion,
     };
   }
   if (ACTIVE_STATUSES.has(status)) {
@@ -838,18 +847,26 @@ export function classifyProductionMarkerEvidence(evidence) {
     // attempt and the same exact deployment replaces that receipt: the
     // bounded recovery re-proved the identical canonical binding rather than
     // competing for primary authority. Any other pairing is a duplicate.
-    const interruptedPrimary = primaryCandidates.find(
-      entry => entry.kind === 'interrupted'
+    // The replaceable primary is an interrupted entry, or a verified entry
+    // whose producer run still ended in an interrupted conclusion (the
+    // cancelled/failure publication-proof shape above). A genuinely
+    // successful primary is never replaceable: a recovery receipt beside
+    // one stays duplicate_primary_marker.
+    const replacedPrimary = primaryCandidates.find(
+      entry =>
+        !entry.recovered &&
+        (entry.kind === 'interrupted' ||
+          INTERRUPTED_CONCLUSIONS.has(entry.producerConclusion))
     );
     const replacedInterrupted =
       classified.length === 2 &&
       recovered?.kind === 'verified' &&
-      interruptedPrimary !== undefined &&
-      recovered.sourceRun === interruptedPrimary.controllerRun &&
-      recovered.sourceAttempt === interruptedPrimary.attempt &&
+      replacedPrimary !== undefined &&
+      recovered.sourceRun === replacedPrimary.controllerRun &&
+      recovered.sourceAttempt === replacedPrimary.attempt &&
       INTERRUPTED_CONCLUSIONS.has(recovered.sourceConclusion) &&
-      recovered.deploymentId === interruptedPrimary.deploymentId &&
-      recovered.entryDigest === interruptedPrimary.entryDigest;
+      recovered.deploymentId === replacedPrimary.deploymentId &&
+      recovered.entryDigest === replacedPrimary.entryDigest;
     if (primaryCandidates.length > 1 && !converged && !replacedInterrupted) {
       return manual('duplicate_primary_marker');
     }

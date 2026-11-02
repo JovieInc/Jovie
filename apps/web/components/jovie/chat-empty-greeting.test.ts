@@ -39,7 +39,15 @@ describe('getChatEmptyStateFirstName', () => {
   it('takes the first token of a real display name', () => {
     expect(getChatEmptyStateFirstName('Tim White')).toBe('Tim');
     expect(getChatEmptyStateFirstName('  Tim   White  ')).toBe('Tim');
+  });
+
+  it('greets a band or artist by the whole name, never its first word', () => {
+    expect(getChatEmptyStateFirstName('Good Dropouts')).toBe('Good Dropouts');
+    expect(getChatEmptyStateFirstName('The Weeknd')).toBe('The Weeknd');
     expect(getChatEmptyStateFirstName('Cher')).toBe('Cher');
+    expect(getChatEmptyStateFirstName('DJ Snake')).toBe('DJ Snake');
+    // Golden path (tests/e2e/golden-path.spec.ts) asserts the artist name.
+    expect(getChatEmptyStateFirstName('UNMARKED')).toBe('UNMARKED');
   });
 
   it('never fabricates a name when none is real', () => {
@@ -176,5 +184,26 @@ describe('resolveChatEmptyStateInsight', () => {
     expect(action?.prompt).toContain('concrete improvement Jovie can make');
     expect(action?.prompt).toContain('27 clicks, zero completions');
     expect(action?.suggestion).not.toContain('gap');
+  });
+});
+
+describe('resolveChatEmptyStateInsight segment gate (JOV-9679)', () => {
+  const insight = {
+    id: 'i1',
+    title: 'Release momentum',
+    insightType: 'release_momentum',
+    status: 'active',
+    actionSuggestion: 'Post an update',
+    expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+  } as unknown as Parameters<typeof resolveChatEmptyStateInsight>[0][number];
+
+  it('offers the release update to a musician and not to a comedian', () => {
+    expect(
+      resolveChatEmptyStateInsight([insight], Date.now(), 'musician')
+        ?.suggestion
+    ).toBe('Draft a release update');
+    expect(
+      resolveChatEmptyStateInsight([insight], Date.now(), 'comedian')
+    ).toBeNull();
   });
 });

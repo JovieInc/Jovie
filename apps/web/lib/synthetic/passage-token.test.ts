@@ -143,6 +143,24 @@ describe('passage token', () => {
     });
   });
 
+  it('accepts a smartlink_click token only for the smartlink click scope', () => {
+    const token = mint({ scp: 'smartlink_click' });
+    expect(
+      verifyPassageToken(token, KEY, 'smartlink_click', NOW + 5)
+    ).toMatchObject({
+      ok: true,
+      claims: { sub: CANARY, scp: 'smartlink_click' },
+    });
+    // An onboarding_chat passage can never tag a smartlink click synthetic.
+    expect(verifyPassageToken(mint(), KEY, 'smartlink_click', NOW + 5)).toEqual(
+      { ok: false, reason: 'wrong_scope' }
+    );
+    expect(verifyPassageToken(token, KEY, 'onboarding_chat', NOW + 5)).toEqual({
+      ok: false,
+      reason: 'wrong_scope',
+    });
+  });
+
   it.each([
     ['empty', ''],
     ['no prefix', 'abc.def.ghi'],
@@ -166,5 +184,33 @@ describe('passage token', () => {
     const a = verifyPassageToken(mint(), KEY, 'onboarding_chat', NOW);
     const b = verifyPassageToken(mint(), KEY, 'onboarding_chat', NOW);
     expect(a.ok && b.ok && a.claims.jti !== b.claims.jti).toBe(true);
+  });
+});
+
+describe('CI key derivation parity (scripts/synthetic-passage-key.mjs)', () => {
+  it('derives exactly the key the server verifies with', async () => {
+    const { derivePassageKeyBase64Url } = await import(
+      '../../../../scripts/synthetic-passage-key.mjs'
+    );
+    const ciKey = Buffer.from(derivePassageKeyBase64Url(ROOT), 'base64url');
+    expect(ciKey.equals(KEY)).toBe(true);
+    expect(() => derivePassageKeyBase64Url('')).toThrow(/CRON_SECRET/);
+  });
+});
+
+describe('agent mint parity (scripts/synthetic-passage-mint.mjs)', () => {
+  it('mints a token the server verifies for the chat-health canary', async () => {
+    const { mintPassageTokenFromSecret } = await import(
+      '../../../../scripts/synthetic-passage-mint.mjs'
+    );
+    const token = mintPassageTokenFromSecret(ROOT, { run: 'agent-test' });
+    const verdict = verifyPassageToken(token, KEY, 'onboarding_chat');
+    expect(verdict.ok).toBe(true);
+    expect(() =>
+      mintPassageTokenFromSecret(ROOT, {
+        sub: 'someone@example.com',
+        run: 'agent-test',
+      })
+    ).toThrow(/non-canary/);
   });
 });

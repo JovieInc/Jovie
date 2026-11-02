@@ -4,6 +4,7 @@ import {
   createFingerprint,
   mergeAudienceTags,
 } from '@/app/api/audience/lib/audience-utils';
+import { isSmartLinkCrawler } from '@/lib/analytics/smart-link-admission';
 import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
 import { appendSourceUtmParams } from '@/lib/audience/source-links';
 import {
@@ -21,6 +22,7 @@ import {
 } from '@/lib/db/schema/analytics';
 import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { scheduleAfter } from '@/lib/next/schedule-after';
 import { publicClickLimiter } from '@/lib/rate-limit';
 import { detectBot, recordAnonymousBotMetric } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
@@ -195,7 +197,11 @@ export async function GET(
     const clientIP = extractClientIP(request.headers);
     const userAgent = request.headers.get('user-agent');
     const botDetection = detectBot(request, '/s/[code]');
-    if (botDetection.isBot) {
+    // Instagram/WhatsApp/Facebook in-app browsers carry Meta product tokens the
+    // shared detector flags as bots; those are real fans, not crawlers, so only
+    // genuine crawlers skip analytics (same admission rule as /r/[slug]).
+    const isCrawler = isSmartLinkCrawler(botDetection);
+    if (isCrawler) {
       recordAnonymousBotMetric(botDetection, 'redirect');
       return NextResponse.redirect(destinationUrl, { status: 302 });
     }
@@ -220,57 +226,61 @@ export async function GET(
       consent?.marketing === true ||
       (consent === null && !requiresCookieConsent);
 
-    try {
-      await withSystemIngestionSession(async tx => {
-        await tx
-          .update(audienceSourceLinks)
-          .set({
-            scanCount: drizzleSql`${audienceSourceLinks.scanCount} + 1`,
-            lastScannedAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(eq(audienceSourceLinks.id, sourceLink.id));
+    // Analytics must never sit on the redirect critical path (time to
+    // destination); run it after the 302 is flushed.
+    scheduleAfter(async () => {
+      try {
+        await withSystemIngestionSession(async tx => {
+          await tx
+            .update(audienceSourceLinks)
+            .set({
+              scanCount: drizzleSql`${audienceSourceLinks.scanCount} + 1`,
+              lastScannedAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(eq(audienceSourceLinks.id, sourceLink.id));
 
-        if (!hasMarketingConsent) return;
+          if (!hasMarketingConsent) return;
 
-        const audienceMemberId = await resolveAudienceMemberId(tx, {
-          creatorProfileId: sourceLink.creatorProfileId,
-          fingerprint: createFingerprint(clientIP, userAgent),
-          isBot: botDetection.isBot,
-          userAgent,
-          geoCity,
-          geoCountry,
+          const audienceMemberId = await resolveAudienceMemberId(tx, {
+            creatorProfileId: sourceLink.creatorProfileId,
+            fingerprint: createFingerprint(clientIP, userAgent),
+            isBot: isCrawler,
+            userAgent,
+            geoCity,
+            geoCountry,
+          });
+
+          await recordAudienceEvent(tx, {
+            creatorProfileId: sourceLink.creatorProfileId,
+            audienceMemberId,
+            eventType: 'source_scanned',
+            verb: 'scanned',
+            confidence: 'observed',
+            sourceKind: resolveSourceKind(sourceLink.sourceType),
+            sourceLabel: sourceLink.name,
+            sourceLinkId: sourceLink.id,
+            objectType: resolveObjectType(sourceLink.destinationKind),
+            objectId: sourceLink.destinationId,
+            objectLabel:
+              typeof sourceLink.metadata?.objectLabel === 'string'
+                ? sourceLink.metadata.objectLabel
+                : null,
+            properties: {
+              code: sourceLink.code,
+              destinationUrl,
+              utmParams: sourceLink.utmParams,
+            },
+          });
         });
-
-        await recordAudienceEvent(tx, {
-          creatorProfileId: sourceLink.creatorProfileId,
-          audienceMemberId,
-          eventType: 'source_scanned',
-          verb: 'scanned',
-          confidence: 'observed',
-          sourceKind: resolveSourceKind(sourceLink.sourceType),
-          sourceLabel: sourceLink.name,
+      } catch (analyticsError) {
+        await captureError('Source link analytics failed', analyticsError, {
+          route: '/s/[code]',
+          code,
           sourceLinkId: sourceLink.id,
-          objectType: resolveObjectType(sourceLink.destinationKind),
-          objectId: sourceLink.destinationId,
-          objectLabel:
-            typeof sourceLink.metadata?.objectLabel === 'string'
-              ? sourceLink.metadata.objectLabel
-              : null,
-          properties: {
-            code: sourceLink.code,
-            destinationUrl,
-            utmParams: sourceLink.utmParams,
-          },
-        });
-      });
-    } catch (analyticsError) {
-      await captureError('Source link analytics failed', analyticsError, {
-        route: '/s/[code]',
-        code,
-        sourceLinkId: sourceLink.id,
-      }).catch(() => undefined);
-    }
+        }).catch(() => undefined);
+      }
+    });
 
     return NextResponse.redirect(destinationUrl, { status: 302 });
   } catch (error) {

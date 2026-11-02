@@ -134,9 +134,19 @@ function readRepo(repoRoot, relativePath) {
   return readFileSync(resolve(repoRoot, relativePath), 'utf8');
 }
 
+function cssWithoutComments(css) {
+  // A `:root,` phrase inside a comment is not a selector list. Keep newlines
+  // so a later column-0 `}` still bounds the real block that follows.
+  return css.replace(/\/\*[\s\S]*?\*\//g, comment =>
+    comment.replace(/[^\n]/g, ' ')
+  );
+}
+
 function declarationsFor(css, selector) {
   const blocks =
-    css.match(/:root(?:\.dark)?(?:\s*,[^{]+)?\s*\{[\s\S]*?\n\}/g) ?? [];
+    cssWithoutComments(css).match(
+      /:root(?:\.dark)?(?:\s*,[^{]+)?\s*\{[\s\S]*?\n\}/g
+    ) ?? [];
   const map = new Map();
   for (const block of blocks) {
     if (!selector.test(block.slice(0, block.indexOf('{')))) continue;

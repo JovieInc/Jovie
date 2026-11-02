@@ -195,7 +195,16 @@ async function decide({
     });
     return {
       ...result,
-      shouldProbe: readFileSync(output, 'utf8').trim().split('\n').at(-1),
+      shouldProbe: readFileSync(output, 'utf8')
+        .trim()
+        .split('\n')
+        .filter(line => line.startsWith('should_probe='))
+        .at(-1),
+      shouldCertify: readFileSync(output, 'utf8')
+        .trim()
+        .split('\n')
+        .filter(line => line.startsWith('should_certify='))
+        .at(-1),
     };
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -264,6 +273,50 @@ describe('automatic landed production probes (JOV-8081)', () => {
     expect(result.stdout).not.toContain(
       'following up against landed production'
     );
+  });
+
+  it('certifies after Production Verified even when in-lease probes ran (JOV-9822)', async () => {
+    const base = {
+      run_id: 123,
+      run_attempt: 2,
+      head_sha: sha,
+      head_branch: 'main',
+      status: 'completed',
+      conclusion: 'success',
+    };
+    const jobs = [
+      { ...base, id: 456, name: 'Lighthouse CI (Production)' },
+      { ...base, id: 457, name: 'Production Verified' },
+    ];
+    const result = await decide({ jobs });
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.shouldProbe).toBe('should_probe=false');
+    expect(result.shouldCertify).toBe('should_certify=true');
+
+    const unverified = await decide({
+      jobs: [jobs[0], { ...jobs[1], conclusion: 'skipped' }],
+    });
+    expect(unverified.shouldCertify).toBe('should_certify=false');
+    const otherAttempt = await decide({
+      jobs: [jobs[0], { ...jobs[1], run_attempt: 1 }],
+    });
+    expect(otherAttempt.shouldCertify).toBe('should_certify=false');
+  });
+
+  it('certifies without probing on the lanes clock dispatch (JOV-9822)', async () => {
+    const result = await decide({
+      event: { EVENT_NAME: 'repository_dispatch' },
+    });
+    expect(result.code).toBe(0);
+    expect(result.shouldProbe).toBe('should_probe=false');
+    expect(result.shouldCertify).toBe('should_certify=true');
+    expect(result.requests).toEqual([]);
+  });
+
+  it('never certifies on untrusted controller evidence', async () => {
+    const result = await decide({ event: { TRIGGER_HEAD_BRANCH: 'feature' } });
+    expect(result.code).not.toBe(0);
+    expect(result.shouldCertify).toBe('should_certify=false');
   });
 
   it('retains explicit manual dispatch without requiring controller evidence', async () => {

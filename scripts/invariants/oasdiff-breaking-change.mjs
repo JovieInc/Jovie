@@ -142,6 +142,10 @@ export function renderBaseSpec(repoRoot, baseRef) {
     if (!existsSync(modules)) {
       symlinkSync(join(repoRoot, 'apps/web/node_modules'), modules);
     }
+    // pnpm's .bin/tsx shim resolves tsx through <root>/node_modules/.pnpm.
+    const rootModules = join(worktree, 'node_modules');
+    if (!existsSync(rootModules) && existsSync(join(repoRoot, 'node_modules')))
+      symlinkSync(join(repoRoot, 'node_modules'), rootModules);
     return renderSpecAt(repoRoot, worktree);
   } finally {
     git(repoRoot, ['worktree', 'remove', '--force', worktree]);

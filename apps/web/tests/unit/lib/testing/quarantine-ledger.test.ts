@@ -28,7 +28,6 @@ describe('quarantine ledger', () => {
       entry => entry.kind === 'e2e' && isActive(entry)
     ).length;
 
-    expect(parsed.ledger.entries.length).toBeGreaterThan(0);
     expect(parsed.unitPaths).toHaveLength(expectedUnitCount);
     expect(parsed.e2ePaths).toHaveLength(expectedE2eCount);
     expect(parsed.unitIssueUrls).toHaveLength(expectedUnitCount);
@@ -44,6 +43,18 @@ describe('quarantine ledger', () => {
       expect(parsed.e2eIssueUrls[index]).toBe(entry.fixIssueUrl);
     }
     expect(parsed.summary.withinRetryBudget).toBe(true);
+  });
+
+  it('has no expired quarantine entries (expired entries are inert, so fix or remove them)', () => {
+    const ledgerPath = resolve(process.cwd(), 'tests/quarantine.json');
+    const parsed = parseQuarantineLedger(
+      JSON.parse(readFileSync(ledgerPath, 'utf8'))
+    );
+    const expired = parsed.ledger.entries
+      .filter(entry => Date.parse(entry.expiresAt) < Date.now())
+      .map(entry => `${entry.id} (expired ${entry.expiresAt})`);
+
+    expect(expired).toEqual([]);
   });
 
   it('flags missing required entry metadata', () => {

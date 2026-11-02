@@ -142,6 +142,22 @@ export const selectInvestorSettingsSchema =
 export type InvestorSettings = typeof investorSettings.$inferSelect;
 export type NewInvestorSettings = typeof investorSettings.$inferInsert;
 
+/**
+ * Private investor-portal files (memos, manifest, deck PDF). The source of truth
+ * is JovieInc/Ops jovie-private/apps/web; scripts/investor-portal-sync.mjs
+ * publishes it here. Read only behind the portal gate (see
+ * lib/investors/private-content.ts). Bodies are base64 so one table holds text
+ * and the PDF.
+ */
+export const investorPortalContent = pgTable('investor_portal_content', {
+  path: text('path').primaryKey(),
+  contentType: text('content_type').notNull(),
+  bodyBase64: text('body_base64').notNull(),
+  byteSize: integer('byte_size').notNull(),
+  sha256: text('sha256').notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 // ============================================================================
 // Approval-First Investor Updates
 // ============================================================================

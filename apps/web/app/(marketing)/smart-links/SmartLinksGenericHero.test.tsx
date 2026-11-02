@@ -35,7 +35,7 @@ describe('SmartLinksLanding generic hero', () => {
         name: 'Share your work with one link.',
       })
     ).toBeInTheDocument();
-    expect(screen.getByText(/Example: a release\./u)).toBeInTheDocument();
+    expect(screen.getByText(/Share a release/u)).toBeInTheDocument();
     expect(
       screen.queryByRole('heading', {
         level: 1,

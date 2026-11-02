@@ -109,14 +109,11 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
     await expect(drawerContent).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
-    await expect(page.getByTestId('profile-pay-recipient')).toContainText(
-      'Pay Tim White'
-    );
-    // JOV-6567 moved the Venmo method onto the pay dial. The recipient line
-    // is the handle only.
+    // One title line names the recipient; no repeated recipient block.
     await expect(
-      page.getByTestId('profile-pay-recipient').locator('p').nth(1)
-    ).toHaveText('@tim');
+      page.getByTestId('profile-drawer-title-slot').first()
+    ).toContainText('Pay Tim White');
+    await expect(page.getByTestId('profile-pay-recipient')).toHaveCount(0);
 
     await closeDrawer(page);
 

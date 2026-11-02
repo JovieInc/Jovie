@@ -56,7 +56,6 @@ const HEADLINE_CLAMP_BASELINE: Readonly<Record<string, number>> = {
   [join('app', '(marketing)', 'download', 'page.tsx')]: 1,
   [join('app', '(marketing)', 'instant-merch', 'InstantMerchLanding.tsx')]: 3,
   [join('app', '(marketing)', 'not-found.tsx')]: 1,
-  [join('app', '(marketing)', 'product', 'ProductLanding.tsx')]: 1,
   [join('app', '(marketing)', 'renders', '[state]', 'page.tsx')]: 1,
   [join('app', '(marketing)', 'renders', 'page.tsx')]: 2,
   [join('app', '(marketing)', 'smart-links', 'SmartLinksLanding.tsx')]: 4,

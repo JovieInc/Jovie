@@ -143,27 +143,28 @@ function HowItWorksSection() {
             </div>
           </div>
 
-          <div className='homepage-section-stack grid grid-cols-1 gap-6 md:grid-cols-3'>
+          <ol className='homepage-section-stack grid list-none grid-cols-1 gap-6 p-0 md:grid-cols-3'>
             {STEPS.map((step, i) => (
-              <div
+              <li
                 key={step.title}
                 className='homepage-surface-card relative flex flex-col rounded-[1rem] p-7 text-left'
               >
-                <div className='flex h-11 w-11 items-center justify-center rounded-xl border border-subtle bg-surface-1'>
-                  <step.icon className='h-6 w-6 text-secondary-token' />
-                </div>
-                <span className='mt-5 text-[length:var(--linear-label-size)] text-tertiary-token'>
-                  Step {i + 1}
-                </span>
-                <h3 className='mt-2 text-lg font-medium tracking-tight text-primary-token'>
+                {/* Order is carried by the <ol>; the count stays in the DOM for
+                    assistive tech and is never visible text. */}
+                <span className='sr-only'>Step {i + 1}</span>
+                <step.icon
+                  className='h-6 w-6 text-secondary-token'
+                  aria-hidden='true'
+                />
+                <h3 className='mt-5 text-balance text-lg font-medium tracking-tight text-primary-token'>
                   {step.title}
                 </h3>
                 <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
                   {step.description}
                 </p>
-              </div>
+              </li>
             ))}
-          </div>
+          </ol>
         </div>
       </MarketingContainer>
     </section>
@@ -230,9 +231,10 @@ function BenefitsSection() {
                 key={benefit.title}
                 className='homepage-surface-card flex flex-col rounded-[1rem] p-7'
               >
-                <div className='flex h-10 w-10 items-center justify-center rounded-xl border border-subtle bg-surface-1'>
-                  <benefit.icon className='h-5 w-5 text-secondary-token' />
-                </div>
+                <benefit.icon
+                  className='h-5 w-5 text-secondary-token'
+                  aria-hidden='true'
+                />
                 <h3 className='mt-5 text-base font-medium tracking-tight text-primary-token'>
                   {benefit.title}
                 </h3>
@@ -298,9 +300,10 @@ function SocialProofSection() {
                 key={uc.label}
                 className='homepage-surface-card flex flex-col items-center gap-3 rounded-[1rem] p-6'
               >
-                <div className='flex h-11 w-11 items-center justify-center rounded-xl border border-subtle bg-surface-1'>
-                  <uc.icon className='h-5 w-5 text-secondary-token' />
-                </div>
+                <uc.icon
+                  className='h-5 w-5 text-secondary-token'
+                  aria-hidden='true'
+                />
                 <span className='text-sm font-medium text-primary-token'>
                   {uc.label}
                 </span>

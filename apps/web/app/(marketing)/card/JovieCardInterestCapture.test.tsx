@@ -36,9 +36,12 @@ describe('JovieCardInterestCapture', () => {
   it('reuses signed-in email and persists stable feature/source/state attribution', async () => {
     render(<JovieCardInterestCapture />);
 
-    expect(screen.getByLabelText('Email Address')).toHaveValue(
+    expect(screen.getByLabelText('Email address')).toHaveValue(
       'founder@example.com'
     );
+    // The security check arms on first touch (deferSecurityCheck), as a
+    // visitor does before submitting.
+    fireEvent.pointerDown(screen.getByLabelText('Email address'));
     fireEvent.submit(screen.getByTestId('changelog-subscribe-form'));
 
     await waitFor(() =>
@@ -57,9 +60,9 @@ describe('JovieCardInterestCapture', () => {
       screen.getByRole('heading', { name: 'Check your email' })
     ).toBeVisible();
     expect(
-      screen.getAllByText(
+      screen.getByText(
         'Confirm your email to receive Jovie Card access updates.'
-      )[1]
+      )
     ).toBeVisible();
   });
 

@@ -97,9 +97,9 @@ A canonical surface's source fingerprint and screenshot pointers live in
 not in the census. PRs never edit it. When a PR changes a certified route's
 source, the census check reports that route as stale (`staleCertifications`,
 not counted in `freshCertified`; `--strict` fails) until
-`.github/workflows/surface-recertify.yml` recaptures it after merge and opens a
-ledger-only PR. A fingerprint is only written with a desktop (1440) and mobile
-(390) capture pointer.
+`scripts/design-surface-recertify.mjs` recaptures it after merge. The workflow
+that opens the ledger-only PR stacks on this change. A fingerprint is written
+only with a desktop (1440) and mobile (390) capture pointer.
 
 Screenshots are stored in the `jovie-evidence` R2 bucket, content-addressed, and
 the repo keeps `<name>.evidence.json` pointers (hash, URL, viewport,

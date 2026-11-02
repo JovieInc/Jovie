@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
 import { evaluateFleetRules } from '../../pr-fleet-rules.mjs';
+import { evaluateCustomerNoteContract } from '../daily-changelog-publication.mjs';
 
 const { load } = createRequire(import.meta.url)('js-yaml');
 const root = resolve(import.meta.dirname, '../../..');
@@ -45,4 +46,105 @@ test('the red-before-green block the lanes write satisfies the Fleet Rules parse
     withBlock.errors.filter(e => e.startsWith('red-before-green')).length,
     0
   );
+});
+
+// Execute the lane generator, then pass its output through the production guards.
+// This proves metadata compatibility, not model compliance or product runtime.
+for (const decision of [
+  { releaseWorthy: false },
+  {
+    issueId: 'JOV-7447',
+    outcomeKey: 'profile-link-claim',
+    audience: 'public',
+    visibility: 'public',
+    releaseWorthy: true,
+    section: 'Added',
+    text: 'Choose your profile link: Start with a name on the homepage.',
+    availability: { status: 'ga', prerequisites: [] },
+    evidence: [{ url: 'https://jov.ie/', contains: 'Claim' }],
+  },
+]) {
+  test(`repair metadata satisfies both guards with releaseWorthy=${decision.releaseWorthy}`, () => {
+    const body = execFileSync(
+      'python3',
+      [
+        '-c',
+        [
+          'import sys,json',
+          "sys.path.insert(0,'scripts/lanes')",
+          'import pr_events as e',
+          "pr={'statusCheckRollup':[{'name':'Source Validation','conclusion':'FAILURE','detailsUrl':'https://github.com/JovieInc/Jovie/actions/runs/123/job/456'}]}",
+          "print(e.repair_evidence_body(pr, '## Summary\\nRepair', customer_decision=json.loads(sys.argv[1])))",
+        ].join('\n'),
+        JSON.stringify(decision),
+      ],
+      { cwd: root, encoding: 'utf8' }
+    );
+    assert.deepEqual(
+      evaluateFleetRules({
+        pr: { title: 'fix(links): count social visits', body },
+        files: [],
+      }).errors,
+      []
+    );
+    const verdict = evaluateCustomerNoteContract({
+      files: ['apps/web/app/s/[code]/route.ts'],
+      body,
+      createdAt: '2026-10-28T00:00:00Z',
+    });
+    assert.equal(verdict.passed, true, verdict.reason);
+    assert.equal(body.split('customer-changelog/v1').length - 1, 1);
+  });
+}
+
+test('compounding repairs retain measured wins and pass the canonical guards', () => {
+  const win = [
+    '## Win',
+    '',
+    '- Claim: Repair metadata carries measured evidence through the existing lane helper',
+    '- Area: ci',
+    '- Theme: merge-throughput',
+    '- Metric: missing win receipts in the compounding repair fixture | count | lower | 1 | 0 | canonical Fleet guard | node --test scripts/lib/__tests__/fleet-rules-lane-evidence.test.mjs',
+    '- Verify: https://github.com/JovieInc/Jovie/pull/23697',
+  ].join('\n');
+  const script = `import sys,json
+sys.path.insert(0,'scripts/lanes')
+import pr_events as e
+pr={'statusCheckRollup':[{'name':'PR Fleet Rules','conclusion':'FAILURE','detailsUrl':'https://github.com/JovieInc/Jovie/actions/runs/123/job/456'}]}
+print(e.repair_evidence_body(pr, sys.argv[1], customer_decision={"releaseWorthy":False}, win_section=sys.argv[2]))`;
+  const generate = (body, supplied = win) =>
+    execFileSync('python3', ['-c', script, body, supplied], {
+      cwd: root,
+      encoding: 'utf8',
+    }).trimEnd();
+  const check = body =>
+    evaluateFleetRules({
+      pr: { title: 'feat: stats', labels: ['compounding'], body },
+      files: [],
+    }).errors;
+  assert.equal(
+    check('## Summary\nRepair').filter(e => e.startsWith('win:')).length,
+    1
+  );
+  const body = generate('## Summary\nRepair');
+  assert.deepEqual(check(body), []);
+  assert.equal(
+    evaluateCustomerNoteContract({
+      files: ['apps/web/app/api/internal/proof-stats/route.ts'],
+      body,
+      createdAt: '2026-10-28T00:00:00Z',
+    }).passed,
+    true
+  );
+  assert.equal(body.split('customer-changelog/v1').length - 1, 1);
+  assert.equal(generate(body), body);
+  assert.equal(
+    generate(body, win.replace(' | 1 | 0 | ', ' | 99 | 0 | ')),
+    body
+  );
+  // Existing incomplete evidence remains visible to the guard; never silently replace it.
+  const incomplete = '## Summary\nRepair\n\n## Win\n- Claim: Existing claim';
+  assert.ok(check(generate(incomplete)).some(e => e.startsWith('win:')));
+  const absent = generate('## Summary\nRepair', '');
+  assert.ok(check(absent).some(e => e.startsWith('win:')));
 });

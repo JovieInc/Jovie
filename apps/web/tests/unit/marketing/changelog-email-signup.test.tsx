@@ -124,10 +124,13 @@ describe('ChangelogEmailSignup', () => {
     const revealRoot = container.querySelector("[data-pen-source='qKrDn']");
     expect(revealRoot).toHaveAttribute('data-visual-state', 'idle');
 
-    expect(screen.getByText('Get product updates')).toBeVisible();
+    expect(screen.getByText('Get updates')).toBeVisible();
+    // One title, one field, one microcopy line: no subtitle, no visible label.
     expect(
-      screen.getByText('New features and improvements from Jovie.')
-    ).toBeVisible();
+      screen.queryByText('New features and improvements from Jovie.')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Email Address')).not.toBeInTheDocument();
+    expect(screen.getByText('Unsubscribe anytime.')).toBeVisible();
     expect(
       screen.queryByTestId('changelog-reveal-button')
     ).not.toBeInTheDocument();
@@ -299,7 +302,7 @@ describe('ChangelogEmailSignup', () => {
         'button',
         { name: 'Subscribe' }
       )
-    ).toBeDisabled();
+    ).not.toBeDisabled(); // waiting on a token validates on submit, never a grey button;
 
     act(() => {
       turnstileMock.onToken?.('recovered-turnstile-token');
@@ -323,7 +326,7 @@ describe('ChangelogEmailSignup', () => {
       json: async () => ({ state: 'subscribed' }),
     } as Response);
     render(<ChangelogEmailSignup source='marketing:/blog' />);
-    fireEvent.change(screen.getByLabelText('Email Address'), {
+    fireEvent.change(screen.getByLabelText('Email address'), {
       target: { value: 'reader@example.com' },
     });
     fireEvent.submit(screen.getByTestId('changelog-subscribe-form'));
@@ -352,7 +355,7 @@ describe('ChangelogEmailSignup', () => {
     } as Response);
 
     render(<ChangelogEmailSignup />);
-    fireEvent.change(screen.getByLabelText('Email Address'), {
+    fireEvent.change(screen.getByLabelText('Email address'), {
       target: { value: 'artist@exmaple.com' },
     });
     fireEvent.submit(screen.getByTestId('changelog-subscribe-form'));
@@ -368,7 +371,7 @@ describe('ChangelogEmailSignup', () => {
     );
 
     expect(form).not.toHaveAttribute('inert');
-    const input = screen.getByLabelText('Email Address');
+    const input = screen.getByLabelText('Email address');
     expect(input).toHaveValue('artist@exmaple.com');
     await waitFor(() => expect(input).toHaveFocus());
 
@@ -400,7 +403,7 @@ describe('ChangelogEmailSignup', () => {
     } as Response);
 
     render(<ChangelogEmailSignup />);
-    fireEvent.change(screen.getByLabelText('Email Address'), {
+    fireEvent.change(screen.getByLabelText('Email address'), {
       target: { value: 'reader@example.com' },
     });
     fireEvent.submit(screen.getByTestId('changelog-subscribe-form'));
@@ -438,7 +441,7 @@ describe('ChangelogEmailSignup', () => {
     } as Response);
 
     render(<ChangelogEmailSignup />);
-    fireEvent.change(screen.getByLabelText('Email Address'), {
+    fireEvent.change(screen.getByLabelText('Email address'), {
       target: { value: 'reader@example.com' },
     });
     fireEvent.submit(screen.getByTestId('changelog-subscribe-form'));
@@ -474,14 +477,14 @@ describe('ChangelogEmailSignup', () => {
       json: async () => ({}),
     } as Response);
     render(<ChangelogEmailSignup />);
-    fireEvent.change(screen.getByLabelText('Email Address'), {
+    fireEvent.change(screen.getByLabelText('Email address'), {
       target: { value: 'reader@example.com' },
     });
     fireEvent.submit(screen.getByTestId('changelog-subscribe-form'));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Subscription could not be confirmed'
     );
-    expect(screen.getByLabelText('Email Address')).toHaveValue(
+    expect(screen.getByLabelText('Email address')).toHaveValue(
       'reader@example.com'
     );
     expect(screen.getByRole('status')).not.toHaveTextContent(

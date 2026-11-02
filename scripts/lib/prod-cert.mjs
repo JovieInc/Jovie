@@ -47,7 +47,7 @@ export function statusFromChecks(checks) {
 }
 
 /**
- * @param {{ surface: string, checks: any[], sha: any, deploymentId?: any, runUrl?: any, startedAt: any, endedAt: any, identity?: any, observations?: any[] }} input
+ * @param {{ surface: string, checks: any[], sha: any, deploymentId?: any, runUrl?: any, startedAt: any, endedAt: any, identity?: any, observations?: any[], consoleErrorCount?: number | null, networkErrorCount?: number | null, screenshot?: { format: string, dataUrl: string } | null, adminInventoryReadback?: { status: string, detail: string } | null }} input
  */
 export function buildReceipt({
   surface,
@@ -59,6 +59,10 @@ export function buildReceipt({
   endedAt,
   identity,
   observations = [],
+  consoleErrorCount = null,
+  networkErrorCount = null,
+  screenshot = null,
+  adminInventoryReadback = null,
 }) {
   const meta = SURFACES[surface];
   if (!meta) throw new Error(`unknown surface ${surface}`);
@@ -87,6 +91,12 @@ export function buildReceipt({
         : null,
     issueUrl: null,
     observations,
+    // Per-surface browser evidence (JOV-9625): null when the surface was not
+    // browser-exercised, so "not measured" is never presented as a clean zero.
+    consoleErrorCount,
+    networkErrorCount,
+    screenshot,
+    adminInventoryReadback,
   };
 }
 
@@ -113,8 +123,6 @@ export async function runCheck(id, fn, now = () => new Date().toISOString()) {
     };
   }
 }
-
-const blocked = summary => ({ status: 'blocked', summary });
 
 async function get(origin, path, fetchImpl, init = {}) {
   const response = await fetchImpl(new URL(path, origin), {
@@ -284,11 +292,6 @@ export function anonymousChecks({
           summary: await ogImageCheck(origin, page.body, fetchImpl, link),
         };
       }),
-      run('click-analytics-capture', async () =>
-        blocked(
-          'needs a synthetic-tagged visitor so a prod click does not enter customer analytics; no such path exists yet'
-        )
-      ),
     ],
   };
 }
@@ -306,6 +309,9 @@ export function stepChecks(
 ) {
   const bySurface = {};
   const observationsBySurface = {};
+  const telemetryBySurface = {};
+  const screenshotBySurface = {};
+  let readback = null;
   for (const step of steps ?? []) {
     if (step.kind === 'observation') {
       (observationsBySurface[step.surface] ??= []).push({
@@ -317,24 +323,71 @@ export function stepChecks(
       });
       continue;
     }
-    (bySurface[step.surface] ??= []).push({
+    if (step.kind === 'telemetry') {
+      telemetryBySurface[step.surface] = {
+        consoleErrorCount: step.consoleErrors,
+        networkErrorCount: step.networkErrors,
+      };
+      continue;
+    }
+    if (step.kind === 'screenshot') {
+      screenshotBySurface[step.surface] = {
+        format: step.format,
+        dataUrl: step.dataUrl,
+      };
+      continue;
+    }
+    if (step.kind === 'readback') {
+      // One admin inventory-readback attempt per run; the latest wins.
+      readback = {
+        status: step.status,
+        detail: step.detail,
+      };
+      continue;
+    }
+    // A Playwright retry re-records the same check. The latest attempt is
+    // the verdict, so one failed attempt followed by a pass is one passed
+    // check, not a failed surface (JOV-9822).
+    const checks = (bySurface[step.surface] ??= []);
+    const record = {
       id: step.id,
       status: step.status,
       startedAt: step.startedAt,
       endedAt: step.endedAt,
       summary: step.summary ?? '',
-    });
+    };
+    const prior = checks.findIndex(c => c.id === step.id);
+    if (prior === -1) checks.push(record);
+    else if (Date.parse(record.endedAt) >= Date.parse(checks[prior].endedAt)) {
+      checks[prior] = record;
+    }
   }
-  return { bySurface, observationsBySurface, authStatus, now };
+  return {
+    bySurface,
+    observationsBySurface,
+    telemetryBySurface,
+    screenshotBySurface,
+    adminInventoryReadback: readback,
+    authStatus,
+    now,
+  };
 }
 
 /** The browser-owned checks every surface is expected to carry. */
 export const EXPECTED_BROWSER_CHECKS = Object.freeze({
   'signup-signin': ['returning-user-email-otp', 'new-user-email-otp'],
-  claim: ['claimed-profile-owned'],
-  onboarding: ['dashboard-first-value'],
+  claim: [
+    'claimed-profile-owned',
+    'start-chat-first-reply',
+    'golden-path-preview-has-release',
+  ],
+  onboarding: ['dashboard-first-value', 'fresh-user-onboarding-first-value'],
   chat: ['composer-ready', 'first-reply'],
-  'public-profile': ['owned-profile-renders-publicly'],
+  'public-profile': [
+    'owned-profile-renders-publicly',
+    'profile-edit-save-readback',
+  ],
+  smartlink: ['click-analytics-capture'],
   checkout: ['checkout-entry-renders'],
 });
 
@@ -423,8 +476,43 @@ export async function runProductionCertification({
         startedAt,
         endedAt: now(),
         observations: stepState.observationsBySurface[surface] ?? [],
+        consoleErrorCount:
+          stepState.telemetryBySurface[surface]?.consoleErrorCount ?? null,
+        networkErrorCount:
+          stepState.telemetryBySurface[surface]?.networkErrorCount ?? null,
+        screenshot: stepState.screenshotBySurface[surface] ?? null,
+        // One readback per run, carried on the front-door receipt only.
+        adminInventoryReadback:
+          surface === 'landing'
+            ? (stepState.adminInventoryReadback ?? null)
+            : undefined,
       })
     );
   }
   return { served, receipts };
+}
+
+/**
+ * One verdict for everything that depends on the production golden path
+ * (recovery email gate, marketplace listing, launch certification): every
+ * surface passed on the served SHA within the freshness window.
+ * @param {any[]} receipts
+ * @param {{ servedSha: string, nowMs?: number, maxAgeMs?: number }} options
+ */
+export function certificationVerdict(
+  receipts,
+  { servedSha, nowMs = Date.now(), maxAgeMs = 24 * 60 * 60 * 1000 }
+) {
+  const bySurface = new Map(receipts.map(r => [r.surface, r]));
+  const notGreen = [];
+  for (const surface of SURFACE_IDS) {
+    const r = bySurface.get(surface);
+    if (!r) notGreen.push({ surface, why: 'no receipt' });
+    else if (r.status !== 'passed') notGreen.push({ surface, why: r.status });
+    else if (r.sha !== servedSha)
+      notGreen.push({ surface, why: `passed on ${r.sha.slice(0, 8)}` });
+    else if (nowMs - Date.parse(r.endedAt) > maxAgeMs)
+      notGreen.push({ surface, why: 'older than 24h' });
+  }
+  return { certified: notGreen.length === 0, servedSha, notGreen };
 }

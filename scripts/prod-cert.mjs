@@ -19,7 +19,10 @@ import {
   remediationTriggersEnabled,
   upsertLinearIssueByTitleFingerprint,
 } from './lib/linear-issue-intake.mjs';
-import { runProductionCertification } from './lib/prod-cert.mjs';
+import {
+  certificationVerdict,
+  runProductionCertification,
+} from './lib/prod-cert.mjs';
 
 export function surfaceFingerprint(surface) {
   return `prod-cert-${surface}`;
@@ -81,26 +84,108 @@ Run: ${runUrl ?? 'n/a'}`,
   return results;
 }
 
-async function postReceipts(receipts, origin) {
+export const OVERALL_FINGERPRINT = 'prod-cert-overall';
+
+/**
+ * One owned Linear issue for the whole golden path (JOV-9822): open while any
+ * surface is not green on the served SHA, closed when all eight are. Summer
+ * picks it up from the Launch project; per-surface issues carry the detail.
+ * @param {ReturnType<typeof certificationVerdict>} verdict
+ * @param {{ runUrl?: string | null, deps?: { upsert?: Function, close?: Function } }} [options]
+ */
+export async function fileOverallIssue(verdict, { runUrl, deps = {} } = {}) {
+  const upsert = deps.upsert ?? upsertLinearIssueByTitleFingerprint;
+  const close = deps.close ?? closeLinearIssueByFingerprint;
+  const sha = verdict.servedSha.slice(0, 8);
+  if (verdict.certified) {
+    return close({
+      fingerprint: OVERALL_FINGERPRINT,
+      labelKey: OVERALL_FINGERPRINT,
+      comment: `All 8 golden-path surfaces passed on production ${sha}.`,
+      runId: process.env.GITHUB_RUN_ID,
+    });
+  }
+  return upsert({
+    fingerprint: OVERALL_FINGERPRINT,
+    labelKey: OVERALL_FINGERPRINT,
+    title: 'Production golden path is not certified',
+    description: `## Source
+Production golden-path certification (JOV-9822), served build \`${verdict.servedSha}\`.
+
+## Not green
+${verdict.notGreen.map(n => `- \`${n.surface}\`: ${n.why}`).join('\n')}
+
+## Why it matters
+The recovery email gate, agent-marketplace readiness and launch certification all require every surface to pass on the current production SHA within 24h.
+
+## Acceptance criteria or triage question
+A production certification run passes all eight surfaces on the served SHA; this issue closes itself then.
+
+Run: ${runUrl ?? 'n/a'}`,
+    priority: 1,
+    reopenTerminal: true,
+  });
+}
+
+// Evidence-only receipt fields (JOV-9625): verdict-neutral extras that a
+// ledger predating the field rejects under its strict zod schema. Stripping
+// them on a schema-skew repost never changes a surface verdict, and the full
+// receipts (readback included) stay in the --out file.
+export const EVIDENCE_ONLY_RECEIPT_KEYS = Object.freeze([
+  'adminInventoryReadback',
+]);
+
+export function stripEvidenceOnlyKeys(
+  receipts,
+  keys = EVIDENCE_ONLY_RECEIPT_KEYS
+) {
+  return receipts.map(receipt => {
+    const copy = { ...receipt };
+    for (const key of keys) delete copy[key];
+    return copy;
+  });
+}
+
+export async function postReceipts(receipts, origin) {
   const secret = process.env.CRON_SECRET;
   if (!secret) throw new Error('CRON_SECRET is not set; cannot post receipts');
-  const response = await fetch(
-    new URL('/api/internal/ovie/golden-path-evidence', origin),
-    {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${secret}`,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ receipts }),
-    }
-  );
-  const text = await response.text();
-  if (!response.ok)
-    throw new Error(
-      `ledger POST HTTP ${response.status}: ${text.slice(0, 300)}`
+  const send = async body => {
+    const response = await fetch(
+      new URL('/api/internal/ovie/golden-path-evidence', origin),
+      {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${secret}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ receipts: body }),
+      }
     );
-  return JSON.parse(text);
+    const text = await response.text();
+    return { ok: response.ok, status: response.status, text };
+  };
+  let result = await send(receipts);
+  // Deploy skew (JOV-9822 producer vs a frozen promotion): the served build's
+  // ledger schema can predate an evidence-only field, which its strict schema
+  // rejects. Repost once without that field — verdict-bearing receipts are
+  // byte-identical, and the readback stays in the receipts file for the run
+  // log. Anything else still fails loudly with the original body.
+  if (
+    !result.ok &&
+    result.status === 400 &&
+    result.text.includes('invalid_receipts') &&
+    EVIDENCE_ONLY_RECEIPT_KEYS.some(key => result.text.includes(key))
+  ) {
+    console.error(
+      `ledger on the served build predates evidence-only receipt keys (${EVIDENCE_ONLY_RECEIPT_KEYS.join(', ')}); reposting without them — surface verdicts unchanged, the field stays in the receipts file`
+    );
+    result = await send(stripEvidenceOnlyKeys(receipts));
+  }
+  if (!result.ok)
+    throw new Error(
+      `ledger POST HTTP ${result.status}: ${result.text.slice(0, 300)}`
+    );
+  return JSON.parse(result.text);
 }
 
 async function main() {
@@ -147,8 +232,15 @@ async function main() {
       }`
     );
   }
+  const verdict = certificationVerdict(receipts, { servedSha: served.sha });
+  console.log(
+    verdict.certified
+      ? `certified: all surfaces passed on ${served.sha}`
+      : `not certified on ${served.sha}: ${verdict.notGreen.map(n => `${n.surface} (${n.why})`).join(', ')}`
+  );
   if (values['file-issues'] && remediationTriggersEnabled()) {
     console.log(JSON.stringify(await fileSurfaceIssues(receipts, { runUrl })));
+    console.log(JSON.stringify(await fileOverallIssue(verdict, { runUrl })));
   }
   if (values.post)
     console.log(JSON.stringify(await postReceipts(receipts, values.origin)));

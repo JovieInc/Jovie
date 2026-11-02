@@ -75,4 +75,5 @@ export const AboutDestination: StoryObj<typeof meta> = {
   },
 };
 
+/** Pay sheet: the recipient is named once, in the drawer title; the body is amount and method only. */
 export const PayNow: StoryObj<typeof meta> = {};

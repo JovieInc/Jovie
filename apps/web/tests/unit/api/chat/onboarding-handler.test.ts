@@ -103,6 +103,17 @@ vi.mock('@/lib/auth/better-auth', () => ({
   auth: { api: { getSession: hoisted.getBetterAuthSessionMock } },
 }));
 
+// Fail-open bot check: unverified starts are denied unless a test grants
+// the unverified budget.
+const botCheck = vi.hoisted(() => ({
+  admit: vi.fn(),
+  record: vi.fn(),
+}));
+vi.mock('@/lib/turnstile/onboarding-bot-check.server', () => ({
+  admitUnverifiedOnboardingStart: botCheck.admit,
+  recordOnboardingBotCheck: botCheck.record,
+}));
+
 vi.mock('@/lib/turnstile/verify', () => ({
   isTurnstileConfigured: hoisted.isTurnstileConfiguredMock,
   verifyTurnstileToken: hoisted.verifyTurnstileTokenMock,
@@ -225,7 +236,87 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     );
     hoisted.appUserMock.mockResolvedValue(null);
     hoisted.findConversationMock.mockResolvedValue(null);
+    botCheck.admit.mockResolvedValue({ admitted: false, reason: 'ip_budget' });
     installDefaultDbMocks();
+  });
+
+  describe('fail-open bot check', () => {
+    async function firstMessage(turnstileToken?: string) {
+      vi.resetModules();
+      stubRuntimeEnv({ nodeEnv: 'production', vercelEnv: 'production' });
+      // Kill switch on: the scripted reply answers, so no LLM is needed.
+      hoisted.checkGateForUserMock.mockResolvedValue(true);
+      hoisted.isTurnstileConfiguredMock.mockReturnValue(true);
+      hoisted.verifyTurnstileTokenMock.mockResolvedValue(
+        turnstileToken === 'real-token'
+          ? { success: true }
+          : { success: false, reason: 'missing_token' }
+      );
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      return tryHandleAnonymousOnboardingChat(
+        makeRequest({
+          mode: 'onboarding',
+          ...(turnstileToken ? { turnstileToken } : {}),
+          messages: [userMessage('hi')],
+        }),
+        'req-fail-open'
+      );
+    }
+
+    it('admits a widget failure on the unverified budget without siteverify', async () => {
+      botCheck.admit.mockResolvedValue({ admitted: true, reason: 'admitted' });
+      const result = await firstMessage('jv-unverified:error');
+      expect(result?.status).toBe(200);
+      expect(hoisted.verifyTurnstileTokenMock).not.toHaveBeenCalled();
+      expect(botCheck.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          outcome: 'degraded',
+          reason: 'client_error',
+          clientStatus: 'error',
+        })
+      );
+    });
+
+    it('admits a missing token on the unverified budget', async () => {
+      botCheck.admit.mockResolvedValue({ admitted: true, reason: 'admitted' });
+      const result = await firstMessage();
+      expect(result?.status).toBe(200);
+      expect(botCheck.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          outcome: 'degraded',
+          reason: 'missing_token',
+        })
+      );
+    });
+
+    it('returns the retryable check once the unverified budget is spent', async () => {
+      botCheck.admit.mockResolvedValue({
+        admitted: false,
+        reason: 'global_budget',
+      });
+      const result = await firstMessage('jv-unverified:unsupported');
+      expect(result?.status).toBe(403);
+      await expect(result?.json()).resolves.toMatchObject({
+        errorCode: 'TURNSTILE_REQUIRED',
+      });
+      expect(botCheck.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          outcome: 'denied',
+          reason: 'client_unsupported:global_budget',
+        })
+      );
+    });
+
+    it('never charges the unverified budget for a verified token', async () => {
+      const result = await firstMessage('real-token');
+      expect(result?.status).toBe(200);
+      expect(botCheck.admit).not.toHaveBeenCalled();
+      expect(botCheck.record).toHaveBeenCalledWith(
+        expect.objectContaining({ outcome: 'verified' })
+      );
+    });
   });
 
   it.each([
@@ -1214,7 +1305,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     vi.resetModules();
     stubRuntimeEnv({ nodeEnv: 'test' });
     vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
-    vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
     hoisted.checkGateForUserMock.mockResolvedValue(true);
     hoisted.isTurnstileConfiguredMock.mockReturnValue(false);
     hoisted.executeChatTurnMock.mockResolvedValue({
@@ -1325,7 +1416,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     vi.resetModules();
     stubRuntimeEnv({ nodeEnv: 'production', vercelEnv: 'preview' });
     vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
-    vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
     vi.stubEnv('PUBLIC_NOAUTH_SMOKE', '1');
     hoisted.checkGateForUserMock.mockResolvedValue(false);
     hoisted.isTurnstileConfiguredMock.mockReturnValue(false);
@@ -2028,7 +2119,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       stubRuntimeEnv({ nodeEnv: 'test' });
       vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
       vi.stubEnv('E2E_REQUIRE_TURNSTILE_GATE', '1');
-      vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+      vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
     }
 
     it('disarms the E2E bypass so an anonymous first message reaches the Turnstile gate', async () => {
@@ -2063,7 +2154,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       stubRuntimeEnv({ nodeEnv: 'test' });
       vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
       vi.stubEnv('E2E_REQUIRE_TURNSTILE_GATE', '');
-      vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+      vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
       hoisted.isTurnstileConfiguredMock.mockReturnValue(true);
       hoisted.verifyTurnstileTokenMock.mockResolvedValue({
         success: false,
@@ -2119,7 +2210,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       vi.resetModules();
       stubRuntimeEnv({ nodeEnv: 'test' });
       vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
-      vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+      vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
       hoisted.checkGateForUserMock.mockResolvedValue(true);
       hoisted.executeChatTurnMock.mockResolvedValue({
         streamResult: {
@@ -2158,7 +2249,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       stubRuntimeEnv({ nodeEnv: 'test', vercelEnv: 'preview' });
       vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
       vi.stubEnv('E2E_REQUIRE_TURNSTILE_GATE', '1');
-      vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+      vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
       hoisted.isTurnstileConfiguredMock.mockReturnValue(true);
       hoisted.verifyTurnstileTokenMock.mockResolvedValue({
         success: false,

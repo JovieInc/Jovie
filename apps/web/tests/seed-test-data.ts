@@ -8,6 +8,7 @@
  * - no-restricted-imports: Seed scripts import full schema for flexibility
  */
 
+import { createHash } from 'node:crypto';
 /* eslint-disable no-restricted-imports */
 import { neon } from '@neondatabase/serverless';
 import { Redis } from '@upstash/redis';
@@ -980,6 +981,52 @@ const DUALIPA_QA_TOUR_DATES: TestTourDate[] = [
     startTime: '8:00 PM',
   },
 ];
+
+/** Minimal valid one-page PDF standing in for the private deck in E2E. */
+const E2E_INVESTOR_DECK_PDF = Buffer.from(
+  [
+    '%PDF-1.1',
+    '1 0 obj',
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    'endobj',
+    '2 0 obj',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    'endobj',
+    '3 0 obj',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 72 72] >>',
+    'endobj',
+    'trailer',
+    '<< /Root 1 0 R >>',
+    '%%EOF',
+    '',
+  ].join('\n'),
+  'utf8'
+);
+
+/**
+ * The gated deck route serves from the private investor content store
+ * (investor_portal_content), which production fills from JovieInc/Ops. The
+ * isolated E2E Neon branch starts empty, so /investor-portal/deck/* answered
+ * 404 and investor-portal-privacy.spec.ts failed on both browsers (matrix run
+ * 41153386766). Seed a synthetic PDF under the real path so the gated-route
+ * contract (200, application/pdf, private headers) is exercised without
+ * shipping the private deck into CI. Idempotent.
+ */
+async function seedInvestorPortalFixtures(
+  db: ReturnType<typeof drizzle>
+): Promise<void> {
+  console.log('    Seeding investor portal fixtures...');
+  await db
+    .insert(schema.investorPortalContent)
+    .values({
+      path: 'assets/investor-deck/Jovie-Pitch-Deck.pdf',
+      contentType: 'application/pdf',
+      bodyBase64: E2E_INVESTOR_DECK_PDF.toString('base64'),
+      byteSize: E2E_INVESTOR_DECK_PDF.byteLength,
+      sha256: createHash('sha256').update(E2E_INVESTOR_DECK_PDF).digest('hex'),
+    })
+    .onConflictDoNothing();
+}
 
 /**
  * Seeds tour dates for a creator profile.
@@ -2038,6 +2085,10 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
       );
       return { success: true };
     }
+    await withSeedDatabaseRetry(
+      () => seedInvestorPortalFixtures(db),
+      seedRetryOptions
+    );
     await withSeedDatabaseRetry(async () => {
       if (!options.publicProfilesOnly) {
         // Create E2E test user (for authenticated dashboard tests)

@@ -49,6 +49,10 @@ const NON_PRODUCT = /\.(test|spec|stories)\.[jt]sx?$/;
  */
 const FULL_TITLE_HEADING_FILES: ReadonlySet<string> = new Set([
   'apps/web/components/marketing/FaqSection.tsx',
+  // /proof/methodology states the rules behind every public number; a clamp
+  // would cut a rule title, so its h1/h2 stay complete.
+  'apps/web/app/(marketing)/proof/methodology/page.tsx',
+  'apps/web/components/marketing/proof/ProofMethodology.tsx',
   // Artist Profiles section value propositions stay complete at phone widths.
   'apps/web/components/marketing/artist-profile/ArtistProfileSectionHeader.tsx',
   'apps/web/components/marketing/artist-notifications/ArtistNotificationsHero.tsx',
@@ -78,6 +82,9 @@ const FULL_TITLE_HEADING_FILES: ReadonlySet<string> = new Set([
   // copy at desktop and 390px (route DOM clipped-heading, JOV-7713).
   'apps/web/app/(marketing)/launch/page.tsx',
   'apps/web/app/(marketing)/download/page.tsx',
+  // Page-spec section titles are authored value propositions (title is capped
+  // at 80 characters in the schema); a clamp would truncate published copy.
+  'apps/web/components/marketing/page-spec/PageSpecSections.tsx',
 ]);
 
 function hasEditorialTitleContract(

@@ -46,8 +46,8 @@ export function AuthProviderButtonSlot({
     >
       <Image
         src={`/auth/${provider}-logo.svg`}
-        width={provider === 'apple' ? 24 : 20}
-        height={provider === 'apple' ? 44 : 20}
+        width={20}
+        height={20}
         alt=''
         aria-hidden='true'
         unoptimized

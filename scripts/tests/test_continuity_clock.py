@@ -251,7 +251,7 @@ class CadenceClocksTest(unittest.TestCase):
                         self.assertIn("'repository_dispatch'", condition)
 
     def test_stale_workflows_are_dispatched_once_on_their_own_intervals(self):
-        self.age = {"stale-branch-sweep.yml": 8 * 86400}
+        self.age = {"stale-branch-sweep.yml": 8 * 86400, "postdeploy-probes.yml": 13 * 3600}
         result = clock.tick(self.path, "gem", self.api, NOW)
         self.assertEqual(result["status"], "dispatch-requested")
         self.assertEqual(set(result["clocks"]), {c.name for c in clock.CLOCKS[1:]})
@@ -282,6 +282,21 @@ class CadenceClocksTest(unittest.TestCase):
         self.assertEqual(result["clocks"]["runnerHeartbeat"]["status"], "current")
         self.assertEqual(result["clocks"]["costAnomaly"]["status"], "current")
         self.assertNotIn("event_type=clock_runner_heartbeat", self.posts())
+
+    def test_ignored_triggers_neither_refresh_nor_invalidate_a_clock(self):
+        cert = next(c for c in clock.CLOCKS if c.name == "prodGoldenPathCert")
+        page = lambda rows: (lambda run, args: json.dumps(
+            {"workflow_runs": []} if "status=in_progress" in args[-1]
+            else {"total_count": len(rows), "workflow_runs": rows}))
+        promotions = [run_row(age=60, id=7, event="workflow_run")]
+        with patch.object(clock, "api", side_effect=page(promotions)):
+            self.assertEqual(clock.observe(None, NOW, cert)["status"], "overdue")
+        with patch.object(clock, "api", side_effect=page(
+                promotions + [run_row(age=3600, id=8, event="repository_dispatch")])):
+            self.assertEqual(clock.observe(None, NOW, cert)["status"], "current")
+        with patch.object(clock, "api", side_effect=page(
+                promotions + [run_row(age=13 * 3600, id=9, event="repository_dispatch")])):
+            self.assertEqual(clock.observe(None, NOW, cert)["status"], "overdue")
 
     def test_one_broken_clock_state_leaves_the_others_running(self):
         (self.path / "cost-anomaly-clock.json").write_text("broken")

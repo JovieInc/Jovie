@@ -15,11 +15,7 @@ import {
   type ClaimInviteTemplateData,
   getClaimInviteEmail,
 } from '@/lib/email/templates/claim-invite';
-import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
-import {
-  formatFounderSender,
-  getSenderPolicy,
-} from '@/lib/notifications/sender-policy';
+import { GatewayEmailProvider } from '@/lib/notifications/providers/gateway';
 import { isEmailSuppressed } from '@/lib/notifications/suppression';
 import {
   COLD_CLAIM_INVITE_CLOSED_MESSAGE,
@@ -32,10 +28,10 @@ import { logger } from '@/lib/utils/logger';
  * Shared email provider instance (singleton).
  * Avoids creating a new provider for each job.
  */
-let emailProviderInstance: ResendEmailProvider | null = null;
+let emailProviderInstance: GatewayEmailProvider | null = null;
 
-function getEmailProvider(): ResendEmailProvider {
-  emailProviderInstance ??= new ResendEmailProvider();
+function getEmailProvider(): GatewayEmailProvider {
+  emailProviderInstance ??= new GatewayEmailProvider();
   return emailProviderInstance;
 }
 
@@ -182,23 +178,6 @@ export async function processSendClaimInviteJob(
     };
   }
 
-  // Always generate a fresh token pair per email send.
-  // The raw token is never stored at rest — only the hash is persisted in the DB.
-  const {
-    token: claimToken,
-    tokenHash,
-    expiresAt,
-  } = await generateClaimTokenPair();
-
-  await tx
-    .update(creatorProfiles)
-    .set({
-      claimToken: tokenHash,
-      claimTokenExpiresAt: expiresAt,
-      updatedAt: new Date(),
-    })
-    .where(eq(creatorProfiles.id, profile.id));
-
   // Check if the email is suppressed (user unsubscribed or bounced)
   const suppressionCheck = await isEmailSuppressed(invite.email);
   if (suppressionCheck.suppressed) {
@@ -225,6 +204,25 @@ export async function processSendClaimInviteJob(
     };
   }
 
+  // Rotate only once the send is certain to proceed: a suppressed recipient
+  // must not invalidate a link we already delivered.
+  // Always generate a fresh token pair per email send.
+  // The raw token is never stored at rest — only the hash is persisted in the DB.
+  const {
+    token: claimToken,
+    tokenHash,
+    expiresAt,
+  } = await generateClaimTokenPair();
+
+  await tx
+    .update(creatorProfiles)
+    .set({
+      claimToken: tokenHash,
+      claimTokenExpiresAt: expiresAt,
+      updatedAt: new Date(),
+    })
+    .where(eq(creatorProfiles.id, profile.id));
+
   // Mark as sending
   await tx
     .update(creatorClaimInvites)
@@ -246,14 +244,15 @@ export async function processSendClaimInviteJob(
   };
 
   const emailContent = getClaimInviteEmail(templateData);
-  const founderSender = getSenderPolicy('founder');
 
-  // Send via Resend (using singleton provider)
+  // Cold stream: the gateway rejects it until Tim approves a cold path
+  // (domain, provider, spend), and never sends it from jov.ie or Resend.
   const emailProvider = getEmailProvider();
   const result = await emailProvider.sendEmail({
+    stream: 'cold',
+    purpose: 'claim-invite',
+    consent: 'legitimate-interest',
     to: invite.email,
-    from: formatFounderSender(),
-    replyTo: founderSender.replyToEmail,
     subject: emailContent.subject,
     text: emailContent.text,
     html: emailContent.html,

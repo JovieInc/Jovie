@@ -342,24 +342,6 @@ const AUDIENCE_ROWS = [
   },
 ] as const;
 
-const STATS = [
-  {
-    value: '7M',
-    label: 'Tracks Generated Per Day On Suno Alone',
-    source: 'Source: Suno, 2025',
-  },
-  {
-    value: '$60.4B',
-    label: 'projected AI music market by 2034, up from $5.2B today',
-    source: 'Source: Market Research Future',
-  },
-  {
-    value: '$100',
-    label: 'Estimated Lifetime Value For Each Owned Fan Relationship',
-    source: 'Internal direct-to-fan estimate',
-  },
-] as const;
-
 const COMPARISON = [
   {
     label: 'Static Link Stack',
@@ -824,30 +806,6 @@ export default function LaunchPage() {
                   </section>
                 </div>
               </div>
-            </div>
-          </MarketingContainer>
-        </section>
-
-        <section
-          aria-labelledby='whynow-heading'
-          className='system-b-launch-section'
-          {...launchStamp('stats', '3-stat-band')}
-        >
-          <MarketingContainer width='page'>
-            <SectionIntro
-              headingId='whynow-heading'
-              eyebrow='Why now'
-              title='More creators than ever. More noise than ever.'
-              body='AI is creating more music and more competition for fan attention. Owned fan context is the edge.'
-            />
-            <div className='system-b-launch-stat-grid'>
-              {STATS.map(({ value, label, source }) => (
-                <article key={value}>
-                  <strong className='tabular-nums'>{value}</strong>
-                  <p>{label}</p>
-                  <span>{source}</span>
-                </article>
-              ))}
             </div>
           </MarketingContainer>
         </section>

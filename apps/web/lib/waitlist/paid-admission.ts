@@ -8,7 +8,7 @@ import { logger } from '@/lib/utils/logger';
 
 /**
  * A verified paid subscription admits its buyer. Anyone may check out the
- * $199 offer; once Stripe's signed webhook confirms the subscription is
+ * self-serve Pro offer (price: lib/config/plan-prices.ts); once Stripe's signed webhook confirms the subscription is
  * active, a still-pending account moves to `waitlist_approved` so the gate
  * never holds a paying customer on the waitlist. The update only matches
  * `waitlist_pending`, so it can never downgrade a further-along user or

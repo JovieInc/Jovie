@@ -166,7 +166,10 @@
         "at": "2026-10-20T22:14:00Z",
         "ref": "334dc8c4413326cad5832ed2b0e74780da7e3467:apps/web/app/claim/page.tsx"
       },
-      "sources": ["apps/web/app/claim/page.tsx"]
+      "sources": [
+        "apps/web/app/claim/agent/[draftId]/page.tsx",
+        "apps/web/app/claim/page.tsx"
+      ]
     },
     {
       "id": "home",
@@ -287,6 +290,7 @@
         "apps/web/app/(marketing)/cli/page.tsx",
         "apps/web/app/(marketing)/compare/[slug]/page.tsx",
         "apps/web/app/(marketing)/compare/page.tsx",
+        "apps/web/app/(marketing)/developers/agents/page.tsx",
         "apps/web/app/(marketing)/developers/page.tsx",
         "apps/web/app/(marketing)/download/page.tsx",
         "apps/web/app/(marketing)/engineering/[slug]/page.tsx",
@@ -303,6 +307,7 @@
         "apps/web/app/(marketing)/product/pre-save/page.tsx",
         "apps/web/app/(marketing)/product/release-scheduling/page.tsx",
         "apps/web/app/(marketing)/product/utm-links/page.tsx",
+        "apps/web/app/(marketing)/proof/methodology/page.tsx",
         "apps/web/app/(marketing)/smart-links/page.tsx",
         "apps/web/app/(marketing)/solutions/[audience]/page.tsx",
         "apps/web/app/(marketing)/support/page.tsx",
@@ -392,8 +397,8 @@
       "remainingScope": "Certified local source; continuous perceptual refinement is owned by JOV-8101.",
       "evidence": {
         "kind": "certification",
-        "at": "2026-10-29T10:03:24.442Z",
-        "ref": "docs/screenshots/jov-8882-pricing-renewal/README.md. Merged with PR #22849: home, section, blog, and artist-profile widths use one .public-container token; pricing section and chart dropped the 64rem cap; /pricing edges stayed x 71-1369 at 1440 and x 24-366 at 390 with no horizontal overflow. JOV-8882 launch-hero selectors in the shared stylesheet match no /pricing elements. Renewed 2026-10-29 (PR #23618): the shared stylesheet change touches only .system-b-artist-notifications-card-* and the mobile .system-b-launch-profile-stage rule, which match no /pricing elements. Renewed 2026-10-29 (PR #23597 rebase onto #23618): MarketingHero dropped its unused photo prop and photo-only classes; content-mode DOM and classes are unchanged (MarketingHero.test.tsx)."
+        "at": "2026-11-01T12:51:06.924Z",
+        "ref": "docs/screenshots/pricing-recert-1029/README.md. Renewed 2026-10-31 (PR #23964, rebased after #23954): the Artist Presence card now lists the features it adds over Free (derived from the comparison data), and two comparison row labels were renamed (Audience email capture, Release notifications to your audience); same markup and classes, no layout change. Verified by pricing unit tests only (MarketingPricingPlans, PricingComparisonChart, PricingRecipeBody, copy-rendered-verification); the pricing e2e and 1440/390 overflow check were not run locally and are left to CI. Main-red renewal: #23600 added a copy-allow comment around the copyright line in MarketingFooter.tsx (a /pricing owner); rendered DOM and layout unchanged. Pricing e2e 11/11 on current main, no horizontal overflow at 1440 or 390. Prior: docs/screenshots/mvp-pricing-audit-1029/README.md. PR #23570 replaced the false comparison row (fan capture capped at 100 on Free) with true certified rows; layout unchanged; pricing e2e 11/11 at 320-1440, no horizontal overflow at 1440 and 390. Merged with PR #23618 (main): its shared stylesheet change touches only .system-b-artist-notifications-card-* and the mobile .system-b-launch-profile-stage rule, which match no /pricing elements. Main Renewed 2026-10-29 (PR #23597 rebase onto #23618): MarketingHero dropped its unused photo prop and photo-only classes; content-mode DOM and classes are unchanged (MarketingHero.test.tsx). Renewed 2026-10-31 (PR #23954): PublicPageShell gained optional pageContract and footerShowCta props, MarketingHeader now reads the homepage CTA from data/marketing/headerCta.ts; only the (home) layout passes them, so /pricing rendered DOM is unchanged (defaults preserved; PublicPageShell, MarketingHeader and MarketingFooter unit tests green). Renewed 2026-10-31 (PR #24036): MarketingHeader and MarketingFooter read the pathname through usePublicPathname instead of usePathname so server and client markup agree; rendered DOM and classes on /pricing are unchanged (MarketingFooter and PublicPageShell unit tests green). Found by the merge-group census failure in run 41230243515. Renewed 2026-11-01 (PR #23611 rebase onto main): ArtistProfileLandingPage.css changed only .ap-how-it-works__setup-stage-header/-detail grid tracks after the step numeral was removed; no /pricing element uses those classes, so /pricing DOM and layout are unchanged. Renewed 2026-11-01 (PR #23606 rebase onto main after #23611): plan cards drop the eyebrow badge, one closing CTA, category rows lose mono caps, comparison rows stay the certified public set passed server-side; verified by hosted CI pricing unit and e2e lanes, production screenshots at 1440 and 390 after deploy. Same day: the comparison chart reads the certified row set directly again (no server prop), restoring main client chunking; markup unchanged. Same day (PR #23606 review fix): the plans-section padding-top rule moved after the section padding-block rules so it applies; only .system-b-pricing-section--plans changes."
       },
       "sources": ["apps/web/app/(marketing)/pricing/page.tsx"]
     },
@@ -698,6 +703,27 @@
       "to": "holdout",
       "at": "2026-10-29T01:10:00Z",
       "evidence": "PR #23536 introduces the signed homepage spec preview, rendering the same home sections; source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/(marketing)/developers/agents/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-29T09:55:00Z",
+      "evidence": "PR #23608 introduces the generated agent connector docs page (JOV-9762); source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/claim/agent/[draftId]/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-29T16:20:00Z",
+      "evidence": "PR #23573 introduces the agent draft claim page (JOV-9760); source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/(marketing)/proof/methodology/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-29T18:00:00Z",
+      "evidence": "Proof-stat methodology page generated from the stat registry; source registration only, not rendered certification."
     }
   ]
 }

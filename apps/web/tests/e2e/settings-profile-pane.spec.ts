@@ -621,6 +621,11 @@ test('Account keeps its full pane after Profile navigation and browser history',
       modalSheet:
         element?.getAttribute('role') === 'dialog' &&
         element?.getAttribute('aria-modal') === 'true',
+      // Guard-level receipts from lib/testing/runtime-trace (rail input
+      // flips + settles, in order) — names why the phase is stuck.
+      runtimeTrace:
+        (window as unknown as { __JOVIE_RUNTIME_TRACE__?: unknown })
+          .__JOVIE_RUNTIME_TRACE__ ?? null,
     };
   });
   process.stdout.write(

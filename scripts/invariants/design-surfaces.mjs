@@ -99,6 +99,25 @@ export const DESIGN_SURFACE_ROOTS = Object.freeze([
 ]);
 
 export const NAVIGATION_SOURCE = 'apps/web/data/marketingNavigation.ts';
+/**
+ * The published site chrome's code-default record (header nav + footer). Its
+ * hrefs are path literals (it is content, not code), so they are resolved back
+ * to APP_ROUTES members through `apps/web/constants/routes.ts` and held to the
+ * same label-to-destination binding as `NAVIGATION_SOURCE`.
+ */
+export const NAVIGATION_RECORD_SOURCE =
+  'apps/web/lib/content-records/site-chrome.defaults.ts';
+const ROUTES_SOURCE = 'apps/web/constants/routes.ts';
+
+/** Path literal -> APP_ROUTES member, read from the one routes file. */
+export function readRoutePaths(repoRoot) {
+  const text = readFileSync(resolve(repoRoot, ROUTES_SOURCE), 'utf8');
+  const paths = new Map();
+  for (const match of text.matchAll(/^\s*([A-Z0-9_]+):\s*'(\/[^']*)'/gm)) {
+    if (!paths.has(match[2])) paths.set(match[2], match[1]);
+  }
+  return paths;
+}
 export const LANDING_GRAMMAR_SOURCE =
   'apps/web/data/marketing/landingPageGrammar.ts';
 export const RECIPES_SOURCE = 'apps/web/data/marketing/recipes.ts';
@@ -385,7 +404,7 @@ function appRouteName(node) {
  * direct `APP_ROUTES.X` or template `${APP_ROUTES.X}#anchor` href, or the
  * literal URL for an external https link. Anything else is unparseable.
  */
-function navDestination(node) {
+function navDestination(node, routePaths) {
   const direct = appRouteName(node);
   if (direct) return direct;
   const expr = unwrapExpression(node);
@@ -399,6 +418,7 @@ function navDestination(node) {
   }
   const text = literalText(expr);
   if (text && /^https:\/\//.test(text)) return text;
+  if (text && routePaths?.has(text)) return routePaths.get(text);
   return null;
 }
 
@@ -407,7 +427,7 @@ function navDestination(node) {
  * Flyout menus (label + `links`) are containers, not destinations. Anything
  * the parser cannot resolve is returned as unparseable so it fails closed.
  */
-export function collectNavEntries(relPath, sourceText) {
+export function collectNavEntries(relPath, sourceText, routePaths) {
   const sourceFile = parseTs(relPath, sourceText);
   const entries = [];
   const unparseable = [];
@@ -427,7 +447,7 @@ export function collectNavEntries(relPath, sourceText) {
           });
         } else {
           const label = literalText(props.get('label'));
-          const destination = navDestination(props.get('href'));
+          const destination = navDestination(props.get('href'), routePaths);
           if (label == null) {
             unparseable.push({ line, reason: 'label is not a string literal' });
           } else if (destination == null) {
@@ -491,6 +511,10 @@ export const NAV_LABEL_DESTINATIONS = Object.freeze({
   Developers: ['DEVELOPERS'],
   'Jovie Card': ['CARD'],
   'Artist Profiles': ['ARTIST_PROFILES'],
+  // Site-chrome record labels are sentence case.
+  'Artist profiles': ['ARTIST_PROFILES'],
+  'Smart links': ['SMART_LINKS'],
+  Download: ['DOWNLOAD'],
   Pay: ['PAY'],
   'Fan Capture': ['ARTIST_PROFILES'],
   'Fan Reactivation': ['ARTIST_PROFILES'],
@@ -532,9 +556,13 @@ export function allowedNavDestinations(label) {
     : null;
 }
 
-export function scanNavSemantics(relPath, sourceText) {
+export function scanNavSemantics(relPath, sourceText, routePaths) {
   const findings = [];
-  const { entries, unparseable } = collectNavEntries(relPath, sourceText);
+  const { entries, unparseable } = collectNavEntries(
+    relPath,
+    sourceText,
+    routePaths
+  );
   for (const { line, reason } of unparseable) {
     findings.push({
       path: relPath,
@@ -801,6 +829,20 @@ export function scanRuntime(repoRoot = DEFAULT_ROOT, files = {}) {
     if (relPath === NAVIGATION_SOURCE) {
       findings.push(...scanNavSemantics(relPath, source));
     }
+  }
+  const recordSource =
+    files[NAVIGATION_RECORD_SOURCE] ??
+    (existsSync(resolve(repoRoot, NAVIGATION_RECORD_SOURCE))
+      ? readFileSync(resolve(repoRoot, NAVIGATION_RECORD_SOURCE), 'utf8')
+      : null);
+  if (recordSource != null) {
+    findings.push(
+      ...scanNavSemantics(
+        NAVIGATION_RECORD_SOURCE,
+        recordSource,
+        readRoutePaths(repoRoot)
+      )
+    );
   }
   findings.push(...scanRouteIntent(repoRoot, files));
   findings.push(...scanTasteLocks(repoRoot, files));

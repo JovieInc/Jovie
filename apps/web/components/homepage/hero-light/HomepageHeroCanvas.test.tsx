@@ -169,6 +169,43 @@ describe('HomepageHeroCanvas', () => {
     ).toBe(false);
     expect(screen.queryByRole('img')).toBeNull();
   });
+
+  it('uses product claim identities without changing the canonical proof frame', () => {
+    render(
+      <HomepageHeroCanvas
+        headingId='product-hero-heading'
+        headingTestId='product-hero-heading'
+        headline={hero.headline}
+        subhead={hero.subhead}
+        claim={hero.claim}
+        supportNote={hero.supportNote}
+        profile={hero.profile}
+        sectionOwner='apps/web/app/(marketing)/product/ProductLanding.tsx'
+        claimTestId='product-claim-card'
+        claimInputId='product-handle-input'
+        claimTestIdPrefix='product'
+        claimSubmitTestId='product-claim-cta'
+      />
+    );
+
+    expect(screen.getByTestId('product-hero-heading')).toHaveTextContent(
+      hero.headline
+    );
+    expect(screen.getByTestId('product-claim-card')).toContainElement(
+      screen.getByTestId('product-claim-cta')
+    );
+    expect(
+      screen.getByRole('textbox', { name: 'Choose Your Handle' })
+    ).toHaveAttribute('id', 'product-handle-input');
+    expect(screen.getByTestId('product-claim-form')).toHaveAttribute(
+      'action',
+      '/start'
+    );
+    expect(screen.getByTestId('homepage-hero-proof')).toContainElement(
+      screen.getByRole('img', { name: hero.profile.alt })
+    );
+    expect(screen.queryByTestId('homepage-primary-cta')).toBeNull();
+  });
 });
 
 describe('HomepageHeroCanvas proof geometry', () => {

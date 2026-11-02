@@ -29,7 +29,18 @@ for ref in origin/main main; do
 done
 
 if [[ -z "$BASE" ]]; then
-  # No usable base ref (shallow/detached clone, or base == HEAD) — fall back to a
+  # A candidate base ref exists but points at HEAD (e.g. a CI checkout of main
+  # after the push landed, or a push with no new commits): the changed-file
+  # diff is empty by definition, so there is nothing branch-local to lint.
+  # Skip rather than fall back to a repo-wide check — the fallback fails on
+  # pre-existing drift CI never scopes to (gh#12475) and fails every
+  # push-to-main dev-loop probe (CI Duration Ratchet).
+  if git rev-parse --verify -q origin/main >/dev/null 2>&1 \
+    || git rev-parse --verify -q main >/dev/null 2>&1; then
+    echo "[biome-pre-push] base ref equals HEAD; nothing changed to check"
+    exit 0
+  fi
+  # No usable base ref at all (shallow/detached clone) — fall back to a
   # full check rather than silently linting nothing.
   echo "[biome-pre-push] no usable base ref; checking whole repo"
   exec "$BIOME" check .

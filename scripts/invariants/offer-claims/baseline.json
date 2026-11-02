@@ -1,0 +1,335 @@
+{
+  "apps/desktop/SIGNING.md": {
+    "recurring_price": 1,
+    "billing_claim": 1
+  },
+  "apps/docs/app/docs/build-your-presence/audience/understand-audience-data/page.mdx": {
+    "trial_claim": 1,
+    "refund_guarantee_claim": 1
+  },
+  "apps/docs/app/docs/manage-jovie/contact-support/contact-support-or-report-incorrect-data/page.mdx": {
+    "refund_guarantee_claim": 1
+  },
+  "apps/docs/app/docs/manage-jovie/plans-and-billing/manage-your-subscription/page.mdx": {
+    "cancel_claim": 3,
+    "refund_guarantee_claim": 1
+  },
+  "apps/eve-pilot/COMMERCIAL_GOVERNOR.md": {
+    "recurring_price": 1
+  },
+  "apps/web/app/(home)/page.tsx": {
+    "structured_offer_literal": 2
+  },
+  "apps/web/app/(marketing)/card/JovieCardLanding.tsx": {
+    "refund_guarantee_claim": 1
+  },
+  "apps/web/app/(marketing)/launch/page.tsx": {
+    "no_card_claim": 1
+  },
+  "apps/web/app/(marketing)/pricing/page.tsx": {
+    "billing_claim": 1,
+    "free_forever_claim": 1,
+    "structured_offer_literal": 2
+  },
+  "apps/web/app/api/billing/status/route.ts": {
+    "trial_claim": 1
+  },
+  "apps/web/app/api/cron/send-release-notifications/route.ts": {
+    "trial_claim": 1
+  },
+  "apps/web/app/api/stripe/cancel/route.ts": {
+    "cancel_claim": 1
+  },
+  "apps/web/app/app/(shell)/admin/costs/page.tsx": {
+    "trial_claim": 1
+  },
+  "apps/web/app/app/(shell)/admin/revenue-lift/RevenueLiftDashboardView.tsx": {
+    "trial_claim": 1
+  },
+  "apps/web/app/billing/youtube-thumbnails/YoutubeThumbnailCheckoutClient.tsx": {
+    "billing_claim": 2,
+    "cancel_claim": 1
+  },
+  "apps/web/app/brand/page.tsx": {
+    "trial_claim": 1
+  },
+  "apps/web/app/claim/page.tsx": {
+    "cancel_claim": 1
+  },
+  "apps/web/app/exp/right-rail-shotgun/page.tsx": {
+    "trial_claim": 1
+  },
+  "apps/web/app/exp/shell-v1/ShellV1ExperimentClient.tsx": {
+    "trial_claim": 1
+  },
+  "apps/web/app/onboarding/actions/activate-trial.ts": {
+    "trial_claim": 4
+  },
+  "apps/web/app/onboarding/actions/post-onboarding.ts": {
+    "trial_claim": 2
+  },
+  "apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx": {
+    "free_forever_claim": 2
+  },
+  "apps/web/components/features/admin/FunnelMetricsStrip.tsx": {
+    "billing_claim": 1
+  },
+  "apps/web/components/features/admin/capacity/CapacityBoard.tsx": {
+    "billing_claim": 3
+  },
+  "apps/web/components/features/auth/AuthOfferSummary.tsx": {
+    "trial_claim": 2,
+    "billing_claim": 1
+  },
+  "apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.tsx": {
+    "trial_claim": 1
+  },
+  "apps/web/components/features/dashboard/organisms/jovie-work-feed/JovieWorkFeed.tsx": {
+    "trial_claim": 1
+  },
+  "apps/web/components/features/dashboard/organisms/release-provider-matrix/SmartLinkGateBanner.tsx": {
+    "trial_claim": 1
+  },
+  "apps/web/components/features/home/PipelineBottleneckBanner.tsx": {
+    "billing_claim": 1
+  },
+  "apps/web/components/features/pay/PayLanding.tsx": {
+    "no_card_claim": 1,
+    "free_forever_claim": 1
+  },
+  "apps/web/components/marketing/homepage-v2/HomepageV2Ctas.tsx": {
+    "free_forever_claim": 1
+  },
+  "apps/web/components/organisms/PricingRecipeBody.tsx": {
+    "billing_claim": 1,
+    "free_forever_claim": 1
+  },
+  "apps/web/components/organisms/VoicePageContent.tsx": {
+    "no_card_claim": 1,
+    "cancel_claim": 1
+  },
+  "apps/web/components/organisms/billing/BillingActionsSection.tsx": {
+    "cancel_claim": 3
+  },
+  "apps/web/components/organisms/billing/PlanComparisonSection.tsx": {
+    "billing_claim": 2
+  },
+  "apps/web/components/organisms/home-loop/HomeLoopLatency.tsx": {
+    "trial_claim": 1
+  },
+  "apps/web/components/organisms/home-loop/fixtures.ts": {
+    "recurring_price": 1,
+    "billing_claim": 1,
+    "plan_price": 1
+  },
+  "apps/web/constants/admin-navigation.ts": {
+    "trial_claim": 1
+  },
+  "apps/web/content/legal/terms.md": {
+    "billing_claim": 2,
+    "trial_claim": 3,
+    "no_card_claim": 1,
+    "cancel_claim": 2,
+    "refund_guarantee_claim": 3
+  },
+  "apps/web/content/published-claims.ts": {
+    "trial_claim": 1
+  },
+  "apps/web/data/homepageFrontDoorCta.ts": {
+    "no_card_claim": 1,
+    "free_forever_claim": 1
+  },
+  "apps/web/data/homepageV2Copy.ts": {
+    "trial_claim": 3,
+    "no_card_claim": 1,
+    "free_forever_claim": 1
+  },
+  "apps/web/data/marketing/copy.ts": {
+    "trial_claim": 1,
+    "no_card_claim": 1,
+    "refund_guarantee_claim": 1
+  },
+  "apps/web/data/marketing/renderedCopyCoverage.ts": {
+    "free_forever_claim": 3,
+    "recurring_price": 4,
+    "plan_price": 3,
+    "billing_claim": 4
+  },
+  "apps/web/data/marketingCtaIntents.ts": {
+    "no_card_claim": 1
+  },
+  "apps/web/data/product-truth/golden-path-claims.ts": {
+    "free_forever_claim": 1,
+    "refund_guarantee_claim": 1
+  },
+  "apps/web/data/product-truth/golden-path-proof.gen.json": {
+    "free_forever_claim": 1,
+    "refund_guarantee_claim": 3
+  },
+  "apps/web/data/product-truth/registry.ts": {
+    "trial_claim": 1
+  },
+  "apps/web/docs/auth-visual-audit-2026-05-09T031254Z.md": {
+    "no_card_claim": 1
+  },
+  "apps/web/lib/acquisition/canonical-artist-site-certification.ts": {
+    "billing_claim": 2
+  },
+  "apps/web/lib/acquisition/eligibility.ts": {
+    "plan_price": 5,
+    "refund_guarantee_claim": 3
+  },
+  "apps/web/lib/acquisition/proof-claim-funnel.ts": {
+    "billing_claim": 1
+  },
+  "apps/web/lib/auth/auth-offer-optimization.ts": {
+    "trial_claim": 4
+  },
+  "apps/web/lib/auth/auth-shell-offer.ts": {
+    "billing_claim": 1
+  },
+  "apps/web/lib/billing/commerce/RAIL_DECISIONS.md": {
+    "recurring_price": 1,
+    "billing_claim": 1
+  },
+  "apps/web/lib/billing/commerce/platform-evidence.ts": {
+    "refund_guarantee_claim": 1
+  },
+  "apps/web/lib/billing/commerce/rail-decisions.ts": {
+    "refund_guarantee_claim": 1
+  },
+  "apps/web/lib/billing/commerce/support-matrix.ts": {
+    "refund_guarantee_claim": 4,
+    "billing_claim": 1
+  },
+  "apps/web/lib/billing/offer-truth.ts": {
+    "trial_claim": 2,
+    "no_card_claim": 1,
+    "free_forever_claim": 2,
+    "billing_claim": 3
+  },
+  "apps/web/lib/billing/price-assignment.ts": {
+    "no_card_claim": 1
+  },
+  "apps/web/lib/billing/sync-remediation-policy.ts": {
+    "refund_guarantee_claim": 2
+  },
+  "apps/web/lib/billing/verified-upgrade.ts": {
+    "billing_claim": 2
+  },
+  "apps/web/lib/canaries/m2-revenue-path.ts": {
+    "billing_claim": 2
+  },
+  "apps/web/lib/chat/knowledge/topics/playlist-strategy.md": {
+    "refund_guarantee_claim": 2
+  },
+  "apps/web/lib/chat/knowledge/topics/profile-optimization.md": {
+    "trial_claim": 1
+  },
+  "apps/web/lib/chat/knowledge/topics/release-strategy.md": {
+    "trial_claim": 1
+  },
+  "apps/web/lib/chat/knowledge/topics/streaming-metrics.md": {
+    "refund_guarantee_claim": 1
+  },
+  "apps/web/lib/chat/prompts/onboarding.ts": {
+    "billing_claim": 2,
+    "trial_claim": 1,
+    "no_card_claim": 1,
+    "cancel_claim": 1
+  },
+  "apps/web/lib/chat/system-prompt.ts": {
+    "refund_guarantee_claim": 1
+  },
+  "apps/web/lib/claim/claim-verification-review.server.ts": {
+    "refund_guarantee_claim": 3
+  },
+  "apps/web/lib/claim/proof-terms.ts": {
+    "cancel_claim": 1,
+    "refund_guarantee_claim": 1
+  },
+  "apps/web/lib/connectors/eval/fixtures/booking_us_east_coast.ts": {
+    "refund_guarantee_claim": 1
+  },
+  "apps/web/lib/constants/ai-models.ts": {
+    "billing_claim": 2
+  },
+  "apps/web/lib/constants/schemas.ts": {
+    "structured_offer_literal": 2
+  },
+  "apps/web/lib/entitlements/registry.ts": {
+    "free_forever_claim": 1,
+    "trial_claim": 2
+  },
+  "apps/web/lib/finance/classification.ts": {
+    "refund_guarantee_claim": 1
+  },
+  "apps/web/lib/finance/metric-contracts.ts": {
+    "refund_guarantee_claim": 5,
+    "trial_claim": 1
+  },
+  "apps/web/lib/investors/fundraising-registry.ts": {
+    "refund_guarantee_claim": 1
+  },
+  "apps/web/lib/library/product-graph-optimization.ts": {
+    "trial_claim": 1
+  },
+  "apps/web/lib/merch/orders.ts": {
+    "refund_guarantee_claim": 1
+  },
+  "apps/web/lib/music-resolver/parity/chartmetric-endpoints.ts": {
+    "trial_claim": 1
+  },
+  "apps/web/lib/music-resolver/parity/permissions.ts": {
+    "trial_claim": 1,
+    "billing_claim": 1
+  },
+  "apps/web/lib/music-resolver/parity/socialblade-rows.ts": {
+    "refund_guarantee_claim": 1
+  },
+  "apps/web/lib/ovie/company-operations.ts": {
+    "trial_claim": 3
+  },
+  "apps/web/lib/ovie/generated/invariant-stewardship.current-week.json": {
+    "billing_claim": 1
+  },
+  "apps/web/lib/queries/useBillingMutations.ts": {
+    "cancel_claim": 2
+  },
+  "apps/web/lib/rate-limit/config.ts": {
+    "trial_claim": 1
+  },
+  "apps/web/lib/sections/variants/logo-bar.tsx": {
+    "no_card_claim": 1
+  },
+  "apps/web/lib/seo/structured-data/merch.ts": {
+    "structured_offer_literal": 1
+  },
+  "apps/web/lib/services/channel-intelligence/playlist-rules.ts": {
+    "trial_claim": 3
+  },
+  "apps/web/lib/stripe/client.ts": {
+    "cancel_claim": 1
+  },
+  "apps/web/lib/stripe/legacy-prices.ts": {
+    "plan_price": 2
+  },
+  "apps/web/lib/stripe/startup-validation.ts": {
+    "billing_claim": 1
+  },
+  "apps/web/lib/stripe/test-price-contract.ts": {
+    "billing_claim": 2
+  },
+  "apps/web/lib/stripe/webhooks/handlers/charge-handler.ts": {
+    "refund_guarantee_claim": 2
+  },
+  "apps/web/lib/testing/reliability-detectors.ts": {
+    "plan_price": 1
+  },
+  "apps/web/lib/visibility-audit/offer.ts": {
+    "billing_claim": 1
+  },
+  "apps/web/typecheck-tests-baseline.json": {
+    "trial_claim": 1
+  }
+}

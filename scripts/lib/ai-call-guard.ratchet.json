@@ -1,0 +1,19 @@
+{
+  "schema": "jovie.ai-call-guard-ratchet/v1",
+  "entries": {
+    ".github/scripts/internal-pr-review.mjs": 1,
+    "apps/web/lib/ai/gateway-spend.ts": 1,
+    "apps/web/lib/services/album-art/provider-xai.ts": 1,
+    "apps/web/lib/services/retouching/provider-gemini.ts": 1,
+    "apps/web/scripts/golden-path-visual-review.ts": 1,
+    "apps/web/scripts/merch-alpha-spike.ts": 1,
+    "apps/web/scripts/merch-image-spike.ts": 1,
+    "apps/web/scripts/merch-knockout-spike.ts": 1,
+    "packages/copy/judge.ts": 1,
+    "packages/research/judge.ts": 1,
+    "scripts/invariants/jev-gateway.mjs": 1,
+    "scripts/knowledge/distill.ts": 1,
+    "scripts/lib/credentials-live-reads.mjs": 1,
+    "scripts/screenshot-loop/screenshot-bug-loop.mjs": 1
+  }
+}

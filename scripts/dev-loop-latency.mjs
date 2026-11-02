@@ -23,6 +23,14 @@ export const BUDGETS = Object.freeze({
   stepOverrides: Object.freeze({
     'bash scripts/security/scan-secrets.sh pre-commit': 10,
     'pnpm exec lint-staged --no-stash': 10,
+    // Publication rung: biome-pre-push (changed-file scope; the base==HEAD
+    // probe skip keeps it fast on CI checkouts of main), a scanner-binary
+    // cold download (~4.4s on ubuntu-latest, run 36212094867 baseline) and
+    // the real git+Biome hook fixtures. Measured end-to-end at 3.7s on a
+    // 2-core sandbox (2026-10-29); 20s keeps ~5x headroom. The retired
+    // full-repo `biome check .` fallback failed on exit code regardless of
+    // duration, and at its ~25-33s slow end would trip this budget too.
+    'bash scripts/hooks/pre-push-gate.sh publication': 20,
   }),
   preCommitTotalSeconds: 25,
 });

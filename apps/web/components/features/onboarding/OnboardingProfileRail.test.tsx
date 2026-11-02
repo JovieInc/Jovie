@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { UIMessage } from 'ai';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -170,7 +171,8 @@ describe('OnboardingProfileRail', () => {
     expect(
       screen.queryByTestId('onboarding-dsp-match-strip')
     ).not.toBeInTheDocument();
-    expect(screen.getByText('Draft · founder · Review')).toBeInTheDocument();
+    expect(screen.getByText('Preview · not claimed yet')).toBeInTheDocument();
+    expect(screen.queryByText(/Draft · /)).toBeNull();
     expect(screen.queryByText('Test Artist')).not.toBeInTheDocument();
   });
   it('renders nothing when there is no preview artist', () => {
@@ -199,6 +201,8 @@ describe('OnboardingProfileRail', () => {
     expect(rail).toContainElement(strip);
     expect(phonePreview).not.toContainElement(strip);
     expect(screen.getByText(/12\.3K Spotify followers/)).toBeVisible();
+    // No pipeline words in the preview (2026-10-31 golden-path walk).
+    expect(screen.queryByText(/enrichment|\(source:/i)).toBeNull();
   });
 
   it('renders the inline rail variant at mobile widths', () => {
@@ -210,9 +214,55 @@ describe('OnboardingProfileRail', () => {
       screen.getByTestId('onboarding-profile-rail-inline')
     ).toBeInTheDocument();
   });
+
+  it('lets keyboard users enter the side preview scroll region', async () => {
+    const user = userEvent.setup();
+    render(<OnboardingProfileRail placement='side' state={CONFIRMED_STATE} />);
+
+    await user.tab();
+
+    expect(
+      screen.getByRole('complementary', { name: 'Profile Preview' })
+    ).toHaveFocus();
+  });
+
+  it('does not add a container tab stop to the inline preview', async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <OnboardingProfileRail placement='inline' state={CONFIRMED_STATE} />
+        <button type='button'>Continue conversation</button>
+      </>
+    );
+
+    await user.tab();
+
+    expect(
+      screen.getByRole('button', { name: 'Continue conversation' })
+    ).toHaveFocus();
+  });
 });
 
 describe('resolvePreviewArtist', () => {
+  it('previews a claimed handle before any link is shared (Pen R6As7U)', () => {
+    expect(
+      resolvePreviewArtist({
+        artist: null,
+        artistConfirmed: false,
+        handle: 'timwhite',
+        socialLinks: [],
+      })
+    ).toEqual({ id: 'handle-timwhite', name: 'timwhite', url: '' });
+    expect(
+      resolvePreviewArtist({
+        artist: null,
+        artistConfirmed: false,
+        handle: null,
+        socialLinks: [],
+      })
+    ).toBeNull();
+  });
+
   it('previews a handle-only profile once social links exist', () => {
     expect(
       resolvePreviewArtist({
@@ -222,5 +272,68 @@ describe('resolvePreviewArtist', () => {
         socialLinks: ['https://instagram.com/djnova'],
       })
     ).toEqual({ id: 'handle-djnova', name: 'djnova', url: '' });
+  });
+});
+
+// JOV-7973: the side rail is a focusable scroll region, so it must own its
+// Home/End keyboard scrolling (JOV-8844 reachability) instead of relying on
+// the browser default, which the live chat's focus/keyboard layers can shadow
+// mid-journey — leaving the rail at its bottom edge with the preview badge
+// clipped at the scrollport top (golden-path toBeInViewport ratio 0.8125).
+describe('OnboardingProfileRail keyboard scrolling (JOV-7973)', () => {
+  it('scrolls itself to the top edge on Home', async () => {
+    const user = userEvent.setup();
+    render(<OnboardingProfileRail placement='side' state={CONFIRMED_STATE} />);
+    const rail = screen.getByTestId('onboarding-profile-rail');
+    const scrollTo = vi.fn();
+    Object.defineProperty(rail, 'scrollTo', {
+      configurable: true,
+      value: scrollTo,
+    });
+
+    await user.type(rail, '{Home}');
+    expect(scrollTo).toHaveBeenLastCalledWith({
+      top: 0,
+      behavior: 'auto',
+    });
+  });
+
+  it('scrolls itself to the bottom edge on End', async () => {
+    const user = userEvent.setup();
+    render(<OnboardingProfileRail placement='side' state={CONFIRMED_STATE} />);
+    const rail = screen.getByTestId('onboarding-profile-rail');
+    const scrollTo = vi.fn();
+    Object.defineProperty(rail, 'scrollTo', {
+      configurable: true,
+      value: scrollTo,
+    });
+    Object.defineProperty(rail, 'scrollHeight', {
+      configurable: true,
+      value: 754,
+    });
+    Object.defineProperty(rail, 'clientHeight', {
+      configurable: true,
+      value: 720,
+    });
+
+    await user.type(rail, '{End}');
+    expect(scrollTo).toHaveBeenLastCalledWith({
+      top: 34,
+      behavior: 'auto',
+    });
+  });
+
+  it('lets every other key scroll natively (no preventDefault)', async () => {
+    const user = userEvent.setup();
+    render(<OnboardingProfileRail placement='side' state={CONFIRMED_STATE} />);
+    const rail = screen.getByTestId('onboarding-profile-rail');
+    const scrollTo = vi.fn();
+    Object.defineProperty(rail, 'scrollTo', {
+      configurable: true,
+      value: scrollTo,
+    });
+
+    await user.type(rail, '{ArrowDown}');
+    expect(scrollTo).not.toHaveBeenCalled();
   });
 });

@@ -3,7 +3,9 @@ import test from 'node:test';
 import {
   findDesignAuthorityViolations,
   hasExactSerifException,
+  interactiveRatchetViolations,
   isSerifDeclaration,
+  rawInteractiveCounts,
   validateSerifException,
 } from './design-authority-guard.mjs';
 
@@ -88,4 +90,33 @@ test('serif exceptions reject broad or wildcard exemptions', () => {
       }),
     /kind must be ugc or media/
   );
+});
+
+const settingsFile = 'apps/web/app/app/(shell)/settings/example.tsx';
+test('raw control detector parses JSX, ignoring comments, strings and test files', () => {
+  const source = `// <button> in a comment
+    const text = '<input />';
+    const view = <><button
+      type="button">Save</button><input /><select /><Button /><Input /></>;`;
+  const counts = rawInteractiveCounts(settingsFile, source);
+  assert.deepEqual(counts, { button: 1, input: 1, select: 1 });
+  assert.deepEqual(
+    rawInteractiveCounts(settingsFile.replace('.tsx', '.test.tsx'), source),
+    {}
+  );
+});
+
+test('raw control ratchet blocks new files, new tags and growth; requires debt shrinkage', () => {
+  const sources = { [settingsFile]: '<button />' };
+  const baseline = { [`${settingsFile}:<button>`]: 1 };
+  assert.deepEqual(interactiveRatchetViolations(sources, baseline), []);
+  assert.equal(interactiveRatchetViolations(sources, {}).length, 1);
+  for (const source of ['<button /><input />', '<button /><button />']) {
+    const findings = interactiveRatchetViolations(
+      { [settingsFile]: source },
+      baseline
+    );
+    assert.equal(findings.length, 1);
+  }
+  assert.match(interactiveRatchetViolations({}, baseline)[0], /shrink/);
 });

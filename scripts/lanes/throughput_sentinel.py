@@ -9,6 +9,13 @@ Alarms (each names its stage and carries its evidence):
   throughput-queue-no-merge          merge queue > 0, zero merges in the last 60 min
   throughput-queue-unmergeable      an UNMERGEABLE queue entry the sweep could not dequeue (it dequeues, comments and
                                      routes to lane-fix-conflict after 10 min; #23519 stalled the queue 3h)
+  throughput-queue-starved           merge queue depth <= 1 while CLEAN unqueued PRs wait, for > 10 min (supply-side:
+                                     green PRs are not being enrolled; 2026-10-29 17:53Z the queue held 1 entry beside
+                                     5 CLEAN unqueued PRs and 35 DIRTY ones)
+  throughput-supply-dwell:<state>    p95 dwell of non-draft PRs in BLOCKED/DIRTY/CLEAN-unqueued past its SLO
+  throughput-remediation-silent      no remediation dispatcher (swarm run or lane fix) for 30 min while red or DIRTY PRs
+                                     exist (2026-10-29: the swarm last ran 05:35Z, safe-pr-remediation 10-26, the relay
+                                     that was meant to call them was disabled)
   throughput-claim-errors:<lane>     >= 20% of a lane's runs in 30 min died on claim-error (a broken claim ledger
                                      killed ~560 fix-red runs from 2026-10-26 07:30Z and nothing alarmed)
   throughput-merge-group-start-slow  merge-group runs wait > 5 min (p50) for a runner
@@ -35,12 +42,38 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
+from atomic_state import atomic_write_text
+
 IDLE_LOG = "idle-exits.jsonl"
 IDLE_LOG_KEEP_S = 2 * 3600
 IDLE_LOG_MAX_BYTES = 512 * 1024
 NO_PUSH_S = 3600
 MERGE_GROUP_START_P50_MIN = 5.0
 MERGE_GROUP_MIN_RUNS = 3
+# Per-pool merge-gate wait (2026-10-29): after #23586 moved the gate jobs to the gem pool its
+# created->started wait was p50 120 s / p95 451 s while hosted jobs in the same groups waited
+# p50 3 s / p95 33 s. Alarm when the self-hosted pool is the slower one, or hosted is saturated.
+POOL_MIN_JOBS = 5
+POOL_SLOWER_MARGIN_S = 30.0
+HOSTED_SATURATED_P50_S = 120.0
+SELF_HOSTED_LABELS = frozenset({"self-hosted", "jovie-fixed"})
+
+
+def runner_pool(labels) -> str:
+    """'self-hosted' when a job asked for the gem pool, else 'hosted'."""
+    return "self-hosted" if any(str(l).lower() in SELF_HOSTED_LABELS for l in labels or []) else "hosted"
+
+
+def pool_waits(waits_by_pool: dict) -> dict:
+    """p50/p95/n of created->started seconds per runner pool."""
+    out = {}
+    for pool, waits in sorted(waits_by_pool.items()):
+        if not waits:
+            continue
+        ordered = sorted(waits)
+        p95 = ordered[max(0, min(len(ordered) - 1, -(-95 * len(ordered) // 100) - 1))]
+        out[pool] = {"n": len(ordered), "p50S": round(statistics.median(ordered), 1), "p95S": round(p95, 1)}
+    return out
 LEASE_HELD_MIN = 45.0
 IDLE_DOMINANT_FRACTION = 0.5
 IDLE_DOMINANT_MIN_EXITS = 6
@@ -165,7 +198,7 @@ def sample_release_flow(state: Path, now: float, run=None, repo: str = REPO) -> 
         groups = _gh_json(run, f"repos/{repo}/actions/runs?event=merge_group&per_page=30&created=%3E%3D{since}")
         # run_started_at equals created_at for merge_group runs; the real wait is a job's
         # created_at -> started_at (runner assignment), sampled over the latest runs.
-        waits, sampled = [], 0
+        waits, sampled, by_pool = [], 0, {}
         for row in sorted(groups.get("workflow_runs") or [], key=lambda r: str(r.get("created_at")), reverse=True):
             if sampled >= MERGE_GROUP_SAMPLE_RUNS:
                 break
@@ -176,6 +209,7 @@ def sample_release_flow(state: Path, now: float, run=None, repo: str = REPO) -> 
                 created, started = _iso_epoch(job.get("created_at")), _iso_epoch(job.get("started_at"))
                 if created is not None and started is not None and started >= created:
                     waits.append((started - created) / 60)
+                    by_pool.setdefault(runner_pool(job.get("labels")), []).append(started - created)
         held = _gh_json(run, f"repos/{repo}/actions/workflows/{CONTROLLER_WORKFLOW}/runs?status=in_progress&per_page=10")
         leases = [(now - started) / 60 for row in held.get("workflow_runs") or []
                   if (started := _iso_epoch(row.get("run_started_at"))) is not None]
@@ -193,8 +227,270 @@ def sample_release_flow(state: Path, now: float, run=None, repo: str = REPO) -> 
                   "mergeGroupRuns": sampled, "mergeGroupJobs": len(waits),
                   "mergeGroupStartP50Min": round(statistics.median(waits), 2) if waits else None,
                   "mergeGroupStartMaxMin": round(max(waits), 2) if waits else None,
+                  "mergeGroupStartByPool": pool_waits(by_pool),
                   "leaseHeldMin": round(max(leases), 1) if leases else 0.0, "leaseRunIds": runs[:3],
                   "queuedRuns": queued_total, "queuedOldestMin": oldest_min}
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(signal, sort_keys=True))
+        os.replace(tmp, path)
+        return signal, None
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        return (cached or None), f"{type(error).__name__}: {error}"[:200]
+
+
+QUEUE_TIMINGS_REFRESH_S, QUEUE_TIMINGS_PRS, QUEUE_TIMINGS_FILE = 900, 12, "queue-timings.json"
+SUPPLY_FILE, SUPPLY_REFRESH_S = "supply-flow.json", 120
+QUEUE_STARVED_S = 600          # depth <= 1 with CLEAN unqueued PRs for longer than this alarms
+QUEUE_STARVED_DEPTH = 1
+# Dwell SLOs (p95 seconds a PR sits in one supply state before it moves). CLEAN-unqueued is the one
+# Green Enroll owns: one 10-minute backstop sweep plus its 200 s budget.
+SUPPLY_DWELL_SLO_S = {"CLEAN-unqueued": 900, "DIRTY": 6 * 3600, "BLOCKED": 12 * 3600}
+SUPPLY_DWELL_MIN_PRS = 3
+ADMIT_STATES = frozenset({"CLEAN", "HAS_HOOKS", "UNSTABLE"})
+BACKSTOP_ENROLL_AFTER_S, BACKSTOP_ENROLL_EVERY_S = 600, 600
+BACKSTOP_FILE, ENROLL_WORKFLOW = "green-enroll-backstop.json", "merge-queue-green-enroll.yml"
+REARM_CONTEXT = "jovie-queue-victim-rearm/v1"  # scripts/merge-group-victim-rearm.mjs
+
+
+def _pct(values: list, q: float):
+    values = sorted(values)
+    return round(values[min(len(values) - 1, int(len(values) * q))], 1) if values else None
+
+
+def _supply_blockers() -> frozenset:
+    """Admission hold labels (scripts/lib/admission-hold-labels.json: the one source Green Enroll reads)."""
+    try:
+        data = json.loads((Path(__file__).resolve().parents[1] / "lib" / "admission-hold-labels.json").read_text())
+        return frozenset(x.lower() for x in [*data["stopHoldLabels"], data["queuePoisonLabel"],
+                                             *data["machineBlockLabels"]])
+    except (OSError, ValueError, KeyError):
+        return frozenset({"hold", "gated", "incident", "queue-deferred", "queue-poison", "lane-fix-red"})
+
+
+SUPPLY_QUERY = """query($owner:String!,$repo:String!,$after:String){repository(owner:$owner,name:$repo){
+mergeQueue(branch:"main"){entries{totalCount}}
+pullRequests(states:OPEN,first:100,after:$after,baseRefName:"main"){pageInfo{hasNextPage endCursor}
+nodes{number isDraft isInMergeQueue isCrossRepository mergeStateStatus createdAt headRefOid labels(first:30){nodes{name}}}}}}"""
+
+
+def sample_supply_flow(state: Path, now: float, run=None, repo: str = REPO) -> tuple[dict | None, str | None]:
+    """Supply side of the merge queue (schema symphony-supply-flow/v1), every 2 min: how many open non-draft
+    PRs sit in each state, how long each has been in it (first-seen per head and state, kept in the
+    state file), whether the queue is starved (depth <= 1 while admissible PRs wait unqueued) and since
+    when, and the CLEAN-unqueued -> queued dwell of PRs that left that state (the green->enqueue lag,
+    sample-interval resolution; Green Enroll's own receipts carry the exact figure). Also merged
+    into queue-timings.json under `supply`."""
+    path = Path(state) / SUPPLY_FILE
+    try:
+        cached = json.loads(path.read_text())
+    except (OSError, ValueError):
+        cached = {}
+    if isinstance(cached.get("observedAt"), (int, float)) and 0 <= now - cached["observedAt"] < SUPPLY_REFRESH_S:
+        return cached, None
+    run = run or _budgeted_gh
+    owner, name = repo.split("/")
+    blockers = _supply_blockers()
+    try:
+        nodes, after, depth = [], None, None
+        for _ in range(5):
+            args = ["api", "graphql", "-f", f"query={SUPPLY_QUERY}", "-F", f"owner={owner}", "-F", f"repo={name}"]
+            if after:
+                args += ["-F", f"after={after}"]
+            result = run(args, capture_output=True, text=True, timeout=60)
+            if result.returncode != 0:
+                raise RuntimeError((result.stderr or result.stdout or f"exit {result.returncode}").strip()[-160:])
+            data = json.loads(result.stdout)["data"]["repository"]
+            depth = ((data.get("mergeQueue") or {}).get("entries") or {}).get("totalCount", 0)
+            nodes += data["pullRequests"]["nodes"]
+            if not data["pullRequests"]["pageInfo"]["hasNextPage"]:
+                break
+            after = data["pullRequests"]["pageInfo"]["endCursor"]
+        previous = cached.get("prs") if isinstance(cached.get("prs"), dict) else {}
+        prs, dwell, left_clean = {}, {}, []
+        for node in nodes:
+            if node.get("isDraft") or node.get("isCrossRepository"):
+                continue
+            labels = {l["name"].lower() for l in (node.get("labels") or {}).get("nodes") or []}
+            status = node.get("mergeStateStatus")
+            if node.get("isInMergeQueue"):
+                bucket = "queued"
+            elif status in ADMIT_STATES and labels & blockers:
+                bucket = "held"
+            elif status in ADMIT_STATES:
+                bucket = "CLEAN-unqueued"
+            elif status == "DIRTY":
+                bucket = "DIRTY"
+            elif status == "BLOCKED":
+                bucket = "BLOCKED"
+            else:
+                bucket = status or "UNKNOWN"
+            before = previous.get(str(node["number"])) or {}
+            same = before.get("bucket") == bucket and before.get("head") == node.get("headRefOid")
+            since = before["since"] if same and isinstance(before.get("since"), (int, float)) else now
+            prs[str(node["number"])] = {"bucket": bucket, "head": node.get("headRefOid"), "since": since}
+            dwell.setdefault(bucket, []).append(now - since)
+            if bucket == "queued" and before.get("bucket") == "CLEAN-unqueued" and before.get("head") == node.get("headRefOid"):
+                left_clean.append(now - before["since"])
+        clean = dwell.get("CLEAN-unqueued", [])
+        starving = depth is not None and depth <= QUEUE_STARVED_DEPTH and bool(clean)
+        starved_since = (cached.get("starvedSince") or now) if starving else None
+        samples = [x for x in (cached.get("greenToEnqueueS") or []) if isinstance(x, (int, float))][-200:] + left_clean
+        signal = {"schema": "symphony-supply-flow/v1", "observedAt": now, "queueDepth": depth, "prs": prs,
+                  "counts": {k: len(v) for k, v in sorted(dwell.items())},
+                  "dwellS": {k: {"p50": _pct(v, .5), "p95": _pct(v, .95), "max": round(max(v), 1)}
+                             for k, v in sorted(dwell.items()) if v},
+                  "starvedSince": starved_since, "starvedForS": round(now - starved_since, 1) if starved_since else 0,
+                  "cleanUnqueued": sorted(int(n) for n, row in prs.items() if row["bucket"] == "CLEAN-unqueued")[:20],
+                  "greenToEnqueueS": samples[-200:],
+                  "greenToEnqueueP50S": _pct(samples, .5), "greenToEnqueueP95S": _pct(samples, .95)}
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(signal, sort_keys=True))
+        os.replace(tmp, path)
+        try:  # the queue-timings feed carries the same numbers for the reviewers of that file
+            timings_path = Path(state) / QUEUE_TIMINGS_FILE
+            timings = json.loads(timings_path.read_text())
+            timings["supply"] = {k: signal[k] for k in ("observedAt", "queueDepth", "counts", "dwellS", "starvedForS",
+                                                         "greenToEnqueueP50S", "greenToEnqueueP95S")}
+            tmp = timings_path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(timings, sort_keys=True))
+            os.replace(tmp, timings_path)
+        except (OSError, ValueError):
+            pass
+        return signal, None
+    except (OSError, ValueError, KeyError, TypeError, RuntimeError, subprocess.SubprocessError) as error:
+        return (cached or None), f"{type(error).__name__}: {error}"[:200]
+
+
+REMEDIATION_SILENT_S = 1800
+SWARM_WORKFLOW = "pr-remediation-swarm.yml"
+
+
+def remediation_liveness(state: Path, supply: dict | None, now: float, run=None, repo: str = REPO) -> dict | None:
+    """Dead-man for every remediation dispatcher: the newest of the swarm's last run and the lanes' last
+    fix attempt, against the count of red/DIRTY PRs the supply sample sees."""
+    if not supply or not isinstance(supply.get("observedAt"), (int, float)):
+        return None
+    counts = supply.get("counts") or {}
+    waiting = int(counts.get("DIRTY", 0)) + int(counts.get("BLOCKED", 0))
+    last_swarm = None
+    try:
+        rows = _gh_json(run, f"repos/{repo}/actions/workflows/{SWARM_WORKFLOW}/runs?per_page=1").get("workflow_runs") or []
+        last_swarm = _iso_epoch(rows[0].get("created_at")) if rows else None
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+        pass
+    last_lane = None
+    try:
+        attempts = json.loads((Path(state) / "fix-attempts.json").read_text())
+        last_lane = max((float(r["at"]) for r in attempts.values() if isinstance(r, dict) and isinstance(r.get("at"), (int, float))), default=None)
+    except (OSError, ValueError):
+        pass
+    newest = max([t for t in (last_swarm, last_lane) if t is not None], default=None)
+    if newest is None:
+        newest = min((r["since"] for r in (supply.get("prs") or {}).values()
+                      if r.get("bucket") in ("DIRTY", "BLOCKED") and isinstance(r.get("since"), (int, float))), default=None)
+    return {"observedAt": now, "waiting": waiting, "lastSwarmRun": last_swarm, "lastLaneFix": last_lane,
+            "silentForS": None if newest is None else round(now - newest)}
+
+
+def backstop_enroll(state: Path, supply: dict | None, now: float, run=None, repo: str = REPO) -> dict | None:
+    """Lanes-tick backstop for a lost Green Enroll wake (JOV-INV-042 keeps admission off cron, so the
+    clock lives here): when a CLEAN unqueued PR has waited BACKSTOP_ENROLL_AFTER_S, dispatch the
+    workflow's roster sweep, at most once per BACKSTOP_ENROLL_EVERY_S. Returns the receipt."""
+    if not supply or not isinstance(supply.get("observedAt"), (int, float)) or now - supply["observedAt"] > 900:
+        return None
+    waits = [now - row["since"] for row in (supply.get("prs") or {}).values()
+             if row.get("bucket") == "CLEAN-unqueued" and isinstance(row.get("since"), (int, float))]
+    if not waits or max(waits) < BACKSTOP_ENROLL_AFTER_S:
+        return None
+    path = Path(state) / BACKSTOP_FILE
+    try:
+        last = json.loads(path.read_text())
+    except (OSError, ValueError):
+        last = {}
+    if isinstance(last.get("at"), (int, float)) and 0 <= now - last["at"] < BACKSTOP_ENROLL_EVERY_S:
+        return last
+    run = run or _budgeted_gh
+    try:
+        done = run(["workflow", "run", ENROLL_WORKFLOW, "-R", repo, "--ref", "main"], capture_output=True, text=True, timeout=60)
+        receipt = {"at": now, "waiting": len(waits), "oldestS": round(max(waits)), "ok": done.returncode == 0,
+                   "error": None if done.returncode == 0 else (done.stderr or done.stdout or "")[-160:]}
+    except (OSError, subprocess.SubprocessError) as error:
+        receipt = {"at": now, "waiting": len(waits), "oldestS": round(max(waits)), "ok": False, "error": str(error)[:160]}
+    try:
+        atomic_write_text(path, json.dumps(receipt, sort_keys=True))
+    except OSError:
+        pass
+    return receipt
+
+
+def sample_queue_timings(state: Path, now: float, run=None, repo: str = REPO) -> tuple[dict | None, str | None]:
+    """Merge-queue wait stages (schema symphony-queue-timings/v1), refreshed every 15 min:
+    merge-group CI duration p50/p95 and outcome mix over the latest 100 CI merge_group runs
+    (cancelled = a group reset by a failure, jump or dequeue), and enqueue->merge p50/p95 for the
+    latest merged PRs (last enqueue, and first enqueue which includes ejections and re-enqueues)."""
+    path = Path(state) / QUEUE_TIMINGS_FILE
+    try:
+        cached = json.loads(path.read_text())
+    except (OSError, ValueError):
+        cached = {}
+    if isinstance(cached.get("observedAt"), (int, float)) and 0 <= now - cached["observedAt"] < QUEUE_TIMINGS_REFRESH_S:
+        return cached, None
+    try:
+        runs = _gh_json(run, f"repos/{repo}/actions/workflows/ci.yml/runs?event=merge_group&per_page=100").get("workflow_runs") or []
+        done = [row for row in runs if row.get("status") == "completed" and _iso_epoch(row.get("created_at")) is not None
+                and _iso_epoch(row.get("updated_at")) is not None]
+        by = {kind: [(_iso_epoch(r["updated_at"]) - _iso_epoch(r["created_at"])) / 60 for r in done if r.get("conclusion") == kind]
+              for kind in ("success", "failure", "cancelled")}
+        merged = _gh_json(run, f"repos/{repo}/pulls?state=closed&sort=updated&direction=desc&per_page=40")
+        merged = [pr for pr in merged if pr.get("merged_at")][:QUEUE_TIMINGS_PRS]
+        last, first = [], []
+        dequeues = {"github": 0, "bot": 0, "human": 0}
+        requeue_lag, auto_lag, push_lag = [], [], []
+        receipts_cache: dict[str, list[float]] = {}
+        for pr in merged:
+            events = _gh_json(run, f"repos/{repo}/issues/{pr['number']}/timeline?per_page=100")
+            adds = [_iso_epoch(e.get("created_at")) for e in events if e.get("event") == "added_to_merge_queue"]
+            adds = [a for a in adds if a is not None]
+            # Silent dequeues: removals with no check named on the PR. github-merge-queue[bot] = GitHub ejected
+            # the entry after a merge-group failure/timeout; each is followed by a re-enqueue (lag measured).
+            removed = [(_iso_epoch(e.get("created_at")), str((e.get("actor") or {}).get("login") or ""))
+                       for e in events if e.get("event") == "removed_from_merge_queue"]
+            for at, actor in removed:
+                if at is None:
+                    continue
+                dequeues["github" if actor.startswith("github-merge-queue") else "bot" if actor.endswith("[bot]") else "human"] += 1
+                later = [a for a in adds if a > at]
+                if later:
+                    back = min(later)
+                    lag = (back - at) / 60
+                    requeue_lag.append(lag)
+                    # Auto = the victim-rearm job wrote a why= receipt on this head between the removal and the
+                    # re-add (the enqueue lands seconds before the receipt); anything else came from the enroll sweep.
+                    sha = str((pr.get("head") or {}).get("sha") or "")
+                    if sha and sha not in receipts_cache:
+                        rows = _gh_json(run, f"repos/{repo}/commits/{sha}/statuses?per_page=100")
+                        receipts_cache[sha] = [t for t in (_iso_epoch(r.get("created_at")) for r in rows
+                                               if r.get("context") == REARM_CONTEXT and ";why=" in str(r.get("description") or ""))
+                                               if t is not None]
+                    auto = any(at <= t <= back + 120 for t in receipts_cache.get(sha, []))
+                    (auto_lag if auto else push_lag).append(lag)
+            merged_at = _iso_epoch(pr.get("merged_at"))
+            if adds and merged_at is not None:
+                last.append((merged_at - max(adds)) / 60)
+                first.append((merged_at - min(adds)) / 60)
+        total = sum(len(v) for v in by.values())
+        signal = {"schema": "symphony-queue-timings/v1", "observedAt": now, "groupCi": {
+                      "runs": total, "successP50Min": _pct(by["success"], .5), "successP95Min": _pct(by["success"], .95),
+                      "cancelledShare": round(len(by["cancelled"]) / total, 3) if total else None,
+                      "failureShare": round(len(by["failure"]) / total, 3) if total else None},
+                  "enqueueToMerge": {"prs": len(last), "lastEnqueueP50Min": _pct(last, .5), "lastEnqueueP95Min": _pct(last, .95),
+                                     "firstEnqueueP50Min": _pct(first, .5), "firstEnqueueP95Min": _pct(first, .95),
+                                     "targets": {"p50Min": 30, "p95Min": 60}},
+                  "dequeues": {"prs": len(last), "silentGithub": dequeues["github"], "bot": dequeues["bot"], "human": dequeues["human"],
+                               "requeueLagP50Min": _pct(requeue_lag, .5), "requeueLagP95Min": _pct(requeue_lag, .95),
+                               "autoRequeues": len(auto_lag), "pushToMainRequeues": len(push_lag),
+                               "autoRequeueLagP50Min": _pct(auto_lag, .5), "autoRequeueLagP95Min": _pct(auto_lag, .95),
+                               "pushRequeueLagP50Min": _pct(push_lag, .5), "pushRequeueLagP95Min": _pct(push_lag, .95)}}
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(signal, sort_keys=True))
         os.replace(tmp, path)
@@ -303,6 +599,12 @@ def observe(state: Path, now: float, receipts: list[dict], limits: dict, run=Non
         except Exception as error:  # noqa: BLE001  (a sweep failure must never stop the sentinel)
             queue_unmergeable = {"seen": [], "dequeued": [], "errors": [f"{type(error).__name__}: {error}"[:160]]}
     flow, flow_error = (sample_release_flow(state, now, run) if fetch_remote else (None, None))
+    supply, supply_error, backstop, remediation = (None, None, None, None)
+    if fetch_remote:
+        sample_queue_timings(state, now, run)
+        supply, supply_error = sample_supply_flow(state, now, run)
+        backstop = backstop_enroll(state, supply, now, run)
+        remediation = remediation_liveness(state, supply, now, run)
     exits = read_idle_exits(state, now)
     repos, repo_errors = {}, {}
     for watched in (WATCHED_REPOS if fetch_remote else ()):
@@ -321,6 +623,7 @@ def observe(state: Path, now: float, receipts: list[dict], limits: dict, run=Non
             "idleExits1h": dict(Counter(row["reason"] for row in exits)),
             "idleExitsByProvider1h": {name: dict(Counter(r["reason"] for r in exits if r.get("provider") == name))
                                       for name in sorted({r.get("provider") for r in exits if r.get("provider")})},
+            "supplyFlow": supply, "supplyFlowError": supply_error, "enrollBackstop": backstop, "remediation": remediation,
             "releaseFlow": flow, "releaseFlowError": flow_error, "repos": repos, "repoErrors": repo_errors,
             "growth": growth_bounds(state, limits)}
 
@@ -375,6 +678,31 @@ def judge(obs: dict) -> dict[str, str]:
             f"stage queued->merged: {merge['queueDepth']} PRs in the merge queue, zero merges in the last 60 min "
             f"(queue wait p50 {merge.get('queueWaitP50Minutes')} min, ejection rate {merge.get('ejectionRate')}); "
             f"evidence: node scripts/promotion-loss-metrics.mjs --since 1h --json")
+    # 2b. Supply side: the queue is nearly empty while admissible PRs wait unqueued, and per-state dwell.
+    supply = sentinel.get("supplyFlow") or {}
+    if isinstance(supply.get("observedAt"), (int, float)) and obs["now"] - supply["observedAt"] < 900:
+        if (supply.get("starvedForS") or 0) > QUEUE_STARVED_S:
+            alerts["throughput-queue-starved"] = (
+                f"stage ready->queued: queue depth {supply.get('queueDepth')} (<= {QUEUE_STARVED_DEPTH}) for "
+                f"{round(supply['starvedForS'] / 60)} min while {len(supply.get('cleanUnqueued') or [])} CLEAN unqueued PR(s) "
+                f"wait ({', '.join('#' + str(n) for n in (supply.get('cleanUnqueued') or [])[:6])}); Green Enroll is not "
+                "admitting them: read its latest run's enroll-receipts (hold, failure hold, head-unchanged) and the "
+                "queue-ruleset; no human needs to arm anything")
+        counts = supply.get("counts") or {}
+        for state_name, slo in SUPPLY_DWELL_SLO_S.items():
+            row = (supply.get("dwellS") or {}).get(state_name) or {}
+            if counts.get(state_name, 0) >= SUPPLY_DWELL_MIN_PRS and (row.get("p95") or 0) > slo:
+                alerts[f"throughput-supply-dwell:{state_name}"] = (
+                    f"stage {state_name}: {counts[state_name]} non-draft PRs, dwell p50 {round((row.get('p50') or 0) / 60)} min, "
+                    f"p95 {round(row['p95'] / 60)} min (SLO {round(slo / 60)} min); state counts {counts}")
+    # 2c. Dead-man: red or DIRTY PRs exist and no dispatcher has acted for 30 minutes.
+    liveness = sentinel.get("remediation") or {}
+    if isinstance(liveness.get("observedAt"), (int, float)) and obs["now"] - liveness["observedAt"] < 900 \
+            and (liveness.get("waiting") or 0) > 0 and (liveness.get("silentForS") or 0) > REMEDIATION_SILENT_S:
+        alerts["throughput-remediation-silent"] = (
+            f"stage red->remediation: {liveness['waiting']} DIRTY/BLOCKED non-draft PRs and no remediation dispatcher "
+            f"acted for {round(liveness['silentForS'] / 60)} min (PR Remediation Swarm last run {liveness.get('lastSwarmRun')}, "
+            f"lanes last fix {liveness.get('lastLaneFix')}); check the swarm's workflow_run wake and the lanes service")
     # 3 and 4. Merge-group runner wait and production lease.
     flow = sentinel.get("releaseFlow") or {}
     if (flow.get("mergeGroupJobs") or 0) >= MERGE_GROUP_MIN_RUNS and \
@@ -383,6 +711,18 @@ def judge(obs: dict) -> dict[str, str]:
             f"stage merge-group created->started: p50 {flow['mergeGroupStartP50Min']} min (max "
             f"{flow.get('mergeGroupStartMaxMin')}) over {flow.get('mergeGroupJobs')} jobs in the latest {flow['mergeGroupRuns']} merge_group runs; "
             "runner capacity or Actions queueing; check runner-heartbeat and runner-health-monitor")
+    pools = flow.get("mergeGroupStartByPool") or {}
+    hosted, fixed = pools.get("hosted") or {}, pools.get("self-hosted") or {}
+    if (hosted.get("n") or 0) >= POOL_MIN_JOBS and (fixed.get("n") or 0) >= POOL_MIN_JOBS \
+            and fixed["p50S"] > hosted["p50S"] + POOL_SLOWER_MARGIN_S:
+        alerts["throughput-merge-gate-pool"] = (
+            f"stage merge-group created->started: self-hosted p50 {fixed['p50S']}s / p95 {fixed['p95S']}s vs hosted "
+            f"p50 {hosted['p50S']}s / p95 {hosted['p95S']}s; route merge-gate jobs to hosted by deleting repo variable MERGE_GATE_POOL"
+            "")
+    elif (hosted.get("n") or 0) >= POOL_MIN_JOBS and not fixed and hosted["p50S"] > HOSTED_SATURATED_P50_S:
+        alerts["throughput-merge-gate-pool"] = (
+            f"stage merge-group created->started: hosted p50 {hosted['p50S']}s / p95 {hosted['p95S']}s (saturated); "
+            "consider the gem pool: set repo variable MERGE_GATE_POOL=fixed")
     if (flow.get("leaseHeldMin") or 0) > LEASE_HELD_MIN:
         alerts["throughput-prod-lease-held"] = (
             f"stage deploy: a Production Controller run has held the production lease {flow['leaseHeldMin']} min "

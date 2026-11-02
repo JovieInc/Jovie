@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { BadgeCheck, BarChart3, Sparkles, Wallet } from 'lucide-react';
+import { BadgeCheck, BarChart3, Mail, Sparkles } from 'lucide-react';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -20,7 +20,7 @@ import { track } from '@/lib/analytics';
 import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import { clearPlanIntent, type PlanIntentTier } from '@/lib/auth/plan-intent';
 import { PROOF_PENDING_TERMS } from '@/lib/claim/proof-terms';
-import { getEntitlements } from '@/lib/entitlements/registry';
+import { getEntitlements, getLimit } from '@/lib/entitlements/registry';
 import type { OnboardingCatalogPreview } from '@/lib/onboarding/catalog-preview';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import type { ClaimTimeFinding } from '@/lib/proof/claim-time-proof';
@@ -57,23 +57,25 @@ function getAnnualSavingsPercent(
   return Math.round(((yearlyAtMonthly - annualAmount) / yearlyAtMonthly) * 100);
 }
 
+const PRO_ANALYTICS_DAYS = getLimit('pro', 'analyticsRetentionDays');
+
+// Paid-only, entitlement-gated items. Tips are not plan-gated, so they are not
+// sold as an upgrade; verification is a reviewed request, not automatic.
 const OFFER_HIGHLIGHTS = [
   {
-    // JOV-7794: a certified capability, not internal-only monitoring.
-    icon: Wallet,
-    label: 'Payments',
-    detail: 'Take tips and payments on your profile',
+    icon: Mail,
+    label: 'Release Emails',
+    detail: 'Email your verified subscribers when new music drops',
   },
   {
     icon: BarChart3,
-    // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Numeric-leading duration is valid Title Case; the rule's canonical suggestion is identical.
-    label: '90-day Analytics',
+    label: `${PRO_ANALYTICS_DAYS}-day Analytics`,
     detail: 'Geographic insights & advanced data',
   },
   {
     icon: BadgeCheck,
     label: 'Verified Badge',
-    detail: 'Build trust with your audience',
+    detail: 'Request verification, reviewed by our team',
   },
 ] as const;
 

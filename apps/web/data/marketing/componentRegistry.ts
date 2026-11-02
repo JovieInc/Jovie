@@ -577,6 +577,12 @@ const SECTION_RESOLUTIONS = {
           'apps/web/components/marketing/artist-profile/ArtistProfileSocialProof.tsx',
         rootBinding: "sectionVariant='release-rail'",
       },
+      {
+        variantId: 'release-rail',
+        componentPath:
+          'apps/web/components/marketing/ConnectedComponentsGallery.tsx',
+        rootBinding: "sectionVariant='release-rail'",
+      },
     ],
   },
   'spec-wall': {

@@ -5,7 +5,7 @@ import { BASE_URL } from '@/constants/domains';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
+import { sendStreamEmail } from '@/lib/email/gateway';
 import { isEmailSuppressed } from '@/lib/notifications/suppression';
 import { postgresRecordBackend } from '@/lib/ovie/mcp/postgres-backend';
 import { summerCardId } from '@/lib/ovie/summer-card-digest';
@@ -66,7 +66,6 @@ export function buildServerRunnerDeps(
   certifier: FixCertifier,
   stalled: readonly StalledUser[]
 ): RunnerDeps {
-  const provider = new ResendEmailProvider();
   return {
     fixes: KNOWN_BAD_FLOW_FIXES,
     users: stalled,
@@ -74,13 +73,17 @@ export function buildServerRunnerDeps(
     ledger: createLedger(postgresRecordBackend()),
     mailingAddress: process.env.LEGAL_MAILING_ADDRESS?.trim() || null,
     now: new Date(),
-    async send(email, to, idempotencyKey) {
-      const result = await provider.sendEmail({
+    async send(email, to, idempotencyKey, approvalKey) {
+      // Lifecycle stream: the gateway re-checks the approving card, the
+      // postal address, the unsubscribe headers and suppression.
+      const result = await sendStreamEmail({
+        stream: 'lifecycle',
+        purpose: 'signup-recovery',
+        consent: { basis: 'account-relationship' },
+        ...(approvalKey && { approval: { cardId: summerCardId(approvalKey) } }),
         to,
         subject: email.subject,
         text: email.text,
-        from: email.from,
-        replyTo: email.replyTo,
         headers: email.headers,
         idempotencyKey: `recovery-${idempotencyKey}`,
       });
@@ -100,15 +103,5 @@ export function buildServerRunnerDeps(
     },
   };
 }
-
-/**
- * Production certifier. Until a fix records `deployedAt` it is never live.
- * The deploy and check probes are the golden-path evidence feeds; no probe
- * answers yes by default, so an unwired check keeps the gate closed.
- */
-export const closedCertifier: FixCertifier = {
-  isLiveOnProduction: async () => false,
-  recheck: async () => false,
-};
 
 export { runRecovery };

@@ -1,0 +1,136 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: A hosted hourly read of Vercel budget, usage and runtime logs with a read-only token outside the pausable Vercel team; it only files fingerprinted remediation issues and a Slack message, and never changes a budget.
+# removal-trigger: Remove when Summer's Vercel spend webhook (POST /summer/v1/events/vercel) and an independent usage reader deliver 50/75/90 percent and anomaly alerts for 30 consecutive days.
+name: Spend Guard
+
+# clock-class: temporal-resource
+# Vercel pauses every project at 100 percent of the team budget (2026-10-29 outage). This hourly
+# read forecasts month-end spend, alerts at 50/75/90 percent or when the pause date is under seven
+# days away, detects 3x cost and build spikes per project, and turns new or rising runtime-log error
+# signatures into remediation items. Vercel's own webhook is the event-driven path; this is the
+# forecast and anomaly layer the webhook cannot provide.
+
+on:
+  # Fired hourly by the Gem lanes clock (scripts/lanes/continuity_clock.py); no GitHub cron (JOV-INV-042).
+  repository_dispatch:
+    types: [clock_spend_guard]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: spend-guard
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    name: Forecast, anomalies and log signatures
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Restore log signature state
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: log-state.json
+          key: spend-guard-log-state-${{ github.run_id }}
+          restore-keys: spend-guard-log-state-
+
+      - name: Evaluate spend
+        id: spend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_READONLY_TOKEN }}
+          SPEND_GUARD_AUDIT: ${{ runner.temp }}/spend-guard-audit.jsonl
+        run: |
+          set -euo pipefail
+          test -n "$VERCEL_TOKEN" || { echo "::warning::VERCEL_READONLY_TOKEN is unavailable; spend guard cannot read usage."; exit 0; }
+          node scripts/spend-guard.mjs > spend-report.json
+          echo "alert=$(jq -r .alert spend-report.json)" >> "$GITHUB_OUTPUT"
+          echo "message=$(jq -r .message spend-report.json)" >> "$GITHUB_OUTPUT"
+          jq -r .message spend-report.json
+
+      - name: Collect runtime log signatures
+        id: logs
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_READONLY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$VERCEL_TOKEN" || exit 0
+          node scripts/vercel-log-errors.mjs --state log-state.json --since 1h > log-report.json
+          echo "items=$(jq -r .itemCount log-report.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Save log signature state
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: log-state.json
+          key: spend-guard-log-state-${{ github.run_id }}
+
+      - name: Notify Slack on a spend alert
+        if: ${{ steps.spend.outputs.alert == 'true' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          MESSAGE: ${{ steps.spend.outputs.message }}
+        run: |
+          set -euo pipefail
+          test -n "$SLACK_WEBHOOK_URL" || { echo "::warning::Slack webhook unavailable"; exit 0; }
+          curl --silent --show-error --max-time 20 -X POST "$SLACK_WEBHOOK_URL" -H 'Content-Type: application/json' \
+            -d "$(jq -n --arg m "$MESSAGE" '{text: ("Spend guard: " + $m)}')"
+
+      - name: File or resolve spend remediation
+        if: ${{ steps.spend.outputs.alert != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          REMEDIATION_MODE: monitor
+          REMEDIATION_FINGERPRINT: vercel-spend-guard
+          REMEDIATION_SOURCE: spend-guard.yml
+          REMEDIATION_CONCLUSION: ${{ steps.spend.outputs.alert == 'true' && 'failure' || 'success' }}
+          REMEDIATION_DETAIL: ${{ steps.spend.outputs.message }}
+          REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REMEDIATION_FAIL_OPEN: '1'
+        run: node scripts/remediation-signal-intake.mjs
+
+      - name: File new or rising runtime error signatures
+        if: ${{ steps.logs.outputs.items != '' && steps.logs.outputs.items != '0' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          REMEDIATION_MODE: monitor
+          REMEDIATION_SOURCE: spend-guard.yml
+          REMEDIATION_CONCLUSION: failure
+          REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REMEDIATION_FAIL_OPEN: '1'
+        run: |
+          set -euo pipefail
+          jq -c '.items[:3][]' log-report.json | while read -r item; do
+            REMEDIATION_FINGERPRINT="vercel-log-$(printf '%s' "$item" | jq -r .fingerprint | sha256sum | cut -c1-16)"
+            REMEDIATION_DETAIL="$(printf '%s' "$item" | jq -r '"\(.kind) \(.project) x\(.count): \(.sample[0:200])"')"
+            export REMEDIATION_FINGERPRINT REMEDIATION_DETAIL
+            node scripts/remediation-signal-intake.mjs || true
+          done
+
+      - name: Upload reports and audit trail
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: spend-guard
+          path: |
+            spend-report.json
+            log-report.json
+            ${{ runner.temp }}/spend-guard-audit.jsonl
+          if-no-files-found: ignore
+          retention-days: 30

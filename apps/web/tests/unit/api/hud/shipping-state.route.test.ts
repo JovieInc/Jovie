@@ -104,6 +104,43 @@ describe('GET /api/hud/shipping-state', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
+  it('measures inline when the cached observation is past the freshness cutoff', async () => {
+    mockAuthorizeHud.mockResolvedValue({ ok: true, mode: 'admin' });
+    mockReadCached.mockReturnValue({
+      schema: 'ovie.shipping-state.v1',
+      state: 'stale',
+      publishing: true,
+      observationTimestamp: new Date(Date.now() - 120_000).toISOString(),
+    });
+    mockPublish.mockResolvedValue({
+      schema: 'ovie.shipping-state.v1',
+      state: 'fresh',
+    });
+    const { GET } = await import('@/app/api/hud/shipping-state/route');
+    const response = await GET(
+      new NextRequest('http://localhost/api/hud/shipping-state')
+    );
+    await expect(response.json()).resolves.toMatchObject({ state: 'fresh' });
+    expect(mockPublish).toHaveBeenCalledTimes(1);
+  });
+
+  it('serves the aged projection when the inline measurement fails', async () => {
+    mockAuthorizeHud.mockResolvedValue({ ok: true, mode: 'admin' });
+    mockReadCached.mockReturnValue({
+      schema: 'ovie.shipping-state.v1',
+      state: 'stale',
+      publishing: true,
+      observationTimestamp: new Date(Date.now() - 120_000).toISOString(),
+    });
+    mockPublish.mockRejectedValue(new Error('boom'));
+    const { GET } = await import('@/app/api/hud/shipping-state/route');
+    const response = await GET(
+      new NextRequest('http://localhost/api/hud/shipping-state')
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ state: 'stale' });
+  });
+
   it('returns the local projection without waiting for reconciliation', async () => {
     mockAuthorizeHud.mockResolvedValue({ ok: true, mode: 'admin' });
     mockPublish.mockReturnValue(new Promise(() => {}));

@@ -3,10 +3,10 @@ import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { postgresRecordBackend } from '@/lib/ovie/mcp/postgres-backend';
 import { verifySummerOidcRequest } from '@/lib/ovie/summer-oidc.server';
 import { createLedger } from '@/lib/recovery/ledger';
+import { createProductionCertifier } from '@/lib/recovery/probes.server';
 import { buildRecoveryReport } from '@/lib/recovery/report';
 import {
   buildServerRunnerDeps,
-  closedCertifier,
   loadStalledUsers,
   runRecovery,
 } from '@/lib/recovery/server';
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   }
   const stalled = await loadStalledUsers();
   const result = await runRecovery(
-    buildServerRunnerDeps(closedCertifier, stalled)
+    buildServerRunnerDeps(createProductionCertifier(), stalled)
   );
   return json({ contract: 'recovery-emails/v1', result });
 }

@@ -278,10 +278,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/dashboard/organisms/release-provider-matrix/NewReleaseHeaderAction.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleasesExperience.tsx",
       "linearIssue": "JOV-8847"
     },
@@ -291,10 +287,6 @@
     },
     {
       "path": "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseTableExportButton.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseWorkflowOverlays.tsx",
       "linearIssue": "JOV-8847"
     },
     {
@@ -399,10 +391,6 @@
     },
     {
       "path": "apps/web/components/features/demo/DemoReleaseTasksSurface.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/features/demo/DemoReleaseTrackedLinksSurface.tsx",
       "linearIssue": "JOV-8847"
     },
     {

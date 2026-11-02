@@ -33,7 +33,7 @@ _sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not 
 from atomic_state import atomic_write_text  # noqa: E402
 import macos_pool
 
-READY_LABEL = "agent-ready"
+READY_LABEL = "agent-ready"  # retired as a requirement (2026-10-29); still produced by some intake, never required
 # Labels that mean a human decision, a human-owned task or a container: never auto-promoted.
 HOLD_LABELS = frozenset({"needs-tim", "tim-action-required", "human-review-required", "type:epic",
                          "hold", "reasoning-job", "codex-blocked", "gated"})
@@ -70,8 +70,8 @@ def skip_reason(row: dict, open_ids: set[str], excluded: frozenset[str], red_lin
     if not row.get("labelsComplete"):
         return "labels-incomplete"
     labels = {label.lower() for label in row.get("labels") or ()}
-    if READY_LABEL not in labels:
-        return "not-agent-ready"
+    # EVENT 2026-10-29: `agent-ready` is retired as an admission requirement. Readiness is computed from the
+    # checks below (spec, acceptance, no hold, no blocker, no red line). The label is still accepted, never required.
     blocked = sorted((HOLD_LABELS | excluded) & labels)
     if blocked:
         return f"label:{blocked[0]}"
@@ -122,8 +122,6 @@ def missing_info(row: dict) -> list[str]:
         found.append("description under %d chars: state the problem and the scope" % MIN_DESCRIPTION)
     if not ACCEPTANCE.search(description):
         found.append("no acceptance criteria: add a checkable Definition of done")
-    if READY_LABEL not in labels and not found:
-        found.append("groomed but not labelled agent-ready: confirm no human gate, then label")
     return found
 
 

@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import {
   CUSTOMER_MARKER,
@@ -12,6 +16,8 @@ import {
   downgradeHostRed,
   GENERATORS,
   HEAVY_GUARDS,
+  invariantTestFiles,
+  NARROWED,
   parseArgs,
   typecheckTargets,
 } from './preflight-changed.mjs';
@@ -20,6 +26,66 @@ const file = (filename, status = 'modified') => ({
   filename,
   status,
   patch: '',
+});
+
+test('changed invariant modules select their contract tests before push', () => {
+  assert.deepEqual(
+    invariantTestFiles(
+      [
+        file('scripts/invariants/screen-certification.mjs'),
+        file('scripts/invariants/screen-certification.test.mjs'),
+        file('scripts/invariants/absent.mjs', 'removed'),
+        file('apps/web/lib/unrelated.mjs'),
+        {
+          ...file('scripts/moved.mjs', 'renamed'),
+          previous_filename: 'scripts/invariants/screen-certification.mjs',
+        },
+      ],
+      process.cwd()
+    ),
+    ['scripts/invariants/screen-certification.test.mjs']
+  );
+});
+
+test('selected invariant contracts catch a stale registry expectation', () => {
+  const repo = mkdtempSync(path.join(tmpdir(), 'preflight-invariant-'));
+  try {
+    mkdirSync(path.join(repo, 'scripts/invariants'), { recursive: true });
+    writeFileSync(
+      path.join(repo, 'scripts/invariants/registry.mjs'),
+      'export const sources = ["page.tsx", "loading.tsx"];\n'
+    );
+    const testPath = path.join(repo, 'scripts/invariants/registry.test.mjs');
+    const contract = expected =>
+      `import assert from 'node:assert/strict';\nimport { sources } from './registry.mjs';\nassert.deepEqual(sources, ${JSON.stringify(expected)});\n`;
+    const tests = invariantTestFiles(
+      [file('scripts/invariants/registry.mjs')],
+      repo
+    );
+    assert.deepEqual(tests, []);
+    writeFileSync(testPath, contract(['page.tsx']));
+    const selected = invariantTestFiles(
+      [file('scripts/invariants/registry.mjs')],
+      repo
+    );
+    assert.deepEqual(selected, ['scripts/invariants/registry.test.mjs']);
+    const env = { ...process.env };
+    delete env.NODE_TEST_CONTEXT;
+    const run = () =>
+      spawnSync(process.execPath, ['--test', ...selected], {
+        cwd: repo,
+        encoding: 'utf8',
+        env,
+      });
+    const red = run();
+    assert.equal(red.status, 1, red.stdout + red.stderr);
+    assert.match(red.stdout + red.stderr, /AssertionError/);
+    writeFileSync(testPath, contract(['page.tsx', 'loading.tsx']));
+    const green = run();
+    assert.equal(green.status, 0, green.stdout + green.stderr);
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
 });
 
 test('PR body lint names every missing section and prints a filled template', () => {
@@ -35,7 +101,7 @@ test('PR body lint names every missing section and prints a filled template', ()
   });
   const ids = r.errors.map(e => e.id);
   assert.ok(ids.includes('red-before-green'));
-  assert.ok(ids.includes('blast-radius'));
+  assert.ok(r.warnings.some(w => w.id === 'blast-radius'));
   assert.ok(ids.includes('locked-areas'));
   assert.ok(ids.includes('changelog-marker'));
   assert.match(r.template, /## Red-before-green/);
@@ -113,7 +179,52 @@ test('typecheck targets are the affected packages only', () => {
     ],
     process.cwd()
   );
-  assert.deepEqual(t.sort(), ['scripts', 'web', 'web-tests']);
+  assert.deepEqual(t.sort(), [
+    'pkg:@jovie/ovie',
+    'scripts',
+    'web',
+    'web-tests',
+  ]);
+});
+
+test('script checkJs runs for an mjs-only repair before publication', () => {
+  for (const filename of ['scripts/intake.mjs', 'scripts/intake.test.mjs']) {
+    assert.deepEqual(typecheckTargets([file(filename)], process.cwd()), [
+      'scripts',
+    ]);
+  }
+  assert.deepEqual(
+    typecheckTargets([file('scripts/intake.mjs', 'removed')], process.cwd()),
+    []
+  );
+  assert.deepEqual(
+    typecheckTargets([file('scripts/README.md')], process.cwd()),
+    []
+  );
+});
+
+test('web source changes typecheck test consumers without a changed test file', () => {
+  assert.deepEqual(
+    typecheckTargets(
+      [file('apps/web/lib/leads/route-lead.ts')],
+      process.cwd()
+    ).sort(),
+    ['pkg:@jovie/ovie', 'web', 'web-tests']
+  );
+  assert.deepEqual(
+    typecheckTargets(
+      [file('apps/web/tests/lib/leads/route-lead.test.ts')],
+      process.cwd()
+    ),
+    ['web-tests']
+  );
+  assert.deepEqual(
+    typecheckTargets(
+      [file('apps/web/lib/leads/route-lead.ts', 'removed')],
+      process.cwd()
+    ),
+    []
+  );
 });
 
 test('arguments parse and unknown flags fail', () => {
@@ -138,6 +249,25 @@ test('host-only reds are downgraded on macOS but real reds are not', () => {
   assert.equal(downgradeHostRed(check, host, 'linux').code, 1);
 });
 
+test('default preflight checks heading bounds without truncating marketing copy', () => {
+  const command = NARROWED['merge-group-unit-guards'].command;
+  assert.ok(
+    command.startsWith('node scripts/design-system-source-ratchet.mjs && ')
+  );
+  assert.ok(
+    command.includes('tests/unit/design-system/mac-header-two-lines-v1.test.ts')
+  );
+  assert.ok(
+    command.includes(
+      'tests/unit/marketing/marketing-headline-line-clamp-guard.test.ts'
+    )
+  );
+  assert.equal(
+    NARROWED['merge-group-unit-guards'].note,
+    'source identity, metrics-layer, locked chrome and heading contracts; full suite with --thorough'
+  );
+});
+
 test('ship gate violations become exact files to add or touch', () => {
   const todo = explainShipGate(
     [
@@ -160,4 +290,12 @@ test('merge-tree conflict output yields the conflicting paths', () => {
     'apps/web/a.ts',
     'b.ts deleted in HEAD and modified in x',
   ]);
+});
+
+test('a scripts/ .mjs-only change still runs the checkJs scripts typecheck', () => {
+  assert.deepEqual(
+    typecheckTargets([file('scripts/lib/__tests__/a.test.mjs')], process.cwd()),
+    ['scripts']
+  );
+  assert.deepEqual(typecheckTargets([file('docs/a.mjs')], process.cwd()), []);
 });

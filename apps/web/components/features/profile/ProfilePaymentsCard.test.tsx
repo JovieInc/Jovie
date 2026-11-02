@@ -38,10 +38,7 @@ describe('ProfilePaymentsCard', () => {
     ]);
     expect(within(group).getByRole('radio', { name: '$10' })).toBeChecked();
     const cta = within(card).getByRole('link', { name: 'Pay $10' });
-    expect(cta).toHaveAttribute(
-      'href',
-      `${VENMO}?utm_amount=10&utm_username=timwhite`
-    );
+    expect(cta).toHaveAttribute('href', `${VENMO}?txn=pay&amount=10`);
     expect(cta).toHaveAttribute('target', '_blank');
     // Generalized payments copy, never "support" or "fund".
     expect(card).not.toHaveTextContent(/support|fund|tip/i);
@@ -61,7 +58,7 @@ describe('ProfilePaymentsCard', () => {
     expect(screen.getByRole('radio', { name: '$20' })).toBeChecked();
     expect(screen.getByRole('link', { name: 'Pay $20' })).toHaveAttribute(
       'href',
-      `${VENMO}?utm_amount=20&utm_username=timwhite`
+      `${VENMO}?txn=pay&amount=20`
     );
   });
 

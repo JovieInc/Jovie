@@ -469,6 +469,184 @@ describe('in-house cross-DSP resolver', () => {
     expect(edition.candidates).toHaveLength(1);
   });
 
+  describe('UPC fan-out and collaborator credits', () => {
+    const spotifyHit = {
+      provider: 'spotify',
+      title: 'Album',
+      artist: 'Coldplay, Tim White',
+      artists: ['Coldplay', 'Tim White'],
+      url: 'https://open.spotify.com/album/' + 'A'.repeat(22),
+      upc: '00602567247746',
+      provenance: 'exact_name',
+      confidence: PROVENANCE_CONFIDENCE.exact_name,
+    };
+    const appleByUpc = {
+      provider: 'apple_music',
+      title: 'Album',
+      artist: 'Coldplay & Tim White',
+      url: 'https://music.apple.com/us/album/123',
+      upc: '602567247746',
+      provenance: 'upc_exact',
+      confidence: PROVENANCE_CONFIDENCE.upc_exact,
+    };
+    const deezerByUpc = {
+      ...appleByUpc,
+      provider: 'deezer',
+      url: 'https://www.deezer.com/album/9',
+    };
+    const query = {
+      kind: 'album' as const,
+      artist: 'Tim White',
+      title: 'Album',
+    };
+
+    it('links every provider that reports the exact UPC', async () => {
+      const result = await resolveInHouse(
+        { kind: 'album', upc: '602567247746' },
+        sources({
+          albumsByUpc: async () => [
+            appleByUpc,
+            { ...spotifyHit, provenance: 'upc_exact' },
+            deezerByUpc,
+          ],
+        })
+      );
+      expect(result.status).toBe('resolved');
+      expect(result.links.map(link => link.provider)).toEqual([
+        'apple_music',
+        'deezer',
+        'spotify',
+      ]);
+    });
+
+    it('never keeps a provider album that reports a different UPC', async () => {
+      const result = await resolveInHouse(
+        { kind: 'album', upc: '602567247746' },
+        sources({
+          albumsByUpc: async () => [
+            appleByUpc,
+            { ...spotifyHit, upc: '5059460202801' },
+          ],
+        })
+      );
+      expect(result.links.map(link => link.provider)).toEqual(['apple_music']);
+    });
+
+    it('resolves a collaborator credit when a second provider confirms the UPC', async () => {
+      const result = await resolveInHouse(
+        query,
+        sources({
+          searchAlbums: async () => [spotifyHit],
+          albumsByUpc: async () => [appleByUpc],
+        })
+      );
+      expect(result.status).toBe('resolved');
+      expect(result.links.map(link => link.provider)).toEqual([
+        'apple_music',
+        'spotify',
+      ]);
+    });
+
+    it('abstains on a collaborator credit with no second-provider UPC evidence', async () => {
+      const result = await resolveInHouse(
+        query,
+        sources({
+          searchAlbums: async () => [spotifyHit],
+          albumsByUpc: async () => [],
+        })
+      );
+      expect(result.status).toBe('ambiguous');
+      expect(result.links).toEqual([]);
+    });
+
+    it('abstains on same-name artists with different UPCs', async () => {
+      const result = await resolveInHouse(
+        { ...query, artist: 'Coldplay' },
+        sources({
+          searchAlbums: async () => [
+            spotifyHit,
+            {
+              ...spotifyHit,
+              artist: 'Coldplay',
+              artists: ['Coldplay'],
+              url: 'https://open.spotify.com/album/' + 'B'.repeat(22),
+              upc: '111111111111',
+            },
+          ],
+          albumsByUpc: async () => [appleByUpc],
+        })
+      );
+      expect(result.status).toBe('ambiguous');
+      expect(result.links).toEqual([]);
+    });
+
+    it('abstains when two same-name releases cannot be told apart by UPC', async () => {
+      const apple = {
+        ...appleByUpc,
+        artist: 'Tim White',
+        upc: null,
+        provenance: 'exact_name',
+      };
+      const result = await resolveInHouse(
+        query,
+        sources({
+          searchAlbums: async () => [
+            apple,
+            { ...apple, url: 'https://music.apple.com/us/album/456' },
+          ],
+        })
+      );
+      expect(result.status).toBe('ambiguous');
+    });
+
+    it('does not trust a lone Spotify name hit without UPC corroboration', async () => {
+      const result = await resolveInHouse(
+        query,
+        sources({
+          searchAlbums: async () => [
+            { ...spotifyHit, artist: 'Tim White', artists: ['Tim White'] },
+          ],
+          albumsByUpc: async () => [],
+        })
+      );
+      expect(result.status).toBe('no_match');
+      expect(result.links).toEqual([]);
+    });
+
+    it('matches collaborator tracks only with a confirmed ISRC', async () => {
+      const track = {
+        ...apple,
+        artist: 'Tim White & Guest',
+        title: 'Signal Fire',
+        provenance: 'exact_name',
+      };
+      const query = {
+        kind: 'track' as const,
+        artist: 'Tim White',
+        title: 'Signal Fire',
+      };
+      const abstained = await resolveInHouse(
+        query,
+        sources({ searchTracks: async () => [{ ...track, isrc: null }] })
+      );
+      expect(abstained.status).toBe('ambiguous');
+      const resolved = await resolveInHouse(
+        query,
+        sources({
+          searchTracks: async () => [track],
+          trackByIsrc: async () => [
+            { ...track, provider: 'deezer', url: 'https://deezer.com/track/1' },
+          ],
+        })
+      );
+      expect(resolved.status).toBe('resolved');
+      expect(resolved.links.map(link => link.provider)).toEqual([
+        'apple_music',
+        'deezer',
+      ]);
+    });
+  });
+
   it('merges only the Apple ID explicitly linked by MusicBrainz despite storefront/name variations', async () => {
     const result = await resolveInHouse(
       { kind: 'artist', name: 'Tim White' },

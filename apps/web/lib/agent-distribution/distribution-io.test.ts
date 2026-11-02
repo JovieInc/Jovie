@@ -2,7 +2,12 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { findDrift, runGenerate, writeDistribution } from './distribution-io';
+import {
+  findDrift,
+  renderDistribution,
+  runGenerate,
+  writeDistribution,
+} from './distribution-io';
 import type { DistributionOutput } from './generate';
 import { bullets, code, fence, heading, numbered, page } from './markdown';
 
@@ -26,6 +31,14 @@ const output = (
 });
 
 describe('distribution io', () => {
+  it('renders the distribution from the plugin assets', async () => {
+    const output = await renderDistribution(
+      join(__dirname, '../../plugins/jovie-artists/assets')
+    );
+    expect(output.toolsListHash).toMatch(/^[0-9a-f]{16,}$/);
+    expect(Object.keys(output.files).length).toBeGreaterThan(0);
+  });
+
   it('writes files, removes stale ones and then reports no drift', async () => {
     const dir = await temp();
     await mkdir(join(dir, 'old'), { recursive: true });

@@ -247,7 +247,9 @@ const WEB_CI_CONTRACT_TESTS_COMMAND = webCiContractTestsCommand(
     '..',
     '..',
     'apps/web/tests/quarantine.json'
-  )
+  ),
+  // The deploy contract runs by name regardless of its quarantine membership.
+  ['tests/unit/ci/deploy-workflow.test.ts']
 );
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
@@ -442,7 +444,12 @@ describe('runStructural screenshot contract discovery', () => {
       expect(
         commands.includes(DESKTOP_INSTALLED_IDENTITY_COVERAGE_COMMAND)
       ).toBe(lane === 'mac');
-    }
+    },
+    // The first case pays the cold screenshot-contract discovery scan (5.4s of
+    // this file's 6.3s on an idle host). As structural command 1 it runs beside
+    // 60 others and crossed the 30s default, ejecting #23938 and #23706 from
+    // the merge queue on 2026-10-31. Assertions are unchanged.
+    120_000
   );
 
   it.each([
@@ -1802,11 +1809,40 @@ describe('webCiContractTestsCommand', () => {
     }
   });
 
-  it('excludes the live ledger deploy-workflow quarantine', () => {
-    expect(WEB_CI_CONTRACT_TESTS_COMMAND).toContain(
-      '--exclude=tests/unit/ci/deploy-workflow.test.ts'
-    );
-  });
+  it.each([true, false])(
+    'excludes separately run contracts exactly once with deploy quarantined=%s',
+    quarantined => {
+      const dir = mkdtempSync(join(tmpdir(), 'ci-contract-membership-'));
+      const ledger = join(dir, 'quarantine.json');
+      const deploy = 'tests/unit/ci/deploy-workflow.test.ts';
+      const other = 'tests/unit/ci/quarantine-fixture.test.ts';
+      try {
+        writeFileSync(
+          ledger,
+          JSON.stringify({
+            entries: [
+              { kind: 'unit', path: other },
+              ...(quarantined ? [{ kind: 'unit', path: deploy }] : []),
+            ],
+          })
+        );
+        const command = webCiContractTestsCommand(ledger, [deploy]);
+        const { options } = parseCLI(
+          command.replace('pnpm --filter @jovie/web exec ', '')
+        );
+        expect(options.exclude).toEqual(
+          [
+            deploy,
+            other,
+            'tests/unit/ci/playwright-artifact-secrets.test.ts',
+            'tests/unit/ci/production-marker-state.test.ts',
+          ].sort()
+        );
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  );
 });
 
 describe('failure annotation helpers', () => {
@@ -2168,6 +2204,7 @@ describe('source-read guard selection', () => {
       'apps/web/app/api/cron/example/route.test.ts',
       [
         'artist-launch-contract',
+        'privacy-input-route-trackers',
         'merge-group-unit-guards',
         'node-environment-files',
       ],
@@ -2208,6 +2245,7 @@ describe('source-read guard selection', () => {
       'apps/web/app/(marketing)/download/page.tsx',
       [
         'artist-launch-contract',
+        'privacy-input-route-trackers',
         'merge-group-unit-guards',
         'static-revalidate-policy',
         'art-direction',
@@ -2225,7 +2263,7 @@ describe('source-read guard selection', () => {
       ],
     ],
     ['apps/web/tests/e2e/public-profile-smoke.spec.ts', []],
-    ['apps/ios/Jovie/App.swift', []],
+    ['apps/ios/Jovie/App.swift', ['native-design-system']],
     // OutboundRail.tsx text-destructive ejected group pr-21458 (10-13).
     [
       'apps/web/components/features/admin/outbound/OutboundRail.tsx',
@@ -2338,11 +2376,14 @@ describe('source-read guard selection', () => {
     const all = SOURCE_GUARDS.map(guard => guard.id);
     // Manual dispatch runs web Unit Tests and structural, which carry the rest.
     expect(selected('workflow_dispatch', ['README.md'])).toEqual([
+      'native-design-system',
       'artist-launch-contract',
+      'privacy-input-route-trackers',
       'artist-profile-conformance',
       'ci-schedule-inventory',
       'automation-registry',
       'growth-registry',
+      'outcome-verifier',
       'synthetic-canary-liveness',
       'playbook-authoring',
       'icp-language',
@@ -2355,11 +2396,14 @@ describe('source-read guard selection', () => {
     expect(selected('pull_request', null)).toEqual(all);
     expect(selected('pull_request', [])).toEqual(all);
     expect(selected('merge_group', null)).toEqual([
+      'native-design-system',
       'artist-launch-contract',
+      'privacy-input-route-trackers',
       'artist-profile-conformance',
       'ci-schedule-inventory',
       'automation-registry',
       'growth-registry',
+      'outcome-verifier',
       'synthetic-canary-liveness',
       'playbook-authoring',
       'icp-language',
@@ -2372,6 +2416,17 @@ describe('source-read guard selection', () => {
 
   it('points every guard at a test file that exists', () => {
     for (const guard of SOURCE_GUARDS) {
+      if (guard.id === 'native-design-system') {
+        expect(guard.command).toContain('native-design-system.mjs');
+        expect(guard.command).toContain('native-spacing-scale.mjs');
+        expect(
+          readFileSync(
+            join(REPO_ROOT, 'apps/ios/scripts/native-design-system.test.mjs'),
+            'utf8'
+          )
+        ).toContain("from 'node:test'");
+        continue;
+      }
       if (guard.id === 'artist-profile-conformance') {
         expect(guard.command).toContain(
           join(REPO_ROOT, 'scripts/artist-profile-conformance.mjs')
@@ -2379,6 +2434,19 @@ describe('source-read guard selection', () => {
         expect(guard.command).toContain(
           join(REPO_ROOT, 'scripts/artist-profile-conformance.test.mjs')
         );
+        continue;
+      }
+      if (guard.id === 'privacy-input-route-trackers') {
+        expect(guard.prOnly).toBe(false);
+        expect(guard.command).toContain(
+          'scripts/compliance/input-page-trackers.test.mjs'
+        );
+        expect(
+          readFileSync(
+            join(REPO_ROOT, 'scripts/compliance/input-page-trackers.test.mjs'),
+            'utf8'
+          )
+        ).toContain("from 'node:test'");
         continue;
       }
       if (guard.id === 'artist-launch-contract') {

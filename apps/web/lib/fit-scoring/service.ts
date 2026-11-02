@@ -212,6 +212,7 @@ export async function calculateAndStoreFitScore(
     .where(
       and(
         eq(discogReleases.creatorProfileId, creatorProfileId),
+        isNull(discogReleases.deletedAt),
         isNotNull(discogReleases.releaseDate)
       )
     )

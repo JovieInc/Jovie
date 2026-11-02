@@ -19,6 +19,11 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import {
+  GEN_JSON_SIZE_ALLOWLIST,
+  MAX_GEN_JSON_BYTES,
+  MAX_RETAINED_DRIZZLE_SNAPSHOTS,
+} from './lib/repo-hygiene-limits.mjs';
+import {
   classifyRolloutFindings,
   evaluateRepoHygiene,
   filterMergeParentIdenticalPaths,
@@ -1044,11 +1049,31 @@ test('drizzle meta retains only a bounded window of schema snapshots', () => {
     snapshots.length > 0,
     'drizzle-kit generate needs the newest snapshot as its diff base'
   );
-  const MAX_RETAINED_SNAPSHOTS = 8;
+  const MAX_RETAINED_SNAPSHOTS = MAX_RETAINED_DRIZZLE_SNAPSHOTS;
   assert.ok(
     snapshots.length <= MAX_RETAINED_SNAPSHOTS,
     `${snapshots.length} drizzle meta snapshots retained (cap ${MAX_RETAINED_SNAPSHOTS}); ` +
       'each is a ~1 MiB copy of the full schema and only the newest is read by ' +
       'drizzle-kit generate — git rm the oldest *_snapshot.json files in this PR'
   );
+});
+
+test('generated *.gen.json files over 1 MiB fail unless allowlisted', () => {
+  const root = mkdtempSync(join(tmpdir(), 'jovie-hygiene-gen-json-'));
+  try {
+    const big = 'ops/registry/big.gen.json';
+    const small = 'ops/registry/small.gen.json';
+    fixtureFile(root, big, MAX_GEN_JSON_BYTES + 1);
+    fixtureFile(root, small, 1024);
+    const errors = evaluateRepoHygiene({
+      root,
+      addedPaths: [],
+      trackedPaths: [big, small],
+    }).errors.filter(error => error.includes('.gen.json'));
+    assert.equal(errors.length, 1);
+    assert.match(errors[0], /big\.gen\.json/);
+    assert.ok(Array.isArray(GEN_JSON_SIZE_ALLOWLIST));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

@@ -18,7 +18,8 @@ export type PublicProfileIdentityExclusionReason =
   | 'legacy_claim_fixture'
   | 'production_canary'
   | 'qa_auth_fixture'
-  | 'screen_cert_fixture';
+  | 'screen_cert_fixture'
+  | 'capture_profile_fixture';
 
 const EXCLUDED_HANDLES_BY_REASON = {
   claim_flow_fixture: ['e2eclaimartist'],
@@ -29,8 +30,9 @@ const EXCLUDED_HANDLES_BY_REASON = {
     'edgecase-long',
   ],
   legacy_claim_fixture: ['testartist'],
-  production_canary: ['authqaprod'],
+  production_canary: ['authqaprod', 'gooddropouts', 'jovie-chat-health'],
   screen_cert_fixture: ['jovie-screen-fixture'],
+  capture_profile_fixture: ['unfazed'],
   qa_auth_fixture: [
     'authiosprod',
     'authiosstaging',

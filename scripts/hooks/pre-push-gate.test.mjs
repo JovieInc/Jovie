@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
   copyFileSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -13,7 +14,7 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const hooksDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(hooksDir, '../..');
@@ -228,7 +229,9 @@ test('publication rejects committed formatter drift and accepts the formatted re
     // Other publication checks are outside this formatting contract. Real Git,
     // the publication dispatcher and the installed Biome run without mocks.
     write('scripts/ci-branching-guard.mjs', 'export {};\n');
+    write('scripts/component-ship-gate.mjs', 'export {};\n');
     write('scripts/lib/policy-gate-liveness.mjs', 'export {};\n');
+    write('scripts/preflight-changed.mjs', 'export {};\n');
     write('scripts/security/scan-secrets.sh', 'exit 0\n');
     write('scripts/hooks/pre-push-gate.test.mjs', 'export {};\n');
     write('.gitignore', 'node_modules/\n');
@@ -277,6 +280,100 @@ test('publication rejects committed formatter drift and accepts the formatted re
     rmSync(path.join(root, 'node_modules/.bin/biome'));
     const missingTool = publish();
     assert.notEqual(missingTool.status, 0, 'missing Biome must fail closed');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('publication blocks missing component stories and tests before publishing', () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'publication-component-'));
+  const source = 'apps/web/components/atoms/PublishAction.tsx';
+  const testFile = source.replace('.tsx', '.test.tsx');
+  const story = source.replace('.tsx', '.stories.tsx');
+  const marker = path.join(root, 'publication-completed');
+  const write = (file, body, executable = false) => {
+    const absolute = path.join(root, file);
+    mkdirSync(path.dirname(absolute), { recursive: true });
+    writeFileSync(absolute, body, { mode: executable ? 0o755 : 0o644 });
+  };
+  try {
+    write('scripts/hooks/pre-push-gate.sh', readFileSync(gateScript, 'utf8'));
+    write('scripts/hooks/resolve-repo-node.sh', 'exit 0\n');
+    write('scripts/hooks/biome-pre-push.sh', 'exit 0\n');
+    write(
+      'bin/git',
+      '#!/bin/sh\nif [ "$*" != "rev-parse --local-env-vars" ]; then echo fixture-base; fi\n',
+      true
+    );
+    write('scripts/ci-branching-guard.mjs', '');
+    write('scripts/security/scan-secrets.sh', 'exit 0\n');
+    write(
+      'scripts/lib/policy-gate-liveness.mjs',
+      `import { writeFileSync } from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'done');\n`
+    );
+    write('scripts/hooks/pre-push-gate.test.mjs', 'export {};\n');
+    write('scripts/preflight-changed.mjs', 'export {};\n');
+    const checker = pathToFileURL(
+      path.join(repoRoot, 'scripts/component-ship-gate.mjs')
+    ).href;
+    // Exercise the real artifact checker; isolate network/scanners and git range discovery.
+    write(
+      'scripts/component-ship-gate.mjs',
+      `
+import assert from 'node:assert/strict';
+import { checkChangedComponents } from ${JSON.stringify(checker)};
+assert.deepEqual(process.argv.slice(2), ['--check-artifacts', '--diff-base=fixture-base']);
+const report = checkChangedComponents(${JSON.stringify([source, testFile])}, { repoRoot: process.cwd() });
+console.log(report.issues.map(issue => issue.rule).join('\\n'));
+process.exit(report.ok ? 0 : 1);
+`
+    );
+    write(
+      source,
+      'export function PublishAction() { return <button>Publish</button>; }'
+    );
+    write(testFile, "import { PublishAction } from './PublishAction';");
+    const run = () =>
+      spawnSync(
+        'bash',
+        [path.join(root, 'scripts/hooks/pre-push-gate.sh'), 'publication'],
+        {
+          cwd: root,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${path.join(root, 'bin')}:${process.env.PATH}`,
+            JOVIE_SKIP_PRE_PUSH_GATE: '',
+          },
+        }
+      );
+    const missingStory = run();
+    assert.equal(
+      missingStory.status,
+      1,
+      missingStory.stdout + missingStory.stderr
+    );
+    assert.match(missingStory.stdout, /missing-story/);
+    assert.equal(existsSync(marker), false);
+
+    write(
+      story,
+      "import { PublishAction } from './PublishAction';\nexport default { component: PublishAction };\nexport const Default = {};\n"
+    );
+    rmSync(path.join(root, testFile));
+    const missingTest = run();
+    assert.equal(
+      missingTest.status,
+      1,
+      missingTest.stdout + missingTest.stderr
+    );
+    assert.match(missingTest.stdout, /missing-test/);
+    assert.equal(existsSync(marker), false);
+
+    write(testFile, "import { PublishAction } from './PublishAction';");
+    const complete = run();
+    assert.equal(complete.status, 0, complete.stdout + complete.stderr);
+    assert.equal(existsSync(marker), true);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

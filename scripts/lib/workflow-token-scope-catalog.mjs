@@ -55,6 +55,15 @@ export const CATALOG_ACKNOWLEDGEMENTS = [
     message:
       'dequeue-held calls dequeuePullRequest with contents: write and pull-requests: write, not merge-queues: write. The step catches the denial. Tim must approve permission-merge-queues: write if that dequeue should succeed. This check does not change scopes.',
   },
+  {
+    id: 'enroll-relabel-jump-without-merge-queues',
+    workflow: '.github/workflows/merge-queue-green-enroll.yml',
+    job: 'enroll',
+    call: 'dequeuePullRequest',
+    missing: ['merge-queues:write'],
+    message:
+      'enroll calls dequeuePullRequest for the relabel-jump with contents: write and pull-requests: write, not merge-queues: write, the same token shape as dequeue-held. The step catches a denial and leaves the PR queued. Tim must approve permission-merge-queues: write if that dequeue should always succeed. This check does not change scopes.',
+  },
 ];
 
 /** @type {Array<{ method: string, path: RegExp, requirement: Requirement }>} */

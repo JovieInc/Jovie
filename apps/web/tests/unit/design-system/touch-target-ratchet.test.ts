@@ -74,18 +74,20 @@ describe('touch-target ratchet', () => {
     ).toBeLessThanOrEqual(baseline.count);
   }, 60_000);
 
-  it('baseline follows the work down (no stale slack)', () => {
+  it('a count below the baseline is a notice, never a failure', () => {
     const current = countViolations(WEB_ROOT).length;
     const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')) as {
       count: number;
     };
-    // Allow a small slack window so parallel PRs that remove violations
-    // don't hard-block each other, but force periodic baseline updates.
-    expect(
-      baseline.count - current,
-      `Baseline is ${baseline.count - current} above the real count (${current}). ` +
-        'Run `pnpm --filter web run lint:touch-target -- --update` to lower it.'
-    ).toBeLessThanOrEqual(25);
+    // An improvement must never fail a PR or a merge group; growth is
+    // enforced by the test above. Surface the slack so --update locks it in.
+    if (current < baseline.count) {
+      console.info(
+        `Baseline is ${baseline.count - current} above the real count (${current}). ` +
+          'Run `pnpm --filter web run lint:touch-target -- --update` to lower it.'
+      );
+    }
+    expect(current).toBeLessThanOrEqual(baseline.count);
   }, 60_000);
 });
 

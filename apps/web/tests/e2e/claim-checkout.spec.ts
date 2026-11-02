@@ -20,6 +20,7 @@ import {
 import {
   createCheckoutSession,
   createSignedStripeWebhook,
+  detachCustomerPaymentMethods,
   ensureUserIsFree,
   expireRunOwnedTestCheckoutSession,
   getBillingStatus,
@@ -70,6 +71,13 @@ test.describe('Self-serve artist profile checkout', () => {
     await interceptTrackingRoutes(page);
     await setTestAuthBypassSession(page, 'creator');
     await ensureUserIsFree(page, stripeClient);
+    // JOV-8805: the persona's Stripe customer persists across runs; clear
+    // attached test PaymentMethods so checkout.sessions.create stays under
+    // Stripe's per-customer cap.
+    await detachCustomerPaymentMethods(
+      stripeClient,
+      DEFAULT_DEV_TEST_AUTH_EMAILS.creator
+    );
 
     // Claim start captures Pro monthly intent and the claim-flow marker.
     const start = await page.request.get('/claim/start?new=1', {
@@ -125,6 +133,15 @@ test.describe('Self-serve artist profile checkout', () => {
         .toBe(true);
       expect((await getBillingStatus(page)).plan).toBe('pro');
 
+      // Paid value (golden-path step): the buyer lands on the unlock screen,
+      // not a bare receipt. This is the only run that can pay, so it asserts it.
+      await page.goto(`/billing/success?session_id=${sessionId}`, {
+        waitUntil: 'domcontentloaded',
+      });
+      await expect(page.getByText(/You're on .+: unlocked/)).toBeVisible({
+        timeout: 30_000,
+      });
+
       // An existing subscriber is never charged twice.
       const again = await page.request.get('/claim/start?new=1', {
         maxRedirects: 0,
@@ -136,6 +153,10 @@ test.describe('Self-serve artist profile checkout', () => {
       // The persona keeps its Stripe customer; only the test subscription
       // is canceled so the next run starts free.
       await ensureUserIsFree(page, stripeClient);
+      await detachCustomerPaymentMethods(
+        stripeClient,
+        DEFAULT_DEV_TEST_AUTH_EMAILS.creator
+      );
     }
   });
 });
@@ -252,6 +273,7 @@ test.describe('Claim checkout dogfood', () => {
     await ensureUserIsFree(page, stripeClient).catch(async () => {
       await resetDogfoodBilling(buyerEmail);
     });
+    await detachCustomerPaymentMethods(stripeClient, buyerEmail);
     const { profileId } = await readActiveClaimVerification(buyerEmail);
     await clearDogfoodClaim(profileId, artist);
 
@@ -400,6 +422,9 @@ test.describe('Claim checkout dogfood', () => {
       await ensureUserIsFree(page, stripeClient).catch(async () => {
         await resetDogfoodBilling(buyerEmail);
       });
+      await detachCustomerPaymentMethods(stripeClient, buyerEmail).catch(
+        () => undefined
+      );
       if (openSession) {
         await expireRunOwnedTestCheckoutSession(
           stripeClient,

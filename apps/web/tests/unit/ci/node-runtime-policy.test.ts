@@ -13,6 +13,7 @@ import {
   evaluateOfficialReleases,
   getReleaseStatus,
   isPromotionReady,
+  latestReleaseForMajor,
   validateRepositoryPolicy,
 } from '../../../../../scripts/node-runtime-policy.mjs';
 
@@ -218,5 +219,47 @@ describe('Node runtime lifecycle policy', () => {
         ).toBe(true);
       }
     }
+  });
+  it('skips pre-release index entries instead of aborting resolution (JOV-8795)', () => {
+    const result = evaluateOfficialReleases({
+      policy: { ...policy, productionVersion: '24.21.0' },
+      schedule,
+      index: [
+        { version: 'v27.0.0-alpha.0.0.0', date: '2026-10-29', security: false },
+        { version: 'v24.22.0-beta.1', date: '2026-10-29', security: true },
+        ...releaseIndex,
+      ],
+      now,
+    });
+    expect(result.errors).toEqual([]);
+    expect(result.production).toEqual({
+      version: '24.21.0',
+      latest: '24.21.0',
+      status: 'active_lts',
+    });
+  });
+  it('never selects a pre-release as the latest release for a major', () => {
+    expect(() =>
+      latestReleaseForMajor(
+        [
+          {
+            version: 'v27.0.0-alpha.0.0.0',
+            date: '2026-10-29',
+            security: false,
+          },
+        ],
+        27
+      )
+    ).toThrow('Node 27 is missing from the official release index');
+  });
+  it('still fails loudly on a malformed release index entry', () => {
+    expect(() =>
+      evaluateOfficialReleases({
+        policy: { ...policy, productionVersion: '24.21.0' },
+        schedule,
+        index: [{ version: 'v24-broken', date: '2026-10-29', security: false }],
+        now,
+      })
+    ).toThrow('Invalid Node version: v24-broken');
   });
 });

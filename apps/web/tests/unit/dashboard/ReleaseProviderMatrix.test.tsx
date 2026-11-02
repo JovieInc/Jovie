@@ -288,7 +288,19 @@ vi.mock(
 vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog',
   () => ({
-    SpotifyConnectDialog: () => null,
+    SpotifyConnectDialog: ({
+      connected,
+      connectedArtistName,
+    }: {
+      connected?: boolean;
+      connectedArtistName?: string | null;
+    }) => (
+      <div
+        data-testid='spotify-dialog-connection'
+        data-connected={String(connected)}
+        data-artist={connectedArtistName ?? ''}
+      />
+    ),
   })
 );
 
@@ -687,6 +699,37 @@ describe('ReleaseProviderMatrix', () => {
       expect(screen.getByTestId('release-table')).toBeInTheDocument();
       expect(screen.getByTestId('release-subheader')).toBeInTheDocument();
     });
+
+    it.each([true, false])(
+      'passes connection state %s into the Spotify dialog',
+      connected => {
+        render(
+          <QueryClientProvider client={new QueryClient()}>
+            <TooltipProvider>
+              <HeaderActionsProvider>
+                <RightPanelProvider>
+                  <ReleaseProviderMatrix
+                    releases={[]}
+                    providerConfig={providerConfig}
+                    primaryProviders={primaryProviders}
+                    spotifyConnected={connected}
+                    spotifyArtistName='Tim White'
+                  />
+                </RightPanelProvider>
+              </HeaderActionsProvider>
+            </TooltipProvider>
+          </QueryClientProvider>
+        );
+        expect(screen.getByTestId('spotify-dialog-connection')).toHaveAttribute(
+          'data-connected',
+          String(connected)
+        );
+        expect(screen.getByTestId('spotify-dialog-connection')).toHaveAttribute(
+          'data-artist',
+          'Tim White'
+        );
+      }
+    );
 
     it('keeps the spotify import banner footprint when import is idle', () => {
       renderWithProviders(
