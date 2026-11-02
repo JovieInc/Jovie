@@ -1,27 +1,13 @@
 // @coverage-via apps/web/components/marketing/ProductShot.test.tsx
-import type { CSSProperties } from 'react';
 import {
   getProductShot,
   type ProductShotId,
-  type ProductShotImage,
 } from '@/lib/screenshots/product-shots';
 import { cn } from '@/lib/utils';
 import './ProductShot.css';
 
 /** Matches the narrow-screen breakpoint in ProductShot.css. */
 export const PRODUCT_SHOT_MOBILE_MEDIA = '(max-width: 47.99rem)';
-
-function shotStyle(shot: ProductShotImage): CSSProperties {
-  const vars: Record<string, string> = {
-    '--product-shot-max-width': `${shot.width}px`,
-  };
-  if (shot.mobile) {
-    vars['--product-shot-mobile-max-width'] = `${shot.mobile.width}px`;
-    vars['--product-shot-mobile-ratio'] =
-      `${shot.mobile.width} / ${shot.mobile.height}`;
-  }
-  return vars as CSSProperties;
-}
 
 interface ProductShotProps {
   readonly id: ProductShotId;
@@ -58,7 +44,6 @@ export function ProductShot({
         staged && 'product-shot--staged',
         className
       )}
-      style={shotStyle(shot)}
       data-product-shot={shot.id}
       data-testid={`product-shot-${shot.id}`}
     >
@@ -72,15 +57,21 @@ export function ProductShot({
       <picture>
         {shot.mobile ? (
           <>
+            {/* Source dimensions reserve the mobile art's own aspect, so the
+                swap below the breakpoint cannot shift layout. */}
             <source
               media={PRODUCT_SHOT_MOBILE_MEDIA}
               type='image/avif'
               srcSet={shot.mobile.avif}
+              width={shot.mobile.width}
+              height={shot.mobile.height}
             />
             <source
               media={PRODUCT_SHOT_MOBILE_MEDIA}
               type='image/webp'
               srcSet={shot.mobile.webp}
+              width={shot.mobile.width}
+              height={shot.mobile.height}
             />
           </>
         ) : null}

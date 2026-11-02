@@ -56,25 +56,16 @@
 
 .product-shot--staged picture {
   display: block;
-  width: 100%;
-  max-width: var(--product-shot-max-width, 100%);
+  max-width: 100%;
 }
 
+/* Staged UI renders at its display width (the img width attribute), never
+   upscaled past it, and shrinks with the card. */
 .product-shot--staged .product-shot__image {
+  width: auto;
+  max-width: 100%;
   border-radius: var(--radius-lg);
 }
 
-/* Narrow screens serve the mobile variant when the shot has one; reserve its
-   aspect ratio so the art swap cannot shift layout. */
-@media (max-width: 47.99rem) {
-  .product-shot__image {
-    aspect-ratio: var(--product-shot-mobile-ratio, auto);
-  }
-
-  .product-shot--staged picture {
-    max-width: var(
-      --product-shot-mobile-max-width,
-      var(--product-shot-max-width, 100%)
-    );
-  }
-}
+/* Narrow screens serve the mobile variant when the shot has one; its
+   <source width height> reserves the aspect ratio, so no override here. */

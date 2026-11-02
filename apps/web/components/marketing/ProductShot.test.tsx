@@ -61,10 +61,11 @@ describe('ProductShot', () => {
     expect(mobileAvif).toHaveAttribute('srcset', mobile.avif);
     expect(mobileWebp).toHaveAttribute('srcset', mobile.webp);
     expect(desktopAvif).not.toHaveAttribute('media');
-    const figure = container.querySelector('figure') as HTMLElement;
-    expect(figure.style.getPropertyValue('--product-shot-mobile-ratio')).toBe(
-      '358 / 180'
-    );
+    // Dimensions on the mobile sources reserve the swap's aspect (no CLS),
+    // with no inline style on the figure (System B source invariant).
+    expect(mobileAvif).toHaveAttribute('width', '358');
+    expect(mobileAvif).toHaveAttribute('height', '180');
+    expect(container.querySelector('figure')).not.toHaveAttribute('style');
     spy.mockRestore();
   });
 
