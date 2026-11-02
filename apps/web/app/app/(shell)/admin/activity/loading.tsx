@@ -1,8 +1,6 @@
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ActivityTableSkeleton } from '@/features/admin/ActivityTableUnified';
 
-const activityTabs = [{ value: 'activity', label: 'Activity' }] as const;
-
 /**
  * Skeleton wrapper for the admin Activity page.
  *
@@ -19,13 +17,9 @@ export function AdminActivitySkeleton() {
 export default function AdminActivityLoading() {
   return (
     <AdminPage
-      title='Activity'
-      description='Recent admin interventions, creator events, and system outcomes.'
-      tabs={{
-        param: 'view',
-        value: 'activity',
-        options: activityTabs,
-      }}
+      views='shipping'
+      title='Timeline'
+      description='The 50 most recent company events from the last 7 days, with source evidence and observed outcomes.'
       testId='admin-activity-page'
       viewTestId='admin-activity-view'
     >

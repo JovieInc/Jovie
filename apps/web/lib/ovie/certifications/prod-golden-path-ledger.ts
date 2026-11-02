@@ -1,4 +1,8 @@
-import type { CertificationReviewPacket } from '@/lib/agent-os/certification';
+import { createHash } from 'node:crypto';
+import type {
+  CertificationEvidenceReceipt,
+  CertificationReviewPacket,
+} from '@/lib/agent-os/certification';
 import { JOVIE_CERTIFICATION_CONTRACT } from '@/lib/agent-os/certification';
 import {
   CERTIFICATION_PERSISTENCE_TTL_SECONDS,
@@ -81,6 +85,18 @@ export interface ProdGoldenPathScreenshot {
   readonly dataUrl: string;
 }
 
+/**
+ * One admin certifications-inventory readback attempt per run (JOV-9625
+ * outcome rework): the readback signs in as the documented CI admin fixture
+ * and reads `GET /api/ovie/certifications`. Evidence only — it never turns
+ * a surface red; a not-viable fixture records 'blocked' with the exact
+ * reason.
+ */
+export interface ProdGoldenPathAdminReadback {
+  readonly status: 'passed' | 'blocked' | 'failed';
+  readonly detail: string;
+}
+
 export interface ProdGoldenPathReceipt {
   readonly schema: typeof PROD_GOLDEN_PATH_RECEIPT_SCHEMA;
   readonly surface: ProdGoldenPathSurfaceId;
@@ -101,6 +117,7 @@ export interface ProdGoldenPathReceipt {
   readonly consoleErrorCount?: number | null;
   readonly networkErrorCount?: number | null;
   readonly screenshot?: ProdGoldenPathScreenshot | null;
+  readonly adminInventoryReadback?: ProdGoldenPathAdminReadback | null;
 }
 
 export interface ProdGoldenPathSurfaceRecord {
@@ -247,6 +264,34 @@ export async function readProdGoldenPathLedger(
     : parseProdGoldenPathLedger(raw);
 }
 
+/**
+ * A surface is certified while its latest production receipt passed within
+ * this window. Post-deploy probes certify after every promotion, so a day
+ * without a passing receipt means the certification is no longer current.
+ */
+export const PROD_GOLDEN_PATH_CERTIFICATION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const CLOCK_SKEW_MS = 5 * 60 * 1000;
+
+/**
+ * Surfaces with a current production certification, in launch order. The
+ * production alias perf gate blocks only on these (Tim 2026-10-31): the
+ * blocking set grows as surfaces certify, and a missing ledger certifies
+ * nothing, so it can never block.
+ */
+export function certifiedProdGoldenPathSurfaces(
+  ledger: ProdGoldenPathLedger | null,
+  now: number = Date.now(),
+  maxAgeMs: number = PROD_GOLDEN_PATH_CERTIFICATION_MAX_AGE_MS
+): ProdGoldenPathSurfaceId[] {
+  if (!ledger) return [];
+  return PROD_GOLDEN_PATH_SURFACE_IDS.filter(id => {
+    const latest = ledger.surfaces[id]?.latest;
+    if (!latest || latest.status !== 'passed') return false;
+    const endedAt = Date.parse(latest.endedAt);
+    return endedAt <= now + CLOCK_SKEW_MS && now - endedAt <= maxAgeMs;
+  });
+}
+
 export type ProdGoldenPathRecordResult = {
   readonly recorded: readonly ProdGoldenPathSurfaceId[];
   /** Receipts not newer than the stored latest for their surface. */
@@ -338,33 +383,103 @@ const EVIDENCE_STATUS = {
   'passed' | 'failed' | 'blocked'
 >;
 
-function summarize(receipt: ProdGoldenPathReceipt): string {
+/** Freshness window for a passed receipt, aligned with certificationVerdict. */
+export const PROD_GOLDEN_PATH_FRESHNESS_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Per-surface runtime lifecycle state of the golden-path projection
+ * (JOV-9625 outcome rework). `certified` = passed on the served build inside
+ * the freshness window; `expired` = last pass is older than the window;
+ * `missing` = no receipt ever recorded; a failed/blocked receipt keeps its
+ * own status and carries no lifecycle state.
+ */
+export type ProdGoldenPathRuntimeState = 'certified' | 'expired' | 'missing';
+
+function runtimeState(
+  receipt: ProdGoldenPathReceipt | undefined,
+  nowMs: number
+): ProdGoldenPathRuntimeState | undefined {
+  if (!receipt) return 'missing';
+  // A failed/blocked receipt was exercised on production: it keeps its own
+  // status and carries no lifecycle state, so it is never conflated with a
+  // surface that has no receipt at all (JOV-9625 review rework).
+  if (receipt.status !== 'passed') return undefined;
+  if (nowMs - Date.parse(receipt.endedAt) > PROD_GOLDEN_PATH_FRESHNESS_MS) {
+    return 'expired';
+  }
+  return 'certified';
+}
+
+function summarize(
+  receipt: ProdGoldenPathReceipt | undefined,
+  state: ProdGoldenPathRuntimeState | undefined,
+  nowMs: number
+): string {
+  if (!receipt) {
+    return 'state=missing; No production receipt recorded for this surface.';
+  }
+  const evidenceCounts =
+    typeof receipt.consoleErrorCount === 'number' ||
+    typeof receipt.networkErrorCount === 'number'
+      ? `; consoleErrors=${receipt.consoleErrorCount ?? 'n/a'}; networkErrors=${receipt.networkErrorCount ?? 'n/a'}`
+      : '';
+  // Blocked and failed receipts carry no `state=` marker: their own status
+  // is the verdict, and `missing` is reserved for never-recorded surfaces.
   if (receipt.status === 'blocked') {
-    return `Not exercised on production: ${receipt.blocker}`;
+    return `Not exercised on production: ${receipt.blocker}${evidenceCounts}`;
   }
   const failed = receipt.checks.filter(c => c.status === 'failed');
   if (failed.length > 0) {
-    return `Failed on production: ${failed.map(c => `${c.id} (${c.summary})`).join('; ')}`.slice(
+    return `Failed on production: ${failed.map(c => `${c.id} (${c.summary})`).join('; ')}${evidenceCounts}`.slice(
       0,
       1_900
     );
   }
-  return `${receipt.checks.length} production checks passed as ${receipt.identity}.`;
+  if (state === 'expired') {
+    const ageHours = (
+      (nowMs - Date.parse(receipt.endedAt)) /
+      3_600_000
+    ).toFixed(1);
+    return `state=expired; Last production pass on ${receipt.sha.slice(0, 8)} is ${ageHours}h old (freshness window 24h)${evidenceCounts}`;
+  }
+  return `state=certified; ${receipt.checks.length} production checks passed as ${receipt.identity}${evidenceCounts}`;
 }
 
 /**
  * Project each stored surface into the packet-file shape the Ovie inventory
  * already renders. The evidence is runtime_dogfood bound to the deployed SHA.
+ * Every surface emits a row — a surface with no receipt projects the
+ * explicit `missing` state instead of vanishing — and each row carries the
+ * runtime lifecycle state (`certified` / `expired` / `missing`) plus the
+ * receipt's per-surface browser evidence (screenshot frame, console and
+ * network error counts) so the inventory preserves what the run measured.
  */
 export function prodGoldenPathPacketFiles(
-  ledger: ProdGoldenPathLedger
+  ledger: ProdGoldenPathLedger,
+  options: { readonly nowMs?: number } = {}
 ): CertificationPacketFile[] {
+  const nowMs = options.nowMs ?? Date.now();
   const files: CertificationPacketFile[] = [];
   for (const id of PROD_GOLDEN_PATH_SURFACE_IDS) {
     const record = ledger.surfaces[id];
-    if (!record) continue;
-    const receipt = record.latest;
+    const receipt = record?.latest;
+    const state = runtimeState(receipt, nowMs);
     const meta = PROD_GOLDEN_PATH_SURFACES[id];
+    const summary = summarize(receipt, state, nowMs);
+    const visualProof: CertificationEvidenceReceipt[] = [];
+    if (receipt?.screenshot) {
+      visualProof.push({
+        id: `prod-golden-path-screenshot:${id}`,
+        tier: 'runtime_dogfood',
+        status: 'passed',
+        sourceSha: receipt.sha,
+        ref: receipt.screenshot.dataUrl,
+        digest: createHash('sha256')
+          .update(receipt.screenshot.dataUrl)
+          .digest('hex'),
+        summary: `JPEG evidence frame for ${id} on ${receipt.sha.slice(0, 8)}`,
+      });
+    }
     const packet: CertificationReviewPacket = {
       contract: JOVIE_CERTIFICATION_CONTRACT,
       subject: {
@@ -372,30 +487,47 @@ export function prodGoldenPathPacketFiles(
         kind: 'production-surface',
         title: `${meta.title} (production)`,
       },
-      source: {
-        repository: 'JovieInc/Jovie',
-        ref: 'production',
-        sha: receipt.sha,
-        paths: [...receipt.screenIds],
-        digest: null,
-      },
+      source: receipt
+        ? {
+            repository: 'JovieInc/Jovie',
+            ref: 'production',
+            sha: receipt.sha,
+            paths: [...receipt.screenIds],
+            digest: null,
+          }
+        : null,
       canonicalReferences: [],
       invariantEvaluation: [],
       testsCoverage: [],
-      visualProof: [],
+      visualProof,
       requiredVariants: [],
       itemMedia: [],
       operational: {
         runtimeDogfood: [
-          {
-            id: `prod-golden-path:${id}:${receipt.sha.slice(0, 8)}`,
-            tier: 'runtime_dogfood',
-            status: EVIDENCE_STATUS[receipt.status],
-            sourceSha: receipt.sha,
-            ref: receipt.runUrl ?? 'prod-golden-path',
-            digest: null,
-            summary: summarize(receipt),
-          },
+          receipt
+            ? {
+                id: `prod-golden-path:${id}:${receipt.sha.slice(0, 8)}`,
+                tier: 'runtime_dogfood',
+                // An expired pass is pending recertification, not a pass:
+                // the freshness window gates the runtime_dogfood tier.
+                status:
+                  state === 'expired'
+                    ? 'pending'
+                    : EVIDENCE_STATUS[receipt.status],
+                sourceSha: receipt.sha,
+                ref: receipt.runUrl ?? 'prod-golden-path',
+                digest: null,
+                summary,
+              }
+            : {
+                id: `prod-golden-path:${id}:missing`,
+                tier: 'runtime_dogfood',
+                status: 'missing',
+                sourceSha: null,
+                ref: 'prod-golden-path',
+                digest: null,
+                summary,
+              },
         ],
       },
     };
@@ -403,13 +535,163 @@ export function prodGoldenPathPacketFiles(
       domain: meta.domain,
       surface: meta.title,
       owner: null,
-      packetUpdatedAt: receipt.endedAt,
-      links: receipt.runUrl
-        ? [{ label: 'Production run', href: receipt.runUrl, kind: 'test_run' }]
+      packetUpdatedAt: receipt?.endedAt ?? new Date(nowMs).toISOString(),
+      links: receipt?.runUrl
+        ? [
+            {
+              label: 'Production run',
+              href: receipt.runUrl,
+              kind: 'test_run',
+            },
+          ]
         : [],
       packet,
       file: `ledger:prod-golden-path/${id}`,
     });
   }
   return files;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Quality-contract observations (JOV-9625 outcome rework)             */
+/* ------------------------------------------------------------------ */
+
+export const QUALITY_CONTRACT_OBSERVATIONS_LEDGER_KEY =
+  'jovie:certification:v1:quality-contract-observations' as const;
+export const QUALITY_CONTRACT_OBSERVATIONS_CONTRACT =
+  'jovie.quality-contract-observations/v1' as const;
+const OBSERVATIONS_SCHEMA_VERSION = 1 as const;
+
+/** One measured quality-contract observation, from the run's evidence. */
+export interface QualityContractObservationRecord {
+  readonly contractId: string;
+  readonly dimension: string;
+  readonly value: number;
+  readonly unit: string;
+  /** Cumulative sample count across recorded runs. */
+  readonly sampleSize: number;
+  readonly sourceSha: string;
+  readonly recordedAt: string;
+}
+
+export interface QualityContractObservationsLedger {
+  readonly schemaVersion: typeof OBSERVATIONS_SCHEMA_VERSION;
+  readonly contract: typeof QUALITY_CONTRACT_OBSERVATIONS_CONTRACT;
+  /** Keyed by `${contractId}:${dimension}`; the latest run's value wins. */
+  readonly observations: Readonly<
+    Record<string, QualityContractObservationRecord>
+  >;
+  readonly updatedAt: string;
+}
+
+function parseObservationsLedger(
+  raw: unknown
+): QualityContractObservationsLedger {
+  let value: unknown = raw;
+  if (typeof raw === 'string') {
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      throw new ProdGoldenPathPersistenceError(
+        'Quality-contract observations ledger is not valid JSON.'
+      );
+    }
+  }
+  if (
+    !isRecord(value) ||
+    value.schemaVersion !== OBSERVATIONS_SCHEMA_VERSION ||
+    value.contract !== QUALITY_CONTRACT_OBSERVATIONS_CONTRACT ||
+    !isRecord(value.observations) ||
+    !isIso(value.updatedAt)
+  ) {
+    throw new ProdGoldenPathPersistenceError(
+      'Quality-contract observations ledger has an unexpected shape.'
+    );
+  }
+  return value as unknown as QualityContractObservationsLedger;
+}
+
+/** Missing observations are disconnected evidence, never a measured zero. */
+export async function readQualityContractObservations(
+  backend: CertificationRecordBackend
+): Promise<QualityContractObservationsLedger | null> {
+  const raw = await backend.get(QUALITY_CONTRACT_OBSERVATIONS_LEDGER_KEY);
+  return raw === null || raw === undefined
+    ? null
+    : parseObservationsLedger(raw);
+}
+
+/**
+ * Fold the run's per-contract observations into the observations ledger so
+ * the six quality contracts' `observed` values are populated from evidence
+ * instead of staying uncalibrated. The latest run's value wins per
+ * `${contractId}:${dimension}`; the sample size accumulates. Recording is
+ * idempotent per run and never blocks receipt persistence.
+ */
+export async function recordQualityContractObservations(input: {
+  readonly backend: CertificationRecordBackend;
+  readonly receipts: readonly ProdGoldenPathReceipt[];
+  readonly recordedAt?: string;
+}): Promise<{ readonly recorded: number }> {
+  const recordedAt = input.recordedAt ?? new Date().toISOString();
+  const incoming = new Map<
+    string,
+    {
+      observation: ProdGoldenPathObservation;
+      sourceSha: string;
+    }
+  >();
+  for (const receipt of input.receipts) {
+    for (const observation of receipt.observations ?? []) {
+      incoming.set(`${observation.contractId}:${observation.dimension}`, {
+        observation,
+        sourceSha: receipt.sha,
+      });
+    }
+  }
+  if (incoming.size === 0) return { recorded: 0 };
+
+  const result = await mutateCertificationRecord<
+    QualityContractObservationsLedger,
+    { recorded: number }
+  >({
+    backend: input.backend,
+    key: QUALITY_CONTRACT_OBSERVATIONS_LEDGER_KEY,
+    initialize: () =>
+      input.backend.setIfAbsent(
+        QUALITY_CONTRACT_OBSERVATIONS_LEDGER_KEY,
+        JSON.stringify({
+          schemaVersion: OBSERVATIONS_SCHEMA_VERSION,
+          contract: QUALITY_CONTRACT_OBSERVATIONS_CONTRACT,
+          observations: {},
+          updatedAt: recordedAt,
+        }),
+        CERTIFICATION_PERSISTENCE_TTL_SECONDS
+      ),
+    parse: parseObservationsLedger,
+    validate: parseObservationsLedger,
+    error: message => new ProdGoldenPathPersistenceError(message),
+    update: ledger => {
+      const observations: Record<string, QualityContractObservationRecord> = {
+        ...ledger.observations,
+      };
+      for (const [key, entry] of incoming) {
+        const prior = observations[key];
+        observations[key] = {
+          contractId: entry.observation.contractId,
+          dimension: entry.observation.dimension,
+          value: entry.observation.value,
+          unit: entry.observation.unit,
+          sampleSize: entry.observation.sampleSize + (prior?.sampleSize ?? 0),
+          sourceSha: entry.sourceSha,
+          recordedAt,
+        };
+      }
+      return {
+        ledger: { ...ledger, observations, updatedAt: recordedAt },
+        result: { recorded: incoming.size },
+      };
+    },
+  });
+  return result;
 }

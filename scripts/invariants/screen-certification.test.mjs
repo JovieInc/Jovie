@@ -250,6 +250,32 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       'coherent labels do not grant artifact trust'
     );
   });
+  it('registers each profile representation without borrowing canonical profile proof', () => {
+    const routes = ['alerts', 'notifications', 'shop'];
+    const paths = routes.map(
+      route => `apps/web/app/[username]/${route}/page.tsx`
+    );
+    for (const [index, path] of paths.entries()) {
+      const classified = classifyScreenPath(path);
+      assert.equal(classified.kind, 'registered');
+      assert.equal(classified.entry.id, `web.public-profile-${routes[index]}`);
+      assert.equal(classified.entry.owner, 'public-profile');
+      assert.deepEqual(classified.entry.viewports, ['desktop', 'mobile']);
+    }
+    const result = evaluateChangedScreens({
+      changedFiles: paths,
+      headSha: HEAD,
+      requireExternalEvidence: true,
+    });
+    assert.deepEqual(
+      result.issues,
+      routes.map(
+        route => `missing exact-head proof for web.public-profile-${route}`
+      )
+    );
+    assert.deepEqual(result.excludedChanges, []);
+  });
+
   it('registers integrations while requiring separate public and operator proofs', () => {
     for (const [path, id] of [
       [
@@ -491,6 +517,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
   it('registers every founder cockpit route for changed-surface certification', () => {
     const sources = [
       'apps/web/app/app/(shell)/admin/activity/page.tsx',
+      'apps/web/app/app/(shell)/admin/activity/loading.tsx',
       'apps/web/app/app/(shell)/admin/growth/page.tsx',
       'apps/web/app/app/(shell)/admin/operations/page.tsx',
       'apps/web/app/app/(shell)/admin/product/page.tsx',
@@ -506,7 +533,21 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       sources,
       viewports: ['desktop', 'mobile'],
     });
-    for (const source of sources) assert.equal(kindOf(source), 'registered');
+    for (const source of sources) {
+      assert.equal(kindOf(source), 'registered');
+      const result = evaluateChangedScreens({
+        changedFiles: [{ path: source, status: 'M' }],
+        headSha: HEAD,
+      });
+      assert.deepEqual(result.issues, []);
+      assert.deepEqual(result.changedScreens, [
+        {
+          id: 'web.ov-founder-cockpit',
+          verdict: 'evidence-required',
+          findings: [],
+        },
+      ]);
+    }
   });
 
   it('registers the public artists directory for changed-surface certification', () => {
@@ -1228,13 +1269,15 @@ if (p.endsWith('/zip')) {
       'utf8'
     );
     // These screens were registered but uncovered (no rendered producer).
-    // Two bind to already-captured marketing routes; the rest share one
-    // multi-screen proof spec whose entries must match these bindings.
-    assert.equal(SCREEN_MARKETING_ROUTES['web.marketing-renders'], '/renders');
-    assert.equal(
-      SCREEN_MARKETING_ROUTES['web.profile-admission'],
-      '/renders/profile-admission'
-    );
+    // They all share one multi-screen proof spec whose entries must match
+    // these bindings. web.marketing-renders and web.profile-admission are
+    // intentionally NOT marketing-bound: /renders* are render-fixture routes
+    // excluded from MARKETING_EXACT_PUBLIC_ROUTE_TARGETS, so the shared
+    // marketing artifact can never carry their evidence (binding them made
+    // every certification invocation reject that artifact — JOV-INV-018
+    // incident 2026-10-30, run 41106813919).
+    assert.equal(SCREEN_MARKETING_ROUTES['web.marketing-renders'], undefined);
+    assert.equal(SCREEN_MARKETING_ROUTES['web.profile-admission'], undefined);
     const batchScreens = [
       'web.root-document',
       'web.root-layout',
@@ -3835,10 +3878,13 @@ if (p.endsWith('/zip')) {
       sources: [source],
       viewports: ['desktop', 'mobile'],
     });
-    assert.equal(
-      SCREEN_MARKETING_ROUTES['web.engineering-preview'],
-      '/engineering/preview'
-    );
+    // NOT marketing-bound: /engineering/preview is production-blocked and
+    // noindex, so it renders not-found in this workflow's production build
+    // and MARKETING_EXACT_PUBLIC_ROUTE_TARGETS excludes it. Binding it made
+    // every certification invocation reject the shared marketing artifact
+    // (JOV-INV-018 incident 2026-10-30, run 41106813919) instead of the
+    // honest "missing exact-head proof" for this screen.
+    assert.equal(SCREEN_MARKETING_ROUTES['web.engineering-preview'], undefined);
 
     const result = evaluateChangedScreens({
       changedFiles: [

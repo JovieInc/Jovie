@@ -156,6 +156,17 @@ export function claims(ids: readonly ClaimId[], offer: Offer = OFFER): string {
     .join(' ');
 }
 
+/**
+ * Account-state line for a profile that is currently trialing. Unlike the
+ * registered claims it describes the viewer's own trial, so it renders even
+ * when the offer stops granting new trials.
+ */
+export function trialStatusLine(endsLabel: string | null): string {
+  return endsLabel
+    ? `Your trial ends ${endsLabel}. Compare plans to keep it after that.`
+    : 'Your trial is active. Compare plans to keep it after it ends.';
+}
+
 export type CloserPath = 'checkout_now' | 'free_profile';
 
 /**

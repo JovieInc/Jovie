@@ -1,14 +1,5 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import {
-  cpSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { load } from 'js-yaml';
@@ -123,185 +114,21 @@ test('n/a declines; malformed section errors; absent is silent', () => {
   assert.ok(winSectionErrors('## Win\n- Claim: only a claim\n').length > 0);
 });
 
-// Execute the committed workflow shells and real ledger CLI with real Git.
-// Only the remote API, push, and origin emitter are local fixtures: no network
-// or credentials are available to this replay.
-function ingestWorkflow(mode) {
-  const root = resolve(import.meta.dirname, '../../..');
-  const dir = mkdtempSync(join(tmpdir(), 'wins-workflow-'));
-  const workflow =
-    /** @type {{ jobs: { ingest: { steps: { name: string, run?: string }[] } } }} */ (
-      load(
-        readFileSync(join(root, '.github/workflows/wins-ledger.yml'), 'utf8')
-      )
-    );
-  const env = {
-    PATH: `${dir}/bin:${process.env.PATH}`,
-    NODE_OPTIONS: '--v8-pool-size=1',
-    UV_THREADPOOL_SIZE: '1',
-    GIT_CONFIG_GLOBAL: '/dev/null',
-    GIT_CONFIG_NOSYSTEM: '1',
-    PR_NUMBER: '23835',
-    GH_TOKEN: 'fixture',
-  };
-  const run = (command, args = []) => {
-    const result = spawnSync(command, args, {
-      cwd: dir,
-      env,
-      encoding: 'utf8',
-      timeout: 15_000,
-    });
-    assert.ifError(result.error);
-    return result;
-  };
-  const initialMetrics = '{"at":"2026-10-29T00:00:00Z"}\n';
-  const prBody =
-    mode === 'new' || mode === 'duplicate'
-      ? body
-      : mode === 'declined'
-        ? '## Win\nn/a\n'
-        : 'Refs JOV-6783.\n\nAppends the Win section of #23830 to canon/wins/wins.jsonl. Status starts as claimed; it becomes verified only when a post-deploy receipt keeps the gain.';
-  const win = winFromPr(
-    {
-      repo: 'JovieInc/Jovie',
-      number: 23835,
-      mergedAt: '2026-10-29T10:00:00Z',
-    },
-    parseWinSection(body)
+// Data is not shipped as PRs: the workflow writes the Win to the runtime store
+// and never opens a ledger PR or commits to git.
+test('workflow records wins in the store and never opens a ledger PR', () => {
+  const text = readFileSync(
+    join(
+      resolve(import.meta.dirname, '../../..'),
+      '.github/workflows/wins-ledger.yml'
+    ),
+    'utf8'
   );
-  const initialLedger = `# fixture ledger\n${
-    mode === 'duplicate'
-      ? `${JSON.stringify(win)}\n`
-      : mode === 'invalid'
-        ? `${JSON.stringify({ ...win, id: 'invalid' })}\n`
-        : ''
-  }`;
-  try {
-    for (const path of [
-      'bin',
-      'scripts/lib',
-      'packages/api-client',
-      'canon/wins',
-      'docs/metrics',
-    ])
-      mkdirSync(join(dir, path), { recursive: true });
-    for (const path of [
-      'scripts/wins-ledger.mjs',
-      'scripts/lib/wins-ledger.mjs',
-      'scripts/lib/format-biome-json.mjs',
-    ])
-      cpSync(join(root, path), join(dir, path));
-    writeFileSync(join(dir, 'canon/wins/wins.jsonl'), initialLedger);
-    for (const name of ['wins-latest.json', 'wins-weekly.json'])
-      writeFileSync(join(dir, 'docs/metrics', name), initialMetrics);
-    writeFileSync(
-      join(dir, 'packages/api-client/gh.ts'),
-      `export async function runGh(args) {
-        if (args[0] === 'api' && args[1] === 'repos/JovieInc/Jovie/pulls/23835')
-          return {code: 0, stdout: ${JSON.stringify(JSON.stringify({ body: prBody, merged_at: '2026-10-29T10:00:00Z' }))}};
-        if (args[0] === 'pr' && args[1] === 'list')
-          return {code: 0, stdout: '[]'};
-        throw new Error('Unexpected remote read: ' + JSON.stringify(args));
-      }`
-    );
-    writeFileSync(
-      join(dir, 'packages/api-client/cli.ts'),
-      'console.log(23839);'
-    );
-    const realGit = run('bash', ['-c', 'command -v git']).stdout.trim();
-    assert.equal(run(realGit, ['init', '-q']).status, 0);
-    for (const [key, value] of [
-      ['user.name', 'Fixture'],
-      ['user.email', 'fixture@example.invalid'],
-      ['commit.gpgsign', 'false'],
-      ['core.hooksPath', '/dev/null'],
-    ])
-      assert.equal(run(realGit, ['config', key, value]).status, 0);
-    assert.equal(run(realGit, ['add', 'canon', 'docs']).status, 0);
-    assert.equal(run(realGit, ['commit', '-qm', 'fixture']).status, 0);
-    assert.equal(run(realGit, ['remote', 'add', 'origin', dir]).status, 0);
-    const shellQuote = value => `'${value.replaceAll("'", "'\\''")}'`;
-    const stub = (name, script) =>
-      writeFileSync(join(dir, 'bin', name), `#!/bin/bash\n${script}\n`, {
-        mode: 0o755,
-      });
-    stub(
-      'node',
-      `printf '%s\\n' "node $*" >> calls\nexec ${shellQuote(process.execPath)} "$@"`
-    );
-    stub(
-      'git',
-      `if [ "$1" = push ]; then echo push >> calls; exit 0; fi\nexec ${shellQuote(realGit)} -c core.preloadIndex=false -c index.threads=1 "$@"`
-    );
-    stub('python3', 'echo origin-emitter >> calls');
-    let result;
-    for (const name of ['Ingest the Win section', 'Open ledger PR']) {
-      const step = workflow.jobs.ingest.steps.find(step => step.name === name);
-      assert.ok(step?.run, `missing workflow step ${name}`);
-      const script = step.run
-        .replaceAll('${{ github.run_id }}', '123')
-        .replaceAll('${{ github.repository }}', 'JovieInc/Jovie');
-      assert.equal(script.includes('${{'), false);
-      result = run('bash', ['-c', script]);
-      if (result.status !== 0) break;
-    }
-    return {
-      status: result.status,
-      stderr: result.stderr,
-      calls: readFileSync(join(dir, 'calls'), 'utf8').trim().split('\n'),
-      ledger: readFileSync(join(dir, 'canon/wins/wins.jsonl'), 'utf8'),
-      metrics: ['wins-latest.json', 'wins-weekly.json'].map(name =>
-        readFileSync(join(dir, 'docs/metrics', name), 'utf8')
-      ),
-      initialLedger,
-      initialMetrics,
-    };
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-}
-
-for (const mode of ['absent', 'duplicate', 'declined']) {
-  test(`workflow leaves metrics unchanged and opens no PR for ${mode} win`, () => {
-    const result = ingestWorkflow(mode);
-    assert.equal(result.status, 0, result.stderr);
-    assert.deepEqual(result.calls, [
-      'node scripts/wins-ledger.mjs ingest --pr 23835',
-      'node scripts/wins-ledger.mjs validate',
-    ]);
-    assert.equal(result.ledger, result.initialLedger);
-    assert.deepEqual(result.metrics, Array(2).fill(result.initialMetrics));
-  });
-}
-
-test('workflow still derives, notifies and opens a PR for a new valid win', () => {
-  const result = ingestWorkflow('new');
-  assert.equal(result.status, 0, result.stderr);
-  assert.notEqual(result.ledger, result.initialLedger);
-  assert.equal(JSON.parse(result.metrics[0]).winsTotal, 1);
-  assert.notEqual(result.metrics[1], result.initialMetrics);
-  assert.deepEqual(result.calls.slice(0, 6), [
-    'node scripts/wins-ledger.mjs ingest --pr 23835',
-    'node scripts/wins-ledger.mjs validate',
-    'node scripts/wins-ledger.mjs summary --write',
-    'node scripts/wins-ledger.mjs rollup --write',
-    'node scripts/wins-ledger.mjs notify',
-    'push',
-  ]);
-  assert.ok(result.calls.some(call => call.includes('-- pr create --repo')));
-  assert.equal(result.calls.at(-1), 'origin-emitter');
-});
-
-test('workflow blocks an invalid unchanged ledger before deriving or publishing', () => {
-  const result = ingestWorkflow('invalid');
-  assert.equal(result.status, 1, result.stderr);
-  assert.match(result.stderr, /id must look like/);
-  assert.deepEqual(result.calls, [
-    'node scripts/wins-ledger.mjs ingest --pr 23835',
-    'node scripts/wins-ledger.mjs validate',
-  ]);
-  assert.equal(result.ledger, result.initialLedger);
-  assert.deepEqual(result.metrics, Array(2).fill(result.initialMetrics));
+  const steps = /** @type {any} */ (load(text)).jobs.ingest.steps
+    .map(s => s.run ?? '')
+    .join('\n');
+  assert.match(steps, /wins-ledger\.mjs ingest --pr "\$PR_NUMBER" --store/);
+  assert.doesNotMatch(steps, /git (commit|push)|pr create/);
 });
 
 test('clusters trigger at ten verified wins only', () => {

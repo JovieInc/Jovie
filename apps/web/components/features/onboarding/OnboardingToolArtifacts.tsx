@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import type { ReactNode } from 'react';
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   ATTACH_ACCOUNT_CTA_LABEL,
   CONFIRM_HANDLE_CTA_LABEL,
@@ -329,6 +329,9 @@ export function OnboardingSpotifyArtistPickerCard({
   const fieldId = useId();
   const [query, setQuery] = useState(initialQuery);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Pen R6As7U: the agent proposes its top match with one confirm; the full
+  // list and search sit behind "Not Me".
+  const [browsing, setBrowsing] = useState(false);
   const artistSearch = useArtistSearchQuery({
     debounceMs: 250,
     limit: 5,
@@ -382,6 +385,29 @@ export function OnboardingSpotifyArtistPickerCard({
   const isSearching =
     selectedId === null &&
     (artistSearch.state === 'loading' || artistSearch.isPending);
+  const selectArtist = (artist: SpotifyArtistResult) => {
+    setSelectedId(artist.id);
+    onSelectArtist(selectionFromSpotifyResult(artist));
+  };
+  const proposal = results[0];
+  // Hold the proposal frame while the prefilled query resolves so the card
+  // does not swap layouts under the reader.
+  const proposing =
+    !browsing &&
+    hasQuery &&
+    !artistSearch.error &&
+    (isSearching || proposal !== undefined);
+
+  if (proposing) {
+    return (
+      <OnboardingArtistProposal
+        artist={isSearching ? null : (proposal ?? null)}
+        disabled={disabled}
+        onConfirm={selectArtist}
+        onNotMe={() => setBrowsing(true)}
+      />
+    );
+  }
 
   return (
     <div
@@ -400,7 +426,12 @@ export function OnboardingSpotifyArtistPickerCard({
         <input
           id={fieldId}
           value={query}
-          onChange={event => setQuery(event.target.value)}
+          onChange={event => {
+            // Typing is browsing: the proposal swap is for the agent's
+            // prefilled query only, never for keystrokes in this field.
+            setBrowsing(true);
+            setQuery(event.target.value);
+          }}
           placeholder='Search Spotify artists'
           className='min-w-0 flex-1 bg-transparent text-sm leading-6 text-primary-token placeholder:text-quaternary-token focus:outline-none'
           disabled={disabled}
@@ -463,10 +494,7 @@ export function OnboardingSpotifyArtistPickerCard({
             artist={artist}
             disabled={disabled || selectedId !== null}
             selected={selectedId === artist.id}
-            onSelect={() => {
-              setSelectedId(artist.id);
-              onSelectArtist(selectionFromSpotifyResult(artist));
-            }}
+            onSelect={() => selectArtist(artist)}
           />
         ))}
 
@@ -485,6 +513,89 @@ export function OnboardingSpotifyArtistPickerCard({
             {NONE_OF_THESE_CTA_LABEL}
           </Button>
         ) : null}
+      </div>
+    </div>
+  );
+}
+
+function OnboardingArtistProposal({
+  artist,
+  disabled,
+  onConfirm,
+  onNotMe,
+}: {
+  readonly artist: SpotifyArtistResult | null;
+  readonly disabled: boolean;
+  readonly onConfirm: (artist: SpotifyArtistResult) => void;
+  readonly onNotMe: () => void;
+}) {
+  const followers = artist
+    ? formatFollowers(
+        getDisplaySpotifyFollowers(
+          normalizeArtistMetrics(
+            { followers: artist.followers },
+            { source: 'spotify_search' }
+          )
+        )
+      )
+    : null;
+
+  return (
+    <div
+      className='min-h-42 w-full max-w-110 py-1'
+      data-testid='onboarding-artist-picker'
+      data-mode='proposal'
+    >
+      <p className='text-sm font-semibold leading-5 tracking-[-0.01em] text-primary-token'>
+        Is This You?
+      </p>
+      {artist ? (
+        <div
+          className='mt-3 flex items-center gap-3'
+          data-testid='onboarding-artist-proposal'
+        >
+          <ArtistAvatar imageUrl={artist.imageUrl} name={artist.name} />
+          <span className='min-w-0 flex-1'>
+            <span className='block truncate text-sm font-medium leading-5 text-primary-token'>
+              {artist.name}
+            </span>
+            {followers ? (
+              <span className='block truncate text-xs leading-5 tabular-nums text-secondary-token'>
+                {followers}
+              </span>
+            ) : null}
+          </span>
+        </div>
+      ) : (
+        <div
+          className='mt-3 flex h-10.5 items-center gap-2 text-xs text-secondary-token'
+          role='status'
+        >
+          <Loader2 className='h-3.5 w-3.5 animate-spin motion-reduce:animate-none' />
+          Searching Spotify
+        </div>
+      )}
+      <div className='mt-3 flex items-center gap-2'>
+        <Button
+          type='button'
+          data-testid='onboarding-artist-confirm'
+          disabled={disabled || !artist}
+          onClick={() => {
+            if (artist) onConfirm(artist);
+          }}
+        >
+          That&apos;s Me
+        </Button>
+        <Button
+          type='button'
+          variant='ghost'
+          size='sm'
+          data-testid='onboarding-artist-not-me'
+          disabled={disabled}
+          onClick={onNotMe}
+        >
+          Not Me
+        </Button>
       </div>
     </div>
   );
@@ -597,6 +708,12 @@ export function OnboardingHandleCheckCard({
   const fieldId = useId();
   const [draftHandle, setDraftHandle] = useState(handle ?? '');
   const [confirmed, setConfirmed] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const handleInputRef = useRef<HTMLInputElement>(null);
+  // Change Handle moves focus into the field it just opened.
+  useEffect(() => {
+    if (editing) handleInputRef.current?.focus();
+  }, [editing]);
   const outputConfirmed = output?.action === 'handle_confirmed';
   const normalizedDraft = draftHandle.replace(/^@/, '').trim().toLowerCase();
   const availabilityQuery = useHandleAvailabilityQuery({
@@ -663,27 +780,49 @@ export function OnboardingHandleCheckCard({
       ? undefined
       : availability.available;
   const error = availability.error;
-  const profilePath = normalizedDraft ? `jov.ie/${normalizedDraft}` : null;
+  const profilePath = `jov.ie/${normalizedDraft || handle}`;
   const canConfirm =
     Boolean(normalizedDraft) &&
     available === true &&
     !loading &&
     !disabled &&
     !confirmed;
+  // Pen R6As7U: one line and one action. Editing stays reachable but
+  // secondary, behind an explicit Change Handle.
+  const showEditor = editing;
+  const isTaken = available === false;
+  const statusLabel =
+    loading || available === undefined
+      ? 'is being checked'
+      : available
+        ? 'is available'
+        : 'is not available';
+  const helper =
+    error ??
+    (available === false
+      ? availability.suggestedAlternatives &&
+        availability.suggestedAlternatives.length > 0
+        ? `${SUGGESTED_AVAILABLE_HANDLE_LABEL}: @${availability.suggestedAlternatives[0]}`
+        : 'Try a sharper variant.'
+      : null);
 
   return (
     <div
       className={cn(
-        'w-full max-w-110 px-1 py-2 text-primary-token',
+        'w-full max-w-110 py-1 text-primary-token',
         available === false && 'text-error'
       )}
       data-testid='onboarding-handle-check'
+      data-editing={showEditor ? 'true' : 'false'}
       role={available === false ? 'alert' : 'status'}
     >
-      <div className='flex items-start gap-3'>
+      <div
+        className='flex items-center gap-1.5 text-sm leading-5 tracking-[-0.01em]'
+        data-testid='onboarding-handle-status'
+      >
         <span
           className={cn(
-            'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center text-secondary-token',
+            'flex h-4 w-4 shrink-0 items-center justify-center text-secondary-token',
             available && 'text-green-500',
             available === false && 'text-error'
           )}
@@ -697,22 +836,21 @@ export function OnboardingHandleCheckCard({
             <AlertCircle className='h-3.5 w-3.5' />
           )}
         </span>
-        <div className='min-w-0 flex-1'>
-          <div className='flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-sm leading-5 tracking-[-0.01em]'>
-            <strong className='font-semibold text-primary-token'>
-              @{normalizedDraft || handle}
-            </strong>
-            <span className='text-secondary-token'>
-              {loading || available === undefined
-                ? 'is being checked'
-                : available
-                  ? 'is available'
-                  : 'is not available'}
-            </span>
-          </div>
+        <strong className='font-semibold text-primary-token'>
+          {profilePath}
+        </strong>
+        <span className='text-secondary-token'>{statusLabel}</span>
+      </div>
+      {helper && !showEditor ? (
+        <p className='mt-1.5 text-xs leading-5 text-secondary-token'>
+          {helper}
+        </p>
+      ) : null}
+      {showEditor ? (
+        <>
           <OnboardingToolField density='compact' htmlFor={fieldId}>
             <span className='text-app text-tertiary-token' aria-hidden>
-              @
+              jov.ie/
             </span>
             <span className='sr-only'>Edit Proposed Handle</span>
             <input
@@ -726,18 +864,19 @@ export function OnboardingHandleCheckCard({
               autoCapitalize='none'
               spellCheck={false}
               disabled={disabled || confirmed}
+              ref={handleInputRef}
             />
           </OnboardingToolField>
-          <p className='mt-1.5 text-xs leading-5 text-secondary-token'>
-            {error ??
-              (available === false
-                ? availability.suggestedAlternatives &&
-                  availability.suggestedAlternatives.length > 0
-                  ? `${SUGGESTED_AVAILABLE_HANDLE_LABEL}: @${availability.suggestedAlternatives[0]}`
-                  : 'Try a sharper variant.'
-                : (profilePath ?? 'Edit the handle before it is claimed.'))}
-          </p>
-          {onConfirmHandle ? (
+          {helper ? (
+            <p className='mt-1.5 text-xs leading-5 text-secondary-token'>
+              {helper}
+            </p>
+          ) : null}
+        </>
+      ) : null}
+      {onConfirmHandle || !(showEditor || confirmed) ? (
+        <div className='mt-3 flex items-center gap-2'>
+          {isTaken || !onConfirmHandle ? null : (
             <Button
               type='button'
               data-testid='onboarding-confirm-handle'
@@ -748,7 +887,7 @@ export function OnboardingHandleCheckCard({
                 onConfirmHandle(normalizedDraft);
               }}
               className={cn(
-                'mt-3 h-9 rounded-full px-3.5 text-app font-semibold',
+                'h-9 rounded-full px-3.5 text-app font-semibold',
                 canConfirm
                   ? 'bg-white text-black hover:bg-white/90 dark:bg-white dark:text-black'
                   : 'cursor-not-allowed border border-subtle bg-surface-0 text-tertiary-token'
@@ -756,9 +895,21 @@ export function OnboardingHandleCheckCard({
             >
               {confirmed ? 'Handle Confirmed' : CONFIRM_HANDLE_CTA_LABEL}
             </Button>
-          ) : null}
+          )}
+          {showEditor || confirmed ? null : (
+            <Button
+              type='button'
+              variant={isTaken ? 'primary' : 'ghost'}
+              size='sm'
+              data-testid='onboarding-edit-handle'
+              disabled={disabled}
+              onClick={() => setEditing(true)}
+            >
+              Change Handle
+            </Button>
+          )}
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

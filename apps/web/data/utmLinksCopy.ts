@@ -27,6 +27,6 @@ export const UTM_LINKS_COPY = {
     { href: APP_ROUTES.PRODUCT, label: 'Product' },
     { href: APP_ROUTES.SMART_LINKS, label: 'Smart Links' },
     { href: APP_ROUTES.PRICING, label: 'Pricing' },
-    { href: APP_ROUTES.CARD, label: 'Jovie Card' },
+    { href: APP_ROUTES.PRODUCT_LINK_ANALYTICS, label: 'Link analytics' },
   ],
 } as const;

@@ -116,6 +116,7 @@ describe('GET /api/calendar/profile/[username]', () => {
     });
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
     expect(response.headers.get('Content-Type')).toBe(
       'text/calendar; charset=utf-8'
     );
@@ -160,6 +161,7 @@ describe('GET /api/calendar/profile/[username]', () => {
     });
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
 
     const body = await response.text();
     expect(body).toContain('SUMMARY:Test Artist at Berlin');
@@ -214,6 +216,7 @@ describe('GET /api/calendar/profile/[username]', () => {
     );
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
     expect(await response.text()).not.toContain('BEGIN:VEVENT');
   });
 });

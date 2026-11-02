@@ -6,7 +6,8 @@
  * - ok results map profile/links/contacts and inject venmo tipping links
  * - non-public profiles resolve to not_found
  * - storage failures resolve to error (never throw into the RSC render)
- * - the unstable_cache layer is bypassed under NODE_ENV=test / QA smoke
+ * - no cross-request cached body grants public access: production reads a
+ *   fresh publication decision and only then serves the cached body
  *
  * Related surface: public-profile-isr (docs/TEST_RISK_REGISTER.md, 75% target).
  */
@@ -31,8 +32,7 @@ const {
 vi.mock('server-only', () => ({}));
 
 vi.mock('next/cache', () => ({
-  // unstable_cache wraps the fetcher; run it immediately and record the call
-  // so cache-key/tag/TTL assertions can inspect the real configuration.
+  // Record any attempted registration of cross-request public authority.
   unstable_cache: vi.fn(
     (fetcher: () => Promise<unknown>, keyParts: string[], options: unknown) => {
       unstableCacheMock(keyParts, options);
@@ -119,6 +119,18 @@ function buildProfileWithLinks(
   } as ProfileWithLinks;
 }
 
+async function mockPublicationAuthority(
+  rows: Array<{ id: string; isPublic: unknown }>
+) {
+  const { db } = await import('@/lib/db');
+  vi.mocked(db.select).mockImplementation((() => ({
+    from: () => {
+      const where = () => ({ limit: async () => rows });
+      return { where, leftJoin: () => ({ where }) };
+    },
+  })) as never);
+}
+
 async function importLoader() {
   vi.resetModules();
   return import('@/app/[username]/_lib/public-profile-loader');
@@ -127,8 +139,6 @@ async function importLoader() {
 beforeEach(() => {
   vi.clearAllMocks();
   getProfileWithLinksMock.mockReset();
-  // The loader's unstable_cache path is skipped under NODE_ENV=test; the
-  // cache-configuration assertions below run under a production-like env.
   vi.stubEnv('NODE_ENV', 'test');
 });
 
@@ -151,6 +161,7 @@ describe('public profile loader behavior (JOV-5778)', () => {
 
     expect(getProfileWithLinksMock).toHaveBeenCalledWith('testartist', {
       skipCache: true,
+      throwOnError: true,
     });
   });
 
@@ -177,16 +188,16 @@ describe('public profile loader behavior (JOV-5778)', () => {
     expect(result.genres).toEqual(['techno', 'house']);
   });
 
-  it('treats truthy non-boolean isPublic values as public (neon-http edge case)', async () => {
-    getProfileWithLinksMock.mockResolvedValue(
-      buildProfileWithLinks({ isPublic: 1 as never })
-    );
-    const { getProfileAndLinks } = await importLoader();
-
-    const result = await getProfileAndLinks('testartist');
-
-    expect(result.status).toBe('ok');
-  });
+  it.each([true, 1, 't'])(
+    'accepts canonical and known legacy true publication encodings: %j',
+    async isPublic => {
+      getProfileWithLinksMock.mockResolvedValue(
+        buildProfileWithLinks({ isPublic: isPublic as never })
+      );
+      const { getProfileAndLinks } = await importLoader();
+      expect((await getProfileAndLinks('testartist')).status).toBe('ok');
+    }
+  );
 
   it('returns not_found for profiles that exist but are not public', async () => {
     getProfileWithLinksMock.mockResolvedValue(
@@ -425,34 +436,34 @@ describe('public profile loader behavior (JOV-5778)', () => {
       delete process.env.PUBLIC_NOAUTH_SMOKE;
     });
 
-    it('registers a per-username cache key with profile tags and a 1h revalidate', async () => {
+    it('keeps production authority fresh and caches only the body', async () => {
       vi.stubEnv('NODE_ENV', 'production');
       delete process.env.PUBLIC_NOAUTH_SMOKE;
       getProfileWithLinksMock.mockResolvedValue(buildProfileWithLinks());
+      await mockPublicationAuthority([{ id: 'profile-1', isPublic: true }]);
       const { getProfileAndLinks } = await importLoader();
 
-      await getProfileAndLinks('testartist');
+      expect((await getProfileAndLinks('testartist')).status).toBe('ok');
 
       expect(unstableCacheMock).toHaveBeenCalledWith(
-        ['public-profile-testartist'],
-        {
-          tags: ['profiles-all', 'profile:testartist'],
-          revalidate: 3600,
-        }
+        ['public-profile-body', 'testartist'],
+        expect.objectContaining({ revalidate: 3600 })
       );
+      expect(getProfileWithLinksMock).toHaveBeenCalledWith('testartist', {
+        skipCache: true,
+        throwOnError: true,
+      });
     });
 
-    it('does not cache non-ok results: the fetcher throws inside unstable_cache', async () => {
+    it('does not retain non-ok results between requests', async () => {
       vi.stubEnv('NODE_ENV', 'production');
       delete process.env.PUBLIC_NOAUTH_SMOKE;
       getProfileWithLinksMock.mockResolvedValue(
         buildProfileWithLinks({ isPublic: false })
       );
+      await mockPublicationAuthority([{ id: 'profile-1', isPublic: false }]);
       const { getProfileAndLinks } = await importLoader();
 
-      // The unstable_cache wrapper runs the fetcher synchronously in this
-      // mock; the NonCacheableProfileResultError must escape it and be
-      // unwrapped back into the original not_found payload.
       const result = await getProfileAndLinks('testartist');
 
       expect(result.status).toBe('not_found');
@@ -460,27 +471,27 @@ describe('public profile loader behavior (JOV-5778)', () => {
   });
 });
 
-describe('non-ok payload unwrapping through the cache throw path', () => {
-  it('carries the original result object through NonCacheableProfileResultError', async () => {
+describe('authoritative reads despite shared cache state', () => {
+  it('rechecks publication after a previous not-found response', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     delete process.env.PUBLIC_NOAUTH_SMOKE;
-    getProfileWithLinksMock.mockResolvedValue(
-      buildProfileWithLinks({ isPublic: false })
-    );
+    getProfileWithLinksMock.mockResolvedValue(buildProfileWithLinks());
+    await mockPublicationAuthority([{ id: 'profile-1', isPublic: false }]);
     const loader = await importLoader();
 
     const result = await loader.getProfileAndLinks('testartist');
 
     expect(result.status).toBe('not_found');
     expect(result.profile).toBeNull();
+    await mockPublicationAuthority([{ id: 'profile-1', isPublic: true }]);
+    expect((await loader.getProfileAndLinks('testartist')).status).toBe('ok');
   });
 
-  it('falls back to a fresh fetch when the cache layer itself throws', async () => {
+  it('reads authoritative storage when the shared cache is unavailable', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     delete process.env.PUBLIC_NOAUTH_SMOKE;
-    getProfileWithLinksMock.mockResolvedValueOnce(buildProfileWithLinks());
-    // Simulate an unstable_cache infrastructure failure: this invocation of
-    // the mocked unstable_cache returns a fetcher that throws on call.
+    getProfileWithLinksMock.mockResolvedValue(buildProfileWithLinks());
+    await mockPublicationAuthority([{ id: 'profile-1', isPublic: true }]);
     const { unstable_cache } = await import('next/cache');
     vi.mocked(unstable_cache).mockImplementationOnce((() => () => {
       throw new Error('cache store unavailable');
@@ -490,12 +501,10 @@ describe('non-ok payload unwrapping through the cache throw path', () => {
     const result = await loader.getProfileAndLinks('testartist');
 
     expect(result.status).toBe('ok');
-    expect(getProfileWithLinksMock).toHaveBeenCalledExactlyOnceWith(
-      'testartist',
-      {
-        skipCache: true,
-      }
-    );
+    expect(getProfileWithLinksMock).toHaveBeenCalledWith('testartist', {
+      skipCache: true,
+      throwOnError: true,
+    });
   });
 });
 

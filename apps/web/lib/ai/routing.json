@@ -11,6 +11,7 @@
     "workers-ai": {
       "label": "Cloudflare Workers AI",
       "funding": "Cloudflare Startup Program credits",
+      "relayBaseUrl": "https://jovie-workers-ai.tim-fd8.workers.dev/v1",
       "registryId": "cloudflare-credits"
     }
   },
@@ -58,6 +59,27 @@
       "models": ["@cf/zai-org/glm-5.3", "@cf/zai-org/glm-5.3-flash"],
       "gatewayKey": "Jovie_Development_20261026",
       "gatewayUsdPerDayMax": 0.1
+    },
+    {
+      "id": "dev.buyer-eval",
+      "label": "Buyer-eval strong tier (vision conversion forecaster over recorded walks)",
+      "repo": "JovieInc/Jovie",
+      "route": "workers-ai-only",
+      "fallback": null,
+      "models": ["@cf/zai-org/glm-5.3-flash"],
+      "gatewayKey": null,
+      "note": "Through the Workers AI relay (WORKERS_AI_TOKEN). Flash is the vision model: @cf/zai-org/glm-5.3 on Workers AI drops image parts (measured 2026-10-31, JOV-10091). Replaced the claude -p subscription route."
+    },
+    {
+      "id": "hermes.agent",
+      "label": "Hermes CLI worker (outside this repo; model glm-5.2 is off the web allowlist)",
+      "repo": "hermes",
+      "route": "gateway-only",
+      "fallback": null,
+      "models": ["zai/glm-5.2"],
+      "gatewayKey": "hermes-agent-glm-5.2",
+      "gatewayUsdPerDayMax": 0.2,
+      "note": "Follow-up: Workers AI hosts @cf/zai-org/glm-5.2 at the same list price; move Hermes to workers-first."
     },
     {
       "id": "summer.agent-turns",

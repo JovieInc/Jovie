@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
+import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 import {
+  ARTIST_VISIBILITY_FAN_LIST_UNLOCK,
   getPaidSuccessPrimaryHref,
   getPaidSuccessPrimaryLabel,
   resolveCheckoutSuccessView,
@@ -48,5 +50,15 @@ describe('resolveCheckoutSuccessView', () => {
     };
     expect(getPaidSuccessPrimaryHref(input)).toBe(APP_ROUTES.START);
     expect(getPaidSuccessPrimaryLabel(input)).toBe('Claim your link');
+  });
+});
+
+describe('paid-only unlock after checkout', () => {
+  it('secures the fan list export, which Free cannot use', () => {
+    expect(ARTIST_VISIBILITY_FAN_LIST_UNLOCK.href).toBe(
+      APP_ROUTES.CONTACTS_AUDIENCE
+    );
+    expect(ENTITLEMENT_REGISTRY.pro.booleans.canExportContacts).toBe(true);
+    expect(ENTITLEMENT_REGISTRY.free.booleans.canExportContacts).toBe(false);
   });
 });

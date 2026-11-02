@@ -142,13 +142,14 @@ export async function GET(request: Request) {
 
     const handleLower = handle.toLowerCase();
 
-    // Fast path: cached boolean availability still goes through the canonical
-    // contract so taken handles expose suggestedAlternatives consistently.
+    // Fast path: only a cached "available" is trusted. A cached "taken" can
+    // outlive the row that caused it (fixture release, failed claim, cleanup),
+    // so it is advisory: fall through to the database and heal the cache.
     const cachedAvailability = await getCachedHandleAvailability(handleLower);
-    if (cachedAvailability !== null) {
+    if (cachedAvailability === true) {
       const cachedResult = toHandleAvailabilityResult({
         handle: handleLower,
-        available: cachedAvailability,
+        available: true,
       });
       return respondWithConstantTime(serializeHandleCheck(cachedResult));
     }

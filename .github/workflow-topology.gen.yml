@@ -186,7 +186,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:main-release-ready
-    jobCount: 64
+    jobCount: 65
   - name: Claim Checkout Dogfood
     path: .github/workflows/claim-checkout-dogfood.yml
     active: true
@@ -281,8 +281,8 @@ nodes:
       - repository_dispatch
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:evaluate
-    jobCount: 1
+    terminalReceipt: job:ai-routing-drift
+    jobCount: 2
   - name: Native Security Advisory
     path: .github/workflows/deepsec-native.yml
     active: true
@@ -449,12 +449,24 @@ nodes:
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Fleet Rules Ready Re-run
     triggeringStateTransition:
       - pull_request_target
       - workflow_run
     terminalReceipt: job:rerun
     jobCount: 2
+  - name: Fleet Rules Ready Re-run
+    path: .github/workflows/fleet-rules-ready-rerun.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_run
+    terminalReceipt: job:rerun-ready
+    jobCount: 1
   - name: Fork PR Gate
     path: .github/workflows/fork-pr-gate.yml
     active: true
@@ -713,7 +725,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:land
-    jobCount: 2
+    jobCount: 3
   - name: Marketing Certification Producer
     path: .github/workflows/marketing-certification-producer.yml
     active: true
@@ -1105,7 +1117,7 @@ nodes:
     triggeringStateTransition:
       - workflow_run
     terminalReceipt: job:heal-interrupted-marker
-    jobCount: 14
+    jobCount: 15
   - name: Production Marker Recovery
     path: .github/workflows/production-marker-recovery.yml
     active: true
@@ -1378,6 +1390,18 @@ nodes:
       - pull_request
     terminalReceipt: job:ready
     jobCount: 7
+  - name: Spend Guard
+    path: .github/workflows/spend-guard.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - repository_dispatch
+      - workflow_dispatch
+    terminalReceipt: job:guard
+    jobCount: 1
   - name: Staging Controller
     path: .github/workflows/staging-controller.yml
     active: true
@@ -1593,6 +1617,9 @@ edges:
     type: workflow_run
   - from: Source Validation
     to: Fleet Rules Evidence
+    type: workflow_run
+  - from: Fleet Rules Evidence
+    to: Fleet Rules Ready Re-run
     type: workflow_run
   - from: iOS CI
     to: Mac Lane Route

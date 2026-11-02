@@ -12,6 +12,7 @@ import {
 import {
   decideFallbackTurn,
   type FallbackTurn,
+  handleCardEventForConfirmation,
   resolveGuardedStep,
   type ServerArtistConfirmation,
 } from './engine';
@@ -124,7 +125,8 @@ function pickerEvent(query: string) {
 /** Turn for a picker selection, built from the already-confirmed artist. */
 export function turnFromArtistConfirmation(
   confirmation: ServerArtistConfirmation,
-  state: OnboardingTurnState
+  state: OnboardingTurnState,
+  uiMessages: readonly UIMessage[] = []
 ): FallbackTurn {
   const hasData = state.spotifyFollowers !== null;
   const line = scriptedLine(
@@ -140,6 +142,8 @@ export function turnFromArtistConfirmation(
       name: state.spotifyArtistName,
       followers: state.spotifyFollowers,
     }),
+    // The line points at the handle card below, so the card ships in this
+    // turn (same builder as the engine's confirmation path).
     toolEvents: part
       ? [
           {
@@ -147,6 +151,7 @@ export function turnFromArtistConfirmation(
             input: part.input,
             output: part.output,
           },
+          handleCardEventForConfirmation(uiMessages, state.spotifyArtistName),
         ]
       : [],
     guardedStep: 'artist_select',
@@ -202,7 +207,7 @@ export async function routeOnboardingTurn(
   if (artistConfirmation) {
     return {
       kind: 'script',
-      turn: turnFromArtistConfirmation(artistConfirmation, state),
+      turn: turnFromArtistConfirmation(artistConfirmation, state, uiMessages),
       classification: null,
       guardedStep: 'artist_select',
     };
