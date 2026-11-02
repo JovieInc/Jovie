@@ -112,7 +112,9 @@ export function HomeLoopCanvas({
     >
       {company ? (
         <section aria-label='Company' className='flex flex-col gap-1.5'>
-          <h2 className='text-2xs font-medium text-tertiary-token'>Company</h2>
+          <h2 className='text-2xs font-medium text-balance text-tertiary-token'>
+            Company
+          </h2>
           <HomeLoopPulse
             tiles={company}
             loading={companyLoading}
@@ -128,7 +130,7 @@ export function HomeLoopCanvas({
       />
       {pulseCaption ? (
         <h2
-          className='-mb-1.5 text-2xs font-medium text-tertiary-token'
+          className='-mb-1.5 text-2xs font-medium text-balance text-tertiary-token'
           data-testid='home-loop-pulse-caption'
         >
           {pulseCaption}
