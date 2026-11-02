@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# Run actionlint v1.7.12 from checksum-pinned release artifacts.
+# Run actionlint from checksum-pinned upstream sources.
 #
 # Replaces the rhysd/actionlint Docker action, whose image the runner rebuilt
 # at every job start (~26-33s) even when the step was skipped. The toolchain
-# matches that image exactly:
-#   - actionlint v1.7.12: the release binary built from the same tag commit
-#     (914e7df21a07ef503a81201c76d2b11c789d3fca) the Docker action pinned.
-#     The tarball sha256 matches upstream actionlint_1.7.12_checksums.txt.
+# retains that image's checks, with the upstream stdin deadlock fix:
+#   - actionlint fd33e9f582a01a02885c93ae3775e1190cf63653 fixes issue #650.
+#     v1.7.12 writes scripts into a pipe before starting shellcheck/pyflakes;
+#     a full pipe can hang indefinitely. No fixed release exists yet. Build
+#     the exact verified upstream source with the existing Go toolchain and
+#     its checked-in module checksums; use a truthful unreleased version.
 #   - shellcheck v0.11.0: the image copied /bin/shellcheck from
 #     koalaman/shellcheck-alpine:stable (sha256:c82fe425...9183 in CI logs).
 #     That binary is byte-identical (sha256 below) to the upstream release
@@ -18,8 +20,9 @@
 # closed before linting. Arguments are forwarded to actionlint.
 set -euo pipefail
 
-readonly ACTIONLINT_VERSION='1.7.12'
-readonly ACTIONLINT_SHA256='8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8'
+readonly ACTIONLINT_COMMIT='fd33e9f582a01a02885c93ae3775e1190cf63653'
+readonly ACTIONLINT_VERSION='1.7.12+fd33e9f582a0'
+readonly ACTIONLINT_SOURCE_SHA256='475da14da4ed169c493d4f988f2cd6e4f15434752635ad809e5613cc3cde6fcc'
 readonly SHELLCHECK_VERSION='0.11.0'
 readonly SHELLCHECK_TARBALL_SHA256='8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198'
 readonly SHELLCHECK_BINARY_SHA256='4da528ddb3a4d1b7b24a59d4e16eb2f5fd960f4bd9a3708a15baddbdf1d5a55b'
@@ -31,27 +34,26 @@ fail() {
   exit 1
 }
 
-# Keep the CI Linux artifacts unchanged. Darwin pins come from the same
-# official releases; binary hashes are measured after verifying the archives.
+# Shellcheck retains the exact native artifacts already used in CI.
 platform="$(uname -s) $(uname -m)"
 case "$platform" in
   'Linux x86_64')
-    actionlint_platform='linux_amd64'
-    actionlint_sha256="$ACTIONLINT_SHA256"
+    actionlint_goos='linux'
+    actionlint_goarch='amd64'
     shellcheck_platform='linux.x86_64'
     shellcheck_tarball_sha256="$SHELLCHECK_TARBALL_SHA256"
     shellcheck_binary_sha256="$SHELLCHECK_BINARY_SHA256"
     ;;
   'Darwin arm64')
-    actionlint_platform='darwin_arm64'
-    actionlint_sha256='aba9ced2dee8d27fecca3dc7feb1a7f9a52caefa1eb46f3271ea66b6e0e6953f'
+    actionlint_goos='darwin'
+    actionlint_goarch='arm64'
     shellcheck_platform='darwin.aarch64'
     shellcheck_tarball_sha256='56affdd8de5527894dca6dc3d7e0a99a873b0f004d7aabc30ae407d3f48b0a79'
     shellcheck_binary_sha256='61c17246d69f012cd458ae82f244c46023dac75d1b69733ca1cc7d28fb270fd7'
     ;;
   'Darwin x86_64')
-    actionlint_platform='darwin_amd64'
-    actionlint_sha256='5b44c3bc2255115c9b69e30efc0fecdf498fdb63c5d58e17084fd5f16324c644'
+    actionlint_goos='darwin'
+    actionlint_goarch='amd64'
     shellcheck_platform='darwin.x86_64'
     shellcheck_tarball_sha256='3c89db4edcab7cf1c27bff178882e0f6f27f7afdf54e859fa041fca10febe4c6'
     shellcheck_binary_sha256='2589be755bb115f4421b8271eb7c08df1e03729f00350c1e4cf53b4a0bf9c2df'
@@ -82,9 +84,35 @@ download() {
 }
 
 download \
-  "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_${actionlint_platform}.tar.gz" \
-  "$tool_dir/actionlint.tar.gz" "$actionlint_sha256"
-tar -xzf "$tool_dir/actionlint.tar.gz" -C "$tool_dir" actionlint
+  "https://codeload.github.com/rhysd/actionlint/tar.gz/${ACTIONLINT_COMMIT}" \
+  "$tool_dir/actionlint-source.tar.gz" "$ACTIONLINT_SOURCE_SHA256"
+mkdir "$tool_dir/actionlint-source"
+tar -xzf "$tool_dir/actionlint-source.tar.gz" -C "$tool_dir/actionlint-source" --strip-components=1
+command -v go >/dev/null || fail 'Go is required to build the source-pinned actionlint (see its verified go.mod)'
+(
+  cd "$tool_dir/actionlint-source"
+  # Do not download an implicit compiler or use a caller's workspace/build flags.
+  # Go's existing build cache avoids recompiling unchanged public dependencies.
+  export GOTOOLCHAIN=local GOWORK=off GOFLAGS='' CGO_ENABLED=0
+  export GOOS="$actionlint_goos" GOARCH="$actionlint_goarch"
+  command -v cat >/dev/null || fail 'cat is required for the upstream stdin regression'
+  go test -p=1 -mod=readonly -count=1 -timeout=20s \
+    -run '^TestProcessConcurrentStdinDoesNotDeadlock$' \
+    -coverprofile="$tool_dir/actionlint-pipe.coverage" . || fail 'upstream stdin regression failed'
+  fixed_line="$(awk '/cmd.Stdin = strings.NewReader/ { print NR }' process.go)"
+  [[ "$fixed_line" =~ ^[0-9]+$ ]] || fail 'upstream stdin fix is missing'
+  awk -v line="$fixed_line" '
+    /\/process.go:/ {
+      split($1, location, ":"); split(location[2], span, ",");
+      split(span[1], first, "."); split(span[2], last, ".");
+      if (first[1] <= line && last[1] >= line && $3 > 0) covered = 1;
+    }
+    END { exit !covered }
+  ' "$tool_dir/actionlint-pipe.coverage" || fail 'upstream stdin regression did not cover the fix'
+  go build -p=1 -mod=readonly -trimpath -buildvcs=false \
+      -ldflags "-s -w -X github.com/rhysd/actionlint.version=${ACTIONLINT_VERSION} -X github.com/rhysd/actionlint.installedFrom=verified-upstream-source-${ACTIONLINT_COMMIT}" \
+      -o "$tool_dir/actionlint" ./cmd/actionlint
+) || fail 'source-pinned actionlint build failed'
 
 download \
   "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.${shellcheck_platform}.tar.xz" \
