@@ -71,6 +71,20 @@ After push, monitor with `no-mistakes` (TUI) or `no-mistakes axi status`.
 
 The husky hook defaults to **publication** (diff integrity, changed-file secrets, hook policy) so the first draft can reach GitHub. Set `JOVIE_PUSH_PHASE=qualification` to restore the affected-test gate before ready/landing. The no-mistakes pipeline adds tests, review, docs, and CI babysitting in the disposable worktree.
 
+### Host admission for hooks
+
+Where `host-admit` is installed (Gem, via `scripts/hostops/install-hostops-tools.sh`), every hook step and heavy local run passes the one host admission gate (`scripts/hostops/host_admit.py`, limits in `scripts/hostops/host-admit.json`). No check moved or was removed; only admission changed:
+
+| Step | Runs where | Admission class |
+|---|---|---|
+| Publication pre-push (diff checks, scoped Biome, secrets, hook policy, `preflight:changed --fast`) | local hook | `hook-light`: short wait, then defer (exit 75) with the reason; never queues behind suites |
+| Qualification pre-push (`JOVIE_PUSH_PHASE=qualification`: lint, preflight, affected tests) | local hook | `test-suite`; its typechecks also take `typecheck` |
+| `preflight.mjs` / `preflight:changed` typechecks | local | `typecheck` (replaces the `~/.cache/gem-typecheck.lock` flock; hosts without `host-admit` keep the flock) |
+| lane workers / lane gate seats | Gem lanes | `lane` / `test-suite` |
+| Full typecheck, test suites, coverage, required checks | hosted CI and merge queue | unchanged |
+
+Tim's Mac is orchestration-only: its profile admits `hook-light` and refuses execution classes. `host-admit status` shows live occupancy; `host-admit stats` gives queue-to-admitted p50/p95 from `~/.local/state/jovie-hostops/admissions.jsonl`.
+
 ## Agent-local verification receipt
 
 Before opening or updating a draft PR, autonomous shippers should run:

@@ -156,6 +156,17 @@ test('set -e is neutralised and || exit is contained', () => {
   assert.equal(prepareStatement('set -euo pipefail'), 'set -uo pipefail');
   assert.match(prepareStatement('test 1 -eq 2 || exit 7'), /^\( test/);
   assert.match(prepareStatement('if x; then\n exit 0\nfi'), /^\( if/);
+  assert.equal(
+    prepareStatement('pnpm --filter web typecheck', {
+      flockPath: '/tmp/l',
+      typecheckGate: 'host-admit typecheck --',
+    }),
+    'host-admit typecheck -- pnpm --filter web typecheck'
+  );
+  assert.equal(
+    prepareStatement('pnpm typecheck', { flockPath: '/tmp/l' }),
+    'flock /tmp/l pnpm typecheck'
+  );
 });
 
 test('local history fetch preserves shallow-clone flags and fetch failures', () => {

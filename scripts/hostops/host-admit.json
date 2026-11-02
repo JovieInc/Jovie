@@ -1,0 +1,94 @@
+{
+  "schema": "jovie-host-admit/v1",
+  "_doc": "One host admission gate for agents, lanes, typechecks, test suites and git hooks. Read by scripts/hostops/host_admit.py (CLI `host-admit`, lane_runner, preflight, .husky/pre-push). Sized for Gem (16 cores, 62 GiB). maxLoadPerCore compares the 1-minute load average to the core count. Processes started outside the gate still count through `processes` matchers, so agents launched before the gate existed are not invisible.",
+  "stateDir": "~/.local/state/jovie-hostops",
+  "profileByPlatform": {
+    "Darwin": "orchestrator",
+    "Linux": "build"
+  },
+  "profiles": {
+    "build": {
+      "_doc": "Execution host (Gem). Every class is admitted when capacity allows.",
+      "classes": ["agent", "lane", "typecheck", "test-suite", "hook-light"]
+    },
+    "orchestrator": {
+      "_doc": "Tim's Mac runs orchestration and sessions only; execution classes are refused and belong on Gem or hosted CI.",
+      "classes": ["hook-light"],
+      "overrides": {
+        "hook-light": {
+          "_doc": "macOS load averages count blocked I/O threads and read far above Linux for the same work; gate Mac hooks on concurrency and memory only.",
+          "maxLoadPerCore": 1000
+        }
+      }
+    }
+  },
+  "classes": {
+    "agent": {
+      "_doc": "Headless coding agents (codex exec, claude -p). Replaces artdir slot.sh (<4 codex exec, >=8 GB).",
+      "maxConcurrent": 6,
+      "maxLoadPerCore": 1.5,
+      "minMemAvailableGiB": 8,
+      "waitS": 600,
+      "pollS": 30,
+      "processes": [
+        {
+          "exe": ["codex"],
+          "arg": "exec"
+        },
+        {
+          "exe": ["claude"],
+          "arg": "-p"
+        }
+      ]
+    },
+    "lane": {
+      "_doc": "lane_runner workers. Each worker leases its own pid; provider slot caps in lane_runner still apply on top.",
+      "maxConcurrent": 8,
+      "maxLoadPerCore": 1.5,
+      "minMemAvailableGiB": 6,
+      "waitS": 0,
+      "pollS": 15,
+      "processes": [
+        {
+          "exe": ["lane_runner.py"],
+          "arg": "worker"
+        }
+      ]
+    },
+    "typecheck": {
+      "_doc": "tsc runs (3-4.5 GB RSS each). Replaces the ~/.cache/gem-typecheck.lock flock.",
+      "maxConcurrent": 3,
+      "maxLoadPerCore": 2.0,
+      "minMemAvailableGiB": 8,
+      "waitS": 900,
+      "pollS": 15,
+      "processes": [
+        {
+          "exe": ["tsc"]
+        }
+      ]
+    },
+    "test-suite": {
+      "_doc": "Full or affected test suites (lane gate seats, qualification pushes).",
+      "maxConcurrent": 3,
+      "maxLoadPerCore": 2.0,
+      "minMemAvailableGiB": 8,
+      "waitS": 900,
+      "pollS": 15,
+      "processes": [
+        {
+          "exe": ["vitest", "vitest.mjs"]
+        }
+      ]
+    },
+    "hook-light": {
+      "_doc": "Fast, targeted git-hook checks. Waits briefly and never queues behind full suites: heavy classes defer well before this ceiling.",
+      "maxConcurrent": 8,
+      "maxLoadPerCore": 4.0,
+      "minMemAvailableGiB": 2,
+      "waitS": 90,
+      "pollS": 5,
+      "processes": []
+    }
+  }
+}

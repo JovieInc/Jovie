@@ -160,10 +160,12 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_epics.py",
               "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py", "scripts/tests/test_priority_admission.py", "scripts/tests/test_macos_pool.py",
               "scripts/tests/test_backlog_rank.py", "scripts/tests/test_decompose_pass.py",
-              "scripts/tests/test_pytest_hook_names.py"]
+              "scripts/tests/test_pytest_hook_names.py", "scripts/tests/test_host_admit.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/shipping_origin.py", # Shared client layer (budgeted gh) used by the throughput sentinel.
+                  # One host admission gate: worker launches (lane) and gate seats (test-suite).
+                  "scripts/hostops/host_admit.py", "scripts/hostops/host-admit.json",
                   "scripts/apiclient/__init__.py", "scripts/apiclient/__main__.py", "scripts/apiclient/cache.py", "scripts/apiclient/client.py", "scripts/apiclient/contract.py", "scripts/apiclient/credentials.py", "scripts/apiclient/fake.py", "scripts/apiclient/gh.py", "scripts/apiclient/github.py", "scripts/apiclient/headers.py", "scripts/apiclient/legacy.py", "scripts/apiclient/linear.py", "scripts/apiclient/policy.py", "scripts/apiclient/store.py",
                   "packages/api-client/providers.json",
                   "scripts/lib/github-rate-limit.mjs",
@@ -2383,6 +2385,26 @@ def notify_issue_claim(linear: Linear, issue: Issue, name: str, spec: dict) -> N
         print(f"lane claim comment unavailable: {type(error).__name__}", file=sys.stderr)
 
 
+HOSTOPS_DIR = Path(__file__).resolve().parent.parent / "hostops"
+
+
+def host_admission(cls: str, note: str = ""):
+    """Ask the host admission gate (scripts/hostops/host_admit.py) for one seat of `cls` for this
+    process, without waiting: lanes retry on the next tick or poll. None = gate not applied
+    (release self-test, LANES_HOST_ADMIT=off). A gate fault admits but is logged, never silent."""
+    if os.environ.get("LANES_SELFTEST") or os.environ.get("LANES_HOST_ADMIT") == "off":
+        return None
+    try:
+        if str(HOSTOPS_DIR) not in sys.path:
+            sys.path.append(str(HOSTOPS_DIR))
+        import host_admit
+        return host_admit.admit(cls, wait_s=0, note=note, quiet=True)
+    except Exception as error:
+        print(f"lane host-admit: gate unavailable for {cls}, admitting: {type(error).__name__}: {error}",
+              file=sys.stderr)
+        return None
+
+
 class Locked:
     """flock-held file: released by the kernel if the holder dies, so no stale locks."""
     def __init__(self, path: Path, blocking: bool):
@@ -2407,6 +2429,10 @@ class Locked:
             self.held = False
 
     def release(self) -> None:
+        lease = getattr(self, "host_lease", None)
+        if lease is not None:
+            lease.release()
+            self.host_lease = None
         fcntl.flock(self.handle, fcntl.LOCK_UN)
         self.handle.close()
 
@@ -3826,6 +3852,10 @@ def gate_admission(host: Host, *, staging: bool = False):
             lock.release()
 
 
+# A gate seat waits this long for host capacity (class test-suite) before the repair stops cleanly.
+HOST_ADMIT_GATE_WAIT_S = 1800
+
+
 def gate_slot(host: Host) -> tuple[Locked, float]:
     """One of `gate_slots` host-wide gate seats; waits (polling) until one is free.
 
@@ -3839,6 +3869,14 @@ def gate_slot(host: Host) -> tuple[Locked, float]:
                 for index in range(host.gate_slots):
                     lock = Locked(host.state / "slots" / f"gate.{index}.lock", blocking=False)
                     if lock.held:
+                        # The seat is free; the host must also have room for a test suite.
+                        admission = host_admission("test-suite", note="lane gate seat")
+                        if admission is not None and not admission.admitted:
+                            lock.release()
+                            if time.time() - started > HOST_ADMIT_GATE_WAIT_S:
+                                raise RepairStopped(f"host-admit-deferred: {admission.reason}", None, "before-gate-seat")
+                            break
+                        lock.host_lease = admission
                         return lock, time.time() - started
                     lock.release()
         except lifecycle.AdmissionHeld as error:
@@ -9270,6 +9308,13 @@ def worker(host: Host, name: str) -> int:
         admission.release()
     if slot is None:
         return reserved_binding_pass(host, name, spec)
+    # Host admission (class `lane`): the provider seat is free, but the host may not be.
+    admission = host_admission("lane", note=f"worker {name}")
+    if admission is not None and not admission.admitted:
+        slot.release()
+        print(f"lane worker {name}: host-admit {admission.decision}: {admission.reason}", file=sys.stderr)
+        return 0
+    slot.host_lease = admission
     try:
         return worker_with_slot(host, name, spec, slot, maintenance_only=maintenance_only)
     finally:

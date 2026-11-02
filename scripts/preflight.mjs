@@ -165,7 +165,10 @@ const SET_E = /^set\s+-[a-z]*e[a-z]*\b/;
 const TYPECHECK = /^(\s*)(pnpm\b[^\n]*\btypecheck[^\n]*)$/gm;
 
 /** Statement-level adjustments that keep one failure from hiding the rest. */
-export function prepareStatement(statement, { flockPath = '' } = {}) {
+export function prepareStatement(
+  statement,
+  { flockPath = '', typecheckGate = '' } = {}
+) {
   let text = statement;
   // `set -e` would end the process at the first red statement.
   if (SET_E.test(text.trim())) return 'set -uo pipefail';
@@ -177,8 +180,10 @@ export function prepareStatement(statement, { flockPath = '' } = {}) {
   }
   // `exit` would end the process; contain it in a subshell.
   if (/\bexit\b/.test(text)) text = `( ${text}\n)`;
-  // Typechecks share gem's CPU: serialize them under the host lock.
-  if (flockPath) text = text.replace(TYPECHECK, `$1flock ${flockPath} $2`);
+  // Typechecks share the host's CPU: admit them through the host gate
+  // (scripts/hostops/host-admit, class typecheck), else serialize on the lock.
+  const gate = typecheckGate || (flockPath ? `flock ${flockPath}` : '');
+  if (gate) text = text.replace(TYPECHECK, `$1${gate} $2`);
   return text;
 }
 
@@ -433,7 +438,14 @@ export async function main({
     runnerTemp,
     env: procEnv,
   });
+  // One host admission gate (scripts/hostops/install-hostops-tools.sh installs
+  // host-admit); hosts without it keep the legacy flock serialization.
+  const typecheckGate =
+    spawnSync('host-admit', ['--help'], { cwd, env: childEnv }).status === 0
+      ? 'host-admit typecheck --'
+      : '';
   const flockPath = (() => {
+    if (typecheckGate) return '';
     if (
       !existsSync('/usr/bin/flock') &&
       spawnSync('which', ['flock'], { cwd, env: childEnv }).status !== 0
@@ -487,7 +499,7 @@ export async function main({
         GITHUB_BASE_REF: args.base,
         GITHUB_EVENT_NAME: 'pull_request',
       },
-      { flockPath }
+      { flockPath, typecheckGate }
     );
     const seen = new Set();
     let mark = Date.now();

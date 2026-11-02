@@ -33,6 +33,8 @@ from pathlib import Path
 from types import SimpleNamespace
 
 os.environ["LANES_EXECUTION_BACKEND"] = "local-test"
+# Live host load must not decide fixture outcomes; HostAdmissionTest covers the gate wiring.
+os.environ["LANES_HOST_ADMIT"] = "off"
 ROOT = Path(__file__).resolve().parents[2]
 # Literal header: the staged lanes release bundle carries no canon/ files.
 REGISTRY_HEADER = '{"schema": "jovie-automation-registry/v1"}\n'
@@ -12103,6 +12105,54 @@ class UpdaterSelfHealTest(unittest.TestCase):
              patch.object(lane.worktree_pool, "fill") as fill:
             self.assertFalse(lane.ensure_dependency_pool(host))
             fill.assert_not_called()
+
+
+class HostAdmissionTest(unittest.TestCase):
+    """lane_runner asks the host admission gate once per worker / gate seat, never waiting."""
+
+    def fake_gate(self, decision):
+        calls = []
+        admission = SimpleNamespace(decision=decision, reason="load 60 > 24", admitted=decision == "admit",
+                                    release=lambda: calls.append("release"))
+        module = SimpleNamespace(admit=lambda cls, **kw: calls.append((cls, kw["wait_s"])) or admission)
+        return module, calls
+
+    def test_gate_called_without_wait_and_returned(self):
+        module, calls = self.fake_gate("defer")
+        with patch.dict(os.environ, {"LANES_HOST_ADMIT": "", "LANES_SELFTEST": ""}), \
+                patch.dict(sys.modules, {"host_admit": module}):
+            result = lane.host_admission("lane", note="worker codex")
+        self.assertEqual(calls, [("lane", 0)])
+        self.assertFalse(result.admitted)
+
+    def test_gate_skipped_in_selftest_and_when_off(self):
+        module, calls = self.fake_gate("admit")
+        with patch.dict(sys.modules, {"host_admit": module}):
+            with patch.dict(os.environ, {"LANES_SELFTEST": "1"}):
+                self.assertIsNone(lane.host_admission("lane"))
+            with patch.dict(os.environ, {"LANES_SELFTEST": "", "LANES_HOST_ADMIT": "off"}):
+                self.assertIsNone(lane.host_admission("lane"))
+        self.assertEqual(calls, [])
+
+    def test_gate_fault_admits_loudly(self):
+        broken = SimpleNamespace(admit=Mock(side_effect=OSError("disk full")))
+        with patch.dict(os.environ, {"LANES_HOST_ADMIT": "", "LANES_SELFTEST": ""}), \
+                patch.dict(sys.modules, {"host_admit": broken}), patch("sys.stderr", new_callable=io.StringIO) as err:
+            self.assertIsNone(lane.host_admission("test-suite"))
+        self.assertIn("gate unavailable", err.getvalue())
+
+    def test_slot_release_releases_host_lease(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            module, calls = self.fake_gate("admit")
+            lock = lane.Locked(Path(tmp) / "seat.lock", blocking=False)
+            lock.host_lease = module.admit("test-suite", wait_s=0)
+            lock.release()
+            self.assertIn("release", calls)
+
+    def test_hostops_gate_ships_with_the_release(self):
+        self.assertIn("scripts/hostops/host_admit.py", lane.RELEASE_EXTRAS)
+        self.assertIn("scripts/hostops/host-admit.json", lane.RELEASE_EXTRAS)
+        self.assertTrue((lane.HOSTOPS_DIR / "host_admit.py").exists())
 
 
 if __name__ == "__main__":

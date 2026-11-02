@@ -400,8 +400,17 @@ export function typecheckTargets(files, cwd) {
   return [...out];
 }
 
+// Typechecks go through the host admission gate (scripts/hostops/host-admit,
+// class typecheck) where it is installed; `env` keeps the heap cap on the child.
+let hostAdmitAvailable;
+function typecheckGate() {
+  hostAdmitAvailable ??=
+    spawnSync('host-admit', ['--help'], { stdio: 'ignore' }).status === 0;
+  return hostAdmitAvailable ? 'host-admit typecheck -- env ' : '';
+}
+
 function typecheckCommand(target, cwd) {
-  const cap = `NODE_OPTIONS=--max-old-space-size=${target.startsWith('web') ? WEB_HEAP_MB : HEAP_MB}`;
+  const cap = `${typecheckGate()}NODE_OPTIONS=--max-old-space-size=${target.startsWith('web') ? WEB_HEAP_MB : HEAP_MB}`;
   if (target === 'web')
     return `cd apps/web && ${cap} pnpm exec node ../../scripts/typecheck-singleflight.mjs -- tsc -p tsconfig.typecheck.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo`;
   if (target === 'web-tests')

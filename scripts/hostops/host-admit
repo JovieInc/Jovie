@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# host-admit <class> -- <cmd>: the one host admission gate (see host_admit.py, host-admit.json).
+here="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "${BASH_SOURCE[0]}")")" && pwd)"
+exec python3 "$here/host_admit.py" "$@"

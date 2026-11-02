@@ -65,6 +65,19 @@ test('.husky/pre-push separates draft publication from qualification', () => {
   assert.match(hook, /pre-push-gate\.sh affected/);
 });
 
+test('.husky/pre-push admits publication as hook-light and qualification as test-suite', () => {
+  const hook = readFileSync(path.join(repoRoot, '.husky/pre-push'), 'utf8');
+  assert.match(
+    hook,
+    /gated hook-light bash scripts\/hooks\/pre-push-gate\.sh publication/
+  );
+  assert.match(
+    hook,
+    /gated test-suite bash scripts\/hooks\/pre-push-gate\.sh affected/
+  );
+  assert.match(hook, /host-admit "\$class"/);
+});
+
 test('publication remains policy gated without running affected tests', () => {
   const source = readFileSync(gateScript, 'utf8');
   const publication = source
