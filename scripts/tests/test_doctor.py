@@ -103,6 +103,67 @@ class MutableClock:
 
 
 class FactoryStayUpWatchdogTest(unittest.TestCase):
+    def test_reuse_returns_the_previous_issue_only_within_the_cool_off(self):
+        # JOV-10358: a flapping condition re-opens the previous incident's issue instead of
+        # filing a duplicate every denied streak; past the cool-off a fresh issue is correct.
+        now = 1_000_000.0
+        record = {"alert": {"reuseIssueId": "ISSUE-X", "reuseSince": now - 60}}
+        self.assertEqual(factory_watchdog.reuse_issue(record, now), "ISSUE-X")
+        record = {"alert": {"reuseIssueId": "ISSUE-X", "reuseSince": now - doctor.COOL_OFF_S - 1}}
+        self.assertIsNone(factory_watchdog.reuse_issue(record, now))
+        for record in ({}, {"alert": {}}, {"alert": {"reuseIssueId": "ISSUE-X"}},
+                       {"alert": {"reuseSince": now - 60}},
+                       {"alert": {"reuseIssueId": "ISSUE-X", "reuseSince": now + 1}}):
+            self.assertIsNone(factory_watchdog.reuse_issue(record, now), record)
+
+    def test_operator_alert_reopens_within_the_cool_off_and_opens_past_it(self):
+        import lane_runner
+        now = time.time()
+        record = {"status": "decision-required", "reasons": ["admission-denied"], "attempts": [],
+                  "alert": {"status": "pending", "attempts": 0, "nextAttemptAt": 0,
+                            "reuseIssueId": "ISSUE-X", "reuseSince": now - 60}}
+        tracker = mock.Mock()
+        tracker.reopen.return_value = True
+        with mock.patch.object(doctor, "Tracker", return_value=tracker), \
+                mock.patch.object(lane_runner, "Linear"), mock.patch.object(lane_runner, "Host"):
+            self.assertEqual(factory_watchdog.operator_alert(record), "ISSUE-X")
+            self.assertEqual(tracker.reopen.call_args.args[0], "ISSUE-X")
+            self.assertIn("admission-denied", tracker.reopen.call_args.args[1])
+            record["alert"]["reuseSince"] = now - doctor.COOL_OFF_S - 1
+            tracker.open.return_value = "ISSUE-NEW"
+            self.assertEqual(factory_watchdog.operator_alert(record), "ISSUE-NEW")
+            tracker.open.assert_called_once()
+
+    def test_a_new_incident_carries_the_previous_issue_for_reuse(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            clock = MutableClock(1000.0)
+            denied = factory_observation(tickEpoch=300, tickAgeSeconds=60, runningWorkers=0,
+                                         admissionDenied="disk-critical", admissionDeniedStreak=3,
+                                         eligibleWork=4, openPullRequests=1, demandKnown=True, demand=5)
+            healthy = factory_observation(tickEpoch=1001, doctorEpoch=1001, runningWorkers=1)
+            observations = [denied, healthy, denied]
+
+            def observe(_state, _now):
+                return observations.pop(0)
+
+            def alert(record, issue_id=None, resolve=False):
+                return True if resolve else "ISSUE-X"
+
+            recovery = mock.Mock()
+            factory_watchdog.run_once(state, clock=clock, observe=observe, recover=recovery, alert=alert)
+            recovered = factory_watchdog.run_once(state, clock=clock, observe=observe, recover=recovery, alert=alert)
+            result = factory_watchdog.run_once(state, clock=clock, observe=observe, recover=recovery, alert=alert)
+            recovery.assert_not_called()  # admission-denied is decision-required, never auto-restarted
+            self.assertEqual(recovered["status"], "recovered")
+            self.assertEqual(result["generation"], 2)
+            self.assertEqual(result["status"], "decision-required")
+            self.assertEqual(result["alert"]["reuseIssueId"], "ISSUE-X")
+            self.assertEqual(result["alert"]["reuseSince"],
+                             factory_watchdog.parse_epoch(recovered["recoveredAt"]))
+            self.assertIsInstance(result["alert"]["reuseSince"], float)
+            self.assertEqual(factory_watchdog.reuse_issue(result, clock()), "ISSUE-X")
+
     def test_active_release_update_gets_a_bounded_grace_instead_of_interruption(self):
         with tempfile.TemporaryDirectory() as tmp:
             recovery = mock.Mock()

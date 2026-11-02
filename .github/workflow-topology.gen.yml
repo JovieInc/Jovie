@@ -1539,6 +1539,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:mine
     jobCount: 1
+  - name: Comparative Claims Re-measure
+    path: .github/workflows/vs-linktree-claims.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - repository_dispatch
+      - workflow_dispatch
+    terminalReceipt: job:remeasure
+    jobCount: 1
   - name: Wins Ledger
     path: .github/workflows/wins-ledger.yml
     active: true
