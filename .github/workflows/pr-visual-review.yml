@@ -305,6 +305,28 @@ jobs:
           PR_VISUAL_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node .github/scripts/pr-visual-evidence-gate.mjs
 
+      # Dogfood judge gate (reporting only). Judge receipts live on the runner
+      # host, not in CI, so a CI deny is expected and is not a failure here;
+      # blocking enforcement is in the certification kernel, waitlist
+      # auto-accept and outbound approval. Skipped until the judge CLI lands.
+      - name: Dogfood judge gate (report)
+        if: always()
+        env:
+          JUDGE_SURFACE: pr-visual-review
+          JUDGE_DIR: scripts/dogfood-judge
+        run: |
+          if [ -f "$JUDGE_DIR/cli.mjs" ]; then
+            if out="$(node "$JUDGE_DIR/cli.mjs" gate --surface "$JUDGE_SURFACE" 2>&1)"; then
+              echo "judge gate: allow (surface $JUDGE_SURFACE)" | tee -a "$GITHUB_STEP_SUMMARY"
+            else
+              reasons="$(printf '%s' "$out" | tr '\n' ' ' | cut -c1-500)"
+              echo "judge gate: deny, reasons ${reasons} (surface $JUDGE_SURFACE)" | tee -a "$GITHUB_STEP_SUMMARY"
+            fi
+          else
+            echo "judge gate: skipped, judge CLI not present in this checkout" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+          exit 0
+
       - name: Upload visual evidence
         id: upload
         if: always()

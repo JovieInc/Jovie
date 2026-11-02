@@ -438,7 +438,9 @@ function customerCandidate(): AcquisitionCertificationCandidate {
       canonicalReferences: [customerProof('canonical_references')],
       invariantEvaluation: [customerProof('invariant_evaluation')],
       testsCoverage: [customerProof('tests_coverage')],
-      visualProof: [customerProof('visual_proof')],
+      visualProof: [
+        { ...customerProof('visual_proof'), id: 'dogfood-judge:customer' },
+      ],
       requiredVariants: [
         {
           id: 'profile',

@@ -116,6 +116,9 @@ export async function POST(request: Request) {
     if (!result.ok)
       return jsonError(OUTBOUND_REFUSAL_MESSAGES[result.reason], 409, {
         reason: result.reason,
+        ...('judgeReasons' in result && result.judgeReasons
+          ? { judgeReasons: result.judgeReasons }
+          : {}),
       });
     return NextResponse.json({ ok: true }, { headers: NO_STORE_HEADERS });
   }
