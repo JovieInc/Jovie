@@ -154,26 +154,16 @@ export function LibraryAssetSharePanel({
         onSelect: onSharePrivately,
       });
     }
-    items.push(
-      {
-        id: 'visibility',
-        label: visibility === 'public' ? 'Make private' : 'Make public',
-        disabled: overflowBusy,
-        onSelect: () => {
-          handleVisibilityToggle(visibility !== 'public').catch(() => {
-            toast.error('Unable to change share visibility right now');
-          });
-        },
+    items.push({
+      id: 'visibility',
+      label: visibility === 'public' ? 'Make private' : 'Make public',
+      disabled: overflowBusy,
+      onSelect: () => {
+        handleVisibilityToggle(visibility !== 'public').catch(() => {
+          toast.error('Unable to change share visibility right now');
+        });
       },
-      {
-        id: 'open',
-        label: 'Open',
-        disabled: !shareUrl,
-        onSelect: () => {
-          globalThis.open(shareUrl, '_blank', 'noopener,noreferrer');
-        },
-      }
-    );
+    });
 
     if (visibility === 'private') {
       items.push({
@@ -197,7 +187,6 @@ export function LibraryAssetSharePanel({
     onSharePrivately,
     overflowBusy,
     profileId,
-    shareUrl,
     visibility,
   ]);
 
@@ -211,6 +200,7 @@ export function LibraryAssetSharePanel({
         displayValue={displayUrl}
         size='sm'
         surface='flat'
+        showOpen={false}
         valueClassName='font-sans'
         testId={`library-asset-share-url-${asset.id}`}
         className={cn(

@@ -36,7 +36,7 @@ const release = {
       url: 'https://open.spotify.com/album/work-inspector-proof',
     },
     {
-      key: 'appleMusic',
+      key: 'apple_music',
       label: 'Apple Music',
       url: 'https://music.apple.com/album/work-inspector-proof',
     },
@@ -137,6 +137,8 @@ function WorkInspectorProof({
             <LibrarySurface
               assets={assets}
               postReleaseBundle={postReleaseBundle}
+              profileId='profile-story'
+              artistHandle='tim'
             />
           )}
         </main>

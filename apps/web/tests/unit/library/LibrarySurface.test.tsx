@@ -1443,9 +1443,7 @@ describe('LibrarySurface', () => {
     expect(drawer.getAllByText('Destinations')).toHaveLength(1);
     expect(drawer.getByText('Spotify')).toBeInTheDocument();
     expect(about.getByText('Single')).toBeInTheDocument();
-    expect(
-      about.getByText('Discography · catalog-release-1')
-    ).toBeInTheDocument();
+    expect(about.getByText('Discography')).toBeInTheDocument();
     expect(about.queryByText('68/100')).not.toBeInTheDocument();
   });
 

@@ -133,6 +133,7 @@ export function ShareableLinkRow({
           ? 'border border-(--app-shell-frame-seam) bg-surface-0 hover:bg-surface-1'
           : 'border border-transparent bg-transparent hover:bg-surface-1/80',
         styles.container,
+        surface === 'flat' && 'px-0',
         className
       )}
     >
@@ -145,7 +146,7 @@ export function ShareableLinkRow({
       <span
         className={cn(
           'min-w-0 flex-1 truncate font-mono leading-none tracking-tight text-secondary-token',
-          styles.value,
+          surface === 'flat' ? 'text-xs' : styles.value,
           valueClassName
         )}
         title={url}

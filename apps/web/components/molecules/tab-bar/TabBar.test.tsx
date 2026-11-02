@@ -26,5 +26,6 @@ describe('TabBar task density contract', () => {
     expect(rail).toContain('rounded-full');
     expect(trigger).toContain('rounded-full');
     expect(trigger).not.toContain('border-b-2');
+    expect(source).toContain('bg-surface-3 font-medium text-primary-token');
   });
 });
