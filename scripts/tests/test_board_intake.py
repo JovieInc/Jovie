@@ -67,11 +67,20 @@ class FakeLinear:
         self.moved.append((issue_id, state))
 
 
-def gh_with(states):
+def gh_with(states, calls=None):
     def gh(args, priority="default"):
+        if calls is not None:
+            calls.append(args)
+        if args[:2] == ["pr", "merge"]:
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
         query = args[-1]
-        nodes = {f"p{n}": {"state": s, "mergeCommit": {"oid": "abc"} if s == "MERGED" else None}
-                 for n, s in states.items() if f"pullRequest(number:{n})" in query}
+        nodes = {}
+        for n, s in states.items():
+            if f"pullRequest(number:{n})" not in query:
+                continue
+            state, merge_state, auto = (s, None, False) if isinstance(s, str) else s
+            nodes[f"p{n}"] = {"state": state, "mergeCommit": {"oid": "abc"} if state == "MERGED" else None,
+                              "mergeStateStatus": merge_state, "autoMergeRequest": {"enabledAt": "x"} if auto else None}
         return SimpleNamespace(returncode=0, stdout=json.dumps({"data": {"repository": nodes}}), stderr="")
     return gh
 
@@ -168,6 +177,27 @@ class TickTest(unittest.TestCase):
         (done,) = hub.ops("done")
         self.assertEqual(done["status"], "failed")
         self.assertIn("escalate", done["result"])
+
+    def test_stuck_prs_are_claimed_before_older_detector_and_goal_backlog(self):
+        old = (NOW - 7 * 86400) * 1000
+        hub = FakeHub([task(f"jov-{n}", postedAt=old + n) for n in range(1, 7)] + [task("goal-y", postedAt=old)]
+                      + [task("stall-jovie-9-aaaaaaa-a1"), task("stall-jovie-8-bbbbbbb-a2")])
+        receipt = self.run_tick(hub, FakeLinear())
+        self.assertEqual(receipt["claimed"][:2], ["stall-jovie-9-aaaaaaa-a1", "stall-jovie-8-bbbbbbb-a2"])
+        self.assertEqual(len(receipt["claimed"]), bi.MAX_CLAIMS_PER_TICK)
+        self.assertNotIn("goal-y", receipt["claimed"])
+
+    def test_a_green_pr_with_auto_merge_off_is_enqueued_once(self):
+        hub = FakeHub([task("stall-jovie-7-ccccccc-a1")])
+        self.run_tick(hub, FakeLinear())
+        calls = []
+        green = gh_with({7: ("OPEN", "CLEAN", False)}, calls)
+        receipt = self.run_tick(hub, FakeLinear(), gh=green, now=NOW + 60)
+        self.assertEqual(receipt["enqueued"], ["https://github.com/JovieInc/Jovie/pull/7"])
+        self.assertIn(["pr", "merge", "7", "--repo", "JovieInc/Jovie", "--auto"], calls)
+        calls.clear()
+        self.run_tick(hub, FakeLinear(), gh=green, now=NOW + 120)
+        self.assertFalse(any(c[:2] == ["pr", "merge"] for c in calls))
 
     def test_hub_outage_keeps_held_tasks_and_never_raises(self):
         hub = FakeHub([task("stall-jovie-5-eeeeeee-a1")])

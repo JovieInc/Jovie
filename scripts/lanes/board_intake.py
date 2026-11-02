@@ -97,6 +97,13 @@ def goal_prompt(task: dict) -> str:
     ])
 
 
+def claim_order(task: dict) -> tuple:
+    """Stuck PRs first (they block merges now), then detector issues, then goals; oldest first within each.
+    2026-11-02: oldest-first claimed a week of detector backlog five per tick while fresh `Unstick` tasks waited."""
+    rank = {"pr": 0, "linear": 1, "goal": 2}[classify(task)["kind"]]
+    return (rank, task.get("postedAt") or 0)
+
+
 def sla_breached(row: dict, now: float) -> bool:
     return now - float(row.get("claimedEpoch") or now) >= PROGRESS_SLA_S
 
@@ -149,7 +156,8 @@ def pr_states(refs: list[tuple[str, int]], gh=None) -> dict:
     for repo in sorted({r for r, _ in refs}):
         owner, name = repo.split("/")
         nums = sorted({n for r, n in refs if r == repo})
-        fields = " ".join(f"p{n}:pullRequest(number:{n}){{state mergeCommit{{oid}}}}" for n in nums)
+        fields = " ".join(f"p{n}:pullRequest(number:{n}){{state mergeStateStatus autoMergeRequest{{enabledAt}} "
+                          f"mergeCommit{{oid}}}}" for n in nums)
         result = gh(["api", "graphql", "-f", f'query=query{{repository(owner:"{owner}",name:"{name}"){{{fields}}}}}'],
                     priority="repair")
         if result.returncode != 0:
@@ -158,8 +166,16 @@ def pr_states(refs: list[tuple[str, int]], gh=None) -> dict:
         for n in nums:
             node = data.get(f"p{n}") or {}
             if node.get("state"):
-                out[(repo, n)] = {"state": node["state"], "mergeSha": (node.get("mergeCommit") or {}).get("oid")}
+                out[(repo, n)] = {"state": node["state"], "mergeSha": (node.get("mergeCommit") or {}).get("oid"),
+                                  "mergeState": node.get("mergeStateStatus"), "autoMerge": bool(node.get("autoMergeRequest"))}
     return out
+
+
+def enqueue(repo: str, number: int, gh=None) -> bool:
+    """Turn on auto-merge for a green PR: it joins the merge queue in order (never a jump)."""
+    if gh is None:
+        from gh_budget import gh_call as gh
+    return gh(["pr", "merge", str(number), "--repo", repo, "--auto"], priority="merge").returncode == 0
 
 
 def issue_state(linear, identifier: str) -> dict | None:
@@ -250,6 +266,11 @@ def tick(state: Path, linear, *, now: float | None = None, call=hub, gh=None) ->
                 if seen.get("state") == "CLOSED":
                     close(tid, row, "failed", f"{url} closed unmerged; nothing to land")
                     continue
+                if seen.get("state") == "OPEN" and seen.get("mergeState") == "CLEAN" and not seen.get("autoMerge") \
+                        and not row.get("enqueuedEpoch"):
+                    if enqueue(row["repo"], row["number"], gh=gh):
+                        row["enqueuedEpoch"] = now
+                        receipt.setdefault("enqueued", []).append(url)
             elif row.get("issue"):
                 issue = issue_state(linear, row["issue"])
                 if issue and issue["type"] == "completed":
@@ -275,7 +296,7 @@ def tick(state: Path, linear, *, now: float | None = None, call=hub, gh=None) ->
             receipt["errors"].append(f"{tid}:{type(error).__name__}")
 
     board = call("GET", "/v1/board?status=open&limit=500")
-    for task in sorted(filter(eligible, board.get("tasks") or []), key=lambda t: t.get("postedAt") or 0):
+    for task in sorted(filter(eligible, board.get("tasks") or []), key=claim_order):
         if len(receipt["claimed"]) >= MAX_CLAIMS_PER_TICK:
             break
         if task["id"] in tasks:
