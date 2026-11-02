@@ -42,6 +42,33 @@ describe('HomeLoopConstraintBanner', () => {
   });
 });
 
+describe('HomeLoopConstraintBanner details', () => {
+  it('links the full diagnostic only when the constraint names a details view', () => {
+    const { rerender } = render(
+      <HomeLoopConstraintBanner
+        constraint={{
+          tone: 'bad',
+          text: 'Remediation alerts are not being acknowledged',
+          detailsHref: '/app/ov/product',
+        }}
+        emptyLabel='All clear'
+      />
+    );
+    expect(screen.getByRole('link', { name: 'Details' })).toHaveAttribute(
+      'href',
+      '/app/ov/product'
+    );
+
+    rerender(
+      <HomeLoopConstraintBanner
+        constraint={{ tone: 'warn', text: 'Lanes feed is stale' }}
+        emptyLabel='All clear'
+      />
+    );
+    expect(screen.queryByTestId('home-loop-constraint-details')).toBeNull();
+  });
+});
+
 describe('HomeLoopPulse', () => {
   it('shows each tile with its previous value and a named tone', () => {
     render(<HomeLoopPulse tiles={HOME_LOOP_FIXTURE_PULSE} />);
@@ -54,6 +81,29 @@ describe('HomeLoopPulse', () => {
     expect(
       within(prod).getByRole('img', { name: 'Healthy' })
     ).toBeInTheDocument();
+  });
+
+  it('shows the target beside the state and links to the drill-down', () => {
+    render(
+      <HomeLoopPulse
+        tiles={[
+          {
+            key: 'ejections',
+            label: 'Queue ejections',
+            value: '58%',
+            was: '41%',
+            tone: 'bad',
+            measured: true,
+            target: 'Target ≤ 10%',
+            href: '/app/ov/shipping',
+          },
+        ]}
+      />
+    );
+    const tile = screen.getByTestId('home-loop-tile-ejections');
+    expect(tile).toHaveTextContent('Target ≤ 10% · Was 41%');
+    expect(tile).toHaveAttribute('href', '/app/ov/shipping');
+    expect(within(tile).getByRole('img', { name: 'Problem' })).toBeVisible();
   });
 
   it('keeps tile frames reserved while loading or unavailable', () => {
@@ -215,6 +265,37 @@ describe('HomeLoopSection', () => {
     );
     expect(screen.queryByText('Nothing here')).not.toBeInTheDocument();
     expect(screen.queryByText('Body')).not.toBeInTheDocument();
+  });
+});
+
+describe('HomeLoopSection notice link', () => {
+  it('links a summarized warning to its full list in both empty and populated states', () => {
+    const section = (isEmpty: boolean) => (
+      <HomeLoopSection
+        title='Blocked On You'
+        status='ready'
+        isEmpty={isEmpty}
+        emptyLabel='Nothing here'
+        errorLabel='Could not load'
+        notice='27 sources are unavailable or missing evidence.'
+        noticeHref='/app/ov/inbox'
+        skeleton={<p>Skeleton</p>}
+        testId='section'
+      >
+        <p>Body</p>
+      </HomeLoopSection>
+    );
+    const { rerender } = render(section(true));
+    expect(screen.getByTestId('section-notice-link')).toHaveAttribute(
+      'href',
+      '/app/ov/inbox'
+    );
+    rerender(section(false));
+    expect(screen.getByTestId('section-notice-link')).toHaveAttribute(
+      'href',
+      '/app/ov/inbox'
+    );
+    expect(screen.getByText('Body')).toBeVisible();
   });
 });
 

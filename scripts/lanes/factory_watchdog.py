@@ -29,12 +29,17 @@ TICK_STALE_S = 10 * 60
 # more in one bounded selector retry. Do not interrupt that legitimate service
 # run; after this grace, an active service with no tick is itself hung.
 ACTIVE_TICK_GRACE_S = 22 * 60
+# A tick that keeps starting subprocesses (lifecycle.beat touches tick-heartbeat) is working, however long it
+# takes; only silence for HEARTBEAT_ALIVE_S, or a tick older than TICK_HARD_CAP_S, is hung.
+HEARTBEAT_ALIVE_S = 3 * 60
+TICK_HARD_CAP_S = 3 * 3600
 ZERO_WORKER_S = 5 * 60
 ATTEMPT_COOLDOWN_S = 2 * 60
 MAX_RECOVERY_ATTEMPTS = 3
 VERIFY_TIMEOUT_S = 90
 VERIFY_POLL_S = 2
 ALERT_RETRY_S = 15 * 60
+ADMISSION_DENIED_TICKS = 3  # consecutive denied ticks (disk-critical backpressure) before Summer is alerted
 RECOVERABLE_CONDITIONS = frozenset({"spawn-exit", "tick-error"})
 CAPACITY_BLOCK = re.compile(r"banked|credit|quota|token|usage.limit", re.IGNORECASE)
 ACTIVE_STATUSES = frozenset({"observing", "recovering", "exhausted", "decision-required"})
@@ -127,6 +132,27 @@ def journal(state: Path, event: dict) -> None:
         os.fsync(handle.fileno())
 
 
+def heartbeat_age(state: Path, now: float) -> int | None:
+    try:
+        return int(now - (state / "tick-heartbeat").stat().st_mtime)
+    except OSError:
+        return None
+
+
+def admission_streak(state: Path, tick: dict) -> int:
+    """Consecutive distinct ticks that ended admission-denied; persisted so each tick counts once."""
+    path = state / "admission-denied-streak.json"
+    row = read_json(path, {})
+    streak, last = int(row.get("streak") or 0), row.get("tickAt")
+    if tick.get("at") and tick.get("at") != last:
+        streak = streak + 1 if tick.get("admissionDenied") else 0
+        try:
+            atomic_write(path, {"tickAt": tick.get("at"), "streak": streak})
+        except OSError:
+            pass
+    return streak
+
+
 def snapshot(state: Path, now: float) -> dict:
     """Small local-only factory observation; no API call or credential read."""
     tick = read_json(state / "tick.json", {})
@@ -161,8 +187,10 @@ def snapshot(state: Path, now: float) -> dict:
         "doctorEpoch": doctor_epoch,
         "doctorAgeSeconds": None if doctor_epoch is None else int(now - doctor_epoch),
         "service": service,
+        "heartbeatAgeSeconds": heartbeat_age(state, now),
         "tickError": tick.get("error"),
         "admissionDenied": tick.get("admissionDenied"),
+        "admissionDeniedStreak": admission_streak(state, tick),
         "enabledProviders": enabled,
         "spawnedProviders": spawned,
         "unhealthyProviders": unhealthy,
@@ -186,8 +214,11 @@ def assess(observation: dict) -> dict:
     if not isinstance(tick_age, (int, float)) or tick_age < -30 or tick_age > TICK_STALE_S:
         service = observation.get("service") if isinstance(observation.get("service"), dict) else {}
         service_age = service.get("ageSeconds")
+        beat = observation.get("heartbeatAgeSeconds")
+        working = isinstance(beat, (int, float)) and -30 <= beat <= HEARTBEAT_ALIVE_S \
+            and isinstance(service_age, (int, float)) and 0 <= service_age <= TICK_HARD_CAP_S
         if service.get("active") is True and isinstance(service_age, (int, float)) \
-                and 0 <= service_age <= ACTIVE_TICK_GRACE_S:
+                and (0 <= service_age <= ACTIVE_TICK_GRACE_S or working):
             reasons.append("factory-tick-in-progress")
             waiting = True
         else:
@@ -202,6 +233,10 @@ def assess(observation: dict) -> dict:
     if zero_capacity:
         reasons.append("zero-provider-capacity")
 
+    admission_blocked = not waiting and int(observation.get("admissionDeniedStreak") or 0) >= ADMISSION_DENIED_TICKS
+    if admission_blocked:
+        reasons.append("admission-denied")
+
     doctor_fresh = isinstance(doctor_age, (int, float)) and -30 <= doctor_age <= TICK_STALE_S
     if doctor_fresh and not waiting and not reasons[:1] == ["factory-down"]:
         conditions = observation.get("activeConditions") or []
@@ -209,14 +244,14 @@ def assess(observation: dict) -> dict:
                for key in conditions):
             reasons.append("stuck-retry")
         if observation.get("demandKnown") and observation.get("demand", 0) > 0 \
-                and observation.get("runningWorkers") == 0:
+                and observation.get("runningWorkers") == 0 and not observation.get("admissionDenied"):
             reasons.append("zero-worker")
 
     reasons = list(dict.fromkeys(reasons))
     return {
         "healthy": not reasons,
         "reasons": reasons,
-        "decisionRequired": "zero-provider-capacity" in reasons,
+        "decisionRequired": bool({"zero-provider-capacity", "admission-denied"} & set(reasons)),
         "waiting": waiting,
     }
 
@@ -276,6 +311,8 @@ def operator_alert(record: dict, issue_id: str | None = None, resolve: bool = Fa
         attempts = len(record.get("attempts") or [])
         text = (f"Factory stay-up recovery is {record.get('status')}: {reasons}; "
                 f"{attempts}/{MAX_RECOVERY_ATTEMPTS} bounded service attempts used. "
+                + ("Dispatch admission has been denied for 3+ consecutive ticks (disk-critical?); free disk, a restart will not help. "
+                   if "admission-denied" in (record.get("reasons") or []) else "") +
                 "Inspect factory-watchdog.json and its journal before any manual action.")
         return tracker.open("factory-stay-up", text)
     except Exception:

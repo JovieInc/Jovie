@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page } from '@playwright/test';
+import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
 import type {
   VisualQaCoverageEntry,
   VisualQaPlaywrightRouteSource,
@@ -46,6 +47,20 @@ export interface FocusVisualStyle {
   readonly outlineWidth: string;
 }
 
+/**
+ * A text control inside a composite field (prefix/suffix, search pill, claim
+ * field) paints no focus of its own: the CompositeField container owns the
+ * ring. The check accepts a visible change on the control OR on its closest
+ * composite-field ancestor.
+ */
+export function hasVisibleCompositeFocusChange(
+  focused: { readonly composite?: FocusVisualStyle | null },
+  blurred: { readonly composite?: FocusVisualStyle | null }
+): boolean {
+  if (!focused.composite || !blurred.composite) return false;
+  return hasVisibleFocusStyleChange(focused.composite, blurred.composite);
+}
+
 export function hasVisibleFocusStyleChange(
   focused: FocusVisualStyle,
   blurred: FocusVisualStyle
@@ -72,14 +87,7 @@ export async function assertRegisteredQualityChecks(
 
   if (checks.has('accessibility')) {
     const results = await new AxeBuilder({ page })
-      .withTags([
-        'wcag2a',
-        'wcag2aa',
-        'wcag21a',
-        'wcag21aa',
-        'wcag22a',
-        'wcag22aa',
-      ])
+      .options(wcag22AaAxeOptions())
       .analyze();
     const blockingViolations = results.violations.filter(
       violation =>
@@ -113,7 +121,20 @@ export async function assertRegisteredQualityChecks(
 
       const focused = await focusedElement.evaluate(element => {
         const style = globalThis.getComputedStyle(element);
+        const container = element.closest('[data-component="composite-field"]');
+        const cs = container ? globalThis.getComputedStyle(container) : null;
         return {
+          composite: cs
+            ? {
+                backgroundColor: cs.backgroundColor,
+                borderColor: cs.borderColor,
+                boxShadow: cs.boxShadow,
+                outlineColor: cs.outlineColor,
+                outlineStyle: cs.outlineStyle,
+                outlineWidth: cs.outlineWidth,
+              }
+            : null,
+
           backgroundColor: style.backgroundColor,
           borderColor: style.borderColor,
           boxShadow: style.boxShadow,
@@ -134,7 +155,20 @@ export async function assertRegisteredQualityChecks(
       );
       const blurred = await focusedElement.evaluate(element => {
         const style = globalThis.getComputedStyle(element);
+        const container = element.closest('[data-component="composite-field"]');
+        const cs = container ? globalThis.getComputedStyle(container) : null;
         return {
+          composite: cs
+            ? {
+                backgroundColor: cs.backgroundColor,
+                borderColor: cs.borderColor,
+                boxShadow: cs.boxShadow,
+                outlineColor: cs.outlineColor,
+                outlineStyle: cs.outlineStyle,
+                outlineWidth: cs.outlineWidth,
+              }
+            : null,
+
           backgroundColor: style.backgroundColor,
           borderColor: style.borderColor,
           boxShadow: style.boxShadow,
@@ -144,7 +178,8 @@ export async function assertRegisteredQualityChecks(
         };
       });
       expect(
-        hasVisibleFocusStyleChange(focused, blurred),
+        hasVisibleFocusStyleChange(focused, blurred) ||
+          hasVisibleCompositeFocusChange(focused, blurred),
         `${entry.id} visible focus indicator ${JSON.stringify({ focused, blurred })}`
       ).toBe(true);
     }

@@ -57,6 +57,13 @@ async function assertDrawerScrollToShowLowerSettings(
 
   await openProfileEditor(page, 'about');
 
+  // Below lg the profile deep link no longer auto-opens the rail (#22772):
+  // on mobile it stays closed until its explicit header control. Open it the
+  // way a mobile user does before asserting drawer scroll behavior.
+  if (viewport.width < 1024) {
+    await page.getByTestId('artist-profile-rail-toggle').click();
+  }
+
   await page.getByRole('tab', { name: 'About' }).click();
 
   const scrollRegion = page.getByTestId(PROFILE_DRAWER_SCROLL_REGION_TEST_ID);

@@ -11,13 +11,17 @@ import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  PRESENCE_BUTTON_DESKTOP_DENSITY,
+  PresenceSignalList,
+  PresenceStatusBadge,
+} from '@/components/features/presence/PresenceStatusParts';
+import {
   HeaderActionsProvider,
   useHeaderActions,
 } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { classifyConnectionInput } from './AddConnectionRail';
 import type { ProfilesWorkspaceData } from './data';
-import { PRESENCE_BUTTON_DESKTOP_DENSITY } from './PresenceStatusParts';
 import { ProfilesWorkspace } from './ProfilesWorkspace';
 
 const navigationMock = vi.hoisted(() => ({
@@ -38,6 +42,37 @@ vi.mock('next/navigation', () => ({
   }),
   useSearchParams: () => navigationMock.searchParams,
 }));
+
+describe('shared Presence status vocabulary', () => {
+  it.each(['success', 'warning', 'error', 'neutral'] as const)(
+    'shows the %s status and explains the next action',
+    async tone => {
+      const user = userEvent.setup();
+      render(
+        <TooltipProvider>
+          <PresenceStatusBadge
+            status={{
+              label: 'Source status',
+              tone,
+              needsAttention: tone !== 'success',
+              nextAction: 'Reconnect this source.',
+              sortPriority: 1,
+            }}
+          />
+        </TooltipProvider>
+      );
+
+      await user.hover(screen.getByText('Source status'));
+      const tooltip = await screen.findByRole('tooltip');
+      expect(tooltip).toHaveTextContent('Reconnect this source.');
+    }
+  );
+
+  it('does not invent evidence for an empty signal list', () => {
+    render(<PresenceSignalList signals={[]} />);
+    expect(screen.getByTestId('presence-signal-list')).toBeEmptyDOMElement();
+  });
+});
 
 describe('classifyConnectionInput', () => {
   it('normalizes and classifies a bare provider domain', () => {
@@ -597,7 +632,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     );
     expect(
       screen.getByRole('heading', { name: 'No Identity Selected' })
-    ).toHaveClass('text-2xl', 'font-semibold', 'text-primary-token');
+    ).toHaveClass('text-sm', 'font-semibold', 'text-primary-token');
     expect(
       screen.getByRole('link', { name: 'Set Up Identity' })
     ).toHaveAttribute('href', '/app/settings/profile');
@@ -668,6 +703,20 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(
       screen.getByRole('button', { name: 'Add Profile Or Site' })
     ).toBeInTheDocument();
+  });
+
+  // JOV-8964: the Add Profile action moved from the floating shell-header
+  // registration slot into the page toolbar, next to Review Suggestions.
+  it('renders Add Profile in the page toolbar and leaves the header registration empty', () => {
+    renderWorkspace(dataWithConnector);
+    const toolbar = screen.getByTestId('connections-workspace-toolbar');
+    expect(
+      within(toolbar).getByRole('button', { name: 'Add Profile Or Site' })
+    ).toBeInTheDocument();
+    expect(within(toolbar).getByText('Profiles')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('registered-header-actions')
+    ).toBeEmptyDOMElement();
   });
 
   it('renders one explanation per suggested identity without a duplicate recommendation', async () => {
@@ -792,8 +841,10 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(screen.getByText('YouTube')).toBeInTheDocument();
     expect(screen.getByText('Fan Wiki')).toBeInTheDocument();
 
+    // JOV-8964: Add Profile lives in the page toolbar (next to Review
+    // Suggestions), not the floating shell-header registration slot.
     await user.click(
-      within(screen.getByTestId('registered-header-actions')).getByRole(
+      within(screen.getByTestId('connections-workspace-toolbar')).getByRole(
         'button',
         { name: 'Add Profile Or Site' }
       )
@@ -802,7 +853,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(panel).not.toBeNull();
 
     render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
-    expect(screen.getByText('Review Suggestions')).toBeInTheDocument();
+    expect(await screen.findByText('Review Suggestions')).toBeInTheDocument();
     expect(
       screen.getByText('2 suggested profiles to review.')
     ).toBeInTheDocument();
@@ -1181,7 +1232,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
 
     render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
     expect(
-      screen.getByRole('complementary', { name: 'Add Profile Or Site' })
+      await screen.findByRole('complementary', { name: 'Add Profile Or Site' })
     ).toBeInTheDocument();
     expect(screen.queryByText(/Connect services/i)).not.toBeInTheDocument();
     expect(screen.queryByText('Gmail')).not.toBeInTheDocument();
@@ -1208,7 +1259,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
 
     await user.click(
-      screen.getByRole('button', { name: /Add public profile/i })
+      await screen.findByRole('button', { name: /Add public profile/i })
     );
     const input = screen.getByRole('textbox', { name: 'Public Profile URL' });
     await user.type(input, '@newhandle');

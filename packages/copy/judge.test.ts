@@ -145,6 +145,46 @@ describe('tiered judge panel', () => {
     expect(partial.status).toBe('revise');
   });
 
+  it('rejects out-of-rubric scores and malformed confidence without coercion', async () => {
+    const valid = JSON.parse(
+      await judgeReturning({})({
+        model: 'zai/fixture',
+        system: '',
+        prompt: '',
+      })
+    );
+    const run = (value: unknown) =>
+      gateCopy(
+        'One link for every fan.',
+        { ...brief, tier: 'standard' },
+        async () => JSON.stringify(value)
+      );
+    expect((await run(valid)).status).toBe('pass');
+    for (const score of [11, 99, '9', true, null]) {
+      expect(
+        (await run({ ...valid, scores: { ...valid.scores, truth: score } }))
+          .status,
+        `truth score ${JSON.stringify(score)}`
+      ).toBe('revise');
+    }
+    for (const confidence of [undefined, -0.1, 1.1, '0.9', true, null]) {
+      expect(
+        (await run({ ...valid, confidence })).status,
+        `confidence ${JSON.stringify(confidence)}`
+      ).toBe('revise');
+    }
+    // Valid fractional scores and low confidence retain the existing voting policy.
+    expect(
+      (
+        await run({
+          ...valid,
+          confidence: 0,
+          scores: { ...valid.scores, truth: 8.5 },
+        })
+      ).status
+    ).toBe('pass');
+  });
+
   it('rewrite loop feeds critique back and blocks when rounds run out', async () => {
     const drafts = ['Guaranteed streams.', 'One link for every fan.'];
     const passed = await writeUntilPass(

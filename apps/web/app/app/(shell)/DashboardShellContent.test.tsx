@@ -115,6 +115,13 @@ vi.mock('./ProfileCompletionRedirect', () => ({
 vi.mock('./shell-route-matches', () => ({
   shouldRedirectToOnboarding: () => false,
   shouldUseEssentialShellData: mocks.essential,
+  shouldDefaultOpenShellPreview: (
+    pathname: string | null,
+    useEssentialShell: boolean
+  ) =>
+    !useEssentialShell ||
+    pathname === '/app/settings/profile' ||
+    Boolean(pathname?.startsWith('/app/settings/profile/')),
 }));
 
 import { DashboardShellContent } from './DashboardShellContent';

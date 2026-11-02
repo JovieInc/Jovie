@@ -97,30 +97,6 @@
   color: var(--color-text-secondary-token);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .artist-profile-faq .faq-section__heading,
-  .artist-profile-faq .faq-accordion {
-    animation: artist-profile-faq-rise var(--ds-motion-cinematic-duration)
-      var(--ds-motion-cinematic-easing) both;
-  }
-
-  .artist-profile-faq .faq-accordion {
-    animation-delay: var(--ds-motion-subtle-duration);
-  }
-}
-
-@keyframes artist-profile-faq-rise {
-  from {
-    opacity: 0;
-    transform: translateY(var(--space-3));
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 @media (max-width: 767px) {
   /* Mobile cap: the marketing title ramp is fluid, so only the small-width
      ceiling and the title-token leading need restating here. */

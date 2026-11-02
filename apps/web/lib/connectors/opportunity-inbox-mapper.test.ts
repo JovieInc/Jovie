@@ -241,7 +241,7 @@ describe('mapSuggestedActionToInboxCard', () => {
       createdAt: new Date('2026-06-28T10:00:00.000Z'),
     });
 
-    expect(card.title).toBe('Untitled suggestion');
+    expect(card.title).toBe('Suggestion');
     expect(card.why).toBe('Jovie found a booking signal worth your review.');
     expect(card.primaryActionLabel).toBe('Approve');
     expect(card.signalType).toBe('other');
@@ -354,16 +354,11 @@ describe('buildOpportunityInboxData', () => {
     expect(data.cards[0]?.brandDealRankingScore).toBe(125);
   });
 
-  it('includes default empty-state action cards', () => {
+  it('returns no empty-state action cards so setup steps stay on Home', () => {
     const data = buildOpportunityInboxData([]);
 
     expect(data.cards).toEqual([]);
-    expect(data.emptyActionCards).toHaveLength(2);
-    expect(data.emptyActionCards[0]?.id).toBe('connect-spotify');
-    expect(data.emptyActionCards[0]?.actionLabel).toBe('Connect Spotify');
-    expect(data.emptyActionCards[0]?.href).toBe(
-      '/app/dashboard/releases?connect=spotify'
-    );
+    expect(data.emptyActionCards).toEqual([]);
   });
 });
 

@@ -79,6 +79,9 @@ export const EXPECTED_ERROR_PATTERNS = [
 
   // Network errors from browser-level failures (not app bugs)
   'net::err_', // Chrome network-level failures (ERR_FAILED, ERR_CONNECTION_REFUSED, etc.)
+  // Firefox phrases the same aborted/failed fetch as this TypeError. Chrome's
+  // net::ERR_* form is already ignored above.
+  'networkerror when attempting to fetch resource',
 
   // Chunk loading (Turbopack/webpack dev environment hot reload)
   'chunkloaderror', // dynamic import fails during hot reload
@@ -929,6 +932,7 @@ export function isTransientNavigationError(error: unknown): boolean {
     msg.includes('net::ERR_CONNECTION_RESET') ||
     msg.includes('net::ERR_EMPTY_RESPONSE') ||
     msg.includes('net::ERR_ABORTED') ||
+    msg.includes('NS_BINDING_ABORTED') ||
     msg.includes('frame was detached') ||
     msg.includes('Target closed') ||
     msg.includes('Target page, context or browser has been closed') ||

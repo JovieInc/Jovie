@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { Check } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
@@ -168,7 +169,7 @@ export function GetStartedChecklistCard({
   if (allDone || dismissed) return null;
 
   return (
-    <ContentSurfaceCard className='overflow-hidden p-0'>
+    <ContentSurfaceCard className='overflow-hidden'>
       <div className='flex items-center justify-between gap-3 border-b border-subtle px-3 py-2'>
         <div className='flex items-center gap-1.5'>
           <h3 className='text-xs font-caption tracking-tight text-primary-token'>
@@ -189,13 +190,14 @@ export function GetStartedChecklistCard({
               View profile
             </a>
           )}
-          <button
+          <Button
             type='button'
+            variant='ghost'
+            size='sm'
             onClick={handleDismiss}
-            className='rounded-full border border-transparent px-2 py-0.5 text-2xs text-tertiary-token transition-colors hover:border-subtle hover:bg-surface-0 hover:text-secondary-token'
           >
             Dismiss
-          </button>
+          </Button>
         </div>
       </div>
 

@@ -68,11 +68,6 @@ export function validateProductReferenceSnapshot(
   if (!owner.PRODUCT_PROJECTION_LOCALES.includes(snapshot.locale)) {
     errors.push('unowned product reference locale');
   }
-  if (typeof snapshot.flags?.PROFILES_WORKSPACE !== 'boolean') {
-    errors.push(
-      'product reference snapshot needs the resolved PROFILES_WORKSPACE flag'
-    );
-  }
   if (errors.length) return errors;
   const expected = owner.getProductProjection(snapshot.flags, snapshot.locale);
   const features = Array.isArray(snapshot.features) ? snapshot.features : [];
@@ -207,7 +202,6 @@ export function scanProductNavigationBindings(path, source) {
       [labelKey, 'label'],
       ['href', 'canonicalRoute'],
     ];
-    if (concept === 'identity') bindings.push(['requiredFlag', 'requiredFlag']);
     for (const [key, field] of bindings)
       assertBinding(id, key, read(key), `PRODUCT_ONTOLOGY.${concept}.${field}`);
   };
@@ -238,7 +232,7 @@ export function scanProductNavigationBindings(path, source) {
       const id = node.arguments[0].text;
       const concept = expected[id];
       seen.add(id);
-      const slots = { label: 1, href: 4, requiredFlag: 5 };
+      const slots = { label: 1, href: 4 };
       assertProjection(id, concept, 'label', key =>
         node.arguments[slots[key]]?.getText(ast)
       );

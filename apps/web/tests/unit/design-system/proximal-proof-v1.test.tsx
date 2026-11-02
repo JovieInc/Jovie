@@ -3,16 +3,15 @@
 // "Claims need proximal, route-specific proof. Proof should support the
 // promise being made on that route, not generic proof inserted mechanically."
 //
-// The artist-profile homepage (EVENT 2026-10-20) proves its claim with the
-// real product: a registry capture of a live Jovie artist profile, in the
-// same hero as the jov.ie/ claim. The proof must stay proximal, keep the
-// actual /start handoff, and be labeled as the founder's real profile rather
-// than implying the visitor already owns it.
+// The shipped homepage hero keeps the jov.ie/ claim and its /start handoff in
+// one section. It shows no real person: Tim, 2026-10-26, "no real person's
+// face on /". The founder's live capture used to be the proof here; the
+// homepage-no-person-images guard now owns that rule, and this receipt asserts
+// the claim stays bound to /start without borrowing a person's capture.
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HomepageArtistHero } from '@/components/homepage/HomepageArtistProfile';
 import { HOMEPAGE_COPY } from '@/data/homepageCopy';
-import { getMarketingExportImage } from '@/lib/screenshots/registry';
 
 vi.mock('@/components/homepage/homepage-analytics', () => ({
   trackHomepageEvent: vi.fn(),
@@ -42,41 +41,31 @@ vi.mock('next/image', () => ({
 }));
 
 describe('JOV-INV-038 proximal-proof evaluator (homepage hero)', () => {
-  it('renders the proof inside the same section container as the claim it supports', () => {
+  it('keeps the claim and its form in the hero section without a person capture', () => {
     render(<HomepageArtistHero />);
 
     const hero = screen.getByTestId('marketing-section-hero');
     const claim = screen.getByRole('heading', { level: 1 });
-    const form = screen.getByTestId('homepage-claim-form');
-    const proof = within(hero).getByRole('img');
+    const form = within(hero).getByTestId('homepage-claim-form');
 
-    // Proximal: the product proof lives in the same hero section as the
-    // promise and the claim, with zero navigation or scroll to reach it.
     expect(hero.contains(claim)).toBe(true);
     expect(hero.contains(form)).toBe(true);
-    expect(proof).toHaveAttribute(
-      'src',
-      getMarketingExportImage(HOMEPAGE_COPY.hero.profile.scenarioId).publicUrl
-    );
-    // Always visible with the claim; never gated behind hover or drill-down.
-    expect(proof).not.toHaveAttribute('hidden');
-    expect(proof).toHaveAttribute('data-priority', 'true');
+    expect(within(hero).queryByRole('img', { name: /Tim White/i })).toBeNull();
   });
 
-  it('binds the proof to the real claim handoff and labels whose profile it is', () => {
+  it('binds the claim to /start and shows no unlabeled profile capture', () => {
     render(<HomepageArtistHero />);
+    const { claim } = HOMEPAGE_COPY.hero;
     const form = screen.getByTestId('homepage-claim-form');
-    const proof = screen.getByRole('img');
-    const { claim, profile } = HOMEPAGE_COPY.hero;
 
     expect(form).toHaveAttribute('action', '/start');
     expect(within(form).getByRole('textbox')).toHaveAttribute(
       'placeholder',
       claim.placeholder
     );
-    // The capture is a named, real profile, not a visitor or customer stand-in.
-    expect(proof).toHaveAttribute('alt', profile.alt);
-    expect(profile.alt).toMatch(/Tim White's Jovie artist profile/);
+    expect(
+      screen.queryByRole('img', { name: /Jovie artist profile/i })
+    ).toBeNull();
     expect(
       screen.queryByText(/Claimed|Verified customer|Illustrative/i)
     ).toBeNull();

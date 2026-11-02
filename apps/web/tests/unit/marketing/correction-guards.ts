@@ -23,7 +23,7 @@ export const JSX_ROOTS = [
   'apps/web/components/site',
 ] as const;
 
-export const LOCKED_HOMEPAGE_H1 = 'One profile. For every fan.';
+export const LOCKED_HOMEPAGE_H1 = 'Be found. Be understood.';
 
 const SOURCE_EXT = /\.(?:tsx?|mdx?)$/u;
 const SKIP_FILE = /\.(?:test|spec|stories)\./u;
@@ -37,7 +37,50 @@ const BANNED_NAME_RULES = [
   { id: 'haruki', pattern: /\bHaruki\b/giu },
 ] as const;
 
+/**
+ * Paths the new term rules do not scan: internal registry and recipe text that
+ * is never rendered (data/marketing), the unmounted legacy home components,
+ * the redirected /launch page, claim-id-bound published claims, and story
+ * fixtures. Rendered copy everywhere else is scanned and must be clean, so the
+ * shrink-only baseline does not grow.
+ */
+const NEW_RULE_SKIP_PATH =
+  /\/(?:data\/marketing|components\/features\/home|components\/marketing\/storybook|app\/\(marketing\)\/launch)\/|\/content\/(?:blog|published-claims)/u;
+
+/**
+ * Banned marketing terms (phase 1, 2026-10-25). Same shrink-only baseline as
+ * the phrase rules: existing hits are grandfathered, new ones fail.
+ * - "fan": we say audience or listener (editorial blog posts are exempt).
+ * - white-label / remove branding: branding stays on every profile.
+ * - revolutionary / all-in-one: filler claims with no evidence.
+ */
 const PHRASE_RULES = [
+  {
+    id: 'banned-fan',
+    pattern: /(?<![-_#/])\bfans?\b(?![-_])/giu,
+    skipPath: NEW_RULE_SKIP_PATH,
+  },
+  {
+    id: 'white-label',
+    pattern: /\bwhite[\s-]?label(?:ed|ing)?\b/giu,
+    skipPath: NEW_RULE_SKIP_PATH,
+  },
+  {
+    id: 'remove-branding',
+    pattern:
+      /\bremov(?:e|es|ing|al)\s+(?:of\s+)?(?:the\s+)?(?:jovie\s+)?branding\b/giu,
+    skipPath: NEW_RULE_SKIP_PATH,
+  },
+  {
+    id: 'revolutionary',
+    pattern: /\brevolutionary\b/giu,
+    skipPath: NEW_RULE_SKIP_PATH,
+  },
+  {
+    id: 'all-in-one',
+    pattern: /\ball[\s-]in[\s-]one\b/giu,
+    skipPath: NEW_RULE_SKIP_PATH,
+  },
   { id: 'link-in-bio', pattern: /\blink[\s-]in[\s-]bio\b/giu },
   {
     id: 'niche-music',
@@ -236,11 +279,16 @@ function excerptAround(source: string, index: number, length: number): string {
 function collectPatternHits(
   file: string,
   source: string,
-  rules: readonly { readonly id: string; readonly pattern: RegExp }[],
+  rules: readonly {
+    readonly id: string;
+    readonly pattern: RegExp;
+    readonly skipPath?: RegExp;
+  }[],
   useExcerpt: boolean
 ): CorrectionHit[] {
   const hits: CorrectionHit[] = [];
   for (const rule of rules) {
+    if (rule.skipPath?.test(file)) continue;
     const pattern = new RegExp(rule.pattern.source, rule.pattern.flags);
     for (const match of source.matchAll(pattern)) {
       const text = useExcerpt

@@ -5,12 +5,13 @@
  * - generateProfileStructuredData (JSON-LD for SEO)
  * - fetchProfileAndLinks (data fetching with error handling)
  * - generateMetadata (SEO metadata generation)
- * - getCachedProfileAndLinks (only caches successful results)
+ * - fresh publication authority across profile representations
  *
  * Includes the small server-rendered recovery surface used by the page.
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { render, screen } from '@testing-library/react';
@@ -53,9 +54,8 @@ const PUBLIC_PROFILE_LAYOUT_SOURCE = readFileSync(
   path.join(WEB_ROOT, 'app/[username]/layout.tsx'),
   'utf8'
 );
-// Profile loader (cache + error class + TTL) was extracted to its own file
-// so per-mode routes can reuse it; assertions in this suite that look for
-// loader internals search across both sources.
+// Per-mode routes reuse the canonical profile loader; assertions about shared
+// rendering boundaries search across both sources.
 const PUBLIC_PROFILE_LOADER_SOURCE = readFileSync(
   path.join(WEB_ROOT, 'app/[username]/_lib/public-profile-loader.ts'),
   'utf8'
@@ -72,7 +72,16 @@ const PUBLIC_PROFILE_TEMPLATE_SOURCE = readFileSync(
 type RedirectRule = {
   readonly source: string;
   readonly destination: string;
-  readonly permanent: boolean;
+  readonly permanent?: boolean;
+  readonly has?: readonly {
+    readonly type: string;
+    readonly key: string;
+    readonly value?: string;
+  }[];
+  readonly missing?: readonly {
+    readonly type: string;
+    readonly key: string;
+  }[];
 };
 
 type RewriteRule = Omit<RedirectRule, 'permanent'>;
@@ -84,6 +93,30 @@ const PRIVATE_PROFILE_MODE_PAGE_SOURCE = readFileSync(
   ),
   'utf8'
 );
+
+function collectStaticRoutes(directory: string): string[][] {
+  const routes: string[][] = [];
+  const walk = (current: string, segments: readonly string[]) => {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const isGroup =
+        entry.name.startsWith('(') ||
+        entry.name.startsWith('@') ||
+        entry.name.startsWith('_');
+      if (entry.isDirectory()) {
+        walk(
+          path.join(current, entry.name),
+          isGroup ? segments : [...segments, entry.name]
+        );
+        continue;
+      }
+      if (entry.name === 'page.tsx' || entry.name === 'route.ts') {
+        routes.push([...segments]);
+      }
+    }
+  };
+  walk(directory, []);
+  return routes;
+}
 
 function getAfterFilesRewrites(
   rewrites:
@@ -174,38 +207,38 @@ describe('Public Profile Page Logic', () => {
   );
 
   describe('public profile ISR boundary', () => {
-    sourceTest('scopes streamed loading to the base profile page', () => {
-      expect(
-        existsSync(path.join(WEB_ROOT, 'app/[username]/loading.tsx'))
-      ).toBe(false);
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        '<Suspense fallback={<ProfileLoading />}>'
-      );
-    });
-
     sourceTest(
-      'resolves missing profiles before the streamed page boundary',
+      'renders the profile in the first HTML, with no streamed loading shell',
       () => {
-        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-          "import { notFound, permanentRedirect } from 'next/navigation'"
-        );
-        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-          'const profileResult = await getProfileAndLinks(username)'
-        );
-        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-          "profileResult.status === 'not_found'"
-        );
-        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('notFound()');
+        // A Suspense fallback buried the LCP artwork in a hidden segment that
+        // React reveals from a throttled script (claim-link LCP 1.7s-6.0s on
+        // the throttled-mobile entry gate, budget 4000ms).
         expect(
-          PUBLIC_PROFILE_PAGE_SOURCE.indexOf("status === 'not_found'")
-        ).toBeLessThan(
-          PUBLIC_PROFILE_PAGE_SOURCE.indexOf(
-            '<Suspense fallback={<ProfileLoading />}>'
-          )
-        );
-        expect(PUBLIC_PROFILE_LAYOUT_SOURCE).not.toContain('notFound()');
+          existsSync(path.join(WEB_ROOT, 'app/[username]/loading.tsx'))
+        ).toBe(false);
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('<Suspense');
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('ProfileLoading');
       }
     );
+
+    sourceTest('resolves missing profiles before rendering the page', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        "import { notFound, permanentRedirect } from 'next/navigation'"
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'const profileResult = await getProfileAndLinks(username)'
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        "profileResult.status === 'not_found'"
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('notFound()');
+      expect(
+        PUBLIC_PROFILE_PAGE_SOURCE.indexOf("status === 'not_found'")
+      ).toBeLessThan(
+        PUBLIC_PROFILE_PAGE_SOURCE.lastIndexOf('<ArtistPageContent')
+      );
+      expect(PUBLIC_PROFILE_LAYOUT_SOURCE).not.toContain('notFound()');
+    });
 
     sourceTest(
       'redirects or 404s opaque internal-ID profile URLs before rendering junk',
@@ -621,7 +654,10 @@ describe('Public Profile Page Logic', () => {
         mockLinks
       );
       const musicGroup2 = findInGraph(data2, 'MusicGroup')!;
-      expect(musicGroup2.description).toBe('Music by Test Artist');
+      // Bioless artists with genres reuse the page meta description.
+      expect(musicGroup2.description).toContain(
+        'rock, indie, alternative artist. Stream Test Artist'
+      );
     });
 
     it('only includes recognized social platforms in sameAs', () => {
@@ -973,31 +1009,39 @@ describe('Public Profile Page Logic', () => {
     );
   });
 
-  describe('cache strategy', () => {
-    function shouldCache(status: 'ok' | 'not_found' | 'error') {
-      return status === 'ok';
-    }
+  describe('fresh publication route configuration', () => {
+    // Structural guard only. Warm-response withdrawal and storage failures are
+    // exercised against the real loader in its colocated behavior suite.
+    sourceTest.each([
+      'app/[username]/page.tsx',
+      'app/[username]/profile-mode-render/[profileMode]/[marker]/page.tsx',
+    ])('serves %s from ISR only behind the proxy publication gate', route => {
+      const source = readFileSync(path.join(WEB_ROOT, route), 'utf8');
+      expect(source).toMatch(/export const revalidate\s*=\s*3600\s*;/);
+      expect(source).not.toMatch(/export const dynamic\s*=/);
+      const proxy = readFileSync(path.join(WEB_ROOT, 'proxy.ts'), 'utf8');
+      expect(proxy).toMatch(/await gateProfilePublicationAtEdge\(/);
+    });
 
-    it('caches only successful results, not_found and error are always fresh', () => {
-      expect(shouldCache('ok')).toBe(true);
-      expect(shouldCache('not_found')).toBe(false);
-      expect(shouldCache('error')).toBe(false);
+    sourceTest.each([
+      'app/[username]/alerts/page.tsx',
+      'app/[username]/shop/page.tsx',
+      'app/[username]/opengraph-image.tsx',
+    ])('requires a fresh render for %s', route => {
+      const source = readFileSync(path.join(WEB_ROOT, route), 'utf8');
+      expect(source).toMatch(/export const revalidate\s*=\s*0\s*;/);
+      if (!route.endsWith('opengraph-image.tsx')) {
+        expect(source).toMatch(
+          /export const dynamic\s*=\s*['"]force-dynamic['"]\s*;/
+        );
+      }
     });
 
     sourceTest(
-      'carries the first non-ok payload through the unstable_cache throw path',
+      'keeps profile-specific cache policy out of the shared release layout',
       () => {
-        expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).toContain(
-          'NonCacheableProfileResultError'
-        );
-        expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).toContain(
-          'throw new NonCacheableProfileResultError(data)'
-        );
-        expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).toContain(
-          'if (error instanceof NonCacheableProfileResultError)'
-        );
-        expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).toContain(
-          'return error.result'
+        expect(PUBLIC_PROFILE_LAYOUT_SOURCE).not.toMatch(
+          /export const (?:dynamic|revalidate)\s*=/
         );
       }
     );
@@ -1039,15 +1083,78 @@ sourceDescribe('profile mode route redirects', () => {
     }
   });
 
-  it('does not shadow smart-link slugs with config-level redirects', async () => {
+  it('edge-redirects legacy aliases without stealing reserved roots or collisions', async () => {
     const nextConfigModule = await import('../../../next.config.js');
+    const redirectModule = await import(
+      '../../../lib/routing/legacy-profile-alias-redirects.js'
+    );
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const redirects = (await nextConfig.redirects()) as RedirectRule[];
     const profileRedirects = redirects.filter(rule =>
-      rule.source.startsWith('/:username/')
+      rule.source.startsWith('/:username(')
     );
+    const aliasModes = Object.entries(LEGACY_PROFILE_MODE_BY_SLUG);
+    const require = createRequire(import.meta.url);
+    const { pathToRegexp } = require('next/dist/compiled/path-to-regexp') as {
+      pathToRegexp: (source: string) => RegExp;
+    };
 
-    expect(profileRedirects).toEqual([]);
+    expect(redirectModule.LEGACY_PROFILE_MODE_ALIAS_MODES).toEqual(aliasModes);
+    expect(profileRedirects).toEqual(
+      redirectModule.legacyProfileAliasRedirects()
+    );
+    expect(profileRedirects).toHaveLength(aliasModes.length * 2);
+
+    for (const [alias, mode] of aliasModes) {
+      const [attributed, plain] = profileRedirects.filter(rule =>
+        rule.source.endsWith(`/${alias}`)
+      );
+      expect(attributed).toMatchObject({
+        destination: `/:username?mode=${mode}&source=:profileSource#alias=${alias}`,
+        permanent: false,
+        missing: [
+          { type: 'query', key: 'alias-content' },
+          { type: 'cookie', key: 'jovie_alias_content' },
+        ],
+      });
+      expect(plain).toMatchObject({
+        destination: `/:username?mode=${mode}#alias=${alias}`,
+        permanent: false,
+      });
+      expect(plain?.missing).toEqual([
+        { type: 'query', key: 'alias-content' },
+        { type: 'cookie', key: 'jovie_alias_content' },
+        { type: 'query', key: 'source' },
+      ]);
+      expect(plain?.has).toBeUndefined();
+
+      const matcher = pathToRegexp(plain?.source ?? '');
+      expect(matcher.test(`/dualipa/${alias}`)).toBe(true);
+      expect(matcher.test(`/app/${alias}`)).toBe(false);
+      expect(matcher.test(`/api/${alias}`)).toBe(false);
+      expect(matcher.test(`/investor-portal/${alias}`)).toBe(false);
+      expect(matcher.test(`/application/${alias}`)).toBe(true);
+    }
+
+    const aliasSlugs = new Set(aliasModes.map(([slug]) => slug));
+    const reservedRoots = new Set(
+      redirectModule.LEGACY_PROFILE_ALIAS_RESERVED_ROOTS
+    );
+    const staticAliasRoutes = collectStaticRoutes(
+      path.join(WEB_ROOT, 'app')
+    ).filter(
+      segments =>
+        segments.length === 2 &&
+        aliasSlugs.has(segments[1] ?? '') &&
+        segments.every(segment => !segment.startsWith('['))
+    );
+    expect(staticAliasRoutes.length).toBeGreaterThan(0);
+    for (const [root] of staticAliasRoutes) {
+      expect(reservedRoots.has(root ?? '')).toBe(true);
+    }
+    expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+      '<DeferredAliasCollisionRecovery'
+    );
   });
 
   it('routes legacy aliases through the collision-safe resolver after filesystem matches', async () => {
@@ -1077,7 +1184,7 @@ sourceDescribe('profile mode route redirects', () => {
     );
   });
 
-  it('server-renders bounded query modes through the private ISR route', async () => {
+  it('server-renders bounded query modes through the private profile route', async () => {
     const nextConfigModule = await import('../../../next.config.js');
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const afterFiles = getAfterFilesRewrites(await nextConfig.rewrites());
@@ -1105,10 +1212,10 @@ sourceDescribe('profile mode route redirects', () => {
       '__profileMode: initialMode'
     );
     expect(PRIVATE_PROFILE_MODE_PAGE_SOURCE).toContain(
-      'export const revalidate = 3600'
+      'export function generateStaticParams()'
     );
     expect(PRIVATE_PROFILE_MODE_PAGE_SOURCE).toContain(
-      'export function generateStaticParams()'
+      'return getProfileModeRenderStaticParams()'
     );
     expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('searchParams');
   });
@@ -1156,6 +1263,7 @@ sourceDescribe('profile mode route redirects', () => {
     ['tour', 'tour'],
     ['shows', 'tour'],
     ['events', 'tour'],
+    ['contact', 'contact'],
   ] as const)('maps the missing %s slug to %s mode', (slug, mode) => {
     expect(
       getLegacyProfileModeRedirectHref('dualipa', slug, { source: 'qr' })

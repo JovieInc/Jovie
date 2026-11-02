@@ -21,6 +21,7 @@ from apiclient.gh import gh_shape, run_gh, split_included  # noqa: E402
 from apiclient.github import GitHubClient, pull_request_field  # noqa: E402
 from apiclient.legacy import GithubBudgetHooks  # noqa: E402
 from apiclient.linear import LinearClient, issue_field, linear_scope  # noqa: E402
+from apiclient.policy import credential_state  # noqa: E402
 from apiclient.store import FileLedgerStore, MemoryLedgerStore  # noqa: E402
 
 GH = "https://api.github.com"
@@ -150,6 +151,40 @@ class AdapterTest(unittest.TestCase):
 
 
 class GhTest(unittest.TestCase):
+    LOG_ARGS = ["run", "view", "--repo", "o/r", "--job", "12", "--attempt", "2", "--log"]
+
+    def test_safe_job_log_shape_is_bounded_and_costed_as_rest(self):
+        expected = {"resource": "core", "write": False, "idempotent": True, "cost": 5}
+        self.assertEqual(gh_shape(self.LOG_ARGS), expected)
+        self.assertEqual(gh_shape(self.LOG_ARGS[:2] + self.LOG_ARGS[4:]), expected)
+        for args in (self.LOG_ARGS[:-1], [*self.LOG_ARGS, "--log-failed"],
+                     [*self.LOG_ARGS[:5], "0", *self.LOG_ARGS[6:]],
+                     [*self.LOG_ARGS[:7], "-1", "--log"], ["run", "view", "12", "--log"]):
+            with self.subTest(args=args):
+                self.assertNotIn("cost", gh_shape(args))
+
+    def test_safe_job_log_reserves_five_core_reads_before_execution(self):
+        for remaining, expected_calls in ((4, 0), (5, 1)):
+            with self.subTest(remaining=remaining):
+                clock, store, calls = FakeClock(), MemoryLedgerStore(), []
+                def seed(ledger):
+                    state = credential_state(ledger, "c", clock.now)
+                    state["buckets"]["core"] = {"limit": None, "remaining": remaining,
+                                                   "resetAt": clock.now + 60000, "observedAt": clock.now}
+                store.transact("github", seed)
+                def execute(args, env):
+                    calls.append(args)
+                    return 0, "safe log", ""
+                result = run_gh(self.LOG_ARGS, priority="repair", store=store, credential="c", run=execute,
+                                now=clock.read, sleep=clock.sleep, log=quiet, max_attempts=1, max_wait_ms=0)
+                self.assertEqual(len(calls), expected_calls)
+                self.assertEqual(result["code"], 0 if expected_calls else 75)
+                self.assertEqual(clock.now, FakeClock().now, "admission never waits")
+                if calls:
+                    self.assertEqual(calls, [self.LOG_ARGS])
+                    self.assertEqual(store.transact("github", lambda ledger:
+                                     ledger["credentials"]["c"]["buckets"]["core"]["remaining"]), 0)
+
     def test_shape_and_include_parsing(self):
         self.assertEqual(gh_shape(["api", "repos/o/r/pulls"]), {"resource": "core", "write": False, "idempotent": True})
         self.assertTrue(gh_shape(["api", "-X", "PATCH", "repos/o/r/pulls/1", "-f", "state=closed"])["write"])

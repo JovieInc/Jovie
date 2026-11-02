@@ -511,6 +511,7 @@ vi.mock('@/components/features/dashboard/tasks/TaskBoard', () => ({
     board,
     onOpenTask,
     onMoveTask,
+    showAssigneeChip = true,
   }: {
     readonly board?: TaskBoardResult;
     readonly onOpenTask: (task: TaskView) => void;
@@ -518,8 +519,12 @@ vi.mock('@/components/features/dashboard/tasks/TaskBoard', () => ({
       readonly taskId: string;
       readonly toStatus: TaskStatus;
     }) => void;
+    readonly showAssigneeChip?: boolean;
   }) => (
-    <div data-testid='tasks-board'>
+    <div
+      data-testid='tasks-board'
+      data-show-assignee-chip={String(showAssigneeChip)}
+    >
       {board?.columns.flatMap(column =>
         column.tasks.map(task => (
           <button
@@ -729,7 +734,6 @@ vi.mock('@/components/organisms/release-sidebar', () => ({
 }));
 
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
-import type { HeaderSearchAdapter } from '@/contexts/HeaderActionsContext';
 import {
   HeaderActionsProvider,
   useOptionalHeaderActions,
@@ -740,14 +744,8 @@ const { TasksPageClient } = await import(
   '@/components/features/dashboard/tasks/TasksPageClient'
 );
 
-let latestHeaderSearchAdapter: HeaderSearchAdapter | null = null;
-
 function HeaderActionsHost() {
   const state = useOptionalHeaderActions();
-
-  React.useEffect(() => {
-    latestHeaderSearchAdapter = state?.headerSearchAdapter ?? null;
-  }, [state?.headerSearchAdapter]);
 
   return (
     <div data-testid='header-actions-host'>
@@ -817,7 +815,6 @@ describe('TasksPageClient', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     editorTestState.real = false;
-    latestHeaderSearchAdapter = null;
     mockCreateTask.mockReset();
     mockDeleteTask.mockReset();
     mockUpdateTask.mockReset();
@@ -953,6 +950,24 @@ describe('TasksPageClient', () => {
     expect(screen.getByTestId('task-document-pane')).toHaveClass('lg:flex');
     expect(screen.getByTestId('task-list-pane').parentElement).toHaveClass(
       'lg:grid-cols-[minmax(0,1fr)_minmax(18rem,20rem)]'
+    );
+  });
+
+  it('keeps the assignee chip on a board filtered to Jovie', () => {
+    mockViewMode = 'board';
+    mockTasksData = [mockTask, mockTaskTwo, mockJovieTask];
+
+    renderPage();
+
+    fireEvent.click(
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Jovie', '1'),
+      })
+    );
+
+    expect(screen.getByTestId('tasks-board')).toHaveAttribute(
+      'data-show-assignee-chip',
+      'true'
     );
   });
 
@@ -1726,6 +1741,10 @@ describe('TasksPageClient', () => {
     openTask(mockHelperTask);
 
     expect(screen.getByTestId('task-description-helper')).toBeInTheDocument();
+    expect(screen.getByLabelText('Task Title')).toHaveAttribute(
+      'placeholder',
+      'Task'
+    );
     expect(screen.getByLabelText('Task Description')).not.toHaveAttribute(
       'placeholder'
     );
@@ -1884,10 +1903,9 @@ describe('TasksPageClient', () => {
     expect(screen.getByRole('button', { name: 'Next Task' })).toBeEnabled();
   }, 10000);
 
-  it('registers task filtering behind the shared global search trigger', () => {
+  it('keeps the global search trigger inside the header actions host', () => {
     renderPage();
 
-    expect(latestHeaderSearchAdapter?.totalCount).toBe(2);
     const searchTrigger = within(
       screen.getByTestId('header-actions-host')
     ).getByRole('button', { name: 'Search Jovie' });
@@ -1920,27 +1938,17 @@ describe('TasksPageClient', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('keeps task title search wired into list filters', () => {
-    renderPage();
-
-    act(() => {
-      latestHeaderSearchAdapter?.onPillsChange([
-        {
-          id: 'pill-1',
-          field: 'title',
-          op: 'is',
-          values: ['metadata'],
-        },
-      ]);
-    });
-
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
-
-    expect(mockUseTasksQuery.mock.calls.at(-1)?.[1]).toEqual(
-      expect.objectContaining({ search: 'metadata' })
+  it('does not register a retired header search adapter (JOV-8792)', () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../components/features/dashboard/tasks/TasksPageClient.tsx'
+      ),
+      'utf8'
     );
+
+    expect(source).not.toContain('useRegisterHeaderSearch');
+    expect(source).not.toContain('headerSearchAdapter');
   });
 
   it('opts the task title cell into multiline row content', () => {
@@ -1952,31 +1960,6 @@ describe('TasksPageClient', () => {
 
     expect(titleColumn?.meta?.cellContentClassName).toBe(
       TASK_DATA_TABLE_MULTILINE_CELL_CONTENT_CLASSNAME
-    );
-  });
-
-  it('keeps task title search wired into board filters', () => {
-    mockViewMode = 'board';
-
-    renderPage();
-
-    act(() => {
-      latestHeaderSearchAdapter?.onPillsChange([
-        {
-          id: 'pill-1',
-          field: 'title',
-          op: 'is',
-          values: ['press'],
-        },
-      ]);
-    });
-
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
-
-    expect(mockUseTaskBoardQuery.mock.calls.at(-1)?.[1]).toEqual(
-      expect.objectContaining({ search: 'press' })
     );
   });
 

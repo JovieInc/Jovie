@@ -70,6 +70,11 @@ export {
 
 export const DETERMINISTIC_TEST_OTP = '424242';
 
+function redactTestEmail(email: string): string {
+  const at = email.lastIndexOf('@');
+  return at > 1 ? `${email.slice(0, 2)}***${email.slice(at)}` : '***';
+}
+
 /**
  * Trusted origins: production + staging + local dev + native deep-link
  * schemes. Exact Vercel deployment hosts (preview and production) are
@@ -292,8 +297,17 @@ function buildPlugins() {
       allowedAttempts: 5,
       // Returning '' falls through to better-auth's default generator
       // (`generateOTP(...) || defaultOTPGenerator(...)` at 1.6.23).
-      generateOTP: ({ email }) =>
-        isDeterministicTestOtpEmail(email) ? DETERMINISTIC_TEST_OTP : '',
+      generateOTP: ({ email }) => {
+        if (!isDeterministicTestOtpEmail(email)) return '';
+        // Every use of the deterministic code is logged (redacted address).
+        console.info(
+          `[auth] deterministic test OTP issued ${JSON.stringify({
+            vercelEnv: env.VERCEL_ENV ?? 'unset',
+            email: redactTestEmail(email),
+          })}`
+        );
+        return DETERMINISTIC_TEST_OTP;
+      },
       // Outcome logging + fail-closed send: see email-otp-sender.ts.
       sendVerificationOTP: sendEmailOtp,
     }),

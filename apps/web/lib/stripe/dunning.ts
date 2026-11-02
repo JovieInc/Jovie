@@ -12,7 +12,7 @@
  */
 
 import 'server-only';
-import { eq } from 'drizzle-orm';
+import { eq, or } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -30,7 +30,7 @@ import {
 } from '@/lib/email/templates/payment-recovered';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { captureError } from '@/lib/error-tracking';
-import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
+import { GatewayEmailProvider } from '@/lib/notifications/providers/gateway';
 import { logger } from '@/lib/utils/logger';
 import { createBillingPortalSession } from './client';
 import { getPriceMappingDetails } from './config';
@@ -38,10 +38,10 @@ import { getPriceMappingDetails } from './config';
 /**
  * Shared email provider instance (singleton).
  */
-let emailProviderInstance: ResendEmailProvider | null = null;
+let emailProviderInstance: GatewayEmailProvider | null = null;
 
-function getEmailProvider(): ResendEmailProvider {
-  emailProviderInstance ??= new ResendEmailProvider();
+function getEmailProvider(): GatewayEmailProvider {
+  emailProviderInstance ??= new GatewayEmailProvider();
   return emailProviderInstance;
 }
 
@@ -49,7 +49,7 @@ function getEmailProvider(): ResendEmailProvider {
  * Information about a failed payment
  */
 export interface PaymentFailureInfo {
-  /** Clerk user ID */
+  /** App `users.id`, or a legacy Clerk id from Stripe metadata. */
   userId: string;
   /** Amount due in cents */
   amountDue: number;
@@ -69,7 +69,7 @@ export interface PaymentFailureInfo {
  * Information about a recovered payment
  */
 export interface PaymentRecoveryInfo {
-  /** Clerk user ID */
+  /** App `users.id`, or a legacy Clerk id from Stripe metadata. */
   userId: string;
   /** Amount paid in cents */
   amountPaid: number;
@@ -80,7 +80,8 @@ export interface PaymentRecoveryInfo {
 }
 
 /**
- * Get user email from Clerk user ID
+ * Resolve the recipient. Payment-failure mail passes `result.appUserId`.
+ * Recovery mail may still pass a legacy Clerk id from Stripe metadata.
  */
 async function getUserEmail(userId: string): Promise<{
   email: string | null;
@@ -93,7 +94,7 @@ async function getUserEmail(userId: string): Promise<{
         name: users.name,
       })
       .from(users)
-      .where(eq(users.clerkId, userId))
+      .where(or(eq(users.id, userId), eq(users.clerkId, userId)))
       .limit(1);
 
     return {
@@ -172,6 +173,9 @@ export async function sendPaymentFailedEmail(
 
     const provider = getEmailProvider();
     const result = await provider.sendEmail({
+      stream: 'transactional',
+      purpose: 'dunning-payment-failed',
+      consent: 'account-transaction',
       to: email,
       subject: getPaymentFailedSubject(templateData),
       text: getPaymentFailedText(templateData),
@@ -236,6 +240,9 @@ export async function sendPaymentRecoveredEmail(
 
     const provider = getEmailProvider();
     const result = await provider.sendEmail({
+      stream: 'transactional',
+      purpose: 'dunning-payment-recovered',
+      consent: 'account-transaction',
       to: email,
       subject: getPaymentRecoveredSubject(),
       text: getPaymentRecoveredText(templateData),

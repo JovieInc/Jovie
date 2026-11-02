@@ -5,7 +5,7 @@
  * Ensures uniqueness across both content types per creator.
  */
 
-import { and, eq, ne } from 'drizzle-orm';
+import { and, eq, isNull, like, ne } from 'drizzle-orm';
 import { db, withRetry } from '@/lib/db';
 import { QUERY_TIMEOUTS } from '@/lib/db/query-timeout';
 import {
@@ -15,7 +15,9 @@ import {
   discogReleaseTracks,
   discogTracks,
 } from '@/lib/db/schema/content';
+import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import { logger } from '@/lib/utils/logger';
+import { qualifierCandidates, type VersionType } from './slug-policy';
 
 export type ContentType = 'release' | 'track' | 'release_track';
 
@@ -163,39 +165,48 @@ export async function isSlugAvailable(
 }
 
 export interface GenerateUniqueSlugOptions {
-  /**
-   * Prefer year-based disambiguation (`title-2019`) before opaque `-2` suffixes
-   * when two same-title releases collide.
-   */
+  /** Release year (fallback when no full date is known). */
   readonly year?: number | null;
+  readonly releaseDate?: Date | null;
+  /** Other `main_artist` credits besides the profile owner (co-primary). */
+  readonly coPrimary?: readonly string[];
+  readonly featured?: readonly string[];
+  readonly remixers?: readonly string[];
+  /** Explicit version metadata; never inferred from the title. */
+  readonly versionType?: VersionType | null;
 }
 
 /**
- * Ordered slug candidates for collision resolution.
- * Prefer base → year → numeric suffixes (skipping year-shaped numbers).
+ * Ordered slug candidates for collision resolution. Never numeric suffixes:
+ * base, then version, co-primary (`-with-x`), featured, year, and combinations.
  */
 export function buildSlugDisambiguationCandidates(
   baseSlug: string,
-  year?: number | null
+  options: GenerateUniqueSlugOptions = {}
 ): string[] {
   if (!baseSlug) return [];
-
-  const candidates: string[] = [baseSlug];
-  if (typeof year === 'number' && Number.isFinite(year) && year >= 1000) {
-    candidates.push(`${baseSlug}-${year}`);
-  }
-
-  for (let i = 2; i <= 100; i++) {
-    // Avoid re-emitting a year-shaped suffix already preferred above.
-    if (typeof year === 'number' && i === year) continue;
-    candidates.push(`${baseSlug}-${i}`);
-  }
-
-  return candidates;
+  const releaseDate =
+    options.releaseDate ??
+    (typeof options.year === 'number' &&
+    Number.isFinite(options.year) &&
+    options.year >= 1000
+      ? new Date(Date.UTC(options.year, 0, 1))
+      : null);
+  return [
+    baseSlug,
+    ...qualifierCandidates(baseSlug, {
+      releaseDate,
+      coPrimary: options.coPrimary ?? [],
+      featured: options.featured ?? [],
+      remixers: options.remixers ?? [],
+      versionType: options.versionType ?? null,
+    }).map(c => c.slug),
+  ];
 }
 
 /**
- * Generate a unique slug for content, handling collisions with year then -2, -3.
+ * Generate a unique slug for content, disambiguating with a meaningful
+ * qualifier (see slug-policy.ts), never `-2`/`-3`.
  */
 export async function generateUniqueSlug(
   creatorProfileId: string,
@@ -217,16 +228,30 @@ export async function generateUniqueSlug(
 
   for (const candidate of buildSlugDisambiguationCandidates(
     baseSlug,
-    options?.year
+    options
   )) {
     if (await isSlugAvailable(creatorProfileId, candidate, excludeOptions)) {
       return candidate;
     }
   }
 
-  // Fallback: append random suffix (extremely rare edge case)
-  const randomSuffix = crypto.randomUUID().slice(0, 6);
-  return `${baseSlug}-${randomSuffix}`;
+  // Still ambiguous (identical title, date and credits): letters-only suffix,
+  // never numeric.
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const word = crypto
+      .randomUUID()
+      .replaceAll(/[^a-f]/g, '')
+      .padEnd(5, 'x')
+      .slice(0, 5);
+    const candidate = `${baseSlug}-${word}`;
+    if (await isSlugAvailable(creatorProfileId, candidate, excludeOptions)) {
+      return candidate;
+    }
+  }
+  return `${baseSlug}-${crypto
+    .randomUUID()
+    .replaceAll(/[^a-f]/g, 'x')
+    .slice(0, 8)}`;
 }
 
 /**
@@ -289,13 +314,77 @@ export async function findContentBySlug(
 }
 
 /**
+ * Resolve a superseded base slug to the artist's one published release.
+ *
+ * Import-time collisions suffix later releases (`take-me-over` becomes
+ * `take-me-over-2`) while links already published elsewhere keep the base
+ * slug. Identity cannot be known generically, so this is deliberately
+ * conservative. It returns a slug only when ALL hold:
+ *  - no non-deleted release of the creator owns `baseSlug` (a placeholder or
+ *    draft owner means the slug is claimed; never shadow it);
+ *  - exactly ONE publish-eligible release has slug `{baseSlug}-N`;
+ *  - that release's title normalizes to exactly `baseSlug` (so remixes and
+ *    differently-titled versions never match).
+ * Two or more candidates are ambiguous (could be different recordings), so no
+ * redirect is made.
+ */
+export async function findSupersededReleaseSlug(
+  creatorProfileId: string,
+  baseSlug: string
+): Promise<{ readonly currentSlug: string } | null> {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(baseSlug)) return null;
+
+  const [owner, siblings] = await Promise.all([
+    db
+      .select({ id: discogReleases.id })
+      .from(discogReleases)
+      .where(
+        and(
+          eq(discogReleases.creatorProfileId, creatorProfileId),
+          eq(discogReleases.slug, baseSlug),
+          isNull(discogReleases.deletedAt)
+        )
+      )
+      .limit(1),
+    db
+      .select({ slug: discogReleases.slug, title: discogReleases.title })
+      .from(discogReleases)
+      .where(
+        and(
+          eq(discogReleases.creatorProfileId, creatorProfileId),
+          like(discogReleases.slug, `${baseSlug}-%`),
+          publicReleaseEligibilitySqlPredicate()
+        )
+      )
+      .limit(20),
+  ]);
+  if (owner.length > 0) return null;
+
+  const suffixed = new RegExp(`^${baseSlug}-\\d+$`);
+  const candidates = siblings.filter(
+    row => suffixed.test(row.slug) && generateBaseSlug(row.title) === baseSlug
+  );
+  const [only] = candidates;
+  return candidates.length === 1 && only ? { currentSlug: only.slug } : null;
+}
+
+/**
  * Look up redirect by old slug.
  * Returns the current slug if a redirect exists.
  */
 export async function findRedirectByOldSlug(
   creatorProfileId: string,
   oldSlug: string,
-  options: { readonly onError?: 'return-null' | 'throw' } = {}
+  options: {
+    readonly onError?: 'return-null' | 'throw';
+    /**
+     * Also resolve a base slug superseded by a collision-suffixed sibling
+     * (see `findSupersededReleaseSlug`). Defaults to true for the public
+     * content route; legacy profile-mode alias checks opt out so a mode alias
+     * is never captured by a release.
+     */
+    readonly includeSuperseded?: boolean;
+  } = {}
 ): Promise<{ type: ContentType; currentSlug: string } | null> {
   try {
     const [redirect] = await withRetry(
@@ -319,7 +408,16 @@ export async function findRedirectByOldSlug(
       { operation: 'read', retryBudgetMs: QUERY_TIMEOUTS.api }
     );
 
-    if (!redirect) return null;
+    if (!redirect) {
+      if (options.includeSuperseded === false) return null;
+      const superseded = await findSupersededReleaseSlug(
+        creatorProfileId,
+        oldSlug
+      );
+      return superseded
+        ? { type: 'release', currentSlug: superseded.currentSlug }
+        : null;
+    }
 
     return await resolveRedirectSlug(redirect);
   } catch (error) {

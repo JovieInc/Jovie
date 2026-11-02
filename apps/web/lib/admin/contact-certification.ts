@@ -11,6 +11,7 @@ import {
   evidenceDigest,
   evidenceFreshness,
 } from '@/lib/contacts/certification';
+import { REQUIRED_OUTREACH_EVIDENCE } from '@/lib/contacts/evidence-display';
 import { contactLifecycleStageRank } from '@/lib/contacts/lifecycle';
 import { db } from '@/lib/db';
 import { contactEvidenceReviews, contacts } from '@/lib/db/schema/contacts';
@@ -36,13 +37,7 @@ import {
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { qualificationForIdentityDecision } from '@/lib/profile-surfaces/qualification';
 
-const REQUIRED_COVERAGE = [
-  'identity',
-  'dsp',
-  'catalog',
-  'search',
-  'reachability',
-] as const;
+const REQUIRED_COVERAGE = REQUIRED_OUTREACH_EVIDENCE;
 
 // biome-ignore format: compact type declaration avoids inflating the hard PR line budget.
 type Draft = Omit<ContactEvidenceItem, 'decision' | 'freshness' | 'observedAt' | 'revision' | 'url'> & {

@@ -1,0 +1,112 @@
+/* ── One Light atmosphere ─────────────────────────────────────────────── */
+/* Matte field (Tim, 2026-10-29): cinematic black, no gradient wallpaper.
+   The product shot is the hero's one focal point, so the only light is a
+   faint Ion halo centered behind it. Static: no extra DOM, JS, or motion. */
+.home-viewport--hero-canvas .homepage-hero-canvas__field {
+  isolation: isolate;
+  --hero-shot-x: 74%;
+  --hero-shot-y: 54%;
+  background:
+    radial-gradient(
+      ellipse 26% 42% at var(--hero-shot-x) var(--hero-shot-y),
+      color-mix(in oklab, var(--noir-ion-ion) 7%, transparent),
+      transparent 78%
+    ),
+    var(--system-b-cinematic-black);
+}
+
+.home-viewport--hero-canvas .homepage-hero-canvas__field::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent 68%,
+    var(--system-b-cinematic-black) 100%
+  );
+}
+
+.home-viewport--hero-canvas .homepage-hero-light {
+  --hero-light-focal-x: var(--hero-shot-x, 74%);
+  --hero-light-focal-y: var(--hero-shot-y, 54%);
+  --hero-light-ultra: var(--noir-ion-ion);
+  --hero-light-pulse: var(--noir-ion-ion);
+
+  /* Keep both the CSS poster and live renderer out of the reading zone. */
+  mask-image: linear-gradient(
+    to right,
+    transparent 32%,
+    var(--noir-ion-canvas) 88%
+  );
+}
+
+/* Matte: the product shot is the one focal point, so the decorative
+   edge ring and grid stay off the homepage hero (static poster only). */
+.home-viewport--hero-canvas .homepage-hero-light__edge,
+.home-viewport--hero-canvas .homepage-hero-light__grid {
+  visibility: hidden;
+}
+
+.home-viewport--hero-canvas .homepage-hero-light__canvas {
+  /* Preserve the renderer's moving luminance, with the underlying Ion field
+     supplying its hue. The shader's secondary hues never enter this section. */
+  mix-blend-mode: luminosity;
+}
+
+.home-viewport--hero-canvas .homepage-artist-section {
+  background-color: var(--system-b-cinematic-black);
+}
+
+.home-viewport--hero-canvas [data-testid="marketing-section-product-gallery"] {
+  background-image: radial-gradient(
+    ellipse 64% 60% at 0% 56%,
+    color-mix(in oklab, var(--noir-ion-ultra) 9%, transparent),
+    transparent 78%
+  );
+}
+
+.home-viewport--hero-canvas [data-testid="marketing-section-cta"] {
+  background-image: radial-gradient(
+    ellipse 48% 90% at 104% 70%,
+    color-mix(in oklab, var(--noir-ion-ion) 13%, transparent),
+    transparent 78%
+  );
+}
+
+@media (max-width: 63.99rem) {
+  .home-viewport--hero-canvas .homepage-hero-canvas__field {
+    /* Stacked: the shot sits under the claim, so the halo follows it. */
+    --hero-shot-x: 50%;
+    --hero-shot-y: 78%;
+    background:
+      radial-gradient(
+        ellipse 60% 26% at var(--hero-shot-x) var(--hero-shot-y),
+        color-mix(in oklab, var(--noir-ion-ion) 7%, transparent),
+        transparent 78%
+      ),
+      var(--system-b-cinematic-black);
+  }
+
+  .home-viewport--hero-canvas .homepage-hero-light {
+    --hero-light-focal-y: var(--hero-shot-y, 78%);
+
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 42%,
+      var(--noir-ion-canvas) 90%
+    );
+  }
+}
+
+@media (prefers-contrast: more), (forced-colors: active) {
+  .home-viewport--hero-canvas .homepage-hero-canvas__field::after,
+  .home-viewport--hero-canvas .homepage-hero-canvas__field,
+  .home-viewport--hero-canvas .homepage-artist-section {
+    background-image: none;
+  }
+
+  .home-viewport--hero-canvas .homepage-hero-light {
+    visibility: hidden;
+  }
+}

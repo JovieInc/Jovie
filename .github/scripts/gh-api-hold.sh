@@ -12,6 +12,11 @@
 # A reset outside the window exits non-zero. A non-rate-limit error exits
 # non-zero. Exit 0 happens only after `gh` itself succeeds, so a 403 never
 # passes as an empty result.
+#
+# Visibility: the hold is announced as a ::notice on stderr and in
+# GITHUB_STEP_SUMMARY; release-lineage-gate.sh re-prints the notice. It is
+# metadata only: label, trigger status, wait, reset, bucket and quota counts.
+# It never includes tokens, headers or URLs.
 set -euo pipefail
 
 budget="${GH_API_HOLD_BUDGET_SECONDS:-3900}"
@@ -78,16 +83,48 @@ if [ "$reset_status" -ne 0 ] || ! [[ "$reset" =~ ^[0-9]+$ ]]; then
   cat "$err" >&2
   exit "$status"
 fi
+# Which resource ran dry, from the failing response's own x-ratelimit-resource
+# header (core when the response carried none and rate_limit says core).
+bucket="$(printf '%s\n' "$message" | grep -ioE 'x-ratelimit-resource:[[:space:]]*[A-Za-z_]+' | head -n1 | sed -E 's/^[^:]*:[[:space:]]*//' || true)"
+bucket_src="x-ratelimit-resource"
+if [ -z "$bucket" ]; then
+  bucket="core"
+  bucket_src="rate_limit.resources.core"
+fi
+# Unit tests drive this script with a fake gh (GH_API_HOLD_BIN) and mocked
+# resets. Their lines carry [fixture] so nobody mistakes them for a live quota
+# refusal (2026-10-25: two workers chased a mocked "resets at 1792938043").
+tag=""
+if [ -n "${GH_API_HOLD_BIN:-}" ] || [ "${GH_API_HOLD_FIXTURE:-}" = 1 ]; then
+  tag="[fixture] "
+fi
 wait=$((reset - now + 1))
 if [ "$wait" -lt 0 ]; then
   wait=0
 fi
 if [ "$wait" -gt "$budget" ]; then
-  echo "::error::GitHub rate limit resets at ${reset}, outside the ${budget}s budget. Not passing." >&2
+  echo "::error::${tag}GitHub rate limit resets at ${reset} (resource=${bucket}), outside the ${budget}s budget. Not passing." >&2
   cat "$err" >&2
   exit "$status"
 fi
 echo "::warning::Holding ${wait}s for the GitHub rate limit reset." >&2
+# Visibility only. Callers such as release-lineage-gate.sh capture this
+# stderr and re-print the ::notice line, so it is kept to sanitized metadata
+# (never tokens, headers or URLs). The summary is a plain file append.
+trigger_http="$(printf '%s\n' "$message" | grep -oE 'HTTP [0-9]{3}' | head -n1 | cut -d' ' -f2 || true)"
+label="${GH_API_HOLD_LABEL:-gh ${1:-} ${2:-}}"
+label="${label%%\?*}"
+label="$(printf '%s' "$label" | tr -c 'A-Za-z0-9 ._/@-' '_' | cut -c1-120)"
+reset_iso="$(date -u -d "@${reset}" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -r "$reset" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo unknown)"
+hold_fields="label=${label} http=${trigger_http:-unknown} wait_s=${wait} reset_epoch=${reset} reset_iso=${reset_iso} bucket=${bucket} bucket_source=${bucket_src}"
+hdr_limit="$(printf '%s\n' "$message" | grep -ioE 'x-ratelimit-limit:[[:space:]]*[0-9]+' | head -n1 | grep -oE '[0-9]+$' || true)"
+hdr_remaining="$(printf '%s\n' "$message" | grep -ioE 'x-ratelimit-remaining:[[:space:]]*[0-9]+' | head -n1 | grep -oE '[0-9]+$' || true)"
+if [ -n "$hdr_limit" ]; then hold_fields="${hold_fields} limit=${hdr_limit}"; fi
+if [ -n "$hdr_remaining" ]; then hold_fields="${hold_fields} remaining=${hdr_remaining}"; fi
+echo "::notice title=GitHub API hold::${hold_fields}" >&2
+if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+  printf '%s\n' "- GitHub API hold: ${hold_fields}" >>"$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+fi
 sleep "$wait"
 
 run_gh "$@"

@@ -11,6 +11,9 @@ import {
 import { unknownProjection } from '@/lib/ovie/shipping-state/project';
 
 vi.mock('@jovie/ui', () => ({
+  LoadingSkeleton: () => (
+    <span data-testid='matrix-skeleton' aria-hidden='true' />
+  ),
   Button: ({ children, ...props }: ComponentProps<'button'>) => (
     <button type='button' {...props}>
       {children}
@@ -335,7 +338,16 @@ describe('ShippingMatrix rendering (JOV-6893)', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows loading, then the empty live state', async () => {
+  it('shows 7d stage time above the matrix once the projection loads', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(projection([])));
+    renderMatrix();
+    const strip = await screen.findByRole('region', {
+      name: 'Stage time 7d (p50 / p95)',
+    });
+    expect(strip).toHaveTextContent('Stage events not published yet');
+  });
+
+  it('keeps the table viewport reserved from loading to the empty live state', async () => {
     let resolveFetch: ((value: Response) => void) | undefined;
     fetchMock.mockReturnValueOnce(
       new Promise(resolve => {
@@ -345,13 +357,20 @@ describe('ShippingMatrix rendering (JOV-6893)', () => {
 
     renderMatrix();
 
+    const viewport = screen.getByTestId('shipping-matrix-viewport');
+    expect(viewport).toHaveClass('h-64', 'overflow-auto');
     expect(screen.getByText('Loading in-flight work…')).toBeInTheDocument();
+    expect(screen.getAllByTestId('matrix-skeleton')).toHaveLength(35);
+    expect(screen.getAllByRole('row')).toHaveLength(6);
+    expect(screen.queryByText(/UNKNOWN/)).not.toBeInTheDocument();
     await act(async () => {
       resolveFetch?.(jsonResponse(projection([])));
     });
     expect(
       await screen.findByText('No open lane pull requests.')
     ).toBeInTheDocument();
+    expect(screen.getByTestId('shipping-matrix-viewport')).toBe(viewport);
+    expect(viewport).toHaveClass('h-64', 'overflow-auto');
   });
 
   it('reports observation errors and refreshes successfully', async () => {
@@ -361,6 +380,7 @@ describe('ShippingMatrix rendering (JOV-6893)', () => {
     const user = userEvent.setup();
 
     renderMatrix();
+    const viewport = screen.getByTestId('shipping-matrix-viewport');
 
     expect(
       await screen.findByText(
@@ -375,6 +395,8 @@ describe('ShippingMatrix rendering (JOV-6893)', () => {
     expect(
       await screen.findByText('No open lane pull requests.')
     ).toBeInTheDocument();
+    expect(screen.getByTestId('shipping-matrix-viewport')).toBe(viewport);
+    expect(viewport).toHaveClass('h-64', 'overflow-auto');
   });
 
   it('never renders the empty state on a stale cache', async () => {

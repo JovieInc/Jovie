@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ChangelogRelease } from '@/lib/changelog-parser';
+import { applyRootTitleTemplate } from '@/lib/seo/document-title';
 import { parseWhatsNewFeed, projectWhatsNew } from '@/lib/whats-new';
 
 const mocks = vi.hoisted(() => ({
@@ -184,7 +185,7 @@ describe('ChangelogReleasePage', () => {
     const metadata = await generateMetadata({
       params: Promise.resolve({ version: '26.8.0' }),
     });
-    expect(metadata.title).toBe('Jovie v26.8.0');
+    expect(applyRootTitleTemplate(metadata.title)).toBe('Jovie v26.8.0');
     expect(metadata.description).toBe('Chat shell refinements.');
     expect(metadata.alternates).toEqual({
       canonical: 'https://jov.ie/changelog/26.8.0',

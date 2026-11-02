@@ -4,6 +4,7 @@ import { mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { wcag22AaAxeOptions } from '../apps/web/lib/a11y-gates/wcag-standard.cjs';
 import { evaluateRenderedSnapshots } from './component-rendered-invariant-policy.mjs';
 
 /**
@@ -313,7 +314,7 @@ export async function collectSnapshots(
     });
     const axe = await new AxeBuilder({ page })
       .include(`[data-jovie-eval-instance="${instanceId}"]`)
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+      .options(wcag22AaAxeOptions())
       .analyze();
 
     const snapshot = await root.evaluate(

@@ -1,10 +1,10 @@
 import 'server-only';
 
 import { desc, inArray } from 'drizzle-orm';
-import { getAppUrl } from '@/constants/domains';
 import { contactDedupeKey } from '@/lib/contacts/lifecycle';
 import { db } from '@/lib/db';
 import { contactEvidenceReviews, contacts } from '@/lib/db/schema/contacts';
+import { getOutboundClaimUrl } from '@/lib/outbound/claim-url';
 import {
   type OutboundLedgerRow,
   type OutboundTarget,
@@ -40,7 +40,7 @@ export function outboundTargetFromLead(
     contactEmail: lead.contactEmail,
     instagramHandle: lead.instagramHandle,
     creatorProfileId: lead.creatorProfileId,
-    claimUrl: lead.claimToken ? getAppUrl(`/claim/${lead.claimToken}`) : null,
+    claimUrl: lead.claimToken ? getOutboundClaimUrl(lead.claimToken) : null,
   };
 }
 

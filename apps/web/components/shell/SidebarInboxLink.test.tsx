@@ -1,10 +1,21 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { type ComponentPropsWithoutRef, forwardRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 const { runtimeUpdate } = vi.hoisted(() => ({
   runtimeUpdate: { available: false },
 }));
+// Expose the Next Link contract without starting a router in jsdom.
+vi.mock('next/link', () => ({
+  default: forwardRef<
+    HTMLAnchorElement,
+    ComponentPropsWithoutRef<'a'> & { readonly prefetch?: boolean }
+  >(function TestLink({ prefetch, ...props }, ref) {
+    return <a {...props} data-prefetch={String(prefetch)} ref={ref} />;
+  }),
+}));
+
 vi.mock('./RuntimeUpdateProvider', () => ({
   useRuntimeUpdate: () => runtimeUpdate,
 }));
@@ -21,7 +32,18 @@ describe('central Inbox bell', () => {
     const link = screen.getByRole('link', {
       name: 'Inbox — 3 Items Need Attention',
     });
+    expect(link.querySelector('svg')).toHaveClass(
+      'size-(--app-shell-sidebar-icon-size)'
+    );
+    expect(link).toHaveClass('size-7', 'items-center', 'justify-center');
     expect(link).toHaveAttribute('href', '/app');
+    expect(link).toHaveAttribute('data-prefetch', 'false');
+    expect(link.querySelector('span')).toHaveClass(
+      'absolute',
+      'bottom-1',
+      'right-1'
+    );
+    expect(link.querySelector('span')).not.toHaveClass('top-1');
     await userEvent.tab();
     expect(link).toHaveFocus();
     expect(link).toHaveAttribute('data-inbox-attention', 'available');
@@ -35,7 +57,14 @@ describe('central Inbox bell', () => {
       const link = screen.getByRole('link', {
         name: 'Inbox — All Caught Up; App Update Available',
       });
-      expect(link.querySelector('[data-runtime-update]')).not.toBeNull();
+      expect(link.querySelector('[data-runtime-update]')).toHaveClass(
+        'absolute',
+        'bottom-1',
+        'right-1'
+      );
+      expect(link.querySelector('[data-runtime-update]')).not.toHaveClass(
+        'top-1'
+      );
     } finally {
       runtimeUpdate.available = false;
     }
@@ -53,6 +82,9 @@ describe('central Inbox bell', () => {
         name: 'Inbox — 3 Items Need Attention; App Update Available',
       });
       expect(link.querySelectorAll('[data-runtime-update]')).toHaveLength(1);
+      expect(link.querySelector('[data-runtime-update]')).toHaveClass(
+        'bottom-1'
+      );
     } finally {
       runtimeUpdate.available = false;
     }
@@ -66,6 +98,8 @@ describe('central Inbox bell', () => {
     ],
   ])('keeps the destination available for %s', (availability, name) => {
     render(<SidebarInboxLink availability={availability} />);
-    expect(screen.getByRole('link', { name })).toHaveAttribute('href', '/app');
+    const link = screen.getByRole('link', { name });
+    expect(link).toHaveAttribute('href', '/app');
+    expect(link.querySelector('span')).toBeNull();
   });
 });

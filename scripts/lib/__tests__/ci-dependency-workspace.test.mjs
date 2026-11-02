@@ -1,4 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -52,6 +58,17 @@ function fixture() {
 describe('merge-group dependency workspace', () => {
   it('accepts an installed tree bound to the exact dependency inputs', () => {
     const root = fixture();
+    prepareDependencyWorkspace(root, runtime);
+    expect(validateDependencyWorkspace(root, runtime)).toMatchObject(runtime);
+  });
+  it('accepts the repository lockfile exactly as written by the frozen install', () => {
+    const root = fixture();
+    for (const path of ['pnpm-lock.yaml', 'node_modules/.pnpm/lock.yaml']) {
+      writeFileSync(
+        join(root, path),
+        readFileSync(new URL(`../../../${path}`, import.meta.url))
+      );
+    }
     prepareDependencyWorkspace(root, runtime);
     expect(validateDependencyWorkspace(root, runtime)).toMatchObject(runtime);
   });

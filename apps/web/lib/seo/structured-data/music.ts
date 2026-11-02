@@ -250,7 +250,9 @@ export function generateMusicStructuredData(
 
   const listenActions = buildListenActions(
     content.providerLinks,
-    PROVIDER_CONFIG
+    PROVIDER_CONFIG,
+    // Every published service in sameAs needs its own named destination.
+    content.providerLinks.length
   );
   const flatCredits = buildFlatCredits(content.credits);
   // Track-list recordings reference the first credited artist entity that has

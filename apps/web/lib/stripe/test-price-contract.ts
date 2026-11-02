@@ -1,6 +1,7 @@
 import type Stripe from 'stripe';
 import { ARTIST_VISIBILITY_OFFER, toCents } from '@/lib/config/plan-prices';
 import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
+import { getStripePriceIdsFromEnv } from './price-id-mapping';
 
 export interface StripeTestEnvironment {
   readonly STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY?: string;
@@ -30,7 +31,7 @@ export function getRequiredStripeTestConfig(env: StripeTestEnvironment): {
   readonly secretKey: string;
   readonly webhookSecret: string;
 } {
-  const priceId = env.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY;
+  const priceId = getStripePriceIdsFromEnv(env).artistVisibilityProMonthly;
   const accountId = env.STRIPE_TEST_ACCOUNT_ID;
   const secretKey = env.STRIPE_SECRET_KEY;
   const webhookSecret = env.STRIPE_WEBHOOK_SECRET;

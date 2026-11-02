@@ -5,6 +5,7 @@ import { Icon } from '@/components/atoms/Icon';
 import { Avatar } from '@/components/molecules/Avatar';
 import { LoadingSkeleton as Skeleton } from '@/components/molecules/LoadingSkeleton';
 import { MAX_SOCIAL_LINKS } from '@/constants/app';
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import { useCreator } from '@/hooks/useCreator';
 
 export function CreatorProfile({ username }: Readonly<{ username: string }>) {
@@ -85,9 +86,7 @@ export function CreatorProfile({ username }: Readonly<{ username: string }>) {
             <div className='aspect-video w-full rounded-md bg-muted'>
               {/* Spotify embed or custom player component would go here */}
               <div className='flex h-full items-center justify-center'>
-                <p className='text-muted-foreground'>
-                  Music player placeholder
-                </p>
+                <p className='text-muted-foreground'>{COPY_FALLBACKS.audio}</p>
               </div>
             </div>
           </CardContent>

@@ -2,6 +2,10 @@
 
 Status: approved founder direction; product-first invariants locked
 
+For the capture → script → scoped review → launch design proposal, read
+[Creative workspace](creative-workspace.md) (JOV-8648). It preserves this graph
+and existing implementation owners; it is not evidence of a live editor.
+
 This is the Work product canon, not a strategy memo. `Library` remains the
 stable implementation namespace. It lives under
 `docs/product/` so the public-repo brand-scrub path block on `docs/plans/`

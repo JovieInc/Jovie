@@ -134,6 +134,33 @@ const existingRepairSchema = z
   })
   .strict();
 
+// Optional publication of the #1 pipeline bottleneck's operational status so
+// the HUD can say whether agents are attacking it or Tim must act. Absent
+// means the sender has nothing to add — never a rejection of the snapshot.
+const bottleneckStatusSchema = z
+  .object({
+    schema: z.literal('jovie.eve.summer-bottleneck-status/v1'),
+    status: z.enum(['agentic', 'needs-you']),
+    metric: z.string().trim().min(1).max(140),
+    statusLink: z.url({ protocol: /^https?$/u }).max(2048),
+    monthlyCostUsd: z.number().finite().nonnegative().optional(),
+    expectedImpact: z.string().trim().min(1).max(200).optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      value.status === 'needs-you' &&
+      (value.monthlyCostUsd === undefined || value.expectedImpact === undefined)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'needs-you bottleneck status requires monthlyCostUsd and expectedImpact',
+        path: ['monthlyCostUsd'],
+      });
+    }
+  });
+
 const unsignedSnapshotSchema = z
   .object({
     schema: z.literal('jovie.eve.summer-bottleneck-snapshot/v1'),
@@ -198,6 +225,7 @@ const unsignedSnapshotSchema = z
         admissions: summerAdmissionsSchema.optional(),
         existingRepair: existingRepairSchema.optional(),
         taskAdmissions: summerTaskAdmissionsSchema.optional(),
+        bottleneckStatus: bottleneckStatusSchema.optional(),
       })
       .strict(),
   })

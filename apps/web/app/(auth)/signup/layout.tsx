@@ -33,8 +33,8 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: ogTitle,
     description,
-    creator: '@jovieapp',
-    site: '@jovieapp',
+    creator: COMPANY_IDENTITY.xHandle,
+    site: COMPANY_IDENTITY.xHandle,
     images: [
       {
         url: imageUrl,

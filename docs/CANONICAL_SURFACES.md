@@ -9,7 +9,7 @@ This document and [apps/web/lib/canonical-surfaces.ts](../apps/web/lib/canonical
 | `homepage` | Homepage | `/` | `/` | `marketing-home-desktop` | `app/(home)/page.tsx -> MarketingPosterHero` (`app/(home)/layout.tsx -> PublicPageShell`) | `features/home` | Primary marketing homepage and current live review surface. |
 | `public-profile` | Public Profile | `/[username]` | `/demo/showcase/public-profile` | `public-profile-desktop`, `public-profile-mobile` | `app/[username]/page.tsx -> StaticArtistPage` | `features/profile` | Canonical public artist profile surface rendered from `StaticArtistPage` and `ProfileCompactTemplate`. |
 | `release-landing` | Release Landing | `/r/[slug]`, `/[username]/[slug]` | `/demo/showcase/release-landing` | `release-landing-desktop`, `release-landing-mobile` | `app/r/[slug]/ReleaseLandingPage.tsx -> ReleaseLandingPage` | `features/release` | Canonical smart-link release destination sharing the public shell direction. |
-| `dashboard-releases` | Dashboard Releases | `/app/releases`, `/app/dashboard/releases` | `/demo` | `dashboard-releases-desktop`, `dashboard-releases-sidebar-desktop`, `dashboard-release-sidebar-detail-desktop`, `dashboard-release-sidebar-platforms-desktop` | live `ShellReleasesView`; demo `/demo` still `ReleasesExperience` | `features/dashboard/organisms/release-provider-matrix` | Canonical authenticated releases workspace and current dashboard review/capture surface. |
+| `dashboard-releases` | Dashboard Releases | `/app/releases`, `/app/dashboard/releases` | `/demo` | `dashboard-releases-desktop`, `dashboard-releases-sidebar-desktop`, `dashboard-release-sidebar-detail-desktop`, `dashboard-release-sidebar-platforms-desktop` | live and demo `/demo` both `ShellReleasesView` | `features/dashboard/organisms/release-provider-matrix` | Canonical authenticated releases workspace and current dashboard review/capture surface. |
 
 The TypeScript registry also tracks additional mirrored workspaces (`dashboard-audience`, `dashboard-insights`, `dashboard-earnings`, `settings-artist-profile`, `settings-links`). They are outside this rapid-audit set.
 
@@ -46,3 +46,14 @@ To use a screenshot on a marketing page:
    - `<MarketingPhoneImage scenarioId="..." />` ([apps/web/components/marketing/MarketingPhoneImage.tsx](../apps/web/components/marketing/MarketingPhoneImage.tsx)) — for plain `<Image>` renders inside a `<PhoneFrame>` (or anywhere `<ProductScreenshot>` is the wrong shape).
 
 Do not write `<Image src="/product-screenshots/..." />` in marketing pages. The wrappers resolve URL + retina dimensions from the registry so renames are caught by typescript and so a renamed PNG never silently breaks a marketing page.
+
+Dashboard page captures that declare `playerTimestamp` opt into
+`/demo?capturePlayer=1&playerTimestamp=M:SS`. The demo harness uses the
+canonical Tim White profile and release fixtures, including real artwork,
+and freezes the shared player's playing state without autoplay or network
+audio. The production `PersistentAudioBar` renders the player; Playwright
+opens its waveform and checks identity, progress and loaded account chrome.
+Capture cleanup releases only its own playback frame. This URL state exists
+only in demo components and grants no authenticated session or API access.
+The workflow captures demo fixtures without a database; `seed.ts` is the
+legacy database-backed seed, not the catalog job's data source.

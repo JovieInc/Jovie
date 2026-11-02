@@ -1,8 +1,10 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
 import {
   applyPendingClaimCookie,
   writePendingClaimContext,
 } from '@/lib/claim/context';
+import { buildClaimRedirectUrl } from '@/lib/claim/redirect-origin';
 import {
   clearLeadAttributionCookie,
   lookupLeadByClaimToken,
@@ -22,13 +24,14 @@ import {
   isClaimTokenValid,
   lookupUsernameByClaimToken,
 } from '@/lib/services/profile/queries';
+import { ACQUISITION_COOKIE_NAME } from '@/lib/tracking/consent';
 
 interface ClaimTokenRouteContext {
   readonly params: Promise<{ readonly token: string }>;
 }
 
 function buildAbsoluteUrl(request: NextRequest, pathname: string): URL {
-  return new URL(pathname, request.url);
+  return buildClaimRedirectUrl(request, pathname);
 }
 
 export async function GET(
@@ -78,8 +81,14 @@ export async function GET(
   }
 
   const lead = await lookupLeadByClaimToken(token);
+
   const claimTokenHash = await hashClaimToken(token);
 
+  // Golden-path entry cohort. Consent-gated: no journey id, nothing recorded.
+  await recordArtistOfferStage(
+    request.cookies.get(ACQUISITION_COOKIE_NAME)?.value,
+    'claim-link-open'
+  );
   await setLeadAttributionCookieFromToken(token);
   await markLeadClaimPageViewedFromToken(token);
   const context = await writePendingClaimContext({
@@ -91,13 +100,16 @@ export async function GET(
     expectedSpotifyArtistId: profile.spotifyId ?? null,
   });
 
+  // A held lead-built page is private, so the claim link cannot land on a
+  // preview of it. Hand off to the claim route, which starts auth with the
+  // pending claim context; the page publishes when the artist claims.
+  const destination =
+    profile.isPublic !== false
+      ? `/${encodeURIComponent(profile.usernameNormalized)}?claim=1`
+      : `/${encodeURIComponent(profile.usernameNormalized)}/claim?token=${encodeURIComponent(token)}&next=auth`;
+
   return applyPendingClaimCookie(
-    NextResponse.redirect(
-      buildAbsoluteUrl(
-        request,
-        `/${encodeURIComponent(profile.usernameNormalized)}?claim=1`
-      )
-    ),
+    NextResponse.redirect(buildAbsoluteUrl(request, destination)),
     context
   );
 }

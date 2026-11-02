@@ -35,19 +35,19 @@ export function AuthProviderButtonSlot({
     <button
       type='button'
       disabled={isDisabled}
-      aria-label={isDisabled ? `${label} loading` : undefined}
+      aria-label={pending ? `${label} loading` : undefined}
       data-auth-provider-slot={provider}
       data-auth-provider-pending={pending ? 'true' : undefined}
       onClick={onClick}
       className={cn(
         AUTH_PROVIDER_BUTTON_CLASS,
-        isDisabled && 'cursor-wait opacity-75'
+        pending && 'cursor-wait opacity-75'
       )}
     >
       <Image
         src={`/auth/${provider}-logo.svg`}
-        width={provider === 'apple' ? 24 : 20}
-        height={provider === 'apple' ? 44 : 20}
+        width={20}
+        height={20}
         alt=''
         aria-hidden='true'
         unoptimized

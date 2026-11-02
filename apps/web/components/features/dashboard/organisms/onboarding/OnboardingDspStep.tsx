@@ -144,7 +144,7 @@ export function OnboardingDspStep({
                   data-testid='spotify-link-input'
                   value={state.searchQuery}
                   onChange={e => handleInputChange(e.target.value)}
-                  placeholder='Search for your artist or paste a Spotify link'
+                  placeholder='Artist name or Spotify link'
                   autoComplete='off'
                   autoCapitalize='none'
                   autoCorrect='off'
@@ -178,7 +178,7 @@ export function OnboardingDspStep({
                           })
                         }
                         className={cn(
-                          'w-full flex items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors',
+                          'focus-ring-themed w-full flex items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors',
                           state.activeResultIndex === index
                             ? 'bg-surface-0'
                             : 'hover:bg-surface-0'

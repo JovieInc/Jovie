@@ -1,5 +1,5 @@
 import { ChevronRight } from 'lucide-react';
-import type { ComponentPropsWithoutRef } from 'react';
+import type { ComponentPropsWithoutRef, ReactElement } from 'react';
 import { cn, rowState } from '../table.styles';
 
 export type ShellListRowChrome = 'plain' | 'shell';
@@ -11,14 +11,44 @@ export type ShellListRowDensity =
   | 'spacious';
 export type ShellListRowInteraction = 'self' | 'task-row-group' | 'none';
 
-export interface ShellListRowFrameProps
-  extends ComponentPropsWithoutRef<'div'> {
+type ShellListRowHost = 'div' | 'li';
+
+interface ShellListRowFrameSharedProps {
   readonly chrome?: ShellListRowChrome;
+  readonly className?: string;
   readonly density?: ShellListRowDensity;
-  readonly isSelected?: boolean;
   readonly interaction?: ShellListRowInteraction;
   readonly interactive?: boolean;
+  readonly isSelected?: boolean;
 }
+
+type ShellListRowFrameDomProps<T extends ShellListRowHost> = Omit<
+  ComponentPropsWithoutRef<T>,
+  keyof ShellListRowFrameSharedProps | 'as'
+>;
+
+interface ShellListRowFrameDivProps
+  extends ShellListRowFrameSharedProps,
+    ShellListRowFrameDomProps<'div'> {
+  /** Default host. Div attributes such as `align` stay on this variant. */
+  readonly as?: 'div';
+}
+
+interface ShellListRowFrameLiProps
+  extends ShellListRowFrameSharedProps,
+    ShellListRowFrameDomProps<'li'> {
+  /** Native list item. `li` attributes such as `value` stay on this variant. */
+  readonly as: 'li';
+}
+
+/**
+ * Host element for the row frame. A native `li` carries implicit listitem
+ * semantics for the shell lists that own their rows (the releases catalog
+ * renders rows directly as list items — no wrapper). Div and li DOM types
+ * disagree (`align` vs `type`/`value`), so each host keeps its own props.
+ */
+export type ShellListRowFrameProps<T extends ShellListRowHost = 'div'> =
+  T extends 'li' ? ShellListRowFrameLiProps : ShellListRowFrameDivProps;
 
 export interface ShellListRowButtonProps
   extends ComponentPropsWithoutRef<'button'> {
@@ -86,20 +116,41 @@ export function getShellListRowFrameClassName({
   );
 }
 
-export function ShellListRowFrame({
+function shellListRowHostAttrs({
   chrome = 'plain',
   className,
   density = 'none',
   interaction = 'self',
   interactive = false,
   isSelected = false,
-  ...props
-}: Readonly<ShellListRowFrameProps>) {
+}: ShellListRowFrameSharedProps) {
+  return {
+    'data-shell-list-row': 'true' as const,
+    'data-selected': isSelected ? ('true' as const) : undefined,
+    className: getShellListRowFrameClassName({
+      chrome,
+      className,
+      density,
+      interaction,
+      interactive,
+      isSelected,
+    }),
+  };
+}
+
+function ShellListRowDivFrame({
+  as: _as,
+  chrome,
+  className,
+  density,
+  interaction,
+  interactive,
+  isSelected,
+  ...domProps
+}: ShellListRowFrameDivProps) {
   return (
     <div
-      data-shell-list-row='true'
-      data-selected={isSelected ? 'true' : undefined}
-      className={getShellListRowFrameClassName({
+      {...shellListRowHostAttrs({
         chrome,
         className,
         density,
@@ -107,9 +158,49 @@ export function ShellListRowFrame({
         interactive,
         isSelected,
       })}
-      {...props}
+      {...domProps}
     />
   );
+}
+
+function ShellListRowLiFrame({
+  as: _as,
+  chrome,
+  className,
+  density,
+  interaction,
+  interactive,
+  isSelected,
+  ...domProps
+}: ShellListRowFrameLiProps) {
+  return (
+    <li
+      {...shellListRowHostAttrs({
+        chrome,
+        className,
+        density,
+        interaction,
+        interactive,
+        isSelected,
+      })}
+      {...domProps}
+    />
+  );
+}
+
+export function ShellListRowFrame(
+  props: ShellListRowFrameLiProps
+): ReactElement;
+export function ShellListRowFrame(
+  props: ShellListRowFrameDivProps
+): ReactElement;
+export function ShellListRowFrame(
+  props: ShellListRowFrameDivProps | ShellListRowFrameLiProps
+) {
+  // Choose the element before spreading. One props bag cannot satisfy both
+  // hosts: HTMLDivElement requires `align`, HTMLLIElement requires `type`/`value`.
+  if (props.as === 'li') return <ShellListRowLiFrame {...props} />;
+  return <ShellListRowDivFrame {...props} />;
 }
 
 export function ShellListRowButton({

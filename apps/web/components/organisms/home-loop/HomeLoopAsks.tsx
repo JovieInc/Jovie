@@ -2,10 +2,19 @@
 
 // @coverage-via apps/web/components/organisms/home-loop/HomeLoopCanvas.test.tsx
 import { Button, Input } from '@jovie/ui';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@jovie/ui/atoms/popover';
 import { ArrowUp, Check, ChevronRight } from 'lucide-react';
-import { type FormEvent, useEffect, useId, useState } from 'react';
+import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
-import { formatCountdown, type HomeLoopAsk } from '@/lib/home-loop/contract';
+import {
+  formatCountdown,
+  type HomeLoopAsk,
+  isAskEvidenceMissing,
+} from '@/lib/home-loop/contract';
 import { cn } from '@/lib/utils';
 import { useFitList } from './useFitList';
 
@@ -57,13 +66,80 @@ function DefaultLine({ ask }: Readonly<{ readonly ask: HomeLoopAsk }>) {
   );
 }
 
+/** Inline links shown on a review ask; the rest stay under "Why". */
+const INLINE_EVIDENCE_LINKS = 3;
+
+/**
+ * Review asks show what is being certified next to the action. With nothing
+ * attached the line says so and the action stays disabled.
+ */
+function EvidenceLine({ ask }: Readonly<{ readonly ask: HomeLoopAsk }>) {
+  if (!ask.requiresEvidence) return null;
+  if (isAskEvidenceMissing(ask))
+    return (
+      <p
+        className='text-xs text-warning'
+        data-testid='home-loop-ask-evidence-missing'
+      >
+        Evidence missing
+      </p>
+    );
+  return (
+    <p
+      className='flex min-w-0 flex-wrap items-baseline gap-x-2 text-xs text-secondary-token'
+      data-testid='home-loop-ask-evidence'
+    >
+      {ask.evidenceSummary ? (
+        <span className='truncate'>{ask.evidenceSummary}</span>
+      ) : null}
+      {ask.evidence.slice(0, INLINE_EVIDENCE_LINKS).map((url, index) => (
+        <a
+          key={url}
+          href={url}
+          target='_blank'
+          rel='noreferrer'
+          className='text-secondary-token underline underline-offset-2 hover:text-primary-token'
+        >
+          {`Evidence ${index + 1}`}
+        </a>
+      ))}
+    </p>
+  );
+}
+
 /** Actions and the answered line share one slot height. */
 const ACTION_SLOT = 'flex min-h-9 flex-wrap items-center gap-1.5';
+
+function WhyDetails({ ask }: Readonly<{ readonly ask: HomeLoopAsk }>) {
+  return (
+    <>
+      {ask.why}
+      {ask.evidence.length > 0 ? (
+        <ul className='mt-1.5 flex flex-wrap gap-x-3'>
+          {ask.evidence.map((url, index) => (
+            <li key={url}>
+              <a
+                href={url}
+                target='_blank'
+                rel='noreferrer'
+                className='text-tertiary-token underline-offset-2 hover:underline'
+              >
+                {`Evidence ${index + 1}`}
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </>
+  );
+}
 
 function AskCard({
   ask,
   answer,
   approveLabel,
+  bounded,
+  onHiddenFocus,
   onApprove,
   onReply,
   onFeedback,
@@ -71,6 +147,8 @@ function AskCard({
   readonly ask: HomeLoopAsk;
   readonly answer: HomeLoopAnswer | undefined;
   readonly approveLabel: string;
+  readonly bounded: boolean;
+  readonly onHiddenFocus: () => void;
   readonly onApprove: (ask: HomeLoopAsk, option?: string) => void;
   readonly onReply: (ask: HomeLoopAsk, text: string) => void;
   readonly onFeedback?: (ask: HomeLoopAsk, text: string) => void;
@@ -80,7 +158,26 @@ function AskCard({
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedback, setFeedback] = useState('');
   const whyId = useId();
+  const cardRef = useRef<HTMLLIElement>(null);
+  useEffect(() => {
+    const card = cardRef.current;
+    if (!bounded || !whyOpen || !card) return;
+    // Fitting hides rather than unmounts cards. Close intentional detail when
+    // its trigger disappears, before it can float detached from the list.
+    const closeIfHidden = () => {
+      if (card.getAttribute('aria-hidden') === 'true') setWhyOpen(false);
+    };
+    const observer = new MutationObserver(closeIfHidden);
+    observer.observe(card, {
+      attributes: true,
+      attributeFilter: ['aria-hidden'],
+    });
+    closeIfHidden();
+    return () => observer.disconnect();
+  }, [bounded, whyOpen]);
   const answered = answer && answer.state !== 'failed';
+  // A review action without evidence would certify nothing.
+  const evidenceMissing = isAskEvidenceMissing(ask);
 
   function submitFeedback(event: FormEvent) {
     event.preventDefault();
@@ -99,9 +196,30 @@ function AskCard({
     setDraft('');
   }
 
-  return (
+  const whyButton = (
+    <Button
+      type='button'
+      variant='ghost'
+      size='sm'
+      className='shrink-0'
+      aria-controls={whyId}
+      aria-expanded={whyOpen}
+      onClick={bounded ? undefined : () => setWhyOpen(open => !open)}
+    >
+      <ChevronRight
+        aria-hidden='true'
+        className={cn(
+          'size-3 transition-transform duration-subtle motion-reduce:transition-none',
+          whyOpen && 'rotate-90'
+        )}
+      />
+      Why
+    </Button>
+  );
+  const card = (
     <li
-      className={cn(CARD_FRAME, 'shrink-0', answered && 'opacity-70')}
+      ref={cardRef}
+      className={cn(CARD_FRAME, 'shrink-0', answered && 'opacity-75')}
       data-answer-state={answer?.state ?? 'open'}
       data-fit-item
       data-testid='home-loop-ask'
@@ -124,24 +242,11 @@ function AskCard({
             ) : null}
             {ask.title}
           </h3>
-          <Button
-            type='button'
-            variant='ghost'
-            size='sm'
-            className='shrink-0'
-            aria-controls={whyId}
-            aria-expanded={whyOpen}
-            onClick={() => setWhyOpen(open => !open)}
-          >
-            <ChevronRight
-              aria-hidden='true'
-              className={cn(
-                'size-3 transition-transform duration-subtle motion-reduce:transition-none',
-                whyOpen && 'rotate-90'
-              )}
-            />
-            Why
-          </Button>
+          {bounded ? (
+            <PopoverTrigger asChild>{whyButton}</PopoverTrigger>
+          ) : (
+            whyButton
+          )}
         </div>
         <p
           className='line-clamp-2 text-xs text-secondary-token'
@@ -149,30 +254,33 @@ function AskCard({
         >
           {ask.recommendation}
         </p>
+        <EvidenceLine ask={ask} />
         <DefaultLine ask={ask} />
-        <div
-          id={whyId}
-          hidden={!whyOpen}
-          className='whitespace-pre-line pt-1 text-xs text-secondary-token'
-        >
-          {ask.why}
-          {ask.evidence.length > 0 ? (
-            <ul className='mt-1.5 flex flex-wrap gap-x-3'>
-              {ask.evidence.map((url, index) => (
-                <li key={url}>
-                  <a
-                    href={url}
-                    target='_blank'
-                    rel='noreferrer'
-                    className='text-tertiary-token underline-offset-2 hover:underline'
-                  >
-                    {`Evidence ${index + 1}`}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
+        {bounded ? (
+          <PopoverContent
+            id={whyId}
+            aria-label={`Why: ${ask.title}`}
+            align='end'
+            className='w-80 whitespace-pre-line'
+            onCloseAutoFocus={event => {
+              if (cardRef.current?.getAttribute('aria-hidden') === 'true') {
+                event.preventDefault();
+                onHiddenFocus();
+              }
+            }}
+            testId='home-loop-ask-why'
+          >
+            <WhyDetails ask={ask} />
+          </PopoverContent>
+        ) : (
+          <div
+            id={whyId}
+            hidden={!whyOpen}
+            className='whitespace-pre-line pt-1 text-xs text-secondary-token'
+          >
+            <WhyDetails ask={ask} />
+          </div>
+        )}
       </div>
 
       {answered ? (
@@ -206,6 +314,7 @@ function AskCard({
                   type='button'
                   size='sm'
                   variant={index === 0 ? 'primary' : 'secondary'}
+                  disabled={evidenceMissing}
                   onClick={() => onApprove(ask, option)}
                   data-testid='home-loop-ask-option'
                 >
@@ -217,6 +326,7 @@ function AskCard({
             <Button
               type='button'
               size='sm'
+              disabled={evidenceMissing}
               onClick={() => onApprove(ask)}
               data-testid='home-loop-ask-approve'
             >
@@ -280,6 +390,13 @@ function AskCard({
       ) : null}
     </li>
   );
+  return bounded ? (
+    <Popover open={whyOpen} onOpenChange={setWhyOpen}>
+      {card}
+    </Popover>
+  ) : (
+    card
+  );
 }
 
 function MoreDecisions({
@@ -329,6 +446,7 @@ export function HomeLoopAsks({
   readonly onReply: (ask: HomeLoopAsk, text: string) => void;
   readonly onFeedback?: (ask: HomeLoopAsk, text: string) => void;
 }>) {
+  const overflowRef = useRef<HTMLParagraphElement>(null);
   const visible = fit ? asks : asks.slice(0, maxVisible);
   const { ref, hidden: fitHidden } = useFitList<HTMLUListElement>(
     visible.map(ask => ask.id).join('|'),
@@ -341,6 +459,11 @@ export function HomeLoopAsks({
       ask={ask}
       answer={answers[ask.id]}
       approveLabel={approveLabel}
+      bounded={fit}
+      onHiddenFocus={() => {
+        const overflow = overflowRef.current;
+        (overflow?.querySelector('a') ?? overflow)?.focus();
+      }}
       onApprove={onApprove}
       onReply={onReply}
       onFeedback={onFeedback}
@@ -356,7 +479,11 @@ export function HomeLoopAsks({
         >
           {cards}
         </ul>
-        <p className='h-4 shrink-0 px-1 text-xs tabular-nums text-tertiary-token'>
+        <p
+          ref={overflowRef}
+          tabIndex={-1}
+          className='h-4 shrink-0 px-1 text-xs tabular-nums text-tertiary-token'
+        >
           {hidden > 0 ? (
             <MoreDecisions hidden={hidden} moreHref={moreHref} />
           ) : null}

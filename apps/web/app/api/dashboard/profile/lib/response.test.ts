@@ -74,4 +74,20 @@ describe('finalizeProfileResponse cache invalidation', () => {
       'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
     );
   });
+  it.each([false, true])(
+    'hard-expires privacy changes even with simultaneous rename=%s',
+    async renamed => {
+      await finalizeProfileResponse({
+        updatedProfile: profile('newartist'),
+        oldUsernameNormalized: renamed ? 'oldartist' : 'newartist',
+        clerkUserId: 'owner',
+        privacyChanged: true,
+      });
+      expect(invalidateProfileCache).toHaveBeenCalledWith(
+        'newartist',
+        renamed ? 'oldartist' : undefined,
+        { privacyChanged: true }
+      );
+    }
+  );
 });

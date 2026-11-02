@@ -11,6 +11,7 @@ import {
   cleanOutboundName,
   countOutboundViews,
   fitBand,
+  fitBasis,
   type OutboundLeadFacts,
   rankOutboundRows,
   whyNow,
@@ -24,6 +25,7 @@ function facts(overrides: Partial<OutboundLeadFacts> = {}): OutboundLeadFacts {
     linktreeHandle: 'ada',
     linktreeUrl: 'https://linktr.ee/ada',
     displayName: 'Ada - Listen on Spotify',
+    bio: null,
     avatarUrl: 'https://img/ada.jpg',
     contactEmail: 'ada@example.com',
     instagramHandle: null,
@@ -34,6 +36,7 @@ function facts(overrides: Partial<OutboundLeadFacts> = {}): OutboundLeadFacts {
     dmCopy: null,
     claimToken: 'tok',
     fitScore: 45,
+    fitScoreBreakdown: { hasSpotify: 15, genreMatch: 10, releaseRecency: 20 },
     priorityScore: null,
     spotifyFollowers: null,
     latestReleaseDate: null,
@@ -48,6 +51,7 @@ function facts(overrides: Partial<OutboundLeadFacts> = {}): OutboundLeadFacts {
     profileAvatarUrl: null,
     certified: false,
     replied: false,
+    evidenceClasses: ['dsp', 'catalog', 'search', 'reachability'],
     ...overrides,
   };
 }
@@ -100,23 +104,113 @@ describe('outbound queue display', () => {
     expect(fitBand(10)).toBe('low');
   });
 
-  it('picks the strongest why-now evidence', () => {
+  it('only reports dated trigger events as why-now (A16)', () => {
     expect(
       whyNow(
         facts({ latestReleaseDate: new Date('2026-09-30T00:00:00Z') }),
         NOW
       )
     ).toBe('Released 5 days ago');
-    expect(whyNow(facts({ spotifyFollowers: 12_400 }), NOW)).toBe(
-      '12,400 Spotify followers'
-    );
-    expect(whyNow(facts(), NOW)).toBe('Profile built 188 days ago');
+    expect(
+      whyNow(facts({ paidAt: new Date('2026-10-03T12:00:00Z') }), NOW)
+    ).toBe('Paid yesterday');
+    // Static attributes are not triggers.
+    expect(whyNow(facts({ spotifyFollowers: 908 }), NOW)).toBeNull();
+    expect(whyNow(facts(), NOW)).toBeNull();
     expect(
       whyNow(
         facts({ ingestedAt: null, discoveryQuery: 'site:linktr.ee dj' }),
         NOW
       )
-    ).toBe('Found via "site:linktr.ee dj"');
+    ).toBeNull();
+    // An old release or a future date is not "now".
+    expect(
+      whyNow(
+        facts({ latestReleaseDate: new Date('2026-01-01T00:00:00Z') }),
+        NOW
+      )
+    ).toBeNull();
+    expect(
+      whyNow(
+        facts({ latestReleaseDate: new Date('2026-12-01T00:00:00Z') }),
+        NOW
+      )
+    ).toBeNull();
+  });
+
+  it('labels presence-only and missing fit scores instead of banding them (A15)', () => {
+    const presence = {
+      hasSpotify: 15,
+      usesLinkInBio: 15,
+      usesMusicTools: 10,
+      hasContactEmail: 5,
+      genreMatch: 0,
+      meta: { version: 5 },
+    };
+    expect(fitBasis(45, presence)).toBe('presence_only');
+    expect(fitBasis(45, { ...presence, genreMatch: 10 })).toBe('scored');
+    expect(fitBasis(null, null)).toBe('unscored');
+    const thin = row(facts({ fitScoreBreakdown: presence }));
+    expect(thin).toMatchObject({
+      fit: 'unknown',
+      fitBasis: 'presence_only',
+      view: 'ready',
+    });
+    expect(thin.flags).toContain('presence_only_fit');
+    const unscored = row(facts({ fitScore: null }));
+    expect(unscored).toMatchObject({ view: 'flagged', fitBasis: 'unscored' });
+  });
+
+  it('keeps rows with missing evidence out of Ready to certify (A12)', () => {
+    const built = row(facts({ evidenceClasses: ['dsp'] }));
+    expect(built.view).toBe('needs_evidence');
+    expect(built.nextAction).toBe('gather_evidence');
+    expect(built.missingEvidence).toEqual([
+      'catalog',
+      'search',
+      'reachability',
+    ]);
+    const noProfile = row(
+      facts({ creatorProfileId: null, evidenceClasses: null })
+    );
+    expect(noProfile).toMatchObject({
+      view: 'needs_evidence',
+      nextAction: 'build_profile',
+    });
+  });
+
+  it('flags possible non-artists without rejecting them (A13)', () => {
+    const curator = row(
+      facts({
+        linktreeHandle: 'spotifyplaylistcurator',
+        displayName: 'Best Spotify Playlist Pitch',
+      })
+    );
+    expect(curator).toMatchObject({
+      view: 'flagged',
+      nextAction: 'check_entity',
+    });
+    expect(curator.flags).toContain('possible_non_artist');
+    expect(curator.entityNote).toMatch(/curator/);
+    expect(curator.approval.target).toBe('unreviewed');
+  });
+
+  it('drafts only on a channel with a recipient on file (A17)', () => {
+    const noEmail = row(facts({ contactEmail: null, outreachRoute: 'email' }));
+    expect(noEmail.channel).toBeNull();
+    expect(noEmail.message).toBeNull();
+    const dmOnly = row(
+      facts({
+        contactEmail: null,
+        outreachRoute: 'both',
+        instagramHandle: 'ada',
+      })
+    );
+    expect(dmOnly.channel).toBe('dm');
+    const flagOnly = row(
+      facts({ contactEmail: null, hasInstagram: true, instagramHandle: null })
+    );
+    expect(flagOnly.channel).toBeNull();
   });
 
   it('defaults to Ready to certify with a creator-generic draft', () => {
@@ -133,7 +227,13 @@ describe('outbound queue display', () => {
   });
 
   it('asks for a profile build before facts exist', () => {
-    const built = row(facts({ creatorProfileId: null, status: 'qualified' }));
+    const built = row(
+      facts({
+        creatorProfileId: null,
+        status: 'qualified',
+        evidenceClasses: null,
+      })
+    );
     expect(built.nextAction).toBe('build_profile');
   });
 
@@ -179,7 +279,14 @@ describe('outbound queue display', () => {
   it('ranks closest-to-revenue first, then fit, then priority', () => {
     const ranked = rankOutboundRows(
       [
-        row(facts({ id: 'a', fitScore: 90, creatorProfileId: null })),
+        row(
+          facts({
+            id: 'a',
+            fitScore: 90,
+            creatorProfileId: null,
+            evidenceClasses: null,
+          })
+        ),
         row(facts({ id: 'b', fitScore: 40 })),
         row(facts({ id: 'c', fitScore: 70 })),
         row(facts({ id: 'd', fitScore: 70, certified: true })),
@@ -193,7 +300,8 @@ describe('outbound queue display', () => {
       ['a', 4],
     ]);
     expect(countOutboundViews(ranked)).toMatchObject({
-      ready: 3,
+      ready: 2,
+      needs_evidence: 1,
       certified: 1,
       approved: 0,
     });

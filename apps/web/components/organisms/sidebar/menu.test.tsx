@@ -40,7 +40,15 @@ describe('sidebar menu', () => {
     expect(button?.getAttribute('data-active')).toBe('true');
     const className = button?.className ?? '';
     expect(className).toContain('duration-fast');
+    expect(button).toHaveClass('hover:bg-sidebar-accent');
+    expect(className).not.toContain('var(--color-sidebar-accent)_82%');
     expect(className).toContain('ease-interactive');
+    expect(button).toHaveClass(
+      'gap-(--app-shell-sidebar-icon-gap)',
+      'px-(--app-shell-sidebar-inset)',
+      '[&>svg]:size-(--app-shell-sidebar-icon-size)'
+    );
+    expect(button).not.toHaveClass('gap-2.5', 'px-2.5');
   });
 
   it('renders a sub button with nav font weight', () => {

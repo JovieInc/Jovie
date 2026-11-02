@@ -9,6 +9,7 @@ import {
   isNotNull,
   isNull,
   ne,
+  notExists,
 } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { isUniqueViolation as isUniqueViolationUtil } from '@/lib/db/errors';
@@ -104,6 +105,8 @@ export interface UpsertReleaseInput {
   spotifyPopularity?: number | null;
   sourceType?: ReleaseSourceType;
   metadata?: Record<string, unknown>;
+  /** Omitted keeps the column default ('released') on insert. */
+  status?: 'draft' | 'scheduled' | 'released';
 }
 
 // Base fields shared by both release and track links
@@ -756,6 +759,7 @@ export async function upsertRelease(
     spotifyPopularity: input.spotifyPopularity ?? null,
     sourceType: input.sourceType ?? 'ingested',
     metadata: input.metadata ?? {},
+    ...(input.status ? { status: input.status } : {}),
     createdAt: now,
     updatedAt: now,
   };
@@ -1786,4 +1790,32 @@ export async function syncProfileGenresFromReleases(
     .update(creatorProfiles)
     .set({ genres: topGenres, updatedAt: new Date() })
     .where(eq(creatorProfiles.id, creatorProfileId));
+}
+
+/**
+ * Hard-deleting a release cascades its release tracks but leaves the
+ * profile-scoped recordings behind. Remove the recordings no remaining release
+ * carries so deleted songs cannot resurface through any recording-keyed read.
+ */
+export async function purgeOrphanRecordings(
+  profileId: string,
+  recordingIds: readonly string[]
+): Promise<number> {
+  if (recordingIds.length === 0) return 0;
+  const removed = await db
+    .delete(discogRecordings)
+    .where(
+      and(
+        eq(discogRecordings.creatorProfileId, profileId),
+        inArray(discogRecordings.id, [...recordingIds]),
+        notExists(
+          db
+            .select({ one: discogReleaseTracks.id })
+            .from(discogReleaseTracks)
+            .where(eq(discogReleaseTracks.recordingId, discogRecordings.id))
+        )
+      )
+    )
+    .returning({ id: discogRecordings.id });
+  return removed.length;
 }

@@ -48,6 +48,12 @@ export interface DatePickerProps {
   readonly disabled?: boolean;
   readonly placeholder?: string;
   readonly className?: string;
+  /**
+   * Render the calendar in the trigger's parent. Drawers dismiss or hide a
+   * portaled popover, so the release form cannot find the day grid inside
+   * the sidebar.
+   */
+  readonly disablePortal?: boolean;
 }
 
 export function DatePicker({
@@ -57,6 +63,7 @@ export function DatePicker({
   disabled = false,
   placeholder = DATE_PICKER_PLACEHOLDER,
   className,
+  disablePortal = false,
 }: DatePickerProps) {
   const selected = parseDatePickerValue(value);
   return (
@@ -80,7 +87,12 @@ export function DatePicker({
           </span>
         </button>
       </PopoverTrigger>
-      <PopoverContent className='w-auto' align='start' size='bare'>
+      <PopoverContent
+        className='w-auto'
+        align='start'
+        size='bare'
+        disablePortal={disablePortal}
+      >
         <Calendar
           mode='single'
           selected={selected}

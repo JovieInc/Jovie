@@ -4,12 +4,13 @@
  * Centralized profile update operations.
  */
 
-import { sql as drizzleSql, eq, type SQL } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, isNull, type SQL } from 'drizzle-orm';
 import { invalidateProfileCache } from '@/lib/cache/profile';
-import { db } from '@/lib/db';
+import { type DbOrTransaction, db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError, captureWarning } from '@/lib/error-tracking';
+import { buildLeadBuildHold } from '@/lib/leads/lead-build-hold';
 import { mergeProfileTheme } from '@/lib/profile/profile-theme';
 import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server';
 import { getRedis } from '@/lib/redis';
@@ -85,22 +86,61 @@ export async function updateProfileById(
   return applyProfileUpdate(eq(creatorProfiles.id, profileId), updates);
 }
 
+/** Apply the lead hold inside the authorized ingestion transaction. */
+export async function holdLeadBuiltProfileInTx(
+  tx: DbOrTransaction,
+  profileId: string
+): Promise<boolean> {
+  const [profile] = await tx
+    .update(creatorProfiles)
+    .set({
+      isPublic: false,
+      settings: drizzleSql`coalesce(${creatorProfiles.settings}, '{}'::jsonb) || ${JSON.stringify({ leadBuild: buildLeadBuildHold() })}::jsonb`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(creatorProfiles.id, profileId),
+        isNull(creatorProfiles.userId),
+        drizzleSql`coalesce(${creatorProfiles.isClaimed}, false) = false`,
+        isNull(
+          drizzleSql`${creatorProfiles.settings} #>> '{leadBuild,releasedAt}'`
+        )
+      )
+    )
+    .returning({ usernameNormalized: creatorProfiles.usernameNormalized });
+
+  if (!profile) {
+    const [existing] = await tx
+      .select({ id: creatorProfiles.id })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, profileId))
+      .limit(1);
+    if (!existing) throw new Error('Lead-built profile not found');
+    return false;
+  }
+  await invalidateProfileCache(profile.usernameNormalized);
+  return true;
+}
+
 /**
- * Update a profile by user's Clerk ID.
+ * Update a profile for the signed-in app user.
  *
- * @param clerkUserId - The Clerk user ID
+ * The argument is `users.id` from the chat session, despite the historical
+ * function name. Better Auth rows leave `clerk_id` null.
+ *
+ * @param appUserId - App `users.id`
  * @param updates - The fields to update
  * @returns Updated profile or null if not found
  */
 export async function updateProfileByClerkId(
-  clerkUserId: string,
+  appUserId: string,
   updates: ProfileUpdateData
 ): Promise<ProfileData | null> {
-  // First get the user ID from clerk_id
   const [user] = await db
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.clerkId, clerkUserId))
+    .where(eq(users.id, appUserId))
     .limit(1);
 
   if (!user) {

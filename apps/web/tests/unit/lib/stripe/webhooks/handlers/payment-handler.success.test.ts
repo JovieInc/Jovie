@@ -22,6 +22,7 @@ vi.mock('@/lib/server-analytics', () => ({
 
 import type Stripe from 'stripe';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { isStripeReconciliationRequiredError } from '@/lib/stripe/webhooks/reconciliation';
 
 const {
   mockStripeSubscriptionsRetrieve,
@@ -291,7 +292,7 @@ describe('@critical PaymentHandler - payment succeeded', () => {
     );
   });
 
-  it('skips when the user cannot be identified after fallback', async () => {
+  it('flags an unattributed paid invoice for reconciliation instead of skipping', async () => {
     const mockSubscription = {
       id: 'sub_unknown_user',
       status: 'active',
@@ -322,23 +323,30 @@ describe('@critical PaymentHandler - payment succeeded', () => {
       stripeEventTimestamp: new Date(),
     };
 
-    const result = await handler.handle(context);
+    // Never ack and forget a paid invoice: the handler raises a
+    // reconciliation error so the route durably marks the stored event
+    // needs_reconciliation (unprocessed, replayable) before any 2xx.
+    const failure = await handler.handle(context).then(
+      () => null,
+      (error: unknown) => error
+    );
 
-    expect(result.success).toBe(true);
-    expect(result.skipped).toBe(true);
-    expect(result.reason).toBe('cannot_identify_user_for_payment_success');
-    expect(mockGetUserIdFromStripeCustomer).toHaveBeenCalledWith('cus_unknown');
-    expect(mockUpdateUserBillingStatus).not.toHaveBeenCalled();
-    // A paid-but-unattributed invoice must never be a silent skip.
-    expect(mockCaptureCriticalError).toHaveBeenCalledWith(
-      'Paid subscription invoice has no attributable user',
-      expect.any(Error),
-      expect.objectContaining({
-        event: 'invoice.payment_succeeded',
-        stripeEventId: 'evt_unknown_user',
+    expect(isStripeReconciliationRequiredError(failure)).toBe(true);
+    expect(failure).toMatchObject({
+      reason: 'invoice_unattributed',
+      context: expect.objectContaining({
         invoiceId: 'in_unknown_user',
         subscriptionId: 'sub_unknown_user',
-      })
+        customerId: 'cus_unknown',
+      }),
+    });
+    expect(mockGetUserIdFromStripeCustomer).toHaveBeenCalledWith('cus_unknown');
+    expect(mockUpdateUserBillingStatus).not.toHaveBeenCalled();
+    // The route's reconciliation marker alerts once; no duplicate capture here.
+    expect(mockCaptureCriticalError).not.toHaveBeenCalledWith(
+      'Error handling payment success webhook',
+      expect.anything(),
+      expect.anything()
     );
   });
 

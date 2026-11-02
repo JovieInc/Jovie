@@ -217,6 +217,7 @@ export function SignInPageClient({
         showFormTitle={false}
         showFooterPrompt={false}
         layoutVariant='stack'
+        contentPlacement='center'
       >
         <AuthRoutePrefetch href={signUpUrl} />
         <SignInOauthErrorBanner />

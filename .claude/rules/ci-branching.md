@@ -92,9 +92,9 @@ PR/issue labels, Linear state) are event-driven. The Gem lanes tick
 
 - `hotfix/*` branches
 - `train/*` or integration→main train PRs
-- PRs labeled `needs-human`
+- Orchestrator-owned PRs that target `main` by design
 - Dependabot / `screenshots/*` automation
-- Workflow PRs that change CI itself (label `needs-human` or orchestrator-owned)
+- Workflow PRs that change CI itself (orchestrator-owned)
 
 ## Orchestration artifacts
 
@@ -115,3 +115,62 @@ PR/issue labels, Linear state) are event-driven. The Gem lanes tick
 default (`docs/PR_FLOW.md`, 2026-06-22 post-mortem); error mode would fight the
 canonical flow. **Re-evaluate when:** integration-branch waves become the
 default again. **Then:** escalate to error mode.
+
+## Gate-weakening detector (JOV-INV-045)
+
+`gate-weakening-detector` is a blocking `prOnly` source guard. On
+`pull_request` it diffs `origin/<base>...HEAD` and fails when that diff loosens
+required checks, branch protection, PR Ready needs, Source Validation steps, or
+source-guard ids; grows a shrink-only baseline or allowlist; loosens a coverage
+or budget threshold; adds a skip, exclusive test, suppression, or ignore entry;
+deletes or empties an invariant test; or raises a CI timeout or retry. Demoting
+a blocking guard to advisory, `continue-on-error`, or `if: false` fails too.
+
+Override is never silent. The PR body needs a `gate-change: <reason>` line and
+the `codeowners-approved` label, which is a machine-checked audit record applied by the authoring agent after the strong LLM review (`internal-review`); no person approves it (EVENT 2026-10-28).
+Findings still print. Local run:
+`node scripts/invariants/gate-weakening-detector.mjs --check`. Do not remove it
+from `SOURCE_GUARDS` or mark it advisory.
+
+## Open PRs with `pnpm pr:open`
+
+`pnpm pr:open open` opens a PR; `draft [N]` drafts, `check --body-file f` validates,
+and `update N` repairs N from its own diff. Drafting recovers PR/issue metrics and red CI URLs,
+then asks once for missing `--metric`, `--failing-command`, `--failing-run` or `--failing-log`.
+Blast radius severity matches CI; main's classifier reports unmapped paths as pending.
+Updates guard PR references (body files need N's URL or `<!-- pr-open-target: JovieInc/Jovie#N -->`)
+and confirm fresh validation runs via real edits. Verdicts: `~/.local/state/jovie-lanes/pr-open.jsonl`.
+
+## Preflight before every push
+
+Run `pnpm preflight:changed` before every push (JOV-9727; also in the pre-push
+gate). It scopes to the diff vs `origin/main` and runs, in about a minute,
+every rule CI would otherwise teach one 20-40 minute round at a time: generators
+(topology, harness docs; written, not just checked), the Source Validation
+guards selected by path (private-data, external-api, gate-weakening,
+metrics-layer, ownership/registries, script contracts), the customer-changelog
+marker, Migration Guard, changed-line coverage, biome, and typecheck of only the
+affected packages under a heap cap (`JOVIE_PREFLIGHT_HEAP_MB`, default 4096).
+It lints the PR body (`--body-file f`, `--pr N`, or the open PR) and prints a
+filled template for any missing section (Red-before-green, Blast radius,
+Locked areas, changelog marker), plus a checklist of companion edits for new
+workflows, scripts, tests and migrations. `--thorough` adds heavy guards,
+`--no-coverage` / `--no-typecheck` trim it, `JOVIE_PREFLIGHT_CHANGED=0` skips
+the hook only. Commit first: coverage and the private-data guard read commits.
+Every run appends to `~/.local/state/jovie-lanes/preflight-changed.jsonl`; CI
+rounds per merged PR (target <= 1.3) and the Source Validation first-push pass
+rate are in the shipping SLO report.
+
+`pnpm preflight` below is the broader pass over the Source Validation job.
+
+
+Run `pnpm preflight` before every push (workers: every push, no exceptions; the
+pre-push gate also runs it, so do not bypass hooks). It derives its plan from
+the `deterministic` job of `.github/workflows/source-validation.yml`, runs each
+statement on its own, and lists all failures in one pass: typecheck of affected
+packages, `lint:eslint:changed`, screen registry, census, nav and manifest
+registrations, component-ship-gate, ratchets and baselines. Add
+`--body-file <path> --title <title>` to lint the PR body (changelog marker,
+Red-before-green, Blast radius, Locked areas). `pnpm preflight --list` prints the
+plan. `pnpm ci:rounds` reports CI rounds (Source Validation head commits) per
+merged PR as p50/p95; the goal is to drive the p50 toward 1.

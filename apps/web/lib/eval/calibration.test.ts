@@ -22,6 +22,30 @@ function makeHoldout(items: HumanHoldoutSet['items']): HumanHoldoutSet {
 }
 
 describe('parseHumanHoldoutSet', () => {
+  it('retains a required founder rejection and refuses that marker on a passing case', () => {
+    const input = makeHoldout([
+      {
+        id: 'rejected',
+        caseId: 'rejected.png',
+        humanLabel: 'fail',
+        mustReject: true,
+      },
+    ]);
+    expect(parseHumanHoldoutSet(input).items[0]?.mustReject).toBe(true);
+    expect(() =>
+      parseHumanHoldoutSet({
+        ...input,
+        items: [{ ...input.items[0], mustReject: false }],
+      })
+    ).toThrow(/mustReject/);
+    expect(() =>
+      parseHumanHoldoutSet({
+        ...input,
+        items: [{ ...input.items[0], humanLabel: 'pass' }],
+      })
+    ).toThrow(/mustReject/);
+  });
+
   it('parses a valid holdout payload', () => {
     const holdout = parseHumanHoldoutSet({
       schemaVersion: 1,

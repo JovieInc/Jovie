@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq, or } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getCurrentUserProfile } from '@/lib/auth/session';
 import {
@@ -41,13 +41,24 @@ const parseJsonArray = <T>(value: JsonArray<T>): T[] => {
  * GET /api/dashboard/releases/[releaseId]/analytics
  *
  * Lightweight smartlink analytics for a release sidebar panel.
+ *
+ * Session requests resolve through `getCurrentUserProfile` (`users.id`).
+ * This helper is only the test-bypass and demo fallback. Those values are a
+ * Better Auth user id, an app `users.id`, or `DEMO_CLERK_USER_ID`, so the
+ * Clerk column match stays for the demo id.
  */
-async function getProfileIdForClerkUserId(clerkUserId: string) {
+async function getProfileIdForUserIdentity(userIdentity: string) {
   const [profile] = await db
     .select({ id: creatorProfiles.id })
     .from(users)
     .innerJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
-    .where(eq(users.clerkId, clerkUserId))
+    .where(
+      or(
+        eq(users.id, userIdentity),
+        eq(users.betterAuthUserId, userIdentity),
+        eq(users.clerkId, userIdentity)
+      )
+    )
     .limit(1);
 
   return profile?.id ?? null;
@@ -61,7 +72,7 @@ async function resolveAnalyticsProfile(request: Request) {
 
   const bypassUserId = resolveTestBypassUserId(request.headers);
   if (bypassUserId) {
-    const bypassProfileId = await getProfileIdForClerkUserId(bypassUserId);
+    const bypassProfileId = await getProfileIdForUserIdentity(bypassUserId);
     if (bypassProfileId) {
       return { id: bypassProfileId };
     }
@@ -74,7 +85,7 @@ async function resolveAnalyticsProfile(request: Request) {
   ) {
     const demoClerkUserId = env.DEMO_CLERK_USER_ID?.trim();
     if (demoClerkUserId) {
-      const demoProfileId = await getProfileIdForClerkUserId(demoClerkUserId);
+      const demoProfileId = await getProfileIdForUserIdentity(demoClerkUserId);
       if (demoProfileId) {
         return { id: demoProfileId };
       }

@@ -9,6 +9,7 @@ import {
 } from '@/data/marketingPricingPlans';
 import { PricingComparisonChart } from '@/features/pricing/PricingComparisonChart';
 import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
+import { documentTitle } from '@/lib/seo/document-title';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
 export const revalidate = false;
@@ -22,7 +23,7 @@ const PRICING_DESCRIPTION = `Jovie profiles are free forever. ${PRO_NAME} is ${P
 const requestAccessCopy = `${PRO_NAME} is ${PRO_MONTHLY_PRICE}. Claim your profile.`;
 
 export const metadata: Metadata = {
-  title: PRICING_TITLE,
+  title: documentTitle(PRICING_TITLE),
   description: PRICING_DESCRIPTION,
   keywords: [
     'Jovie pricing',

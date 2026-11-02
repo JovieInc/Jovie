@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { and, asc, desc, eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   getUserByClerkId,
@@ -223,7 +223,7 @@ function missingFieldArtifactRows(params: {
 
 export async function getSubmissionRequestForUser(
   requestId: string,
-  clerkUserId: string
+  appUserId: string
 ) {
   const [request] = await db
     .select({
@@ -247,10 +247,7 @@ export async function getSubmissionRequestForUser(
       eq(users.activeProfileId, metadataSubmissionRequests.creatorProfileId)
     )
     .where(
-      and(
-        eq(metadataSubmissionRequests.id, requestId),
-        eq(users.clerkId, clerkUserId)
-      )
+      and(eq(metadataSubmissionRequests.id, requestId), eq(users.id, appUserId))
     )
     .limit(1);
 
@@ -310,7 +307,8 @@ export async function loadCanonicalSubmissionContext(params: {
           .where(
             and(
               eq(discogReleases.id, releaseId),
-              eq(discogReleases.creatorProfileId, profileId)
+              eq(discogReleases.creatorProfileId, profileId),
+              isNull(discogReleases.deletedAt)
             )
           )
           .limit(1)

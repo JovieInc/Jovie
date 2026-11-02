@@ -25,6 +25,151 @@ async function output() {
 const html = `<link rel="canonical" href="https://jov.ie/tim"><script type="application/ld+json">{"@graph":[{"@id":"https://jov.ie/tim#musicgroup","sameAs":["${TIM_WHITE_PROFILE.spotifyUrl}"]}]}</script><section data-testid="profile-aeo-content"><a href="/tim">Tim White</a><a href="/broken">other</a><a href="https://example.com/">external</a></section>`;
 
 describe('artist proof collector', () => {
+  it('certifies guide/API/MCP and exact raw-HTML items with stable build evidence', async () => {
+    const profileUrl = 'https://jov.ie/tim';
+    const release = {
+      id: 'release-1',
+      title: 'Song',
+      url: `${profileUrl}/song`,
+      releaseDate: '2026-01-02',
+    };
+    const product = {
+      id: '00000000-0000-4000-8000-000000000002',
+      title: 'Tee',
+      url: `${profileUrl}/merch/00000000-0000-4000-8000-000000000002`,
+    };
+    const artist = {
+      username: 'tim',
+      name: 'Tim White',
+      profileUrl,
+      isClaimed: false,
+      isVerified: false,
+      links: [{ url: 'https://example.com/work' }],
+    };
+    const releaseNode = {
+      '@type': 'MusicAlbum',
+      name: 'Song',
+      url: release.url,
+      datePublished: release.releaseDate,
+      sameAs: ['https://music.apple.com/album/song'],
+      potentialAction: [
+        {
+          '@type': 'ListenAction',
+          name: 'Listen on Apple Music',
+          target: { urlTemplate: 'https://music.apple.com/album/song' },
+        },
+      ],
+    };
+    const profileHtml = `<link rel="canonical" href="${profileUrl}"><script type="application/ld+json">${JSON.stringify({ '@graph': [{ '@id': `${profileUrl}#musicgroup`, name: 'Tim White', sameAs: [TIM_WHITE_PROFILE.spotifyUrl] }] })}</script><section data-testid="profile-aeo-content"></section>`;
+    const guide = `# Tim White\n- **Canonical URL**: ${profileUrl}\n- **Claim status**: Unclaimed\n- **Jovie verification**: Not verified\n- [Work](<https://example.com/work>)\n## Latest Release\n- **Title**: Song\n- **Released**: 2026-01-02\n- **Link**: ${release.url}\n`;
+    const api = { artist, releases: [release], merch: [product] };
+    for (const scenario of [
+      'valid',
+      'collection',
+      'mcp-mismatch',
+      'wrong-item',
+      'missing-service',
+      'build-drift',
+      'off-origin',
+      'unavailable',
+    ]) {
+      const directory = await output();
+      const observedApi =
+        scenario === 'collection'
+          ? {
+              ...api,
+              releases: [{ ...release, url: `${profileUrl}/releases` }],
+            }
+          : scenario === 'off-origin'
+            ? {
+                ...api,
+                releases: [{ ...release, url: 'https://outside.example/song' }],
+              }
+            : api;
+      let buildReads = 0;
+      const fetcher = vi
+        .fn<typeof fetch>()
+        .mockImplementation(async (url, init) => {
+          const href = String(url);
+          if (href === profileUrl) return new Response(profileHtml);
+          if (href.endsWith('/api/health/build-info')) {
+            buildReads++;
+            return Response.json({
+              commitSha: (scenario === 'build-drift' && buildReads > 2
+                ? 'b'
+                : 'a'
+              ).repeat(40),
+            });
+          }
+          if (href.endsWith('/api/v1/tim')) return Response.json(observedApi);
+          if (href.endsWith('/llms.txt')) return new Response(guide);
+          if (href.endsWith('/api/mcp/tim')) {
+            if (scenario === 'unavailable')
+              return new Response('', { status: 503 });
+            const request = JSON.parse(String(init?.body));
+            const resource = request.params.uri.split('/').at(-1);
+            let content =
+              resource === 'bio'
+                ? artist
+                : observedApi[resource as 'releases' | 'merch'];
+            if (scenario === 'mcp-mismatch' && resource === 'releases')
+              content = [];
+            return Response.json({
+              result: { contents: [{ text: JSON.stringify(content) }] },
+            });
+          }
+          if (href === release.url) {
+            const node =
+              scenario === 'wrong-item'
+                ? { ...releaseNode, name: 'Wrong item' }
+                : scenario === 'missing-service'
+                  ? { ...releaseNode, potentialAction: [] }
+                  : releaseNode;
+            return new Response(
+              `<link rel="canonical" href="${release.url}"><script type="application/ld+json">${JSON.stringify(node)}</script>`
+            );
+          }
+          if (href === product.url)
+            return new Response(
+              `<script type="application/ld+json">${JSON.stringify({ '@type': 'Product', name: 'Tee', url: product.url, sku: product.id })}</script>`
+            );
+          throw new Error(`Unexpected URL: ${href}`);
+        });
+      const result = await certifyArtistProfile(
+        ['--output', directory, '--agent-surfaces'],
+        fetcher
+      );
+      expect(result.discovery?.failed, scenario).toBe(scenario !== 'valid');
+      expect(result.failed, scenario).toBe(scenario !== 'valid');
+      expect(
+        fetcher.mock.calls.every(
+          ([url]) => new URL(String(url)).origin === 'https://jov.ie'
+        )
+      ).toBe(true);
+      const report = JSON.parse(await readFile(result.reportPath, 'utf8'));
+      expect(report.discovery.evidence.length).toBeGreaterThan(0);
+      for (const receipt of report.discovery.evidence) {
+        expect(receipt.sha256).toMatch(/^[a-f0-9]{64}$/);
+        expect(
+          await readFile(join(directory, receipt.file), 'utf8')
+        ).toBeTypeOf('string');
+      }
+      if (scenario === 'valid') {
+        expect(report.discovery).toMatchObject({
+          releaseSha: 'a'.repeat(40),
+          stableBuild: true,
+          mcpMatches: true,
+        });
+        expect(report.discovery.items[0].destinations).toEqual([
+          {
+            label: 'Listen on Apple Music',
+            url: 'https://music.apple.com/album/song',
+          },
+        ]);
+      }
+    }
+  });
+
   it('treats the live pay control as the deferred tips surface', () => {
     for (const marker of [
       'pay-trigger',

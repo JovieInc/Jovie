@@ -6,12 +6,13 @@ import { createFeedbackItem } from '@/lib/feedback';
 import { notifySlackFeedbackSubmission } from '@/lib/notifications/providers/slack';
 
 export async function submitChatFeedback(params: {
+  /** App `users.id` from the chat session (`getOptionalAuth`). */
   clerkUserId: string;
   message: string;
 }): Promise<{ success: true } | { success: false; error: string }> {
   try {
     const userRecord = await db.query.users.findFirst({
-      where: eq(users.clerkId, params.clerkUserId),
+      where: eq(users.id, params.clerkUserId),
       columns: { id: true, name: true },
     });
 

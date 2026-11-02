@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   results: [] as unknown[][],
   ledger: vi.fn(),
+  execute: vi.fn(),
 }));
 
 function chain(result: unknown[]) {
@@ -14,7 +15,10 @@ function chain(result: unknown[]) {
 }
 
 vi.mock('@/lib/db', () => ({
-  db: { select: () => chain(mocks.results.shift() ?? []) },
+  db: {
+    select: () => chain(mocks.results.shift() ?? []),
+    execute: mocks.execute,
+  },
 }));
 vi.mock('./ledger.server', async importOriginal => ({
   ...(await importOriginal<typeof import('./ledger.server')>()),
@@ -27,6 +31,8 @@ vi.mock('@/constants/domains', () => ({
 import { getOutboundQueue } from './queue.server';
 
 const base = {
+  bio: null,
+  fitScoreBreakdown: { hasSpotify: 15, genreMatch: 10 },
   linktreeUrl: 'https://linktr.ee/x',
   avatarUrl: null,
   instagramHandle: null,
@@ -50,6 +56,8 @@ const base = {
 describe('getOutboundQueue', () => {
   beforeEach(() => {
     mocks.ledger.mockResolvedValue(new Map());
+    mocks.execute.mockReset();
+    mocks.execute.mockResolvedValue({ rows: [] });
   });
 
   it('joins certification and reply evidence into ranked rows', async () => {
@@ -88,25 +96,65 @@ describe('getOutboundQueue', () => {
           creatorProfileId: 'p3',
           profileUsername: 'cy',
         },
+        {
+          ...base,
+          id: 'd',
+          linktreeHandle: 'dee',
+          displayName: 'Dee',
+          contactEmail: 'dee@example.com',
+          status: 'ingested',
+          fitScore: 55,
+          creatorProfileId: 'p4',
+          profileUsername: 'dee',
+        },
+        {
+          ...base,
+          id: 'e',
+          linktreeHandle: 'eve',
+          displayName: 'Eve',
+          contactEmail: 'eve@example.com',
+          status: 'ingested',
+          fitScore: 55,
+          creatorProfileId: 'p5',
+          profileUsername: 'eve',
+        },
       ],
       [{ dedupeKey: 'email:ada@example.com' }],
       [{ leadId: 'c' }],
     ];
+    const full = { dsp: true, catalog: true, search: true, reachability: true };
+    mocks.execute.mockResolvedValue({
+      rows: [
+        { id: 'p4', ...full },
+        { id: 'p5', ...full, search: false, reachability: false },
+      ],
+    });
     const queue = await getOutboundQueue(new Date('2026-10-04T12:00:00Z'));
     expect(
       queue.rows.map(row => [row.leadId, row.view, row.nextAction])
     ).toEqual([
       ['a', 'certified', 'approve_message'],
-      ['b', 'ready', 'build_profile'],
+      ['d', 'ready', 'review_facts'],
+      ['e', 'needs_evidence', 'gather_evidence'],
+      ['b', 'needs_evidence', 'build_profile'],
       ['c', 'replied', 'await_claim'],
     ]);
+    expect(queue.rows.find(row => row.leadId === 'e')?.missingEvidence).toEqual(
+      ['search', 'reachability']
+    );
+    expect(mocks.execute).toHaveBeenCalledTimes(1);
     expect(queue.rows[0]).toMatchObject({
       name: 'Ada',
       dedupeKey: 'email:ada@example.com',
       profilePath: '/ada',
     });
-    expect(queue.counts).toMatchObject({ certified: 1, ready: 1, replied: 1 });
-    expect(mocks.ledger).toHaveBeenCalledWith(['a', 'b', 'c']);
+    expect(queue.counts).toMatchObject({
+      certified: 1,
+      ready: 1,
+      needs_evidence: 2,
+      replied: 1,
+    });
+    expect(mocks.ledger).toHaveBeenCalledWith(['a', 'b', 'c', 'd', 'e']);
   });
 
   it('returns an empty queue without extra reads', async () => {
@@ -114,5 +162,6 @@ describe('getOutboundQueue', () => {
     const queue = await getOutboundQueue();
     expect(queue.rows).toEqual([]);
     expect(queue.counts.ready).toBe(0);
+    expect(mocks.execute).not.toHaveBeenCalled();
   });
 });

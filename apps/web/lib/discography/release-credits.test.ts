@@ -336,7 +336,7 @@ describe('release credit integrity', () => {
     expect(reconciled.mismatch).toBeNull();
   });
 
-  it('does not hide a provider id conflict behind a case-only name match', () => {
+  it('collapses a same-name provider id conflict to one credit and records it', () => {
     const reconciled = reconcilePrimaryArtists({
       storedCredits: [
         {
@@ -354,10 +354,45 @@ describe('release credit integrity', () => {
       ],
     });
 
-    expect(reconciled.primaryArtists).toHaveLength(2);
-    expect(reconciled.mismatch).toMatchObject({
-      addedNames: ['Tones And I'],
+    expect(reconciled.primaryArtists.map(credit => credit.name)).toEqual([
+      'Tones and I',
+    ]);
+    expect(reconciled.mismatch).toBeNull();
+    expect(reconciled.idConflicts).toEqual([
+      {
+        provider: 'spotify',
+        name: 'Tones And I',
+        storedProviderId: 'different-spotify-artist',
+        providerId: 'tones-and-i',
+      },
+    ]);
+  });
+
+  it('never shows a duplicate name when a stored id is stale (JOVIE-WEB-W3)', () => {
+    const stored = ['Dimitri Vegas', 'David Guetta', 'Loreen'].map(
+      (name, position) => ({
+        artistId: `artist-${position}`,
+        spotifyId: position === 0 ? 'stale-dimitri' : `sp-${position}`,
+        name,
+        handle: null,
+        role: 'main_artist' as const,
+        position,
+        isPrimary: true,
+      })
+    );
+    const reconciled = materializeReleaseCreditPayload({
+      storedCredits: stored,
+      providerArtists: [
+        { provider: 'spotify', id: 'real-dimitri', name: 'Dimitri Vegas' },
+        { provider: 'spotify', id: 'sp-1', name: 'David Guetta' },
+        { provider: 'spotify', id: 'sp-2', name: 'Loreen' },
+      ],
     });
+
+    const names = reconciled.primaryArtists.map(credit => credit.name);
+    expect(names).toEqual(['Dimitri Vegas', 'David Guetta', 'Loreen']);
+    expect(new Set(names).size).toBe(names.length);
+    expect(reconciled.mismatch).toBeNull();
   });
 
   it('does not treat unrelated neighbors as a split provider artist', () => {

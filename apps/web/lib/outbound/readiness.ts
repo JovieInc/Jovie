@@ -54,7 +54,10 @@ export interface ReadinessInputs {
   } | null;
   readonly funnel: FunnelJudgeReceipt | null;
   readonly queue: {
+    /** Evidence complete: Tim can review facts and certify. */
     readonly ready: number;
+    readonly needsEvidence: number;
+    readonly flagged: number;
     readonly certified: number;
     readonly approved: number;
     readonly needsProfile: number;
@@ -84,7 +87,7 @@ export interface ReadinessInputs {
 /** Linear work that blocks onboarding artists, in the order it unblocks. */
 export const READINESS_BLOCKING_ISSUES = [
   { id: 'JOV-7192', label: 'Golden Path Nightly green', owner: 'billing' },
-  { id: 'JOV-7794', label: 'Proof gaps on the $199 path', owner: 'proof' },
+  { id: 'JOV-7794', label: 'Proof gaps on the $12 path', owner: 'proof' },
   {
     id: 'JOV-7628',
     label: 'Consent, quiet hours, creator-generic copy (#20462)',
@@ -146,7 +149,7 @@ export function buildOutboundReadiness(
     detail: !input.cone
       ? 'Eligibility could not be read; outbound stays held.'
       : input.cone.eligible
-        ? 'Every $199 cone receipt is green.'
+        ? 'Every $12 cone receipt is green.'
         : `${input.cone.requirements.filter(r => r.status !== 'green').length} of ${input.cone.requirements.length} receipts not green`,
     owner: 'revenue',
     href: null,
@@ -190,7 +193,7 @@ export function buildOutboundReadiness(
         : 'red',
     detail: !queue
       ? 'Outbound queue could not be read.'
-      : `${queue.ready - queue.needsProfile} built profiles to review · ${queue.needsProfile} waiting on a profile build · ${queue.certified} certified · ${queue.approved} approved`,
+      : `${queue.ready} ready to certify · ${queue.needsEvidence} need evidence (${queue.needsProfile} waiting on a profile build) · ${queue.flagged} flagged · ${queue.certified} certified · ${queue.approved} approved`,
     owner: 'Tim',
     href: '/app/ov/outbound',
   });

@@ -83,6 +83,8 @@ function loadNextConfigForTracingTest(vercelEnv = ''): NextConfigForTest {
         return () => identityConfig;
       case '@sentry/nextjs/config':
         return { withSentryConfig: identityConfig };
+      case './lib/routing/legacy-profile-alias-redirects':
+        return repoRequire(resolve(configDirectory, specifier));
       default:
         throw new Error(`Unexpected next.config.js dependency: ${specifier}`);
     }

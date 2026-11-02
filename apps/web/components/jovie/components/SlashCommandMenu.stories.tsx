@@ -1,3 +1,4 @@
+import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Paperclip } from 'lucide-react';
 import { fn } from 'storybook/test';
@@ -6,6 +7,13 @@ import { SlashCommandMenu } from './SlashCommandMenu';
 const meta = {
   title: 'Jovie/Components/SlashCommandMenu',
   component: SlashCommandMenu,
+  decorators: [
+    Story => (
+      <div className='system-b-chat-composer-picker-shell isolate w-140 overflow-hidden'>
+        <Story />
+      </div>
+    ),
+  ],
   parameters: {
     layout: 'centered',
     backgrounds: { default: 'dark' },

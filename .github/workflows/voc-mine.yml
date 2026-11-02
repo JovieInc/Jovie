@@ -34,6 +34,9 @@ jobs:
         run: echo "::notice::VOC_TARGETS_JSON is not set; skipping. See scripts/voc/README.md."
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: env.VOC_TARGETS_JSON != ''
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ (env.VOC_TARGETS_JSON != '') && hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         if: env.VOC_TARGETS_JSON != ''
         with:

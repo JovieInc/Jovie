@@ -49,12 +49,12 @@ const MAX_BODY_SIZE = 8 * 1024;
 
 export async function POST(request: Request) {
   try {
-    const { userId: clerkId } = await getCachedAuth();
-    if (!clerkId) {
+    const { userId: appUserId } = await getCachedAuth();
+    if (!appUserId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const rateLimit = await generalLimiter.limit(clerkId);
+    const rateLimit = await generalLimiter.limit(appUserId);
     if (!rateLimit.success) {
       return NextResponse.json(
         { error: 'Too many feedback submissions' },
@@ -75,8 +75,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
     }
 
+    // getCachedAuth().userId is users.id. clerk_id is null for Better Auth users.
     const userRecord = await db.query.users.findFirst({
-      where: eq(users.clerkId, clerkId),
+      where: eq(users.id, appUserId),
       columns: { id: true },
     });
     if (!userRecord) {

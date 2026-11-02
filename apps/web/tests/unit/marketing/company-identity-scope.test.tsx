@@ -9,6 +9,7 @@ import {
   ABOUT_FAQ_ITEMS,
   AboutPageContent,
 } from '@/components/organisms/AboutPageContent';
+import { ABOUT_COPY, ABOUT_DEFINITION } from '@/data/aboutCopy';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import { HOMEPAGE_COPY } from '@/data/homepageCopy';
 import { buildOrganizationSchema } from '@/lib/constants/schemas';
@@ -20,6 +21,7 @@ import {
   requiresSpotifyCatalogOrFollowers,
   SPECIALIST_API_IDENTITY_SURFACES,
 } from '@/lib/marketing/company-identity-policy';
+import { applyRootTitleTemplate } from '@/lib/seo/document-title';
 
 vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
@@ -83,8 +85,10 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
   });
 
   it('keeps homepage metadata general while the page body sells the artist profile', () => {
-    // EVENT 2026-10-20: the visible homepage sells the artist profile, but
-    // metadata and structured data stay on the general company identity.
+    // EVENT 2026-10-20: the visible homepage sells the artist profile.
+    // JOV-8565: the homepage WebSite/SoftwareApplication JSON-LD speaks with
+    // the approved artist-profile launch, while page metadata and the
+    // Organization schema stay on the general company identity.
     const page = readWebSource('app/(home)/page.tsx');
     expect(page).toContain('COMPANY_IDENTITY.seoDescription');
     expect(page).toContain('description: COMPANY_IDENTITY.seoDescription');
@@ -94,37 +98,27 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
     );
   });
 
-  it('renders About as a general company definition with a labeled artist example', () => {
+  it('renders About as a general company page with no segment example', () => {
     render(<AboutPageContent />);
 
     expect(
-      screen.getByRole('heading', {
-        level: 1,
-        name: COMPANY_IDENTITY.headline,
-      })
+      screen.getByRole('heading', { level: 1, name: ABOUT_COPY.headline })
     ).toBeVisible();
-    expect(
-      screen.getByRole('heading', {
-        level: 1,
-        name: COMPANY_IDENTITY.headline,
-      }).nextElementSibling
-    ).toHaveTextContent(COMPANY_IDENTITY.definition);
-    expect(
-      screen.getByRole('heading', { level: 3, name: 'For Artists' })
-    ).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'For Artists' })).toBeNull();
     expect(
       isArtistOnlyCompanyDefinition(
-        `${COMPANY_IDENTITY.headline} ${COMPANY_IDENTITY.support} ${ABOUT_FAQ_ITEMS[0]?.answer}`
+        `${ABOUT_COPY.headline} ${ABOUT_DEFINITION} ${ABOUT_FAQ_ITEMS[0]?.answer}`
       )
     ).toBe(false);
   });
 
   it('uses general metadata, Open Graph, and Organization schema on /about', async () => {
     const { metadata } = await import('../../../app/(marketing)/about/page');
-    const expectedTitle = `About Jovie: ${COMPANY_IDENTITY.headline.replace(/\.$/, '')}`;
 
-    expect(metadata.title).toBe(expectedTitle);
-    expect(String(metadata.description)).toContain(COMPANY_IDENTITY.definition);
+    expect(applyRootTitleTemplate(metadata.title)).toBe(
+      ABOUT_COPY.metadataTitle
+    );
+    expect(String(metadata.description)).toBe(ABOUT_COPY.metadataDescription);
     expect(isArtistOnlyCompanyDefinition(String(metadata.description))).toBe(
       false
     );
@@ -142,7 +136,7 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
     expect(schema.description).toBe(COMPANY_IDENTITY.definition);
     expect(schema.knowsAbout).toEqual([...COMPANY_IDENTITY.knowsAbout]);
     expect(schema.knowsAbout).toContain('Independent Creators');
-    expect(schema.knowsAbout).toContain('Music Marketing');
+    expect(schema.knowsAbout).toContain('Public Identity');
   });
 
   it('uses general root-layout and signup metadata defaults', async () => {

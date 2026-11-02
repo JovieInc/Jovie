@@ -14,8 +14,8 @@ async function getAuthenticatedUserProfile(): Promise<{
   profileId: string;
   usernameNormalized: string;
 } | null> {
-  const { userId: clerkUserId } = await getOptionalAuth();
-  if (!clerkUserId) return null;
+  const { userId: appUserId } = await getOptionalAuth();
+  if (!appUserId) return null;
 
   const [row] = await db
     .select({
@@ -24,7 +24,7 @@ async function getAuthenticatedUserProfile(): Promise<{
     })
     .from(creatorProfiles)
     .innerJoin(users, eq(users.activeProfileId, creatorProfiles.id))
-    .where(eq(users.clerkId, clerkUserId))
+    .where(eq(users.id, appUserId))
     .limit(1);
 
   if (!row) return null;

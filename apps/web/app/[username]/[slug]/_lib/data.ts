@@ -5,12 +5,21 @@
  * Used by both the main smart link page and the /sounds page.
  */
 
-import { and, sql as drizzleSql, eq, isNotNull, isNull } from 'drizzle-orm';
+import {
+  and,
+  sql as drizzleSql,
+  eq,
+  gt,
+  isNotNull,
+  isNull,
+  or,
+} from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
 import { sanitizeCacheTags } from '@/lib/cache/tags';
 import { db, doesColumnExist, withRetry } from '@/lib/db';
 import { QUERY_TIMEOUTS } from '@/lib/db/query-timeout';
+import { users } from '@/lib/db/schema/auth';
 import {
   type ArtistRole,
   artists,
@@ -35,6 +44,7 @@ import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { env } from '@/lib/env-server';
 import { captureWarning } from '@/lib/error-tracking';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
+import { shouldHideTestProfileFromDirectUrl } from '@/lib/profile/test-profile-policy';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { logger } from '@/lib/utils/logger';
 import { shouldBypassPublicProfileQaCache } from '../../_lib/public-profile-qa';
@@ -264,6 +274,14 @@ function attachCanonicalCredits(
         skippedFeaturedNames: reconciled.mismatch.skippedFeaturedNames,
       }
     );
+  }
+
+  if (reconciled.idConflicts && reconciled.idConflicts.length > 0) {
+    logger.info('Release credit provider id conflict collapsed by name', {
+      entityType: context.entityType,
+      entityId: context.entityId,
+      conflicts: reconciled.idConflicts,
+    });
   }
 
   const primaryArtists = toSmartLinkPrimaryEntries(reconciled.primaryArtists);
@@ -511,9 +529,29 @@ const fetchCreatorByUsername = async (usernameNormalized: string) => {
       .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
       .limit(1);
 
+    if (!creator) return null;
+
+    // Test/e2e/golden-path accounts have no public smart-link pages either.
+    if (creator.userId) {
+      const [owner] = await db
+        .select({ email: users.email })
+        .from(users)
+        .where(eq(users.id, creator.userId))
+        .limit(1);
+      if (
+        shouldHideTestProfileFromDirectUrl({
+          handle: creator.usernameNormalized,
+          ownerEmail: owner?.email,
+          settings: creator.settings,
+        })
+      ) {
+        return null;
+      }
+    }
+
     // Schema-rollout fallback only: this is not canonical profile state.
     // Revisit once these columns exist in every environment.
-    return creator ? { ...fallbacks, ...creator } : null;
+    return { ...fallbacks, ...creator };
   }, `smartLinkCreator(${usernameNormalized})`);
 };
 
@@ -878,9 +916,12 @@ function rehydrateContent(
 }
 
 /**
- * Soft presence check for an entity that exists but is not public-eligible yet.
- * Used to convert 404s into alerts opt-in (JOV-3682). Does not leak draft
- * status beyond title + existence; deleted rows still resolve to null.
+ * Soft presence check for a genuinely upcoming release: a non-deleted row that
+ * is not public-eligible yet AND has a future release or reveal date. Used to
+ * convert 404s into alerts opt-in (JOV-3682). Orphans (drafts, past-dated rows
+ * that never became eligible, stale duplicates) resolve to null so the route
+ * returns a real 404 instead of a misleading "Coming soon" page. Does not leak
+ * draft status beyond title + existence; deleted rows resolve to null.
  */
 export async function getUnpublishedReleasePresence(
   creatorProfileId: string,
@@ -898,7 +939,11 @@ export async function getUnpublishedReleasePresence(
         and(
           eq(discogReleases.creatorProfileId, creatorProfileId),
           eq(discogReleases.slug, slug),
-          isNull(discogReleases.deletedAt)
+          isNull(discogReleases.deletedAt),
+          or(
+            gt(discogReleases.releaseDate, drizzleSql`NOW()`),
+            gt(discogReleases.revealDate, drizzleSql`NOW()`)
+          )
         )
       )
       .limit(1);

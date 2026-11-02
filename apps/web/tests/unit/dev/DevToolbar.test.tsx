@@ -242,25 +242,29 @@ describe('DevToolbar', () => {
   });
 
   describe('UX latency telemetry', () => {
-    it('keeps a fixed five-metric strip for empty and populated samples', async () => {
+    it('keeps a fixed six-metric strip for empty and populated samples', async () => {
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
       const strip = screen.getByTestId('dev-toolbar-latency');
-      expect(strip).toHaveClass('h-12');
-      expect(strip.querySelectorAll('[data-metric]')).toHaveLength(5);
-      expect(screen.getAllByText(/P50 — · P95 —/)).toHaveLength(5);
+      expect(strip).toHaveClass('h-12', 'overflow-x-auto');
+      expect(strip.querySelectorAll('[data-metric]')).toHaveLength(6);
+      expect(screen.getAllByText(/P50 — · P95 —/)).toHaveLength(6);
 
       recordUxLatency('chat_first_token', 125);
       recordUxLatency('chat_first_token', 300);
+      recordUxLatency('ovie_home_ready', 950);
 
       await waitFor(() => {
         expect(
           strip.querySelector('[data-metric="chat_first_token"]')
         ).toHaveTextContent('P50 125ms · P95 300ms');
+        expect(
+          strip.querySelector('[data-metric="ovie_home_ready"]')
+        ).toHaveTextContent('P50 950ms · P95 950ms');
       });
-      expect(strip).toHaveClass('h-12');
-      expect(strip.querySelectorAll('[data-metric]')).toHaveLength(5);
+      expect(strip).toHaveClass('h-12', 'overflow-x-auto');
+      expect(strip.querySelectorAll('[data-metric]')).toHaveLength(6);
     });
 
     it('does not render latency chrome while the toolbar is collapsed', () => {

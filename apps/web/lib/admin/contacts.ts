@@ -1,6 +1,10 @@
 import 'server-only';
 
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
+import {
+  getCustomerPopulationExclusions,
+  isCustomerContactSource,
+} from '@/lib/admin/customer-population';
 import {
   type CanonicalContactRow,
   type CanonicalContactSourceRow,
@@ -16,7 +20,7 @@ import { db, doesTableExist } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { contactStageTransitions, contacts } from '@/lib/db/schema/contacts';
 import { leads } from '@/lib/db/schema/leads';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { captureError } from '@/lib/error-tracking';
 import { isInternalOrTestAccountEmail } from '@/lib/utils/email';
@@ -389,21 +393,84 @@ async function collectSourceRows(): Promise<CanonicalContactSourceRow[]> {
       .limit(SOURCE_SCAN_LIMIT),
   ]);
 
+  const owners = profileRows.length
+    ? await db
+        .select({
+          creatorProfileId: userProfileClaims.creatorProfileId,
+          userId: userProfileClaims.userId,
+        })
+        .from(userProfileClaims)
+        .where(
+          and(
+            eq(userProfileClaims.role, 'owner'),
+            inArray(
+              userProfileClaims.creatorProfileId,
+              profileRows.map(row => row.id)
+            )
+          )
+        )
+    : [];
+  const ownerByProfile = new Map(
+    owners.map(row => [row.creatorProfileId, row.userId])
+  );
+  const ownedProfiles = profileRows.map(profile => ({
+    ...profile,
+    userId: ownerByProfile.get(profile.id) ?? profile.userId,
+  }));
+  // Source scans are capped independently. Resolve identity edges even when
+  // their user/waitlist row falls outside the newest source batch.
+  const knownUserIds = new Set(userRows.map(row => row.id));
+  const linkedUserIds = [
+    ...new Set(
+      [
+        ...ownedProfiles.map(row => row.userId),
+        ...leadRows.map(row => row.signupUserId),
+      ].filter((id): id is string => !!id && !knownUserIds.has(id))
+    ),
+  ];
+  const knownWaitlistIds = new Set(waitlistRows.map(row => row.id));
+  const linkedWaitlistIds = [
+    ...new Set(
+      ownedProfiles
+        .map(row => row.waitlistEntryId)
+        .filter((id): id is string => !!id && !knownWaitlistIds.has(id))
+    ),
+  ];
+  const [linkedUsers, linkedWaitlist] = await Promise.all([
+    linkedUserIds.length
+      ? db
+          .select({ id: users.id, email: users.email })
+          .from(users)
+          .where(inArray(users.id, linkedUserIds))
+      : [],
+    linkedWaitlistIds.length
+      ? db
+          .select({
+            id: waitlistEntries.id,
+            emailNormalized: waitlistEntries.emailNormalized,
+          })
+          .from(waitlistEntries)
+          .where(inArray(waitlistEntries.id, linkedWaitlistIds))
+      : [],
+  ]);
   const rows: CanonicalContactSourceRow[] = [];
 
   // Cross-source identity hints: a profile or lead linked to a user/waitlist
   // row should dedupe onto that person's email key instead of its own handle.
-  const emailByUserId = mapEmails(userRows, u => [u.id, u.email]);
-  const emailByWaitlistEntryId = mapEmails(waitlistRows, e => [
-    e.id,
-    e.emailNormalized,
+  const emailByUserId = mapEmails([...userRows, ...linkedUsers], u => [
+    u.id,
+    u.email,
   ]);
+  const emailByWaitlistEntryId = mapEmails(
+    [...waitlistRows, ...linkedWaitlist],
+    e => [e.id, e.emailNormalized]
+  );
 
   rows.push(
     ...waitlistRows.map(waitlistSourceRow).filter(nonNull),
     ...leadRows.map(lead => leadSourceRow(lead, emailByUserId)).filter(nonNull),
     ...userRows.map(userSourceRow).filter(nonNull),
-    ...profileRows
+    ...ownedProfiles
       .map(profile =>
         profileSourceRow(profile, emailByUserId, emailByWaitlistEntryId)
       )
@@ -488,11 +555,18 @@ export async function getCanonicalContactByKey(
 }
 
 async function buildCanonicalContacts(): Promise<CanonicalContactListRow[]> {
-  const [sourceRows, overrides] = await Promise.all([
+  const [sourceRows, overrides, excluded] = await Promise.all([
     collectSourceRows(),
     getContactOverrides(),
+    getCustomerPopulationExclusions(),
   ]);
-  return applyOverrides(mergeCanonicalContacts(sourceRows), overrides);
+  const customerSources = sourceRows.filter(row =>
+    isCustomerContactSource(row, excluded)
+  );
+  return applyOverrides(
+    mergeCanonicalContacts(customerSources),
+    overrides
+  ).filter(row => isCustomerContactSource(row, excluded));
 }
 
 export function canonicalContactMatchesSearch(

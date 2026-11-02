@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/ReleaseProviderMatrix.test.tsx
+
 import { ConfirmDialog } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import {
@@ -1086,7 +1088,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 onGenerateAlbumArt={handleGenerateAlbumArt}
                 onGeneratePitch={handleGeneratePitch}
                 columnVisibility={columnVisibility}
-                rowHeight={46}
+                rowMode='dense'
                 showTracks={showTracks}
                 groupByYear={groupByYear}
                 selectedReleaseId={editingRelease?.id}
@@ -1133,6 +1135,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         <SpotifyConnectDialog
           open={spotifySearchOpen}
           onOpenChange={setSpotifySearchOpen}
+          connected={isConnected}
+          connectedArtistName={artistName}
           onConnected={handleArtistConnected}
           onImportStart={handleImportStart}
         />

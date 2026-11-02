@@ -104,6 +104,27 @@ describe('MobileReleaseList', () => {
     expect(screen.getByText('No Date Release')).toBeInTheDocument();
   });
 
+  it('truncates long credit lists to "A and N more" with the full list on title', () => {
+    render(
+      <MobileReleaseList
+        releases={[
+          createRelease({
+            artistNames: ['Vigel', 'Cosmic Gate', 'LYNX'],
+          }),
+        ]}
+        artistName='Vigel'
+        onEdit={vi.fn()}
+      />
+    );
+
+    // ds-cert:credit-format: mobile rows truncate through the canonical
+    // formatter (budget of one) and keep the full list reachable via title.
+    expect(screen.getByText('Vigel and 2 more')).toBeInTheDocument();
+    expect(
+      screen.getByTitle('Vigel, Cosmic Gate and LYNX')
+    ).toBeInTheDocument();
+  });
+
   it('routes row taps through the edit handler', async () => {
     const user = userEvent.setup();
     const onEdit = vi.fn();
@@ -152,6 +173,23 @@ describe('MobileReleaseList', () => {
     expect(badge.className).toContain('inline-flex');
     expect(badge.className).toContain('items-center');
     expect(badge.className).toContain('leading-none');
+  });
+
+  it('scans titles through the shared titleClassName token with the target-size floor', () => {
+    render(
+      <MobileReleaseList
+        releases={[createRelease()]}
+        artistName='Jovie Artist'
+        onEdit={vi.fn()}
+      />
+    );
+
+    // The shared row-typography keys are className tokens, not copy: the
+    // dense-row 24px WCAG 2.5.8 target floor rides on the shared constant.
+    expect(screen.getByText('Summer Lights').className).toContain('min-h-6');
+    const source = readWebSource(mobileReleaseListSourcePath);
+    expect(source).toContain('shellReleaseRowTypography.titleClassName');
+    expect(source).toContain('shellReleaseRowTypography.subtitleClassName');
   });
 
   it('imports mobile tokens from the direct module instead of the barrel', () => {

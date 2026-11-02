@@ -23,6 +23,7 @@
  */
 import { execFile } from 'node:child_process';
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
@@ -75,6 +76,51 @@ function githubHeaders(token) {
   return token
     ? { Authorization: `Bearer ${token}`, 'X-GitHub-Api-Version': '2022-11-28' }
     : {};
+}
+
+/**
+ * Controller failure streak: healthy unless the newest `receipt.streak` (default 3) conclusive runs (success or
+ * failure; skipped and cancelled runs carry no verdict) all failed. A streak reports the newest success time (or
+ * epoch when none), which is always older than the entry's silence budget, so it goes silent with the run ids named.
+ */
+export async function observeWorkflowFailureStreak(
+  receipt,
+  { fetchImpl, token, nowMs, apiUrl = GITHUB_API }
+) {
+  const streak = receipt.streak ?? 3;
+  const branch = receipt.branch
+    ? `&branch=${encodeURIComponent(receipt.branch)}`
+    : '';
+  const url = `${apiUrl}/repos/${receipt.repo}/actions/workflows/${encodeURIComponent(receipt.workflow)}/runs?status=completed&per_page=50${branch}`;
+  const read = await readJson(fetchImpl, url, githubHeaders(token));
+  if (!read.ok) return { ok: false, reason: `github-${read.reason}` };
+  if (!Array.isArray(read.body?.workflow_runs))
+    return { ok: false, reason: 'github-runs-unreadable' };
+  const conclusive = read.body.workflow_runs
+    .filter(
+      row => row?.conclusion === 'success' || row?.conclusion === 'failure'
+    )
+    .sort((a, b) =>
+      String(b?.created_at ?? '').localeCompare(String(a?.created_at ?? ''))
+    );
+  const newest = conclusive.slice(0, streak);
+  if (
+    newest.length === streak &&
+    newest.every(row => row.conclusion === 'failure')
+  ) {
+    const lastSuccess = conclusive.find(row => row.conclusion === 'success');
+    return {
+      ok: true,
+      lastProofAt: lastSuccess?.updated_at ?? new Date(0).toISOString(),
+      detailOnStale: true,
+      reason: `${streak}-consecutive-failures[${newest.map(row => row.id).join(',')}]`,
+    };
+  }
+  return {
+    ok: true,
+    lastProofAt: new Date(nowMs).toISOString(),
+    reason: 'no-failure-streak',
+  };
 }
 
 /** Last run of a workflow whose conclusion is one of `receipt.conclusions`. */
@@ -237,11 +283,15 @@ function mainRefFailure(error, status) {
 const execFileAsync = promisify(execFile);
 
 function gitProbeEnv(token) {
-  // Spreading process.env drops its index signature, so later GIT_CONFIG_*
-  // writes are not assignable unless the bag is typed as the real env.
+  // Keep the probe independent of inherited credentials and Git settings.
   /** @type {NodeJS.ProcessEnv} */
   const env = {
-    ...process.env,
+    PATH: process.env.PATH ?? '',
+    // A non-directory also prevents libcurl from loading inherited ~/.netrc.
+    HOME: '/dev/null',
+    GIT_CONFIG_GLOBAL: '/dev/null',
+    GIT_CONFIG_SYSTEM: '/dev/null',
+    GIT_CONFIG_NOSYSTEM: '1',
     GIT_TERMINAL_PROMPT: '0',
     GCM_INTERACTIVE: 'never',
   };
@@ -266,7 +316,9 @@ function gitProbeEnv(token) {
 
 async function defaultGit(args, env) {
   const { stdout } = await execFileAsync('git', args, {
+    cwd: tmpdir(),
     timeout: TIMEOUT_MS,
+    maxBuffer: 8192,
     env,
     encoding: 'utf8',
     windowsHide: true,
@@ -275,26 +327,34 @@ async function defaultGit(args, env) {
 }
 
 /**
- * refs/heads/main over the git protocol. The token stays in the child
- * environment, never in argv. A failure returns null so the REST fallback
- * can still run.
+ * refs/heads/main over the git protocol. Try anonymously before retrying
+ * with the token in the child environment, never in argv. A failure returns
+ * null so the REST fallback can still run.
  */
 export async function lsRemoteMain(repo, token, gitExec = defaultGit) {
   if (!/^[^/\s]+\/[^/\s]+$/.test(String(repo ?? ''))) return null;
-  try {
-    const stdout = await gitExec(
-      [
-        'ls-remote',
-        '--refs',
-        `https://github.com/${repo}.git`,
-        'refs/heads/main',
-      ],
-      gitProbeEnv(token)
-    );
+  const args = [
+    'ls-remote',
+    '--refs',
+    `https://github.com/${repo}.git`,
+    'refs/heads/main',
+  ];
+  const read = async authToken => {
+    const stdout = await gitExec(args, gitProbeEnv(authToken));
     const sha = String(stdout ?? '')
       .trim()
       .split(/\s+/)[0];
     return SHA_RE.test(sha ?? '') ? sha : null;
+  };
+  try {
+    const anonymous = await read(undefined);
+    if (anonymous) return anonymous;
+  } catch {
+    // A failed anonymous read may still recover with the Actions token.
+  }
+  if (!token) return null;
+  try {
+    return await read(token);
   } catch {
     return null;
   }
@@ -370,13 +430,62 @@ async function readMainSha(client, repo, headers, apiUrl, readGitTip) {
   }
 }
 
+/** Read only the oldest missing commit; retry transients through the shared client. */
+async function readUnshippedRange(url, { client, fetchImpl, token }) {
+  const read = async (reader, authToken, maxAttempts) => {
+    try {
+      const response = await reader.request({
+        url,
+        headers: {
+          Accept: 'application/json',
+          'Cache-Control': 'no-cache',
+          ...githubHeaders(authToken),
+        },
+        priority: 'report',
+        conditional: false,
+        maxAttempts,
+        maxWaitMs: TIMEOUT_MS,
+        timeoutMs: TIMEOUT_MS,
+      });
+      if (response.status !== 200)
+        return {
+          ok: false,
+          reason: `http-${response.status}`,
+          publicRecovery: response.status === 403,
+        };
+      return { ok: true, body: response.json() };
+    } catch (error) {
+      return {
+        ok: false,
+        reason: error?.status
+          ? `http-${error.status}`
+          : (error?.failure ?? error?.kind ?? 'unreadable'),
+        publicRecovery:
+          error?.status === 403 || ['shed', 'budget'].includes(error?.kind),
+      };
+    }
+  };
+  const authenticated = await read(client, token, 2);
+  if (authenticated.ok || !token || !authenticated.publicRecovery)
+    return authenticated;
+  // Jovie is public. A denied/exhausted Actions credential must not hide an
+  // otherwise readable range. The public read has its own shared budget and
+  // one attempt; it carries no token and still requires a real comparison.
+  const publicClient = createApiClient({
+    provider: 'github',
+    credential: hashCredential('github', ''),
+    fetch: fetchImpl,
+  });
+  return read(publicClient, '', 1);
+}
+
 /**
  * Production promotion heartbeat, independent of the continuity guard's own
  * verdict: production carrying main is a fresh proof; otherwise the proof is
  * as old as the oldest missing commit has been on main. Unreadable is unknown
  * (red), never healthy.
  */
-export async function observeProductionFreshness(
+async function observeProductionFreshnessProof(
   receipt,
   { fetchImpl, token, nowMs, githubClient, apiUrl = GITHUB_API, lsRemote }
 ) {
@@ -404,12 +513,18 @@ export async function observeProductionFreshness(
   const now = new Date(nowMs).toISOString();
   if (live === main)
     return { ok: true, lastProofAt: now, reason: 'production-current' };
-  const compare = await readJson(
+  const compareUrl = `${apiUrl}/repos/${receipt.repo}/compare/${live}...${main}?per_page=1`;
+  const compare = await readUnshippedRange(compareUrl, {
+    client,
     fetchImpl,
-    `${apiUrl}/repos/${receipt.repo}/compare/${live}...${main}`,
-    headers
-  );
-  if (!compare.ok) return { ok: false, reason: 'unshipped-range-unreadable' };
+    token,
+  });
+  if (!compare.ok)
+    return {
+      ok: false,
+      reason: `unshipped-range-${compare.reason}`,
+      url: compareUrl,
+    };
   if (Number(compare.body?.ahead_by) === 0)
     return { ok: true, lastProofAt: now, reason: 'production-current' };
   const oldestCommit = compare.body?.commits?.[0];
@@ -429,6 +544,30 @@ export async function observeProductionFreshness(
     lastProofAt: landedAt,
     reason: `${compare.body.ahead_by}-commits-unshipped`,
   };
+}
+
+const FEED_BUDGET_MIN_MINUTES = 60;
+const FEED_BUDGET_MAX_MINUTES = 24 * 60;
+
+/**
+ * Production promotion heartbeat with ONE source of truth for its silence budget: the measured p95 of normal
+ * merge-to-production lag, recomputed weekly by the lanes doctor and published in the lanes feed
+ * (`deployHealth.limits[repo].ageS`). Bounded to 1 to 24 hours; an unreadable or out-of-bounds feed falls back to
+ * the receipt's own `fallbackBudgetMinutes` (246, the p95 measured 2026-10-25), never a separate static budget.
+ */
+export async function observeProductionFreshness(receipt, context) {
+  const proof = await observeProductionFreshnessProof(receipt, context);
+  if (!proof.ok || !receipt.limitsUrl) return proof;
+  const feed = await readJson(context.fetchImpl, receipt.limitsUrl);
+  const ageS = feed.ok
+    ? feed.body?.deployHealth?.limits?.[receipt.repo]?.ageS
+    : undefined;
+  const minutes = Number.isFinite(ageS) ? Math.ceil(ageS / 60) : NaN;
+  const budgetMinutes =
+    minutes >= FEED_BUDGET_MIN_MINUTES && minutes <= FEED_BUDGET_MAX_MINUTES
+      ? minutes
+      : receipt.fallbackBudgetMinutes;
+  return { ...proof, budgetMinutes };
 }
 
 /**
@@ -730,6 +869,8 @@ export async function observeEntry(entry, context) {
   const receipt = entry.receipt ?? {};
   if (receipt.kind === 'github-workflow')
     return observeGithubWorkflow(receipt, context);
+  if (receipt.kind === 'workflow-failure-streak')
+    return observeWorkflowFailureStreak(receipt, context);
   if (receipt.kind === 'json-timestamp')
     return observeJsonTimestamp(receipt, context);
   if (receipt.kind === 'production-freshness')
@@ -905,13 +1046,19 @@ export async function main({
   if (env.GITHUB_STEP_SUMMARY)
     appendFileSync(env.GITHUB_STEP_SUMMARY, summary(report));
 
-  const state = { ...previous };
-  for (const row of report.results) {
-    if (row.critical)
-      state[livenessFingerprint(row.id)] =
-        row.status === 'fresh' ? 'green' : 'red';
-  }
+  // Alert state only moves when the decisions are actually applied
+  // (JOV-8843). A diagnostic run (no --file) or a disabled-intake run
+  // (REMEDIATION_INTAKE_DISABLED=1) observes and reports but must preserve
+  // the persisted state: otherwise a run that never filed could still flip a
+  // fingerprint green, silently dropping a red->green resolution the next
+  // filing run would have delivered (an open alert stuck unresolved).
   if (args.file && env.REMEDIATION_INTAKE_DISABLED !== '1') {
+    const state = { ...previous };
+    for (const row of report.results) {
+      if (row.critical)
+        state[livenessFingerprint(row.id)] =
+          row.status === 'fresh' ? 'green' : 'red';
+    }
     const { applyRemediationDecisionWithRetry } = await import(
       './lib/remediation-signal.mjs'
     );
@@ -931,9 +1078,9 @@ export async function main({
         state[decision.fingerprint] =
           previous[decision.fingerprint] ?? 'unknown';
     }
+    if (args.previous)
+      writeFileSync(args.previous, `${JSON.stringify(state, null, 2)}\n`);
   }
-  if (args.previous)
-    writeFileSync(args.previous, `${JSON.stringify(state, null, 2)}\n`);
   process.stdout.write(
     `${JSON.stringify({ status: report.status, red: report.results.filter(row => row.status !== 'fresh').map(row => row.id) })}\n`
   );

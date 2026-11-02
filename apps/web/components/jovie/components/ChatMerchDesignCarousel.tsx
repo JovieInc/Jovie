@@ -372,20 +372,34 @@ export function ChatMerchDesignCarousel({
       <p className='mb-3 text-xs text-secondary-token'>
         Do you like any of these?
       </p>
-      <div className='flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 sm:grid sm:grid-cols-3 sm:overflow-visible'>
+      {/* Always a three-column grid: equal tiles, no base-vs-breakpoint
+          display override for split CSS chunks to reorder. */}
+      <div className='grid grid-cols-3 gap-2 pb-2 sm:gap-3'>
         {result.designs.slice(0, 3).map(design => (
           <article
             key={design.id}
             data-testid='chat-merch-option-card'
-            className='group relative min-w-64 snap-start overflow-hidden rounded-xl bg-surface-0 sm:min-w-0'
+            className='flex h-full min-w-0 flex-col overflow-hidden rounded-xl bg-surface-0'
           >
-            <div className='relative aspect-square'>
+            {/* Nothing sits on the artwork: it already carries its own print. */}
+            <div
+              className='relative aspect-square'
+              data-testid='chat-merch-option-art'
+            >
               <DesignArt design={design} />
-              <div className='pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/70 to-transparent' />
+            </div>
+            <div
+              className='flex min-w-0 flex-1 flex-col justify-between gap-2 px-2.5 py-3'
+              data-testid='chat-merch-option-caption'
+            >
+              <h3 className='line-clamp-3 text-xs font-medium leading-snug text-primary-token sm:text-sm'>
+                {design.design_name}
+              </h3>
               <Button
                 type='button'
                 size='sm'
-                className='absolute bottom-2 right-2 z-10 whitespace-nowrap'
+                variant='secondary'
+                className='w-full whitespace-nowrap'
                 onClick={() => loadProducts(design)}
                 disabled={design.status !== 'ready' || pendingAction !== null}
               >
@@ -395,11 +409,6 @@ export function ChatMerchDesignCarousel({
                 ) : null}
                 Select
               </Button>
-            </div>
-            <div className='min-w-0 px-2.5 py-2'>
-              <h3 className='truncate text-xs font-medium text-primary-token'>
-                {design.design_name}
-              </h3>
             </div>
           </article>
         ))}

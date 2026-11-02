@@ -2,6 +2,7 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
 import { PROFILE_DESKTOP_SURFACE_ENABLED } from '../../lib/profile/desktop-surface-flag';
 import { installPublicRouteMocks } from '../e2e/utils/public-surface-helpers';
 import { waitForHydration } from '../e2e/utils/smoke-test-utils';
@@ -128,7 +129,7 @@ test('emits exact-head public-profile desktop and mobile evidence', async ({
 
     const accessibility = await new AxeBuilder({ page })
       .include('[data-testid="public-profile-layout-shell"]')
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .options(wcag22AaAxeOptions())
       .analyze();
     expect(accessibility.violations).toEqual([]);
 

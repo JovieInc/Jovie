@@ -68,8 +68,10 @@ describe('OperatorListsNav', () => {
     expect(screen.getByRole('list', { name: 'Smart Views' })).toContainElement(
       screen.getByRole('link', { name: 'Favorites' })
     );
-    expect(screen.getByRole('button', { name: 'New List' })).toHaveClass('h-7');
-    expect(collab).toHaveClass('h-7');
+    expect(screen.getByRole('button', { name: 'New List' })).toHaveClass(
+      'h-(--app-shell-sidebar-row-height)'
+    );
+    expect(collab).toHaveClass('h-(--app-shell-sidebar-row-height)');
     expect(screen.getByLabelText('12 creators')).toHaveTextContent('12');
     expect(screen.getByLabelText('4 creators')).toHaveTextContent('4');
   });

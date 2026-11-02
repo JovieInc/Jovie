@@ -228,8 +228,12 @@ export const DrawerEditableTextField = React.memo(
                 'border border-transparent bg-transparent shadow-none',
                 !hasValue && 'text-tertiary-token'
               )}
-              aria-label={`Edit ${label}`}
             >
+              {/* Named from content (WCAG 2.5.3 Label in Name): an overriding
+                  aria-label that omits the visible value fails axe 4.14
+                  label-content-name-mismatch on the /product/isrc marketing
+                  capture and blocked production promotion. */}
+              <span className='sr-only'>{`Edit ${label}`}</span>
               <span
                 className={cn(
                   'block truncate text-app text-primary-token',

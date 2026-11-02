@@ -1,4 +1,5 @@
 name: Production Synthetic Monitoring
+run-name: Production Synthetic Monitoring (${{ github.event.schedule || github.event_name }})
 # clock-class: production-liveness
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
@@ -25,7 +26,7 @@ jobs:
   synthetic-test:
     name: Production Synthetic Tests
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '17 */6 * * *' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -191,6 +192,17 @@ jobs:
           doppler run --preserve-env -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/public-profile-smoke.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/public-profile-smoke
         continue-on-error: true
 
+      - name: Run Start Chat Fail-Open Guard (desktop + Instagram webview)
+        env:
+          BASE_URL: https://jov.ie
+          PLAYWRIGHT_TEST_BASE_URL: https://jov.ie
+          E2E_SKIP_WEB_SERVER: '1'
+          E2E_SYNTHETIC_MODE: 'true'
+          E2E_ENVIRONMENT: production
+          SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-start-chat-results.json
+        run: |
+          env -u DOPPLER_TOKEN -u DATABASE_URL node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-start-chat.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-start-chat
+
       - name: Confirm synthetic identity policy
         if: always()
         run: |
@@ -238,9 +250,9 @@ jobs:
         if: ${{ always() && hashFiles('apps/web/test-results/*-results.json') != '' }}
         with:
           name: synthetic-test-results
-          path: |
-            apps/web/test-results/
-            !apps/web/test-results/public-profile-smoke-*.png
+          # Retry error-context.md is scanned by the producer, but this
+          # artifact deliberately publishes only structured JSON evidence.
+          path: apps/web/test-results/**/*.json
           retention-days: 30
 
       - name: Send Slack Alert on Failure

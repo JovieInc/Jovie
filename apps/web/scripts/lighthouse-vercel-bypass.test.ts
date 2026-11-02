@@ -115,6 +115,7 @@ const {
       readonly cookieHeader: string;
       readonly fetchImpl: ReturnType<typeof vi.fn>;
       readonly attempts?: number;
+      readonly linkedReleaseHandle?: string;
     }
   ) => Promise<void>;
 };
@@ -1670,6 +1671,130 @@ describe('origin-bound Vercel protection bypass', () => {
     expect(
       fetchImpl.mock.calls.some(([url]) => new URL(url).pathname === '/tim')
     ).toBe(true);
+  });
+
+  describe('golden-path linked release walk', () => {
+    const filler = 'healthy'.repeat(200);
+    const releasePage = (title: string, h1 = 'Take Me Over') =>
+      `<html><head><title>${title}</title></head><body><h1>${h1}</h1>${filler}</body></html>`;
+    const catalog =
+      '<html><body><h1>Tim White</h1>' +
+      '<a href="/tim/never-say-a-word">Never Say A Word</a>' +
+      '<a href="/tim/wheels-up?utm=x">Wheels Up</a>' +
+      '<a href="/tim/listen">Listen</a>' +
+      '<a href="/tim/subscribe">Subscribe</a>' +
+      '<a href="/other/not-mine">Other</a>' +
+      '<script>self.__next_f.push([1,"href=\\"/tim/hidden-in-flight\\""])</script>' +
+      filler +
+      '</body></html>';
+
+    function build(
+      overrides: Record<string, { status?: number; body: string }> = {}
+    ) {
+      return vi.fn(async (rawUrl: URL, _options: unknown) => {
+        const url = new URL(rawUrl);
+        const isHealth = url.pathname === DEPLOY_HEALTH_PATH;
+        const override = overrides[url.pathname];
+        const body = override
+          ? override.body
+          : isHealth
+            ? HEALTHY_DEPLOY_PAYLOAD
+            : url.pathname === '/tim'
+              ? catalog
+              : url.pathname.startsWith('/tim/')
+                ? releasePage('Never Say A Word | Tim White')
+                : '<html><body>' + filler + '</body></html>';
+        return {
+          status: override?.status ?? 200,
+          url: url.href,
+          headers: {
+            get: (name: string) =>
+              name.toLowerCase() === 'content-type'
+                ? isHealth
+                  ? 'application/json'
+                  : 'text/html; charset=utf-8'
+                : null,
+          },
+          text: vi.fn().mockResolvedValue(body),
+        };
+      });
+    }
+    const run = (fetchImpl: ReturnType<typeof build>, walk = true) =>
+      verifyPublicDeploymentSurfaces(DEPLOYMENT_URL, {
+        cookieHeader: '__vercel_live_token=opaque-cookie',
+        fetchImpl,
+        attempts: 1,
+        ...(walk ? { linkedReleaseHandle: 'tim' } : {}),
+      });
+    const fetched = (fetchImpl: ReturnType<typeof build>) =>
+      fetchImpl.mock.calls.map(([url]) => new URL(url).pathname);
+
+    it('opens every linked release page and skips mode routes and script payloads', async () => {
+      const fetchImpl = build();
+      await run(fetchImpl);
+      const paths = fetched(fetchImpl);
+      expect(paths).toContain('/tim/never-say-a-word');
+      expect(paths).toContain('/tim/wheels-up');
+      expect(paths).not.toContain('/tim/listen');
+      expect(paths).not.toContain('/tim/subscribe');
+      expect(paths).not.toContain('/tim/hidden-in-flight');
+      expect(paths).not.toContain('/other/not-mine');
+    });
+
+    it('does not walk releases unless the caller opts in', async () => {
+      const fetchImpl = build();
+      await run(fetchImpl, false);
+      expect(fetched(fetchImpl)).not.toContain('/tim/never-say-a-word');
+    });
+
+    it.each([
+      {
+        label: 'a linked release that 404s',
+        override: { status: 404, body: 'Not found' },
+        error: 'Release page /tim/wheels-up returned HTTP 404.',
+      },
+      {
+        label: 'a Coming soon placeholder',
+        override: { body: releasePage('Coming soon | Tim White') },
+        error:
+          'Release page /tim/wheels-up rendered the Coming soon placeholder.',
+      },
+      {
+        label: 'a release with no title',
+        override: { body: releasePage('Wheels Up', '  ') },
+        error: 'Release page /tim/wheels-up has no release title.',
+      },
+      {
+        label: 'a not-found heading',
+        override: { body: releasePage('Wheels Up', 'Content not found') },
+        error: 'Release page /tim/wheels-up rendered a not-found heading.',
+      },
+    ])('rejects $label', async ({ override, error }) => {
+      const fetchImpl = build({ '/tim/wheels-up': override });
+      await expect(run(fetchImpl)).rejects.toThrow(error);
+    });
+
+    it('rejects a catalog that links to no release pages', async () => {
+      const fetchImpl = build({
+        '/tim': { body: '<html><body>' + filler + '</body></html>' },
+      });
+      await expect(run(fetchImpl)).rejects.toThrow(
+        'Release catalog (tim) links to no release pages.'
+      );
+    });
+
+    it('rejects a malformed handle before any request', async () => {
+      const fetchImpl = build();
+      await expect(
+        verifyPublicDeploymentSurfaces(DEPLOYMENT_URL, {
+          cookieHeader: '__vercel_live_token=opaque-cookie',
+          fetchImpl,
+          attempts: 1,
+          linkedReleaseHandle: '../etc',
+        })
+      ).rejects.toThrow('Linked release handle is malformed.');
+      expect(fetchImpl).not.toHaveBeenCalled();
+    });
   });
 
   it('still rejects rendered error content outside inline scripts', async () => {

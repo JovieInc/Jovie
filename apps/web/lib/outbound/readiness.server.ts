@@ -126,7 +126,10 @@ async function readSendPath() {
       .select({ total: count() })
       .from(leads)
       .where(
-        and(eq(leads.outreachStatus, 'pending'), isNotNull(leads.claimToken))
+        and(
+          eq(leads.outreachStatus, 'pending'),
+          isNotNull(leads.claimTokenHash)
+        )
       ),
   ]);
   return {
@@ -166,6 +169,8 @@ export async function getOutboundReadiness(
     queue: queue
       ? {
           ready: queue.counts.ready,
+          needsEvidence: queue.counts.needs_evidence,
+          flagged: queue.counts.flagged,
           certified: queue.counts.certified,
           approved: queue.counts.approved,
           needsProfile: queue.rows.filter(

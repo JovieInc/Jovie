@@ -215,4 +215,12 @@ export const FOUNDER_DEMO_DASHBOARD_DATA: DashboardData = {
   ...DEMO_DASHBOARD_DATA,
   creatorProfiles: [FOUNDER_DEMO_PROFILE],
   selectedProfile: FOUNDER_DEMO_PROFILE,
+  tippingStats: {
+    ...DEMO_DASHBOARD_DATA.tippingStats,
+    tipClicks: 624,
+    qrTipClicks: 248,
+    linkTipClicks: 376,
+    totalReceivedCents: 23_500,
+    tipsSubmitted: 47,
+  },
 };

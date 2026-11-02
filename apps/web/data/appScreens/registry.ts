@@ -220,6 +220,7 @@ export const APP_SCREEN_SOURCES = [
   'apps/web/app/app/(shell)/admin/agent-runs/[id]/page.tsx',
   'apps/web/app/app/(shell)/admin/algorithm-health/page.tsx',
   'apps/web/app/app/(shell)/admin/campaigns/page.tsx',
+  'apps/web/app/app/(shell)/admin/capacity/page.tsx',
   'apps/web/app/app/(shell)/admin/certifications/page.tsx',
   'apps/web/app/app/(shell)/admin/chat/page.tsx',
   'apps/web/app/app/(shell)/admin/chat-playground/page.tsx',
@@ -355,6 +356,7 @@ const ALIAS_SOURCES = new Set<string>([
 const NON_REFERENCE_SOURCES = new Set<string>([
   'apps/web/app/app/(shell)/admin/algorithm-health/page.tsx',
   'apps/web/app/app/(shell)/admin/campaigns/page.tsx',
+  'apps/web/app/app/(shell)/admin/capacity/page.tsx',
   'apps/web/app/app/(shell)/admin/chat-playground/page.tsx',
   'apps/web/app/app/(shell)/admin/creators/page.tsx',
   'apps/web/app/app/(shell)/admin/feedback/page.tsx',

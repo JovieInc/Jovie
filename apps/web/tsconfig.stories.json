@@ -12,6 +12,7 @@
     "app/**/*.stories.tsx",
     "components/**/*.stories.ts",
     "components/**/*.stories.tsx",
+    "tests/fixtures/storybook-a11y-runner/*.stories.tsx",
     ".storybook/**/*.ts",
     ".storybook/**/*.tsx",
     "types/**/*.ts",

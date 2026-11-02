@@ -15,11 +15,12 @@ import {
   localCheckoutFromEvidence,
   MAX_API_ATTEMPTS,
   MERGE_GROUP_JOB_BUDGET_MS,
+  MergeGroupPolicyBudgetUnavailableError,
   MergeGroupPolicyRateLimitError,
   parseTrackedRegularTree,
   readBoundedResponseText,
   resolveMergeGroupMembers,
-  runPolicy,
+  runPolicy as runPolicyWithCheckout,
 } from '../merge-group-member-policy.mjs';
 import { HYGIENE_LIMITS } from '../repo-hygiene-limits.mjs';
 
@@ -28,6 +29,13 @@ const FIRST = '2'.repeat(40);
 const HEAD = '3'.repeat(40);
 const SOURCE_101 = 'a'.repeat(40);
 const TREE = '4'.repeat(40);
+
+// API fixtures use synthetic SHAs; never probe this host's partial clone.
+// Tests supplying local evidence override this boundary explicitly.
+/** @param {Parameters<typeof runPolicyWithCheckout>[0]} options */
+function runPolicy(options) {
+  return runPolicyWithCheckout({ readLocal: async () => null, ...options });
+}
 
 function treeEntry(mode, type, size, path, sha = 'f'.repeat(40)) {
   return {
@@ -749,10 +757,10 @@ describe('merge-group hold labels (JOV-6843)', () => {
   });
 
   it('fails a member that carries any hold label, case-insensitively', () => {
-    expect(evaluateHoldMemberPolicy(heldPr(['ci', 'Do-Not-Merge']))).toEqual({
+    expect(evaluateHoldMemberPolicy(heldPr(['ci', 'Queue-Deferred']))).toEqual({
       passed: false,
       policy: 'hold',
-      reason: 'carries the Do-Not-Merge label',
+      reason: 'carries the Queue-Deferred label',
     });
     expect(evaluateHoldMemberPolicy(heldPr(['ci', 'big-pr']))).toBeNull();
     for (const label of HOLD_LABELS) {
@@ -1203,37 +1211,99 @@ describe('merge-group API outages do not eject a valid group', () => {
       true
     );
     expect(logs.some(line => line.includes('/git/trees/'))).toBe(false);
+  });
 
-    await expect(
-      runPolicy({
-        argv: ['--policy=size'],
-        env: { GH_TOKEN: 'test-token', MAX_LINES: '800', MAX_FILES: '40' },
-        event: event({ head_sha: FIRST, head_commit: { id: FIRST } }),
-        log: () => {},
-        now: () => 1,
-        readLocal: async () =>
-          localCheckoutFromEvidence(
-            {
-              baseSha: BASE,
-              headSha: FIRST,
-              parentSha: BASE,
-              treeSha: TREE,
-              subject: 'fix(ci): queue member 101 (#101)',
-              committerName: 'GitHub',
-              committerEmail: 'noreply@github.com',
-              files: [{ filename: 'a.ts', additions: 2_000, deletions: 0 }],
-              tracked: { bytes: 20, files: 1 },
-            },
-            BASE,
-            FIRST
-          ),
-        request() {
-          throw new MergeGroupPolicyRateLimitError(
-            'GitHub API 403 for /repos/JovieInc/Jovie/pulls/101: API rate limit exceeded for installation'
-          );
-        },
-      })
-    ).rejects.toThrow('PR #101 failed size merge-group policy');
+  it('defers with budget-unavailable, never a size-cap verdict, when a 403 hides the exemption', async () => {
+    // Run 39927237081 ejected big-pr #22711 with 'exceeds standard size cap'
+    // because the installation REST budget was exhausted and the substituted
+    // pull carries no labels. The over-cap fallback must fail as a distinct
+    // budget-unavailable deferral instead, and never as a size-cap verdict.
+    const logs = [];
+    const outputs = [];
+    const local = localCheckoutFromEvidence(
+      {
+        baseSha: BASE,
+        headSha: FIRST,
+        parentSha: BASE,
+        treeSha: TREE,
+        subject: 'fix(ci): queue member 101 (#101)',
+        committerName: 'GitHub',
+        committerEmail: 'noreply@github.com',
+        files: [
+          { filename: 'apps/web/large.ts', additions: 2000, deletions: 0 },
+        ],
+        tracked: { bytes: 20, files: 1 },
+      },
+      BASE,
+      FIRST
+    );
+    const failure = await runPolicy({
+      argv: ['--policy=size', '--also=fork'],
+      env: { GH_TOKEN: 'test-token', MAX_LINES: '800', MAX_FILES: '40' },
+      event: event({ head_sha: FIRST, head_commit: { id: FIRST } }),
+      log: line => logs.push(line),
+      now: () => 1,
+      readLocal: async () => local,
+      writeOutput: line => outputs.push(line),
+      request(path) {
+        throw new MergeGroupPolicyRateLimitError(
+          `GitHub API 403 for ${path}: API rate limit exceeded for installation`
+        );
+      },
+    }).catch(error => error);
+    expect(failure).toBeInstanceOf(MergeGroupPolicyBudgetUnavailableError);
+    expect(failure.message).toMatch(/budget-unavailable/);
+    expect(failure.message).toMatch(
+      /2000\/800 lines and 1\/40 files over the standard cap/
+    );
+    expect(failure.message).toMatch(/API rate limit exceeded for installation/);
+    expect(logs.some(line => line.includes('exceeds standard size cap'))).toBe(
+      false
+    );
+    expect(logs.some(line => line.startsWith('PR #101: FAIL'))).toBe(false);
+    expect(logs.some(line => line.includes('kept the size cap'))).toBe(false);
+    expect(outputs).toEqual([]);
+
+    // Exactly at the standard cap is not over it: the fallback keeps the cap
+    // and passes without the unread exemption evidence mattering.
+    const atCap = localCheckoutFromEvidence(
+      {
+        baseSha: BASE,
+        headSha: FIRST,
+        parentSha: BASE,
+        treeSha: TREE,
+        subject: 'fix(ci): queue member 101 (#101)',
+        committerName: 'GitHub',
+        committerEmail: 'noreply@github.com',
+        files: [
+          ...Array.from({ length: 40 }, (_, index) => ({
+            filename: `apps/web/f${index}.ts`,
+            additions: 20,
+            deletions: 0,
+          })),
+        ],
+        tracked: { bytes: 20, files: 41 },
+      },
+      BASE,
+      FIRST
+    );
+    const keptLogs = [];
+    await runPolicy({
+      argv: ['--policy=size'],
+      env: { GH_TOKEN: 'test-token', MAX_LINES: '800', MAX_FILES: '40' },
+      event: event({ head_sha: FIRST, head_commit: { id: FIRST } }),
+      log: line => keptLogs.push(line),
+      now: () => 1,
+      readLocal: async () => atCap,
+      request() {
+        throw new MergeGroupPolicyRateLimitError(
+          'GitHub API 403 for /repos/JovieInc/Jovie/pulls/101: API rate limit exceeded for installation'
+        );
+      },
+    });
+    expect(
+      keptLogs.some(line => line.includes('within standard size cap'))
+    ).toBe(true);
   });
 
   it('does not pass a rate limit when the diff or the tree byte count is missing', async () => {

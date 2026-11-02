@@ -11,6 +11,8 @@ import {
 } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { applyShareGate } from '@/lib/audience/share-gate';
+import { loadSharedContactKeys } from '@/lib/audience/share-gate.server';
 import { withDbSessionTx } from '@/lib/auth/session';
 import {
   buildCursorCondition,
@@ -313,7 +315,6 @@ export async function GET(request: NextRequest) {
         utmParams: member.utmParams ?? {},
         email: member.email,
         phone: member.phone,
-        emailVisibleToArtist: member.email != null,
         spotifyConnected: Boolean(member.spotifyConnected),
         purchaseCount: member.purchaseCount,
         tipAmountTotalCents: member.tipAmountTotalCents ?? 0,
@@ -335,9 +336,13 @@ export async function GET(request: NextRequest) {
         lastAlertConfirmedAt: serializeDate(member.lastAlertConfirmedAt),
       }));
 
+      // Level-2 gate: email/phone only for people who shared with this artist.
+      const sharedKeys = await loadSharedContactKeys(tx, profileId, members);
+      const gatedMembers = applyShareGate(members, sharedKeys);
+
       // total is null — clients use hasMore / nextCursor for pagination control.
       return NextResponse.json(
-        { rows: members, total: null, hasMore, nextCursor },
+        { rows: gatedMembers, total: null, hasMore, nextCursor },
         { status: 200, headers: NO_STORE_HEADERS }
       );
     });

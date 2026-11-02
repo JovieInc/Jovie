@@ -28,6 +28,7 @@ import {
 } from './dashboard/actions';
 import { ProfileCompletionRedirect } from './ProfileCompletionRedirect';
 import {
+  shouldDefaultOpenShellPreview,
   shouldRedirectToOnboarding,
   shouldUseEssentialShellData,
 } from './shell-route-matches';
@@ -147,7 +148,10 @@ export async function DashboardShellContent({
         lockedUntil={lockedUntil}
         persistSidebarCollapsed={setSidebarCollapsed}
         sidebarDefaultOpen={sidebarDefaultOpen}
-        previewPanelDefaultOpen={!useEssentialShell}
+        previewPanelDefaultOpen={shouldDefaultOpenShellPreview(
+          pathname,
+          useEssentialShell
+        )}
         unlockedShellChrome={
           initiallyLocked ? null : (
             <>

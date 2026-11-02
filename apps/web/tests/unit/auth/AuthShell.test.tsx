@@ -216,6 +216,44 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     ).not.toBeNull();
   });
 
+  it('renders the full-page shell as one hairline focal card with left-aligned identity', () => {
+    const { container } = render(<AuthShell mode='sign-in' />);
+    const card = container.querySelector('[data-auth-surface-card]');
+    expect(card).not.toBeNull();
+    expect(card).toHaveClass('rounded-lg');
+    expect(card).toHaveClass('border-subtle');
+    expect(card).toHaveClass('bg-surface-1');
+    const identity = container.querySelector('[data-auth-shell-identity]');
+    expect(identity).toHaveClass('items-start');
+    expect(identity).toHaveClass('text-left');
+    const divider = container.querySelector('[data-auth-method-divider]');
+    expect(divider?.textContent).toContain('or use email');
+    expect(divider?.textContent).toBe('or use email');
+  });
+
+  it('renders the page-surface headline at the quiet Pen scale (glm/auth-focal-polish)', () => {
+    const { container } = render(<AuthShell mode='sign-in' />);
+    const heading = container.querySelector(
+      '[data-auth-shell-identity] h1'
+    ) as HTMLElement | null;
+    expect(heading).not.toBeNull();
+    expect(heading?.textContent).toBe('Log in to Jovie');
+    expect(heading?.className).toContain('text-app');
+    expect(heading?.className).toContain('font-medium');
+    expect(heading?.className).not.toContain('text-xl');
+    expect(heading?.className).not.toContain('font-semibold');
+  });
+
+  it('keeps intercepted modal and marketing captures centered without the card', () => {
+    const { container } = render(<AuthShell mode='sign-in' compact />);
+    const modalCard = container.querySelector('[data-auth-surface-card]');
+    expect(modalCard).not.toBeNull();
+    expect(modalCard).not.toHaveClass('bg-surface-1');
+    expect(container.querySelector('[data-auth-shell-identity]')).toHaveClass(
+      'items-center'
+    );
+  });
+
   it('keeps OAuth buttons disabled until client hydration attaches handlers', async () => {
     const serverMarkup = renderToStaticMarkup(<AuthShell mode='sign-in' />);
     expect(serverMarkup).toContain('data-auth-shell-hydrated="false"');

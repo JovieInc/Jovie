@@ -380,12 +380,20 @@ async function withRedisDeadline<T>(params: {
   readonly cacheKey: string;
   readonly fallback: T;
   readonly operation: (redis: AudienceBlockRedis) => Promise<T>;
+  readonly signal?: AbortSignal;
   readonly telemetryKey?: string;
   readonly warning: string;
 }): Promise<T> {
+  if (params.signal?.aborted) return params.fallback;
+
   const controller = new AbortController();
+  const abortFromParent = () => controller.abort();
+  params.signal?.addEventListener('abort', abortFromParent, { once: true });
   const redis = getRedis({ signal: controller.signal });
-  if (!redis) return params.fallback;
+  if (!redis) {
+    params.signal?.removeEventListener('abort', abortFromParent);
+    return params.fallback;
+  }
 
   const timeoutId = setTimeout(
     () => controller.abort(),
@@ -394,22 +402,29 @@ async function withRedisDeadline<T>(params: {
   try {
     return await params.operation(redis);
   } catch (error) {
-    captureAudienceBlockWarning(params.warning, {
-      cacheKey: params.telemetryKey ?? params.cacheKey,
-      error,
-    });
+    if (!params.signal?.aborted) {
+      captureAudienceBlockWarning(params.warning, {
+        cacheKey: params.telemetryKey ?? params.cacheKey,
+        error,
+      });
+    }
     return params.fallback;
   } finally {
     clearTimeout(timeoutId);
+    params.signal?.removeEventListener('abort', abortFromParent);
   }
 }
 
-async function tryGetRedisFlag(cacheKey: string): Promise<boolean> {
+async function tryGetRedisFlag(
+  cacheKey: string,
+  signal?: AbortSignal
+): Promise<boolean> {
   const cacheStart = Date.now();
   const cached = await withRedisDeadline({
     cacheKey,
     fallback: null as boolean | null,
     operation: redis => audienceBlockRedisGet<boolean>(redis, cacheKey),
+    signal,
     warning: '[audience-block] Redis cache read failed',
   });
   const cacheDuration = Date.now() - cacheStart;
@@ -446,16 +461,19 @@ async function deleteRedisFlag(cacheKey: string): Promise<void> {
 
 async function getVisitorDecision(
   username: string,
-  fingerprint: string
+  fingerprint: string,
+  signal?: AbortSignal
 ): Promise<VisitorDecision | null> {
   const cacheKey = visitorDecisionCacheKey(username, fingerprint);
   if (tryGetMemoryCache(cacheKey, 'blocked')) return 'blocked';
   if (tryGetMemoryCache(cacheKey, 'allowed')) return 'allowed';
+  if (signal?.aborted) return null;
 
   const cached = await withRedisDeadline({
     cacheKey,
     fallback: null as VisitorDecision | null,
     operation: redis => audienceBlockRedisGet<VisitorDecision>(redis, cacheKey),
+    signal,
     telemetryKey: `visitor:${normalizeUsername(username)}`,
     warning: '[audience-block] Redis visitor cache read failed',
   });
@@ -502,20 +520,28 @@ async function clearHasBlocksFlag(username: string): Promise<void> {
   await deleteRedisFlag(cacheKey);
 }
 
-async function isNegativeCacheHit(username: string): Promise<boolean> {
+async function isNegativeCacheHit(
+  username: string,
+  signal?: AbortSignal
+): Promise<boolean> {
   const cacheKey = negativeCacheKey(username);
   if (tryGetMemoryCache(cacheKey, 'negative')) return true;
-  if (await tryGetRedisFlag(cacheKey)) {
+  if (signal?.aborted) return false;
+  if (await tryGetRedisFlag(cacheKey, signal)) {
     setMemoryCache(cacheKey, 'negative');
     return true;
   }
   return false;
 }
 
-async function isHasBlocksFlagSet(username: string): Promise<boolean> {
+async function isHasBlocksFlagSet(
+  username: string,
+  signal?: AbortSignal
+): Promise<boolean> {
   const cacheKey = hasBlocksCacheKey(username);
   if (tryGetMemoryCache(cacheKey, 'has-blocks')) return true;
-  if (await tryGetRedisFlag(cacheKey)) {
+  if (signal?.aborted) return false;
+  if (await tryGetRedisFlag(cacheKey, signal)) {
     setMemoryCache(cacheKey, 'has-blocks');
     return true;
   }
@@ -664,20 +690,23 @@ async function isVisitorBlockedByFingerprint(
 
 async function resolveProfileBlockStateUncached(
   username: string,
-  cacheEpoch: number
+  cacheEpoch: number,
+  signal?: AbortSignal
 ): Promise<ProfileBlockState> {
   // Read both shared flags in one bounded parallel window. A positive
   // has-blocks decision always wins if a prior cache mutation was partially
   // applied, preventing a stale negative flag from bypassing a real block.
   const [hasBlocksFlag, negativeCacheHit] = await Promise.all([
-    isHasBlocksFlagSet(username),
-    isNegativeCacheHit(username),
+    isHasBlocksFlagSet(username, signal),
+    isNegativeCacheHit(username, signal),
   ]);
 
+  if (signal?.aborted) return 'negative';
   if (hasBlocksFlag) return 'has-blocks';
   if (negativeCacheHit) return 'negative';
 
   const hasBlocks = await profileHasActiveBlocks(username);
+  if (signal?.aborted) return 'negative';
   const state: ProfileBlockState = hasBlocks ? 'has-blocks' : 'negative';
 
   // A concurrent block/unblock mutation owns the newer cache state. Do not
@@ -693,7 +722,8 @@ async function resolveProfileBlockStateUncached(
 }
 
 function resolveProfileBlockState(
-  username: string
+  username: string,
+  signal?: AbortSignal
 ): Promise<ProfileBlockState> {
   const normalized = normalizeUsername(username);
   const existing = profileStateRefreshes.get(normalized);
@@ -702,7 +732,8 @@ function resolveProfileBlockState(
   const cacheEpoch = getProfileCacheEpoch(normalized);
   const refresh = resolveProfileBlockStateUncached(
     normalized,
-    cacheEpoch
+    cacheEpoch,
+    signal
   ).finally(() => {
     if (profileStateRefreshes.get(normalized) === refresh) {
       profileStateRefreshes.delete(normalized);
@@ -714,7 +745,8 @@ function resolveProfileBlockState(
 
 function resolveVisitorDecision(
   username: string,
-  fingerprint: string
+  fingerprint: string,
+  signal?: AbortSignal
 ): Promise<VisitorDecision> {
   const normalized = normalizeUsername(username);
   const cacheKey = visitorDecisionCacheKey(normalized, fingerprint);
@@ -723,13 +755,19 @@ function resolveVisitorDecision(
 
   const cacheEpoch = getProfileCacheEpoch(normalized);
   const refresh = (async () => {
-    const cachedDecision = await getVisitorDecision(normalized, fingerprint);
+    const cachedDecision = await getVisitorDecision(
+      normalized,
+      fingerprint,
+      signal
+    );
+    if (signal?.aborted) return 'allowed' as const;
     if (cachedDecision) return cachedDecision;
 
     const isBlocked = await isVisitorBlockedByFingerprint(
       normalized,
       fingerprint
     );
+    if (signal?.aborted) return 'allowed' as const;
     const decision: VisitorDecision = isBlocked ? 'blocked' : 'allowed';
     if (getProfileCacheEpoch(normalized) === cacheEpoch) {
       await setVisitorDecision(normalized, fingerprint, decision);
@@ -757,21 +795,29 @@ function resolveVisitorDecision(
 export async function checkProfileVisitorBlocked(
   username: string,
   ip: string | null,
-  ua: string | null
+  ua: string | null,
+  signal?: AbortSignal
 ): Promise<boolean> {
+  if (signal?.aborted) return false;
   if (isTestRuntime()) return false;
   if (isPublicNoAuthSmoke()) return false;
 
   try {
     const normalizedUsername = normalizeUsername(username);
-    const profileState = await resolveProfileBlockState(normalizedUsername);
-    if (profileState === 'negative') return false;
+    const profileState = await resolveProfileBlockState(
+      normalizedUsername,
+      signal
+    );
+    if (signal?.aborted || profileState === 'negative') return false;
 
     const fingerprint = await createFingerprintEdge(ip, ua);
+    if (signal?.aborted) return false;
     const visitorDecision = await resolveVisitorDecision(
       normalizedUsername,
-      fingerprint
+      fingerprint,
+      signal
     );
+    if (signal?.aborted) return false;
     return visitorDecision === 'blocked';
   } catch {
     return false;

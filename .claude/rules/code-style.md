@@ -60,7 +60,7 @@ const slug = title?.replaceAll(' ', '-') ?? '';
 - Functional components with hooks only.
 - Server Components by default, Client Components when needed.
 - Use `'use client'` directive sparingly and intentionally.
-- Cache Components is recommended upstream; JOV-7985 owns the dated migration exception. Node.js routes are supported, so do not recreate that retired blocker. Keep TanStack Query for client-owned state and audit hydration ownership before duplicating RSC data.
+- Data reads, mutations, caching and client fetching follow [the data architecture ADR](../../docs/architecture/data-architecture-adr-2026-10-29.md) (rule: `data-architecture.md`). Cache Components is recommended upstream; JOV-7985 owns the dated migration exception. Node.js routes are supported, so do not recreate that retired blocker. Keep TanStack Query for client-owned state and audit hydration ownership before duplicating RSC data.
 
 ### Component Definition Rules
 
@@ -223,7 +223,7 @@ useQuery({
 
 ## Custom ESLint Rules
 
-21 custom rules in `apps/web/eslint-rules/` run via `pnpm --filter web lint:eslint`; enforced in CI.
+22 custom rules in `apps/web/eslint-rules/` run via `pnpm --filter web lint:eslint`; enforced in CI.
 
 | Rule | What It Blocks | Fix |
 |------|---------------|-----|
@@ -248,6 +248,7 @@ useQuery({
 | `no-hardcoded-theme-colors` | Bare `text-black`/`bg-white` or `text-[#hex]` that bypass semantic tokens | Use token utilities (`text-primary-token`) or pair light/dark classes |
 | `no-direct-stripe-client` | Runtime `stripe` imports, `require('stripe')`, or `new Stripe(...)` outside `lib/stripe/` | Import the canonical client from `@/lib/stripe/client` (type-only imports are allowed) |
 | `ui-feel` | Numeral displays without `tabular-nums`, headings without `text-balance`/`text-pretty`, dual-axis sub-40px hit areas, child radius larger than its parent's | Add `tabular-nums` / `text-balance`, size hit areas to 44px (or a `before:`/`after:` hit container), keep child radius ≤ parent |
+| `no-users-clerk-id-lookup` | `eq(users.clerkId, ...)` outside the legacy identity allowlist | Match session ids on `users.id`; keep `clerkId` only for external or legacy ids |
 
 **Run:** `pnpm --filter web lint:eslint` (all rules) or `pnpm --filter web lint:server-boundaries` (boundary rules only).
 
@@ -297,7 +298,7 @@ Location: `apps/web/app/{route}/actions.ts` or `apps/web/lib/actions/{domain}.ts
 'use server';
 
 import { getCachedAuth } from '@/lib/auth/cached';
-import { revalidatePath } from 'next/cache';
+import { updateTag } from 'next/cache'; // invalidate the changed record's tag only
 import { db } from '@/lib/db';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 ```
@@ -325,6 +326,25 @@ grep -rn "PATTERN_YOU_FIXED" apps/web --include="*.tsx"
 ```
 
 **Why:** A bug in one file often indicates a systemic issue. Patching one instance while leaving others creates inconsistency and delays future debugging.
+
+### Escape classes (replay of 19 post-merge fixes, 2026-10-28)
+
+Most escapes were not logic bugs; they were a missed consumer or a guard that
+assumed its environment. Before opening a PR, check the class that applies:
+
+- **Moved, renamed or deleted source:** `git grep` the old path, export and
+  fixture name for consumers (stories, desktop token readers, lanes readers,
+  `testMatch` lists). A new producer or spec must be registered where its
+  runner enumerates it.
+- **CI guard or workflow step:** run it against the merge of base and PR head,
+  not the head alone, and gate any proof behind the flag it depends on.
+- **Test files:** a helper named `setup` is a pytest hook; assertions on wall
+  time need a frozen clock.
+- **Auth, config flags:** a route that calls `unauthorized()` or `forbidden()`
+  needs the matching Next.js config flag in the same PR.
+
+Every escape is traced by `scripts/review-escapes.mjs` and feeds
+`docs/metrics/review-replay-cases.jsonl`.
 
 ## Self-Improvement Loop
 

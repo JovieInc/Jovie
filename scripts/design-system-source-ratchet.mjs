@@ -25,6 +25,12 @@ import {
 } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { evaluateBaseDesignRatchet } from './design-system-base-ratchet.mjs';
+
+export {
+  RAW_HEX_PATTERN,
+  RAW_PALETTE_PATTERN,
+} from './design-system-base-ratchet.mjs';
 
 const THIS_DIR = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = join(THIS_DIR, '..');
@@ -269,13 +275,31 @@ function readAllowlist(filePath) {
 
 export function writeIdentityBaseline(options = {}) {
   const repoRoot = options.repoRoot ?? REPO_ROOT;
-  const identities = uniqueSorted(
+  let identities = uniqueSorted(
     options.identities ?? collectDesignSystemIdentities({ repoRoot })
   );
   const outPath = join(
     repoRoot,
     options.relativePath ?? IDENTITY_BASELINE_RELATIVE
   );
+  // After taking main's generated copy during a merge, retain only surviving
+  // grandfathered identities. Never turn new debt or allowlist escapes into
+  // baseline entries just because a generated file conflicted.
+  if (options.prune) {
+    const baseline = new Set(readIdentityList(outPath, 'identity baseline'));
+    const allowlist = new Set(
+      readAllowlist(join(repoRoot, IDENTITY_ALLOWLIST_RELATIVE))
+    );
+    const added = identities.filter(
+      key => !baseline.has(key) && !allowlist.has(key)
+    );
+    if (added.length) {
+      throw new Error(
+        `Cannot prune baseline: ${added.length} new identities:\n${added.join('\n')}`
+      );
+    }
+    identities = identities.filter(key => baseline.has(key));
+  }
   mkdirSync(dirname(outPath), { recursive: true });
   // Compact JSON on purpose: a pretty-printed identity list is thousands of
   // lines and trips the source-PR size cap. Biome excludes this generated
@@ -377,8 +401,9 @@ export function evaluateDesignSystemSourceRatchet(options = {}) {
 
 function main() {
   const writeBaseline = process.argv.includes('--write-baseline');
-  if (writeBaseline) {
-    const written = writeIdentityBaseline();
+  const pruneBaseline = process.argv.includes('--prune-baseline');
+  if (writeBaseline || pruneBaseline) {
+    const written = writeIdentityBaseline({ prune: pruneBaseline });
     console.log(
       `[design-system-source-ratchet] wrote ${written.count} identities to ${written.path}`
     );
@@ -386,14 +411,20 @@ function main() {
   }
 
   const result = evaluateDesignSystemSourceRatchet();
+  const baseResult = evaluateBaseDesignRatchet();
   const summary = `${result.metrics[0].count} identities (${result.metrics[0].newCount} new / baseline ${result.metrics[0].baseline})`;
-  if (!result.ok) {
+  if (!result.ok || !baseResult.ok) {
     console.error(`[design-system-source-ratchet] FAIL — ${summary}`);
     for (const issue of result.issues) console.error(issue);
+    for (const identity of baseResult.newIdentities)
+      console.error(`new design identity: ${identity}`);
     process.exitCode = 1;
     return;
   }
   console.log(`[design-system-source-ratchet] PASS — ${summary}`);
+  console.log(
+    `[design-system-base-ratchet] PASS — ${baseResult.identities.length} identities (0 new / base ${baseResult.base})`
+  );
 }
 
 if (

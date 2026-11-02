@@ -44,7 +44,7 @@ export function GET() {
 
 - **Official brand name**: ${APP_NAME} (capitalize the J and spell out "${APP_NAME}")
 - **Primary domain**: jov.ie
-- **Product scope**: Presence, relationships, and growth for artists, founders, authors, creators, and independent experts
+- **Product scope**: Presence, relationships, and growth for any creator
 
 ## Brand Disambiguation
 
@@ -63,7 +63,7 @@ ${COMPANY_IDENTITY.definition}
 - Release smart links with remembered audience platform choice
 - Pre-save access is part of the canonical smart-links capability
 
-### 3. Enrolled music workflows
+### 3. Enrolled release workflows
 - Opt-in audience notifications require enrolled access
 - Advanced analytics and audience CRM capabilities require enrolled access
 - Release planning and its task workspace require enrolled access

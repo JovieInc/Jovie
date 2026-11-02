@@ -2,6 +2,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import {
+  CANONICAL_PRO_MONTHLY_USD,
   type CanonicalArtistSiteCheckId,
   type CanonicalArtistSiteReceipt,
   evaluateCanonicalArtistSiteCertification,
@@ -18,6 +19,7 @@ export interface CanonicalArtistSiteCliOptions {
   readonly m2Status: string;
   readonly m2ReceiptPath: string;
   readonly profileStatus: string;
+  readonly navigationStatus?: string;
   readonly profileResultPath: string;
   readonly outputPath: string;
   /** Newest-first SHAs from the certified revision. Empty means equality only. */
@@ -123,6 +125,7 @@ function parseOptions(argv: readonly string[]): CanonicalArtistSiteCliOptions {
     m2Status: required(argv, '--m2-status'),
     m2ReceiptPath: required(argv, '--m2-receipt'),
     profileStatus: required(argv, '--profile-status'),
+    navigationStatus: required(argv, '--navigation-status'),
     profileResultPath: required(argv, '--profile-result'),
     outputPath: required(argv, '--output'),
     sourceHistory: loadSourceHistory(optional(argv, '--source-history')),
@@ -256,6 +259,15 @@ export function certifyCanonicalArtistSite(
     : 'Waitlist admission did not pass. Unadmitted artists must stay outside the app shell.';
   const waitlistEvidence = [`${options.runUrl}#waitlist-admission`];
   const profileAndJourney = [...profileEvidence, ...goldenEvidence];
+  const navigationPassed = options.navigationStatus === 'success';
+  const navigationOk = navigationPassed && profilePassed;
+  const navigationEvidence = [
+    ...profileEvidence,
+    `${options.runUrl}#canonical-navigation`,
+  ];
+  const navigationDetail = navigationOk
+    ? 'Live mobile and desktop Events → Home → 15-second wait → reload and Back/Forward passed on the observed profile revision.'
+    : 'Live mobile/desktop profile navigation failed, was skipped, or lacks bound profile evidence.';
   const identityOk = profilePassed && claimOk;
   const hierarchyOk = profilePassed && goldenPassed;
   const releaseOk = referenceReleasePassed && goldenPassed;
@@ -276,7 +288,13 @@ export function certifyCanonicalArtistSite(
       profileAndJourney,
       boundDefect(profileHealthy && goldenPassed)
     ),
-    row('profile_modes', goldenPassed, journeyDetail, goldenEvidence),
+    row(
+      'profile_modes',
+      navigationOk,
+      navigationDetail,
+      navigationEvidence,
+      'canonical-artist-site-refresh-back-retry'
+    ),
     row(
       'release_smart_link',
       releaseOk,
@@ -303,13 +321,16 @@ export function certifyCanonicalArtistSite(
       waitlistEvidence,
       'canonical-artist-site-waitlist-admission'
     ),
-    ...(
-      [
-        'claim_auth_intent',
-        'ownership_existing_profile',
-        'refresh_back_retry',
-      ] as const
-    ).map(checkId => row(checkId, claimOk, claimText, claimAndJourney)),
+    ...(['claim_auth_intent', 'ownership_existing_profile'] as const).map(
+      checkId => row(checkId, claimOk, claimText, claimAndJourney)
+    ),
+    row(
+      'refresh_back_retry',
+      claimOk && navigationOk,
+      `${claimText} ${navigationDetail}`,
+      [...claimAndJourney, ...navigationEvidence],
+      'canonical-artist-site-refresh-back-retry'
+    ),
     ...(['free_state_value', 'payment_entitlement'] as const).map(checkId =>
       row(checkId, goldenPassed, journeyDetail, goldenEvidence)
     ),
@@ -317,8 +338,8 @@ export function certifyCanonicalArtistSite(
       'pro_handoff_199',
       proPassed,
       proPassed
-        ? 'Live claim-first pricing exposed the truthful $199 monthly Pro handoff.'
-        : 'Live claim-first pricing or the $199 monthly Pro handoff failed.',
+        ? `Live claim-first pricing exposed the truthful $${CANONICAL_PRO_MONTHLY_USD} monthly Pro handoff.`
+        : `Live claim-first pricing or the $${CANONICAL_PRO_MONTHLY_USD} monthly Pro handoff failed.`,
       m2Evidence,
       'JOV-6439'
     ),

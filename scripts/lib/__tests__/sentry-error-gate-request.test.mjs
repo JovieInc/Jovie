@@ -20,6 +20,121 @@ import {
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
+
+/**
+ * Resolve a GNU coreutils-style `timeout` binary for the fixture's child
+ * shells. Prefers the Linux name, then the macOS coreutils name
+ * (`gtimeout`, Homebrew does not link `timeout` by default). Returns null on
+ * hosts that ship neither (stock macOS), where the fixture stages its own
+ * bounded shim instead of failing. Results are cached per process.
+ *
+ * @param {{env?: Record<string, string|undefined>}} [options]
+ * @returns {Promise<string|null>}
+ */
+let cachedGnuTimeoutBinary;
+async function resolveGnuTimeoutBinary(options = {}) {
+  const probeNames = async () => {
+    for (const name of ['timeout', 'gtimeout']) {
+      try {
+        const found = (
+          await exec('bash', ['-c', `command -v ${name}`], {
+            ...(options.env ? { env: options.env } : {}),
+          })
+        ).stdout.trim();
+        if (found) return found;
+      } catch {
+        // Not present under this PATH (stock macOS has no BSD or GNU timeout);
+        // keep looking for the coreutils name.
+      }
+    }
+    return null;
+  };
+  // Explicit-env probes (tests pinning per-environment behavior) bypass the
+  // process cache so one host resolution cannot leak across environments.
+  if (options.env) return probeNames();
+  if (cachedGnuTimeoutBinary === undefined) {
+    cachedGnuTimeoutBinary = await probeNames();
+  }
+  return cachedGnuTimeoutBinary;
+}
+
+/**
+ * Build the fixture `timeout` script staged on the probe PATH. With a backing
+ * GNU timeout binary this is a pass-through (optionally accelerated so unit CI
+ * does not wait 55s); without one it is a pure-bash shim implementing exactly
+ * the subset `.github/scripts/sentry-read-json.sh` and the action steps use:
+ * `timeout --signal=TERM --kill-after=Ns DURATION command...`, with GNU exit
+ * semantics (124 when the deadline fires). Durations pass through unchanged —
+ * no deadline is relaxed.
+ *
+ * @param {{backing: string|null, accelerate?: boolean}} options
+ * @returns {string}
+ */
+function buildFixtureTimeoutShim({ backing, accelerate = false }) {
+  if (backing) {
+    if (!accelerate) {
+      return `#!/bin/bash\nexec '${backing}' "$@"\n`;
+    }
+    return [
+      '#!/bin/bash',
+      'args=("$@")',
+      '[ "$3" = 55s ] || exit 90',
+      'args[2]=0.2s',
+      `exec '${backing}' "\${args[@]}"`,
+      '',
+    ].join('\n');
+  }
+  return `#!/bin/bash
+# Fixture-only portable stand-in for GNU coreutils timeout, used when the host
+# ships neither timeout nor gtimeout (stock macOS). Covers the exact subset the
+# Sentry helper uses. Orphaned watcher sleeps die on their own; the watcher is
+# always killed before this shim exits, so it never signals a recycled pid.
+signal=TERM
+kill_after=1
+duration=
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --signal=*) signal="\${1#--signal=}"; shift ;;
+    --kill-after=*) kill_after="\${1#--kill-after=}"; kill_after="\${kill_after%s}"; shift ;;
+    --*) shift ;;
+    *) duration="$1"; shift; break ;;
+  esac
+done
+${
+  accelerate
+    ? '[ "$duration" = 55s ] || exit 90\nduration=0.2'
+    : ': # pass the real duration through unchanged'
+}
+duration="\${duration%s}"
+[ -n "$duration" ] || exit 125
+"$@" &
+child=$!
+fired="$(mktemp)"
+# The watcher's stdio is detached so a killed watcher's orphaned sleep cannot
+# hold the caller's output pipes open after this shim exits.
+(
+  sleep "$duration"
+  echo fired > "$fired"
+  kill "-$signal" "$child" 2>/dev/null
+  sleep "$kill_after"
+  kill -KILL "$child" 2>/dev/null
+) </dev/null >/dev/null 2>&1 &
+watcher=$!
+wait "$child"
+status=$?
+# The fired marker is written at the deadline, before the signal lands, so
+# reading it after the child exits decides the path without racing the
+# watcher's grace sleep.
+if [ -s "$fired" ]; then
+  rm -f "$fired"
+  exit 124
+fi
+rm -f "$fired"
+kill -KILL "$watcher" 2>/dev/null
+wait "$watcher" 2>/dev/null
+exit "$status"
+`;
+}
 const helper = resolve(root, '.github/scripts/sentry-read-json.sh');
 /** @typedef {{runs: {steps: Array<{id: string, run: string}>}}} SentryAction */
 const action = /** @type {SentryAction} */ (
@@ -37,11 +152,16 @@ describe('single-document Sentry evidence', () => {
     const fixture = join(scratch, 'response.json');
     writeFileSync(fixture, body);
     try {
+      await stageFixtureTimeoutBin(join(scratch, 'bin'));
       return {
         status: 0,
         ...(await exec('bash', ['-c', command, 'fixture', helper, fixture], {
           cwd: root,
           timeout: 5000,
+          env: {
+            ...process.env,
+            PATH: `${join(scratch, 'bin')}:${process.env.PATH}`,
+          },
         })),
       };
     } catch (error) {
@@ -85,10 +205,40 @@ describe('single-document Sentry evidence', () => {
   );
 });
 
-/** @param {Array<{status: number, body?: string, headers?: Record<string, string>}>} responses */
+/**
+ * Stage the fixture `timeout` bin directory used by both probe styles so the
+ * sourced helper and action steps resolve a working GNU-timeout on any host
+ * (Linux: pass-through; macOS coreutils: gtimeout; stock macOS: bounded
+ * pure-bash shim). Returns the backing binary that was found, if any.
+ *
+ * @param {string} binDir
+ * @param {{accelerate?: boolean, gnuTimeoutBinary?: string|null}} [options]
+ * @returns {Promise<string|null>}
+ */
+async function stageFixtureTimeoutBin(
+  binDir,
+  { accelerate = false, gnuTimeoutBinary } = {}
+) {
+  mkdirSync(binDir, { recursive: true });
+  const backing =
+    gnuTimeoutBinary === undefined
+      ? await resolveGnuTimeoutBinary()
+      : gnuTimeoutBinary;
+  writeFileSync(
+    join(binDir, 'timeout'),
+    buildFixtureTimeoutShim({ backing, accelerate }),
+    { mode: 0o755 }
+  );
+  return backing;
+}
+
+/**
+ * @param {Array<{status: number, body?: string, headers?: Record<string, string>}>} responses
+ * @param {{stepId?: string, shortDeadline?: boolean, gnuTimeoutBinary?: string|null}} [options]
+ */
 async function configurationProbe(
   responses,
-  { stepId = 'sentry-config', shortDeadline = false } = {}
+  { stepId = 'sentry-config', shortDeadline = false, gnuTimeoutBinary } = {}
 ) {
   const requests = [];
   const scratch = mkdtempSync(join(tmpdir(), 'sentry-gate-read-'));
@@ -111,21 +261,16 @@ async function configurationProbe(
     server.listen(0, '127.0.0.1', () => resolveListen(undefined));
   });
   try {
-    let fixturePath = process.env.PATH;
-    if (shortDeadline) {
-      const actualTimeout = (
-        await exec('bash', ['-c', 'command -v timeout'])
-      ).stdout.trim();
-      const bin = join(scratch, 'bin');
-      mkdirSync(bin);
-      // Accelerate the same outer timeout instead of waiting 55s in unit CI.
-      writeFileSync(
-        join(bin, 'timeout'),
-        `#!/bin/bash\nargs=("$@")\n[ "$3" = 55s ] || exit 90\nargs[2]=0.2s\nexec '${actualTimeout}' "\${args[@]}"\n`,
-        { mode: 0o755 }
-      );
-      fixturePath = `${bin}:${fixturePath}`;
-    }
+    const bin = join(scratch, 'bin');
+    // Stage a `timeout` for the helper and action steps so every probe works
+    // on macOS hosts where GNU timeout is absent or named gtimeout. The
+    // accelerated variant swaps the same outer 55s deadline for 0.2s —
+    // identical semantics, no waiting 55s in unit CI.
+    await stageFixtureTimeoutBin(bin, {
+      accelerate: shortDeadline,
+      gnuTimeoutBinary,
+    });
+    const fixturePath = `${bin}:${process.env.PATH}`;
     const address = server.address();
     if (!address || typeof address === 'string') {
       throw new Error('Sentry fixture requires a bound loopback TCP address');
@@ -389,4 +534,91 @@ it('runs the Sentry regression in normal control CI and the bounded affected sel
   expect(
     plan.scriptVitestTests.every(file => existsSync(resolve(root, file)))
   ).toBe(true);
+});
+
+describe('portable Sentry fixture timeout', () => {
+  async function runShim(shim, args, timeoutMs = 15000) {
+    const dir = mkdtempSync(join(tmpdir(), 'fixture-timeout-shim-'));
+    try {
+      writeFileSync(join(dir, 'timeout'), shim, { mode: 0o755 });
+      try {
+        const { stdout } = await exec(join(dir, 'timeout'), args, {
+          timeout: timeoutMs,
+        });
+        return { status: 0, stdout };
+      } catch (error) {
+        return { status: error.code, stdout: error.stdout };
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it('resolves no GNU timeout binary when the PATH ships neither name', async () => {
+    const emptyBin = mkdtempSync(join(tmpdir(), 'no-gnu-timeout-'));
+    try {
+      expect(await resolveGnuTimeoutBinary({ env: { PATH: emptyBin } })).toBe(
+        null
+      );
+    } finally {
+      rmSync(emptyBin, { recursive: true, force: true });
+    }
+  });
+
+  it('passes the command exit status through when the deadline does not fire', async () => {
+    const shim = buildFixtureTimeoutShim({ backing: null });
+    expect(
+      await runShim(shim, [
+        '--signal=TERM',
+        '--kill-after=1s',
+        '30s',
+        'bash',
+        '-c',
+        'exit 3',
+      ])
+    ).toEqual({ status: 3, stdout: '' });
+  });
+
+  it('keeps real durations in the pass-through shim and exits 124 at the deadline', async () => {
+    const shim = buildFixtureTimeoutShim({ backing: null });
+    const startedAt = Date.now();
+    const result = await runShim(shim, [
+      '--signal=TERM',
+      '--kill-after=1s',
+      '1s',
+      'bash',
+      '-c',
+      'sleep 10',
+    ]);
+    expect(result.status).toBe(124);
+    expect(Date.now() - startedAt).toBeLessThan(5000);
+  });
+
+  it('accelerates only the helper outer 55s guard in the no-binary shim', async () => {
+    const shim = buildFixtureTimeoutShim({ backing: null, accelerate: true });
+    const startedAt = Date.now();
+    const result = await runShim(shim, [
+      '--signal=TERM',
+      '--kill-after=1s',
+      '55s',
+      'bash',
+      '-c',
+      'sleep 60',
+    ]);
+    expect(result.status).toBe(124);
+    expect(Date.now() - startedAt).toBeLessThan(5000);
+    expect((await runShim(shim, ['1s', 'bash', '-c', 'exit 0'])).status).toBe(
+      90
+    );
+  });
+
+  it('runs the Retry-After deadline probe without a host GNU timeout binary', async () => {
+    const result = await configurationProbe(
+      [{ status: 503, headers: { 'Retry-After': '30' } }, { status: 200 }],
+      { shortDeadline: true, gnuTimeoutBinary: null }
+    );
+    expect(result.status, result.stderr).toBe(124);
+    expect(result.requests).toHaveLength(1);
+    expect(result.output).toBe('');
+  });
 });

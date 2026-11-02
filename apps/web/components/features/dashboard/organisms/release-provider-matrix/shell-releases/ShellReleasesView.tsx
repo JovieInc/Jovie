@@ -32,10 +32,7 @@ import type {
   FilterPill,
 } from '@/components/shell/pill-search.types';
 import { shouldOpenSpotifyCatalogConnection } from '@/constants/routes';
-import {
-  useRegisterHeaderActions,
-  useRegisterHeaderSearch,
-} from '@/contexts/HeaderActionsContext';
+import { useRegisterHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
 import {
   buildReleaseActions,
@@ -71,6 +68,7 @@ import {
   computeSmartLinkGating,
   type SmartLinkLockReason,
 } from '../smart-link-gating';
+import type { ReleaseExperienceAdapter } from '../types';
 import { useReleaseProviderMatrix } from '../useReleaseProviderMatrix';
 import {
   RELEASE_DETAIL_PANEL_WIDTH,
@@ -136,23 +134,6 @@ function applyPills(
   );
 }
 
-function distinctValues(
-  releases: readonly ReleaseViewModel[],
-  pick: (r: ReleaseViewModel) => string | string[] | undefined
-): string[] {
-  const seen = new Set<string>();
-  for (const r of releases) {
-    const picked = pick(r);
-    if (Array.isArray(picked)) {
-      for (const v of picked) if (v) seen.add(v);
-    } else if (picked) {
-      seen.add(picked);
-    }
-    if (seen.size >= 200) break;
-  }
-  return [...seen];
-}
-
 // ── Empty / list content ───────────────────────────────────────────────────────
 
 interface ReleasesListContentProps {
@@ -177,7 +158,7 @@ interface ReleasesListContentProps {
   readonly onSelect: (release: ReleaseViewModel) => void;
   readonly onClearFilters: () => void;
   /** Ref forwarded to the listbox element for keyboard-nav focus scoping. */
-  readonly listboxRef?: RefObject<HTMLDivElement | null>;
+  readonly listboxRef?: RefObject<HTMLUListElement | null>;
 }
 
 function ReleasesListContent({
@@ -204,9 +185,12 @@ function ReleasesListContent({
     return (
       <div className='py-12 grid place-items-center text-center'>
         <div className='max-w-sm'>
-          <div className='text-app font-caption text-primary-token'>
-            Connect Spotify to get started
-          </div>
+          {/* Real heading: the e2e state resolution and axe gates resolve the
+              disconnected state by its 'Connect Spotify' heading, matching
+              the h3 the connected empty state already renders. */}
+          <h3 className='text-app font-caption text-primary-token text-balance'>
+            Connect Spotify To Get Started
+          </h3>
           <p className='mt-1 text-xs text-tertiary-token leading-normal'>
             Sync your catalog from Spotify or add a release manually to start
             generating smart links.
@@ -304,9 +288,16 @@ function ReleasesListContent({
   }
 
   return (
-    <div
+    <ul
       ref={listboxRef}
-      role='listbox'
+      // Native `ul` (implicit role=list) + native `li` rows: each row owns
+      // real interactive controls, which an ARIA `option` cannot contain
+      // (axe nested-interactive). Every row IS the li host: axe's `list`
+      // rule requires ul children to carry listitem semantics (suppressed
+      // wrappers are rejected like a div), and no wrapper element keeps
+      // the listitem role set singular for the shell's keyboard navigation
+      // and role queries. The Radix context-menu trigger's global
+      // aria-haspopup on the row's implicit listitem is legal aria.
       aria-label='Releases'
       className='py-1.5 space-y-px px-2'
     >
@@ -315,23 +306,23 @@ function ReleasesListContent({
           key={r.id}
           items={contextMenuItemsByReleaseId.get(r.id)}
         >
-          {/* Plain wrapper: Radix ContextMenu.Trigger asChild needs a host
-              element that accepts the injected ref/onContextMenu props. */}
-          <div data-shell-release-row-context-target>
-            <ShellReleaseRow
-              release={r}
-              isSelected={r.id === selectedReleaseId}
-              onSelect={() => onSelect(r)}
-              actionMenuItems={actionMenusByReleaseId.get(r.id)}
-              smartLinkLockReason={
-                isSmartLinkLocked(r.id) ? getSmartLinkLockReason(r.id) : null
-              }
-              syncStatus={getSyncStatus(r.id)}
-            />
-          </div>
+          {/* The row IS the li host: Radix ContextMenu.Trigger asChild
+              injects its ref/onContextMenu/global aria onto the row's own
+              host element (React 19 passes refs through function-component
+              props), so the ul's direct children are exactly the rows. */}
+          <ShellReleaseRow
+            release={r}
+            isSelected={r.id === selectedReleaseId}
+            onSelect={() => onSelect(r)}
+            actionMenuItems={actionMenusByReleaseId.get(r.id)}
+            smartLinkLockReason={
+              isSmartLinkLocked(r.id) ? getSmartLinkLockReason(r.id) : null
+            }
+            syncStatus={getSyncStatus(r.id)}
+          />
         </TableContextMenu>
       ))}
-    </div>
+    </ul>
   );
 }
 
@@ -349,6 +340,8 @@ export interface ShellReleasesViewProps {
   readonly initialSpotifyConnectOpen?: boolean;
   readonly initialImporting?: boolean;
   readonly initialTotalCount?: number;
+  /** Swaps live mutations and entitlements for deterministic demo fixtures. */
+  readonly experienceAdapter?: ReleaseExperienceAdapter;
 }
 
 /**
@@ -370,7 +363,9 @@ export function ShellReleasesView({
   initialSpotifyConnectOpen = false,
   initialImporting = false,
   initialTotalCount = 0,
+  experienceAdapter,
 }: ShellReleasesViewProps) {
+  const experienceMode = experienceAdapter?.mode ?? 'live';
   const router = useRouter();
   const searchParams = useSearchParams();
   const shouldOpenSpotifyConnect =
@@ -452,16 +447,27 @@ export function ShellReleasesView({
   } = useReleaseDeletion({ rows, setRows });
 
   const planGate = usePlanGate();
-  const {
-    smartLinksLimit,
-    isPro,
-    canCreateManualReleases,
-    canGenerateAlbumArt,
-    canGenerateReleasePlans,
-    canEditSmartLinks,
-    canAccessFutureReleases,
-  } = planGate;
-  const isReleasePlanGateLoading = planGate.isLoading || planGate.isError;
+  const entitlementOverrides = experienceAdapter?.entitlements;
+  const releasePlanEntitlementOverride =
+    entitlementOverrides?.canGenerateReleasePlans;
+  const smartLinksLimit =
+    entitlementOverrides?.smartLinksLimit ?? planGate.smartLinksLimit;
+  const isPro = entitlementOverrides?.isPro ?? planGate.isPro;
+  const canCreateManualReleases =
+    entitlementOverrides?.canCreateManualReleases ??
+    planGate.canCreateManualReleases;
+  const canGenerateAlbumArt =
+    entitlementOverrides?.canGenerateAlbumArt ?? planGate.canGenerateAlbumArt;
+  const canGenerateReleasePlans =
+    releasePlanEntitlementOverride ?? planGate.canGenerateReleasePlans;
+  const canEditSmartLinks =
+    entitlementOverrides?.canEditSmartLinks ?? planGate.canEditSmartLinks;
+  const canAccessFutureReleases =
+    entitlementOverrides?.canAccessFutureReleases ??
+    planGate.canAccessFutureReleases;
+  const isReleasePlanGateLoading =
+    (planGate.isLoading || planGate.isError) &&
+    releasePlanEntitlementOverride === undefined;
   const showGenerateAlbumArtAction =
     albumArtFlagEnabled && Boolean(canGenerateAlbumArt);
 
@@ -503,16 +509,6 @@ export function ShellReleasesView({
 
   const visibleReleases = useMemo(() => applyPills(rows, pills), [rows, pills]);
 
-  const artistOptions = useMemo(
-    () => distinctValues(rows, r => r.artistNames),
-    [rows]
-  );
-  const titleOptions = useMemo(
-    () => distinctValues(rows, r => r.title),
-    [rows]
-  );
-  const albumOptions = titleOptions;
-
   const handleSelect = useCallback(
     (release: ReleaseViewModel) => {
       openEditor(release);
@@ -553,7 +549,7 @@ export function ShellReleasesView({
   );
 
   /** Ref for the listbox container — used to scope J/K nav to the releases list. */
-  const listboxRef = useRef<HTMLDivElement>(null);
+  const listboxRef = useRef<HTMLUListElement>(null);
 
   useAmbientListSelection({
     enabled: visibleReleases.length > 0,
@@ -705,8 +701,10 @@ export function ShellReleasesView({
     setIsImporting(false);
   }, []);
 
+  const syncAction = experienceAdapter?.onSync ?? handleSync;
+
   const { importedCount, totalCount } = useImportPolling({
-    enabled: isImporting,
+    enabled: isImporting && experienceMode !== 'demo',
     initialTotalCount,
     onReleasesUpdate: handleReleasesFromPolling,
     onImportComplete: handleImportComplete,
@@ -731,9 +729,13 @@ export function ShellReleasesView({
   // ── New-release affordance (sync / add manually) ──
 
   const handleNewRelease = useCallback(() => {
+    if (experienceAdapter?.onCreateRelease) {
+      experienceAdapter.onCreateRelease();
+      return;
+    }
     closeEditor();
     setAddReleaseOpen(true);
-  }, [closeEditor]);
+  }, [closeEditor, experienceAdapter]);
 
   const closeAddRelease = useCallback(() => setAddReleaseOpen(false), []);
 
@@ -786,7 +788,11 @@ export function ShellReleasesView({
     }
 
     if (!isReleaseSidebarOpen) {
-      if (addReleaseOpen && canCreateManualReleases) {
+      if (
+        addReleaseOpen &&
+        experienceMode === 'live' &&
+        canCreateManualReleases
+      ) {
         return (
           <Suspense
             fallback={
@@ -811,6 +817,9 @@ export function ShellReleasesView({
       return null;
     }
 
+    const selectedSidebarData =
+      experienceAdapter?.sidebarDataByReleaseId?.[editingRelease?.id ?? ''];
+
     const releaseSidebarProps: ReleaseSidebarProps = {
       release: editingRelease,
       mode: 'admin',
@@ -821,31 +830,53 @@ export function ShellReleasesView({
       ...releaseActionCapabilities,
       onClose: closeEditor,
       onRefresh: editingRelease
-        ? () => handleRefreshRelease(editingRelease.id)
+        ? () =>
+            (experienceAdapter?.onRefreshRelease ?? handleRefreshRelease)(
+              editingRelease.id
+            )
         : undefined,
       isRefreshing: refreshingReleaseId === editingRelease?.id,
-      onAddDspLink: handleAddUrl,
+      onAddDspLink: experienceAdapter?.onAddDspLink ?? handleAddUrl,
       onRescanIsrc: editingRelease
-        ? () => handleRescanIsrc(editingRelease.id)
+        ? () =>
+            (experienceAdapter?.onRescanIsrc ?? handleRescanIsrc)(
+              editingRelease.id
+            )
         : undefined,
       isRescanningIsrc,
-      onArtworkUpload: handleArtworkUpload,
-      onArtworkRevert: handleArtworkRevert,
+      onArtworkUpload:
+        experienceAdapter?.onArtworkUpload ?? handleArtworkUpload,
+      onArtworkRevert: experienceAdapter?.onArtworkRevert
+        ? (releaseId: string) =>
+            experienceAdapter.onArtworkRevert?.(
+              releaseId,
+              editingRelease ?? null
+            ) ?? Promise.resolve(editingRelease?.artworkUrl ?? '')
+        : handleArtworkRevert,
       onReleaseChange: handleReleaseChange,
-      onSaveMetadata: handleSaveMetadata,
-      onSavePrimaryIsrc: handleSavePrimaryIsrc,
-      onSaveLyrics: handleSaveLyrics,
-      onFormatLyrics: handleFormatLyrics,
+      onSaveMetadata: experienceAdapter?.onSaveMetadata ?? handleSaveMetadata,
+      onSavePrimaryIsrc:
+        experienceAdapter?.onSavePrimaryIsrc ?? handleSavePrimaryIsrc,
+      onSaveLyrics: experienceAdapter?.onSaveLyrics ?? handleSaveLyrics,
+      onFormatLyrics: experienceAdapter?.onFormatLyrics
+        ? (releaseId: string, lyrics: string) =>
+            experienceAdapter.onFormatLyrics?.(releaseId, lyrics) ??
+            Promise.resolve([])
+        : handleFormatLyrics,
       isLyricsSaving,
       isSaving,
       allowDownloads: allowArtworkDownloads,
-      readOnly: !canEditSmartLinks,
+      onToggleArtworkDownloads: experienceAdapter?.onToggleArtworkDownloads,
+      readOnly: experienceMode === 'demo' ? false : !canEditSmartLinks,
       canGenerateAlbumArt: showGenerateAlbumArtAction,
       onGenerateAlbumArt: handleGenerateAlbumArt,
       onGeneratePitch: handleGeneratePitch,
-      showCredits: true,
+      analyticsOverride: selectedSidebarData?.analytics ?? null,
+      tracksOverride: selectedSidebarData?.tracks,
+      showCredits: experienceMode === 'live',
       designV1: true,
-      onCanvasStatusUpdate: handleCanvasStatusUpdate,
+      onCanvasStatusUpdate:
+        experienceAdapter?.onCanvasStatusUpdate ?? handleCanvasStatusUpdate,
       onTrackClick: openTrackDrawer,
     };
 
@@ -874,6 +905,8 @@ export function ShellReleasesView({
     closeTrackDrawer,
     editingRelease,
     editingTrack,
+    experienceAdapter,
+    experienceMode,
     handleAddReleaseCreated,
     handleAddUrl,
     handleArtworkRevert,
@@ -912,48 +945,18 @@ export function ShellReleasesView({
     setPills([]);
   }, []);
 
-  const headerSearchAdapter = useMemo(
-    () => ({
-      key: 'shell-releases',
-      pills,
-      onPillsChange: setPills,
-      artistOptions,
-      titleOptions,
-      albumOptions,
-      totalCount: rows.length,
-      visibleCount: visibleReleases.length,
-      triggerLabel:
-        pills.length > 0
-          ? `Filter Releases (${pills.length})`
-          : 'Filter Releases',
-      ariaLabel: 'Filter releases',
-      placeholder: 'Search releases',
-      allowedFields: ['artist', 'title', 'album', 'status', 'has'] as const,
-    }),
-    [
-      albumOptions,
-      artistOptions,
-      pills,
-      rows.length,
-      titleOptions,
-      visibleReleases.length,
-    ]
-  );
-
-  useRegisterHeaderSearch(headerSearchAdapter);
-
   const headerActions = useMemo(() => {
     return (
       <DashboardHeaderActionGroup>
         <NewReleaseHeaderAction
           canCreateManualReleases={canCreateManualReleases}
           isSyncing={isSyncing}
-          onSyncSpotify={handleSync}
+          onSyncSpotify={syncAction}
           onCreateManual={handleNewRelease}
         />
       </DashboardHeaderActionGroup>
     );
-  }, [canCreateManualReleases, handleNewRelease, handleSync, isSyncing]);
+  }, [canCreateManualReleases, handleNewRelease, isSyncing, syncAction]);
 
   useRegisterHeaderActions(headerActions);
 
@@ -978,7 +981,7 @@ export function ShellReleasesView({
   const { data: appleMusicMatches, isLoading: isAppleMusicEligibilityLoading } =
     useDspMatchesQuery({
       profileId: rows[0]?.profileId ?? '',
-      enabled: shouldResolveAppleMusicEligibility,
+      enabled: experienceMode !== 'demo' && shouldResolveAppleMusicEligibility,
     });
   const shouldGateListPaint =
     isInitialListPaint &&
@@ -1044,7 +1047,7 @@ export function ShellReleasesView({
                 getSyncStatus={getSyncStatus}
                 onConnectSpotify={() => setSpotifySearchOpen(true)}
                 onNewRelease={handleNewRelease}
-                onSync={handleSync}
+                onSync={syncAction}
                 onSelect={handleSelect}
                 onClearFilters={handleClearFilters}
                 listboxRef={listboxRef}
@@ -1059,6 +1062,8 @@ export function ShellReleasesView({
         setAmPaletteOpen={setAmPaletteOpen}
         spotifySearchOpen={spotifySearchOpen}
         setSpotifySearchOpen={setSpotifySearchOpen}
+        spotifyConnected={isConnected}
+        spotifyArtistName={artistName}
         onAppleMusicConnect={handleAppleMusicConnect}
         onSpotifyConnected={handleArtistConnected}
         onSpotifyImportStart={handleImportStart}

@@ -104,9 +104,7 @@ describe('self-hosted runner setup action', () => {
       'pnpm install --frozen-lockfile'
     );
     const pnpm = actionStep('Setup pnpm');
-    expect(pnpm.uses).toBe(
-      'pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413'
-    );
+    expect(pnpm.uses).toBe('./.github/actions/vendor/pnpm-action-setup');
     expect(pnpm.with?.dest).toBe('${{ runner.temp }}/setup-pnpm');
     expect(JSON.stringify(pnpm)).not.toContain('--no-deprecation');
   });
@@ -140,9 +138,7 @@ describe('self-hosted runner setup action', () => {
       'Restore installed node_modules (GitHub-hosted)'
     );
     expect(restore.id).toBe('node-modules-cache');
-    expect(restore.uses).toBe(
-      'actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9'
-    );
+    expect(restore.uses).toBe('./.github/actions/vendor/actions-cache/restore');
     expect(String(restore.with?.path).trim().split('\n')).toEqual([
       'node_modules',
       'apps/*/node_modules',
@@ -242,9 +238,7 @@ describe('self-hosted runner setup action', () => {
     expect(stepIndex('Install dependencies')).toBeLessThan(
       stepIndex('Save installed node_modules (GitHub-hosted)')
     );
-    expect(save.uses).toBe(
-      'actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9'
-    );
+    expect(save.uses).toBe('./.github/actions/vendor/actions-cache/save');
     expect(save.with?.path).toBe(
       actionStep('Restore installed node_modules (GitHub-hosted)').with?.path
     );
@@ -818,9 +812,18 @@ describe('baked runner prerequisite contract', () => {
       '#!/usr/bin/env bash\nset -euo pipefail\nif [[ "${1:-}" == "cat-file" ]]; then\n  printf \'1\\n\' >> "${GIT_CAT_FILE_COUNT}"\nfi\nexec "${REAL_GIT}" "$@"\n'
     );
     chmodSync(gitWrapper, 0o755);
+    const environment = {
+      ...process.env,
+      GIT_INDEX_FILE: resolve(directory, 'index'),
+    };
+    execFileSync('git', ['read-tree', 'HEAD'], {
+      cwd: repoRoot,
+      env: environment,
+    });
     const buildTree = execFileSync('git', ['write-tree'], {
       cwd: repoRoot,
       encoding: 'utf8',
+      env: environment,
     }).trim();
     expect(buildTree).toMatch(/^[0-9a-f]{40}$/);
     const listedPaths = execFileSync(

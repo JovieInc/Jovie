@@ -174,6 +174,48 @@ function setState(partial: Partial<PlaybackState>): void {
   }
 }
 
+/**
+ * Freeze a demo capture at a known playback frame without autoplay/network.
+ * Only the /demo capture harness calls this. Never replace live playback;
+ * cleanup releases the frame only while it still owns the singleton.
+ */
+export function captureTrackPlayback(
+  track: AudioTrackSource,
+  duration: number,
+  currentTime: number
+): () => void {
+  if (state.activeTrackId || !Number.isFinite(duration) || duration <= 0) {
+    return () => {};
+  }
+  const previous = state;
+  const captureToken = ++_playToken;
+  const captured: PlaybackState = {
+    ...previous,
+    activeTrackId: track.id,
+    trackTitle: track.title,
+    releaseTitle: track.releaseTitle ?? null,
+    artistName: track.artistName ?? null,
+    artworkUrl: track.artworkUrl ?? null,
+    hasLyrics: Boolean(track.hasLyrics),
+    duration,
+    currentTime: Number.isFinite(currentTime)
+      ? Math.max(0, Math.min(currentTime, duration))
+      : 0,
+    isPlaying: true,
+    playbackStatus: 'playing',
+    lastErrorReason: null,
+  };
+  state = captured;
+  notify();
+  return () => {
+    if (_playToken !== captureToken) return;
+    _playToken += 1;
+    state = previous;
+    notify();
+    syncMediaSession();
+  };
+}
+
 function getMediaSession(): MediaSession | null {
   if (typeof navigator === 'undefined') return null;
   if (!('mediaSession' in navigator)) return null;

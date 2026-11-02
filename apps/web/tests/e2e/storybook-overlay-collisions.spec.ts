@@ -1,5 +1,9 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import {
+  disabledRuleIds,
+  wcag22AaAxeOptions,
+} from '@/lib/a11y-gates/wcag-standard.cjs';
 
 test('ancillary inspector restores a focused edit after loading without stealing moved focus', async ({
   page,
@@ -189,7 +193,9 @@ for (const width of [1100, 390]) {
     const header = page.getByTestId('library-asset-entity-header');
     await expect(header).toBeVisible();
     const inset = await header.evaluate(element => {
-      const rail = element.closest('aside')!.getBoundingClientRect();
+      const rail = element
+        .closest('[data-rail-phase]')!
+        .getBoundingClientRect();
       const header = element.getBoundingClientRect();
       const title = element.querySelector('h2')!.getBoundingClientRect();
       return {
@@ -230,7 +236,9 @@ for (const viewport of [
       }
     );
     const inset = await header.evaluate(element => {
-      const rail = element.closest('aside')!.getBoundingClientRect();
+      const rail = element
+        .closest('[data-rail-phase]')!
+        .getBoundingClientRect();
       const title = element.querySelector('h2')!.getBoundingClientRect();
       return { left: title.left - rail.left, right: rail.right - title.right };
     });
@@ -371,11 +379,12 @@ async function expectFocusInside(page: Page, container: Locator) {
 }
 
 async function expectNoSeriousA11yViolations(page: Page, selector: string) {
+  // Contrast is owned by the token contrast gates, not the overlay contract.
   const results = await new AxeBuilder({ page })
     .include(selector)
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-    // Contrast is owned by the token contrast gates, not the overlay contract.
-    .disableRules(['color-contrast'])
+    .options(
+      wcag22AaAxeOptions(disabledRuleIds('storybook-overlay-collisions'))
+    )
     .analyze();
   const serious = results.violations.filter(
     violation =>
@@ -617,3 +626,48 @@ test.describe('overlay collisions: anchors and scroll lock', () => {
     });
   }
 });
+
+// Auth dialogs share the hosted overlay geometry regression lane.
+
+const authModalViewports = [
+  { width: 375, height: 812 },
+  { width: 768, height: 1024 },
+  { width: 1440, height: 900 },
+];
+
+for (const viewport of authModalViewports) {
+  for (const story of ['default', 'with-status-row', 'transformed-ancestor']) {
+    test(`${story} stays centered and on-screen at ${viewport.width}×${viewport.height}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await page.goto(
+        `/iframe.html?id=auth-authmodalshell--${story}&viewMode=story`
+      );
+      const dialog = page.getByRole('dialog');
+      await expect(dialog).toBeVisible();
+      await expect
+        .poll(async () => {
+          const box = await dialog.boundingBox();
+          if (!box) return Infinity;
+          return Math.max(
+            Math.abs(box.x + box.width / 2 - viewport.width / 2),
+            Math.abs(box.y + box.height / 2 - viewport.height / 2)
+          );
+        })
+        .toBeLessThanOrEqual(2);
+      const box = await dialog.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.y).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width);
+      expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height);
+      // The small form must not stretch to the desktop max-height, leaving
+      // its controls stranded at the top of a mostly empty panel.
+      if (viewport.width >= 640) expect(box!.height).toBeLessThan(500);
+      await expect(
+        dialog.getByRole('textbox', { name: 'Email address' })
+      ).toBeInViewport();
+    });
+  }
+}

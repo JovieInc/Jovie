@@ -144,4 +144,17 @@ describe('PR visual review workflow', () => {
 
     expect(workflow).toContain("- 'apps/web/data/homepage*.ts'");
   });
+
+  it('lets the exact-route capture guard scan Playwright error-context.md instead of filing it as unknown-binary', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const step = workflow.slice(
+      workflow.indexOf('SCREENSHOT_BUILD_MODE: pr-premerge')
+    );
+    const guardAt = step.indexOf('guard-playwright-artifacts.mjs');
+
+    expect(guardAt).toBeGreaterThan(0);
+    expect(step.slice(0, guardAt)).toContain(
+      "PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'"
+    );
+  });
 });

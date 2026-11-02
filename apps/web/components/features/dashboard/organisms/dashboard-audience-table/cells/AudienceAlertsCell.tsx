@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/components/features/dashboard/organisms/dashboard-audience-table/cells/AudienceAlertsCell.test.tsx
+
 import { Bell } from 'lucide-react';
 import { memo } from 'react';
 import { Tooltip } from '@/components/shell/Tooltip';
@@ -27,7 +29,7 @@ function ChannelChip({ channel }: { readonly channel: AudienceAlertChannel }) {
   return (
     <Tooltip label={label} side='top'>
       <span
-        className='inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm bg-emerald-500/20 text-3xs font-bold tabular-nums uppercase tracking-tight text-emerald-200 ring-1 ring-inset ring-emerald-500/40'
+        className='inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm bg-success/20 text-3xs font-bold tabular-nums uppercase tracking-tight text-success ring-1 ring-inset ring-success/40'
         aria-label={label}
         role='img'
       >
@@ -59,7 +61,7 @@ export const AudienceAlertsCell = memo(function AudienceAlertsCell({
     <output className='inline-flex items-center gap-1' aria-label={tooltip}>
       <Tooltip label={tooltip} side='top'>
         <Bell
-          className={cn('h-3.5 w-3.5 text-emerald-300 fill-emerald-300/30')}
+          className={cn('h-3.5 w-3.5 text-success fill-success/30')}
           strokeWidth={2}
           aria-hidden='true'
         />

@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { drizzleColumns } from '@/tests/unit/auth/drizzle-predicate';
+
+const APP_USER_ID = '22222222-2222-4222-8222-222222222222';
 
 const mockGetCachedAuth = vi.hoisted(() => vi.fn());
 const mockCreateFeedbackItem = vi.hoisted(() => vi.fn());
@@ -63,7 +66,7 @@ describe('POST /api/feedback', () => {
     vi.resetModules();
     vi.clearAllMocks();
 
-    mockGetCachedAuth.mockResolvedValue({ userId: 'clerk_1' });
+    mockGetCachedAuth.mockResolvedValue({ userId: APP_USER_ID });
     mockGetClientIP.mockReturnValue('127.0.0.1');
     mockGeneralLimit.mockResolvedValue({
       success: true,
@@ -108,6 +111,9 @@ describe('POST /api/feedback', () => {
     expect(
       mockNotifySlackFeedbackSubmission.mock.calls[0]?.[0]
     ).not.toHaveProperty('email');
+    expect(drizzleColumns(mockFindFirst.mock.calls[0]?.[0].where)).toEqual([
+      'users.id',
+    ]);
   });
 
   it('persists opportunity inbox rating metadata in feedback context', {

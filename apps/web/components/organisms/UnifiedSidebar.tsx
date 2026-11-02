@@ -2,6 +2,7 @@
 
 // @coverage-via apps/web/tests/unit/components/organisms/UnifiedSidebar.library.test.tsx
 
+import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -30,6 +31,7 @@ import {
   SHELL_RAIL_LABEL,
 } from '@/components/shell/rail-motion';
 import { SidebarInboxLink } from '@/components/shell/SidebarInboxLink';
+import { SIDEBAR_ENTRY_LABEL_INSET_CLASS } from '@/components/shell/sidebar-optical';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
@@ -40,11 +42,13 @@ import {
 } from '@/features/dashboard/dashboard-nav/config';
 import { NavMenuItem } from '@/features/dashboard/dashboard-nav/NavMenuItem';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
+import { ProfileCompletionCard } from '@/features/dashboard/molecules/ProfileCompletionCard';
 import { useProfileData } from '@/hooks/useProfileData';
 import { APP_SHELL_WORKSPACES } from '@/lib/app-shell/workspaces';
 import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { useAppFlag } from '@/lib/flags/client';
+import { shippingStateQueryOptions } from '@/lib/queries/shipping-state';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 import type { AppShellSection } from '@/types/app-shell';
@@ -75,10 +79,12 @@ function SettingsNavGroup({
   items,
   pathname,
   isItemActive,
+  onPrefetch,
 }: Readonly<{
   items: readonly NavItem[];
   pathname: string;
   isItemActive?: (item: NavItem) => boolean;
+  onPrefetch?: (item: NavItem) => void;
 }>) {
   return (
     <SidebarMenu>
@@ -87,14 +93,22 @@ function SettingsNavGroup({
           isItemActive?.(item) ??
           (pathname === item.href || pathname.startsWith(`${item.href}/`));
         return (
-          <NavMenuItem key={item.id} item={item} isActive={isActive} calm />
+          <NavMenuItem
+            key={item.id}
+            item={item}
+            isActive={isActive}
+            calm
+            onPrefetch={onPrefetch ? () => onPrefetch(item) : undefined}
+          />
         );
       })}
     </SidebarMenu>
   );
 }
 
-const TOOLS_OPEN_KEY = 'ovie.nav.tools-open.v1';
+/** Tools keeps its original key so saved preferences survive; others append the id. */
+const groupOpenKey = (id: string) =>
+  id === 'tools' ? 'ovie.nav.tools-open.v1' : `ovie.nav.${id}-open.v1`;
 
 /**
  * One operator nav group. Tools is collapsed by default (Tim 2026-10-21: Ovie
@@ -108,15 +122,23 @@ function OperatorNavGroup({
   readonly section: OperatorNavSection;
   readonly pathname: string;
 }>) {
+  const queryClient = useQueryClient();
+  const prefetchShipping = (item: NavItem) => {
+    if (item.href === APP_ROUTES.ADMIN_SHIPPING) {
+      void queryClient.prefetchQuery(shippingStateQueryOptions);
+    }
+  };
   const [stored, setStored] = useState(false);
   useEffect(() => {
     if (!section.collapsible) return;
     try {
-      setStored(globalThis.localStorage?.getItem(TOOLS_OPEN_KEY) === '1');
+      setStored(
+        globalThis.localStorage?.getItem(groupOpenKey(section.id)) === '1'
+      );
     } catch {
       // Storage is a per-viewer convenience; the group defaults to closed.
     }
-  }, [section.collapsible]);
+  }, [section.collapsible, section.id]);
   const isActive = (item: NavItem) =>
     isOperatorNavigationHrefActive(pathname, item.href);
   const holdsActive = section.items.some(isActive);
@@ -125,7 +147,10 @@ function OperatorNavGroup({
     const next = !stored;
     setStored(next);
     try {
-      globalThis.localStorage?.setItem(TOOLS_OPEN_KEY, next ? '1' : '0');
+      globalThis.localStorage?.setItem(
+        groupOpenKey(section.id),
+        next ? '1' : '0'
+      );
     } catch {
       // Ignore unavailable storage.
     }
@@ -165,6 +190,7 @@ function OperatorNavGroup({
           items={section.items}
           pathname={pathname}
           isItemActive={isActive}
+          onPrefetch={prefetchShipping}
         />
       </div>
     </div>
@@ -248,7 +274,8 @@ function SettingsNavigation({
       <div>
         <span
           className={cn(
-            'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted',
+            'mb-1.5 block text-xs font-caption tracking-normal text-sidebar-muted',
+            SIDEBAR_ENTRY_LABEL_INSET_CLASS,
             SHELL_RAIL_LABEL
           )}
         >
@@ -259,7 +286,8 @@ function SettingsNavigation({
       <div>
         <span
           className={cn(
-            'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted',
+            'mb-1.5 block text-xs font-caption tracking-normal text-sidebar-muted',
+            SIDEBAR_ENTRY_LABEL_INSET_CLASS,
             SHELL_RAIL_LABEL
           )}
         >
@@ -294,9 +322,9 @@ function SidebarHeaderNav({
   routeBackLabel?: string;
 }>) {
   const isDesktop = useIsElectronRuntime();
-  const { state, isMobile, open: pinned } = useSidebar();
+  const { state, isMobile, isPreview, open: pinned } = useSidebar();
   const chromeHidden = state === 'closed' && !isMobile;
-  const { inboxNavigation } = useDashboardData();
+  const { inboxNavigation, selectedProfile } = useDashboardData();
 
   return (
     <div className='flex w-full items-center' data-sidebar-brand-row='true'>
@@ -309,6 +337,7 @@ function SidebarHeaderNav({
               <div className='flex w-full items-center gap-2'>
                 <Link
                   href={routeBackHref}
+                  prefetch={false}
                   aria-label={routeBackLabel}
                   className={cn(
                     'focus-ring-themed inline-flex h-6 shrink-0 items-center gap-1 rounded-lg px-2 text-xs text-sidebar-item-foreground transition-[background,border-color,color] duration-normal ease-interactive hover:bg-sidebar-accent/55 hover:text-sidebar-item-foreground focus-visible:bg-sidebar-accent/55 focus-visible:text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
@@ -330,7 +359,7 @@ function SidebarHeaderNav({
             return (
               <div
                 className={cn(
-                  'flex h-7 w-full items-center gap-1.5 rounded-full px-2.5',
+                  'flex h-7 w-full items-center gap-(--app-shell-sidebar-icon-gap) rounded-full',
                   'group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
                 )}
               >
@@ -346,7 +375,7 @@ function SidebarHeaderNav({
                     SHELL_RAIL_LABEL
                   )}
                 >
-                  Demo
+                  {selectedProfile?.displayName ?? 'Demo'}
                 </span>
               </div>
             );
@@ -368,7 +397,7 @@ function SidebarHeaderNav({
           return (
             <div
               className={cn(
-                'flex h-7 w-full items-center gap-1.5',
+                'flex h-7 w-full items-center gap-(--app-shell-sidebar-icon-gap)',
                 'group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
               )}
             >
@@ -405,7 +434,9 @@ function SidebarHeaderNav({
 
       {!isDesktop ? (
         <RailStagedContent
-          hidden={!pinned && !isMobile && headerOwnsCollapsedToggle}
+          hidden={
+            !pinned && !isPreview && !isMobile && headerOwnsCollapsedToggle
+          }
           stage={headerOwnsCollapsedToggle}
           className='ml-auto shrink-0 group-data-[collapsible=icon]:order-first group-data-[collapsible=icon]:mx-auto'
         >
@@ -427,7 +458,13 @@ export function UnifiedSidebar({
   variant = 'jovie',
   headerOwnsCollapsedToggle = false,
 }: UnifiedSidebarProps) {
-  const { identities, isAdmin: canSwitchWorkspaces, user } = useDashboardData();
+  const {
+    identities,
+    isAdmin: canSwitchWorkspaces,
+    user,
+    profileCompletion,
+    selectedProfile: dockProfile,
+  } = useDashboardData();
   const sidebarOverride = useShellSidebarOverride();
   const { state: sidebarState } = useSidebar();
   const pathname = usePathname();
@@ -439,6 +476,13 @@ export function UnifiedSidebar({
 
   const { profileHref } = useProfileData(section !== 'ov');
   const isSidebarCollapsed = sidebarState === 'closed';
+  // JOV-8137: the completion widget persists on every page's sidebar until
+  // the profile hits 100%, then disappears. Missing data reads as complete.
+  const showProfileCompletionWidget =
+    !isOperatorSection &&
+    !isRouteSidebar &&
+    !isDemoRoute &&
+    (profileCompletion?.percentage ?? 100) < 100;
 
   return (
     <Sidebar
@@ -459,10 +503,10 @@ export function UnifiedSidebar({
       <SidebarHeader
         data-electron-drag-region='true'
         className={cn(
-          'relative justify-center gap-0 px-(--space-2-5) group-data-[collapsible=icon]:px-0',
+          'relative justify-center gap-0 px-(--app-shell-sidebar-inset) group-data-[collapsible=icon]:px-0',
           isRouteSidebar || isOperatorSection
             ? 'h-(--app-shell-header-height) py-0.5'
-            : 'h-16 pl-4 pr-3 pt-5 pb-4'
+            : 'h-16 pt-5 pb-4'
         )}
       >
         <SidebarHeaderNav
@@ -478,7 +522,7 @@ export function UnifiedSidebar({
         />
       </SidebarHeader>
 
-      <SidebarContent className='min-h-0 flex-1 overflow-anchor-none px-2 pb-(--space-2-5) pt-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+      <SidebarContent className='min-h-0 flex-1 overflow-anchor-none px-0 pb-(--space-2-5) pt-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
         <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
           <SidebarGroupContent className='flex min-h-0 flex-1 flex-col'>
             {section === 'ov' ? (
@@ -498,11 +542,22 @@ export function UnifiedSidebar({
             )}
           </SidebarGroupContent>
         </SidebarGroup>
+        {/* JOV-8137: the completion widget persists on every page's sidebar
+            until the profile hits 100% — it hides itself once complete. */}
+        {showProfileCompletionWidget ? (
+          <div
+            className='group-data-[collapsible=icon]:hidden px-(--app-shell-sidebar-inset)'
+            data-testid='sidebar-profile-completion'
+          >
+            <ProfileCompletionCard />
+          </div>
+        ) : null}
       </SidebarContent>
 
       <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 pt-(--space-2-5) pb-(--space-3-5) [&_[data-slot=common-dropdown-trigger]]:min-h-8'>
         <SidebarDockBridge
           userId={user?.id ?? ''}
+          userState={{ hasClaimedHandle: Boolean(dockProfile?.username) }}
           collapsed={isSidebarCollapsed}
         >
           {dockStatus => (

@@ -1,16 +1,50 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { observeDesktopVisualActivity } from '@/lib/desktop/electron-bridge';
 
 /** Scroll distance (px) from bottom before considering "scrolled away". */
 export const SCROLL_THRESHOLD = 200;
 
-interface UseStickToBottomReturn {
-  /** Whether the scroll is currently pinned to the bottom */
-  isStuckToBottom: boolean;
+const SERVER_STUCK = () => true;
+
+interface StuckStore {
+  getSnapshot: () => boolean;
+  setStuck: (stuck: boolean) => void;
+  subscribe: (listener: () => void) => () => void;
+}
+
+function createStuckStore(): StuckStore {
+  let stuck = true;
+  const listeners = new Set<() => void>();
+  return {
+    getSnapshot: () => stuck,
+    setStuck: next => {
+      if (stuck === next) return;
+      stuck = next;
+      for (const listener of listeners) listener();
+    },
+    subscribe: listener => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+}
+
+export interface StickToBottomController {
   /** Manually set stuck state (e.g., when clicking scroll-to-bottom button) */
   setStuckToBottom: (stuck: boolean) => void;
+  /** Notifies subscribers without rendering the controller's caller. */
+  subscribe: (listener: () => void) => () => void;
+  getSnapshot: () => boolean;
   /**
    * Legacy scroll handler — stuck detection is driven by IntersectionObserver.
    * Kept as a no-op so existing call sites can keep `onScroll={onScroll}`.
@@ -24,6 +58,11 @@ interface UseStickToBottomReturn {
   bottomSentinelRef: React.RefCallback<HTMLDivElement>;
 }
 
+interface UseStickToBottomReturn extends StickToBottomController {
+  /** Whether the scroll is currently pinned to the bottom */
+  isStuckToBottom: boolean;
+}
+
 /**
  * Implements sticky-to-bottom scroll behavior for virtualized chat.
  *
@@ -32,10 +71,10 @@ interface UseStickToBottomReturn {
  * Scroll-to-bottom only fires when the sentinel is already in view; appending
  * a new message while the user is scrolled away does NOT force them back down.
  */
-export function useStickToBottom(
+export function useStickToBottomController(
   messageCount?: number
-): UseStickToBottomReturn {
-  const [isStuckToBottom, setIsStuckToBottom] = useState(true);
+): StickToBottomController {
+  const [store] = useState(createStuckStore);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const intersectionObserverRef = useRef<IntersectionObserver | null>(null);
@@ -44,19 +83,39 @@ export function useStickToBottom(
   const scrollRafRef = useRef<number | null>(null);
   const visualActiveRef = useRef(true);
   const restoringPinnedRef = useRef(false);
+  // Viewport bottom edge (scrollTop + clientHeight) when the transcript was
+  // last pinned. Content growth moves scrollHeight but not this edge; only a
+  // user scroll moves the viewport up from it.
+  const pinnedViewportBottomRef = useRef<number | null>(null);
 
-  const setStuckToBottom = useCallback((stuck: boolean) => {
-    if (!stuck) restoringPinnedRef.current = false;
-    setIsStuckToBottom(stuck);
-    isStuckRef.current = stuck;
-  }, []);
+  const setStuckToBottom = useCallback(
+    (stuck: boolean) => {
+      if (!stuck) restoringPinnedRef.current = false;
+      const container = scrollContainerRef.current;
+      pinnedViewportBottomRef.current =
+        stuck && container
+          ? container.scrollTop + container.clientHeight
+          : null;
+      isStuckRef.current = stuck;
+      store.setStuck(stuck);
+    },
+    [store]
+  );
 
-  const updateStuckFromIntersection = useCallback((intersecting: boolean) => {
-    if (!visualActiveRef.current || restoringPinnedRef.current) return;
-    if (isStuckRef.current === intersecting) return;
-    isStuckRef.current = intersecting;
-    setIsStuckToBottom(intersecting);
-  }, []);
+  const updateStuckFromIntersection = useCallback(
+    (intersecting: boolean) => {
+      if (!visualActiveRef.current || restoringPinnedRef.current) return;
+      if (isStuckRef.current === intersecting) return;
+      const container = scrollContainerRef.current;
+      pinnedViewportBottomRef.current =
+        intersecting && container
+          ? container.scrollTop + container.clientHeight
+          : null;
+      isStuckRef.current = intersecting;
+      store.setStuck(intersecting);
+    },
+    [store]
+  );
 
   const scheduleScrollToBottom = useCallback(() => {
     if (!visualActiveRef.current || scrollRafRef.current !== null) return;
@@ -74,7 +133,30 @@ export function useStickToBottom(
         return;
       }
 
+      const clientHeight = container.clientHeight;
+      if (clientHeight > 0) {
+        const viewportBottom = container.scrollTop + clientHeight;
+        const distanceFromBottom = container.scrollHeight - viewportBottom;
+        const pinnedViewportBottom = pinnedViewportBottomRef.current;
+        // The sentinel observer delivers after the scroll. A resize in that
+        // gap used to assign scrollTop and jump the transcript back down,
+        // which is a dropped frame on the way through the list. Only a
+        // viewport that moved up from where it was pinned counts as the user
+        // leaving: one tall append (a tool card plus its reply, JOV-10131)
+        // grows scrollHeight past the threshold without any scroll.
+        const leftPinnedBottom =
+          pinnedViewportBottom === null ||
+          pinnedViewportBottom - viewportBottom > SCROLL_THRESHOLD;
+        if (distanceFromBottom > SCROLL_THRESHOLD && leftPinnedBottom) {
+          restoringPinnedRef.current = false;
+          setStuckToBottom(false);
+          return;
+        }
+      }
+
       container.scrollTop = container.scrollHeight;
+      pinnedViewportBottomRef.current =
+        container.scrollTop + container.clientHeight;
       if (restoringPinnedRef.current) {
         // IO callbacks can deliver hidden samples after this restoration frame.
         // Drain those samples; subsequent user-scroll observations still apply.
@@ -82,7 +164,7 @@ export function useStickToBottom(
       }
       restoringPinnedRef.current = false;
     });
-  }, []);
+  }, [setStuckToBottom]);
 
   useEffect(
     () =>
@@ -197,11 +279,24 @@ export function useStickToBottom(
   }, []);
 
   return {
-    isStuckToBottom,
     setStuckToBottom,
+    subscribe: store.subscribe,
+    getSnapshot: store.getSnapshot,
     onScroll,
     totalSizeRef,
     scrollContainerRef,
     bottomSentinelRef,
   };
+}
+
+export function useStickToBottom(
+  messageCount?: number
+): UseStickToBottomReturn {
+  const controller = useStickToBottomController(messageCount);
+  const isStuckToBottom = useSyncExternalStore(
+    controller.subscribe,
+    controller.getSnapshot,
+    SERVER_STUCK
+  );
+  return { ...controller, isStuckToBottom };
 }

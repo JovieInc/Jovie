@@ -1,5 +1,7 @@
 'use client';
 
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
+
 // @coverage-via apps/web/tests/components/release-provider-matrix/AddReleaseSidebar.test.tsx
 
 import {
@@ -269,7 +271,7 @@ export function AddReleaseSidebar({
                 <AvatarUploadable
                   src={stagedArtworkPreviewUrl}
                   alt={title ? `${title} artwork` : 'New release artwork'}
-                  name={title || 'Untitled'}
+                  name={title || COPY_FALLBACKS.release}
                   size='2xl'
                   shape='artwork'
                   uploadable
@@ -277,7 +279,7 @@ export function AddReleaseSidebar({
                   showHoverOverlay
                 />
               }
-              title={title || 'Untitled'}
+              title={title || COPY_FALLBACKS.release}
               subtitle={
                 artistName ? <span>{artistName}</span> : 'No artist selected'
               }
@@ -348,6 +350,7 @@ export function AddReleaseSidebar({
               id='release-date'
               value={releaseDate}
               onChange={setReleaseDate}
+              disablePortal
             />
           </DrawerFormField>
 

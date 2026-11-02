@@ -49,6 +49,11 @@ export const CODE_FLAGS = {
   MUSIC_RESOLVER_PROVIDER_LINKS: false,
   MUSIC_RESOLVER_RELEASE_FACTS: false,
   NEW_RELEASE_PAGE: true,
+  // JOV-9758: value before paywall. On: the onboarding preview shows the
+  // matched artist's real Spotify catalog, the materialized profile imports
+  // that catalog, and the upgrade page leads with it before the price.
+  // FEATURE_ONBOARDING_VALUE_BEFORE_PAYWALL=false is the kill switch.
+  ONBOARDING_VALUE_BEFORE_PAYWALL: true,
   // Better Auth dynamic client registration. Default off: Better Auth
   // discovery omits registration_endpoint and /oauth2/register stays closed.
   // FEATURE_OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION=true opens unauthenticated

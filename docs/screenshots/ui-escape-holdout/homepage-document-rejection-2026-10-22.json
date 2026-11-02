@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "caseId": "esc-ui-homepage-document-like-1440",
+  "scope": "This fuller desktop composition only: document-like landing-page mockup despite added content coverage. A separate rejection from the earlier tall-profile/sparse checkpoint; not a rejection of every element, all repetition, or every text-led page.",
+  "authority": {
+    "sourceThreadId": "01a15732-b864-72b9-89a0-50396f62c02e",
+    "deliveryAtMinuteUtc": "2026-10-22T15:30Z",
+    "rejectedAtMinuteUtc": "2026-10-22T15:38Z",
+    "evidence": "Trusted parent readback identifies the delivered Library pair and subsequent user judgment; exact conversation message IDs were not supplied for this second outcome.",
+    "messages": [
+      {
+        "text": "Ok better but this looks like a word doc mix up not a landing page design"
+      },
+      {
+        "text": "Mock up",
+        "role": "user correction to the preceding transcription"
+      }
+    ]
+  },
+  "negativeCapture": {
+    "file": "esc-ui-homepage-document-like-1440.png",
+    "libraryFileId": "libfile_6ece57e899988191829e40b555afc105",
+    "fileId": "file_00000000ae5c81f9be5be97808ea8a44",
+    "sha256": "a89c435215a2595c9ffe3e97c056f0768cc25a520224ec95441a80b3c4d84119",
+    "width": 1440,
+    "height": 5014,
+    "humanLabel": "fail",
+    "mustReject": true,
+    "reasons": ["document-like-composition-despite-content-coverage"]
+  },
+  "companionCapture": {
+    "libraryFileId": "libfile_62c14d865d748191934dabc88d0f207d",
+    "fileId": "file_0000000077ec81f5a947f78015439ae2",
+    "sha256": "a3f35f8bf085fc425edeb5783aeec65179a6535bacb30156404d949e9804f859",
+    "width": 390,
+    "height": 6462,
+    "role": "Delivered companion context; no new binary label assigned."
+  },
+  "source": {
+    "buildKind": "local preview; not production",
+    "byteMatch": "Both Library files match the original homepage-music-journey fuller-default captures.",
+    "captureReceiptAt": [
+      "2026-10-22T15:26:18.172Z",
+      "2026-10-22T15:26:20.361Z"
+    ],
+    "state": "Untouched default form, local demo idle, FAQ closed; all real images decoded through normal scrolling.",
+    "sourceFingerprint": "Not attested by the per-capture receipt; no exact source-head or deployed-build claim."
+  },
+  "reviewDimensions": "Compare document-like repetition, product-image emphasis, hierarchy and composed narrative with reference pixels. These are review dimensions, not separately quoted user findings or arbitrary automated taste thresholds.",
+  "referenceComparison": "No independent pixel parity with an identified Pen frame is claimed. Missing reference comparison remains UNKNOWN.",
+  "earlierCase": "esc-ui-homepage-wide-profile-sparse-1440",
+  "calibrationBoundary": "Fixed-label regression proves false-approval handling and immutable capture binding. It does not establish live vision accuracy, recognition of document-like composition, or a replacement design.",
+  "earlierCaseStatus": "Unchanged and independently required."
+}

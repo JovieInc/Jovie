@@ -11,11 +11,12 @@ import {
 } from '@/data/productOntology';
 
 describe('Identity and Work product ontology', () => {
-  it('projects only enabled features while retaining technical compatibility IDs', () => {
+  it('projects permanent workspaces with missing or stale rollout overrides', () => {
     expect(
       getProductProjection({}).features.map(feature => feature.featureId)
-    ).toEqual(['work']);
-    const enabled = getProductProjection({ PROFILES_WORKSPACE: true });
+    ).toEqual(['identity', 'work']);
+    const staleFlags = { PROFILES_WORKSPACE: false, JOVIE_WORK_NAV: false };
+    const enabled = getProductProjection(staleFlags);
     expect(enabled.features).toContainEqual({
       featureId: 'identity',
       label: 'Identity',

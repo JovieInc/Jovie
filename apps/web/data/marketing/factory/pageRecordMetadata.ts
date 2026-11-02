@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import { type PageRecord, pageRecordPath } from './pageRecord';
 
 /**
@@ -42,8 +43,8 @@ export function buildPageRecordMetadata(record: PageRecord): Metadata {
       title: socialTitle,
       description: seo.description,
       images: [ogImage],
-      creator: '@meetjovie',
-      site: '@meetjovie',
+      creator: COMPANY_IDENTITY.xHandle,
+      site: COMPANY_IDENTITY.xHandle,
     },
   };
 }

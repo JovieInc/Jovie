@@ -32,6 +32,7 @@ import type { PendingAudio } from './hooks/useChatAudioAttachments';
 import type { PendingFile } from './hooks/useChatFileAttachments';
 import { type ComposerDraft, useComposerDraft } from './hooks/useComposerDraft';
 import type { ChatError, MessagePart } from './types';
+import { isWeeklyPlanLimitError } from './utils';
 
 interface ChatComposerSurfaceProps {
   readonly chatInputProps: ChatInputProps;
@@ -197,6 +198,7 @@ export function ChatInlineError({
   isSubmitting,
   chatMode,
 }: ChatInlineErrorProps) {
+  if (isWeeklyPlanLimitError(chatError)) return null;
   return (
     <div
       className={`${CHAT_CONTENT_SHELL_CLASSNAME} pb-4`}
@@ -327,6 +329,14 @@ export function ChatThreadMessages({
               : `${collapsedFailureCount} earlier messages went unanswered. Show them`}
           </Button>
         </div>
+      ) : null}
+      {messages.length === 0 && !isStreaming ? (
+        <p
+          data-testid='chat-thread-empty'
+          className={`${CHAT_MESSAGE_CONTENT_SHELL_CLASSNAME} text-sm text-secondary-token`}
+        >
+          Nothing in this thread yet.
+        </p>
       ) : null}
       {renderVirtualWindow ? (
         <div

@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './setup';
 import { waitForHydration } from './utils/smoke-test-utils';
@@ -9,8 +10,10 @@ type StreamChunk = Record<string, unknown>;
 const CHAT_PANEL = '[data-testid="onboarding-chat"]';
 const COMPOSER_SURFACE = '[data-testid="chat-composer-surface"]';
 const COMPOSER_TEXTAREA = '[aria-label="Chat message input" i]';
-const TEST_AVATAR_PNG_BASE64 =
-  'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAeElEQVR4nO3PQQ3AIADAQMD+/5w9QnJ4QKZsZu2cJwAAAAAAAAAAAAAAANxq7g7wG7iBHYgb2IG4gR2IG9iBuIEdiBvYgbiBHYgb2IG4gR2IG9iBuIEdiBvYgbiBHYgb2IG4gR2IG9iBuIEdiBvYgbiBHYgb2IG4gR2IG9gB9bYCfQMD+LwAAAAASUVORK5CYII=';
+const TEST_AVATAR_PNG_PATH = join(
+  __dirname,
+  '../../public/avatars/default-user.png'
+);
 const IGNORABLE_CONSOLE_ERRORS = [
   /favicon/i,
   /ResizeObserver loop/i,
@@ -215,7 +218,7 @@ async function mockOnboardingChat(
     await route.fulfill({
       status: 200,
       contentType: 'image/png',
-      body: Buffer.from(TEST_AVATAR_PNG_BASE64, 'base64'),
+      path: TEST_AVATAR_PNG_PATH,
     });
   });
   await page.route('**/_next/image?**', async route => {
@@ -224,7 +227,7 @@ async function mockOnboardingChat(
       await route.fulfill({
         status: 200,
         contentType: 'image/png',
-        body: Buffer.from(TEST_AVATAR_PNG_BASE64, 'base64'),
+        path: TEST_AVATAR_PNG_PATH,
       });
       return;
     }
@@ -483,23 +486,24 @@ test.describe('canonical /start onboarding chat', () => {
 
     const bubble = page.getByTestId('chat-user-bubble').first();
     await expect(bubble).toBeVisible();
-    // Chat body text follows --text-app, which #19154 consolidated onto the
-    // 10/12/14 scale (12px; was 13px).
+    // Pen R6As7U (T68xUV): the onboarding transcript reads at 16px body in a
+    // dark surface-2 bubble padded 16/20 (was the app chat's 12px pill).
     await expect(bubble.locator('.system-b-chat-user-text')).toHaveCSS(
       'font-size',
-      '12px'
+      '16px'
     );
-    await expect(bubble).toHaveCSS('padding-top', '6px');
-    await expect(bubble).toHaveCSS('padding-right', '12px');
-    await expect(bubble).toHaveCSS('padding-bottom', '6px');
-    await expect(bubble).toHaveCSS('padding-left', '12px');
+    await expect(bubble).toHaveCSS('padding-top', '16px');
+    await expect(bubble).toHaveCSS('padding-right', '20px');
+    await expect(bubble).toHaveCSS('padding-bottom', '16px');
+    await expect(bubble).toHaveCSS('padding-left', '20px');
 
     const bubbleBox = await bubble.boundingBox();
     const composerBox = await page.locator(COMPOSER_SURFACE).boundingBox();
     expect(bubbleBox).not.toBeNull();
     expect(composerBox).not.toBeNull();
     if (bubbleBox && composerBox) {
-      expect(bubbleBox.height).toBeLessThanOrEqual(40);
+      // One 16px line at 1.45 plus 32px vertical padding.
+      expect(bubbleBox.height).toBeLessThanOrEqual(60);
       expect(bubbleBox.y + bubbleBox.height).toBeLessThan(composerBox.y);
     }
 
@@ -526,7 +530,7 @@ test.describe('canonical /start onboarding chat', () => {
     await sendComposerMessage(page, 'I am Test Artist');
 
     await expect(page.getByTestId('onboarding-artist-picker')).toBeVisible();
-    await page.getByTestId('onboarding-artist-picker').getByText('Use').click();
+    await page.getByTestId('onboarding-artist-confirm').click();
 
     await expect(page.getByTestId('onboarding-profile-rail')).toBeHidden();
     const inlineRail = page.getByTestId('onboarding-profile-rail-inline');
@@ -572,7 +576,7 @@ test.describe('canonical /start onboarding chat', () => {
 
     await sendComposerMessage(page, 'I am Test Artist');
     await expect(page.getByTestId('onboarding-artist-picker')).toBeVisible();
-    await page.getByTestId('onboarding-artist-picker').getByText('Use').click();
+    await page.getByTestId('onboarding-artist-confirm').click();
 
     const sideRail = page.getByTestId('onboarding-profile-rail');
     await expect(sideRail).toBeVisible();
@@ -680,7 +684,7 @@ test.describe('canonical /start onboarding chat', () => {
       width: 440,
     });
 
-    await page.getByTestId('onboarding-artist-picker').getByText('Use').click();
+    await page.getByTestId('onboarding-artist-confirm').click();
 
     await expect(page.getByTestId('onboarding-artist-confirmed')).toHaveCount(
       0
@@ -751,6 +755,8 @@ test.describe('canonical /start onboarding chat', () => {
     );
     await expect(laterMessage).toBeVisible();
 
+    // Pen R6As7U: search sits behind Not Me on the proposed match.
+    await picker.getByTestId('onboarding-artist-not-me').click();
     await picker
       .getByRole('textbox', { name: 'Search Spotify artists' })
       .fill('muse');

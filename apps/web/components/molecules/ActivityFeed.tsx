@@ -143,7 +143,7 @@ export function ActivityTimelineLine({
 }
 
 interface ActivityTimelineRowProps {
-  readonly as?: 'div' | 'li';
+  readonly as?: 'div' | 'li' | 'article';
   readonly children: ReactNode;
   readonly className?: string;
   readonly contentClassName?: string;
@@ -238,8 +238,11 @@ export function ActivityFeedSkeleton({ rows = 4 }: { readonly rows?: number }) {
 function ActivityEventRow({ event }: { readonly event: ActivityEvent }) {
   const isSystem = event.actor?.type === 'system';
   return (
+    // `article` is the required child role of `role="feed"` (axe
+    // aria-required-children); a plain div row left the feed with zero
+    // owned articles.
     <ActivityTimelineRow
-      as='div'
+      as='article'
       interactive
       leading={<ActivityIcon action={event.action} />}
     >

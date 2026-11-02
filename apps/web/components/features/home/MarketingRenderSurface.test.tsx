@@ -40,6 +40,7 @@ describe('MarketingRenderSurface', () => {
 
     expect(container.firstElementChild).not.toBeNull();
     expect(container.firstElementChild).not.toBeEmptyDOMElement();
+    expect(container.firstElementChild).toHaveClass('marketing-rounded-frame');
   });
 
   it('renders the compact-glass demo inside the emphasized shell', () => {

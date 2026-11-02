@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, type Page, type TestInfo, test } from '@playwright/test';
+// Screenshot and e2e configs have separate testDirs; retain the H1 checks in both.
+import '../e2e/marketing-headings-visual.spec';
 import { MARKETING_EXACT_PUBLIC_ROUTE_TARGETS } from '@/data/marketing';
 import { SCREENSHOT_VIEWPORTS } from '@/lib/screenshots/registry';
 import {

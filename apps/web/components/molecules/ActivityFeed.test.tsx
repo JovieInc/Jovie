@@ -39,6 +39,12 @@ describe('ActivityFeed', () => {
 
     expect(screen.getByRole('feed', { name: 'Activity Feed' })).toBeVisible();
     expect(screen.getAllByTestId('activity-timeline-row')).toHaveLength(2);
+    // Each feed row is an `article` — the required child role of `role=feed`
+    // (axe aria-required-children).
+    expect(screen.getAllByRole('article')).toHaveLength(2);
+    expect(screen.getAllByRole('article')[0]).toHaveTextContent(
+      'Published Listen Now links.'
+    );
 
     const rowShells = screen.getAllByTestId('activity-timeline-row-shell');
     expect(rowShells[0]).toHaveTextContent('Published Listen Now links.');

@@ -24,6 +24,17 @@ vi.mock('next/link', () => ({
 }));
 
 describe('YoutubeThumbnailsLanding (JOV-5862 lock)', () => {
+  it('keeps the complete hero copy in one accessible heading', () => {
+    render(<YoutubeThumbnailsLanding />);
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole('heading', {
+        level: 1,
+        name: 'Paste your channel. See three thumbnails, redone.',
+      })
+    ).toHaveClass('youtube-thumbnails-hero-title');
+  });
+
   it('pastes a channel first, has no SKU, and Connects only to apply', () => {
     render(<YoutubeThumbnailsLanding />);
     const primary = screen.getByTestId('youtube-thumbnails-primary-cta');

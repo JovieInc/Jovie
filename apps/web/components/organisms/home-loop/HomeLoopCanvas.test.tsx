@@ -57,6 +57,43 @@ function props(
 }
 
 describe('HomeLoopCanvas', () => {
+  it('puts the company row above the shipping verdict with its caption', () => {
+    render(
+      <HomeLoopCanvas
+        {...props({
+          company: [
+            {
+              key: 'runway',
+              label: 'Runway',
+              value: '6 days',
+              was: null,
+              tone: 'bad',
+              measured: true,
+              target: 'Default dead · $23 cash',
+            },
+          ],
+          pulseCaption: 'Shipping · compared with your visit 3h ago',
+        })}
+      />
+    );
+    const company = screen.getByRole('region', { name: 'Company' });
+    expect(company).toHaveTextContent('6 days');
+    expect(company).toHaveTextContent('Default dead · $23 cash');
+    expect(
+      company.compareDocumentPosition(
+        screen.getByTestId('home-loop-constraint')
+      ) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(screen.getByTestId('home-loop-pulse-caption')).toHaveTextContent(
+      'compared with your visit 3h ago'
+    );
+  });
+
+  it('omits the company row when the persona has none', () => {
+    render(<HomeLoopCanvas {...props()} />);
+    expect(screen.queryByRole('region', { name: 'Company' })).toBeNull();
+  });
+
   it('renders every section populated with named headings and counts', () => {
     render(<HomeLoopCanvas {...props()} />);
 
@@ -212,14 +249,15 @@ describe('HomeLoopCanvas', () => {
     const toggle = within(first as HTMLElement).getByRole('button', {
       name: 'Why',
     });
-    const why = document.getElementById(
-      toggle.getAttribute('aria-controls') ?? ''
-    );
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(why).not.toBeVisible();
+    expect(
+      document.getElementById(toggle.getAttribute('aria-controls') ?? '')
+    ).toBeNull();
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    expect(why).toBeVisible();
+    expect(
+      document.getElementById(toggle.getAttribute('aria-controls') ?? '')
+    ).toBeVisible();
   });
 
   it('replaces controls with the answer and restores them on failure', () => {
@@ -260,6 +298,31 @@ describe('HomeLoopCanvas', () => {
     expect(
       within(failed as HTMLElement).getByTestId('home-loop-ask-approve')
     ).toBeVisible();
+  });
+});
+
+describe('HomeLoopCanvas notices and details', () => {
+  it('links a summarized asks notice and the constraint details', () => {
+    render(
+      <HomeLoopCanvas
+        {...props({
+          constraint: {
+            tone: 'bad',
+            text: 'Remediation alerts are not being acknowledged',
+            detailsHref: '/app/ov/product',
+          },
+          asksNotice: '27 sources are unavailable or missing evidence.',
+          asksNoticeHref: '/app/ov/inbox',
+        })}
+      />
+    );
+    expect(screen.getByTestId('home-loop-constraint-details')).toHaveAttribute(
+      'href',
+      '/app/ov/product'
+    );
+    expect(
+      screen.getByTestId('home-loop-asks-section-notice-link')
+    ).toHaveAttribute('href', '/app/ov/inbox');
   });
 });
 
@@ -557,5 +620,32 @@ describe('useUndoableAnswers', () => {
     expect(onCommitted).not.toHaveBeenCalled();
     expect(toastMock.error).toHaveBeenCalledWith('Not recorded. Try again.');
     expect(toastMock.success).not.toHaveBeenCalled();
+  });
+});
+
+describe('HomeLoopCanvas answered ask dim (a11y AA floor)', () => {
+  it('dims an answered ask card at opacity-75, never 0.70', () => {
+    const askId = HOME_LOOP_FIXTURE_ASKS[0]!.id;
+    render(
+      <HomeLoopCanvas
+        {...props({
+          answers: { [askId]: { label: 'Approved', state: 'sent' } },
+        })}
+      />
+    );
+    const cards = screen.getAllByTestId('home-loop-ask');
+    expect(cards).toHaveLength(HOME_LOOP_FIXTURE_ASKS.length);
+    const card = cards.find(card =>
+      within(card).queryByRole('heading', {
+        name: HOME_LOOP_FIXTURE_ASKS[0]!.title,
+      })
+    );
+    expect(card).toHaveClass('opacity-75');
+    expect(card).not.toHaveClass('opacity-70');
+    for (const openCard of cards.filter(candidate => candidate !== card)) {
+      expect(openCard).toHaveAttribute('data-answer-state', 'open');
+      expect(openCard).not.toHaveClass('opacity-75');
+      expect(openCard).not.toHaveClass('opacity-70');
+    }
   });
 });

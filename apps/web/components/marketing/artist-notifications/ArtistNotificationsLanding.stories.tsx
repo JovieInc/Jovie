@@ -10,7 +10,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Full /artist-notifications landing page composition: hero, trust strip, capture, reactivation, benefits, spec wall, FAQ, and final CTA.',
+          'Full /artist-notifications landing page composition: hero, trust strip, capture, reactivation, benefits, spec wall, FAQ, and final CTA. The hero opts into the dock inset so its H1 clears the header at 390.',
       },
     },
   },

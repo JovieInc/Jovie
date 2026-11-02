@@ -88,7 +88,7 @@ describe('stage derivation from receipts', () => {
       prs: [pr(7, { mergedAt: ago(90) })],
       controllers,
       linearIssues: JSON.parse(
-        `{"JOV-7":{"createdAt":${q(ago(1000))},"startedAt":${q(ago(400))},"initialType":"backlog","history":[{"at":${q(ago(800))},"fromType":"backlog","toType":"unstarted"}]}}`
+        `{"JOV-7":{"createdAt":${q(ago(1000))},"startedAt":${q(ago(400))},"initialType":"backlog","history":[{"at":${q(ago(800))},"fromType":"backlog","toType":"unstarted"},{"at":${q(ago(100))},"fromType":"started","toType":"completed"},{"at":${q(ago(10))},"fromType":"started","toType":"completed"}]}}`
       ),
       feeds: {
         lanes: {
@@ -116,6 +116,8 @@ describe('stage derivation from receipts', () => {
       ['merged', ago(90)],
       ['deployed', ago(40)],
       ['verified', ago(30)],
+      // Done before verification (ago(100)) is ignored; closure is first Done after it.
+      ['closed', ago(10)],
     ]);
     expect(events[0].actor).toBe('codex');
     const release = deriveStageEvents(raw, MANIFEST).filter(
@@ -129,6 +131,45 @@ describe('stage derivation from receipts', () => {
     ]);
     expect(release[2]).toMatchObject({ enteredAt: ago(60), exitedAt: ago(30) });
   });
+  it.each([
+    ['after production verification', 20, 10, 'advanced'],
+    ['before a rework PR merges', 200, 190, 'failed'],
+    ['when verification is abandoned', 20, 10, 'abandoned'],
+  ])(
+    'preserves independent outcome receipts %s',
+    (_, entered, exited, outcome) => {
+      const receipt = event({
+        entityId: 'JOV-7',
+        stage: 'outcome-receipt',
+        enteredAt: ago(entered),
+        exitedAt: ago(exited),
+        outcome,
+        sourceReceipt: 'lanes-ledger:outcome-7',
+      });
+      const feeds = { lanes: { events: [receipt] } };
+      const events = deriveStageEvents(
+        { prs: [pr(7, { mergedAt: ago(90) })], controllers, feeds },
+        MANIFEST
+      );
+      expect(events.filter(e => e.stage === 'outcome-receipt')).toEqual([
+        receipt,
+      ]);
+      expect(
+        events.find(e => e.entityType === 'shipping' && e.stage === 'deployed')
+      ).toMatchObject({ enteredAt: ago(40), exitedAt: ago(30) });
+      expect(
+        events.find(e => e.entityType === 'shipping' && e.stage === 'verified')
+      ).toMatchObject({ outcome: 'open', exitedAt: null });
+      const timings = compactStageTimings(
+        computeStageTimings(events, MANIFEST, { now: NOW })
+      );
+      expect(
+        timings.entities.shipping.stages['outcome-receipt']['24h']
+      ).toEqual([1, 600, 600]);
+      expect(deriveStageEvents({ feeds }, MANIFEST)).toEqual([receipt]);
+    }
+  );
+
   it('derives red → classified → green remediation episodes', () => {
     const at = minutes => q(ago(minutes));
     const suite = (conclusion, minutes) =>
@@ -456,7 +497,7 @@ describe('committed stage-timings snapshot', () => {
       '28d': [1, 1200, 1200],
       regression: [false, null, 1200, null, 1, 0],
     });
-    expect(compact.entities.shipping.stages.verified).toMatchObject({
+    expect(compact.entities.shipping.stages.closed).toMatchObject({
       terminal: true,
       regression: null,
     });

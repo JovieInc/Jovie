@@ -4,19 +4,12 @@ import {
   MarketingContainer,
   MarketingFeatureGrid,
   MarketingHero,
-  MarketingHeroPhoto,
   MarketingPageShell,
 } from '@/components/marketing';
 import { MarketingCtaSection } from '@/components/site/MarketingCtaSection';
 import { APP_ROUTES } from '@/constants/routes';
 import { YOUTUBE_THUMBNAILS_COPY as copy } from '@/data/youtubeThumbnailsCopy';
 import { YoutubeThumbnailPasteForm } from './YoutubeThumbnailPasteForm';
-
-const YOUTUBE_THUMBNAILS_HERO_PHOTO = {
-  src: '/images/marketing-hero/youtube-thumbnails.webp',
-  width: 1600,
-  height: 686,
-} as const;
 
 /** Apply needs an account and YouTube Connect. Live mutation is JOV-5158. */
 export const YOUTUBE_THUMBNAILS_APPLY_HREF = `${APP_ROUTES.SIGNUP}?source=youtube-thumbnails&intent=apply`;
@@ -27,7 +20,6 @@ export function YoutubeThumbnailsLanding() {
     <MarketingPageShell className='bg-base text-primary-token'>
       <div>
         <div className='marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden'>
-          <MarketingHeroPhoto {...YOUTUBE_THUMBNAILS_HERO_PHOTO} />
           <MarketingHero
             variant='left'
             sectionVariant='left-none'
@@ -38,7 +30,7 @@ export function YoutubeThumbnailsLanding() {
             <h1
               id='youtube-thumbnails-hero-heading'
               data-testid='youtube-thumbnails-hero-heading'
-              className='marketing-h1-linear mt-5 max-w-3xl text-primary-token line-clamp-2'
+              className='marketing-h1-linear youtube-thumbnails-hero-title mt-5 max-w-3xl text-primary-token line-clamp-2'
             >
               {copy.hero.title}
             </h1>
@@ -75,7 +67,7 @@ export function YoutubeThumbnailsLanding() {
                 {copy.workflow.body}
               </p>
             </div>
-            <div className='mx-auto mt-12 grid max-w-5xl gap-8 md:grid-cols-3'>
+            <div className='mt-12 grid gap-8 md:grid-cols-3'>
               {copy.workflow.steps.map((step, index) => (
                 <article
                   key={step.title}

@@ -72,6 +72,31 @@ function renderWorkspace() {
 }
 
 describe('OutboundWorkspace', () => {
+  it('keeps table headers through loading and shows one quiet empty line', () => {
+    mockQueue(undefined, { isLoading: true });
+    const { container, rerender } = renderWorkspace();
+    const headers = screen.getAllByRole('columnheader');
+    expect(
+      container.querySelectorAll('[data-slot="skeleton"]').length
+    ).toBeGreaterThan(0);
+    const loadingCells = container.querySelectorAll('tbody tr:first-child td');
+    expect(
+      loadingCells[0]?.querySelector('.system-b-table-skeleton-person-face')
+    ).toBeNull();
+    expect(
+      loadingCells[1]?.querySelector('.system-b-table-skeleton-person-face')
+    ).not.toBeNull();
+    mockQueue(outboundFixtureQueue([]));
+    rerender(
+      <TooltipProvider>
+        <OutboundWorkspace />
+      </TooltipProvider>
+    );
+    expect(screen.getAllByRole('columnheader')).toEqual(headers);
+    expect(screen.getByText('Nobody in Ready to certify')).toBeInTheDocument();
+    expect(container.querySelector('[data-empty-state-card]')).toBeNull();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.panels.length = 0;
@@ -86,7 +111,34 @@ describe('OutboundWorkspace', () => {
     expect(screen.getByText('Ada')).toBeInTheDocument();
     expect(screen.getByText('Bea')).toBeInTheDocument();
     expect(screen.queryByText('Cy')).toBeNull();
-    expect(screen.getAllByText('Profile built 188 days ago')).toHaveLength(2);
+    expect(screen.getAllByText('Released 5 days ago')).toHaveLength(2);
+  });
+
+  it('shows "No trigger" instead of a static attribute and flags non-artists', () => {
+    mockQueue(
+      outboundFixtureQueue([
+        outboundFixtureRow({
+          leadId: 'z',
+          name: 'Curator',
+          handle: 'spotifyplaylistcurator',
+          view: 'ready',
+          whyNow: null,
+          fit: 'unknown',
+          fitBasis: 'presence_only',
+          flags: ['possible_non_artist', 'presence_only_fit'],
+          entityNote: 'Looks like a playlist curator or submission service',
+        }),
+      ])
+    );
+    renderWorkspace();
+    expect(screen.getByText('No trigger')).toBeInTheDocument();
+    expect(screen.getByText('Presence only')).toBeInTheDocument();
+    expect(screen.getByTestId('outbound-flag-non-artist')).toHaveTextContent(
+      'Possible non-artist'
+    );
+    expect(
+      screen.getByTestId('outbound-count-needs_evidence')
+    ).toHaveTextContent('0');
   });
 
   it('shows a retryable error state', () => {

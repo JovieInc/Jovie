@@ -366,6 +366,8 @@ function makeAudienceMember(index: number): AudienceMember {
         ? { source: 'ig', medium: 'social', campaign: 'spring26' }
         : {},
     email: hasEmail ? name : null,
+    // Fictional demo rows; treated as shared so the demo shows contact details.
+    emailVisibleToArtist: true,
     phone: index % 5 === 0 ? `+1555${String(1000 + index).slice(0, 4)}` : null,
     spotifyConnected: index % 3 === 0,
     purchaseCount: getDeterministicPurchaseCount(index),

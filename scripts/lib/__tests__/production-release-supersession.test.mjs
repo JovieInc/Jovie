@@ -12,6 +12,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
+import { load } from 'js-yaml';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   STRUCTURAL_DEFAULT_CONCURRENCY,
@@ -22,8 +23,11 @@ import {
   aliasDecision,
   collectAliasGraduation,
   completeList,
+  MIN_SAMPLES_PER_ROUTE,
+  nearestRankP95,
   parseAliasSamples,
   selectAliasWindow,
+  uniformSamplesPerRoute,
 } from '../public-profile-alias-graduation.mjs';
 import {
   realGhVersion,
@@ -31,6 +35,7 @@ import {
   runWithRealGh,
   storedZip,
 } from '../real-gh-harness.mjs';
+import { assertReviewDeadline } from '../review-deadline.mjs';
 
 vi.mock('node:child_process', async importOriginal => {
   const actual = /** @type {typeof import('node:child_process')} */ (
@@ -86,16 +91,12 @@ describe('public-profile alias graduation policy', () => {
     }
     expect(receipt.schema).toBe('jovie-public-profile-alias-graduation/v2');
     expect(inventory).toHaveLength(selection.enumeratedControllers);
-    const originalWindow = selectAliasWindow(
-      inventory,
-      'production',
-      '2026-10-14T15:21:25Z'
-    );
-    expect(originalWindow.map(row => row.production.jobId)).toEqual(
-      expect.arrayContaining([115872079856, 115852914061, 115804204403])
-    );
+    // Completeness: every selected window below is recomputed from the full
+    // enumerated inventory, so an omitted controller changes the selection.
     expect(selection.windowSize).toBe(policy.requiredConsecutiveRuns);
-    expect(policy.samplesPerRoute).toBe(5);
+    expect(policy.samplesPerRoute).toBeGreaterThanOrEqual(
+      MIN_SAMPLES_PER_ROUTE
+    );
     expect(policy.p95Estimator).toBe('nearest-rank');
     for (const [surface, window] of Object.entries(windows)) {
       const selected = selectAliasWindow(inventory, surface, selection.cutoff);
@@ -120,10 +121,13 @@ describe('public-profile alias graduation policy', () => {
         expect(row.jobUrl).toBe(
           `https://github.com/JovieInc/Jovie/actions/runs/${row.controllerRunId}/job/${row.jobId}`
         );
+        expect(row.samplesPerRoute).toBe(policy.samplesPerRoute);
         for (const route of ALIAS_ROUTES) {
-          expect(row.routeSamplesMs[route]).toHaveLength(5);
+          expect(row.routeSamplesMs[route]).toHaveLength(
+            policy.samplesPerRoute
+          );
           expect(row.routeP95Ms[route]).toBe(
-            Math.max(...row.routeSamplesMs[route])
+            nearestRankP95(row.routeSamplesMs[route])
           );
         }
         expect(row.observedP95Ms).toBe(
@@ -136,7 +140,12 @@ describe('public-profile alias graduation policy', () => {
     const measuredAt = Date.parse(receipt.measuredAt);
     const nextReviewAt = Date.parse(policy.nextReviewAt);
     expect(nextReviewAt).toBeGreaterThan(measuredAt);
-    expect(nextReviewAt).toBeGreaterThan(Date.now());
+    // A missed review warns for 72h (naming JOV-8338), then fails merge groups.
+    assertReviewDeadline({
+      label: 'public-profile alias graduation',
+      deadline: policy.nextReviewAt,
+      trackingIssue: policy.trackingIssue,
+    });
     expect(nextReviewAt - measuredAt).toBeLessThanOrEqual(
       7 * 24 * 60 * 60 * 1000
     );
@@ -164,9 +173,14 @@ describe('public-profile alias graduation policy', () => {
     expect(production).toContain(
       `no later than ${review} (${policy.trackingIssue})`
     );
-    expect(production.includes('performance_status=warn')).toBe(
-      !windows.production.graduated
+    // A graduated receipt authorizes blocking, but only on pages whose
+    // golden-path surface is certified in the Ovie ledger; the rest warn.
+    expect(production.includes('performance_status=failed')).toBe(
+      windows.production.graduated
     );
+    expect(production).toContain('scripts/lib/alias-gate-certified-routes.mjs');
+    expect(production).toContain('/api/internal/ovie/golden-path-evidence');
+    expect(production).toContain('performance_status=${status}');
     expect(production).not.toContain('JOV-4854');
   });
 
@@ -246,6 +260,50 @@ describe('public-profile alias graduation policy', () => {
     });
     expect(aliasDecision(Array(13).fill(parsed)).graduated).toBe(false);
     expect(aliasDecision(Array(14).fill(parsed)).graduated).toBe(true);
+  });
+
+  it('reads the guard sample count from the log and checks the nearest-rank p95, not the max', () => {
+    // performance-budgets-guard takes 20 samples since #22656; its summary is
+    // the 19th of 20 sorted samples, so one 1800ms outlier still qualifies.
+    const values = index => (index === 20 ? 1800 : index === 19 ? 900 : 700);
+    const log = ALIAS_ROUTES.map(
+      route =>
+        `Checking ${route} -> /test\n${Array.from({ length: 20 }, (_, i) => `  sample ${i + 1}/20: ${values(i + 1)}ms`).join('\n')}\n${route} (/test) primary=usable-alias-result=700ms\n  PASS usable-alias-result-max: 900.0ms / 1500.0ms`
+    ).join('\n');
+    expect(parseAliasSamples(log)).toMatchObject({
+      samplesPerRoute: 20,
+      valid: true,
+      qualifies: true,
+      observedP95Ms: 900,
+    });
+    for (const broken of [
+      // summary claims the max instead of the nearest-rank p95
+      log.replaceAll('900.0ms / 1500.0ms', '1800.0ms / 1500.0ms'),
+      // one route reports a different sample count
+      log.replace('sample 20/20: 1800ms', 'sample 20/21: 1800ms'),
+      // fewer than the minimum samples per route
+      ALIAS_ROUTES.map(
+        route =>
+          `Checking ${route} -> /test\n  sample 1/1: 700ms\n${route} (/test) primary=usable-alias-result=700ms\n  PASS usable-alias-result-max: 700.0ms / 1500.0ms`
+      ).join('\n'),
+    ]) {
+      expect(parseAliasSamples(broken)).toMatchObject({
+        valid: false,
+        qualifies: false,
+      });
+    }
+    expect(
+      uniformSamplesPerRoute([
+        { valid: true, samplesPerRoute: 20 },
+        { valid: false, samplesPerRoute: 5 },
+      ])
+    ).toBe(20);
+    expect(
+      uniformSamplesPerRoute([
+        { valid: true, samplesPerRoute: 20 },
+        { valid: true, samplesPerRoute: 5 },
+      ])
+    ).toBeNull();
   });
 
   it('collects paginated exact-attempt jobs without filtering failed controllers or borrowing staging samples', async () => {
@@ -339,10 +397,20 @@ describe('public-profile alias graduation policy', () => {
     ).rejects.toThrow('Incomplete');
   });
 
-  it.each(['production', 'staging'])(
-    'executes the %s guard with the measured enforcement decision',
-    surface => {
+  it.each([
+    ['production', 'certified'],
+    ['production', 'uncertified'],
+    ['production', 'unreadable'],
+    ['staging', 'certified'],
+    ['staging', 'uncertified'],
+    ['staging', 'unreadable'],
+  ])(
+    'executes the %s guard with the measured enforcement decision (%s ledger)',
+    (surface, ledgerState) => {
       const staging = surface === 'staging';
+      // Both lanes block only while public-profile is certified in the ledger
+      // (Tim 2026-10-31); uncertified or unreadable ledgers warn.
+      const certified = ledgerState === 'certified';
       const job = getJobBlock(
         RELEASE_WORKFLOW,
         staging ? 'promote-production' : 'production-public-profile-alias-gate'
@@ -359,27 +427,80 @@ describe('public-profile alias graduation policy', () => {
         stubCommand(
           fixture.bin,
           'pnpm',
-          '#!/bin/sh\nprintf "%s\\n" "$@" > "$ALIAS_GUARD_ARGUMENTS"\nexit "$ALIAS_GUARD_EXIT"\n'
+          // Record every invocation (the script runs other pnpm commands around the guard) and
+          // fail only the performance-budgets guard, so the assertions read that guard's own arguments.
+          // Each call is appended with one write: the staged gate runs its budget lanes concurrently.
+          '#!/bin/sh\ncall="$(printf "%s\\n" "$@"; printf -- "--invocation-end--\\n")"\nprintf "%s\\n" "$call" >> "$ALIAS_GUARD_ARGUMENTS"\ncase "$*" in *performance-budgets-guard*) exit "$ALIAS_GUARD_EXIT" ;; *) exit 0 ;; esac\n'
+        );
+        const ledgerBody =
+          ledgerState === 'unreadable'
+            ? '<html>bad gateway</html>'
+            : JSON.stringify({
+                schema: 'jovie.prod-golden-path-certified/v1',
+                ledger: 'present',
+                certifiedSurfaces: certified
+                  ? ['landing', 'public-profile']
+                  : ['landing'],
+              });
+        writeFileSync(join(fixture.root, 'ledger.json'), ledgerBody);
+        // The staged lane reads CRON_SECRET through Doppler; pass through.
+        stubCommand(
+          fixture.bin,
+          'doppler',
+          '#!/bin/sh\nwhile [ "$1" != "--" ]; do shift; done\nshift\nexec "$@"\n'
+        );
+        stubCommand(
+          fixture.bin,
+          'curl',
+          '#!/bin/sh\ncase "$*" in *golden-path-evidence*) cat "$ALIAS_LEDGER_BODY" ;; *) exit 22 ;; esac\n'
         );
         const result = runScript(script, fixture, {
+          ALIAS_LEDGER_BODY: join(fixture.root, 'ledger.json'),
+          CRON_SECRET: 'fixture-cron-secret',
           ALIAS_GUARD_ARGUMENTS: join(fixture.root, 'arguments'),
           ALIAS_GUARD_EXIT: String(exit),
-          DOPPLER_TOKEN: '',
+          DOPPLER_TOKEN: staging ? 'fixture-doppler' : '',
+          // Never let a developer's real key file a ticket from this test.
+          LINEAR_API_KEY: '',
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: 'fixture-bypass',
           PRODUCTION_DEPLOYMENT_URL_B64:
             Buffer.from(DEPLOYMENT_URL).toString('base64'),
         });
+        // An unreadable ledger is never silent: it warns and files a P1.
+        expect(
+          result.stdout.includes(
+            '::warning::Golden-path certification ledger unavailable'
+          )
+        ).toBe(ledgerState === 'unreadable');
         const decision =
           PUBLIC_PROFILE_ALIAS_GRADUATION.windows[surface].decision;
-        expect(result.status).toBe(exit && decision === 'block' ? 1 : 0);
+        const blocks = certified && decision === 'block';
+        expect(result.status).toBe(exit && blocks ? 1 : 0);
         const outputs = parseOutputs(fixture.output);
         if (!exit) expect(outputs.performance_status).toBe('passed');
-        else if (staging)
+        else if (staging && blocks)
           expect(outputs).toMatchObject({
             failure_subtype: 'exact_build_performance_failed',
           });
-        else expect(outputs.performance_status).toBe('warn');
-        const args = readFileSync(join(fixture.root, 'arguments'), 'utf8');
+        else if (staging) {
+          expect(outputs.failure_subtype).toBeUndefined();
+          expect(result.stdout).toContain(
+            '::warning::Exact staged-build public-profile alias budgets missed on uncertified pages'
+          );
+        } else
+          expect(outputs.performance_status).toBe(blocks ? 'failed' : 'warn');
+        const calls = readFileSync(join(fixture.root, 'arguments'), 'utf8')
+          .split('--invocation-end--\n')
+          .filter(Boolean);
+        const guardCalls = calls.filter(call =>
+          call.includes('performance-budgets-guard')
+        );
+        expect(guardCalls.length).toBeGreaterThan(0);
+        // The public-profile alias guard is the one carrying the alias routes.
+        const args =
+          guardCalls.find(call =>
+            call.includes('--route-id\n' + ALIAS_ROUTES[0])
+          ) ?? guardCalls.at(-1);
         expect(args).toContain(
           `--base-url\n${staging ? DEPLOYMENT_URL : 'https://jov.ie'}`
         );
@@ -387,6 +508,48 @@ describe('public-profile alias graduation policy', () => {
         for (const route of ALIAS_ROUTES)
           expect(args).toContain(`--route-id\n${route}`);
       }
+    }
+  );
+});
+
+describe('production lane evidence across failed-job retries', () => {
+  it.each([
+    [1, 1],
+    [1, 2],
+    [2, 3],
+  ])(
+    'downloads the artifact produced in attempt %s from consumer attempt %s',
+    (producerAttempt, consumerAttempt) => {
+      const workflow =
+        /** @type {{ jobs: Record<string, { outputs: Record<string, string>, steps: { name?: string, uses?: string, with?: Record<string, string> }[] }> }} */ (
+          load(CONTROLLER_WORKFLOW)
+        );
+      const producer = workflow.jobs['authorize-production'];
+      const upload = producer.steps.find(
+        step =>
+          step.uses?.startsWith('actions/upload-artifact@') &&
+          step.name === 'Preserve cumulative production lane evidence'
+      );
+      const producerValues = {
+        'steps.authorize.outputs.expected_sha': EXPECTED_SHA,
+        'github.run_attempt': String(producerAttempt),
+      };
+      const uploaded = materialize(upload.with.name, producerValues);
+      const output = producer.outputs.lane_range_artifact_name;
+      expect(
+        output,
+        'authorization must retain the producer artifact name'
+      ).toBeTypeOf('string');
+      const retained = materialize(output, producerValues);
+      const download = workflow.jobs['production-verified'].steps.find(step =>
+        step.uses?.startsWith('actions/download-artifact@')
+      );
+      const requested = materialize(download.with.name, {
+        'needs.authorize-production.outputs.lane_range_artifact_name': retained,
+        'needs.authorize-production.outputs.expected_sha': EXPECTED_SHA,
+        'github.run_attempt': String(consumerAttempt),
+      });
+      expect(requested).toBe(uploaded);
     }
   );
 });
@@ -2147,6 +2310,120 @@ exit 9
     expect(run.outputs.decision).toBe('proceed');
     expect(run.outputs.wait_seconds).toBe('0');
     expect(run.result.stderr).not.toContain('unexpected merge-queue read');
+  });
+
+  it.each([
+    {
+      label: 'unknown lineage',
+      gateDecision: 'error',
+      gateStatus: 1,
+      expectedDecision: 'error',
+      expectedCurrent: 'false',
+    },
+    {
+      label: 'nonzero lineage error',
+      gateDecision: 'error',
+      gateStatus: 7,
+      expectedDecision: 'error',
+      expectedCurrent: 'false',
+    },
+    {
+      label: 'successful yield',
+      gateDecision: 'yield',
+      gateStatus: 0,
+      expectedDecision: 'superseded',
+      expectedCurrent: 'false',
+    },
+    {
+      label: 'successful proceed',
+      gateDecision: 'proceed',
+      gateStatus: 0,
+      expectedDecision: 'proceed',
+      expectedCurrent: 'true',
+    },
+  ])(
+    'handles lineage result before evaluation: $label',
+    ({ gateDecision, gateStatus, expectedDecision, expectedCurrent }) => {
+      const fixture = makeFixture('coalesce-unreadable-');
+      stubCommand(
+        fixture.bin,
+        'bash',
+        `#!/bin/sh
+case "$1" in
+  *resolve-main-sha.sh) printf '%s\\n' '${NEWER_SHA}' ;;
+  *release-lineage-gate.sh) printf 'decision=${gateDecision}\\n'; exit ${gateStatus} ;;
+  -c) exec /bin/bash "$@" ;;
+  *) echo "unexpected bash: $*" >&2; exit 2 ;;
+esac
+`
+      );
+      const script = getStepRunScript(
+        getJobBlock(CONTROLLER_WORKFLOW, 'coalesce-production'),
+        'Evaluate event-driven supersession'
+      );
+      const result = runScript(script, fixture, {
+        EXPECTED_SHA,
+        FIXED_WINDOW_SECONDS_REPLACED: '60',
+        GITHUB_STEP_SUMMARY: join(fixture.root, 'step-summary'),
+        PRODUCTION_STARVATION_SECONDS: '5400',
+        REPOSITORY: 'JovieInc/Jovie',
+        RESOLVE_MAIN_BUDGET_SECONDS: '5',
+        RESOLVE_MAIN_RETRY_SECONDS: '0',
+      });
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(
+        gateStatus
+      );
+      const outputs = parseOutputs(fixture.output);
+      expect(outputs.is_current).toBe(expectedCurrent);
+      expect(outputs.decision ?? null).toBe(expectedDecision);
+      const receipt = join(fixture.root, 'release-lineage-receipt.json');
+      if (gateStatus !== 0) {
+        expect(result.stdout).toContain(
+          `Release lineage gate failed before evaluation (exit=${gateStatus}).`
+        );
+        expect(existsSync(receipt)).toBe(false);
+      } else {
+        expect(JSON.parse(readFileSync(receipt, 'utf8'))).toMatchObject({
+          decision: expectedDecision,
+          replacementSha: gateDecision === 'yield' ? NEWER_SHA : EXPECTED_SHA,
+        });
+      }
+      expect(result.stdout).not.toContain('mutation-authorized');
+    }
+  );
+
+  it('still fails the wave when the pre-mutation gate crashes without a decision', () => {
+    const fixture = makeFixture('coalesce-crash-');
+    stubCommand(
+      fixture.bin,
+      'bash',
+      `#!/bin/sh
+case "$1" in
+  *resolve-main-sha.sh) printf '%s\\n' '${NEWER_SHA}' ;;
+  *release-lineage-gate.sh) echo 'boom' >&2; exit 1 ;;
+  -c) exec /bin/bash "$@" ;;
+  *) echo "unexpected bash: $*" >&2; exit 2 ;;
+esac
+`
+    );
+    const script = getStepRunScript(
+      getJobBlock(CONTROLLER_WORKFLOW, 'coalesce-production'),
+      'Evaluate event-driven supersession'
+    );
+    const result = runScript(script, fixture, {
+      EXPECTED_SHA,
+      FIXED_WINDOW_SECONDS_REPLACED: '60',
+      GITHUB_STEP_SUMMARY: join(fixture.root, 'step-summary'),
+      PRODUCTION_STARVATION_SECONDS: '5400',
+      REPOSITORY: 'JovieInc/Jovie',
+      RESOLVE_MAIN_BUDGET_SECONDS: '5',
+      RESOLVE_MAIN_RETRY_SECONDS: '0',
+    });
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain(
+      'Release lineage gate failed before evaluation (exit=1).'
+    );
+    expect(result.stdout).not.toContain('yielding without mutation');
   });
 
   it('still fails closed when main stays unreadable', () => {

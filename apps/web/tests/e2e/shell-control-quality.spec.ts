@@ -1,11 +1,17 @@
 import { expect, type Page, test } from '@playwright/test';
-import { SHELL_RAIL_PREVIEW_GRACE_MS } from '@/components/shell/rail-motion';
+import {
+  SHELL_RAIL_PREVIEW_GRACE_MS,
+  SHELL_RAIL_PREVIEW_INTENT_MS,
+} from '@/components/shell/rail-motion';
 import {
   detectReversibleControl,
   type ReversibleActivation,
 } from '../utils/reversible-control-detector';
 import { inspectShellMaterial } from './utils/shell-material-detector';
-import { waitForHydration } from './utils/smoke-test-utils';
+import {
+  gotoAuthenticatedChatRoute,
+  waitForHydration,
+} from './utils/smoke-test-utils';
 
 test.use({
   storageState: { cookies: [], origins: [] },
@@ -86,6 +92,9 @@ test.beforeEach(async ({ page }) => {
   );
   await expect(page.locator('[data-app-shell-frame]')).toBeVisible();
   await waitForHydration(page);
+  // JOV-8973 (#23006) discloses the inbox Notes on demand, so open the
+  // disclosure first: the Notes box stays this spec's settle/draft anchor.
+  await page.getByRole('button', { name: 'Add Notes' }).click();
   await expect(
     page.getByRole('textbox', { name: 'Notes', exact: true })
   ).toBeVisible();
@@ -189,7 +198,7 @@ test('rapid reversals preserve final intent, attachment and inspector scroll geo
   );
 });
 
-for (const side of ['left', 'right'] as const) {
+for (const side of ['right'] as const) {
   test(`${side} hover and focus preview preserves allocation and saved pinning for ten cycles`, async ({
     page,
   }, testInfo) => {
@@ -223,25 +232,9 @@ for (const side of ['left', 'right'] as const) {
         ? '#shell-left-rail [data-sidebar="sidebar"]'
         : '#shell-artist-profile-rail'
     );
-    // Since #22207 the left navigation opens only on explicit activation:
-    // a hover preview moved the toggle before the pointer could click it.
-    // The right inspector keeps its hover/focus preview.
-    const previewsOnHover = side === 'right';
+    // The left flyout has its own spec below (hover intent, pin, Esc).
     for (let cycle = 0; cycle < 10; cycle++) {
       await controls(page, side).hover();
-      if (!previewsOnHover) {
-        await expect(controls(page, side)).toHaveAttribute(
-          'aria-expanded',
-          'false'
-        );
-        await expect(controls(page, side)).toHaveAccessibleName(
-          'Expand sidebar'
-        );
-        await expect(notes).toBeFocused();
-        await expect.poll(async () => plane.boundingBox()).toEqual(initial);
-        await page.mouse.move(700, 450);
-        continue;
-      }
       await expect(controls(page, side)).toHaveAttribute(
         'aria-expanded',
         'true'
@@ -264,16 +257,11 @@ for (const side of ['left', 'right'] as const) {
     expect(
       (await page.context().cookies()).filter(c => c.name === 'sidebar:state')
     ).toEqual(cookies);
-    // Focus is equivalent access; explicit toggle pins the preview (right)
-    // or opens the navigation (left, which has no preview).
+    // Focus is equivalent access; explicit toggle pins the preview.
     await controls(page, side).focus();
-    await expect(controls(page, side)).toHaveAccessibleName(
-      previewsOnHover ? /Pin / : 'Expand sidebar'
-    );
+    await expect(controls(page, side)).toHaveAccessibleName(/Pin /);
     await controls(page, side).press('Enter');
-    await expect(controls(page, side)).toHaveAccessibleName(
-      side === 'left' ? 'Collapse sidebar' : /Hide .* profile/
-    );
+    await expect(controls(page, side)).toHaveAccessibleName(/Hide .* profile/);
     await page.mouse.move(700, 450);
     await page.waitForTimeout(SHELL_RAIL_PREVIEW_GRACE_MS + 30);
     await expect(controls(page, side)).toHaveAttribute('aria-expanded', 'true');
@@ -283,6 +271,75 @@ for (const side of ['left', 'right'] as const) {
     });
   });
 }
+
+test('left flyout: hover intent peeks, Escape closes, pin pushes, unpin returns, arrows roam', async ({
+  page,
+}, testInfo) => {
+  const rail = page.locator('#shell-left-rail');
+  const plane = page.locator('main#main-content');
+  const railX = 26;
+  const toggle = page
+    .locator('[data-rail-toggle="left"]')
+    .filter({ visible: true });
+  if ((await toggle.first().getAttribute('aria-expanded')) === 'true')
+    await toggle.first().click();
+  await expect(rail).toHaveAttribute('data-rail-phase', 'closed');
+  await page.mouse.move(700, 450);
+  const initial = await plane.boundingBox();
+
+  // A pass-through shorter than the intent dwell never flickers it open.
+  await page.mouse.move(railX, 300);
+  await page.mouse.move(700, 450);
+  await page.waitForTimeout(SHELL_RAIL_PREVIEW_INTENT_MS + 80);
+  await expect(rail).not.toHaveAttribute('data-rail-preview', 'true');
+
+  // Dwell on the rail peeks: floats over content, never pushes it.
+  await page.mouse.move(railX, 300);
+  await expect(rail).toHaveAttribute('data-rail-preview', 'true');
+  await expect(rail).toHaveAttribute('data-rail-pinned', 'false');
+  await expect.poll(async () => plane.boundingBox()).toEqual(initial);
+  await testInfo.attach('left-flyout-peek', {
+    body: await page.screenshot(),
+    contentType: 'image/png',
+  });
+
+  // Escape closes the peek without touching the saved pin.
+  await page.keyboard.press('Escape');
+  await expect(rail).not.toHaveAttribute('data-rail-preview', 'true');
+  await expect(rail).toHaveAttribute('data-rail-pinned', 'false');
+
+  // Pin from a fresh peek: the content plane yields (pushes), no overlay.
+  await page.mouse.move(700, 450);
+  await page.waitForTimeout(SHELL_RAIL_PREVIEW_GRACE_MS + 30);
+  await page.mouse.move(railX, 300);
+  await expect(rail).toHaveAttribute('data-rail-preview', 'true');
+  await rail.getByRole('button', { name: 'Pin sidebar' }).click();
+  await expect(rail).toHaveAttribute('data-rail-pinned', 'true');
+  await expect(rail).toHaveAttribute('data-rail-phase', 'open');
+  await expect
+    .poll(async () => (await plane.boundingBox())!.x)
+    .toBeGreaterThan(initial!.x + 100);
+  await page.mouse.move(700, 450);
+  await page.keyboard.press('Escape');
+  await expect(rail).toHaveAttribute('data-rail-pinned', 'true');
+  await testInfo.attach('left-flyout-pinned', {
+    body: await page.screenshot(),
+    contentType: 'image/png',
+  });
+
+  // Arrow keys roam the navigation rows.
+  const rows = rail.locator('nav a[href]');
+  await rows.first().focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(rows.nth(1)).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(rows.first()).toBeFocused();
+
+  // Unpin returns to the collapsed rail.
+  await rail.getByRole('button', { name: 'Collapse sidebar' }).click();
+  await expect(rail).toHaveAttribute('data-rail-pinned', 'false');
+  await expect(rail).toHaveAttribute('data-rail-phase', 'closed');
+});
 
 test('rendered Home material detector rejects a deliberate inset seam', async ({
   page,
@@ -356,7 +413,9 @@ test('chat profile stays mounted through closed, opening and interrupted exits',
   await page.getByRole('link', { name: 'New Chat', exact: true }).click();
   // E2E chat intentionally disables this surface unless its existing
   // profile fixture parameter is set; production enables it by default.
-  await page.goto('/app/chat?panel=profile');
+  await gotoAuthenticatedChatRoute(page, {
+    path: '/app/chat?panel=profile',
+  });
   await expect(
     page.getByRole('heading', { name: 'New Chat', exact: true })
   ).toBeVisible();

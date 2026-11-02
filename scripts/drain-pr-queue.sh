@@ -213,6 +213,8 @@ DRAIN_FLEET_GATE_B64="${DRAIN_FLEET_GATE_B64:-}"
 DRAIN_RECOVER_FLEET_HOLDS="${DRAIN_RECOVER_FLEET_HOLDS:-0}"
 FLEET_HOLD_CONTEXT="jovie-fleet-queue-hold/v1"
 FLEET_HOLD_APP_USER="jovie-bot[bot]"
+# Lane apps share jovie-bot trust; jovie-bot stays the fallback.
+TRUSTED_APP_ACTORS_JSON='["jovie-bot[bot]","jovie-ci-lane[bot]","jovie-symphony-lane[bot]","jovie-agents-lane[bot]"]'
 FLEET_HOLD_WORKFLOW_NAME="Merge Queue Auto-Enroll"
 FLEET_HOLD_WORKFLOW_PATH=".github/workflows/merge-queue-autoenroll.yml"
 # Pending fleet holds are a recovery selector, never an unbounded required
@@ -539,9 +541,9 @@ deferred_release_receipt_for_pr() {  # <pr>
   local raw body
   raw="$(gh_retry api "repos/${REPO}/issues/${1}/comments" --paginate --slurp 2>/dev/null || true)"
   [[ -n "$raw" ]] || return 0
-  body="$(jq -r --arg marker "$QUEUE_DEFERRED_RELEASE_MARKER" --arg actor "$QUEUE_DEFERRED_RELEASE_ACTOR" '
+  body="$(jq -r --arg marker "$QUEUE_DEFERRED_RELEASE_MARKER" --argjson actors "${TRUSTED_APP_ACTORS_JSON:-[\"jovie-bot[bot]\"]}" '
     [ .[][]?
-      | select(.user.login == $actor)
+      | select(.user.login as $l | $actors | index($l))
       | select((.body | type == "string") and (.body | contains($marker)))
       | .body
     ] | last // empty
@@ -558,9 +560,9 @@ missing_ci_recovery_attempted() {  # <pr> <head>
   if ! raw="$(gh_retry api "repos/${REPO}/issues/${n}/comments" --paginate --slurp 2>/dev/null)"; then
     return 0
   fi
-  jq -e --arg marker "$MISSING_CI_RECOVERY_MARKER" --arg actor "$MISSING_CI_RECOVERY_ACTOR" --arg head "$head" '
+  jq -e --arg marker "$MISSING_CI_RECOVERY_MARKER" --argjson actors "${TRUSTED_APP_ACTORS_JSON:-[\"jovie-bot[bot]\"]}" --arg head "$head" '
     [ .[][]?
-      | select(.user.login == $actor)
+      | select(.user.login as $l | $actors | index($l))
       | select((.body | type == "string") and (.body | contains($marker)) and (.body | contains($head)))
     ] | length > 0
   ' <<<"$raw" >/dev/null 2>&1
@@ -798,24 +800,34 @@ null_creator_receipt_has_provenance() {  # <head> <status-json>
   fi
   target_url="https://github.com/$REPO/actions/runs/$run_id"
   status_url="${GITHUB_API_URL:-https://api.github.com}/repos/$REPO/statuses/$head"
-  if ! app_identity="$(gh_retry api "users/jovie-bot%5Bbot%5D" 2>/dev/null)"; then
-    return 2
-  fi
-  if ! jq -e 'type == "object" and (.login | type == "string") and (.type | type == "string") and (.avatar_url | type == "string")' <<<"$app_identity" >/dev/null 2>&1; then
-    return 2
-  fi
-  if ! app_avatar="$(jq -er --arg login "$FLEET_HOLD_APP_USER" '
-      select(.login == $login and .type == "Bot") | .avatar_url
-    ' <<<"$app_identity" 2>/dev/null)"; then
-    return 1
-  fi
-  if ! jq -e --arg avatar "$app_avatar" --arg status_url "$status_url" '
-    .creator == null and
-    .avatar_url == $avatar and
-    .url == $status_url
-  ' <<<"$status" >/dev/null; then
-    return 1
-  fi
+  # Match the status avatar against each trusted app (jovie-bot first, then
+  # the lane apps).
+  local trusted_login trusted_path matched=0
+  while IFS= read -r trusted_login; do
+    trusted_path="${trusted_login//\[/%5B}"
+    trusted_path="${trusted_path//\]/%5D}"
+    if ! app_identity="$(gh_retry api "users/${trusted_path}" 2>/dev/null)" \
+      || ! jq -e 'type == "object" and (.login | type == "string") and (.type | type == "string") and (.avatar_url | type == "string")' <<<"$app_identity" >/dev/null 2>&1; then
+      # jovie-bot identity unreadable stays fail-closed; a lane app lookup
+      # failure only means that lane cannot vouch for this status.
+      [[ "$trusted_login" == "$FLEET_HOLD_APP_USER" ]] && return 2
+      continue
+    fi
+    if ! app_avatar="$(jq -er --arg login "$trusted_login" '
+        select(.login == $login and .type == "Bot") | .avatar_url
+      ' <<<"$app_identity" 2>/dev/null)"; then
+      continue
+    fi
+    if jq -e --arg avatar "$app_avatar" --arg status_url "$status_url" '
+      .creator == null and
+      .avatar_url == $avatar and
+      .url == $status_url
+    ' <<<"$status" >/dev/null; then
+      matched=1
+      break
+    fi
+  done < <(jq -r '.[]' <<<"${TRUSTED_APP_ACTORS_JSON:-[\"jovie-bot[bot]\"]}")
+  [[ "$matched" == 1 ]] || return 1
   if ! run="$(gh_retry api "repos/$REPO/actions/runs/$run_id" 2>/dev/null)"; then
     return 2
   fi
@@ -1019,8 +1031,8 @@ queue_reentry_receipt_is_recoverable() {  # <pr> <head> [target-url] [checkpoint
       )
   ' <<<"$statuses" 2>/dev/null)" || true
   [[ -n "$latest" ]] || return 1
-  if jq -e --arg actor "$FLEET_HOLD_APP_USER" '
-    .creator.type == "Bot" and .creator.login == $actor
+  if jq -e --argjson actors "${TRUSTED_APP_ACTORS_JSON:-[\"jovie-bot[bot]\"]}" '
+    .creator.type == "Bot" and (.creator.login as $l | $actors | index($l))
   ' <<<"$latest" >/dev/null; then
     canonical_admission_receipt_has_provenance "$latest" "$enqueued_at"
     return $?
@@ -1880,7 +1892,7 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
       post_failures="$(check_failures_for_pr "$n")"
       if [[ ! "$post_main_sha" =~ ^[0-9a-f]{40}$ \
         || "$post_main_sha" != "$repair_main_sha" ]] \
-        || ! jq -e '.mutationActor == "jovie-bot[bot]"' \
+        || ! jq -e --argjson actors "${TRUSTED_APP_ACTORS_JSON:-[\"jovie-bot[bot]\"]}" '.mutationActor as $l | $actors | index($l)' \
           <<<"$enrollment_receipt" >/dev/null \
         || ! jq -e 'type == "array" and length == 0' \
           <<<"$post_failures" >/dev/null \

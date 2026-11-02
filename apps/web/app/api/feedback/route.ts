@@ -104,9 +104,10 @@ export async function POST(request: Request) {
     const source = parsed.data.source;
     const pathname = parsed.data.pathname ?? null;
 
+    // getCachedAuth().userId is users.id. clerk_id is null for Better Auth users.
     const userRecord = userId
       ? await db.query.users.findFirst({
-          where: eq(users.clerkId, userId),
+          where: eq(users.id, userId),
           columns: { id: true, name: true },
         })
       : null;

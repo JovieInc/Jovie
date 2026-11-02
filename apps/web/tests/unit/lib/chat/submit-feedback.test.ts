@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { drizzleColumns } from '@/tests/unit/auth/drizzle-predicate';
+
+const APP_USER_ID = '44444444-4444-4444-8444-444444444444';
 
 const mockFindFirst = vi.hoisted(() => vi.fn());
 const mockCreateFeedbackItem = vi.hoisted(() => vi.fn());
@@ -40,11 +43,14 @@ describe('submitChatFeedback', () => {
     const { submitChatFeedback } = await import('@/lib/chat/submit-feedback');
 
     const result = await submitChatFeedback({
-      clerkUserId: 'clerk_1',
+      clerkUserId: APP_USER_ID,
       message: 'Please add richer collaboration tools',
     });
 
     expect(result).toEqual({ success: true });
+    expect(drizzleColumns(mockFindFirst.mock.calls[0]?.[0].where)).toEqual([
+      'users.id',
+    ]);
     expect(mockNotifySlackFeedbackSubmission).toHaveBeenCalledWith({
       message: 'Please add richer collaboration tools',
       name: 'Test User',

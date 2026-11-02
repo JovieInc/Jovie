@@ -200,6 +200,14 @@ describe('Ovie speaks through durable Eve Summer', () => {
     ]);
     expect(fetchShadow).toHaveBeenCalledOnce();
   });
+  it('does not call a header-less 5xx a deployment mismatch', async () => {
+    fetchShadow
+      .mockReset()
+      .mockResolvedValueOnce(new Response('{"ok":false}', { status: 503 }));
+    expect(await collect()).toEqual([
+      { type: 'error', state: 'unknown', hop: 'summer_unreachable' },
+    ]);
+  });
   it('rejects a response from a different Eve deployment', async () => {
     fetchShadow.mockReset().mockResolvedValueOnce(
       new Response('{}', {

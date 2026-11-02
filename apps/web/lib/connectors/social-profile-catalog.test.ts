@@ -16,6 +16,12 @@ import { DSP_PROFILE_CATALOG } from './dsp-profile-catalog';
 import { CONNECTOR_REGISTRY } from './registry';
 import { SOCIAL_PROFILE_CATALOG } from './social-profile-catalog';
 
+const jsonResponse = (body: unknown): Response =>
+  new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  });
+
 afterEach(() => vi.restoreAllMocks());
 
 describe('shared artist-profile destination coverage', () => {
@@ -167,14 +173,25 @@ describe('shared artist-profile destination coverage', () => {
     );
   });
 
-  it('keeps Laylo blocked when its checked-in fetch rejects the source host', async () => {
-    const fetch = vi.spyOn(globalThis, 'fetch');
+  it('keeps Laylo blocked while its fetch allowlist covers its hosts', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse({}));
     expect(SOCIAL_PROFILE_CATALOG.laylo.ingestion.status).toBe(
       'blocked_unreliable'
     );
-    await expect(fetchLayloProfile('artist')).rejects.toMatchObject({
-      code: 'INVALID_HOST',
+    expect(SOCIAL_PROFILE_CATALOG.laylo.ingestion.detail).toContain(
+      'CloudFront'
+    );
+    // JOV-8466: the checked-in fetch no longer rejects Laylo's own
+    // CloudFront JSON hosts before the request; the destination stays
+    // blocked on unverified capability, not on a broken transport.
+    await expect(fetchLayloProfile('artist')).resolves.toMatchObject({
+      profile: {},
+      user: null,
     });
-    expect(fetch).not.toHaveBeenCalled();
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      'https://d21i0hc4hl3bvt.cloudfront.net/artist/profile.json'
+    );
   });
 });

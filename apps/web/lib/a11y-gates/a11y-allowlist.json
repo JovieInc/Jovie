@@ -1,0 +1,22 @@
+{
+  "schema": "jovie.a11y-allowlist/v1",
+  "maxEntries": 2,
+  "entries": [
+    {
+      "id": "a11y-dashboard-frame-tested",
+      "surface": "a11y-dashboard",
+      "ruleId": "frame-tested",
+      "issue": "JOV-8827",
+      "expires": "2027-01-23",
+      "reason": "Third-party iframe false positive on the signed-in dashboard scan."
+    },
+    {
+      "id": "storybook-overlay-color-contrast",
+      "surface": "storybook-overlay-collisions",
+      "ruleId": "color-contrast",
+      "issue": "JOV-8826",
+      "expires": "2027-01-23",
+      "reason": "Overlay collision spec delegates contrast to the token contrast gates."
+    }
+  ]
+}

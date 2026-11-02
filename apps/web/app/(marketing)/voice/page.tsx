@@ -1,12 +1,13 @@
 import type { Metadata } from 'next';
 import { VoicePageContent } from '@/components/organisms/VoicePageContent';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { documentTitle } from '@/lib/seo/document-title';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: 'Voice Cloning for Creators | Jovie',
+  title: documentTitle('Voice Cloning for Creators | Jovie'),
   description:
     // ui-casing-allow: metadata sentence with brand name ElevenLabs
     'Turn any YouTube video into your trained AI voice in minutes. Consent-first cloning powered by ElevenLabs. Use it for promos, replies, and radio drops inside your Jovie flows.',

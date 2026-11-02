@@ -1,0 +1,71 @@
+======== lane: structural ========
+##[error]Structural command 31/58 failed (exit 1). Command: pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/me… | FAIL   workspace-scripts  lib/__tests__/external-api-guard.test.mjs > external API guard > holds the live repo to its grandfathered ratchet | AssertionError: expected [ …(4) ] to deeply equal []
+[ci-fast] 1 lane(s) failed: structural
+[ci-fast] structural: failure (289.4s)
+Structural command 31/58 failed (exit 1). Command: pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/me…
+#### Structural command timings (wall 289.4s, sum 612.8s, 32 commands)
+| 58 | 289.4s | pass | `if python3 -c "import coverage, pytest, xdist" 2>/dev/null; then { COVERAGE_FILE="${RUNNER_TEMP:-/t…` |
+| 31 | 136.1s | exit 1 | `pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/merge-group-failure-ho…` |
+| 30 | 53.7s | pass | `node --test --experimental-test-coverage --test-coverage-include=scripts/deprecation-clearance.mjs …` |
+| 1 | 32.8s | pass | `pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs…` |
+| 13 | 19.6s | pass | `node --test --experimental-test-coverage --test-coverage-include=.github/scripts/canonical-staging-…` |
+| 16 | 16.4s | pass | `node --test --experimental-test-coverage --test-coverage-include=.github/scripts/staging-release-so…` |
+| 18 | 5.5s | pass | `pnpm exec vitest run --config scripts/vitest.config.mts lib/__tests__/rolling-ci-failure-dispositio…` |
+| 11 | 5.4s | pass | `node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-ru…` |
+| 17 | 5.2s | pass | `node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/deliv…` |
+| 6 | 5.1s | pass | `if python3 -c "import coverage, pytest, xdist" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp…` |
+| 3 | 4.8s | pass | `pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/provider-incident-contract.te…` |
+| 2 | 4.7s | pass | `pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/provider-attempt-receipt.test…` |
+| 23 | 4.6s | pass | `pnpm ci:harness:check` |
+| 12 | 4.4s | pass | `node --test --experimental-test-coverage --test-coverage-include=.github/scripts/staging-lane-carry…` |
+| 5 | 4.4s | pass | `pnpm --filter @***/api-client test` |
+| 4 | 4.1s | pass | `pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/symphony-health-contract.test…` |
+| 9 | 2.9s | pass | `node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-co…` |
+| 7 | 1.8s | pass | `node --test .github/scripts/publish-queue-junit.test.mjs scripts/record-quarantine-releases.test.mjs` |
+| 27 | 1.7s | pass | `node --test scripts/file-quarantine-clusters.test.mjs scripts/propose-quarantine-ledger.test.mjs` |
+| 24 | 1.6s | pass | `pnpm ci:incident-contract:validate` |
+| 22 | 1.5s | pass | `node --experimental-test-coverage --test --test-coverage-include='scripts/verification/*.mjs' --tes…` |
+| 19 | 1.0s | pass | `node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mj…` |
+| 8 | 0.7s | pass | `node --test .github/scripts/dependency-parity-evidence.test.mjs` |
+| 26 | 0.7s | pass | `node --test .github/scripts/collect-quarantine-evidence.test.mjs` |
+| 29 | 0.7s | pass | `node --test .github/scripts/update-quarantine.test.js` |
+| 10 | 0.6s | pass | `node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-re…` |
+| 14 | 0.6s | pass | `node --test --experimental-test-coverage --test-coverage-include=.github/scripts/vercel-on-demand-l…` |
+| 15 | 0.6s | pass | `node --test --experimental-test-coverage --test-coverage-include=.github/scripts/vercel-build-queue…` |
+| 28 | 0.6s | pass | `node --test .github/scripts/marketing-dom-workflow.test.mjs` |
+| 20 | 0.5s | pass | `node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-subscript…` |
+| 21 | 0.5s | pass | `node --test --experimental-test-coverage --test-coverage-include=scripts/promotion-loss-metrics.mjs…` |
+| 25 | 0.5s | pass | `node --test scripts/ci-release-trigger-contract.test.mjs .github/scripts/analyze-test-flakiness.tes…` |
+[ci-fast] wrote lane results → /home/runner/work/_temp/ci-fast-lanes-structural.json
+======== lane: biome ========
+[ci-fast] biome: success (0.6s)
+======== lane: eslint-server-boundaries ========
+[ci-fast] eslint-server-boundaries: success (0.0s)
+======== lane: shadcn-lint-contracts ========
+[ci-fast] shadcn-lint-contracts: success (30.0s)
+======== lane: scripts-typecheck ========
+[ci-fast] scripts-typecheck: success (76.1s)
+======== lane: guardrails ========
+[ci-fast] guardrails: success (39.7s)
+======== lane: design-system-source-ratchet ========
+[ci-fast] design-system-source-ratchet: skipped (0.0s)
+======== lane: design-exception-registry ========
+[ci-fast] design-exception-registry: skipped (0.0s)
+======== lane: design-governance-enforcement ========
+[ci-fast] design-governance-enforcement: skipped (0.0s)
+======== lane: ios-fast ========
+[ci-fast] ios-fast: skipped (0.0s)
+======== lane: billing-coverage ========
+[ci-fast] billing-coverage: skipped (0.0s)
+======== lane: copy-gate ========
+[ci-fast] copy-gate: skipped (0.0s)
+======== lane: source-guards ========
+[ci-fast] source-guards: failure (14.1s)
+[source-guards] external-api-guard: exit 1
+======== lane: node-runtime-contracts ========
+[ci-fast] node-runtime-contracts: success (10.5s)
+======== lane: structural ========
+[ci-fast] structural: skipped (0.0s)
+skipped: earlier lane failed (fail-fast)
+[ci-fast] wrote lane results → /home/runner/work/_temp/ci-fast-lanes.json
+[ci-fast] 1 lane(s) failed: source-guards

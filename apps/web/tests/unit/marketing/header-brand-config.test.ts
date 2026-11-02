@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import { getComparison, getComparisonSlugs } from '@/content/comparisons';
+import { DOWNLOAD_COPY } from '@/data/downloadCopy';
 import { JOVIE_CARD_COPY } from '@/data/jovieCardCopy';
 import {
   headlineNamesBrand,
@@ -23,7 +24,6 @@ function inlineH1Text(path: string): string {
 // Pages whose hero H1 is authored inline in the route file.
 const INLINE_HERO_H1_SOURCES = {
   [APP_ROUTES.AI]: 'app/(marketing)/ai/page.tsx',
-  [APP_ROUTES.DOWNLOAD]: 'app/(marketing)/download/page.tsx',
   [APP_ROUTES.ABOUT]: 'components/organisms/AboutPageContent.tsx',
 } as const;
 
@@ -36,6 +36,10 @@ describe('marketing header brand config', () => {
   });
 
   it('lists exactly the copy-driven heroes whose H1 names Jovie', () => {
+    expect(MARKETING_HEADER_ICON_ONLY_PATHS.includes(APP_ROUTES.DOWNLOAD)).toBe(
+      headlineNamesBrand(DOWNLOAD_COPY.headline)
+    );
+
     const cardIconOnly = MARKETING_HEADER_ICON_ONLY_PATHS.includes(
       APP_ROUTES.CARD
     );

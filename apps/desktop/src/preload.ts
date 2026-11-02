@@ -274,6 +274,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }>;
   },
 
+  /** Subscribe to the native View > Toggle Sidebar command. */
+  onToggleSidebar: (cb: () => void): (() => void) => {
+    const listener = () => cb();
+    ipcRenderer.on('shell:toggle-sidebar', listener);
+    return () => ipcRenderer.removeListener('shell:toggle-sidebar', listener);
+  },
+
   /**
    * Subscribe to tray quick-action events (e.g. "new-message") fired by the
    * main process when the user clicks a menu bar context-menu item.

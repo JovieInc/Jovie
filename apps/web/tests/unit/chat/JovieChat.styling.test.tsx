@@ -101,6 +101,7 @@ const mockChatState = vi.hoisted(() => ({
   isLoading: true,
   isSubmitting: false,
   status: 'streaming' as 'ready' | 'streaming',
+  chatError: null as null | { type: string; message: string },
   collapsedSummerFailureCount: 0,
   showCollapsedSummerFailures: vi.fn(),
   messages: [{ id: 'm1', role: 'user', parts: [{ type: 'text', text: 'Hi' }] }],
@@ -143,7 +144,7 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
       draft: createComposerDraft(''),
       setInput: vi.fn(),
       messages: mockChatState.messages,
-      chatError: null,
+      chatError: mockChatState.chatError,
       isLoading: mockChatState.isLoading,
       isSubmitting: mockChatState.isSubmitting,
       hasMessages: mockChatState.hasMessages,
@@ -320,6 +321,45 @@ describe('JovieChat styling regressions', () => {
     submitting.unmount();
     expect(getDesktopWorkState()).toBeNull();
   });
+  it('shows scroll-to-latest without remounting the transcript when the sentinel leaves', () => {
+    let onIntersect: ((entries: IntersectionObserverEntry[]) => void) | null =
+      null;
+    const original = globalThis.IntersectionObserver;
+    globalThis.IntersectionObserver = vi.fn().mockImplementation(function (
+      this: IntersectionObserver,
+      callback: (entries: IntersectionObserverEntry[]) => void
+    ) {
+      onIntersect = callback;
+      this.observe = vi.fn();
+      this.unobserve = vi.fn();
+      this.disconnect = vi.fn();
+      this.takeRecords = vi.fn(() => []);
+    }) as unknown as typeof IntersectionObserver;
+
+    try {
+      const view = renderWithQueryClient(<JovieChat profileId='profile-1' />);
+      const message = view.getByTestId('chat-message');
+      const scroll = view.getByTestId('chat-message-scroll');
+      expect(
+        scroll.querySelector('.system-b-scroll-to-bottom-icon')
+      ).toBeNull();
+
+      act(() => {
+        onIntersect?.([{ isIntersecting: false } as IntersectionObserverEntry]);
+      });
+
+      const button = scroll.querySelector('.system-b-scroll-to-bottom');
+      expect(button).not.toBeNull();
+      expect(
+        button?.querySelector('.system-b-scroll-to-bottom-icon')
+      ).not.toBeNull();
+      expect(scroll.lastElementChild).toBe(button);
+      expect(view.getByTestId('chat-message')).toBe(message);
+    } finally {
+      globalThis.IntersectionObserver = original;
+    }
+  });
+
   it('renders thinking placeholder as a ChatMessage with isThinking when loading', () => {
     const { container } = renderWithQueryClient(
       <JovieChat profileId='profile-1' />
@@ -333,6 +373,21 @@ describe('JovieChat styling regressions', () => {
     // Verify the chat input area renders
     const chatInput = container.querySelector('[data-testid="chat-input"]');
     expect(chatInput).toBeTruthy();
+  });
+
+  it('shows the weekly plan limit once: no inline error beside the usage alert', () => {
+    mockChatState.chatError = {
+      type: 'rate_limit',
+      message:
+        'You have reached your weekly AI message limit. Upgrade to Artist Presence for 70 messages per week.',
+    };
+    try {
+      const view = renderWithQueryClient(<JovieChat profileId='profile-1' />);
+      expect(view.queryByTestId('chat-error')).toBeNull();
+      expect(view.getAllByTestId('chat-usage').length).toBeGreaterThan(0);
+    } finally {
+      mockChatState.chatError = null;
+    }
   });
 
   it('keeps the composer dock padded above mobile shell navigation', () => {
@@ -428,6 +483,11 @@ describe('JovieChat styling regressions', () => {
     expect(jovieChatSource).toContain('CHAT_TRANSCRIPT_WINDOW');
     expect(jovieChatSource).toContain('virtualizeAfterMessageCount');
     expect(jovieChatSource).toContain('overscanRowCount');
+    // JOV-8481: the virtual window must always mount the newest message, so a
+    // stale window can never strand scrollIntoView to the live tail.
+    expect(jovieChatSource).toContain(
+      'rangeExtractor: chatTranscriptRangeWithPinnedTail'
+    );
     // The virtualizer owner stays out of React Compiler memoization, or the
     // window freezes on its first rows and the thread renders blank (JOV-6702).
     expect(jovieChatSource).toMatch(

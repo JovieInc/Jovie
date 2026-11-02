@@ -1,5 +1,5 @@
 'use client';
-// @coverage-via apps/web/tests/components/release-provider-matrix/release-table-system-b-style-guard.test.ts
+// @coverage-via apps/web/tests/components/release-provider-matrix/ReleaseTable.test.tsx
 
 import { lazy, Suspense, useCallback, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
@@ -53,7 +53,8 @@ export function ReleaseTableWithTracks({
   onGeneratePitch,
   onChangeStatus,
   columnVisibility,
-  rowHeight = TABLE_ROW_HEIGHTS.STANDARD + 4,
+  rowHeight = TABLE_ROW_HEIGHTS.STANDARD,
+  rowMode,
   onFocusedRowChange,
   groupByYear = false,
   selectedReleaseId,
@@ -319,7 +320,8 @@ export function ReleaseTableWithTracks({
       getRowTestId={getRowTestId}
       getRowClassName={getRowClassName}
       enableVirtualization={!hasExpandedRows && !groupByYear}
-      rowHeight={rowHeight}
+      rowHeight={rowMode ? undefined : rowHeight}
+      rowMode={rowMode}
       minWidth='0'
       hideHeader
       className='text-app text-primary-token'

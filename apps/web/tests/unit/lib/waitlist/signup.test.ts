@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { markWaitlistSignedUpInTx } from '@/lib/waitlist/signup';
+import { drizzleColumns } from '@/tests/unit/auth/drizzle-predicate';
 
 const mockInsertWaitlistAuditLog = vi.hoisted(() => vi.fn());
 const mockEnqueueSignedUpWelcomeEmail = vi.hoisted(() => vi.fn());
@@ -24,7 +25,7 @@ function createTxMock(userRows: Row[], entryRows: Row[]) {
     .mockImplementation(() => Promise.resolve(selectQueue.shift() ?? []));
   const forUpdate = vi.fn(() => ({ limit }));
   const orderBy = vi.fn(() => ({ for: forUpdate }));
-  const where = vi.fn(() => ({
+  const where = vi.fn((_predicate: unknown) => ({
     for: forUpdate,
     orderBy,
   }));
@@ -73,7 +74,7 @@ describe('markWaitlistSignedUpInTx', () => {
   });
 
   it('marks an approved entry signed up for an app UUID and queues the welcome email', async () => {
-    const { tx, updateSet } = createTxMock(
+    const { tx, updateSet, where } = createTxMock(
       [
         {
           id: 'user-1',
@@ -103,6 +104,11 @@ describe('markWaitlistSignedUpInTx', () => {
       })
     );
     expect(mockEnqueueSignedUpWelcomeEmail).toHaveBeenCalledWith(tx, 'entry-1');
+    const columns = drizzleColumns(where.mock.calls[0]?.[0]);
+    expect(columns).toEqual(
+      expect.arrayContaining(['users.id', 'users.better_auth_user_id'])
+    );
+    expect(columns).not.toContain('users.clerk_id');
   });
 
   it('uses canonical email fallback when a legacy user lacks waitlistEntryId', async () => {

@@ -17,6 +17,7 @@ const baseMember: AudienceMember = {
   referrerHistory: [],
   utmParams: {},
   email: 'tim@example.com',
+  emailVisibleToArtist: true,
   phone: null,
   spotifyConnected: false,
   purchaseCount: 0,
@@ -42,7 +43,7 @@ describe('AudienceMobileCard', () => {
       />
     );
 
-    expect(screen.getByText('Anonymous Fan')).toBeInTheDocument();
+    expect(screen.getByText('Anonymous visitor')).toBeInTheDocument();
     expect(screen.queryByText('hidden@example.com')).not.toBeInTheDocument();
   });
 

@@ -1,3 +1,8 @@
+import { REQUIRED_OUTREACH_EVIDENCE } from '@/lib/contacts/evidence-display';
+import {
+  NON_ARTIST_KIND_LABELS,
+  possibleNonArtist,
+} from '@/lib/leads/entity-eligibility';
 import { cleanScrapedDisplayName } from '@/lib/profile/scraped-display-name';
 import {
   draftOutboundCopy,
@@ -9,6 +14,8 @@ import {
 import type {
   OutboundBand,
   OutboundChannel,
+  OutboundFitBasis,
+  OutboundFlag,
   OutboundNextAction,
   OutboundRow,
   OutboundView,
@@ -27,6 +34,7 @@ export interface OutboundLeadFacts {
   readonly linktreeHandle: string;
   readonly linktreeUrl: string;
   readonly displayName: string | null;
+  readonly bio: string | null;
   readonly avatarUrl: string | null;
   readonly contactEmail: string | null;
   readonly instagramHandle: string | null;
@@ -37,6 +45,7 @@ export interface OutboundLeadFacts {
   readonly dmCopy: string | null;
   readonly claimToken: string | null;
   readonly fitScore: number | null;
+  readonly fitScoreBreakdown: unknown;
   readonly priorityScore: number | null;
   readonly spotifyFollowers: number | null;
   readonly latestReleaseDate: Date | null;
@@ -52,6 +61,11 @@ export interface OutboundLeadFacts {
   /** A founder `profile:certification` row exists for this contact. */
   readonly certified: boolean;
   readonly replied: boolean;
+  /**
+   * Evidence source classes observed for the built profile (same rules as the
+   * certification inspection). Null when no profile is built yet.
+   */
+  readonly evidenceClasses: readonly string[] | null;
 }
 
 /** Linktree page titles leak into names: "Ada - Listen on Spotify". */
@@ -81,34 +95,79 @@ function ago(date: Date, now: Date): string {
   return `${days} days ago`;
 }
 
-/** The single strongest reason to look at this person now. */
-export function whyNow(facts: OutboundLeadFacts, now: Date): string {
+/**
+ * The dated event that makes now the time to reach out, or null. Static
+ * attributes (follower counts, when we built the profile, the search query)
+ * are not triggers and never fill this column.
+ */
+export function whyNow(facts: OutboundLeadFacts, now: Date): string | null {
   if (facts.paidAt) return `Paid ${ago(facts.paidAt, now)}`;
   if (facts.signupAt) return `Claimed ${ago(facts.signupAt, now)}`;
+  const released = facts.latestReleaseDate?.getTime();
   if (
-    facts.latestReleaseDate &&
-    now.getTime() - facts.latestReleaseDate.getTime() < 90 * DAY_MS
+    released !== undefined &&
+    released <= now.getTime() &&
+    now.getTime() - released < 90 * DAY_MS
   )
-    return `Released ${ago(facts.latestReleaseDate, now)}`;
-  if (facts.spotifyFollowers)
-    return `${facts.spotifyFollowers.toLocaleString('en-US')} Spotify followers`;
-  if (facts.ingestedAt) return `Profile built ${ago(facts.ingestedAt, now)}`;
-  if (facts.discoveryQuery) return `Found via "${facts.discoveryQuery}"`;
-  return `Found ${ago(facts.createdAt, now)}`;
+    return `Released ${ago(new Date(released), now)}`;
+  return null;
+}
+
+/** Fit components that only record presence (a link exists), not fit. */
+const PRESENCE_FIT_KEYS = new Set([
+  'hasSpotify',
+  'usesLinkInBio',
+  'usesMusicTools',
+  'hasContactEmail',
+]);
+
+/**
+ * A score is "presence only" when every non-zero component just records that
+ * a link or tool exists. Those scores cluster at 40-45 for every lead, so the
+ * band they produce says nothing about fit.
+ */
+export function fitBasis(
+  score: number | null,
+  breakdown: unknown
+): OutboundFitBasis {
+  if (score === null) return 'unscored';
+  if (!breakdown || typeof breakdown !== 'object') return 'scored';
+  const signal = Object.entries(breakdown as Record<string, unknown>).some(
+    ([key, value]) =>
+      !PRESENCE_FIT_KEYS.has(key) && typeof value === 'number' && value > 0
+  );
+  return signal ? 'scored' : 'presence_only';
+}
+
+/** Required evidence classes still missing for a lead. */
+export function missingEvidence(facts: OutboundLeadFacts): string[] {
+  const observed = new Set(['identity', ...(facts.evidenceClasses ?? [])]);
+  return REQUIRED_OUTREACH_EVIDENCE.filter(
+    sourceClass => !observed.has(sourceClass)
+  );
+}
+
+/** A channel counts only when its recipient is on file. */
+function reachable(
+  channel: OutboundChannel,
+  facts: OutboundLeadFacts
+): boolean {
+  return channel === 'email'
+    ? Boolean(facts.contactEmail?.trim())
+    : Boolean(facts.instagramHandle?.trim());
 }
 
 function channelFor(facts: OutboundLeadFacts): OutboundChannel | null {
-  if (facts.outreachRoute === 'email' || facts.outreachRoute === 'both')
-    return 'email';
-  if (facts.outreachRoute === 'dm') return 'dm';
-  if (facts.contactEmail) return 'email';
-  if (facts.hasInstagram || facts.instagramHandle) return 'dm';
-  return null;
+  const preferred: OutboundChannel[] =
+    facts.outreachRoute === 'dm' ? ['dm', 'email'] : ['email', 'dm'];
+  return preferred.find(channel => reachable(channel, facts)) ?? null;
 }
 
 function classify(
   facts: OutboundLeadFacts,
-  approval: OutboundApprovalState
+  approval: OutboundApprovalState,
+  flags: readonly OutboundFlag[],
+  missing: readonly string[]
 ): OutboundView {
   if (facts.paidAt) return 'paid';
   if (facts.signupAt || facts.signupUserId) return 'claimed';
@@ -120,16 +179,26 @@ function classify(
   if (approval.target === 'held') return 'held';
   if (approval.sendableCopy) return 'approved';
   if (facts.certified) return 'certified';
+  if (flags.includes('possible_non_artist') || flags.includes('unscored'))
+    return 'flagged';
+  if (!facts.creatorProfileId || missing.length) return 'needs_evidence';
   return 'ready';
 }
 
 function nextActionFor(
   view: OutboundView,
-  facts: OutboundLeadFacts
+  facts: OutboundLeadFacts,
+  flags: readonly OutboundFlag[]
 ): OutboundNextAction {
   switch (view) {
     case 'ready':
-      return facts.creatorProfileId ? 'review_facts' : 'build_profile';
+      return 'review_facts';
+    case 'needs_evidence':
+      return facts.creatorProfileId ? 'gather_evidence' : 'build_profile';
+    case 'flagged':
+      return flags.includes('possible_non_artist')
+        ? 'check_entity'
+        : 'review_facts';
     case 'certified':
       return 'approve_message';
     case 'approved':
@@ -154,8 +223,21 @@ export function buildOutboundRow(input: {
 }): Omit<OutboundRow, 'rank'> {
   const { facts, target } = input;
   const approval = resolveOutboundApproval(target, input.ledger);
-  const view = classify(facts, approval);
-  const channel = approval.latestCopy?.channel ?? channelFor(facts);
+  const nonArtist = possibleNonArtist({
+    handle: facts.linktreeHandle,
+    displayName: facts.displayName,
+    bio: facts.bio,
+  });
+  const basis = fitBasis(facts.fitScore, facts.fitScoreBreakdown);
+  const flags: OutboundFlag[] = [];
+  if (nonArtist) flags.push('possible_non_artist');
+  if (basis === 'unscored') flags.push('unscored');
+  if (basis === 'presence_only') flags.push('presence_only_fit');
+  const missing = missingEvidence(facts);
+  const view = classify(facts, approval, flags, missing);
+  const saved = approval.latestCopy?.channel;
+  // A saved draft keeps its channel only while its recipient is on file.
+  const channel = saved && reachable(saved, facts) ? saved : channelFor(facts);
   const name = cleanOutboundName(facts.displayName, facts.linktreeHandle);
   const message = approval.latestCopy
     ? approval.latestCopy
@@ -180,13 +262,17 @@ export function buildOutboundRow(input: {
     sourceUrl: facts.linktreeUrl,
     view,
     whyNow: whyNow(facts, input.now),
-    fit: fitBand(facts.fitScore),
+    fit: basis === 'scored' ? fitBand(facts.fitScore) : 'unknown',
     fitScore: facts.fitScore,
+    fitBasis: basis,
+    flags,
+    entityNote: nonArtist ? NON_ARTIST_KIND_LABELS[nonArtist] : null,
+    missingEvidence: missing,
     ability: 'unknown',
     intent: 'unknown',
     certified: facts.certified,
     channel,
-    nextAction: nextActionFor(view, facts),
+    nextAction: nextActionFor(view, facts, flags),
     approval: {
       targetRevision: approval.targetRevision,
       target: approval.target,
@@ -202,11 +288,13 @@ const ACTION_ORDER: Record<OutboundNextAction, number> = {
   send: 0,
   approve_message: 1,
   review_facts: 2,
-  build_profile: 3,
-  await_reply: 4,
-  await_claim: 5,
-  await_payment: 6,
-  none: 7,
+  gather_evidence: 3,
+  check_entity: 4,
+  build_profile: 5,
+  await_reply: 6,
+  await_claim: 7,
+  await_payment: 8,
+  none: 9,
 };
 
 /**

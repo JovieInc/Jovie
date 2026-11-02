@@ -1,104 +1,109 @@
+import { SUPPORT_EMAIL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
-import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
+
+/**
+ * /about copy. A general company page (MKT-D16): no segment language, no
+ * founder biography (Tim, 2026-10-26). Every sentence is a plain fact that an
+ * answer engine can lift whole. The one-sentence definition is derived from
+ * COMPANY_IDENTITY.seoDescription so there is a single source of truth.
+ */
+export const ABOUT_FACTS = {
+  founder: 'Tim White',
+  operator: 'Jovie Technology Inc.',
+  city: 'Los Angeles, California',
+  supportEmail: SUPPORT_EMAIL,
+  supportPath: '/support',
+  /**
+   * Verified identity links only (checked 2026-10-26). The GitHub organization
+   * exists and links back to jov.ie. The founder channel is linked from the
+   * live jov.ie/tim profile. The X handle is the canonical one from companyIdentity.
+   */
+  organizationSameAs: [
+    'https://github.com/JovieInc',
+    `https://x.com/${COMPANY_IDENTITY.xHandle.replace(/^@/, '')}`,
+  ],
+  founderSameAs: ['https://www.youtube.com/@timwhite'],
+} as const;
+
+export const ABOUT_DEFINITION =
+  'Jovie is a public profile at jov.ie/yourname. It holds your work, your links, and a clear way to contact you, in one place you own, for people and for agents.';
 
 export const ABOUT_COPY = {
-  kicker: 'About',
-  headline: COMPANY_IDENTITY.headline,
-  support: `${COMPANY_IDENTITY.definition} ${COMPANY_IDENTITY.seoDescription}`,
-  metadataTitle: `About Jovie: ${COMPANY_IDENTITY.headline.replace(/\.$/, '')}`,
-  metadataDescription: `${COMPANY_IDENTITY.definition} Founded by Tim White. Not affiliated with Jovie childcare.`,
-  openGraphDescription: `${COMPANY_IDENTITY.definition} Founded by Tim White.`,
+  eyebrow: 'About',
+  headline: 'Easy to find. Easy to reach.',
+  metadataTitle: 'About Jovie',
+  metadataDescription: `Jovie is a public profile that makes any creator easy to find and easy to reach, for people and for agents. Founded by ${ABOUT_FACTS.founder}. Based in Los Angeles.`,
+  openGraphDescription: `Jovie is a public profile that makes any creator easy to find and easy to reach. Founded by ${ABOUT_FACTS.founder}.`,
   organizationDescription: COMPANY_IDENTITY.definition,
   keywords: [
     'Jovie',
     'what is Jovie',
-    'Jovie Technology',
-    'Tim White Jovie',
+    'Jovie Technology Inc.',
     'public profile',
-    'personal presence',
-    'audience relationships',
   ],
-  origin: {
-    heading: 'Why Jovie Exists',
-    paragraphs: [
-      'I spent 15 years in music. My first single, "Take Me Over," came out independently in 2014 and went viral. Five singles signed to Armada Music. "The Deep End" with Cosmic Gate premiered on A State of Trance. Along the way I wrote and produced for We Are Loud, Justin Prime, and Orjan Nilsen, engineered for Lauryn Hill, and played more than 500 shows, opening for The Disco Biscuits and playing the final nights at Pacha NYC.',
-      'I also ran digital marketing for the NFL, the NBA All-Star Game, Google, and Netflix, and won a Clio Award for Hulu Pride Fest 2020. The whole time, the same problem kept showing up: the people who needed infrastructure the most were the ones who could never afford it. Labels have teams coordinating releases, managing fan data, planning rollouts. Independent artists have themselves and maybe a friend who is decent at Instagram.',
-      'Jovie is what I wish existed when I was an artist: one product for presence, relationships, and growth, without reducing you to a category. For musicians, Jovie routes fans to the right streaming platform, turns profile visits into relationships, surfaces audience signals, and gives AI the context of stream counts, tour dates, and collaborations.',
-    ],
-    signoff: 'Tim White, Founder',
-    href: `${TIM_WHITE_PROFILE.publicProfilePath}/about`,
+  sections: [
+    {
+      id: 'what',
+      label: 'What Jovie is',
+      text: ABOUT_DEFINITION,
+    },
+    {
+      id: 'why',
+      label: 'Why it exists',
+      text: 'Attention is spread across platforms you do not control. A profile you own gives people one place to find you, and one clear next step once they do.',
+    },
+    {
+      id: 'who',
+      label: 'Who makes it',
+      text: `Founded by ${ABOUT_FACTS.founder}. Jovie is operated by ${ABOUT_FACTS.operator}, based in ${ABOUT_FACTS.city}.`,
+    },
+  ],
+  contact: {
+    id: 'contact',
+    label: 'Contact',
+    email: ABOUT_FACTS.supportEmail,
+    supportPath: ABOUT_FACTS.supportPath,
+    supportLabel: `jov.ie${ABOUT_FACTS.supportPath}`,
   },
-  featuresHeading: 'What Jovie Does',
-  features: [
-    {
-      title: 'Living Profile',
-      href: APP_ROUTES.PRODUCT,
-      description:
-        'Your work, links, and story in one place people can actually find.',
-    },
-    {
-      title: 'Relationships',
-      href: APP_ROUTES.PRODUCT,
-      description:
-        'Give each person the next step that fits: follow, subscribe, listen, buy, book, or reach out.',
-    },
-    {
-      title: 'Audience',
-      href: APP_ROUTES.PRODUCT,
-      description:
-        'See who is paying attention, what brought them, and what they may want next.',
-    },
-    {
-      title: 'Adaptive',
-      href: APP_ROUTES.PRODUCT,
-      description:
-        'Jovie adapts to your work without reducing you to a category.',
-    },
-    {
-      title: 'For Artists',
-      href: APP_ROUTES.ARTIST_PROFILES,
-      description:
-        'Smart links, release notifications, and catalog tools when the work is music.',
-    },
-    {
-      title: 'Payments',
-      href: APP_ROUTES.PAY,
-      description:
-        // ui-casing-allow: feature list copy with brand name
-        'Let people tip you directly through your profile or a QR code, with payments handled by Stripe.',
-    },
-  ],
+  related: {
+    id: 'related',
+    label: 'Related',
+    links: [
+      { label: 'Product', href: APP_ROUTES.PRODUCT },
+      { label: 'Pricing', href: APP_ROUTES.PRICING },
+      { label: 'Changelog', href: APP_ROUTES.CHANGELOG },
+    ],
+  },
+  questionsLabel: 'Questions',
 } as const;
 
 export const ABOUT_FAQ_ITEMS = [
   {
     question: 'What is Jovie?',
-    answer: `${COMPANY_IDENTITY.definition} Jovie is available at jov.ie.`,
-  },
-  {
-    question: 'Is Jovie related to Jovie childcare or babysitting?',
     answer:
-      'No. Jovie at jov.ie and Jovie the childcare franchise (jovie.com) are completely separate, unrelated companies in different industries. Jovie at jov.ie is operated by Jovie Technology Inc. The childcare franchise is operated by Bright Horizons Family Solutions.',
+      'Jovie is a public profile for any creator, at jov.ie. It makes you easy to find and easy to reach, for people and for agents.',
   },
   {
     question: 'Who founded Jovie?',
-    answer:
-      'Jovie was founded by Tim White, an artist, producer, and engineer with 15+ years in music: 500+ live shows, five singles signed to Armada Music, songwriting and production for We Are Loud, Justin Prime, and Orjan Nilsen, engineering for Lauryn Hill, and a Clio Award for Hulu Pride Fest 2020.',
+    answer: `Jovie was founded by ${ABOUT_FACTS.founder}.`,
   },
   {
-    question: 'What does Jovie do?',
-    answer:
-      'Jovie gives you a living profile for your work, links, and story, plus a way to turn attention into a next step. For artists, that includes smart links, audience intelligence, release notifications, and AI that uses your actual career data.',
+    question: 'Where is Jovie based?',
+    answer: `Jovie is operated by ${ABOUT_FACTS.operator}, based in ${ABOUT_FACTS.city}.`,
+  },
+  {
+    question: 'How do I contact Jovie?',
+    answer: `Email ${ABOUT_FACTS.supportEmail} or visit jov.ie${ABOUT_FACTS.supportPath}.`,
   },
   {
     question: 'Is Jovie free?',
     answer:
-      'Yes, Jovie offers a free tier that lets you create a profile and start with your name. Paid plans add advanced analytics, notifications, and contact export.',
+      'Yes. You can create a Jovie profile for free. Paid plans are listed at jov.ie/pricing.',
   },
   {
-    question: 'How is Jovie different from Linktree?',
+    question: 'Is Jovie related to Jovie childcare?',
     answer:
-      'Linktree is a general-purpose link list. Jovie keeps your work, links, and a clear next step in one living profile. For artists, that includes smart links for releases, fan capture, and notifications when new music drops.',
+      'No. Jovie at jov.ie is a separate company from the childcare franchise at jovie.com.',
   },
 ] as const;

@@ -48,8 +48,8 @@ const requestSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const { userId: clerkId } = await getOptionalAuth();
-    if (!clerkId) {
+    const { userId: appUserId } = await getOptionalAuth();
+    if (!appUserId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     const [user] = await db
       .select({ id: users.id })
       .from(users)
-      .where(eq(users.clerkId, clerkId))
+      .where(eq(users.id, appUserId))
       .limit(1);
 
     if (!user) {

@@ -9,6 +9,7 @@ const serverOnlyImportsRule = require('./eslint-rules/server-only-imports');
 const useClientDirectiveRule = require('./eslint-rules/use-client-directive');
 const readonlyComponentPropsRule = require('./eslint-rules/readonly-component-props');
 const noDbTransactionRule = require('./eslint-rules/no-db-transaction');
+const noUsersClerkIdLookupRule = require('./eslint-rules/no-users-clerk-id-lookup');
 const noManualDbPoolingRule = require('./eslint-rules/no-manual-db-pooling');
 const noHardcodedRoutesRule = require('./eslint-rules/no-hardcoded-routes');
 const requireQueryCacheConfigRule = require('./eslint-rules/require-query-cache-config');
@@ -57,6 +58,7 @@ const baseConfig = {
         'use-client-directive': useClientDirectiveRule,
         'readonly-component-props': readonlyComponentPropsRule,
         'no-db-transaction': noDbTransactionRule,
+        'no-users-clerk-id-lookup': noUsersClerkIdLookupRule,
         'no-manual-db-pooling': noManualDbPoolingRule,
         'no-hardcoded-routes': noHardcodedRoutesRule,
         'require-query-cache-config': requireQueryCacheConfigRule,
@@ -214,6 +216,8 @@ const baseConfig = {
     '@jovie/readonly-component-props': 'error',
     // Database guardrails - Neon WebSocket driver supports transactions for RLS
     '@jovie/no-db-transaction': 'error',
+    // Session ids are users.id. New Clerk-column lookups fail closed.
+    '@jovie/no-users-clerk-id-lookup': 'error',
     '@jovie/no-manual-db-pooling': 'error',
     // Route management - prevent hardcoded paths
     '@jovie/no-hardcoded-routes': 'error',

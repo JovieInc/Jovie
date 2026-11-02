@@ -5,41 +5,13 @@ import {
   PROVENANCE_CONFIDENCE,
 } from './in-house-contracts';
 
+import {
+  matchesNumericId,
+  readProviderJson as readArtistJson,
+  providerRecord as record,
+} from './provider-response';
+
 const TIMEOUT_MS = 8_000;
-
-function record(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
-/** An official 404 is absence; rate limits, outages and malformed JSON are not. */
-async function readArtistJson(
-  url: string,
-  signal: AbortSignal
-): Promise<unknown> {
-  signal.throwIfAborted();
-  const response = await fetch(url, {
-    headers: { accept: 'application/json' },
-    signal,
-    redirect: 'error',
-  });
-  signal.throwIfAborted();
-  if (response.status === 404) return undefined;
-  if (!response.ok) throw new Error(`Artist provider HTTP ${response.status}`);
-  const payload: unknown = await response.json();
-  signal.throwIfAborted();
-  return payload;
-}
-
-function matchesNumericId(value: unknown, id: string): boolean {
-  return (
-    typeof value === 'number' &&
-    Number.isSafeInteger(value) &&
-    value > 0 &&
-    String(value) === id
-  );
-}
 
 /** Called only for a validated artist URL when MusicBrainz has no URL relation. */
 export async function verifyArtistUrl(

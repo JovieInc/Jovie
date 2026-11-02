@@ -88,6 +88,18 @@ class MirrorSyncTest(Base):
         self.assertEqual(linear.calls[0][1]["since"], "2026-10-11T00:00:00.000Z")
         self.assertEqual(ls.read_mirror(self.state, "JOV")["cursor"], "2026-10-11T09:00:00.000Z")
 
+    def test_incremental_asks_newest_first_and_logs_freshness_stage(self):
+        ls.apply(self.state, "JOV", [node(1)])
+        with ls._mutating(ls.mirror_path(self.state, "JOV"), ls.MIRROR) as data:
+            data.update(cursor="2026-10-11T00:00:00.000Z", syncedAt=1.0)
+        linear = FakeLinear([page([node(2, updated="2026-10-11T09:00:00.000Z"), node(3, updated="2026-10-11T08:00:00.000Z")])])
+        self.assertEqual(self.sync(linear)["outcome"], "synced")
+        self.assertIn("orderBy:updatedAt", ls.SYNC_QUERY)
+        import stage_events
+        rows = [r for r in stage_events.mirror_events(self.state, time.time()) if r["stage"] == "stale"]
+        self.assertEqual((rows[0]["entityId"], rows[0]["enteredAt"]), ("JOV", "2026-10-11T08:00:00Z"))
+        self.assertEqual({r["stage"] for r in stage_events.mirror_events(self.state, time.time())}, {"stale", "mirrored"})
+
     def test_budget_and_rate_limits_skip_the_read_and_keep_the_mirror(self):
         ls.apply(self.state, "JOV", [node(1)])
         linear = FakeLinear([])
@@ -184,6 +196,25 @@ class OutboxTest(Base):
         self.assertEqual(ls.status(self.state)["outbox"]["depth"], 0)
         self.assertEqual(ls.claim_status(self.state, "id-1"), "active")
 
+    def test_one_flush_drains_far_more_than_ten_entries_until_the_wall_budget_ends(self):
+        # Gem 2026-10-25: 504 pending writes, arrivals 80-175 per 30 min, 10 delivered per tick.
+        ls.claim(self.state, "id-1", "JOV-1", "codex")
+        for index in range(25):
+            ls.enqueue(self.state, "comment", "id-1", body=f"note {index}")
+        linear = FakeLinear([{"commentCreate": {"success": True}}] * 25)
+        report = ls.flush(self.state, linear, lambda n: True, (Limited,))
+        self.assertEqual((report["outcome"], len(report["delivered"])), ("drained", 25))
+        for index in range(3):
+            ls.enqueue(self.state, "comment", "id-1", body=f"later {index}")
+        held = ls.flush(self.state, FakeLinear([]), lambda n: True, (Limited,), budget_s=-1)
+        self.assertEqual((held["outcome"], held["delivered"]), ("partial", []))
+        self.assertEqual(ls.status(self.state)["outbox"]["depth"], 3)
+
+    def test_outbox_alert_fires_at_an_hour(self):
+        view = {"outbox": {"depth": 400, "oldestAgeS": 3700, "dead": 0}}
+        self.assertIn("linear-outbox-stale", ls.alerts(view))
+        self.assertNotIn("linear-outbox-stale", ls.alerts({"outbox": {"depth": 9, "oldestAgeS": 600, "dead": 0}}))
+
     def test_budget_rate_limit_and_errors_keep_the_entry_without_failing_work(self):
         ls.claim(self.state, "id-1", "JOV-1", "codex")
         ls.enqueue(self.state, "move", "id-1", target="In Progress")
@@ -256,6 +287,35 @@ class StartedOwnershipTest(Base):
         with mock.patch.object(ls.time, "time", return_value=claimed_at):
             self.assertTrue(ls.claim(self.state, f"id-{n}", f"JOV-{n}", "codex"))
 
+    def lyb_claim(self, n, claimed_at):
+        with mock.patch.object(ls.time, "time", return_value=claimed_at):
+            self.assertTrue(ls.claim(self.state, f"lyb-{n}", f"LYB-{n}", "codex"))
+
+    def binding_lock(self, ident):
+        path = self.state / "bindings" / "LYB" / f"issue.{ident}.lock"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return open(path, "a+")
+
+    def test_dead_binding_claim_is_released_but_a_held_one_is_not(self):
+        """LYB-180 sat `active` 238 h: reconcile only looked at the Jovie run lease."""
+        import fcntl
+        self.lyb_claim(1, self.NOW - 3600)
+        self.lyb_claim(2, self.NOW - 3600)
+        self.binding_lock("LYB-1").close()  # taken and dropped: the run is over
+        live = self.binding_lock("LYB-2")
+        fcntl.flock(live, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        try:
+            report = self.reconcile()
+        finally:
+            live.close()
+        self.assertEqual(report["claimsReleased"], ["LYB-1"])
+        self.assertEqual(ls._claims(self.state)["lyb-2"]["status"], "active")
+
+    def test_binding_claim_without_any_lock_waits_out_the_legacy_window(self):
+        self.lyb_claim(3, self.NOW - 3600)
+        self.assertEqual(self.reconcile()["claimsReleased"], [])
+        self.assertEqual(self.reconcile(at=ownership.LEGACY_RUN_GRACE_S)["claimsReleased"], ["LYB-3"])
+
     def test_owner_process_dies_then_the_issue_returns_to_the_pool(self):
         self.started(1)
         self.claim_at(1, self.NOW - 3600)
@@ -301,6 +361,34 @@ class StartedOwnershipTest(Base):
         lease = ownership.acquire_run_lease(self.state, "id-5", "JOV-5", "codex")
         lease.close()  # a run that ended: released without waiting for the legacy grace
         self.assertEqual(self.reconcile(at=ownership.CLAIM_GRACE_S)["claimsReleased"], ["JOV-5"])
+
+    def worktree(self, ident, stamp="20261031T010101Z"):
+        path = self.state / "worktrees" / f"{stamp}-{ident}-codex-ab12cd"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def test_a_worktree_leftover_does_not_keep_a_dead_lease_claim(self):
+        """JOV-10218: JOV-7577 stayed `active` for as long as its preserved worktree existed,
+        while the doctor called the claim stranded. A live run always holds its run lease (the
+        kernel releases it if the worker dies), so a checkout without one is a leftover."""
+        self.started(30)
+        self.claim_at(30, self.NOW - ownership.LEGACY_RUN_GRACE_S - 1)
+        self.worktree("JOV-30")
+        report = self.reconcile()
+        self.assertEqual(report["claimsReleased"], ["JOV-30"])
+        self.assertEqual(ls.claim_status(self.state, "id-30"), "released")
+
+    def test_a_worktree_does_not_release_a_live_lease_claim(self):
+        self.started(31)
+        self.claim_at(31, self.NOW - ownership.LEGACY_RUN_GRACE_S - 1)
+        self.worktree("JOV-31")
+        lease = ownership.acquire_run_lease(self.state, "id-31", "JOV-31", "codex")
+        try:
+            report = self.reconcile()
+        finally:
+            lease.close()
+        self.assertEqual(report["claimsReleased"], [])
+        self.assertEqual(ls.claim_status(self.state, "id-31"), "active")
 
     def test_a_started_state_without_an_owner_is_rejected(self):
         with self.assertRaises(ls.StartedWithoutOwner):

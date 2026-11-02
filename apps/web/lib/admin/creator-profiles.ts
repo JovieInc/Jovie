@@ -1,15 +1,17 @@
 import 'server-only';
 
 import {
+  and,
   count,
   desc,
   sql as drizzleSql,
   ilike,
   inArray,
+  notInArray,
   or,
   type SQL,
 } from 'drizzle-orm';
-
+import { getCustomerPopulationExclusions } from '@/lib/admin/customer-population';
 import { db } from '@/lib/db';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -291,8 +293,7 @@ export async function getAdminCreatorProfiles(
   const sort: AdminCreatorProfilesSort = params.sort ?? 'created_desc';
   const orderByExpressions = getOrderByExpressions(sort);
 
-  // Build where clause for reuse in both queries
-  const whereClause: SQL | undefined = likePattern
+  const searchClause: SQL | undefined = likePattern
     ? or(
         ilike(creatorProfiles.username, likePattern),
         ilike(creatorProfiles.displayName, likePattern)
@@ -300,6 +301,14 @@ export async function getAdminCreatorProfiles(
     : undefined;
 
   try {
+    const excluded = await getCustomerPopulationExclusions();
+    // Apply the same provenance policy to rows AND count before paging.
+    const whereClause = and(
+      searchClause,
+      excluded.profileIds.size
+        ? notInArray(creatorProfiles.id, [...excluded.profileIds])
+        : undefined
+    );
     // Execute queries in parallel for better performance
     const [rows, [{ value: total }]] = await Promise.all([
       // Paginated data query

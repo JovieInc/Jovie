@@ -27,6 +27,14 @@ import {
 } from '@/data/marketing';
 
 const mutateMock = vi.hoisted(() => vi.fn());
+const routerMock = vi.hoisted(() => ({
+  push: vi.fn(),
+  replace: vi.fn(),
+  prefetch: vi.fn(),
+  back: vi.fn(),
+  forward: vi.fn(),
+  refresh: vi.fn(),
+}));
 
 vi.mock('next/image', () => ({
   default: (props: { readonly alt?: string; readonly src?: unknown }) => (
@@ -56,14 +64,7 @@ vi.mock('next/link', () => ({
 }));
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: vi.fn(),
-    replace: vi.fn(),
-    prefetch: vi.fn(),
-    back: vi.fn(),
-    forward: vi.fn(),
-    refresh: vi.fn(),
-  }),
+  useRouter: () => routerMock,
   usePathname: () => '/',
   useSearchParams: () => new URLSearchParams(),
   useParams: () => ({}),
@@ -85,7 +86,14 @@ vi.mock('@/lib/analytics', async importOriginal => ({
 import { JovieCardLanding } from '@/app/(marketing)/card/JovieCardLanding';
 import DownloadPage from '@/app/(marketing)/download/page';
 import { InstantMerchLanding } from '@/app/(marketing)/instant-merch/InstantMerchLanding';
+import { CommandPaletteLanding } from '@/app/(marketing)/product/command-palette/CommandPaletteLanding';
+import { DspLinksLanding } from '@/app/(marketing)/product/dsp-links/DspLinksLanding';
+import { IsrcLanding } from '@/app/(marketing)/product/isrc/IsrcLanding';
+import { LinkAnalyticsLanding } from '@/app/(marketing)/product/link-analytics/LinkAnalyticsLanding';
 import { ProductLanding } from '@/app/(marketing)/product/ProductLanding';
+import { PreSaveLanding } from '@/app/(marketing)/product/pre-save/PreSaveLanding';
+import { ReleaseSchedulingLanding } from '@/app/(marketing)/product/release-scheduling/ReleaseSchedulingLanding';
+import { UtmLinksLanding } from '@/app/(marketing)/product/utm-links/UtmLinksLanding';
 import { SmartLinksLanding } from '@/app/(marketing)/smart-links/SmartLinksLanding';
 import { SolutionsRecordBody } from '@/app/(marketing)/solutions/[audience]/sections';
 import { YoutubeThumbnailsLanding } from '@/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding';
@@ -170,7 +178,18 @@ const RENDERERS: Readonly<Record<string, () => ReactElement>> = {
   '(marketing)/voice/page.tsx': () => <VoicePageContent />,
   '(marketing)/instant-merch/page.tsx': () => <InstantMerchLanding />,
   '(marketing)/youtube-thumbnails/page.tsx': () => <YoutubeThumbnailsLanding />,
+  '(marketing)/product/link-analytics/page.tsx': () => <LinkAnalyticsLanding />,
   '(marketing)/product/page.tsx': () => <ProductLanding />,
+  '(marketing)/product/command-palette/page.tsx': () => (
+    <CommandPaletteLanding />
+  ),
+  '(marketing)/product/release-scheduling/page.tsx': () => (
+    <ReleaseSchedulingLanding />
+  ),
+  '(marketing)/product/dsp-links/page.tsx': () => <DspLinksLanding />,
+  '(marketing)/product/utm-links/page.tsx': () => <UtmLinksLanding />,
+  '(marketing)/product/isrc/page.tsx': () => <IsrcLanding />,
+  '(marketing)/product/pre-save/page.tsx': () => <PreSaveLanding />,
   '(marketing)/card/page.tsx': () => <JovieCardLanding />,
   '(marketing)/smart-links/page.tsx': () => <SmartLinksLanding />,
 };
@@ -204,6 +223,18 @@ const COPY_ONLY_FIXTURE_ENTRY: Pick<
 };
 
 describe('product-evidence contract (JOV-6917)', () => {
+  it('binds the download hero to its complete accessible heading', () => {
+    const { getByRole, getByTestId } = render(<DownloadPage />);
+    const heading = getByRole('heading', {
+      level: 1,
+      name: 'Jovie, Installed Where You Work.',
+    });
+    expect(getByTestId('marketing-section-hero')).toHaveAttribute(
+      'aria-labelledby',
+      heading.id
+    );
+  });
+
   it('Card uses an honest planned description instead of a destination-profile screenshot', () => {
     const { container } = render(<JovieCardLanding />);
     const hero = container.querySelector<HTMLElement>(

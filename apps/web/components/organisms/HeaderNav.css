@@ -68,10 +68,7 @@
 .marketing-glass-header {
   --marketing-glass-top: clamp(0.42rem, 0.8vw, 0.62rem);
   --marketing-glass-height: 2.72rem;
-  --marketing-glass-gutter: max(
-    clamp(0.9rem, 2vw, 1.5rem),
-    calc(var(--homepage-page-gutter, 1.75rem) - 0.75rem)
-  );
+  --marketing-glass-gutter: var(--ds-public-gutter);
   --marketing-glass-shell: transparent;
   --marketing-glass-shell-scrolled: rgba(12, 13, 15, 0.74);
   --marketing-glass-border: rgba(255, 255, 255, 0.1);
@@ -92,7 +89,7 @@
   min-height: var(--marketing-glass-height);
   max-width: var(--ds-public-content-max) !important;
   align-items: center;
-  padding-inline: var(--marketing-glass-gutter) !important;
+  padding-inline: 0 !important;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -214,6 +211,7 @@
     0.38rem
   );
   left: 50%;
+  /* container-width-allow: flyout menu panel, not a page container */
   width: min(50rem, calc(100vw - var(--marketing-glass-gutter) * 2));
   transform: translate(-50%, -0.35rem);
   pointer-events: none;
@@ -395,12 +393,11 @@
   .marketing-glass-header {
     --marketing-glass-top: 0.6rem;
     --marketing-glass-height: 3.15rem;
-    --marketing-glass-gutter: 1rem;
+    --marketing-glass-gutter: var(--ds-public-gutter);
   }
 
   .marketing-glass-header__shell {
     min-height: var(--marketing-glass-height);
-    padding-inline: 0.82rem !important;
   }
 }
 

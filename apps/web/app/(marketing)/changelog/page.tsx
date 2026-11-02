@@ -6,6 +6,7 @@ import {
 } from '@/components/marketing';
 import { ChangelogSubscribeColumn } from '@/components/marketing/changelog/ChangelogSubscribeColumn';
 import { CustomerChangelogArchive } from '@/components/marketing/changelog/CustomerChangelogArchive';
+import { NoOrphanText } from '@/components/marketing/NoOrphanText';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
@@ -17,17 +18,19 @@ import {
   groupCustomerChangelogByMonth,
   projectCustomerChangelogArchive,
 } from '@/lib/customer-changelog';
+import { documentTitle } from '@/lib/seo/document-title';
 import './changelog-editorial.css';
 
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: 'Jovie Changelog: Product Updates & New Features',
+  title: documentTitle('Jovie Changelog: Product Updates & New Features'),
   description: `Audience and control updates in ${APP_NAME}. What got better for you, not every deploy.`,
   alternates: {
     canonical: `${BASE_URL}${APP_ROUTES.CHANGELOG}`,
     types: {
       'application/atom+xml': `${BASE_URL}${APP_ROUTES.CHANGELOG}/feed.xml`,
+      'application/rss+xml': `${BASE_URL}${APP_ROUTES.CHANGELOG}/rss.xml`,
       'application/feed+json': `${BASE_URL}${APP_ROUTES.CHANGELOG}/feed.json`,
     },
   },
@@ -98,7 +101,7 @@ function ReleaseJournalHero({
                         {formatTimelineDate(entry.date)}
                       </span>
                       <span className='changelog-hero__timeline-title'>
-                        {entry.title}
+                        <NoOrphanText>{entry.title}</NoOrphanText>
                       </span>
                     </Link>
                   </li>
@@ -184,9 +187,8 @@ export default async function ChangelogPage() {
       </MarketingContainer>
 
       <MarketingFooterCta
-        title='Take control of your presence.'
         ctaLabel='Find your profile'
-        ctaHref='/#handle-input'
+        ctaHref='/#homepage-claim-handle'
       />
     </div>
   );

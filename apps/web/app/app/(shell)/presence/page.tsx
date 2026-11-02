@@ -19,7 +19,6 @@ export default async function PresencePage() {
   const routeContext = await loadAppShellRouteContext({
     route: APP_ROUTES.PRESENCE,
     authFailure: 'notFound',
-    requiredFlag: 'PROFILES_WORKSPACE',
     dashboardErrorLogMessage: 'Dashboard data load failed on Profiles page',
     dashboardErrorMessage: 'Failed to load Profiles. Please refresh the page.',
   });

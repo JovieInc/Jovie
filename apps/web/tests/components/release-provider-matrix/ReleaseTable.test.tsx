@@ -2,10 +2,13 @@ import { render, screen } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ReleaseTable } from '@/features/dashboard/organisms/release-provider-matrix/ReleaseTable';
+import { ReleaseTableWithTracks } from '@/features/dashboard/organisms/release-provider-matrix/ReleaseTableWithTracks';
 import type { ProviderKey } from '@/lib/discography/types';
 import { createMockRelease } from '@/tests/test-utils/factories';
 
 const tableCapture = vi.hoisted(() => ({
+  rowHeight: undefined as number | undefined,
+  rowMode: undefined as string | undefined,
   columns: [] as Array<{
     id?: string;
     meta?: {
@@ -123,6 +126,8 @@ vi.mock('@/components/organisms/table', () => ({
     expandedRowIds,
     renderExpandedContent,
     emptyState,
+    rowHeight,
+    rowMode,
   }: {
     data: Array<{ id: string }>;
     columns: unknown[];
@@ -135,8 +140,12 @@ vi.mock('@/components/organisms/table', () => ({
       columnCount: number
     ) => ReactNode;
     emptyState?: ReactNode;
+    rowHeight?: number;
+    rowMode?: string;
   }) => {
     tableCapture.columns = columns as typeof tableCapture.columns;
+    tableCapture.rowHeight = rowHeight;
+    tableCapture.rowMode = rowMode;
     return (
       <div data-testid='unified-table'>
         {data.length === 0
@@ -182,6 +191,57 @@ describe('ReleaseTable', () => {
     onCopy: vi.fn().mockResolvedValue('copied'),
     onEdit: vi.fn(),
   } satisfies Partial<ComponentProps<typeof ReleaseTable>>;
+
+  describe.each([
+    ['release list', ReleaseTable],
+    ['release list with tracks', ReleaseTableWithTracks],
+  ] as const)('%s density', (_name, Table) => {
+    it('lets the named mode own row and content sizing over a raw height', () => {
+      render(<Table {...commonProps} rowMode='dense' rowHeight={46} />);
+
+      expect(tableCapture.rowMode).toBe('dense');
+      expect(tableCapture.rowHeight).toBeUndefined();
+    });
+
+    it('preserves an explicit height when there is no named mode', () => {
+      render(<Table {...commonProps} rowHeight={46} />);
+
+      expect(tableCapture.rowMode).toBeUndefined();
+      expect(tableCapture.rowHeight).toBe(46);
+    });
+  });
+
+  it('preserves the named density when delegating to the tracks table', async () => {
+    render(
+      <ReleaseTable
+        {...commonProps}
+        showTracks
+        rowMode='dense'
+        rowHeight={46}
+      />
+    );
+
+    await screen.findByTestId('expanded-row-release_1');
+    expect(tableCapture.rowMode).toBe('dense');
+    expect(tableCapture.rowHeight).toBeUndefined();
+  });
+
+  it('retains dense sizing and selected tracks in the expanded table', async () => {
+    render(
+      <ReleaseTableWithTracks
+        {...commonProps}
+        rowMode='dense'
+        selectedTrackId='track-2'
+      />
+    );
+
+    expect(await screen.findByTestId('expanded-track-track-2')).toHaveAttribute(
+      'data-state',
+      'selected'
+    );
+    expect(tableCapture.rowMode).toBe('dense');
+    expect(tableCapture.rowHeight).toBeUndefined();
+  });
 
   it('keeps selected and expanded release rows visually distinct', async () => {
     render(

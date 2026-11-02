@@ -797,7 +797,7 @@ export function DevToolbar({
             {/*
              * Visual states: hidden/collapsed omit the drawer; expanded always
              * reserves this exact-height strip. Empty and populated samples
-             * render the same five cells, so live telemetry changes text only.
+             * render the same six cells, so live telemetry changes text only.
              * Narrow viewports scroll horizontally without moving controls.
              */}
             <section

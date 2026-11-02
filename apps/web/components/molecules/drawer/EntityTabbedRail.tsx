@@ -29,6 +29,11 @@ export interface EntityTabbedRailProps<T extends string> {
   readonly testId?: string;
   readonly tabDistribution?: 'intrinsic' | 'fill';
   readonly tabOverflowMode?: 'collapse' | 'wrap' | 'scroll';
+  /**
+   * Contacts and audience-member rails stay flat. Analytics opts into the
+   * shared rounded drawer card so live and demo match.
+   */
+  readonly tabbedSurfaceVariant?: 'card' | 'flat';
 }
 
 /**
@@ -61,6 +66,7 @@ export function EntityTabbedRail<T extends string>({
   testId,
   tabDistribution = 'fill',
   tabOverflowMode = 'collapse',
+  tabbedSurfaceVariant = 'flat',
 }: EntityTabbedRailProps<T>) {
   return (
     <EntitySidebarShell
@@ -82,7 +88,7 @@ export function EntityTabbedRail<T extends string>({
         <DrawerTabbedCard
           testId={tabbedCardTestId}
           sectionKind={sectionKind}
-          surfaceVariant='flat'
+          surfaceVariant={tabbedSurfaceVariant}
           controls={controls}
           tabsContainerClassName={tabsContainerClassName}
           tabs={

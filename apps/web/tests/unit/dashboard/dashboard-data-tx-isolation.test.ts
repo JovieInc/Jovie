@@ -32,6 +32,7 @@ type TxState = { poisoned: boolean; closed: boolean; rolledBack: boolean };
 const {
   captureExceptionMock,
   cleanupGates,
+  commitFailures,
   loggerErrorMock,
   loggerWarnMock,
   outcomes,
@@ -40,6 +41,7 @@ const {
   withDbSessionTxMock,
 } = vi.hoisted(() => {
   const cleanupGates = new Map<number, () => Promise<void>>();
+  const commitFailures = new Map<number, QueryOutcome>();
   const outcomes: QueryOutcome[] = [];
   const setupFailures = new Map<number, QueryOutcome>();
   const txStates: TxState[] = [];
@@ -118,7 +120,16 @@ const {
           state.poisoned = true;
           throw setupError;
         }
-        return await handler(createTx(state), 'user_123');
+        const result = await handler(createTx(state), 'user_123');
+        const commitError = commitFailures.get(transactionIndex)?.().error;
+        if (commitError) {
+          // The callback already finished; Drizzle's post-callback COMMIT
+          // failed on the wire and the wrapper discarded the client (JOV-8641
+          // preserves this original error instead of letting ROLLBACK mask
+          // it). Nothing the callback wrote can be acknowledged.
+          throw commitError;
+        }
+        return result;
       } catch (error) {
         state.rolledBack = true;
         throw error;
@@ -133,6 +144,7 @@ const {
   return {
     captureExceptionMock: vi.fn(),
     cleanupGates,
+    commitFailures,
     loggerErrorMock: vi.fn(),
     loggerWarnMock: vi.fn(),
     outcomes,
@@ -429,6 +441,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     const { doesTableExist } = await import('@/lib/db');
     vi.mocked(doesTableExist).mockReset().mockResolvedValue(false);
     cleanupGates.clear();
+    commitFailures.clear();
     outcomes.length = 0;
     setupFailures.clear();
     txStates.length = 0;
@@ -642,6 +655,177 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
 
     // Isolation mechanism: 1 base transaction + 3 supplementary reads; absent distribution table opens none.
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+  });
+
+  it.each(['25P03', undefined])(
+    'JOV-8834: recovers an idle social-link read (%s) after cleanup with the same identity',
+    async code => {
+      const idle = new Error('Failed query: select', {
+        cause: Object.assign(
+          new Error(
+            'terminating connection due to idle-in-transaction timeout'
+          ),
+          code ? { code } : {}
+        ),
+      });
+      let releaseCleanup!: () => void;
+      let signalCleanup!: () => void;
+      const cleanupStarted = new Promise<void>(resolve => {
+        signalCleanup = resolve;
+      });
+      const pendingCleanup = new Promise<void>(resolve => {
+        releaseCleanup = resolve;
+      });
+      cleanupGates.set(1, () => {
+        signalCleanup();
+        return pendingCleanup;
+      });
+      queueReadsBeforeDistribution();
+      outcomes.splice(5, 0, fail(idle));
+
+      const resultPromise = getDashboardData();
+      await cleanupStarted;
+      try {
+        expect(txStates).toHaveLength(2);
+        expect(captureExceptionMock).not.toHaveBeenCalled();
+      } finally {
+        releaseCleanup();
+        await resultPromise;
+      }
+      const result = await resultPromise;
+      expect(result.hasSocialLinks).toBe(true);
+      expect(result.hasMusicLinks).toBe(true);
+      expect(result.tippingStats.totalReceivedCents).toBe(100);
+      expect(result.dashboardLoadError).toBeUndefined();
+      expect(txStates[1]).toMatchObject({ closed: true, rolledBack: true });
+      expect(txStates.every(state => state.closed)).toBe(true);
+      expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+      expect(withDbSessionTxMock).toHaveBeenNthCalledWith(
+        3,
+        expect.any(Function),
+        { clerkUserId: 'user_123' }
+      );
+      expect(captureExceptionMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('JOV-8834: retries an idle RLS setup failure before the social-link callback', async () => {
+    setupFailures.set(1, fail(idleDistributionError('25P03')));
+    queueReadsBeforeDistribution();
+    const result = await getDashboardData();
+    expect(result.hasSocialLinks).toBe(true);
+    expect(result.hasMusicLinks).toBe(true);
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(txStates[1]).toMatchObject({ closed: true, rolledBack: true });
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+  });
+
+  it('JOV-8834: falls back after two idle social-link failures have rolled back', async () => {
+    const first = idleDistributionError('25P03');
+    const second = idleDistributionError('25P03');
+    queueReadsBeforeDistribution();
+    outcomes.splice(5, 1, fail(first), fail(second));
+    captureExceptionMock.mockImplementation(error => {
+      if (error === second) {
+        expect(txStates[1]).toMatchObject({ closed: true, rolledBack: true });
+        expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
+      }
+    });
+    const result = await getDashboardData();
+    expect(result.hasSocialLinks).toBe(false);
+    expect(result.hasMusicLinks).toBe(false);
+    expect(result.avatarQuality?.status).toBe('ok');
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+    expect(capturedErrors()).toEqual([second]);
+    expect(captureExceptionMock).toHaveBeenCalledWith(
+      second,
+      expect.objectContaining({
+        tags: {
+          query: 'social_links_existence',
+          context: 'dashboard_data_settled',
+        },
+      })
+    );
+  });
+
+  it.each(['57014', '25P02', '42501', '40001', '08006'])(
+    'JOV-8834: reports SQLSTATE %s after cleanup without replaying the social-link read',
+    async code => {
+      const error = idleDistributionError(code);
+      queueReadsBeforeDistribution();
+      outcomes.splice(5, 1, fail(error));
+      captureExceptionMock.mockImplementation(captured => {
+        if (captured === error) {
+          expect(txStates[1]).toMatchObject({ closed: true, rolledBack: true });
+        }
+      });
+      const result = await getDashboardData();
+      expect(result.hasSocialLinks).toBe(false);
+      expect(result.tippingStats.totalReceivedCents).toBe(100);
+      expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+      expect(capturedErrors()).toEqual([error]);
+    }
+  );
+
+  it('JOV-8834: declines social-link recovery once its retry admission budget expires', async () => {
+    const clock = vi.spyOn(performance, 'now');
+    queueReadsBeforeDistribution();
+    outcomes.splice(5, 1, () => {
+      clock.mockReturnValue(Number.MAX_SAFE_INTEGER);
+      return { error: idleDistributionError('25P03') };
+    });
+    try {
+      const result = await getDashboardData();
+      expect(result.hasSocialLinks).toBe(false);
+      expect(result.tippingStats.totalReceivedCents).toBe(100);
+      expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('JOV-8834: awaits asynchronous SQL timeout setup before querying or returning fallback', async () => {
+    const timeout = Object.assign(
+      new Error('canceling statement due to statement timeout'),
+      { code: '57014' }
+    );
+    let rejectSetup!: (error: Error) => void;
+    let signalSetup!: () => void;
+    const setupStarted = new Promise<void>(resolve => {
+      signalSetup = resolve;
+    });
+    const pendingSetup = new Promise<void>((_resolve, reject) => {
+      rejectSetup = reject;
+    });
+    void pendingSetup.catch(() => {});
+    const { setStatementTimeout } = await import('@/lib/db/query-timeout');
+    vi.mocked(setStatementTimeout).mockImplementationOnce(() => {
+      signalSetup();
+      return pendingSetup;
+    });
+    queueReadsBeforeDistribution();
+    outcomes.splice(5, 1);
+    const resultPromise = getDashboardData();
+    await setupStarted;
+    try {
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+      expect(outcomes).toHaveLength(3);
+      expect(txStates).toHaveLength(2);
+      expect(txStates[1].closed).toBe(false);
+      expect(captureExceptionMock).not.toHaveBeenCalled();
+    } finally {
+      rejectSetup(timeout);
+      await resultPromise;
+    }
+    const result = await resultPromise;
+    expect(result.hasSocialLinks).toBe(false);
+    expect(result.avatarQuality?.status).toBe('ok');
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(txStates[1]).toMatchObject({ closed: true, rolledBack: true });
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+    expect(capturedErrors()).toEqual([timeout]);
   });
 
   it('degrades the Inbox count read log-only on connector schema drift (JOV-5160)', async () => {
@@ -1058,7 +1242,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       const { setStatementTimeout } = await import('@/lib/db/query-timeout');
       let attempts = 0;
       vi.mocked(setStatementTimeout).mockImplementation(async (_tx, ms) => {
-        if (ms === 8000 && ++attempts === 1) {
+        if (ms === 8000 && txStates.length >= 5 && ++attempts === 1) {
           txStates[4].poisoned = true;
           throw idle;
         }
@@ -1109,7 +1293,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     const { setStatementTimeout } = await import('@/lib/db/query-timeout');
     let attempts = 0;
     vi.mocked(setStatementTimeout).mockImplementation(async (_tx, ms) => {
-      if (ms === 8000 && ++attempts === 1) {
+      if (ms === 8000 && txStates.length >= 5 && ++attempts === 1) {
         signalSetup();
         await pendingSetup;
       }
@@ -1146,7 +1330,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     const { setStatementTimeout } = await import('@/lib/db/query-timeout');
     let attempts = 0;
     vi.mocked(setStatementTimeout).mockImplementation(async (_tx, ms) => {
-      if (ms === 8000) {
+      if (ms === 8000 && txStates.length >= 5) {
         attempts++;
         throw idle;
       }
@@ -1196,7 +1380,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       });
       const { setStatementTimeout } = await import('@/lib/db/query-timeout');
       vi.mocked(setStatementTimeout).mockImplementation(async (_tx, ms) => {
-        if (ms === 8000) throw error;
+        if (ms === 8000 && txStates.length >= 5) throw error;
       });
       queueReadsBeforeDistribution();
       const result = await getDashboardData();
@@ -1206,7 +1390,8 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       expect(
         vi
           .mocked(setStatementTimeout)
-          .mock.calls.filter(([, ms]) => ms === 8000)
+          .mock.calls.slice(1)
+          .filter(([, ms]) => ms === 8000)
       ).toHaveLength(1);
       expect(txStates[4]).toMatchObject({ closed: true, rolledBack: true });
       expect(captureExceptionMock).toHaveBeenCalledWith(
@@ -1232,7 +1417,10 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     );
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
     expect(
-      vi.mocked(setStatementTimeout).mock.calls.filter(([, ms]) => ms === 8000)
+      vi
+        .mocked(setStatementTimeout)
+        .mock.calls.slice(1)
+        .filter(([, ms]) => ms === 8000)
     ).toHaveLength(1);
     expect(txStates.every(state => state.closed)).toBe(true);
     expect(captureExceptionMock).not.toHaveBeenCalled();
@@ -1330,10 +1518,15 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     // source accidentally stops awaiting timeout setup.
     void pendingSetup.catch(() => {});
     const { setStatementTimeout } = await import('@/lib/db/query-timeout');
-    vi.mocked(setStatementTimeout).mockImplementation(() => {
-      if (txStates.length !== 3) return Promise.resolve();
-      signalSetup();
-      return pendingSetup;
+    vi.mocked(setStatementTimeout).mockImplementation(async (_tx, ms) => {
+      // Profile reads also take the 5000ms API deadline (JOV-8651). Stall only
+      // the avatar transaction this case proves (JOV-8580): it is the open
+      // transaction once three sessions exist, and earlier 5000ms setup must
+      // resolve so the avatar read is the one still awaiting cancellation.
+      if (ms === 5000 && txStates.length === 3) {
+        signalSetup();
+        await pendingSetup;
+      }
     });
     let avatarOrTippingStarted = false;
     outcomes.push(
@@ -1521,5 +1714,80 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     } finally {
       clock.mockRestore();
     }
+  });
+
+  it('JOV-8837: recovers an avatar read whose read-only commit died on a dropped connection', async () => {
+    // Neon idle-in-transaction terminations can arrive as a bare transport
+    // failure: Drizzle's post-callback COMMIT rejects with `Failed query:
+    // commit` wrapping a lost connection — no 25P03 SQLSTATE, no idle text.
+    // The idle-only predicate (pre-JOV-8837) let that escape as a warning.
+    const droppedCommit = () =>
+      new Error('Failed query: commit', {
+        cause: new Error('Connection terminated unexpectedly'),
+      });
+    commitFailures.set(2, fail(droppedCommit()));
+    queueReadsBeforeDistribution();
+    // Both avatar attempts consume one profilePhotos outcome each: the first
+    // attempt's rows are discarded by its failed commit, so the retry needs
+    // its own queued read inserted after the first avatar outcome.
+    outcomes.splice(7, 0, () => {
+      // Recovery starts only after the failed transaction fully closed and
+      // was discarded — never on the poisoned, still-open connection.
+      expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
+      return { rows: [{ width: 2048, height: 2048 }] };
+    });
+
+    const result = await getDashboardData();
+
+    expect(result.avatarQuality).toEqual({
+      status: 'ok',
+      width: 2048,
+      height: 2048,
+    });
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(result.dashboardLoadError).toBeUndefined();
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+    expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
+    expect(txStates[3]).toMatchObject({ closed: true, rolledBack: false });
+    expect(txStates.every(state => state.closed)).toBe(true);
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(capturedCascadeErrors()).toEqual([]);
+  });
+
+  it('JOV-8837: falls back after two commit failures have closed their transactions', async () => {
+    const droppedCommit = () =>
+      new Error('Failed query: commit', {
+        cause: new Error('Connection terminated unexpectedly'),
+      });
+    const firstCommit = droppedCommit();
+    const secondCommit = droppedCommit();
+    commitFailures.set(2, fail(firstCommit));
+    commitFailures.set(3, fail(secondCommit));
+    captureExceptionMock.mockImplementation(error => {
+      // The tolerated failure is reported only after both failed
+      // transactions fully closed and were discarded.
+      expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
+      expect(txStates[3]).toMatchObject({ closed: true, rolledBack: true });
+      expect(error).toBe(secondCommit);
+    });
+    queueReadsBeforeDistribution();
+    // Both avatar attempts consume one profilePhotos outcome each before
+    // their commits die; the retry needs its own queued read.
+    outcomes.splice(7, 0, ok([{ width: 1024, height: 1024 }]));
+
+    const result = await getDashboardData();
+
+    expect(result.avatarQuality?.status).toBe('unknown');
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(result.dashboardLoadError).toBeUndefined();
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+    expect(captureExceptionMock).toHaveBeenCalledWith(
+      secondCommit,
+      expect.objectContaining({
+        tags: expect.objectContaining({ query: 'avatar_quality' }),
+      })
+    );
+    expect(capturedCascadeErrors()).toEqual([]);
+    expect(txStates.every(state => state.closed)).toBe(true);
   });
 });

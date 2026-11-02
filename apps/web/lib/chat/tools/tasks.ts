@@ -6,6 +6,7 @@ import {
   getTasks,
 } from '@/app/app/(shell)/dashboard/tasks/task-actions';
 import { APP_ROUTES } from '@/constants/routes';
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
 import type { TaskView } from '@/lib/tasks/types';
 import { chatToolSchema } from '../strict-schema';
@@ -94,7 +95,7 @@ export function createManageTasksTool(profileId: string | null) {
       }
 
       const task = await createTask({
-        title: title?.trim() || 'Untitled task',
+        title: title?.trim() || COPY_FALLBACKS.task,
         status: 'todo',
         priority: 'medium',
       });

@@ -1,4 +1,6 @@
 'use client';
+
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 // @coverage-via apps/web/tests/unit/dashboard/TasksPageClient.test.tsx
 
 import {
@@ -77,7 +79,6 @@ import { useViewMode } from '@/components/organisms/table/utils/useViewMode';
 import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import type { FilterPill } from '@/components/shell/pill-search.types';
 import { APP_ROUTES } from '@/constants/routes';
-import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useIsomorphicLayoutEffect } from '@/hooks/useIsomorphicLayoutEffect';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
@@ -137,7 +138,7 @@ import {
   TASK_PRIORITY_OPTIONS,
   TASK_STATUS_OPTIONS,
 } from './task-action-registry';
-import { distinctTaskTitles, taskSearchFromPills } from './task-header-search';
+import { taskSearchFromPills } from './task-header-search';
 import {
   getTaskAssigneeVisual,
   getTaskPriorityVisual,
@@ -943,7 +944,7 @@ function TaskTitleEditor({
         rows={1}
         aria-label='Task Title'
         onChange={event => onChange(event.target.value)}
-        placeholder='Untitled Task' // ui-casing-allow: default task title placeholder
+        placeholder={COPY_FALLBACKS.task}
         className='w-full resize-none rounded-md border-0 bg-transparent px-0 py-0 text-[1.75rem] font-semibold leading-[1.15] tracking-normal text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_80%,transparent)] transition-colors duration-fast focus:outline-none! focus-visible:ring-0! focus:shadow-none! focus-visible:bg-[color-mix(in_oklab,var(--linear-border-focus)_16%,transparent)]'
         style={{
           height: measuredHeight,
@@ -2130,37 +2131,6 @@ export function TasksPageClient() {
   ) : null;
   useRegisterRightPanel(sidebarPanel);
 
-  const taskTitleOptions = useMemo(
-    () => distinctTaskTitles(taskSubviewBaseTasks),
-    [taskSubviewBaseTasks]
-  );
-
-  const headerSearchAdapter = useMemo(
-    () =>
-      taskSubviewBaseTasks.length === 0
-        ? null
-        : {
-            key: 'tasks',
-            pills,
-            onPillsChange: setPills,
-            artistOptions: [],
-            titleOptions: taskTitleOptions,
-            albumOptions: [],
-            totalCount: taskSubviewBaseTasks.length,
-            visibleCount: tasks.length,
-            triggerLabel:
-              pills.length > 0
-                ? `Filter Tasks (${pills.length})`
-                : 'Filter Tasks',
-            ariaLabel: 'Filter Tasks',
-            placeholder: 'Search tasks',
-            allowedFields: ['title'] as const,
-          },
-    [pills, taskSubviewBaseTasks.length, taskTitleOptions, tasks.length]
-  );
-
-  useRegisterHeaderSearch(headerSearchAdapter);
-
   const showAssigneeInListRows = assigneeFilter === 'all';
   const hideSelectedRowDue = showTaskDocumentPane && Boolean(selectedTask);
 
@@ -2260,7 +2230,6 @@ export function TasksPageClient() {
         artistName={artistName}
         selectedTaskId={effectiveSelectedTaskId}
         compactColumnLabels={Boolean(selectedTask)}
-        showAssigneeChip={assigneeFilter === 'all'}
         onOpenTask={openTaskDocument}
         onCreateTask={() => setHeaderMode('create')}
         onMoveTask={handleMoveTask}

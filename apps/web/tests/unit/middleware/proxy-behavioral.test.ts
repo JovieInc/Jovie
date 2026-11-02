@@ -54,6 +54,11 @@ const mocks = vi.hoisted(() => ({
   ),
   sanitizeRedirectUrl: vi.fn().mockImplementation((url: string | null) => url),
   fetch: vi.fn(),
+  investorTokenLimit: vi.fn(),
+}));
+
+vi.mock('@/lib/rate-limit', () => ({
+  investorPortalTokenLimiter: { limit: mocks.investorTokenLimit },
 }));
 
 vi.mock('@/lib/auth/proxy-state', () => ({
@@ -861,7 +866,8 @@ describe('proxy.ts middleware', () => {
       expect(mocks.checkProfileVisitorBlocked).toHaveBeenCalledWith(
         'timwhite',
         'masked-ip',
-        'Mozilla/5.0'
+        'Mozilla/5.0',
+        expect.any(AbortSignal)
       );
     });
 
@@ -881,7 +887,8 @@ describe('proxy.ts middleware', () => {
       expect(mocks.checkProfileVisitorBlocked).toHaveBeenCalledWith(
         'timwhite',
         'masked-ip',
-        'Mozilla/5.0'
+        'Mozilla/5.0',
+        expect.any(AbortSignal)
       );
     });
 
@@ -898,12 +905,21 @@ describe('proxy.ts middleware', () => {
       expect(res.headers.get('location')).toBe('https://jov.ie/');
     });
 
-    it('bounds a cold audience lookup and keeps its reconciliation alive', async () => {
-      let resolveBlockCheck: ((blocked: boolean) => void) | undefined;
-      mocks.checkProfileVisitorBlocked.mockReturnValue(
-        new Promise<boolean>(resolve => {
-          resolveBlockCheck = resolve;
-        })
+    it('aborts a cold audience lookup instead of holding the cached document', async () => {
+      let capturedSignal: AbortSignal | undefined;
+      mocks.checkProfileVisitorBlocked.mockImplementation(
+        (
+          _username: string,
+          _ip: string | null,
+          _ua: string | null,
+          signal?: AbortSignal
+        ) =>
+          new Promise<boolean>(resolve => {
+            capturedSignal = signal;
+            signal?.addEventListener('abort', () => resolve(false), {
+              once: true,
+            });
+          })
       );
       const backgroundWork: Promise<unknown>[] = [];
       const event = createFetchEvent(promise => backgroundWork.push(promise));
@@ -915,10 +931,8 @@ describe('proxy.ts middleware', () => {
 
       expect(res.status).toBeLessThan(300);
       expect(durationMs).toBeLessThan(250);
-      expect(backgroundWork).toHaveLength(1);
-
-      resolveBlockCheck?.(true);
-      await Promise.all(backgroundWork);
+      expect(backgroundWork).toHaveLength(0);
+      expect(capturedSignal?.aborted).toBe(true);
     });
 
     it('normalizes /sign-in to /signin', async () => {
@@ -1231,11 +1245,12 @@ describe('proxy.ts middleware', () => {
   });
 
   describe('path-based investor portal (proxy investor early returns)', () => {
-    it('lets investor response links bypass Clerk without stripping token params', async () => {
+    it('rate-limits valid investor response links without redirecting to sign-in', async () => {
+      mocks.investorTokenLimit.mockResolvedValue({ success: true });
       const req = createUnauthenticatedRequest({
         pathname: '/investor-portal/respond',
         searchParams: {
-          t: 'token-123',
+          t: 'a'.repeat(43),
           action: 'interested',
         },
       });
@@ -1245,6 +1260,9 @@ describe('proxy.ts middleware', () => {
       expect(res.headers.get('location')).toBeNull();
       expect(res.headers.get('X-Robots-Tag')).toContain('noindex');
       expect(res.headers.get('Cache-Control')).toBe('private, no-store');
+      expect(mocks.investorTokenLimit).toHaveBeenCalledWith(
+        'investor-portal:token:unknown'
+      );
       expect(mocks.clerkMiddleware).not.toHaveBeenCalled();
     });
   });

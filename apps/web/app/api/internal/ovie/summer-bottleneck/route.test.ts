@@ -245,6 +245,83 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('signs and forwards the optional bottleneck status for both published statuses', async () => {
+    for (const status of [
+      {
+        schema: 'jovie.eve.summer-bottleneck-status/v1',
+        status: 'agentic',
+        metric: 'Median merge-queue wait 6 min',
+        statusLink: 'https://github.com/JovieInc/Jovie/pull/17005',
+      },
+      {
+        schema: 'jovie.eve.summer-bottleneck-status/v1',
+        status: 'needs-you',
+        metric: 'Runner memory 94% sustained',
+        statusLink:
+          'https://linear.app/jovie/issue/JOV-5974/raise-runner-memory',
+        monthlyCostUsd: 24,
+        expectedImpact: 'Adds capacity for two concurrent repairs.',
+      },
+    ]) {
+      const baseline = publisherSnapshot();
+      const input = {
+        ...baseline,
+        signals: { ...baseline.signals, bottleneckStatus: status },
+      };
+      vi.setSystemTime(new Date(input.observedAt));
+      vi.stubEnv('VERCEL_GIT_COMMIT_SHA', input.signals.release.productionSha);
+      const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+        Response.json(
+          {
+            ok: true,
+            receipt: { eventId: input.eventId, decision: 'accepted' },
+          },
+          { status: 202 }
+        )
+      );
+      vi.stubGlobal('fetch', fetch);
+      expect((await POST(request(input))).status).toBe(202);
+      const delivered = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+      expect(delivered.signals.bottleneckStatus).toEqual(status);
+    }
+  });
+
+  it('rejects a malformed bottleneck status before signing or delivery', async () => {
+    const baseline = publisherSnapshot();
+    vi.setSystemTime(new Date(baseline.observedAt));
+    vi.stubEnv('VERCEL_GIT_COMMIT_SHA', baseline.signals.release.productionSha);
+    const fetch = vi.fn<typeof globalThis.fetch>();
+    vi.stubGlobal('fetch', fetch);
+    const valid = {
+      schema: 'jovie.eve.summer-bottleneck-status/v1',
+      status: 'agentic',
+      metric: 'Median merge-queue wait 6 min',
+      statusLink: 'https://github.com/JovieInc/Jovie/pull/17005',
+    } as Record<string, unknown>;
+    for (const bad of [
+      { ...valid, status: 'clear' },
+      { ...valid, statusLink: 'not-a-url' },
+      { ...valid, statusLink: 'javascript:alert(1)' },
+      { ...valid, status: 'needs-you' },
+      {
+        ...valid,
+        status: 'needs-you',
+        monthlyCostUsd: -1,
+        expectedImpact: 'Unblocks repairs.',
+      },
+      { ...valid, monthlyCostUsd: '24' },
+      { ...valid, extraField: true },
+      { ...valid, metric: '   ' },
+    ]) {
+      const input = {
+        ...baseline,
+        signals: { ...baseline.signals, bottleneckStatus: bad },
+      };
+      expect((await POST(request(input))).status).toBe(422);
+    }
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.bridgeEvents.length = 0;

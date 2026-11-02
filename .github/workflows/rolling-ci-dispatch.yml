@@ -654,9 +654,6 @@ jobs:
       # This binds the trusted runner output and tree; PR tests and their assertions remain untrusted test data, not a malicious-test attestation.
       - name: Run exact-head changed-line coverage when applicable
         working-directory: candidate
-        env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
-          CLERK_SECRET_KEY: sk_test_dummy_secret_for_coverage_run_only
         run: |
           set -euo pipefail
           unset GH_TOKEN GITHUB_TOKEN STATUS_TOKEN AI_GATEWAY_API_KEY CURSOR_API_KEY
@@ -781,8 +778,8 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          app-id: ${{ vars.SYMPHONY_APP_ID }}
+          private-key: ${{ secrets.SYMPHONY_APP_PRIVATE_KEY }}
           owner: JovieInc
           repositories: Jovie
           permission-contents: write
@@ -842,6 +839,7 @@ jobs:
             scripts/lib/ci-repo-lanes.mjs
             scripts/lib/merge-queue-guard.mjs
             scripts/lib/merge-group-member-policy.mjs
+            scripts/lib/pr-size-exclusions.mjs
             scripts/lib/native-queue-policy-evidence.mjs
             scripts/lib/pre-land-changelog.mjs
             scripts/lib/pr-size-guard-policy.mjs
@@ -930,8 +928,8 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          app-id: ${{ vars.SYMPHONY_APP_ID }}
+          private-key: ${{ secrets.SYMPHONY_APP_PRIVATE_KEY }}
           owner: JovieInc
           repositories: Jovie
           permission-actions: read

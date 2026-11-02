@@ -3,6 +3,9 @@ import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { buildLibraryReleaseAssets } from '@/app/app/(shell)/library/library-data';
 import {
+  formatLibraryItemType,
+  formatReleaseType,
+  LibraryCatalogArtistCell,
   LibraryCatalogArtworkCell,
   LibraryCatalogWaveformCell,
 } from '@/components/features/library/library-catalog-columns';
@@ -76,5 +79,43 @@ describe('LibraryCatalogWaveformCell', () => {
     expect(cell.querySelector('svg')).not.toBeInTheDocument();
     expect(cell).toHaveTextContent('—');
     expect(cell).toHaveClass('h-6', 'w-40');
+  });
+});
+
+describe('library type data labels (JOV-8963)', () => {
+  it('renders the ep release type as EP, never title-cased to "Ep"', () => {
+    expect(formatReleaseType('ep')).toBe('EP');
+  });
+
+  it('keeps title-casing for multi-word release types', () => {
+    expect(formatReleaseType('music_video')).toBe('Music Video');
+    expect(formatReleaseType('single')).toBe('Single');
+  });
+
+  it('shows the EP data label in the item type column', () => {
+    const [asset] = buildLibraryReleaseAssets([
+      { ...buildRelease('verified'), releaseType: 'ep' },
+    ]);
+
+    expect(formatLibraryItemType(asset!)).toBe('EP');
+  });
+
+  it('renders the artist cell with the full billing on one line', () => {
+    const [asset] = buildLibraryReleaseAssets([
+      {
+        ...buildRelease('verified'),
+        artistNames: ['A Very Long Collaborative Artist Billing'],
+      },
+    ]);
+
+    render(<LibraryCatalogArtistCell asset={asset!} />);
+
+    const cell = screen.getByText('A Very Long Collaborative Artist Billing');
+    expect(cell).toHaveAttribute(
+      'title',
+      'A Very Long Collaborative Artist Billing'
+    );
+    expect(cell).toHaveClass('whitespace-nowrap');
+    expect(cell.className).not.toContain('truncate');
   });
 });

@@ -7,28 +7,62 @@ import { APP_ROUTES } from '@/constants/routes';
 import { useJovieAuth } from '@/hooks/useJovieAuth';
 import { OnboardingShell, type OnboardingShellProps } from './OnboardingShell';
 
-interface Snapshot {
+export interface OnboardingSessionSnapshot {
   readonly identityId: string | null;
   readonly conversationId: string | null;
   readonly owned: boolean;
   readonly messages: UIMessage[];
 }
+type Snapshot = OnboardingSessionSnapshot;
+
+export interface OnboardingSessionBoundaryProps extends OnboardingShellProps {
+  /**
+   * Server-resolved snapshot for a visitor with no account and no onboarding
+   * cookie, whose restored conversation is known to be empty. Skips the
+   * hydrate -> auth -> fetch waterfall so the real chat paints with the HTML
+   * instead of "Restoring your conversation". Ignored if the client resolves
+   * to a different identity.
+   */
+  readonly initialSnapshot?: OnboardingSessionSnapshot;
+}
 
 /** Resolve history before mounting useChat, and discard it on identity changes. */
-export function OnboardingSessionBoundary(props: OnboardingShellProps) {
+export function OnboardingSessionBoundary({
+  initialSnapshot,
+  ...props
+}: OnboardingSessionBoundaryProps) {
   const { isLoaded, isSignedIn, userId, signOut } = useJovieAuth();
-  const identity = isLoaded ? (userId ?? 'anonymous') : null;
+  const identity = isLoaded
+    ? (userId ?? 'anonymous')
+    : initialSnapshot
+      ? 'anonymous'
+      : null;
   const [revision, setRevision] = useState(0);
   const [loaded, setLoaded] = useState<{
     identity: string;
     revision: number;
     snapshot: Snapshot;
     allowHandoff: boolean;
-  } | null>(null);
+  } | null>(
+    initialSnapshot
+      ? {
+          identity: 'anonymous',
+          revision: 0,
+          snapshot: initialSnapshot,
+          allowHandoff: true,
+        }
+      : null
+  );
   const [failure, setFailure] = useState<{
     identity: string;
     revision: number;
   } | null>(null);
+  // Read by the restore effect only to skip a server-seeded first load, so
+  // the effect depends on identity and revision alone.
+  const loadedRef = useRef(loaded);
+  useLayoutEffect(() => {
+    loadedRef.current = loaded;
+  }, [loaded]);
   const [actionPending, setActionPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [chatBusy, setChatBusy] = useState(false);
@@ -41,6 +75,9 @@ export function OnboardingSessionBoundary(props: OnboardingShellProps) {
   useEffect(() => {
     if (!identity) return;
     initialIdentity.current ??= identity;
+    // The server already resolved this exact identity and revision.
+    const seeded = loadedRef.current;
+    if (seeded?.identity === identity && seeded.revision === revision) return;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
     let cancelled = false;
@@ -126,6 +163,37 @@ export function OnboardingSessionBoundary(props: OnboardingShellProps) {
   ) {
     const failed =
       failure?.identity === identity && failure.revision === revision;
+    // Sign-up inside this tab (anonymous -> account): keep the conversation
+    // the visitor is looking at, frozen, while the linked copy loads. It is
+    // the same person's in-tab history, so nothing new is exposed; unmounting
+    // it flashed a blank "Restoring your conversation…" screen right after
+    // the code was entered (2026-10-31 golden-path walk). Account-to-account
+    // switches still hide history immediately.
+    if (
+      !failed &&
+      identity &&
+      identity !== 'anonymous' &&
+      loaded?.identity === 'anonymous' &&
+      loaded.revision === revision
+    ) {
+      return (
+        <OnboardingShell
+          {...props}
+          key={`anonymous:${revision}:${loaded.snapshot.conversationId ?? 'new'}`}
+          isSignedIn={false}
+          intentId={loaded.allowHandoff ? props.intentId : undefined}
+          starterHandoff={loaded.allowHandoff ? props.starterHandoff : null}
+          entryProfile={loaded.allowHandoff ? props.entryProfile : null}
+          initialMessages={loaded.snapshot.messages}
+          conversationId={loaded.snapshot.conversationId}
+          resumeOwnedConversation={loaded.snapshot.owned}
+          onBusyChange={setChatBusy}
+          controlsDisabled
+          actionPending
+          actionError={null}
+        />
+      );
+    }
     return (
       <div
         className='flex min-h-0 flex-1 flex-col items-center justify-center gap-3'
@@ -134,11 +202,11 @@ export function OnboardingSessionBoundary(props: OnboardingShellProps) {
         data-testid='onboarding-session-boundary'
         data-restore-state={failed ? 'failed' : 'restoring'}
       >
-        <p>
+        <h1 className='m-0 text-balance text-base font-normal leading-normal'>
           {failed
             ? 'Your conversation could not be restored.'
             : 'Restoring your conversation…'}
-        </p>
+        </h1>
         {failed ? (
           <>
             <Button onClick={() => setRevision(current => current + 1)}>

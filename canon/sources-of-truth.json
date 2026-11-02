@@ -1,0 +1,471 @@
+{
+  "schema": "jovie-sources-of-truth/v1",
+  "updated": "2026-10-29",
+  "rule": "Every fact has ONE owner. Before adding a fact, find its domain here. Never copy a value into another file: import it, generate it, or read it from the owner. canon/SOURCES_OF_TRUTH.md is rendered from this file (node scripts/sources-of-truth.mjs --write).",
+  "ownerKinds": {
+    "file": "A file in this repo is the owner; edit it there.",
+    "record": "A database content record is the owner; edit it through the content-record API.",
+    "external": "An outside system is the authority; the repo mirrors it and a live check proves the mirror."
+  },
+  "domains": [
+    {
+      "id": "models-and-prices",
+      "title": "Models and prices per access path",
+      "owner": {
+        "kind": "file",
+        "ref": "ops/registry/capacity.json",
+        "note": "Model ids, access paths (subscription, gateway, API) and per-path price. The model-registry-sync worker (branch opus/model-registry-sync) adds scripts/model-id-guard.mjs and its ratchet; this map does not duplicate that guard."
+      },
+      "derived": [
+        "canon/CAPACITY.md",
+        "scripts/backlog-orchestrator/config/model-registry.json",
+        "canon/virtual-models.json",
+        "apps/web/lib/constants/ai-models.ts"
+      ],
+      "liveAuthority": "provider model lists (checked by the model-registry-sync worker, not here)"
+    },
+    {
+      "id": "plans-prices-offers",
+      "title": "Plans, prices, offers",
+      "owner": {
+        "kind": "file",
+        "ref": "apps/web/lib/config/plan-prices.ts",
+        "note": "ARTIST_VISIBILITY_OFFER and PLAN_PRICES. Stripe is the live authority for what is charged."
+      },
+      "derived": [
+        "apps/web/lib/billing/offer-truth.ts",
+        "apps/web/lib/config/pricing.ts",
+        "apps/web/data/marketingPricingPlans.ts",
+        "apps/web/lib/entitlements/registry.ts",
+        "apps/web/app/api/stripe/pricing-options/route.ts",
+        "apps/docs/app/docs/plans-pricing/page.mdx",
+        "apps/web/content/legal/terms.md"
+      ],
+      "liveAuthority": "Stripe prices",
+      "scan": "plan-prices"
+    },
+    {
+      "id": "stripe-price-ids",
+      "title": "Stripe price ids",
+      "owner": {
+        "kind": "external",
+        "authority": "Stripe",
+        "ref": "apps/web/lib/stripe/price-ids.ts",
+        "note": "Stripe holds the price objects; price-ids.ts is the only reader of price env vars."
+      },
+      "derived": [
+        "apps/web/lib/stripe/price-contract.ts",
+        "apps/web/lib/stripe/price-id-mapping.ts",
+        "apps/web/scripts/check-stripe-price-ids.mjs"
+      ],
+      "liveAuthority": "Stripe prices"
+    },
+    {
+      "id": "entitlements-limits",
+      "title": "Entitlements and plan limits",
+      "owner": {
+        "kind": "file",
+        "ref": "apps/web/lib/entitlements/registry.ts",
+        "note": "Plan features and numeric limits per plan; server gates, usePlanGate, pricing page and rate limits derive from it."
+      },
+      "derived": [
+        "apps/web/lib/entitlements/server.ts",
+        "apps/web/lib/rate-limit/config.ts",
+        "apps/web/data/marketingPricingPlans.ts"
+      ],
+      "scan": "entitlement-limits"
+    },
+    {
+      "id": "feature-flags",
+      "title": "Feature flags",
+      "owner": {
+        "kind": "file",
+        "ref": "apps/web/lib/flags/registry.ts",
+        "note": "Flag keys and defaults. Runtime overrides live in the feature-flags table and Statsig."
+      },
+      "derived": [
+        "apps/web/lib/flags/code-flags.ts",
+        "apps/web/lib/db/schema/feature-flags.ts"
+      ]
+    },
+    {
+      "id": "rate-limits",
+      "title": "Rate limits and API budgets",
+      "owner": {
+        "kind": "file",
+        "ref": "apps/web/lib/rate-limit/config.ts",
+        "pendingPr": 23531,
+        "note": "Web request limits today. PR #23531 adds the outbound API rate-limit registry and headroom file; when it lands, point this owner at it."
+      },
+      "derived": [
+        "apps/web/lib/auth/rate-limit-rules.ts",
+        "packages/api-client/providers.json"
+      ]
+    },
+    {
+      "id": "ai-routing",
+      "title": "Which provider serves which model call (Gateway vs Workers AI)",
+      "owner": {
+        "kind": "file",
+        "ref": "apps/web/lib/ai/routing.json",
+        "note": "Per-caller route (workers-first, gateway-first, gateway-only), models, Gateway key and $/day ceiling. Runtime routing reads it; docs, memory and prose must not restate it."
+      },
+      "derived": ["apps/web/lib/ai/routing.ts", "apps/web/lib/ai/sdk.ts"],
+      "liveAuthority": "(Summer mirror: apps/summer/PROVIDER_FALLBACK.md in summer-config) AI Gateway /v1/report, Cloudflare Workers AI analytics, relay /health and Vercel env flags, proven by scripts/ai-routing-check.mjs"
+    },
+    {
+      "id": "credentials-spend",
+      "title": "Credentials and spend",
+      "owner": {
+        "kind": "file",
+        "ref": "ops/registry/credentials.json",
+        "note": "Metadata only. Spend caps and runway in ops/registry/spend.json; checked daily by scripts/credentials-spend-check.mjs."
+      },
+      "derived": [
+        "ops/registry/spend.json",
+        ".github/preview-env-registry.json"
+      ]
+    },
+    {
+      "id": "automations",
+      "title": "Automations (crons, workflows, lanes clocks)",
+      "owner": {
+        "kind": "file",
+        "ref": "canon/automation-registry.jsonl",
+        "note": "One line per automation; CI fails on a cron with no live entry."
+      },
+      "derived": [
+        "docs/CRON_REGISTRY.md",
+        "vercel.json",
+        "apps/web/vercel.json"
+      ]
+    },
+    {
+      "id": "design-tokens",
+      "title": "Design tokens",
+      "owner": {
+        "kind": "file",
+        "ref": "apps/web/design/tokens.json",
+        "note": "Machine-readable token source; the repo-root export and CSS are generated from it."
+      },
+      "derived": ["design.tokens.json", "canon/DESIGN.md"]
+    },
+    {
+      "id": "marketing-copy-nav-footer",
+      "title": "Marketing copy, nav and footer",
+      "owner": {
+        "kind": "record",
+        "ref": "apps/web/lib/content-records/registry.ts",
+        "pendingPr": 23595,
+        "note": "Content records (marketing page specs; site-chrome for header and footer in #23595). The registry file declares the record kinds; the records themselves live in the content-records table."
+      },
+      "derived": [
+        "apps/web/lib/content-records/marketing-page.ts",
+        "apps/web/data/product-truth/claims.ts"
+      ]
+    },
+    {
+      "id": "positioning-lines",
+      "title": "Positioning lines per surface (one-liner, what-we-build, deck title, heroes, bios)",
+      "owner": {
+        "kind": "file",
+        "ref": "canon/positioning-variants.json",
+        "note": "Meaning and message roles stay in canon/POSITIONING.md (founder-locked). This file holds the concrete lines, the competing variants and the active id per surface. It changes only through scripts/positioning/rank.mjs (gates plus persona panel) and live experiments logged in canon/growth-experiments.jsonl. Private consumers (fundraising answers.yaml, deck.yaml) bind with {p:<surface>}."
+      },
+      "derived": ["scripts/positioning/rank.mjs"],
+      "liveAuthority": "live experiment results (content-record experiment funnel, Statsig), recorded in gbrain experiments/*"
+    },
+    {
+      "id": "product-claims",
+      "title": "Product claims and proof",
+      "owner": {
+        "kind": "file",
+        "ref": "apps/web/data/product-truth/claims.ts",
+        "note": "Each public claim names its evidence; copy that states a capability must derive from a claim."
+      },
+      "derived": [
+        "apps/web/data/product-truth/registry.ts",
+        "apps/web/data/product-truth/claim-digest.gen.json"
+      ]
+    },
+    {
+      "id": "email-streams-domains",
+      "title": "Email streams and sending domains",
+      "owner": {
+        "kind": "file",
+        "ref": "apps/web/lib/email/stream-registry.json",
+        "note": "Every email stream (transactional, lifecycle, founder, broadcast, inbox, cold) bound to provider, sending domain and address, reply-to, required headers, postal footer, consent, suppression, rate limit, approval and deliverability thresholds. The send gateway (apps/web/lib/email/gateway) and the mail rules in scripts/lib/external-api-guard.mjs read it. Cold never runs on jov.ie or the Resend account and is closed until Tim approves a cold path."
+      },
+      "derived": [
+        "apps/web/lib/email/streams.ts",
+        "apps/web/lib/notifications/sender-policy.ts",
+        "apps/web/lib/inbox/constants.ts",
+        "apps/web/lib/email/legal-footer.ts",
+        "docs/company/email-sending-streams.md"
+      ],
+      "liveAuthority": "DNS (SPF, DKIM, DMARC) for the sending domains; Resend domain verification"
+    },
+    {
+      "id": "legal-claims",
+      "title": "Legal claims (privacy, terms, cookies)",
+      "owner": {
+        "kind": "file",
+        "ref": "apps/web/content/legal/privacy.md",
+        "note": "Privacy policy, terms and cookies in apps/web/content/legal. COMPLIANCE.md is the register of what must be true."
+      },
+      "derived": [
+        "apps/web/content/legal/terms.md",
+        "canon/COMPLIANCE.md",
+        "apps/web/lib/email/legal-footer.ts"
+      ]
+    },
+    {
+      "id": "retention-and-limits",
+      "title": "Retention windows and numeric limits quoted in copy",
+      "owner": {
+        "kind": "file",
+        "ref": "apps/web/lib/analytics/data-retention.ts",
+        "note": "DEFAULT_RETENTION_DAYS and CHAT_RETENTION_DAYS. Privacy policy and pricing copy quote these; they must derive from this owner, not restate it."
+      },
+      "derived": [
+        "apps/web/content/legal/privacy.md",
+        "apps/web/app/api/cron/data-retention/route.ts"
+      ],
+      "scan": "retention-days"
+    },
+    {
+      "id": "linear-workflow-states",
+      "title": "Linear workflow states",
+      "owner": {
+        "kind": "external",
+        "authority": "Linear (team workflow settings)",
+        "ref": ".claude/rules/linear.md",
+        "note": "Linear holds the states; the rule documents which transitions agents make."
+      },
+      "derived": [
+        "scripts/lib/linear-issue-intake.mjs",
+        "scripts/lib/linear-sync-on-merge.mjs"
+      ]
+    },
+    {
+      "id": "agent-fleet",
+      "title": "Agent fleet, identities and ownership",
+      "owner": {
+        "kind": "file",
+        "ref": "ops/registry/fleet.json",
+        "note": "Which agents exist and how they are reached. Identities in canon/agent-identities.json; who owns what in canon/ownership.json."
+      },
+      "derived": [
+        "canon/agent-identities.json",
+        "canon/ownership.json",
+        "canon/FLEET.md"
+      ]
+    },
+    {
+      "id": "repo-product-boundaries",
+      "title": "Repository and product boundaries",
+      "owner": {
+        "kind": "file",
+        "ref": "docs/company/REPOSITORY_SOURCE_CONTRACT.md",
+        "note": "Which code is public, which is private, and where each product lives."
+      },
+      "derived": ["canon/ownership.json"]
+    },
+    {
+      "id": "release-channels",
+      "title": "Release channels and rings",
+      "owner": {
+        "kind": "file",
+        "ref": "packages/release-channel-contracts",
+        "note": "Machine-readable channel contract (Stable, Beta, Nightly)."
+      },
+      "derived": ["canon/RELEASE_CHANNELS.md"]
+    },
+    {
+      "id": "deploy-env-and-build",
+      "title": "Environment variable names and production build",
+      "owner": {
+        "kind": "external",
+        "authority": "Vercel project env and the production build",
+        "ref": "apps/web/lib/env-server-schema.ts",
+        "note": "The schema names every env var the app reads; Vercel holds the values; /api/health/build-info reports the running commit."
+      },
+      "derived": [
+        "apps/web/lib/env-public.ts",
+        "apps/web/lib/observability/build-info.ts",
+        "apps/web/app/api/health/build-info/route.ts"
+      ],
+      "liveAuthority": "Vercel env names and production build-info"
+    },
+    {
+      "id": "invariants",
+      "title": "Binding invariants",
+      "owner": {
+        "kind": "file",
+        "ref": "canon/invariants.jsonl",
+        "note": "Binding and adopted company invariants; enforcement consumers name the checks."
+      },
+      "derived": ["scripts/invariants/registry.mjs"]
+    },
+    {
+      "id": "engineering-wins",
+      "title": "Engineering wins and the numbers in engineering posts",
+      "owner": {
+        "kind": "file",
+        "ref": "canon/wins/wins.jsonl",
+        "note": "One record per measured engineering win with before/after, source, query, PRs and post-deploy receipts. Status is computed (scripts/lib/wins-ledger.mjs), never stored."
+      },
+      "derived": [
+        "apps/web/content/engineering/",
+        "docs/metrics/wins-latest.json"
+      ],
+      "liveAuthority": "the measurement source named in each metric, re-run after deploy"
+    },
+    {
+      "id": "proof-stats",
+      "title": "Public numbers and proof stats (counts, speed, benchmarks, milestones)",
+      "owner": {
+        "kind": "file",
+        "ref": "apps/web/data/proof-stats/registry.json",
+        "note": "Definition of every stat: template, rounding, threshold, freshness SLA, fallback, methodology, legal class, visibility. Measured values are the proof-stats/observations content record, written only by apps/web/lib/proof-stats (hourly production refresh and /api/internal/proof-stats intake). Copy binds with {stat:<id>}; scripts/invariants/stat-claims fails hand-written numeric claims."
+      },
+      "derived": [
+        "apps/web/lib/proof-stats/registry.ts",
+        "apps/web/lib/proof-stats/format.ts",
+        "scripts/invariants/stat-claims/check.mjs",
+        "docs/proof/STATS.md"
+      ],
+      "liveAuthority": "production database (counts), Public Profile Benchmark receipts (speed, agent score), founder-approved Summer cards (comparative claims)"
+    }
+  ],
+  "scans": [
+    {
+      "id": "plan-prices",
+      "domain": "plans-prices-offers",
+      "label": "Plan price",
+      "owner": "apps/web/lib/config/plan-prices.ts",
+      "extract": [
+        "monthlyUsd:\\s*(\\d+)",
+        "yearly:\\s*(\\d+)",
+        "\\bmonthly:\\s*(\\d+)"
+      ],
+      "literal": [
+        "\\${n}(?![\\d])",
+        "\\b{n}\\s*(?:/|per\\s+)(?:mo|month|yr|year)\\b"
+      ],
+      "scope": [
+        "apps/web/app",
+        "apps/web/components",
+        "apps/web/data",
+        "apps/web/content",
+        "apps/web/lib",
+        "apps/docs/app",
+        "apps/docs/content"
+      ],
+      "exts": [".ts", ".tsx", ".md", ".mdx"],
+      "allow": []
+    },
+    {
+      "id": "plan-names",
+      "domain": "plans-prices-offers",
+      "label": "Plan display name",
+      "owner": "apps/web/lib/config/plan-prices.ts",
+      "extract": ["pro:\\s*\\{\\s*displayName:\\s*'([^']+)'"],
+      "literal": "\\b{n}\\b",
+      "scope": [
+        "apps/web/app",
+        "apps/web/components",
+        "apps/web/data",
+        "apps/web/content",
+        "apps/docs/app",
+        "apps/docs/content"
+      ],
+      "exts": [".ts", ".tsx", ".md", ".mdx"],
+      "allow": []
+    },
+    {
+      "id": "retention-days",
+      "domain": "retention-and-limits",
+      "label": "Retention window",
+      "owner": "apps/web/lib/analytics/data-retention.ts",
+      "extract": ["_RETENTION_DAYS\\s*=\\s*(\\d+)"],
+      "literal": "\\b{n}[- ]days?\\b",
+      "scope": [
+        "apps/web/app",
+        "apps/web/components",
+        "apps/web/data",
+        "apps/web/content",
+        "apps/docs/app",
+        "apps/docs/content"
+      ],
+      "exts": [".ts", ".tsx", ".md", ".mdx"],
+      "allow": []
+    },
+    {
+      "id": "entitlement-limits",
+      "domain": "entitlements-limits",
+      "label": "Plan limit",
+      "owner": "apps/web/lib/entitlements/registry.ts",
+      "extract": [
+        "(?:analyticsRetentionDays|contactsLimit|aiWeeklyMessageLimit|aiRetouchDailyLimit):\\s*(\\d+)"
+      ],
+      "minValue": 50,
+      "literal": "\\b{n}\\s+(?:days?|contacts|messages|retouch\\w*)\\b",
+      "scope": [
+        "apps/web/app",
+        "apps/web/components",
+        "apps/web/data",
+        "apps/web/content",
+        "apps/docs/app",
+        "apps/docs/content"
+      ],
+      "exts": [".ts", ".tsx", ".md", ".mdx"],
+      "allow": []
+    }
+  ],
+  "scanExcludes": [
+    "\\.(test|spec|stories)\\.",
+    "/__tests__/",
+    "/tests?/",
+    "/fixtures?/",
+    "\\.gen\\.",
+    "/drizzle/",
+    "/node_modules/"
+  ],
+  "liveChecks": {
+    "stripe-prices": {
+      "domain": "plans-prices-offers",
+      "owner": "apps/web/lib/config/plan-prices.ts",
+      "secretEnv": "STRIPE_READONLY_KEY",
+      "severity": "high",
+      "note": "Every owner price must exist as an active recurring Stripe price in USD. Disabled until STRIPE_READONLY_KEY (restricted, read-only Prices) is added to the sweep. Max prices are legacy and not checked.",
+      "ids": ["pro-monthly", "pro-yearly"]
+    },
+    "email-dns": {
+      "domain": "email-streams-domains",
+      "domains": ["jov.ie"],
+      "require": ["spf", "dmarc"],
+      "severity": "high",
+      "note": "Sending domains must publish SPF and DMARC. Switch the domain list to the stream registry when #23585 lands."
+    },
+    "production-build": {
+      "domain": "deploy-env-and-build",
+      "url": "https://jov.ie/api/health/build-info",
+      "repo": "JovieInc/Jovie",
+      "maxBehindCommits": 60,
+      "maxAgeHours": 24,
+      "severity": "high",
+      "note": "Production must not trail main by more than this; merged-but-unreleased state is drift."
+    },
+    "vercel-env-names": {
+      "domain": "deploy-env-and-build",
+      "covered": "scripts/credentials-spend-check.mjs",
+      "note": "Vercel env names are compared with the credentials registry by the daily credentials check (unclaimed secret names); this map points to it instead of duplicating it."
+    },
+    "model-lists": {
+      "domain": "models-and-prices",
+      "covered": "opus/model-registry-sync",
+      "note": "Provider model lists are checked by the model-registry-sync worker."
+    }
+  }
+}

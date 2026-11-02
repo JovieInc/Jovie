@@ -12,13 +12,41 @@
     "minAbsoluteSeconds": 60
   },
   "entities": {
+    "chat-comparison": {
+      "entityId": "source SHA (build) or source SHA:attempt (smoke)",
+      "stages": [
+        {
+          "id": "build",
+          "meaning": "production standalone build",
+          "producer": "compare-chat-performance.ts",
+          "status": "pushed",
+          "source": "chat-comparison-receipts"
+        },
+        {
+          "id": "smoke",
+          "meaning": "eight-worker smoke attempt",
+          "producer": "compare-chat-performance.ts",
+          "status": "pushed",
+          "source": "chat-comparison-receipts"
+        },
+        {
+          "id": "finished",
+          "meaning": "smoke attempt finished",
+          "producer": "compare-chat-performance.ts",
+          "status": "pushed",
+          "source": "chat-comparison-receipts"
+        }
+      ]
+    },
     "shipping": {
       "entityId": "owner/repo#pr (Linear identifier in actor-independent joins)",
       "description": "One unit of shipped work: Linear issue to production-verified PR.",
       "endToEnd": [
         ["issue", "verified"],
         ["pr-open", "merged"],
-        ["merged", "verified"]
+        ["merged", "verified"],
+        ["verified", "closed"],
+        ["merged", "closed"]
       ],
       "stages": [
         {
@@ -102,11 +130,26 @@
           "source": "github-controller"
         },
         {
+          "id": "outcome-receipt",
+          "meaning": "independent issue span: outcome receipt owed (lifecycle comment) to receipt recorded by the outcome lane; entityId is the JOV issue",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
           "id": "verified",
           "meaning": "first Production Verified job completed at or after deploy",
           "producer": "production-controller.yml",
           "status": "derived",
           "source": "github-controller"
+        },
+        {
+          "id": "closed",
+          "meaning": "Linear issue reached Done at or after production verification; verified to closed is the closure lag",
+          "producer": "linear-sync-on-merge.yml",
+          "status": "derived",
+          "source": "linear-history"
         }
       ]
     },
@@ -183,7 +226,7 @@
     },
     "release-replay": {
       "entityId": "<controller workflow file>#<run id>@<run attempt> (the failed controller attempt)",
-      "description": "One failed Staging/Production Controller attempt, from its failure to the replay decision of controller-quota-replay.yml. Only transient failures (quota, GitHub 5xx, network, runner loss) are replayed, at most to attempt 3.",
+      "description": "One failed Staging/Production Controller attempt, from its failure to the replay decision of controller-quota-replay.yml. Only transient failures (quota, GitHub 5xx, network, runner loss) of attempt 1 at current main are replayed, by rerunning the source CI run, at most to CI attempt 3.",
       "endToEnd": [["blocked", "replayed"]],
       "stages": [
         {
@@ -195,7 +238,7 @@
         },
         {
           "id": "replayed",
-          "meaning": "gh run rerun --failed was accepted for the attempt",
+          "meaning": "gh run rerun of the exact source CI run was accepted",
           "producer": "controller-quota-replay.yml",
           "status": "pushed",
           "source": "release-replay-receipts"
@@ -353,6 +396,48 @@
         }
       ]
     },
+    "detector-issue": {
+      "entityId": "Linear issue identifier and detector cycle (JOV-10167#1; a reopen starts cycle 2)",
+      "description": "One detector-filed issue (lanes doctor or capacity collector, title `Symphony doctor: <key> (<host>)`) from filing to the detector's own clear reading. Routed model-free by summer-config detector-loop.ts; SLA by class severity (P0 1h own / 4h fix, P1 4h / 24h, P2 24h / 7d). Per-class p50/p95 and the unowned and aged counts (target 0) are at https://summer.jov.ie/runtime/v1/detector-loop.json. actor = detector:<class>.",
+      "endToEnd": [["filed", "verified"], ["filed", "owned"]],
+      "stages": [
+        {
+          "id": "filed",
+          "meaning": "filed by a detector until an owner holds it (board claim, lane start, or a founder card for reserved items)",
+          "producer": "summer-config",
+          "status": "pushed",
+          "source": "summer-stage-feed"
+        },
+        {
+          "id": "owned",
+          "meaning": "owner holds it until a PR is in review, or until the fix is applied when no PR is needed",
+          "producer": "summer-config",
+          "status": "pushed",
+          "source": "summer-stage-feed"
+        },
+        {
+          "id": "pr",
+          "meaning": "PR in review or merging until it merges",
+          "producer": "summer-config",
+          "status": "pushed",
+          "source": "summer-stage-feed"
+        },
+        {
+          "id": "fixed",
+          "meaning": "fix merged or applied until the detector confirms the condition cleared (Validating; Done only on the detector's clear)",
+          "producer": "summer-config",
+          "status": "pushed",
+          "source": "summer-stage-feed"
+        },
+        {
+          "id": "verified",
+          "meaning": "terminal: completed when the detector closed it with its cleared receipt",
+          "producer": "summer-config",
+          "status": "pushed",
+          "source": "summer-stage-feed"
+        }
+      ]
+    },
     "summer-turn": {
       "entityId": "<hashed conversation>:<hashed turn> (summer-config hashes both)",
       "description": "One Summer turn from triggering event to measured outcome.",
@@ -386,6 +471,52 @@
           "producer": "summer-config",
           "status": "pushed",
           "source": "summer-stage-feed"
+        }
+      ]
+    },
+    "linear-mirror": {
+      "entityId": "Linear team key whose local lanes mirror was refreshed",
+      "description": "Freshness of the lanes Linear mirror: the oldest change in a sync pass until the mirror held it. Target p95 under 5 minutes; Urgent and recently updated issues sync first.",
+      "endToEnd": [["stale", "mirrored"]],
+      "stages": [
+        {
+          "id": "stale",
+          "meaning": "updatedAt of the oldest changed issue in an incremental pass, until the pass finished",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
+          "id": "mirrored",
+          "meaning": "the local mirror holds every change up to that pass",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        }
+      ]
+    },
+    "taste-decision": {
+      "entityId": "JOV issue identifier awaiting a founder-taste receipt",
+      "description": "A founder-taste wait ending in a founder decision or the risk- and confidence-scaled default (scripts/lanes/taste-policy.json).",
+      "endToEnd": [["waiting", "decided"]],
+      "stages": [
+        {
+          "id": "waiting",
+          "meaning": "issue entered Validating owing a founder-taste receipt, until a decision or the default shipped",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
+          "id": "decided",
+          "meaning": "founder-taste receipt recorded (founder decision or default-accepted)",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
         }
       ]
     },
@@ -439,9 +570,42 @@
           "owner": "signals"
         }
       ]
+    },
+    "marketing-change": {
+      "entityId": "content-record kind/key@version (data changes); code changes are measured by the shipping entity, pr-open to verified",
+      "description": "Edit-to-live for marketing content changed as data: version drafted to live pointer moved. Compare with shipping pr-open to verified for code changes. Data share = data-live arrivals / (data-live arrivals + marketing PRs verified).",
+      "endToEnd": [["data-edit", "data-live"]],
+      "stages": [
+        {
+          "id": "data-edit",
+          "meaning": "content record version drafted (immutable version stored)",
+          "producer": "content-records",
+          "status": "pushed",
+          "source": "content-record-events",
+          "owner": "apps/web/lib/content-records/stage-events.ts"
+        },
+        {
+          "id": "data-live",
+          "meaning": "publish or rollback moved the live pointer; served on the next request",
+          "producer": "content-records",
+          "status": "pushed",
+          "source": "content-record-events",
+          "owner": "apps/web/lib/content-records/stage-events.ts"
+        }
+      ]
     }
   },
   "sources": {
+    "content-record-events": {
+      "kind": "events",
+      "url": "https://jov.ie/api/content-records/stage-events",
+      "owner": "apps/web/lib/content-records/stage-events.ts"
+    },
+    "chat-comparison-receipts": {
+      "kind": "events",
+      "url": null,
+      "owner": "JOV-8719"
+    },
     "github-pr": {
       "kind": "derived",
       "description": "GraphQL merged-PR search with timeline items and commit check suites (28d window)."
@@ -535,6 +699,7 @@
       "pr-preparation-canary.yml": "harness self-test, not a delivery stage",
       "runner-autoscaler-canary.yml": "runner health probe, not a delivery stage",
       "m2-revenue-path-canary.yml": "synthetic revenue probe; gap tracked in the stage gap audit",
+      "ovie-summer-canary.yml": "synthetic Summer fast-chat probe, not a delivery stage",
       "production-controller-health.yml": "controller liveness monitor; measures the controller, not a stage",
       "postdeploy-probes.yml": "manual re-run of production probes; production-controller.yml owns the stage",
       "desktop-release.yml": "desktop app release; gap tracked in the stage gap audit",

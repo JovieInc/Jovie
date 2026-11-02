@@ -37,6 +37,22 @@ def _run(repo: Path) -> subprocess.CompletedProcess[str]:
 
 
 class TestCheckConflictMarkers:
+    def test_unmerged_index_without_markers_is_rejected(self, tmp_path: Path) -> None:
+        _init_repo(tmp_path)
+        _stage(tmp_path, "clean.txt", "all good\n")
+        oid = subprocess.check_output(
+            ["git", "rev-parse", ":clean.txt"], cwd=tmp_path, text=True
+        ).strip()
+        (tmp_path / "unmerged.txt").write_text("all good\n", encoding="utf-8")
+        subprocess.run(
+            ["git", "update-index", "--index-info"],
+            cwd=tmp_path, check=True, text=True,
+            input="".join(f"100644 {oid} {stage}\tunmerged.txt\n" for stage in (1, 2, 3)),
+        )
+        result = _run(tmp_path)
+        assert result.returncode == 1
+        assert "Unmerged index entries" in result.stdout
+
     def test_clean_staged_tree_prints_pass_line(self, tmp_path: Path) -> None:
         _init_repo(tmp_path)
         _stage(tmp_path, "clean.txt", "all good\n")

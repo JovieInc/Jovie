@@ -44,13 +44,31 @@ export const CLS_INTERACTION_BUDGET = 0.05;
 // screens, or marketing pages not yet in either registry) are intentionally
 // left unmapped: JOV-INV-018 has no producer for them on this workflow, and
 // mapping them to the wrong route would silently accept unrelated evidence.
+//
+// This precondition is enforced, not assumed: every bound route must be a live
+// MARKETING_EXACT_PUBLIC_ROUTE_TARGETS entry, so the shared marketing artifact
+// provably contains the screen's receipt pair. A binding to a route outside
+// that set is unsatisfiable — the producer can never emit its receipt — and
+// every certification invocation (each exporting SCREEN_CERT_ARTIFACT_ID)
+// reports the shared artifact as unacceptable. That incident (JOV-INV-018,
+// 2026-10-30, run 41106813919) came from binding web.engineering-preview to
+// /engineering/preview, a production-blocked noindex route the capture set
+// excludes (healthCheck expected 'not-found'); deprecated-redirect routes
+// (/new, /artist-profile) and render-fixture routes (/renders,
+// /renders/profile-admission) are excluded from the capture set for the same
+// reason. See apps/web/tests/unit/ci/screen-marketing-route-bindings.test.ts.
 export const SCREEN_MARKETING_ROUTES = Object.freeze({
   'web.homepage': '/',
-  'web.marketing-new': '/new',
   'web.marketing-pricing': '/pricing',
   'web.marketing-download': '/download',
   'web.marketing-pay': '/pay',
   'web.marketing-product': '/product',
+  'web.marketing-command-palette': '/product/command-palette',
+  'web.marketing-release-scheduling': '/product/release-scheduling',
+  'web.marketing-dsp-links': '/product/dsp-links',
+  'web.marketing-isrc': '/product/isrc',
+  'web.marketing-pre-save': '/product/pre-save',
+  'web.marketing-link-analytics': '/product/link-analytics',
   'web.marketing-card': '/card',
   'web.marketing-smart-links': '/smart-links',
   'web.marketing-launch': '/launch',
@@ -58,14 +76,20 @@ export const SCREEN_MARKETING_ROUTES = Object.freeze({
   'web.marketing-support': '/support',
   'web.marketing-integrations': '/integrations',
   'web.developers': '/developers',
+  'web.developers-agents': '/developers/agents',
+  'web.proof-methodology': '/proof/methodology',
   'web.api-versioning-policy': '/api-versioning',
   'web.cli-landing': '/cli',
   // JOV-7110: web.engineering-publication used to cover both engineering
   // routes as one screen, but the schema binds one route per screen. Split
-  // into the index (this binding) and preview (below) screens so each keeps
-  // its own exact-head proof instead of extending the schema to N routes.
+  // into the index (this binding) and preview (below) screens; only the
+  // index is bound here — /engineering/preview is production-blocked
+  // (lib/security/production-blocked-routes.ts) and noindex, so it renders
+  // not-found in this workflow's production build and is excluded from
+  // MARKETING_EXACT_PUBLIC_ROUTE_TARGETS. web.engineering-preview keeps its
+  // registry row (source changes still demand proof) but has no producer on
+  // this workflow until one exists.
   'web.engineering-publication': '/engineering',
-  'web.engineering-preview': '/engineering/preview',
   'web.marketing-ai': '/ai',
   'web.marketing-compare': '/compare',
   'web.marketing-alternatives': '/alternatives',
@@ -82,8 +106,10 @@ export const SCREEN_MARKETING_ROUTES = Object.freeze({
   // apps/web/tests/contracts/global-page-contract.test.ts's filesystem
   // scan), so it needs its own SCREEN_PROOF_ROUTES-style producer — see
   // JOV-7110 follow-up.
+  // web.artist-profile is intentionally NOT here either: the /artist-profile
+  // manifest entry is deprecated with a redirect healthCheck, so it is not a
+  // live capture target.
   'web.artist-profiles': '/artist-profiles',
-  'web.artist-profile': '/artist-profile',
   'web.artist-notifications': '/artist-notifications',
   'web.voice': '/voice',
   'web.instant-merch': '/instant-merch',
@@ -91,11 +117,13 @@ export const SCREEN_MARKETING_ROUTES = Object.freeze({
   'web.demo-video': '/demo/video',
   'web.demovideo': '/demovideo',
   'web.waitlist-invite': '/waitlist/invite',
-  // JOV-8170: both routes are active MARKETING_ROUTE_MANIFEST entries already
-  // captured every run; the screens were registered but never bound, so the
-  // nightly audit could never see their evidence.
-  'web.marketing-renders': '/renders',
-  'web.profile-admission': '/renders/profile-admission',
+  // JOV-8170: web.marketing-renders and web.profile-admission are active
+  // MARKETING_ROUTE_MANIFEST entries, but /renders* are render-fixture routes
+  // (lib/render-fixture-policy.ts RENDER_FIXTURE_ROUTE_GLOBS), so
+  // MARKETING_EXACT_PUBLIC_ROUTE_TARGETS excludes them and the marketing
+  // producer can never carry their evidence. They stay registered
+  // (source changes still demand proof) but intentionally unmapped here.
+  // See apps/web/tests/unit/ci/screen-marketing-route-bindings.test.ts.
 });
 export const SCREEN_PROOF_ROUTES = Object.freeze({
   'web.public-profile': '/unfazed',
@@ -222,11 +250,13 @@ function parseRegistry(raw) {
 export const SCREEN_REGISTRY = Object.freeze(
   parseRegistry(
     `
-web.homepage|web|marketing-home|apps/web/app/(home)/page.tsx,apps/web/app/(home)/layout.tsx|desktop,mobile
+web.homepage|web|marketing-home|apps/web/app/(home)/page.tsx,apps/web/app/(home)/layout.tsx,apps/web/app/content-preview/|desktop,mobile
 web.root-document|web|root-document-shell|apps/web/app/layout.tsx|desktop,mobile
 web.artists|web|marketing-artists|apps/web/app/artists/page.tsx|desktop,mobile
 web.waitlist|web|marketing-waitlist|apps/web/app/waitlist/page.tsx,apps/web/app/waitlist/layout.tsx,apps/web/app/waitlist/error.tsx|desktop,mobile
 web.developers|web|developer-documentation|apps/web/app/(marketing)/developers/page.tsx|desktop,mobile
+web.developers-agents|web|developer-agent-docs|apps/web/app/(marketing)/developers/agents/page.tsx|desktop,mobile
+web.proof-methodology|web|proof-methodology|apps/web/app/(marketing)/proof/methodology/page.tsx|desktop,mobile
 web.api-versioning-policy|web|api-versioning-policy|apps/web/app/(marketing)/api-versioning/page.tsx|desktop,mobile
 web.cli-landing|web|cli-landing|apps/web/app/(marketing)/cli/page.tsx|desktop,mobile
 web.engineering-publication|web|engineering-publication|apps/web/app/(marketing)/engineering/page.tsx,apps/web/app/(marketing)/engineering/[slug]/page.tsx|desktop,mobile
@@ -236,14 +266,21 @@ web.blog|web|blog|apps/web/app/(marketing)/blog/|desktop,mobile
 web.marketing-ai|web|marketing-ai|apps/web/app/(marketing)/ai/page.tsx|desktop,mobile
 web.marketing-alternatives|web|marketing-alternatives|apps/web/app/(marketing)/alternatives/|desktop,mobile
 web.marketing-card|web|marketing-card|apps/web/app/(marketing)/card/page.tsx|desktop,mobile
-web.marketing-compare|web|marketing-compare|apps/web/app/(marketing)/compare/page.tsx|desktop,mobile
+web.marketing-compare|web|marketing-compare|apps/web/app/(marketing)/compare/page.tsx,apps/web/app/(marketing)/compare/[slug]/page.tsx|desktop,mobile
 web.marketing-download|web|marketing-download|apps/web/app/(marketing)/download/page.tsx|desktop,mobile
 web.investor-portal|web|investor-portal|apps/web/app/investor-portal/|desktop,mobile
 web.marketing-launch|web|marketing-launch|apps/web/app/(marketing)/launch/page.tsx|desktop,mobile
 web.marketing-product|web|marketing-product|apps/web/app/(marketing)/product/page.tsx|desktop,mobile
+web.marketing-command-palette|web|marketing-command-palette|apps/web/app/(marketing)/product/command-palette/page.tsx|desktop,mobile
+web.marketing-release-scheduling|web|marketing-release-scheduling|apps/web/app/(marketing)/product/release-scheduling/page.tsx|desktop,mobile
+web.marketing-dsp-links|web|marketing-dsp-links|apps/web/app/(marketing)/product/dsp-links/page.tsx|desktop,mobile
+web.marketing-product-utm-links|web|marketing-product-utm-links|apps/web/app/(marketing)/product/utm-links/page.tsx|desktop,mobile
+web.marketing-isrc|web|marketing-isrc|apps/web/app/(marketing)/product/isrc/page.tsx|desktop,mobile
+web.marketing-pre-save|web|marketing-pre-save|apps/web/app/(marketing)/product/pre-save/page.tsx|desktop,mobile
+web.marketing-link-analytics|web|marketing-link-analytics|apps/web/app/(marketing)/product/link-analytics/page.tsx|desktop,mobile
 web.marketing-smart-links|web|marketing-smart-links|apps/web/app/(marketing)/smart-links/page.tsx|desktop,mobile
 web.marketing-pay|web|marketing-pay|apps/web/app/(marketing)/pay/page.tsx|desktop,mobile
-web.marketing-pricing|web|marketing-pricing|apps/web/app/(marketing)/pricing/page.tsx,apps/web/app/(marketing)/pricing/layout.tsx|desktop,mobile
+web.marketing-pricing|web|marketing-pricing|apps/web/app/(marketing)/pricing/page.tsx,apps/web/app/(marketing)/pricing/layout.tsx,apps/web/app/(marketing)/pricing/loading.tsx|desktop,mobile
 web.marketing-new|web|marketing-new|apps/web/app/(marketing)/new/page.tsx|desktop,mobile
 web.marketing-not-found|web|marketing-not-found|apps/web/app/(marketing)/not-found.tsx|desktop,mobile
 web.root-not-found|web|root-not-found|apps/web/app/not-found.tsx|desktop,mobile
@@ -266,10 +303,11 @@ web.legal-privacy|web|legal-privacy|apps/web/app/(dynamic)/legal/privacy/|deskto
 web.legal-terms|web|legal-terms|apps/web/app/(dynamic)/legal/terms/|desktop,mobile
 web.legal-cookies|web|legal-cookies|apps/web/app/(dynamic)/legal/cookies/|desktop,mobile
 web.legal-dmca|web|legal-dmca|apps/web/app/(dynamic)/legal/dmca/|desktop,mobile
-web.playlists-index|web|public-playlists|apps/web/app/(dynamic)/playlists/page.tsx|desktop,mobile
+web.playlists-index|web|public-playlists|apps/web/app/(dynamic)/playlists/page.tsx,apps/web/app/(dynamic)/playlists/layout.tsx|desktop,mobile
 web.brand|web|marketing-brand|apps/web/app/brand/page.tsx,apps/web/app/brand/layout.tsx|desktop,mobile
 web.marketing-renders|web|marketing-renders|apps/web/app/(marketing)/renders/|desktop,mobile
 web.profile-admission|web|profile-admission|apps/web/app/(profile-admission)/renders/profile-admission/page.tsx|desktop,mobile
+web.app-loading|web|app-shell|apps/web/app/app/loading.tsx|desktop,mobile
 web.app-not-found|web|app-shell-not-found|apps/web/app/app/not-found.tsx|desktop,mobile
 web.app-shell|web|app-shell|apps/web/app/app/(shell)/layout.tsx|desktop,mobile
 web.money|web|screen.money|apps/web/app/app/money/page.tsx,apps/web/app/app/money/layout.tsx|desktop,mobile
@@ -277,11 +315,16 @@ web.exp-library-v1|web|exp-library-v1|apps/web/app/exp/library-v1/page.tsx|deskt
 web.exp-right-rail-shotgun|web|exp-right-rail-shotgun|apps/web/app/exp/right-rail-shotgun/page.tsx|desktop,mobile
 web.public-profile|web|public-profile|apps/web/app/[username]/page.tsx,apps/web/app/[username]/layout.tsx,apps/web/components/features/profile/artist-notifications-cta/,apps/web/components/features/profile/subscribe/|desktop,mobile
 web.public-profile-about|web|public-profile|apps/web/app/[username]/about/page.tsx|desktop,mobile
+web.public-profile-alerts|web|public-profile|apps/web/app/[username]/alerts/page.tsx|desktop,mobile
+web.public-profile-notifications|web|public-profile|apps/web/app/[username]/notifications/page.tsx|desktop,mobile
+web.public-profile-shop|web|public-profile|apps/web/app/[username]/shop/page.tsx|desktop,mobile
 web.auth|web|browser-input-assurance|apps/web/app/(auth)/,apps/web/app/@auth/,apps/web/app/auth-return/,apps/web/app/desktop-auth/,apps/web/app/mobile-auth-return/,apps/web/components/features/auth/|desktop,mobile
 web.artist-pay|web|artist-pay|apps/web/app/[username]/pay/page.tsx|desktop,mobile
+web.artist-alerts|web|artist-alerts|apps/web/app/[username]/alerts/page.tsx|desktop,mobile
 web.profile-mode-render|web|profile-mode-render|apps/web/app/[username]/profile-mode-render/|desktop,mobile
 web.release-landing|web|release-landing|apps/web/app/r/[slug]/page.tsx,apps/web/app/r/[slug]/ReleaseLandingPage.tsx|desktop,mobile
-web.smartlink-release|web|release-landing|apps/web/app/[username]/[...slug]/page.tsx,apps/web/app/[username]/[slug]/page.tsx|desktop,mobile
+web.smartlink-release|web|release-landing|apps/web/app/[username]/[...slug]/page.tsx,apps/web/app/[username]/[slug]/page.tsx,apps/web/app/[username]/[slug]/not-found.tsx|desktop,mobile
+web.smartlink-sounds|web|release-landing|apps/web/app/[username]/[slug]/sounds/page.tsx|desktop,mobile
 web.smartlink-track|web|release-landing|apps/web/app/[username]/[slug]/[trackSlug]/page.tsx|desktop,mobile
 web.out-link|web|wrapped-link-interstitial|apps/web/app/out/[id]/page.tsx|desktop,mobile
 web.report|web|abuse-report-intake|apps/web/app/report/page.tsx|desktop,mobile
@@ -307,9 +350,11 @@ web.ov-chat|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat/page.tsx,apps
 web.ov-inbox|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/inbox/page.tsx|desktop,mobile
 web.ov-integrations|web|settings-connectors|apps/web/app/app/(shell)/admin/integrations/page.tsx|desktop,mobile
 web.admin-chat-playground|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat-playground/page.tsx,apps/web/app/app/(shell)/admin/chat-playground/layout.tsx|desktop,mobile
-web.ov-founder-cockpit|web|ovie-founder-cockpit|apps/web/app/app/(shell)/admin/activity/page.tsx,apps/web/app/app/(shell)/admin/growth/page.tsx,apps/web/app/app/(shell)/admin/operations/page.tsx,apps/web/app/app/(shell)/admin/product/page.tsx|desktop,mobile
+web.ov-founder-cockpit|web|ovie-founder-cockpit|apps/web/app/app/(shell)/admin/activity/page.tsx,apps/web/app/app/(shell)/admin/activity/loading.tsx,apps/web/app/app/(shell)/admin/growth/page.tsx,apps/web/app/app/(shell)/admin/operations/page.tsx,apps/web/app/app/(shell)/admin/product/page.tsx|desktop,mobile
+web.ov-agents|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/system/page.tsx|desktop,mobile
 web.ov-company-presence|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/presence/page.tsx|desktop,mobile
 web.admin-costs|web|admin-costs|apps/web/app/app/(shell)/admin/costs/page.tsx|desktop,mobile
+web.admin-capacity|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/capacity/page.tsx|desktop,mobile
 web.admin-features|web|admin-features|apps/web/app/app/(shell)/admin/features/page.tsx|desktop,mobile
 web.admin-feature-registry|web|admin-feature-registry|apps/web/app/app/(shell)/admin/feature-registry/page.tsx|desktop,mobile
 web.admin-platform-connections|web|admin-platform-connections|apps/web/app/app/(shell)/admin/platform-connections/|desktop,mobile
@@ -328,17 +373,20 @@ web.hud-tv|web|ovie-ops-isolated|apps/web/app/hud-tv/page.tsx|desktop,mobile
 web.hud-wiki|web|admin-wiki|apps/web/app/hud/wiki/|desktop,mobile
 web.youtube-channel-pilot|web|screen.youtube.channel-pilot|apps/web/app/app/(shell)/youtube/page.tsx|desktop,mobile
 web.shipping-statistics|web|shipping-statistics|apps/web/app/app/(shell)/admin/shipping/page.tsx|desktop,mobile
-web.start|web|organism.onboarding-chat|apps/web/app/(dynamic)/start/page.tsx,apps/web/app/(dynamic)/start/layout.tsx,apps/web/app/(dynamic)/start/loading.tsx|desktop,mobile
+web.start|web|organism.onboarding-chat|apps/web/app/(dynamic)/start/page.tsx,apps/web/app/(dynamic)/start/layout.tsx|desktop,mobile
 web.app-root|web|screen.root|apps/web/app/app/(shell)/page.tsx|desktop,mobile
 web.chat|web|screen.chat|apps/web/app/app/(shell)/chat/page.tsx|desktop,mobile
 web.jovie-work|web|screen.jovie.work|apps/web/app/app/(shell)/jovie-work/page.tsx|desktop,mobile
 web.settings-billing|web|screen.settings.billing|apps/web/app/app/(shell)/settings/billing/page.tsx|desktop,mobile
+web.settings-data-privacy|web|screen.settings.data-privacy|apps/web/app/app/(shell)/settings/data-privacy/page.tsx|desktop,mobile
 web.settings-connectors|web|settings-connectors|apps/web/app/app/(shell)/settings/connectors/|desktop,mobile
 web.settings|web|screen.settings|apps/web/app/app/(shell)/settings/layout.tsx|desktop,mobile
 web.onboarding-checkout|web|onboarding-checkout|apps/web/app/onboarding/checkout/page.tsx,apps/web/app/onboarding/checkout/loading.tsx|desktop,mobile
 web.billing-success|web|billing-success|apps/web/app/billing/success/page.tsx|desktop,mobile
+web.billing-youtube-thumbnails|web|billing-youtube-thumbnails|apps/web/app/billing/youtube-thumbnails/page.tsx|desktop,mobile
+web.billing-youtube-thumbnails-success|web|billing-youtube-thumbnails-success|apps/web/app/billing/youtube-thumbnails/success/page.tsx|desktop,mobile
 web.billing-shell|web|billing-shell|apps/web/app/billing/layout.tsx|desktop,mobile
-web.claim|web|artist-claim-checkout|apps/web/app/claim/page.tsx,apps/web/app/claim/ClaimArtistSearch.tsx|desktop,mobile
+web.claim|web|artist-claim-checkout|apps/web/app/claim/page.tsx,apps/web/app/claim/ClaimArtistSearch.tsx,apps/web/app/claim/agent/[draftId]/page.tsx,apps/web/app/claim/agent/[draftId]/AgentClaimScreen.tsx|desktop,mobile
 web.account-shell|web|account-shell|apps/web/app/account/layout.tsx|desktop,mobile
 web.account-creation-recovery|web|account-creation-recovery|apps/web/app/error/user-creation-failed/page.tsx,apps/web/app/error/user-creation-failed/loading.tsx|desktop,mobile
 web.root-error-boundary|web|screen.errors.root|apps/web/app/error.tsx,apps/web/app/global-error.tsx|desktop,mobile

@@ -1,11 +1,16 @@
-import { dirname, resolve } from 'node:path';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it, vi } from 'vitest';
+import { load } from 'js-yaml';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiClient } from '../../../packages/api-client/client.ts';
 import { MemoryLedgerStore } from '../../../packages/api-client/store.ts';
 import {
   lsRemoteMain,
+  observeWorkflowFailureStreak,
   runLiveness as runLivenessImpl,
+  main as runMain,
 } from '../../automation-liveness.mjs';
 import { ADMISSION_BLOCKING_LABELS } from '../admission-hold-labels.mjs';
 import {
@@ -13,9 +18,16 @@ import {
   livenessFingerprint,
   loadRegistry,
 } from '../automation-registry.mjs';
+import { applyRemediationDecisionWithRetry } from '../remediation-signal.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const registry = loadRegistry(repoRoot);
+
+// JOV-8843: the filing branch's intake is mocked so state-preservation tests
+// never reach Linear. Restore the mock per test that counts calls.
+vi.mock('../remediation-signal.mjs', () => ({
+  applyRemediationDecisionWithRetry: vi.fn(async () => ({ ok: true })),
+}));
 const NOW = Date.parse('2026-10-20T19:35:00Z');
 const iso = minutesAgo => new Date(NOW - minutesAgo * 60_000).toISOString();
 const MAIN = 'a'.repeat(40);
@@ -86,7 +98,7 @@ function rowFor(report, id) {
 }
 
 describe('ls-remote main tip', () => {
-  it('asks git for refs/heads/main and keeps the token out of argv', async () => {
+  it('reads main anonymously without exposing the token or inherited git config', async () => {
     const token = 'actions-token';
     const encoded = Buffer.from(`x-access-token:${token}`).toString('base64');
     // Assigned inside the git callback. An uninitialized let stays
@@ -114,8 +126,79 @@ describe('ls-remote main tip', () => {
     expect(JSON.stringify(seen.args)).not.toContain(token);
     expect(JSON.stringify(seen.args)).not.toContain(encoded);
     expect(seen.env.GIT_CONFIG_VALUE_0).toBe('/dev/null');
-    expect(seen.env.GIT_CONFIG_VALUE_2).toBe(`AUTHORIZATION: basic ${encoded}`);
+    expect(JSON.stringify(seen.env).includes(token)).toBe(false);
+    expect(JSON.stringify(seen.env).includes(encoded)).toBe(false);
+    expect(seen.env.GIT_CONFIG_GLOBAL).toBe('/dev/null');
+    expect(seen.env.GIT_CONFIG_SYSTEM).toBe('/dev/null');
+    expect(seen.env.GIT_CONFIG_NOSYSTEM).toBe('1');
     expect(seen.env.GIT_TERMINAL_PROMPT).toBe('0');
+  });
+
+  it.each(['transport', 'malformed'])(
+    'retries an anonymous %s failure with the token only in the child environment',
+    async failure => {
+      const token = 'actions-token';
+      const gitExec = vi.fn(async (_args, env) => {
+        if (env.GIT_CONFIG_COUNT === '1') {
+          if (failure === 'transport') throw new Error('anonymous failed');
+          return 'nope';
+        }
+        return `${MAIN}\trefs/heads/main\n`;
+      });
+      expect(await lsRemoteMain('JovieInc/Jovie', token, gitExec)).toBe(MAIN);
+      expect(gitExec).toHaveBeenCalledTimes(2);
+      const [args, env] = gitExec.mock.calls[1];
+      expect(JSON.stringify(args)).not.toContain(token);
+      expect(env.GIT_CONFIG_COUNT).toBe('3');
+      expect(env.GIT_CONFIG_VALUE_0).toBe('/dev/null');
+      expect(env.GIT_CONFIG_VALUE_1).toBe('');
+      expect(env.GIT_CONFIG_VALUE_2).toBe(
+        `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`
+      );
+    }
+  );
+
+  it('does not retry an anonymous failure without a token', async () => {
+    const gitExec = vi.fn(async () => {
+      throw new Error('network');
+    });
+    expect(await lsRemoteMain('JovieInc/Jovie', '', gitExec)).toBeNull();
+    expect(gitExec).toHaveBeenCalledTimes(1);
+  });
+
+  it('isolates the anonymous probe from inherited credentials and git config', async () => {
+    const inherited = {
+      HOME: '/tmp/inherited-home',
+      GITHUB_TOKEN: 'inherited-token',
+      GIT_CONFIG_COUNT: '1',
+      GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader',
+      GIT_CONFIG_VALUE_0: 'AUTHORIZATION: inherited',
+      GIT_CONFIG_PARAMETERS: "'http.extraheader=AUTHORIZATION: inherited'",
+    };
+    const previous = Object.fromEntries(
+      Object.keys(inherited).map(key => [key, process.env[key]])
+    );
+    Object.assign(process.env, inherited);
+    try {
+      const gitExec = vi.fn(
+        async (_args, _env) => `${MAIN}\trefs/heads/main\n`
+      );
+      expect(
+        await lsRemoteMain('JovieInc/Jovie', 'provided-token', gitExec)
+      ).toBe(MAIN);
+      const [, env] = gitExec.mock.calls[0];
+      expect(env.HOME).toBe('/dev/null');
+      expect(env.GITHUB_TOKEN).toBeUndefined();
+      expect(env.GIT_CONFIG_PARAMETERS).toBeUndefined();
+      expect(env.GIT_CONFIG_COUNT).toBe('1');
+      expect(env.GIT_CONFIG_KEY_0).toBe('core.hooksPath');
+      expect(env.GIT_CONFIG_VALUE_0).toBe('/dev/null');
+    } finally {
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
   });
 
   it('returns null for a bad repo, a bad tip, or a git failure', async () => {
@@ -213,6 +296,53 @@ describe('dead-man liveness', () => {
     expect(livenessDecisions(report)).toEqual([]);
   });
 
+  describe('promotion silence budget from the lanes feed (one source of truth)', () => {
+    const run = async feed => {
+      const { report } = await runLiveness({
+        registry: only('derived:jovie:production-promotion'),
+        nowMs: NOW,
+        fetchImpl: fakeFetch({
+          'jov.ie/api/health/build-info': { commitSha: LIVE },
+          '/git/ref/heads/main': mainRef(MAIN),
+          [`/compare/${LIVE}...${MAIN}`]: {
+            ahead_by: 1,
+            commits: [{ commit: { committer: { date: iso(200) } } }],
+          },
+          ...(feed ? { 'lanes-status.json': feed } : {}),
+        }),
+      });
+      return rowFor(report, 'derived:jovie:production-promotion');
+    };
+    const limit = ageS => ({
+      deployHealth: { limits: { 'JovieInc/Jovie': { ageS } } },
+    });
+
+    it('uses the measured limit when it is inside the 1 to 24 hour bounds', async () => {
+      expect(await run(limit(9000))).toMatchObject({
+        status: 'stale',
+        budgetMinutes: 150,
+      });
+      expect(await run(limit(30_000))).toMatchObject({
+        status: 'fresh',
+        budgetMinutes: 500,
+      });
+    });
+
+    it('falls back to 246 minutes when the feed is missing, unreadable or out of bounds', async () => {
+      for (const feed of [
+        null,
+        limit(100),
+        limit(999_999),
+        { deployHealth: {} },
+      ]) {
+        expect(await run(feed)).toMatchObject({
+          status: 'fresh',
+          budgetMinutes: 246,
+        });
+      }
+    });
+  });
+
   it('keeps a recent unshipped commit inside the promotion silence budget', async () => {
     const { report } = await runLiveness({
       registry: only('derived:jovie:production-promotion'),
@@ -280,19 +410,19 @@ describe('dead-man liveness', () => {
           commits: [
             {
               sha: MAIN,
-              commit: { committer: { date: iso(141) } },
+              commit: { committer: { date: iso(300) } },
             },
           ],
         },
         'event=push': {
           total_count: 1,
-          workflow_runs: [{ created_at: iso(141), event: 'push' }],
+          workflow_runs: [{ created_at: iso(300), event: 'push' }],
         },
       }),
     });
     expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
       status: 'stale',
-      ageMinutes: 141,
+      ageMinutes: 300,
     });
   });
 
@@ -351,7 +481,7 @@ describe('dead-man liveness', () => {
           commits: [
             {
               sha: MAIN,
-              commit: { committer: { date: iso(180) } },
+              commit: { committer: { date: iso(300) } },
             },
           ],
         },
@@ -359,7 +489,7 @@ describe('dead-man liveness', () => {
           String(url).includes('page=2')
             ? {
                 total_count: 101,
-                workflow_runs: [{ created_at: iso(130), event: 'push' }],
+                workflow_runs: [{ created_at: iso(280), event: 'push' }],
               }
             : {
                 total_count: 101,
@@ -369,12 +499,214 @@ describe('dead-man liveness', () => {
     });
     expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
       status: 'stale',
-      ageMinutes: 130,
+      ageMinutes: 280,
     });
   });
 
+  describe('unshipped range recovery', () => {
+    beforeEach(() => vi.stubEnv('JOVIE_API_STATE', 'memory'));
+    afterEach(() => vi.unstubAllEnvs());
+
+    it.each([500, 502, 503, 504, { name: 'AbortError' }, new Error('reset')])(
+      'recovers a transient unshipped-range read with a bounded retry (%j)',
+      async failure => {
+        let attempts = 0;
+        const { report } = await runLiveness({
+          registry: only('derived:jovie:production-promotion'),
+          nowMs: NOW,
+          fetchImpl: fakeFetch({
+            'jov.ie/api/health/build-info': { commitSha: LIVE },
+            '/git/ref/heads/main': mainRef(MAIN),
+            [`/compare/${LIVE}...${MAIN}`]: () => {
+              attempts += 1;
+              if (attempts > 1)
+                return {
+                  ahead_by: 2,
+                  commits: [{ commit: { committer: { date: iso(30) } } }],
+                };
+              if (typeof failure === 'number') return failure;
+              throw failure;
+            },
+          }),
+        });
+        expect(
+          rowFor(report, 'derived:jovie:production-promotion')
+        ).toMatchObject({
+          status: 'fresh',
+          reason: '2-commits-unshipped',
+          ageMinutes: 30,
+        });
+        expect(attempts).toBe(2);
+        expect(livenessDecisions(report)).toEqual([]);
+      }
+    );
+
+    it.each([30, 300])(
+      'recovers an authenticated range 403 without hiding %i minutes of lag',
+      async ageMinutes => {
+        const requests = [];
+        const network = fakeFetch({
+          'jov.ie/api/health/build-info': { commitSha: LIVE },
+          '/git/ref/heads/main': 403,
+          [`/compare/${LIVE}...${MAIN}`]: () =>
+            requests.length === 1
+              ? 403
+              : {
+                  ahead_by: 2,
+                  commits: [
+                    { commit: { committer: { date: iso(ageMinutes) } } },
+                  ],
+                },
+        });
+        const { report } = await runLiveness({
+          registry: only('derived:jovie:production-promotion'),
+          nowMs: NOW,
+          token: 'test-token',
+          lsRemote: async () => MAIN,
+          fetchImpl: async (url, init) => {
+            if (String(url).includes('/compare/'))
+              requests.push({
+                url: String(url),
+                headers: new Headers(init.headers),
+              });
+            return network(url);
+          },
+        });
+        expect(
+          rowFor(report, 'derived:jovie:production-promotion')
+        ).toMatchObject({
+          status: ageMinutes > 246 ? 'stale' : 'fresh',
+          reason:
+            ageMinutes > 246
+              ? 'silent-for-300m-over-246m'
+              : '2-commits-unshipped',
+          ageMinutes,
+        });
+        expect(requests).toHaveLength(2);
+        expect(requests[0].headers.get('authorization')).toBe(
+          'Bearer test-token'
+        );
+        expect(requests[1].headers.get('authorization')).toBeNull();
+        expect(requests.every(r => r.url.endsWith('?per_page=1'))).toBe(true);
+        expect(livenessDecisions(report).length).toBe(ageMinutes > 246 ? 1 : 0);
+      }
+    );
+    it('uses the public credential budget when main recovery exhausted the Actions budget', async () => {
+      const rangeHeaders = [];
+      const network = fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: LIVE },
+        '/git/ref/heads/main': new Response(
+          '{"message":"API rate limit exceeded"}',
+          {
+            status: 403,
+            headers: {
+              'Content-Type': 'application/json',
+              'X-RateLimit-Remaining': '0',
+              'X-RateLimit-Reset': String(NOW / 1000 + 3600),
+              'X-RateLimit-Resource': 'core',
+            },
+          }
+        ),
+        [`/compare/${LIVE}...${MAIN}`]: {
+          ahead_by: 1,
+          commits: [{ commit: { committer: { date: iso(30) } } }],
+        },
+      });
+      const { report } = await runLiveness({
+        registry: only('derived:jovie:production-promotion'),
+        nowMs: NOW,
+        token: 'test-token',
+        lsRemote: async () => MAIN,
+        fetchImpl: async (url, init) => {
+          if (String(url).includes('/compare/'))
+            rangeHeaders.push(new Headers(init.headers));
+          return network(url);
+        },
+      });
+      expect(
+        rowFor(report, 'derived:jovie:production-promotion')
+      ).toMatchObject({
+        status: 'fresh',
+        reason: '1-commits-unshipped',
+        ageMinutes: 30,
+      });
+      expect(rangeHeaders).toHaveLength(1);
+      expect(rangeHeaders[0].get('authorization')).toBeNull();
+    });
+
+    it.each([
+      [403, 'http-403'],
+      [429, 'http-429'],
+      [503, 'http-503'],
+      [new Error('reset'), 'transient'],
+      [new Response('not json', { status: 200 }), 'unreadable'],
+    ])(
+      'keeps a failed public recovery red with its diagnostic (%j)',
+      async (failure, reason) => {
+        let attempts = 0;
+        const { report } = await runLiveness({
+          registry: only('derived:jovie:production-promotion'),
+          nowMs: NOW,
+          token: 'test-token',
+          fetchImpl: fakeFetch({
+            'jov.ie/api/health/build-info': { commitSha: LIVE },
+            '/git/ref/heads/main': mainRef(MAIN),
+            [`/compare/${LIVE}...${MAIN}`]: () => {
+              attempts += 1;
+              if (attempts === 1) return 403;
+              if (failure instanceof Error) throw failure;
+              return failure;
+            },
+          }),
+        });
+        expect(
+          rowFor(report, 'derived:jovie:production-promotion')
+        ).toMatchObject({
+          status: 'unknown',
+          reason: `unshipped-range-${reason}`,
+          url: `https://api.github.com/repos/JovieInc/Jovie/compare/${LIVE}...${MAIN}?per_page=1`,
+        });
+        expect(attempts).toBe(2);
+        expect(livenessDecisions(report)[0].action).toBe('red');
+      }
+    );
+
+    it.each([401, 404, 503])(
+      'keeps other authenticated failures red (%i)',
+      async status => {
+        const authorizations = [];
+        const network = fakeFetch({
+          'jov.ie/api/health/build-info': { commitSha: LIVE },
+          '/git/ref/heads/main': mainRef(MAIN),
+          [`/compare/${LIVE}...${MAIN}`]: status,
+        });
+        const { report } = await runLiveness({
+          registry: only('derived:jovie:production-promotion'),
+          nowMs: NOW,
+          token: 'test-token',
+          fetchImpl: async (url, init) => {
+            if (String(url).includes('/compare/'))
+              authorizations.push(
+                new Headers(init.headers).get('authorization')
+              );
+            return network(url);
+          },
+        });
+        expect(
+          rowFor(report, 'derived:jovie:production-promotion')
+        ).toMatchObject({
+          status: 'unknown',
+          reason: `unshipped-range-http-${status}`,
+        });
+        expect(authorizations).toEqual(
+          Array(status === 503 ? 2 : 1).fill('Bearer test-token')
+        );
+      }
+    );
+  });
+
   it.each([
-    [503, 'unknown', 'unshipped-range-unreadable'],
+    [503, 'unknown', 'unshipped-range-http-503'],
     [{ ahead_by: 1, commits: [] }, 'unknown', 'unshipped-age-unreadable'],
     [{ ahead_by: 0 }, 'fresh', 'production-current'],
   ])(
@@ -581,6 +913,83 @@ describe('dead-man liveness', () => {
       reason: 'main-ref-unreadable',
     });
     expect(livenessDecisions(report)[0].action).toBe('red');
+  });
+
+  it('ages an unshipped main recovered after a 403 ref read', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: LIVE },
+        '/git/ref/heads/main': 403,
+        [`/compare/${LIVE}...${MAIN}`]: {
+          ahead_by: 1,
+          commits: [{ commit: { committer: { date: iso(30) } } }],
+        },
+      }),
+      lsRemote: async () => MAIN,
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'fresh',
+      reason: '1-commits-unshipped',
+      ageMinutes: 30,
+    });
+  });
+
+  it('ages a 403-recovered main from when its push reached main', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: LIVE },
+        '/git/ref/heads/main': 403,
+        [`/compare/${LIVE}...${MAIN}`]: {
+          ahead_by: 1,
+          commits: [
+            {
+              sha: MAIN,
+              commit: { committer: { date: iso(141) } },
+            },
+          ],
+        },
+        'event=push': {
+          total_count: 1,
+          workflow_runs: [{ created_at: iso(19), event: 'push' }],
+        },
+      }),
+      lsRemote: async () => MAIN,
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'fresh',
+      reason: '1-commits-unshipped',
+      ageMinutes: 19,
+      lastProofAt: iso(19),
+    });
+  });
+
+  it('recovers when the ref client throws HTTP 403', async () => {
+    const { report } = await runLivenessImpl({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: MAIN },
+      }),
+      githubClient: {
+        provider: 'github',
+        credential: 'test',
+        state: async () => null,
+        request: async () => {
+          const denied = new Error('denied');
+          Object.assign(denied, { status: 403 });
+          throw denied;
+        },
+      },
+      lsRemote: async () => MAIN,
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'fresh',
+      reason: 'production-current',
+    });
   });
 
   it.each([401, 403, 404, 429, 503])(
@@ -1244,5 +1653,198 @@ describe('liveness run receipts', () => {
       ['started', 'advanced'],
       ['finished', 'failed'],
     ]);
+  });
+});
+
+describe('alert state preservation (JOV-8843)', () => {
+  const FINGERPRINT = livenessFingerprint('summer:model-turns');
+  const failFetch = async () => new Response('{}', { status: 404 });
+  // The JOV-8803 critical loop back fresh: its heartbeat returned while an
+  // alert for it was already filed (persisted red state).
+  const recoveredFetch = fakeFetch({
+    'summer.jov.ie/runtime/v1/health': {
+      receiptFreshness: {
+        modelTurn: {
+          // main() judges against real wall-clock time; a fixed fixture
+          // timestamp would age past the 120-minute silence budget.
+          observedAt: new Date(Date.now() - 10 * 60_000).toISOString(),
+          status: 'verified',
+        },
+      },
+    },
+  });
+  const summerStatus = report =>
+    report.results.find(row => row.id === 'summer:model-turns')?.status;
+
+  function persistState(at) {
+    const dir = mkdtempSync(join(tmpdir(), 'automation-liveness-'));
+    const path = join(dir, 'state.json');
+    writeFileSync(path, `${JSON.stringify(at, null, 2)}\n`);
+    return path;
+  }
+
+  beforeEach(() => {
+    vi.mocked(applyRemediationDecisionWithRetry).mockClear();
+  });
+
+  it('keeps filed alert state on a diagnostic run without --file', async () => {
+    const path = persistState({ [FINGERPRINT]: 'red' });
+    const result = await runMain({
+      argv: ['--previous', path],
+      env: {},
+      fetchImpl: recoveredFetch,
+    });
+    expect(summerStatus(result)).toBe('fresh');
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({
+      [FINGERPRINT]: 'red',
+    });
+    expect(applyRemediationDecisionWithRetry).not.toHaveBeenCalled();
+  });
+
+  it('keeps filed alert state when remediation intake is disabled', async () => {
+    const path = persistState({ [FINGERPRINT]: 'red' });
+    const result = await runMain({
+      argv: ['--file', '--previous', path],
+      env: { REMEDIATION_INTAKE_DISABLED: '1' },
+      fetchImpl: recoveredFetch,
+    });
+    expect(summerStatus(result)).toBe('fresh');
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({
+      [FINGERPRINT]: 'red',
+    });
+    expect(applyRemediationDecisionWithRetry).not.toHaveBeenCalled();
+  });
+
+  it('still advances state and files decisions when intake is active', async () => {
+    const path = persistState({ [FINGERPRINT]: 'red' });
+    const result = await runMain({
+      argv: ['--file', '--previous', path],
+      env: {},
+      fetchImpl: recoveredFetch,
+    });
+    expect(summerStatus(result)).toBe('fresh');
+    expect(JSON.parse(readFileSync(path, 'utf8'))[FINGERPRINT]).toBe('green');
+    const decisions = vi
+      .mocked(applyRemediationDecisionWithRetry)
+      .mock.calls.map(([decision]) => decision);
+    expect(decisions.find(row => row.fingerprint === FINGERPRINT)?.action).toBe(
+      'green'
+    );
+    // main() also returns the export-automations payload, which has no decisions.
+    if (!('decisions' in result)) {
+      throw new Error('expected a liveness report with decisions');
+    }
+    expect(applyRemediationDecisionWithRetry).toHaveBeenCalledTimes(
+      result.decisions.length
+    );
+  });
+
+  it('keeps the prior state for a fingerprint whose filing failed', async () => {
+    // checkJs accepts only a real applyRemediationDecision return. The intake reads ok.
+    vi.mocked(applyRemediationDecisionWithRetry).mockResolvedValue({
+      ok: false,
+      action: 'green',
+      results: [],
+    });
+    const path = persistState({ [FINGERPRINT]: 'red' });
+    try {
+      const result = await runMain({
+        argv: ['--file', '--previous', path],
+        env: {},
+        fetchImpl: failFetch,
+      });
+      expect(summerStatus(result)).toBe('unknown');
+      expect(JSON.parse(readFileSync(path, 'utf8'))[FINGERPRINT]).toBe('red');
+    } finally {
+      vi.mocked(applyRemediationDecisionWithRetry).mockResolvedValue({
+        ok: true,
+        action: 'skip',
+      });
+    }
+  });
+});
+
+describe('budget diagnostics failure isolation', () => {
+  /** @typedef {{id?: string, name?: string, if?: string, run?: string}} BudgetStep */
+  /** @typedef {{needs: string, if: string, steps: BudgetStep[]}} BudgetJob */
+  it('uses the same due gate without becoming a heartbeat dependency', () => {
+    const workflow = /** @type {{jobs: Record<string, BudgetJob>}} */ (
+      load(
+        readFileSync(
+          join(repoRoot, '.github/workflows/automation-liveness.yml'),
+          'utf8'
+        )
+      )
+    );
+    const budget = workflow.jobs['installation-budget'];
+    const heartbeat = workflow.jobs.liveness;
+    expect(budget.needs).toBe('gate');
+    expect(heartbeat.needs).toBe('gate');
+    expect(budget.if).toBe(heartbeat.if);
+    expect(heartbeat.steps.some(step => step.id === 'ci-app-token')).toBe(
+      false
+    );
+    expect(
+      heartbeat.steps.some(
+        step => step.name === 'Preserve synthetic dead-man failure'
+      )
+    ).toBe(true);
+    const sample = budget.steps.find(step => step.id === 'installation-budget');
+    expect(sample.if).toBe('${{ always() }}');
+    expect(sample.run).toBe('node scripts/installation-budget-sentinel.mjs');
+    const alert = budget.steps.find(
+      step => step.name === 'Send Slack Alert on Low Installation Budget'
+    );
+    expect(alert.if).toContain(
+      "steps.installation-budget.outputs.shared_github_token_low == 'true'"
+    );
+    expect(alert.if).toContain(
+      "steps.installation-budget.outputs.ci_app_low == 'true'"
+    );
+  });
+});
+
+describe('workflow failure streak (production controller alarm)', () => {
+  const nowMs = Date.parse('2026-10-29T23:00:00Z');
+  const receipt = {
+    repo: 'JovieInc/Jovie',
+    workflow: 'production-controller.yml',
+    streak: 3,
+  };
+  const runsFetch = conclusions => async () => ({
+    status: 200,
+    json: async () => ({
+      workflow_runs: conclusions.map((conclusion, index) => ({
+        id: 100 - index,
+        conclusion,
+        created_at: new Date(nowMs - index * 60_000).toISOString(),
+        updated_at: new Date(nowMs - index * 60_000).toISOString(),
+      })),
+    }),
+  });
+
+  it('goes silent after 3 consecutive failures, ignoring skipped runs', async () => {
+    const observed = await observeWorkflowFailureStreak(receipt, {
+      fetchImpl: runsFetch([
+        'failure',
+        'skipped',
+        'failure',
+        'failure',
+        'cancelled',
+      ]),
+      token: 'test-token',
+      nowMs,
+    });
+    expect(observed.reason).toContain('3-consecutive-failures');
+    expect(Date.parse(observed.lastProofAt)).toBeLessThan(nowMs - 60 * 60_000);
+  });
+
+  it('stays healthy when a success interrupts the failures', async () => {
+    const observed = await observeWorkflowFailureStreak(receipt, {
+      fetchImpl: runsFetch(['failure', 'failure', 'success', 'failure']),
+      token: 'test-token',
+      nowMs,
+    });
+    expect(observed.lastProofAt).toBe(new Date(nowMs).toISOString());
   });
 });
