@@ -219,7 +219,7 @@
           "id": "agent.duplicate_overlaps",
           "label": "Duplicate overlapping runs (fleet ledger, 7d)",
           "unit": "count",
-          "source": "feed:fleet-metrics.json:duplicateOverlaps",
+          "source": "fleet.duplicateOverlaps",
           "detector": {
             "kind": "ceiling",
             "max": 3
@@ -320,7 +320,7 @@
           "id": "idle.ready_minutes",
           "label": "Minutes with ready work and idle lanes (fleet ledger, 7d)",
           "unit": "min",
-          "source": "feed:fleet-metrics.json:idleWhileReadyMin",
+          "source": "fleet.idleWhileReadyMin",
           "detector": {
             "kind": "ceiling",
             "max": 120

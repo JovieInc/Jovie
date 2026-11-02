@@ -227,11 +227,29 @@ def read_capacity(res_id: str) -> float | None:
         return None
 
 
+def col_fleet() -> dict:
+    """Fleet-ledger waste read directly (7d); an absent ledger or ready-trace is a GAP, never a zero."""
+    sys.path.insert(0, str(REPO / "scripts" / "lanes"))
+    try:
+        import fleet_ledger as fl
+        state, since = lanes_state(), time.time() - WEEK
+        runs = fl.read_runs(state, since)
+        idle = fl.idle_while_ready(state, since)
+    except (ImportError, OSError, ValueError, KeyError):
+        return {}
+    out = {}
+    if runs:
+        out["duplicateOverlaps"] = float(len(fl.duplicate_overlaps(runs)))
+    if idle.get("coveredMin"):
+        out["idleWhileReadyMin"] = float(sum((idle.get("idleMin") or {}).values()))
+    return out
+
+
 def collect_all(reg: dict) -> dict:
     gh = col_github()
     gw = col_gateway()
     inputs = reg.get("inputs", {})
-    data = {"github": gh, "ci": col_ci(gh.get("merged7d")), "pr": col_pr_gates(), "gateway": gw, "storage": col_storage(),
+    data = {"fleet": col_fleet(), "github": gh, "ci": col_ci(gh.get("merged7d")), "pr": col_pr_gates(), "gateway": gw, "storage": col_storage(),
             "debt": col_debt(), "money": col_money(inputs, gh.get("merged7d"), gw),
             "inputs": {"activeUsers": inputs.get("activeUsers", {}).get("value")}}
     data["llm"] = {"gatewayUsdPerMergedPr": data["money"].get("gatewayUsdPerMergedPr")}
@@ -335,6 +353,14 @@ def write_signals(reg: dict, rows: list[dict], specs: dict, lanes: Path) -> list
     return wrote
 
 
+def drop_signal(metric_id: str, lanes: Path) -> None:
+    fp = "waste-" + metric_id.replace(".", "-").replace("_", "-")
+    try:
+        (lanes / "factory-signals" / (fp + ".json")).unlink()
+    except OSError:
+        pass
+
+
 def store_put(rel: str, obj: dict, create: bool, env=os.environ, opener=urllib.request.urlopen) -> str:
     url, tok = env.get("SUMMER_STORE_URL"), env.get("SUMMER_STORE_TOKEN")
     if not url or not tok:
@@ -349,6 +375,9 @@ def store_put(rel: str, obj: dict, create: bool, env=os.environ, opener=urllib.r
         return "already recorded" if e.code == 409 else f"store error {e.code}"
     except OSError:
         return "store unreachable"
+
+
+STORE_SETTLED = ("recorded", "already recorded", "store not configured")  # anything else is retried next pass
 
 
 def settle_wins(reg: dict, rows: list[dict], state: Path, now: float) -> list[dict]:
@@ -370,6 +399,8 @@ def settle_wins(reg: dict, rows: list[dict], state: Path, now: float) -> list[di
                                 "source": "scripts/capacity/waste.py", "query": "python3 scripts/capacity/waste.py report"}],
                    "story": "Detected by the continuous waste loop and fixed through the factory-signal stream.", "receipts": []}
             win["store"] = store_put(reg["fixStream"]["winsStorePrefix"] + win["id"] + ".json", win, True)
+            if win["store"] not in STORE_SETTLED:
+                continue  # transient store failure: keep the open flag so the win is recorded next pass
             with open(state / "waste-wins.jsonl", "a") as f:
                 f.write(json.dumps(win) + "\n")
             wins.append(win)
@@ -419,12 +450,15 @@ def run_pass(publish: bool = True, now: float | None = None) -> dict:
                     f.write(json.dumps({"t": now, "id": r["id"], "v": r["value"]}) + "\n")
         result["signals"] = write_signals(reg, rows, specs, lanes_state())
         result["wins"] = settle_wins(reg, rows, state, now)
+        for w in result["wins"]:  # a fixed metric that regresses must file fresh evidence, not replay the old file
+            drop_signal(w["metrics"][0]["name"], lanes_state())
         d = digest(reg, rows, state, now)
         stamp = state / "waste-digest-day"
         today = iso(now)[:10]
         if not stamp.exists() or stamp.read_text() != today:
             d["store"] = store_put(reg["fixStream"]["digestStorePrefix"] + f"digest-{today}.json", d, True)
-            stamp.write_text(today)
+            if d["store"] in STORE_SETTLED:
+                stamp.write_text(today)
         store_put(reg["fixStream"]["digestStorePrefix"] + "latest.json", d, False)
         (state / "waste-latest.json").write_text(json.dumps(d, indent=1))
         (lanes_state() / "waste-latest.json").parent.mkdir(parents=True, exist_ok=True)

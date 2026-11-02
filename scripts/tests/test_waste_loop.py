@@ -95,6 +95,41 @@ class Wins(unittest.TestCase):
         self.assertEqual(wins[0]["metrics"][0]["before"], 0.5)
         self.assertEqual(wins[0]["metrics"][0]["after"], 0.2)
 
+    def test_a_transient_store_failure_keeps_the_win_open_for_retry(self):
+        bad = {"id": "ci.cancelled_share", "class": "ci", "owner": "ci", "label": "Cancelled share", "unit": "share",
+               "value": 0.5, "status": "WASTE", "excess": 1.4, "why": "x"}
+        good = dict(bad, value=0.2, status="OK", excess=0.5)
+        with tempfile.TemporaryDirectory() as d:
+            st = Path(d)
+            w.settle_wins(REG, [bad], st, 0)
+            orig = w.store_put
+            w.store_put = lambda *a, **k: "store unreachable"
+            try:
+                self.assertEqual(w.settle_wins(REG, [good], st, 86400), [])
+                self.assertIn("ci.cancelled_share", json.loads((st / "waste-open.json").read_text()))
+                self.assertFalse((st / "waste-wins.jsonl").exists())
+            finally:
+                w.store_put = orig
+            self.assertEqual(len(w.settle_wins(REG, [good], st, 86400)), 1)
+
+    def test_dropping_a_signal_lets_a_regression_file_fresh_evidence(self):
+        with tempfile.TemporaryDirectory() as d:
+            row = FixStream().row()
+            self.assertEqual(len(w.write_signals(REG, [row], SPECS, Path(d))), 1)
+            w.drop_signal(row["id"], Path(d))
+            self.assertEqual(len(w.write_signals(REG, [row], SPECS, Path(d))), 1)
+
+    def test_fleet_feed_metrics_read_the_fleet_collector_not_a_missing_file(self):
+        for mid in ("agent.duplicate_overlaps", "idle.ready_minutes"):
+            self.assertTrue(SPECS[mid]["source"].startswith("fleet."), mid)
+        with tempfile.TemporaryDirectory() as d:
+            orig = w.lanes_state
+            w.lanes_state = lambda: Path(d)
+            try:
+                self.assertEqual(w.col_fleet(), {})  # no ledger yet: a GAP, never a zero
+            finally:
+                w.lanes_state = orig
+
     def test_store_put_fails_open_without_credentials(self):
         self.assertEqual(w.store_put("a/b.json", {}, True, env={}), "store not configured")
 
