@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   DELIVERY_CONTROLLER_COVERAGE_ARGS,
+  SCRIPT_CONTRACT_VITEST_TESTS,
   STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
 } from './ci-fast-lanes.mjs';
 import {
@@ -1232,6 +1233,26 @@ const CODEX_CAPACITY_QUALIFICATION_MANIFEST = new Set([
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
 
+// The ejector driver has no product import edge. Qualify its complete repair
+// signature with its behavior suites and the CI plumbing/inventory contracts.
+// Partial signatures and unknown peers retain the existing full fallback.
+const MAIN_RED_EJECT_DRIVER = 'scripts/main-red-eject.mjs';
+// The quota regression arrives in the caller's PR. Discover that changed test,
+// then require its file and live CI registration before selecting it. Fixed
+// selector references continue to obey the existing-test inventory guard.
+const MAIN_RED_EJECT_QUOTA_TEST =
+  /^scripts\/lib\/__tests__\/main-red-eject-quota-failover\.test\.mjs$/;
+const MAIN_RED_EJECT_BEHAVIOR_TESTS = [
+  'scripts/lib/__tests__/main-red-eject.test.mjs',
+  'scripts/lib/__tests__/main-red-eject-failing-head.test.mjs',
+];
+const MAIN_RED_EJECT_PLUMBING_TESTS = [
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
+  ...AFFECTED_TEST_SELECTOR_TESTS,
+];
+
 export function buildAffectedTestPlan(changedFiles, options) {
   const files = unique(changedFiles.filter(Boolean));
   const plan = planAffectedTests(files, options);
@@ -1335,12 +1356,64 @@ function planAffectedTests(
     isFileAvailable = file => existsSync(resolve(REPO_ROOT, file)),
     readFile = readRepoFile,
     blogContentReceipt = undefined,
+    scriptContractVitestTests = SCRIPT_CONTRACT_VITEST_TESTS,
   } = {}
 ) {
   const files = unique(changedFiles.filter(Boolean)).sort();
   const globalTestInput = files.find(file => GLOBAL_TEST_INPUTS.has(file));
   if (globalTestInput) {
     return fullSuitePlan(`global test input changed: ${globalTestInput}`);
+  }
+  const ejectorQuotaTest = files.find(file =>
+    MAIN_RED_EJECT_QUOTA_TEST.test(file)
+  );
+  const ejectorInputs = [
+    MAIN_RED_EJECT_DRIVER,
+    CI_CANCELLATION_HEALER_COMPANION,
+    ejectorQuotaTest,
+  ];
+  const ejectorSelectorInputs = files.filter(file =>
+    AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
+  );
+  const isExactEjectorQualification =
+    Boolean(ejectorQuotaTest) &&
+    ejectorInputs.every(file => files.includes(file)) &&
+    files.length === ejectorInputs.length + ejectorSelectorInputs.length &&
+    (ejectorSelectorInputs.length === 0 ||
+      ejectorSelectorInputs.length === AFFECTED_TEST_SELECTOR_MANIFEST.size);
+  if (
+    (files.includes(MAIN_RED_EJECT_DRIVER) || ejectorQuotaTest) &&
+    !isExactEjectorQualification
+  ) {
+    return fullSuitePlan(
+      'main-red ejector change exceeds its complete qualification closure'
+    );
+  }
+  if (isExactEjectorQualification) {
+    const behaviorTests = [...MAIN_RED_EJECT_BEHAVIOR_TESTS, ejectorQuotaTest];
+    const qualificationTests = [
+      ...behaviorTests,
+      ...MAIN_RED_EJECT_PLUMBING_TESTS,
+    ];
+    if (
+      !qualificationTests.every(isFileAvailable) ||
+      !behaviorTests.every(test => scriptContractVitestTests.includes(test))
+    ) {
+      return fullSuitePlan(
+        'main-red ejector behavior or CI inventory proof is unavailable'
+      );
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      nodeTests: [],
+      scriptVitestTests: qualificationTests,
+    };
   }
   const sentryGateInputs = new Set([
     '.github/actions/sentry-error-gate/action.yml',

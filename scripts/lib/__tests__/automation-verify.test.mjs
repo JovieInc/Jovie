@@ -49,6 +49,133 @@ const SERVICE_CENSUS_SELECTOR_TESTS = [
   'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
 ];
 
+describe('main-red ejector qualification closure', () => {
+  const inputs = [
+    'scripts/ci-fast-lanes.mjs',
+    'scripts/lib/__tests__/main-red-eject-quota-failover.test.mjs',
+    'scripts/main-red-eject.mjs',
+  ];
+  const behavior = [
+    'scripts/lib/__tests__/main-red-eject.test.mjs',
+    'scripts/lib/__tests__/main-red-eject-failing-head.test.mjs',
+    'scripts/lib/__tests__/main-red-eject-quota-failover.test.mjs',
+  ];
+  const proofs = [
+    ...behavior,
+    'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+    'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+    'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
+    'scripts/lib/__tests__/automation-verify.test.mjs',
+  ];
+  const options = {
+    isFileAvailable: () => true,
+    scriptContractVitestTests: behavior,
+  };
+  it('selects the complete behavior and CI inventory closure for the exact repair signature', () => {
+    for (const files of [
+      inputs,
+      [
+        ...inputs,
+        'scripts/run-affected-tests.mjs',
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+      ],
+    ]) {
+      const plan = buildAffectedTestPlan(files, options);
+      expect(plan.mode).toBe('selected');
+      expect(plan.scriptVitestTests).toEqual(proofs);
+      expect(plan.selectedTests).toEqual([]);
+      const commands = buildSelectedTestCommands(plan, '1');
+      expect(commands).toHaveLength(1);
+      expect(commands[0][1]).toEqual(
+        expect.arrayContaining(
+          proofs.map(file => file.replace(/^scripts\//, ''))
+        )
+      );
+    }
+  });
+  it.each(proofs)(
+    'retains full fallback when required proof %s is missing',
+    missing => {
+      const plan = buildAffectedTestPlan(inputs, {
+        ...options,
+        isFileAvailable: file => file !== missing,
+      });
+      expect(plan.mode).toBe('full');
+      expect(plan.fallbackReason).toBe(
+        'main-red ejector behavior or CI inventory proof is unavailable'
+      );
+    }
+  );
+  it.each(behavior)(
+    'requires actual CI inventory registration of %s',
+    missing => {
+      expect(
+        buildAffectedTestPlan(inputs, {
+          ...options,
+          scriptContractVitestTests: behavior.filter(test => test !== missing),
+        }).mode
+      ).toBe('full');
+    }
+  );
+  it.each([
+    'scripts/unknown-control.mjs',
+    'scripts/lib/__tests__/unknown.test.mjs',
+    'apps/web/lib/product.ts',
+    'package.json',
+    'scripts/run-affected-tests.mjs',
+  ])('preserves full fallback for an unknown/mixed/partial peer %s', peer => {
+    expect(buildAffectedTestPlan([...inputs, peer], options).mode).toBe('full');
+  });
+  it.each(inputs)(
+    'does not accept the incomplete signature without %s',
+    missing => {
+      expect(
+        buildAffectedTestPlan(
+          inputs.filter(file => file !== missing),
+          options
+        ).mode
+      ).toBe('full');
+    }
+  );
+  it('executes a selected failing behavior test and propagates its real nonzero status', async () => {
+    const dir = mkdtempSync(resolve(tmpdir(), 'ejector-selected-failure-'));
+    const marker = resolve(dir, 'selected-args');
+    const fixture = resolve(dir, 'behavior.test.mjs');
+    try {
+      writeFileSync(
+        fixture,
+        "import { test } from 'node:test'; import assert from 'node:assert/strict'; test('behavior regression', () => assert.equal(1, 2));\n"
+      );
+      writeFileSync(
+        resolve(dir, 'pnpm'),
+        '#!/bin/sh\nprintf "%s\\n" "$@" > "$EJECTOR_SELECTED_MARKER"\ncase "$*" in *lib/__tests__/main-red-eject-quota-failover.test.mjs*) exec "$EJECTOR_REAL_NODE" --test "$EJECTOR_FAILURE_FIXTURE";; *) exit 0;; esac\n',
+        { mode: 0o755 }
+      );
+      const plan = buildAffectedTestPlan(inputs, options);
+      expect(plan.mode).toBe('selected');
+      const [[command, args]] = buildSelectedTestCommands(plan, '1');
+      const status = await runCommandStatus(
+        'env',
+        [
+          `PATH=${dir}:${process.env.PATH}`,
+          `EJECTOR_SELECTED_MARKER=${marker}`,
+          `EJECTOR_REAL_NODE=${process.execPath}`,
+          `EJECTOR_FAILURE_FIXTURE=${fixture}`,
+          command,
+          ...args,
+        ],
+        { bufferOutput: true }
+      );
+      expect(status).toBe(1);
+      expect(readFileSync(marker, 'utf8')).toContain(
+        'lib/__tests__/main-red-eject-quota-failover.test.mjs'
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('Sentry deployment contract selection', () => {
   const inputs = [
     '.github/actions/sentry-error-gate/action.yml',
