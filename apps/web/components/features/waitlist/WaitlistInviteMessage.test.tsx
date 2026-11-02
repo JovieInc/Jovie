@@ -5,7 +5,10 @@ import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import WaitlistRouteLayout from '@/app/waitlist/layout';
 import { WaitlistInviteMessage } from './WaitlistInviteMessage';
-import storyMeta, { Web213MissingToken } from './WaitlistInviteMessage.stories';
+import storyMeta, {
+  Web213MissingToken,
+  Web213UnverifiedEmail,
+} from './WaitlistInviteMessage.stories';
 
 vi.mock('next/link', async () => {
   const { forwardRef } = await import('react');
@@ -124,5 +127,29 @@ describe('WaitlistInviteMessage', () => {
       title: MISSING_TOKEN_TITLE,
       body: MISSING_TOKEN_BODY,
     });
+  });
+
+  it('shows the route-owned recovery for a recipient without verified email', () => {
+    const routeSource = readFileSync(
+      resolve(process.cwd(), 'app/waitlist/invite/page.tsx'),
+      'utf8'
+    );
+    const args = Web213UnverifiedEmail.args;
+    expect(args).toEqual({
+      title: 'Verify your email',
+      body: 'Sign in with the same verified email address that received this invite, then open the link again.',
+    });
+    expect(routeSource).toContain(`title='${args?.title}'`);
+    expect(routeSource).toContain(`body='${args?.body}'`);
+    if (typeof args?.title !== 'string' || typeof args.body !== 'string') {
+      throw new Error('Unverified email story requires its recovery copy');
+    }
+    render(<WaitlistInviteMessage title={args.title} body={args.body} />);
+    expect(
+      screen.getByRole('heading', { name: 'Verify your email' })
+    ).toBeVisible();
+    expect(
+      screen.getByRole('link', { name: 'Check waitlist status' })
+    ).toHaveAttribute('href', '/waitlist');
   });
 });
