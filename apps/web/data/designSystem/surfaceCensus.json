@@ -602,6 +602,7 @@
       "apps/web/app/demo/onboarding/page.tsx",
       "apps/web/app/demo/page.tsx",
       "apps/web/app/demo/showcase/[surface]/page.tsx",
+      "apps/web/app/dev/dsp-dial/page.tsx",
       "apps/web/app/dev/root-not-found-probe/page.tsx",
       "apps/web/app/dev/smart-links/page.tsx",
       "apps/web/app/exp/component-checker/page.tsx",

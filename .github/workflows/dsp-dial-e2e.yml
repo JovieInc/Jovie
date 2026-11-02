@@ -1,0 +1,99 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Claude
+# capability-gap: The dial's touch, wheel, keyboard and performance budget need a real browser against next dev; unit tests cannot see momentum jank or long tasks. Read-only token except issues:write on a red main run.
+# revisit-trigger: Fold into a shared main-failure reporter when one covers every evidence workflow, or retire if the dial is removed.
+# github-token-budget: 6 calls/run - on a red main run, list the standing issue then create it or resolve and edit it; includes gh metadata reads.
+name: Service Dial E2E
+
+# Gesture, keyboard, wheel, a11y and performance budget for the release-page
+# service dial (apps/web/tests/e2e/dsp-dial) against the development-only
+# /dev/dsp-dial harness. Deep evidence: runs once dial inputs land on main and
+# never blocks source PRs. Paths cover only the dial, its physics and its demo,
+# so it adds no load for unrelated changes.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/lib/dial/**'
+      - 'apps/web/components/features/release/ActionDial*.tsx'
+      - 'apps/web/components/features/release/DialDemo*.tsx'
+      - 'apps/web/app/dev/dsp-dial/**'
+      - 'apps/web/app/dev/dial-demo/**'
+      - 'apps/web/tests/e2e/dsp-dial/**'
+      - 'apps/web/playwright.config.dsp-dial.ts'
+      - '.github/workflows/dsp-dial-e2e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dsp-dial-e2e-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  dial-e2e:
+    name: Service Dial E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
+      - name: Start next dev
+        run: |
+          set -euo pipefail
+          (pnpm --filter @jovie/web run dev:local:playwright > "$RUNNER_TEMP/next-dev.log" 2>&1 &)
+          for _ in $(seq 1 90); do
+            if curl -fsS -o /dev/null "http://localhost:3100/dev/dsp-dial?fixture=tim"; then exit 0; fi
+            sleep 5
+          done
+          tail -n 80 "$RUNNER_TEMP/next-dev.log"
+          exit 1
+      - name: Run dial e2e
+        env:
+          BASE_URL: http://localhost:3100
+        run: pnpm --filter @jovie/web run e2e:dsp-dial
+
+  report-main-failure:
+    # Nothing fails silently: a red main run opens or updates one standing issue.
+    name: Report main failure
+    needs: [dial-e2e]
+    if: ${{ always() && github.event_name == 'push' && github.ref_name == 'main' && contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+      - name: Open or update standing issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          TITLE="Service dial e2e lane red"
+          BODY="The main $GITHUB_WORKFLOW run failed on ${GITHUB_SHA::8}. Run: $RUN_URL. Reproduce: pnpm --filter @jovie/web run e2e:dsp-dial against next dev."
+          EXISTING=$(node packages/api-client/cli.ts gh --priority repair -- issue list --state open --search "in:title \"$TITLE\"" --json number,title \
+            --jq '.[] | select(.title == "Service dial e2e lane red") | .number' | head -1)
+          if [ -n "$EXISTING" ]; then
+            node packages/api-client/cli.ts gh --priority repair -- issue edit "$EXISTING" --body "$BODY"
+          else
+            node packages/api-client/cli.ts gh --priority repair -- issue create --title "$TITLE" --body "$BODY"
+          fi

@@ -391,6 +391,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:garden
     jobCount: 1
+  - name: Service Dial E2E
+    path: .github/workflows/dsp-dial-e2e.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:report-main-failure
+    jobCount: 2
   - name: E2E Full Browser Matrix
     path: .github/workflows/e2e-full-matrix.yml
     active: true
