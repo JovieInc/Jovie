@@ -68,7 +68,6 @@
     "github:jovie:visual-regression",
     "github:jovie:cli-chaos-nightly",
     "github:jovie:deepsec-native",
-    "github:jovie:pr-review-learn",
     "vercel:jovie-web:frequent",
     "vercel:jovie-web:daily-maintenance",
     "vercel:jovie-web:generate-insights",
