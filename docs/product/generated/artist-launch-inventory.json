@@ -6579,6 +6579,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/app/(shell)/inbox/page.tsx",
+      "kind": "page",
+      "route": "/app/inbox",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/app/(shell)/insights/page.tsx",
       "kind": "page",
       "route": "/app/insights",
