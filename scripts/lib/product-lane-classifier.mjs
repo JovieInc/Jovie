@@ -235,7 +235,7 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     'operations-tooling',
     'operations-tooling',
     [],
-    /^(\.github\/|scripts\/|apps\/(console|docs|eve-pilot|should-i-make)\/|workers\/prod-liveness\/|workers\/x402-artist-resource-proxy\/wrangler\.example\.jsonc$|\.agents\/|\.claude\/|\.codex\/|\.conductor\/|\.context\/|\.cursor\/|\.design-sync(?:-marketing)?\/|\.grok\/|\.hermes\/|\.husky\/|\.lavish\/|\.neon(?:\/|$)|\.no-mistakes\/|\.orchestrator\/|\.sonarlint\/|\.vscode\/|\.windsurf\/|\.zap\/|agentos\/|architecture\/|audits\/|canon\/|config\/slop-guard\/|creator_profiles(?:\/|$)|docs\/|github\/|ideation\/|infra\/|ops\/|prompts\/|tests\/|tools\/)/,
+    /^(\.github\/|scripts\/|apps\/(console|docs|eve-pilot|should-i-make)\/|workers\/(?:prod-liveness|competitor-watch)\/|workers\/x402-artist-resource-proxy\/wrangler\.example\.jsonc$|\.agents\/|\.claude\/|\.codex\/|\.conductor\/|\.context\/|\.cursor\/|\.design-sync(?:-marketing)?\/|\.grok\/|\.hermes\/|\.husky\/|\.lavish\/|\.neon(?:\/|$)|\.no-mistakes\/|\.orchestrator\/|\.sonarlint\/|\.vscode\/|\.windsurf\/|\.zap\/|agentos\/|architecture\/|audits\/|canon\/|config\/slop-guard\/|creator_profiles(?:\/|$)|docs\/|github\/|ideation\/|infra\/|ops\/|prompts\/|tests\/|tools\/)/,
   ],
   [
     'operations-root-file',
