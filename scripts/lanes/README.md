@@ -535,6 +535,8 @@ Effective cost = base x (1 + quota pressure): Claude runs in its 5h window, bank
 
 Hyperagent runs agent `cmtj3n2q901i407adklzzq01t` (GLM 5.3 Developer, `auto`; the agent id picks the model, Astra Planner is `confirm`). It is remote-only (`repairs: false`): it claims issues through `hyperagent_lane.py` and local lanes maintain its PRs. Each attempt joins a live `list_agents` identity read with the owner's attestation at `~/.config/jovie-lanes/hyperagent-attestation.json` (`agentId`, `model`, `repository`, `currentInstructions`, `allInCap`, `balanceUsd`, `maxCostUsd`, `attestedAt`, `expiresAt`, `attestedBy`), because the API exposes no balance or cap. Without it the lane is unhealthy. Only the owner can write the attestation — the API exposes no balance or cap for an agent to read back — so a host that lacks it must scope the lane off with `LANES_SLOTS_HYPERAGENT=0` (no probe, no `provider-down` alert) rather than page on a credential that does not exist.
 
+Hyperagent can also repair existing PRs remotely (`hyperagent_repair.py`, enabled by `remoteRepairs: true` in `providers.json`; it ships `false` until GLM 5.3 model timeouts stop ending repair threads early). The shared daily cap below applies either way. Each hyperagent lane turn first takes one DIRTY or required-check-red PR (revenue and golden-path first, then `compounding`, then oldest), sends the branch, head and failing-check log excerpt, and the agent pushes to the same branch with a `Hyperagent-Repair: <attempt>` trailer. The lane counts a success only when the PR head moved forward (no force push), the tip carries that trailer, and every required check is green; the receipt (`kind: remote-repair`, stage stamps, thread URL) goes to `runs/ledger.jsonl` and a PR comment. It never touches a hold-labelled PR or a head pushed in the last 30 minutes. One writer per PR: the local `locks/repair-pr-N.lock` flock, an in-flight `fix-attempts.json` record (no local attempt charged) and a lane claim comment; a definite failure releases all three, an unknown remote outcome keeps the record and comment until their TTLs. The 24 threads/day cap (`HYPERAGENT_RUNS_PER_DAY`) is shared with the mesh bridge counter and the lane's issue runs; a spent cap ends the hyperagent turn before it claims issues. `hyperagent_repair.py status` shows cap use and the queue; `run --pr N` does one repair by hand.
+
 ## Install on a host
 
 Gem (systemd user timer) or a Mac (launchd), with a dedicated clone:
@@ -548,6 +550,15 @@ Select the repository's pinned Node in the installing shell first. The installer
 puts that Node directory first in the timer PATH on both Linux and macOS.
 After changing the host's Node installation, rerun the installer so the timer
 does not retain a removed runtime directory.
+
+On Linux, set `LANES_TMPDIR` when installing to place scanner clones and worker
+temporaries on a volume with sufficient headroom. The installer creates a private
+mode-700 directory or validates an existing one without changing its permissions,
+then writes `65-temp-placement.conf` for the lanes, watchdog and wake services.
+Relative paths, symlinks, shared directories and unit specifiers are rejected.
+Unset preserves existing placement. To roll back, remove only those three
+drop-ins and reload the user systemd configuration; active workers keep their
+existing environment until they finish. Security scans and disk guards are unchanged.
 
 Per-host knobs: `LANES_SLOTS_<PROVIDER>`, `LANES_LINEAR_ENV`, `LANES_AGENT_TIMEOUT_S`,
 `LANES_GATE_TIMEOUT_S`, `LANES_GATE_SLOTS`. A host-specific GitHub token in

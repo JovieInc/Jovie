@@ -73,6 +73,10 @@ SETUP_RETRY_S = 3600                # a head whose checkout/install failed waits
 MAX_ACTIONS = 10                    # GitHub writes per maintenance pass
 DEPENDENCY = re.compile(r"(?i)\b(?:depends on|blocked by|waits? (?:on|for)|stacked on)\s+#(\d+)"
                         r"|#(\d+)\s+(?:must|has to|needs to)\s+(?:be merged|merge|land)")
+# Lanes never enroll a `compounding` PR: merge-queue-green-enroll.yml owns the reset-safe jump
+# policy (caps, batch window, build age), and a plain enqueue here beats it to the queue's back
+# (2026-11-01: #24141 was enqueued twice as jovie-ci-lane and sat 2h+). Green enroll picks it up.
+DEFERRED_ENQUEUE_LABELS = frozenset({"compounding"})
 ENQUEUE_MUTATION = ('mutation($id:ID!,$head:GitObjectID!){enqueuePullRequest(input:{pullRequestId:$id,'
                     'expectedHeadOid:$head}){mergeQueueEntry{position}}}')
 MERGE_GROUP_LOG_CHARS = 6000        # tail of the failed merge-group jobs' log in a repair prompt
@@ -403,6 +407,8 @@ def maintenance_actions(binding: Binding, prs: list[dict], now: float) -> list[t
                 actions.append(("ready", pr))
             continue
         last = (pr.get("removals") or [{}])[-1]
+        if set(pr.get("labels") or ()) & DEFERRED_ENQUEUE_LABELS:
+            continue  # green enroll applies the compounding jump under its caps
         if state in ENQUEUE_STATES and not (last.get("reason") == "manual"
                                              and _age(last.get("at") or "", now) < MANUAL_QUIET_S):
             actions.append(("enqueue", pr))

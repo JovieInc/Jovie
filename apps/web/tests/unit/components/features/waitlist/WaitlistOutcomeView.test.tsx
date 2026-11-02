@@ -70,6 +70,29 @@ describe('WaitlistOutcomeView Start Pro (JOV-7701: anyone can buy)', () => {
     expect(screen.getByTestId('waitlist-resume-start')).toBeInTheDocument();
   });
 
+  it('says what paying buys: it skips the waitlist (paid admission)', () => {
+    render(
+      <WaitlistOutcomeView
+        outcome='pending'
+        reservedHandle='coolartist'
+        proCheckoutPriceId='price_pro_monthly'
+      />
+    );
+
+    // A verified payment admits the buyer (admitPaidUser), so the paid ask
+    // must read as skip-the-line, never as paying to stay on the list.
+    const note = screen.getByTestId('waitlist-start-pro-note');
+    expect(note).toHaveTextContent(/skip the waitlist/i);
+    expect(note).toHaveTextContent(/setup opens as soon as payment clears/i);
+    const { priceLabel, cadence } = getPublicPriceClaim('pro');
+    expect(note).toHaveTextContent(`${priceLabel}${cadence}`);
+  });
+
+  it('shows no skip-the-waitlist note without the paid CTA', () => {
+    render(<WaitlistOutcomeView outcome='pending' />);
+    expect(screen.queryByTestId('waitlist-start-pro-note')).toBeNull();
+  });
+
   it('hides Start Pro without a configured price or on error receipts', () => {
     const { rerender } = render(<WaitlistOutcomeView outcome='pending' />);
     expect(screen.queryByTestId('waitlist-start-pro-checkout')).toBeNull();
