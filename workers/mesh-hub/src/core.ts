@@ -273,7 +273,14 @@ export class MailboxStore {
         "UPDATE messages SET acked_at = ?, body = NULL WHERE kind = 'probe' AND acked_at IS NULL",
         envelope.acceptedAt
       );
-    } else if (this.unackedCount() >= LIMITS.unackedPerMailbox) {
+    } else if (
+      this.unackedCount() >=
+      // Control-plane events and DLQ wrappers get headroom above the message
+      // quota, so a full mailbox can still report that it is full.
+      (envelope.kind === 'message'
+        ? LIMITS.unackedPerMailbox
+        : LIMITS.unackedPerMailbox * 2)
+    ) {
       return { ok: false, status: 507, code: 'mailbox_full', retryable: true };
     }
     const row = this.sql
@@ -393,13 +400,22 @@ export class MailboxStore {
     return { acked };
   }
 
-  /** History for `mesh read --all`: every non-probe message accepted since `since`. */
-  history(since: number, limit: number = LIMITS.pageSize): Delivered[] {
+  /**
+   * History for `mesh read --all`: every non-probe message accepted since
+   * `since`. A full page means there may be more: pass the last `seq` back as
+   * `afterSeq` to continue instead of silently truncating at the page size.
+   */
+  history(
+    since: number,
+    limit: number = LIMITS.pageSize,
+    afterSeq = 0
+  ): Delivered[] {
     return this.sql
       .exec(
-        `SELECT * FROM messages WHERE accepted_at >= ? AND body IS NOT NULL AND kind != 'probe'
+        `SELECT * FROM messages WHERE accepted_at >= ? AND seq > ? AND body IS NOT NULL AND kind != 'probe'
          ORDER BY seq LIMIT ?`,
         since,
+        afterSeq,
         Math.min(limit, LIMITS.pageSize)
       )
       .toArray()
