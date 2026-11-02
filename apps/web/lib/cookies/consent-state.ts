@@ -32,3 +32,8 @@ export function hasAnalyticsConsent(cookieValue: string | undefined): boolean {
   const consent = parseConsentCookieValue(cookieValue);
   return consent?.analytics === true;
 }
+
+export const PRIVACY_CHOICES_HREF = '/legal/privacy#privacy-choices';
+export const PRIVACY_CHOICES_LABEL =
+  'Do Not Sell or Share My Personal Information';
+export const GPC_CONFIRMATION = "Your browser's privacy signal is honored";
