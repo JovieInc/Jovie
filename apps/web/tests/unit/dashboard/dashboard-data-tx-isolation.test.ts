@@ -801,9 +801,14 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     });
     void pendingSetup.catch(() => {});
     const { setStatementTimeout } = await import('@/lib/db/query-timeout');
-    vi.mocked(setStatementTimeout).mockImplementationOnce(() => {
-      signalSetup();
-      return pendingSetup;
+    vi.mocked(setStatementTimeout).mockImplementation(async (_tx, ms) => {
+      // Profile setup uses the 5000ms API deadline (JOV-8651) and must resolve.
+      // Stall the social-link setup this case proves (JOV-8834): 8000ms on the
+      // second transaction, before that read or its fallback.
+      if (ms === 8000 && txStates.length === 2) {
+        signalSetup();
+        await pendingSetup;
+      }
     });
     queueReadsBeforeDistribution();
     outcomes.splice(5, 1);
@@ -1387,12 +1392,13 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       expect(result.bioLinkActivation?.activatedAt).toBeNull();
       expect(result.dashboardLoadError).toBeUndefined();
       expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+      // Social-link existence plus this one distribution attempt. The profile
+      // read's 5000ms deadline is a different call and must not hide a retry.
       expect(
         vi
           .mocked(setStatementTimeout)
-          .mock.calls.slice(1)
-          .filter(([, ms]) => ms === 8000)
-      ).toHaveLength(1);
+          .mock.calls.filter(([, ms]) => ms === 8000)
+      ).toHaveLength(2);
       expect(txStates[4]).toMatchObject({ closed: true, rolledBack: true });
       expect(captureExceptionMock).toHaveBeenCalledWith(
         error,
@@ -1416,12 +1422,11 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       activatedAt.toISOString()
     );
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+    // The failed setup throws before its callback. One 8000ms call is the
+    // social-link read; the other is the single distribution retry.
     expect(
-      vi
-        .mocked(setStatementTimeout)
-        .mock.calls.slice(1)
-        .filter(([, ms]) => ms === 8000)
-    ).toHaveLength(1);
+      vi.mocked(setStatementTimeout).mock.calls.filter(([, ms]) => ms === 8000)
+    ).toHaveLength(2);
     expect(txStates.every(state => state.closed)).toBe(true);
     expect(captureExceptionMock).not.toHaveBeenCalled();
   });
