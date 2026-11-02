@@ -78,6 +78,7 @@ import remediation  # noqa: E402  (classifier, router, escalation ladder)
 import shipping_attribution  # noqa: E402  (receipt-first merged-PR provenance)
 import workstreams  # noqa: E402  (shared workstream rank + duplicate identity)
 import worktree_sweep  # noqa: E402  (idle / merged-PR checkout retirement, JOV-7704)
+import worker_resources  # noqa: E402
 import worktree_pool  # noqa: E402  (pre-installed worktree pool, JOV-7705)
 import reason_lane  # noqa: E402
 import outcome_lane  # noqa: E402
@@ -152,7 +153,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_git_housekeeping.py",
               "scripts/tests/test_continuity_clock.py",
               "scripts/tests/test_worktree_sweep.py", "scripts/tests/test_service_census.py",
-              "scripts/tests/test_worktree_pool.py",
+              "scripts/tests/test_worktree_pool.py", "scripts/tests/test_worker_resources.py",
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_file_overlap.py",
               "scripts/tests/test_remediation.py", "scripts/tests/test_autoscale.py",
@@ -4366,7 +4367,7 @@ def free_red_provider(host):
 
 
 def record_red_row(state, *, status, pr, sha, run_id, run_attempt, red_at,
-                   reason=None, provider=None):
+                   reason=None, provider=None, resources=None):
     """One JSONL row per wake outcome. Timestamps join with the CI timing
     collector (JOV-8933) on (pr, sha, runId, runAttempt)."""
     dispatched = status == "dispatched"
@@ -4384,6 +4385,7 @@ def record_red_row(state, *, status, pr, sha, run_id, run_attempt, red_at,
         "claimAt": None,
         "provider": provider,
         "reason": reason,
+        **({"resources": resources} if resources is not None else {}),
     })
 
 
@@ -4480,11 +4482,18 @@ def fix_now(host: Host) -> int:
                            run_attempt=run_attempt, red_at=red_at, reason="no-free-slot")
             path.unlink(missing_ok=True)
             continue
-        subprocess.Popen([sys.executable, str(Path(__file__)), "worker", "--provider", provider],
-                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                         start_new_session=True, **lifecycle.spawn_kwargs())
+        try:
+            resource_receipt = worker_resources.spawn(
+                [sys.executable, str(Path(__file__)), "worker", "--provider", provider], provider=provider,
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                start_new_session=True, **lifecycle.spawn_kwargs(env=worktree_pool.node_env(host.repo)))
+        except worker_resources.ResourceHeld as error:
+            record_red_row(host.state, status="no-slot", pr=pr, sha=sha, run_id=run_id,
+                           run_attempt=run_attempt, red_at=red_at, reason=str(error), provider=provider)
+            marker.unlink(missing_ok=True)  # retry the existing wake after its bounded resource hold
+            continue
         record_red_row(host.state, status="dispatched", pr=pr, sha=sha, run_id=run_id,
-                       run_attempt=run_attempt, red_at=red_at, provider=provider)
+                       run_attempt=run_attempt, red_at=red_at, provider=provider, resources=resource_receipt)
         path.unlink(missing_ok=True)
     return 0
 
@@ -10199,9 +10208,11 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                     tick["unhealthy"].append(name)
                     continue
                 for _ in range(slots):
-                    subprocess.Popen([sys.executable, str(Path(__file__)), "worker", "--provider", name],
-                                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                     start_new_session=True, **lifecycle.spawn_kwargs())
+                    resource_receipt = worker_resources.spawn(
+                        [sys.executable, str(Path(__file__)), "worker", "--provider", name], provider=name,
+                        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                        start_new_session=True, **lifecycle.spawn_kwargs(env=worktree_pool.node_env(host.repo)))
+                    tick.setdefault("workerResources", []).append(resource_receipt)
                     tick["spawned"].append(name)
             except Exception as error:
                 # One provider's malformed spec, probe or spawn fault holds that provider only;

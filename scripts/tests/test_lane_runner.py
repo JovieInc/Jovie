@@ -17556,6 +17556,20 @@ class FixNowTest(unittest.TestCase):
             self.assertFalse(wake.exists())
             self.assertTrue((self.wake_dir / (wake.name + ".claim")).exists())
 
+    def test_fix_now_resource_hold_keeps_wake_retryable_without_dispatch_receipt(self):
+        wake = self.wake()
+        fixes = self.healthy()
+        with lane.lifecycle.Guard(self.state), \
+                fixes[0], fixes[1], fixes[2], fixes[3], fixes[4], fixes[5], \
+                patch.object(lane.pr_events, "claim_active", return_value=False), \
+                patch.object(lane.worker_resources, "spawn", side_effect=lane.worker_resources.ResourceHeld("scope unavailable")):
+            self.assertEqual(lane.fix_now(self.host), 0)
+        self.assertTrue(wake.exists())
+        self.assertFalse((self.wake_dir / (wake.name + ".claim")).exists())
+        self.assertEqual(self.rows()[0]["status"], "no-slot")
+        self.assertIn("scope unavailable", self.rows()[0]["reason"])
+        self.assertIsNone(self.rows()[0]["dispatchedAt"])
+
     def test_fix_now_records_no_slot_and_keeps_label(self):
         wake = self.wake()
         fixes = self.healthy(slots=0)
