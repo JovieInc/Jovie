@@ -29,8 +29,12 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             .nvmrc
+            .github/actions/prime-node-toolcache
             scripts/sentry-autofix-intake.mjs
           sparse-checkout-cone-mode: false
+
+      - name: Prime Node toolcache
+        uses: ./.github/actions/prime-node-toolcache
 
       - name: Setup pinned Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

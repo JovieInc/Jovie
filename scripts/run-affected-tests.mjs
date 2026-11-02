@@ -343,7 +343,9 @@ const SENTRY_AUTOFIX_RECURRENCE_PRIMARY_INPUTS = new Set([
 const SENTRY_AUTOFIX_RECURRENCE_LANE = new Set([
   ...SENTRY_AUTOFIX_RECURRENCE_PRIMARY_INPUTS,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  'scripts/ci-fast-lanes.mjs',
   'scripts/tests/test_agent_workflow_hygiene.py',
+  'scripts/lib/external-api-guard.ratchet.gen.json',
 ]);
 const SENTRY_AUTOFIX_RECURRENCE_SCRIPT_TESTS = [
   'scripts/lib/__tests__/sentry-autofix-intake.test.mjs',
