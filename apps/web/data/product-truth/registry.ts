@@ -770,10 +770,7 @@ export const PRODUCT_FLAG_CAPABILITIES = {
     nonMarketing:
       'auth offer recap; default off; no price, trial, or entitlement change',
   },
-  PUBLIC_SIGNUP_CLOSED: {
-    nonMarketing:
-      'closed public signup; default off; on routes /signup and anonymous /start to the /waitlist role form; reopen criteria in canon/PRODUCT.md (2026-11-02)',
-  },
+  PUBLIC_SIGNUP_CLOSED: { nonMarketing: 'closed signup gate; default off' },
   SOCIAL_HTML_ISOLATED_PROVIDER: {
     nonMarketing:
       'internal ingestion routing kill switch; reserved for future isolated provider rollout',
