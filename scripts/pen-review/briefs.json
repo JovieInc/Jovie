@@ -1,0 +1,53 @@
+{
+  "schema": "pen-review-briefs/v1",
+  "_comment": "Mission and audience per PROPOSAL family (first match on the frame name wins). The judge panel reads these; add a brief when a new proposal family lands. Personas: intended-user, premium-critic, buyer, heritage-manager.",
+  "defaults": {
+    "audience": "an independent artist or their manager using Jovie",
+    "mission": "make the next step obvious and trustworthy in one glance",
+    "personas": ["intended-user", "premium-critic"]
+  },
+  "briefs": [
+    {
+      "match": "Network CRM",
+      "surface": "Jovie Network: the artist's music-industry CRM built from Gmail headers and release credits",
+      "audience": "an independent artist or manager who emails producers, writers, engineers, managers and A&R",
+      "mission": "see who you already make music with, by role, and invite each collaborator one at a time without it feeling like spam or surveillance",
+      "buyer": "You would pay because this saves hours of contact admin and grows your network.",
+      "personas": [
+        "intended-user",
+        "premium-critic",
+        "buyer",
+        "heritage-manager"
+      ]
+    },
+    {
+      "match": "Assembling profile",
+      "surface": "Jovie golden-path onboarding: the chat shows a 'Building your profile' indicator while Jovie assembles the artist's profile",
+      "audience": "an artist who just claimed their profile and is waiting for it to be built",
+      "mission": "show honest progress so the artist trusts the wait and knows what they will get, without fake precision",
+      "buyer": "You are deciding in your first minutes whether Jovie is worth paying for.",
+      "personas": ["intended-user", "premium-critic", "buyer"]
+    },
+    {
+      "match": "Claim verification|Verify|Verification|Dispute",
+      "surface": "Jovie claim verification: proving you control an artist before a claimed profile goes public",
+      "audience": "an artist or their manager claiming an artist profile on Jovie",
+      "mission": "prove control quickly and safely so no impostor or fan account ever publishes a profile, without slowing first-use value",
+      "buyer": "You would only pay if your act can never be impersonated on Jovie.",
+      "personas": [
+        "intended-user",
+        "premium-critic",
+        "buyer",
+        "heritage-manager"
+      ]
+    },
+    {
+      "match": "Fan engine",
+      "surface": "Jovie fan stories: a living story per fan, set up once by the artist, then always on inside rails",
+      "audience": "an independent artist (or a fan, on the opt-in and email screens) using Jovie fan stories",
+      "mission": "set the rails once, then trust Jovie to write to opted-in fans one story at a time, with one-tap pause and nothing that feels like spam",
+      "buyer": "You would pay because fans hear from you every week without you running campaigns.",
+      "personas": ["intended-user", "premium-critic", "buyer"]
+    }
+  ]
+}
