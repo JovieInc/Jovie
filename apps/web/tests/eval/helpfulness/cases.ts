@@ -9,8 +9,24 @@
 
 import type { FixtureId } from './fixtures';
 
+/**
+ * Intent card: who the (synthetic) artist is, what they want and where the
+ * case came from. The dogfood loop (Summer) adds cases in this order: intent
+ * card, then the transcript (history + ask), then deterministic checks
+ * (mustMentionAny, expectToolsAny, the global no-dead-end rules) and judge
+ * guidance (great). Every eval session is synthetic and tagged so.
+ */
+export interface IntentCard {
+  readonly persona: string;
+  readonly goal: string;
+  readonly source: 'real-anonymized' | 'web-mined' | 'synthetic';
+  /** Date, issue or URL the case was mined from. Never user text. */
+  readonly sourceRef?: string;
+}
+
 export interface HelpfulnessCase {
   readonly id: string;
+  readonly intent?: IntentCard;
   readonly fixture: FixtureId;
   /** Prior turns, oldest first, for multi-turn cases. */
   readonly history?: readonly { role: 'user' | 'assistant'; text: string }[];
@@ -248,6 +264,72 @@ export const HELPFULNESS_CASES: readonly HelpfulnessCase[] = [
     expectToolsAny: ['suggestRelatedArtists'],
     great:
       'Calls suggestRelatedArtists and frames the result around one outreach move.',
+  },
+  {
+    id: 'catalog-greeting-instinct',
+    fixture: 'catalog',
+    intent: {
+      persona: 'Legacy pop/electronic artist, 48 releases, empty bio.',
+      goal: 'Says hi and expects Jovie to lead with what matters.',
+      source: 'real-anonymized',
+      sourceRef: 'artist chat transcript 2026-11-01',
+    },
+    ask: 'yo',
+    mustMentionAny: [['bio'], ['cass arden']],
+    maxWords: 120,
+    great:
+      'Opens with the single most valuable known fact, not "what are we working on". Here: the bio is empty, so it shows a short drafted bio built only from verified facts (name, pop/electronic, 48 releases) and offers to put it live in one step.',
+    ciSubset: true,
+  },
+  {
+    id: 'catalog-youtube-optimize',
+    fixture: 'catalog',
+    intent: {
+      persona:
+        'Legacy pop/electronic artist with a YouTube channel on their profile.',
+      goal: 'Get the YouTube channel working for the back catalog.',
+      source: 'real-anonymized',
+      sourceRef: 'artist chat transcript 2026-11-01',
+    },
+    history: [
+      { role: 'user', text: 'hey' },
+      {
+        role: 'assistant',
+        text: 'Hey. What are we working on today: a release, promo, merch, or something else?',
+      },
+    ],
+    ask: 'I want my youtube channel set up properly',
+    mustMentionAny: [
+      ['@cassarden', 'youtube.com/@cassarden'],
+      ['description', 'pinned comment', 'playlist', 'end screen'],
+    ],
+    expectToolsAny: ['auditYouTubeChannel'],
+    great:
+      'Already knows the channel (@cassarden) from the profile links, reads it with the YouTube audit tool, and returns a ranked plan of 3 to 5 concrete moves tied to the back catalog (Jovie links in top video descriptions, pinned comments to each song page, playlists by era). Says which moves it can do now and offers the one-tap YouTube connect for the rest. Never asks for the URL.',
+    ciSubset: true,
+  },
+  {
+    id: 'catalog-youtube-you-have-it',
+    fixture: 'catalog',
+    intent: {
+      persona:
+        'Legacy pop/electronic artist with a YouTube channel on their profile.',
+      goal: 'Pushes back after being asked for a URL Jovie already has.',
+      source: 'real-anonymized',
+      sourceRef: 'artist chat transcript 2026-11-01',
+    },
+    history: [
+      { role: 'user', text: 'I want my youtube channel set up properly' },
+      {
+        role: 'assistant',
+        text: 'I can add your channel to your profile. Send me the channel URL.',
+      },
+    ],
+    ask: 'you should already have that',
+    mustMentionAny: [['@cassarden', 'youtube.com/@cassarden']],
+    expectToolsAny: ['auditYouTubeChannel'],
+    great:
+      'Owns it in a few words, names the channel it already has (@cassarden) and moves straight to the audit and the first concrete move. No settings-page deflection, no request for links.',
   },
   {
     id: 'followup-do-it',

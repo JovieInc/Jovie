@@ -471,6 +471,8 @@ async function main(): Promise<void> {
       );
       return {
         result,
+        synthetic: true as const,
+        intent: testCase.intent ?? null,
         ask: testCase.ask,
         reply: turn.reply,
         usage: turn.usage,
@@ -485,6 +487,8 @@ async function main(): Promise<void> {
       );
       return {
         result,
+        synthetic: true as const,
+        intent: testCase.intent ?? null,
         ask: testCase.ask,
         reply: { text: '', toolCalls: [] },
         usage: { input: 0, output: 0 },
@@ -507,6 +511,8 @@ async function main(): Promise<void> {
   const report = {
     schema: 'jovie.helpfulness-eval/v1',
     version: HELPFULNESS_EVAL_VERSION,
+    // Every session is a synthetic artist against fixtures, never a user.
+    tags: { synthetic: true },
     ranAt: now.toISOString(),
     provider: 'workers-ai',
     model: args.model,

@@ -521,6 +521,37 @@ export const DEAD_END_RULES: readonly DeadEndRule[] = [
 ];
 
 /**
+ * JOV-INV-046 in conversation: assistant replies must act or offer the
+ * one-tap step, never deflect the artist to another screen or ask for data
+ * Jovie already holds. Source: 2026-11-01 artist chat transcript ("that's a
+ * settings-page item on your end", "paste the channel URL"). Checked on
+ * replies by the helpfulness eval; same intent as DEAD_END_RULES.
+ */
+export const CHAT_DEAD_END_RULES: readonly DeadEndRule[] = [
+  {
+    id: 'chat-dead-end-go-elsewhere',
+    pattern:
+      /\bsettings[- ]page\b|\bon your end\b|\b(?:go|head) (?:to|into) (?:your |the )?settings\b|\byou(?:['’]ll| will)? need to (?:visit|open|go to)\b/i,
+    message:
+      'Reply sends the artist to another screen. Do it with a tool or put the one-tap step in the reply.',
+  },
+  {
+    id: 'chat-dead-end-ask-known',
+    pattern:
+      /\b(?:paste|send|share|give me|drop) (?:me )?(?:your|the) (?:\w+ ){0,2}(?:url|link|handle)\b/i,
+    message:
+      'Reply asks for a link the profile may already hold. Read the profile links first.',
+  },
+  {
+    id: 'chat-dead-end-blind',
+    pattern:
+      /\bI (?:can['’]?t|cannot|can not|don['’]?t|do not) (?:see|view|access|tell)\b[^.]{0,40}\b(?:platform|account|link|channel|connected)/i,
+    message:
+      'Reply claims blindness to the artist’s own accounts. Those facts are in context.',
+  },
+];
+
+/**
  * A string that offers a retry or reports a transient failure is an allowed
  * error-with-retry state, not a dead end.
  */

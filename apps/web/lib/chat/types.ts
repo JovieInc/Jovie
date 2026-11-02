@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { ArtistLinksContext } from '@/lib/chat/artist-links';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 
 /**
@@ -27,7 +28,13 @@ export const artistContextSchema = z.object({
   }),
 });
 
-export type ArtistContext = z.infer<typeof artistContextSchema>;
+/**
+ * `linksContext` is server-only: it is read from the DB in the route and never
+ * accepted from the client payload.
+ */
+export type ArtistContext = z.infer<typeof artistContextSchema> & {
+  readonly linksContext?: ArtistLinksContext;
+};
 
 /** Lightweight release info for chat context (avoids loading full provider data). */
 export interface ReleaseContext {

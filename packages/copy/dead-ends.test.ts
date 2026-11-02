@@ -10,6 +10,7 @@ import {
   scanLinks,
   toCounts,
 } from './dead-ends';
+import { CHAT_DEAD_END_RULES } from './rules';
 
 const TSX = 'apps/web/components/Example.tsx';
 const rules = (path: string, source: string) =>
@@ -141,6 +142,36 @@ describe('dead-end ratchet', () => {
     );
     expect(
       compareToBaseline(toCounts(scanAll()), baseline).regressions
+    ).toEqual([]);
+  });
+});
+
+describe('CHAT_DEAD_END_RULES', () => {
+  const hits = (text: string) =>
+    CHAT_DEAD_END_RULES.filter(rule => rule.pattern.test(text)).map(
+      rule => rule.id
+    );
+
+  it('flags the 2026-11-01 transcript deflections', () => {
+    expect(hits("That's a settings-page item on your end.")).toContain(
+      'chat-dead-end-go-elsewhere'
+    );
+    expect(hits('Give me your YouTube channel URL.')).toContain(
+      'chat-dead-end-ask-known'
+    );
+    expect(hits('I can’t see which platforms those are.')).toContain(
+      'chat-dead-end-blind'
+    );
+    expect(hits("I can't see which platforms your links are.")).toContain(
+      'chat-dead-end-blind'
+    );
+  });
+
+  it('leaves acting replies alone', () => {
+    expect(
+      hits(
+        'Your channel is @timwhite. I added the Jovie link to the top 10 descriptions.'
+      )
     ).toEqual([]);
   });
 });

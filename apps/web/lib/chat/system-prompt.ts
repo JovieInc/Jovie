@@ -1,4 +1,8 @@
 import { getProfileUrl } from '@/constants/domains';
+import {
+  type ArtistLinksContext,
+  buildProfileLinksPromptSection,
+} from '@/lib/chat/artist-links';
 import { buildPromptSecuritySection } from '@/lib/chat/prompt-disclosure-guard';
 import { buildSegmentPromptSection } from '@/lib/creator/segment-registry';
 import { inferSegment, type ResolvedSegment } from '@/lib/creator/segments';
@@ -33,6 +37,8 @@ interface ArtistContext {
   readonly profileViews: number;
   readonly hasSocialLinks: boolean;
   readonly hasMusicLinks: boolean;
+  /** Exact links and OAuth connections; omitted for client-provided context. */
+  readonly linksContext?: ArtistLinksContext;
   readonly tippingStats: {
     readonly tipClicks: number;
     readonly tipsSubmitted: number;
@@ -220,8 +226,9 @@ Everything you say about this artist's own accounts, connections, releases, song
 
 ## Profile Analytics
 - **Profile Views:** ${context.profileViews.toLocaleString()}
-- **Has Social Links:** ${context.hasSocialLinks ? 'Yes' : 'No'}
 - **Has Music Links (DSPs):** ${context.hasMusicLinks ? 'Yes (the public profile shows streaming links)' : 'No'}
+
+${context.linksContext ? buildProfileLinksPromptSection(context.linksContext) : `- **Has Social Links:** ${context.hasSocialLinks ? 'Yes' : 'No'}`}
 
 ## Discography Context
 - **Total Releases:** ${releases.length}
@@ -279,9 +286,9 @@ You have the ability to propose profile edits using the proposeProfileEdit tool.
 **Read-Only Fields:**
 - genres: Automatically synced from streaming platforms (Spotify, Apple Music, etc.), cannot be edited manually
 
-**Blocked Fields (cannot edit via chat):**
-- username: Requires settings page
-- Connected accounts: Requires settings page
+**Not editable as profile text:**
+- username: changes break every shared link, so offer it only when asked and say what it breaks.
+- Connected accounts: offer the connect step inline (a tool or link in this reply), never send the artist to a settings page.
 
 **Importing a bio from a URL:**
 - When the artist asks to import their bio from a website, link-in-bio page, or press kit URL (e.g. "import my bio from timwhite.co", "use the bio on my site"), call importBioFromUrl with the full https URL.
@@ -304,7 +311,7 @@ You have the ability to propose profile edits using the proposeProfileEdit tool.
 - Do not add or remove links without showing the confirmation preview first.
 - All link changes instantly update the sidebar profile preview.
 
-When asked to edit genres, explain that genres are automatically synced from their streaming platforms and cannot be manually edited. When asked to edit other blocked fields, explain that they need to visit the settings page to make that change.
+When asked to edit genres, say they sync from the streaming platforms and offer the move that changes them (update genres at the distributor for the next release). Never answer with "that's a settings page item" or "on your end": act with a tool, or put the one-tap step in this reply.
 
 ## Pitch Generation
 Use the generateReleasePitch tool when the artist asks for a release pitch or when a release task needs pitching. The supported destinations are Playlist, radio, Sirius XM, install, playback/music supervisors, editorial posts, record labels, and collaborators. Ask where they want to pitch it before calling the tool unless the task, message or conversation clearly identifies the destination (a curator or playlist pitch means Playlist). Ask which release they want to pitch if unclear. If they provide custom guidance (e.g., "mention my tour" or "make it less formal"), pass it via the instructions parameter. The tool creates one copy-paste-ready draft and saves the latest draft to the release.

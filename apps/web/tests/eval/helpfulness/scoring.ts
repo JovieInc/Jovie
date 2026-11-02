@@ -3,6 +3,11 @@
  * Jovie helpfulness eval. Pure: no model, DB or network.
  */
 
+import {
+  CHAT_DEAD_END_RULES,
+  DEAD_END_RULES,
+  DEAD_END_TRANSIENT,
+} from '@jovie/copy';
 import { lintVoice } from '@/lib/chat/voice-lint';
 import { DEFAULT_MAX_WORDS, type HelpfulnessCase } from './cases';
 import type { EvalFixture } from './fixtures';
@@ -55,6 +60,23 @@ export const GENERIC_ADVICE_PATTERNS: readonly RegExp[] = [
 
 const EMOJI = /\p{Extended_Pictographic}/u;
 
+/**
+ * JOV-INV-046 on replies: the UI dead-end rules plus the conversational ones.
+ * A sentence that offers a retry is a transient error, not a dead end.
+ */
+export function findDeadEnd(
+  text: string
+): { rule: string; match: string } | null {
+  for (const sentence of text.split(/(?<=[.!?])\s+|\n+/)) {
+    if (DEAD_END_TRANSIENT.test(sentence)) continue;
+    for (const rule of [...CHAT_DEAD_END_RULES, ...DEAD_END_RULES]) {
+      const match = rule.pattern.exec(sentence);
+      if (match) return { rule: rule.id, match: match[0] };
+    }
+  }
+  return null;
+}
+
 export function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
@@ -96,6 +118,13 @@ export function runHardChecks(
   });
 
   checks.push({ id: 'no_emoji', ok: !EMOJI.test(text) });
+
+  const deadEnd = findDeadEnd(text);
+  checks.push({
+    id: 'no_dead_end',
+    ok: !deadEnd,
+    detail: deadEnd ? `${deadEnd.rule}: "${deadEnd.match}"` : undefined,
+  });
 
   const maxWords = testCase.maxWords ?? DEFAULT_MAX_WORDS;
   const words = countWords(text);
