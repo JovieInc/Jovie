@@ -75,6 +75,9 @@ export const RATE_LIMIT_OUTAGE_POLICY = {
   onboarding: mandatoryDenyFixed,
   anonymousOnboardingChatIp: mandatoryDenyFixed,
   anonymousOnboardingChatAsn: mandatoryDenyFixed,
+  // Fail-open /start unverified budgets: an outage denies (retryable check).
+  anonymousOnboardingChatUnverifiedIp: mandatoryDenyFixed,
+  anonymousOnboardingChatUnverifiedGlobal: mandatoryDenyFixed,
   syntheticPassageToken: mandatoryDenyFixed,
   anonymousOnboardingChatSession: mandatoryDenyFixed,
   // Fresh-session allowance only (Turnstile-gated); memory-degrades on Redis

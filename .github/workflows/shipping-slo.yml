@@ -91,6 +91,18 @@ jobs:
           permission-pull-requests: read
           permission-statuses: read
 
+      - name: Trace escapes to the PRs that introduced them
+        # Post-merge fix/revert commits traced to their origin PR and labelled
+        # with the layer that should have caught them. Deterministic, git only.
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          AUTH="Authorization: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          git -c "http.https://github.com/.extraheader=$AUTH" fetch --no-tags --filter=blob:none \
+            --shallow-since="35 days ago" origin main
+          node scripts/review-escapes.mjs report --days 30 --write-latest
+
       # Sampled hosted queue wait + control-plane spend; exit 2 = p95 > 120s
       # alarm, which is surfaced in the report instead of failing the SLO run.
       - name: Sample hosted runner capacity
@@ -126,6 +138,14 @@ jobs:
             echo "samples=$SAMPLES"
           } >> "$GITHUB_OUTPUT"
 
+      # Merge to live per production promotion (alias move), last 10: p50/p95
+      # and the slowest stage. REST only, so a GraphQL shed cannot blank it.
+      - name: Measure merge-to-live lead time
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/merge-to-live.mjs --runs 40 --limit 10 >> "$GITHUB_STEP_SUMMARY" || true
+
       - name: Open latest snapshot PR
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -137,6 +157,8 @@ jobs:
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
           git switch -c "$BRANCH"
           git add docs/metrics/shipping-slo-latest.json docs/metrics/blog-publish-latency-latest.json docs/metrics/stage-timings-latest.json
+          git add docs/metrics/review-escapes-latest.json 2>/dev/null || true
+          git add docs/metrics/merge-to-live-latest.json 2>/dev/null || true
           if git diff --staged --quiet; then
             echo "Snapshot unchanged — nothing to commit."
             exit 0

@@ -1,26 +1,26 @@
 {
   "schema": "jovie.wins-weekly/v1",
-  "at": "2026-10-30T23:16:02.665Z",
+  "at": "2026-10-31T08:10:03.934Z",
   "weeks": [
     {
       "week": "2026-10-19",
       "wins": 0,
       "verified": 0,
       "claimed": 0,
-      "mergedPrs": 76,
-      "mergesPerDay": 10.9,
+      "mergedPrs": 62,
+      "mergesPerDay": 8.9,
       "leadTimeHoursP50": 1.9,
       "secondsSavedPerMergeVerified": 0,
       "secondsSavedPerMergeClaimed": 0
     },
     {
       "week": "2026-10-26",
-      "wins": 23,
+      "wins": 24,
       "verified": 1,
       "claimed": 14,
-      "mergedPrs": 424,
-      "mergesPerDay": 60.6,
-      "leadTimeHoursP50": 2.2,
+      "mergedPrs": 438,
+      "mergesPerDay": 62.6,
+      "leadTimeHoursP50": 2.1,
       "secondsSavedPerMergeVerified": 0,
       "secondsSavedPerMergeClaimed": 0
     }

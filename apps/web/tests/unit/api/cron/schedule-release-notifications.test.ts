@@ -517,3 +517,50 @@ describe('fan release audience queue admission denial', () => {
     }
   );
 });
+
+// JOV-9779: with audience delivery denied, the scheduler reads only the
+// configured release-email canary profile and reports canary-only.
+describe('release-email canary carve-out under the audience denial', () => {
+  let mockedEnv: Record<string, unknown>;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    audiencePolicy.open = false;
+    mockedEnv = (await import('@/lib/env-server')).env as unknown as Record<
+      string,
+      unknown
+    >;
+    mockDbSelect.mockReturnValue(createFromWhereChain([]));
+  });
+
+  afterEach(() => {
+    delete mockedEnv.RELEASE_EMAIL_CANARY_PROFILE_ID;
+    delete mockedEnv.RELEASE_EMAIL_CANARY_INBOX;
+  });
+
+  it('scopes the release query to the canary when configured', async () => {
+    mockedEnv.RELEASE_EMAIL_CANARY_PROFILE_ID =
+      '0de33b39-ebcf-42ef-bcdd-c22bd8577368';
+    mockedEnv.RELEASE_EMAIL_CANARY_INBOX =
+      'release-canary+synthetic-release-email@jovie.fm';
+
+    expect(await scheduleReleaseNotifications()).toMatchObject({
+      scheduled: 0,
+      releasesFound: 0,
+      canaryOnly: true,
+      policyBlocked: { reason: 'audience_delivery_disabled' },
+    });
+    expect(mockDbSelect).toHaveBeenCalledTimes(1);
+    expect(mockDbInsert).not.toHaveBeenCalled();
+  });
+
+  it('reads nothing when the configured inbox is a real address', async () => {
+    mockedEnv.RELEASE_EMAIL_CANARY_PROFILE_ID =
+      '0de33b39-ebcf-42ef-bcdd-c22bd8577368';
+    mockedEnv.RELEASE_EMAIL_CANARY_INBOX = 'fan@example.com';
+
+    const result = await scheduleReleaseNotifications();
+    expect(result).not.toHaveProperty('canaryOnly');
+    expect(mockDbSelect).not.toHaveBeenCalled();
+  });
+});

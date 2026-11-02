@@ -983,7 +983,11 @@ jobs:
             exit 0
           fi
           floor="$(date -u -d "$EVENT_UPDATED_AT" +%s)"
-          runs="$(node packages/api-client/cli.ts gh --priority default -- api "repos/$REPOSITORY/actions/workflows/fleet-rules-evidence.yml/runs?head_sha=$HEAD_SHA&event=pull_request_target&per_page=20")" || runs='{"workflow_runs":[]}'
+          # Never filter by head_sha: a pull_request_target run for an `edited` event
+          # carries the BASE sha as its head_sha (#24184), so the head_sha filter hid
+          # every post-edit verdict. Bind by PR title, head branch/repo and the floor.
+          ref_q="$(jq -rn --arg r "$HEAD_REF" '$r | @uri')"
+          runs="$(node packages/api-client/cli.ts gh --priority default -- api "repos/$REPOSITORY/actions/workflows/fleet-rules-evidence.yml/runs?branch=$ref_q&event=pull_request_target&per_page=20")" || runs='{"workflow_runs":[]}'
           row="$(jq -r --argjson floor "$floor" --arg title "fleet-rules #$PR_NUMBER base=main" --arg ref "$HEAD_REF" --argjson repo "$HEAD_REPO_ID" '[.workflow_runs[] | select(.path == ".github/workflows/fleet-rules-evidence.yml" and .display_title == $title and .head_branch == $ref and .head_repository.id == $repo and (.created_at | fromdateiso8601) >= ($floor - 10) and .conclusion != "cancelled")] | sort_by([.created_at, .id]) | last // {status: "missing"} | "\(.status)\t\(.conclusion // "")\t\(.html_url // "")"' <<<"$runs" 2>/dev/null || echo 'missing')"
           IFS=$'\t' read -r status conclusion url <<<"$row"
           case "$status/$conclusion" in

@@ -331,6 +331,10 @@ def reconcile(state: Path, repo: Path, open_prs: frozenset[str] | None, *, run=s
         moves += 1
         report["moved"].append({"issue": row["identifier"], "from": current, "to": target, "reason": why})
     # A claim is a reservation, not an owner: release every active claim whose run is over.
+    # A worktree checkout is not liveness: every live run holds its run lease (the kernel
+    # releases it if the worker dies), so a checkout without one is a leftover of a preserved
+    # or crashed run. Keeping the claim on it stranded JOV-7577 for as long as the checkout
+    # existed while the doctor already reported the claim stranded (JOV-10218).
     for issue_id, claim in claims.items():
         if claim.get("status") != "active" or now - (claim.get("claimedAt") or now) < CLAIM_GRACE_S:
             continue
@@ -340,7 +344,7 @@ def reconcile(state: Path, repo: Path, open_prs: frozenset[str] | None, *, run=s
             # Another team's claim (a repo binding): its lock is the binding issue lock. Without
             # this a binding run that died left its claim `active` forever (LYB-180: 238 h).
             lease = binding_lease(state, ident) or lease
-        if lease == "live" or ident in worktrees:
+        if lease == "live":
             continue
         if lease is None and now - claim["claimedAt"] < LEGACY_RUN_GRACE_S:
             continue

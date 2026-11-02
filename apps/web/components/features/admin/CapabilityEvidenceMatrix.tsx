@@ -1,5 +1,6 @@
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { MeasuredValue } from '@/components/molecules/MeasuredValue';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   CAPABILITY_STAGE_LABEL,
@@ -10,21 +11,38 @@ import {
 
 const REPOSITORY_URL = 'https://github.com/JovieInc/Jovie';
 
-const NOT_MEASURED = 'n/a';
-
-function formatObservation(observation: CapabilityObservation): string {
-  if (observation.error) return 'source error';
-  if (!observation.measured) return NOT_MEASURED;
+function ObservationValue({
+  observation,
+}: Readonly<{ readonly observation: CapabilityObservation }>) {
+  if (observation.error || !observation.measured) {
+    return (
+      <MeasuredValue
+        state='unknown'
+        source='Analytics'
+        reason={observation.error ? 'source error' : 'not instrumented'}
+      />
+    );
+  }
   const count = (observation.count ?? 0).toLocaleString('en-US');
   const latest = observation.latestAt
     ? ` · latest ${observation.latestAt}`
     : '';
-  return `${count} in ${observation.windowDays}d${observation.stale ? ' · stale' : ''}${latest}`;
+  return (
+    <MeasuredValue
+      state={observation.stale ? 'stale' : 'measured'}
+      source='Analytics'
+      value={`${count} in ${observation.windowDays}d${latest}`}
+    />
+  );
 }
 
-function formatDeployment(record: CapabilityEvidenceRecord): string {
+function DeploymentValue({
+  record,
+}: Readonly<{ readonly record: CapabilityEvidenceRecord }>) {
   const { commitSha, version, environment } = record.deployment;
-  if (!commitSha) return NOT_MEASURED;
+  if (!commitSha) {
+    return <MeasuredValue state='unknown' source='Build info' />;
+  }
   const sha = commitSha.slice(0, 7);
   const base = version ? `${version} ${sha}` : sha;
   return environment ? `${base} (${environment})` : base;
@@ -67,18 +85,26 @@ export function CapabilityEvidenceMatrix({
           <ContentMetricRow
             label='Certified'
             value={
-              certification
-                ? `${certification.state} (${certification.readiness})`
-                : NOT_MEASURED
+              certification ? (
+                `${certification.state} (${certification.readiness})`
+              ) : (
+                <MeasuredValue state='unknown' source='Feature registry' />
+              )
             }
           />
           <ContentMetricRow
             label='Evidence Rev'
-            value={digest ? `${digest}…` : NOT_MEASURED}
+            value={
+              digest ? (
+                `${digest}…`
+              ) : (
+                <MeasuredValue state='unknown' source='Feature registry' />
+              )
+            }
           />
           <ContentMetricRow
             label='Deployed Build'
-            value={formatDeployment(record)}
+            value={<DeploymentValue record={record} />}
           />
           <ContentMetricRow
             label='Configured Rollout'
@@ -86,15 +112,25 @@ export function CapabilityEvidenceMatrix({
           />
           <ContentMetricRow
             label='Observed Exposure'
-            value={formatObservation(record.exposure)}
+            value={<ObservationValue observation={record.exposure} />}
           />
           <ContentMetricRow
             label='Observed Outcome'
-            value={formatObservation(record.outcome)}
+            value={<ObservationValue observation={record.outcome} />}
           />
           <ContentMetricRow
             label='Running Client'
-            value={record.clientSha ? record.clientSha.slice(0, 7) : 'unknown'}
+            value={
+              record.clientSha ? (
+                record.clientSha.slice(0, 7)
+              ) : (
+                <MeasuredValue
+                  state='unknown'
+                  source='Client telemetry'
+                  reason='not instrumented'
+                />
+              )
+            }
           />
         </div>
         <p className='min-h-4 break-words text-2xs leading-4 text-tertiary-token'>

@@ -558,6 +558,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/(marketing)/changelog/rss.xml/route.ts",
+      "kind": "handler",
+      "route": "/changelog/rss.xml",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/(marketing)/changelog/whats-new.json/route.ts",
       "kind": "handler",
       "route": "/changelog/whats-new.json",
@@ -785,6 +793,14 @@
       "source": "apps/web/app/(marketing)/product/utm-links/page.tsx",
       "kind": "page",
       "route": "/product/utm-links",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/(marketing)/proof/methodology/page.tsx",
+      "kind": "page",
+      "route": "/proof/methodology",
       "methods": [],
       "surface": "deferred",
       "classification": "C"
@@ -3308,7 +3324,7 @@
       "source": "apps/web/app/api/internal/ovie/golden-path-evidence/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/golden-path-evidence",
-      "methods": ["POST"],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3364,6 +3380,22 @@
       "source": "apps/web/app/api/internal/ovie/summer-bottleneck/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-bottleneck",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/ovie/summer-cards/[id]/decision/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-cards/[id]/decision",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/ovie/summer-cards/[id]/supersede/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-cards/[id]/supersede",
       "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
@@ -3425,6 +3457,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/summer-company/golden-path/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-company/golden-path",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/summer-company/revenue/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/revenue",
@@ -3444,6 +3484,14 @@
       "source": "apps/web/app/api/internal/ovie/summer-shadow/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-shadow",
+      "methods": ["GET", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/proof-stats/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/proof-stats",
       "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
@@ -4180,6 +4228,14 @@
       "source": "apps/web/app/api/profile-alias-decision/route.ts",
       "kind": "handler",
       "route": "/api/profile-alias-decision",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/profile-publication/route.ts",
+      "kind": "handler",
+      "route": "/api/profile-publication",
       "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"

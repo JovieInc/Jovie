@@ -38,6 +38,23 @@ describe('ChatUsageAlert', () => {
     mockUseChatUsageQuery.mockReset();
   });
 
+  it('shows the exhausted plan limit as a notice, not an error', () => {
+    mockUsage({
+      plan: 'free',
+      used: 15,
+      remaining: 0,
+      weeklyLimit: 15,
+      warningThreshold: 3,
+      isNearLimit: true,
+      isExhausted: true,
+    });
+    const { container } = render(<ChatUsageAlert />);
+    expect(container.querySelector('[data-variant]')).toHaveAttribute(
+      'data-variant',
+      'info'
+    );
+  });
+
   it('renders nothing while usage is healthy', () => {
     mockUsage({
       plan: 'free',

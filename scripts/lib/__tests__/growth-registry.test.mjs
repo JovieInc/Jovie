@@ -30,12 +30,13 @@ describe('growth loop registry', () => {
     expect(validateExperiments(experiments, loops)).toEqual([]);
   });
 
-  it('seeds the six launch loops', () => {
+  it('registers the launch loops plus the positioning loop', () => {
     expect(loops.entries.map(l => l.id).sort()).toEqual([
       'artist-referral',
       'claim-link-outreach',
       'ig-scene-gating',
       'jovie-spotted-drafts',
+      'positioning-hero',
       'seo-gsc-pages',
       'via-jovie-footer',
     ]);

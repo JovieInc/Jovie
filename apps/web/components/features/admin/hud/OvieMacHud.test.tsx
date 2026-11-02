@@ -20,10 +20,6 @@ vi.mock('./OvieLauncherRail', () => ({
   OvieLauncherRail: () => null,
 }));
 
-vi.mock('@/components/features/admin/summer-cards', () => ({
-  SummerCardReviewPanel: () => <div data-testid='summer-card-review-panel' />,
-}));
-
 const snapshot: OvieMacHudSnapshot = {
   alive: {
     cashUsd: null,

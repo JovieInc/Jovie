@@ -201,7 +201,7 @@ pnpm --filter web exec vitest run <affected test file>   # if applicable
 git add <files>
 git commit -m "fix(design-system): <conventional commit message>"
 git push -u origin tim/<chunk-slug>
-gh pr create --draft --base main --title "fix(design-system): <title>" --body "<body>"
+pnpm pr:open open --draft --title "fix(design-system): <title>" --failing-command "<cmd>" --failing-run "<url>"
 
 # 6. QA (REQUIRED -- flag is mandatory)
 # Invoke /qa --exhaustive

@@ -24,6 +24,16 @@ import {
  * sitekey. A test-mode widget grants nothing on its own: /api/chat
  * re-verifies and consumes the token before accepting a test-mode Turnstile
  * token.
+ *
+ * Every deny/grant site pairs the environment-gated `logger` call with a
+ * raw `console` mirror of the same message and payload. The shared logger
+ * no-ops on production builds (lib/utils/logger.ts), which left denial
+ * reasons invisible exactly when they matter: diagnosing a prod cert red
+ * (`/api/chat` 403 `siteverify_failed`, JOV-9625) remotely, from the
+ * requestId the 403 body already carries. The mirror is what Vercel Runtime
+ * Logs capture. Payloads are audit fields only — scope, hashed subject,
+ * jti, run id, requestId — never the token, the raw claims, or any secret
+ * value. Keep each mirror's message byte-identical to its logger call.
  */
 
 const JTI_KEY_PREFIX = 'synthetic-passage:jti:';
@@ -56,6 +66,8 @@ export async function resolveSyntheticPassageToken(
   const key = passageKey();
   if (!key) {
     logger.warn('[synthetic-passage-token] denied: disabled', base);
+    if (!logger.enabled)
+      console.warn('[synthetic-passage-token] denied: disabled', base);
     return null;
   }
 
@@ -65,6 +77,11 @@ export async function resolveSyntheticPassageToken(
       ...base,
       reason: verdict.reason,
     });
+    if (!logger.enabled)
+      console.warn('[synthetic-passage-token] denied', {
+        ...base,
+        reason: verdict.reason,
+      });
     return null;
   }
   const { claims } = verdict;
@@ -84,11 +101,15 @@ export async function resolveSyntheticPassageToken(
     const rate = await syntheticPassageTokenLimiter.limit(scope);
     if (!rate.success) {
       logger.warn('[synthetic-passage-token] denied: rate limit', audit);
+      if (!logger.enabled)
+        console.warn('[synthetic-passage-token] denied: rate limit', audit);
       return null;
     }
     const redis = getRedis();
     if (!redis) {
       logger.warn('[synthetic-passage-token] denied: no redis', audit);
+      if (!logger.enabled)
+        console.warn('[synthetic-passage-token] denied: no redis', audit);
       return null;
     }
     const ttl = Math.max(60, claims.exp - Math.floor(Date.now() / 1000) + 60);
@@ -98,6 +119,8 @@ export async function resolveSyntheticPassageToken(
     });
     if (claimed !== 'OK') {
       logger.warn('[synthetic-passage-token] denied: replay', audit);
+      if (!logger.enabled)
+        console.warn('[synthetic-passage-token] denied: replay', audit);
       return null;
     }
   } catch (error) {
@@ -105,9 +128,15 @@ export async function resolveSyntheticPassageToken(
       ...audit,
       error: error instanceof Error ? error.message : String(error),
     });
+    if (!logger.enabled)
+      console.warn('[synthetic-passage-token] denied: store error', {
+        ...audit,
+        error: error instanceof Error ? error.message : String(error),
+      });
     return null;
   }
 
   logger.info('[synthetic-passage-token] granted', audit);
+  if (!logger.enabled) console.info('[synthetic-passage-token] granted', audit);
   return { actorId: 'prodcert', claims };
 }

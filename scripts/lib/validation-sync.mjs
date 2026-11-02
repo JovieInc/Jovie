@@ -240,6 +240,103 @@ const PULL_FILES = /^repos\/[^/]+\/[^/]+\/pulls\/(\d+)\/files\?/;
 const SHA_COMPARE =
   /^repos\/[^/]+\/[^/]+\/compare\/[0-9a-f]{40}\.\.\.[0-9a-f]{40}$/i;
 export const GITHUB_CACHE_KEEP = 4000;
+const MAX_CLOSED_PULL_SNAPSHOT_PAGES = 10;
+
+/**
+ * @typedef {{
+ *   number: number,
+ *   title: string,
+ *   body: string,
+ *   headRef: string,
+ *   merged: boolean,
+ *   mergedAt: string,
+ *   mergeCommitSha: string,
+ *   baseRef: string,
+ * }} ClosedPullSnapshotEntry
+ */
+
+/**
+ * @param {string} link
+ * @returns {string}
+ */
+function nextPageLink(link) {
+  for (const part of String(link ?? '').split(',')) {
+    const match = /<([^>]+)>;\s*rel="next"/i.exec(part);
+    if (match) return match[1];
+  }
+  return '';
+}
+
+/**
+ * The GitHub client takes an API path, while a Link header carries an
+ * absolute URL. Return the path so the next page request does not carry
+ * the API origin twice (a 404 that would silently degrade the snapshot to
+ * its fallback after one page).
+ * @param {string} url
+ * @returns {string}
+ */
+function apiPathFromLinkUrl(url) {
+  return String(url).replace(/^https:\/\/api\.github\.com\//i, '');
+}
+
+/**
+ * One bounded listing that answers whether the pull requests Linear attaches
+ * to lifecycle issues are merged, without a per-issue `pulls/N` read. A full
+ * sweep re-reads every attachment number otherwise; unmerged pulls are never
+ * immutable, so they are re-read by every sweep until the shared
+ * GITHUB_TOKEN quota dies partway (2026-10-30, run 41157880216: ~70 issues
+ * in, 194 deferred, and a Merging issue starved behind the backlog).
+ * `state=closed` returns merged and closed-unmerged rows together, so a
+ * snapshot row that is not merged can never become a binding merge; open
+ * numbers are answered by the complete open scan. Numbers outside the window
+ * fall back to the per-pull read, so the snapshot never changes a binding
+ * decision — it only removes reads that cannot change it.
+ *
+ * @param {{
+ *   readonly fetchImpl: HttpFetch,
+ *   readonly token: string,
+ *   readonly repository: string,
+ *   readonly maxPages?: number,
+ * }} input
+ * @returns {Promise<Map<number, ClosedPullSnapshotEntry>>}
+ */
+export async function readClosedPullSnapshot(input) {
+  const maxPages = input.maxPages ?? MAX_CLOSED_PULL_SNAPSHOT_PAGES;
+  const github = githubClient(input.fetchImpl, input.token);
+  /** @type {Map<number, ClosedPullSnapshotEntry>} */
+  const snapshot = new Map();
+  let path = `repos/${input.repository}/pulls?state=closed&sort=updated&direction=desc&per_page=100&page=1`;
+  for (let page = 0; page < maxPages; page += 1) {
+    const { body, link } = await github(path);
+    if (!Array.isArray(body)) {
+      throw new Error('GitHub closed pull request snapshot was not a list');
+    }
+    for (const row of body) {
+      const number = Number(row?.number);
+      if (!Number.isInteger(number) || number <= 0) continue;
+      const mergedAt = typeof row?.merged_at === 'string' ? row.merged_at : '';
+      const mergeCommitSha =
+        typeof row?.merge_commit_sha === 'string' &&
+        /^[0-9a-f]{40}$/i.test(row.merge_commit_sha)
+          ? row.merge_commit_sha.toLowerCase()
+          : '';
+      snapshot.set(number, {
+        number,
+        title: typeof row?.title === 'string' ? row.title : '',
+        body: typeof row?.body === 'string' ? row.body : '',
+        headRef: typeof row?.head?.ref === 'string' ? row.head.ref : '',
+        merged: Boolean(mergedAt) && Boolean(mergeCommitSha),
+        mergedAt,
+        mergeCommitSha,
+        baseRef: typeof row?.base?.ref === 'string' ? row.base.ref : '',
+      });
+    }
+    const next = nextPageLink(link);
+    if (!next) break;
+    path = apiPathFromLinkUrl(next);
+  }
+  return snapshot;
+}
 
 /**
  * Reuse the release owner's complete byte/producer/attempt classifier.
@@ -584,6 +681,8 @@ export function pullImplementsIssue(pull, identifier) {
  *   readonly identifier: string,
  *   readonly attachmentUrls: readonly string[],
  *   readonly eventPull?: { number: number },
+ *   readonly closedPulls?: ReadonlyMap<number, ClosedPullSnapshotEntry>,
+ *   readonly openPullNumbers?: ReadonlySet<number>,
  * }} input
  * @returns {Promise<MergedPull[]>}
  */
@@ -609,6 +708,18 @@ export async function listMergedLinkedPulls(input) {
   /** @type {number[]} */
   const unreadable = [];
   for (const number of selected) {
+    const closed = input.closedPulls?.get(number);
+    if (closed && !closed.merged) {
+      // Closed without merging: the number can never become a binding merge,
+      // and the snapshot row already carries the answer the per-pull read
+      // would return. Unmerged pulls are not immutable, so without this cut
+      // every sweep re-reads them until the shared quota dies.
+      continue;
+    }
+    if (input.openPullNumbers?.has(number)) {
+      // The open scan is complete, so an open number cannot be merged.
+      continue;
+    }
     let body;
     try {
       ({ body } = await input.github(
@@ -791,6 +902,8 @@ export function selectStateId(name, states) {
  *   readonly assuranceMatrix: unknown,
  *   readonly linear: LinearPort,
  *   readonly eventPull?: { number: number },
+ *   readonly closedPulls?: ReadonlyMap<number, ClosedPullSnapshotEntry>,
+ *   readonly openPullNumbers?: ReadonlySet<number>,
  *   readonly dryRun?: boolean,
  *   readonly now?: () => Date,
  *   readonly log: (message: string) => void,
@@ -835,6 +948,8 @@ export async function reconcileValidation(ctx) {
     identifier: issue.identifier,
     attachmentUrls: issue.attachmentUrls,
     eventPull: ctx.eventPull,
+    closedPulls: ctx.closedPulls,
+    openPullNumbers: ctx.openPullNumbers,
   });
   const escapedDefect = evaluateEscapedDefectClosure({
     ...issue,

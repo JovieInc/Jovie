@@ -92,6 +92,9 @@ CLOCKS = (
     Clock("prodGoldenPathCert", "postdeploy-probes.yml", "clock_prod_golden_path_cert", 12 * 3600,
           "prod-golden-path-cert-clock.json", github_cron=False,
           ignored_events=frozenset({"workflow_run"})),
+    # Hourly Vercel budget forecast and runtime-log signatures (2026-10-29 pause went unwarned ~1 h).
+    Clock("spendGuard", "spend-guard.yml", "clock_spend_guard", 3600,
+          "spend-guard-clock.json", github_cron=False),
 )
 CONTINUITY = CLOCKS[0]
 
