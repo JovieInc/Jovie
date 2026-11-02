@@ -61,15 +61,13 @@ jobs:
         if: steps.stale.outputs.count != '0'
         run: pnpm turbo build --filter=@jovie/web
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_mock
-          CLERK_SECRET_KEY: sk_test_mock
           DATABASE_URL: postgresql://localhost/noop
 
       - name: Start server and capture
         if: steps.stale.outputs.count != '0'
         run: |
           set -euo pipefail
-          (cd apps/web && PORT=3100 DATABASE_URL=postgresql://localhost/noop NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_mock CLERK_SECRET_KEY=sk_test_mock NEXT_DISABLE_TOOLBAR=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_E2E_MODE=1 VERCEL_ENV=development HOSTNAME=localhost NEXT_PUBLIC_APP_URL=http://127.0.0.1:3100 pnpm run start) > "$RUNNER_TEMP/server.log" 2>&1 &
+          (cd apps/web && PORT=3100 DATABASE_URL=postgresql://localhost/noop NEXT_DISABLE_TOOLBAR=1 NEXT_PUBLIC_E2E_MODE=1 VERCEL_ENV=development HOSTNAME=localhost NEXT_PUBLIC_APP_URL=http://127.0.0.1:3100 pnpm run start) > "$RUNNER_TEMP/server.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/server.pid"
           for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:3100 >/dev/null 2>&1 && break; sleep 2; done
           node scripts/design-surface-capture.mjs --base-url http://127.0.0.1:3100 --out "$RUNNER_TEMP/captures"
