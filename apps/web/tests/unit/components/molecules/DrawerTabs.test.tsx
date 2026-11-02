@@ -49,14 +49,12 @@ describe('DrawerTabs', () => {
     expect(activeTab).toHaveAttribute('aria-selected', 'true');
     expect(inactiveTab).toHaveAttribute('aria-selected', 'false');
     expect(activeTab).toHaveClass(
-      'rounded-md',
-      'border-subtle',
-      'bg-surface-0',
+      'rounded-full',
+      'bg-(--surface-2)',
       'shadow-none'
     );
     expect(activeTab).not.toHaveClass('ring-(--color-accent)');
     expect(inactiveTab).toHaveClass(
-      'border-transparent',
       'focus-visible:ring-2',
       'focus-visible:ring-focus/35'
     );

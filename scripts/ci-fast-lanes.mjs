@@ -229,6 +229,16 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
+    // Compliance loop: privacy rules with negative controls and the tracker
+    // registry shape. The input-route tracker guard stays its own source guard.
+    id: 'privacy-compliance',
+    command:
+      'node --test --test-isolation=none scripts/compliance/privacy-rules.test.mjs',
+    inputs:
+      /^(?:apps\/web\/app\/|apps\/web\/components\/features\/tracking\/|apps\/web\/content\/legal\/|canon\/privacy\/|scripts\/compliance\/|scripts\/ci-fast-lanes\.mjs$)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     id: 'artist-profile-conformance',
     // Source Validation loads this module from trusted main; older heads may lack these files.
     command: `node ${shellQuote(fileURLToPath(new URL('./artist-profile-conformance.mjs', import.meta.url)))} && node --test --test-isolation=none ${shellQuote(fileURLToPath(new URL('./artist-profile-conformance.test.mjs', import.meta.url)))}`,
@@ -282,9 +292,9 @@ export const SOURCE_GUARDS = Object.freeze([
     // rejected; coverage floors keep the verifier itself fully exercised.
     id: 'outcome-verifier',
     command:
-      'pnpm exec vitest --root scripts --config vitest.config.mts run --coverage --coverage.include=lib/outcome-verifier.mjs --coverage.reporter=text --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-outcome-verifier-coverage" --coverage.thresholds.lines=100 --coverage.thresholds.functions=100 --coverage.thresholds.branches=90 lib/__tests__/outcome-verifier.test.mjs',
+      'pnpm exec vitest --root scripts --config vitest.config.mts run --coverage --coverage.include=lib/outcome-verifier.mjs --coverage.reporter=text --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-outcome-verifier-coverage" --coverage.thresholds.lines=100 --coverage.thresholds.functions=100 --coverage.thresholds.branches=90 lib/__tests__/outcome-verifier.test.mjs lib/__tests__/ship-verify-receipt.test.mjs lib/__tests__/skills-verify-outcome.test.mjs',
     inputs:
-      /^(?:scripts\/lib\/(?:outcome-verifier\.mjs|__tests__\/outcome-verifier\.test\.mjs)|apps\/web\/app\/api\/chat\/(?:route|onboarding-handler)\.ts|apps\/web\/lib\/rate-limit\/limiters\.ts|scripts\/ci-fast-lanes\.mjs)$/u,
+      /^(?:scripts\/lib\/(?:outcome-verifier\.mjs|__tests__\/(?:outcome-verifier|ship-verify-receipt|skills-verify-outcome)\.test\.mjs)|apps\/web\/app\/api\/chat\/(?:route|onboarding-handler)\.ts|apps\/web\/lib\/rate-limit\/limiters\.ts|scripts\/ship-verify\.mjs|\.agents\/skills\/gstack\/(?:canary|land-and-deploy|qa-only|ship|investigate)\/SKILL\.md(?:\.tmpl)?|\.claude\/skills\/qa(?:-swarm)?\/SKILL\.md|scripts\/ci-fast-lanes\.mjs)$/u,
     prOnly: false,
   }),
   Object.freeze({
