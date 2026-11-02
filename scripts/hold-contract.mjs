@@ -163,6 +163,7 @@ function gh(args) {
  */
 function ghError(outcome) {
   const message = `${outcome.stderr}\n${outcome.stdout}`.trim();
+  /** @type {Error & { deferred?: boolean, exitCode?: number }} */
   const error = new Error(
     outcome.deferred
       ? `GitHub quota deferral: ${message || 'hold sweep deferred'}`
@@ -206,6 +207,7 @@ export async function sweepHolds({ now, dryRun, io }) {
       const completeWindow =
         pr.comments?.pageInfo?.hasPreviousPage === false ||
         oldestComment <= Date.parse(labeledAt) - RECEIPT_SKEW_MS;
+      /** @type {ReturnType<typeof evaluateHold>} */
       const verdict = completeWindow
         ? evaluateHold({ labeledAt, now, headSha: pr.headRefOid, comments })
         : { action: 'keep', reason: 'incomplete-evidence' };
