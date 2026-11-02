@@ -641,6 +641,20 @@ class StandaloneAndHeadroomTest(unittest.TestCase):
         self.state = self.base / "state"
         self.home.mkdir()
         self.state.mkdir()
+        # Fail before enumeration if a future test forgets its explicit fixture roots.
+        candidates = sweeper.standalone_candidates
+
+        def fixture_candidates(home, state, repos, **kw):
+            roots = [home, state, *kw.get("mounted_roots", sweeper.DEFAULT_MOUNTED_ROOTS)]
+            for root in roots:
+                resolved = root.resolve()
+                self.assertTrue(resolved == self.base or self.base in resolved.parents,
+                                f"cleanup fixture reached host root: {root}")
+            return candidates(home, state, repos, **kw)
+
+        candidate_guard = patch.object(sweeper, "standalone_candidates", fixture_candidates)
+        candidate_guard.start()
+        self.addCleanup(candidate_guard.stop)
         self.remote = self.base / "remote.git"
         git(self.base, "init", "-q", "--bare", "-b", "main", str(self.remote))
         seed = self.base / "seed"
@@ -659,7 +673,51 @@ class StandaloneAndHeadroomTest(unittest.TestCase):
 
     def sweep(self, **kw):
         return sweeper.sweep_standalone(self.home, self.state, [], [self.base / "never"], run=no_processes,
-                                        now=self.now, **kw)
+                                        now=self.now, mounted_roots=(), **kw)
+
+    def test_fixture_sweep_cannot_enumerate_or_remove_host_clones(self):
+        """A future fixture clock and fake ps must never escape the fixture root."""
+        path = self.clone("codex-worktrees/owned")
+        foreign = self.base / "mounted/codex-worktrees/foreign"
+        foreign.mkdir(parents=True)
+        (foreign / "sentinel").write_text("owner work\n")
+        real_glob = Path.glob
+        removed = []
+
+        def fixture_glob(base, pattern):
+            self.assertTrue(base == self.base or self.base in base.parents,
+                            f"cleanup fixture reached host root: {base}")
+            return real_glob(base, pattern)
+
+        def fixture_remove(target):
+            self.assertTrue(self.base in target.parents, target)
+            removed.append(target)
+            sweeper.shutil.rmtree(target)
+
+        with patch.object(Path, "glob", fixture_glob):
+            report = self.sweep(remove=fixture_remove)
+        self.assertEqual(report["removed"], [str(path)])
+        self.assertEqual(removed, [path])
+        self.assertEqual((foreign / "sentinel").read_text(), "owner work\n")
+
+    def test_explicit_mounted_roots_and_production_default(self):
+        default_globs = sweeper.standalone_globs(self.home, self.state)
+        self.assertIn((Path("/srv/worktrees"), "codex-worktrees/*"), default_globs)
+        local_globs = sweeper.standalone_globs(self.home, self.state, mounted_roots=())
+        self.assertNotIn((Path("/srv/worktrees"), "codex-worktrees/*"), local_globs)
+        mounted = self.base / "mounted"
+        path = mounted / "codex-worktrees/published"
+        git(self.base, "clone", "-q", str(self.remote), str(path))
+        self.assertEqual(sweeper.standalone_candidates(
+            self.home, self.state, [], mounted_roots=(mounted,)), [path])
+        self.assertEqual(sweeper.standalone_candidates(
+            self.home, self.state, [], mounted_roots=()), [])
+        self.assertEqual(sweeper.standalone_candidates(
+            self.home, self.state, [path], mounted_roots=(mounted,)), [])
+        report = sweeper.sweep_standalone(self.home, self.state, [], [], now=self.now,
+                                         run=no_processes, mounted_roots=(mounted,))
+        self.assertEqual(report["removed"], [str(path)])
+        self.assertFalse(path.exists())
 
     def test_clean_published_idle_clone_is_removed_and_logged_first(self):
         path = self.clone("grok-ship-workspaces/JOV/JOV-1")
@@ -693,7 +751,7 @@ class StandaloneAndHeadroomTest(unittest.TestCase):
         (self.state / "bindings.json").write_text('{"wt": "ref-me"}')
         busy = self.clone("grok-wt/busy")
         report = sweeper.sweep_standalone(
-            self.home, self.state, [], [], now=self.now,
+            self.home, self.state, [], [], now=self.now, mounted_roots=(),
             run=lambda args, **kw: SimpleNamespace(returncode=0, stdout=f"{busy}\n", stderr="")
             if args[0] == "ps" else no_processes(args, **kw))
         for path in (dirty, unpushed, stash, linked, kept, referenced, busy):
@@ -709,7 +767,7 @@ class StandaloneAndHeadroomTest(unittest.TestCase):
         git(path, "commit", "-qm", "local only")
         (path / "node_modules/x").mkdir(parents=True)
         (path / "node_modules/x/big.bin").write_bytes(b"0" * 4096)
-        report = sweeper.sweep_standalone(self.home, self.state, [], [], now=self.now, run=no_processes)
+        report = sweeper.sweep_standalone(self.home, self.state, [], [], now=self.now, run=no_processes, mounted_roots=())
         self.assertTrue(path.exists())
         self.assertTrue((path / "b.txt").exists())
         self.assertFalse((path / "node_modules").exists())
@@ -770,7 +828,7 @@ class StandaloneAndHeadroomTest(unittest.TestCase):
     def test_recent_clone_and_unreadable_process_inventory_keep_everything(self):
         path = self.clone("wt-fresh")
         self.assertEqual(self.sweep(idle_s=30 * DAY)["kept"], {"recent": 1})
-        broken = sweeper.sweep_standalone(self.home, self.state, [], [], now=self.now, run=lambda *a, **k: (_ for _ in ()).throw(OSError("no ps")))
+        broken = sweeper.sweep_standalone(self.home, self.state, [], [], now=self.now, mounted_roots=(), run=lambda *a, **k: (_ for _ in ()).throw(OSError("no ps")))
         self.assertEqual(broken["errors"], ["process-state-unavailable"])
         self.assertTrue(path.exists())
 
@@ -828,7 +886,7 @@ class StandaloneAndHeadroomTest(unittest.TestCase):
     def test_candidates_skip_linked_worktrees_and_known_repos(self):
         repo = self.clone("codex-worktrees/primary")
         git(repo, "worktree", "add", "-q", "-b", "wt", str(self.home / "codex-worktrees/linked"), "origin/main")
-        names = [p.name for p in sweeper.standalone_candidates(self.home, self.state, [repo])]
+        names = [p.name for p in sweeper.standalone_candidates(self.home, self.state, [repo], mounted_roots=())]
         self.assertEqual(names, [])
 
     def test_default_roots_cover_the_ship_and_fleet_roots(self):
@@ -841,7 +899,7 @@ class StandaloneAndHeadroomTest(unittest.TestCase):
         never = sweeper.default_never(self.home)
         self.assertTrue(sweeper.in_scope(self.home / "wt" / "fix-thing", roots, never))
         self.assertFalse(sweeper.in_scope(self.home / "Jovie", roots, never))
-        self.assertIn((self.home, "wt/*"), sweeper.standalone_globs(self.home, self.state))
+        self.assertIn((self.home, "wt/*"), sweeper.standalone_globs(self.home, self.state, mounted_roots=()))
 
     def test_headroom_levels_and_alarm_events_on_change(self):
         usage = {Path("/a"): (100, 0, 20), Path("/b"): (100, 0, 25), Path("/c"): (100, 0, 10), Path("/d"): (100, 0, 60)}
