@@ -18,6 +18,7 @@ import {
   isTurnstileClientConfigured,
 } from '@/components/atoms/InvisibleTurnstile';
 import { track } from '@/lib/analytics';
+import { cn } from '@/lib/utils';
 import {
   GENERAL_WAITLIST_ROLES,
   WAITLIST_ROLES,
@@ -49,10 +50,8 @@ export function WaitlistRoleForm({
   const Heading = headingLevel === 1 ? 'h1' : headingLevel === 2 ? 'h2' : 'h3';
   const roles = variant === 'general' ? GENERAL_WAITLIST_ROLES : WAITLIST_ROLES;
   const [name, setName] = useState('');
-  const formRef = useRef<HTMLFormElement>(null);
   const confirmationRef = useRef<HTMLDivElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
-  const [reservedHeight, setReservedHeight] = useState<number>();
   const inputRef = useRef<HTMLInputElement>(null);
   const [role, setRole] = useState<WaitlistRole | ''>('');
   const [email, setEmail] = useState('');
@@ -118,6 +117,7 @@ export function WaitlistRoleForm({
     try {
       const response = await fetch(WAITLIST_ROLE_FORM_ENDPOINT, {
         method: 'POST',
+        signal: AbortSignal.timeout(15_000),
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: email.trim(),
@@ -136,14 +136,16 @@ export function WaitlistRoleForm({
         );
       }
       track('waitlist_role_form_joined', { role });
-      setReservedHeight(formRef.current?.getBoundingClientRect().height);
       setStatus('joined');
     } catch (error) {
       setStatus('error');
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : 'Something went wrong. Please try again.'
+        (error instanceof DOMException || error instanceof Error) &&
+          error.name === 'TimeoutError'
+          ? 'Request timed out. Please try again.'
+          : error instanceof Error
+            ? error.message
+            : 'Something went wrong. Please try again.'
       );
     } finally {
       setTurnstileToken('');
@@ -151,121 +153,123 @@ export function WaitlistRoleForm({
     }
   }
 
-  if (status === 'joined') {
-    return (
-      <div
-        ref={confirmationRef}
-        tabIndex={-1}
-        style={{ minHeight: reservedHeight }}
-        data-testid='waitlist-role-form-joined'
-        role='status'
-        className='flex w-full flex-col items-center gap-2 text-center'
-      >
-        <Heading className='text-balance text-xl font-medium tracking-tight text-primary-token'>
-          Request received
-        </Heading>
-        <p className='text-sm text-secondary-token'>
-          We&apos;ll email you an invite when your spot opens.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <form
-      ref={formRef}
-      onSubmit={handleSubmit}
-      data-testid='waitlist-role-form'
-      aria-labelledby={`${formId}-heading`}
-      className='flex w-full flex-col items-center gap-5'
-    >
-      <Heading
-        id={`${formId}-heading`}
-        className='text-balance text-xl font-medium tracking-tight text-primary-token'
-      >
-        Request access
-      </Heading>
-      {variant === 'general' ? (
-        <label
-          className='grid w-full gap-2 text-sm text-primary-token'
-          htmlFor={`${formId}-name`}
+    <div className='grid w-full'>
+      {status === 'joined' ? (
+        <div
+          ref={confirmationRef}
+          tabIndex={-1}
+          data-testid='waitlist-role-form-joined'
+          role='status'
+          className='col-start-1 row-start-1 flex w-full flex-col items-center gap-2 text-center'
         >
-          Your name
-          <Input
-            ref={nameRef}
-            id={`${formId}-name`}
-            name='name'
-            autoComplete='name'
-            required
-            maxLength={120}
-            value={name}
-            onChange={event => {
-              setName(event.target.value);
-              if (status === 'error' && !turnstileFailed) {
-                setStatus('idle');
-                setErrorMessage('');
-              }
-            }}
-          />
-        </label>
+          <Heading className='text-balance text-xl font-medium tracking-tight text-primary-token'>
+            Request received
+          </Heading>
+          <p className='text-sm text-secondary-token'>
+            We&apos;ll email you an invite when your spot opens.
+          </p>
+        </div>
       ) : null}
-      <RadioGroup
-        aria-label='Role'
-        value={role}
-        onValueChange={value => {
-          setRole(value as WaitlistRole);
-          if (status === 'error' && !turnstileFailed) {
-            setStatus('idle');
-            setErrorMessage('');
-          }
-        }}
+      <form
+        inert={status === 'joined'}
+        aria-hidden={status === 'joined' || undefined}
+        onSubmit={handleSubmit}
+        data-testid='waitlist-role-form'
+        aria-labelledby={`${formId}-heading`}
+        className={cn(
+          'col-start-1 row-start-1 flex w-full flex-col items-center gap-5',
+          status === 'joined' && 'invisible'
+        )}
       >
-        {roles.map(option => (
+        <Heading
+          id={`${formId}-heading`}
+          className='text-balance text-xl font-medium tracking-tight text-primary-token'
+        >
+          Request access
+        </Heading>
+        {variant === 'general' ? (
           <label
-            key={option.value}
-            htmlFor={`${formId}-${option.value}`}
-            className='flex min-h-11 cursor-pointer items-center gap-3 text-sm text-primary-token'
+            className='grid w-full gap-2 text-sm text-primary-token'
+            htmlFor={`${formId}-name`}
           >
-            <RadioGroupItem
-              id={`${formId}-${option.value}`}
-              value={option.value}
+            Name
+            <Input
+              ref={nameRef}
+              id={`${formId}-name`}
+              name='name'
+              autoComplete='name'
+              required
+              maxLength={120}
+              value={name}
+              onChange={event => {
+                setName(event.target.value);
+                if (status === 'error' && !turnstileFailed) {
+                  setStatus('idle');
+                  setErrorMessage('');
+                }
+              }}
             />
-            {option.label}
           </label>
-        ))}
-      </RadioGroup>
-      <InlineSubscribe
-        className='w-full'
-        inputId={`${formId}-email`}
-        inputRef={inputRef}
-        ariaLabel='Email address'
-        buttonLabel='Join'
-        value={email}
-        onValueChange={value => {
-          setEmail(value);
-          if (status === 'error' && !turnstileFailed) {
-            setStatus('idle');
-            setErrorMessage('');
-          }
-        }}
-        loading={status === 'submitting'}
-        pending={status === 'submitting'}
-        unavailable={turnstileFailed}
-        invalid={status === 'error' && !turnstileFailed}
-        describedBy={`${formId}-error`}
-      />
-      <InvisibleTurnstile
-        onToken={setTurnstileToken}
-        onStateChange={handleTurnstileStateChange}
-        resetSignal={turnstileResetSignal}
-      />
-      <p
-        id={`${formId}-error`}
-        className='min-h-5 text-sm text-accent-red'
-        role={status === 'error' ? 'alert' : undefined}
-      >
-        {status === 'error' ? errorMessage : ''}
-      </p>
-    </form>
+        ) : null}
+        <RadioGroup
+          aria-label='Role'
+          value={role}
+          onValueChange={value => {
+            setRole(value as WaitlistRole);
+            if (status === 'error' && !turnstileFailed) {
+              setStatus('idle');
+              setErrorMessage('');
+            }
+          }}
+        >
+          {roles.map(option => (
+            <label
+              key={option.value}
+              htmlFor={`${formId}-${option.value}`}
+              className='flex min-h-11 cursor-pointer items-center gap-3 text-sm text-primary-token'
+            >
+              <RadioGroupItem
+                id={`${formId}-${option.value}`}
+                value={option.value}
+              />
+              {option.label}
+            </label>
+          ))}
+        </RadioGroup>
+        <InlineSubscribe
+          className='w-full'
+          inputId={`${formId}-email`}
+          inputRef={inputRef}
+          ariaLabel='Email address'
+          buttonLabel='Join'
+          value={email}
+          onValueChange={value => {
+            setEmail(value);
+            if (status === 'error' && !turnstileFailed) {
+              setStatus('idle');
+              setErrorMessage('');
+            }
+          }}
+          loading={status === 'submitting'}
+          pending={status === 'submitting'}
+          unavailable={turnstileFailed}
+          invalid={status === 'error' && !turnstileFailed}
+          describedBy={`${formId}-error`}
+        />
+        <InvisibleTurnstile
+          onToken={setTurnstileToken}
+          onStateChange={handleTurnstileStateChange}
+          resetSignal={turnstileResetSignal}
+        />
+        <p
+          id={`${formId}-error`}
+          className='min-h-5 text-sm text-accent-red'
+          role={status === 'error' ? 'alert' : undefined}
+        >
+          {status === 'error' ? errorMessage : ''}
+        </p>
+      </form>
+    </div>
   );
 }

@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WaitlistRoleForm } from './WaitlistRoleForm';
 
@@ -18,6 +24,8 @@ describe('WaitlistRoleForm', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
@@ -43,21 +51,21 @@ describe('WaitlistRoleForm', () => {
       screen.getByRole('heading', { level: 3, name: 'Request access' })
     ).toBeVisible();
     expect(screen.queryByRole('radio', { name: 'Artist' })).toBeNull();
-    fireEvent.change(screen.getByLabelText('Your name'), {
+    fireEvent.change(screen.getByLabelText('Name'), {
       target: { value: ' Alex Example ' },
     });
     fireEvent.click(screen.getByRole('radio', { name: 'A team' }));
     fireEvent.change(screen.getByLabelText('Email address'), {
       target: { value: 'person@example.com' },
     });
-    vi.spyOn(
-      screen.getByTestId('waitlist-role-form'),
-      'getBoundingClientRect'
-    ).mockReturnValue({ height: 420 } as DOMRect);
+    const form = screen.getByTestId('waitlist-role-form');
     fireEvent.submit(screen.getByTestId('waitlist-role-form'));
     const confirmation = await screen.findByTestId('waitlist-role-form-joined');
-    expect(confirmation).toHaveFocus();
-    expect(confirmation).toHaveStyle({ minHeight: '420px' });
+    await waitFor(() => expect(confirmation).toHaveFocus());
+    expect(form).toHaveClass('invisible', 'col-start-1', 'row-start-1');
+    expect(form).toHaveAttribute('inert');
+    expect(form).toHaveAttribute('aria-hidden', 'true');
+    expect(confirmation).toHaveClass('col-start-1', 'row-start-1');
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
       name: 'Alex Example',
       role: 'team',
@@ -75,8 +83,8 @@ describe('WaitlistRoleForm', () => {
       'Enter your name.'
     );
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(screen.getByLabelText('Your name')).toHaveFocus();
-    fireEvent.change(screen.getByLabelText('Your name'), {
+    expect(screen.getByLabelText('Name')).toHaveFocus();
+    fireEvent.change(screen.getByLabelText('Name'), {
       target: { value: 'Alex' },
     });
     expect(screen.queryByRole('alert')).toBeNull();
@@ -114,6 +122,59 @@ describe('WaitlistRoleForm', () => {
       email: 'person@example.com',
       role: 'label',
     });
+  });
+
+  it('recovers a stalled join after 15 seconds and preserves input for retry', async () => {
+    vi.useFakeTimers();
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
+      const controller = new AbortController();
+      setTimeout(
+        () => controller.abort(new DOMException('Timed out', 'TimeoutError')),
+        ms
+      );
+      return controller.signal;
+    });
+    fetchMock.mockImplementationOnce(
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener(
+            'abort',
+            () => reject(init.signal?.reason),
+            { once: true }
+          );
+        })
+    );
+    render(<WaitlistRoleForm variant='general' />);
+    fireEvent.change(screen.getByLabelText('Name'), {
+      target: { value: 'Alex Example' },
+    });
+    fireEvent.click(screen.getByRole('radio', { name: 'A team' }));
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'person@example.com' },
+    });
+    fireEvent.submit(screen.getByTestId('waitlist-role-form'));
+    expect(screen.getByRole('button')).toBeDisabled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+    expect(screen.queryByRole('alert')).toHaveTextContent(
+      'Request timed out. Please try again.'
+    );
+    expect(timeout).toHaveBeenCalledWith(15_000);
+    expect(screen.getByLabelText('Name')).toHaveValue('Alex Example');
+    expect(screen.getByLabelText('Email address')).toHaveValue(
+      'person@example.com'
+    );
+    expect(screen.getByRole('radio', { name: 'A team' })).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Join' })).toBeEnabled();
+    vi.useRealTimers();
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ state: 'joined' }), { status: 201 })
+    );
+    fireEvent.submit(screen.getByTestId('waitlist-role-form'));
+    expect(
+      await screen.findByTestId('waitlist-role-form-joined')
+    ).toHaveFocus();
   });
 
   it('keeps the input and shows the server error on failure', async () => {
