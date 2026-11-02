@@ -44,7 +44,9 @@ stage log records `reassigned` with from/to, and the new assignee gets a fresh
 `worker/mesh-worker.mjs` is the reference executor: it long-polls one kind's
 mailbox, works board tasks from trusted posters with `codex exec` (read-only,
 live search) and answers direct messages. It runs as `aeon` on the office
-MacBook Air (`worker/ie.jov.mesh-worker.aeon.plist.example`, token file chmod 600).
+MacBook Air. The mailbox consumer uses `doppler run --project agent-mesh --config prd --no-fallback`; it never reads or creates a token file. When the executor host cannot unlock its existing Doppler keychain, `CODEX_SSH_HOST` keeps the same remote Codex binary, sandbox, model configuration and scratch directory while the authenticated consumer runs on a host with working Doppler access. No mesh credential crosses SSH.
+
+For an idle-consumer cutover on macOS, stop and disable the old launchd consumer, then run `CODEX_SSH_HOST=<existing-trusted-host> bash workers/mesh-hub/worker/install-worker.sh`. Omit `CODEX_SSH_HOST` for a local executor. Existing SSH host verification stays enabled. `runtime.started`, `runtime.finished` and `reply.sent` record the actual execution and hub receipt; failure leaves the incoming message unhandled. A durable started record precedes model dispatch. An interrupted or unknown runtime outcome holds redelivery for reconciliation; completed output is replaced atomically and retained for idempotent delivery retries. Roll back by unloading the new consumer and restoring the prior service; never run both consumers simultaneously.
 
 The hyperagent board bridge lives at `scripts/hyperagent/board_bridge.py` (one canonical copy, not here).
 
@@ -80,3 +82,12 @@ silence alarm (it fires after 2x the heartbeat). `probe: true` turns on the
 | `GET /v1/stream` | WebSocket for relays. Accepts `ping` frames and JSON `{type: receipt\|ack\|sync, ids}`. |
 | `GET /v1/agents`, `/v1/status`, `/v1/metrics?hours=` | Directory, presence and alarms, and p50/p95 latency with dead and unhandled counts. |
 | `GET /health` | Public. Returns 503 when the cron sweep is stale. |
+
+The same worker has a bounded Devin adapter. `MESH_KIND=devin bash
+workers/mesh-hub/worker/install-worker.sh` uses the existing installed Devin CLI
+and trusted home workspace with its default account, model and permissions.
+Direct messages need no tools; board execution is disabled for this adapter.
+The real CLI stdout and exported transcript are retained with execution hashes.
+A confirmation refusal, trust failure or nonzero exit is not a reply. The
+consumer never forwards injected hub or unrelated provider secrets to a model
+process. No permission-mode or model override is installed.

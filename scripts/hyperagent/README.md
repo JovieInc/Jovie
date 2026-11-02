@@ -41,3 +41,20 @@ repeat qualification. Roll back by installing the preceding repository revision.
 Run `python3 -m pytest scripts/tests/test_hyperagent_cli.py -q` for deterministic
 compatibility tests. The existing canonical lane coverage selector also runs
 these tests and enforces 90% combined branch coverage on the managed CLI/installer.
+
+
+The board bridge also answers authenticated direct messages from `claude` and
+`summer` through the existing hosted agent. It persists the generated response
+before sending, uses a stable reply correlation ID, and acknowledges the inbound
+message only after hub acceptance. A runtime with an unknown outcome is held for
+reconciliation rather than creating another paid thread. The existing 24/day
+cap covers direct and board work together.
+
+`bash scripts/hyperagent/install-board-bridge.sh` installs the same source through
+launchd on macOS or the existing systemd user unit on Linux. Both require
+`doppler run --project agent-mesh --config prd --no-fallback` to inject
+`MESH_HUB_TOKEN_HYPERAGENT`; token files are not used. Stop the old consumer only
+after checking no task is running, preserve run counters and pending reply state,
+and disable its autostart before moving hosts. The installer retains the prior
+script as `.prev` for rollback. No OAuth, approval, model or budget setting is
+changed by the installer.
