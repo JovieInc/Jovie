@@ -10,10 +10,7 @@ import * as fs from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-/**
- * Linear takes a personal API key raw (`lin_api_…`) and an OAuth access token
- * (an app actor such as Jovie Lanes) as `Bearer <token>`.
- */
+/** Personal keys (`lin_api_…`) stay raw; OAuth access tokens use Bearer. */
 export function linearAuthorization(key) {
   if (/^Bearer\s/i.test(key) || key.startsWith('lin_api_')) return key;
   return `Bearer ${key}`;
@@ -54,56 +51,73 @@ export function legacyCooldownRoots(
   return [...new Set(roots)].filter(root => root && root !== canonical);
 }
 
-/**
- * Per-uid tmp fallback used when the shared state dir rejects a write.
- * `LINEAR_COOLDOWN_FALLBACK_DIR` overrides the location so a process can own
- * its fallback surface outright. Without it, a replayed publish-failure
- * scenario inside the deadline window inherits the previous run's live
- * fallback record and reports cooling-down instead of the failure under
- * test (merge-group run 41019753132, structural command 42/61).
- */
+/** Tmp fallback. LINEAR_COOLDOWN_FALLBACK_DIR isolates the live tmp root. */
 export function fallbackCooldownRoot(env = process.env) {
   if (env.LINEAR_COOLDOWN_FALLBACK_DIR) return env.LINEAR_COOLDOWN_FALLBACK_DIR;
   const uid = process.getuid ? process.getuid() : 'shared';
   return join(tmpdir(), `jovie-linear-cooldown-${uid}`);
 }
 
-// Cooldowns this process failed to persist, keyed by credential scope hash.
-// Raw keys never reach the map or the fallback files (JOV-7577).
+// In-process deadlines for writes the shared dir rejected. Raw keys stay out.
 const processCooldowns = new Map();
 let unwritableEventFired = false;
 
+async function writePrivateJson(directory, name, body, flag) {
+  await fs.mkdir(directory, { recursive: true, mode: 0o700 });
+  const target = join(directory, name);
+  const fd = await fs.open(target, flag, 0o600);
+  try {
+    await fd.writeFile(JSON.stringify(body));
+    await fd.sync();
+  } finally {
+    await fd.close();
+  }
+  await fs.chmod(target, 0o600);
+}
+
 async function fallbackPublish(scope, resetAt) {
   try {
-    const directory = join(fallbackCooldownRoot(), scope);
-    await fs.mkdir(directory, { recursive: true, mode: 0o700 });
-    const record = join(directory, `${resetAt}-${randomUUID()}.json`);
-    const fd = await fs.open(record, 'wx', 0o600);
-    try {
-      await fd.writeFile(JSON.stringify({ schema: 1, resetAt }));
-      await fd.sync();
-    } finally {
-      await fd.close();
-    }
+    await writePrivateJson(
+      join(fallbackCooldownRoot(), scope),
+      `${resetAt}-${randomUUID()}.json`,
+      { schema: 1, resetAt },
+      'wx'
+    );
   } catch {
     // the tmp fallback is best-effort; the in-process record still applies
   }
 }
 
-async function reportUnwritableCooldown(root, cause) {
-  console.error(
-    JSON.stringify({
-      schema: 'jovie.linear-cooldown-write-failure/v1',
-      fingerprint: 'linear-cooldown-unwritable',
-      root,
-      error:
-        cause instanceof Error
-          ? `${cause.name}: ${cause.message}`
-          : String(cause),
-    })
-  );
+function cooldownWriteFailure(root, scope, cause) {
+  const error = String(
+    cause instanceof Error ? `${cause.name}: ${cause.message}` : cause
+  ).slice(0, 500);
+  return {
+    schema: 'jovie.linear-cooldown-write-failure/v1',
+    fingerprint: 'linear-cooldown-unwritable',
+    root,
+    scope,
+    error,
+    at: new Date().toISOString(),
+  };
+}
+
+async function reportUnwritableCooldown(root, scope, cause) {
+  const receipt = cooldownWriteFailure(root, scope, cause);
+  try {
+    await writePrivateJson(
+      fallbackCooldownRoot(),
+      'write-failure.json',
+      receipt,
+      'w'
+    );
+  } catch {
+    // stderr below still names the cause when the tmp receipt cannot be written
+  }
+  console.error(JSON.stringify(receipt));
   if (unwritableEventFired) return;
   unwritableEventFired = true;
+  if (process.env.LINEAR_COOLDOWN_REPORT_INTAKE === '0') return;
   try {
     const { upsertLinearIssueByTitleFingerprint } = await import(
       './linear-issue-intake.mjs'
@@ -116,7 +130,8 @@ async function reportUnwritableCooldown(root, cause) {
       description:
         'A lane could not persist the shared Linear cooldown. Until a write ' +
         'succeeds, sibling processes rely on the tmp and in-process fallback. ' +
-        'Check ownership and permissions of the LINEAR_COOLDOWN_STATE_DIR root.',
+        'Check ownership and permissions of the LINEAR_COOLDOWN_STATE_DIR root. ' +
+        receipt.error,
       priority: 2,
       createStateName: 'Todo',
       reopenTerminal: true,
@@ -126,8 +141,9 @@ async function reportUnwritableCooldown(root, cause) {
   }
 }
 
-function stateError() {
-  return Object.assign(new Error(STATE_ERROR), {
+function stateError(detail = '') {
+  const message = detail ? `${STATE_ERROR} (${detail})` : STATE_ERROR;
+  return Object.assign(new Error(message), {
     code: 'BACKOFF_STATE_INVALID',
   });
 }
@@ -136,9 +152,7 @@ async function privateDirectory(path, repair = false) {
   try {
     await fs.mkdir(path, { recursive: true, mode: 0o700 });
   } catch (error) {
-    // Concurrent publishers mkdir one scope together. Node reports that race
-    // as EEXIST. The stat check below still fail-closes a file, a symlink,
-    // or a directory this process does not own.
+    // EEXIST is the concurrent mkdir race. Stat still fail-closes the rest.
     if (error?.code !== 'EEXIST') throw error;
   }
   if (repair) {
@@ -155,17 +169,14 @@ async function privateDirectory(path, repair = false) {
     !stat.isDirectory() ||
     (stat.mode & 0o077) !== 0 ||
     (process.getuid && stat.uid !== process.getuid())
-  )
-    throw stateError();
+  ) {
+    const kind = stat.isDirectory() ? 'directory' : 'other';
+    const mode = (stat.mode & 0o777).toString(8);
+    const euid = process.geteuid?.() ?? '';
+    throw stateError(`kind=${kind} mode=0${mode} uid=${stat.uid} euid=${euid}`);
+  }
 }
 
-/**
- * @param {string} directory
- * @param {number} nowMs
- * @param {boolean} strict
- * @param {number} publicationDeadline
- * @param {Set<string>} uncommitted
- */
 async function readScope(
   directory,
   nowMs,
@@ -281,10 +292,6 @@ async function readLegacyFile(root, keyHash, nowMs) {
   }
 }
 
-/**
- * @param {string} key @param {string} root
- * @param {{ legacyRoots?: string[], strict?: boolean }} [options]
- */
 export function credentialBackoff(
   key,
   root,
@@ -378,7 +385,7 @@ export function credentialBackoff(
         );
         await fallbackPublish(scope, resetAt);
       }
-      await reportUnwritableCooldown(root, error);
+      await reportUnwritableCooldown(root, scope, error);
       if (!strict) return;
       if (error?.code === 'BACKOFF_STATE_INVALID') throw error;
       throw stateError();
