@@ -557,3 +557,26 @@ test('percentile uses nearest-rank and handles empty input', () => {
     37
   );
 });
+
+test('clearDead un-flags a message so a failed dead-letter notification is retried', async () => {
+  const store = new MailboxStore(sqlite());
+  store.enqueue(await envelope({ acceptedAt: 0 }));
+  const first = store.sweepDead(
+    LIMITS.deadAfterActiveMs + 2,
+    LIMITS.deadAfterActiveMs
+  );
+  assert.equal(first.length, 1);
+  assert.equal(
+    store.sweepDead(LIMITS.deadAfterActiveMs + 3, LIMITS.deadAfterActiveMs)
+      .length,
+    0,
+    'dead once'
+  );
+  store.clearDead(first[0].seq);
+  assert.equal(
+    store.sweepDead(LIMITS.deadAfterActiveMs + 4, LIMITS.deadAfterActiveMs)
+      .length,
+    1,
+    'retried after clearDead'
+  );
+});
