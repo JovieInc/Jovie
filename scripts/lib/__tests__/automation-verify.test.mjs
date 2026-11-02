@@ -3748,6 +3748,111 @@ describe('automation-verify affected scope', () => {
     );
   });
 
+  describe('marketing certification evidence producers', () => {
+    const census = 'apps/web/data/designSystem/surfaceCensus.json';
+    const censusProducer =
+      'scripts/lib/__tests__/design-surface-census.test.mjs';
+    const tokens = 'apps/web/lib/brand/tokens.ts';
+    const brandProducers = [
+      'apps/web/tests/unit/lib/brand/brand-mark-size-guard.test.ts',
+      'apps/web/tests/unit/lib/brand/primitives.test.tsx',
+      'apps/web/tests/unit/atoms/BrandLogo.test.tsx',
+      'apps/web/components/atoms/BrandLogo.test.tsx',
+      'apps/web/components/atoms/Logo.test.tsx',
+      'apps/web/components/atoms/LogoLink.test.tsx',
+      'apps/web/tests/unit/components/site/MarketingHeader.test.tsx',
+    ];
+
+    it('runs the real census validator with the scripts Vitest runner', () => {
+      const plan = buildAffectedTestPlan([census]);
+      expect(plan.mode).toBe('selected');
+      expect(plan.scriptVitestTests).toContain(censusProducer);
+      expect(plan.selectedTests).not.toContain(censusProducer);
+      expect(plan.nodeTests).not.toContain(censusProducer);
+      const commands = buildSelectedTestCommands(plan, '2');
+      expect(commands).toContainEqual([
+        'node',
+        ['scripts/design-surface-census.mjs', 'origin/main'],
+      ]);
+      expect(commands).toContainEqual([
+        'pnpm',
+        [
+          'exec',
+          'vitest',
+          '--root',
+          'scripts',
+          '--config',
+          'vitest.config.mts',
+          'run',
+          'lib/__tests__/design-surface-census.test.mjs',
+          '--maxWorkers',
+          '2',
+        ],
+      ]);
+    });
+
+    it('runs the existing brand geometry and rendered header behavior producers', () => {
+      const plan = buildAffectedTestPlan([tokens]);
+      expect(plan.mode).toBe('selected');
+      expect(plan.selectedTests).toEqual(
+        expect.arrayContaining(brandProducers)
+      );
+      const commands = buildSelectedTestCommands(plan, '2');
+      expect(commands.some(([command]) => command === 'node')).toBe(false);
+      expect(
+        commands.some(
+          ([command, args]) =>
+            command === 'pnpm' &&
+            args.includes('@jovie/web') &&
+            args.includes('tests/unit/components/site/MarketingHeader.test.tsx')
+        )
+      ).toBe(true);
+    });
+
+    it('validates current census transitions against the caller-provided base', () => {
+      const plan = buildAffectedTestPlan([census]);
+      const base = '0123456789abcdef0123456789abcdef01234567';
+      expect(buildSelectedTestCommands(plan, '2', base)).toContainEqual([
+        'node',
+        ['scripts/design-surface-census.mjs', base],
+      ]);
+    });
+
+    it.each([censusProducer, ...brandProducers])(
+      'retains full fallback when required producer %s is missing',
+      producer => {
+        const source = producer === censusProducer ? census : tokens;
+        const plan = buildAffectedTestPlan([source], {
+          isFileAvailable: file => file !== producer,
+        });
+        expect(plan.mode).toBe('full');
+        expect(plan.fallbackReason).toContain(source);
+      }
+    );
+
+    it.each([
+      'apps/web/lib/brand/unregistered.ts',
+      'apps/web/data/designSystem/unregistered.json',
+    ])(
+      'retains full fallback for unknown neighbor %s, alone or mixed',
+      neighbor => {
+        expect(buildAffectedTestPlan([neighbor]).mode).toBe('full');
+        expect(buildAffectedTestPlan([census, tokens, neighbor]).mode).toBe(
+          'full'
+        );
+      }
+    );
+
+    it('retains both real runners when the two registered sources change together', () => {
+      const plan = buildAffectedTestPlan([census, tokens]);
+      expect(plan.mode).toBe('selected');
+      expect(plan.scriptVitestTests).toContain(censusProducer);
+      expect(plan.selectedTests).toEqual(
+        expect.arrayContaining(brandProducers)
+      );
+    });
+  });
+
   describe('audience release denial lane', () => {
     const productFiles = [
       'apps/web/app/api/cron/schedule-release-notifications/route.ts',
