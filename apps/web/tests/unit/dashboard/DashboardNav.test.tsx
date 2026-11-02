@@ -152,7 +152,7 @@ describe('DashboardNav', () => {
   });
 
   it('gives Home sole current-page ownership at the shell root', () => {
-    mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
+    mockUsePathname.mockReturnValue(APP_ROUTES.INBOX);
     renderDashboardNav({
       renderFn: fastRender,
       overrides: {
