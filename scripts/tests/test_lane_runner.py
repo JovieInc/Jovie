@@ -5525,6 +5525,33 @@ class DispatchTest(unittest.TestCase):
             self.assertEqual(tick["admissionDenied"], "disk-critical")
             self.assertNotIn("tick-error", lane.doctor.judge({"tick": tick, "now": 0.0}))
 
+    def test_disk_denied_tick_still_drains_the_linear_outbox(self):
+        # JOV-10355: the outbox is the doctor's own reporting channel — the writes that
+        # raise and clear the disk condition travel through it — so a denied tick must
+        # still flush it (bounded; small state JSONs on the state root, never the full
+        # worktree volume). Everything after the flush stays gated.
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(lane.disk_guard, "free_pct", return_value=4.0), \
+                patch.object(lane.doctor, "run"), \
+                patch.object(lane, "Linear", return_value=SimpleNamespace(admit=lambda requests: False)) as client, \
+                patch.object(lane.linear_sync, "flush", return_value={"outcome": "drained", "delivered": []}) as flush, \
+                patch.object(lane.pr_events, "tick") as events:
+            previous_selftest = os.environ.get("LANES_SELFTEST")
+            os.environ.pop("LANES_SELFTEST", None)
+            try:
+                host = lane.Host(state=Path(tmp), repo=Path(tmp))
+                self.assertEqual(lane.dispatch(host), 1)
+            finally:
+                if previous_selftest is not None:
+                    os.environ["LANES_SELFTEST"] = previous_selftest
+            flush.assert_called_once()
+            self.assertEqual(flush.call_args.args[:2], (host.state, client.return_value))
+            events.assert_not_called()
+            tick = json.loads((Path(tmp) / "tick.json").read_text())
+            self.assertEqual(tick["linearSync"], {"outbox": {"outcome": "drained", "delivered": []}})
+            self.assertEqual(tick["admissionDenied"], "disk-critical")
+
+
     def test_critical_disk_still_starts_the_worktree_sweep(self):
         # JOV-7704: admission denial must not also deny the cleanup that would end it.
         with tempfile.TemporaryDirectory() as tmp, \
