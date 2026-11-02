@@ -1,0 +1,38 @@
+{
+  "schema": "jovie.imagery/v1",
+  "plates": {
+    "stage-profile-depth-v1": {
+      "specHash": "e1aa58985e4f454f15a9e15d88d4b9c16181721d06d0d9b6974f52b1c1baed16",
+      "promptHash": "76e5cefe0ace29b82cef357f825c25e98f5811c0d3646e4d37a4d3435165971d",
+      "model": "@cf/black-forest-labs/flux-1-schnell",
+      "modelSeed": null,
+      "seed": 1994772222,
+      "accent": "ion",
+      "width": 1920,
+      "height": 1080,
+      "generatedAt": "2026-10-30T00:44:39.884Z",
+      "costUsd": 0.001,
+      "bytes": {
+        "avif": 2820,
+        "webp": 6826
+      }
+    },
+    "stage-setup-flow-v1": {
+      "specHash": "5334b1f79fce69952d47c3e9fdffea18dd8070625b74f42a03ef0edf7863d9fa",
+      "promptHash": "2de74367013572464316947cfd850b95a3bd3e68d092785ed277616b94ed9bf6",
+      "model": "@cf/black-forest-labs/flux-1-schnell",
+      "modelSeed": null,
+      "seed": 770130791,
+      "accent": "ultra",
+      "width": 1920,
+      "height": 1080,
+      "generatedAt": "2026-10-30T00:44:59.061Z",
+      "costUsd": 0.001,
+      "bytes": {
+        "avif": 2384,
+        "webp": 5694
+      }
+    }
+  },
+  "stages": {}
+}
