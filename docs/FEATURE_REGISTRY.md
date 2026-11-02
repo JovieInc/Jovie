@@ -101,7 +101,6 @@ create rollout flags, billing entitlements, or admin certification items.
 | AI Assistant | Merch creation tools | Shipped (internal v1 default-on) | Trial/Pro/Max | Former key: `merch_mvp` | Entitlement-backed (`canAccessMerchCreation`); generates exactly 3 deterministic production-art options |
 | AI Connectors | Gmail booking email to Google Calendar auto-add | Shipped (internal v1 default-on) | Internal team | Former key: `ai_connectors_beta` | Product rollout flag defaults on |
 | Mobile App | iOS internal TestFlight app | Shipped | Authenticated users | None | Internal v1 install access; public marketing remains off |
-| Brand | Remove Jovie branding | Shipped | Pro+ | None | Entitlement-backed (`canRemoveBranding`) |
 | Growth (Coming Soon) | A/B testing | Planned | Growth | None | Smart link variant testing |
 | Growth (Coming Soon) | Automated follow-ups | Planned | Growth | None | Auto-follow-up emails to fans |
 | Growth (Coming Soon) | Catalog monitoring | Planned | Growth | None | Monitor catalog across DSPs |
@@ -171,6 +170,7 @@ The source defaults below are preserved in this slice.
 |---|---|---|
 | `AUTH_OFFER_SUMMARY` | `false` | Remove copy/layout gate after selecting the supported offer recap; no pricing, auth or entitlement change. |
 | `CANVAS_GRAIN` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
+| `CLAIM_LEGACY_PROOF_SWEEP` | `false` | Keep rollout stop for the grandfathered-claim sweep that takes 50k+ pages private after the 30-day nudge; remove once the first flip is observed. |
 | `CHATGPT_APP_DIRECTORY_MCP` | `false` | Keep public API exposure security control; no dynamic client registration grant. |
 | `CHAT_COMPOSER_V2` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
 | `CYAN_FOCUS_GLOW` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
@@ -182,6 +182,7 @@ The source defaults below are preserved in this slice.
 | `MUSIC_RESOLVER_PROVIDER_LINKS` | `false` | Keep provider-family routing/rollback control (JOV-7323). |
 | `MUSIC_RESOLVER_RELEASE_FACTS` | `false` | Keep provider-family routing/rollback control (JOV-7323). |
 | `NEW_RELEASE_PAGE` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
+| `ONBOARDING_VALUE_BEFORE_PAYWALL` | `true` | Keep funnel-order kill switch (JOV-9758) until the catalog-before-pricing read-out; then remove in favor of the enabled behavior. |
 | `OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION` | `false` | Keep unauthenticated client-registration security boundary and redirect allowlist. |
 | `SOCIAL_HTML_ISOLATED_PROVIDER` | `false` | Keep off: isolation provider is absent; server-IP scraping remains prohibited. |
 | `YOUTUBE_THUMBNAILS_PASTE_GENERATE` | `false` | Keep model-spend/output-certification control (JOV-5862); provider publication restrictions remain. |

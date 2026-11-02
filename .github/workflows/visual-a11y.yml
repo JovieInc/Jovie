@@ -61,7 +61,7 @@ jobs:
     name: Storybook A11y Checks (${{ matrix.shard }}/16)
     needs: [ci-visual-path-changes]
     if: ${{ needs.ci-visual-path-changes.outputs.has_visual_changes == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     # One Chromium page runs every story file in a shard. A single ~1,200-file
     # run lost the browser ("Browser connection was closed") after 127-173

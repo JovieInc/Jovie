@@ -15,9 +15,10 @@
  *   - any changed screen red: fail (the lifecycle routes it to Rework);
  *   - any changed screen uncovered or missing evidence: no receipt. It is
  *     reported, because nothing can prove it and a guess is not evidence;
- *   - the merged paths map to no registered screen: pass (the registry's path
- *     ownership attributes no screen to this change) unless a red inventory
- *     screen has no remediation issue yet, which holds until it is tracked.
+ *   - the merged paths map to no registered screen but declare or currently
+ *     owe machine UI evidence: no receipt; missing attribution is not proof;
+ *   - other no-screen changes: pass unless a red inventory screen has no
+ *     remediation issue yet, which holds until it is tracked.
  * Every receipt names its sha, the screenshots run and the verdicts. The
  * lifecycle still checks that the sha is a verified production generation
  * containing the binding merge.
@@ -35,6 +36,7 @@ import { writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { createGitHubClient } from '../../packages/api-client/github.ts';
 import { createLinearClient } from '../../packages/api-client/linear.ts';
+import { readAssuranceMatrix } from '../invariants/assurance-matrix.mjs';
 import {
   auditScreens,
   changedScreenManifest,
@@ -132,9 +134,11 @@ export function decideScreenAuditReceipt(input) {
   const verdict = new Map(
     input.ledger.screens.map(screen => [screen.id, screen])
   );
+  const matrix = readAssuranceMatrix();
+  const changedManifest = changedScreenManifest([...input.mergedFiles], matrix);
   const changed = [
     ...new Set(
-      changedScreenManifest([...input.mergedFiles]).screens.map(
+      changedManifest.screens.map(
         (/** @type {{ screenId: string }} */ screen) => screen.screenId
       )
     ),
@@ -162,10 +166,41 @@ export function decideScreenAuditReceipt(input) {
       detail: `changed screens green: ${changed.join(', ')}`,
     };
   }
-  // The registry's path ownership is the attribution rule: these paths own
-  // no screen, so no screen's verdict is this change's evidence. Red screens
-  // still block when nothing tracks them (no fingerprinted remediation
-  // issue yet), so a regression is never silently passed over.
+  // Neither registry gaps nor matrix drift can discharge declared machine
+  // obligations. Only literal taste judgments are exempt, as in the lifecycle.
+  const declared = input.manifest.uiEvidence;
+  // Legacy lifecycle manifests omit uiEvidence:null but preserve this reason.
+  const unknown = input.manifest.required.some(
+    (/** @type {{ kind?: string, reason?: string }} */ entry) =>
+      entry?.kind === 'screen-audit' &&
+      String(entry.reason ?? '').startsWith(
+        'UI evidence is unknown (merged files or the assurance matrix were unreadable)'
+      )
+  );
+  const machineRows = new Set([
+    ...(unknown ? ['unknown UI evidence'] : []),
+    ...(Array.isArray(declared)
+      ? declared
+          .filter(entry => entry?.judgment !== 'taste')
+          .map(entry => String(entry?.row ?? 'unknown UI evidence'))
+      : declared === undefined
+        ? []
+        : ['unknown UI evidence']),
+    ...changedManifest.requirements
+      .filter(
+        entry =>
+          matrix.rows.find(row => row.id === entry.row)?.ui?.judgment !==
+          'taste'
+      )
+      .map(entry => entry.row),
+  ]);
+  if (machineRows.size > 0)
+    return {
+      action: 'hold',
+      detail: `merged paths map to no registered screen, but machine UI evidence is still owed for ${[...machineRows].sort().join(', ')}; unrelated screen evidence cannot prove this change`,
+    };
+  // No machine UI obligation is known for these paths. Red inventory screens
+  // still block when no fingerprinted remediation issue tracks them.
   const red = input.ledger.screens.filter(screen => screen.verdict === 'red');
   const untracked = red.filter(
     screen => !input.remediationCreatedAt[screen.id]

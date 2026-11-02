@@ -93,11 +93,6 @@ export function InstantMerchLanding() {
         body={copy.hero.body}
         media={<MerchFlowPreview />}
         mediaClassName='w-full min-w-0 lg:self-stretch lg:content-center'
-        photo={{
-          src: '/images/marketing-hero/instant-merch.webp',
-          width: 1600,
-          height: 901,
-        }}
         headingId='instant-merch-hero-heading'
         headlineMaxLines='none'
         sectionTestId='marketing-section-hero'
@@ -133,12 +128,9 @@ export function InstantMerchLanding() {
             </p>
           </div>
           <div className='mt-12 grid gap-8 md:grid-cols-3'>
-            {copy.flow.steps.map((step, index) => (
+            {copy.flow.steps.map(step => (
               <article key={step.title} className='border-t border-subtle pt-5'>
-                <p className='text-xs font-mono text-tertiary-token'>
-                  0{index + 1}
-                </p>
-                <h3 className='mt-3 text-balance text-lg font-medium text-primary-token'>
+                <h3 className='text-balance text-lg font-medium text-primary-token'>
                   {step.title}
                 </h3>
                 <p className='mt-2 text-sm leading-6 text-secondary-token'>

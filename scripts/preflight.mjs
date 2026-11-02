@@ -36,15 +36,34 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
 } from 'node:fs';
 import { cpus, freemem, homedir, loadavg, tmpdir } from 'node:os';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { load as yamlLoad } from 'js-yaml';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const WORKFLOW_PATH = '.github/workflows/source-validation.yml';
 export const JOB_ID = 'deterministic';
+
+/** Keep hook-local Git routing out of gates that create fixture repositories. */
+export function buildPreflightEnv(source = process.env, cwd = ROOT) {
+  const result = spawnSync('git', ['rev-parse', '--local-env-vars'], {
+    cwd,
+    env: { ...source },
+    encoding: 'utf8',
+  });
+  const names = result.stdout?.trim().split('\n') ?? [];
+  if (result.status !== 0 || !names.includes('GIT_DIR')) {
+    throw new Error(
+      'Could not identify Git repository-local environment variables'
+    );
+  }
+  const env = { ...source };
+  for (const name of names) delete env[name];
+  return env;
+}
 
 /** Steps with no local meaning. Everything not listed here is derived. */
 export const SKIPPED_BY_NAME = Object.freeze({
@@ -150,6 +169,7 @@ const TYPECHECK = /^(\s*)(pnpm\b[^\n]*\btypecheck[^\n]*)$/gm;
  * on free runners; running them on a shared dev host costs shipping capacity
  * (fleet charter). A test requires every statement matching a heavy pattern in
  * the real workflow to be listed here, so nothing is dropped silently.
+ * @type {ReadonlyArray<readonly [RegExp, string]>}
  */
 export const EXCLUDED_STATEMENTS = Object.freeze([
   [/\btypecheck(?::[a-z]+)?\b/, 'full typecheck; hosted CI runs it'],
@@ -200,6 +220,12 @@ export function prepareStatement(statement, { flockPath = '' } = {}) {
   let text = statement;
   // `set -e` would end the process at the first red statement.
   if (SET_E.test(text.trim())) return 'set -uo pipefail';
+  // CI starts shallow; a developer checkout may already have full history.
+  // Still fetch the same refs, and preserve failures in either form.
+  if (/^git fetch\b.*\s--unshallow(?:\s|$)/u.test(text)) {
+    const completeFetch = text.replace(/\s+--unshallow(?=\s|$)/u, '');
+    text = `if [ "$(git rev-parse --is-shallow-repository)" = false ]; then\n${completeFetch}\nelse\n${text}\nfi`;
+  }
   // `exit` would end the process; contain it in a subshell.
   if (/\bexit\b/.test(text)) text = `( ${text}\n)`;
   // Typechecks share gem's CPU: serialize them under the host lock.
@@ -291,38 +317,81 @@ function runProgram(program, cwd, env, onResult) {
   });
 }
 
-function git(args) {
-  const r = spawnSync('git', args, { cwd: ROOT, encoding: 'utf8' });
+function git(args, { cwd = ROOT, env = process.env } = {}) {
+  const r = spawnSync('git', args, {
+    cwd,
+    env: buildPreflightEnv(env, cwd),
+    encoding: 'utf8',
+  });
   return r.status === 0 ? r.stdout.trim() : '';
 }
 
 /** Fleet Rules lint of a PR body against the files this branch changes. */
-export async function lintBody({ bodyFile, title, base }) {
+export async function lintBody({
+  bodyFile,
+  title,
+  base,
+  cwd = ROOT,
+  env = process.env,
+}) {
   const { evaluateFleetRules } = await import('./pr-fleet-rules.mjs');
+  const { evaluateCustomerNoteContract } = await import(
+    './lib/daily-changelog-publication.mjs'
+  );
+  const { CUSTOMER_MARKER } = await import('./lib/preflight-changed.mjs');
   const body = readFileSync(bodyFile, 'utf8');
-  const mergeBase = git(['merge-base', `origin/${base}`, 'HEAD']);
-  const status = git(['diff', '--name-status', mergeBase, 'HEAD']);
+  const mergeBase = git(['merge-base', `origin/${base}`, 'HEAD'], { cwd, env });
+  if (!mergeBase) throw new Error('Cannot resolve PR body comparison base');
+  const status = git(['diff', '--name-status', mergeBase, 'HEAD'], {
+    cwd,
+    env,
+  });
   const files = status
     .split('\n')
     .filter(Boolean)
     .map(row => {
       const [code, from, to] = row.split('\t');
+      const diff = spawnSync(
+        'git',
+        [
+          'diff',
+          '--no-ext-diff',
+          '--no-textconv',
+          mergeBase,
+          'HEAD',
+          '--',
+          from,
+          ...(to ? [to] : []),
+        ],
+        { cwd, env, encoding: 'utf8' }
+      );
+      if (diff.status !== 0)
+        throw new Error(`Cannot read PR body diff for ${to ?? from}`);
       return {
         filename: to ?? from,
         previous_filename: to ? from : undefined,
         status: code.startsWith('A') ? 'added' : 'modified',
-        patch: '',
+        patch: diff.stdout,
       };
     });
   const { errors, warnings } = evaluateFleetRules({
     pr: { title: title ?? '', body, labels: [] },
     files,
   });
-  if (!/releaseWorthy\s*:\s*(?:true|false)|^#{1,6}\s*release note/im.test(body))
+  const note = evaluateCustomerNoteContract({
+    files: files.map(file => file.filename),
+    body,
+    createdAt: undefined,
+  });
+  if (!note.passed)
     errors.push(
-      'changelog-marker: add `releaseWorthy:false` or a release note section.'
+      `changelog-marker: customer outcome decision missing or invalid (${note.reason}).`
     );
-  return { errors, warnings };
+  // A missing decision can use the existing internal-work template after the
+  // writer classifies the change. Malformed/duplicate decisions need repair,
+  // not another marker appended to the body.
+  const template = note.reason === 'missing-metadata' ? CUSTOMER_MARKER : '';
+  return { errors, warnings, template };
 }
 
 export function parseArgs(argv) {
@@ -368,23 +437,26 @@ export async function main({
     log('[preflight] skipped (JOVIE_PREFLIGHT=0)');
     return 0;
   }
+  const childEnv = buildPreflightEnv(env, cwd);
   const workflowFile = path.resolve(cwd, args.workflow ?? WORKFLOW_PATH);
   // A branch behind base fails CI on files it never saw (#23313: a missing
   // scripts/anti-slop/run.mjs). Bring base in first; the hook only reports.
   if (!args.list) {
     spawnSync('git', ['fetch', '--no-tags', '-q', 'origin', args.base], {
       cwd,
+      env: childEnv,
     });
     const hasBase =
       spawnSync('git', ['rev-parse', '--verify', '-q', `origin/${args.base}`], {
         cwd,
+        env: childEnv,
       }).status === 0;
     const behind =
       hasBase &&
       spawnSync(
         'git',
         ['merge-base', '--is-ancestor', `origin/${args.base}`, 'HEAD'],
-        { cwd }
+        { cwd, env: childEnv }
       ).status !== 0;
     if (behind && args.hook) {
       log(
@@ -397,10 +469,10 @@ export async function main({
       const merged = spawnSync(
         'git',
         ['merge', '--no-edit', `origin/${args.base}`],
-        { cwd }
+        { cwd, env: childEnv }
       );
       if (merged.status !== 0) {
-        spawnSync('git', ['merge', '--abort'], { cwd });
+        spawnSync('git', ['merge', '--abort'], { cwd, env: childEnv });
         log(
           `[preflight] merge of origin/${args.base} conflicts; resolve it, then rerun.`
         );
@@ -412,14 +484,19 @@ export async function main({
   // Gates refuse the ambient Node when it violates engines (gem ships 22).
   const pinned = spawnSync('bash', ['scripts/hooks/resolve-repo-node.sh'], {
     cwd,
+    env: childEnv,
     encoding: 'utf8',
   });
   const pinnedBin = pinned.status === 0 ? pinned.stdout.trim() : '';
   const procEnv = pinnedBin
-    ? { ...env, PATH: `${pinnedBin}:${env.PATH}` }
-    : env;
-  const runnerTemp = mkdtempSync(path.join(tmpdir(), 'preflight-'));
-  const headSha = git(['rev-parse', 'HEAD']);
+    ? { ...childEnv, PATH: `${pinnedBin}:${childEnv.PATH}` }
+    : childEnv;
+  // Copied guards compare their module URL to argv[1]; /var -> /private/var
+  // aliases must not turn their actual checks into successful no-ops.
+  const runnerTemp = realpathSync(
+    mkdtempSync(path.join(tmpdir(), 'preflight-'))
+  );
+  const headSha = git(['rev-parse', 'HEAD'], { cwd, env: childEnv });
   const values = expressionValues({
     base: args.base,
     headSha,
@@ -429,7 +506,7 @@ export async function main({
   const flockPath = (() => {
     if (
       !existsSync('/usr/bin/flock') &&
-      spawnSync('which', ['flock']).status !== 0
+      spawnSync('which', ['flock'], { cwd, env: childEnv }).status !== 0
     )
       return '';
     return path.join(homedir(), '.cache', 'gem-typecheck.lock');
@@ -542,12 +619,19 @@ export async function main({
       bodyFile: args.bodyFile,
       title: args.title,
       base: args.base,
+      cwd,
+      env: childEnv,
     });
     for (const message of bodyIssues.errors) {
       failures.push({ step: 'PR body', label: message, code: 1, output: [] });
       log(`  FAIL  ${message}`);
     }
     for (const message of bodyIssues.warnings) log(`  warn  ${message}`);
+    if (bodyIssues.template) {
+      log('  For internal work, add this decision to the PR body:');
+      log(bodyIssues.template);
+      log('  Customer-visible work: see docs/CHANGELOG_PUBLICATION.md.');
+    }
   }
 
   log('\n== preflight summary');
@@ -583,5 +667,9 @@ export async function main({
   return failures.length ? 1 : 0;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)
+if (
+  process.argv[1] &&
+  existsSync(process.argv[1]) &&
+  realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1])
+)
   process.exitCode = await main();

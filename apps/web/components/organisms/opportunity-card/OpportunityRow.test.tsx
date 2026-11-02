@@ -74,6 +74,21 @@ describe('OpportunityRow', () => {
     ).not.toBeInTheDocument();
   });
 
+  // JOV-8964: the in-progress status is neutral (design-system text token),
+  // never the loud accent-orange.
+  it('renders the in-progress status dot and ring in the neutral token', () => {
+    render(<OpportunityRow {...{ ...baseProps, state: 'in-progress' }} />);
+    const dot = document.querySelector<HTMLSpanElement>('[aria-hidden="true"]');
+    expect(dot?.getAttribute('style')).toContain(
+      'var(--color-text-secondary-token)'
+    );
+    expect(dot?.getAttribute('style')).not.toContain('accent-orange');
+    const btn = screen.getByLabelText('Plan Opportunity');
+    expect(btn.getAttribute('style')).toContain(
+      'var(--color-text-secondary-token)'
+    );
+  });
+
   it('renders no action chrome for rejected state', () => {
     render(<OpportunityRow {...{ ...baseProps, state: 'rejected' }} />);
     expect(screen.queryByLabelText('Plan Opportunity')).not.toBeInTheDocument();

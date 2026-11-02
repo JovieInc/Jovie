@@ -137,6 +137,7 @@ describe('useJovieAuth', () => {
     expect(result.current.user.isSignedIn).toBe(true);
     expect(result.current.user.user).toEqual({
       id: 'ba_user_tim',
+      emailVerified: true,
       emailAddresses: [
         { id: 'ba_email_ba_user_tim', emailAddress: 'tim@jov.ie' },
       ],
@@ -313,5 +314,45 @@ describe('useJovieAuth', () => {
     expect(useJovieAuth).toBe(useAuthSafe);
     expect(useJovieUser).toBe(useUserSafe);
     expect(useJovieSession).toBe(useSessionSafe);
+  });
+});
+
+describe('trusted bootstrap session marker', () => {
+  it('marks only the first unresolved seeded session and never re-arms after settlement', () => {
+    useSessionMock.mockReturnValue({ data: null, isPending: true });
+    const { result, rerender } = renderWithWrapper(({ children }) => (
+      <JovieAuthValuesProvider
+        initialUser={{
+          id: 'seed-a',
+          email: 'seed-a@example.com',
+          name: 'Seed A',
+        }}
+      >
+        {children}
+      </JovieAuthValuesProvider>
+    ));
+    expect(result.current.auth.bootstrapSessionPending).toBe(true);
+    expect(result.current.auth.sessionId).toBeNull();
+    useSessionMock.mockReturnValue({
+      data: {
+        user: { id: 'seed-a', email: 'seed-a@example.com', name: 'Seed A' },
+        session: { id: 'live-a', userId: 'seed-a' },
+      },
+      isPending: false,
+    });
+    rerender();
+    expect(result.current.auth.bootstrapSessionPending).toBe(false);
+    expect(result.current.auth.sessionId).toBe('live-a');
+    useSessionMock.mockReturnValue({ data: null, isPending: true });
+    rerender();
+    expect(result.current.auth.bootstrapSessionPending).toBe(false);
+  });
+
+  it('does not grant bootstrap provenance to an ordinary unresolved live session', () => {
+    useSessionMock.mockReturnValue({ data: null, isPending: true });
+    const { result } = renderWithWrapper(({ children }) => (
+      <JovieAuthValuesProvider>{children}</JovieAuthValuesProvider>
+    ));
+    expect(result.current.auth.bootstrapSessionPending).toBe(false);
   });
 });

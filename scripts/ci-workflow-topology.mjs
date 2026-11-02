@@ -3,9 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dump as yamlDump, load as yamlLoad } from 'js-yaml';
+import { checkRunnerPins } from './workflow-runner-pin-check.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const outputPath = path.join(root, '.github/workflow-topology.gen.yml');
 const policy = JSON.parse(String.raw`{"schema":"jovie-workflow-topology/v1","measuredBaseline":{"sha":"06fe003f7e3c2cf4919aa2a115749bafa0bf0196","capturedAt":"2026-09-29","workflowRuns":293,"checkRecords":487},"budgets":{"blockingPrChecks":12,"normalPrCheckRecords":25,"normalPrExternalAllowance":8,"mainShaWorkflowRuns":72},"authoritativeOwners":[{"category":"source-validation","workflow":"Source Validation"},{"category":"release-orchestration","workflow":"Production Controller"},{"category":"production-verification","workflow":"Production Controller"},{"category":"telemetry-aggregation","workflow":"Delivery Control Receipts"},{"category":"remediation-dispatch","workflow":"Lane Fix Relay"}],"authoritySurfaces":[{"surface":"staging","workflow":"Staging Controller"},{"surface":"production","workflow":"Production Controller"},{"surface":"rollback","workflow":"Production Release"},{"surface":"queue-admission","workflow":"Merge Queue Green Enroll"},{"surface":"release-truth","workflow":"Production Controller"}],"blockingPrChecks":["PR Ready","Migration Guard","Fork PR Gate","PR Size Guard","PR targets main","llm-review"],"normalPrWorkflows":["Source Validation","Fork PR Gate","PR Size Guard","PR targets main","Repository documentation shadow","Summer Eve identity check"],"inactiveWorkflows":["Agent Tick","Auto-PR on Agent Push","Auto-Ready Agent Drafts","GitHub AI Dispatcher","GitHub AI Orchestrator (retired)","Main CI health monitor","PR Conflict Handler","Rolling CI Dispatch","Stuck Draft Auto-Close"]}`);
 /**
  * @typedef {object} WorkflowYaml
@@ -139,13 +139,21 @@ export function validateTopology({ policy: rules, nodes, edges }) {
     errors.push('main SHA workflow-run budget did not fall by at least 75%');
   return { errors, normalPrCheckRecords };
 }
-function main() {
-  const topology = buildTopology();
+export function syncTopology(repoRoot = root, write = false) {
+  const outputPath = path.join(repoRoot, '.github/workflow-topology.gen.yml');
+  const topology = buildTopology(repoRoot);
   const result = validateTopology(topology);
   const serialized = yamlDump({ ...topology.policy, generatedAt: 'deterministic', normalPrCheckRecords: result.normalPrCheckRecords, nodes: topology.nodes, edges: topology.edges }, { lineWidth: -1, noRefs: true });
-  if (process.argv.includes('--write')) fs.writeFileSync(outputPath, serialized);
-  else if (!fs.existsSync(outputPath) || fs.readFileSync(outputPath, 'utf8') !== serialized)
+  result.errors.push(...checkRunnerPins({ workflowsDir: path.join(repoRoot, '.github/workflows'), allowlistPath: path.join(repoRoot, '.github/runner-pin-allowlist.json') }));
+  if (write) {
+    if (!result.errors.length) fs.writeFileSync(outputPath, serialized);
+  } else if (!fs.existsSync(outputPath) || fs.readFileSync(outputPath, 'utf8') !== serialized)
     result.errors.push('generated workflow DAG is stale; run pnpm ci:topology:write');
+  return { ...result, topology };
+}
+function main() {
+  const result = syncTopology(root, process.argv.includes('--write'));
+  const { topology } = result;
   if (result.errors.length) {
     console.error(result.errors.join('\n'));
     process.exitCode = 1;

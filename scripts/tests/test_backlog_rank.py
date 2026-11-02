@@ -77,18 +77,23 @@ class GroomTests(unittest.TestCase):
         self.assertEqual(refill.missing_info(row(1, labels=(), description="short")),
                          ["description under 200 chars: state the problem and the scope",
                           "no acceptance criteria: add a checkable Definition of done"])
-        self.assertEqual(refill.missing_info(row(2, labels=())),
-                         ["groomed but not labelled agent-ready: confirm no human gate, then label"])
+        # agent-ready is retired as an admission requirement (2026-10-29): a complete row
+        # without the label has no missing info — readiness is computed, never labelled.
+        self.assertEqual(refill.missing_info(row(2, labels=())), [])
         self.assertEqual(refill.missing_info(row(3, labels=("needs-tim",), description="short")), [])
         self.assertEqual(refill.missing_info(row(4)), [])
 
     def test_groom_queue_is_ranked_and_bounded(self):
-        rows = [row(1, priority=4, labels=()), row(2, priority=1, labels=()), row(3)]
+        rows = [row(1, priority=4, labels=(), description="## Acceptance criteria\n- [ ] Fix the defect"),
+                row(2, priority=1, labels=(), description="A scoped defect with a known fix. " * 10),
+                row(3, labels=())]
         queue = refill.groom_queue(rows, NOW, keep=1)
         self.assertEqual([item["id"] for item in queue], ["JOV-2"])
+        self.assertEqual(queue[0]["missing"], ["no acceptance criteria: add a checkable Definition of done"])
+        self.assertEqual([item["id"] for item in refill.groom_queue(rows, NOW, keep=2)], ["JOV-2", "JOV-1"])
 
     def test_view_counts_ready_age_percentiles(self):
-        rows = [row(n, days=n) for n in range(1, 11)] + [row(99, labels=())]
+        rows = [row(n, days=n, labels=()) for n in range(1, 11)] + [row(99, labels=(), description="short")]
         view = refill.view(rows, NOW)
         self.assertEqual((view["backlog"], view["ready"]), (11, 10))
         self.assertEqual(view["readyAgeDaysP50"], 6.0)
@@ -224,20 +229,21 @@ class WakeTests(unittest.TestCase):
 
 
 class GroomApplyTests(unittest.TestCase):
-    def test_apply_queues_label_and_comment_and_marks_checked(self):
+    def test_apply_queues_rationale_and_marks_checked_without_agent_ready_label(self):
         import groom_pass
         tmp = tempfile.TemporaryDirectory(); self.addCleanup(tmp.cleanup)
         state = Path(tmp.name)
         for team in ("JOV", "LYB"):
             path = ls.mirror_path(state, team); path.parent.mkdir(parents=True, exist_ok=True)
-            rows = [row(1)] if team == "JOV" else []
+            rows = [row(1, labels=())] if team == "JOV" else []
             path.write_text(json.dumps({"schema": ls.MIRROR, "syncedAt": NOW, "issues": {r["id"]: r for r in rows}}))
         done = groom_pass.apply(state, [{"id": "JOV-1", "verdict": "ready", "rationale": "One scoped PR."},
                                         {"id": "JOV-1", "verdict": "error"}, {"id": "JOV-9", "verdict": "ready", "rationale": "x"}])
         self.assertEqual(done, ["JOV-1"])
         entries = json.loads((state / "linear" / "outbox.json").read_text())["entries"]
-        self.assertEqual(sorted((e["op"], e.get("body", "")[:30]) for e in entries),
-                         [("comment", "Readiness pass (grok-4.7): age"), ("label", "agent-ready"), ("label", "readiness-checked")])
+        self.assertEqual(sorted((e["op"], e.get("body", "")) for e in entries),
+                         [("comment", "Readiness pass (grok-4.7): agent-ready. One scoped PR."),
+                          ("label", "readiness-checked")])
 
     def test_not_ready_comments_only_for_urgent_or_high(self):
         import groom_pass

@@ -1,0 +1,90 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: TimWhite
+# capability-gap: No existing controller turns Dependabot alerts into owned Linear work with a severity SLA; this emits deduped intake, a ratchet and a stage-timing receipt. It writes no code, branches or deploys.
+# removal-trigger: Remove when Summer or GitHub advisory intake files and closes security work natively.
+name: Security Advisory Loop (Linear devin lane)
+
+# Dependabot alert -> one owned Linear issue per (advisory, package) with an
+# SLA (critical 48h, high 7d, medium 30d) -> closed only when the alert is
+# fixed on main AND a Production deploy landed after the fix. The final step is
+# the ratchet: an advisory past its SLA without a live exception fails the run.
+# Events: a landed dependency change (fixes). New advisories reach no workflow
+# event, so the Gem lanes clock fires repository_dispatch clock_security_advisory_loop
+# every 4h (JOV-INV-042 freezes GitHub crons; the clock is the only backstop).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pnpm-lock.yaml'
+      - '**/package.json'
+      - '**/requirements.txt'
+      - 'scripts/security/advisory-exceptions.json'
+      - 'scripts/security-advisory-intake.mjs'
+      - 'scripts/lib/security-advisory-policy.mjs'
+      - '.github/workflows/security-advisory-loop.yml'
+  repository_dispatch:
+    types: [clock_security_advisory_loop]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: security-advisory-loop
+  cancel-in-progress: false
+
+jobs:
+  loop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      deployments: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Prime Node toolcache
+        uses: ./.github/actions/prime-node-toolcache
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Generate alerts-read App token
+        id: app-token
+        # Keep token failures blocking. The intake still records blindness and
+        # files the deduped repair card when this permission is unavailable.
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-vulnerability-alerts: read
+
+      - name: Sync advisories to Linear and close the fixed-and-deployed
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ALERTS_TOKEN: ${{ steps.app-token.outputs.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+        run: node scripts/security-advisory-intake.mjs
+
+      - name: Ratchet - no advisory ages past its SLA silently
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ALERTS_TOKEN: ${{ steps.app-token.outputs.token }}
+          RECEIPT_PATH: security-advisory-check-receipt.json
+        run: node scripts/security-advisory-intake.mjs --check
+
+      - name: Preserve stage-timing receipt
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: security-advisory-receipt-${{ github.run_id }}
+          path: |
+            security-advisory-receipt.json
+            security-advisory-check-receipt.json
+          retention-days: 30
+          if-no-files-found: warn

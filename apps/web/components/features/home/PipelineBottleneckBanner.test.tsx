@@ -93,6 +93,59 @@ describe('PipelineBottleneckBanner', () => {
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 
+  it('renders held evidence through the real query parser without implying clear or active repair', async () => {
+    const held = bottleneckFixture({
+      status: 'needs-you',
+      rank1: null,
+      dispatchRef: null,
+      cost: null,
+      impact: null,
+      statusLink: undefined,
+      metric: undefined,
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(held)))
+    );
+    const { client } = mount(null);
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: key });
+    });
+    expect(await screen.findByText('Needs you')).toBeInTheDocument();
+    expect(
+      screen.getByText('Bottleneck evidence unavailable')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Cost unavailable')).toBeInTheDocument();
+    expect(screen.getByText('Impact unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('No current bottleneck')).not.toBeInTheDocument();
+    expect(screen.queryByText('Agents on it')).not.toBeInTheDocument();
+    expect(screen.queryByText(/\$0/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    {
+      cost: null,
+      impact: 'Restores provider access.',
+      visible: 'Restores provider access.',
+      missing: 'Cost unavailable',
+    },
+    {
+      cost: { item: 'Runner memory', monthlyUsd: 24 },
+      impact: null,
+      visible: '$24/mo · Runner memory',
+      missing: 'Impact unavailable',
+    },
+  ])(
+    'renders known evidence alongside unknown fields: %j',
+    ({ cost, impact, visible, missing }) => {
+      mount(bottleneckFixture({ status: 'needs-you', cost, impact }));
+      expect(screen.getByText(visible)).toBeInTheDocument();
+      expect(screen.getByText(missing)).toBeInTheDocument();
+      expect(screen.queryByText('Agents on it')).not.toBeInTheDocument();
+    }
+  );
+
   it('shows an actionable cost and impact for needs-you, including zero-cost credential changes', async () => {
     const loop = contributionFixture();
     const { client } = mount(

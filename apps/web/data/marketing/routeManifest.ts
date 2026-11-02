@@ -908,6 +908,12 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'split-claim-card'
       ),
       approvedVariantBinding(
+        'apps/web/components/marketing/ConnectedComponentsGallery.tsx',
+        'product-gallery',
+        'release-rail',
+        'connected-components'
+      ),
+      approvedVariantBinding(
         'apps/web/app/(marketing)/product/ProductLanding.tsx',
         'cta',
         'editorial-search'
@@ -1284,11 +1290,6 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       ),
       approvedVariantBinding(
         'apps/web/app/(marketing)/launch/page.tsx',
-        'stats',
-        '3-stat-band'
-      ),
-      approvedVariantBinding(
-        'apps/web/app/(marketing)/launch/page.tsx',
         'comparison',
         'feature-matrix'
       ),
@@ -1302,7 +1303,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     bindingEvidence: {
       status: 'verified',
       source:
-        'mounted stamps 2026-10-15: profile-stage hero, platform strip, pillar grid, editorial splits, deeplink grid, three-stat band, dual-path close',
+        'mounted stamps 2026-10-15: profile-stage hero, platform strip, pillar grid, editorial splits, deeplink grid, dual-path close',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -1324,11 +1325,6 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       ),
       approvedVariantBinding(
         'apps/web/components/organisms/AboutPageContent.tsx',
-        'feature-grid',
-        'two-column-text'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/marketing/FaqSection.tsx',
         'faq',
         'objection-handler'
       ),
@@ -1342,7 +1338,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     bindingEvidence: {
       status: 'verified',
       source:
-        'AboutPageContent mounts left-none, article-body, two-column-text, objection-handler, and the footer final-single-claim (2026-10-15)',
+        'AboutPageContent mounts left-none, article-body, objection-handler, and the footer final-single-claim; the plain-company page change (#23332) removed the feature grid (2026-10-30)',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -1405,6 +1401,54 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     url: '/developers',
     healthCheck: {
       path: '/developers',
+      expected: 'page',
+    },
+  },
+  {
+    glob: '(marketing)/developers/agents/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'JOV-9762 agent connector docs',
+      notes:
+        'Agent connector docs page is generated from the listing and tools/list snapshot; prose-led, not recipe-composable.',
+    },
+    exempt: {
+      reason:
+        'public agent connector documentation — generated reference; not recipe-composable',
+      linearId: 'JOV-9762',
+      approvedBy: 'autonomous-shipping-policy (agent)',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/23608',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/developers/agents',
+    healthCheck: {
+      path: '/developers/agents',
+      expected: 'page',
+    },
+  },
+  {
+    glob: '(marketing)/proof/methodology/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'proof-stat registry methodology',
+      notes:
+        'Methodology page is generated from apps/web/data/proof-stats/registry.json; prose-led reference, not recipe-composable.',
+    },
+    exempt: {
+      reason:
+        'public proof methodology — generated from the stat registry; not recipe-composable',
+      linearId: 'JOV-9911',
+      approvedBy: 'autonomous-shipping-policy (agent)',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/23666',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/proof/methodology',
+    healthCheck: {
+      path: '/proof/methodology',
       expected: 'page',
     },
   },

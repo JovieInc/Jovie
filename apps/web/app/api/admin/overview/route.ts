@@ -1,6 +1,7 @@
 import { sql as drizzleSql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
+import { organicWaitlistEntrySql } from '@/lib/admin/organic-waitlist';
 import { db } from '@/lib/db';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { captureError } from '@/lib/error-tracking';
@@ -131,7 +132,8 @@ async function getWaitlistCount(): Promise<{
   try {
     const [row] = await db
       .select({ count: drizzleSql<number>`count(*)::int` })
-      .from(waitlistEntries);
+      .from(waitlistEntries)
+      .where(organicWaitlistEntrySql());
     return { count: Number(row?.count ?? 0) };
   } catch (error) {
     const message =
