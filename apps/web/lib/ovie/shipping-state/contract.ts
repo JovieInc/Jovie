@@ -33,6 +33,12 @@ export const LANE_BRANCH_PREFIXES = [
   'sonnet',
   'fable',
 ] as const;
+/** The agent lane a PR belongs to; one value per {@link LANE_BRANCH_PREFIXES}. */
+export type LaneAgent = (typeof LANE_BRANCH_PREFIXES)[number];
+const LANE_AGENTS: ReadonlySet<string> = new Set(LANE_BRANCH_PREFIXES);
+export function isLaneAgent(value: unknown): value is LaneAgent {
+  return typeof value === 'string' && LANE_AGENTS.has(value);
+}
 const LANE_PREFIX_ALTERNATION = LANE_BRANCH_PREFIXES.join('|');
 export const LANE_BRANCH_RE = new RegExp(`^(?:${LANE_PREFIX_ALTERNATION})/`);
 export const LANE_AGENT_RE = new RegExp(`^(${LANE_PREFIX_ALTERNATION})/`, 'i');
@@ -165,7 +171,7 @@ export type OperationalTaskPullRequest = {
   readonly url: string | null;
   readonly branch: string | null;
   /** Owning agent lane derived from the branch prefix. */
-  readonly agent: 'devin' | 'codex' | null;
+  readonly agent: LaneAgent | null;
   readonly isDraft: boolean;
   readonly checks: OperationalTaskChecks;
   readonly queuePosition: number | null;

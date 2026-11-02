@@ -127,10 +127,19 @@ deletes or empties an invariant test; or raises a CI timeout or retry. Demoting
 a blocking guard to advisory, `continue-on-error`, or `if: false` fails too.
 
 Override is never silent. The PR body needs a `gate-change: <reason>` line and
-the `codeowners-approved` label, which is a machine-checked audit record applied by the authoring agent after its own diff review; no person approves it (EVENT 2026-10-28).
+the `codeowners-approved` label, which is a machine-checked audit record applied by the authoring agent after independent diff review; no person approves it (EVENT 2026-10-28).
 Findings still print. Local run:
 `node scripts/invariants/gate-weakening-detector.mjs --check`. Do not remove it
 from `SOURCE_GUARDS` or mark it advisory.
+
+## Open PRs with `pnpm pr:open`
+
+`pnpm pr:open open` opens a PR; `draft [N]` drafts, `check --body-file f` validates,
+and `update N` repairs N from its own diff. Drafting recovers PR/issue metrics and red CI URLs,
+then asks once for missing `--metric`, `--failing-command`, `--failing-run` or `--failing-log`.
+Blast radius severity matches CI; main's classifier reports unmapped paths as pending.
+Updates guard PR references (body files need N's URL or `<!-- pr-open-target: JovieInc/Jovie#N -->`)
+and confirm fresh validation runs via real edits. Verdicts: `~/.local/state/jovie-lanes/pr-open.jsonl`.
 
 ## Preflight before every push
 

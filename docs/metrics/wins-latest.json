@@ -1,14 +1,14 @@
 {
   "schema": "jovie.wins-metrics/v1",
-  "at": "2026-10-30T23:15:58.875Z",
-  "winsTotal": 27,
+  "at": "2026-10-31T08:10:01.098Z",
+  "winsTotal": 28,
   "winsVerified": 1,
   "winsClaimed": 14,
   "winsUnverified": 3,
   "winsNotReproduced": 1,
   "winsPendingMerge": 4,
-  "winsPendingMeasure": 4,
-  "winsLast7d": 27,
+  "winsPendingMeasure": 5,
+  "winsLast7d": 28,
   "clusters": [
     {
       "theme": "release-reliability",
@@ -54,6 +54,12 @@
     },
     {
       "theme": "runner-pin",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "golden-path",
       "total": 1,
       "verified": 0,
       "ready": false
@@ -167,6 +173,10 @@
     {
       "id": "win-2026-10-30-the-runner-pin-gate-is-green",
       "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-31-typed-handles-are-honored-and-freed",
+      "status": "pending-measure"
     }
   ]
 }

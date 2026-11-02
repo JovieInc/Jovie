@@ -22,12 +22,13 @@ import { getMerchMvpEnabled } from '@/lib/flags/profile-variant';
 import { NO_STORE_HEADERS, RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { getLiveMerchCardsForProfile } from '@/lib/merch/service';
 import { getPublicProfileDiscoveryExclusionResponse } from '@/lib/profile/public-profile-discovery-response';
+import { shouldHideTestProfileFromDirectUrl } from '@/lib/profile/test-profile-policy';
 import {
   createRateLimitHeaders,
   getClientIP,
   publicArtistApiLimiter,
 } from '@/lib/rate-limit';
-import { getProfileByUsername } from '@/lib/services/profile';
+import { getProfileWithUser } from '@/lib/services/profile';
 import { getActiveLinksForProfile } from '@/lib/services/social-links/queries';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
 
@@ -158,9 +159,16 @@ export async function GET(
     return addPublicApiHeaders(requestExclusion, rateLimitHeaders);
   }
 
-  const profile = await getProfileByUsername(username);
+  const profile = await getProfileWithUser(username);
 
-  if (!profile?.isPublic) {
+  if (
+    !profile?.isPublic ||
+    shouldHideTestProfileFromDirectUrl({
+      handle: username,
+      ownerEmail: profile.userEmail,
+      settings: profile.settings,
+    })
+  ) {
     return NextResponse.json(
       { error: 'Artist not found' },
       {

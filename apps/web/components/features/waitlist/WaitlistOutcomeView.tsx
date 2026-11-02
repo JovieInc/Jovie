@@ -6,7 +6,10 @@ import Link from 'next/link';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
-import { PLAN_PRICES } from '@/lib/config/plan-prices';
+import {
+  formatPublicPriceDisplay,
+  getPublicPriceClaim,
+} from '@/lib/billing/offer-truth';
 import { useCheckoutMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import type { WaitlistAccessOutcome } from '@/lib/waitlist/access-request';
@@ -29,8 +32,8 @@ interface WaitlistOutcomeViewProps {
   readonly reservedHandle?: string | null;
   /**
    * Stripe price for the self-serve Pro offer. When present, waiting visitors
-   * can buy now: a verified payment admits them, then /billing/success sends
-   * them on to claim their link.
+   * can skip the waitlist by buying now: a verified payment admits them, then
+   * /billing/success sends them on to claim their link. The receipt says so.
    */
   readonly proCheckoutPriceId?: string | null;
 }
@@ -171,6 +174,24 @@ function PrimaryCtaLink({
 export const WAITLIST_START_PRO_TEST_ID = 'waitlist-start-pro-checkout';
 
 /**
+ * Paying is a skip-the-line purchase, not a fee to stay on the list: the
+ * verified Stripe webhook admits a pending buyer (admitPaidUser), and
+ * /billing/success sends a buyer without a link to /start. Say so next to the
+ * paid CTA. Plan name and price come from offer truth (plan-prices.ts).
+ */
+function StartProNote() {
+  const claim = getPublicPriceClaim('pro');
+  return (
+    <p
+      className='mt-4 text-sm leading-6 text-white/62 tabular-nums'
+      data-testid='waitlist-start-pro-note'
+    >
+      {`Want in now? ${claim.displayName} (${formatPublicPriceDisplay(claim)}) lets you skip the waitlist: setup opens as soon as payment clears.`}
+    </p>
+  );
+}
+
+/**
  * Opens the default checkout (no onboarding source), so success lands on
  * /billing/success, which routes a buyer without a claimed link to /start.
  */
@@ -202,7 +223,7 @@ function StartProCheckoutButton({ priceId }: { readonly priceId: string }) {
       >
         {checkout.isPending
           ? 'Opening Checkout...'
-          : `Start Pro ($${PLAN_PRICES.pro.monthly})`}
+          : getPublicPriceClaim('pro').ctaLabel}
       </Button>
       {checkout.isError ? (
         <p className='text-sm text-error' role='alert'>
@@ -244,6 +265,7 @@ export function WaitlistOutcomeView({
       </div>
       <p className='text-sm leading-6 text-white/62'>{body}</p>
       {copy.showNextSteps ? <NextSteps email={email} /> : null}
+      {showStartPro ? <StartProNote /> : null}
 
       <div className='mt-6 flex flex-col gap-2 sm:flex-row'>
         {primaryHref && primaryLabel ? (

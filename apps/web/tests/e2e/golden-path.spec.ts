@@ -12,6 +12,7 @@ import {
 import {
   releaseGoldenPathTestBindings,
   selectGoldenPathArtist,
+  unpublishGoldenPathTestProfiles,
 } from './helpers/claim-dogfood-fixtures';
 import { completeGoldenPathBillingJourney } from './helpers/golden-path-billing';
 import { openHomeWelcome } from './helpers/golden-path-home-welcome';
@@ -642,6 +643,8 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
   expect(handleResponse.headers()['x-onboarding-fallback']).toMatch(/^handle:/);
   const handleCard = page.getByTestId('onboarding-handle-check');
   await expect(handleCard).toBeVisible({ timeout: 60_000 });
+  // Pen R6As7U: the field sits behind an explicit Change Handle action.
+  await handleCard.getByTestId('onboarding-edit-handle').click();
   await handleCard.getByLabel('Edit Proposed Handle').fill(handle);
   await expect(handleCard.getByText('is available')).toBeVisible({
     timeout: 30_000,
@@ -850,7 +853,9 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
   // (or the prod-cert pool) starts from an unclaimed artist.
   test.afterAll(async () => {
     if (!process.env.DATABASE_URL) return;
-    await releaseGoldenPathTestBindings(neon(process.env.DATABASE_URL));
+    const teardownSql = neon(process.env.DATABASE_URL);
+    await releaseGoldenPathTestBindings(teardownSql);
+    await unpublishGoldenPathTestProfiles(teardownSql);
   });
 
   test.beforeEach(() => {
@@ -1251,6 +1256,14 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
     // with their music imported. Render it as an anonymous fan would —
     // fresh browser context, no auth — the way a real fan clicking a link
     // in bio would land here.
+    // Test-account profiles 404 publicly by policy (lib/profile/test-profile-policy).
+    // This run must render its own profile as a fan, so mark just this profile
+    // directly-viewable; afterAll teardown unpublishes it.
+    await sql`
+      UPDATE creator_profiles
+      SET settings = coalesce(settings, '{}'::jsonb) || '{"testProfileDirectUrlExempt": true}'::jsonb
+      WHERE username_normalized = ${uniqueHandle.toLowerCase()}
+    `;
     const fanContext = await browser.newContext({
       storageState: { cookies: [], origins: [] },
     });
