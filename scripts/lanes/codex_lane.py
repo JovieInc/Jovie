@@ -1491,7 +1491,7 @@ def propose_reset_if_all_at_floor(now: float) -> dict | None:
             "deadlineAt": earliest, "channels": ["summer", "ovie-card"], "neverBuy": True, "autoRedeem": False}
     path = reset_proposals_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path.with_suffix(".lock"), "w") as guard:
+    with open(path.with_suffix(".lock"), "a") as guard:  # lock only; never truncate state
         fcntl.flock(guard, fcntl.LOCK_EX)
         recorded = next((p for p in read_reset_proposals() if p.get("id") == card["id"]), None)
         if recorded:
