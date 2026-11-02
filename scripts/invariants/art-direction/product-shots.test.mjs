@@ -114,6 +114,9 @@ describe('CI wiring', () => {
     for (const source of [
       'apps/web/components/features/dashboard/organisms/table/Row.tsx',
       'apps/web/components/features/dashboard/organisms/onboarding-v20/Step.tsx',
+      'apps/web/components/features/release/UnrelatedReleasePanel.tsx',
+      'apps/web/lib/email/templates/welcome.ts',
+      'apps/web/components/features/dashboard/organisms/dashboard-audience-table/UnrelatedCell.tsx',
     ]) {
       assert.equal(selected(source), false, source);
     }

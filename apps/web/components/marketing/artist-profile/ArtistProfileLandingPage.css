@@ -1929,8 +1929,8 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
   .system-b-pricing-table-shell[data-variant="mobile"]
     .system-b-pricing-chart-cell--feature-heading
 ) {
-  /* One plan column on phones: give feature names the room to sit on one line. */
-  width: 62%;
+  /* Balance feature labels with the full plan heading on narrow phones. */
+  width: 50%;
 }
 
 :where(.system-b-pricing-chart-cell--value),

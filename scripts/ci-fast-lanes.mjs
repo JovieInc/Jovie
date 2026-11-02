@@ -351,7 +351,7 @@ export const SOURCE_GUARDS = Object.freeze([
     command:
       'node scripts/invariants/art-direction/run.mjs && node --test scripts/invariants/art-direction/*.test.mjs',
     inputs:
-      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage)\/|apps\/web\/public\/assets\/generated\/|docs\/design-system\/taste-labels\/|apps\/web\/styles\/design-system\.css$|apps\/web\/data\/marketing\/imageColorPolicy\.ts$|design\.tokens\.json$|docs\/design-system\/motion-effects\.json$|scripts\/invariants\/art-direction\/|apps\/web\/lib\/screenshots\/product-shots|apps\/web\/public\/product-shots\/|apps\/web\/scripts\/product-shots\/|apps\/web\/components\/features\/(?:demo|profile|onboarding|share|dashboard\/organisms\/onboarding(?:-v2)?)\/|apps\/web\/components\/features\/home\/homepage-profile-preview-fixture\.ts$)/u,
+      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage)\/|apps\/web\/public\/assets\/generated\/|docs\/design-system\/taste-labels\/|apps\/web\/styles\/design-system\.css$|apps\/web\/data\/marketing\/imageColorPolicy\.ts$|design\.tokens\.json$|docs\/design-system\/motion-effects\.json$|scripts\/invariants\/art-direction\/|apps\/web\/lib\/screenshots\/product-shots|apps\/web\/public\/product-shots\/|apps\/web\/scripts\/product-shots\/|apps\/web\/components\/features\/(?:demo|profile|onboarding|share|dashboard\/organisms\/onboarding(?:-v2)?)\/|apps\/web\/components\/features\/home\/homepage-profile-preview-fixture\.ts$|apps\/web\/components\/features\/release\/(?:ReleaseNotificationsProvider|MusicServiceDial)\.tsx$|apps\/web\/lib\/email\/templates\/release-day-notification\.ts$|apps\/web\/app\/r\/\[slug\]\/ReleaseLandingPage\.tsx$|apps\/web\/components\/features\/dashboard\/organisms\/dashboard-audience-table\/DashboardAudienceTableUnified\.tsx$)/u,
     prOnly: true,
   }),
   Object.freeze({
@@ -1257,6 +1257,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/verify-patched-dependencies.test.mjs',
   'scripts/lib/__tests__/incident-dedupe.test.mjs',
   'scripts/lib/__tests__/ci-capacity.test.mjs',
+  'scripts/lib/__tests__/source-qualification-receipt.test.mjs',
 ]);
 export const MESH_HOST_ACK_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-host-ack.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-host-ack.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-host-ack-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=99 --coverage.thresholds.statements=99 --coverage.thresholds.branches=90 --coverage.thresholds.functions=100';
