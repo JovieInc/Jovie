@@ -64,7 +64,7 @@ The harness, not the model, owns:
 | Repository bindings: the one service also routes LogYourBody (Linear `LYB` -> `JovieInc/LogYourBody`, `~/LogYourBody` on Gem, `LANES_REPO_LYB` overrides, `LANES_BINDING_LYB=0` disables). A worker spends its held seat on one LYB repair (red or behind lane PR, 2 tries per head, a per-PR lease so two seats never repair one PR) or one claim (any Todo issue without `hold` or a hard-excluded label; sensitive labels only on the Codex lane; no LYB-specific concurrency cap or open-PR ceiling, only the host's seats) before Jovie intake. Jovie-only holds never block LYB and a binding fault never blocks Jovie. The harness pushes, opens a ready PR (never draft: LYB's native merge queue skips drafts; a repair readies a draft lane PR) and moves the issue to In Review; LYB required checks and its native queue land it. LYB runs iOS only in merge groups, so one failed_checks ejection sends that head to repair with the failed merge-group run's log in the prompt, and a queued PR is never re-enqueued Refusal reasons land in `bindings.json`. LYB remediation events never run in the Jovie repo | `bindings.py`, `routing.json` `bindings`, `worker_with_slot()` |
 | Cost-aware routing: one capability floor per issue (`routing.json`), then the cheapest available `(lane, model)` route that clears it by effective cost; every claim is logged with its rationale | `remediation.route_issue()`, `issue_router()`, `runs/routing.jsonl` |
 | Guarded sensitive work: auth/billing/infra labels route only to Codex at `xhigh`; 500-line cap, canonical security/boundary gates, and independent `llm-review` run before enrollment | `pick_issue()`, `gate_pr()`, `sensitive_review()` |
-| Cloud lane (opt-in `cloud-lane` label): eligible repo-only work goes to provider-hosted workers (`claude --cloud` on Max; `codex cloud exec` once `CODEX_CLOUD_ENV` is set) at $0 marginal cost; secrets, protected labels, quota, backoff or any doubt keep it on Gem; an unknown submit outcome is held, never retried. Per-provider tasks, success rate and time-to-PR p50/p95 come from `cloud_lane.py stats`. Not yet wired into `run_issue` (dispatch call site is the follow-up) | `cloud_lane.route()`, `poll()`, `stats()` |
+| Dormant Codex Cloud adapter: `CODEX_CLOUD_ENV` and absolute `CODEX_CLOUD_BINARY` explicitly select the environment and real CLI. It supports opt-in repo-only submission, locked single-writer reservations, quota fallback, unknown-outcome holds, on-demand status and remote-id-correlated PR capture. No Claude Code provider. No `run_issue` dispatch or routing activation; subscription headroom, result application and dispatch remain the commissioning boundary tracked by JOV-10357. Stats report time-to-PR p50/p95 and unmeasured marginal cost | `cloud_lane.route()`, `status()`, `poll()`, `stats()` |
 | Stop revokes publication: a kill writes `runs/publication-revocations.jsonl` before the kill is acked, and every irreversible boundary (push, PR open, label, enqueue) revalidates it — revoked branches never ship (JOV-5060) | `run_agent(on_kill=)`, `revoke_publication()`, `require_publishable()` |
 
 Execution receipts retain `jovie-execution-attempt/v1`. The production and CLI writer
@@ -993,3 +993,14 @@ own gate fails before CI does.
 CI (`.github/workflows/design-gate.yml`) warns when a PR touches the same
 paths with no completed brief; it enforces only when `DESIGN_GATE_ENFORCE`
 is truthy, and unreadable briefs stay warnings even then.
+
+### Dormant cloud adapter recovery
+
+An unknown submit outcome keeps the reservation held. Do not retry or delete the ledger.
+The commissioning owner (JOV-10357) must inspect the configured environment with the real
+`codex cloud list --json` and correlate the remote task to the branch and submission time.
+After verifying the task id, append an `accepted` event with that id to the same ledger
+and inspect it with `status()`. Only positive evidence that no remote task was accepted
+permits an operator to append a `limit` rejection event for that exact task/branch;
+ambiguous CLI diagnostics such as 429 or capacity are insufficient. Corrupt ledgers hold
+routing; preserve the original and restore verified records before resuming.

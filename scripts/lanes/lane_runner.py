@@ -70,6 +70,7 @@ import slot_yield  # noqa: E402  (slot ceilings from measured merged-per-dollar)
 import update_drain  # noqa: E402  (drain gate admission while an update waits)
 import linear_app_token  # noqa: E402  (Jovie Lanes OAuth app quota, separate from Tim's user)
 import linear_sync  # noqa: E402  (local issue mirror, claim ledger, write outbox)
+import board_intake  # noqa: E402  (mesh board work for codex, closed on verified outcomes)
 import ownership  # noqa: E402  (started-state live-owner invariant)
 import fleet_ledger  # noqa: E402  (external agent claims, stranded-claim view)
 import pr_events  # noqa: E402
@@ -158,12 +159,15 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_capacity_limit.py", "scripts/tests/test_capacity_registry.py", "scripts/tests/test_fleet_gate_emitter.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
               "scripts/tests/test_epics.py",
-              "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py", "scripts/tests/test_priority_admission.py", "scripts/tests/test_macos_pool.py",
+              "scripts/tests/test_board_intake.py", "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py", "scripts/tests/test_priority_admission.py", "scripts/tests/test_macos_pool.py",
               "scripts/tests/test_backlog_rank.py", "scripts/tests/test_decompose_pass.py",
               "scripts/tests/test_pytest_hook_names.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
-RELEASE_EXTRAS = ["scripts/shipping_origin.py", # Shared client layer (budgeted gh) used by the throughput sentinel.
+RELEASE_EXTRAS = ["scripts/shipping_origin.py",
+                  # Subsidy pool burn policy (floor, burn order) that codex_lane reads at runtime.
+                  "apps/web/lib/ai/routing.json",
+                  # Shared client layer (budgeted gh) used by the throughput sentinel.
                   "scripts/apiclient/__init__.py", "scripts/apiclient/__main__.py", "scripts/apiclient/cache.py", "scripts/apiclient/client.py", "scripts/apiclient/contract.py", "scripts/apiclient/credentials.py", "scripts/apiclient/fake.py", "scripts/apiclient/gh.py", "scripts/apiclient/github.py", "scripts/apiclient/headers.py", "scripts/apiclient/legacy.py", "scripts/apiclient/linear.py", "scripts/apiclient/policy.py", "scripts/apiclient/store.py",
                   "packages/api-client/providers.json",
                   "scripts/lib/github-rate-limit.mjs",
@@ -865,9 +869,10 @@ def admission_order(issue: Issue, now: float) -> tuple:
     labels = {label.lower() for label in issue.labels}
     tier = (-1 if {SHARED_LABEL, "dispatch-next"} <= labels
             else 0 if effective_priority == 1 or workstreams.compounding(stream) else 1)
-    # Summer's signed portfolio rank is the first key, then explicit Urgent, tier, aged priority, age (JOV-7073).
+    # Summer's signed rank comes first, then Urgent, marketing, tier, aged priority, age (JOV-7073).
     return (*priority_admission.claim_key(issue.identifier, priority_admission.summer_ranks(now=now)),
-            0 if priority == 1 else 1, tier, effective_priority, workstreams.rank(stream),
+            0 if priority == 1 else 1, not priority_admission.marketing_priority(issue.labels),
+            tier, effective_priority, workstreams.rank(stream),
             created_at if created_at is not None else float("inf"))
 
 
@@ -10138,6 +10143,13 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                 tick["linearSync"] = linear_sync.tick(host.state, client, client.admit, (LinearRateLimited,), teams)
             except (Exception, SystemExit) as error:  # dispatch reads the mirror at any age
                 tick["linearSyncError"] = f"{type(error).__name__}: {error}"[:200]
+        if not os.environ.get("LANES_SELFTEST") and os.environ.get("LANES_BOARD_INTAKE", "1") != "0":
+            try:
+                # Typed failures Summer posts to the mesh board (doctor issues, stuck PRs, red main)
+                # become lanes work here and close only on a verified outcome (board_intake.py).
+                tick["boardIntake"] = board_intake.tick(host.state, Linear(host.linear_env))
+            except (Exception, SystemExit) as error:  # the board never takes dispatch down
+                tick["boardIntakeError"] = f"{type(error).__name__}: {error}"[:200]
             try:  # measure the shared hosted-macOS pool (throttled); the LYB refill below reads it
                 tick["macosPool"] = macos_pool.sample(host.state)
             except (Exception, SystemExit) as error:  # a sampling fault never blocks dispatch

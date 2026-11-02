@@ -127,6 +127,18 @@ export function evaluate(snapshot, registry) {
     if (page.error)
       results.push(result('crawl', 'warn', page, `crawl error: ${page.error}`));
   }
+  // A run that crawled nothing proves nothing: fail it instead of passing on
+  // an empty set of rules.
+  if (snapshot.pages.length === 0 || ok.length === 0) {
+    results.push(
+      result(
+        'crawl',
+        'fail',
+        { surface: 'all' },
+        `no page was crawled successfully (${snapshot.pages.length} attempted)`
+      )
+    );
+  }
 
   for (const page of ok) {
     const unknown = (page.third_party_requests ?? [])
@@ -281,7 +293,21 @@ export function evaluate(snapshot, registry) {
       observedByProduct.set(page.product, set);
     }
   }
-  for (const [id, policy] of Object.entries(snapshot.policy_versions ?? {})) {
+  const policyEntries = Object.entries(snapshot.policy_versions ?? {});
+  if (
+    policyEntries.length > 0 &&
+    policyEntries.every(([, p]) => p.error || !p.analysis)
+  ) {
+    results.push(
+      result(
+        'claims-truthful',
+        'fail',
+        { surface: 'all-policies' },
+        'no policy page could be analysed, so no claim was checked'
+      )
+    );
+  }
+  for (const [id, policy] of policyEntries) {
     if (policy.error || !policy.analysis) {
       results.push(
         result(

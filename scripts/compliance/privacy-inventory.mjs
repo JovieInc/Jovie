@@ -22,7 +22,7 @@
 //               pixel can fire, so "nothing fired" in eu is not vacuous.
 //
 // Usage: node scripts/compliance/privacy-inventory.mjs [--out file.json]
-//        [--only <surface-id>,...] [--scenarios us,us-gpc]
+//        [--only <surface-id>,...] [--scenarios us-default,us-gpc]
 // PLAYWRIGHT_MODULE may point at a playwright index.mjs outside this tree.
 
 import { createHash, randomUUID } from 'node:crypto';
@@ -235,6 +235,9 @@ async function crawlOne(browser, surface, scenario, firstParty) {
       timeout: 45_000,
     });
     status = res?.status() ?? null;
+    // A 4xx or 5xx page is a failed crawl, not evidence: its few third-party
+    // requests would make the privacy rules pass vacuously.
+    if (status !== null && status >= 400) error = `HTTP ${status}`;
     await page
       .waitForLoadState('networkidle', { timeout: 15_000 })
       .catch(() => {});
@@ -252,6 +255,11 @@ async function crawlOne(browser, surface, scenario, firstParty) {
     : await page
         .evaluate(pageProbe, probeArgs)
         .catch(e => ({ probe_error: String(e).slice(0, 200) }));
+  // An unreadable page has no probe fields; rules must not judge it.
+  if (probe?.probe_error) {
+    error = `probe failed: ${probe.probe_error}`;
+    probe = null;
+  }
   let accepted = null;
   if (scenario === 'eu-accept' && probe?.consent_banner?.visible) {
     const before = requests.length;
@@ -373,6 +381,13 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const chromium = pw.chromium ?? pw.default.chromium;
   const only = arg('--only')?.split(',');
   const scenarios = arg('--scenarios')?.split(',') ?? SCENARIOS;
+  const unknownScenarios = scenarios.filter(name => !SCENARIOS.includes(name));
+  if (unknownScenarios.length) {
+    console.error(
+      `Unknown scenario(s): ${unknownScenarios.join(', ')}. Valid: ${SCENARIOS.join(', ')}`
+    );
+    process.exit(2);
+  }
   const snapshot = await crawl({ registry, only, scenarios, chromium });
   const out = arg('--out');
   const json = `${JSON.stringify(snapshot, null, 2)}\n`;
