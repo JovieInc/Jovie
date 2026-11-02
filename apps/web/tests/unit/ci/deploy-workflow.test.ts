@@ -5318,7 +5318,7 @@ describe('in-band interrupted marker heal (JOV-7773)', () => {
   it('runs after every verified generation with only dispatch scope', () => {
     const job = healStep();
     expect(job.if).toBe(
-      "${{ always() && needs.production-verified.outputs.verified == 'true' }}"
+      "${{ always() && (needs.production-verified.outputs.verified == 'true' || needs.authorize-production.outputs.deployed_marker_heal == 'true') }}"
     );
     expect(job.needs).toEqual([
       'authorize-production',
@@ -5379,6 +5379,128 @@ describe('in-band interrupted marker heal (JOV-7773)', () => {
       expect(result.calls).toBe('');
     }
   }, 30_000);
+});
+
+describe('deployed interrupted-marker self-heal at authorize (JOV-9971)', () => {
+  const sha = '5cbe0cbce760caf9a62e11231e0a2b8db5e513d7';
+
+  function deployedHealStep() {
+    const parsed = parseYaml(
+      readFileSync(productionControllerWorkflowPath, 'utf8')
+    ) as {
+      jobs: Record<
+        string,
+        {
+          if?: string;
+          needs?: string[];
+          permissions?: Record<string, string>;
+          steps: Array<{
+            name?: string;
+            if?: string;
+            env?: Record<string, string>;
+            run?: string;
+          }>;
+        }
+      >;
+    };
+    return parsed.jobs['heal-interrupted-marker'];
+  }
+
+  function runDeployedHeal(env: Record<string, string | undefined>) {
+    const job = deployedHealStep();
+    const script = job.steps[1]?.run;
+    expect(script).toBeTruthy();
+    const root = mkdtempSync(resolve(tmpdir(), 'deployed-marker-heal-'));
+    try {
+      const bin = resolve(root, 'bin');
+      mkdirSync(bin);
+      const calls = resolve(root, 'calls');
+      writeFileSync(calls, '');
+      writeFileSync(
+        resolve(bin, 'gh'),
+        `#!/usr/bin/env bash\nprintf '%s\\n' "$*" >> "$CALLS"\n`
+      );
+      chmodSync(resolve(bin, 'gh'), 0o700);
+      const result = spawnSync('bash', ['-c', script!], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH ?? ''}`,
+          CALLS: calls,
+          HEAL_SHA: sha,
+          HEAL_DEPLOYMENT_ID: 'dpl_37144574062',
+          HEAL_RUN: '40932269374',
+          HEAL_ATTEMPT: '1',
+          ...env,
+        },
+      });
+      return { ...result, calls: readFileSync(calls, 'utf8') };
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  }
+
+  it('activates only when authorize surfaces a healable deployed marker', () => {
+    const job = deployedHealStep();
+    // The existing interrupted-generation path and the deployed-marker path
+    // are mutually exclusive: a failed authorize never sets verified.
+    expect(job.if).toContain(
+      "needs.production-verified.outputs.verified == 'true'"
+    );
+    expect(job.if).toContain(
+      "needs.authorize-production.outputs.deployed_marker_heal == 'true'"
+    );
+    expect(job.steps[1]?.if).toBe(
+      "${{ needs.authorize-production.outputs.deployed_marker_heal == 'true' }}"
+    );
+    expect(job.steps[1]?.env?.GH_TOKEN).toBe('${{ github.token }}');
+    expect(job.permissions).toEqual({ actions: 'write', contents: 'read' });
+  });
+
+  it('dispatches the bounded re-proof with the classifier binding for the safe-to-rerun state', () => {
+    const result = runDeployedHeal({});
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.calls.trim()).toBe(
+      `workflow run production-marker-recovery.yml --ref main -f sha=${sha} -f deployment_id=dpl_37144574062 -f controller_run=40932269374 -f controller_attempt=1`
+    );
+  }, 30_000);
+
+  it('fails closed without exact deployed-marker evidence', () => {
+    for (const env of [
+      { HEAL_SHA: 'abc' },
+      { HEAL_DEPLOYMENT_ID: 'not-applicable' },
+      { HEAL_RUN: '0' },
+      { HEAL_ATTEMPT: '' },
+    ]) {
+      const result = runDeployedHeal(env);
+      expect(result.status).toBe(1);
+      expect(result.calls).toBe('');
+    }
+  }, 30_000);
+
+  it('authorize surfaces the heal binding for exactly the one-interrupted state and fails closed otherwise', () => {
+    const controller = readFileSync(productionControllerWorkflowPath, 'utf8');
+    const authorize = getStepBlock(
+      controller,
+      'Cross-prove exact successful push CI'
+    );
+    const handler = authorize.slice(
+      authorize.indexOf('--release-base "$EXPECTED_SHA"')
+    );
+    expect(handler).toContain('recovery_available');
+    expect(handler).toContain('one_interrupted_marker_safe_to_rerun');
+    expect(handler).toContain('deployed_marker_heal=true');
+    expect(handler).toContain('deployed_marker_sha=$deployed_sha');
+    expect(handler).toContain(
+      'deployed_marker_deployment_id=$heal_deployment_id'
+    );
+    expect(handler).toContain('deployed_marker_run=$heal_run');
+    expect(handler).toContain('deployed_marker_attempt=$heal_attempt');
+    // The release base is never admitted from a recovery state: the run
+    // still exits 1 whether or not the heal dispatch was surfaced.
+    expect(handler).toContain('exit 1');
+    expect(handler).not.toContain('deployed_marker_state="recovery_available"');
+  });
 });
 
 describe('production marker recovery workflow (JOV-4965)', () => {
