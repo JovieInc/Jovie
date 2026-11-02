@@ -24,6 +24,14 @@ while IFS= read -r git_local_env_name; do
 done <<< "$git_local_env_names"
 unset git_local_env_names git_local_env_name
 
+# Recursion guard (incident 2026-11-01, Gem load 1,661): preflight sets
+# JOVIE_PREFLIGHT_DEPTH for its children, so a gate that finds it set was
+# re-entered from inside a preflight and must refuse rather than fork-storm.
+if [[ -n "${JOVIE_PREFLIGHT_DEPTH:-}" ]]; then
+  echo "[pre-push-gate] refusing to run: nested inside a preflight (JOVIE_PREFLIGHT_DEPTH=${JOVIE_PREFLIGHT_DEPTH})" >&2
+  exit 1
+fi
+
 if [[ "${JOVIE_SKIP_PRE_PUSH_GATE:-}" == "1" ]]; then
   echo "[pre-push-gate] skipped (JOVIE_SKIP_PRE_PUSH_GATE=1)"
   exit 0
