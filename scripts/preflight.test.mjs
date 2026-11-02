@@ -747,7 +747,11 @@ test('real local qualification isolates retries, changed heads, stale artifacts 
   assert.equal(f.git('status', '--porcelain'), '');
 });
 
-for (const [name, setup, expected] of [
+for (const [
+  name,
+  setup,
+  expected,
+] of /** @type {Array<[string, string, RegExp]>} */ ([
   [
     'malformed parent',
     'printf owner > "$RUNNER_TEMP/tmp"',
@@ -773,7 +777,7 @@ for (const [name, setup, expected] of [
     'mkdir "$RUNNER_TEMP/tmp"; ln -s "$PREFLIGHT_SNAPSHOTS.outside" "$RUNNER_TEMP/tmp/source-guard-actions"',
     /EEXIST/,
   ],
-]) {
+])) {
   test(`real local qualification propagates ${name} snapshot failure without replacing its owner`, async t => {
     const f = actionSnapshotFixture(t, setup);
     const outside = path.join(f.root, 'workspaces.outside');
