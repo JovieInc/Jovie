@@ -285,15 +285,6 @@ export const PRODUCT_SHOTS = [
     maxHeight: 260,
     frame: 'window',
     displayWidth: 720,
-    // Phones: the address and its Subscriber state, readable at 358 px.
-    mobile: {
-      crop: [
-        '[data-testid="homepage-moment-list"] th:has-text("Member")',
-        '[data-testid="homepage-moment-list"] :nth-match(:text-is("Subscriber"), 5)',
-      ],
-      padding: 12,
-      displayWidth: 358,
-    },
     sources: [
       `${DEMO}/DemoHomepageMomentSurface.tsx`,
       `${DEMO}/homepage-moment-fixtures.ts`,
@@ -319,15 +310,53 @@ export const PRODUCT_SHOTS = [
     padding: { top: 18, right: 20, bottom: 18, left: 44 },
     frame: 'window',
     displayWidth: 720,
-    // Phones: cover, title and type only.
-    mobile: {
-      crop: [
-        '[data-testid="homepage-moment-catalog"] :text("The Deep End")',
-        '[data-testid="homepage-moment-catalog"] :nth-match(:text-is("Single"), 2)',
-      ],
-      padding: { top: 18, right: 20, bottom: 18, left: 44 },
-      displayWidth: 358,
-    },
+    sources: [
+      `${DEMO}/DemoHomepageMomentSurface.tsx`,
+      `${DEMO}/DemoReleasesExperience.tsx`,
+      `${DEMO}/mock-release-data.ts`,
+    ],
+    placements: ['/'],
+  },
+  {
+    // Phone art direction for home-subscriber-list: the address and its
+    // state only, legible at phone width (shown below 48rem by the page).
+    id: 'home-subscriber-list-phone',
+    title: 'Subscribers (phone)',
+    alt: 'New email subscribers in the Jovie audience table, each marked Subscriber.',
+    route: '/demo/showcase/homepage-moment?moment=list',
+    viewport: 'desktop',
+    theme: 'dark',
+    waitFor: '[data-testid="homepage-moment-list"] td:has-text("1h")',
+    crop: [
+      '[data-testid="homepage-moment-list"] th:has-text("Member")',
+      '[data-testid="homepage-moment-list"] :nth-match(:text-is("Subscriber"), 5)',
+    ],
+    padding: 12,
+    frame: 'window',
+    displayWidth: 358,
+    sources: [
+      `${DEMO}/DemoHomepageMomentSurface.tsx`,
+      `${DEMO}/homepage-moment-fixtures.ts`,
+      'apps/web/components/features/dashboard/organisms/dashboard-audience-table/DashboardAudienceTableUnified.tsx',
+    ],
+    placements: ['/'],
+  },
+  {
+    // Phone art direction for home-catalog: cover, title and type.
+    id: 'home-catalog-phone',
+    title: 'Imported catalog (phone)',
+    alt: "Tim White's releases imported into Jovie: The Deep End and Take Me Over.",
+    route: '/demo/showcase/homepage-moment?moment=catalog',
+    viewport: 'desktop',
+    theme: 'dark',
+    waitFor: '[data-testid="homepage-moment-catalog"] [style*="take-me-over"]',
+    crop: [
+      '[data-testid="homepage-moment-catalog"] :text("The Deep End")',
+      '[data-testid="homepage-moment-catalog"] :nth-match(:text-is("Single"), 2)',
+    ],
+    padding: { top: 18, right: 20, bottom: 18, left: 44 },
+    frame: 'window',
+    displayWidth: 358,
     sources: [
       `${DEMO}/DemoHomepageMomentSurface.tsx`,
       `${DEMO}/DemoReleasesExperience.tsx`,
