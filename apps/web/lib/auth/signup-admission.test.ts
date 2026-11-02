@@ -108,7 +108,6 @@ function createAuth() {
         verifyIdToken: async () => true,
         getUserInfo: async () => ({
           user: {
-            id: `provider-${provider.email}`,
             name: 'Invited user',
             ...provider,
           },
