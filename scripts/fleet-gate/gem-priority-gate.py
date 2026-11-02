@@ -77,6 +77,12 @@ LANE_CAPACITY_SCHEMA = "jovie-lane-capacity/v2"
 QUEUE_SNAPSHOT_TTL = timedelta(minutes=10)
 CONTROLLER_SNAPSHOT_SCHEMA = "jovie-controller-snapshot/v1"
 CONTROLLER_SNAPSHOT_TTL = timedelta(minutes=10)
+# A working tick can hold tick.json's start-of-tick stamp past CONTROLLER_SNAPSHOT_TTL
+# (dispatch ticks were measured at 25-60 minutes on 2026-10-26). Liveness for that
+# in-flight window is the controller's own heartbeat: lifecycle.beat touches
+# tick-heartbeat while the tick runs tracked children, the same signal the stay-up
+# watchdog consumes. Past this bound the heartbeat is silence, not progress.
+NATIVE_HEARTBEAT_ALIVE_S = 3 * 60  # factory_watchdog.HEARTBEAT_ALIVE_S
 # Schema-padding sentinel for evaluation-failed receipts. Auto-Enroll jq
 # requires a 40-hex main SHA; this value never authorizes promotion.
 UNKNOWN_MAIN_SHA = "0" * 40
@@ -982,6 +988,22 @@ def native_user_bus_environment(home: Path, *, runtime_root: Path = Path("/run/u
     return {**env, **canonical}
 
 
+def native_heartbeat_age(state_dir: Path, now: datetime) -> float | None:
+    """Age (seconds) of the controller's tick-heartbeat, or None when absent/irregular.
+
+    The heartbeat is regular-file liveness evidence written by the same tracked
+    lifecycle helper the tick receipt comes from; a symlink or special file is
+    not evidence.
+    """
+    try:
+        info = (state_dir / "tick-heartbeat").lstat()
+    except OSError:
+        return None
+    if not stat.S_ISREG(info.st_mode):
+        return None
+    return now.timestamp() - info.st_mtime
+
+
 def observe_native_controller(state_dir: Path, now: datetime) -> dict[str, Any]:
     """Observe the installed lanes runtime; a retired HTTP endpoint is not authority."""
     failed = {"status": "failed", "kind": "native-lanes", "source": "native-runtime",
@@ -1028,8 +1050,24 @@ def observe_native_controller(state_dir: Path, now: datetime) -> dict[str, Any]:
         observed = (datetime.fromisoformat(tick_at.replace("Z", "+00:00"))
                     if isinstance(tick_at, str) else None)
         tick_revision = tick.get("release")
+        tick_age = (now - observed) if observed is not None else None
+        # A tick stamp older than CONTROLLER_SNAPSHOT_TTL is not by itself a dead
+        # controller: a working dispatch holds tick.json's start-of-tick stamp past
+        # that bound (ticks ran 25-60 minutes on 2026-10-26), exactly while the
+        # service keeps spawning workers. For that in-flight window the tick's own
+        # heartbeat is the liveness evidence — lifecycle.beat touches
+        # tick-heartbeat while the tick runs tracked children. A missing,
+        # irregular or stale heartbeat still fails closed, as does a failed tick,
+        # an unbound release identity or a future-dated stamp: the heartbeat
+        # never manufactures health, it only certifies an in-flight tick.
+        heartbeat_age = native_heartbeat_age(state, now)
+        receipt_fresh = (tick_age is not None
+                         and -timedelta(seconds=30) <= tick_age <= CONTROLLER_SNAPSHOT_TTL)
+        heartbeat_fresh = (tick_age is not None and tick_age >= -timedelta(seconds=30)
+                           and heartbeat_age is not None
+                           and heartbeat_age <= NATIVE_HEARTBEAT_ALIVE_S)
         if (observed is None or observed.tzinfo is None or observed.utcoffset() is None
-                or not -timedelta(seconds=30) <= now - observed <= CONTROLLER_SNAPSHOT_TTL
+                or not (receipt_fresh or heartbeat_fresh)
                 or not isinstance(tick_revision, str) or not re.fullmatch(r"[0-9a-f]{7,40}", tick_revision)
                 or not str(objects.get("scripts/lanes", "")).startswith(tick_revision) or "error" not in tick or tick["error"] is not None):
             raise ValueError("native controller tick is stale, failed or unbound")
@@ -1066,6 +1104,7 @@ def observe_native_controller(state_dir: Path, now: datetime) -> dict[str, Any]:
         return {"status": "green", "kind": "native-lanes", "source": "native-runtime",
                 "observedAt": isoformat(now), "tickAt": tick["at"],
                 "sourceCommit": revision, "bundleDigest": parts[0],
+                "heartbeatAgeS": round(heartbeat_age, 1) if heartbeat_age is not None else None,
                 "service": "jovie-lanes.service", "timer": "jovie-lanes.timer"}
     except (OSError, ValueError, TypeError, IndexError, AttributeError, subprocess.SubprocessError):
         return {**failed, "error": "native-controller-evidence-unavailable"}

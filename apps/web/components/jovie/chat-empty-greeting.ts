@@ -3,6 +3,7 @@ import {
   INSIGHT_ACTIONS,
 } from '@/lib/creator/segment-registry';
 import type { ResolvedSegment } from '@/lib/creator/segments';
+import { resolveSafeFirstName } from '@/lib/email/templates/personalization';
 import type { InsightResponse, InsightType } from '@/types/insights';
 
 /** Home welcomes the person and offers one real next step (JOV-7150). */
@@ -14,12 +15,18 @@ export function getTimeOfDayGreeting(date: Date = new Date()): string {
   return 'Good evening';
 }
 
-/** First token of a real display name. Never invents a name. */
+/**
+ * A person's first-and-last name greets by first name ("Tim White" -> "Tim").
+ * Any other display name is an artist or band name and greets whole ("Good
+ * Dropouts", "UNMARKED"), never by its first word ("Good afternoon, Good.").
+ * Artists are greeted by name: the golden path asserts it.
+ */
 export function getChatEmptyStateFirstName(
   displayName: string | null | undefined
 ): string | null {
-  const first = displayName?.trim().split(/\s+/)[0];
-  return first ? first : null;
+  const name = displayName?.trim().replaceAll(/\s+/g, ' ') ?? '';
+  if (!name) return null;
+  return resolveSafeFirstName(name, '') ?? name;
 }
 
 export function getChatEmptyStateGreetingText(

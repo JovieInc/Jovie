@@ -55,8 +55,9 @@ export async function mutateCertificationRecord<State, Result>(input: {
     const current = input.parse(json);
     input.validate(current);
     const next = input.update(current);
-    if (next.ledger === current) return next.result;
     const serialized = JSON.stringify(next.ledger);
+    // Unchanged state skips the write; `parse` may have extended it (registry drift), which still persists.
+    if (next.ledger === current && serialized === json) return next.result;
     input.validate(input.parse(serialized));
     if (
       await input.backend.compareAndSet(

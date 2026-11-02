@@ -13,7 +13,10 @@ import {
   useRef,
   useState,
 } from 'react';
-import { CHAT_STREAM_FAILED_USER_MESSAGE } from '@/lib/ai/gateway-errors';
+import {
+  CHAT_STREAM_FAILED_USER_MESSAGE,
+  CHAT_STREAM_STALLED_USER_MESSAGE,
+} from '@/lib/ai/gateway-errors';
 import { track } from '@/lib/analytics';
 import { matchCommand } from '@/lib/chat/command-registry';
 import {
@@ -119,6 +122,12 @@ const TITLE_POLL_MAX_DURATION_MS = 15_000;
 /** Number of fast poll intervals to allow before backing off. */
 const TITLE_POLL_FAST_WINDOW_MS = TITLE_POLL_FAST_INTERVAL_MS * 3;
 const TIMELINE_CACHE_LIMIT = 20;
+/**
+ * Longest a turn may show typing dots with no streamed progress. Above the
+ * server-side stall bounds (lib/ai/stream-stall-guard.ts) so the server's
+ * terminal error wins, and below the route's 60s maxDuration.
+ */
+export const CHAT_CLIENT_STALL_TIMEOUT_MS = 50_000;
 const timelineStateCache = new Map<string, ChatTimelineState>();
 
 type ChatTurnSource = 'typed' | 'quick_action' | 'slash_command';
@@ -1213,6 +1222,29 @@ export function useJovieChatController({
 
   const isLoading = status === 'streaming' || status === 'submitted';
   const hasMessages = messages.length > 0;
+
+  // No-progress watchdog: the server bounds a silent provider (~30s) and ends
+  // the stream with an error, but a dropped connection or a killed function
+  // can leave `useChat` in submitted/streaming with nothing arriving. Never
+  // leave the typing dots up forever: cancel and show the honest retry state.
+  const awaitingReply = isLoading || isSubmitting;
+  useEffect(() => {
+    if (!awaitingReply) return;
+    const clientTurnId = activeClientTurnIdRef.current;
+    if (!clientTurnId) return;
+    // `sdkMessages` is a dependency so every streamed delta re-arms the timer.
+    void sdkMessages;
+    const timer = setTimeout(() => {
+      if (activeClientTurnIdRef.current !== clientTurnId) return;
+      rawStop();
+      handleChatFailure(
+        new Error(CHAT_STREAM_STALLED_USER_MESSAGE),
+        'stream',
+        clientTurnId
+      );
+    }, CHAT_CLIENT_STALL_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [awaitingReply, sdkMessages, handleChatFailure, rawStop]);
 
   useEffect(() => {
     if (status !== 'ready') return;

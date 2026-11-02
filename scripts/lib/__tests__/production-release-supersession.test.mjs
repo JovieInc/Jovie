@@ -23,8 +23,11 @@ import {
   aliasDecision,
   collectAliasGraduation,
   completeList,
+  MIN_SAMPLES_PER_ROUTE,
+  nearestRankP95,
   parseAliasSamples,
   selectAliasWindow,
+  uniformSamplesPerRoute,
 } from '../public-profile-alias-graduation.mjs';
 import {
   realGhVersion,
@@ -88,16 +91,12 @@ describe('public-profile alias graduation policy', () => {
     }
     expect(receipt.schema).toBe('jovie-public-profile-alias-graduation/v2');
     expect(inventory).toHaveLength(selection.enumeratedControllers);
-    const originalWindow = selectAliasWindow(
-      inventory,
-      'production',
-      '2026-10-14T15:21:25Z'
-    );
-    expect(originalWindow.map(row => row.production.jobId)).toEqual(
-      expect.arrayContaining([115872079856, 115852914061, 115804204403])
-    );
+    // Completeness: every selected window below is recomputed from the full
+    // enumerated inventory, so an omitted controller changes the selection.
     expect(selection.windowSize).toBe(policy.requiredConsecutiveRuns);
-    expect(policy.samplesPerRoute).toBe(5);
+    expect(policy.samplesPerRoute).toBeGreaterThanOrEqual(
+      MIN_SAMPLES_PER_ROUTE
+    );
     expect(policy.p95Estimator).toBe('nearest-rank');
     for (const [surface, window] of Object.entries(windows)) {
       const selected = selectAliasWindow(inventory, surface, selection.cutoff);
@@ -122,10 +121,13 @@ describe('public-profile alias graduation policy', () => {
         expect(row.jobUrl).toBe(
           `https://github.com/JovieInc/Jovie/actions/runs/${row.controllerRunId}/job/${row.jobId}`
         );
+        expect(row.samplesPerRoute).toBe(policy.samplesPerRoute);
         for (const route of ALIAS_ROUTES) {
-          expect(row.routeSamplesMs[route]).toHaveLength(5);
+          expect(row.routeSamplesMs[route]).toHaveLength(
+            policy.samplesPerRoute
+          );
           expect(row.routeP95Ms[route]).toBe(
-            Math.max(...row.routeSamplesMs[route])
+            nearestRankP95(row.routeSamplesMs[route])
           );
         }
         expect(row.observedP95Ms).toBe(
@@ -171,9 +173,14 @@ describe('public-profile alias graduation policy', () => {
     expect(production).toContain(
       `no later than ${review} (${policy.trackingIssue})`
     );
-    expect(production.includes('performance_status=warn')).toBe(
-      !windows.production.graduated
+    // A graduated receipt authorizes blocking, but only on pages whose
+    // golden-path surface is certified in the Ovie ledger; the rest warn.
+    expect(production.includes('performance_status=failed')).toBe(
+      windows.production.graduated
     );
+    expect(production).toContain('scripts/lib/alias-gate-certified-routes.mjs');
+    expect(production).toContain('/api/internal/ovie/golden-path-evidence');
+    expect(production).toContain('performance_status=${status}');
     expect(production).not.toContain('JOV-4854');
   });
 
@@ -253,6 +260,50 @@ describe('public-profile alias graduation policy', () => {
     });
     expect(aliasDecision(Array(13).fill(parsed)).graduated).toBe(false);
     expect(aliasDecision(Array(14).fill(parsed)).graduated).toBe(true);
+  });
+
+  it('reads the guard sample count from the log and checks the nearest-rank p95, not the max', () => {
+    // performance-budgets-guard takes 20 samples since #22656; its summary is
+    // the 19th of 20 sorted samples, so one 1800ms outlier still qualifies.
+    const values = index => (index === 20 ? 1800 : index === 19 ? 900 : 700);
+    const log = ALIAS_ROUTES.map(
+      route =>
+        `Checking ${route} -> /test\n${Array.from({ length: 20 }, (_, i) => `  sample ${i + 1}/20: ${values(i + 1)}ms`).join('\n')}\n${route} (/test) primary=usable-alias-result=700ms\n  PASS usable-alias-result-max: 900.0ms / 1500.0ms`
+    ).join('\n');
+    expect(parseAliasSamples(log)).toMatchObject({
+      samplesPerRoute: 20,
+      valid: true,
+      qualifies: true,
+      observedP95Ms: 900,
+    });
+    for (const broken of [
+      // summary claims the max instead of the nearest-rank p95
+      log.replaceAll('900.0ms / 1500.0ms', '1800.0ms / 1500.0ms'),
+      // one route reports a different sample count
+      log.replace('sample 20/20: 1800ms', 'sample 20/21: 1800ms'),
+      // fewer than the minimum samples per route
+      ALIAS_ROUTES.map(
+        route =>
+          `Checking ${route} -> /test\n  sample 1/1: 700ms\n${route} (/test) primary=usable-alias-result=700ms\n  PASS usable-alias-result-max: 700.0ms / 1500.0ms`
+      ).join('\n'),
+    ]) {
+      expect(parseAliasSamples(broken)).toMatchObject({
+        valid: false,
+        qualifies: false,
+      });
+    }
+    expect(
+      uniformSamplesPerRoute([
+        { valid: true, samplesPerRoute: 20 },
+        { valid: false, samplesPerRoute: 5 },
+      ])
+    ).toBe(20);
+    expect(
+      uniformSamplesPerRoute([
+        { valid: true, samplesPerRoute: 20 },
+        { valid: true, samplesPerRoute: 5 },
+      ])
+    ).toBeNull();
   });
 
   it('collects paginated exact-attempt jobs without filtering failed controllers or borrowing staging samples', async () => {
@@ -346,10 +397,20 @@ describe('public-profile alias graduation policy', () => {
     ).rejects.toThrow('Incomplete');
   });
 
-  it.each(['production', 'staging'])(
-    'executes the %s guard with the measured enforcement decision',
-    surface => {
+  it.each([
+    ['production', 'certified'],
+    ['production', 'uncertified'],
+    ['production', 'unreadable'],
+    ['staging', 'certified'],
+    ['staging', 'uncertified'],
+    ['staging', 'unreadable'],
+  ])(
+    'executes the %s guard with the measured enforcement decision (%s ledger)',
+    (surface, ledgerState) => {
       const staging = surface === 'staging';
+      // Both lanes block only while public-profile is certified in the ledger
+      // (Tim 2026-10-31); uncertified or unreadable ledgers warn.
+      const certified = ledgerState === 'certified';
       const job = getJobBlock(
         RELEASE_WORKFLOW,
         staging ? 'promote-production' : 'production-public-profile-alias-gate'
@@ -371,24 +432,63 @@ describe('public-profile alias graduation policy', () => {
           // Each call is appended with one write: the staged gate runs its budget lanes concurrently.
           '#!/bin/sh\ncall="$(printf "%s\\n" "$@"; printf -- "--invocation-end--\\n")"\nprintf "%s\\n" "$call" >> "$ALIAS_GUARD_ARGUMENTS"\ncase "$*" in *performance-budgets-guard*) exit "$ALIAS_GUARD_EXIT" ;; *) exit 0 ;; esac\n'
         );
+        const ledgerBody =
+          ledgerState === 'unreadable'
+            ? '<html>bad gateway</html>'
+            : JSON.stringify({
+                schema: 'jovie.prod-golden-path-certified/v1',
+                ledger: 'present',
+                certifiedSurfaces: certified
+                  ? ['landing', 'public-profile']
+                  : ['landing'],
+              });
+        writeFileSync(join(fixture.root, 'ledger.json'), ledgerBody);
+        // The staged lane reads CRON_SECRET through Doppler; pass through.
+        stubCommand(
+          fixture.bin,
+          'doppler',
+          '#!/bin/sh\nwhile [ "$1" != "--" ]; do shift; done\nshift\nexec "$@"\n'
+        );
+        stubCommand(
+          fixture.bin,
+          'curl',
+          '#!/bin/sh\ncase "$*" in *golden-path-evidence*) cat "$ALIAS_LEDGER_BODY" ;; *) exit 22 ;; esac\n'
+        );
         const result = runScript(script, fixture, {
+          ALIAS_LEDGER_BODY: join(fixture.root, 'ledger.json'),
+          CRON_SECRET: 'fixture-cron-secret',
           ALIAS_GUARD_ARGUMENTS: join(fixture.root, 'arguments'),
           ALIAS_GUARD_EXIT: String(exit),
-          DOPPLER_TOKEN: '',
+          DOPPLER_TOKEN: staging ? 'fixture-doppler' : '',
+          // Never let a developer's real key file a ticket from this test.
+          LINEAR_API_KEY: '',
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: 'fixture-bypass',
           PRODUCTION_DEPLOYMENT_URL_B64:
             Buffer.from(DEPLOYMENT_URL).toString('base64'),
         });
+        // An unreadable ledger is never silent: it warns and files a P1.
+        expect(
+          result.stdout.includes(
+            '::warning::Golden-path certification ledger unavailable'
+          )
+        ).toBe(ledgerState === 'unreadable');
         const decision =
           PUBLIC_PROFILE_ALIAS_GRADUATION.windows[surface].decision;
-        expect(result.status).toBe(exit && decision === 'block' ? 1 : 0);
+        const blocks = certified && decision === 'block';
+        expect(result.status).toBe(exit && blocks ? 1 : 0);
         const outputs = parseOutputs(fixture.output);
         if (!exit) expect(outputs.performance_status).toBe('passed');
-        else if (staging)
+        else if (staging && blocks)
           expect(outputs).toMatchObject({
             failure_subtype: 'exact_build_performance_failed',
           });
-        else expect(outputs.performance_status).toBe('warn');
+        else if (staging) {
+          expect(outputs.failure_subtype).toBeUndefined();
+          expect(result.stdout).toContain(
+            '::warning::Exact staged-build public-profile alias budgets missed on uncertified pages'
+          );
+        } else
+          expect(outputs.performance_status).toBe(blocks ? 'failed' : 'warn');
         const calls = readFileSync(join(fixture.root, 'arguments'), 'utf8')
           .split('--invocation-end--\n')
           .filter(Boolean);

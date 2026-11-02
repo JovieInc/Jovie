@@ -274,6 +274,42 @@ test('a full mailbox reports a retryable 507 instead of dropping', async () => {
   });
 });
 
+test('control-plane events keep headroom above the message quota, and history pages by seq', async () => {
+  const store = new MailboxStore(sqlite());
+  store.unackedCount = () => LIMITS.unackedPerMailbox;
+  const event = { ...(await envelope()), kind: 'event' };
+  assert.equal(
+    store.enqueue(event).ok,
+    true,
+    'an event fits past the message quota'
+  );
+  store.unackedCount = () => LIMITS.unackedPerMailbox * 2;
+  assert.equal(
+    store.enqueue({
+      ...event,
+      id: 'claude:mesh-0002-test',
+      sha256: 'b'.repeat(64),
+    }).code,
+    'mailbox_full'
+  );
+
+  const paged = new MailboxStore(sqlite());
+  for (let i = 1; i <= 3; i++) {
+    paged.enqueue({
+      ...(await envelope()),
+      id: `claude:mesh-000${i}-test`,
+      sha256: String(i).repeat(64),
+    });
+  }
+  const first = paged.history(0, 2);
+  assert.equal(first.length, 2);
+  const rest = paged.history(0, 2, first.at(-1).seq);
+  assert.deepEqual(
+    [...first, ...rest].map(m => m.id),
+    ['claude:mesh-0001-test', 'claude:mesh-0002-test', 'claude:mesh-0003-test']
+  );
+});
+
 test('meta round-trips and deletes', () => {
   const store = new MailboxStore(sqlite());
   assert.equal(store.getMeta('k'), null);
@@ -395,6 +431,25 @@ test('presence: silence after 2x heartbeat, one event per transition, dormant ag
     'agent.silent',
     'an open socket without pings is not alive'
   );
+});
+
+test('presence: a newly registered heartbeat agent is not silent until 2x the heartbeat has passed', () => {
+  const base = {
+    now: 1_000_000,
+    heartbeatSec: 20,
+    state: 'unknown',
+    lastSeenAt: null,
+    connected: 0,
+    lastPingAt: null,
+    lastActivityAt: null,
+  };
+  const fresh = evaluatePresence({ ...base, registeredAt: base.now - 10_000 });
+  assert.deepEqual([fresh.state, fresh.event], ['ok', null]);
+  const overdue = evaluatePresence({
+    ...base,
+    registeredAt: base.now - 41_000,
+  });
+  assert.deepEqual([overdue.state, overdue.event], ['silent', 'agent.silent']);
 });
 
 test('probe: first probe, ack with RTT, misses alarm once at the threshold, recovery event', () => {
@@ -582,13 +637,44 @@ test('negative control: a dead agent is detected no later than with the fixed pr
     }
     return Infinity;
   };
+  // Documented bound: the worst case is unchanged. Adaptive may be slower for
+  // one death time (it waits out a quiet interval after the last proof), but
+  // never slower than the fixed probe's own worst case over a full cycle.
+  let fixedWorst = 0;
+  let adaptiveWorst = 0;
   for (let diesAt = 10 * MIN; diesAt < 20 * MIN; diesAt += MIN) {
     const fixed = detect(diesAt, false);
     const adaptive = detect(diesAt, true);
+    assert.ok(Number.isFinite(fixed), 'fixed probe must detect a dead agent');
     assert.ok(Number.isFinite(adaptive), 'dead agent must be detected');
-    assert.ok(
-      adaptive <= Math.max(fixed, 9 * MIN) + MIN,
-      `dies ${diesAt}: adaptive ${adaptive} vs fixed ${fixed}`
-    );
+    fixedWorst = Math.max(fixedWorst, fixed);
+    adaptiveWorst = Math.max(adaptiveWorst, adaptive);
   }
+  assert.ok(
+    adaptiveWorst <= fixedWorst,
+    `adaptive worst ${adaptiveWorst} vs fixed worst ${fixedWorst}`
+  );
+});
+
+test('clearDead un-flags a message so a failed dead-letter notification is retried', async () => {
+  const store = new MailboxStore(sqlite());
+  store.enqueue(await envelope({ acceptedAt: 0 }));
+  const first = store.sweepDead(
+    LIMITS.deadAfterActiveMs + 2,
+    LIMITS.deadAfterActiveMs
+  );
+  assert.equal(first.length, 1);
+  assert.equal(
+    store.sweepDead(LIMITS.deadAfterActiveMs + 3, LIMITS.deadAfterActiveMs)
+      .length,
+    0,
+    'dead once'
+  );
+  store.clearDead(first[0].seq);
+  assert.equal(
+    store.sweepDead(LIMITS.deadAfterActiveMs + 4, LIMITS.deadAfterActiveMs)
+      .length,
+    1,
+    'retried after clearDead'
+  );
 });

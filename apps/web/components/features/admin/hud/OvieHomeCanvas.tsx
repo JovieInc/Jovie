@@ -18,25 +18,30 @@ import {
   buildCanvasTurns,
   partitionCanvasCards,
 } from '@/lib/ovie/home/canvas-turns';
-import { buildStageStrip } from '@/lib/ovie/home/flow-home';
+import {
+  buildCompanyTiles,
+  type OvieFunnelInput,
+  type OvieGoldenPathRow,
+} from '@/lib/ovie/home/company-tiles';
+import { summarizeSourceIssues } from '@/lib/ovie/home/operator-copy';
+import { reportOvieHomePanelError } from '@/lib/ovie/home/panel-alerts';
 import {
   buildOvieAsks,
   buildOvieHomeShipping,
   OVIE_SHIP_STAGES,
   type OviePulseMemory,
   ovieAskAction,
-  rememberPulse,
-  summarizeSourceIssues,
 } from '@/lib/ovie/home/shipping-home';
 import { inboxDecisionRequest, type OvieInbox } from '@/lib/ovie/inbox';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
+import type { HudMetrics } from '@/types/hud';
 import { useCanvasHistory } from './useCanvasHistory';
 import { useHudShippingStateQuery } from './useHudShippingStateQuery';
 import { useOvieHomeReadyTiming } from './useOvieHomeReadyTiming';
 
 const OVIE_HOME_COPY: HomeLoopCopy = {
-  constraintClear: 'Nothing is blocking shipping',
-  asksTitle: 'Blocked On You',
+  constraintClear: 'Shipping is on target',
+  asksTitle: 'Needs you',
   asksEmpty: 'Nothing needs your decision.',
   asksError: 'Decisions could not load.',
   inFlightTitle: 'In Flight',
@@ -44,32 +49,81 @@ const OVIE_HOME_COPY: HomeLoopCopy = {
   inFlightError: 'Shipping data could not load.',
   doneTitle: 'Done Today',
   doneEmpty: 'Nothing has landed yet today.',
-  latencyTitle: 'Stage Time 7d (P50 / P95)',
-  latencyEmpty: 'Not measured',
 };
 
 const INBOX_QUERY_KEY = ['ovie', 'inbox'] as const;
-const PULSE_MEMORY_KEY = 'ovie.home.pulse-memory.v1';
+const LAST_VISIT_KEY = 'ovie.home.last-visit.v1';
+/** Home shows at most this many asks; the rest resolve by their defaults. */
+export const OVIE_HOME_MAX_ASKS = 3;
 
-function readPulseMemory(): OviePulseMemory {
+interface OvieLastVisit {
+  readonly at: number | null;
+  readonly memory: OviePulseMemory;
+}
+
+/**
+ * Tile values as Tim last saw them, so each tile's "was" means "since your
+ * last visit" rather than "since the last 6s poll".
+ */
+function readLastVisit(): OvieLastVisit {
   try {
-    const raw = globalThis.sessionStorage?.getItem(PULSE_MEMORY_KEY);
-    return raw ? (JSON.parse(raw) as OviePulseMemory) : {};
+    const raw = globalThis.localStorage?.getItem(LAST_VISIT_KEY);
+    if (!raw) return { at: null, memory: {} };
+    const parsed = JSON.parse(raw) as {
+      at?: unknown;
+      values?: Record<string, unknown>;
+    };
+    const memory: Record<string, { value: string; was: null }> = {};
+    for (const [key, value] of Object.entries(parsed.values ?? {}))
+      if (typeof value === 'string') memory[key] = { value, was: null };
+    return {
+      at: typeof parsed.at === 'number' ? parsed.at : null,
+      memory: memory as OviePulseMemory,
+    };
   } catch {
-    return {};
+    return { at: null, memory: {} };
   }
 }
 
-function writePulseMemory(memory: OviePulseMemory): void {
+function writeLastVisit(
+  pulse: readonly { key: string; value: string; measured: boolean }[]
+): void {
   try {
-    globalThis.sessionStorage?.setItem(
-      PULSE_MEMORY_KEY,
-      JSON.stringify(memory)
+    const values = Object.fromEntries(
+      pulse.filter(tile => tile.measured).map(tile => [tile.key, tile.value])
+    );
+    globalThis.localStorage?.setItem(
+      LAST_VISIT_KEY,
+      JSON.stringify({ at: Date.now(), values })
     );
   } catch {
-    // Pulse history is a per-tab convenience; the tiles render without it.
+    // A per-browser convenience; tiles render without it.
   }
 }
+
+function sinceLabel(at: number | null, now: number): string {
+  if (at === null) return 'Shipping';
+  const minutes = Math.max(0, Math.round((now - at) / 60_000));
+  const ago =
+    minutes < 60
+      ? `${minutes}m`
+      : minutes < 48 * 60
+        ? `${Math.round(minutes / 60)}h`
+        : `${Math.round(minutes / 1440)}d`;
+  return `Shipping · compared with your visit ${ago} ago`;
+}
+
+async function fetchJson<T>(url: string, signal: AbortSignal): Promise<T> {
+  const response = await fetch(url, { signal, cache: 'no-store' });
+  if (!response.ok) throw new Error(`${url} ${response.status}`);
+  return (await response.json()) as T;
+}
+
+const COMPANY_PLACEHOLDER = buildCompanyTiles({
+  overview: null,
+  funnel: null,
+  goldenPath: null,
+});
 
 async function fetchInbox(signal: AbortSignal): Promise<OvieInbox> {
   const response = await fetch('/api/ovie/inbox', {
@@ -101,39 +155,68 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
     refetchInterval: 30_000,
   });
 
-  const [pulseMemory, setPulseMemory] =
-    useState<OviePulseMemory>(readPulseMemory);
+  const [lastVisit] = useState<OvieLastVisit>(readLastVisit);
+  const [mountedAt] = useState(() => Date.now());
+  const company = useQuery({
+    queryKey: ['ovie', 'home', 'company'],
+    queryFn: async ({ signal }) => {
+      const [metrics, funnel, certifications] = await Promise.allSettled([
+        fetchJson<HudMetrics>('/api/hud/metrics', signal),
+        fetchJson<OvieFunnelInput>(
+          '/api/admin/hud/founder-funnel?range=7d',
+          signal
+        ),
+        fetchJson<{ rows: readonly OvieGoldenPathRow[] }>(
+          '/api/ovie/certifications',
+          signal
+        ),
+      ]);
+      const failed = [metrics, funnel, certifications].filter(
+        result => result.status === 'rejected'
+      ).length;
+      if (failed > 0)
+        reportOvieHomePanelError('company', `${failed} of 3 sources failed`);
+      return buildCompanyTiles({
+        overview:
+          metrics.status === 'fulfilled' ? metrics.value.overview : null,
+        funnel: funnel.status === 'fulfilled' ? funnel.value : null,
+        goldenPath:
+          certifications.status === 'fulfilled'
+            ? certifications.value.rows
+            : null,
+      });
+    },
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    staleTime: 30_000,
+    retry: false,
+  });
 
   const snapshot = shipping.isPending ? null : shipping;
-  const strip = useMemo(
-    () => (snapshot ? buildStageStrip(snapshot.view.delivery) : null),
-    [snapshot]
-  );
   const home = useMemo(
     () =>
       snapshot
         ? buildOvieHomeShipping({
             delivery: snapshot.view.delivery,
             operationalTasks: snapshot.operationalTasks,
-            pulseMemory,
+            pulseMemory: lastVisit.memory,
           })
         : null,
-    [snapshot, pulseMemory]
+    [snapshot, lastVisit]
   );
 
   useEffect(() => {
-    if (!home) return;
-    const next = rememberPulse(pulseMemory, home.pulse);
-    // Only store real changes; an unchanged read must not re-render.
-    if (JSON.stringify(next) === JSON.stringify(pulseMemory)) return;
-    setPulseMemory(next);
-    writePulseMemory(next);
-  }, [home, pulseMemory]);
+    if (home) writeLastVisit(home.pulse);
+  }, [home]);
 
-  const asks = useMemo(
+  const allAsks = useMemo(
     () => (inbox.data ? buildOvieAsks(inbox.data) : []),
     [inbox.data]
   );
+  // Only the top few reach Home (Tim 2026-10-30); every other ask carries a
+  // declared default and resolves on its own unless he opens the inbox.
+  const asks = allAsks.slice(0, OVIE_HOME_MAX_ASKS);
+  const deferredAsks = allAsks.length - asks.length;
 
   const onCommitted = useCallback(
     (id: string) => {
@@ -189,6 +272,13 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
     [answer, inbox.data]
   );
 
+  // Empty stage columns are dead space on a dense Home; the verdict already
+  // names a stalled queue. The full six-stage path lives on Shipping.
+  const activeStages = useMemo(() => {
+    const used = new Set(home?.rows.map(row => row.stage));
+    const active = OVIE_SHIP_STAGES.filter(stage => used.has(stage));
+    return active.length > 0 ? active : OVIE_SHIP_STAGES;
+  }, [home]);
   const connection = snapshot?.view.connection ?? null;
   // The task feed reports `syncing` with no observation until its first
   // reconciled read; that is loading, not an empty pipeline.
@@ -237,14 +327,41 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
     : inbox.isError
       ? 'error'
       : 'loading';
+  // Every panel error state is an incident (panel-alerts.ts), not just copy.
+  const loopErrorReason =
+    loopStatus === 'error'
+      ? connection === 'unauthorized'
+        ? 'unauthorized'
+        : 'operational-tasks-unavailable'
+      : null;
+  useEffect(() => {
+    if (loopErrorReason)
+      reportOvieHomePanelError('shipping-loop', loopErrorReason);
+  }, [loopErrorReason]);
+  useEffect(() => {
+    if (asksStatus === 'error')
+      reportOvieHomePanelError('asks', 'inbox-unavailable');
+  }, [asksStatus]);
   // Mirror the inbox: a successful read can still omit a source. Showing the
   // loaded asks alone would claim the section is complete.
   // First meaningful paint: both sections past their skeletons.
   useOvieHomeReadyTiming(loopStatus !== 'loading' && asksStatus !== 'loading');
-  // Many issues collapse to a count; the inbox lists every one.
-  const asksNotice = inbox.data
-    ? summarizeSourceIssues(inbox.data.issues)
-    : null;
+  // The rest resolve by their declared defaults; a missing source is still
+  // named so a short list never reads as complete.
+  const sourceIssues = inbox.data?.issues.length ?? 0;
+  const asksNotice =
+    [
+      deferredAsks > 0
+        ? `${deferredAsks} more resolve by their defaults`
+        : null,
+      inbox.data ? summarizeSourceIssues(inbox.data.issues) : null,
+    ]
+      .filter(Boolean)
+      .join(' · ') || null;
+  useEffect(() => {
+    if (sourceIssues > 0)
+      reportOvieHomePanelError('asks', `${sourceIssues} inbox source issues`);
+  }, [sourceIssues]);
 
   const turns = useMemo(
     () => buildCanvasTurns(chat?.messages ?? [], chat?.isStreaming ?? false),
@@ -295,7 +412,7 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       answer={answerPanel}
       inFlightOverride={inFlightOverride}
       copy={OVIE_HOME_COPY}
-      stages={OVIE_SHIP_STAGES}
+      stages={activeStages}
       constraint={constraint}
       pulse={home?.pulse ?? []}
       asks={asks}
@@ -317,9 +434,10 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       onRetryLoop={() => void shipping.refetch()}
       onRetryAsks={() => void inbox.refetch()}
       asksMoreHref={APP_ROUTES.ADMIN_INBOX}
+      company={company.data ?? COMPANY_PLACEHOLDER}
+      companyLoading={company.isPending}
+      pulseCaption={sinceLabel(lastVisit.at, mountedAt)}
       inFlightMoreHref={APP_ROUTES.ADMIN_SHIPPING}
-      strip={strip?.items ?? []}
-      stripCoverage={strip?.coverage ?? null}
     />
   );
 }

@@ -327,6 +327,25 @@ grep -rn "PATTERN_YOU_FIXED" apps/web --include="*.tsx"
 
 **Why:** A bug in one file often indicates a systemic issue. Patching one instance while leaving others creates inconsistency and delays future debugging.
 
+### Escape classes (replay of 19 post-merge fixes, 2026-10-28)
+
+Most escapes were not logic bugs; they were a missed consumer or a guard that
+assumed its environment. Before opening a PR, check the class that applies:
+
+- **Moved, renamed or deleted source:** `git grep` the old path, export and
+  fixture name for consumers (stories, desktop token readers, lanes readers,
+  `testMatch` lists). A new producer or spec must be registered where its
+  runner enumerates it.
+- **CI guard or workflow step:** run it against the merge of base and PR head,
+  not the head alone, and gate any proof behind the flag it depends on.
+- **Test files:** a helper named `setup` is a pytest hook; assertions on wall
+  time need a frozen clock.
+- **Auth, config flags:** a route that calls `unauthorized()` or `forbidden()`
+  needs the matching Next.js config flag in the same PR.
+
+Every escape is traced by `scripts/review-escapes.mjs` and feeds
+`docs/metrics/review-replay-cases.jsonl`.
+
 ## Self-Improvement Loop
 
 After any correction from a human reviewer:

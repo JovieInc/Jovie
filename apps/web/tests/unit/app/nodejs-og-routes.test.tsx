@@ -74,6 +74,7 @@ describe('profile opengraph-image', () => {
     expect(response).toBeDefined();
     expect(mockGetProfile).toHaveBeenCalledWith('testartist', {
       skipCache: true,
+      throwOnError: true,
     });
     expect(response.status).toBe(503);
     expect(response.headers.get('Cache-Control')).toBe('no-store');

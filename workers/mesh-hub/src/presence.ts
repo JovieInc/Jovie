@@ -25,6 +25,12 @@ export type PresenceInput = {
   connected: number;
   lastPingAt: number | null;
   lastActivityAt: number | null;
+  /**
+   * When the agent was registered. A new agent with a heartbeat contract has
+   * no proof of life yet; it gets 2x the heartbeat from registration before
+   * it can be declared silent instead of alarming on the first sweep.
+   */
+  registeredAt?: number | null;
 };
 
 export type PresenceResult = {
@@ -57,8 +63,9 @@ export function evaluatePresence(input: PresenceInput): PresenceResult {
       lastAliveAt: aliveAt,
       event: null,
     };
+  const baseline = aliveAt ?? input.registeredAt ?? null;
   const silent =
-    aliveAt === null || input.now - aliveAt > 2 * input.heartbeatSec * 1000;
+    baseline === null || input.now - baseline > 2 * input.heartbeatSec * 1000;
   const next: AgentState = silent ? 'silent' : 'ok';
   let event: PresenceResult['event'] = null;
   if (next === 'silent' && input.state !== 'silent') event = 'agent.silent';

@@ -83,10 +83,19 @@ export function useStickToBottomController(
   const scrollRafRef = useRef<number | null>(null);
   const visualActiveRef = useRef(true);
   const restoringPinnedRef = useRef(false);
+  // Viewport bottom edge (scrollTop + clientHeight) when the transcript was
+  // last pinned. Content growth moves scrollHeight but not this edge; only a
+  // user scroll moves the viewport up from it.
+  const pinnedViewportBottomRef = useRef<number | null>(null);
 
   const setStuckToBottom = useCallback(
     (stuck: boolean) => {
       if (!stuck) restoringPinnedRef.current = false;
+      const container = scrollContainerRef.current;
+      pinnedViewportBottomRef.current =
+        stuck && container
+          ? container.scrollTop + container.clientHeight
+          : null;
       isStuckRef.current = stuck;
       store.setStuck(stuck);
     },
@@ -97,6 +106,11 @@ export function useStickToBottomController(
     (intersecting: boolean) => {
       if (!visualActiveRef.current || restoringPinnedRef.current) return;
       if (isStuckRef.current === intersecting) return;
+      const container = scrollContainerRef.current;
+      pinnedViewportBottomRef.current =
+        intersecting && container
+          ? container.scrollTop + container.clientHeight
+          : null;
       isStuckRef.current = intersecting;
       store.setStuck(intersecting);
     },
@@ -121,12 +135,19 @@ export function useStickToBottomController(
 
       const clientHeight = container.clientHeight;
       if (clientHeight > 0) {
-        const distanceFromBottom =
-          container.scrollHeight - container.scrollTop - clientHeight;
+        const viewportBottom = container.scrollTop + clientHeight;
+        const distanceFromBottom = container.scrollHeight - viewportBottom;
+        const pinnedViewportBottom = pinnedViewportBottomRef.current;
         // The sentinel observer delivers after the scroll. A resize in that
         // gap used to assign scrollTop and jump the transcript back down,
-        // which is a dropped frame on the way through the list.
-        if (distanceFromBottom > SCROLL_THRESHOLD) {
+        // which is a dropped frame on the way through the list. Only a
+        // viewport that moved up from where it was pinned counts as the user
+        // leaving: one tall append (a tool card plus its reply, JOV-10131)
+        // grows scrollHeight past the threshold without any scroll.
+        const leftPinnedBottom =
+          pinnedViewportBottom === null ||
+          pinnedViewportBottom - viewportBottom > SCROLL_THRESHOLD;
+        if (distanceFromBottom > SCROLL_THRESHOLD && leftPinnedBottom) {
           restoringPinnedRef.current = false;
           setStuckToBottom(false);
           return;
@@ -134,6 +155,8 @@ export function useStickToBottomController(
       }
 
       container.scrollTop = container.scrollHeight;
+      pinnedViewportBottomRef.current =
+        container.scrollTop + container.clientHeight;
       if (restoringPinnedRef.current) {
         // IO callbacks can deliver hidden samples after this restoration frame.
         // Drain those samples; subsequent user-scroll observations still apply.

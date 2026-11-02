@@ -1,0 +1,33 @@
+{
+  "schema": "jovie.imagery-provenance-baseline/v1",
+  "ids": [
+    "apps/web/app/(marketing)/alternatives/[slug]/page.tsx#next-image",
+    "apps/web/app/(marketing)/api-versioning/page.tsx#next-image",
+    "apps/web/app/(marketing)/blog/components/BlogCard.tsx#next-image",
+    "apps/web/app/(marketing)/developers/page.tsx#next-image",
+    "apps/web/app/(marketing)/download/page.tsx#next-image",
+    "apps/web/app/(marketing)/launch/page.tsx#next-image",
+    "apps/web/app/(marketing)/smart-links/SmartLinksDemo.tsx#next-image",
+    "apps/web/app/(marketing)/solutions/[audience]/sections.tsx#next-image",
+    "apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailPasteForm.tsx#next-image",
+    "apps/web/components/homepage/HomepageCertifiedSections.tsx#next-image",
+    "apps/web/components/marketing/MarketingEditorialHeroPhoto.tsx#next-image",
+    "apps/web/components/marketing/MarketingPhoneImage.tsx#next-image",
+    "apps/web/components/marketing/MarketingPlatformSpecBento.tsx#next-image",
+    "apps/web/components/marketing/MarketingSurfaceCard.tsx#next-image",
+    "apps/web/components/marketing/ProductScreenshotFrame.tsx#next-image",
+    "apps/web/components/marketing/artist-notifications/ArtistNotificationsHero.tsx#next-image",
+    "apps/web/components/marketing/artist-profile/ArtistProfileHero.tsx#next-image",
+    "apps/web/components/marketing/artist-profile/ArtistProfileHowItWorks.tsx#next-image",
+    "apps/web/components/marketing/artist-profile/ArtistProfileLandingPage.tsx#next-image",
+    "apps/web/components/marketing/artist-profile/ArtistProfileModeSwitcher.tsx#next-image",
+    "apps/web/components/marketing/artist-profile/ArtistProfileMonetizationSection.tsx#next-image",
+    "apps/web/components/marketing/artist-profile/ArtistProfileOpinionatedSection.tsx#next-image",
+    "apps/web/components/marketing/artist-profile/ArtistProfileSocialProof.tsx#next-image",
+    "apps/web/components/marketing/artist-profile/ArtistProfileSpecWall.tsx#next-image",
+    "apps/web/components/marketing/changelog/CustomerChangelogArchive.tsx#next-image",
+    "apps/web/components/marketing/device/DeviceScreen.tsx#next-image",
+    "apps/web/components/marketing/homepage-v2/HomepageV2Route.tsx#next-image",
+    "apps/web/components/marketing/page-spec/PageSpecSections.tsx#next-image"
+  ]
+}

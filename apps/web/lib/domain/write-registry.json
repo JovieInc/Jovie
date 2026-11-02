@@ -53,8 +53,16 @@
       "exports": [
         "updateProfileById",
         "updateProfileByClerkId",
+        "holdLeadBuiltProfileInTx",
         "publishProfile"
       ],
+      "tables": ["creatorProfiles"]
+    },
+    {
+      "id": "profile.test-cleanup",
+      "entity": "profile",
+      "module": "apps/web/lib/services/profile/test-profile-unpublish.ts",
+      "exports": ["buildUnpublishTestProfilesQuery"],
       "tables": ["creatorProfiles"]
     },
     {
@@ -93,6 +101,13 @@
         "stampWaitlistAcquisitionId"
       ],
       "tables": ["waitlistEntries", "creatorProfiles"]
+    },
+    {
+      "id": "synthetic.admitted-canary",
+      "entity": "admitted production canary fixture",
+      "module": "apps/web/lib/synthetic/admitted-canary.server.ts",
+      "exports": ["reconcileAdmittedCanary", "verifyAdmittedCanaryOwnership"],
+      "tables": ["creatorProfiles", "userProfileClaims"]
     },
     {
       "id": "claim.finalize",
