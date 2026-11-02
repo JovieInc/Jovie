@@ -51,6 +51,45 @@ test('main-branch failure wakes and the non-workflow_run signals are unchanged',
   assert.match(condition, /"push"/);
 });
 
+test('failed check events reach the same relay and coalesce by PR and source', () => {
+  assert.deepEqual(workflow.on.check_run.types, ['completed']);
+  assert.deepEqual(workflow.on.check_suite.types, ['completed']);
+  assert.match(condition, /check_run/);
+  assert.match(condition, /check_suite/);
+  const group = String(workflow.concurrency.group);
+  assert.match(group, /check_run\.pull_requests\[0\]\.number/);
+  assert.match(group, /check_suite\.pull_requests\[0\]\.number/);
+  assert.match(group, /check_run\.name/);
+  assert.match(group, /check_suite\.id/);
+});
+
+test('Gem event wake executes only the installed trusted bridge without a checkout or secret expansion', () => {
+  const wake = workflow.jobs['wake-gem'];
+  assert.equal(wake.needs, 'relay');
+  assert.deepEqual(wake['runs-on'], [
+    'self-hosted',
+    'Linux',
+    'X64',
+    'jovie-fixed',
+  ]);
+  assert.deepEqual(wake.permissions, {});
+  assert.equal(wake['timeout-minutes'], 3);
+  assert.equal(wake.steps.length, 1);
+  assert.equal(wake.steps[0].uses, undefined);
+  assert.equal(wake.steps[0].env, undefined);
+  assert.match(
+    wake.steps[0].run,
+    /\$HOME\/\.local\/state\/jovie-lanes\/current\/pr_events\.py/
+  );
+  assert.match(wake.steps[0].run, /python3 "\$bridge" repair-event/);
+  assert.doesNotMatch(
+    wake.steps[0].run,
+    /git |checkout|secrets\.|github\.event\./
+  );
+  assert.match(wake.if, /needs\.relay\.result == 'success'/);
+  assert.match(wake.if, /head_repository\.full_name == github\.repository/);
+});
+
 test('the actual sparse relay checkout can wake through the shared API policy', () => {
   const checkout = workflow.jobs.relay.steps.find(
     step => step.name === 'Checkout trusted lane policy'

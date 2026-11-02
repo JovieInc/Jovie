@@ -171,6 +171,10 @@ describe('Shared fenced-attempt coverage contract', () => {
     expect(command).toContain('scripts/tests/test_backlog_admission.py');
     expect(command).toContain('scripts/tests/test_backlog_writer_guard.py');
     expect(command).toContain('scripts/tests/test_board_intake.py');
+    expect(command).toContain('scripts/tests/test_fixer_events.py');
+    expect(command).toContain(
+      '*/scripts/lanes/fixer_events.py" --fail-under=95'
+    );
     expect(command).toContain(
       '*/scripts/lanes/board_intake.py" --fail-under=85'
     );

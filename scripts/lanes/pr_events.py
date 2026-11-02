@@ -219,6 +219,11 @@ def relay_targets(event: str, payload: dict) -> list[tuple[int, str, str | None]
         kind = "red" if conclusion in RED_CONCLUSIONS else "green" if conclusion == "success" else None
         return [(pr["number"], kind, workflow_run.get("head_sha")) for pr in workflow_run.get("pull_requests") or []
                 if kind]
+    if event in ("check_run", "check_suite") and payload.get("action") == "completed":
+        check = payload.get(event) or {}
+        if check.get("conclusion") in RED_CONCLUSIONS:
+            return [(pr["number"], "red", check.get("head_sha")) for pr in check.get("pull_requests") or []]
+        return []
     pr = payload.get("pull_request") or {}
     head = (pr.get("head") or {}).get("sha")
     if event == "pull_request_target" and payload.get("action") == "dequeued":
@@ -1833,7 +1838,7 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
     attempts = json.loads(path.read_text()) if path.exists() else {}
     held_file = lane.held_path(host)
     held = json.loads(held_file.read_text()) if held_file.exists() else {}
-    providers = lane.load_providers()
+    providers = lane.repair_providers()
     order = cost_order(providers)
     disabled = set(providers) - set(order)
     for pr in sorted(prs, key=lambda item: item["number"]):
@@ -1900,7 +1905,7 @@ def cleanup_one_event(host, lane, prs: list[dict], now: float | None = None) -> 
         attempts = json.loads(path.read_text()) if path.exists() else {}
         if not isinstance(attempts, dict):
             return None
-        providers = lane.load_providers()
+        providers = lane.repair_providers()
         disabled = set(providers) - set(cost_order(providers))
         candidates = sorted((pr for pr in prs if pr.get("isInMergeQueue") is not True
                              and set(pr.get("eventKinds") or []) & set(FIX_KINDS)
@@ -2627,7 +2632,7 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
     prune_held = getattr(lane, "prune_held", None)
     if prune_held is not None:
         prune_held(host, prs, now, complete=bool(report.get("complete")))
-    providers = lane.load_providers()
+    providers = lane.repair_providers()
     disabled = set(providers) - set(cost_order(providers))
     deps = open_dependencies(prs, now, lane.sh)
     attempts = read_state(host, "fix-attempts.json")
@@ -2818,11 +2823,14 @@ def wake_state_dir() -> Path | None:
     return Path.home() / ".local/state/jovie-lanes"
 
 
-def write_wake_file(state, *, pr, sha, run_id, run_attempt, red_at):
+def write_wake_file(state, *, pr, sha, run_id, run_attempt, red_at, generation=None, board_task=None, fingerprint=None):
     """Atomic wake file for the gem host's jovie-lanes-wake.path unit. The
     dot-prefixed tmp name never matches the red-*.json glob fix-now drains, so
     a concurrent fix-now cannot read a partial write."""
-    path = state / "wake" / f"red-{int(pr)}-{sha}-{int(run_attempt)}.json"
+    if generation is not None and not re.fullmatch(r"[0-9a-f]{8}", generation):
+        raise ValueError("invalid wake generation")
+    suffix = f"-{generation}" if generation else ""
+    path = state / "wake" / f"red-{int(pr)}-{sha}-{int(run_attempt)}{suffix}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     tmp.write_text(json.dumps({
@@ -2832,10 +2840,45 @@ def write_wake_file(state, *, pr, sha, run_id, run_attempt, red_at):
         "runId": run_id,
         "runAttempt": int(run_attempt),
         "redAt": red_at,
+        "boardTask": board_task,
+        "fingerprint": fingerprint,
         "writtenAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }))
     os.replace(tmp, path)
     return path
+
+
+def repair_event(event=None, payload=None, *, state=None, gh=None, call=None) -> int:
+    """Installed trusted bridge: authenticated GitHub source -> exact board witness -> existing file wake."""
+    import fixer_events
+    import board_intake
+    from gh_budget import gh_call
+    event = os.environ.get("GITHUB_EVENT_NAME", "") if event is None else event
+    if payload is None:
+        try:
+            payload = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
+        except (OSError, ValueError, KeyError):
+            return 1
+    state = wake_state_dir() if state is None else state
+    if state is None:
+        return 1
+    records = fixer_events.verify(event, payload, REPO, gh_call if gh is None else gh)
+    failed = False
+    for row in records:
+        try:
+            task = board_intake.claim_event(state, row, board_intake.hub if call is None else call)
+        except (OSError, ValueError, TypeError):
+            print(f"verified-repair held=state-or-board-error pr={row['number']}")
+            task = None
+        if task is None:
+            failed = True
+            continue
+        write_wake_file(state, pr=row["number"], sha=row["sha"],
+                        run_id=row["sourceId"] if event == "workflow_run" else None,
+                        run_attempt=row["runAttempt"], red_at=row["eventAt"], generation=row["generation"],
+                        board_task=task["id"], fingerprint=row["fingerprint"])
+        print(f"verified-repair board={task['id']} pr={row['number']} head={row['sha']}")
+    return int(failed)
 
 
 def wake(argv: list[str]) -> int:
@@ -2880,6 +2923,8 @@ def main(argv: list[str] | None = None) -> int:
         added = label_backlog()
     elif command == "wake":
         return wake(argv[1:])
+    elif command == "repair-event":
+        return repair_event()
     else:
         print(__doc__, file=sys.stderr)
         return 2

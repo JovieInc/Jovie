@@ -607,7 +607,7 @@ def _work_one(lane, host, binding: Binding, name: str, spec: dict, maintenance_o
             maintained = {"error": f"{type(error).__name__}: {error}"[:200]}
         attempts_path = host.state / "bindings" / binding.key / "fix-attempts.json"
         attempts = lane.read_json(attempts_path)
-        pr = repair_candidate(lane, binding, prs, attempts, busy)
+        pr = repair_candidate(lane, binding, prs, attempts, busy) if lane.provider_may_run(name, "fix-red") else None
         lease = leases.pop(pr["number"], None) if pr is not None else None
         for other in leases.values():
             other.release()
@@ -776,6 +776,10 @@ def render_prompt(binding: Binding, branch: str, *, issue=None, pr=None, context
 
 def run(lane, host, binding: Binding, name: str, spec: dict, *, issue=None, pr=None) -> dict:
     """One agent run in a binding worktree, then push and (for an issue) a ready PR."""
+    if pr is not None and not lane.provider_may_run(name, "fix-red"):
+        return {"provider": name, "kind": "binding-repair", "pr": pr["number"],
+                "verdict": "skipped", "reasons": ["repair-provider-not-approved"],
+                "startedAt": lane.now_iso(), "endedAt": lane.now_iso()}
     subject = issue.identifier if issue is not None else f"{binding.key}-PR{pr['number']}"
     run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-{subject}-{name}-{uuid.uuid4().hex[:6]}"
     branch = pr["headRefName"] if pr is not None else f"{name}/{issue.identifier.lower()}-{run_id[:15].lower()}"
