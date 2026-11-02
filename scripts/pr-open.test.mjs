@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -497,6 +503,72 @@ function localRepo() {
     cleanup: () => rmSync(repo, { recursive: true, force: true }),
   };
 }
+
+test('local check uses the remote PR base when local main is stale', async () => {
+  const { repo, cleanup } = localRepo();
+  const git = args =>
+    execFileSync('git', args, { cwd: repo, encoding: 'utf8' }).trim();
+  try {
+    const stale = git(['rev-parse', 'origin/main']);
+    git(['switch', '-c', 'scoped-change']);
+    git(['branch', '-f', 'main', stale]);
+    const upstream = path.join(repo, 'apps/web/app/(auth)/signin');
+    mkdirSync(upstream, { recursive: true });
+    writeFileSync(
+      path.join(upstream, 'page.tsx'),
+      '// upstream-only protected source\n'
+    );
+    git(['add', '.']);
+    git([
+      '-c',
+      'core.hooksPath=/dev/null',
+      'commit',
+      '-m',
+      'upstream auth change',
+    ]);
+    git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    writeFileSync(
+      path.join(repo, 'notes.txt'),
+      'only this change belongs to the PR\n'
+    );
+    git(['add', '.']);
+    git([
+      '-c',
+      'core.hooksPath=/dev/null',
+      'commit',
+      '-m',
+      'chore: scoped note',
+    ]);
+    const body = path.join(repo, 'body.md');
+    writeFileSync(body, draftBody({ title: 'chore: scoped note', files: [] }));
+    const output = [];
+    const result = await main(
+      [
+        'check',
+        '--repo',
+        repo,
+        '--title',
+        'chore: scoped note',
+        '--body-file',
+        body,
+      ],
+      line => output.push(line),
+      {
+        execute: (command, args) =>
+          command === 'git' && args[0] === 'log'
+            ? okText('chore: scoped note')
+            : fakeDiffRunner(command, args),
+        github: () => {
+          throw new Error('unexpected GitHub call');
+        },
+      }
+    );
+    assert.equal(result, 0, output.join('\n'));
+    assert.doesNotMatch(output.join('\n'), /locked-areas|upstream-only/);
+  } finally {
+    cleanup();
+  }
+});
 
 test('check reports lane-map waiting as pending without a failure', async () => {
   const pr = targetPr(42);
