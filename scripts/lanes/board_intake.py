@@ -24,12 +24,14 @@ closures per hour. Task text is quoted data, never instructions.
 from __future__ import annotations
 
 import json
+import fcntl
 import os
 import re
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+from atomic_state import atomic_write_text
 
 SCHEMA = "jovie.board-intake/v1"
 HUB = os.environ.get("MESH_HUB", "https://jovie-mesh-hub.tim-fd8.workers.dev")
@@ -38,6 +40,8 @@ AGENT = "codex"
 CAPS = frozenset({"code", "ops"})
 TRUSTED = frozenset({"summer", "claude"})
 MAX_CLAIMS_PER_TICK = int(os.environ.get("LANES_BOARD_CLAIMS_PER_TICK", "5"))
+# This bounds new work only. Claiming an existing PR repair does not create more
+# product WIP; its execution still passes the lanes' provider/resource admission.
 LEASE_S = 6 * 3600          # the hub's maximum lease
 RENEW_S = 30 * 60
 PROGRESS_SLA_S = int(os.environ.get("LANES_BOARD_PROGRESS_SLA_S", str(24 * 3600)))
@@ -245,9 +249,7 @@ def _read(path: Path) -> dict:
 
 
 def _write(path: Path, data: dict) -> None:
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, sort_keys=True))
-    os.replace(tmp, path)
+    atomic_write_text(path, json.dumps(data, sort_keys=True))
 
 
 def _journal(state: Path, row: dict) -> None:
@@ -258,12 +260,25 @@ def _journal(state: Path, row: dict) -> None:
 
 
 def tick(state: Path, linear, *, now: float | None = None, call=hub, gh=None) -> dict:
+    """One writer owns intake state and per-PR task admission; a concurrent pass yields."""
+    with open(state / "board-intake.lock", "a+") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return {"at": time.time() if now is None else now, "held": None, "claimed": [], "closed": [],
+                    "renewed": 0, "errors": [], "repairClaimed": 0, "newWorkClaimed": 0,
+                    "deferred": "active-intake"}
+        return _tick(state, linear, now=now, call=call, gh=gh)
+
+
+def _tick(state: Path, linear, *, now: float | None = None, call=hub, gh=None) -> dict:
     """One intake pass. Never raises for a hub fault; returns a receipt for the tick record."""
     now = time.time() if now is None else now
     path = state / "board-intake.json"
     held = _read(path)
     tasks: dict = held.setdefault("tasks", {})
-    receipt = {"at": now, "held": len(tasks), "claimed": [], "closed": [], "renewed": 0, "errors": []}
+    receipt = {"at": now, "held": len(tasks), "claimed": [], "closed": [], "renewed": 0, "errors": [],
+               "repairClaimed": 0, "newWorkClaimed": 0}
 
     if now - float(held.get("capsAt") or 0) >= CAPS_REFRESH_S:
         if call("POST", "/v1/board/caps", {"caps": sorted(CAPS)}).get("ok") is not False:
@@ -324,15 +339,23 @@ def tick(state: Path, linear, *, now: float | None = None, call=hub, gh=None) ->
             receipt["errors"].append(f"{tid}:{type(error).__name__}")
 
     board = call("GET", "/v1/board?status=open&limit=500")
+    claimed_prs = {(row["repo"], row["number"]) for row in tasks.values() if row["kind"] == "pr"}
     for task in sorted(filter(eligible, board.get("tasks") or []), key=claim_order):
-        if len(receipt["claimed"]) >= MAX_CLAIMS_PER_TICK:
-            break
         if task["id"] in tasks:
             continue
         work = classify(task)
+        repair = work["kind"] == "pr"
+        pr_key = (work["repo"], work["number"]) if repair else None
+        if repair and pr_key in claimed_prs:
+            continue  # one held repair per PR, even when several fingerprints arrive
+        if not repair and receipt["newWorkClaimed"] >= MAX_CLAIMS_PER_TICK:
+            continue
         answer = call("POST", "/v1/board/claim", {"id": task["id"], "leaseSec": LEASE_S})
         if not answer.get("claimed"):
             continue
+        if repair:
+            claimed_prs.add(pr_key)
+        receipt["repairClaimed" if repair else "newWorkClaimed"] += 1
         row = {**work, "postedEpoch": (task.get("postedAt") or now * 1000) / 1000, "claimedEpoch": now, "renewedEpoch": now}
         try:
             if work["kind"] == "linear":
@@ -344,6 +367,7 @@ def tick(state: Path, linear, *, now: float | None = None, call=hub, gh=None) ->
             receipt["errors"].append(f"{task['id']}:handoff:{type(error).__name__}")
         tasks[task["id"]] = row
         _journal(state, {"event": "claimed", "id": task["id"], "kind": work["kind"], "issue": row.get("issue"),
+                         "repo": work.get("repo"), "number": work.get("number"),
                          "postedEpoch": row["postedEpoch"], "claimedEpoch": now})
         call("POST", "/v1/board/update", {"id": task["id"], "leaseSec": LEASE_S,
                                          "note": f"claimed by Symphony lanes on gem ({work['kind']}"

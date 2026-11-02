@@ -63,7 +63,8 @@ function DesktopFeatureRow({
     <tr className='system-b-pricing-chart-row'>
       <th
         scope='row'
-        className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature whitespace-nowrap'
+        data-wrap='feature-label'
+        className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature'
       >
         {feature.name}
       </th>
