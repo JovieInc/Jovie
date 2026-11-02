@@ -280,14 +280,18 @@ const CASES = [
   },
 ];
 
-async function viaForm(input: (typeof CASES)[number]['input']) {
+type ReleaseFormInput = Parameters<
+  typeof import('@/app/app/(shell)/dashboard/releases/actions').createRelease
+>[0];
+
+async function viaForm(input: ReleaseFormInput) {
   const { createRelease } = await import(
     '@/app/app/(shell)/dashboard/releases/actions'
   );
   return createRelease(input);
 }
 
-async function viaChat(input: (typeof CASES)[number]['input']) {
+async function viaChat(input: ReleaseFormInput) {
   const { createReleaseTool } = await import('@/lib/ai/tools/create-release');
   const tool = createReleaseTool(MOCK_PROFILE.id, MOCK_USER_ID) as unknown as {
     execute: (input: unknown, options: unknown) => Promise<unknown>;
