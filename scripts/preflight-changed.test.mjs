@@ -469,6 +469,7 @@ export const selectSourceGuards = () => [{
     /** @type {NodeJS.ProcessEnv} */
     const env = { ...process.env, JOVIE_PREFLIGHT_LEDGER: 'off' };
     delete env.NODE_TEST_CONTEXT;
+    delete env.JOVIE_PR_BODY_FILE;
     for (const base of ['main', 'origin/main', 'refs/remotes/origin/main']) {
       const result = spawnSync(
         process.execPath,
