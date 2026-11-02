@@ -32,6 +32,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from atomic_state import atomic_write_text
+import fixer_events
 
 SCHEMA = "jovie.board-intake/v1"
 HUB = os.environ.get("MESH_HUB", "https://jovie-mesh-hub.tim-fd8.workers.dev")
@@ -69,18 +70,22 @@ def classify(task: dict) -> dict:
                 "cause": cause.group(1) if cause else None}
     found = PR_REF.search(str(task.get("body") or ""))
     if found and tid.startswith(("stall-", "pr-")):
-        return {"kind": "pr", "repo": found.group(1), "number": int(found.group(2))}
+        work = {"kind": "pr", "repo": found.group(1), "number": int(found.group(2))}
+        if cause:
+            work["cause"] = cause.group(1)
+        return work
     linear = LINEAR_ID.match(tid)
     if linear:
         return {"kind": "linear", "identifier": f"{linear.group(1).upper()}-{linear.group(2)}"}
     return {"kind": "goal"}
 
 
-def eligible(task: dict) -> bool:
+def eligible(task: dict, verified: dict | None = None, now: float | None = None) -> bool:
     caps = set(task.get("caps") or [])
     if task.get("status", "open") != "open" or task.get("type", "task") != "task":
         return False
-    if task.get("poster") not in TRUSTED:
+    if task.get("poster") not in TRUSTED and not fixer_events.matches(
+            task, verified or {}, time.time() if now is None else now):
         return False
     if task.get("assignee") == AGENT:
         return True
@@ -240,11 +245,18 @@ def create_goal_issue(linear, task: dict) -> str | None:
     return data["issueCreate"]["issue"]["identifier"]
 
 
-def _read(path: Path) -> dict:
+def _read(path: Path, *, strict=False) -> dict:
     try:
         data = json.loads(path.read_text())
-        return data if isinstance(data, dict) else {}
-    except (OSError, ValueError):
+        if (not isinstance(data, dict) or ("tasks" in data and
+                (not isinstance(data["tasks"], dict) or any(not isinstance(row, dict) for row in data["tasks"].values())))):
+            raise ValueError("invalid-intake-state")
+        return data
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError) as error:
+        if strict:
+            raise ValueError("unreadable-intake-state") from error
         return {}
 
 
@@ -271,14 +283,99 @@ def tick(state: Path, linear, *, now: float | None = None, call=hub, gh=None) ->
         return _tick(state, linear, now=now, call=call, gh=gh)
 
 
+def claim_event(state: Path, record: dict, call=hub) -> dict | None:
+    """Immediately claim one verified event through the existing intake transaction.
+
+    This is not general task intake. Only the installed bridge supplies record after its
+    authenticated GitHub read. A currently held repair owns all events for that PR; check
+    fingerprints remain in wake receipts without creating competing board owners.
+    """
+    with open(state / "board-intake.lock", "a+") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        path = state / "board-intake.json"
+        held = _read(path, strict=True)
+        tasks = held.setdefault("tasks", {})
+        if not _recover_events(state, tasks, record["verifiedAt"], call, key=(record["repo"], record["number"])):
+            return None
+        if tasks:
+            _write(path, held)
+        for tid, row in tasks.items():
+            if (row.get("kind"), row.get("repo"), row.get("number")) != ("pr", record["repo"], record["number"]):
+                continue
+            task = call("GET", f"/v1/board/task?id={tid}").get("task") or {}
+            if (task.get("status") == "claimed" and task.get("claimant") == AGENT
+                    and type(task.get("leaseUntil")) in (int, float)
+                    and task["leaseUntil"] > record["verifiedAt"] * 1000
+                    and classify(task).get("repo") == record["repo"]
+                    and classify(task).get("number") == record["number"]):
+                return task
+            return None  # unresolved ownership never admits another writer
+        task = fixer_events.register(state, record, call)
+        if task is None:
+            return None
+        reply = call("POST", "/v1/board/claim", {"id": task["id"], "leaseSec": LEASE_S})
+        task = call("GET", f"/v1/board/task?id={task['id']}").get("task") or {}
+        if (not reply.get("claimed") or task.get("status") != "claimed" or task.get("claimant") != AGENT
+                or not fixer_events.matches(task, {record["id"]: record}, record["verifiedAt"], open_only=False)):
+            return None
+        row = _event_row(task, record["verifiedAt"])
+        tasks[task["id"]] = row
+        _write(path, held)
+        _journal(state, {"event": "claimed", "id": task["id"], **row})
+        return task
+
+
+def _event_row(task: dict, now: float) -> dict:
+    return {**classify(task), "postedEpoch": task["postedAt"] / 1000,
+            "claimedEpoch": task["claimedAt"] / 1000, "renewedEpoch": now}
+
+
+def _recover_events(state: Path, tasks: dict, now: float, call, *, key=None) -> bool:
+    verified = fixer_events.witnesses(state, strict=True)
+    # Exact task reads avoid the hub's capped board listing hiding a claimed owner.
+    # Normally every witness is already held, so this performs no network reads.
+    for tid, record in verified.items():
+        if tid in tasks or not isinstance(record, dict) or (key and (record.get("repo"), record.get("number")) != key):
+            continue
+        reply = call("GET", f"/v1/board/task?id={tid}")
+        task = reply.get("task") or {}
+        if reply.get("ok") is False or not task:
+            return False  # unknown server ownership cannot authorize a second claim
+        if (task.get("status") == "claimed"
+                and task.get("claimant") == AGENT
+                and fixer_events.matches(task, verified, now, open_only=False)):
+            row = _event_row(task, now)
+            tasks[task["id"]] = row
+            _journal(state, {"event": "claimed", "id": task["id"], **row, "recovered": True})
+        elif task.get("status") == "claimed":
+            return False
+    return True
+
+
 def _tick(state: Path, linear, *, now: float | None = None, call=hub, gh=None) -> dict:
     """One intake pass. Never raises for a hub fault; returns a receipt for the tick record."""
     now = time.time() if now is None else now
     path = state / "board-intake.json"
-    held = _read(path)
+    try:
+        held = _read(path, strict=True)
+    except ValueError:
+        return {"at": now, "held": None, "claimed": [], "closed": [], "renewed": 0,
+                "errors": ["ownership-state-unreadable"], "repairClaimed": 0, "newWorkClaimed": 0,
+                "deferred": "ownership-unverified"}
     tasks: dict = held.setdefault("tasks", {})
     receipt = {"at": now, "held": len(tasks), "claimed": [], "closed": [], "renewed": 0, "errors": [],
                "repairClaimed": 0, "newWorkClaimed": 0}
+
+    # Recover the narrow crash window after a server claim but before local state commits.
+    # An exact locally witnessed task plus the server's live owned lease are both required.
+    try:
+        recovered = _recover_events(state, tasks, now, call)
+    except (OSError, ValueError, TypeError):
+        recovered = False
+    if not recovered:
+        receipt.update(deferred="ownership-unverified", errors=["event-owner-unavailable"])
+        return receipt  # neither a new goal nor another PR repair may bypass uncertain ownership
+    verified = fixer_events.witnesses(state)
 
     if now - float(held.get("capsAt") or 0) >= CAPS_REFRESH_S:
         if call("POST", "/v1/board/caps", {"caps": sorted(CAPS)}).get("ok") is not False:
@@ -340,7 +437,7 @@ def _tick(state: Path, linear, *, now: float | None = None, call=hub, gh=None) -
 
     board = call("GET", "/v1/board?status=open&limit=500")
     claimed_prs = {(row["repo"], row["number"]) for row in tasks.values() if row["kind"] == "pr"}
-    for task in sorted(filter(eligible, board.get("tasks") or []), key=claim_order):
+    for task in sorted((t for t in board.get("tasks") or [] if eligible(t, verified, now)), key=claim_order):
         if task["id"] in tasks:
             continue
         work = classify(task)

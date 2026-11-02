@@ -2281,7 +2281,7 @@ def repair_inventory_process(root, role, entered, release, preclaim, done, outpu
                      (lane,'requeue_verified',{'side_effect':before_claim}),
                      (lane,'sh',{'side_effect':offline_sh}),
                      (lane.lifecycle,'run',{'side_effect':forbidden}),
-                     (lane,'provider_may_run',{'return_value':False}),
+                     (lane,'provider_may_run',{'side_effect':lambda provider,kind:kind == 'fix-red'}),
                      (lane,'claimed_elsewhere',{'return_value':scenario == 'unknown-owner'}),
                      (lane,'reconcile_fix_target',{'side_effect':target}),
                      (lane,'Locked',{'side_effect':locked}),
@@ -3449,6 +3449,12 @@ class MaintenanceDemandTest(unittest.TestCase):
         self.assertEqual(row['observedAt'], self.now)
 
     def setUp(self):
+        # This fixture tests generic resource/routing mechanics with synthetic rungs.
+        # Unmocked production repair admission is covered by RepairProviderPolicyTest.
+        production_policy = lane.provider_may_run
+        policy = patch.object(lane, "provider_may_run", side_effect=lambda provider, kind:
+                              True if kind == "fix-red" else production_policy(provider, kind))
+        policy.start(); self.addCleanup(policy.stop)
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name))
@@ -3757,6 +3763,42 @@ class BindingIsolationWorkerTest(unittest.TestCase):
 
 
 class WorkerTest(unittest.TestCase):
+    # Generic worker mechanics use synthetic lanes. Production repair admission is
+    # exercised without this fixture override in RepairProviderPolicyTest below.
+    def test_event_worker_repairs_only_its_fresh_target_and_never_starts_an_issue(self):
+        rows = [{**repair_inventory_pr(), "number": 8}, {**repair_inventory_pr(), "number": 7}]
+        now = time.time()
+        spec = {"label": "codex", "slots": 1, "model": "offline", "cmd": ["true"]}
+        for head, expected in (("a" * 40, 7), ("b" * 40, None)):
+            with self.subTest(head=head), contextlib.ExitStack() as guards:
+                guards.enter_context(patch.dict(os.environ, {lane.EVENT_REPAIR_TARGET_ENV: json.dumps({"pr": 7, "sha": head})}))
+                guards.enter_context(patch.object(lane, "load_providers", return_value={"codex": spec}))
+                guards.enter_context(patch.object(lane, "_SUMMARY", {"at": now, "sourceAt": now, "readable": True, "prs": rows}))
+                guards.enter_context(patch.object(lane, "fix_candidates", return_value=rows))
+                guards.enter_context(patch.object(lane.pr_events, "queued_prs", return_value=rows))
+                claim = guards.enter_context(patch.object(lane.pr_events, "claim_event_pr", side_effect=lambda host, module, name, prs: prs[0] if prs else None))
+                guards.enter_context(patch.object(lane, "pr_recovery_held", return_value=False))
+                guards.enter_context(patch.object(lane, "repair_routing_needed", return_value=False))
+                guards.enter_context(patch.object(lane, "requeue_verified"))
+                binding = guards.enter_context(patch.object(lane.bindings, "work"))
+                deferred = guards.enter_context(patch.object(lane, "yield_deferred_requeues"))
+                guards.enter_context(patch.object(lane, "revisit_terminal_prs"))
+                guards.enter_context(patch.object(lane, "publish_exhausted_repairs"))
+                sweep = guards.enter_context(patch.object(lane, "sweep_execution_statuses"))
+                work = guards.enter_context(patch.object(lane, "run_issue"))
+                repair = guards.enter_context(patch.object(lane, "fix_red_pr", return_value={"verdict": "fix-pushed"}))
+                self.assertEqual(lane.worker(self.host, "codex"), 0)
+                binding.assert_not_called()
+                deferred.assert_not_called()
+                sweep.assert_not_called()
+                work.assert_not_called()
+                self.assertEqual([pr["number"] for pr in claim.call_args.args[3]], [7] if expected else [])
+                if expected:
+                    self.assertEqual(repair.call_args.args[3]["number"], expected)
+                else:
+                    repair.assert_not_called()
+                self.assertEqual(self.execs, [])
+
     def test_joined_idle_refresh_preserves_expired_same_lane_legacy_but_refuses_foreign_or_active(self):
         # Real worker and every repair selector/classifier/planner. An expired
         # legacy lease lacks endedAt; that is ordinary scope, not a new transfer.
@@ -4363,6 +4405,10 @@ class WorkerTest(unittest.TestCase):
         finally: contender.release()
 
     def setUp(self):
+        production_policy = lane.provider_may_run
+        policy = patch.object(lane, "provider_may_run", side_effect=lambda provider, kind:
+                              True if kind == "fix-red" else production_policy(provider, kind))
+        policy.start(); self.addCleanup(policy.stop)
         # No live host state: a lane run exports LANES_*/SYMPHONY_*/LINEAR_* vars that
         # Host.base_slots, lane_state_dir, cooldown scopes and autoscale.mode all read.
         # Without this scrub the class inherits the host's slot counts and shared state.
@@ -6387,7 +6433,7 @@ class TerminalRevisitTest(unittest.TestCase):
                 patch.object(lane, "reexec", return_value=0), \
                 patch.object(lane, "revisit_terminal_prs", side_effect=revisit):
             self.assertEqual(
-                lane.worker_with_slot(self.host, "grok", {"repairs": True, "slots": 1}, slot), 0)
+                lane.worker_with_slot(self.host, "codex", {"repairs": True, "slots": 1}, slot), 0)
         self.assertEqual(seen.get("candidates"), [21770])
         self.assertIs(seen.get("locked"), False, "terminal sync must not hold the claim lock")
 
@@ -7645,7 +7691,7 @@ class ExecutionStatusTerminalTest(unittest.TestCase):
             opened.update(claimed)  # what _fix_red_pr records once its claim is admitted
             raise KeyboardInterrupt
         with patch.object(lane, "_fix_red_pr", side_effect=crash), self.assertRaises(KeyboardInterrupt):
-            lane.fix_red_pr(self.host, "devin", {}, {"number": 5})
+            lane.fix_red_pr(self.host, "codex", {}, {"number": 5})
         rows = lane.execution_attempt._rows(self.host.state / "runs" / "execution-attempts.jsonl")
         self.assertEqual((rows[-1]["event"], rows[-1]["terminalState"], rows[-1]["failureClass"]),
                          ("attempt_finished", "failed_unknown", "harness_crash"))
@@ -8180,7 +8226,7 @@ class FixRedTest(unittest.TestCase):
                 attempts = host.state / "fix-attempts.json"
                 attempts.write_text(json.dumps({"5": {"sha": "h1", "count": 2, "at": time.time() - 1}}))
                 with patch.object(lane, "run_agent", return_value=SimpleNamespace(returncode=0)):
-                    receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, {
+                    receipt = lane.fix_red_pr(host, "codex", {"cmd": ["true"]}, {
                         **self.pr(), "isDraft": False,
                         "labels": [{"name": "lane-fix-conflict"}, {"name": "lane-fix-red"}],
                     })
@@ -8216,7 +8262,7 @@ class FixRedTest(unittest.TestCase):
                 request = {**self.pr(), "eventKinds": ["dequeued"],
                            "gateEvidence": ["check-failed:ci-fast"],
                            "queueFailure": "source merge-group failure"}
-                receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, request)
+                receipt = lane.fix_red_pr(host, "codex", {"cmd": ["true"]}, request)
             finally:
                 lane.sh, lane.run_agent = real_sh, real_agent
             ledger = [json.loads(line) for line in (host.state / "runs/ledger.jsonl").read_text().splitlines()]
@@ -8248,7 +8294,7 @@ class FixRedTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp), repo=Path(tmp))
             try:
-                receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]},
+                receipt = lane.fix_red_pr(host, "codex", {"cmd": ["true"]},
                                           {**self.pr(), "isDraft": False, "mergeStateStatus": "DIRTY"})
                 pending = json.loads((host.state / "requeue.json").read_text())
             finally:
@@ -8284,7 +8330,7 @@ class FixRedTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp), repo=Path(tmp))
             try:
-                receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]},
+                receipt = lane.fix_red_pr(host, "codex", {"cmd": ["true"]},
                                           {**self.pr(), "isDraft": False, "mergeStateStatus": "DIRTY"})
             finally:
                 lane.sh = real_sh
@@ -8323,7 +8369,7 @@ class FixRedTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp), repo=Path(tmp))
             try:
-                receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]},
+                receipt = lane.fix_red_pr(host, "codex", {"cmd": ["true"]},
                                           {**self.pr(), "isDraft": False, "mergeStateStatus": "DIRTY"})
             finally:
                 lane.sh = real_sh
@@ -8368,7 +8414,7 @@ class FixRedTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp), repo=Path(tmp))
             try:
-                receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]},
+                receipt = lane.fix_red_pr(host, "codex", {"cmd": ["true"]},
                                           {**self.pr(), "isDraft": False, "mergeStateStatus": "DIRTY"})
             finally:
                 lane.sh = real_sh
@@ -8843,7 +8889,7 @@ class FixRedTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp), repo=Path(tmp))
             try:
-                receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, self.pr())
+                receipt = lane.fix_red_pr(host, "codex", {"cmd": ["true"]}, self.pr())
             finally:
                 lane.sh, lane.failure_excerpt = real, real_excerpt
             self.assertEqual((receipt["verdict"], receipt["headAfter"]), ("fix-pushed", "h2"))
@@ -8868,7 +8914,7 @@ class FixRedTest(unittest.TestCase):
         self.addCleanup(lambda: (setattr(lane, "sh", real), setattr(lane, "failure_excerpt", real_excerpt)))
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp), repo=Path(tmp))
-            first = lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, self.pr())
+            first = lane.fix_red_pr(host, "codex", {"cmd": ["true"]}, self.pr())
             second = lane.fix_red_pr(host, "codex", {"cmd": ["true"]}, self.pr())
         self.assertEqual((first["execution"]["terminalState"], first["execution"]["retryDecision"],
                           second["verdict"], second["execution"]["attempt"]), (None, "retry", "fix-no-change", 2))
@@ -8897,7 +8943,7 @@ class FixRedTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp), repo=Path(tmp))
             dirty = {**self.pr(), "mergeStateStatus": "DIRTY"}
-            first = lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, dirty)
+            first = lane.fix_red_pr(host, "codex", {"cmd": ["true"]}, dirty)
             second = lane.fix_red_pr(host, "codex", {"cmd": ["true"]}, dirty)
         self.assertEqual((first["execution"]["retryDecision"], second["execution"]["attempt"],
                           second["execution"]["terminalState"]), ("retry", 2, "quarantined"))
@@ -10914,7 +10960,7 @@ class RepairQueueAuthorityTest(unittest.TestCase):
             with patch.object(lane, "reconcile_fix_target", return_value={**self.target(), "isInMergeQueue": True}), \
                     patch.object(lane.execution_attempt, "claim") as claim, patch.object(lane, "sh") as shell, \
                     patch.object(lane, "install_dependencies") as install, patch.object(lane, "run_agent") as agent:
-                receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, self.target())
+                receipt = lane.fix_red_pr(host, "codex", {"cmd": ["true"]}, self.target())
                 claim.assert_not_called();shell.assert_not_called();install.assert_not_called();agent.assert_not_called()
             self.assertEqual(receipt["reasons"], ["target-pr-queued"])
             self.assertNotIn("execution", receipt)
@@ -16168,6 +16214,16 @@ class PendingRungDispositionTest(unittest.TestCase):
         for reason in ("preserved-reconciliation-required", "publication-revoked", "secret-file", "ownership-unknown"):
             with self.subTest(reason=reason): self.assertEqual(self.run_case(recovery_block=reason)["reason"], reason)
 
+    def test_missing_custody_owner_cannot_borrow_dispatch_identity(self):
+        self.assertEqual(self.run_case(custody_providers={"grok": self.providers["grok"]})["reason"],
+                         "rung-draft-owner-unproven")
+
+    def test_unreadable_custody_catalog_never_waives_transfer(self):
+        for catalog in ([], "bad", False):
+            with self.subTest(catalog=catalog):
+                self.assertEqual(self.run_case(custody_providers=catalog),
+                                 {"state": "unknown", "reason": "rung-custody-catalog-unreadable", "crossLaneDraft": False})
+
     def test_current_target_class_and_prescription_must_agree(self):
         for changes in ({"state": "MERGED"}, {"state": "CLOSED"}, {"isCrossRepository": True},
                         {"isInMergeQueue": True}, {"headRefOid": "head-B"}):
@@ -16249,15 +16305,23 @@ class PendingRungDispositionTest(unittest.TestCase):
         self.assertEqual(self.run_case()["state"], "unknown")
 
 
+    def authorize_runtime_target(self):
+        # Keep the old owner as custody evidence; only the approved target may dispatch.
+        self.providers = {"grok": {"enabled": True, "tier": 0}, "codex": {"enabled": True, "tier": 1}}
+        self.pr["headRefName"] = "grok/jov-7-20261016"
+        self.record.update(lane="grok", repairBranch=self.pr["headRefName"])
+        self.record["pendingEscalation"]["lane"] = "codex"
+
     def routing_context(self, host):
         with patch.object(lane, "observe_repair_provider_health", return_value=True):
-            return lane.capture_repair_routing(host, self.providers,
+            return lane.capture_repair_routing(host, lane.repair_providers(self.providers),
                 {"readable": True, "sourceAt": self.now, "prs": [self.integration_pr()]})
 
     def integration_pr(self):
         return {**self.pr, "mergeStateStatus": "DIRTY", "labels": [], "statusCheckRollup": []}
 
     def test_actual_claim_charges_one_separate_rung_and_preserves_spent_history(self):
+        self.authorize_runtime_target()
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp)); pr = self.integration_pr()
             path = host.state / "fix-attempts.json"
@@ -16269,19 +16333,20 @@ class PendingRungDispositionTest(unittest.TestCase):
                     patch.object(lane, "post_claim") as posted, \
                     patch.object(lane, "sh", side_effect=AssertionError("no external mutation")), \
                     patch.object(lane.time, "time", return_value=self.now):
-                selected = lane.claim_escalation_pr(host, "grok", [pr], routing_context=self.routing_context(host))
+                selected = lane.claim_escalation_pr(host, "codex", [pr], routing_context=self.routing_context(host))
                 self.assertEqual(selected["dossier"], "existing evidence")
-                self.assertIsNone(lane.claim_escalation_pr(host, "grok", [pr], routing_context=self.routing_context(host)))
+                self.assertIsNone(lane.claim_escalation_pr(host, "codex", [pr], routing_context=self.routing_context(host)))
             rows = json.loads(path.read_text()); after = rows["7"]
             self.assertEqual(rows["8"], {"keep": True})
             for key, value in before.items():
                 if key not in {"pendingEscalation", "escalations"}: self.assertEqual(after[key], value)
             self.assertEqual(after["escalations"][:-1], before["escalations"])
-            self.assertEqual(after["escalations"][-1]["lane"], "grok")
+            self.assertEqual(after["escalations"][-1]["lane"], "codex")
             self.assertEqual(after["escalations"][-1]["kind"], "model")
             posted.assert_called_once_with(7, "head-A", "fix")
 
     def test_certified_draft_still_requires_fresh_owner_target_and_publication_fences(self):
+        self.authorize_runtime_target()
         for fault in ("owner", "queued", "head", "revoked", "secret"):
             with self.subTest(fault=fault), tempfile.TemporaryDirectory() as tmp:
                 host = lane.Host(state=Path(tmp)); pr = self.integration_pr(); live = copy.deepcopy(pr)
@@ -16298,10 +16363,11 @@ class PendingRungDispositionTest(unittest.TestCase):
                         patch.object(lane, "post_claim") as posted, \
                         patch.object(lane, "sh", side_effect=AssertionError("no external mutation")), \
                         patch.object(lane.time, "time", return_value=self.now):
-                    self.assertIsNone(lane.claim_escalation_pr(host, "grok", [pr], routing_context=self.routing_context(host)))
+                    self.assertIsNone(lane.claim_escalation_pr(host, "codex", [pr], routing_context=self.routing_context(host)))
                 self.assertEqual(path.read_bytes(), before); posted.assert_not_called()
 
     def test_dedicated_inventory_join_and_census_find_rung_absent_from_polling(self):
+        self.authorize_runtime_target()
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp)); pr = self.integration_pr()
             (host.state / "fix-attempts.json").write_text(json.dumps({"7": self.record}))
@@ -16311,18 +16377,19 @@ class PendingRungDispositionTest(unittest.TestCase):
                     patch.object(lane.time, "time", return_value=self.now), \
                     patch.object(lane, "sh", side_effect=AssertionError("no API or model")), \
                     patch.object(lane, "claimed_elsewhere", side_effect=AssertionError("no remote claim in census")):
-                self.assertEqual(lane.pending_rung_candidates(host, "grok", [pr]), [pr])
-                lane.record_maintenance_demand(host, "grok", [], [], [], set(), routing_context=self.routing_context(host))
-                sample = json.loads((host.state / "maintenance-demand.json").read_text())["lanes"]["grok"]
+                self.assertEqual(lane.pending_rung_candidates(host, "codex", [pr]), [pr])
+                lane.record_maintenance_demand(host, "codex", [], [], [], set(), routing_context=self.routing_context(host))
+                sample = json.loads((host.state / "maintenance-demand.json").read_text())["lanes"]["codex"]
                 self.assertEqual(sample["pending"], 1)
                 self.assertEqual(sample["byKind"], {"escalation": 1})
                 self.assertEqual(sample["ordinaryPrPending"], 0)
-                lane.record_maintenance_demand(host, "grok", [], [], [], {7}, routing_context=self.routing_context(host))
-                sample = json.loads((host.state / "maintenance-demand.json").read_text())["lanes"]["grok"]
+                lane.record_maintenance_demand(host, "codex", [], [], [], {7}, routing_context=self.routing_context(host))
+                sample = json.loads((host.state / "maintenance-demand.json").read_text())["lanes"]["codex"]
                 self.assertIsNone(sample["pending"])
                 self.assertEqual(sample["blockedByReason"], {"selected": 1})
 
     def test_preserved_or_revoked_rung_never_becomes_positive_demand(self):
+        self.authorize_runtime_target()
         for fault in ("preserved", "revoked"):
             with self.subTest(fault=fault), tempfile.TemporaryDirectory() as tmp:
                 host = lane.Host(state=Path(tmp)); pr = self.integration_pr()
@@ -16335,13 +16402,14 @@ class PendingRungDispositionTest(unittest.TestCase):
                 with patch.object(lane, "_SUMMARY", summary), \
                         patch.object(lane, "load_providers", return_value=self.providers), \
                         patch.object(lane.time, "time", return_value=self.now):
-                    lane.record_maintenance_demand(host, "grok", [], [], [], set(), routing_context=self.routing_context(host))
-                sample = json.loads((host.state / "maintenance-demand.json").read_text())["lanes"]["grok"]
+                    lane.record_maintenance_demand(host, "codex", [], [], [], set(), routing_context=self.routing_context(host))
+                sample = json.loads((host.state / "maintenance-demand.json").read_text())["lanes"]["codex"]
                 self.assertIsNone(sample["pending"])
                 reason = "preserved-reconciliation-required" if fault == "preserved" else "publication-revoked"
                 self.assertEqual(sample["blockedByReason"], {reason: 1})
 
     def test_repair_floor_refreshes_only_model_authority_without_linear(self):
+        self.authorize_runtime_target()
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp)); pr = self.integration_pr()
             pr.update(mergeStateStatus="BLOCKED", statusCheckRollup=[{"name": "source", "status": "COMPLETED", "conclusion": "FAILURE"}])
@@ -16358,12 +16426,13 @@ class PendingRungDispositionTest(unittest.TestCase):
             after = json.loads(path.read_text())["7"]
             self.assertEqual(after["pendingEscalation"]["cls"], "fixable-by-model")
             self.assertEqual(after["pendingEscalation"]["subtype"], "check")
-            self.assertEqual(after["pendingEscalation"]["lane"], "grok")
+            self.assertEqual(after["pendingEscalation"]["lane"], "codex")
             self.assertEqual(after["pendingEscalation"]["head"], "head-A")
             for key, value in before.items():
                 if key != "pendingEscalation": self.assertEqual(after[key], value)
 
     def test_repair_floor_refresh_stops_on_fresh_custody_and_target_races(self):
+        self.authorize_runtime_target()
         for fault in ("active", "held", "preserved", "revoked", "head"):
             with self.subTest(fault=fault), tempfile.TemporaryDirectory() as tmp:
                 host = lane.Host(state=Path(tmp)); pr = self.integration_pr()
@@ -16391,6 +16460,7 @@ class PendingRungDispositionTest(unittest.TestCase):
                 self.assertEqual(path.read_bytes(), before); label.assert_not_called()
 
     def test_repair_floor_defers_terminal_latch_until_one_ordinary_disposition(self):
+        self.authorize_runtime_target()
         with tempfile.TemporaryDirectory() as tmp:
             host = lane.Host(state=Path(tmp)); pr = self.integration_pr()
             pr["reviewThreads"] = [{"resolved": False, "author": "itstimwhite",
@@ -16423,6 +16493,12 @@ class PendingRungDispositionTest(unittest.TestCase):
 
 class RepairRoutingContextTest(unittest.TestCase):
     def setUp(self):
+        # This fixture tests generic resource/routing mechanics with synthetic rungs.
+        # Unmocked production repair admission is covered by RepairProviderPolicyTest.
+        production_policy = lane.provider_may_run
+        policy = patch.object(lane, "provider_may_run", side_effect=lambda provider, kind:
+                              True if kind == "fix-red" else production_policy(provider, kind))
+        policy.start(); self.addCleanup(policy.stop)
         self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
         self.host = lane.Host(state=Path(self.tmp.name)); self.now = 10000.0
         self.providers = {"codex": {"tier": 1, "label": "codex", "slots": 3},
@@ -16712,7 +16788,13 @@ class RepairRoutingContextTest(unittest.TestCase):
         self.transport.assert_not_called()
 
 class RepairRoutingWorkerPathTest(unittest.TestCase):
-    setUp = RepairRoutingContextTest.setUp
+    def setUp(self):
+        RepairRoutingContextTest.setUp(self)
+        # Isolate the generic routing/fencing mechanism with synthetic approved rungs.
+        production_policy = lane.provider_may_run
+        policy = patch.object(lane, "provider_may_run", side_effect=lambda provider, kind:
+                              True if kind == "fix-red" else production_policy(provider, kind))
+        policy.start(); self.addCleanup(policy.stop)
 
     def idle_dependencies(self, stack):
         self.host.linear_env = Path("unused")
@@ -17498,6 +17580,52 @@ class AdoptionShareTest(unittest.TestCase):
                 self.assertEqual(sum(lane.adoption_turn_due(host) for _ in range(lane.ADOPT_SHARE_EVERY)), 1)
 
 
+
+class RepairProviderPolicyTest(unittest.TestCase):
+    def test_repair_catalog_excludes_forbidden_rungs_without_mutating_new_feature_configuration(self):
+        configured = {'devin': {'tier': 0}, 'codex': {'tier': 1}, 'claude': {'tier': 2}}
+        before = copy.deepcopy(configured)
+        with patch.object(lane, 'load_providers', return_value=configured):
+            repairs = lane.repair_providers()
+            self.assertEqual(lane.pr_events.cost_order(repairs), ['codex'])
+            self.assertEqual(lane.pr_events.disabled_lanes(repairs), {'devin', 'claude'})
+            self.assertEqual(lane.load_providers(), before)
+            self.assertEqual(lane.pr_events.disabled_lanes(lane.load_providers()), set())
+        self.assertEqual(configured, before)
+
+    def test_only_codex_can_execute_existing_pr_repairs_and_new_work_remains_permitted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp))
+            for provider in ('claude', 'devin', 'grok', 'hyperagent'):
+                with self.subTest(provider=provider), patch.object(lane, '_fix_red_pr') as execute:
+                    self.assertFalse(lane.provider_may_run(provider, 'fix-red'))
+                    self.assertTrue(lane.provider_may_run(provider, 'issue'))
+                    receipt = lane.fix_red_pr(host, provider, {}, {'number': 7})
+                    self.assertEqual(receipt['reasons'], ['repair-provider-not-approved'])
+                    bound = lane.bindings.run(lane, host, None, provider, {}, pr={'number': 8})
+                    self.assertEqual(bound['reasons'], ['repair-provider-not-approved'])
+                    execute.assert_not_called()
+            self.assertTrue(lane.provider_may_run('codex', 'fix-red'))
+
+    def test_ordinary_unapproved_worker_cannot_select_a_repair_from_red_inventory(self):
+        # Keep every generic worker dependency from its hermetic fixture, then restore
+        # the real production policy for this admission-boundary test.
+        production_policy = lane.provider_may_run
+        fixture = WorkerTest()
+        fixture.setUp()
+        try:
+            with patch.object(lane, 'provider_may_run', side_effect=production_policy), \
+                    patch.object(lane, 'capture_repair_inventory') as inventory, \
+                    patch.object(lane, 'run_issue', return_value={'verdict': 'landing', 'prUrl': 'fixture'}) as work, \
+                    patch.object(lane, 'fix_red_pr') as repair:
+                self.assertEqual(lane.worker(fixture.host, 'devin'), 0)
+                inventory.assert_not_called(); repair.assert_not_called()
+                work.assert_called_once()
+                self.assertEqual(work.call_args.args[-1].identifier, 'JOV-3')
+        finally:
+            fixture.tearDown()
+            fixture.doCleanups()
+
 class FixNowTest(unittest.TestCase):
     """JOV-8931: lane_runner fix-now drains relay wake files with the same
     admission as dispatch(); dedupe is an O_EXCL marker per PR+SHA+attempt."""
@@ -17556,6 +17684,31 @@ class FixNowTest(unittest.TestCase):
             self.assertFalse(wake.exists())
             self.assertTrue((self.wake_dir / (wake.name + ".claim")).exists())
 
+    def test_event_dispatch_uses_only_codex_and_targets_the_exact_pr_head(self):
+        self.wake()
+        fixes = self.healthy()
+        providers = {"claude": {"slots": 1}, "devin": {"slots": 1}, "codex": {"slots": 1}}
+        with fixes[0], fixes[2], fixes[3], fixes[4], fixes[5], \
+                patch.object(lane, "load_providers", return_value=providers), \
+                patch.object(lane.pr_events, "claim_active", return_value=False), \
+                patch.object(lane.subprocess, "Popen") as spawn:
+            lane.fix_now(self.host)
+        self.assertEqual(spawn.call_args.args[0][-1], "codex")
+        env = spawn.call_args.kwargs["env"]
+        self.assertEqual(json.loads(env[lane.EVENT_REPAIR_TARGET_ENV]), {"pr": 22868, "sha": "a" * 40})
+
+    def test_malformed_or_wrong_provider_event_worker_fails_closed_before_admission(self):
+        for target in ("{", "[]", '{"pr":true,"sha":"' + "a" * 40 + '"}', '{"pr":1,"sha":"bad"}'):
+            with self.subTest(target=target), patch.dict(os.environ, {lane.EVENT_REPAIR_TARGET_ENV: target}), \
+                    patch.object(lane, "load_providers") as providers:
+                self.assertEqual(lane.worker(self.host, "codex"), 1)
+                providers.assert_not_called()
+        with patch.dict(os.environ, {lane.EVENT_REPAIR_TARGET_ENV: json.dumps({"pr": 1, "sha": "a" * 40})}), \
+                patch.object(lane.os, "execv") as execute:
+            self.assertEqual(lane.worker(self.host, "claude"), 1)
+            self.assertEqual(lane.reexec(self.host, "codex"), 0)
+            execute.assert_not_called()
+
     def test_fix_now_records_no_slot_and_keeps_label(self):
         wake = self.wake()
         fixes = self.healthy(slots=0)
@@ -17598,12 +17751,12 @@ class FixNowTest(unittest.TestCase):
             spawn.assert_not_called()
             self.assertEqual(self.rows()[0]["status"], "already-claimed")
 
-    def test_fix_now_hourly_cap_keeps_label(self):
+    def test_fix_now_prior_dispatch_count_does_not_throttle_a_new_head(self):
         now = time.time()
         ledger = self.state / "runs/red-dispatch.jsonl"
         ledger.parent.mkdir(parents=True, exist_ok=True)
         with ledger.open("a") as handle:
-            for _ in range(lane.MAX_RED_DISPATCH_PER_PR_PER_HOUR):
+            for _ in range(10):
                 handle.write(json.dumps({"pr": 22868, "sha": "b" * 40, "status": "dispatched",
                                          "dispatchedEpoch": now - 60}) + "\n")
         wake = self.wake()
@@ -17612,9 +17765,9 @@ class FixNowTest(unittest.TestCase):
                 patch.object(lane.pr_events, "claim_active", return_value=False), \
                 patch.object(lane.subprocess, "Popen") as spawn:
             self.assertEqual(lane.fix_now(self.host), 0)
-            spawn.assert_not_called()
-            self.assertEqual(self.rows()[-1]["status"], "no-slot")
-            self.assertEqual(self.rows()[-1]["reason"], "hourly-cap")
+            spawn.assert_called_once()
+            self.assertEqual(self.rows()[-1]["status"], "dispatched")
+            self.assertIsNone(self.rows()[-1]["reason"])
             self.assertFalse(wake.exists())
 
     def test_fix_now_rejects_oversized_wake_file(self):
@@ -17625,8 +17778,8 @@ class FixNowTest(unittest.TestCase):
             self.assertEqual(self.rows()[0]["status"], "invalid")
             self.assertFalse(wake.exists())
 
-    def test_fix_now_processes_at_most_max_wake_files(self):
-        for index in range(lane.MAX_WAKE_PER_ACTIVATION + 2):
+    def test_fix_now_drains_all_distinct_pr_events_without_an_activation_cap(self):
+        for index in range(7):
             self.wake(pr=22868 + index)
         fixes = self.healthy()
         with lane.lifecycle.Guard(self.state), \
@@ -17634,9 +17787,9 @@ class FixNowTest(unittest.TestCase):
                 patch.object(lane.pr_events, "claim_active", return_value=False), \
                 patch.object(lane.subprocess, "Popen") as spawn:
             self.assertEqual(lane.fix_now(self.host), 0)
-            self.assertEqual(spawn.call_count, lane.MAX_WAKE_PER_ACTIVATION)
+            self.assertEqual(spawn.call_count, 7)
             remaining = list(self.wake_dir.glob("red-*.json"))
-            self.assertEqual(len(remaining), 2)
+            self.assertEqual(len(remaining), 0)
 
     def test_fix_now_ignores_missing_wake_dir(self):
         self.assertEqual(lane.fix_now(self.host), 0)

@@ -159,7 +159,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_capacity_limit.py", "scripts/tests/test_capacity_registry.py", "scripts/tests/test_fleet_gate_emitter.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
               "scripts/tests/test_epics.py",
-              "scripts/tests/test_board_intake.py", "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py", "scripts/tests/test_priority_admission.py", "scripts/tests/test_macos_pool.py",
+              "scripts/tests/test_board_intake.py", "scripts/tests/test_fixer_events.py", "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py", "scripts/tests/test_priority_admission.py", "scripts/tests/test_macos_pool.py",
               "scripts/tests/test_backlog_rank.py", "scripts/tests/test_decompose_pass.py",
               "scripts/tests/test_pytest_hook_names.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
@@ -574,6 +574,12 @@ def load_providers(path: Path = HERE / "providers.json", registry: dict | None =
     if registry is None and Path(path) == HERE / "providers.json":
         registry = capacity_registry.load()
     return capacity_registry.apply_limits(providers, registry) if registry else providers
+
+
+def repair_providers(providers: dict | None = None) -> dict:
+    """Dispatch availability only; custody must use the unchanged configured catalog."""
+    return {name: spec if provider_may_run(name, "fix-red") else {**spec, "repairs": False}
+            for name, spec in (load_providers() if providers is None else providers).items()}
 
 
 # ---------------------------------------------------------------- selection
@@ -1153,6 +1159,8 @@ def write_agent_prompt(path: Path, prompt: str, kind: str, provider: str,
 
 def provider_may_run(provider: str, kind: str) -> bool:
     """Review-only task kinds (adopt/gate claims) never run on implementation-only lanes."""
+    if kind == "fix-red" and provider != "codex":
+        return False  # fx/Cloud are commissioned separately; never Claude/Devin for repairs
     return not (provider in IMPLEMENTATION_ONLY_PROVIDERS and kind in REVIEW_ONLY_KINDS)
 
 
@@ -2564,7 +2572,7 @@ def repair_routing_reason(context, providers: dict, now: float, cooldowns: dict)
 def current_repair_routing_reason(host: Host, context, providers: dict) -> str | None:
     """Only local bounded reads at admission, including the final charge boundary."""
     try:
-        current = load_providers()
+        current = repair_providers()
         if repair_provider_identity(current) != repair_provider_identity(providers):
             return "routing-provider-config-changed"
         return repair_routing_reason(context, current, time.time(), repair_route_cooldowns(host, current))
@@ -4310,8 +4318,7 @@ def requeue_verified(host: Host, prs: list[dict] | None, *, defer=None) -> dict 
 RED_DISPATCH_SCHEMA = "jovie-lane-red-dispatch/v1"
 RED_DISPATCH_HOUR_S = 3600
 WAKE_FILE_MAX_BYTES = 4096
-MAX_WAKE_PER_ACTIVATION = 5
-MAX_RED_DISPATCH_PER_PR_PER_HOUR = 4
+EVENT_REPAIR_TARGET_ENV = "LANES_EVENT_REPAIR_TARGET"
 
 
 def iso_epoch(stamp):
@@ -4350,6 +4357,8 @@ def free_red_provider(host):
     admission dispatch's spawn loop applies (disk is checked by the caller)."""
     for name, spec in load_providers().items():
         try:
+            if name != "codex" or spec.get("repairs") is False:
+                continue  # approved subscription fallback; fx/cloud join only after commissioning
             if not spec.get("enabled", True):
                 continue
             slots = host.slots(name, spec.get("slots", 1))
@@ -4436,7 +4445,7 @@ def fix_now(host: Host) -> int:
         backlog_wake(host)
     except (Exception, SystemExit):
         pass
-    for path in sorted(wake_dir.glob("red-*.json"))[:MAX_WAKE_PER_ACTIVATION]:
+    for path in sorted(wake_dir.glob("red-*.json")):
         marker = path.with_name(path.name + ".claim")
         try:
             fd = os.open(marker, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
@@ -4462,11 +4471,6 @@ def fix_now(host: Host) -> int:
                            run_id=run_id, run_attempt=run_attempt, red_at=red_at)
             path.unlink(missing_ok=True)
             continue
-        if red_dispatch_claims_this_hour(host.state, pr, time.time()) >= MAX_RED_DISPATCH_PER_PR_PER_HOUR:
-            record_red_row(host.state, status="no-slot", pr=pr, sha=sha, run_id=run_id,
-                           run_attempt=run_attempt, red_at=red_at, reason="hourly-cap")
-            path.unlink(missing_ok=True)
-            continue
         disk = disk_guard.check(host)
         if not disk.get("admitted"):
             record_red_row(host.state, status="no-slot", pr=pr, sha=sha, run_id=run_id,
@@ -4482,7 +4486,8 @@ def fix_now(host: Host) -> int:
             continue
         subprocess.Popen([sys.executable, str(Path(__file__)), "worker", "--provider", provider],
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                         start_new_session=True, **lifecycle.spawn_kwargs())
+                         start_new_session=True, **lifecycle.spawn_kwargs(env={**os.environ,
+                             EVENT_REPAIR_TARGET_ENV: json.dumps({"pr": pr, "sha": sha})}))
         record_red_row(host.state, status="dispatched", pr=pr, sha=sha, run_id=run_id,
                        run_attempt=run_attempt, red_at=red_at, provider=provider)
         path.unlink(missing_ok=True)
@@ -4836,7 +4841,8 @@ def escalate_exhausted(host: Host, prs: list[dict], linear, *, model_only=False,
     attempts = json.loads(path.read_text()) if path.exists() else {}
     observed = json.loads(json.dumps(attempts))
     held = json.loads(held_path(host).read_text()) if held_path(host).exists() else {}
-    providers = load_providers()
+    custody_providers = load_providers()
+    providers = repair_providers(custody_providers)
     cooled = {name for name in providers if cooling(host, name)} if routing_context is REPAIR_ROUTING_UNSET else set()
     data = load_escalation(host)
     now = time.time()
@@ -4889,11 +4895,11 @@ def escalate_exhausted(host: Host, prs: list[dict], linear, *, model_only=False,
                 if not isinstance(pending, dict) or type(pr.get("isDraft")) is not bool \
                         or pr.get("isCrossRepository") is not False or (pr["isDraft"] and not owned):
                     continue
-                disabled = {name for name, spec in providers.items() if isinstance(spec, dict)
+                disabled = {name for name, spec in custody_providers.items() if isinstance(spec, dict)
                             and (not spec.get("enabled", True) or spec.get("repairs") is False)}
                 transfer = bool(pr.get("isDraft") and owned
                                 and owned["lane"] not in {pending.get("lane"), *disabled})
-                if transfer and (owned["lane"] not in providers or record.get("lane") != owned["lane"]
+                if transfer and (owned["lane"] not in custody_providers or record.get("lane") != owned["lane"]
                                  or pending.get("head") != pr["headRefOid"]
                                  or pr["headRefOid"] not in (record.get("sha"), record.get("pushedHead"))
                                  or record.get("repairBranch") != pr["headRefName"]
@@ -5675,7 +5681,7 @@ def _event_start_claim(fingerprint: str, row: dict) -> dict:
 def claim_remediation_events(host: Host, linear) -> dict:
     """Claim every labeled remediation event. One cached read, then local planning."""
     issues = fetch_labeled_events(linear)
-    providers = load_providers()
+    providers = repair_providers()
     cooled = {name for name in providers if cooling(host, name)}
 
     health_seen = {}  # one probe per provider per pass: a per-PR probe cost ~460 `grok models` calls (~400s) per tick
@@ -5947,7 +5953,7 @@ def _rung_stamp(value):
 
 def pending_rung_disposition(pr, record, name, providers, now, *, classified,
                              caps_allow, plan_ladder, top_rung_used, active_previous_attempt,
-                             recovery_block=None):
+                             recovery_block=None, custody_providers=None):
     """Return eligible/blocked/unknown for a local pending rung, without mutation.
 
     Same-lane/disabled-owner draft handling retains the existing scope and the
@@ -5959,7 +5965,9 @@ def pending_rung_disposition(pr, record, name, providers, now, *, classified,
     the *recorded* head; a changed remote head must not hide its original lease.
     `recovery_block` is the caller's existing preserved/revoked/custody reason.
     None means that caller's local preflight has not found such a hold; it does
-    not attest to remote ownership. All live claim fences remain mandatory.
+    not attest to remote ownership. The custody catalog is independent of dispatch
+    availability; filtering a route never releases an enabled branch owner.
+    All live claim fences remain mandatory.
     """
     if not isinstance(pr, dict) or not isinstance(record, dict) or not isinstance(providers, dict):
         return _rung_result("unknown", "rung-input-unreadable")
@@ -6021,14 +6029,17 @@ def pending_rung_disposition(pr, record, name, providers, now, *, classified,
             return _rung_result("unknown", "rung-top-authority-unreadable")
         if used:
             return _rung_result("blocked", "ladder-exhausted")
+    custody_providers = providers if custody_providers is None else custody_providers
+    if not isinstance(custody_providers, dict):
+        return _rung_result("unknown", "rung-custody-catalog-unreadable")
     owned = LANE_BRANCH.match(branch)
-    disabled = {lane for lane, provider in providers.items() if isinstance(provider, dict)
+    disabled = {lane for lane, provider in custody_providers.items() if isinstance(provider, dict)
                 and (not provider.get("enabled", True) or provider.get("repairs") is False)}
     transfer = bool(pr["isDraft"] and owned and owned["lane"] not in {name, *disabled})
     if pr["isDraft"] and not owned:
         return _rung_result("blocked", "rung-foreign-draft")
     if transfer:
-        if owned["lane"] not in providers or record.get("lane") != owned["lane"]:
+        if owned["lane"] not in custody_providers or record.get("lane") != owned["lane"]:
             return _rung_result("blocked", "rung-draft-owner-unproven")
         if pending.get("head") != head:
             return _rung_result("blocked", "rung-draft-exact-head-required")
@@ -6099,7 +6110,8 @@ def claim_escalation_pr(host: Host, name: str, prs: list[dict], *,
             return None
     except (OSError, ValueError):
         return None
-    providers = load_providers()
+    custody_providers = load_providers()
+    providers = repair_providers(custody_providers)
     for key, record in attempts.items():
         if not isinstance(record, dict):
             continue
@@ -6142,7 +6154,7 @@ def claim_escalation_pr(host: Host, name: str, prs: list[dict], *,
         rung = pending_rung_disposition(
             live, record, name, providers, time.time(), classified=classified,
             caps_allow=remediation.caps_allow, plan_ladder=current_plan,
-            top_rung_used=remediation.top_rung_used,
+            top_rung_used=remediation.top_rung_used, custody_providers=custody_providers,
             active_previous_attempt=pr_events.in_flight(record, {"headRefOid": record.get("sha")}, time.time()))
         if rung["state"] != "eligible":
             continue
@@ -6177,7 +6189,7 @@ def claim_escalation_pr(host: Host, name: str, prs: list[dict], *,
             fresh_rung = pending_rung_disposition(
                 live, record, name, providers, now, classified=classified,
                 caps_allow=remediation.caps_allow, plan_ladder=current_plan,
-                top_rung_used=remediation.top_rung_used,
+                top_rung_used=remediation.top_rung_used, custody_providers=custody_providers,
                 active_previous_attempt=pr_events.in_flight(record, {"headRefOid": record.get("sha")}, now))
             if fresh_rung["state"] != "eligible":
                 raise RepairStopped("escalation-route-changed", live, "before-escalation-charge")
@@ -7943,6 +7955,10 @@ def archive_unresumable_preserved(host: Host, path: Path, reason: str, *, observ
 
 
 def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
+    if not provider_may_run(name, "fix-red"):
+        return {"schema": "jovie-lane-run/v1", "provider": name, "kind": "fix-red", "pr": pr["number"],
+                "verdict": "skipped", "reasons": ["repair-provider-not-approved"],
+                "startedAt": now_iso(), "endedAt": now_iso()}
     lock = Locked(host.state / "locks" / f"repair-pr-{pr['number']}.lock", blocking=False)
     opened: dict = {}
     try:
@@ -9070,9 +9086,10 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
     path = host.state / "fix-attempts.json"
     attempts = json.loads(path.read_text()) if path.exists() else {}
     held = json.loads(held_path(host).read_text()) if held_path(host).exists() else {}
-    providers = load_providers()
+    custody_providers = load_providers()
+    providers = repair_providers(custody_providers)
     order, now = pr_events.cost_order(providers), time.time()
-    disabled = set(providers) - set(order)
+    disabled = pr_events.disabled_lanes(custody_providers)
     prs = [pr for pr in prs if not pr_recovery_held(host, pr, now) and not pr_breaker_open(host, pr["number"], now, pr.get("headRefOid"))
            and pr_events.may_take(name, pr, attempts.get(str(pr["number"]), {}), order, now)]
     settled = []
@@ -9245,13 +9262,30 @@ def reserved_binding_pass(host: Host, name: str, spec: dict) -> int:
     return 0 if bound is None else reexec(host, name)
 
 
+def event_repair_target() -> tuple[int, str] | None:
+    raw = os.environ.get(EVENT_REPAIR_TARGET_ENV)
+    if raw is None:
+        return None
+    target = json.loads(raw)
+    if (not isinstance(target, dict) or set(target) != {"pr", "sha"} or type(target["pr"]) is not int
+            or target["pr"] <= 0 or not isinstance(target["sha"], str) or not re.fullmatch(r"[0-9a-f]{40}", target["sha"])):
+        raise ValueError("invalid event repair target")
+    return target["pr"], target["sha"]
+
+
 def worker(host: Host, name: str) -> int:
+    try:
+        repair_target = event_repair_target()
+    except (ValueError, TypeError):
+        return 1
+    if repair_target and name != "codex":
+        return 1
     spec = load_providers()[name]
     limit = host.slots(name, spec.get("slots", 1))
     if not spec.get("enabled", True):
         return 0
     if limit <= 0:
-        return reserved_binding_pass(host, name, spec)
+        return 0 if repair_target else reserved_binding_pass(host, name, spec)
     intake_limit = host.intake_slots(name, spec.get("slots", 1))
     slot = None
     # One ledger and one serialized count/acquire, even while old occupied seats
@@ -9263,7 +9297,7 @@ def worker(host: Host, name: str) -> int:
         full = occupied is None or occupied.get(name, 0) >= limit or (
             ceiling is not None and sum(occupied.values()) >= ceiling)
         for index in range(0 if full else limit):
-            maintenance_only = index >= intake_limit
+            maintenance_only = repair_target is not None or index >= intake_limit
             if maintenance_only and spec.get("repairs") is False:
                 continue
             lock = Locked(host.state / "slots" / f"{name}.{index}.lock", blocking=False)
@@ -9274,7 +9308,7 @@ def worker(host: Host, name: str) -> int:
     finally:
         admission.release()
     if slot is None:
-        return reserved_binding_pass(host, name, spec)
+        return 0 if repair_target else reserved_binding_pass(host, name, spec)
     try:
         return worker_with_slot(host, name, spec, slot, maintenance_only=maintenance_only)
     finally:
@@ -9373,8 +9407,9 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
                 raise ValueError("maintenance-state-not-object")
             snapshots[filename] = row
         attempts, held = snapshots["fix-attempts.json"], snapshots["held.json"]
-        providers = load_providers()
-        order, disabled = pr_events.cost_order(providers), pr_events.disabled_lanes(providers)
+        custody_providers = load_providers()
+        providers = repair_providers(custody_providers)
+        order, disabled = pr_events.cost_order(providers), pr_events.disabled_lanes(custody_providers)
         if name not in order:
             raise ValueError("maintenance-provider-disabled")
         # A preserved checkout needs its existing reconciliation/qualification path.
@@ -9448,7 +9483,7 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
                     rung = pending_rung_disposition(
                         pr, attempt, name, providers, now, classified=rung_blocker(pr, attempt, entry),
                         caps_allow=remediation.caps_allow, plan_ladder=current_plan,
-                        top_rung_used=remediation.top_rung_used,
+                        top_rung_used=remediation.top_rung_used, custody_providers=custody_providers,
                         active_previous_attempt=pr_events.in_flight(attempt, {"headRefOid": attempt.get("sha")}, now))
                     if rung["state"] == "eligible" and provider_may_run(name, "fix"):
                         eligible.add(number)
@@ -9569,9 +9604,13 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         return 1
     # Extra repository bindings (LYB) share this seat. Jovie-only holds below never block them,
     # and a binding fault never blocks the Jovie path. No configured binding = no reads at all.
+    repair_target = event_repair_target()
+    maintenance_only = maintenance_only or repair_target is not None
+    def target_pr(pr):
+        return repair_target is None or (pr.get("number"), pr.get("headRefOid")) == repair_target
     try:
-        bound = bindings.work(THIS, host, name, spec, maintenance_only=maintenance_only,
-                              jovie_repair_pending=jovie_repair_pending(host))
+        bound = None if repair_target else bindings.work(THIS, host, name, spec, maintenance_only=maintenance_only,
+                                                         jovie_repair_pending=jovie_repair_pending(host))
     except Exception as error:
         bound = None
         print(f"binding pass failed: {type(error).__name__}: {error}"[:300], file=sys.stderr)
@@ -9596,8 +9635,9 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     linear = None
     # Publication can await canonical policy and native queue reads. Keep those
     # outside the global claim lock, then refresh inventory for ordinary admission.
-    requeue_verified(host, lane_prs(name))
-    repair_inventory = capture_repair_inventory(name) if spec.get("repairs") is not False else None
+    requeue_verified(host, [pr for pr in lane_prs(name) if target_pr(pr)])
+    repairs_allowed = provider_may_run(name, "fix-red") and spec.get("repairs") is not False
+    repair_inventory = capture_repair_inventory(name) if repairs_allowed else None
     scan_summary = repair_inventory["summary"] if repair_inventory is not None else _SUMMARY
     # Scope-only evidence is optional. Never fetch it while holding claim.lock or
     # let an unavailable witness displace repair/adopt/labeled priority.
@@ -9610,8 +9650,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     # mutable summary is not provenance for cross-provider draft scope.
     rung_inventory = json.loads(json.dumps({key: scan_summary.get(key)
                                            for key in ("readable", "sourceAt", "prs")}))
-    routing_needed = spec.get("repairs") is not False and repair_routing_needed(host, rung_inventory)
-    routing_providers = load_providers() if routing_needed else {}
+    routing_needed = repairs_allowed and repair_routing_needed(host, rung_inventory)
+    routing_providers = repair_providers() if routing_needed else {}
     routing_context = capture_repair_routing(host, routing_providers, rung_inventory) if routing_needed else None
     if repair_inventory is not None:
         claim, repair_inventory = lock_repair_inventory(host, name, repair_inventory)
@@ -9629,7 +9669,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         # then ungated lane drafts, then new issues.
         # A remote-only lane (Hyperagent) cannot repair a local checkout: it only claims issues,
         # and the local lanes repair its PRs like any orphan (`repairs: false`).
-        local = spec.get("repairs") is not False
+        local = repairs_allowed
         if local and not repair_inventory_valid(repair_inventory, name):
             raise RepairInventoryHold()
         if local:
@@ -9638,21 +9678,21 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             # revalidated by the new-issue path before use.
             scan_summary = repair_inventory["summary"]
             rung_inventory = {key: scan_summary.get(key) for key in ("readable", "sourceAt", "prs")}
-        candidates = [pr for pr in fix_candidates(name, inventory=repair_inventory["prs"]) if not pr_recovery_held(host, pr)] if local else []
+        candidates = [pr for pr in fix_candidates(name, inventory=repair_inventory["prs"]) if target_pr(pr) and not pr_recovery_held(host, pr)] if local else []
         # Reclaimed abandoned drafts (the only non-lane drafts among the fix candidates) are
         # gated and readied like this lane's own drafts. Derived from the one cached scan so
         # no extra inventory read happens per worker pass.
-        lane_owned = [pr for pr in lane_prs(name, inventory=repair_inventory["prs"]) if not pr_recovery_held(host, pr)] if local else []
+        lane_owned = [pr for pr in lane_prs(name, inventory=repair_inventory["prs"]) if target_pr(pr) and not pr_recovery_held(host, pr)] if local else []
         owned_numbers = {pr["number"] for pr in lane_owned}
         prs = lane_owned + [pr for pr in candidates if pr.get("isDraft") and pr["number"] not in owned_numbers]
         events = [pr for pr in pr_events.queued_prs(THIS, pr_events.FIX_KINDS, inventory=repair_inventory["prs"])
-                  if not pr_recovery_held(host, pr)] if local else []
+                  if target_pr(pr) and not pr_recovery_held(host, pr)] if local else []
         source_at = rung_inventory.get("sourceAt")
         rung_inventory_valid = (rung_inventory.get("readable") is True
                                 and type(source_at) in (int, float) and math.isfinite(source_at)
                                 and 0 <= time.time() - source_at <= MAINTENANCE_DEMAND_MAX_AGE_S
                                 and isinstance(rung_inventory.get("prs"), list))
-        rung_candidates = pending_rung_candidates(host, name, rung_inventory["prs"]) \
+        rung_candidates = [pr for pr in pending_rung_candidates(host, name, rung_inventory["prs"]) if target_pr(pr)] \
             if local and rung_inventory_valid else []
         # A fixed share of turns gates green drafts first: red repairs otherwise took 94-99% of
         # lane turns and green drafts waited hours for a gate (2026-10-21, Gem ledger).
@@ -9686,7 +9726,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
                                 **({"joined_rungs": frozenset(pr["number"] for pr in rung_candidates)}
                                    if rung_candidates else {}), routing_context=routing_context)
         if not (red or adopt) and (routing_needed or rung_candidates):
-            routing_refresh_reason = current_repair_routing_reason(host, routing_context, load_providers())
+            routing_refresh_reason = current_repair_routing_reason(host, routing_context, repair_providers())
         labeled = None if red or adopt or not local or maintenance_only \
             else linear_optional(claim_labeled_event, host, name, linear)
         issue = labeled
@@ -9695,7 +9735,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         if local and not (red or adopt or labeled):
             publish_exhausted_repairs(host, name, candidates)
             try:
-                sweep_execution_statuses(host)
+                if repair_target is None:
+                    sweep_execution_statuses(host)
             except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
                 pass  # Retried on the next idle pass; it never blocks new work.
         budget = None if red or adopt or labeled or maintenance_only else read_new_issue_budget(name, host.base_slots(name, spec.get("slots", 1)))
@@ -9793,7 +9834,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         record_idle_exit(host, name, "linear-rate-limited" if rate_limited else "linear-inventory-unknown")
         slot.release()
         return 0
-    if red is not None or adopt is not None or issue is not None:
+    if repair_target is None and (red is not None or adopt is not None or issue is not None):
         claim = Locked(host.state / "claim.lock", blocking=True)
         try: yield_deferred_requeues(host, name)
         finally: claim.release()
@@ -9924,7 +9965,7 @@ _RUN_LEASES: list = []  # open run-lease handles; exec (close-on-exec) or exit r
 
 def reexec(host: Host, name: str) -> int:
     """Slot free -> pull the next piece of work now, on whatever release is current (drain-safe)."""
-    if lifecycle.draining(host.state):
+    if os.environ.get(EVENT_REPAIR_TARGET_ENV) is not None or lifecycle.draining(host.state):
         return 0  # admitted unit finished; do not acquire another assignment
     current = host.state / "current" / "lane_runner.py"
     lifecycle.prepare_reexec()

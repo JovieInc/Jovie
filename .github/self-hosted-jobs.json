@@ -53,6 +53,11 @@
       "reason": "runs the Hermes CLI installed on the gem host"
     },
     {
+      "workflow": "lane-fix-relay.yml",
+      "job": "wake-gem",
+      "reason": "uses Gem's reviewed installed bridge, host-local authenticated board ownership state and wake directory; no PR checkout or execution occurs in this job"
+    },
+    {
       "workflow": "pr-size-guard.yml",
       "job": "merge-group-fork",
       "reason": "light merge_group gate job; hosted by default, routed to the fixed pool only while repo variable MERGE_GATE_POOL=fixed (hosted saturation fallback, #23586)"

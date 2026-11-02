@@ -71,7 +71,7 @@ def fake_lane(shell, claimed=False):
     module = SimpleNamespace(
         sh=shell, REPO_SLUG=runner.REPO_SLUG, PR_FIELDS=runner.PR_FIELDS, RED=runner.RED,
         MAX_FIX_ATTEMPTS=runner.MAX_FIX_ATTEMPTS, held_path=runner.held_path, update_json=runner.update_json,
-        now_iso=runner.now_iso, best_per_issue=runner.best_per_issue, load_providers=lambda: PROVIDERS,
+        now_iso=runner.now_iso, best_per_issue=runner.best_per_issue, load_providers=lambda: PROVIDERS, repair_providers=lambda providers=None: PROVIDERS if providers is None else providers,
         claimed_elsewhere=lambda number, sha, kind, **kwargs: claimed, post_claim=lambda number, sha, kind: posted.append(number),
         publication_revocation=runner.publication_revocation,
         reconcile_fix_target=lambda pr: {**pr, "state": "OPEN"})
@@ -1357,6 +1357,16 @@ class ClaimCommentTest(unittest.TestCase):
 
 
 class ClaimTest(unittest.TestCase):
+    def test_production_repair_catalog_never_grace_defers_codex_for_a_prohibited_lane(self):
+        shell = Shell()
+        module = fake_lane(shell)
+        module.repair_providers = lambda providers=None: runner.repair_providers(PROVIDERS if providers is None else providers)
+        claimed = events.claim_event_pr(self.host, module, 'codex',
+                                       [pr(kinds=['red'], checks=[RED_CHECK])], NOW)
+        self.assertIsNotNone(claimed)
+        self.assertEqual(module.posted, [5])
+        self.assertEqual(events.cost_order(module.repair_providers()), ['codex'])
+
     def test_explicit_queue_inventory_never_refills_and_preserves_input(self):
         module = fake_lane(Shell())
         module.open_prs_summary = Mock(side_effect=AssertionError('unexpected inventory refill'))
@@ -2316,7 +2326,7 @@ class RunnerHookTest(unittest.TestCase):
             with tempfile.TemporaryDirectory() as tmp:
                 host = runner.Host(state=Path(tmp), repo=Path(tmp))
                 (host.state / "fix-attempts.json").write_text(json.dumps({"5": {"sha": "h1", "count": 1, "at": 1}}))
-                runner.fix_red_pr(host, "devin", {"cmd": ["true"]}, pr())
+                runner.fix_red_pr(host, "codex", {"cmd": ["true"]}, pr())
                 record = json.loads((host.state / "fix-attempts.json").read_text())["5"]
         finally:
             runner.sh, runner.failure_excerpt = saved
