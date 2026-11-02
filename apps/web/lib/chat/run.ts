@@ -31,6 +31,7 @@ import {
 } from '@/lib/chat/attachment-policy';
 import { copyFloorRepairTransform } from '@/lib/chat/copy-floor-repair';
 import { buildReferencedEntitiesBlock } from '@/lib/chat/entity-hydration';
+import { createFirstTextMarker } from '@/lib/chat/first-text';
 import {
   buildGroundingFacts,
   wrapStreamResultWithGroundingGuard,
@@ -220,6 +221,8 @@ export function buildCachedSystemMessages(
 }
 
 export interface ExecuteChatTurnInput {
+  /** chat_turns id; when set, the first text delta stamps first_text_at. */
+  turnId?: string;
   /** Server-approved, post-confirmation text-only pilot. Never accept from request JSON. */
   writingPilot?: WritingPilotInput;
   uiMessages: UIMessage[];
@@ -369,6 +372,7 @@ export async function executeChatTurn(
     knowledgeRetriever = retrieveKnowledgeContext,
     mode = 'app',
     identity,
+    turnId,
   } = input;
 
   if (identity?.id === 'summer') {
@@ -651,6 +655,7 @@ export async function executeChatTurn(
             return {};
           },
     abortSignal: signal,
+    onChunk: turnId ? createFirstTextMarker(turnId) : undefined,
     // First text, not hidden thinking, is what an artist waits on. The
     // provider default on glm-5.3 spent ~45s reasoning before any visible
     // word (prod walk 2026-11-02, 1,561 reasoning deltas).

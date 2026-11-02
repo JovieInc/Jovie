@@ -104,6 +104,8 @@ export const chatTurns = pgTable(
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
     startedAt: timestamp('started_at'),
+    /** First non-empty text delta streamed to the client (time-to-first-word metric). */
+    firstTextAt: timestamp('first_text_at'),
     completedAt: timestamp('completed_at'),
   },
   table => ({

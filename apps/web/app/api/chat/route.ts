@@ -3163,6 +3163,7 @@ export async function POST(req: Request) {
     }
 
     const turn = await executeChatTurn({
+      turnId: reservedTurn?.turnId,
       uiMessages,
       artistContext,
       releases,
