@@ -411,11 +411,44 @@ function parse(argv) {
     else if (f === '--customer-visible') a.customerVisible = v();
     else if (f === '--body-file') a.bodyFile = v();
     else if (f === '--draft') a.draft = true;
+    else if (f === '--wip-override') a.wipOverride = v();
     else if (f === '--dry-run') a.dryRun = true;
     else if (f === '--no-push') a.noPush = true;
     else if (!f.startsWith('--')) a.number = f;
   }
   return a;
+}
+
+/**
+ * Per-producer WIP admission (scripts/lanes/pr-wip-policy.json, one rule shared with the
+ * lanes' new-issue budget): a producer that owns `cap` or more open, unheld PRs may not open
+ * another until some land. Exit 3 from pr_wip.py is a refusal; any other failure admits
+ * with a warning, because an unreadable count must not stall shipping.
+ */
+export function wipAdmission(branch, execute, cwd) {
+  const result = execute(
+    'python3',
+    ['scripts/lanes/pr_wip.py', 'admit', '--branch', branch],
+    { cwd }
+  );
+  let decision = null;
+  try {
+    decision = JSON.parse((result.stdout || '').trim().split('\n').pop());
+  } catch {
+    decision = null;
+  }
+  if (result.status === 3 && decision)
+    return {
+      allowed: false,
+      message: `wip-cap: \`${decision.producer}/\` already owns ${decision.used} open PRs (cap ${decision.cap}, scripts/lanes/pr-wip-policy.json). Land, fix or close one of them before opening another.`,
+    };
+  return {
+    allowed: true,
+    message:
+      result.status === 0 && decision
+        ? null
+        : `wip admission unavailable (${(result.stderr || 'no decision').toString().trim().slice(0, 160)}); admitting`,
+  };
 }
 
 function record(row) {
@@ -797,6 +830,26 @@ export async function main(
       await refreshBodyChecks(a.repo, pr, body, title, { github, pause, log });
       return 0;
     }
+    const branch = git(['branch', '--show-current']).stdout.trim();
+    const wip = wipAdmission(branch, execute, a.repo);
+    // An override is visible, not silent: it is recorded and labels the PR `wip-override`
+    // so the census and Fleet Rules can count it. Lane runs never pass it.
+    const override = !wip.allowed && (a.wipOverride ?? '').trim().length >= 12;
+    record({
+      cmd: 'wip-admission',
+      branch,
+      allowed: wip.allowed,
+      ...(override ? { override: a.wipOverride } : {}),
+    });
+    if (wip.message)
+      log(`${wip.allowed || override ? 'warn' : 'FAIL'}  ${wip.message}`);
+    if (!wip.allowed && !override) {
+      log(
+        'Refusing to open: over the WIP cap (--wip-override "<reason>" is recorded and labelled).'
+      );
+      return 3;
+    }
+    if (override) labels.push('wip-override');
     const dir = mkdtempSync(path.join(tmpdir(), 'pr-open-create-'));
     try {
       const bodyFile = path.join(dir, 'body.md');

@@ -1,0 +1,32 @@
+{
+  "schema": "jovie-pr-wip-policy/v1",
+  "about": "Per-producer PR WIP limits and idle expiry. A producer (the branch prefix before the first '/') may not open a new PR, and a lane may not claim a new issue, while it owns cap or more open, unheld PRs. Little's law: cap = the producer's merges per day x a 1-day target lead time, floored at minCap. Measured 2026-11-01 from the last 3 days of merges (fleet 96/day against 391 open, +69/day net growth). Retune here, not in code; pr_wip.py and pr-open.mjs both read this file.",
+  "measuredAt": "2026-11-01T00:40:00Z",
+  "targetLeadTimeDays": 1,
+  "minCap": 4,
+  "defaultCap": 6,
+  "caps": {
+    "opus": 30,
+    "glm": 20,
+    "fix": 15,
+    "feat": 10,
+    "codex": 8,
+    "compounding": 8,
+    "bot": 6,
+    "hyperagent": 5,
+    "ci": 4,
+    "claude": 4,
+    "sonnet": 4,
+    "devin": 4,
+    "grok": 4
+  },
+  "exemptProducers": ["tim", "dependabot", "revert", "gh-readonly-queue"],
+  "liveWindowHours": 48,
+  "expire": {
+    "enabled": false,
+    "about": "Off until JOV-INV-011 (automaticCloseRequiresExplicitDuplicateLabel) is amended by the founder; until then `python3 scripts/lanes/pr_wip.py expire` lists candidates and `--apply` is an explicit, authorized run.",
+    "ownerlessIdleDays": 7,
+    "anyIdleDays": 21,
+    "maxClosesPerTick": 10
+  }
+}

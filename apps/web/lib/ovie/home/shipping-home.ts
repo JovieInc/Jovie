@@ -76,6 +76,7 @@ export type OviePulseKey =
   | 'merges-hour'
   | 'queue'
   | 'red-prs'
+  | 'open-prs'
   | 'lanes'
   | 'eligible'
   | 'held'
@@ -92,6 +93,7 @@ const PULSE_ORDER: readonly OviePulseKey[] = [
   'merges-hour',
   'queue',
   'red-prs',
+  'open-prs',
   'lanes',
   'eligible',
   'held',
@@ -308,6 +310,13 @@ function rawPulse(
   const eligible = flow?.eligiblePool ?? null;
   const candidates = flow?.candidatePool ?? null;
   const ownerless = flow?.ownerless ?? null;
+  const overWip = flow?.overWipProducers ?? null;
+  const ageP95 = flow?.openPrAgeP95Hours ?? null;
+  // Days to drain the open backlog at the current merge rate (Little's law).
+  const drainDays =
+    open === null || perHour === null || perHour <= 0
+      ? null
+      : open / (perHour * 24);
 
   const lyb = lybDeploy(lanes.deployHealth);
 
@@ -366,6 +375,25 @@ function rawPulse(
             : `${red}/${open}`,
       measured: red !== null,
       tone: red === null ? 'neutral' : red === 0 ? 'good' : 'warn',
+    },
+    {
+      key: 'open-prs',
+      label: 'Open PRs',
+      value:
+        open === null
+          ? OVIE_NOT_MEASURED
+          : drainDays === null
+            ? String(open)
+            : `${open} · ${drainDays.toFixed(1)}d drain${ageP95 === null ? '' : ` · p95 ${Math.round(ageP95 / 24)}d old`}`,
+      measured: open !== null,
+      tone:
+        open === null
+          ? 'neutral'
+          : (overWip ?? 0) > 0 || (drainDays ?? 0) > 2
+            ? 'bad'
+            : (drainDays ?? 0) > 1
+              ? 'warn'
+              : 'good',
     },
     {
       key: 'merges-today',
