@@ -302,6 +302,24 @@ def verification(after: dict, attempt_epoch: float) -> dict:
             {"status": "pending", "reasons": ["no-healthy-provider-spawn"]})
 
 
+def reuse_issue(record: dict, now: float) -> str | None:
+    """The previous incident's Linear issue when it closed within the doctor's cool-off
+    (JOV-10358): a flapping condition then re-opens one issue with a "fired again" comment
+    instead of filing a duplicate every denied streak. The id is carried onto a new incident
+    only from a record that reached a terminal status with an acknowledged alert."""
+    state = record.get("alert") or {}
+    issue_id, since = state.get("reuseIssueId"), state.get("reuseSince")
+    if issue_id and isinstance(since, (int, float)) and now - since >= 0:
+        try:
+            import doctor  # lazy: the doctor transport owns the cool-off constant
+            cool_off = doctor.COOL_OFF_S
+        except Exception:  # noqa: BLE001 - the constant is the only dependency
+            cool_off = 6 * 3600
+        if now - since < cool_off:
+            return issue_id
+    return None
+
+
 def operator_alert(record: dict, issue_id: str | None = None, resolve: bool = False):
     """Reuse the doctor transport only after recovery exhausts or needs a decision."""
     try:
@@ -318,6 +336,9 @@ def operator_alert(record: dict, issue_id: str | None = None, resolve: bool = Fa
                 + ("Dispatch admission has been denied for 3+ consecutive ticks (disk-critical?); free disk, a restart will not help. "
                    if "admission-denied" in (record.get("reasons") or []) else "") +
                 "Inspect factory-watchdog.json and its journal before any manual action.")
+        reuse = reuse_issue(record, time.time())
+        if reuse:
+            return reuse if tracker.reopen(reuse, text, "factory-stay-up") else None
         return tracker.open("factory-stay-up", text)
     except Exception:
         return None
@@ -395,6 +416,7 @@ def run_once(state: Path, *, clock=time.time, monotonic=time.monotonic, sleep=ti
 
         if previous.get("status") not in ACTIVE_STATUSES:
             generation = int(previous.get("generation") or 0) + 1
+            prior_alert = previous.get("alert") if isinstance(previous.get("alert"), dict) else {}
             previous = {
                 "schema": SCHEMA,
                 "generation": generation,
@@ -408,6 +430,11 @@ def run_once(state: Path, *, clock=time.time, monotonic=time.monotonic, sleep=ti
                 "reasonFirstObservedEpoch": {reason: now for reason in health["reasons"]},
                 "before": before,
                 "attempts": [],
+                # Carry the previous incident's issue so a re-raise within the doctor's
+                # cool-off re-opens it instead of filing a duplicate (JOV-10358 flap).
+                "alert": {"status": "pending", "attempts": 0, "nextAttemptAt": 0,
+                          "reuseIssueId": prior_alert.get("issueId"),
+                          "reuseSince": parse_epoch(previous.get("recoveredAt") or previous.get("supersededAt"))},
             }
             _persist(state, previous, "incident-opened")
         else:

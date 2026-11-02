@@ -503,6 +503,13 @@ ARTIFACT_IDLE_S = 24 * 3600
 # Retired lane roots: nothing dispatches there any more, so build output is dead weight even
 # when the clone itself cannot be deleted yet (unpublished work awaiting archive).
 RETIRED_ROOT_GLOBS = ("grok-ship-workspaces/*/*", "codex-ship-workspaces/*/*", "grok-wt/*")
+# Kept clones under the agent-worktree roots on the root volume are node_modules-heavy too
+# (JOV-10348: gem root inodes forecast to the 90% limit in 2 days while kept clones under the
+# active roots held full pnpm copies forever). Their build output is regenerable and never
+# source, so the retired-root artifact prune extends to them at the same idle bar; the caller's
+# busy / keep-marker / state-referenced guards still decide. Clone-anchored globs: `wt/*` is a
+# checkout under ~/wt, `wt-*` a checkout named wt-* directly in home, `codex-worktrees/*` as listed.
+ARTIFACT_ROOT_GLOBS = RETIRED_ROOT_GLOBS + ("wt/*", "wt-*", "codex-worktrees/*")
 HEADROOM_WARN_PCT = 70
 HEADROOM_CRIT_PCT = 85
 REPORT_INTERVAL_S = 86400
@@ -625,8 +632,8 @@ def tree_kib(path: Path, run) -> int | None:
         return None
 
 
-def retired_root(home: Path, path: Path) -> bool:
-    return any(path in home.glob(pattern) for pattern in RETIRED_ROOT_GLOBS)
+def artifact_prunable_root(home: Path, path: Path) -> bool:
+    return any(path in home.glob(pattern) for pattern in ARTIFACT_ROOT_GLOBS)
 
 
 def prune_artifacts(path: Path) -> int:
@@ -669,7 +676,7 @@ def sweep_standalone(home: Path, state: Path, repos: list[Path], never: list[Pat
             verdict = standalone_verdict(path, live, run, now, state, idle_s)
             if verdict:
                 report["kept"][verdict] = report["kept"].get(verdict, 0) + 1
-                if verdict not in {"busy", "keep-marker", "state-referenced"} and retired_root(home, path) \
+                if verdict not in {"busy", "keep-marker", "state-referenced"} and artifact_prunable_root(home, path) \
                         and now - newest_touch(path) >= ARTIFACT_IDLE_S:
                     freed = prune_artifacts(path)
                     if freed:
