@@ -145,3 +145,10 @@ test('settled product decisions reach every judge prompt; none means no line', a
     /Settled product decisions/
   );
 });
+
+test('taste issues go to the strong fixer, mechanical ones to the cheap one', async () => {
+  const { fixerModel } = await import('./run.mjs');
+  assert.equal(fixerModel({ source: 'judge' }, {}), 'opus');
+  assert.equal(fixerModel({ source: 'clef-gate' }, {}), 'opus');
+  assert.equal(fixerModel({ source: 'check' }, {}), 'sonnet');
+});
