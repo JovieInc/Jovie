@@ -1712,6 +1712,7 @@ const SENTRY_AUTOFIX_RECURRENCE_LANE = [
   'scripts/sentry-autofix-intake.mjs',
   'scripts/lib/__tests__/sentry-autofix-intake.test.mjs',
   'docs/ops/SENTRY_AUTOFIX_COMMISSIONING.md',
+  'scripts/publish-coverage-report.test.mjs',
   'scripts/lib/sentry-validation-observation.mjs',
   'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
@@ -2215,7 +2216,10 @@ describe('automation-verify affected scope', () => {
           'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
           'scripts/lib/__tests__/automation-verify.test.mjs',
         ],
-        nodeTests: ['scripts/typecheck-scripts.mjs'],
+        nodeTests: [
+          'scripts/typecheck-scripts.mjs',
+          'scripts/publish-coverage-report.test.mjs',
+        ],
       }
     );
     const plan = buildAffectedTestPlan([

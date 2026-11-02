@@ -335,6 +335,7 @@ const SENTRY_AUTOFIX_RECURRENCE_PRIMARY_INPUTS = new Set([
   'scripts/sentry-autofix-intake.mjs',
   'scripts/lib/__tests__/sentry-autofix-intake.test.mjs',
   'docs/ops/SENTRY_AUTOFIX_COMMISSIONING.md',
+  'scripts/publish-coverage-report.test.mjs',
   'scripts/lib/sentry-validation-observation.mjs',
   'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
@@ -357,7 +358,10 @@ const SENTRY_AUTOFIX_RECURRENCE_SCRIPT_TESTS = [
 const SENTRY_AUTOFIX_RECURRENCE_PYTHON_TESTS = [
   'scripts/tests/test_agent_workflow_hygiene.py',
 ];
-const SENTRY_AUTOFIX_RECURRENCE_NODE_TESTS = ['scripts/typecheck-scripts.mjs'];
+const SENTRY_AUTOFIX_RECURRENCE_NODE_TESTS = [
+  'scripts/typecheck-scripts.mjs',
+  'scripts/publish-coverage-report.test.mjs',
+];
 const SAFE_PR_REMEDIATION_PRIMARY_INPUTS = new Set([
   '.github/workflows/safe-pr-remediation.yml',
   'scripts/lib/safe-pr-remediation.mjs',
