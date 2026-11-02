@@ -5,20 +5,24 @@
     {
       "id": "mac:disk-guard",
       "everyMin": 15,
-      "timeoutS": 600,
-      "argv": ["/usr/bin/python3", "{share}/mac-disk-guard/mac_disk_guard.py"]
+      "timeoutS": 2400,
+      "argv": ["/usr/bin/python3", "{share}/mac-disk-guard/mac_disk_guard.py"],
+      "disabledFile": "{state}/mac-disk-guard/disabled"
     },
     {
       "id": "mac:capacity-collector",
       "everyMin": 30,
       "timeoutS": 300,
       "okCodes": [0, 2],
-      "env": { "CAPACITY_HOST": "{capacity_host}" },
+      "env": {
+        "CAPACITY_HOST": "{capacity_host}"
+      },
       "argv": [
         "/usr/bin/python3",
         "{share}/capacity/scripts/capacity/forecast.py",
         "collect"
-      ]
+      ],
+      "disabledFile": "{state}/capacity/disabled"
     }
   ]
 }

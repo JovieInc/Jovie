@@ -58,6 +58,30 @@ class MacTickTest(unittest.TestCase):
         ok, _ = mt.run_task(T("a"), {}, run)
         self.assertFalse(ok)
 
+    def test_task_kill_switch_file_skips_the_task(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            switch = Path(d) / "disabled"
+            task = {**T("a"), "disabledFile": "{state}/disabled"}
+            ctx = {"state": d}
+            ran = []
+            run = lambda argv, **kw: ran.append(argv) or Result(0)
+            self.assertFalse(mt.task_disabled(task, ctx))
+            switch.touch()
+            self.assertTrue(mt.task_disabled(task, ctx))
+            state = mt.tick([task], {}, ctx, 1000.0, run)
+            self.assertEqual(ran, [])
+            self.assertEqual(state, {})
+
+    def test_shipped_tasks_declare_switches_and_disk_guard_outlives_its_sweep(self):
+        import json
+        tasks = {t["id"]: t for t in json.loads(
+            (Path(mt.__file__).with_name("tasks.json")).read_text())["tasks"]}
+        self.assertIn("capacity/disabled", tasks["mac:capacity-collector"]["disabledFile"])
+        self.assertIn("mac-disk-guard/disabled", tasks["mac:disk-guard"]["disabledFile"])
+        # a low-disk sweep can run pnpm store prune (1800s) before it writes its ledger
+        self.assertGreaterEqual(tasks["mac:disk-guard"]["timeoutS"], 2100)
+
 
 if __name__ == "__main__":
     unittest.main()

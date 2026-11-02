@@ -4,7 +4,8 @@
 launchd starts this every 5 minutes; it runs the tasks in tasks.json that are
 due, each with its own timeout, and records a per-task receipt so a silent task
 is visible (state.json: lastRunAt, lastOkAt, failures, ms). A failing task never
-stops the others. Kill switch: touch ~/.local/state/mac-tick/disabled.
+stops the others. Kill switches: touch ~/.local/state/mac-tick/disabled (all tasks) or
+a task's own `disabledFile` (for example ~/.local/state/capacity/disabled).
 """
 from __future__ import annotations
 
@@ -33,6 +34,12 @@ def overdue(tasks: list, state: dict, now: float) -> list:
     return out
 
 
+def task_disabled(task: dict, ctx: dict) -> bool:
+    """A task's own kill switch, so documented per-job switches still work."""
+    path = task.get("disabledFile")
+    return bool(path) and Path(expand(path, ctx)).exists()
+
+
 def expand(value: str, ctx: dict) -> str:
     for key, val in ctx.items():
         value = value.replace("{" + key + "}", val)
@@ -53,7 +60,7 @@ def run_task(task: dict, ctx: dict, run=subprocess.run) -> tuple[bool, float]:
 
 def tick(tasks: list, state: dict, ctx: dict, now: float, run=subprocess.run) -> dict:
     for task in tasks:
-        if not is_due(task, state, now):
+        if not is_due(task, state, now) or task_disabled(task, ctx):
             continue
         ok, ms = run_task(task, ctx, run)
         prev = state.get(task["id"], {})
@@ -73,7 +80,7 @@ def main() -> int:
         return 0
     state_dir.mkdir(parents=True, exist_ok=True)
     tasks = json.loads((Path(__file__).with_name("tasks.json")).read_text())["tasks"]
-    ctx = {"share": str(home / ".local/share"), "capacity_host": os.environ.get("CAPACITY_HOST", "mac")}
+    ctx = {"share": str(home / ".local/share"), "state": str(home / ".local/state"), "capacity_host": os.environ.get("CAPACITY_HOST", "mac")}
     path = state_dir / "state.json"
     try:
         state = json.loads(path.read_text())
