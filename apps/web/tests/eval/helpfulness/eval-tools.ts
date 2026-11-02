@@ -6,8 +6,10 @@
  */
 
 import { z } from 'zod';
+import { findProfileLink } from '@/lib/chat/artist-links';
 import { CHAT_ROUTE_TOOL_IDS } from '@/lib/chat/chat-tool-inventory';
 import { TOOL_SCHEMAS } from '@/lib/chat/tool-schemas';
+import { buildChannelPlan } from '@/lib/youtube/channel-plan';
 import type { EvalFixture } from './fixtures';
 
 const ROUTE_ONLY_TOOLS: Record<
@@ -80,6 +82,35 @@ function stubResult(name: string, fixture: EvalFixture): unknown {
           { name: 'Fictional Artist B', reason: 'similar audience size' },
         ],
       };
+    case 'auditYouTubeChannel': {
+      const link = findProfileLink(
+        fixture.artist.linksContext?.links ?? [],
+        'youtube'
+      );
+      if (!link) return { success: false, reason: 'no_channel_on_profile' };
+      return {
+        success: true,
+        ...buildChannelPlan({
+          channelUrl: link.url,
+          artistName: fixture.artist.displayName,
+          profileUrl: `https://jov.ie/${fixture.artist.username}`,
+          releases: fixture.releases.map(r => ({
+            title: r.title,
+            slug: r.title.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-'),
+            releaseDate: r.releaseDate,
+          })),
+          connected:
+            fixture.artist.linksContext?.connectedAccounts.includes(
+              'youtube'
+            ) ?? false,
+          connectUrl:
+            'https://app.jov.ie/api/connectors/youtube/authorize?creatorProfileId=eval&returnTo=%2Fapp%2Fchat',
+          channel: fixture.youtube?.channel ?? null,
+          topVideos: fixture.youtube?.topVideos ?? [],
+          now: new Date(),
+        }),
+      };
+    }
     case 'checkCanvasStatus':
       return {
         success: true,

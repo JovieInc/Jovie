@@ -77,6 +77,14 @@ export const TOOL_UI_REGISTRY = {
     successTitle: 'Source inspected',
     errorTitle: "Couldn't inspect that source",
   },
+  auditYouTubeChannel: {
+    label: 'YouTube',
+    uiHint: 'status',
+    renderer: 'status',
+    loadingTitle: 'Reading your channel…',
+    successTitle: 'Channel read',
+    errorTitle: "Couldn't read your channel",
+  },
   checkCanvasStatus: {
     label: 'Canvas',
     uiHint: 'status',

@@ -21,6 +21,19 @@ import { interviewSignalSchema } from './tools/onboarding-signals';
 // ---------------------------------------------------------------------------
 
 export const TOOL_SCHEMAS = {
+  auditYouTubeChannel: {
+    description:
+      "Read the artist's YouTube channel (from their profile links; never ask for the URL) and return a ranked plan of 3 to 5 concrete moves that send legacy video viewers to each song's Jovie page: description links on the most-viewed videos, Shorts from legacy hits, era playlists, pinned comments, channel description. Each move says what Jovie does now and whether finishing it needs the one-tap YouTube connect. Call this for any ask to optimize, fix, grow, audit or set up their YouTube channel.",
+    inputSchema: chatToolSchema({
+      channelUrl: z
+        .string()
+        .max(200)
+        .optional()
+        .describe(
+          'Only when the artist names a different channel than the one on their profile.'
+        ),
+    }),
+  },
   proposeAvatarUpload: {
     description:
       'Show a profile photo upload widget in the chat. Use this when the artist wants to change, update, or set their profile photo. Do not describe how to upload — just call this tool.',

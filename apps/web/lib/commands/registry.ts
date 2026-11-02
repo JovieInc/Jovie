@@ -25,6 +25,8 @@ import { isDiscoverabilityFlagEnabled } from '@/lib/flags/discoverability-flags'
  * or here (intentionally hidden) — no orphans.
  */
 export const HIDDEN_TOOLS: Readonly<Record<string, string>> = {
+  auditYouTubeChannel:
+    'Triggered conversationally from any YouTube channel ask; the plan reads the channel already on the profile.',
   checkHandle:
     'Onboarding-only follow-up after Spotify identity; not useful as a standalone slash command.',
   checkCanvasStatus:

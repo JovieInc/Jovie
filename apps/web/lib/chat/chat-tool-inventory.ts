@@ -38,6 +38,7 @@ export const CHAT_ROUTE_TOOL_IDS = [
   'importBioFromUrl',
   'inspectPressSource',
   'checkCanvasStatus',
+  'auditYouTubeChannel',
   'suggestRelatedArtists',
   'writeWorldClassBio',
   'generateCanvasPlan',
