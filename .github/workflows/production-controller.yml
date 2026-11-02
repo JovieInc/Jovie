@@ -1236,7 +1236,7 @@ jobs:
           {
             echo "superseded_before_marker=false"
           } >> "$GITHUB_OUTPUT"
-          current_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "${{ github.repository }}")"
+          current_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "${{ github.repository }}" --once)"
           [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve an exact current main SHA."
             exit 1
@@ -1347,7 +1347,7 @@ jobs:
           # Main can advance while setup runs. The workflow-level production
           # lease prevents a same-SHA rerun from mutating canonical production;
           # recheck main immediately before reading the canonical alias.
-          boundary_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "${{ github.repository }}")"
+          boundary_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "${{ github.repository }}" --once)"
           if [[ ! "$boundary_sha" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::Could not resolve exact main at the canonical verification boundary."
             exit 1
@@ -1402,7 +1402,7 @@ jobs:
           # bind proof gathered while this controller still holds the production
           # FIFO. Marker write-through happens in this same step so successful
           # verification cannot complete without local marker bytes. JOV-4442.
-          boundary_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "${{ github.repository }}")"
+          boundary_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "${{ github.repository }}" --once)"
           if [[ ! "$boundary_sha" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::Could not resolve exact main at the finalization boundary."
             exit 1
