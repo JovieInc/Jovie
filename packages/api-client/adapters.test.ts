@@ -233,6 +233,51 @@ describe('Linear adapter', () => {
 });
 
 describe('gh through the ledger', () => {
+  it('backs off free probes on secondary limits even when the core header is zero', async () => {
+    const clock = new FakeClock();
+    const store = new MemoryLedgerStore();
+    let calls = 0;
+    const run: GhRunner = async () => {
+      calls += 1;
+      const denied = calls === 1;
+      return {
+        code: denied ? 1 : 0,
+        stdout: `HTTP/2.0 ${denied ? '429 Too Many Requests' : '200 OK'}\nX-Ratelimit-Limit: 1000\nX-Ratelimit-Remaining: 0\nX-Ratelimit-Reset: ${Math.floor(clock.now / 1000) + 900}\nX-Ratelimit-Resource: core\nRetry-After: 60\n\n${denied ? 'secondary rate limit' : '{}'}`,
+        stderr: '',
+      };
+    };
+    const options = {
+      store,
+      credential: 'dual-limit',
+      run,
+      now: clock.read,
+      sleep: clock.sleep,
+      log: quiet,
+      maxWaitMs: 0,
+      priority: 'poll' as const,
+    };
+    expect(await runGh(['api', 'rate_limit'], options)).toMatchObject({
+      code: 75,
+      deferred: true,
+    });
+    expect(await runGh(['api', 'rate_limit'], options)).toMatchObject({
+      code: 75,
+      deferred: true,
+    });
+    expect(calls).toBe(1);
+    await clock.sleep(60_001);
+    expect(await runGh(['api', 'rate_limit'], options)).toMatchObject({
+      code: 0,
+      deferred: false,
+    });
+    expect(calls).toBe(2);
+    expect(await runGh(['api', 'repos/o/r'], options)).toMatchObject({
+      code: 75,
+      deferred: true,
+    });
+    expect(calls).toBe(2);
+  });
+
   it('reads free quota observations at core zero while charged calls remain shed', async () => {
     const clock = new FakeClock();
     const store = new MemoryLedgerStore();
