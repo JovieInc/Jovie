@@ -329,7 +329,7 @@ export const PRODUCT_SHOTS = [
     waitFor: '[data-testid="homepage-moment-list"] td:has-text("1h")',
     crop: [
       '[data-testid="homepage-moment-list"] th:has-text("Member")',
-      '[data-testid="homepage-moment-list"] :nth-match(:text-is("Subscriber"), 5)',
+      '[data-testid="homepage-moment-list"] tbody tr:last-child :text-is("Subscriber")',
     ],
     padding: 12,
     frame: 'window',
