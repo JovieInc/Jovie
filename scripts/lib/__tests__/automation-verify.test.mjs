@@ -8,7 +8,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseCLI } from 'vitest/node';
 import { STRUCTURAL_PYTHON_REGRESSION_COMMANDS } from '../../ci-fast-lanes.mjs';
@@ -27,8 +27,10 @@ import {
   formatAffectedTestPlanDiagnostic,
   runCommandStatus,
   runControlTestCommands,
+  selectScriptSourceClosure,
 } from '../../run-affected-tests.mjs';
 import { classifyBlogContentChanges } from '../blog-content-ci.mjs';
+import { testDependencies } from '../test-file-dependencies.mjs';
 
 const SERVICE_CENSUS_QUALIFICATION_INPUTS = [
   'scripts/lanes/service_census.py',
@@ -4316,14 +4318,192 @@ describe('deployment repair qualification regressions', () => {
     });
   }
 
-  it('retains full fallback for standalone CI runner edits and missing required proof files', () => {
-    expect(
-      buildAffectedTestPlan(['scripts/ci-fast-lanes.mjs'], available).mode
-    ).toBe('full');
+  it('retains full fallback for missing required proof files and unknown script peers', () => {
     for (const lane of [ops, packaging]) {
       expect(
         buildAffectedTestPlan(lane, { isFileAvailable: () => false }).mode
       ).toBe('full');
+    }
+    // A changed test no contract list runs is an unknown peer even beside a
+    // covered lane source: the closure stays incomplete and the existing
+    // incomplete-lane fallback keeps returning the full suite (JOV-10360).
+    expect(
+      buildAffectedTestPlan(
+        [
+          'scripts/ci-fast-lanes.mjs',
+          'scripts/lib/__tests__/not-wired-fixture.test.mjs',
+        ],
+        available
+      ).mode
+    ).toBe('full');
+  });
+});
+
+describe('script source closure selection (JOV-10360)', () => {
+  // Script-only repairs used to pay the full suite because a lane source
+  // without every manifest-listed test peer trips the incomplete-lane
+  // fallback (PR #24153: mode=full, >25 min qualification). The closure lane
+  // selects the script contract tests whose imports or reads provably reach
+  // the changed files instead. Before/after dry-run replay, recorded
+  // 2026-11-02 against the exact #24153 file set on its branch shape:
+  //   before: mode=full, fallbackReason 'incomplete or mixed focused-test
+  //           lane: scripts/ci-fast-lanes.mjs, scripts/lib/__tests__/
+  //           main-red-eject-quota-failover.test.mjs, scripts/main-red-eject.mjs'
+  //   after:  mode=selected, 13 node + 18 vitest tests, deterministic.
+  const coveredSource = 'scripts/main-red-eject.mjs';
+  const coveringTest = 'scripts/lib/__tests__/main-red-eject.test.mjs';
+  const CLOSURE_ROOT = resolve(import.meta.dirname, '..', '..', '..');
+
+  it('selects the proven dependency closure for a script-only repair', () => {
+    const changed = [coveredSource, coveringTest];
+    const plan = buildAffectedTestPlan(changed);
+    expect(plan.mode).toBe('selected');
+    expect(plan.fallbackReason).toBeUndefined();
+    // The selected tests actually execute the changed behavior: every
+    // changed source is imported or read by at least one selected test.
+    const selected = [...plan.nodeTests, ...plan.scriptVitestTests];
+    expect(selected.length).toBeGreaterThan(0);
+    for (const source of [coveredSource])
+      expect(
+        selected.some(test => testDependencies(test, CLOSURE_ROOT).has(source)),
+        `${source} must be reached by a selected test`
+      ).toBe(true);
+    expect(selected).toContain(coveringTest);
+    // No gate or threshold is bypassed: no coverage args, no forced skips.
+    expect(plan.scriptVitestCoverageArgs).toEqual([]);
+  });
+
+  it('selects the closure for a standalone lane source instead of the full suite', () => {
+    const plan = buildAffectedTestPlan(['scripts/ci-fast-lanes.mjs']);
+    expect(plan.mode).toBe('selected');
+    const selected = [...plan.nodeTests, ...plan.scriptVitestTests];
+    expect(
+      selected.some(test =>
+        testDependencies(test, CLOSURE_ROOT).has('scripts/ci-fast-lanes.mjs')
+      )
+    ).toBe(true);
+    // The list-wiring guards ride along with a ci-fast-lanes.mjs change.
+    expect(selected).toContain(
+      'scripts/lib/__tests__/ci-script-test-inventory.test.mjs'
+    );
+  });
+
+  it('keeps the full fallback for unknown peers, mixed peers and uncovered sources', () => {
+    // Unknown peer beside a covered lane source (above) and uncovered
+    // sources both stay incomplete.
+    const closure = selectScriptSourceClosure([
+      'scripts/main-red-eject.mjs',
+      'scripts/lib/__tests__/not-wired-fixture.test.mjs',
+    ]);
+    expect(closure.unknownPeers).toEqual([
+      'scripts/lib/__tests__/not-wired-fixture.test.mjs',
+    ]);
+    expect(closure.complete).toBe(false);
+    // A source no selected test reaches is never closure-eligible.
+    expect(
+      selectScriptSourceClosure(['scripts/never-created-source.mjs']).complete
+    ).toBe(false);
+    // Mixed peers: anything outside scripts/ keeps the existing fallback.
+    expect(
+      selectScriptSourceClosure([
+        'scripts/ci-fast-lanes.mjs',
+        'apps/web/lib/example.ts',
+      ]).eligible
+    ).toBe(false);
+    expect(
+      buildAffectedTestPlan([
+        'scripts/ci-fast-lanes.mjs',
+        'apps/web/lib/example.ts',
+      ]).mode
+    ).toBe('full');
+    // Python script trees have no JS dependency engine here: unknown peers.
+    expect(
+      selectScriptSourceClosure([
+        'scripts/lanes/remediation.py',
+        'scripts/tests/test_remediation.py',
+      ]).eligible
+    ).toBe(false);
+  });
+
+  it('keeps the exact selector pair lane ahead of the closure', () => {
+    const pair = [
+      'scripts/run-affected-tests.mjs',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ];
+    expect(buildAffectedTestPlan(pair).scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]);
+  });
+
+  it('fails closed when the dependency graph is unreadable', () => {
+    const closure = selectScriptSourceClosure(
+      ['scripts/main-red-eject.mjs', coveringTest],
+      {
+        isFileAvailable: () => true,
+        nodeTests: ['scripts/definitely-unreadable.test.mjs'],
+        vitestTests: [],
+      }
+    );
+    // The claimed test list cannot be read, so nothing is proven.
+    expect(closure.complete).toBe(false);
+  });
+
+  it('derives an identical closure on a second clean run', () => {
+    const changed = [coveredSource, coveringTest];
+    expect(buildAffectedTestPlan(changed)).toEqual(
+      buildAffectedTestPlan(changed)
+    );
+    expect(selectScriptSourceClosure(changed)).toEqual(
+      selectScriptSourceClosure(changed)
+    );
+  });
+
+  it('proves a synthetic positive closure end to end', () => {
+    const root = mkdtempSync(join(tmpdir(), 'script-closure-positive-'));
+    try {
+      mkdirSync(join(root, 'scripts'), { recursive: true });
+      mkdirSync(join(root, 'scripts/lib/__tests__'), { recursive: true });
+      writeFileSync(
+        join(root, 'scripts/subject.mjs'),
+        'export const answer = 42;\n'
+      );
+      writeFileSync(
+        join(root, 'scripts/lib/__tests__/subject.test.mjs'),
+        "import { answer } from '../../subject.mjs';\n"
+      );
+      const closure = selectScriptSourceClosure(
+        ['scripts/subject.mjs', 'scripts/lib/__tests__/subject.test.mjs'],
+        {
+          root,
+          nodeTests: [],
+          vitestTests: ['scripts/lib/__tests__/subject.test.mjs'],
+        }
+      );
+      expect(closure.eligible).toBe(true);
+      expect(closure.complete).toBe(true);
+      expect(closure.coveredSources).toEqual(['scripts/subject.mjs']);
+      expect(closure.unknownPeers).toEqual([]);
+      expect(closure.vitestTests).toEqual([
+        'scripts/lib/__tests__/subject.test.mjs',
+      ]);
+      // A listed test that reaches the source completes it even standalone
+      // (that is the lane's purpose); with no reaching test it is incomplete.
+      expect(
+        selectScriptSourceClosure(['scripts/subject.mjs'], {
+          root,
+          nodeTests: [],
+          vitestTests: ['scripts/lib/__tests__/subject.test.mjs'],
+        }).complete
+      ).toBe(true);
+      expect(
+        selectScriptSourceClosure(['scripts/subject.mjs'], {
+          root,
+          nodeTests: [],
+          vitestTests: [],
+        }).complete
+      ).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 });

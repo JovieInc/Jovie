@@ -6,6 +6,8 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   DELIVERY_CONTROLLER_COVERAGE_ARGS,
+  SCRIPT_CONTRACT_NODE_TESTS,
+  SCRIPT_CONTRACT_VITEST_TESTS,
   STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
 } from './ci-fast-lanes.mjs';
 import {
@@ -13,6 +15,10 @@ import {
   classifyBlogContentDiff,
   isBlogContentCandidatePath,
 } from './lib/blog-content-ci.mjs';
+import {
+  testDependencies,
+  testsAffectedBy,
+} from './lib/test-file-dependencies.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Full-suite shards are deliberately independent so one Vitest process cannot
@@ -1230,6 +1236,104 @@ const CODEX_CAPACITY_QUALIFICATION_MANIFEST = new Set([
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
 
+// JOV-10360: script files the closure lane can reason about. Python and
+// other script trees have no JS dependency engine here, so they stay unknown
+// peers and keep the existing fallback.
+const SCRIPT_SOURCE_CLOSURE_FILE = /\.(?:mjs|cjs|js|json|ts|mts)$/u;
+
+/**
+ * The dependency-proven test closure for a scripts-only diff (JOV-10360).
+ *
+ * Script-only repairs used to pay the full suite because a lane source
+ * without every manifest-listed test peer trips the incomplete-lane
+ * fallback (PR #24153: mode=full, >25 min qualification for three script
+ * files). This derives the smallest proven closure instead: the script
+ * contract tests whose imports or file reads reach the changed files.
+ *
+ * `complete` is true only when every changed source is imported or read by
+ * at least one selected test and every changed test is a test a CI contract
+ * list actually runs. Unknown peers (a source no selected test names, a test
+ * no list runs, an unreadable dependency graph) and mixed peers (any file
+ * outside scripts/, any non-JS/TS/JSON script file) return `complete: false`
+ * so the caller keeps the existing full fallback. This never bypasses a
+ * gate: it only chooses which tests run, and the exact selector-pair lane
+ * keeps precedence over it.
+ * @param {string[]} changed
+ * @param {{ nodeTests?: readonly string[], vitestTests?: readonly string[], isFileAvailable?: (file: string) => boolean, root?: string }} [options]
+ * @returns {{eligible: boolean, complete: boolean, coveredSources: string[], unknownPeers: string[], nodeTests: string[], vitestTests: string[]}}
+ */
+export function selectScriptSourceClosure(changed, options = {}) {
+  const root = options.root ?? REPO_ROOT;
+  const isFileAvailable =
+    options.isFileAvailable ?? (file => existsSync(resolve(root, file)));
+  const nodeTests = (options.nodeTests ?? SCRIPT_CONTRACT_NODE_TESTS).filter(
+    isFileAvailable
+  );
+  const vitestTests = (
+    options.vitestTests ?? SCRIPT_CONTRACT_VITEST_TESTS
+  ).filter(isFileAvailable);
+  const files = unique(changed.filter(Boolean));
+  const result = {
+    eligible: false,
+    complete: false,
+    coveredSources: [],
+    unknownPeers: [],
+    nodeTests: [],
+    vitestTests: [],
+  };
+  const changedTests = files.filter(file => VITEST_TEST_FILE.test(file));
+  const changedSources = files.filter(file => !VITEST_TEST_FILE.test(file));
+  result.eligible =
+    files.length > 0 &&
+    changedSources.length > 0 &&
+    files.every(
+      file =>
+        file.startsWith('scripts/') && SCRIPT_SOURCE_CLOSURE_FILE.test(file)
+    );
+  if (!result.eligible) return result;
+  const known = new Set([...nodeTests, ...vitestTests]);
+  result.unknownPeers = changedTests.filter(test => !known.has(test));
+  let affectedNode = [];
+  let affectedVitest = [];
+  try {
+    affectedNode = testsAffectedBy(nodeTests, files, root);
+    affectedVitest = testsAffectedBy(vitestTests, files, root);
+  } catch {
+    // An unreadable dependency graph proves nothing; keep the full fallback.
+    return result;
+  }
+  const covering = new Set([...affectedNode, ...affectedVitest]);
+  const changedKnownTests = changedTests.filter(test => known.has(test));
+  for (const test of changedKnownTests) covering.add(test);
+  const changedSourceSet = new Set(changedSources);
+  const covered = new Set();
+  try {
+    for (const test of covering)
+      for (const dependency of testDependencies(test, root))
+        if (changedSourceSet.has(dependency)) covered.add(dependency);
+  } catch {
+    return result;
+  }
+  result.coveredSources = [...covered].sort();
+  if (
+    covering.size === 0 ||
+    result.unknownPeers.length > 0 ||
+    !changedSources.every(source => covered.has(source))
+  )
+    return result;
+  result.complete = true;
+  const nodeSet = new Set(nodeTests);
+  result.nodeTests = unique([
+    ...affectedNode,
+    ...changedKnownTests.filter(test => nodeSet.has(test)),
+  ]);
+  result.vitestTests = unique([
+    ...affectedVitest,
+    ...changedKnownTests.filter(test => !nodeSet.has(test)),
+  ]);
+  return result;
+}
+
 export function buildAffectedTestPlan(changedFiles, options) {
   const files = unique(changedFiles.filter(Boolean));
   const plan = planAffectedTests(files, options);
@@ -2242,6 +2346,34 @@ function planAffectedTests(
     !mandatoryTests.every(isFileAvailable)
   ) {
     return fullSuitePlan('certification normalization proof is unavailable');
+  }
+  // JOV-10360: none of the bounded lanes above matched. For a scripts-only
+  // diff whose dependency closure is proven complete — every changed source
+  // is imported or read by a selected script contract test, every changed
+  // test is one a CI list runs — select exactly that closure instead of
+  // falling into the incomplete-lane fallback below (a lane source like
+  // ci-fast-lanes.mjs sits in several manifests, so a repair without every
+  // manifest-listed test peer used to pay the full suite; #24153 measured
+  // >25 min). The exact selector-pair lane keeps precedence; unknown or
+  // mixed peers keep the full fallback untouched.
+  const isSelectorPairOnlyDiff = files.every(file =>
+    AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
+  );
+  const scriptSourceClosure = selectScriptSourceClosure(files, {
+    isFileAvailable,
+  });
+  if (!isSelectorPairOnlyDiff && scriptSourceClosure.complete) {
+    return {
+      mode: 'selected',
+      relatedFiles: scriptSourceClosure.coveredSources,
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: scriptSourceClosure.vitestTests,
+      nodeTests: scriptSourceClosure.nodeTests,
+    };
   }
   const selectedTests = unique([
     ...(isBoundedCertificationNormalizationChange
