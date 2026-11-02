@@ -5097,6 +5097,14 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
         if last.get("main") == main or publication_revocation(host, pr.get("headRefName")) \
                 or claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
             continue
+        # Comment transport is not a verified Dependabot source generation.
+        # Keep a same-head request pending across main changes, including legacy
+        # receipts that mistook successful comment posting for recreation.
+        if dependabot and last.get("head") == pr["headRefOid"] \
+                and last.get("action") == "dependabot-recreate" \
+                and (last.get("requested") or last.get("ok")):
+            continue
+        requested = False
         # A held PR (preservation hold, live repair) is not a revisit: it took one of the few
         # per-pass slots and was ledgered as revisit-failed without any GitHub call (~334/day).
         if not dependabot and pr.get("mergeStateStatus") != "DIRTY" and pr_events.maintenance_hold(
@@ -5106,7 +5114,9 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
             action = "dependabot-recreate"
             result = sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG,
                          "--body", "@dependabot recreate"])
-            ok = result.returncode == 0
+            requested = result.returncode == 0
+            # Only observed new source can release terminal-generation fences.
+            ok = False
         elif pr.get("mergeStateStatus") == "DIRTY":
             action = "partial-main-sync"
             ok = partial_main_sync(host, pr) is not None
@@ -5119,6 +5129,8 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
                 if label in present:
                     sh(["gh", "api", "-X", "DELETE", f"repos/{REPO_SLUG}/issues/{pr['number']}/labels/{label}"])
         visit = {"at": now, "head": pr["headRefOid"], "main": main, "action": action, "ok": ok}
+        if dependabot:
+            visit["requested"] = requested
         update_json(path, lambda rows, key=str(pr["number"]), visit=visit: rows.update({key: visit}))
         pr_events.ledger(host, {"schema": "jovie-lane-run/v1", "kind": "terminal-revisit", "origin": AUTONOMOUS_ORIGIN,
                                 "attribution": {"category": "finalizer-only", "provider": "lane-event"},

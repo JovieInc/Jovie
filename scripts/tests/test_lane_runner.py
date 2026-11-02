@@ -6272,6 +6272,89 @@ class TerminalRevisitTest(unittest.TestCase):
         self.assertEqual(comments[0][-1], "@dependabot recreate")
         self.assertEqual(self.updates(), [], "never merge main into a Dependabot branch")
 
+
+    def dependabot_terminal(self):
+        spent = {"sha": "h9", "count": lane.MAX_FIX_ATTEMPTS, "escalated": True}
+        self.write("fix-attempts.json", {"9": spent})
+        return self.pr(9, headRefName="dependabot/npm_and_yarn/runtime-non-major",
+                       mergeStateStatus="DIRTY",
+                       labels=[{"name": "queue-poison"}, {"name": "lane-fix-exhausted"}])
+
+    def terminal_label_deletes(self):
+        return [args for args in self.calls if args[:4] == ["gh", "api", "-X", "DELETE"]]
+
+    def test_dependabot_request_acknowledgment_is_not_a_source_generation(self):
+        bump = self.dependabot_terminal()
+        attempts = (self.host.state / "fix-attempts.json").read_bytes()
+        self.assertEqual(lane.revisit_terminal_prs(self.host, [bump], now=TERMINAL_NOW), [9])
+        self.assertEqual(self.terminal_label_deletes(), [],
+                         "comment delivery cannot remove poison or exhausted fences")
+        visit = lane.read_json(self.host.state / "terminal-revisits.json")["9"]
+        self.assertFalse(visit["ok"])
+        self.assertTrue(visit["requested"])
+        self.assertEqual((self.host.state / "fix-attempts.json").read_bytes(), attempts)
+        ledger = [json.loads(row) for row in (self.host.state / "runs/ledger.jsonl").read_text().splitlines()]
+        self.assertEqual(ledger[-1]["verdict"], "revisit-failed",
+                         "canonical progress cannot report recreation from a comment acknowledgment")
+
+    def test_dependabot_pending_request_is_not_reissued_for_another_main(self):
+        bump = self.dependabot_terminal()
+        attempts = (self.host.state / "fix-attempts.json").read_bytes()
+        lane.revisit_terminal_prs(self.host, [bump], now=TERMINAL_NOW)
+        self.calls.clear()
+        self.main = "m2"
+        self.assertEqual(lane.revisit_terminal_prs(self.host, [bump], now=TERMINAL_NOW + 60), [])
+        self.assertFalse([args for args in self.calls if args[:3] == ["gh", "pr", "comment"]])
+        self.assertEqual(self.terminal_label_deletes(), [])
+        self.assertEqual((self.host.state / "fix-attempts.json").read_bytes(), attempts)
+
+    def test_dependabot_legacy_false_success_does_not_authorize_another_request(self):
+        bump = self.dependabot_terminal()
+        self.write("terminal-revisits.json", {"9": {
+            "head": "h9", "main": "older-main", "at": TERMINAL_NOW - 60,
+            "action": "dependabot-recreate", "ok": True}})
+        self.assertEqual(lane.revisit_terminal_prs(self.host, [bump], now=TERMINAL_NOW), [])
+        self.assertFalse([args for args in self.calls if args[:3] == ["gh", "pr", "comment"]])
+        self.assertEqual(self.terminal_label_deletes(), [])
+
+    def test_dependabot_real_new_head_can_request_without_releasing_new_fences(self):
+        bump = self.dependabot_terminal()
+        self.write("terminal-revisits.json", {"9": {
+            "head": "previous-source", "main": "older-main", "at": TERMINAL_NOW - 60,
+            "action": "dependabot-recreate", "requested": True, "ok": False}})
+        self.assertEqual(lane.revisit_terminal_prs(self.host, [bump], now=TERMINAL_NOW), [9])
+        comments = [args for args in self.calls if args[:3] == ["gh", "pr", "comment"]]
+        self.assertEqual(len(comments), 1)
+        self.assertEqual(comments[0][-1], "@dependabot recreate")
+        self.assertEqual(self.terminal_label_deletes(), [])
+        visit = lane.read_json(self.host.state / "terminal-revisits.json")["9"]
+        self.assertEqual(visit["head"], "h9")
+        self.assertTrue(visit["requested"])
+        self.assertFalse(visit["ok"])
+
+    def test_dependabot_comment_failure_preserves_attempts_and_fences(self):
+        bump = self.dependabot_terminal()
+        attempts = (self.host.state / "fix-attempts.json").read_bytes()
+        ordinary_shell = lane.sh.side_effect
+        def refuse_comment(args, **kwargs):
+            if args[:3] == ["gh", "pr", "comment"]:
+                self.calls.append(args)
+                return SimpleNamespace(returncode=1, stdout="", stderr="delivery failed")
+            return ordinary_shell(args, **kwargs)
+        with patch.object(lane, "sh", side_effect=refuse_comment):
+            self.assertEqual(lane.revisit_terminal_prs(self.host, [bump], now=TERMINAL_NOW), [9])
+        self.assertEqual(self.terminal_label_deletes(), [])
+        visit = lane.read_json(self.host.state / "terminal-revisits.json")["9"]
+        self.assertFalse(visit["ok"])
+        self.assertFalse(visit.get("requested"))
+        self.assertEqual((self.host.state / "fix-attempts.json").read_bytes(), attempts)
+
+    def test_dependabot_other_writer_lease_prevents_requests_and_fence_changes(self):
+        bump = self.dependabot_terminal()
+        with patch.object(lane, "claimed_elsewhere", return_value=True):
+            self.assertEqual(lane.revisit_terminal_prs(self.host, [bump], now=TERMINAL_NOW), [])
+        self.assertFalse([args for args in self.calls if args[:3] == ["gh", "pr", "comment"]])
+        self.assertEqual(self.terminal_label_deletes(), [])
     def test_unreadable_main_or_revoked_branch_does_nothing(self):
         self.write("fix-attempts.json", {"1": {"sha": "h1", "count": lane.MAX_FIX_ATTEMPTS, "escalated": True}})
         self.main = ""
