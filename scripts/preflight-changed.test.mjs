@@ -234,6 +234,19 @@ test('arguments parse and unknown flags fail', () => {
   assert.ok(GENERATORS.some(g => g.id === 'workflow-topology'));
 });
 
+test('route and policy changes select launch inventory regeneration before guards', () => {
+  const generator = GENERATORS.find(g => g.id === 'artist-launch-inventory');
+  assert.ok(generator);
+  for (const source of [
+    'apps/web/app/api/admin/reference-review/route.ts',
+    'scripts/artist-launch-policy.mjs',
+    'scripts/artist-launch-contract.mjs',
+    'docs/product/generated/artist-launch-inventory.json',
+  ])
+    assert.ok(generator.when.test(source), source);
+  assert.equal(generator.when.test('apps/web/lib/unrelated.ts'), false);
+});
+
 test('host-only reds are downgraded on macOS but real reds are not', () => {
   const host = {
     code: 1,
