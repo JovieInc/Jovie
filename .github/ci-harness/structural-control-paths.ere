@@ -28,6 +28,7 @@
 ^scripts/ci-
 ^scripts/brand-scrub\.py
 ^scripts/lanes/
+^scripts/(swarm/|tests/test_pr_remediation_swarm\.py$)
 ^scripts/signals/
 ^scripts/fleet-gate/
 ^scripts/tests/test_(lane_runner|design_gate|agent_workflow_hygiene|brand_scrub|gh_retry|runner_routing|vercel_prebuilt_deploy|signal_watch)\.py

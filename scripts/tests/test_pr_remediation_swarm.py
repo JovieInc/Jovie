@@ -227,6 +227,145 @@ class SwarmPolicyTest(unittest.TestCase):
         finally:
             swarm.gh_json, swarm.fetch_job_log, swarm.gh_version = saved
 
+    def test_smoke_survives_a_starved_completed_window_via_conclusion_filtered_runs(self):
+        # JOV-10201 / runs 40936622218 + 41254795498: at this repo's run rate (dozens per minute,
+        # overwhelmingly skipped/cancelled event handlers) the 20 newest completed runs are routinely
+        # ALL non-smokable, which starved the old completed-only window and failed select with "no
+        # readable completed job log". This is the reconstructed 2026-11-01T00:15:25Z snapshot. The
+        # canary must pull candidates from conclusion-filtered run lists instead, so a readable
+        # failure-run log is still reached, and must never consult the raw firehose again.
+        import contextlib, io
+        saved = (swarm.gh_json, swarm.fetch_job_log, swarm.gh_version)
+        swarm.gh_version = lambda: "2.93.0"
+        starved = ([{"id": 100 - i, "conclusion": "skipped"} for i in range(13)]
+                   + [{"id": 80 - i, "conclusion": "cancelled"} for i in range(6)]
+                   + [{"id": 87, "conclusion": "success"}])  # lone success run: all its jobs skipped
+        seen = []
+
+        def jsons(args, **kw):
+            url = args[1]
+            seen.append(url)
+            if "status=completed" in url:
+                return {"workflow_runs": starved}
+            if "/runs?" in url:
+                status = url.split("status=")[1].split("&")[0]
+                self.assertIn(status, ("failure", "success"), url)
+                return {"workflow_runs": [{"id": 7, "conclusion": "failure"}]}
+            if "/runs/87/" in url:
+                return {"jobs": [{"id": 870, "name": "gate", "conclusion": "skipped"}]}
+            return {"jobs": [{"id": 5, "name": "CI", "conclusion": "failure", "started_at": "t"}]}
+
+        swarm.gh_json = jsons
+        try:
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                swarm.fetch_job_log = lambda j: swarm._Result({"code": 0, "stdout": "log bytes", "stderr": ""})
+                self.assertEqual(swarm.cmd_smoke(None), 0)
+            self.assertIn("smoke job 5", buf.getvalue())
+            self.assertTrue(any("status=failure" in u for u in seen), seen)
+            self.assertFalse(any("status=completed" in u for u in seen), seen)
+        finally:
+            swarm.gh_json, swarm.fetch_job_log, swarm.gh_version = saved
+
+    def test_smoke_reads_all_jobs_of_a_run_not_just_the_first_ten(self):
+        # Matrix-heavy runs can open with ten skipped lanes; a first-10-jobs page misses the only
+        # smokable job. The scan must page every job of a candidate run.
+        import contextlib, io, re
+        saved = (swarm.gh_json, swarm.fetch_job_log, swarm.gh_version)
+        swarm.gh_version = lambda: "2.93.0"
+        jobs = [{"id": 900 + i, "name": f"lane {i}", "conclusion": "skipped"} for i in range(10)]
+        jobs.append({"id": 911, "name": "Unit Tests (10/10)", "conclusion": "failure", "started_at": "t"})
+
+        def jsons(args, **kw):
+            url = args[1]
+            if "/runs?" in url:
+                return {"workflow_runs": [{"id": 7, "conclusion": "failure"}]}
+            n = int(re.search(r"per_page=(\d+)", url).group(1))  # the API slices, so must the fake
+            return {"jobs": jobs[:n]}
+
+        swarm.gh_json = jsons
+        try:
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                swarm.fetch_job_log = lambda j: swarm._Result({"code": 0, "stdout": "log bytes", "stderr": ""})
+                self.assertEqual(swarm.cmd_smoke(None), 0)
+            self.assertIn("smoke job 911", buf.getvalue())
+        finally:
+            swarm.gh_json, swarm.fetch_job_log, swarm.gh_version = saved
+
+    def test_smoke_still_fails_loudly_when_the_fetch_path_is_actually_broken(self):
+        # Widening the candidate pool must not weaken the canary: eligible jobs whose log fetch fails
+        # with a real error still exit 1, now with a self-describing scan summary in the error line.
+        import contextlib, io
+        saved = (swarm.gh_json, swarm.fetch_job_log, swarm.gh_version)
+        swarm.gh_version = lambda: "2.93.0"
+
+        def jsons(args, **kw):
+            url = args[1]
+            if "/runs?" in url:
+                status = url.split("status=")[1].split("&")[0]
+                runs = [{"id": 7, "conclusion": "failure"}] if status == "failure" else []
+                return {"workflow_runs": runs}
+            return {"jobs": [{"id": 5, "name": "CI", "conclusion": "failure", "started_at": "t"},
+                             {"id": 6, "name": "Build", "conclusion": "failure", "started_at": "t"}]}
+
+        swarm.gh_json = jsons
+        try:
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                swarm.fetch_job_log = lambda j: swarm._Result({"code": 1, "stdout": "", "stderr": "gh: HTTP 403: Forbidden"})
+                self.assertEqual(swarm.cmd_smoke(None), 1)
+            out = buf.getvalue()
+            self.assertIn("no readable completed job log to smoke-test the log fetch", out)
+            self.assertIn("log_attempts=2", out)          # fetches were attempted and failed
+            self.assertIn('"failure": 1', out)            # conclusions breakdown for the next reader
+        finally:
+            swarm.gh_json, swarm.fetch_job_log, swarm.gh_version = saved
+
+    def test_smoke_caps_log_fetch_attempts_at_six(self):
+        import contextlib, io
+        saved = (swarm.gh_json, swarm.fetch_job_log, swarm.gh_version)
+        swarm.gh_version = lambda: "2.93.0"
+        fetches = []
+
+        def jsons(args, **kw):
+            url = args[1]
+            if "/runs?" in url:
+                return {"workflow_runs": [{"id": 7, "conclusion": "failure"}]}
+            return {"jobs": [{"id": 900 + i, "name": f"j{i}", "conclusion": "failure", "started_at": "t"}
+                             for i in range(8)]}
+
+        swarm.gh_json = jsons
+        try:
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                def fetch(j):
+                    fetches.append(j)
+                    return swarm._Result({"code": 1, "stdout": "", "stderr": "gh: HTTP 500"})
+                swarm.fetch_job_log = fetch
+                self.assertEqual(swarm.cmd_smoke(None), 1)
+            self.assertIn("cannot read job logs", buf.getvalue())
+            self.assertEqual(len(fetches), 6)  # bounded: the canary stops at six attempts
+        finally:
+            swarm.gh_json, swarm.fetch_job_log, swarm.gh_version = saved
+
+    def test_smoke_reports_unverified_and_passes_when_nothing_is_smokable(self):
+        # A repo with zero completed failure/success runs has no subject for the canary: the path is
+        # unverified, not broken. The old code failed select here — the same false-negative class as
+        # the starved window — so this must pass with an explicit notice instead.
+        import contextlib, io
+        saved = (swarm.gh_json, swarm.fetch_job_log, swarm.gh_version)
+        swarm.gh_version = lambda: "2.93.0"
+        swarm.gh_json = lambda args, **kw: {"workflow_runs": []}
+        try:
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                self.assertEqual(swarm.cmd_smoke(None), 0)
+            self.assertIn("log path unverified", buf.getvalue())
+            self.assertIn("::notice", buf.getvalue())
+        finally:
+            swarm.gh_json, swarm.fetch_job_log, swarm.gh_version = saved
+
     def test_claim_format_matches_the_lanes_parser(self):
         body = f"🤖 lane claim kind=fix sha=abc host={swarm.HOST} at={swarm.iso()}"
         fields = dict(p.split("=", 1) for p in body.split()[3:] if "=" in p)

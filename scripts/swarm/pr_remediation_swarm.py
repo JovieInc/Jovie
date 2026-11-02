@@ -865,8 +865,12 @@ def gh_version() -> str:
 
 def cmd_smoke(a) -> int:
     """Runner-side canary for the log path: log the gh version and fetch a known completed job's log
-    through the exact production fetch. Exits 1 (no fan-out) if the log is empty, so client drift
-    (e.g. gh refusing escape sequences) fails loudly here instead of silently skipping every PR."""
+    through the exact production fetch. Exits 1 (no fan-out) if no readable log can be found, so client
+    drift (e.g. gh refusing escape sequences) fails loudly here instead of silently skipping every PR.
+    Candidates come from conclusion-filtered run lists, never the raw completed firehose: this repo
+    creates dozens of runs per minute and the newest completed ones are overwhelmingly skipped or
+    cancelled event handlers, so a completed-only window is routinely starved of every smokable job
+    and used to fail select outright (runs 40936622218, 41254795498; JOV-10201)."""
     version = gh_version()
     parts = tuple(int(x) for x in re.findall(r"\d+", version)[:3]) or (0,)
     print(f"gh version {version} (minimum {'.'.join(map(str, MIN_GH))})")
@@ -874,25 +878,42 @@ def cmd_smoke(a) -> int:
     if parts < MIN_GH:
         print(f"::error title=swarm smoke::gh {version} is older than the supported minimum")
         return 1
-    runs = gh_json(["api", f"repos/{REPO}/actions/runs?status=completed&per_page=20"], priority="report")["workflow_runs"]
     tried = 0
-    for run in runs:
-        if run.get("conclusion") not in {"success", "failure"}:
-            continue
-        jobs = gh_json(["api", f"repos/{REPO}/actions/runs/{run['id']}/jobs?per_page=10"], priority="report")["jobs"]
-        for job in jobs:
-            if job.get("conclusion") not in {"success", "failure"} or not job.get("started_at"):
-                continue  # skipped/cancelled jobs have no log to read
-            log = fetch_job_log(job["id"])
-            size = len(log.stdout or "")
-            tried += 1
-            print(f"smoke job {job['id']} ({job['name']}): rc={log.returncode} bytes={size} err={(log.stderr or '')[:100]!r}")
-            if log.returncode == 0 and size > 0:
-                return 0
-            if "escape" in (log.stderr or "") or tried >= 6:
-                print(f"::error title=swarm smoke::job log fetch returned rc={log.returncode} bytes={size}; gh {version} cannot read job logs")
-                return 1
-    print("::error title=swarm smoke::no readable completed job log to smoke-test the log fetch")
+    scanned = 0
+    conclusions: dict[str, int] = {}
+    # Failure runs first: prepare fetches the failing checks' logs, so that is the exact production
+    # path the canary must prove. 20 conclusion-filtered runs per status, then all jobs per run.
+    for status in ("failure", "success"):
+        runs = gh_json(["api", f"repos/{REPO}/actions/runs?status={status}&per_page=20"], priority="report")["workflow_runs"]
+        for run in runs:
+            conc = run.get("conclusion") or "none"
+            conclusions[conc] = conclusions.get(conc, 0) + 1
+            scanned += 1
+            if conc not in {"success", "failure"}:
+                continue
+            # All jobs, not the first 10: matrix-heavy runs can open with ten skipped lanes.
+            jobs = gh_json(["api", f"repos/{REPO}/actions/runs/{run['id']}/jobs?per_page=100"], priority="report")["jobs"]
+            for job in jobs:
+                if job.get("conclusion") not in {"success", "failure"} or not job.get("started_at"):
+                    continue  # skipped/cancelled jobs have no log to read
+                log = fetch_job_log(job["id"])
+                size = len(log.stdout or "")
+                tried += 1
+                print(f"smoke job {job['id']} ({job['name']}): rc={log.returncode} bytes={size} err={(log.stderr or '')[:100]!r}")
+                if log.returncode == 0 and size > 0:
+                    return 0
+                if "escape" in (log.stderr or "") or tried >= 6:
+                    print(f"::error title=swarm smoke::job log fetch returned rc={log.returncode} bytes={size}; gh {version} cannot read job logs")
+                    return 1
+    if tried == 0:
+        # Nothing smokable exists anywhere (no completed failure/success run at all): the path is
+        # unverified, not broken. Failing select here would repeat the original false negative on a
+        # brand-new or fully green repo, so report it and let selection proceed.
+        print(f"::notice title=swarm smoke::no completed failure/success run to smoke-test yet "
+              f"(scanned {scanned} runs, conclusions={json.dumps(conclusions, sort_keys=True)}); log path unverified")
+        return 0
+    print(f"::error title=swarm smoke::no readable completed job log to smoke-test the log fetch "
+          f"(scanned {scanned} runs, conclusions={json.dumps(conclusions, sort_keys=True)}, log_attempts={tried})")
     return 1
 
 
