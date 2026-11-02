@@ -101,7 +101,7 @@ if (stage === 'list') {
     const calls = readFileSync(callsPath, 'utf8')
       .trim()
       .split('\n')
-      .map(JSON.parse);
+      .map(line => JSON.parse(line));
     return {
       status: result.status,
       stdout: result.stdout,
