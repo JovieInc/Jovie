@@ -560,6 +560,14 @@ Unset preserves existing placement. To roll back, remove only those three
 drop-ins and reload the user systemd configuration; active workers keep their
 existing environment until they finish. Security scans and disk guards are unchanged.
 
+The Linux wake service shares the main service's declarative environment and
+resource drop-ins through ordered `50-main-*.conf` links. Subscription pool and
+Claude-disabled policies therefore follow the same source files. The installer
+rejects command overrides, unit-specific identity specifiers, unsupported sections and collisions with operator-owned
+wake files before enabling timers. Rerunning it removes only stale managed links;
+it does not copy credentials or change their source bindings. Qualify the actual
+wake route and effective policy before activating a newly installed path watcher.
+
 Per-host knobs: `LANES_SLOTS_<PROVIDER>`, `LANES_LINEAR_ENV`, `LANES_AGENT_TIMEOUT_S`,
 `LANES_GATE_TIMEOUT_S`, `LANES_GATE_SLOTS`. A host-specific GitHub token in
 `~/.config/jovie-lanes/github.env` (`GH_TOKEN=...`) gives that host its own API budget.
