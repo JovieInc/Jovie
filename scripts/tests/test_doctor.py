@@ -293,6 +293,53 @@ class FactoryStayUpWatchdogTest(unittest.TestCase):
             self.assertEqual(len(recoveries), factory_watchdog.MAX_RECOVERY_ATTEMPTS)
             self.assertEqual(len(alerts), 1)
 
+    def test_exhausted_incident_reopens_as_a_new_bounded_generation_after_the_window(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            clock = MutableClock(3000)
+            recoveries, alerts = [], []
+            dark = factory_observation(tickEpoch=2000, tickAgeSeconds=1000,
+                                       runningWorkers=0, spawnedProviders=[])
+
+            def recover():
+                recoveries.append(clock())
+                return {"action": "restart-systemd-lanes-service", "returncodes": [1], "accepted": False}
+
+            def alert(record, issue_id, resolve):
+                alerts.append((record["status"], record["incidentId"]))
+                return "linear-incident-id"
+
+            result = None
+            for _ in range(factory_watchdog.MAX_RECOVERY_ATTEMPTS):
+                result = factory_watchdog.run_once(state, clock=clock, observe=lambda *_: dark,
+                                                   recover=recover, alert=alert)
+                clock.advance(factory_watchdog.ATTEMPT_COOLDOWN_S + 1)
+            first = result["incidentId"]
+            self.assertEqual(result["status"], "exhausted")
+            clock.advance(factory_watchdog.EXHAUSTED_REOPEN_S - 600)
+            self.assertEqual(factory_watchdog.run_once(state, clock=clock, observe=lambda *_: dark,
+                                                       recover=recover, alert=alert)["status"], "exhausted")
+            self.assertEqual(len(recoveries), factory_watchdog.MAX_RECOVERY_ATTEMPTS)
+            clock.advance(3600)
+            reopened = factory_watchdog.run_once(state, clock=clock, observe=lambda *_: dark,
+                                                 recover=recover, alert=alert)
+            self.assertNotEqual(reopened["incidentId"], first)
+            self.assertEqual(reopened["generation"], result["generation"] + 1)
+            self.assertEqual(len(recoveries), factory_watchdog.MAX_RECOVERY_ATTEMPTS + 1)
+            journal = (state / "runs" / "factory-watchdog.jsonl").read_text()
+            self.assertIn("incident-superseded", journal)
+
+    def test_exhausted_incident_then_healthy_factory_clears_after_the_window(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            factory_watchdog.atomic_write(state / "factory-watchdog.json", {
+                "schema": factory_watchdog.SCHEMA, "generation": 4, "incidentId": "gem:factory-stay-up:4",
+                "status": "exhausted", "attempts": [{"requestedEpoch": 1000}], "firstObservedEpoch": 900})
+            clock = MutableClock(1000 + factory_watchdog.EXHAUSTED_REOPEN_S + 1)
+            result = factory_watchdog.run_once(state, clock=clock, observe=lambda *_: factory_observation(),
+                                               recover=mock.Mock(), alert=lambda *_: None)
+            self.assertNotIn(result["status"], factory_watchdog.ACTIVE_STATUSES)
+
     def test_zero_provider_capacity_requires_a_decision_without_blind_restart(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = Path(tmp)
