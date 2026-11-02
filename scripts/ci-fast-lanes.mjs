@@ -343,14 +343,15 @@ export const SOURCE_GUARDS = Object.freeze([
   }),
   Object.freeze({
     // Art-direction ratchets (one accent, hue, plates, surface media, hero
-    // scroll, shadow vision judges). prOnly: merge groups run the same
+    // scroll, product-shot freshness, shadow vision judges). Product-shot
+    // source components are inputs so a UI change re-checks its shots. prOnly: merge groups run the same
     // checks via web unit tests. Path-filtered so product-only diffs skip it.
     // The glob wires every art-direction unit test, including ones added later.
     id: 'art-direction',
     command:
       'node scripts/invariants/art-direction/run.mjs && node --test scripts/invariants/art-direction/*.test.mjs',
     inputs:
-      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage)\/|apps\/web\/public\/assets\/generated\/|docs\/design-system\/taste-labels\/|apps\/web\/styles\/design-system\.css$|apps\/web\/data\/marketing\/imageColorPolicy\.ts$|design\.tokens\.json$|docs\/design-system\/motion-effects\.json$|scripts\/invariants\/art-direction\/)/u,
+      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage)\/|apps\/web\/public\/assets\/generated\/|docs\/design-system\/taste-labels\/|apps\/web\/styles\/design-system\.css$|apps\/web\/data\/marketing\/imageColorPolicy\.ts$|design\.tokens\.json$|docs\/design-system\/motion-effects\.json$|scripts\/invariants\/art-direction\/|apps\/web\/lib\/screenshots\/product-shots|apps\/web\/public\/product-shots\/|apps\/web\/scripts\/product-shots\/|apps\/web\/components\/features\/(?:demo|profile|onboarding|share|dashboard\/organisms\/onboarding)\/|apps\/web\/components\/features\/home\/homepage-profile-preview-fixture\.ts$)/u,
     prOnly: true,
   }),
   Object.freeze({

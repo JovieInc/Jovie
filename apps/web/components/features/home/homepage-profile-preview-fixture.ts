@@ -856,6 +856,17 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
     releaseActionLabel: 'Listen',
     showSubscriptionConfirmedBanner: false,
   }),
+  share: createShowcaseState({
+    id: 'share',
+    latestReleaseKey: 'live',
+    kind: 'button',
+    tone: 'quiet',
+    label: 'Share Profile',
+    helper: 'One link to copy or post anywhere.',
+    drawerView: 'share',
+    releaseActionLabel: 'Listen',
+    showSubscriptionConfirmedBanner: false,
+  }),
   'tips-open': createQuietButtonShowcaseState({
     id: 'tips-open',
     latestReleaseKey: 'none',

@@ -9,6 +9,7 @@ import {
 import { cn } from '@/lib/utils';
 import { ArtistProfileSectionHeader } from './artist-profile/ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './artist-profile/ArtistProfileSectionShell';
+import { ProductShot } from './ProductShot';
 
 import './MarketingPlatformSpecBento.css';
 
@@ -48,8 +49,6 @@ export function MarketingPlatformSpecBento({
 
         <div className='m-spec-bento__grid mt-10'>
           {PLATFORM_SPEC_TILES.map(tile => {
-            const image = getShippedSiteImage(tile.scenarioId);
-
             return (
               <article
                 key={tile.id}
@@ -60,20 +59,29 @@ export function MarketingPlatformSpecBento({
                   tile.layoutClassName
                 )}
               >
-                <div
-                  className={cn(
-                    'm-spec-bento__stage relative overflow-hidden rounded-lg',
-                    tile.kind === 'phone' && 'm-spec-bento__stage--phone'
-                  )}
-                >
-                  <Image
-                    fill
-                    src={image.publicUrl}
-                    alt={tile.alt}
-                    className='object-contain object-top'
-                    sizes='(min-width: 1280px) 40vw, (min-width: 768px) 45vw, 92vw'
+                {tile.shot ? (
+                  <ProductShot
+                    id={tile.shot}
+                    staged
+                    className='m-spec-bento__shot'
+                    sizes='(min-width: 1280px) 50rem, (min-width: 768px) 45vw, 92vw'
                   />
-                </div>
+                ) : (
+                  <div
+                    className={cn(
+                      'm-spec-bento__stage relative overflow-hidden rounded-lg',
+                      tile.kind === 'phone' && 'm-spec-bento__stage--phone'
+                    )}
+                  >
+                    <Image
+                      fill
+                      src={getShippedSiteImage(tile.scenarioId).publicUrl}
+                      alt={tile.alt}
+                      className='object-contain object-top'
+                      sizes='(min-width: 1280px) 40vw, (min-width: 768px) 45vw, 92vw'
+                    />
+                  </div>
+                )}
                 <div className='relative z-10 mt-4 max-w-sm'>
                   <h3
                     className={cn(

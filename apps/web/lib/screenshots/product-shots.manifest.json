@@ -1,0 +1,73 @@
+{
+  "schema": "jovie.product-shots/v1",
+  "shots": {
+    "profile-hero-desktop": {
+      "width": 1640,
+      "height": 1172,
+      "sourceHash": "cd03dd9a978db4dbf891bbca9c7d9d92660e3e41d1d2072e8516aa5afd815ad7",
+      "specHash": "431d2bbda1f7a334f405179ebdc85d1f63359bf2683879cf776aa248037d998c",
+      "renderedAt": "2026-11-02T02:00:02.872Z",
+      "sources": [
+        "apps/web/components/features/demo/DemoTimWhiteProfileSurface.tsx",
+        "apps/web/components/features/profile/templates/ProfileCompactTemplate.tsx",
+        "apps/web/components/features/profile/ProfileIdentityHeader.tsx",
+        "apps/web/components/features/profile/pac/ProfilePacCard.tsx"
+      ],
+      "bytes": {
+        "avif": 28848,
+        "webp": 43542
+      }
+    },
+    "setup-claim-handle": {
+      "width": 696,
+      "height": 372,
+      "sourceHash": "86855501b38cd2e53d88dddaa51b4633a80eb2af10e505af06a206a7e37a758c",
+      "specHash": "8e8165321af2f58428e0d98ae5f458702ea14d0331883630a01c31630c875ffd",
+      "renderedAt": "2026-11-02T01:59:35.919Z",
+      "sources": [
+        "apps/web/components/features/dashboard/organisms/onboarding/OnboardingHandleStep.tsx",
+        "apps/web/components/features/dashboard/organisms/onboarding-v2/shared/types.ts",
+        "apps/web/components/features/demo/DemoShowcaseSurface.tsx",
+        "apps/web/components/features/onboarding/OnboardingExperienceShell.tsx"
+      ],
+      "bytes": {
+        "avif": 8086,
+        "webp": 11838
+      }
+    },
+    "setup-connect-music": {
+      "width": 972,
+      "height": 530,
+      "sourceHash": "fda5059b1d042afb12f48c818ef5981e79a21ab3acf31ec123197dfbd0703ee3",
+      "specHash": "cc187de12e7d6b300efb2e132d4520b657a8c2f8ae04e359d7589c5978325b90",
+      "renderedAt": "2026-11-02T01:59:40.421Z",
+      "sources": [
+        "apps/web/components/features/dashboard/organisms/onboarding/OnboardingDspStep.tsx",
+        "apps/web/components/features/dashboard/organisms/onboarding-v2/shared/types.ts",
+        "apps/web/components/features/demo/DemoShowcaseSurface.tsx",
+        "apps/web/components/features/onboarding/OnboardingExperienceShell.tsx"
+      ],
+      "bytes": {
+        "avif": 10992,
+        "webp": 15938
+      }
+    },
+    "setup-share-profile": {
+      "width": 764,
+      "height": 568,
+      "sourceHash": "1db8d35ac700634bb36154fbab9eb5268610d7d07511050c57284fd1b5976ec2",
+      "specHash": "b5e7b8c2e7283ac396ec5dfc619fad20ad240bb90a4f1c4cd23a2ef7f9d8b881",
+      "renderedAt": "2026-11-02T01:59:44.160Z",
+      "sources": [
+        "apps/web/components/features/demo/DemoTimWhiteProfileSurface.tsx",
+        "apps/web/components/features/profile/ProfileUnifiedDrawer.tsx",
+        "apps/web/components/features/share/PublicShareMenu.tsx",
+        "apps/web/components/features/home/homepage-profile-preview-fixture.ts"
+      ],
+      "bytes": {
+        "avif": 5088,
+        "webp": 9178
+      }
+    }
+  }
+}

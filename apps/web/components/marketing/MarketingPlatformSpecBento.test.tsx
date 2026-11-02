@@ -4,6 +4,7 @@ import {
   PLATFORM_SPEC_BENTO_COPY,
   PLATFORM_SPEC_TILES,
 } from '@/data/marketingShowcaseSpecCopy';
+import { getProductShot } from '@/lib/screenshots/product-shots';
 import { MarketingPlatformSpecBento } from './MarketingPlatformSpecBento';
 
 describe('MarketingPlatformSpecBento', () => {
@@ -27,11 +28,15 @@ describe('MarketingPlatformSpecBento', () => {
     expect(
       screen.getByText('Preserved product demonstrations · illustrative data')
     ).toBeVisible();
+    // The adaptive tile is a registry product shot cropped to identity and
+    // the featured release, not a full-viewport desktop capture.
+    const adaptive = getProductShot('profile-hero-desktop');
     expect(
-      screen
-        .getByRole('img', { name: /demo of Tim White.*desktop/i })
-        .getAttribute('src')
-    ).toContain('tim-white-profile-live-desktop.png');
+      screen.getByRole('img', { name: adaptive.alt }).getAttribute('src')
+    ).toBe(adaptive.webp);
+    expect(
+      screen.queryByRole('img', { name: /demo of Tim White.*desktop/i })
+    ).toBeNull();
 
     const tiles = screen.getAllByTestId('platform-spec-tile');
     expect(tiles).toHaveLength(PLATFORM_SPEC_TILES.length);
