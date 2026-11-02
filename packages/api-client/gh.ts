@@ -16,7 +16,6 @@ import {
   type Failure,
   type HeaderBag,
   parseBudget,
-  retryAfterAt,
 } from './headers.ts';
 import {
   backoffMs,
@@ -286,13 +285,11 @@ export async function runGh(
         : failure.kind;
     // A primary-free endpoint cannot spend core quota. If a server throttle
     // carries an empty core header, keep the secondary breaker authoritative
-    // and honor Retry-After rather than letting every free probe through.
+    // and preserve the full provider reset/backoff window for free probes.
     const freeProbeThrottle = shape.cost === 0 && kind === 'primary';
     const settled: Failure = {
       kind: freeProbeThrottle ? 'secondary' : kind,
-      retryAtMs: freeProbeThrottle
-        ? retryAfterAt(headers, at)
-        : failure.retryAtMs,
+      retryAtMs: failure.retryAtMs,
     };
     await inLedger((s, t) => {
       observe(s, parseBudget(spec, headers, t, shape.resource), t);

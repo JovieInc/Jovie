@@ -267,6 +267,13 @@ describe('gh through the ledger', () => {
     expect(calls).toBe(1);
     await clock.sleep(60_001);
     expect(await runGh(['api', 'rate_limit'], options)).toMatchObject({
+      code: 75,
+      deferred: true,
+    });
+    expect(calls).toBe(1);
+    // Preserve the later empty-core reset as well as the secondary Retry-After.
+    await clock.sleep(840_000);
+    expect(await runGh(['api', 'rate_limit'], options)).toMatchObject({
       code: 0,
       deferred: false,
     });
