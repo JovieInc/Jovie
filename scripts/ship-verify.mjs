@@ -15,6 +15,7 @@ import {
   loadCiHarnessManifest,
   riskLocalCommands,
 } from './lib/ci-control-plane.mjs';
+import { foldVerdict } from './lib/outcome-verifier.mjs';
 
 function value(args, flag, fallback) {
   const index = args.indexOf(flag);
@@ -94,9 +95,10 @@ const receipt = {
     matchedRules: risk.matchedRules.map(rule => rule.id),
   },
   checks,
-  status: checks.every(check => check.status !== 'failed')
-    ? 'passed'
-    : 'failed',
+  dryRun,
+  // Strict fold (outcome-verifier contract): a dry run, a skipped check or an
+  // empty plan verified nothing, so it is blocked, never passed.
+  status: foldVerdict(checks.map(check => check.status)),
 };
 mkdirSync(dirname(out), { recursive: true });
 writeFileSync(out, `${JSON.stringify(receipt, null, 2)}\n`);
