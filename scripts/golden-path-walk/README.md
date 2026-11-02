@@ -7,6 +7,8 @@ gate read the same recording.
 ```sh
 CRON_SECRET=… DATABASE_URL=… node scripts/golden-path-walk/walk.mjs OUT=… # new visitor: homepage claim -> chat -> sign-up -> waitlist
 FLOW=./flow-returning.mjs EMAIL=browse-ready+clerk_test@jov.ie node scripts/golden-path-walk/walk.mjs # sign-in -> app -> profile -> chat -> billing -> pricing
+FLOW=./flow-latency.mjs EMAIL=browse-ready+clerk_test@jov.ie node scripts/golden-path-walk/walk.mjs # 6 chat turns: ms to first visible answer -> latency.json
+node scripts/golden-path-walk/latency-gate.mjs <OUT>/latency.json ~/.local/state/jovie-golden-path-cert/chat-latency-history.jsonl # p95 <= 2s; report-only until 3 passes
 node scripts/dogfood-judge/cli.mjs judge --surface waitlist-signup-to-waitlisted --run <OUT>
 ```
 
