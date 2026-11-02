@@ -54,6 +54,9 @@ vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView',
   () => ({ ShellReleasesView: () => null })
 );
+vi.mock('./DemoHomepageMomentSurface', () => ({
+  DemoHomepageMomentSurface: () => <h1>Homepage moment</h1>,
+}));
 vi.mock('./DemoAuthShell', () => ({ DemoAuthShell: () => null }));
 vi.mock('./DemoClientProviders', () => ({ DemoClientProviders: () => null }));
 vi.mock('./DemoReleaseLandingSurface', () => ({
@@ -80,6 +83,15 @@ vi.mock('./SettingsDemoHarness', () => ({ SettingsDemoHarness: () => null }));
 const { DemoShowcaseSurface } = await import('./DemoShowcaseSurface');
 
 describe('demo showcase preview loading', () => {
+  it('routes homepage moments without importing the design registry', () => {
+    expect(registryState.loaded).toBe(false);
+    render(<DemoShowcaseSurface surface='homepage-moment' />);
+    expect(
+      screen.getByRole('heading', { name: 'Homepage moment' })
+    ).toBeInTheDocument();
+    expect(registryState.loaded).toBe(false);
+  });
+
   it('defers design previews until a design surface is requested', async () => {
     expect(registryState.loaded).toBe(false);
 
