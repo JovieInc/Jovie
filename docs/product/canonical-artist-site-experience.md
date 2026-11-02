@@ -50,7 +50,7 @@ obvious action; Jovie remains supporting infrastructure.
 - Preserve the 44px target row, rail/face height, one shared moving face,
   spring behavior, and reduced-motion snap.
 
-![390px About edge state after normalization](../screenshots/jov-6571/selector-390-about.png)
+![390px About edge state after normalization](../screenshots/jov-6571/selector-390-about.png.evidence.json)
 
 **Ship now / Re-evaluate when / Then:** ship the normalized 2px optical edge
 inset now; re-evaluate only if JOV-6536 physical-iPhone evidence shows a Safari

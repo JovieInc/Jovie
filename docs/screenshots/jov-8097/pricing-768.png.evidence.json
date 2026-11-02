@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "fb301fa3e4531a82c60c3ae5066d47f6ecdc7e78f33191d4cdcb56d78fa79d42",
+  "bytes": 438244,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/fb/fb301fa3e4531a82c60c3ae5066d47f6ecdc7e78f33191d4cdcb56d78fa79d42.png",
+  "viewport": "768x3433",
+  "capturedAt": "2026-10-21T08:34:01Z",
+  "label": "docs/screenshots/jov-8097/pricing-768.png"
+}

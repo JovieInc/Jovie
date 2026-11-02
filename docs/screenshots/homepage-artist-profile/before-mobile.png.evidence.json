@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "9e5c779a2e06a0aedbfac15d9049c8a18db8901eb589f1448a63896ddaafe2fd",
+  "bytes": 404155,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/9e/9e5c779a2e06a0aedbfac15d9049c8a18db8901eb589f1448a63896ddaafe2fd.png",
+  "viewport": "360x3073",
+  "capturedAt": "2026-10-22T06:05:55Z",
+  "label": "docs/screenshots/homepage-artist-profile/before-mobile.png"
+}

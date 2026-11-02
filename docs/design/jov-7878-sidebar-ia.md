@@ -118,10 +118,10 @@ reduced motion, pointer/keyboard preview and the short mobile drawer.
 
 | State | Dark | Light |
 | --- | --- | --- |
-| Populated expanded | [Capture](../screenshots/jov-7878-shell/composed-history-dark-expanded.png) | [Capture](../screenshots/jov-7878-shell/composed-history-light-expanded.png) |
-| Populated compact | [Capture](../screenshots/jov-7878-shell/composed-history-dark-compact.png) | [Capture](../screenshots/jov-7878-shell/composed-history-light-compact.png) |
-| Populated preview | [Capture](../screenshots/jov-7878-shell/composed-history-dark-preview.png) | [Capture](../screenshots/jov-7878-shell/composed-history-light-preview.png) |
-| Empty expanded | [Capture](../screenshots/jov-7878-shell/composed-empty-history-dark-expanded.png) | [Capture](../screenshots/jov-7878-shell/composed-empty-history-light-expanded.png) |
+| Populated expanded | [Capture](../screenshots/jov-7878-shell/composed-history-dark-expanded.png.evidence.json) | [Capture](../screenshots/jov-7878-shell/composed-history-light-expanded.png.evidence.json) |
+| Populated compact | [Capture](../screenshots/jov-7878-shell/composed-history-dark-compact.png.evidence.json) | [Capture](../screenshots/jov-7878-shell/composed-history-light-compact.png.evidence.json) |
+| Populated preview | [Capture](../screenshots/jov-7878-shell/composed-history-dark-preview.png.evidence.json) | [Capture](../screenshots/jov-7878-shell/composed-history-light-preview.png.evidence.json) |
+| Empty expanded | [Capture](../screenshots/jov-7878-shell/composed-empty-history-dark-expanded.png.evidence.json) | [Capture](../screenshots/jov-7878-shell/composed-empty-history-light-expanded.png.evidence.json) |
 
 [Short mobile drawer](../screenshots/jov-7878-shell/mobile-history-short.png)
 retains one directly focusable action and a 44px touch hit area.

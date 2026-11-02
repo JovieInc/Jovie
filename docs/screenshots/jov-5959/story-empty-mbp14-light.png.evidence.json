@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "37a25b27801388bc2c26ce00bb03ae3bf602c4606f771d671836d28538c93957",
+  "bytes": 39277,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/37/37a25b27801388bc2c26ce00bb03ae3bf602c4606f771d671836d28538c93957.png",
+  "viewport": "1512x982",
+  "capturedAt": "2026-10-21T01:32:55Z",
+  "label": "docs/screenshots/jov-5959/story-empty-mbp14-light.png"
+}

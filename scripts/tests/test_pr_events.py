@@ -3101,6 +3101,26 @@ console.log(hasPremiseEvidence(readFileSync(0, 'utf8')));
         self.assertTrue(written[0].startswith(body))
         self.assertIn("- Falsifying test: " + self.PREMISE["Falsifying test"], written[0])
 
+    def test_format_measured_win_is_the_fleet_section(self):
+        section = events.format_measured_win(
+            claim="Certification screenshots leave the git tree", area="repo", theme="evidence-off-repo",
+            metric=("tracked repository bytes", "B", "lower", 4, 2, "git ls-tree", "sum sizes"),
+            verify="https://github.com/JovieInc/Jovie/pull/23631")
+        updated = events.repair_evidence_body(self.PR, "Summary\n", win_section=section,
+                                              customer_decision={"releaseWorthy": False})
+        self.assertIn("- Metric: tracked repository bytes | B | lower | 4 | 2 | git ls-tree | sum sizes\n", updated)
+        with self.assertRaises(ValueError):
+            events.format_measured_win(claim="x", area="nope", theme="t",
+                                       metric=("n", "B", "lower", 1, 0, "s", "q"), verify="https://example.com")
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { requiredWinErrors, winSectionErrors } from './scripts/lib/wins-ledger.mjs';
+const body = readFileSync(0, 'utf8');
+const pr = {title: 'feat(design): evidence', labels: ['compounding'], body};
+console.log(JSON.stringify([...requiredWinErrors(pr), ...winSectionErrors(body)]));
+"""], cwd=ROOT, input=updated, text=True, capture_output=True, check=True)
+        self.assertEqual(checked.stdout.strip(), "[]")
+
     def test_explicit_measured_win_repairs_compounding_body_and_passes_fleet(self):
         body = events.red_before_green_block(self.PR)
         updated = events.repair_evidence_body(self.PR, body, win_section=self.WIN,

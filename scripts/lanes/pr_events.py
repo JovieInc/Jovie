@@ -1062,6 +1062,27 @@ def with_red_section(body: str, block: str) -> str:
     return "\n".join(lines[:start] + block.split("\n") + [""] + lines[end:])
 
 
+_WIN_AREAS = frozenset({"ci", "queue", "release", "summer", "perf", "design", "repo", "quality", "ai"})
+
+
+def format_measured_win(*, claim: str, area: str, theme: str, metric: tuple, verify: str) -> str:
+    """Write the ## Win section Fleet Rules Evidence accepts. Numbers come from the caller."""
+    name, unit, better, before, after, source, query = metric
+    claim, theme = (" ".join(str(part).split()) for part in (claim, theme))
+    numbers = type(before) in {int, float} and type(after) in {int, float}
+    plain = all(isinstance(field, str) and field.strip() and "|" not in field for field in (name, unit, source))
+    if area not in _WIN_AREAS or better not in {"lower", "higher"} or not numbers or not plain:
+        raise ValueError("measured win needs area, lower|higher and numeric before/after")
+    if not claim or len(claim) > 200 or not theme or not str(verify).startswith("https://") or not str(query).strip():
+        raise ValueError("measured win needs a claim, theme, query and https verify URL")
+    return (
+        "## Win\n\n"
+        f"- Claim: {claim}\n- Area: {area}\n- Theme: {theme}\n"
+        f"- Metric: {name} | {unit} | {better} | {before} | {after} | {source} | {query}\n"
+        f"- Verify: {verify}\n"
+    )
+
+
 def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None,
                          locking_pr: int | None = None, win_section: str | None = None,
                          premise: dict | None = None) -> str:
@@ -1069,7 +1090,7 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
 
     The caller chooses the customer outcome and supplies any locking PR provenance;
     never infer either from a failed check. Existing locked-area decisions are preserved.
-    Measured wins must be supplied by the caller, never inferred from a red check.
+    Measured wins must be supplied by the caller via format_measured_win, never inferred from a red check.
     Premise evidence must describe the caller's actual falsifying test and observation.
     The canonical Fleet/changelog guards still validate the resulting body.
     """

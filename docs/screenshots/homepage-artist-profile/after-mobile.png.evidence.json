@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "39529ed9cded39b1a450d99e830c05efacb6f272dab11340aecc0d21dccb61bd",
+  "bytes": 390624,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/39/39529ed9cded39b1a450d99e830c05efacb6f272dab11340aecc0d21dccb61bd.png",
+  "viewport": "360x3874",
+  "capturedAt": "2026-10-22T06:05:55Z",
+  "label": "docs/screenshots/homepage-artist-profile/after-mobile.png"
+}

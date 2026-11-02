@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "4854df895ef7a8f1bd679670d801c8e80989c9e64c7d6751d2649dff287fbeea",
+  "bytes": 27267,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/48/4854df895ef7a8f1bd679670d801c8e80989c9e64c7d6751d2649dff287fbeea.png",
+  "viewport": "390x844",
+  "capturedAt": "2026-10-08T02:24:22Z",
+  "label": "docs/screenshots/jov-8009-user-rail-mobile.png"
+}

@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "8a3e5f3918432cb461ad7e821b572da50edcdadbc200356704693bbffbd820d7",
+  "bytes": 12675,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/8a/8a3e5f3918432cb461ad7e821b572da50edcdadbc200356704693bbffbd820d7.png",
+  "viewport": "390x844",
+  "capturedAt": "2026-10-15T09:55:35Z",
+  "label": "docs/screenshots/jov-8176/pending-dark.png"
+}

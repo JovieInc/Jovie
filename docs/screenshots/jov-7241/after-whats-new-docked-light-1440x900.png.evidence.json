@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "635a608954653554dc77ea7909bc40a8957b44ab12eeced61d8c5d50dda7335c",
+  "bytes": 14774,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/63/635a608954653554dc77ea7909bc40a8957b44ab12eeced61d8c5d50dda7335c.png",
+  "viewport": "1440x900",
+  "capturedAt": "2026-10-05T04:53:04Z",
+  "label": "docs/screenshots/jov-7241/after-whats-new-docked-light-1440x900.png"
+}

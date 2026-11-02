@@ -2,8 +2,15 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { validatePointer } from './lib/evidence-store.mjs';
 
 export const CENSUS_PATH = 'apps/web/data/designSystem/surfaceCensus.json';
+// Bot-owned. Per-source fingerprints and evidence-store capture pointers live
+// here, not in the census, so a PR that edits a certified route never edits a
+// shared record. Only scripts/design-surface-recertify.mjs writes this file.
+export const CERTIFICATIONS_PATH =
+  'apps/web/data/designSystem/surfaceCertifications.json';
+export const CERTIFICATIONS_SCHEMA = 'jovie.design-surface-certifications/v1';
 const DAY = 86_400_000;
 const STATUSES = ['canonical', 'migrating', 'holdout', 'intentional_exception'];
 const requireValue = (condition, message) => {
@@ -321,6 +328,54 @@ export function summarizeCensus(census, now = Date.now()) {
   };
 }
 
+export function readCertifications(root = process.cwd()) {
+  const path = join(root, CERTIFICATIONS_PATH);
+  if (!existsSync(path)) {
+    return { schema: CERTIFICATIONS_SCHEMA, entries: {} };
+  }
+  const ledger = JSON.parse(readFileSync(path, 'utf8'));
+  requireValue(
+    ledger.schema === CERTIFICATIONS_SCHEMA,
+    'Unknown certification ledger schema'
+  );
+  return ledger;
+}
+
+/**
+ * A certification entry is valid evidence only with a fingerprint and at least
+ * one well-formed, store-addressed capture per registered viewport. This is what
+ * keeps the gate's meaning when a bot, not the PR author, writes the record.
+ */
+export function validateCertificationEntry(source, entry, viewports = []) {
+  requireValue(
+    /^[0-9a-f]{64}$/.test(entry?.sourceDigest ?? ''),
+    `${source}: certification needs a sourceDigest`
+  );
+  requireValue(
+    timestamp(entry.certifiedAt),
+    `${source}: certification needs certifiedAt`
+  );
+  const captures = Array.isArray(entry.captures) ? entry.captures : [];
+  for (const capture of captures) {
+    const problems = validatePointer(capture);
+    requireValue(
+      problems.length === 0,
+      `${source}: invalid capture pointer (${problems.join('; ')})`
+    );
+  }
+  const widths = new Set(captures.map(capture => capture.viewport));
+  for (const viewport of viewports) {
+    requireValue(
+      [...widths].some(width =>
+        width?.startsWith(`${VIEWPORT_WIDTH[viewport]}x`)
+      ),
+      `${source}: certification needs a ${viewport} capture`
+    );
+  }
+}
+
+export const VIEWPORT_WIDTH = Object.freeze({ desktop: 1440, mobile: 390 });
+
 export function checkCensus(root = process.cwd(), baseRef = 'origin/main') {
   const census = JSON.parse(readFileSync(join(root, CENSUS_PATH), 'utf8'));
   const git = args =>
@@ -336,6 +391,8 @@ export function checkCensus(root = process.cwd(), baseRef = 'origin/main') {
     ? JSON.parse(git(['show', `${baseRef}:${CENSUS_PATH}`]))
     : null;
   const rows = validateCensus(census, discoverPages(root), previous);
+  const ledger = readCertifications(root);
+  const stale = [];
   for (const row of rows) {
     for (const owner of row.expectedOwners) {
       requireValue(
@@ -344,13 +401,30 @@ export function checkCensus(root = process.cwd(), baseRef = 'origin/main') {
       );
     }
     if (row.status === 'canonical') {
+      const entry = ledger.entries[row.source];
       requireValue(
-        row.evidence.sourceDigest === sourceDigest(root, row),
-        `${row.source}: source changed; renew certification evidence`
+        entry,
+        `${row.source}: canonical without a certification record; run scripts/design-surface-recertify.mjs`
       );
+      validateCertificationEntry(row.source, entry, ['desktop', 'mobile']);
+      // Source changed since certification: not certified until the bot
+      // recaptures. A PR never hand-edits the record; --strict fails on this.
+      if (entry.sourceDigest !== sourceDigest(root, row)) {
+        stale.push(row.source);
+      }
     }
   }
-  return { census, rows, summary: summarizeCensus(census) };
+  const summary = summarizeCensus(census);
+  return {
+    census,
+    rows,
+    stale,
+    summary: {
+      ...summary,
+      staleCertifications: stale.length,
+      freshCertified: summary.counts.canonical - stale.length,
+    },
+  };
 }
 
 if (process.argv[1] === import.meta.filename) {
@@ -365,4 +439,10 @@ if (process.argv[1] === import.meta.filename) {
       2
     )
   );
+  if (process.argv.includes('--strict') && result.stale.length > 0) {
+    console.error(
+      `Stale certifications (source changed, evidence not recaptured):\n${result.stale.join('\n')}`
+    );
+    process.exitCode = 1;
+  }
 }

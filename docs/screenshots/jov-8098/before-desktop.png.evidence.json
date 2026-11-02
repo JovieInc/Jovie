@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "b04b1f126b68100920355f43e4bbda3b3a466d0bf0b2f6021d42ed82a36b5a44",
+  "bytes": 111750,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/b0/b04b1f126b68100920355f43e4bbda3b3a466d0bf0b2f6021d42ed82a36b5a44.png",
+  "viewport": "1440x900",
+  "capturedAt": "2026-10-15T13:37:47Z",
+  "label": "docs/screenshots/jov-8098/before-desktop.png"
+}

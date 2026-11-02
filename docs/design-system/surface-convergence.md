@@ -89,3 +89,21 @@ Footer geometry stays fixed after hydration/fonts; navigation intentionally
 changes location. Certification checks and captures are recorded with the PR.
 Local source/browser evidence, hosted CI, merge and production certification are
 separate receipts. The census never claims this branch has deployed.
+
+## Certification evidence is bot-owned and off-repo
+
+A canonical surface's source fingerprint and screenshot pointers live in
+[`surfaceCertifications.json`](../../apps/web/data/designSystem/surfaceCertifications.json),
+not in the census. PRs never edit it. When a PR changes a certified route's
+source, the census check reports that route as stale (`staleCertifications`,
+not counted in `freshCertified`; `--strict` fails) until
+`scripts/design-surface-recertify.mjs` recaptures it after merge. The workflow
+that opens the ledger-only PR stacks on this change. A fingerprint is written
+only with a desktop (1440) and mobile (390) capture pointer.
+
+Screenshots are stored in the `jovie-evidence` R2 bucket, content-addressed, and
+the repo keeps `<name>.evidence.json` pointers (hash, URL, viewport,
+captured-at). Use `node scripts/evidence-store.mjs put <file>`; `verify --remote`
+re-hashes stored bytes. `scripts/evidence-binary-guard.mjs` fails new binaries
+under `docs/screenshots/` (corpora excepted). Bot setup: secret
+`CF_EVIDENCE_R2_TOKEN` (R2 edit on `jovie-evidence`) and var `CF_ACCOUNT_ID`.

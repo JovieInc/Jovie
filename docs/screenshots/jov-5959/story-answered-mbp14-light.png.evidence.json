@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "937588ae6890bebb1065f9c1ade2121bc767d3d5ffb6d2688c7763a4df8e4b23",
+  "bytes": 99065,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/93/937588ae6890bebb1065f9c1ade2121bc767d3d5ffb6d2688c7763a4df8e4b23.png",
+  "viewport": "1512x982",
+  "capturedAt": "2026-10-21T01:32:55Z",
+  "label": "docs/screenshots/jov-5959/story-answered-mbp14-light.png"
+}

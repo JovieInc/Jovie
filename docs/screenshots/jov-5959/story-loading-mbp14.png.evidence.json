@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "5b74a833e73386db9e5a85362e3baf3a6d0bfc896d8b27726d5d80c8d8ab62ee",
+  "bytes": 58607,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/5b/5b74a833e73386db9e5a85362e3baf3a6d0bfc896d8b27726d5d80c8d8ab62ee.png",
+  "viewport": "1512x982",
+  "capturedAt": "2026-10-21T01:32:55Z",
+  "label": "docs/screenshots/jov-5959/story-loading-mbp14.png"
+}

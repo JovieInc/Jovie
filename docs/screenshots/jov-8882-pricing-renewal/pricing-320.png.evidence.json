@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "f8208a4d23d5fefb606e4bc5a9c5c0e78685cb3b52f34fdb73b4edd8bd30c9b5",
+  "bytes": 397945,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/f8/f8208a4d23d5fefb606e4bc5a9c5c0e78685cb3b52f34fdb73b4edd8bd30c9b5.png",
+  "viewport": "320x4595",
+  "capturedAt": "2026-10-23T23:15:45Z",
+  "label": "docs/screenshots/jov-8882-pricing-renewal/pricing-320.png"
+}

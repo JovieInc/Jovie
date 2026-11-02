@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "33d4fa2f97433a7559903a9b334bbe2a7164a462d634848b6d34b02c245d35ca",
+  "bytes": 254825,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/33/33d4fa2f97433a7559903a9b334bbe2a7164a462d634848b6d34b02c245d35ca.png",
+  "viewport": "1512x982",
+  "capturedAt": "2026-10-21T01:32:55Z",
+  "label": "docs/screenshots/jov-5959/ovie-home-mbp14.png"
+}

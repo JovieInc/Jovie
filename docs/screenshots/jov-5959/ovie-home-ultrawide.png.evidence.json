@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "7cb6fc5a53faed27b5621076e7644f3fd1731f57b748b888f8f599a5ea5ba530",
+  "bytes": 365857,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/7c/7cb6fc5a53faed27b5621076e7644f3fd1731f57b748b888f8f599a5ea5ba530.png",
+  "viewport": "3440x1440",
+  "capturedAt": "2026-10-21T01:32:55Z",
+  "label": "docs/screenshots/jov-5959/ovie-home-ultrawide.png"
+}

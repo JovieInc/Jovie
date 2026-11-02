@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "16be7965ba92b98c2ead6d484991dfb84590d4a93d6e49b5c60cce0457d262c9",
+  "bytes": 16493,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/16/16be7965ba92b98c2ead6d484991dfb84590d4a93d6e49b5c60cce0457d262c9.png",
+  "viewport": "390x844",
+  "capturedAt": "2026-10-15T16:08:16Z",
+  "label": "docs/screenshots/jov-8177/chat-light-mobile.png"
+}

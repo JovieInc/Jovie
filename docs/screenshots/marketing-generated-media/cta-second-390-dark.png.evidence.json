@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "d753cd11d0ab044a497adf106cfa5c29855944ce8da62981954a5aa8b9d79c1a",
+  "bytes": 10714,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/d7/d753cd11d0ab044a497adf106cfa5c29855944ce8da62981954a5aa8b9d79c1a.png",
+  "viewport": "390x471",
+  "capturedAt": "2026-10-07T03:39:50Z",
+  "label": "docs/screenshots/marketing-generated-media/cta-second-390-dark.png"
+}
