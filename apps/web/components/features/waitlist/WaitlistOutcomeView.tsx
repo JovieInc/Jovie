@@ -5,12 +5,6 @@ import { ArrowRight, CheckCircle2, Clock3, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
-import { track } from '@/lib/analytics';
-import {
-  formatPublicPriceDisplay,
-  getPublicPriceClaim,
-} from '@/lib/billing/offer-truth';
-import { useCheckoutMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import type { WaitlistAccessOutcome } from '@/lib/waitlist/access-request';
 
@@ -30,12 +24,6 @@ interface WaitlistOutcomeViewProps {
    * only claims the handle is reserved when this is non-null.
    */
   readonly reservedHandle?: string | null;
-  /**
-   * Stripe price for the self-serve Pro offer. When present, waiting visitors
-   * can skip the waitlist by buying now: a verified payment admits them, then
-   * /billing/success sends them on to claim their link. The receipt says so.
-   */
-  readonly proCheckoutPriceId?: string | null;
 }
 
 type OutcomeCopy = {
@@ -171,75 +159,11 @@ function PrimaryCtaLink({
   );
 }
 
-export const WAITLIST_START_PRO_TEST_ID = 'waitlist-start-pro-checkout';
-
-/**
- * Paying is a skip-the-line purchase, not a fee to stay on the list: the
- * verified Stripe webhook admits a pending buyer (admitPaidUser), and
- * /billing/success sends a buyer without a link to /start. Say so next to the
- * paid CTA. Plan name and price come from offer truth (plan-prices.ts).
- */
-function StartProNote() {
-  const claim = getPublicPriceClaim('pro');
-  return (
-    <p
-      className='mt-4 text-sm leading-6 text-white/62 tabular-nums'
-      data-testid='waitlist-start-pro-note'
-    >
-      {`Want in now? ${claim.displayName} (${formatPublicPriceDisplay(claim)}) lets you skip the waitlist: setup opens as soon as payment clears.`}
-    </p>
-  );
-}
-
-/**
- * Opens the default checkout (no onboarding source), so success lands on
- * /billing/success, which routes a buyer without a claimed link to /start.
- */
-function StartProCheckoutButton({ priceId }: { readonly priceId: string }) {
-  const checkout = useCheckoutMutation();
-
-  return (
-    <div className='flex flex-col gap-2'>
-      <Button
-        type='button'
-        variant='primary'
-        size='lg'
-        disabled={checkout.isPending}
-        data-testid={WAITLIST_START_PRO_TEST_ID}
-        onClick={() => {
-          track('checkout_initiated', {
-            flow_type: 'waitlist_receipt',
-            price_id: priceId,
-          });
-          checkout.mutate(
-            { priceId },
-            {
-              onSuccess: data => {
-                globalThis.location.href = data.url;
-              },
-            }
-          );
-        }}
-      >
-        {checkout.isPending
-          ? 'Opening Checkout...'
-          : getPublicPriceClaim('pro').ctaLabel}
-      </Button>
-      {checkout.isError ? (
-        <p className='text-sm text-error' role='alert'>
-          {"Checkout didn't open. Try again in a moment."}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
 export function WaitlistOutcomeView({
   outcome,
   onRetry,
   email,
   reservedHandle,
-  proCheckoutPriceId,
 }: Readonly<WaitlistOutcomeViewProps>) {
   const copy = OUTCOME_COPY[outcome];
   const Icon = copy.icon;
@@ -251,7 +175,6 @@ export function WaitlistOutcomeView({
   const primaryHref = copy.actionHref;
   const primaryLabel = copy.actionLabel;
   const showResumeCta = Boolean(copy.showNextSteps && !primaryHref);
-  const showStartPro = Boolean(copy.showNextSteps && proCheckoutPriceId);
 
   return (
     <section className='w-full rounded-2xl border border-white/[0.08] bg-(--color-bg-surface-0) px-5 py-6 text-primary-token shadow-[0_24px_90px_rgba(0,0,0,0.38)] sm:px-6'>
@@ -265,21 +188,17 @@ export function WaitlistOutcomeView({
       </div>
       <p className='text-sm leading-6 text-white/62'>{body}</p>
       {copy.showNextSteps ? <NextSteps email={email} /> : null}
-      {showStartPro ? <StartProNote /> : null}
 
       <div className='mt-6 flex flex-col gap-2 sm:flex-row'>
         {primaryHref && primaryLabel ? (
           <PrimaryCtaLink href={primaryHref} label={primaryLabel} />
-        ) : null}
-        {showStartPro && proCheckoutPriceId ? (
-          <StartProCheckoutButton priceId={proCheckoutPriceId} />
         ) : null}
         {showResumeCta ? (
           <PrimaryCtaLink
             href={APP_ROUTES.START}
             label='Resume At Start'
             testId='waitlist-resume-start'
-            variant={showStartPro ? 'secondary' : 'primary'}
+            variant='primary'
           />
         ) : null}
         {canRetry ? (

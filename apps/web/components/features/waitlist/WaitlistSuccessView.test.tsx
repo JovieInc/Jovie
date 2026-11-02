@@ -1,15 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
-
-vi.mock('@/lib/queries', () => ({
-  useCheckoutMutation: () => ({
-    mutate: vi.fn(),
-    isPending: false,
-    isError: false,
-  }),
-}));
+import { describe, expect, it } from 'vitest';
 
 import { WaitlistSuccessView } from './WaitlistSuccessView';
 import storyMeta, {
@@ -17,10 +9,13 @@ import storyMeta, {
 } from './WaitlistSuccessView.stories';
 
 describe('WaitlistSuccessView', () => {
-  it('forwards the Pro price so a waiting visitor can buy now (JOV-7701)', () => {
-    render(<WaitlistSuccessView proCheckoutPriceId='price_pro_monthly' />);
+  it('shows no payment CTA on the waitlist confirmation (invite-only GTM)', () => {
+    render(<WaitlistSuccessView />);
 
-    expect(screen.getByTestId('waitlist-start-pro-checkout')).toBeVisible();
+    expect(screen.queryByTestId('waitlist-start-pro-checkout')).toBeNull();
+    expect(screen.queryByTestId('waitlist-start-pro-note')).toBeNull();
+    expect(screen.queryByText(/skip the waitlist/i)).toBeNull();
+    expect(screen.getByRole('link', { name: 'Resume At Start' })).toBeVisible();
   });
 
   it('does not show a saved-request confirmation for an orphaned pending account', () => {
@@ -134,9 +129,8 @@ describe('WaitlistSuccessView', () => {
     );
     expect(routeSource).toContain('<WaitlistRouteWithContract>');
     expect(routeSource).toContain('email={authResult.context.email}');
-    expect(routeSource).toContain(
-      'proCheckoutPriceId = PRICING.pro.monthly.priceId'
-    );
+    expect(routeSource).not.toContain('proCheckoutPriceId');
+    expect(routeSource).not.toContain('PRICING');
     expect(routeSource).toContain('getWaitlistRouteRedirect');
     expect(routeSource).not.toContain('notFound()');
     expect(routeSource).not.toContain('WaitlistIntakeChat');
