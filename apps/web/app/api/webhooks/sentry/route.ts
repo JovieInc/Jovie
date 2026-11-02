@@ -20,6 +20,7 @@ import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import {
   isNonActionableDestinationStreamIssue,
   isNonActionableLoopbackBetterAuthHostIssue,
+  isNonActionableOwnerIdentityVerifiedMergeGuardIssue,
   isNonActionableSpotifyReleaseCreditBoundIssue,
   isNonActionableUpstashErrorBag,
   isNonActionableUpstashIssue,
@@ -321,6 +322,23 @@ export async function POST(request: NextRequest) {
           received: true,
           skipped: true,
           reason: 'loopback-better-auth-host',
+        },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (
+      isNonActionableOwnerIdentityVerifiedMergeGuardIssue({ title, culprit })
+    ) {
+      logger.info(
+        '[Sentry Webhook] Skipping autofix for owner verified-merge guard receipt',
+        { issueId, title, culprit }
+      );
+      return NextResponse.json(
+        {
+          received: true,
+          skipped: true,
+          reason: 'owner-verified-merge-guard',
         },
         { headers: NO_STORE_HEADERS }
       );

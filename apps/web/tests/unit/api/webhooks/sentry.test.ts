@@ -509,6 +509,44 @@ describe('POST /api/webhooks/sentry', () => {
     expect(mockServerFetch).not.toHaveBeenCalled();
   });
 
+  it('skips autofix for the owner verified-merge guard receipt (JOV-10124)', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+
+    const { POST } = await import('@/app/api/webhooks/sentry/route');
+    const payload = {
+      data: {
+        issue: {
+          id: '7822218012',
+          title:
+            'Error: Owner identity requires an explicit verified profile merge',
+          culprit: 'captureWarning',
+        },
+      },
+    };
+    const body = JSON.stringify(payload);
+    const request = new Request('https://example.com/api/webhooks/sentry', {
+      method: 'POST',
+      headers: {
+        'sentry-hook-signature': sign(body),
+      },
+      body,
+    });
+
+    const response = await POST(request as never);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({
+      received: true,
+      skipped: true,
+      reason: 'owner-verified-merge-guard',
+    });
+    expect(mockServerFetch).not.toHaveBeenCalled();
+  });
+
   it('returns deduplicated response when a recent dispatch exists', async () => {
     mockAcquireRecentDispatch.mockResolvedValue({
       acquired: false,
