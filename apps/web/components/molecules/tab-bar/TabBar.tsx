@@ -17,15 +17,15 @@ import type { ReactNode } from 'react';
 import { useCallback, useState } from 'react';
 import { cn } from '@/lib/utils';
 
-/** Classname constants for drawer-variant tab styling (re-exported by DrawerTabs) */
+/** Canonical pill segmented-control tab styling (re-exported by DrawerTabs; also used by InspectorTabs). */
 export const TAB_BAR_RAIL_CLASSNAME =
-  'flex min-w-0 items-center gap-1 rounded-md border-0 bg-transparent p-0';
+  'flex min-w-0 items-center gap-0.5 rounded-full border border-(--app-shell-border)/70 bg-(--surface-0)/70 p-0.5';
 
 export const TAB_BAR_DRAWER_TRIGGER_CLASSNAME =
-  'inline-flex min-h-7 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-md border border-transparent bg-transparent px-2.5 py-1 text-2xs font-caption tracking-tight text-tertiary-token shadow-none transition-[background-color,border-color,color] duration-subtle hover:border-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/35';
+  'inline-flex h-7 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border-0 bg-transparent px-3 text-2xs font-caption tracking-tight text-tertiary-token shadow-none transition-colors duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/35';
 
 export const TAB_BAR_DRAWER_TRIGGER_ACTIVE_CLASSNAME =
-  'border-subtle bg-surface-0 font-medium text-primary-token';
+  'bg-(--surface-2) font-medium text-primary-token ring-1 ring-inset ring-(--app-shell-border)';
 
 export const TAB_BAR_SEGMENT_TRIGGER_CLASSNAME =
   'inline-flex h-7 shrink-0 items-center justify-center whitespace-nowrap rounded-full border-0 bg-transparent px-2.5 text-xs font-caption tracking-tight text-tertiary-token transition-[background-color,color] duration-fast hover:bg-surface-0 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16';
@@ -218,7 +218,7 @@ export function TabBar<T extends string>({
                     />
                   </DropdownMenuTrigger>
                 </TooltipTrigger>
-                <TooltipContent side='bottom' className='text-xs'>
+                <TooltipContent side='bottom'>
                   {overflowLabelText}
                 </TooltipContent>
               </Tooltip>

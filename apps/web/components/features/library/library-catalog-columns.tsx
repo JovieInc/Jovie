@@ -116,11 +116,14 @@ export function resolveLibraryStatusGlyph(
 export const LibraryStatusGlyph = memo(function LibraryStatusGlyph({
   asset,
   showLabel = false,
+  labelOverride,
   className,
 }: {
   readonly asset: LibraryReleaseAsset;
   /** Visible words, for the inspector only; elsewhere the glyph speaks. */
   readonly showLabel?: boolean;
+  /** Visible words only; the tooltip keeps the full phrase. */
+  readonly labelOverride?: string;
   readonly className?: string;
 }) {
   const { state, label } = resolveLibraryStatusGlyph(asset);
@@ -129,7 +132,7 @@ export const LibraryStatusGlyph = memo(function LibraryStatusGlyph({
       state={state}
       size='md'
       tooltipLabel={label}
-      label={showLabel ? label : undefined}
+      label={showLabel ? (labelOverride ?? label) : undefined}
       data-testid={`library-status-glyph-${asset.id}`}
       className={className}
     />
