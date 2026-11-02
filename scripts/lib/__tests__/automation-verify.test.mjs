@@ -4037,6 +4037,33 @@ describe('automation-verify affected scope', () => {
     });
   });
 
+  describe('homepage discovery copy binding', () => {
+    const source = 'apps/web/data/homepageSearchCopy.ts';
+    const producer = 'apps/web/components/homepage/HomepageNameSearch.test.tsx';
+
+    it('executes the real component behavior producer for discovery copy', () => {
+      const plan = buildAffectedTestPlan([source]);
+      expect(plan.mode).toBe('selected');
+      expect(plan.mandatoryTests).toEqual([producer]);
+      expect(plan.selectedTests).toEqual([producer]);
+      expect(plan.fallbackReason).toBeUndefined();
+    });
+
+    it('fails closed when the behavior producer is unavailable or another unknown data file changes', () => {
+      expect(
+        buildAffectedTestPlan([source], {
+          isFileAvailable: file => file !== producer,
+        }).mode
+      ).toBe('full');
+      expect(
+        buildAffectedTestPlan([
+          source,
+          'apps/web/data/homepageSearchCopy-neighbor.ts',
+        ]).mode
+      ).toBe('full');
+    });
+  });
+
   describe('homepage front-door copy bindings', () => {
     const frontDoor = 'apps/web/data/homepageFrontDoorCta.ts';
     const homepageCopy = 'apps/web/data/homepageV2Copy.ts';
