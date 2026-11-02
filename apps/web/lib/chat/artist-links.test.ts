@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildProfileLinksPromptSection,
   findProfileLink,
   MAX_PROMPT_LINKS,
   normalizeProfileLinks,
 } from './artist-links';
+import { buildProfileLinksPromptSection } from './system-prompt';
 
 describe('normalizeProfileLinks', () => {
   it('dedupes scheme, www and trailing-slash variants and drops blanks', () => {

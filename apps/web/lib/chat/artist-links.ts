@@ -59,36 +59,3 @@ export function findProfileLink(
   if (matches.length === 0) return null;
   return matches.find(link => /\/@[^/]+/.test(link.url)) ?? matches[0] ?? null;
 }
-
-const CONNECTABLE_ACCOUNTS: readonly { id: string; label: string }[] = [
-  { id: 'youtube', label: 'YouTube' },
-  { id: 'spotify', label: 'Spotify' },
-];
-
-/**
- * Prompt section: the exact links and connections, so the model never asks for
- * a URL the profile already has or sends the artist to a settings page.
- */
-export function buildProfileLinksPromptSection(
-  context: ArtistLinksContext | undefined
-): string {
-  const links = context?.links ?? [];
-  const connected = new Set(context?.connectedAccounts ?? []);
-  const linkLines =
-    links.length > 0
-      ? links
-          .slice(0, MAX_PROMPT_LINKS)
-          .map(link => `- ${link.platform}: ${link.url}`)
-          .join('\n')
-      : '- none yet';
-  const connectionLines = CONNECTABLE_ACCOUNTS.map(
-    account =>
-      `- ${account.label}: ${connected.has(account.id) ? 'connected (OAuth)' : 'not connected (public data only)'}`
-  ).join('\n');
-  return `## Profile Links (live on their Jovie profile)
-${linkLines}
-
-## Connected Accounts
-${connectionLines}
-These are facts you already have. Never ask the artist for a link listed above, and never say you cannot see which platforms they use. A listed link is enough to work from public data; a connection only adds write access and private analytics.`;
-}
