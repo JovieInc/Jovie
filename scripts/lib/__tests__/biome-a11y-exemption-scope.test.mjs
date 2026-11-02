@@ -76,11 +76,15 @@ const REMAINING_GLOB_A11Y_INCLUDES = [
   '**/scripts/**',
 ];
 
-function runBiome(paths) {
-  return spawnSync(BIOME_BIN, ['check', '--reporter=json', ...paths], {
-    cwd: REPO_ROOT,
-    encoding: 'utf8',
-  });
+function runBiome(paths, options = []) {
+  return spawnSync(
+    BIOME_BIN,
+    ['check', '--reporter=json', ...options, ...paths],
+    {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    }
+  );
 }
 
 function parseBiomeReport(result) {
@@ -149,7 +153,10 @@ describe('Biome a11y exemption scope', () => {
         return file;
       });
       // One Biome process for every probe; each file must still fail on its own.
-      const byPath = a11yCategoriesByPath(parseBiomeReport(runBiome(probes)));
+      // Only external temporary probes bypass VCS discovery, not production files.
+      const result = runBiome(probes, ['--vcs-enabled=false']);
+      expect(result.status, result.stderr).toBe(1);
+      const byPath = a11yCategoriesByPath(parseBiomeReport(result));
       for (const file of probes) {
         expect((byPath.get(file) ?? []).join('\n'), file).toMatch(
           /lint\/a11y\/(noStaticElementInteractions|noNoninteractiveElementInteractions|useKeyWithClickEvents)/

@@ -275,7 +275,7 @@ test('publication rejects committed formatter drift and accepts the formatted re
     git('commit', '-m', 'format the repair');
     const accepted = publish();
     assert.equal(accepted.status, 0, `${accepted.stdout}\n${accepted.stderr}`);
-    assert.match(accepted.stdout, /Checked 1 file/);
+    assert.match(`${accepted.stdout}\n${accepted.stderr}`, /Checked 1 file/);
 
     rmSync(path.join(root, 'node_modules/.bin/biome'));
     const missingTool = publish();

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { describe, it } from 'node:test';
@@ -13,11 +13,36 @@ const BIOME = resolve(REPO_ROOT, 'node_modules/@biomejs/biome/bin/biome');
 function biomeAccepts(text) {
   const dir = mkdtempSync(join(tmpdir(), 'biome-json-'));
   const path = join(dir, 'sample.json');
-  writeFileSync(path, text);
-  execFileSync(BIOME, ['check', path], { encoding: 'utf8' });
+  try {
+    writeFileSync(path, text);
+    // These fixtures live outside the checkout and have no Git/ignore contract.
+    // Biome 2.6+ requires VCS paths to stay beneath its repository root.
+    return execFileSync(BIOME, ['check', '--vcs-enabled=false', path], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 describe('formatBiomeJson', () => {
+  it('rejects formatter drift in temporary JSON fixtures', () => {
+    assert.throws(
+      () => biomeAccepts('{"value":[1,2]}\n'),
+      error =>
+        error.status === 1 && /Formatter would have printed/.test(error.stderr)
+    );
+  });
+
+  it('rejects invalid JSON in temporary fixtures', () => {
+    assert.throws(
+      () => biomeAccepts('{\n  "value":\n}\n'),
+      error => error.status === 1 && /parse/.test(error.stderr)
+    );
+  });
+
   it('collapses a primitive array onto one line when that line fits in 80 columns', () => {
     const value = {
       growthTrend: 'unknown',

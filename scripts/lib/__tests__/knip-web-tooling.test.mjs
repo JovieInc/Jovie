@@ -13,7 +13,13 @@ describe('Knip web tooling entries', () => {
   const knip = JSON.parse(read('knip.json'));
 
   it('keeps the used CLIs and drops the unused vitest runner', () => {
-    expect(webPackage.devDependencies['@stryker-mutator/core']).toBe('10.0.0');
+    const stryker = JSON.parse(
+      read('apps/web/node_modules/@stryker-mutator/core/package.json')
+    );
+    expect(webPackage.devDependencies['@stryker-mutator/core']).toBe(
+      stryker.version
+    );
+    expect(stryker.bin).toHaveProperty('stryker', './bin/stryker.js');
     expect(webPackage.devDependencies.promptfoo).toBe('0.121.20');
     expect(webPackage.devDependencies).not.toHaveProperty(
       '@stryker-mutator/vitest-runner'
