@@ -71,6 +71,10 @@
     {
       "path": "/api/cron/artist-daily-snapshots",
       "schedule": "15 9 * * *"
+    },
+    {
+      "path": "/api/cron/track-daily-snapshots",
+      "schedule": "25 9 * * *"
     }
   ],
   "functions": {
