@@ -215,15 +215,19 @@ async function route(request: Request, env: Env): Promise<Response> {
       Date.parse(url.searchParams.get('since') ?? '') ||
       Date.now() - 86_400_000;
     const limit = Number(url.searchParams.get('limit') ?? LIMITS.pageSize);
-    const messages = await mailbox(env, kind).history(
+    const after = Number(url.searchParams.get('after') ?? 0);
+    const { messages, nextAfter } = await mailbox(env, kind).history(
       since,
-      Number.isFinite(limit) && limit > 0 ? limit : LIMITS.pageSize
+      Number.isFinite(limit) && limit > 0 ? limit : LIMITS.pageSize,
+      Number.isFinite(after) && after > 0 ? after : 0
     );
     return json(200, {
       ok: true,
       recipient: kind,
       dataNotInstructions: true,
       messages,
+      // Non-null means the page was full: repeat with ?after=<nextAfter>.
+      nextAfter,
     });
   }
   if (

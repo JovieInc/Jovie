@@ -252,7 +252,12 @@ export class Registry extends DurableObject<Env> {
     const agents = this.sql
       .exec("SELECT * FROM agents WHERE status = 'active' AND kind != 'summer'")
       .toArray();
-    const pending: { type: string; kind: string; detail: Detail }[] = [];
+    const pending: {
+      type: string;
+      kind: string;
+      detail: Detail;
+      revert?: () => void;
+    }[] = [];
     let heartbeatAgents = 0;
     for (const agent of agents) {
       const kind = String(agent.kind);
@@ -275,6 +280,8 @@ export class Registry extends DurableObject<Env> {
         connected: live.connected,
         lastPingAt: live.lastPingAt,
         lastActivityAt: live.lastActivityAt,
+        registeredAt:
+          agent.updated_at === null ? null : Number(agent.updated_at),
       });
       if (presence.state !== agent.state)
         this.sql.exec(
@@ -283,7 +290,14 @@ export class Registry extends DurableObject<Env> {
           now,
           kind
         );
-      if (presence.event)
+      if (presence.event) {
+        const previous = {
+          state: String(agent.state),
+          changedAt:
+            agent.state_changed_at === null
+              ? null
+              : Number(agent.state_changed_at),
+        };
         pending.push({
           type: presence.event,
           kind,
@@ -291,9 +305,30 @@ export class Registry extends DurableObject<Env> {
             lastAliveAt: presence.lastAliveAt,
             unhandled: live.unhandled,
           },
+          // If the event cannot be recorded, undo the transition so the next
+          // sweep sees it again instead of losing the alert.
+          revert: () =>
+            this.sql.exec(
+              'UPDATE agents SET state = ?, state_changed_at = ? WHERE kind = ?',
+              previous.state,
+              previous.changedAt,
+              kind
+            ),
         });
-      if (Number(agent.probe))
-        await this.probe(kind, live, Number(agent.probe_misses), now, pending);
+      }
+      if (Number(agent.probe)) {
+        try {
+          await this.probe(
+            kind,
+            live,
+            Number(agent.probe_misses),
+            now,
+            pending
+          );
+        } catch {
+          // One unreachable mailbox must not abort the sweep for every agent.
+        }
+      }
     }
     // Storm guard: many agents going silent at once is a hub/network fault, not N outages.
     const silenced = pending.filter(event => event.type === 'agent.silent');
@@ -306,17 +341,31 @@ export class Registry extends DurableObject<Env> {
       for (const event of pending.filter(
         event => event.type !== 'agent.silent'
       )) {
-        await this.recordEvent(event.type, event.kind, event.detail);
-        emitted++;
+        if (await this.emit(event)) emitted++;
       }
     } else {
       for (const event of pending) {
-        await this.recordEvent(event.type, event.kind, event.detail);
-        emitted++;
+        if (await this.emit(event)) emitted++;
       }
     }
     this.setMeta('lastSweepAt', String(now));
     return { checked: agents.length, events: emitted };
+  }
+
+  /** Records a sweep event; on failure undoes its state change so it is retried. */
+  private async emit(event: {
+    type: string;
+    kind: string;
+    detail: Detail;
+    revert?: () => void;
+  }): Promise<boolean> {
+    try {
+      await this.recordEvent(event.type, event.kind, event.detail);
+      return true;
+    } catch {
+      event.revert?.();
+      return false;
+    }
   }
 
   private async probe(
@@ -324,7 +373,12 @@ export class Registry extends DurableObject<Env> {
     live: Liveness,
     misses: number,
     now: number,
-    pending: { type: string; kind: string; detail: Detail }[]
+    pending: {
+      type: string;
+      kind: string;
+      detail: Detail;
+      revert?: () => void;
+    }[]
   ) {
     const result = evaluateProbe({
       now,
@@ -343,6 +397,12 @@ export class Registry extends DurableObject<Env> {
         type: result.event,
         kind,
         detail: { misses: result.misses },
+        revert: () =>
+          this.sql.exec(
+            'UPDATE agents SET probe_misses = ? WHERE kind = ?',
+            misses,
+            kind
+          ),
       });
     if (!result.sendNew) return;
     const body = JSON.stringify({

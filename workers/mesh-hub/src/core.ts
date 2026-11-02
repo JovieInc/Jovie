@@ -422,6 +422,11 @@ export class MailboxStore {
       .map(toDelivered);
   }
 
+  /** Un-flags a message whose dead-letter notification failed, so the next sweep retries it. */
+  clearDead(seq: number): void {
+    this.sql.exec('UPDATE messages SET dead_at = NULL WHERE seq = ?', seq);
+  }
+
   /**
    * Flags messages unhandled past `deadAfterMs` as dead, once. Dead is a flag,
    * not a deletion: the original stays deliverable. Probes, events and DLQ
