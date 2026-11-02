@@ -7,9 +7,9 @@ const meta = {
   title: 'Dashboard/Opportunity Inbox/Empty State',
   component: OpportunityInboxEmptyState,
   parameters: { layout: 'fullscreen' },
-  render: args => (
+  render: () => (
     <div className='flex h-[32rem] bg-(--app-shell-content-surface)'>
-      <OpportunityInboxEmptyState {...args} />
+      <OpportunityInboxEmptyState />
     </div>
   ),
 } satisfies Meta<typeof OpportunityInboxEmptyState>;
