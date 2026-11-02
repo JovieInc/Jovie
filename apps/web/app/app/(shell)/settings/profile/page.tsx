@@ -1,7 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
 import { PreviewDataHydrator } from '@/features/dashboard/organisms/PreviewDataHydrator';
-import { listArtistRulesForProfile } from '@/lib/artist-rules/store';
-import type { ArtistRuleView } from '@/lib/artist-rules/types';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import { loadAppShellRouteContext } from '../../app-shell-route-context';
 import { getProfileSocialLinks } from '../../dashboard/actions';
@@ -10,12 +8,7 @@ import { ArtistProfileContent } from './ArtistProfileContent';
 
 export const runtime = 'nodejs';
 
-export default async function SettingsProfilePage({
-  searchParams,
-}: {
-  readonly searchParams: Promise<{ readonly rules?: string }>;
-}) {
-  const params = await searchParams;
+export default async function SettingsProfilePage() {
   const routeContext = await loadAppShellRouteContext({
     route: APP_ROUTES.SETTINGS_PROFILE,
     dashboardErrorLogMessage:
@@ -32,9 +25,6 @@ export default async function SettingsProfilePage({
   const initialLinks = profileId
     ? await getProfileSocialLinks(profileId).catch(() => [])
     : [];
-  const initialArtistRules: readonly ArtistRuleView[] = profileId
-    ? await listArtistRulesForProfile(profileId).catch(() => [])
-    : [];
 
   const connectedDSPs = dashboardData.selectedProfile
     ? getCanonicalProfileDSPs(dashboardData.selectedProfile, initialLinks)
@@ -47,11 +37,7 @@ export default async function SettingsProfilePage({
         initialLinks={initialLinks}
         connectedDSPs={connectedDSPs}
       />
-      <ArtistProfileContent
-        creatorProfileId={profileId ?? 'unavailable'}
-        initialArtistRules={initialArtistRules}
-        defaultRulesOpen={params.rules === '1'}
-      />
+      <ArtistProfileContent />
     </>
   );
 }

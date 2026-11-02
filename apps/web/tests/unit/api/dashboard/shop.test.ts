@@ -55,6 +55,10 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: hoisted.captureErrorMock,
 }));
 
+vi.mock('@/lib/launch/launch-enforcement', () => ({
+  deferredLaunchRefusal: () => null,
+}));
+
 vi.mock('@/lib/http/headers', () => ({
   NO_STORE_HEADERS: { 'Cache-Control': 'no-store' },
 }));

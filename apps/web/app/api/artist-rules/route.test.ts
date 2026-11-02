@@ -20,6 +20,11 @@ vi.mock('@/lib/artist-rules/store', () => ({
   revokeArtistRule: mocks.revokeArtistRule,
 }));
 vi.mock('@/lib/db', () => ({ db: {} }));
+// Exercise retained route behavior after launch promotion. The real deferred
+// boundary is covered in tests/unit/launch/launch-enforcement.test.ts.
+vi.mock('@/lib/launch/launch-enforcement', () => ({
+  deferredLaunchRefusal: () => null,
+}));
 
 import { DELETE, PATCH, POST } from './route';
 
