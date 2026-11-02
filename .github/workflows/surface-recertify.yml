@@ -82,11 +82,46 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - uses: ./.github/actions/setup-playwright
 
-      # Same no-secret public-route mode the local certification runs use: no
-      # database, mocked auth keys. Evidence is for public marketing routes.
+      # App routes need a real database for the test-auth persona; with the
+      # old noop URL /app/* redirected to /signin and the sign-in page was
+      # certified as the app surface. Same ephemeral branch recipe as
+      # visual-regression.yml and e2e-full-matrix.yml.
+      - name: Create ephemeral Neon database branch
+        id: neon-branch
+        uses: ./.github/actions/neon-create-branch-with-retry
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: surface-recertify-${{ github.run_id }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+          expires_in_hours: '3'
+
+      - name: Fail if the Neon database URL is missing
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+        run: |
+          if [[ -z "$DATABASE_URL" ]]; then
+            echo "::error::No ephemeral Neon DATABASE_URL; app surfaces cannot be signed in."
+            exit 1
+          fi
+
+      - name: Run migrations (ephemeral Neon)
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+          GIT_BRANCH: surface-recertify-${{ github.run_id }}
+          ALLOW_PROD_MIGRATIONS: 'true'
+
+      - name: Seed QA fixtures
+        run: pnpm --filter=@jovie/web run seed:test-data
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+
       - name: Start the app
         env:
-          DATABASE_URL: postgresql://localhost/noop
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
           NEXT_DISABLE_TOOLBAR: '1'
           E2E_USE_TEST_AUTH_BYPASS: '1'
           E2E_CLERK_USER_ID: user_test
@@ -98,7 +133,15 @@ jobs:
           nohup node apps/web/scripts/dev-fast.mjs > "$RUNNER_TEMP/dev.log" 2>&1 &
           for i in $(seq 1 60); do
             code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 120 http://localhost:3917/ || true)"
-            [ "$code" = 200 ] && exit 0
+            if [ "$code" = 200 ]; then
+              # Prove test sign-in works before any capture; a 500 here is the
+              # silent-redirect failure this job used to certify.
+              auth="$(curl -s -o /dev/null -w '%{http_code}' --max-time 240 -X POST -H 'content-type: application/json' --data '{"persona":"creator-ready"}' http://localhost:3917/api/dev/test-auth/session || true)"
+              if [ "$auth" = 200 ]; then exit 0; fi
+              echo "::error::test sign-in returned HTTP $auth"
+              tail -50 "$RUNNER_TEMP/dev.log"
+              exit 1
+            fi
             sleep 5
           done
           tail -50 "$RUNNER_TEMP/dev.log"
@@ -145,7 +188,7 @@ jobs:
           cat > "$RUNNER_TEMP/body.md" <<BODY
           ## Summary
 
-          no Linear issue — automatic recertification (compounding). A push to main (${GITHUB_SHA:0:9}) changed the source or owners of certified surface(s): ${renewed}. \`design-surface-census.test.mjs\` fails for every PR until their \`sourceDigest\` is renewed, so the Surface Recertify bot rendered each route (Next dev build of that commit, Chromium), captured 1440 and 390 full-page evidence, validated it (HTTP 200, no horizontal overflow, no page errors) and wrote the digest with the census module's own \`sourceDigest\`.
+          no Linear issue — automatic recertification (compounding). A push to main (${GITHUB_SHA:0:9}) changed the source or owners of certified surface(s): ${renewed}. \`design-surface-census.test.mjs\` fails for every PR until their \`sourceDigest\` is renewed, so the Surface Recertify bot rendered each route (Next dev build of that commit, Chromium), captured 1440 and 390 full-page evidence, validated it (HTTP 200, test sign-in for app routes, no redirect away from the route, no horizontal overflow, no page errors) and wrote the digest with the census module's own \`sourceDigest\`.
 
           Evidence: screenshots are in workflow artifact \`surface-recert-${GITHUB_RUN_ID}\` of ${run_url} (kept 90 days). The repo keeps their sha256 digests in the census \`evidence.ref\`; no binary is added to the repo.
 
@@ -171,4 +214,13 @@ jobs:
           else
             node packages/api-client/cli.ts gh --priority repair -- pr create --base main --head "$BRANCH" --label compounding \
               --title "chore(design): renew certification evidence for ${renewed}" --body-file "$RUNNER_TEMP/body.md"
+          fi
+
+      - name: Fail loudly on rejected captures
+        if: always() && steps.apply.outcome != 'skipped'
+        run: |
+          failed="$(node -p 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).failed.length' "$RUNNER_TEMP/apply.json" 2>/dev/null || echo unknown)"
+          if [ "$failed" != 0 ]; then
+            node -p 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).failed.map(f => "::error::" + f).join("\n")' "$RUNNER_TEMP/apply.json" 2>/dev/null || echo "::error::apply output missing"
+            exit 1
           fi

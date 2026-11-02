@@ -14,6 +14,7 @@ import {
   REQUIRED_WIDTHS,
   readCensus,
   renewGroup,
+  requiresAuth,
   staleGroups,
 } from './lib/surface-recertify.mjs';
 
@@ -39,12 +40,31 @@ async function capture() {
   );
   const browser = await chromium.launch();
   const stale = staleGroups(root).filter(group => group.recertifiable);
+  const authFailures = [];
   for (const group of stale) {
     const dir = join(values.out, group.id);
     mkdirSync(dir, { recursive: true });
     const record = { id: group.id, route: group.route, shots: [] };
     for (const width of REQUIRED_WIDTHS) {
-      const page = await browser.newPage({ viewport: { width, height: 900 } });
+      const context = await browser.newContext({
+        viewport: { width, height: 900 },
+      });
+      // App routes need a test-auth session; without one they redirect to
+      // /signin and answer 200 with the wrong page. Fail loudly instead.
+      let authStatus;
+      if (requiresAuth(group.route)) {
+        const auth = await context.request.post(
+          new URL('/api/dev/test-auth/session', values['base-url']).href,
+          { data: { persona: 'creator-ready' }, timeout: 240_000 }
+        );
+        authStatus = auth.status();
+        if (authStatus !== 200) {
+          authFailures.push(
+            `${group.id} ${width}px test sign-in HTTP ${authStatus}`
+          );
+        }
+      }
+      const page = await context.newPage();
       const pageErrors = [];
       page.on('pageerror', error =>
         pageErrors.push(String(error.message).slice(0, 160))
@@ -72,6 +92,8 @@ async function capture() {
           width,
           file,
           status,
+          authStatus,
+          finalPath: new URL(page.url()).pathname.replace(/(.)\/$/, '$1'),
           bytes: buffer.length,
           sha256: createHash('sha256').update(buffer).digest('hex'),
           pageErrors,
@@ -81,10 +103,11 @@ async function capture() {
         record.shots.push({
           width,
           status,
+          authStatus,
           error: String(error.message).slice(0, 200),
         });
       } finally {
-        await page.close();
+        await context.close();
       }
     }
     writeFileSync(
@@ -93,6 +116,10 @@ async function capture() {
     );
   }
   await browser.close();
+  if (authFailures.length) {
+    console.error(`::error::test sign-in failed: ${authFailures.join('; ')}`);
+    process.exitCode = 1;
+  }
 }
 
 function apply() {
@@ -100,9 +127,11 @@ function apply() {
   let census = readCensus(root);
   const renewed = [];
   const failed = [];
+  // Not recertifiable by design (dynamic route, multi-source); not a failure.
+  const skipped = [];
   for (const group of staleGroups(root, census)) {
     if (!group.recertifiable) {
-      failed.push(`${group.id}: ${group.reasons.join(', ')}`);
+      skipped.push(`${group.id}: ${group.reasons.join(', ')}`);
       continue;
     }
     try {
@@ -126,8 +155,9 @@ function apply() {
       join(root, CENSUS_PATH),
       `${JSON.stringify(census, null, 2)}\n`
     );
-  console.log(JSON.stringify({ renewed, failed }, null, 2));
-  if (failed.length) process.exitCode = renewed.length ? 0 : 1;
+  console.log(JSON.stringify({ renewed, failed, skipped }, null, 2));
+  // Renewals still land; the workflow fails its last step on any rejection.
+  if (failed.length && !renewed.length) process.exitCode = 1;
 }
 
 if (command === 'list') {

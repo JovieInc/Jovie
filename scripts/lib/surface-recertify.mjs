@@ -58,6 +58,17 @@ export function staleGroups(root, census = readCensus(root)) {
 }
 
 /** Evidence the capture step wrote for one group; throws unless it proves a real render. */
+/** Pathname of a census route, without query or trailing slash. */
+export function routePath(route) {
+  const path = new URL(route, 'http://local').pathname;
+  return path.length > 1 ? path.replace(/\/$/, '') : path;
+}
+
+/** Routes behind sign-in need a test-auth session before capture. */
+export function requiresAuth(route) {
+  return /^\/app(\/|$)/.test(routePath(route));
+}
+
 export function validateCapture(capture, group) {
   const problems = [];
   if (capture?.id !== group.id) problems.push('capture is for another group');
@@ -69,6 +80,14 @@ export function validateCapture(capture, group) {
       continue;
     }
     if (shot.status !== 200) problems.push(`${width}px HTTP ${shot.status}`);
+    // A signed-out redirect (e.g. /app → /signin) answers 200 with the wrong
+    // page; renewing on it certifies the sign-in screen as the app surface.
+    if (shot.finalPath === undefined)
+      problems.push(`${width}px final path not recorded`);
+    else if (shot.finalPath !== routePath(group.route))
+      problems.push(`${width}px redirected to ${shot.finalPath}`);
+    if (shot.authStatus !== undefined && shot.authStatus !== 200)
+      problems.push(`${width}px test sign-in HTTP ${shot.authStatus}`);
     if (!SHA256.test(shot.sha256 ?? ''))
       problems.push(`${width}px screenshot digest missing`);
     if (!(shot.bytes > 5000)) problems.push(`${width}px screenshot is empty`);

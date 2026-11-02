@@ -6,6 +6,8 @@ import { test } from 'vitest';
 import { sourceDigest } from '../../design-surface-census.mjs';
 import {
   renewGroup,
+  requiresAuth,
+  routePath,
   staleGroups,
   validateCapture,
 } from '../surface-recertify.mjs';
@@ -42,6 +44,7 @@ function repo(pageSources = [PAGE]) {
 const shot = width => ({
   width,
   status: 200,
+  finalPath: '/pricing',
   sha256: 'a'.repeat(64),
   bytes: 90_000,
   scrollWidth: width,
@@ -116,6 +119,51 @@ test('capture must prove a real render at 1440 and 390', () => {
     () => validateCapture({ ...capture, route: '/x' }, group),
     /route mismatch/
   );
+});
+
+test('a signed-out redirect or failed test sign-in never renews a surface', () => {
+  const { root, census } = repo();
+  writeFileSync(join(root, OWNER), 'edited');
+  const [group] = staleGroups(root, census);
+  // /app/* without a session answers 200 on /signin: that must not certify.
+  assert.throws(
+    () =>
+      validateCapture(
+        {
+          ...capture,
+          shots: [shot(1440), { ...shot(390), finalPath: '/signin' }],
+        },
+        group
+      ),
+    /390px redirected to \/signin/
+  );
+  assert.throws(
+    () =>
+      validateCapture(
+        { ...capture, shots: [{ ...shot(1440), authStatus: 500 }, shot(390)] },
+        group
+      ),
+    /1440px test sign-in HTTP 500/
+  );
+  const { finalPath: _omit, ...legacy } = shot(1440);
+  assert.throws(
+    () => validateCapture({ ...capture, shots: [legacy, shot(390)] }, group),
+    /1440px final path not recorded/
+  );
+  validateCapture(
+    { ...capture, shots: [{ ...shot(1440), authStatus: 200 }, shot(390)] },
+    group
+  );
+});
+
+test('route helpers normalise paths and flag app routes for sign-in', () => {
+  assert.equal(routePath('/pricing/'), '/pricing');
+  assert.equal(routePath('/'), '/');
+  assert.equal(routePath('/app/contacts?tab=audience'), '/app/contacts');
+  assert.equal(requiresAuth('/app'), true);
+  assert.equal(requiresAuth('/app/contacts'), true);
+  assert.equal(requiresAuth('/apple'), false);
+  assert.equal(requiresAuth('/pricing'), false);
 });
 
 test('renewal writes the real digest, evidence pointers and keeps prior history', () => {
