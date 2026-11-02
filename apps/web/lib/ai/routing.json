@@ -1,6 +1,6 @@
 {
   "schema": "jovie.ai-routing/v1",
-  "updatedAt": "2026-10-30",
+  "updatedAt": "2026-11-01",
   "description": "Single source of truth for which provider serves which model call. Read by apps/web/lib/ai/routing.ts at runtime and by scripts/ai-routing-check.mjs, which flags drift between this file and the live Gateway report, Vercel env flags and the Workers AI relay. Change routing here, never in prose.",
   "providers": {
     "gateway": {
@@ -18,6 +18,65 @@
   "failover": {
     "credit": "Either provider answering with insufficient funds, budget exceeded, 402 or an out-of-allocation message is replayed once on the other provider (apps/web/lib/ai/credit-failover.ts); the dead provider is skipped for 60 seconds.",
     "runwayPageDays": 3
+  },
+  "subsidyPools": {
+    "description": "Ledger of every subsidized pool the fleet is already signed into: subscription usage windows and credits. Burn the pool that loses the most if left unused first, stop new work on a pool at or below floorPercent (runs already started finish), and only when every pool is at the floor propose one banked reset to Tim. Never add accounts or credentials, never hand API keys to workers, never fall back to paid credits or API billing without Tim. Pools are named by alias only; the executing host binds each alias to its home and an emailSha256. scripts/lanes/codex_lane.py reads this policy at runtime; scripts/ai-routing-check.mjs --pools-only fails on drift between these pools and the aliases signed in on the host.",
+    "policy": {
+      "floorPercent": 1,
+      "floorScope": "new-dispatch",
+      "burnOrder": "use-it-or-lose-it",
+      "burnOrderRule": "Among pools above the floor, the one with the highest (remainingPercent - floorPercent) per hour until its longest window resets goes first: most left, soonest reset. Ties go to the least recently used.",
+      "failover": "next-signed-in-pool",
+      "resetProposal": "only-when-every-pool-at-floor",
+      "resetProposalChannel": "founder-card",
+      "autoRedeemResets": false,
+      "paidFallback": "never-without-tim",
+      "newAccounts": "never",
+      "apiKeysInWorkers": "never",
+      "targets": { "windowUsedBeforeResetPercent": 90 }
+    },
+    "pools": [
+      {
+        "id": "codex:current-login",
+        "alias": "current-login",
+        "kind": "subscription-window",
+        "provider": "openai",
+        "plan": "chatgpt-pro",
+        "executor": "scripts/lanes/codex_lane.py",
+        "host": "gem",
+        "window": "weekly"
+      },
+      {
+        "id": "codex:lyb-pro",
+        "alias": "lyb-pro",
+        "kind": "subscription-window",
+        "provider": "openai",
+        "plan": "chatgpt-pro",
+        "executor": "scripts/lanes/codex_lane.py",
+        "host": "gem",
+        "window": "weekly"
+      },
+      {
+        "id": "codex:jovie-pro",
+        "alias": "jovie-pro",
+        "kind": "subscription-window",
+        "provider": "openai",
+        "plan": "chatgpt-pro",
+        "executor": "scripts/lanes/codex_lane.py",
+        "host": "gem",
+        "window": "weekly"
+      },
+      {
+        "id": "workers-ai",
+        "alias": "workers-ai",
+        "kind": "credits",
+        "provider": "cloudflare",
+        "registryId": "cloudflare-credits",
+        "executor": "apps/web/lib/ai/sdk.ts",
+        "window": null,
+        "note": "Startup credits with no usage window; the workers-first callers above drain it. Balance and runway live in the credentials-spend registry (cloudflare-credits)."
+      }
+    ]
   },
   "callers": [
     {

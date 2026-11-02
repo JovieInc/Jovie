@@ -257,12 +257,43 @@
             "kind": "ceiling",
             "max": 3
           }
+        },
+        {
+          "id": "summer.turn_failure_rate",
+          "label": "Summer turns with any failure class (turn critic, 24h)",
+          "unit": "share",
+          "source": "summer.turnFailureRate",
+          "detector": {
+            "kind": "ceiling",
+            "max": 0.1
+          }
+        },
+        {
+          "id": "summer.noise_to_tim_rate",
+          "label": "Summer turns judged noise to Tim (turn critic, 24h)",
+          "unit": "share",
+          "source": "summer.noiseToTimRate",
+          "detector": {
+            "kind": "ceiling",
+            "max": 0.05
+          }
+        },
+        {
+          "id": "summer.missed_incidents",
+          "label": "Stay-live incidents Summer saw but did not route to Tim within 60 min",
+          "unit": "count",
+          "source": "summer.missedIncidents",
+          "detector": {
+            "kind": "ceiling",
+            "max": 0
+          }
         }
       ],
       "feeds": [
         "Tim-time ledger (#23668)",
         "capacity escalations.jsonl",
-        "Summer escalations"
+        "Summer escalations",
+        "summer.jov.ie/runtime/v1/summer-turn-critic (summer-config #385)"
       ]
     },
     {

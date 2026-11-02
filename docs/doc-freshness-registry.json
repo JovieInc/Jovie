@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "agentsMap": {
-    "path": "CLAUDE.md",
+    "path": "AGENTS.md",
     "maxLines": 120
   },
   "crossLinkScopes": [
-    "CLAUDE.md",
+    "AGENTS.md",
     "CODEX.md",
     ".claude/rules/*.md",
     "canon/OPERATING_SYSTEM.md",
@@ -29,7 +29,7 @@
   "freshnessMarkers": [
     {
       "id": "scoped-rules-count",
-      "files": ["CLAUDE.md"],
+      "files": ["AGENTS.md"],
       "computer": "scoped-rules-count"
     },
     {
@@ -364,7 +364,7 @@
         }
       ]
     },
-    "CLAUDE.md": {
+    "AGENTS.md": {
       "owner": "@itstimwhite",
       "claim": "The top-level router inherits the constitution and routes personal/mixed requests to private intake before task tools.",
       "documentSha256": "375c8ef4d8ad65c06aef6bb63b2159fe44790ba5ee3499ebbccf8c76c8dd9e31",
