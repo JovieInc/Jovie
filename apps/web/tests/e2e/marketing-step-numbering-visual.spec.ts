@@ -18,14 +18,18 @@ test.describe('marketing pages render no step numbering', () => {
 
       const numbered = await page.evaluate(() => {
         const pattern = /^(?:Step \d|0[1-9]|[1-9]\. [A-Z][a-z]+)$/;
-        return [
-          ...document.querySelectorAll(
-            'main h1, main h2, main h3, main p, main span, main div'
-          ),
-        ]
-          .filter(el => el.children.length === 0)
-          .map(el => el.textContent?.trim() ?? '')
-          .filter(text => pattern.test(text));
+        return (
+          [
+            ...document.querySelectorAll(
+              'main h1, main h2, main h3, main p, main span, main div'
+            ),
+          ]
+            // Screen-reader-only order hints are allowed; only visible
+            // numbering is banned (matches the unit guards).
+            .filter(el => el.children.length === 0 && !el.closest('.sr-only'))
+            .map(el => el.textContent?.trim() ?? '')
+            .filter(text => pattern.test(text))
+        );
       });
       expect(numbered).toEqual([]);
     });

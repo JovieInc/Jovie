@@ -12,7 +12,7 @@ import { APP_ROUTES } from '@/constants/routes';
 export function ChangelogSubscribeColumn() {
   return (
     <div className='changelog-subscribe'>
-      <ChangelogEmailSignup source='changelog_page' />
+      <ChangelogEmailSignup source='changelog_page' deferSecurityCheck />
       <div className='changelog-subscribe__alternatives'>
         <Link
           href={`${APP_ROUTES.CHANGELOG}/feed.xml`}

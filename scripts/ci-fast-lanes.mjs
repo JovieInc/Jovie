@@ -282,9 +282,9 @@ export const SOURCE_GUARDS = Object.freeze([
     // rejected; coverage floors keep the verifier itself fully exercised.
     id: 'outcome-verifier',
     command:
-      'pnpm exec vitest --root scripts --config vitest.config.mts run --coverage --coverage.include=lib/outcome-verifier.mjs --coverage.reporter=text --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-outcome-verifier-coverage" --coverage.thresholds.lines=100 --coverage.thresholds.functions=100 --coverage.thresholds.branches=90 lib/__tests__/outcome-verifier.test.mjs',
+      'pnpm exec vitest --root scripts --config vitest.config.mts run --coverage --coverage.include=lib/outcome-verifier.mjs --coverage.reporter=text --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-outcome-verifier-coverage" --coverage.thresholds.lines=100 --coverage.thresholds.functions=100 --coverage.thresholds.branches=90 lib/__tests__/outcome-verifier.test.mjs lib/__tests__/ship-verify-receipt.test.mjs',
     inputs:
-      /^(?:scripts\/lib\/(?:outcome-verifier\.mjs|__tests__\/outcome-verifier\.test\.mjs)|apps\/web\/app\/api\/chat\/(?:route|onboarding-handler)\.ts|apps\/web\/lib\/rate-limit\/limiters\.ts|scripts\/ci-fast-lanes\.mjs)$/u,
+      /^(?:scripts\/lib\/(?:outcome-verifier\.mjs|__tests__\/(?:outcome-verifier|ship-verify-receipt)\.test\.mjs)|apps\/web\/app\/api\/chat\/(?:route|onboarding-handler)\.ts|apps\/web\/lib\/rate-limit\/limiters\.ts|scripts\/ship-verify\.mjs|scripts\/ci-fast-lanes\.mjs)$/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -1169,6 +1169,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/pr-size-exclusions.test.mjs',
   'scripts/lib/__tests__/alias-gate-certified-routes.test.mjs',
   'scripts/lib/__tests__/staged-alias-perf-intake.test.mjs',
+  'scripts/lib/__tests__/alias-ledger-unreadable-intake.test.mjs',
   'scripts/lib/__tests__/pr-size-guard-policy.test.mjs',
   'scripts/lib/__tests__/pre-push-gate.test.mjs',
   'scripts/lib/__tests__/production-unbound-repair-attestation.test.mjs',
