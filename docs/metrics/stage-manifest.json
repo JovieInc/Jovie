@@ -593,6 +593,80 @@
           "owner": "apps/web/lib/content-records/stage-events.ts"
         }
       ]
+    },
+    "incident": {
+      "entityId": "<host>:<doctor condition key>#<generation> (gem:probe-red:gem:jovie-research#1)",
+      "description": "One lanes doctor condition generation from the last proof of life to the doctor's own clear reading. undetected = time to detect, unfiled = time to file, open = time to fix and verify. The board claim / PR / merge split of the same Linear issue is the detector-issue entity (summer-config). Journal: runs/incidents.jsonl on Gem.",
+      "endToEnd": [
+        ["undetected", "cleared"],
+        ["unfiled", "cleared"],
+        ["open", "cleared"]
+      ],
+      "stages": [
+        {
+          "id": "undetected",
+          "meaning": "last proof of life (passing probe or fresh registry receipt) until the doctor raised the condition",
+          "producer": "lanes",
+          "status": "pushed",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
+          "id": "unfiled",
+          "meaning": "condition raised until its Linear issue was filed or reopened",
+          "producer": "lanes",
+          "status": "pushed",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
+          "id": "open",
+          "meaning": "issue filed (or condition raised, when never filed) until the doctor read the condition cleared",
+          "producer": "lanes",
+          "status": "pushed",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
+          "id": "cleared",
+          "meaning": "terminal: the doctor read it cleared and closed the issue with its cleared comment",
+          "producer": "lanes",
+          "status": "pushed",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        }
+      ]
+    },
+    "board-task": {
+      "entityId": "mesh hub board task id claimed by the lanes (stall-..., jov-123-c1)",
+      "description": "One mesh board task the Gem lanes claimed through scripts/lanes/board_intake.py, from posting to its verified close. posted = claim latency, running = run time; the terminal stage's failRate is 1 - success rate. Journal: runs/board-intake.jsonl on Gem.",
+      "endToEnd": [["posted", "closed"], ["running", "closed"]],
+      "stages": [
+        {
+          "id": "posted",
+          "meaning": "posted on the hub board until the lanes claimed it",
+          "producer": "lanes",
+          "status": "pushed",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
+          "id": "running",
+          "meaning": "claimed until closed done (completed) or failed",
+          "producer": "lanes",
+          "status": "pushed",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
+          "id": "closed",
+          "meaning": "terminal: done (completed) or failed",
+          "producer": "lanes",
+          "status": "pushed",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        }
+      ]
     }
   },
   "sources": {

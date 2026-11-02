@@ -76,7 +76,11 @@ def default_roots(home: Path, state: Path) -> list[Path]:
             home / "jovie-worktrees", home / "worktrees", home / "LogYourBody-wt",
             home / "jovie-wt-*", Path("/private/tmp/claude-501"), Path("/private/tmp/jovie-*"),
             home / "codex-worktrees", home / "grok-wt", home / "grok-ship-workspaces",
-            home / "codex-ship-workspaces", home / "wt-*", Path("/srv/worktrees/codex-worktrees")]
+            home / "codex-ship-workspaces", home / "wt-*", Path("/srv/worktrees/codex-worktrees"),
+            # ~/wt is where Gem agent sessions put worktrees (global charter: `git worktree add ... ~/wt/<name>`).
+            # It was out of scope: 75 checkouts at ~5.7 GiB each (pnpm copies, the store is on /srv/worktrees)
+            # and root at 89% on 2026-11-02 while the sweeper retired nothing there.
+            home / "wt"]
 
 
 def default_never(home: Path) -> list[Path]:
@@ -385,21 +389,29 @@ def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecy
     if live is None:
         report["errors"].append("process-state-unavailable")
         return report
+    # Fairness cursor: least recently visited checkout first, across every repository. Without it a
+    # spent budget restarted at the first repository each interval, so the second (~/Jovie, whose
+    # worktrees are ~/wt: 334 GiB on root, 2026-11-02) was never reached.
+    visits_path = None if state is None else state / VISITS_FILE
+    visits = _read_visits(visits_path)
+    queue = []
     for repo in repos:
-        if yield_to_drain():
-            return report
         try:
             entries = linked_worktrees(repo, run)
         except (OSError, subprocess.SubprocessError) as error:
             report["errors"].append(f"list:{repo}:{type(error).__name__}")
             continue
-        for path, branch in entries:
+        queue += [(repo, path, branch) for path, branch in entries]
+    queue.sort(key=lambda item: visits.get(str(item[1]), 0.0))
+    try:
+        for repo, path, branch in queue:
             # A retirement is one unit: finish its preservation/removal before
             # yielding, retaining the inherited lifecycle lease throughout.
             if yield_to_drain():
                 return report
             if not path.exists() or not in_scope(path, roots, never):
                 continue
+            visits[str(path)] = now
             try:
                 retire(repo, path, branch, live, report, run=run, now=now, closed=closed.get(repo, set()),
                        idle_s=idle_s, preserved_ttl_s=preserved_ttl_s, prefix=prefix, date=date)
@@ -408,6 +420,9 @@ def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecy
                 # the sweep; it stays in place and is retried next interval.
                 report["kept"] += 1
                 report["errors"].append(f"{path}:{type(error).__name__}"[:200])
+    finally:
+        _write_visits(visits_path, visits, {str(path) for _, path, _ in queue})
+    for repo in repos:
         if yield_to_drain():
             return report
         try:
@@ -415,6 +430,29 @@ def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecy
         except (OSError, subprocess.SubprocessError):
             pass
     return report
+
+
+VISITS_FILE = "worktree-sweep-visits.json"
+
+
+def _read_visits(path: Path | None) -> dict:
+    if path is None:
+        return {}
+    try:
+        data = json.loads(path.read_text())
+        return {k: float(v) for k, v in data.items()} if isinstance(data, dict) else {}
+    except (OSError, ValueError, TypeError):
+        return {}
+
+
+def _write_visits(path: Path | None, visits: dict, live: set) -> None:
+    """Keep only checkouts that still exist in a repository listing; best effort."""
+    if path is None:
+        return
+    try:
+        atomic_write_text(path, json.dumps({k: v for k, v in visits.items() if k in live}, sort_keys=True))
+    except OSError:
+        pass
 
 
 def closed_branches(repo: Path, run) -> set[str]:
@@ -465,6 +503,13 @@ ARTIFACT_IDLE_S = 24 * 3600
 # Retired lane roots: nothing dispatches there any more, so build output is dead weight even
 # when the clone itself cannot be deleted yet (unpublished work awaiting archive).
 RETIRED_ROOT_GLOBS = ("grok-ship-workspaces/*/*", "codex-ship-workspaces/*/*", "grok-wt/*")
+# Kept clones under the agent-worktree roots on the root volume are node_modules-heavy too
+# (JOV-10348: gem root inodes forecast to the 90% limit in 2 days while kept clones under the
+# active roots held full pnpm copies forever). Their build output is regenerable and never
+# source, so the retired-root artifact prune extends to them at the same idle bar; the caller's
+# busy / keep-marker / state-referenced guards still decide. Clone-anchored globs: `wt/*` is a
+# checkout under ~/wt, `wt-*` a checkout named wt-* directly in home, `codex-worktrees/*` as listed.
+ARTIFACT_ROOT_GLOBS = RETIRED_ROOT_GLOBS + ("wt/*", "wt-*", "codex-worktrees/*")
 HEADROOM_WARN_PCT = 70
 HEADROOM_CRIT_PCT = 85
 REPORT_INTERVAL_S = 86400
@@ -473,7 +518,7 @@ STATE_REF_MAX_BYTES = 8 * 1024 * 1024
 
 def standalone_globs(home: Path, state: Path) -> list[tuple[Path, str]]:
     return [(home, "grok-ship-workspaces/*/*"), (home, "codex-ship-workspaces/*/*"), (home, "grok-wt/*"),
-            (home, "codex-worktrees/*"), (home, "wt-*"), (Path("/srv/worktrees"), "codex-worktrees/*"), (state, "bindings/*/worktrees/*"),
+            (home, "codex-worktrees/*"), (home, "wt-*"), (home, "wt/*"), (Path("/srv/worktrees"), "codex-worktrees/*"), (state, "bindings/*/worktrees/*"),
             (state, "runs/owner-*/checkout")]
 
 
@@ -587,8 +632,8 @@ def tree_kib(path: Path, run) -> int | None:
         return None
 
 
-def retired_root(home: Path, path: Path) -> bool:
-    return any(path in home.glob(pattern) for pattern in RETIRED_ROOT_GLOBS)
+def artifact_prunable_root(home: Path, path: Path) -> bool:
+    return any(path in home.glob(pattern) for pattern in ARTIFACT_ROOT_GLOBS)
 
 
 def prune_artifacts(path: Path) -> int:
@@ -631,7 +676,7 @@ def sweep_standalone(home: Path, state: Path, repos: list[Path], never: list[Pat
             verdict = standalone_verdict(path, live, run, now, state, idle_s)
             if verdict:
                 report["kept"][verdict] = report["kept"].get(verdict, 0) + 1
-                if verdict not in {"busy", "keep-marker", "state-referenced"} and retired_root(home, path) \
+                if verdict not in {"busy", "keep-marker", "state-referenced"} and artifact_prunable_root(home, path) \
                         and now - newest_touch(path) >= ARTIFACT_IDLE_S:
                     freed = prune_artifacts(path)
                     if freed:

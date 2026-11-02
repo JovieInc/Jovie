@@ -24,6 +24,11 @@ export const CODE_FLAGS = {
   // enables the anonymous public-artist tools. Does not enable DCR.
   CHATGPT_APP_DIRECTORY_MCP: false,
   CHAT_COMPOSER_V2: true,
+  // Claim-verify spec Q2: daily sweep over grandfathered (legacy) claims.
+  // Default off so the first run that takes 50k+ pages private is a
+  // deliberate, observable flip. FEATURE_CLAIM_LEGACY_PROOF_SWEEP=true stamps
+  // the 30-day nudge and reopens 50k+ claims past it as proof-only requests.
+  CLAIM_LEGACY_PROOF_SWEEP: false,
   CYAN_FOCUS_GLOW: true,
   // Fundraising YC section order. Default off until Tim approves the
   // narrative in Pen. FEATURE_INVESTOR_PORTAL_YC_DECK=true reorders the

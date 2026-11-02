@@ -54,6 +54,7 @@ const hoisted = vi.hoisted(() => {
   const cookiesMock = vi.fn().mockResolvedValue({ set: cookiesSetMock });
   const getClaimVerificationReachMock = vi.fn().mockResolvedValue(null);
   const requestClaimVerificationMock = vi.fn().mockResolvedValue(undefined);
+  const scheduleClaimVerificationCardMock = vi.fn();
   const getCurrentUserEntitlementsMock = vi
     .fn()
     .mockResolvedValue({ isPro: false, isTrialing: false });
@@ -109,6 +110,7 @@ const hoisted = vi.hoisted(() => {
     executeMock,
     getClaimVerificationReachMock,
     requestClaimVerificationMock,
+    scheduleClaimVerificationCardMock,
     getCurrentUserEntitlementsMock,
     updateMock,
     updateSetArgs,
@@ -161,6 +163,7 @@ vi.mock('@/lib/claim/context', () => ({
 vi.mock('@/lib/claim/claim-verification.server', () => ({
   getClaimVerificationReach: hoisted.getClaimVerificationReachMock,
   requestClaimVerification: hoisted.requestClaimVerificationMock,
+  scheduleClaimVerificationCard: hoisted.scheduleClaimVerificationCardMock,
 }));
 
 vi.mock('@/lib/entitlements/server', () => ({
@@ -257,12 +260,16 @@ vi.mock('@/lib/spotify/blacklist', () => ({
   isBlacklistedSpotifyId: hoisted.isBlacklistedSpotifyIdMock,
 }));
 
-function queueOwnedProfile(settings: Record<string, unknown> = {}) {
+function queueOwnedProfile(
+  settings: Record<string, unknown> = {},
+  overrides: { readonly isAdmin?: boolean } = {}
+) {
   hoisted.selectResults.push([
     {
       dbUserId: 'db_user_123',
       handle: 'artist',
       id: 'profile_123',
+      isAdmin: overrides.isAdmin ?? false,
       isClaimed: false,
       settings,
       spotifyId: null,
@@ -453,6 +460,158 @@ describe('connectOnboardingSpotifyArtist', () => {
         spotifyImportStatus: 'complete',
         spotifyImportTotal: 3,
       }),
+    });
+  });
+
+  describe('self-serve claims stay private until ownership is proven', () => {
+    const importOk = {
+      imported: 2,
+      releases: [{ id: 'release_1' }],
+      success: true,
+      total: 2,
+    };
+
+    async function connect() {
+      const { connectOnboardingSpotifyArtist } = await import(
+        '@/app/onboarding/actions/connect-spotify'
+      );
+      return connectOnboardingSpotifyArtist({
+        artistName: 'Small Artist',
+        profileId: 'profile_123',
+        spotifyArtistId: 'small_spotify_id',
+        spotifyArtistUrl: 'https://open.spotify.com/artist/small_spotify_id',
+      });
+    }
+
+    it('stores a proof-only request with a proof code in the attach write', async () => {
+      queueOwnedProfile({ existing: 'value' });
+      queueNoExistingClaim();
+      queueLatestSettings({ spotifyImportStatus: 'importing' });
+      hoisted.syncReleasesFromSpotifyMock.mockResolvedValue(importOk);
+
+      const result = await connect();
+
+      expect(result).toMatchObject({ success: true, proofPending: true });
+      // The identity is attached and the catalog still imports.
+      expect(hoisted.syncReleasesFromSpotifyMock).toHaveBeenCalledWith(
+        'profile_123',
+        { includeTracks: true }
+      );
+      const attach = hoisted.updateSetArgs[0];
+      expect(attach).toMatchObject({ spotifyId: 'small_spotify_id' });
+      expect(attach).not.toHaveProperty('isPublic');
+      const record = (attach.settings as Record<string, unknown>)
+        .claimVerification as Record<string, unknown>;
+      expect(record).toMatchObject({
+        status: 'pending_verification',
+        proofOnly: true,
+        spotifyArtistId: 'small_spotify_id',
+        paidAt: null,
+      });
+      expect(record.proofCode).toMatch(/^jovie-verify-[a-z2-9]{10}$/);
+      expect((attach.settings as Record<string, unknown>).existing).toBe(
+        'value'
+      );
+      expect(hoisted.trackServerEventTxMock).toHaveBeenCalledWith(
+        expect.anything(),
+        'claim_private_created',
+        {
+          profileId: 'profile_123',
+          source: 'onboarding_spotify_connect',
+          requestedAtMs: Date.parse(record.requestedAt as string),
+        },
+        expect.objectContaining({
+          eventIdentity: expect.stringMatching(
+            /^claim_private_created:profile_123:\d+$/
+          ),
+        })
+      );
+      expect(hoisted.scheduleClaimVerificationCardMock).toHaveBeenCalledWith({
+        profileId: 'profile_123',
+        handle: 'artist',
+        record,
+      });
+    });
+
+    it('does not publish a direct prebuilt-profile claim on the ID match', async () => {
+      queueOwnedProfile();
+      queueNoExistingClaim();
+      queueLatestSettings({ spotifyImportStatus: 'importing' });
+      hoisted.readPendingClaimContextMock.mockResolvedValueOnce({
+        mode: 'direct_profile',
+        creatorProfileId: 'profile_123',
+        username: 'artist',
+        expectedSpotifyArtistId: 'small_spotify_id',
+        issuedAt: Date.now(),
+        expiresAt: Date.now() + 60_000,
+      });
+      hoisted.syncReleasesFromSpotifyMock.mockResolvedValue(importOk);
+
+      const result = await connect();
+
+      expect(result).toMatchObject({ proofPending: true });
+      expect(hoisted.claimPrebuiltProfileForUserMock).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          source: 'direct_profile_spotify_match',
+          publish: false,
+        })
+      );
+      expect(
+        (hoisted.updateSetArgs[0].settings as Record<string, unknown>)
+          .claimVerification
+      ).toMatchObject({ proofOnly: true, status: 'pending_verification' });
+      expect(hoisted.trackServerEventTxMock).toHaveBeenCalledWith(
+        expect.anything(),
+        'claim_private_created',
+        expect.objectContaining({ source: 'direct_profile_spotify_match' }),
+        expect.anything()
+      );
+    });
+
+    it('does not re-gate a re-connect of the identity already linked', async () => {
+      hoisted.selectResults.push([
+        {
+          dbUserId: 'db_user_123',
+          handle: 'artist',
+          id: 'profile_123',
+          isAdmin: false,
+          isClaimed: true,
+          settings: {},
+          spotifyId: 'small_spotify_id',
+        },
+      ]);
+      queueNoExistingClaim();
+      queueLatestSettings({ spotifyImportStatus: 'importing' });
+      hoisted.syncReleasesFromSpotifyMock.mockResolvedValue(importOk);
+
+      const result = await connect();
+
+      expect(result).not.toHaveProperty('proofPending');
+      expect(hoisted.updateSetArgs[0].settings).not.toHaveProperty(
+        'claimVerification'
+      );
+      expect(hoisted.scheduleClaimVerificationCardMock).not.toHaveBeenCalled();
+    });
+
+    it('exempts an admin actor', async () => {
+      queueOwnedProfile({}, { isAdmin: true });
+      queueNoExistingClaim();
+      queueLatestSettings({ spotifyImportStatus: 'importing' });
+      hoisted.syncReleasesFromSpotifyMock.mockResolvedValue(importOk);
+
+      const result = await connect();
+
+      expect(result).not.toHaveProperty('proofPending');
+      expect(hoisted.updateSetArgs[0].settings).not.toHaveProperty(
+        'claimVerification'
+      );
+      expect(hoisted.trackServerEventTxMock).not.toHaveBeenCalledWith(
+        expect.anything(),
+        'claim_private_created',
+        expect.anything(),
+        expect.anything()
+      );
     });
   });
 

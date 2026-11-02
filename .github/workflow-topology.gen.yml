@@ -1141,6 +1141,18 @@ nodes:
       - workflow_call
     terminalReceipt: job:release-result
     jobCount: 16
+  - name: Public App Certification
+    path: .github/workflows/public-app-certification.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - push
+    terminalReceipt: job:certify
+    jobCount: 1
   - name: Public Profile Benchmark
     path: .github/workflows/public-benchmark.yml
     active: true
