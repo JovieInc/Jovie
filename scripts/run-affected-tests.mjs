@@ -14,7 +14,7 @@ import {
   isBlogContentCandidatePath,
 } from './lib/blog-content-ci.mjs';
 
-import { baseRefCandidates, resolveBaseRef } from './preflight-changed.mjs';
+import { baseRefCandidates, resolveBaseRef } from './lib/git-base-ref.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Full-suite shards are deliberately independent so one Vitest process cannot
@@ -2916,6 +2916,7 @@ export function buildControlCoverageCommands() {
     '--coverage.include=lib/native-queue-eval.mjs',
     '--coverage.include=native-queue-eval.mjs',
     '--coverage.include=run-affected-tests.mjs',
+    '--coverage.include=lib/git-base-ref.mjs',
     '--coverage.include=lib/github-open-prs-rest.mjs',
     '--coverage.include=lib/pr-conflict-event.mjs',
     '--coverage.include=lib/pr-conflict-handler.mjs',

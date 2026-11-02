@@ -22,7 +22,7 @@ case "$SCOPE" in
     # qualified refs intact and pin the commit for every downstream diff.
     if ! BASE_REF="$(node --input-type=module - "$BASE_REF" <<'NODE'
 import { execFileSync } from 'node:child_process';
-import { baseRefCandidates, resolveBaseRef } from './scripts/preflight-changed.mjs';
+import { baseRefCandidates, resolveBaseRef } from './scripts/lib/git-base-ref.mjs';
 const requested = process.argv[2];
 const base = resolveBaseRef(process.cwd(), requested);
 if (!base) {

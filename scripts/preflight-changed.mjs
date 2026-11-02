@@ -38,6 +38,7 @@ import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { load as yamlLoad } from 'js-yaml';
+import { baseRefCandidates, resolveBaseRef } from './lib/git-base-ref.mjs';
 import {
   companionChecklist,
   explainShipGate,
@@ -45,6 +46,9 @@ import {
   PR_BODY_SKELETON,
   parseMergeConflicts,
 } from './lib/preflight-changed.mjs';
+
+export { baseRefCandidates, resolveBaseRef };
+
 import { checkInstallMatchesLockfile } from './lib/preflight-install.mjs';
 import { remoteHint } from './lib/remote-hint.mjs';
 
@@ -197,30 +201,6 @@ const git = (cwd, args) => {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
   return r.status === 0 ? r.stdout.trim() : '';
 };
-
-/**
- * Ref names to try for a diff base (JOV-10351). A bare branch name resolves
- * to its remote-tracking ref first, then the local branch; a name that is
- * already qualified (origin/main, refs/...) is never prefixed again.
- * @returns {string[]}
- */
-export function baseRefCandidates(base) {
-  const b = base.trim();
-  if (/^(?:origin\/|refs\/)/.test(b)) return [b];
-  return [`origin/${b}`, b];
-}
-
-/**
- * The first candidate that names a commit, or null when none does. Callers
- * must fail on null instead of treating it as 'no changes' (JOV-10351).
- * @returns {string|null}
- */
-export function resolveBaseRef(cwd, base) {
-  for (const candidate of baseRefCandidates(base))
-    if (git(cwd, ['rev-parse', '--verify', '--quiet', `${candidate}^{commit}`]))
-      return candidate;
-  return null;
-}
 
 /** Changed files vs the merge-base, including uncommitted and untracked.
  *  `base` must be a ref that resolves to a commit (see resolveBaseRef). */

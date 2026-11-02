@@ -32,6 +32,7 @@ import {
   runControlTestCommands,
 } from '../../run-affected-tests.mjs';
 import { classifyBlogContentChanges } from '../blog-content-ci.mjs';
+import { resolveBaseRef } from '../git-base-ref.mjs';
 
 const SERVICE_CENSUS_QUALIFICATION_INPUTS = [
   'scripts/lanes/service_census.py',
@@ -4424,6 +4425,9 @@ describe('actual affected-test CLI base selection', () => {
       ]);
     try {
       for (const base of ['main', 'origin/main', 'refs/remotes/origin/main']) {
+        expect(resolveBaseRef(repo, base)).toBe(
+          base === 'main' ? 'origin/main' : base
+        );
         const result = run(base);
         expect(result.status, result.stdout + result.stderr).toBe(0);
         const plan = JSON.parse(result.stdout);
@@ -4433,6 +4437,9 @@ describe('actual affected-test CLI base selection', () => {
         ]);
       }
       git('update-ref', '-d', 'refs/remotes/origin/main');
+      expect(resolveBaseRef(repo, 'main')).toBe('main');
+      expect(resolveBaseRef(repo, 'origin/main')).toBeNull();
+      expect(resolveBaseRef(repo, 'missing-branch')).toBeNull();
       expect(JSON.parse(run('main').stdout).mode).toBe('full');
       expect(run('origin/main').status).not.toBe(0);
       expect(run('missing-branch').status).not.toBe(0);

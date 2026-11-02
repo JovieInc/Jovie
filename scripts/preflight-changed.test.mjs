@@ -466,6 +466,7 @@ export const selectSourceGuards = () => [{
       path.join(repo, 'scripts/lib/source-validation-manifest.mjs'),
       "export const selectManifestGuards = (paths, base) => [{ id: 'manifest-base-probe', name: 'manifest base branch', command: 'test ' + base + ' = main && git rev-parse --verify origin/' + base }];\n"
     );
+    /** @type {NodeJS.ProcessEnv} */
     const env = { ...process.env, JOVIE_PREFLIGHT_LEDGER: 'off' };
     delete env.NODE_TEST_CONTEXT;
     for (const base of ['main', 'origin/main', 'refs/remotes/origin/main']) {
