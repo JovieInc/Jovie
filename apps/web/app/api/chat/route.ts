@@ -41,7 +41,7 @@ import {
   tool,
   type UIMessageChunk,
 } from 'ai';
-import { and, count, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { tryHandleAnonymousOnboardingChat } from '@/app/api/chat/onboarding-handler';
@@ -58,9 +58,7 @@ import { createImportBioFromUrlTool } from '@/lib/ai/tools/import-bio-from-url';
 import { createInspectPressSourceTool } from '@/lib/ai/tools/inspect-press-source';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
 import { createVoicePromoTool } from '@/lib/ai/tools/voice-promo';
-import { readAuthorizedProfileViews } from '@/lib/analytics/authorized-read';
 import { getOptionalAuth } from '@/lib/auth/cached';
-import { getExactProfileAccess } from '@/lib/auth/profile-access';
 import { getSessionContext } from '@/lib/auth/session';
 import { resolveChatAccountContext } from '@/lib/chat/account-context';
 import { createAccountChatTools } from '@/lib/chat/account-tools';
@@ -69,8 +67,10 @@ import {
   detectAlbumArtGenerationIntent,
   resolveAlbumArtCapability,
 } from '@/lib/chat/album-art-capability';
+import { fetchArtistContext } from '@/lib/chat/artist-context';
 import { fetchCatalogTrackTitlesForChat } from '@/lib/chat/catalog-titles';
 import { assertChatToolsRegistered } from '@/lib/chat/chat-tool-inventory';
+import { buildKnownStateAnswer } from '@/lib/chat/known-state-answer';
 import {
   buildLockedToolPromptInfo,
   buildLockedToolSet,
@@ -80,11 +80,9 @@ import {
   extractLastUserImageUrl,
   extractLastUserText,
 } from '@/lib/chat/message-text';
-import { resolveHasMusicLinks } from '@/lib/chat/music-link-presence';
 import { canUseOvChatMode, parseChatMode } from '@/lib/chat/ov-mode';
 import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
 import { buildRelatedSuggestionsFraming } from '@/lib/chat/related-recommendations';
-import { countVisibleReleaseListenLinks } from '@/lib/chat/release-listen-links';
 import {
   updateOwnedReleaseGeneratedPitches,
   updateOwnedReleaseMetadata,
@@ -143,10 +141,7 @@ import { gateAssistantReply } from '@/lib/chat/voice-lint';
 import { wrapToolSetFailSoft } from '@/lib/chat/wrap-tool-execute';
 import { loadCustomerChatPinnedOpportunity } from '@/lib/connectors/customer-pinned-opportunity';
 import { db } from '@/lib/db';
-import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { socialLinks } from '@/lib/db/schema/links';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { sqlAny } from '@/lib/db/sql-helpers';
 import { upsertRelease } from '@/lib/discography/queries';
 import { generateUniqueSlug } from '@/lib/discography/slug';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
@@ -230,7 +225,6 @@ import {
   resolvePitchDestination,
 } from '@/lib/services/pitch';
 import { isRetouchConfigured } from '@/lib/services/retouching/provider-gemini';
-import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { isWeeklyQuotaExemptCanaryEmail } from '@/lib/synthetic/prodcert-identities';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
@@ -257,116 +251,6 @@ const CHAT_KILL_SWITCH_GATES = {
   DISABLED: 'ai_chat_disabled',
   FORCE_LIGHT: 'ai_chat_force_light',
 } as const;
-
-/**
- * Fetches artist context server-side from the database.
- * Validates that the authenticated user can manage the profile.
- */
-async function fetchArtistContext(
-  profileId: string,
-  appUserId: string
-): Promise<ArtistContext | null> {
-  const access = await getExactProfileAccess(db, appUserId, profileId);
-  if (!access.ok) {
-    return null;
-  }
-
-  const [result] = await db
-    .select({
-      displayName: creatorProfiles.displayName,
-      username: creatorProfiles.username,
-      bio: creatorProfiles.bio,
-      genres: creatorProfiles.genres,
-      spotifyFollowers: creatorProfiles.spotifyFollowers,
-      spotifyPopularity: creatorProfiles.spotifyPopularity,
-      spotifyUrl: creatorProfiles.spotifyUrl,
-      appleMusicUrl: creatorProfiles.appleMusicUrl,
-    })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.id, profileId))
-    .limit(1);
-
-  if (!result) {
-    return null;
-  }
-
-  // Fetch link counts and tipping stats in parallel
-  const startOfMonth = new Date();
-  startOfMonth.setUTCDate(1);
-  startOfMonth.setUTCHours(0, 0, 0, 0);
-  const startOfMonthISO = startOfMonth.toISOString();
-
-  // Release listen links render on the public profile too.
-  const releaseListenCount = countVisibleReleaseListenLinks(profileId);
-  const [linkCounts, tipTotals, clickStats, profileViews] = await Promise.all([
-    db
-      .select({
-        totalActive: count(),
-        musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ${sqlAny(DSP_PLATFORMS)})`,
-      })
-      .from(socialLinks)
-      .where(
-        and(
-          eq(socialLinks.creatorProfileId, profileId),
-          eq(socialLinks.state, 'active')
-        )
-      )
-      .then(r => r[0]),
-    db
-      .select({
-        totalReceived: drizzleSql<number>`COALESCE(SUM(${tips.amountCents}), 0)`,
-        monthReceived: drizzleSql<number>`COALESCE(SUM(CASE WHEN ${tips.createdAt} >= ${startOfMonthISO}::timestamp THEN ${tips.amountCents} ELSE 0 END), 0)`,
-        tipsSubmitted: drizzleSql<number>`COALESCE(COUNT(${tips.id}), 0)`,
-      })
-      .from(tips)
-      .where(eq(tips.creatorProfileId, profileId))
-      .then(r => r[0]),
-    db
-      .select({
-        total: drizzleSql<number>`count(*)`,
-      })
-      .from(clickEvents)
-      .where(
-        and(
-          eq(clickEvents.creatorProfileId, profileId),
-          eq(clickEvents.linkType, 'tip')
-        )
-      )
-      .then(r => r[0]),
-    readAuthorizedProfileViews(appUserId).catch(error => {
-      logger.warn('Authorized analytics unavailable for chat context', {
-        profileId,
-        error,
-      });
-      return 0;
-    }),
-  ]);
-
-  return {
-    displayName: result.displayName ?? result.username,
-    username: result.username,
-    bio: result.bio,
-    genres: result.genres ?? [],
-    spotifyFollowers: result.spotifyFollowers,
-    spotifyPopularity: result.spotifyPopularity,
-    spotifyUrl: result.spotifyUrl,
-    appleMusicUrl: result.appleMusicUrl,
-    profileViews,
-    hasSocialLinks: Number(linkCounts?.totalActive ?? 0) > 0,
-    hasMusicLinks: resolveHasMusicLinks({
-      dspSocialLinkCount: Number(linkCounts?.musicActive ?? 0),
-      releaseListenLinkCount: await releaseListenCount,
-      spotifyUrl: result.spotifyUrl,
-      appleMusicUrl: result.appleMusicUrl,
-    }),
-    tippingStats: {
-      tipClicks: Number(clickStats?.total ?? 0),
-      tipsSubmitted: Number(tipTotals?.tipsSubmitted ?? 0),
-      totalReceivedCents: Number(tipTotals?.totalReceived ?? 0),
-      monthReceivedCents: Number(tipTotals?.monthReceived ?? 0),
-    },
-  };
-}
 
 /**
  * Find a release by title (exact match first, then partial).
@@ -2543,13 +2427,11 @@ export async function POST(req: Request) {
   );
   const resolvedProfileId = toNullableString(profileId);
   const resolvedConversationId = toNullableString(conversationId);
-  const albumArtFeatureEnabled = await getAppFlagValue('ALBUM_ART_GENERATION', {
-    userId,
-  });
-  const teleprompterRecordingEnabled = await getAppFlagValue(
-    'TELEPROMPTER_RECORDING',
-    { userId }
-  );
+  const [albumArtFeatureEnabled, teleprompterRecordingEnabled] =
+    await Promise.all([
+      getAppFlagValue('ALBUM_ART_GENERATION', { userId }),
+      getAppFlagValue('TELEPROMPTER_RECORDING', { userId }),
+    ]);
   const albumArtCapability = resolveAlbumArtCapability({
     featureEnabled: albumArtFeatureEnabled,
     providerConfigured: isAlbumArtGatewayConfigured(),
@@ -2953,6 +2835,12 @@ export async function POST(req: Request) {
   );
   if (intentResponse) return intentResponse;
 
+  // Catalog reads are fail-soft and read-only, so start them alongside the
+  // artist-context lookup instead of after it.
+  const releasesPromise = fetchOptionalReleases(resolvedProfileId);
+  const catalogTitlesPromise = resolvedProfileId
+    ? fetchCatalogTrackTitlesForChat(resolvedProfileId)
+    : Promise.resolve(null);
   // Fetch artist context server-side (preferred) or fall back to client-provided
   const contextResult = await resolveArtistContext(
     profileId,
@@ -2994,10 +2882,50 @@ export async function POST(req: Request) {
   }
   const artistContext = contextResult.context;
 
-  const releases = await fetchOptionalReleases(resolvedProfileId);
-  const catalogTrackTitles = resolvedProfileId
-    ? await fetchCatalogTrackTitlesForChat(resolvedProfileId)
-    : null;
+  const [releases, catalogTrackTitles] = await Promise.all([
+    releasesPromise,
+    catalogTitlesPromise,
+  ]);
+  // System-1 answer from known state (no model call) for whole-message growth
+  // questions; attachments, tool intents and pinned cards still go to the model.
+  const knownState =
+    chatMode === 'ov' || toolIntent || pinnedOpportunity
+      ? null
+      : extractLastUserImageUrl(uiMessages)
+        ? null
+        : buildKnownStateAnswer({
+            text: userText,
+            facts: { ...artistContext, releases },
+          });
+  if (knownState) {
+    safeSetSentryContext(() =>
+      Sentry.setTag('chat_fast_path', knownState.intent)
+    );
+    if (reservedTurn) {
+      await persistTerminalAssistantMessage({
+        ...reservedTurn,
+        status: 'completed',
+        content: knownState.text,
+      });
+    }
+    return createAssistantTextStreamResponse({
+      text: knownState.text,
+      requestId,
+      corsHeaders,
+      headers: {
+        'x-chat-fast-path': knownState.intent,
+        ...(reservedTurn
+          ? {
+              'x-conversation-id': reservedTurn.conversationId,
+              'x-chat-turn-id': reservedTurn.turnId,
+            }
+          : {}),
+      },
+      metadata: reservedTurn
+        ? buildChatTurnMetadata({ ...reservedTurn, requestId })
+        : undefined,
+    });
+  }
   const dispatchConversationId =
     reservedTurn?.conversationId ?? resolvedConversationId;
 

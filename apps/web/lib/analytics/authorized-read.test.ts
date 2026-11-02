@@ -162,7 +162,7 @@ describe('analytics read parity', () => {
   it('sends dashboard, mobile API, and agent through the authorized read', () => {
     const dashboardRoute = source('app/api/dashboard/analytics/route.ts');
     const mobileHighlights = source('lib/mobile/audience-highlights.ts');
-    const chatRoute = source('app/api/chat/route.ts');
+    const chatArtistContext = source('lib/chat/artist-context.ts');
     const mobileAgent = source('lib/mobile/chat/artist-context.ts');
 
     expect(dashboardRoute).toContain('readAuthorizedDashboardAnalytics');
@@ -170,10 +170,10 @@ describe('analytics read parity', () => {
     expect(mobileHighlights).toContain('readAuthorizedDashboardAnalytics');
     expect(mobileHighlights).not.toContain('getUserDashboardAnalytics');
 
-    const chatFetch = chatRoute.slice(
-      chatRoute.indexOf('async function fetchArtistContext('),
-      chatRoute.indexOf('function findReleaseByTitle(')
+    const chatFetch = chatArtistContext.slice(
+      chatArtistContext.indexOf('export async function fetchArtistContext(')
     );
+    expect(chatFetch).not.toBe('');
     expect(chatFetch).toContain('readAuthorizedProfileViews');
     expect(chatFetch).not.toContain('creatorProfiles.profileViews');
     expect(mobileAgent).toContain('readAuthorizedProfileViews');
