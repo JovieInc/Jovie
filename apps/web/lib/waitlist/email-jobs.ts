@@ -8,6 +8,7 @@ import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { sendNotification } from '@/lib/notifications/service';
+import { getEmailSendBlockReason } from '@/lib/utils/email';
 import { logger } from '@/lib/utils/logger';
 import { decryptPII, encryptPII } from '@/lib/utils/pii-encryption';
 import {
@@ -203,6 +204,23 @@ function getEmailError(result: NotificationChannelResult): string | null {
   return null;
 }
 
+/**
+ * The send gateway refuses reserved/canary/test recipients by design (code
+ * `reserved-test-recipient`, via getEmailSendBlockReason). That refusal is a
+ * terminal skip, not a failure: the job must complete without error and
+ * without retries, or every test/canary waitlist entry burns its attempts and
+ * pages Sentry on every cron run.
+ */
+function isReservedRecipientSkip(params: {
+  recipientEmail: string;
+  result: NotificationChannelResult;
+}): boolean {
+  return (
+    params.result.status === 'skipped' &&
+    getEmailSendBlockReason(params.recipientEmail) !== null
+  );
+}
+
 async function markEntryEmailResult(params: {
   tx: DbOrTransaction;
   entryId: string;
@@ -353,6 +371,7 @@ async function sendAndRecordWaitlistEmail(params: {
   tx: DbOrTransaction;
   entryId: string;
   type: 'waitlist_confirmation' | 'approval_invite';
+  recipientEmail: string;
   message: Parameters<typeof sendNotification>[0];
   target: Parameters<typeof sendNotification>[1];
 }): Promise<WaitlistEmailJobResult> {
@@ -367,6 +386,18 @@ async function sendAndRecordWaitlistEmail(params: {
 
   if (emailResult.status !== 'sent') {
     const error = getEmailError(emailResult) ?? 'Waitlist email failed';
+    if (
+      isReservedRecipientSkip({
+        recipientEmail: params.recipientEmail,
+        result: emailResult,
+      })
+    ) {
+      return skippedWaitlistEmailResult({
+        entryId: params.entryId,
+        type: params.type,
+        detail: error,
+      });
+    }
     logger.warn('[waitlist] Email job failed', {
       entryId: params.entryId,
       type: params.type,
@@ -431,6 +462,7 @@ async function processWaitlistConfirmationEmail(params: {
     tx,
     entryId: entry.id,
     type: 'waitlist_confirmation',
+    recipientEmail: entry.email,
     message,
     target,
   });
@@ -589,6 +621,7 @@ async function processApprovalInviteEmail(params: {
     tx,
     entryId: entry.id,
     type: 'approval_invite',
+    recipientEmail: entry.email,
     message,
     target,
   });
@@ -681,11 +714,23 @@ async function processWelcomeEmail(params: {
     };
   }
 
+  const error = getEmailError(emailResult) ?? 'Welcome email failed';
+  if (
+    isReservedRecipientSkip({
+      recipientEmail: entry.email,
+      result: emailResult,
+    })
+  ) {
+    return skippedWaitlistEmailResult({
+      entryId: entry.id,
+      type: payload.type,
+      detail: error,
+    });
+  }
   await tx
     .update(users)
     .set({ welcomeFailedAt: now, updatedAt: now })
     .where(eq(users.id, user.id));
-  const error = getEmailError(emailResult) ?? 'Welcome email failed';
   throw new Error(error);
 }
 
