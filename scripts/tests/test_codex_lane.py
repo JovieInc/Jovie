@@ -1414,7 +1414,8 @@ class SubscriptionPoolTest(Isolated):
 
     def test_verified_headroom_releases_a_quota_hold_left_by_an_outside_reset(self):
         self.reconcile()
-        codex.update_state(lambda st: st["current-login"].update(exhaustedUntil=self.NOW + 86400, lastKind="limit"))
+        codex.update_state(lambda st: st["current-login"].update(exhaustedUntil=self.NOW + 86400, lastKind="limit",
+                                                                     lastError=codex.METADATA_HOLD))
         self.assertFalse(codex.available("current-login", codex.read_state(), self.NOW))
         self.reconcile()
         state = codex.read_state()
@@ -1423,8 +1424,10 @@ class SubscriptionPoolTest(Isolated):
         self.assertTrue(codex.available("current-login", state, self.NOW))
 
     def test_depleted_window_auth_bank_or_pending_reset_keeps_the_hold(self):
-        cases = (("depleted", {"lastKind": "limit"}, 100), ("auth", {"lastKind": "auth"}, 1),
-                 ("pending", {"lastKind": "limit", "pendingReset": {"before": {}}}, 1))
+        meta = {"lastKind": "limit", "lastError": codex.METADATA_HOLD}
+        cases = (("depleted", meta, 100), ("auth", {"lastKind": "auth"}, 1),
+                 ("run-error-bank", {"lastKind": "limit", "lastError": "usage limit"}, 1),
+                 ("pending", {**meta, "pendingReset": {"before": {}}}, 1))
         for label, extra, used in cases:
             with self.subTest(label=label):
                 self.reconcile()
@@ -1437,7 +1440,7 @@ class SubscriptionPoolTest(Isolated):
                 codex.reconcile(self.NOW, if_due=0, fetch=fetch)
                 self.assertEqual(codex.read_state()["current-login"]["exhaustedUntil"], self.NOW + 86400)
                 codex.update_state(lambda st: [st["current-login"].pop(k, None)
-                                               for k in ("exhaustedUntil", "pendingReset", "lastKind")])
+                                               for k in ("exhaustedUntil", "pendingReset", "lastKind", "lastError")])
 
     def test_failed_observation_keeps_its_own_cadence_without_suppressing_other_profile(self):
         seen = []

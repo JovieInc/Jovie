@@ -697,6 +697,10 @@ def current_subscription_snapshot(name: str, *, lease_handle=None, sleep=time.sl
     raise TimeoutError("unreachable")
 
 
+# The lastError of a hold derived from public rate-limit metadata (a window at 100%).
+METADATA_HOLD = "public-subscription-capacity-exhausted"
+
+
 def reconcile_current_subscription(now, if_due, fetch, name=CURRENT_LOGIN) -> dict:
     """Observe one existing login; never redeem credits, rotate or clear banks.
 
@@ -799,12 +803,15 @@ def reconcile_current_subscription(now, if_due, fetch, name=CURRENT_LOGIN) -> di
                 entry["capacityLease"] = value
                 # A quota hold outlives the window it was recorded in when the reset is
                 # redeemed outside the lane (2026-11-02: Tim redeemed a banked reset, readback
-                # showed 99%, and the stale hold kept codex at 0 seats). A verified observation
-                # with headroom in every window releases a quota hold only; auth banks and
-                # pending lane redemptions stay with their own owners.
+                # showed 99%, and the stale hold kept codex at 0 seats). Only a hold this module
+                # derived from the same public metadata (run_account: a window at 100%) is
+                # released by a newer verified reading of that metadata with headroom in every
+                # window. Banks from a run's own usage-limit error, auth banks and pending lane
+                # redemptions stay with their owners (test_reconciliation_keeps_..._banks).
                 remaining = list((value.get("usableCapacityRemaining") or {}).values())
                 held = entry.get("exhaustedUntil")
                 if (type(held) in (int, float) and held > now and entry.get("lastKind") == "limit"
+                        and entry.get("lastError") == METADATA_HOLD
                         and not entry.get("pendingReset") and remaining
                         and all(type(row.get("remainingPercent")) in (int, float) and row["remainingPercent"] > 0
                                 for row in remaining)):
@@ -1173,7 +1180,7 @@ def run_account(name: str, handle, cmd: list[str], prompt: str, cwd, now: float,
                     row = st.setdefault(name, {})
                     if float(row.get("exhaustedUntil") or 0) < depleted:
                         row.update(exhaustedUntil=depleted, lastKind="limit", lastExit=NO_ACCOUNT_EXIT,
-                                   lastRunAt=observed_at, lastError="public-subscription-capacity-exhausted")
+                                   lastRunAt=observed_at, lastError=METADATA_HOLD)
                 update_state(bank)
                 return NO_ACCOUNT_EXIT, "limit", depleted
         update_state(lambda st: st.setdefault(name, {}).update(
