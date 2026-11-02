@@ -418,13 +418,17 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(34);
+    expect(LANES_PYTEST_FILES).toHaveLength(35);
     expect(whole).toContain('scripts/tests/test_priority_admission.py');
     expect(STRUCTURAL_PYTHON_REGRESSION_COMMANDS.join(' ')).toContain(
       'priority_admission.py" --fail-under=80'
     );
     expect(whole).toContain('scripts/tests/test_factory_signals.py');
     expect(whole).toContain('scripts/tests/test_factory_intake.py');
+    expect(whole).toContain('scripts/tests/test_cloud_lane.py');
+    expect(command).toContain(
+      'coverage report --include="*/scripts/lanes/cloud_lane.py" --fail-under=90'
+    );
     expect(whole).toContain('scripts/tests/test_hyperagent_cli.py');
     expect(whole).toContain('scripts/tests/test_model_radar.py');
     expect(command).toContain(
