@@ -52,7 +52,7 @@ const CREATOR_SHELL_SLICE_ROUTES = [
   },
   {
     id: 'creator-inbox-nav',
-    path: APP_ROUTES.DASHBOARD,
+    path: APP_ROUTES.INBOX,
     measureMode: 'warm-navigation',
     warmupStrategy: 'authenticated-shell',
     primaryMetric: 'warm-shell-response',
