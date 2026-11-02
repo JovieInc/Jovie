@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { hashShotSources } from '../../../apps/web/scripts/product-shots/source-hash.mjs';
-import { SOURCE_GUARDS } from '../../ci-fast-lanes.mjs';
+import { SOURCE_GUARDS, selectSourceGuards } from '../../ci-fast-lanes.mjs';
 import { REPO_ROOT } from './paths.mjs';
 import {
   checkFreshness,
@@ -100,6 +100,25 @@ describe('raw product imagery in marketing source', () => {
 });
 
 describe('CI wiring', () => {
+  it('selects shot checks for both onboarding generations without widening to unrelated dashboard work', () => {
+    const selected = source =>
+      selectSourceGuards('pull_request', [source]).some(
+        guard => guard.id === 'art-direction'
+      );
+    for (const source of [
+      'apps/web/components/features/dashboard/organisms/onboarding/Step.tsx',
+      'apps/web/components/features/dashboard/organisms/onboarding-v2/shared/types.ts',
+    ]) {
+      assert.equal(selected(source), true, source);
+    }
+    for (const source of [
+      'apps/web/components/features/dashboard/organisms/table/Row.tsx',
+      'apps/web/components/features/dashboard/organisms/onboarding-v20/Step.tsx',
+    ]) {
+      assert.equal(selected(source), false, source);
+    }
+  });
+
   it('runs the art-direction lane when any shot source changes', () => {
     const lane = SOURCE_GUARDS.find(guard => guard.id === 'art-direction');
     assert.ok(lane, 'art-direction lane exists');

@@ -195,6 +195,19 @@ class SelectionTest(unittest.TestCase):
         target.labels.remove("dispatch-next")
         self.assertIs(lane.pick_issue([old, ci, target], {}, now=now), ci)
 
+    def test_marketing_priority_is_reversible_and_keeps_urgent_and_eligibility(self):
+        now = datetime(2026, 10, 16, tzinfo=timezone.utc).timestamp()
+        marketing = issue("JOV-MKT", priority=4, created="2026-10-15T23:00:00Z",
+                          labels=["agent-ready", "priority:marketing"])
+        ci = issue("JOV-CI", priority=2, created="2026-09-01T00:00:00Z", labels=["ws:ci"])
+        urgent = issue("JOV-P0", priority=1, created="2026-10-15T23:00:00Z")
+        self.assertIs(lane.pick_issue([ci, marketing], {}, now=now), marketing)
+        self.assertIs(lane.pick_issue([marketing, urgent], {}, now=now), urgent)
+        self.assertIs(lane.pick_issue([marketing, ci], {}, now=now,
+                                     in_flight=frozenset({marketing.identifier})), ci)
+        marketing.labels.remove("priority:marketing")
+        self.assertIs(lane.pick_issue([marketing, ci], {}, now=now), ci)
+
     def test_explicit_urgent_precedes_aged_or_designated_lower_priority(self):
         now = datetime(2026, 10, 16, tzinfo=timezone.utc).timestamp()
         urgent = issue("JOV-URGENT", priority=1, created="2026-10-15T23:00:00Z")
@@ -12986,6 +12999,7 @@ with open(os.environ['INSTALL_COMMAND_LOG'], 'a') as log:
                     self.assertIn("factory_watchdog.py", watchdog_service)
                     self.assertNotIn("After=jovie-lanes.service", watchdog_service)
                     self.assertIn("OnUnitActiveSec=60s", watchdog_timer)
+                    self.assertIn("OnCalendar=minutely", watchdog_timer)
                 self.assertEqual(timer_path.split(":")[0], str(bin_dir))
                 if with_gbrain:
                     self.assertEqual(shutil.which("gbrain", path=timer_path), str(brain))
