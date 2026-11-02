@@ -1707,6 +1707,9 @@ const SENTRY_AUTOFIX_RECURRENCE_LANE = [
   '.github/workflows/sentry-autofix-recurrence.yml',
   '.github/workflows/sentry-autofix.yml',
   'scripts/sentry-autofix-recurrence.mjs',
+  'scripts/sentry-autofix-intake.mjs',
+  'scripts/lib/__tests__/sentry-autofix-intake.test.mjs',
+  'docs/ops/SENTRY_AUTOFIX_COMMISSIONING.md',
   'scripts/lib/sentry-validation-observation.mjs',
   'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
@@ -2204,6 +2207,7 @@ describe('automation-verify affected scope', () => {
         pythonTests: ['scripts/tests/test_agent_workflow_hygiene.py'],
         pythonUnittestTests: [],
         scriptVitestTests: [
+          'scripts/lib/__tests__/sentry-autofix-intake.test.mjs',
           'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
           'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
           'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
@@ -2227,6 +2231,10 @@ describe('automation-verify affected scope', () => {
         'lib/__tests__/sentry-validation-observation.test.mjs',
         '--coverage.include=lib/sentry-validation-observation.mjs',
         '--coverage.include=sentry-autofix-recurrence.mjs',
+        '--coverage.include=sentry-autofix-intake.mjs',
+        '--coverage.thresholds.**/sentry-autofix-intake*.lines=90',
+        '--coverage.thresholds.**/sentry-autofix-intake*.branches=90',
+        '--coverage.thresholds.**/sentry-autofix-intake*.functions=95',
       ])
     );
     expect(
