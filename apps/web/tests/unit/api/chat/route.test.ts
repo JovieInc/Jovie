@@ -438,6 +438,47 @@ describe('POST /api/chat guard wiring', () => {
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
   });
 
+  it('answers a weekly growth question from known state without calling the model', async () => {
+    const response = await POST(
+      chatRequest({
+        messages: [
+          {
+            id: 'm1',
+            role: 'user',
+            parts: [
+              {
+                type: 'text',
+                text: 'What should I do this week to get more listeners?',
+              },
+            ],
+          },
+        ],
+        artistContext: {
+          displayName: 'Tim White',
+          username: 'timwhite',
+          bio: null,
+          genres: [],
+          spotifyFollowers: null,
+          spotifyPopularity: null,
+          profileViews: 0,
+          hasSocialLinks: true,
+          hasMusicLinks: false,
+          tippingStats: {
+            tipClicks: 0,
+            tipsSubmitted: 0,
+            totalReceivedCents: 0,
+            monthReceivedCents: 0,
+          },
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-chat-fast-path')).toBe('weekly_growth');
+    expect(await response.text()).toContain('Add your streaming links.');
+    expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+  });
+
   it('returns 400 before charging rate-limit quota when neither profileId nor artistContext is provided', async () => {
     const response = await POST(
       chatRequest(validBody({ profileId: undefined }))

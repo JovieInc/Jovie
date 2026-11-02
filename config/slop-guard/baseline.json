@@ -25,7 +25,7 @@
     "apps/web/app/api/audience/visit/route.ts": 793,
     "apps/web/app/api/billing/health/route.ts": 583,
     "apps/web/app/api/chat/onboarding-handler.ts": 1526,
-    "apps/web/app/api/chat/route.ts": 3340,
+    "apps/web/app/api/chat/route.ts": 3280,
     "apps/web/app/api/cron/send-release-notifications/route.ts": 906,
     "apps/web/app/api/images/upload/route.ts": 526,
     "apps/web/app/api/internal/ovie/summer-bottleneck/route.test.ts": 1609,
