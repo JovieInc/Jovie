@@ -19,7 +19,7 @@ concurrency:
 jobs:
   deterministic:
     name: Source Validation
-    runs-on: ubuntu-24.04
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || fromJSON(vars.RUNNER_SOURCE_VALIDATION || '"ubuntu-24.04"') }}
     timeout-minutes: 45
     permissions:
       actions: read
@@ -556,7 +556,7 @@ jobs:
           fi
   security:
     name: Security Evidence
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON(vars.RUNNER_SOURCE_VALIDATION || '"ubuntu-latest"') }}
     timeout-minutes: 20
     permissions:
       actions: read
@@ -615,7 +615,7 @@ jobs:
           config-file: ./.github/dependency-review-config.yml
   migration:
     name: Migration Guard
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON(vars.RUNNER_SOURCE_VALIDATION || '"ubuntu-latest"') }}
     timeout-minutes: 10
     permissions:
       actions: read
@@ -671,7 +671,7 @@ jobs:
           node scripts/db/lint-changed-migrations.mjs --base "$base_sha"
   coverage:
     name: Exact-head Coverage
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON(vars.RUNNER_SOURCE_VALIDATION || '"ubuntu-latest"') }}
     timeout-minutes: 30
     permissions:
       actions: read
@@ -782,7 +782,7 @@ jobs:
   # differed from the PR head for 92 of 103 sampled merges.
   unit:
     name: Affected Unit Tests (${{ matrix.shard }})
-    runs-on: ubuntu-24.04
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || fromJSON(vars.RUNNER_SOURCE_VALIDATION || '"ubuntu-24.04"') }}
     timeout-minutes: 30
     permissions:
       actions: read
@@ -864,7 +864,7 @@ jobs:
         run: pnpm --filter @jovie/ovie test
   a11y:
     name: A11y (UI paths)
-    runs-on: ubuntu-24.04
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || fromJSON(vars.RUNNER_SOURCE_VALIDATION || '"ubuntu-24.04"') }}
     timeout-minutes: 20
     permissions:
       actions: read
@@ -923,7 +923,7 @@ jobs:
     name: PR Ready
     if: ${{ always() }}
     needs: [deterministic, security, migration, coverage, unit, a11y]
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNNER_READY || '"ubuntu-latest"') }}
     permissions:
       contents: read
       actions: read

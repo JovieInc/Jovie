@@ -108,7 +108,7 @@ jobs:
       github.event.workflow_run.event == 'merge_group' &&
       github.event.workflow_run.head_repository.full_name == github.repository &&
       contains(fromJSON('["failure","timed_out","action_required","startup_failure","stale"]'), github.event.workflow_run.conclusion)
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNNER_CONTROL_PLANE || '"ubuntu-latest"') }}
     timeout-minutes: 5
     permissions:
       actions: read
@@ -181,7 +181,7 @@ jobs:
         (github.event.workflow_run.event == 'pull_request' ||
          github.event.workflow_run.event == 'pull_request_target')) ||
        needs.hold-failed-revision.result == 'success')
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNNER_CONTROL_PLANE || '"ubuntu-latest"') }}
     timeout-minutes: 5
     permissions:
       actions: write
@@ -1029,7 +1029,7 @@ jobs:
   dequeue-draft:
     name: Dequeue an exact draft head
     if: github.event_name == 'pull_request_target' && github.event.action == 'converted_to_draft'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNNER_CONTROL_PLANE || '"ubuntu-latest"') }}
     timeout-minutes: 3
     permissions:
       contents: read
@@ -1093,7 +1093,7 @@ jobs:
     if: >-
       contains(fromJSON('["workflow_dispatch","push","pull_request_target"]'), github.event_name) ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'merge_group')
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNNER_CONTROL_PLANE || '"ubuntu-latest"') }}
     timeout-minutes: 5
     permissions:
       contents: read
@@ -1148,7 +1148,7 @@ jobs:
       github.event_name == 'pull_request_target' &&
       github.event.action == 'labeled' &&
       contains(fromJSON('["hold","gated","incident","queue-deferred","queue-poison","lane-fix-red"]'), github.event.label.name)
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNNER_CONTROL_PLANE || '"ubuntu-latest"') }}
     timeout-minutes: 3
     permissions: {}
     steps:
@@ -1232,7 +1232,7 @@ jobs:
       needs.hold-failed-revision.result == 'success' &&
       github.event_name == 'workflow_run' &&
       github.event.workflow_run.event == 'merge_group'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNNER_CONTROL_PLANE || '"ubuntu-latest"') }}
     timeout-minutes: 8
     permissions:
       actions: read

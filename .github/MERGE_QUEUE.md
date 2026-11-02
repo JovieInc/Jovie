@@ -419,3 +419,17 @@ person or agent arming auto-merge by hand). When a parent merges,
 the parent's squash-merged commits, then dispatches green enroll's per-PR path
 for it, so admission (green head, holds, draft) stays in the single queue
 writer. `QUEUE_FREEZE=1` stops that dispatch; the retarget and rebase still run.
+
+## Runner pool variables
+
+Control-plane and the cheap required `PR Ready` job read their pool from repo
+variables so a saturated hosted pool can be relieved without a PR. Unset means
+`ubuntu-latest`. Values are JSON:
+
+- `RUNNER_CONTROL_PLANE`: Green Enroll, Lane Fix Relay, Auto-Ready Drafts, PR Fleet Rules and PR targets main (non-merge-group events). Gem: `["self-hosted","Linux","X64","jovie-fixed"]`.
+- `RUNNER_READY`: the `PR Ready` job in Source Validation.
+
+- `RUNNER_SOURCE_VALIDATION`: the six Source Validation jobs except `PR Ready`. Fork PRs always stay on their hosted label. Gem has 5 slots (one job each) against Source Validation's ~26 average concurrent hosted jobs, so only flip this for a measured subset; compare per-job time before and after.
+
+Fork PR Gate stays hosted: it handles untrusted fork events and must not run on persistent runners.
+Flip: `gh variable set RUNNER_CONTROL_PLANE --body '["self-hosted","Linux","X64","jovie-fixed"]'`; revert: `gh variable delete RUNNER_CONTROL_PLANE`.
