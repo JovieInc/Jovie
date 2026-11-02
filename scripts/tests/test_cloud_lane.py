@@ -100,6 +100,20 @@ class CloudLane(unittest.TestCase):
                 self.assertEqual(c.admit("codex", 1001, events + [
                     {"provider": "codex", "stage": "submitted", "task": "second", "at": 1000}])[1], "concurrency")
 
+    def test_submission_identity_requires_a_single_bare_stdout_id(self):
+        for stdout, stderr in (("warning mentions task_old\ntask_new", ""),
+                               ("task_one task_two", ""),
+                               ("", "task_stderr"),
+                               ("task_new", "previous task_old"),
+                               ("task_new", "unstructured diagnostic")):
+            with self.subTest(stdout=stdout, stderr=stderr):
+                self.p.unlink(missing_ok=True)
+                def run(*args, **kwargs):
+                    return subprocess.CompletedProcess(args, 0, stdout, stderr)
+                self.assertEqual(self.go(run=run)["route"], "held")
+                self.assertEqual([e["stage"] for e in c.read(self.p)], ["submitted", "held"])
+                self.assertEqual(self.go()["reason"], "already-submitted")
+
     def test_status_is_read_only_and_unknown_never_completes(self):
         self.assertEqual(c.status("J-1", path=self.p)["reason"], "remote-id-missing")
         self.go()

@@ -136,11 +136,13 @@ def route(task, provider, labels, text, branch, prompt, run=subprocess.run, now=
     except Exception as error:
         append({**base, "stage": "held", "at": now(), "reason": type(error).__name__}, path)
         return {"route": "held", "reason": "unknown-submit-outcome"}
-    out = (r.stdout or "") + (r.stderr or "")
-    # CLI diagnostics do not prove rejection; every ambiguous outcome stays held.
-    m = re.search(r"\b(task_[A-Za-z0-9_-]+)\b", out)
-    if r.returncode != 0 or not m:
-        append({**base, "stage": "held", "at": now(), "remote": m.group(1) if m else None}, path)
+    # This dormant adapter accepts only the narrow unambiguous response shape.
+    # Diagnostics, prose and multiple IDs cannot establish submission identity;
+    # unsupported real CLI formats stay held for commissioning reconciliation.
+    m = re.fullmatch(r"(task_[A-Za-z0-9_-]+)", (r.stdout or "").strip()) \
+        if r.returncode == 0 and not (r.stderr or "").strip() else None
+    if not m:
+        append({**base, "stage": "held", "at": now(), "remote": None}, path)
         return {"route": "held", "reason": "unknown-submit-outcome"}
     append({**base, "stage": "accepted", "at": now(), "remote": m.group(1)}, path)
     return {"route": "cloud", "reason": "ok", "remote": m.group(1)}
