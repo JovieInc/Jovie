@@ -74,6 +74,7 @@
     "e2e-full-matrix.yml#notify",
     "fleet-rules-evidence.yml#evidence",
     "fleet-rules-evidence.yml#rerun",
+    "fleet-rules-ready-rerun.yml#rerun-ready",
     "fork-pr-gate.yml#dependabot-gate",
     "fork-pr-gate.yml#fork-gate",
     "golden-path-nightly.yml#golden-path",

@@ -1,7 +1,4 @@
-# controller-hop-exception: jovie-controller-hop/v1
-# accountable-writer: Codex
-# necessary-trust-boundary: Existing Jovie Bot credentials publish only generated nightly evidence through draft PRs that trigger normal checks; the read-only checkout token cannot do this. No merge, deploy, or founder-decision authority is added.
-# revisit-trigger: Remove this publication hop when canonical nightly evidence no longer requires committed report files.
+# Evidence is data: it ships as the run artifact below, never as a PR (JovieInc/ci canon/COMPANY.md, "Data vs behaviour").
 name: Nightly Testing Agent
 
 on:
@@ -236,23 +233,6 @@ jobs:
             apps/web/reports/nightly-agent/last-run.json
           allow-markdown: 'true'
           retention-days: 90
-
-      - name: Generate report publication token
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-        id: report-token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
-          permission-contents: write
-          permission-pull-requests: write
-
-      - name: Open nightly evidence PR
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-        env:
-          GH_TOKEN: ${{ steps.report-token.outputs.token }}
-        run: |
-          node --input-type=module -e "import { publishNightlyReport } from './scripts/lib/publish-coverage-report.mjs'; console.log(publishNightlyReport());"
 
       - name: Retain immutable origin payload
         if: ${{ always() }}

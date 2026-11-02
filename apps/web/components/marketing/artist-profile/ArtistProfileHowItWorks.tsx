@@ -60,14 +60,8 @@ export function ArtistProfileHowItWorks({
           />
 
           <ol className='mt-9 border-t border-subtle'>
-            {howItWorks.steps.map((step, index) => (
-              <li
-                key={step.id}
-                className='grid grid-cols-[2rem_minmax(0,1fr)] gap-3 border-b border-subtle py-5'
-              >
-                <span className='font-mono text-3xs text-tertiary-token'>
-                  {String(index + 1).padStart(2, '0')}
-                </span>
+            {howItWorks.steps.map(step => (
+              <li key={step.id} className='border-b border-subtle py-5'>
                 <div>
                   <h3 className='text-sm font-semibold text-primary-token'>
                     {step.title}
@@ -91,15 +85,12 @@ export function ArtistProfileHowItWorks({
             </figcaption>
           </div>
           <ol className='ap-how-it-works__setup-flow'>
-            {SETUP_STAGES.map((stage, index) => (
+            {SETUP_STAGES.map(stage => (
               <li
                 key={stage.id}
                 className={`ap-how-it-works__setup-stage ap-how-it-works__setup-stage--${stage.id}`}
               >
                 <div className='ap-how-it-works__setup-stage-header'>
-                  <span className='font-mono text-3xs text-tertiary-token'>
-                    {String(index + 1).padStart(2, '0')}
-                  </span>
                   <strong className='text-sm font-semibold text-primary-token'>
                     {stage.label}
                   </strong>

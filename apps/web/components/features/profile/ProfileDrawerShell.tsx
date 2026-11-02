@@ -10,7 +10,12 @@ import { useModalFocusBoundary } from '@/lib/a11y/modal-focus-boundary';
 import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 import { cn } from '@/lib/utils';
 
-type ProfileDrawerNavigationLevel = 'root' | 'secondary';
+/**
+ * root: the menu (handle + title). secondary: a view reached from another
+ * sheet (back + title + close). direct: a task sheet opened on its own
+ * (title + close, no back, since there is nowhere to go back to).
+ */
+type ProfileDrawerNavigationLevel = 'root' | 'secondary' | 'direct';
 
 interface ProfileDrawerShellProps {
   readonly open: boolean;
@@ -28,6 +33,11 @@ interface ProfileDrawerShellProps {
   readonly presentation?: ProfileSurfacePresentation;
   /** Center short task titles between the existing equal 44px controls. */
   readonly centerTitle?: boolean;
+  /**
+   * Float the sheet above the bottom safe area with all corners rounded, so
+   * a short task sheet ends on its own edge instead of the screen's.
+   */
+  readonly floating?: boolean;
 }
 
 export function ProfileDrawerShell({
@@ -43,6 +53,7 @@ export function ProfileDrawerShell({
   dataTestId,
   presentation = 'standalone',
   centerTitle = false,
+  floating = false,
 }: ProfileDrawerShellProps) {
   const titleId = useId();
   const modalRef = useRef<HTMLElement | null>(null);
@@ -50,6 +61,7 @@ export function ProfileDrawerShell({
   const accessibleDescriptionId = useId();
   const accessibleDescription = subtitle ?? 'Profile menu and actions.';
   const isSecondaryHeader = navigationLevel === 'secondary' && Boolean(onBack);
+  const isDirectHeader = navigationLevel === 'direct';
   const handleDismiss = useCallback(() => onOpenChange(false), [onOpenChange]);
   const attachModalRef = useCallback((node: HTMLElement | null) => {
     modalRef.current = node;
@@ -68,10 +80,16 @@ export function ProfileDrawerShell({
     ['--profile-drawer-height-max' as string]: 'min(472px, 62dvh)',
     ['--profile-drawer-header' as string]: '72px',
   } as React.CSSProperties;
-  const contentClasses = `relative flex max-h-(--profile-drawer-height-max) w-full flex-col overflow-hidden rounded-t-(--profile-drawer-radius-mobile) border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-8px_40px_rgba(0,0,0,0.4)] md:max-w-(--profile-shell-max-width) md:rounded-t-(--profile-drawer-radius-desktop) before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent)] ${contentClassName ?? ''}`;
+  const contentClasses = `relative flex max-h-(--profile-drawer-height-max) w-full flex-col overflow-hidden rounded-t-(--profile-drawer-radius-mobile) border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-8px_40px_rgba(0,0,0,0.4)] md:max-w-(--profile-shell-max-width) md:rounded-t-(--profile-drawer-radius-desktop) before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent)] ${floating ? 'profile-drawer-floating' : ''} ${contentClassName ?? ''}`;
   // Fixed height (not min-h) so overflow-y-auto activates on overflow; min-h
   // lets the body grow past the parent's max-h and get clipped by overflow-hidden.
-  const bodyClasses = `relative z-10 h-[calc(var(--profile-drawer-height-max)_-_var(--profile-drawer-header))] overflow-y-auto overscroll-contain [touch-action:pan-y] [will-change:scroll-position] px-5 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] pt-3 ${bodyClassName ?? ''}`;
+  // Docked sheets keep one fixed body height so switching views never jumps.
+  // A floating task sheet sizes to its content (capped at the same height),
+  // so a short list ends on the sheet's edge instead of empty space.
+  const bodyHeightClass = floating
+    ? 'profile-drawer-floating-body'
+    : 'h-[calc(var(--profile-drawer-height-max)_-_var(--profile-drawer-header))]';
+  const bodyClasses = `relative z-10 ${bodyHeightClass} overflow-y-auto overscroll-contain [touch-action:pan-y] [will-change:scroll-position] px-5 ${floating ? '' : 'pb-[calc(1.25rem_+_env(safe-area-inset-bottom))]'} pt-3 ${bodyClassName ?? ''}`;
 
   const header = (
     <>
@@ -95,7 +113,7 @@ export function ProfileDrawerShell({
             </button>
 
             <div
-              className='min-h-[2.625rem] min-w-0 py-px'
+              className='flex min-h-[2.625rem] min-w-0 flex-col justify-center py-px'
               data-testid='profile-drawer-title-slot'
             >
               <h2
@@ -138,6 +156,40 @@ export function ProfileDrawerShell({
               <X className='h-4 w-4' />
             </button>
           </div>
+        ) : isDirectHeader ? (
+          <div
+            className='flex items-center gap-3 pt-5'
+            data-testid='profile-drawer-direct-header'
+          >
+            <div
+              className='flex min-h-[2.625rem] min-w-0 flex-1 flex-col justify-center py-px'
+              data-testid='profile-drawer-title-slot'
+            >
+              <h2
+                id={titleId}
+                className='truncate text-mid font-semibold leading-[1.08] tracking-[-0.018em] text-primary-token'
+              >
+                {title}
+              </h2>
+              {subtitle ? (
+                <p
+                  id={subtitleId}
+                  className='mt-0.5 truncate text-3xs font-[440] leading-[1.1] tracking-tight text-tertiary-token'
+                >
+                  {subtitle}
+                </p>
+              ) : null}
+            </div>
+            <button
+              type='button'
+              onClick={handleDismiss}
+              className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[color:var(--color-bg-hover)] text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-interactive-active hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+              aria-label='Close'
+              data-testid='profile-drawer-close-button'
+            >
+              <X className='h-4 w-4' />
+            </button>
+          </div>
         ) : (
           <div className='pt-5' data-testid='profile-drawer-root-header'>
             <div
@@ -163,7 +215,7 @@ export function ProfileDrawerShell({
         )}
       </div>
 
-      {isSecondaryHeader ? (
+      {isSecondaryHeader || isDirectHeader ? (
         <div className='mx-5 h-px bg-[color:var(--color-border-subtle)]' />
       ) : null}
     </>
@@ -200,7 +252,7 @@ export function ProfileDrawerShell({
           tabIndex={-1}
         >
           <div
-            className={`relative flex max-h-(--profile-drawer-height-max) w-full flex-col overflow-hidden rounded-t-(--profile-drawer-radius-desktop) border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-16px_52px_rgba(0,0,0,0.5)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent)] ${contentClassName ?? ''}`}
+            className={`relative flex max-h-(--profile-drawer-height-max) w-full flex-col overflow-hidden rounded-t-(--profile-drawer-radius-desktop) border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-16px_52px_rgba(0,0,0,0.5)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent)] ${floating ? 'profile-drawer-floating' : ''} ${contentClassName ?? ''}`}
           >
             <span id={accessibleDescriptionId} className='sr-only'>
               {accessibleDescription}

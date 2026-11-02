@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { type ReactNode, useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildEntryProfileBuilderState,
   OnboardingShell,
+  OnboardingShellStatus,
 } from './OnboardingShell';
 
 vi.mock('@/components/organisms/AppShellFrame', () => ({
@@ -109,6 +110,33 @@ vi.mock('@/components/features/onboarding/useOnboardingClaim', () => ({
     return claimState.value;
   },
 }));
+
+/** A restored transcript as `readOnboardingMessages` builds it. */
+function nextStepTranscript(
+  kind: 'waitlist' | 'instant_access' | 'needs_more_info'
+) {
+  return [
+    ...STARTED_CONVERSATION,
+    {
+      id: 'm2',
+      role: 'assistant' as const,
+      parts: [
+        { type: 'text' as const, text: 'Sign up below to hold your name.' },
+        {
+          type: 'dynamic-tool' as const,
+          toolName: 'proposeNextStep',
+          toolCallId: 'call-next-step',
+          state: 'output-available' as const,
+          input: {},
+          output: {
+            action: 'propose_next_step',
+            decision: { kind, rationale: 'test', score: 1 },
+          },
+        },
+      ],
+    },
+  ];
+}
 
 const STARTED_CONVERSATION = [
   {
@@ -314,7 +342,7 @@ describe('OnboardingShell status', () => {
     expect(signIn).toHaveFocus();
   });
 
-  it('reports a failed chat start without verification jargon or error codes', () => {
+  it('never dead-ends a failed bot check: the chat sends on the unverified path', () => {
     render(<OnboardingShell sessionLabel='pending' />);
 
     act(() => {
@@ -324,11 +352,8 @@ describe('OnboardingShell status', () => {
       });
     });
 
-    const alert = screen.getByText(
-      "We couldn't start your chat. Refresh the page to try again."
-    );
-    expect(alert).toHaveAttribute('role', 'alert');
-    expect(alert.textContent).not.toMatch(/verification failed|\(\d+\)/i);
+    expect(screen.queryByText(/couldn.t start your chat/i)).toBeNull();
+    expect(chatProps.current?.turnstileToken).toBe('jv-unverified:error');
   });
 
   it('passes headerOverlay to the chat while the visitor is anonymous (JOV-7192)', () => {
@@ -361,7 +386,7 @@ describe('OnboardingShell status', () => {
     expect(screen.getByTestId('onboarding-profile-rail')).toBeInTheDocument();
   });
 
-  it('keeps the rail hidden for an open handle with no page yet', () => {
+  it('shows the draft profile for an open handle from the first paint (Pen R6As7U)', () => {
     render(
       <OnboardingShell
         sessionLabel='pending'
@@ -369,9 +394,11 @@ describe('OnboardingShell status', () => {
       />
     );
 
+    const rail = screen.getByTestId('onboarding-profile-rail');
     expect(
-      screen.queryByTestId('onboarding-profile-rail')
-    ).not.toBeInTheDocument();
+      within(rail).getByRole('heading', { name: 'Your Draft Profile' })
+    ).toBeInTheDocument();
+    expect(within(rail).getByText('jov.ie/newartist')).toBeInTheDocument();
   });
 
   it('keeps the profile preview in the chat main rather than the shell overlay', () => {
@@ -413,6 +440,43 @@ describe('OnboardingShell status', () => {
 
     expect(claimState.trigger).toBe(1);
     expect(claimState.enabled).toBe(true);
+  });
+
+  // Golden-path cert 2026-10-31 pm (walk-m1..m3): the OTP form hard-navigates
+  // to /start while a claim POST from the pre-navigation page is in flight.
+  // The server commits ownership, the response is lost, and the reloaded page
+  // restores an owned transcript that already ends in the waitlist decision.
+  // That restore must claim on mount (the server's idempotent alreadyClaimed
+  // recovery returns the receipt), or the visitor waits on "Saving your
+  // request…" forever.
+  it.each(['waitlist', 'instant_access'] as const)(
+    'claims on mount when a restored owned transcript already ends in a %s decision',
+    kind => {
+      render(
+        <OnboardingShell
+          sessionLabel='saved'
+          isSignedIn
+          resumeOwnedConversation
+          initialMessages={nextStepTranscript(kind)}
+        />
+      );
+
+      expect(claimState.trigger).toBe(0);
+      expect(claimState.enabled).toBe(true);
+    }
+  );
+
+  it('keeps a restored owned transcript without a terminal decision quiet until a genuine turn', () => {
+    render(
+      <OnboardingShell
+        sessionLabel='saved'
+        isSignedIn
+        resumeOwnedConversation
+        initialMessages={nextStepTranscript('needs_more_info')}
+      />
+    );
+
+    expect(claimState.enabled).toBe(false);
   });
 
   it('clears a rejected challenge token and keeps a fresh verification action available', () => {
@@ -466,6 +530,17 @@ describe('buildEntryProfileBuilderState (JOV-7753)', () => {
     ).toBeNull();
     expect(buildEntryProfileBuilderState(null).artist).toBeNull();
   });
+
+  it('seeds the draft panel with an open handle before the first message (Pen R6As7U)', () => {
+    expect(
+      buildEntryProfileBuilderState({ status: 'available', handle: 'timwhite' })
+    ).toEqual({
+      artist: null,
+      artistConfirmed: false,
+      handle: 'timwhite',
+      socialLinks: [],
+    });
+  });
 });
 
 // JOV-7973: the /start shell pane must clip without owning a programmatically
@@ -485,5 +560,22 @@ describe('OnboardingShell route pane (JOV-7973)', () => {
 
     expect(source).toContain("contentClassName='overflow-clip!'");
     expect(source).not.toContain("contentClassName='overflow-hidden!'");
+  });
+});
+
+describe('OnboardingShellStatus (2026-10-31 golden-path walk)', () => {
+  it('shows the status in words, never a bare skeleton bar', () => {
+    render(
+      <OnboardingShellStatus
+        kind='status'
+        message='Saving this conversation to your account…'
+        visible
+      />
+    );
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent(
+      'Saving this conversation to your account…'
+    );
+    expect(status.querySelector('.sr-only')).toBeNull();
   });
 });

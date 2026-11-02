@@ -62,11 +62,19 @@ LOCKFILES = frozenset({"pnpm-lock.yaml"})
 # Conflicts confined to machine-derived files resolve without a model: take main's copy,
 # run the file's canonical regenerator, push. JOV-6837 covered the lockfile; JOV-7594
 # extends the same deterministic rung to the generated workflow topology so Symphony PRs
-# stop hand-merging `.gen.` output.
+# stop hand-merging `.gen.` output. rule-scopes.json hashes are derived from
+# .claude/rules; --write rebuilds them from the merged rule files.
 GENERATED_RESOLVERS = {
+    "canon/SOURCES_OF_TRUTH.md": ("node", "scripts/sources-of-truth.mjs", "--write"),
     ".github/workflow-topology.gen.yml": ("pnpm", "ci:topology:write"),
     "pnpm-lock.yaml": ("pnpm", "install", "--lockfile-only", "--ignore-scripts"),
+    # Integrity record of the scoped rule files: recomputed from the merged rule bodies.
+    "scripts/agent-context/rule-scopes.json": ("node", "scripts/agent-context/rule-scopes.mjs", "--write"),
 }
+# Append-only registries: both sides' added lines are the merge (git merge-file --union), so a
+# conflict is never a model's call.
+UNION_MERGE_FILES = frozenset({"canon/automation-registry.jsonl"})
+RESOLVABLE_CONFLICT_FILES = frozenset(GENERATED_RESOLVERS) | UNION_MERGE_FILES
 # Only a secret-like file is a human call; an oversize diff is split by a repair lane and a
 # lockfile without its manifest is fixed by one (Tim 2026-10-12: no dead-end holds).
 DIFF_POLICY = frozenset({"secret-file"})

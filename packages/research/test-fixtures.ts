@@ -8,6 +8,8 @@ export function sampleResult(
 ): ResearchResult {
   return {
     schema: 'jovie-research-result/v1',
+    verdict: 'ok',
+    reasons: [],
     query: 'exa pricing',
     key: 'k1',
     freshness: 'month',

@@ -107,6 +107,12 @@ export const ServerEnvSchema = z.object({
   RESEND_REPLY_TO_EMAIL: z.string().email().optional(),
   RESEND_WEBHOOK_SECRET: z.string().optional(),
   RESEND_INBOUND_WEBHOOK_SECRET: z.string().optional(),
+  // Read-capable key for received-email bodies (RESEND_API_KEY is send-only).
+  RESEND_RECEIVING_API_KEY: z.string().optional(),
+  // JOV-9779 release-email canary: the only scope the audience-delivery
+  // carve-out admits. Both unset (or invalid) keeps every send denied.
+  RELEASE_EMAIL_CANARY_PROFILE_ID: z.string().uuid().optional(),
+  RELEASE_EMAIL_CANARY_INBOX: z.string().email().optional(),
 
   // Slack notifications (admin alerts for claims, signups, upgrades, waitlist)
   SLACK_WEBHOOK_URL: z.string().url().optional(),
@@ -370,6 +376,9 @@ export const ServerEnvSchema = z.object({
   HELICONE_GATEWAY_BASE_URL: z.string().url().optional(),
   /** Helicone API key sent as `Helicone-Auth` when routing through the proxy. */
   HELICONE_API_KEY: z.string().optional(),
+  /** Cloudflare Workers AI (second model provider, paid from Cloudflare credits). Off when unset. */
+  WORKERS_AI_TOKEN: z.string().optional(),
+  WORKERS_AI_BASE_URL: z.string().url().optional(),
   // Hermes HUD events ingest authentication
   HERMES_HUD_API_KEY: z.string().optional(),
   HUD_AGENT_RUNS_FIXTURES: z
@@ -572,6 +581,9 @@ export const ENV_KEYS = [
   'RESEND_REPLY_TO_EMAIL',
   'RESEND_WEBHOOK_SECRET',
   'RESEND_INBOUND_WEBHOOK_SECRET',
+  'RESEND_RECEIVING_API_KEY',
+  'RELEASE_EMAIL_CANARY_PROFILE_ID',
+  'RELEASE_EMAIL_CANARY_INBOX',
   'SLACK_WEBHOOK_URL',
   'DATABASE_URL',
   'DB_POOL_MAX',
@@ -713,6 +725,8 @@ export const ENV_KEYS = [
   'AI_GATEWAY_API_KEY',
   'HELICONE_GATEWAY_BASE_URL',
   'HELICONE_API_KEY',
+  'WORKERS_AI_TOKEN',
+  'WORKERS_AI_BASE_URL',
   'HERMES_HUD_API_KEY',
   'HUD_AGENT_RUNS_FIXTURES',
   'OPENAI_API_KEY',

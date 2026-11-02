@@ -37,6 +37,10 @@ import { isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { createOnboardingReceiptPendingError } from '@/lib/errors/onboarding';
 import { attributeLeadSignupFromAppUserId } from '@/lib/leads/funnel-events';
+import {
+  getArtistIdentityConfidence,
+  requestArtistIdentityConfirmation,
+} from '@/lib/music-resolver/artist-identity-confidence.server';
 import { musicfetchNetworkAllowed } from '@/lib/music-resolver/musicfetch-gate';
 import { refreshFeaturedPlaylistFallbackCandidate } from '@/lib/profile/featured-playlist-fallback';
 import {
@@ -556,6 +560,19 @@ export async function connectOnboardingSpotifyArtist(
           creatorProfileId: profile.id,
         }
       );
+    }
+
+    // Right-artist gate (JOV-7323): after discovery records ISRC evidence,
+    // a profile below the confidence bar asks its owner to confirm the
+    // artist in-product instead of being auto-approved.
+    try {
+      const identity = await getArtistIdentityConfidence(profile.id);
+      if (identity) await requestArtistIdentityConfirmation(identity);
+    } catch (error) {
+      void captureError('Artist identity confidence check failed', error, {
+        action: 'connectOnboardingSpotifyArtist',
+        creatorProfileId: profile.id,
+      });
     }
 
     if (!params.skipMusicFetchEnrichment && musicfetchNetworkAllowed()) {

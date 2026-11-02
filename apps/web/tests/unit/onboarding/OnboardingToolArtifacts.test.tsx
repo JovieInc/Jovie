@@ -77,13 +77,19 @@ describe('onboarding tool artifacts', () => {
       />
     );
 
-    expect(screen.getByTestId('onboarding-artist-picker')).toBeDefined();
-    expect(screen.getByDisplayValue('Test Artist')).toBeDefined();
+    // Pen R6As7U: the top match is proposed with one confirm, no list.
+    const picker = screen.getByTestId('onboarding-artist-picker');
+    expect(picker).toHaveAttribute('data-mode', 'proposal');
+    expect(screen.getByText('Is This You?')).toBeDefined();
     expect(screen.getByText('Test Artist')).toBeDefined();
     expect(screen.getByText(/12\.3K followers/)).toBeDefined();
+    // No internal Spotify popularity score (2026-10-31 walk).
+    expect(screen.queryByText(/Pop 48/)).toBeNull();
     expect(screen.queryByText('searchSpotifyArtist')).toBeNull();
+    expect(screen.queryByText('Use')).toBeNull();
+    expect(screen.queryByDisplayValue('Test Artist')).toBeNull();
 
-    fireEvent.click(screen.getByText('Use'));
+    fireEvent.click(screen.getByRole('button', { name: "That's Me" }));
 
     expect(onSelectArtist).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -277,13 +283,20 @@ describe('onboarding tool artifacts', () => {
       />
     );
 
-    expect(screen.getByText('@validartist')).toBeDefined();
+    // Pen R6As7U: one line ("jov.ie/<handle> is available"), the handle shown
+    // once, and the field behind an explicit Change Handle action.
+    expect(screen.getByText('jov.ie/validartist')).toBeDefined();
     expect(screen.getByText('is available')).toBeDefined();
+    expect(screen.queryByText('@validartist')).toBeNull();
+    expect(screen.getAllByText(/validartist/)).toHaveLength(1);
+    expect(screen.queryByLabelText('Edit Proposed Handle')).toBeNull();
+    expect(screen.queryByText('checkHandle')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change Handle' }));
     expect(screen.getByLabelText('Edit Proposed Handle')).toHaveValue(
       'validartist'
     );
-    expect(screen.getByText('jov.ie/validartist')).toBeDefined();
-    expect(screen.queryByText('checkHandle')).toBeNull();
+    expect(screen.getByLabelText('Edit Proposed Handle')).toHaveFocus();
 
     fireEvent.change(screen.getByLabelText('Edit Proposed Handle'), {
       target: { value: 'test' },
@@ -309,6 +322,9 @@ describe('onboarding tool artifacts', () => {
     );
 
     expect(screen.getByText('is not available')).toBeDefined();
+    // A taken name offers one way forward, not a disabled confirm.
+    expect(screen.queryByTestId('onboarding-confirm-handle')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Change Handle' })).toBeDefined();
     const card = screen.getByTestId('onboarding-handle-check');
     expect(card.className).toContain('text-error');
     expect(card.className).not.toMatch(/\bred-\d/);
@@ -381,6 +397,22 @@ describe('onboarding tool artifacts', () => {
     expect(screen.queryByTestId('onboarding-attach-account')).toBeNull();
   });
 
+  it('asks for the profile URL without fan vocabulary', () => {
+    fastRender(
+      <OnboardingSocialLinkCard
+        state='output-available'
+        output={{ action: 'propose_social_link', url: null }}
+        onAttachAccount={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByText(
+        'Paste the full profile URL, like instagram.com/yourname.'
+      )
+    ).toBeDefined();
+    expect(screen.queryByText(/fans/i)).toBeNull();
+  });
+
   it('renders proposed social links with Attach Account CTA', () => {
     const onAttachAccount = vi.fn();
     fastRender(
@@ -446,8 +478,34 @@ describe('onboarding tool artifacts', () => {
       />
     );
 
+    // The list, search and None of These sit behind Not Me.
+    expect(screen.queryByRole('button', { name: 'None of These' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Not Me' }));
+    expect(screen.getByDisplayValue('Test Artist')).toBeDefined();
+    expect(screen.getByText('Use')).toBeDefined();
+
     fireEvent.click(screen.getByRole('button', { name: 'None of These' }));
     expect(onNoneOfThese).toHaveBeenCalled();
+  });
+
+  it('keeps the search field mounted while the artist name is typed', () => {
+    fastRender(
+      <OnboardingSpotifyArtistPickerCard
+        state='output-available'
+        output={{ action: 'open_artist_picker', query: '' }}
+        onSelectArtist={vi.fn()}
+      />
+    );
+    // Prod 2026-11-01: the first keystroke swapped the field for the
+    // proposal card, so every later keystroke was lost.
+    mocks.artistSearch.isPending = true;
+    const field = screen.getByPlaceholderText('Search Spotify artists');
+    fireEvent.change(field, { target: { value: 'U' } });
+    const after = screen.getByPlaceholderText('Search Spotify artists');
+    fireEvent.change(after, { target: { value: 'Un' } });
+    expect(
+      screen.getByPlaceholderText('Search Spotify artists')
+    ).toHaveProperty('value', 'Un');
   });
 
   it('routes picker, handle, and social fields through one focus owner', () => {
@@ -473,6 +531,8 @@ describe('onboarding tool artifacts', () => {
         />
       </>
     );
+    // The handle field is behind Change Handle (Pen R6As7U); open it.
+    fireEvent.click(screen.getByRole('button', { name: 'Change Handle' }));
 
     const fields = screen
       .getAllByRole('textbox')

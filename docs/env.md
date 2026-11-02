@@ -151,6 +151,20 @@ Helicone API key sent as the `Helicone-Auth` header when
 `HELICONE_GATEWAY_BASE_URL` is configured. Required for Helicone logging when
 the proxy is enabled.
 
+### `WORKERS_AI_TOKEN`
+
+Bearer for the `jovie-workers-ai` relay Worker (`infra/workers-ai-relay`), the
+second model provider. Workers AI is paid from Cloudflare startup credits, so
+background calls go there first and the Vercel AI Gateway is the fallback; chat
+stays Gateway-first and fails over to Workers AI when Gateway credits run out
+(`apps/web/lib/ai/routing.json`). When unset, Jovie is Gateway-only. The relay
+uses the Workers AI binding, so no Cloudflare API token is needed.
+
+### `WORKERS_AI_BASE_URL`
+
+Optional override for the relay base URL (defaults to
+`https://jovie-workers-ai.tim-fd8.workers.dev/v1`). Use it for a staging relay.
+
 ## Eve Core-Chat Shadow Bridge
 
 The Eve bridge is disabled by default. When enabled in `shadow` mode, the

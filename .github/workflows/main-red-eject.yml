@@ -1,4 +1,5 @@
 name: Main Red Eject
+# github-token-budget: 4 calls/run - gate job reads the queue head (one GraphQL) and its merge-group check runs (up to three pages); the eject job uses the app token and touches github.token only as the quota-exhausted failover and failure alert
 # clock-class: upstream-advisory
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Devin
@@ -43,15 +44,92 @@ env:
   MAIN_RED_EJECT_MODE: ${{ vars.MAIN_RED_EJECT_MODE || 'apply' }}
 
 jobs:
-  eject:
-    name: Eject red culprit
+  # No-op wakes stop here, before checkout, Node and the Jovie Bot token mint. The gate
+  # reads the queue with the job GITHUB_TOKEN (its own budget, not installation
+  # 112037986). Wakes that can never matter (cancelled/skipped completions, CI on any
+  # event but merge_group/push) are dropped by the `if`; the rest need a queue head that
+  # is UNMERGEABLE, past the stuck alert, or has a failed required check, unless the wake
+  # itself is red evidence (Main Health, merge-group CI failure) or a manual dispatch.
+  # The gate fails open: an API error runs the ejector.
+  gate:
+    name: Gate no-op wakes
     if: >-
       github.repository == 'JovieInc/Jovie' &&
-      (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run')
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'workflow_run' &&
+        contains(fromJSON('["success","failure","timed_out"]'), github.event.workflow_run.conclusion) &&
+        (github.event.workflow_run.name != 'CI' ||
+         contains(fromJSON('["merge_group","push"]'), github.event.workflow_run.event))))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
+    outputs:
+      active: ${{ steps.gate.outputs.active }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          sparse-checkout: |
+            packages/api-client
+            .github/actions/prime-node-toolcache
+            .nvmrc
+          persist-credentials: false
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+      - name: Is there anything for the ejector to do
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          WAKE_NAME: ${{ github.event.workflow_run.name }}
+          WAKE_EVENT: ${{ github.event.workflow_run.event }}
+          WAKE_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        run: |
+          set -uo pipefail
+          emit() { echo "active=$1" >> "$GITHUB_OUTPUT"; echo "gate: active=$1 ($2)"; exit 0; }
+          [[ "$EVENT" == workflow_dispatch ]] && emit true dispatch
+          if [[ "$WAKE_CONCLUSION" == failure && ( "$WAKE_NAME" == "Main Health" || "$WAKE_EVENT" == merge_group ) ]]; then
+            emit true red-evidence
+          fi
+          # shellcheck disable=SC2016
+          q='query($o:String!,$r:String!){repository(owner:$o,name:$r){mergeQueue(branch:"main"){entries(first:1){nodes{position state enqueuedAt headCommit{oid}}}}}}'
+          head=$(node packages/api-client/cli.ts gh --priority poll -- api graphql -f query="$q" -f o="${GITHUB_REPOSITORY%/*}" -f r="${GITHUB_REPOSITORY#*/}" \
+            --jq '.data.repository.mergeQueue.entries.nodes[0] // empty') || emit true queue-read-failed
+          [[ -z "$head" ]] && emit false empty-queue
+          state=$(jq -r .state <<<"$head")
+          age=$(( $(date +%s) - $(date -d "$(jq -r .enqueuedAt <<<"$head")" +%s) ))
+          [[ "$state" == UNMERGEABLE ]] && emit true unmergeable-head
+          (( age > 2700 )) && emit true head-past-stuck-alert
+          sha=$(jq -r '.headCommit.oid // empty' <<<"$head")
+          [[ -z "$sha" ]] && emit false head-not-yet-in-checks
+          failed=$(node packages/api-client/cli.ts gh --priority poll -- api "repos/${GITHUB_REPOSITORY}/commits/${sha}/check-runs?per_page=100" --paginate \
+            --jq '.check_runs[] | select(.conclusion == "failure") | select(.name | test("^(CI / )?(PR Ready|Migration Guard|Fork PR Gate|PR Size Guard|ci-fast \\()")) | .name') \
+            || emit true check-read-failed
+          [[ -n "$failed" ]] && emit true failed-required-check
+          emit false healthy-head
+
+  eject:
+    name: Eject red culprit
+    needs: gate
+    if: >-
+      github.repository == 'JovieInc/Jovie' &&
+      needs.gate.outputs.active == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
+      # GITHUB_TOKEN is the ejector's failover bucket when the shared Jovie Bot
+      # installation budget is exhausted (2026-10-31 5 h queue stall).
+      pull-requests: write
+      issues: write
+    env:
+      GH_FALLBACK_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -96,6 +174,12 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: node scripts/main-red-eject.mjs reopen --pr "${{ inputs.pr }}"
+      - name: Alert on ejector failure
+        if: ${{ failure() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: node scripts/main-red-eject.mjs alert-failure
 
   land:
     name: Re-land ejected change
