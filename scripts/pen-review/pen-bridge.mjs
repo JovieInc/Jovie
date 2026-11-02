@@ -270,10 +270,12 @@ export function exportFramesHeadless(
   // One execute per step: each execute has a ~55 s budget in headless mode,
   // and a 1348x900 graft plus two exports can exceed it in one call.
   const snippets = trees.flatMap((tree, i) => {
+    // Node ids are dropped from the grafted copy: Pen regenerates them, and a
+    // kept id that also exists in the snapshot fails the graft (TtXhW, 2026-11-02).
     const { id, x, y, ...body } = tree;
     const v = `__n${i}`;
     return [
-      `const has=Get((n,c)=>{if(c.depth>0){c.skipChildren();return}return n.id===${JSON.stringify(id)}||undefined}).length>0;const b=${JSON.stringify(body)};${v}=has?Replace(${JSON.stringify(id)},b):Insert(document,{...b,x:0,y:-200000});Print("MAP"+JSON.stringify([${JSON.stringify(id)},${v}]))`,
+      `const has=Get((n,c)=>{if(c.depth>0){c.skipChildren();return}return n.id===${JSON.stringify(id)}||undefined}).length>0;const b=${JSON.stringify(body, (k, v) => (k === 'id' ? undefined : v))};${v}=has?Replace(${JSON.stringify(id)},b):Insert(document,{...b,x:0,y:-200000});Print("MAP"+JSON.stringify([${JSON.stringify(id)},${v}]))`,
       `Export([${v}],"png",${JSON.stringify(warm)},{scale:${Number(scale)}})`,
       `Export([${v}],"png",${JSON.stringify(dir)},{scale:${Number(scale)}})`,
     ];
