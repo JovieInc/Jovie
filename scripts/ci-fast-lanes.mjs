@@ -373,7 +373,7 @@ export const SOURCE_GUARDS = Object.freeze([
     // evidence and wiring of every enforced rule, and prose copies of the
     // anti-slop list that drifted from the registry (Tim, 2026-10-26).
     id: 'anti-slop',
-    command: `node scripts/anti-slop/run.mjs validate && node scripts/anti-slop/brand-name.mjs && node --test --test-isolation=none scripts/anti-slop/anti-slop.test.mjs && ${BRAND_NAME_COVERAGE_COMMAND}`,
+    command: `node scripts/anti-slop/run.mjs validate && node scripts/anti-slop/brand-name.mjs && node --test --test-concurrency=1 --test-isolation=none scripts/anti-slop/anti-slop.test.mjs`,
     // Brand spelling scans tracked text regardless of directory or extension.
     inputs: /./u,
     prOnly: false,

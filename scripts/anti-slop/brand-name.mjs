@@ -9,6 +9,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { REPO_ROOT } from './lib.mjs';
@@ -21,12 +22,25 @@ const EXPLICIT =
   /(?<![\w@/.-])(?:Jovy|Jovee|Jovei|Jovvie|Jovies|J0vie|Jovey|Jouvie|Jovvy|Jovye)(?![\w@/-])/giu;
 // App/test fixture domains are literals. Emails and URLs are masked below.
 const DOMAIN = /(?<![\w@-])(?<!test\.)(?<!app\.)jovie\.(?:com|io)\b/giu;
-const DOMAIN_OK_CONTEXT =
-  /childcare|Bright Horizons|unrelated|separate company|different company/iu;
+// Attach the external-company description to this occurrence, never the line.
+const EXTERNAL_COMPANY =
+  '(?:childcare(?: franchise| company| service| business)?|Bright Horizons|(?:separate|different) company)';
+const EXTERNAL_BEFORE = new RegExp(
+  `\\b${EXTERNAL_COMPANY}(?:'s)?(?: (?:is at|at|uses|website is|domain is))?\\s*$`,
+  'iu'
+);
+const EXTERNAL_AFTER = new RegExp(
+  `^(?:\\s+(?:is|belongs to) (?:the |a )?${EXTERNAL_COMPANY}\\b|\\s+\\(Bright Horizons\\))`,
+  'iu'
+);
 const WORD = /(?<![\w@/.:#$-])Jovi(?![\w@/:-]|\.\w)/gu;
 const PROSE = /\.(?:md|mdx|txt|html|htm)$/iu;
+const CODE = /\.[cm]?[jt]sx?$/iu;
+const requireHere = createRequire(import.meta.url);
+let ts;
+const HISTORICAL_FILES = new Set(['pnpm-lock.yaml', 'CHANGELOG.md']);
 const SKIP_PATH =
-  /(?:^|\/)(?:pnpm-lock\.yaml|CHANGELOG\.md)$|(?:^|\/)(?:node_modules|\.git|__snapshots__)(?:\/|$)|\.(?:png|jpe?g|webp|avif|svg|ico|pen|xcodeproj|pbxproj|lock|woff2?)$/iu;
+  /(?:^|\/)(?:node_modules|\.git|__snapshots__)(?:\/|$)|\.(?:png|jpe?g|webp|avif|svg|ico|pen|xcodeproj|pbxproj|lock|woff2?)$/iu;
 // These exact sources contain the guard's deliberate negative examples.
 const GUARD_SOURCES = new Set([
   'scripts/anti-slop/brand-name.mjs',
@@ -37,6 +51,16 @@ const GUARD_SOURCES = new Set([
 ]);
 const BINARY_LIKE =
   /\.(?:png|jpe?g|gif|webp|avif|pdf|zip|mp4|mov|woff2?|ttf|otf|icns|ico)$/iu;
+const CASING_WORD = /(?<![\w@/.:#$-])jovie(?![\w@/:-]|\.\w)/giu;
+
+function hasCasingCandidate(text) {
+  for (const match of text.matchAll(CASING_WORD))
+    if (match[0] !== 'Jovie') return true;
+  return false;
+}
+
+const QUOTED_COMMAND =
+  /\\?(["'])(pnpm|npm|npx|node|yarn|bun|jovie)(?:[ \t]+[\w@./:<>{}=-]+)+\\?\1/gu;
 
 /** Preserve offsets while excluding literal code and links from prose. */
 function proseOnly(line, prose) {
@@ -50,14 +74,20 @@ function proseOnly(line, prose) {
   return text;
 }
 
-export function scanLine(line, { prose = false } = {}) {
+export function scanLine(line, { prose = false, casing = prose } = {}) {
   const found = [];
   const text = proseOnly(line, prose);
   for (const m of text.matchAll(EXPLICIT))
     found.push({ kind: 'misspelling', text: m[0] });
-  if (!DOMAIN_OK_CONTEXT.test(text))
-    for (const m of text.matchAll(DOMAIN))
-      found.push({ kind: 'domain', text: m[0] });
+  for (const m of text.matchAll(DOMAIN)) {
+    if (
+      m[0].toLowerCase() === 'jovie.com' &&
+      (EXTERNAL_BEFORE.test(text.slice(0, m.index)) ||
+        EXTERNAL_AFTER.test(text.slice(m.index + m[0].length)))
+    )
+      continue;
+    found.push({ kind: 'domain', text: m[0] });
+  }
   for (const m of text.matchAll(WORD)) {
     // Exempt this occurrence only: agent names and the real band name.
     const before = text.slice(0, m.index);
@@ -69,11 +99,91 @@ export function scanLine(line, { prose = false } = {}) {
       continue;
     found.push({ kind: 'jovi-outside-agent-context', text: m[0] });
   }
-  if (prose) {
-    for (const m of text.matchAll(/(?<![\w@/.:#$-])jovie(?![\w@/:-]|\.\w)/giu))
+  if (casing) {
+    for (const m of text.matchAll(CASING_WORD))
       if (m[0] !== 'Jovie') found.push({ kind: 'casing', text: m[0] });
   }
   return found;
+}
+
+/** Bounded copy-role context, following the existing copy-inventory key pattern. */
+function isPresentationCopy(node, ast) {
+  let owner = node.parent;
+  if (ts.isTemplateSpan(owner)) owner = owner.parent;
+  if (ts.isTemplateExpression(owner)) owner = owner.parent;
+  if (ts.isJsxExpression(owner)) owner = owner.parent;
+  if (ts.isJsxElement(owner) || ts.isJsxFragment(owner)) return true;
+  if (ts.isJsxAttribute(owner))
+    return /^(?:aria-label|title|placeholder|alt|label|children)$/u.test(
+      owner.name.getText(ast)
+    );
+  return (
+    (ts.isVariableDeclaration(owner) || ts.isPropertyAssignment(owner)) &&
+    (ts.isIdentifier(owner.name) || ts.isStringLiteral(owner.name)) &&
+    /^(?:headline|heading|title|subhead|subtitle|label|description|placeholder|alt|caption|text|body|summary|cta|buttonLabel)$/u.test(
+      owner.name.text
+    )
+  );
+}
+
+/**
+ * Parser/literal pattern from product-reference-coherence and copy-inventory.
+ * Keep offsets and newlines. Only JSX copy or named copy roles establish
+ * presentation intent; whitespace in arbitrary literals does not. Quoted
+ * product names remain prose in those roles. No path exemptions or data flow.
+ */
+function codeCopy(text, file) {
+  ts ??= requireHere('typescript');
+  const ast = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+  const chars = text.split('').map(c => (c === '\n' ? c : ' '));
+  const visit = node => {
+    const literal =
+      ts.isStringLiteral(node) ||
+      ts.isNoSubstitutionTemplateLiteral(node) ||
+      ts.isTemplateHead(node) ||
+      ts.isTemplateMiddle(node) ||
+      ts.isTemplateTail(node);
+    if (ts.isJsxText(node) || literal) {
+      const parent = node.parent;
+      const rendered = isPresentationCopy(node, ast);
+      if (
+        ts.isJsxText(node) ||
+        (literal &&
+          !ts.isLiteralTypeNode(parent) &&
+          parent.name !== node &&
+          rendered)
+      ) {
+        // Strip syntax delimiters, not inline backticks in the rendered content.
+        const start = node.getStart(ast) + (literal ? 1 : 0);
+        const end =
+          node.end -
+          (literal
+            ? ts.isTemplateHead(node) || ts.isTemplateMiddle(node)
+              ? 2
+              : 1
+            : 0);
+        const content = proseOnly(text.slice(start, end), true)
+          .replace(
+            /\b(?:run|execute|cli|command):?[ \t]+(jovie)(?=[ \t]+[\w-])/giu,
+            (match, tool) =>
+              tool === 'jovie' ? match.slice(0, -5) + '     ' : match
+          )
+          .replace(QUOTED_COMMAND, (m, _quote, tool, offset, source) =>
+            tool === 'jovie' &&
+            !/\b(?:run|execute|cli|command):?[ \t]+$/iu.test(
+              source.slice(0, offset)
+            )
+              ? m
+              : ' '.repeat(m.length)
+          );
+        for (let i = 0; i < content.length; i += 1)
+          chars[start + i] = content[i];
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(ast);
+  return chars.join('');
 }
 
 /** Conventional-commit scopes like chore(jovie): are identifiers, not prose. */
@@ -100,9 +210,18 @@ export function scanText(
         'Brand exceptions require a file, exact match and reason'
       );
   }
-  // Mask only the frozen span; preserve line numbers and neighboring prose.
-  for (const e of exceptions.filter(e => e.file === file))
-    text = text.replaceAll(e.match, e.match.replace(/[^\n]/gu, ' '));
+  // Mask checked tokens only within the exact frozen span. Preserve syntax so
+  // an excepted property or JSX specimen cannot hide adjacent parsed copy.
+  for (const e of exceptions.filter(e => e.file === file)) {
+    let masked = e.match;
+    for (const pattern of [DOMAIN, EXPLICIT, WORD, CASING_WORD])
+      masked = masked.replace(pattern, match => ' '.repeat(match.length));
+    text = text.replaceAll(e.match, masked);
+  }
+  const copyLines =
+    !prose && CODE.test(file) && hasCasingCandidate(text)
+      ? codeCopy(text, file).split('\n')
+      : [];
   const frontmatterEnd =
     /(?:^|\/)SKILL\.md$/u.test(file) && text.startsWith('---\n')
       ? text.indexOf('\n---', 4)
@@ -132,7 +251,14 @@ export function scanText(
       fence = marker[1];
       return;
     }
-    for (const hit of scanLine(line, { prose }))
+    const lineHits = scanLine(line, { prose });
+    if (copyLines.length)
+      lineHits.push(
+        ...scanLine(copyLines[index], { casing: true }).filter(
+          hit => hit.kind === 'casing'
+        )
+      );
+    for (const hit of lineHits)
       hits.push({
         file,
         line: index + 1,
@@ -155,7 +281,10 @@ export function readScanFile(file, root = REPO_ROOT, { brand = true } = {}) {
   const path = resolve(root, file);
   const name = relative(root, path).split(sep).join('/');
   if (
-    (brand && (SKIP_PATH.test(name) || GUARD_SOURCES.has(name))) ||
+    (brand &&
+      (HISTORICAL_FILES.has(name) ||
+        SKIP_PATH.test(name) ||
+        GUARD_SOURCES.has(name))) ||
     BINARY_LIKE.test(name)
   )
     return null;

@@ -94,6 +94,7 @@ function main(argv) {
     const safeFiles = files.filter(
       file => readScanFile(file, REPO_ROOT, { brand: false }) !== null
     );
+    if (!safeFiles.length) return 0;
     const reg = loadRegistry();
     const findings = runMatchers(reg, safeFiles);
     for (const hit of scanFiles(safeFiles))

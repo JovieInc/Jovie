@@ -1,13 +1,16 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
+import { BRAND_NAME_COVERAGE_COMMAND } from '../ci-fast-lanes.mjs';
 import {
   checkDrift,
   LEGACY_PATH,
   loadRegistry,
   REGISTRY_PATH,
+  REPO_ROOT,
   validateRegistry,
 } from './lib.mjs';
 import { runMatchers, runValidate } from './run.mjs';
@@ -147,4 +150,26 @@ test('matchers accept absolute paths (agents pass artifact paths from anywhere)'
 
 test('registry path constant points at the committed file', () => {
   assert.equal(REGISTRY_PATH, 'docs/design-system/anti-slop-rules.json');
+});
+
+// Source Validation loads guard commands from trusted main. Keep the real
+// coverage suite reachable through that existing Node entrypoint on first PR CI.
+test('brand spelling assertions pass with per-file V8 coverage floors', () => {
+  const result = spawnSync(BRAND_NAME_COVERAGE_COMMAND, {
+    cwd: REPO_ROOT,
+    shell: true,
+    encoding: 'utf8',
+    timeout: 120_000,
+    maxBuffer: 8 * 1024 * 1024,
+  });
+  process.stdout.write(result.stdout ?? '');
+  process.stderr.write(result.stderr ?? '');
+  assert.ifError(result.error);
+  assert.equal(
+    result.status,
+    0,
+    'real brand spelling tests and V8 floors must pass'
+  );
+  assert.match(result.stdout, /Tests\s+\d+ passed/u);
+  assert.match(result.stdout, /Coverage report from v8/u);
 });
