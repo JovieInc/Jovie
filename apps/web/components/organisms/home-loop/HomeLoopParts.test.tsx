@@ -83,6 +83,29 @@ describe('HomeLoopPulse', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows the target beside the state and links to the drill-down', () => {
+    render(
+      <HomeLoopPulse
+        tiles={[
+          {
+            key: 'ejections',
+            label: 'Queue ejections',
+            value: '58%',
+            was: '41%',
+            tone: 'bad',
+            measured: true,
+            target: 'Target ≤ 10%',
+            href: '/app/ov/shipping',
+          },
+        ]}
+      />
+    );
+    const tile = screen.getByTestId('home-loop-tile-ejections');
+    expect(tile).toHaveTextContent('Target ≤ 10% · Was 41%');
+    expect(tile).toHaveAttribute('href', '/app/ov/shipping');
+    expect(within(tile).getByRole('img', { name: 'Problem' })).toBeVisible();
+  });
+
   it('keeps tile frames reserved while loading or unavailable', () => {
     const { rerender } = render(<HomeLoopPulse tiles={[]} loading />);
     expect(screen.getAllByTestId('home-loop-tile-placeholder')).toHaveLength(7);

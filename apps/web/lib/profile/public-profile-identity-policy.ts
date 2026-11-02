@@ -12,13 +12,16 @@
  * preseeded row. Production monitors may still render their public routes.
  */
 
+import { ADMITTED_CANARY_FIXTURE } from '@/lib/synthetic/admitted-canary-fixture';
+
 export type PublicProfileIdentityExclusionReason =
   | 'claim_flow_fixture'
   | 'fabricated_identity_fixture'
   | 'legacy_claim_fixture'
   | 'production_canary'
   | 'qa_auth_fixture'
-  | 'screen_cert_fixture';
+  | 'screen_cert_fixture'
+  | 'capture_profile_fixture';
 
 const EXCLUDED_HANDLES_BY_REASON = {
   claim_flow_fixture: ['e2eclaimartist'],
@@ -29,8 +32,16 @@ const EXCLUDED_HANDLES_BY_REASON = {
     'edgecase-long',
   ],
   legacy_claim_fixture: ['testartist'],
-  production_canary: ['authqaprod'],
+  // The admitted canary's handle is created only by its reconciler; reserving
+  // it keeps every general create/rename/ingestion path off it.
+  production_canary: [
+    'authqaprod',
+    'gooddropouts',
+    'jovie-chat-health',
+    ADMITTED_CANARY_FIXTURE.handle,
+  ],
   screen_cert_fixture: ['jovie-screen-fixture'],
+  capture_profile_fixture: ['unfazed'],
   qa_auth_fixture: [
     'authiosprod',
     'authiosstaging',

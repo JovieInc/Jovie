@@ -1,11 +1,14 @@
-import Image from 'next/image';
-import '@/components/marketing/MarketingRouteHero.css';
 import { MarketingContainer, MarketingHero } from '@/components/marketing';
+import { SUPPORT_PAGE_COPY } from '@/data/supportCopy';
 import {
   SupportChannels,
   SupportCta,
 } from '../../app/(marketing)/support/SupportContent';
 
+/**
+ * /support body. Matte hero (no texture or accent wash): the H1 is the one
+ * focal point, then the two help paths, then the direct email fallback.
+ */
 export function SupportPageContent() {
   return (
     <>
@@ -15,36 +18,17 @@ export function SupportPageContent() {
         testId='marketing-section-hero'
         sectionVariant='left-none'
         sectionOwner='apps/web/components/organisms/SupportPageContent.tsx'
-        className='marketing-hero-dock marketing-hero-dock--inset relative w-full overflow-hidden pt-20 pb-16 sm:pt-24 sm:pb-24 lg:pt-28 lg:pb-32'
+        className='relative w-full pt-16 pb-12 sm:pt-20 sm:pb-16'
       >
-        <div className='marketing-route-hero__media' aria-hidden='true'>
-          <Image
-            src='/images/hero/support-hero.webp'
-            alt=''
-            fill
-            sizes='100vw'
-            priority
-          />
-        </div>
-        <div className='marketing-route-hero__scrim' aria-hidden='true' />
-        <div
-          className='marketing-route-hero__accent marketing-route-hero__accent--blue'
-          aria-hidden='true'
-        />
-        <MarketingContainer
-          width='page'
-          className='marketing-route-hero__content'
-        >
-          <p className='text-sm font-medium text-tertiary-token'>Support</p>
+        <MarketingContainer width='prose'>
           <h1
             id='support-hero-heading'
-            className='system-b-marketing-route-title mt-6 text-primary-token'
+            className='system-b-marketing-route-title text-primary-token'
           >
-            {/* ui-casing-allow: sentence-case headings per marketing plan phase 1 */}
-            We&apos;re here to help.
+            {SUPPORT_PAGE_COPY.hero.title}
           </h1>
           <p className='mt-6 max-w-xl text-lg leading-relaxed text-secondary-token'>
-            Browse the Help Center or reach out to our team.
+            {SUPPORT_PAGE_COPY.hero.lead}
           </p>
         </MarketingContainer>
       </MarketingHero>

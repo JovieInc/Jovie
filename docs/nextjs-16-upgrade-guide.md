@@ -107,7 +107,7 @@ are relative to `apps/web`; unlisted server reads remain unknown, not exceptions
 | `app/[username]/[...slug]/_lib/content-candidate.ts` | 1 | Public content; verify identity/negative-cache behavior |
 | `app/[username]/[...slug]/page.tsx` | 1 | Public content; inspect shell and metadata |
 | `app/[username]/[slug]/_lib/data.ts` | 2 | Public entity projection; preserve visibility checks |
-| `app/[username]/_lib/public-profile-loader.ts` | 1 | Handle-keyed profile; retain error exclusion and React request memoization |
+| `app/[username]/_lib/public-profile-loader.ts` | 1 at audit; removed by JOV-8629 | Fresh publication per request; only React request memoization remains. Do not restore a cross-request success cache as access authority. |
 | `app/api/admin/campaigns/invites/route.ts` | 1 | Admin data; authorize before any shared boundary |
 | `app/api/billing/health/route.ts` | 1 | Freshness-sensitive; verify a bounded lifetime is appropriate |
 | `app/api/spotify/search/helpers.ts` | 1 | External search; retain argument and failure semantics |

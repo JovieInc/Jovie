@@ -14,35 +14,23 @@ import { describe, expect, it } from 'vitest';
  * lives in `MarketingRouteHero.css`, which this guard does not scan, and is
  * itself checked by `design-system-source-ratchet.mjs`).
  *
- * As of the 2026-09-26 marketing routes pass (Tim direction), /legal/privacy
- * and /legal/terms moved off the shared minimal shell onto their own
- * per-route layout with the full docked MarketingHeader and a route hero;
- * /legal/cookies and /legal/dmca keep the original minimal shell, now on
- * their own sibling layout files instead of the shared parent.
+ * 2026-10-29 marketing critic sweep: every legal route renders one shell
+ * (legal-shell.tsx, from each route's own layout) with the full
+ * docked MarketingHeader and expanded footer, and no route hero. The texture hero repeated the document title above the real
+ * H1 over off-palette wallpaper; cookies/dmca ran a different header.
  */
+
+const legalRoutes = ['privacy', 'terms', 'cookies', 'dmca'] as const;
 
 const sharedSources = [
   'app/(dynamic)/legal/layout.tsx',
-  'app/(dynamic)/legal/cookies/layout.tsx',
-  'app/(dynamic)/legal/dmca/layout.tsx',
-  'app/(dynamic)/legal/privacy/layout.tsx',
-  'app/(dynamic)/legal/terms/layout.tsx',
+  'app/(dynamic)/legal/legal-shell.tsx',
   'app/(dynamic)/legal/privacy/page.tsx',
   'app/(dynamic)/legal/terms/page.tsx',
   'app/(dynamic)/legal/cookies/page.tsx',
   'app/(dynamic)/legal/dmca/page.tsx',
   'components/organisms/LegalPage.tsx',
   'components/site/PublicPageShell.tsx',
-] as const;
-
-const minimalShellSources = [
-  'app/(dynamic)/legal/cookies/layout.tsx',
-  'app/(dynamic)/legal/dmca/layout.tsx',
-] as const;
-
-const heroShellSources = [
-  'app/(dynamic)/legal/privacy/layout.tsx',
-  'app/(dynamic)/legal/terms/layout.tsx',
 ] as const;
 
 const forbiddenVisualPatterns = [
@@ -74,58 +62,32 @@ describe('legal pages System B source contract', () => {
     }
   });
 
-  it('keeps /legal/cookies and /legal/dmca on the minimal PublicPageShell', () => {
-    for (const sourcePath of minimalShellSources) {
-      const layout = readSource(sourcePath);
+  it('gives every legal route one shell: full header, expanded footer, no hero', () => {
+    const layout = readSource('app/(dynamic)/legal/legal-shell.tsx');
 
-      expect(layout).toContain('<PublicPageShell');
-      expect(layout).toContain("headerVariant='minimal'");
-      expect(layout).toContain('MarketingContainer');
-      expect(layout).toContain('text-primary-token');
-      expect(layout).not.toContain('mainOffset={false}');
-      expect(layout).not.toContain('mainClassName=');
-      expect(layout).toContain(
-        "className='public-legal-content py-16 sm:py-20'"
-      );
+    expect(layout).toContain('<PublicPageShell');
+    expect(layout).not.toContain("headerVariant='minimal'");
+    expect(layout).toContain("footerVariant='expanded'");
+    expect(layout).not.toContain('mainOffset={false}');
+    expect(layout).toContain("className='public-legal-content py-16 sm:py-20'");
+    for (const heroResidue of [
+      'MarketingHero',
+      'marketing-route-hero',
+      'MarketingRouteHero.css',
+      '<Image',
+      '/images/hero/',
+    ]) {
+      expect(layout).not.toContain(heroResidue);
     }
-  });
-
-  it('gives /legal/privacy and /legal/terms the full docked header, a route hero, and the full footer', () => {
-    for (const sourcePath of heroShellSources) {
-      const layout = readSource(sourcePath);
-
-      expect(layout).toContain('<PublicPageShell');
-      // The full/docked MarketingHeader is PublicPageShell's default variant;
-      // these routes must not opt back into the minimal variant.
-      expect(layout).not.toContain("headerVariant='minimal'");
-      expect(layout).toContain("footerVariant='expanded'");
-      expect(layout).toContain('marketing-hero-dock');
-      expect(layout).toContain('marketing-route-hero__media');
-      expect(layout).toContain('MarketingRouteHero.css');
-      expect(layout).toContain(
-        "className='public-legal-content py-16 sm:py-20'"
+    // Per-route layouts render the one shell; hoisting it into the segment
+    // layout regrouped client chunks past the /demo and /p/[token] budgets.
+    for (const route of legalRoutes) {
+      const routeLayout = readSource(`app/(dynamic)/legal/${route}/layout.tsx`);
+      expect(routeLayout, `${route} must render LegalDocumentShell`).toContain(
+        '<LegalDocumentShell>'
       );
+      expect(routeLayout).not.toContain('<PublicPageShell');
     }
-  });
-
-  it('gives /legal/privacy and /legal/terms different hero textures and accents', () => {
-    const privacy = readSource('app/(dynamic)/legal/privacy/layout.tsx');
-    const terms = readSource('app/(dynamic)/legal/terms/layout.tsx');
-
-    expect(privacy).toContain('/images/hero/legal-privacy-hero.webp');
-    expect(terms).toContain('/images/hero/legal-terms-hero.webp');
-    expect(privacy).not.toContain('/images/hero/legal-terms-hero.webp');
-    expect(terms).not.toContain('/images/hero/legal-privacy-hero.webp');
-
-    expect(privacy).toContain('marketing-route-hero__accent--purple');
-    expect(terms).toContain('marketing-route-hero__accent--pink');
-  });
-
-  it('keeps the shared /legal segment layout a pass-through', () => {
-    const layout = readSource('app/(dynamic)/legal/layout.tsx');
-
-    expect(layout).not.toContain('<PublicPageShell');
-    expect(layout).toContain('export const revalidate = false');
   });
 
   it('keeps every legal page rendering the shared LegalPage organism', () => {

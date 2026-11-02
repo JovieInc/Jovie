@@ -39,7 +39,15 @@ describe('getChatEmptyStateFirstName', () => {
   it('takes the first token of a real display name', () => {
     expect(getChatEmptyStateFirstName('Tim White')).toBe('Tim');
     expect(getChatEmptyStateFirstName('  Tim   White  ')).toBe('Tim');
+  });
+
+  it('greets a band or artist by the whole name, never its first word', () => {
+    expect(getChatEmptyStateFirstName('Good Dropouts')).toBe('Good Dropouts');
+    expect(getChatEmptyStateFirstName('The Weeknd')).toBe('The Weeknd');
     expect(getChatEmptyStateFirstName('Cher')).toBe('Cher');
+    expect(getChatEmptyStateFirstName('DJ Snake')).toBe('DJ Snake');
+    // Golden path (tests/e2e/golden-path.spec.ts) asserts the artist name.
+    expect(getChatEmptyStateFirstName('UNMARKED')).toBe('UNMARKED');
   });
 
   it('never fabricates a name when none is real', () => {

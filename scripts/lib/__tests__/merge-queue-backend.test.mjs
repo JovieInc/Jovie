@@ -62,7 +62,7 @@ const VALID_REPOSITORY = Object.freeze(
 );
 const VALID_RULESET = Object.freeze(
   JSON.parse(
-    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":30,"grouping_strategy":"HEADGREEN","max_entries_to_build":8,"max_entries_to_merge":10,"merge_method":"SQUASH","min_entries_to_merge":1,"min_entries_to_merge_wait_minutes":0}}]}`
+    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":30,"grouping_strategy":"HEADGREEN","max_entries_to_build":4,"max_entries_to_merge":10,"merge_method":"SQUASH","min_entries_to_merge":1,"min_entries_to_merge_wait_minutes":0}}]}`
   )
 );
 const VALID_WORKFLOW = `name: CI
@@ -86,7 +86,7 @@ const VALID_BRANCH_PROTECTION_REF = Object.freeze({
 }} */
 const VALID_LIVE_QUEUE_CONFIGURATION = Object.freeze({
   checkResponseTimeout: 1800,
-  maximumEntriesToBuild: 8,
+  maximumEntriesToBuild: 4,
   maximumEntriesToMerge: 10,
   mergeMethod: 'SQUASH',
   minimumEntriesToMerge: 1,
@@ -740,7 +740,7 @@ describe('native live preflight', () => {
             { type: 'MERGE_QUEUE', parameters: {
               __typename: 'MergeQueueParameters',
               checkResponseTimeoutMinutes: 30, groupingStrategy: 'HEADGREEN',
-              maxEntriesToBuild: 8, maxEntriesToMerge: 10, mergeMethod: 'SQUASH',
+              maxEntriesToBuild: 4, maxEntriesToMerge: 10, mergeMethod: 'SQUASH',
               minEntriesToMerge: 1, minEntriesToMergeWaitMinutes: 0,
             } },
           ] },
@@ -1073,7 +1073,7 @@ describe('native live preflight', () => {
   });
 
   it.each([
-    1, 2, 6, 8,
+    1, 2, 3, 4,
   ])('allows supported build count %s during rollout and rollback with truthful readback', buildCount => {
     const result = validateNativePreflightEvidence({
       ruleset: VALID_RULESET,
@@ -1089,9 +1089,9 @@ describe('native live preflight', () => {
     expect(result.policyReadback.observed.max_entries_to_build).toBe(
       buildCount
     );
-    expect(result.policyReadback.matched).toBe(buildCount === 8);
+    expect(result.policyReadback.matched).toBe(buildCount === 4);
     expect(result.policyReadback.drift).toEqual(
-      buildCount === 8 ? [] : ['max_entries_to_build']
+      buildCount === 4 ? [] : ['max_entries_to_build']
     );
   });
 
@@ -1194,7 +1194,7 @@ describe('native live preflight', () => {
     expect(liveGraphql.policyReadback).toMatchObject({
       matched: true,
       drift: [],
-      observed: { max_entries_to_build: 8 },
+      observed: { max_entries_to_build: 4 },
     });
   });
 
@@ -1207,7 +1207,7 @@ describe('native live preflight', () => {
     expect(result).toMatchObject({ ready: true });
     expect(result.policyReadback).toMatchObject({
       matched: true,
-      observed: { max_entries_to_build: 8 },
+      observed: { max_entries_to_build: 4 },
     });
     const liveConfigCall = runner.mock.calls.find(([args]) =>
       queryText(args).includes('MergeQueueLiveConfiguration')
@@ -1325,7 +1325,7 @@ describe('native live preflight', () => {
       ready: true,
       policyReadback: {
         matched: true,
-        observed: { max_entries_to_build: 8 },
+        observed: { max_entries_to_build: 4 },
       },
     });
   });

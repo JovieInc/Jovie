@@ -4,9 +4,9 @@ Sandbox file for the recurring doc-gardening agent. **Not canon.** CI ignores th
 
 ## Stale claim
 
-The repo has **22** topic-scoped agent rule files under `.claude/rules/`.
+The repo has **23** topic-scoped agent rule files under `.claude/rules/`.
 
-<!-- doc-freshness:scoped-rules-count:22 -->
+<!-- doc-freshness:scoped-rules-count:23 -->
 
 ## Remediation
 

@@ -2,6 +2,7 @@ import 'server-only';
 
 import { and, eq, ilike, or } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
@@ -31,6 +32,7 @@ const publicColumns = {
   youtubeUrl: creatorProfiles.youtubeUrl,
   isPublic: creatorProfiles.isPublic,
   settings: creatorProfiles.settings,
+  ownerEmail: users.email,
 };
 
 const identifiedColumns = {
@@ -56,6 +58,7 @@ export async function findPublicArtists(
   const rows = await db
     .select(publicColumns)
     .from(creatorProfiles)
+    .leftJoin(users, eq(users.id, creatorProfiles.userId))
     .where(
       and(
         eq(creatorProfiles.isPublic, true),
@@ -78,6 +81,7 @@ async function loadPublicRow(
   const [row] = await db
     .select(identifiedColumns)
     .from(creatorProfiles)
+    .leftJoin(users, eq(users.id, creatorProfiles.userId))
     .where(
       and(
         eq(creatorProfiles.isPublic, true),

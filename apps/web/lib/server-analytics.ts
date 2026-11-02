@@ -275,6 +275,11 @@ export const SERVER_ANALYTICS_EVENTS = {
       'entry_ms',
     ],
   },
+  // One row per fresh /start chat: how its bot check resolved, by client.
+  onboarding_bot_check: {
+    category: 'funnel',
+    properties: ['result', 'reason', 'client_status', 'ua_class'],
+  },
   // JOV-9627: one row per onboarding chat reply. `session_id` is the signed
   // onboarding session, which chat_conversations carries and claim attaches to
   // a user, so a row joins to later billing and retention.
@@ -467,6 +472,11 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
     events: ['funnel_step'],
   },
   {
+    path: 'lib/turnstile/onboarding-bot-check.server.ts',
+    invocations: 1,
+    events: ['onboarding_bot_check'],
+  },
+  {
     path: 'lib/chat/onboarding-script/telemetry.server.ts',
     invocations: 1,
     events: ['onboarding_reply'],
@@ -499,6 +509,7 @@ const SAFE_TOKEN_PROPERTY_NAMES = new Set([
   'billingReason',
   'campaign_id',
   'classifier',
+  'client_status',
   'decision_kind',
   'engine',
   'fallback',
@@ -519,6 +530,7 @@ const SAFE_TOKEN_PROPERTY_NAMES = new Set([
   'source',
   'stripeEventId',
   'toolName',
+  'ua_class',
   'variant_id',
 ]);
 const ENUM_PROPERTY_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {

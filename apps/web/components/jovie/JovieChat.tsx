@@ -67,6 +67,7 @@ import {
   ChatThreadMessages,
 } from './JovieChatSections';
 import type { JovieChatProps } from './types';
+import { isWeeklyPlanLimitError } from './utils';
 
 const VIRTUALIZATION_THRESHOLD =
   CHAT_TRANSCRIPT_WINDOW.virtualizeAfterMessageCount;
@@ -862,7 +863,9 @@ export function JovieChat({
   );
 
   const inlineChatError =
-    chatError && !chatError.suppressComposerPause ? (
+    chatError &&
+    !chatError.suppressComposerPause &&
+    !isWeeklyPlanLimitError(chatError) ? (
       <ChatInlineError
         chatError={chatError}
         onRetry={handleRetry}

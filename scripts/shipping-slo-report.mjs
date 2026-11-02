@@ -27,7 +27,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -67,6 +67,10 @@ const BASELINE_PATH = resolve(
   'docs/metrics/shipping-slo-baseline.json'
 );
 const LATEST_PATH = resolve(REPO_ROOT, 'docs/metrics/shipping-slo-latest.json');
+const ESCAPES_PATH = resolve(
+  REPO_ROOT,
+  'docs/metrics/review-escapes-latest.json'
+);
 const BLOG_LATENCY_PATH = resolve(
   REPO_ROOT,
   'docs/metrics/blog-publish-latency-latest.json'
@@ -546,6 +550,30 @@ export function buildReport(
       );
     }
     gistSlo.stages = buildStageSummary(stageTimings);
+  }
+  // Escape tracking (scripts/review-escapes.mjs) writes its snapshot before
+  // this report runs; Summer reads it through the same lanes status feed.
+  if (existsSync(ESCAPES_PATH)) {
+    try {
+      const {
+        windowDays,
+        mergedPrs,
+        escapedPrs,
+        escapeRate,
+        byLayer,
+        guardRate,
+      } = JSON.parse(readFileSync(ESCAPES_PATH, 'utf8'));
+      gistSlo.escapes = {
+        windowDays,
+        mergedPrs,
+        escapedPrs,
+        escapeRate,
+        byLayer,
+        guardRate,
+      };
+    } catch {
+      // A malformed escape snapshot must not fail the SLO report.
+    }
   }
 
   // Hosted-runner capacity (scripts/ci-capacity-slo.mjs): queue wait p50/p95

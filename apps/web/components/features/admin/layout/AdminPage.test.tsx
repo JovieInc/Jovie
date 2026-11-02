@@ -7,6 +7,7 @@ import { AdminPage } from './AdminPage';
 vi.mock('next/navigation', () => ({
   usePathname: () => '/app/admin/overview',
   useSearchParams: () => new URLSearchParams('view=scoreboard'),
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 describe('AdminPage', () => {
@@ -116,6 +117,24 @@ describe('AdminPage', () => {
     );
     expect(screen.queryByText('Metadata only.')).not.toBeInTheDocument();
     expect(screen.queryByTestId('admin-page-meta')).not.toBeInTheDocument();
+  });
+
+  it('renders route views in the toolbar with the canonical segment control', () => {
+    render(
+      <AdminPage title='Product' testId='product-page' views='shipping'>
+        Product content
+      </AdminPage>
+    );
+    const toolbar = screen.getByTestId('admin-page-toolbar');
+    const views = within(toolbar).getByRole('tablist', {
+      name: 'Shipping Views',
+    });
+    expect(
+      within(views)
+        .getAllByRole('tab')
+        .map(tab => tab.textContent)
+    ).toEqual(['Pipeline', 'Product', 'Timeline']);
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
   });
 });
 

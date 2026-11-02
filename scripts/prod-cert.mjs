@@ -127,26 +127,65 @@ Run: ${runUrl ?? 'n/a'}`,
   });
 }
 
-async function postReceipts(receipts, origin) {
+// Evidence-only receipt fields (JOV-9625): verdict-neutral extras that a
+// ledger predating the field rejects under its strict zod schema. Stripping
+// them on a schema-skew repost never changes a surface verdict, and the full
+// receipts (readback included) stay in the --out file.
+export const EVIDENCE_ONLY_RECEIPT_KEYS = Object.freeze([
+  'adminInventoryReadback',
+]);
+
+export function stripEvidenceOnlyKeys(
+  receipts,
+  keys = EVIDENCE_ONLY_RECEIPT_KEYS
+) {
+  return receipts.map(receipt => {
+    const copy = { ...receipt };
+    for (const key of keys) delete copy[key];
+    return copy;
+  });
+}
+
+export async function postReceipts(receipts, origin) {
   const secret = process.env.CRON_SECRET;
   if (!secret) throw new Error('CRON_SECRET is not set; cannot post receipts');
-  const response = await fetch(
-    new URL('/api/internal/ovie/golden-path-evidence', origin),
-    {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${secret}`,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ receipts }),
-    }
-  );
-  const text = await response.text();
-  if (!response.ok)
-    throw new Error(
-      `ledger POST HTTP ${response.status}: ${text.slice(0, 300)}`
+  const send = async body => {
+    const response = await fetch(
+      new URL('/api/internal/ovie/golden-path-evidence', origin),
+      {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${secret}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ receipts: body }),
+      }
     );
-  return JSON.parse(text);
+    const text = await response.text();
+    return { ok: response.ok, status: response.status, text };
+  };
+  let result = await send(receipts);
+  // Deploy skew (JOV-9822 producer vs a frozen promotion): the served build's
+  // ledger schema can predate an evidence-only field, which its strict schema
+  // rejects. Repost once without that field — verdict-bearing receipts are
+  // byte-identical, and the readback stays in the receipts file for the run
+  // log. Anything else still fails loudly with the original body.
+  if (
+    !result.ok &&
+    result.status === 400 &&
+    result.text.includes('invalid_receipts') &&
+    EVIDENCE_ONLY_RECEIPT_KEYS.some(key => result.text.includes(key))
+  ) {
+    console.error(
+      `ledger on the served build predates evidence-only receipt keys (${EVIDENCE_ONLY_RECEIPT_KEYS.join(', ')}); reposting without them — surface verdicts unchanged, the field stays in the receipts file`
+    );
+    result = await send(stripEvidenceOnlyKeys(receipts));
+  }
+  if (!result.ok)
+    throw new Error(
+      `ledger POST HTTP ${result.status}: ${result.text.slice(0, 300)}`
+    );
+  return JSON.parse(result.text);
 }
 
 async function main() {
