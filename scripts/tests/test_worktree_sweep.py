@@ -161,6 +161,24 @@ class SweepTest(unittest.TestCase):
         self.assertNotIn("drained", report)
         self.assertTrue(first.exists())
 
+    def test_a_spent_budget_resumes_at_the_least_recently_visited_checkout(self):
+        # 2026-11-02: every interval restarted at the first repository and spent its budget there,
+        # so ~/Jovie's worktrees (~/wt, 334 GiB on root) were never reached.
+        first, second = self.worktree("first"), self.worktree("second")
+        state = self.base / "state"
+        state.mkdir()
+        visited = []
+
+        def one_unit_budget():
+            ticks = iter([0.0, 0.0, 0.0, 10_000.0, 10_000.0, 10_000.0, 10_000.0])
+            return lambda: next(ticks, 10_000.0)
+        with patch.object(sweeper, "retire", side_effect=lambda repo, path, *a, **k: visited.append(path.name)):
+            self.sweep(state=state, run=no_processes, budget_s=60, clock=one_unit_budget())
+            self.sweep(state=state, run=no_processes, budget_s=60, clock=one_unit_budget(), now=self.now + 60)
+        self.assertEqual(len(visited), 2)
+        self.assertEqual(set(visited), {"first", "second"})
+        self.assertTrue((state / sweeper.VISITS_FILE).exists())
+
     def test_clean_pushed_idle_worktree_is_removed_without_backup(self):
         path = self.worktree("clean")
         report = self.sweep()
