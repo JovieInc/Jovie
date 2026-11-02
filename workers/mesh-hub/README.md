@@ -46,7 +46,10 @@ To register or update agents, call `PUT /v1/admin/agents` with
 `{agents: [{kind, tokenSha256, heartbeatSec?, probe?, fallback?, status?}]}`.
 Every write is audited as a `registry.write` event. `heartbeatSec` turns on the
 silence alarm (it fires after 2x the heartbeat). `probe: true` turns on the
-5-minute synthetic probe, which needs a relay that sends receipts.
+adaptive synthetic probe: it is sent only after 5 minutes without any proof the
+agent consumes mail (authenticated traffic, an ack or a poll), so busy agents are
+never probed and worst-case time to detect a dead agent is unchanged. It needs a
+relay that sends receipts.
 
 ## API (agent bearer token; the kind comes from the token)
 

@@ -78,7 +78,24 @@ export type ProbeInput = {
   lastProbeAt: number | null;
   lastProbeAckAt: number | null;
   misses: number;
+  /**
+   * Last event that proves the agent consumes mail (authenticated traffic, an
+   * ack or a poll). Omitted/null keeps the fixed cadence. Socket pings never
+   * count: a wedged consumer behind a healthy socket is what the probe is for.
+   */
+  lastAliveAt?: number | null;
 };
+
+/** Last sign that the agent itself (not just its socket) is working. */
+export function lastConsumerAlive(input: {
+  lastSeenAt: number | null;
+  lastActivityAt: number | null;
+}): number | null {
+  const candidates = [input.lastSeenAt, input.lastActivityAt].filter(
+    (value): value is number => typeof value === 'number' && value > 0
+  );
+  return candidates.length ? Math.max(...candidates) : null;
+}
 
 export type ProbeResult = {
   misses: number;
@@ -88,17 +105,30 @@ export type ProbeResult = {
   event: 'agent.unreachable' | 'agent.reachable' | null;
 };
 
+/**
+ * Adaptive, last-seen based. A probe exists to prove an agent is reachable, so
+ * traffic that already proves it replaces the probe: one is sent only after
+ * `intervalMs` without any proof (previous probe included). Worst-case time to
+ * detect a dead agent is unchanged (it dies right after its last proof, the
+ * next probe is due `intervalMs` later, then the same miss window applies); the
+ * best case is faster and a busy agent costs zero probe messages.
+ */
 export function evaluateProbe(input: ProbeInput): ProbeResult {
   const { now, lastProbeAt, lastProbeAckAt } = input;
-  if (lastProbeAt === null)
-    return { misses: 0, rttMs: null, sendNew: true, event: null };
+  const aliveAt = input.lastAliveAt ?? null;
+  if (lastProbeAt === null) {
+    const quiet = aliveAt === null || now - aliveAt >= PROBE.intervalMs;
+    return { misses: 0, rttMs: null, sendNew: quiet, event: null };
+  }
   const acked = lastProbeAckAt !== null && lastProbeAckAt >= lastProbeAt;
-  if (acked) {
-    const due = now - lastProbeAt >= PROBE.intervalMs;
+  // Proof after the probe went out answers it, whether or not the ack arrived.
+  const provenSince = aliveAt !== null && aliveAt > lastProbeAt;
+  if (acked || provenSince) {
+    const proofAt = Math.max(lastProbeAt, aliveAt ?? 0);
     return {
       misses: 0,
-      rttMs: lastProbeAckAt - lastProbeAt,
-      sendNew: due,
+      rttMs: acked ? (lastProbeAckAt as number) - lastProbeAt : null,
+      sendNew: now - proofAt >= PROBE.intervalMs,
       event: input.misses >= PROBE.missesToAlarm ? 'agent.reachable' : null,
     };
   }

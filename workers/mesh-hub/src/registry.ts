@@ -15,6 +15,7 @@ import {
   type AgentState,
   evaluatePresence,
   evaluateProbe,
+  lastConsumerAlive,
   PROBE,
 } from './presence.ts';
 
@@ -323,7 +324,12 @@ export class Registry extends DurableObject<Env> {
             live,
             Number(agent.probe_misses),
             now,
-            pending
+            pending,
+            lastConsumerAlive({
+              lastSeenAt:
+                agent.last_seen_at === null ? null : Number(agent.last_seen_at),
+              lastActivityAt: live.lastActivityAt,
+            })
           );
         } catch {
           // One unreachable mailbox must not abort the sweep for every agent.
@@ -378,10 +384,12 @@ export class Registry extends DurableObject<Env> {
       kind: string;
       detail: Detail;
       revert?: () => void;
-    }[]
+    }[],
+    lastAliveAt: number | null
   ) {
     const result = evaluateProbe({
       now,
+      lastAliveAt,
       lastProbeAt: live.lastProbe?.acceptedAt ?? null,
       lastProbeAckAt: live.lastProbe?.receivedAt ?? null,
       misses,

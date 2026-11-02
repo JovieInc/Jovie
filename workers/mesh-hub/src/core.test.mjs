@@ -15,6 +15,7 @@ import {
   evaluatePresence,
   evaluateProbe,
   lastAlive,
+  lastConsumerAlive,
   PROBE,
 } from './presence.ts';
 import { scanBody } from './scan.ts';
@@ -555,6 +556,103 @@ test('percentile uses nearest-rank and handles empty input', () => {
   assert.equal(
     percentile([12, 17, 18, 19, 20, 23, 27, 28, 31, 36, 37], 95),
     37
+  );
+});
+
+test('probe is adaptive: traffic that proves the agent replaces the probe', () => {
+  const quiet = PROBE.intervalMs;
+  // Busy agent: recent proof, no probe sent even though the last probe is old.
+  assert.equal(
+    evaluateProbe({
+      now: 10 * quiet,
+      lastProbeAt: 0,
+      lastProbeAckAt: 100,
+      misses: 0,
+      lastAliveAt: 10 * quiet - 1_000,
+    }).sendNew,
+    false
+  );
+  // Quiet agent: same cadence as before.
+  assert.equal(
+    evaluateProbe({
+      now: 10 * quiet,
+      lastProbeAt: 0,
+      lastProbeAckAt: 100,
+      misses: 0,
+      lastAliveAt: 100,
+    }).sendNew,
+    true
+  );
+  // Never probed but recently active: wait until it has been quiet.
+  assert.equal(
+    evaluateProbe({
+      now: 1_000,
+      lastProbeAt: null,
+      lastProbeAckAt: null,
+      misses: 0,
+      lastAliveAt: 500,
+    }).sendNew,
+    false
+  );
+  // Proof after an unanswered probe clears the misses and fires recovery.
+  const recovered = evaluateProbe({
+    now: PROBE.missAfterMs + 20,
+    lastProbeAt: 10,
+    lastProbeAckAt: null,
+    misses: PROBE.missesToAlarm,
+    lastAliveAt: 50_000,
+  });
+  assert.deepEqual([recovered.misses, recovered.event], [0, 'agent.reachable']);
+  // Socket pings alone are not consumer proof.
+  assert.equal(
+    lastConsumerAlive({ lastSeenAt: null, lastActivityAt: null }),
+    null
+  );
+});
+
+test('negative control: a dead agent is detected no later than with the fixed probe', () => {
+  const MIN = 60_000;
+  // Simulate the minute sweep. The agent answers until `diesAt`, then is silent.
+  // `adaptive` also gets unrelated traffic every 90 s until it dies.
+  const detect = (diesAt, adaptive) => {
+    let lastProbeAt = null;
+    let lastAck = null;
+    let misses = 0;
+    let lastTraffic = 0;
+    for (let now = MIN; now <= diesAt + 30 * MIN; now += MIN) {
+      if (now <= diesAt && adaptive && now % 90_000 === 0) lastTraffic = now;
+      const r = evaluateProbe({
+        now,
+        lastProbeAt,
+        lastProbeAckAt: lastAck,
+        misses,
+        lastAliveAt: adaptive ? lastTraffic || null : null,
+      });
+      misses = r.misses;
+      if (r.event === 'agent.unreachable') return now - diesAt;
+      if (r.sendNew) {
+        lastProbeAt = now;
+        if (now <= diesAt) lastAck = now;
+      }
+    }
+    return Infinity;
+  };
+  // Documented bound: the worst case is unchanged. Adaptive may be slower for
+  // one death time (it waits out a quiet interval after the last proof), but
+  // never slower than the fixed probe's own worst case over a full cycle.
+  let fixedWorst = 0;
+  let adaptiveWorst = 0;
+  for (let diesAt = 10 * MIN; diesAt < 20 * MIN; diesAt += MIN) {
+    const fixed = detect(diesAt, false);
+    const adaptive = detect(diesAt, true);
+    assert.ok(Number.isFinite(fixed), 'fixed probe must detect a dead agent');
+    assert.ok(Number.isFinite(adaptive), 'dead agent must be detected');
+    fixedWorst = Math.max(fixedWorst, fixed);
+    adaptiveWorst = Math.max(adaptiveWorst, adaptive);
+  }
+  assert.ok(
+    adaptiveWorst <= fixedWorst,
+    `adaptive worst ${adaptiveWorst} vs fixed worst ${fixedWorst}`
   );
 });
 
