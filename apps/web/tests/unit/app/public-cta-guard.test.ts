@@ -92,6 +92,34 @@ describe('public CTA guard', () => {
     // in cookies.spec.ts hit-testing; JSDOM cannot certify rendered dimensions.
   });
 
+  it('forwards the marketing mark size without changing the default header mark or CTA', () => {
+    const props: HeaderNavProps = {
+      authMode: 'public-static',
+      presentation: 'marketing-glass',
+      logoVariant: 'icon',
+      publicCta: { href: '/start', label: 'Find yourself' },
+    };
+    const { rerender } = render(
+      createElement<HeaderNavProps>(HeaderNav, {
+        ...props,
+        logoMarkSize: 'marketing',
+      })
+    );
+    expect(document.querySelector('[data-brand-mark-size]')).toHaveAttribute(
+      'data-brand-mark-size',
+      '28'
+    );
+    expect(screen.getByRole('link', { name: 'Find yourself' })).toHaveAttribute(
+      'href',
+      '/start'
+    );
+    rerender(createElement<HeaderNavProps>(HeaderNav, props));
+    expect(document.querySelector('[data-brand-mark-size]')).toHaveAttribute(
+      'data-brand-mark-size',
+      '20'
+    );
+  });
+
   it('puts the glass header content on the single public container', () => {
     render(
       createElement<HeaderNavProps>(HeaderNav, {
