@@ -13,7 +13,6 @@ import {
   publicArtistApiLimiter,
 } from '@/lib/rate-limit';
 
-export const dynamic = 'force-dynamic';
 const querySchema = z.string().trim().min(2).max(80);
 
 /** Reuse the public-profile discovery policy; never return owner or settings data. */
