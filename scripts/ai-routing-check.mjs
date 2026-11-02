@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
  * node scripts/ai-routing-check.mjs [--days 2] [--json] [--record <jsonl>] [--vercel]
+ *   [--pools-only] [--profiles-dir <systemd drop-in dir>]
  *
  * Compares the documented AI routing (apps/web/lib/ai/routing.json) with the
  * live deployment: Gateway spend by key and model against each caller's declared
@@ -10,18 +11,29 @@
  * everything) to a JSONL ledger. Reads AI_GATEWAY_API_KEY from the environment
  * and never prints it.
  *
+ * Subsidy pools: the ledger policy in routing.json is always checked. With host
+ * profiles (CODEX_LANE_SUBSCRIPTION_PROFILES in the environment, or the systemd
+ * drop-ins under --profiles-dir, e.g. ~/.config/systemd/user/jovie-lanes.service.d
+ * on Gem) every signed-in alias must be a ledgered pool and back. --pools-only runs
+ * just that check, with no Gateway key and no network.
+ *
  * api-budget: ai-gateway 16/hr - cost-gate tick every 15 min, 2 report reads and 1 credits read per run
  * api-budget: cloudflare-api 8/hr - one Workers AI analytics query per cost-gate tick
  */
 import { spawnSync } from 'node:child_process';
-import { appendFileSync, readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { appendFileSync, readdirSync, readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createApiClient } from '../packages/api-client/client.ts';
 import { providerSpec } from '../packages/api-client/contract.ts';
 import { hashCredential } from '../packages/api-client/store.ts';
 import { fetchRows } from './ai-gateway-report.mjs';
-import { evaluateRouting, workersAiUsdByDay } from './lib/ai-routing-drift.mjs';
+import {
+  evaluateRouting,
+  evaluateSubsidyPools,
+  profilesFromDropIns,
+  workersAiUsdByDay,
+} from './lib/ai-routing-drift.mjs';
 import { readGatewayCredits } from './lib/credentials-live-reads.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -121,22 +133,64 @@ function vercelEnvNames(routing) {
   return out;
 }
 
+/** Host subscription profiles (aliases, homes, slots, emailSha256), or null when not on a host. */
+export function hostProfiles(profilesDir, env = process.env) {
+  if (profilesDir) {
+    // systemd applies drop-ins in lexical order; the last assignment wins.
+    const files = readdirSync(profilesDir)
+      .filter(name => name.endsWith('.conf'))
+      .sort();
+    return profilesFromDropIns(
+      files.map(name => readFileSync(join(profilesDir, name), 'utf8'))
+    );
+  }
+  const raw = env.CODEX_LANE_SUBSCRIPTION_PROFILES;
+  return raw ? JSON.parse(raw) : null;
+}
+
 export async function main(
   argv = process.argv.slice(2),
   env = process.env,
   fetchImpl = fetch
 ) {
+  const flag = name => {
+    const i = argv.indexOf(name);
+    return i >= 0 ? argv[i + 1] : undefined;
+  };
+  const routing = JSON.parse(readFileSync(ROUTING_PATH, 'utf8'));
+  const profiles = hostProfiles(flag('--profiles-dir'), env);
+  if (argv.includes('--pools-only')) {
+    const findings = evaluateSubsidyPools({ routing, profiles });
+    if (argv.includes('--json'))
+      console.log(
+        JSON.stringify(
+          {
+            schema: 'jovie.subsidy-pool-check/v1',
+            checkedAt: new Date().toISOString(),
+            hostProfiles: profiles ? Object.keys(profiles).sort() : null,
+            findings,
+          },
+          null,
+          2
+        )
+      );
+    else {
+      console.log(
+        `Subsidy pool ledger: ${routing.subsidyPools?.pools?.length ?? 0} pools, floor ${routing.subsidyPools?.policy?.floorPercent}%, host aliases ${profiles ? Object.keys(profiles).sort().join(', ') : 'not read'}`
+      );
+      for (const f of findings) console.log(`  [${f.severity}] ${f.message}`);
+      if (findings.length === 0) console.log('  no drift');
+    }
+    return findings.some(f => ['high', 'critical'].includes(f.severity))
+      ? 1
+      : 0;
+  }
   const apiKey = env.AI_GATEWAY_API_KEY;
   if (!apiKey) {
     console.error('ai-routing-check: AI_GATEWAY_API_KEY is not set');
     return 2;
   }
-  const flag = name => {
-    const i = argv.indexOf(name);
-    return i >= 0 ? argv[i + 1] : undefined;
-  };
   const days = Number(flag('--days')) || 2;
-  const routing = JSON.parse(readFileSync(ROUTING_PATH, 'utf8'));
   // fetchRows spans start_date = today - n through tomorrow, so n days back is
   // n + 1 calendar days. Ask for days - 1 so the per-day rate divides the
   // window it measured (it read a stale day and over-reported by ~50%).
@@ -159,6 +213,7 @@ export async function main(
     health: await relayHealth(fetchImpl),
     envNames: argv.includes('--vercel') ? vercelEnvNames(routing) : null,
     workersAiByDay: await readWorkersAiByDay(days, fetchImpl, env),
+    profiles,
   });
   const record = {
     ...result,
