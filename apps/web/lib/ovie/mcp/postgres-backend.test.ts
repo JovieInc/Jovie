@@ -86,7 +86,12 @@ describe('postgresRecordBackend', () => {
       backend.setIfAbsent('jovie:cert:ledger:row:1', big, 120)
     ).resolves.toBe(true);
     await expect(
-      backend.compareAndSet('jovie:cert:ledger:row:1', 'old', { blob: big })
+      backend.compareAndSet(
+        'jovie:cert:ledger:row:1',
+        'old',
+        { blob: big },
+        120
+      )
     ).resolves.toBe(true);
 
     expect(mocks.captureWarning).toHaveBeenCalledTimes(2);
