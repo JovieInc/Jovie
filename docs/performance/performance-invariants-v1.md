@@ -90,22 +90,26 @@ other surface's streak.
 
 **Ship now:** production remains warning-only. The dated
 [`jovie-public-profile-alias-graduation/v2`](./public-profile-alias-graduation.json) receipt,
-measured at 2026-10-21T01:06:00Z, records 11 qualifying production runs in the latest
-14-run window and a current consecutive streak of 0/14. The three maxima over budget
-are 1626.2, 2083.1 and 2431.6 ms. Staging independently qualifies at 14/14, so its
-exact-build alias budget now fails closed when that measurement step runs. With five
-samples per route, nearest-rank p95 is the maximum sample; every selected route must
-be at or below 1500 ms for a run to qualify.
+measured at 2026-10-31T06:00:00Z, records 14 qualifying production runs in the latest
+14-run window and a current consecutive streak of 14/14 (worst run 1268.4 ms), so the
+production canonical-alias budget now fails closed. Staging independently qualifies at
+14/14 (worst run 1278.4 ms) and its exact-build alias budget keeps failing closed when
+that measurement step runs. The guard takes 20 samples per alias route
+(`ALIAS_TAIL_RUNS`, #22656), so a route's nearest-rank p95 is its 19th-ordered sample;
+every selected route must be at or below 1500 ms for a run to qualify. The collector
+reads the sample count from each log instead of assuming one: the 2026-10-21 collector
+assumed five samples and marked every later measurement invalid.
 
-**Re-evaluate when:** production reaches 14 consecutive eligible executions, and no later
-than 2026-10-28T01:06:00Z under JOV-8737. Staging's independent graduation is recorded
+**Re-evaluate when:** any selected execution misses, and no later than
+2026-11-07T06:00:00Z under JOV-8737. Staging's independent graduation is recorded
 under JOV-8338; production evidence never changes staging's decision.
 
 **Then:** make the qualifying surface's budget gate blocking. If a surface still does not
 qualify, refresh its dated measurement and set another bounded review date.
 
-The receipt references generated JSONL with all 472 controller jobsets in the fixed
-October 14–21 interval and 28 selected measurements (840 raw samples). Each measurement
+The receipt references generated JSONL with all 246 controller jobsets in the fixed
+2026-10-27T06:00Z to 2026-10-31T06:00Z interval and 28 selected measurements (3,360 raw
+samples). Each measurement
 records exact controller/attempt/job/step identities, native log SHA-256, samples and
 matching native maxima. `headSha` identifies the controller workflow source;
 `testedSha` identifies its actual checkout. Staging also records the immutable
@@ -117,7 +121,7 @@ Refresh manually with authenticated `gh`, explicit UTC boundaries, and the ownin
 
 ```sh
 node scripts/lib/public-profile-alias-graduation.mjs \
-  2026-10-14T00:00:00Z 2026-10-21T01:06:00Z 2026-10-28T01:06:00Z JOV-8737
+  2026-10-27T06:00:00Z 2026-10-31T06:00:00Z 2026-11-07T06:00:00Z JOV-8737
 ```
 
 This regenerates the receipt and its two evidence files; review the resulting

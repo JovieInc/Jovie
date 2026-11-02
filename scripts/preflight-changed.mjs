@@ -17,6 +17,7 @@
  *     [--title t] [--no-coverage] [--no-typecheck] [--thorough] [--no-write]
  *     [--hook] [--list] [--json]
  *
+ *   --fast      static guards only (= --no-typecheck --no-coverage)
  *   --hook      pre-push mode: honours JOVIE_PREFLIGHT_CHANGED=0, never needs a PR
  *   --thorough  also run the heavy guards deferred by default
  *   --no-write  check generators instead of writing their output
@@ -44,6 +45,8 @@ import {
   PR_BODY_SKELETON,
   parseMergeConflicts,
 } from './lib/preflight-changed.mjs';
+import { checkInstallMatchesLockfile } from './lib/preflight-install.mjs';
+import { remoteHint } from './lib/remote-hint.mjs';
 
 const SELF = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HEAP_MB = process.env.JOVIE_PREFLIGHT_HEAP_MB || '4096';
@@ -61,8 +64,8 @@ export const HEAVY_GUARDS = new Set([
 export const NARROWED = {
   'merge-group-unit-guards': {
     command:
-      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts',
-    note: 'metrics-layer + locked chrome only; design-system suite runs with --thorough',
+      'node scripts/design-system-source-ratchet.mjs && pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts tests/unit/design-system/mac-header-two-lines-v1.test.ts tests/unit/marketing/marketing-headline-line-clamp-guard.test.ts',
+    note: 'source identity, metrics-layer, locked chrome and heading contracts; full suite with --thorough',
   },
 };
 
@@ -151,7 +154,10 @@ export function parseArgs(argv) {
     else if (f === '--no-coverage') a.coverage = false;
     else if (f === '--no-typecheck') a.typecheck = false;
     else if (f === '--thorough') a.thorough = true;
-    else if (f === '--no-write') a.write = false;
+    else if (f === '--fast') {
+      a.coverage = false;
+      a.typecheck = false;
+    } else if (f === '--no-write') a.write = false;
     else if (f === '--hook') a.hook = true;
     else if (f === '--list') a.list = true;
     else if (f === '--json') a.json = true;
@@ -192,11 +198,36 @@ const git = (cwd, args) => {
   return r.status === 0 ? r.stdout.trim() : '';
 };
 
-/** Changed files vs the merge-base, including uncommitted and untracked. */
+/**
+ * Ref names to try for a diff base (JOV-10351). A bare branch name resolves
+ * to its remote-tracking ref first, then the local branch; a name that is
+ * already qualified (origin/main, refs/...) is never prefixed again.
+ * @returns {string[]}
+ */
+export function baseRefCandidates(base) {
+  const b = base.trim();
+  if (/^(?:origin\/|refs\/)/.test(b)) return [b];
+  return [`origin/${b}`, b];
+}
+
+/**
+ * The first candidate that names a commit, or null when none does. Callers
+ * must fail on null instead of treating it as 'no changes' (JOV-10351).
+ * @returns {string|null}
+ */
+export function resolveBaseRef(cwd, base) {
+  for (const candidate of baseRefCandidates(base))
+    if (git(cwd, ['rev-parse', '--verify', '--quiet', `${candidate}^{commit}`]))
+      return candidate;
+  return null;
+}
+
+/** Changed files vs the merge-base, including uncommitted and untracked.
+ *  `base` must be a ref that resolves to a commit (see resolveBaseRef). */
 export function changedFiles(cwd, base) {
   const mb =
-    git(cwd, ['merge-base', `origin/${base}`, 'HEAD']) ||
-    git(cwd, ['rev-parse', `origin/${base}`]);
+    git(cwd, ['merge-base', base, 'HEAD']) || git(cwd, ['rev-parse', base]);
+  if (!mb) return { mergeBase: '', files: [] };
   /** @type {{filename:string, previous_filename:string|undefined, status:string, patch:string}[]} */
   const rows = git(cwd, ['diff', '--name-status', '-M', mb])
     .split('\n')
@@ -228,6 +259,19 @@ export function changedFiles(cwd, base) {
         patch: '',
       });
   return { mergeBase: mb, files: rows };
+}
+
+/** Run changed invariant contracts locally even when the full suite is deferred. */
+export function invariantTestFiles(files, repo) {
+  const tests = new Set();
+  for (const file of files) {
+    for (const source of [file.filename, file.previous_filename]) {
+      if (!/^scripts\/invariants\/.+\.mjs$/.test(source ?? '')) continue;
+      const candidate = source.replace(/(?:\.test)?\.mjs$/, '.test.mjs');
+      if (existsSync(path.join(repo, candidate))) tests.add(candidate);
+    }
+  }
+  return [...tests].sort();
 }
 
 /** GitHub reads go through the shared budgeted client (external-apis rule). */
@@ -350,12 +394,21 @@ function biomeTargets(files) {
 export function typecheckTargets(files, cwd) {
   const out = new Set();
   for (const f of files) {
-    if (f.status === 'removed' || !/\.(?:tsx?|mts|cts)$/.test(f.filename))
-      continue;
+    // scripts/ is checkJs (typecheck:scripts), so .mjs/.js count there.
+    const ext = /^scripts\//.test(f.filename)
+      ? /\.(?:tsx?|mts|cts|mjs|js)$/
+      : /\.(?:tsx?|mts|cts)$/;
+    if (f.status === 'removed' || !ext.test(f.filename)) continue;
     const isTest = /\.(?:test|spec)\.[^/]+$|\/tests?\//.test(f.filename);
     const web = f.filename.startsWith('apps/web/');
-    if (web) out.add(isTest ? 'web-tests' : 'web');
-    else if (/^scripts\//.test(f.filename)) out.add('scripts');
+    if (web) {
+      out.add(isTest ? 'web-tests' : 'web');
+      if (!isTest) {
+        // Source changes also affect test consumers and Ovie's TS graph.
+        out.add('web-tests');
+        out.add('pkg:@jovie/ovie');
+      }
+    } else if (/^scripts\//.test(f.filename)) out.add('scripts');
     else {
       let dir = path.dirname(f.filename);
       while (dir && dir !== '.') {
@@ -370,6 +423,17 @@ export function typecheckTargets(files, cwd) {
     }
   }
   return [...out];
+}
+
+/**
+ * Gem's host semaphore (scripts/typecheck-slot.mjs, GEM_TYPECHECK_SLOTS from environment.d) for
+ * preflight's heavy checks. Unset off Gem, so CI and laptops run the command untouched.
+ * 2026-11-02: every agent's pre-push preflight ran tsc and vitest outside the slot (only
+ * apps/web's own `typecheck` script used it), load reached 25-40 on 16 cores and autoscale
+ * halved the Codex lanes.
+ */
+export function hostSlotted(command) {
+  return `node scripts/typecheck-slot.mjs -- bash -c '${command.replace(/'/g, `'\\''`)}'`;
 }
 
 function typecheckCommand(target, cwd) {
@@ -393,6 +457,14 @@ export async function main({
     return 0;
   }
   const cwd = args.repo;
+  const hint = remoteHint({ env });
+  if (hint) log(hint);
+  // Fail fast before any check runs against an install this worktree did not make.
+  const install = checkInstallMatchesLockfile({ repo: cwd });
+  if (!install.ok) {
+    log(`[preflight:changed] ${install.message}`);
+    return 1;
+  }
   const started = Date.now();
   const childEnv = { ...env };
   for (const k of Object.keys(childEnv))
@@ -405,21 +477,40 @@ export async function main({
   });
   if (pinned.status === 0 && pinned.stdout.trim())
     childEnv.PATH = `${pinned.stdout.trim()}:${childEnv.PATH}`;
+  // Fetch the remote branch under its unqualified name; a base that arrives
+  // already remote-qualified (origin/main) maps back to 'main' (JOV-10351).
+  spawnSync(
+    'git',
+    ['fetch', '--no-tags', '-q', 'origin', args.base.replace(/^origin\//, '')],
+    { cwd }
+  );
+  const baseRef = resolveBaseRef(cwd, args.base);
+  if (!baseRef) {
+    log(
+      `[preflight:changed] base ref '${args.base}' does not resolve to a commit (tried ${baseRefCandidates(args.base).join(', ')}); run 'git fetch origin' or pass an existing branch as --base`
+    );
+    return 1;
+  }
   Object.assign(childEnv, {
     NODE_OPTIONS: `--max-old-space-size=${HEAP_MB}`,
     GITHUB_BASE_REF: args.base,
     GITHUB_EVENT_NAME: 'pull_request',
-    CI_BASE_REF: `origin/${args.base}`,
+    CI_BASE_REF: baseRef,
     // Copied guards compare their module URL to argv[1]; macOS /var -> /private/var
     // aliases turn their real checks into silent no-ops or false reds.
     TMPDIR: realpathSync(env.TMPDIR || tmpdir()),
   });
-  spawnSync('git', ['fetch', '--no-tags', '-q', 'origin', args.base], { cwd });
-  const { mergeBase, files } = changedFiles(cwd, args.base);
+  const { mergeBase, files } = changedFiles(cwd, baseRef);
+  if (!mergeBase) {
+    log(
+      `[preflight:changed] git could not compute a diff base against ${baseRef}; failing instead of reporting 'no changes'`
+    );
+    return 1;
+  }
   childEnv.SHADCN_LINT_DIFF_BASE = mergeBase;
   const paths = files.map(f => f.filename);
   if (!paths.length) {
-    log('[preflight:changed] no changes vs origin/' + args.base);
+    log(`[preflight:changed] no changes vs ${baseRef}`);
     return 0;
   }
   const readFile = p => {
@@ -471,48 +562,28 @@ export async function main({
     );
   }
 
+  const invariantTests = invariantTestFiles(files, cwd);
+  if (invariantTests.length)
+    cmd(
+      'invariant-tests',
+      `changed invariant contracts (${invariantTests.length} files)`,
+      `node --test ${invariantTests.map(f => `'${f.replaceAll("'", "'\\''")}'`).join(' ')}`
+    );
+
   const any = re => paths.some(p => re.test(p));
-  if (any(/^\.github\/(?:workflows|actions)\//)) {
-    cmd(
-      'wf:refs',
-      'workflow references',
-      'node scripts/verify-workflow-references.mjs'
-    );
-    cmd(
-      'wf:budget',
-      'workflow expression budget',
-      `node scripts/workflow-expression-budget.mjs --ref HEAD --merge-with origin/${args.base}`
-    );
-    cmd(
-      'wf:token-scope',
-      'workflow token scope',
-      'node scripts/workflow-token-scope.mjs'
-    );
-    cmd(
-      'wf:token-budget',
-      'workflow github-token budget',
-      'node scripts/workflow-token-budget-guard.mjs'
-    );
+  // Source Validation guards come from one manifest (see
+  // scripts/lib/source-validation-manifest.mjs); a test keeps it equal to the workflow.
+  const manifest = await import(
+    pathToFileURL(path.join(cwd, 'scripts/lib/source-validation-manifest.mjs'))
+      .href
+  );
+  for (const g of manifest.selectManifestGuards(paths, args.base)) {
+    if (g.heavy && !args.thorough) {
+      deferred.push(g.id);
+      continue;
+    }
+    cmd(g.id, g.name, g.command, g.phase ?? 1);
   }
-  if (any(/^(?:\.github\/workflows\/|canon\/|scripts\/ownership-registry)/))
-    cmd(
-      'ownership',
-      'ownership registry',
-      'node scripts/ownership-registry.mjs --report',
-      1
-    );
-  if (any(/(?:^|\/)package\.json$|pnpm-lock\.yaml$/))
-    cmd(
-      'lockfile',
-      'lockfile specifiers',
-      'node scripts/lockfile-specifier-preflight.mjs'
-    );
-  if (any(/^(?:CLAUDE\.md|AGENTS\.md|\.claude\/|docs\/agent-context|canon\/)/))
-    cmd(
-      'agent-context',
-      'agent-context size and contracts',
-      'node --run agent-context:check'
-    );
 
   const bio = biomeTargets(files);
   if (bio.length)
@@ -523,9 +594,9 @@ export async function main({
     );
 
   // Merge-with-base: Source Validation judges the merged tree. Warn-only.
-  add('merge-base', 'merges cleanly with origin/' + args.base, async () => {
+  add('merge-base', 'merges cleanly with ' + baseRef, async () => {
     const r = await sh(
-      `git merge-tree --write-tree --name-only origin/${args.base} HEAD`,
+      `git merge-tree --write-tree --name-only ${baseRef} HEAD`,
       { cwd, env: childEnv, timeoutMs: 60_000 }
     );
     if (r.code === 0) return r;
@@ -533,7 +604,7 @@ export async function main({
     return {
       ...r,
       code: 0,
-      warn: `does not merge cleanly with origin/${args.base}; resolve before pushing${conflicts.length ? `: ${conflicts.join(', ')}` : ''}`,
+      warn: `does not merge cleanly with ${baseRef}; resolve before pushing${conflicts.length ? `: ${conflicts.join(', ')}` : ''}`,
     };
   });
 
@@ -560,7 +631,7 @@ export async function main({
     cmd(
       'migration',
       'Migration Guard',
-      `cd apps/web && ./scripts/check-migrations.sh origin/${args.base} && ./scripts/validate-migrations.sh && pnpm exec tsx scripts/online-index-migrate.ts --validate-only`
+      `cd apps/web && ./scripts/check-migrations.sh ${baseRef} && ./scripts/validate-migrations.sh && pnpm exec tsx scripts/online-index-migrate.ts --validate-only`
     );
     add('migration-lint', 'migration SQL lint (squawk)', async () => {
       const r = await sh(
@@ -613,7 +684,9 @@ export async function main({
           JOVIE_COVERAGE_RELATED_TESTS: (parsed.relatedTests ?? []).join('\n'),
         };
         const run = await sh(
-          `pnpm --filter @jovie/web test:coverage --changed ${mergeBase} --bail 1 --testTimeout=60000 --retry=1 && node scripts/check-changed-test-coverage.mjs --base ${mergeBase} --head ${head} --coverage apps/web/coverage/coverage-final.json`,
+          hostSlotted(
+            `pnpm --filter @jovie/web test:coverage --changed ${mergeBase} --bail 1 --testTimeout=60000 --retry=1 && node scripts/check-changed-test-coverage.mjs --base ${mergeBase} --head ${head} --coverage apps/web/coverage/coverage-final.json`
+          ),
           { cwd, env: e, timeoutMs: 900_000 }
         );
         return {
@@ -633,7 +706,7 @@ export async function main({
         `tsc:${t}`,
         `typecheck ${t}`,
         async () => {
-          const r = await sh(typecheckCommand(t, cwd), {
+          const r = await sh(hostSlotted(typecheckCommand(t, cwd)), {
             cwd,
             env: childEnv,
             timeoutMs: 900_000,

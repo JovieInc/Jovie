@@ -48,7 +48,7 @@ export const AGENT_DRAFT_TOOLS = [
     name: 'workspace.create_draft',
     title: 'Create artist draft',
     description:
-      'Create or resume an unpublished visibility draft using the exact artist_id and draft_token from artist.search_or_import. Retrying the same token resumes the same draft; a token for another artist is rejected. Never claims ownership, publishes or purchases.',
+      'Create or resume an unpublished visibility draft using the exact artist_id and draft_token from artist.search_or_import. Retrying the same token resumes the same draft; a token for another artist is rejected. Returns claim_url: show it to the user so they can sign in on Jovie and claim the draft; the artist is matched to its Spotify identity and stays private until the user publishes. Never share draft_token. Never claims ownership, publishes or purchases.',
     inputSchema: z.toJSONSchema(createAgentDraftSchema),
     annotations: {
       title: 'Create artist draft',
@@ -62,7 +62,7 @@ export const AGENT_DRAFT_TOOLS = [
     name: 'release.prepare_launch',
     title: 'Prepare release launch',
     description:
-      'Resolve public release facts and create or resume an unpublished artist, release-page, and smart-link draft. Requires the draft capability. Returns only unresolved questions and never claims, publishes, or purchases.',
+      'Resolve public release facts and create or resume an unpublished artist, release-page, and smart-link draft. Requires the draft capability. Returns only unresolved questions plus claim_url; when next_action is send_user_claim_url, show claim_url to the user so they can claim it on Jovie, where it stays private until they publish. Never claims, publishes, or purchases.',
     inputSchema: z.toJSONSchema(prepareReleaseLaunchSchema),
     annotations: {
       title: 'Prepare release launch',

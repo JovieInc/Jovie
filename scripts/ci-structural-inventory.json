@@ -70,6 +70,12 @@
       "kind": "suite"
     },
     {
+      "key": "node --test --experimental-test-coverage --test-coverage-include=.github/scripts/staging-supersession-policy.mjs --test-",
+      "part": "operationsParts",
+      "seconds": 1.2,
+      "kind": "suite"
+    },
+    {
       "key": "node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mjs --test-coverage-inc",
       "part": "operationsParts",
       "seconds": 0.7,

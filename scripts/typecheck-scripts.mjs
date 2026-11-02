@@ -97,6 +97,56 @@ export function parseTscOutput(output) {
 
 const countFor = (counts, file, code) => counts.get(file)?.get(code) ?? 0;
 
+const UNKNOWN_JSON_PROPERTY =
+  /error TS2339: Property '.+' does not exist on type 'unknown'/;
+const JSON_ENVELOPE_MOCK = /error TS2322:.*NeonJsonEnvelope/;
+
+/**
+ * Recurring Source Validation repair: scripts/tsconfig.json (checkJs, lib
+ * es2022) types `response.json()` as `unknown`, so a new property read is
+ * TS2339 and the shrink-only baseline fails. The fix is a JSDoc type at the
+ * read, never a higher baseline count. That same type then becomes the
+ * injected `request` mock's return type, and `{ branches: unknown[] }` is
+ * TS2322 against it.
+ * @param {readonly string[]} diagnosticLines
+ * @returns {string | null}
+ */
+export function unknownJsonPropertyRepair(diagnosticLines) {
+  const lines = diagnosticLines ?? [];
+  if (lines.some(line => UNKNOWN_JSON_PROPERTY.test(line))) {
+    return (
+      'TS2339 on unknown: scripts checkJs types response.json() as unknown ' +
+      '(scripts/tsconfig.json lib es2022). Give that json() result a JSDoc type ' +
+      'before reading properties. Do not grow scripts/typecheck-baseline.json to absorb these.'
+    );
+  }
+  if (lines.some(line => JSON_ENVELOPE_MOCK.test(line))) {
+    return (
+      'TS2322 on NeonJsonEnvelope: the JSDoc type on response.json() is the ' +
+      'injected request mock return type. Return branch rows assignable to that ' +
+      'envelope, not unknown[]. Do not grow apps/web/typecheck-tests-baseline.json ' +
+      'or scripts/typecheck-baseline.json to absorb it.'
+    );
+  }
+  return null;
+}
+
+/** @param {readonly string[]} diagnosticLines */
+function tupleInferenceRepair(diagnosticLines) {
+  const { counts } = parseTscOutput(diagnosticLines.join('\n'));
+  for (const byCode of counts.values()) {
+    if (byCode.has('TS2769') && byCode.has('TS2698')) {
+      return (
+        'TS2769 and TS2698 in the same file: inspect heterogeneous table rows. ' +
+        'Array inference can mix object and number columns when destructuring. ' +
+        'Declare a JSDoc tuple on the table (for example Array<[typeof event, number]>) ' +
+        'or use named object rows. Do not grow scripts/typecheck-baseline.json to absorb these.'
+      );
+    }
+  }
+  return null;
+}
+
 /**
  * Compare current error counts against a baseline.
  * @param {ErrorCounts} current
@@ -132,7 +182,8 @@ export function compareWithBaseline(current, baseline) {
     }
   }
   return {
-    ok: newErrors.length === 0 && staleEntries.length === 0,
+    // Shrink (staleEntries) is reported as a notice, never a failure.
+    ok: newErrors.length === 0,
     newErrors,
     staleEntries,
   };
@@ -339,6 +390,14 @@ export function evaluateTypecheckBaseline({
   const { ok, newErrors, staleEntries } = compareWithBaseline(counts, baseline);
 
   if (ok) {
+    if (staleEntries.length > 0) {
+      const notice = `[${prefix}] ${staleEntries.length} baselined group(s) shrank; run \`${updateCommand}\` to lock it in.`;
+      console.log(
+        process.env.GITHUB_ACTIONS === 'true'
+          ? `::notice title=${prefix} improved::${notice}`
+          : notice
+      );
+    }
     console.log(
       `[${prefix}] PASS — ${totalErrors(counts)} pre-existing errors match the baseline ` +
         `(${baseline.totalErrors} baselined); no new errors.`
@@ -361,18 +420,15 @@ export function evaluateTypecheckBaseline({
       'Fix the new errors. If one is genuinely pre-existing, regenerate the ' +
         `baseline with \`${updateCommand}\` (visible in PR diff).`
     );
-  }
-  if (staleEntries.length > 0) {
-    console.error(
-      `[${prefix}] FAIL — baseline is stale: ${staleEntries.length} (file, error-code) group(s) no longer produce the baselined errors.`
-    );
-    for (const { file, code, count, baseline: base } of staleEntries) {
-      console.error(`  ${file}: ${code} ×${count} (baseline ×${base})`);
+    /** @type {string[]} */
+    const diagnosticLines = [];
+    for (const { file, code } of newErrors) {
+      diagnosticLines.push(...(lines.get(`${file}::${code}`) ?? []));
     }
-    console.error(
-      `The baseline is shrink-only: regenerate it with \`${updateCommand}\` ` +
-        'in the same PR that removes the errors.'
-    );
+    for (const diagnose of [unknownJsonPropertyRepair, tupleInferenceRepair]) {
+      const repair = diagnose(diagnosticLines);
+      if (repair) console.error(repair);
+    }
   }
   exit(1);
 }

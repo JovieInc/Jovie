@@ -1,0 +1,13 @@
+/* Final block size of the embedded UTM builder (5 fields, URL, actions),
+   reserved before the client island paints so the hero never shifts.
+   Measured at 360-1920px: 548px below 640px (44px inputs), 468-488px
+   above it (32px inputs; the URL wraps to three lines at 768-1024px). */
+.utm-links-builder {
+  min-block-size: 34.25rem;
+}
+
+@media (min-width: 40rem) {
+  .utm-links-builder {
+    min-block-size: 30.5rem;
+  }
+}

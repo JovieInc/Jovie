@@ -1,25 +1,16 @@
 /* ── One Light atmosphere ─────────────────────────────────────────────── */
-/* Extend the shipped hero-light, including its capability gates and scroll
-   canvas. Static light stays behind content: no extra DOM, JS, or animation.
-   The copy side falls to cinematic black before the claim's right edge. */
+/* Matte field (Tim, 2026-10-29): cinematic black, no gradient wallpaper.
+   The product shot is the hero's one focal point, so the only light is a
+   faint Ion halo centered behind it. Static: no extra DOM, JS, or motion. */
 .home-viewport--hero-canvas .homepage-hero-canvas__field {
   isolation: isolate;
+  --hero-shot-x: 74%;
+  --hero-shot-y: 54%;
   background:
-    linear-gradient(
-      118deg,
-      transparent 62%,
-      color-mix(in oklab, var(--noir-ion-ion) 10%, transparent) 62.1%,
-      transparent 62.2%
-    ),
     radial-gradient(
-      ellipse 54% 90% at 108% 12%,
-      color-mix(in oklab, var(--noir-ion-ion) 38%, transparent),
-      transparent 74%
-    ),
-    radial-gradient(
-      ellipse 44% 52% at 92% 60%,
-      color-mix(in oklab, var(--noir-ion-ion) 16%, transparent),
-      transparent 80%
+      ellipse 26% 42% at var(--hero-shot-x) var(--hero-shot-y),
+      color-mix(in oklab, var(--noir-ion-ion) 7%, transparent),
+      transparent 78%
     ),
     var(--system-b-cinematic-black);
 }
@@ -37,8 +28,8 @@
 }
 
 .home-viewport--hero-canvas .homepage-hero-light {
-  --hero-light-focal-x: 88%;
-  --hero-light-focal-y: 42%;
+  --hero-light-focal-x: var(--hero-shot-x, 74%);
+  --hero-light-focal-y: var(--hero-shot-y, 54%);
   --hero-light-ultra: var(--noir-ion-ion);
   --hero-light-pulse: var(--noir-ion-ion);
 
@@ -50,8 +41,11 @@
   );
 }
 
+/* Matte: the product shot is the one focal point, so the decorative
+   edge ring and grid stay off the homepage hero (static poster only). */
+.home-viewport--hero-canvas .homepage-hero-light__edge,
 .home-viewport--hero-canvas .homepage-hero-light__grid {
-  opacity: 0.12;
+  visibility: hidden;
 }
 
 .home-viewport--hero-canvas .homepage-hero-light__canvas {
@@ -82,18 +76,20 @@
 
 @media (max-width: 63.99rem) {
   .home-viewport--hero-canvas .homepage-hero-canvas__field {
-    /* On a stacked fold, keep the source below and right of the form. */
+    /* Stacked: the shot sits under the claim, so the halo follows it. */
+    --hero-shot-x: 50%;
+    --hero-shot-y: 78%;
     background:
       radial-gradient(
-        ellipse 95% 54% at 114% 94%,
-        color-mix(in oklab, var(--noir-ion-ion) 30%, transparent),
-        transparent 80%
+        ellipse 60% 26% at var(--hero-shot-x) var(--hero-shot-y),
+        color-mix(in oklab, var(--noir-ion-ion) 7%, transparent),
+        transparent 78%
       ),
       var(--system-b-cinematic-black);
   }
 
   .home-viewport--hero-canvas .homepage-hero-light {
-    --hero-light-focal-y: 84%;
+    --hero-light-focal-y: var(--hero-shot-y, 78%);
 
     mask-image: linear-gradient(
       to bottom,

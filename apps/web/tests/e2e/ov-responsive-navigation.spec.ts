@@ -142,17 +142,21 @@ async function customerNavigationContract(
           };
         })
       );
-      const accessibility = Array.from(
-        element.querySelectorAll('a[href], button')
-      ).map(interactive => ({
-        role: interactive.tagName.toLowerCase(),
-        name:
-          interactive.getAttribute('aria-label') ??
-          interactive.textContent?.trim() ??
-          null,
-        href: interactive.getAttribute('href'),
-        current: interactive.getAttribute('aria-current'),
-      }));
+      // The accessibility pass follows the same roots as the nodes pass:
+      // scanning the whole landmark leaks the per-user recent-chat rows
+      // (chat links and thread action buttons render inside the nav but
+      // outside every [data-nav-section]), which can never be role-invariant.
+      const accessibility = roots
+        .flatMap(root => Array.from(root.querySelectorAll('a[href], button')))
+        .map(interactive => ({
+          role: interactive.tagName.toLowerCase(),
+          name:
+            interactive.getAttribute('aria-label') ??
+            interactive.textContent?.trim() ??
+            null,
+          href: interactive.getAttribute('href'),
+          current: interactive.getAttribute('aria-current'),
+        }));
 
       return { nodes, styleInvariants, accessibility };
     },

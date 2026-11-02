@@ -37,9 +37,11 @@ export const HOMEPAGE_COPY = {
     },
     // Truthful under either waitlist state (shared CTA intent registry).
     supportNote: MARKETING_CTA_INTENTS.claimProfile.support,
+    // Template capture: jov.ie/you with a monogram avatar and abstract
+    // release art. No real person on `/` (Tim, 2026-10-26).
     profile: {
-      scenarioId: 'tim-white-profile-live-mobile',
-      alt: "Tim White's Jovie artist profile with his latest release first.",
+      scenarioId: 'template-profile-live-mobile',
+      alt: 'A Jovie profile at jov.ie/you with its latest release first.',
     },
   },
   offer: {

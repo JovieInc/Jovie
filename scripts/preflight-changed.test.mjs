@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import {
   CUSTOMER_MARKER,
@@ -9,10 +13,17 @@ import {
 } from './lib/preflight-changed.mjs';
 import { evaluateFleetRules } from './pr-fleet-rules.mjs';
 import {
+  baseRefCandidates,
+  changedFiles,
   downgradeHostRed,
   GENERATORS,
   HEAVY_GUARDS,
+  hostSlotted,
+  invariantTestFiles,
+  main,
+  NARROWED,
   parseArgs,
+  resolveBaseRef,
   typecheckTargets,
 } from './preflight-changed.mjs';
 
@@ -20,6 +31,66 @@ const file = (filename, status = 'modified') => ({
   filename,
   status,
   patch: '',
+});
+
+test('changed invariant modules select their contract tests before push', () => {
+  assert.deepEqual(
+    invariantTestFiles(
+      [
+        file('scripts/invariants/screen-certification.mjs'),
+        file('scripts/invariants/screen-certification.test.mjs'),
+        file('scripts/invariants/absent.mjs', 'removed'),
+        file('apps/web/lib/unrelated.mjs'),
+        {
+          ...file('scripts/moved.mjs', 'renamed'),
+          previous_filename: 'scripts/invariants/screen-certification.mjs',
+        },
+      ],
+      process.cwd()
+    ),
+    ['scripts/invariants/screen-certification.test.mjs']
+  );
+});
+
+test('selected invariant contracts catch a stale registry expectation', () => {
+  const repo = mkdtempSync(path.join(tmpdir(), 'preflight-invariant-'));
+  try {
+    mkdirSync(path.join(repo, 'scripts/invariants'), { recursive: true });
+    writeFileSync(
+      path.join(repo, 'scripts/invariants/registry.mjs'),
+      'export const sources = ["page.tsx", "loading.tsx"];\n'
+    );
+    const testPath = path.join(repo, 'scripts/invariants/registry.test.mjs');
+    const contract = expected =>
+      `import assert from 'node:assert/strict';\nimport { sources } from './registry.mjs';\nassert.deepEqual(sources, ${JSON.stringify(expected)});\n`;
+    const tests = invariantTestFiles(
+      [file('scripts/invariants/registry.mjs')],
+      repo
+    );
+    assert.deepEqual(tests, []);
+    writeFileSync(testPath, contract(['page.tsx']));
+    const selected = invariantTestFiles(
+      [file('scripts/invariants/registry.mjs')],
+      repo
+    );
+    assert.deepEqual(selected, ['scripts/invariants/registry.test.mjs']);
+    const env = { ...process.env };
+    delete env.NODE_TEST_CONTEXT;
+    const run = () =>
+      spawnSync(process.execPath, ['--test', ...selected], {
+        cwd: repo,
+        encoding: 'utf8',
+        env,
+      });
+    const red = run();
+    assert.equal(red.status, 1, red.stdout + red.stderr);
+    assert.match(red.stdout + red.stderr, /AssertionError/);
+    writeFileSync(testPath, contract(['page.tsx', 'loading.tsx']));
+    const green = run();
+    assert.equal(green.status, 0, green.stdout + green.stderr);
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
 });
 
 test('PR body lint names every missing section and prints a filled template', () => {
@@ -35,7 +106,7 @@ test('PR body lint names every missing section and prints a filled template', ()
   });
   const ids = r.errors.map(e => e.id);
   assert.ok(ids.includes('red-before-green'));
-  assert.ok(ids.includes('blast-radius'));
+  assert.ok(r.warnings.some(w => w.id === 'blast-radius'));
   assert.ok(ids.includes('locked-areas'));
   assert.ok(ids.includes('changelog-marker'));
   assert.match(r.template, /## Red-before-green/);
@@ -113,7 +184,52 @@ test('typecheck targets are the affected packages only', () => {
     ],
     process.cwd()
   );
-  assert.deepEqual(t.sort(), ['scripts', 'web', 'web-tests']);
+  assert.deepEqual(t.sort(), [
+    'pkg:@jovie/ovie',
+    'scripts',
+    'web',
+    'web-tests',
+  ]);
+});
+
+test('script checkJs runs for an mjs-only repair before publication', () => {
+  for (const filename of ['scripts/intake.mjs', 'scripts/intake.test.mjs']) {
+    assert.deepEqual(typecheckTargets([file(filename)], process.cwd()), [
+      'scripts',
+    ]);
+  }
+  assert.deepEqual(
+    typecheckTargets([file('scripts/intake.mjs', 'removed')], process.cwd()),
+    []
+  );
+  assert.deepEqual(
+    typecheckTargets([file('scripts/README.md')], process.cwd()),
+    []
+  );
+});
+
+test('web source changes typecheck test consumers without a changed test file', () => {
+  assert.deepEqual(
+    typecheckTargets(
+      [file('apps/web/lib/leads/route-lead.ts')],
+      process.cwd()
+    ).sort(),
+    ['pkg:@jovie/ovie', 'web', 'web-tests']
+  );
+  assert.deepEqual(
+    typecheckTargets(
+      [file('apps/web/tests/lib/leads/route-lead.test.ts')],
+      process.cwd()
+    ),
+    ['web-tests']
+  );
+  assert.deepEqual(
+    typecheckTargets(
+      [file('apps/web/lib/leads/route-lead.ts', 'removed')],
+      process.cwd()
+    ),
+    []
+  );
 });
 
 test('arguments parse and unknown flags fail', () => {
@@ -138,6 +254,25 @@ test('host-only reds are downgraded on macOS but real reds are not', () => {
   assert.equal(downgradeHostRed(check, host, 'linux').code, 1);
 });
 
+test('default preflight checks heading bounds without truncating marketing copy', () => {
+  const command = NARROWED['merge-group-unit-guards'].command;
+  assert.ok(
+    command.startsWith('node scripts/design-system-source-ratchet.mjs && ')
+  );
+  assert.ok(
+    command.includes('tests/unit/design-system/mac-header-two-lines-v1.test.ts')
+  );
+  assert.ok(
+    command.includes(
+      'tests/unit/marketing/marketing-headline-line-clamp-guard.test.ts'
+    )
+  );
+  assert.equal(
+    NARROWED['merge-group-unit-guards'].note,
+    'source identity, metrics-layer, locked chrome and heading contracts; full suite with --thorough'
+  );
+});
+
 test('ship gate violations become exact files to add or touch', () => {
   const todo = explainShipGate(
     [
@@ -160,4 +295,151 @@ test('merge-tree conflict output yields the conflicting paths', () => {
     'apps/web/a.ts',
     'b.ts deleted in HEAD and modified in x',
   ]);
+});
+
+test('a scripts/ .mjs-only change still runs the checkJs scripts typecheck', () => {
+  assert.deepEqual(
+    typecheckTargets([file('scripts/lib/__tests__/a.test.mjs')], process.cwd()),
+    ['scripts']
+  );
+  assert.deepEqual(typecheckTargets([file('docs/a.mjs')], process.cwd()), []);
+});
+
+test('heavy checks run through the host typecheck slot and keep their quoting', () => {
+  const cmd =
+    "cd apps/web && NODE_OPTIONS=--max-old-space-size=8192 pnpm exec tsc --noEmit -p 'tsconfig x.json'";
+  const wrapped = hostSlotted(cmd);
+  assert.match(wrapped, /^node scripts\/typecheck-slot\.mjs -- bash -c '/);
+  const r = spawnSync(
+    'bash',
+    ['-c', `printf '%s' ${wrapped.slice(wrapped.indexOf("'"))}`],
+    { encoding: 'utf8' }
+  );
+  assert.equal(r.stdout, cmd);
+});
+
+const gitIn = (cwd, args) => {
+  const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+};
+
+/**
+ * A repo whose HEAD and remote-tracking origin/main share one base commit,
+ * with an install fixture preflight's provenance guard accepts (no remote).
+ */
+function baseFixtureRepo(label) {
+  const repo = mkdtempSync(path.join(tmpdir(), `preflight-base-${label}-`));
+  writeFileSync(path.join(repo, 'pnpm-lock.yaml'), 'lockfileVersion: 9.0\n');
+  mkdirSync(path.join(repo, 'node_modules/.pnpm'), { recursive: true });
+  writeFileSync(
+    path.join(repo, 'node_modules/.pnpm/lock.yaml'),
+    'lockfileVersion: 9.0\n'
+  );
+  mkdirSync(path.join(repo, 'apps/web/node_modules'), { recursive: true });
+  gitIn(repo, ['init', '-b', 'main']);
+  gitIn(repo, ['config', 'user.email', 'preflight@test.jovie']);
+  gitIn(repo, ['config', 'user.name', 'Preflight Test']);
+  gitIn(repo, ['add', '-A']);
+  gitIn(repo, ['commit', '-m', 'base']);
+  gitIn(repo, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  return repo;
+}
+
+const commitOnFeature = (repo, name) => {
+  gitIn(repo, ['checkout', '-qb', 'feature']);
+  writeFileSync(path.join(repo, name), `${name}\n`);
+  gitIn(repo, ['add', '-A']);
+  gitIn(repo, ['commit', '-m', name]);
+};
+
+test('base ref candidates never double-prefix a qualified ref', () => {
+  assert.deepEqual(baseRefCandidates('main'), ['origin/main', 'main']);
+  assert.deepEqual(baseRefCandidates('origin/main'), ['origin/main']);
+  assert.deepEqual(baseRefCandidates('refs/remotes/origin/main'), [
+    'refs/remotes/origin/main',
+  ]);
+});
+
+test('changedFiles discovers real changes for a qualified remote ref', () => {
+  const repo = baseFixtureRepo('qualified');
+  try {
+    commitOnFeature(repo, 'changed.txt');
+    const qualified = changedFiles(repo, 'origin/main');
+    assert.ok(qualified.mergeBase);
+    assert.deepEqual(
+      qualified.files.map(f => f.filename),
+      ['changed.txt']
+    );
+    const bare = changedFiles(repo, 'main');
+    assert.deepEqual(bare.files, qualified.files);
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test('changedFiles reports an unresolvable base as no diff base, not an empty change set', () => {
+  const repo = baseFixtureRepo('unresolved');
+  try {
+    commitOnFeature(repo, 'changed.txt');
+    assert.equal(resolveBaseRef(repo, 'origin/nope'), null);
+    assert.deepEqual(changedFiles(repo, 'origin/nope'), {
+      mergeBase: '',
+      files: [],
+    });
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test('preflight exits clean on a valid clean branch but fails an invalid base ref', async () => {
+  const env = { ...process.env, JOVIE_PREFLIGHT_LEDGER: 'off' };
+  const clean = baseFixtureRepo('clean');
+  try {
+    gitIn(clean, ['checkout', '-qb', 'feature']);
+    const lines = [];
+    const code = await main({
+      argv: [
+        '--repo',
+        clean,
+        '--base',
+        'origin/main',
+        '--no-typecheck',
+        '--no-coverage',
+      ],
+      env,
+      log: line => lines.push(String(line)),
+    });
+    assert.equal(code, 0);
+    assert.ok(
+      lines.some(l => l.includes('no changes vs origin/main')),
+      lines.join('\n')
+    );
+  } finally {
+    rmSync(clean, { recursive: true, force: true });
+  }
+  const bad = baseFixtureRepo('badref');
+  try {
+    gitIn(bad, ['checkout', '-qb', 'feature']);
+    const lines = [];
+    const code = await main({
+      argv: [
+        '--repo',
+        bad,
+        '--base',
+        'origin/nope',
+        '--no-typecheck',
+        '--no-coverage',
+      ],
+      env,
+      log: line => lines.push(String(line)),
+    });
+    assert.equal(code, 1);
+    assert.ok(
+      lines.some(l => l.includes("'origin/nope'")),
+      lines.join('\n')
+    );
+    assert.ok(!lines.some(l => /no changes/.test(l)), lines.join('\n'));
+  } finally {
+    rmSync(bad, { recursive: true, force: true });
+  }
 });

@@ -6,6 +6,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -344,7 +345,9 @@ describe('conversation issue reconciliation', () => {
 });
 
 function privateFixture(t) {
-  const directory = mkdtempSync(join('/tmp', 'jovie-private-intake-'));
+  const directory = mkdtempSync(
+    join(realpathSync('/tmp'), 'jovie-private-intake-')
+  );
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   return directory;
 }

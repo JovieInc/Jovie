@@ -137,12 +137,14 @@ export async function ingestLeadAsCreator(
             existing: existingCheck.existing,
             extraction: extractionWithHostedAvatar,
             displayName,
+            leadHold: true,
           })
         : await handleNewProfileIngest({
             finalHandle: existingCheck.finalHandle,
             displayName,
             hostedAvatarUrl,
             extraction: extractionWithHostedAvatar,
+            leadHold: true,
           });
 
     const body = (await response.json()) as {

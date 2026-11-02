@@ -1,13 +1,6 @@
-/**
- * Jev judges a cheap-fixer patch before it is pushed. Same seam as jev-ci-failure-triage:
- * one frozen choice question on the Jev evaluator, abstain below the 0.8 floor. Only `approve`
- * at or above the floor permits a push; everything else hands the PR to the lanes.
- */
+/** Offline patch-verdict request and interpretation contract; no evaluator or publication calls. */
 import { curateLogTail } from './jev-ci-failure-triage.mjs';
-import {
-  prepareJevChoiceRequest,
-  runPreparedJevEvaluation,
-} from './jev-gateway.mjs';
+import { prepareJevChoiceRequest } from './jev-gateway.mjs';
 
 export const PATCH_VERDICT_SCHEMA = 'jev-patch-verdict/v1';
 export const PATCH_VERDICT_FLOOR = 0.8;
@@ -86,12 +79,4 @@ export function interpretPatchVerdict(result) {
       shadow: true,
     },
   };
-}
-
-export function runPatchVerdict(input, options = {}) {
-  return runPreparedJevEvaluation(
-    preparePatchVerdictRequest(input),
-    options,
-    interpretPatchVerdict
-  );
 }

@@ -51,7 +51,7 @@ export const JOB_ID = 'deterministic';
 export function buildPreflightEnv(source = process.env, cwd = ROOT) {
   const result = spawnSync('git', ['rev-parse', '--local-env-vars'], {
     cwd,
-    env: source,
+    env: { ...source },
     encoding: 'utf8',
   });
   const names = result.stdout?.trim().split('\n') ?? [];
@@ -169,6 +169,12 @@ export function prepareStatement(statement, { flockPath = '' } = {}) {
   let text = statement;
   // `set -e` would end the process at the first red statement.
   if (SET_E.test(text.trim())) return 'set -uo pipefail';
+  // CI starts shallow; a developer checkout may already have full history.
+  // Still fetch the same refs, and preserve failures in either form.
+  if (/^git fetch\b.*\s--unshallow(?:\s|$)/u.test(text)) {
+    const completeFetch = text.replace(/\s+--unshallow(?=\s|$)/u, '');
+    text = `if [ "$(git rev-parse --is-shallow-repository)" = false ]; then\n${completeFetch}\nelse\n${text}\nfi`;
+  }
   // `exit` would end the process; contain it in a subshell.
   if (/\bexit\b/.test(text)) text = `( ${text}\n)`;
   // Typechecks share gem's CPU: serialize them under the host lock.
@@ -262,6 +268,7 @@ export async function lintBody({
   const { evaluateCustomerNoteContract } = await import(
     './lib/daily-changelog-publication.mjs'
   );
+  const { CUSTOMER_MARKER } = await import('./lib/preflight-changed.mjs');
   const body = readFileSync(bodyFile, 'utf8');
   const mergeBase = git(['merge-base', `origin/${base}`, 'HEAD'], { cwd, env });
   if (!mergeBase) throw new Error('Cannot resolve PR body comparison base');
@@ -310,7 +317,11 @@ export async function lintBody({
     errors.push(
       `changelog-marker: customer outcome decision missing or invalid (${note.reason}).`
     );
-  return { errors, warnings };
+  // A missing decision can use the existing internal-work template after the
+  // writer classifies the change. Malformed/duplicate decisions need repair,
+  // not another marker appended to the body.
+  const template = note.reason === 'missing-metadata' ? CUSTOMER_MARKER : '';
+  return { errors, warnings, template };
 }
 
 export function parseArgs(argv) {
@@ -528,6 +539,11 @@ export async function main({
       log(`  FAIL  ${message}`);
     }
     for (const message of bodyIssues.warnings) log(`  warn  ${message}`);
+    if (bodyIssues.template) {
+      log('  For internal work, add this decision to the PR body:');
+      log(bodyIssues.template);
+      log('  Customer-visible work: see docs/CHANGELOG_PUBLICATION.md.');
+    }
   }
 
   log('\n== preflight summary');

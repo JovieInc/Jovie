@@ -78,6 +78,8 @@ export interface LinkProps
   readonly visited?: boolean;
   /** Keeps compact link visuals while expanding the pointer target to 44px. */
   readonly touchTarget?: boolean;
+  /** Reserve a plain-text label before streamed children arrive. */
+  readonly reserveLabel?: string;
 }
 
 function getLinkDataState({
@@ -105,18 +107,36 @@ const Link = React.forwardRef<HTMLAnchorElement, LinkProps>(
       disabled = false,
       visited = false,
       touchTarget = false,
+      reserveLabel,
+      children,
+      'aria-label': ariaLabel,
       onClick,
       ...props
     },
     ref
   ) => {
     const Comp = asChild ? Slot : 'a';
+    let content = children;
+    if (reserveLabel) {
+      if (asChild) {
+        const child = React.Children.only(children) as React.ReactElement<{
+          children?: React.ReactNode;
+        }>;
+        content = React.cloneElement(child, {
+          children: <span>{child.props.children}</span>,
+        });
+      } else {
+        content = <span>{children}</span>;
+      }
+    }
     return (
       <Comp
         ref={ref}
         data-variant='link'
         data-appearance={variant === null ? 'unstyled' : (variant ?? 'default')}
         data-state={getLinkDataState({ disabled, active, visited })}
+        data-reserved-label={reserveLabel || undefined}
+        aria-label={ariaLabel ?? (reserveLabel || undefined)}
         aria-disabled={disabled || undefined}
         onClick={event => {
           if (disabled) {
@@ -131,10 +151,13 @@ const Link = React.forwardRef<HTMLAnchorElement, LinkProps>(
             ? cn(LINK_COMPACT_CLASSES, className)
             : linkVariants({ variant, className }),
           touchTarget && LINK_TOUCH_TARGET_CLASSES,
+          reserveLabel && 'inline-grid',
           disabled && LINK_DISABLED_CLASSES
         )}
         {...props}
-      />
+      >
+        {content}
+      </Comp>
     );
   }
 );

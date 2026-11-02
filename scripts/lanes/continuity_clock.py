@@ -49,6 +49,9 @@ class Clock:
     # False: the workflow has no GitHub cron backstop (JOV-INV-042), so this clock is its only
     # trigger and an empty run history means it has never run and is due, not unobservable.
     github_cron: bool = True
+    # Triggers whose runs neither count as a fresh invocation nor make the page
+    # invalid: the workflow also runs on them, but they do not do the clocked work.
+    ignored_events: frozenset = frozenset()
 
     @property
     def endpoint(self) -> str:
@@ -76,9 +79,22 @@ CLOCKS = (
     # applies unless client_payload.apply is false; the bot token cannot send workflow_dispatch.
     Clock("staleBranchSweep", "stale-branch-sweep.yml", "clock_stale_branch_sweep", 7 * 86400,
           "stale-branch-sweep-clock.json", github_cron=False),
+    # Dependabot advisories reach no workflow event; the loop files/closes Linear work and
+    # fails its ratchet step when an advisory ages past its SLA. Clock is its only backstop.
+    Clock("securityAdvisory", "security-advisory-loop.yml", "clock_security_advisory_loop", 4 * 3600,
+          "security-advisory-clock.json", frozenset({"push"}), github_cron=False),
     # Hourly stateless probe of Summer's fast chat path through production (P0 2026-10-25).
     Clock("summerCanary", "ovie-summer-canary.yml", "clock_summer_canary", 3600,
           "summer-canary-clock.json", github_cron=False),
+    # Production golden-path certification freshness (JOV-9822): consumers need all eight
+    # surfaces green on the served SHA within 24 h. Promotions certify on workflow_run; this
+    # 12 h clock covers quiet days. workflow_run runs are mostly neutral, so they never count.
+    Clock("prodGoldenPathCert", "postdeploy-probes.yml", "clock_prod_golden_path_cert", 12 * 3600,
+          "prod-golden-path-cert-clock.json", github_cron=False,
+          ignored_events=frozenset({"workflow_run"})),
+    # Hourly Vercel budget forecast and runtime-log signatures (2026-10-29 pause went unwarned ~1 h).
+    Clock("spendGuard", "spend-guard.yml", "clock_spend_guard", 3600,
+          "spend-guard-clock.json", github_cron=False),
 )
 CONTINUITY = CLOCKS[0]
 
@@ -97,6 +113,12 @@ def observe(run, now: float, clock: Clock = CONTINUITY) -> dict:
     rows = data.get("workflow_runs")
     if isinstance(rows, list) and not rows and not clock.github_cron and data.get("total_count") == 0:
         return {"status": "overdue", "runId": None, "ageSeconds": None, "neverRun": True}
+    if isinstance(rows, list) and clock.ignored_events:
+        rows = [row for row in rows
+                if not (isinstance(row, dict) and row.get("event") in clock.ignored_events)]
+        if not rows and not clock.github_cron:
+            # Only ignored triggers in the recent page: no clocked run is visible, so it is due.
+            return {"status": "overdue", "runId": None, "ageSeconds": None}
     if not isinstance(rows, list) or not rows:
         raise ValueError("workflow-runs-unobservable")
     observations = []

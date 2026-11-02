@@ -50,8 +50,10 @@ export function ProductFeatureLanding({
           aria-hidden='true'
           className='hero-glow product-feature-glow pointer-events-none absolute inset-x-0 top-0'
         />
+        {/* Top-aligned columns: the panel's height can never move the copy. */}
         <MarketingHero
           variant='split'
+          className='md:items-start'
           headingId={headingId}
           testId='marketing-section-hero'
           sectionVariant='split-screenshot-right'

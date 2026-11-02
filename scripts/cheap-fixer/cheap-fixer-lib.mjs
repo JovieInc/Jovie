@@ -2,21 +2,12 @@
  * Cheap fixer core (first rung of the repair ladder). Pure functions only: classify a red
  * required check from its log tail, build the bounded prompt, parse and apply the model's
  * search/replace edits, and run the deterministic guards. IO lives in cheap-fixer.mjs.
- * The lanes (Lane Fix Relay -> lane-fix-red -> codex/grok workers) remain the escalation path.
+ * The existing Lane Fix Relay remains the owner; this foundation has no live backend.
  */
 
 export const SCHEMA = 'jovie-cheap-fixer-receipt/v1';
 export const CLAIM_HOST = 'cheap-fixer';
 export const CLAIM_TTL_S = 2 * 3600; // same TTL as scripts/lanes/pr_events.py CLAIM_TTL_S
-export const MODELS = Object.freeze({
-  primary: 'zai/glm-5.3-flash',
-  fallback: 'openai/gpt-6-luna',
-});
-/** USD per token, from the Gateway model list (2026-10-24). */
-export const PRICES = Object.freeze({
-  'zai/glm-5.3-flash': { input: 0.00000015, output: 0.0000005 },
-  'openai/gpt-6-luna': { input: 0.0000001, output: 0.0000005 },
-});
 export const LIMITS = Object.freeze({
   maxFiles: 3,
   maxChangedLines: 60,
@@ -52,10 +43,6 @@ export const CLASSES = Object.freeze([
 // and the class name both fail. The tuple annotation is the type, not a cast of data.
 /** @type {Array<[string, RegExp]>} */
 const CLASS_RULES = [
-  [
-    'pr_metadata',
-    /(Enforce PR fleet rules|Fleet rule evidence unavailable|red-before-green|done-receipt:|locked-areas:|PR description|PR body)/i,
-  ],
   [
     'pr_metadata',
     /(Enforce PR fleet rules|Fleet rule evidence unavailable|red-before-green|done-receipt:|locked-areas:|PR description|PR body)/i,
@@ -321,15 +308,6 @@ export function buildPrompt({
   ].join('\n');
   return { system, user: body };
 }
-
-export const costUsd = (model, usage) => {
-  const p = PRICES[model];
-  if (!p || !usage) return null;
-  return (
-    (usage.prompt_tokens ?? 0) * p.input +
-    (usage.completion_tokens ?? 0) * p.output
-  );
-};
 
 /** Parses "🤖 lane claim kind=fix sha=... host=... at=..." lines exactly as pr_events.claim_active does. */
 export function activeClaims(

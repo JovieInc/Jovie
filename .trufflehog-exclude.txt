@@ -46,7 +46,9 @@ scripts/fetch-current-artist-images.ts
 # JOV-7495 public work link test: URI-detector bait for a userinfo origin
 # (https://user:…@example.com/) asserting that such links are rejected.
 apps/web/lib/agent/public-work-links.test.ts
-# merge-queue-green-enroll.yml: the pinned actions/github-script SHA (line ~254) is
-# a GitHubOauth2 detector false positive (unverified, a 40-hex action pin), same
-# class as sonarcloud.yml above. gitleaks and GitHub secret scanning still cover it.
-.github/workflows/merge-queue-green-enroll.yml
+# JOV-9959 guard test: synthetic postgres URIs for the staging/preview DB-host
+# guard. The introducing commit (213cef9b) carried literal fixture URIs; the
+# head constructs them from parts. Exact path excluded so BASE..HEAD range
+# scans of the branch history do not fail on that blob. Gitleaks still covers
+# this path via its *.test.ts path allowlist.
+apps/web/lib/startup/db-host-guard.test.ts

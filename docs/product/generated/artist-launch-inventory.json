@@ -558,6 +558,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/(marketing)/changelog/rss.xml/route.ts",
+      "kind": "handler",
+      "route": "/changelog/rss.xml",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/(marketing)/changelog/whats-new.json/route.ts",
       "kind": "handler",
       "route": "/changelog/whats-new.json",
@@ -601,6 +609,14 @@
       "source": "apps/web/app/(marketing)/demovideo/page.tsx",
       "kind": "page",
       "route": "/demovideo",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/(marketing)/developers/agents/page.tsx",
+      "kind": "page",
+      "route": "/developers/agents",
       "methods": [],
       "surface": "deferred",
       "classification": "C"
@@ -777,6 +793,14 @@
       "source": "apps/web/app/(marketing)/product/utm-links/page.tsx",
       "kind": "page",
       "route": "/product/utm-links",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/(marketing)/proof/methodology/page.tsx",
+      "kind": "page",
+      "route": "/proof/methodology",
       "methods": [],
       "surface": "deferred",
       "classification": "C"
@@ -1365,6 +1389,14 @@
       "kind": "handler",
       "route": "/api/admin/hud/ovie-launchers",
       "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/admin/hud/route-usage/route.ts",
+      "kind": "handler",
+      "route": "/api/admin/hud/route-usage",
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2241,6 +2273,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/content-records/stage-events/route.ts",
+      "kind": "handler",
+      "route": "/api/content-records/stage-events",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/create-tip-intent/route.ts",
       "kind": "handler",
       "route": "/api/create-tip-intent",
@@ -3081,6 +3121,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/health/revenue-spine/route.ts",
+      "kind": "handler",
+      "route": "/api/health/revenue-spine",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/health/route.ts",
       "kind": "handler",
       "route": "/api/health",
@@ -3257,6 +3305,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/customer-voice/[id]/reply/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/customer-voice/[id]/reply",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/design-ci-judge-evidence/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/design-ci-judge-evidence",
@@ -3276,7 +3332,7 @@
       "source": "apps/web/app/api/internal/ovie/golden-path-evidence/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/golden-path-evidence",
-      "methods": ["POST"],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3332,6 +3388,22 @@
       "source": "apps/web/app/api/internal/ovie/summer-bottleneck/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-bottleneck",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/ovie/summer-cards/[id]/decision/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-cards/[id]/decision",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/ovie/summer-cards/[id]/supersede/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-cards/[id]/supersede",
       "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
@@ -3393,6 +3465,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/summer-company/golden-path/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-company/golden-path",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/summer-company/revenue/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/revenue",
@@ -3412,6 +3492,14 @@
       "source": "apps/web/app/api/internal/ovie/summer-shadow/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-shadow",
+      "methods": ["GET", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/proof-stats/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/proof-stats",
       "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
@@ -3865,6 +3953,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/offer/route.ts",
+      "kind": "handler",
+      "route": "/api/offer",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/onboarding/claim/route.ts",
       "kind": "handler",
       "route": "/api/onboarding/claim",
@@ -3961,6 +4057,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/ovie/fleet-audit/route.ts",
+      "kind": "handler",
+      "route": "/api/ovie/fleet-audit",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/ovie/inbox/route.ts",
       "kind": "handler",
       "route": "/api/ovie/inbox",
@@ -3989,6 +4093,14 @@
       "kind": "handler",
       "route": "/api/ovie/mcp",
       "methods": ["GET", "OPTIONS", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/ovie/music-resolver/route.ts",
+      "kind": "handler",
+      "route": "/api/ovie/music-resolver",
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4124,6 +4236,14 @@
       "source": "apps/web/app/api/profile-alias-decision/route.ts",
       "kind": "handler",
       "route": "/api/profile-alias-decision",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/profile-publication/route.ts",
+      "kind": "handler",
+      "route": "/api/profile-publication",
       "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
@@ -6875,6 +6995,21 @@
       "methods": ["GET"],
       "surface": "claim",
       "classification": "B"
+    },
+    {
+      "source": "apps/web/app/claim/agent/[draftId]/actions.ts",
+      "kind": "action",
+      "export": "claimAgentDraftAction",
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/claim/agent/[draftId]/page.tsx",
+      "kind": "page",
+      "route": "/claim/agent/[draftId]",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
     },
     {
       "source": "apps/web/app/claim/page.tsx",

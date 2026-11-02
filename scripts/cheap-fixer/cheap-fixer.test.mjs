@@ -16,12 +16,12 @@ import {
   interpretPatchVerdict,
   preparePatchVerdictRequest,
 } from '../invariants/jev-patch-verdict.mjs';
+import { dormantReceipt, main } from './cheap-fixer.mjs';
 import {
   activeClaims,
   applyEdits,
   claimBody,
   classifyFailure,
-  costUsd,
   guardPatch,
   parseModelReply,
   pathDenied,
@@ -164,20 +164,12 @@ test('claims use the lane claim comment format and TTL', () => {
   );
 });
 
-test('parseModelReply handles fenced and bare json; cost uses gateway prices', () => {
+test('parseModelReply handles fenced and bare json', () => {
   assert.deepEqual(parseModelReply('```json\n{"handoff":"x"}\n```'), {
     handoff: 'x',
   });
   assert.deepEqual(parseModelReply('ok {"a":1} done'), { a: 1 });
   assert.equal(parseModelReply('nope'), null);
-  assert.ok(
-    Math.abs(
-      costUsd('zai/glm-5.3-flash', {
-        prompt_tokens: 1000000,
-        completion_tokens: 0,
-      }) - 0.15
-    ) < 1e-9
-  );
 });
 
 test('Jev verdict approves only approve at or above the floor', () => {
@@ -291,7 +283,12 @@ test('the workflow sparse checkout boots Node and the fixer without network acce
     writeFileSync(
       event,
       JSON.stringify({
-        workflow_run: { pull_requests: [], head_sha: 'a'.repeat(40) },
+        workflow_run: {
+          id: 1,
+          name: 'CI',
+          pull_requests: [],
+          head_sha: 'a'.repeat(40),
+        },
       })
     );
     // Fail any accidental outbound request, even if a developer has credentials.
@@ -318,26 +315,20 @@ test('the workflow sparse checkout boots Node and the fixer without network acce
     );
     assert.equal(boot.status, 0, boot.stderr);
     const receipt = JSON.parse(readFileSync(join(out, 'receipt.json'), 'utf8'));
-    assert.equal(receipt.outcome, 'skip-no-pr', receipt.error);
-    assert.equal(receipt.mode, 'shadow');
+    assert.equal(receipt.outcome, 'backend-unconfigured', receipt.error);
+    assert.equal(receipt.mode, 'off');
     assert.equal(receipt.costUsd, 0);
-    // The mutating client's conventional token must never authorize a read.
+    // Even old push credentials cannot activate a repair or any request.
     writeFileSync(
       event,
       JSON.stringify({
         workflow_run: {
+          id: 1,
+          name: 'CI',
           pull_requests: [{ number: 1 }],
           head_sha: 'a'.repeat(40),
         },
       })
-    );
-    writeFileSync(
-      offline,
-      `globalThis.fetch = async (url, options) => {
-      if (String(url) !== 'https://api.github.com/repos/JovieInc/Jovie/pulls/1') throw new Error('unexpected request');
-      if (new Headers(options.headers).get('authorization') !== 'Bearer fixture-read') throw new Error('wrong read credential');
-      return new Response(JSON.stringify({ state: 'closed', labels: [] }), {status: 200, headers: { 'content-type': 'application/json' }});
-    };\n`
     );
     const read = spawnSync(
       process.execPath,
@@ -361,8 +352,140 @@ test('the workflow sparse checkout boots Node and the fixer without network acce
     const readReceipt = JSON.parse(
       readFileSync(join(out, 'receipt.json'), 'utf8')
     );
-    assert.equal(readReceipt.outcome, 'skip-closed', readReceipt.error);
+    assert.equal(
+      readReceipt.outcome,
+      'backend-unconfigured',
+      readReceipt.error
+    );
   } finally {
     rmSync(sandbox, { recursive: true, force: true });
+  }
+});
+
+test('all requested modes stay dormant without network or credential access', () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = () => {
+    throw new Error('unexpected network request');
+  };
+  try {
+    for (const mode of [
+      undefined,
+      'off',
+      'shadow',
+      'push',
+      'workers-ai-fx',
+      'invalid',
+    ]) {
+      const times = ['2026-11-02T00:00:00.000Z', '2026-11-02T00:00:00.050Z'];
+      const env = new Proxy(
+        { MODE: mode },
+        {
+          get(target, name) {
+            if (/TOKEN|API_KEY|SECRET/.test(String(name)))
+              throw new Error('credential read');
+            return target[name];
+          },
+        }
+      );
+      const receipt = dormantReceipt({
+        env,
+        now: () => new Date(times.shift()),
+      });
+      assert.equal(receipt.mode, 'off');
+      assert.equal(receipt.attempted, false);
+      assert.equal(receipt.pushedSha, null);
+      assert.equal(receipt.costUsd, 0);
+      assert.equal(receipt.durationMs, 50);
+      assert.deepEqual(receipt.models, []);
+      assert.equal(
+        receipt.outcome,
+        !mode || mode === 'off' ? 'disabled' : 'backend-unconfigured'
+      );
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('terminal receipts retain event identity and malformed-event failures', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'cheap-fixer-receipt-'));
+  try {
+    const event = join(dir, 'event.json');
+    writeFileSync(
+      event,
+      JSON.stringify({
+        workflow_run: {
+          id: 42,
+          name: 'CI',
+          head_sha: 'a'.repeat(40),
+          pull_requests: [{ number: 9 }],
+        },
+      })
+    );
+    const receipt = dormantReceipt({
+      env: { MODE: 'shadow', EVENT_PATH: event },
+    });
+    assert.equal(receipt.runId, 42);
+    assert.equal(receipt.pr, 9);
+    assert.equal(receipt.sha, 'a'.repeat(40));
+    writeFileSync(event, 'bad json');
+    assert.equal(
+      dormantReceipt({ env: { EVENT_PATH: event } }).outcome,
+      'event-unreadable'
+    );
+    assert.equal(
+      dormantReceipt({ env: { EVENT_PATH: join(dir, 'absent') } }).outcome,
+      'event-unreadable'
+    );
+    for (const invalid of [
+      {},
+      { workflow_run: {} },
+      {
+        workflow_run: { id: 1, name: 'CI', head_sha: 'bad', pull_requests: [] },
+      },
+      {
+        workflow_run: {
+          id: 1,
+          name: '',
+          head_sha: 'a'.repeat(40),
+          pull_requests: [],
+        },
+      },
+      {
+        workflow_run: {
+          id: 1,
+          name: 'CI',
+          head_sha: 'a'.repeat(40),
+          pull_requests: {},
+        },
+      },
+      {
+        workflow_run: {
+          id: 1,
+          name: 'CI',
+          head_sha: 'a'.repeat(40),
+          pull_requests: [{ number: -1 }],
+        },
+      },
+      { workflow_run: [] },
+    ]) {
+      writeFileSync(event, JSON.stringify(invalid));
+      assert.equal(
+        dormantReceipt({ env: { EVENT_PATH: event } }).outcome,
+        'event-unreadable'
+      );
+    }
+    assert.equal(
+      dormantReceipt({ env: { REPO: 'example/repository' } }).repo,
+      'example/repository'
+    );
+    const summary = join(dir, 'summary.md');
+    assert.equal(
+      main({ env: { OUT_DIR: dir, GITHUB_STEP_SUMMARY: summary } }),
+      0
+    );
+    assert.match(readFileSync(summary, 'utf8'), /no repair attempted/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });

@@ -1,7 +1,7 @@
 {
   "schema": "jovie.dead-ends/v1",
   "invariant": "JOV-INV-046",
-  "totalFindings": 159,
+  "totalFindings": 157,
   "files": {
     "apps/desktop/src/build-identity.ts": {
       "copy:dead-end-not-available:development (build time unavailable)": 1
@@ -134,9 +134,6 @@
     },
     "apps/web/components/features/admin/outbound/OutboundWorkspace.tsx": {
       "copy:dead-end-not-available:Outbound queue unavailable": 1
-    },
-    "apps/web/components/features/admin/summer-cards/SummerCardReviewPanel.tsx": {
-      "copy:dead-end-not-available:Summer Cards Unavailable": 2
     },
     "apps/web/components/features/admin/table/AdminTablePagination.tsx": {
       "code:disabled-no-reason:<Button disabled>": 1

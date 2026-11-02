@@ -28,7 +28,6 @@ function getAccountNextAction(accountContext: ChatAccountContext): string {
 export function buildAccountStatusPayload(accountContext: ChatAccountContext) {
   return {
     success: true as const,
-    email: accountContext.email,
     plan: accountContext.plan,
     displayPlan: accountContext.displayPlan,
     isPro: accountContext.isPro,

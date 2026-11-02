@@ -300,7 +300,7 @@ def collect(state_dir: Path, tick: dict, now: float, wip_max: int = WIP_MAX_DEFA
             "yieldByProvider": yields, "swarmClaims": swarm, "openPRCount": _count(observed.get("openPRCount")),
             "quotaDeferredHeads": _count(quota), "wipMax": wip_max,
             "ciQueue": {"queuedRuns": _count(flow.get("queuedRuns")), "oldestMin": _num(flow.get("queuedOldestMin")), "fresh": ci_fresh},
-            "stageTimings": stage_timings.cached(root, now),
+            "stageTimings": {**stage_timings.cached(root, now), "queue": _obj(_read_json(root / "queue-timings.json", max_bytes=65536))},
             "flowMetrics": flow_metrics(observed, yields, swarm, wip_max, now),
             "eligiblePoolByProvider": _obj(observed.get("eligiblePoolByProvider")),
             "newIssueBudgetByProvider": _obj(observed.get("newIssueBudgetByProvider")),

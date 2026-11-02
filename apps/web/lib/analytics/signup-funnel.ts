@@ -30,6 +30,8 @@ export const SIGNUP_FUNNEL_STEPS = {
     'cta_click',
     'onboarding_started',
     'chat_started',
+    // JOV-9758: the preview rendered the matched artist's real catalog.
+    'catalog_preview',
     'chat_completed',
     'qualified',
     'auth_start',

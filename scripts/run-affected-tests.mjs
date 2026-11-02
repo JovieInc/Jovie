@@ -3121,8 +3121,8 @@ export function buildSelectedTestCommands(
       [
         'NEXT_PUBLIC_APP_URL=http://localhost:3100',
         'NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3100',
-        'NEXT_PUBLIC_CLERK_MOCK=1',
-        'NEXT_PUBLIC_CLERK_PROXY_DISABLED=1',
+        'NEXT_PUBLIC_AUTH_MOCK=1',
+        'NEXT_PUBLIC_AUTH_PROXY_DISABLED=1',
         'NEXT_PUBLIC_E2E_MODE=1',
         'NEXT_IGNORE_ESLINT=1',
         'NEXT_IGNORE_TYPECHECK=1',

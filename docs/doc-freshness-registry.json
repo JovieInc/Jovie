@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "agentsMap": {
-    "path": "CLAUDE.md",
+    "path": "AGENTS.md",
     "maxLines": 120
   },
   "crossLinkScopes": [
-    "CLAUDE.md",
+    "AGENTS.md",
     "CODEX.md",
     ".claude/rules/*.md",
     "canon/OPERATING_SYSTEM.md",
@@ -29,7 +29,7 @@
   "freshnessMarkers": [
     {
       "id": "scoped-rules-count",
-      "files": ["CLAUDE.md"],
+      "files": ["AGENTS.md"],
       "computer": "scoped-rules-count"
     },
     {
@@ -169,12 +169,16 @@
     },
     ".claude/rules/ios.md": {
       "owner": "@itstimwhite",
-      "claim": "The hard-invariant table is implemented by the existing iOS lint.",
-      "documentSha256": "575fd3bc9e10fd68ab624b374accd15510cce7c821aab7af5552a9f72382b81f",
+      "claim": "The hard-invariant table is implemented by the existing iOS lint; the data-architecture section is enforced by the swift-arch guard.",
+      "documentSha256": "242ab1f217c0e3303f74e2e8539bcb8bebbee9c79e07fa850bc584069cea6f72",
       "sources": [
         {
           "path": "scripts/ios-best-practices-lint.sh",
           "sha256": "1baf41ad81fdfedfd05156140d7d44fde155798d1849e9915659bd64f1875ad7"
+        },
+        {
+          "path": "scripts/swift-arch/guard.mjs",
+          "sha256": "aa3502719ec63fe73659d6932b3cf6f9b68f9200366423e138b0c9d357297081"
         }
       ]
     },
@@ -360,7 +364,7 @@
         }
       ]
     },
-    "CLAUDE.md": {
+    "AGENTS.md": {
       "owner": "@itstimwhite",
       "claim": "The top-level router inherits the constitution and routes personal/mixed requests to private intake before task tools.",
       "documentSha256": "375c8ef4d8ad65c06aef6bb63b2159fe44790ba5ee3499ebbccf8c76c8dd9e31",
