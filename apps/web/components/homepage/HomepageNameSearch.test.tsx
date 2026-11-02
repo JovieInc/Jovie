@@ -59,6 +59,25 @@ describe('homepage read-only name discovery', () => {
     ).toBeVisible();
   });
 
+  it('discloses a limited preview rather than reporting complete empty results', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ profiles: [], partial: true }),
+      })
+    );
+    render(<HomepageNameSearch />);
+    submit();
+    expect(
+      await screen.findByText(/This search preview is limited/)
+    ).toBeVisible();
+    expect(screen.queryByText(/No matching public profile/)).toBeNull();
+    expect(
+      screen.getByRole('link', { name: 'Join the waitlist' })
+    ).toBeVisible();
+  });
+
   it.each([
     { ok: false, json: async () => ({ error: 'Limited' }) },
     { ok: true, json: async () => ({ success: true }) },

@@ -18,7 +18,7 @@ export function HomepageNameSearch({
   const [name, setName] = useState('');
   const [matches, setMatches] = useState<readonly PublicMatch[]>([]);
   const [state, setState] = useState<
-    'idle' | 'loading' | 'found' | 'empty' | 'error'
+    'idle' | 'loading' | 'found' | 'empty' | 'limited' | 'error'
   >('idle');
   const request = useRef<AbortController | null>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -69,7 +69,13 @@ export function HomepageNameSearch({
       );
       if (controller.signal.aborted) return;
       setMatches(profiles);
-      setState(profiles.length ? 'found' : 'empty');
+      setState(
+        profiles.length
+          ? 'found'
+          : 'partial' in data && data.partial === true
+            ? 'limited'
+            : 'empty'
+      );
     } catch {
       if (!controller.signal.aborted) setState('error');
     }
@@ -84,11 +90,11 @@ export function HomepageNameSearch({
       <noscript>
         <p>
           <Link href='/waitlist' prefetch={false}>
-            Join the waitlist
+            {HOMEPAGE_SEARCH_COPY.waitlist}
           </Link>
           {' · '}
           <Link href='/signin' prefetch={false}>
-            Have an invite? Sign in
+            {HOMEPAGE_SEARCH_COPY.invite}
           </Link>
         </p>
       </noscript>
@@ -144,10 +150,14 @@ export function HomepageNameSearch({
           </ul>
         ) : null}
         {state === 'empty' ? <p>{HOMEPAGE_SEARCH_COPY.empty}</p> : null}
+        {state === 'limited' ? <p>{HOMEPAGE_SEARCH_COPY.limited}</p> : null}
         {state === 'error' ? (
           <p role='alert'>{HOMEPAGE_SEARCH_COPY.error}</p>
         ) : null}
-        {state === 'found' || state === 'empty' || state === 'error' ? (
+        {state === 'found' ||
+        state === 'empty' ||
+        state === 'limited' ||
+        state === 'error' ? (
           <p>
             <a href='#waitlist' className='focus-ring-themed'>
               {HOMEPAGE_SEARCH_COPY.waitlist}

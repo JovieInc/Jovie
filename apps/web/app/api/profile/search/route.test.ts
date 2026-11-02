@@ -52,6 +52,36 @@ describe('public homepage discovery boundary', () => {
     expect(mocks.candidates).toHaveBeenCalledWith(30);
   });
 
+  it('continues beyond excluded candidates so an eligible 31st match is not hidden', async () => {
+    mocks.candidates
+      .mockResolvedValueOnce(
+        Array.from({ length: 30 }, (_, i) => ({
+          ...publicProfile,
+          username: `hidden-${i}`,
+          settings: { searchable: false },
+        }))
+      )
+      .mockResolvedValueOnce([publicProfile]);
+    const response = await GET(request('Alex'));
+    expect(await response.json()).toEqual({
+      profiles: [{ username: 'alex-example', name: 'Alex Example' }],
+    });
+    expect(mocks.candidates).toHaveBeenCalledTimes(2);
+  });
+
+  it('bounds work and marks a full excluded preview incomplete rather than asserting no public matches', async () => {
+    mocks.candidates.mockResolvedValue(
+      Array.from({ length: 30 }, (_, i) => ({
+        ...publicProfile,
+        username: `hidden-${i}`,
+        settings: { searchable: false },
+      }))
+    );
+    const response = await GET(request('Alex'));
+    expect(await response.json()).toEqual({ profiles: [], partial: true });
+    expect(mocks.candidates).toHaveBeenCalledTimes(3);
+  });
+
   it('excludes private, unlisted and placeholder identities using the canonical policy', async () => {
     mocks.candidates.mockResolvedValue([
       publicProfile,
