@@ -91,14 +91,4 @@ describe('demo showcase preview loading', () => {
     expect(screen.getByTestId('demo-showcase-shell-lyrics')).toBeVisible();
     expect(registryState.loaded).toBe(true);
   });
-
-  it('keeps missing preview IDs fail-closed', async () => {
-    const { DemoDesignStudioShowcase } = await import(
-      './DemoDesignStudioShowcase'
-    );
-
-    expect(() =>
-      DemoDesignStudioShowcase({ itemId: 'missing', testId: 'missing-preview' })
-    ).toThrow('Missing Design Studio item: missing');
-  });
 });

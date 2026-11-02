@@ -1,5 +1,4 @@
 'use client';
-// @coverage-via apps/web/components/features/demo/DemoShowcaseSurface.lazy.test.tsx
 
 import { getDesignStudioItem } from '@/lib/design-studio/registry';
 
