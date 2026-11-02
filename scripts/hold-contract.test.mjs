@@ -74,7 +74,7 @@ if (stage === 'list') {
     state: scenario === 'closed' ? 'CLOSED' : 'OPEN',
     headRefOid: 'a'.repeat(40), labels: { nodes: [{ name: 'hold' }] },
     timelineItems: { nodes: [{ createdAt: '2026-10-08T05:47:46Z', label: { name: 'hold' } }] },
-    comments: { nodes: [] }
+    comments: { pageInfo: { hasPreviousPage: false }, nodes: [] }
   } } } }));
 } else { console.log('{}'); }
 `
@@ -311,7 +311,7 @@ test('the sweep comments then unlabels only released holds and dry runs never wr
           { createdAt: '2026-10-09T00:00:00Z', label: { name: 'other' } },
         ],
       },
-      comments: { nodes: [] },
+      comments: { pageInfo: { hasPreviousPage: false }, nodes: [] },
     },
     2: {
       state: 'OPEN',
@@ -320,7 +320,10 @@ test('the sweep comments then unlabels only released holds and dry runs never wr
       timelineItems: {
         nodes: [{ createdAt: LABELED, label: { name: HOLD_LABEL } }],
       },
-      comments: { nodes: [comment({ owner: 'gem', head: HEAD })] },
+      comments: {
+        pageInfo: { hasPreviousPage: false },
+        nodes: [comment({ owner: 'gem', head: HEAD })],
+      },
     },
     3: { state: 'CLOSED' },
     4: {
@@ -424,7 +427,7 @@ for (const label of ['tim-hold', 'tim:hold', 'hold:tim', 'do-not-merge']) {
       timelineItems: {
         nodes: [{ createdAt: LABELED, label: { name: label } }],
       },
-      comments: { nodes: [] },
+      comments: { pageInfo: { hasPreviousPage: false }, nodes: [] },
     };
     const { results, writes } = await runHoldSweep(pr, T0 + MAX_HOLD_MS + HOUR);
     assert.deepEqual(results, []);
@@ -438,7 +441,10 @@ test('a machine hold alongside a retired human label still follows the contract'
     headRefOid: 'b'.repeat(40),
     labels: { nodes: [{ name: 'hold' }, { name: 'tim-hold' }] },
     timelineItems: { nodes: [{ createdAt: LABELED, label: { name: 'hold' } }] },
-    comments: { nodes: [comment({ owner: 'gem', head: HEAD })] },
+    comments: {
+      pageInfo: { hasPreviousPage: false },
+      nodes: [comment({ owner: 'gem', head: HEAD })],
+    },
   };
   const { results } = await runHoldSweep(pr, T0 + MAX_HOLD_MS + HOUR);
   assert.deepEqual(
@@ -465,7 +471,7 @@ test('machine stop labels follow their own labeled time', async () => {
         },
       ],
     },
-    comments: { nodes: [] },
+    comments: { pageInfo: { hasPreviousPage: false }, nodes: [] },
   };
   const writes = [];
   const log = console.log;
@@ -552,7 +558,7 @@ for (const failure of ['comment-response-lost', 'unlabel-quota']) {
       timelineItems: {
         nodes: [{ createdAt: LABELED, label: { name: 'hold' } }],
       },
-      comments: { nodes: [] },
+      comments: { pageInfo: { hasPreviousPage: false }, nodes: [] },
     };
     let comments = 0;
     let deletes = 0;
@@ -606,6 +612,7 @@ test('a release comment from an earlier application does not dedupe a new hold',
       ],
     },
     comments: {
+      pageInfo: { hasPreviousPage: false },
       nodes: [{ body, createdAt: new Date(T0 + 30 * HOUR).toISOString() }],
     },
   };
@@ -630,4 +637,88 @@ test('a release comment from an earlier application does not dedupe a new hold',
     writes.map(row => row[0]),
     ['comment', 'unlabel']
   );
+});
+
+for (const evidence of [
+  'truncated-recent',
+  'missing-page-info',
+  'truncated-empty',
+]) {
+  test(`the sweep keeps a hold when receipt evidence is ${evidence}`, async () => {
+    const comments = {
+      nodes:
+        evidence === 'truncated-empty'
+          ? []
+          : Array.from({ length: 100 }, (_, i) => ({
+              body: 'unrelated comment',
+              createdAt: new Date(T0 + (i + 1) * HOUR).toISOString(),
+            })),
+      ...(evidence === 'missing-page-info'
+        ? {}
+        : { pageInfo: { hasPreviousPage: true } }),
+    };
+    const writes = [];
+    const result = await sweepHolds({
+      now: T0 + 101 * HOUR,
+      dryRun: false,
+      io: {
+        listHeld: () => [1],
+        read: () => ({
+          state: 'OPEN',
+          headRefOid: HEAD,
+          labels: { nodes: [{ name: 'hold' }] },
+          timelineItems: {
+            nodes: [{ createdAt: LABELED, label: { name: 'hold' } }],
+          },
+          comments,
+        }),
+        comment: () => writes.push('comment'),
+        unlabel: () => writes.push('unlabel'),
+      },
+    });
+    assert.deepEqual(
+      result.map(r => [r.action, r.reason]),
+      [['keep', 'incomplete-evidence']]
+    );
+    assert.deepEqual(writes, []);
+  });
+}
+
+test('an older partial comment page can release when it spans the entire receipt window', async () => {
+  const writes = [];
+  const result = await sweepHolds({
+    now: T0 + 30 * HOUR,
+    dryRun: false,
+    io: {
+      listHeld: () => [1],
+      read: () => ({
+        state: 'OPEN',
+        headRefOid: HEAD,
+        labels: { nodes: [{ name: 'hold' }] },
+        timelineItems: {
+          nodes: [{ createdAt: LABELED, label: { name: 'hold' } }],
+        },
+        comments: {
+          pageInfo: { hasPreviousPage: true },
+          nodes: [
+            {
+              body: 'older unrelated comment',
+              createdAt: new Date(T0 - HOUR).toISOString(),
+            },
+            {
+              body: 'recent unrelated comment',
+              createdAt: new Date(T0 + HOUR).toISOString(),
+            },
+          ],
+        },
+      }),
+      comment: () => writes.push('comment'),
+      unlabel: () => writes.push('unlabel'),
+    },
+  });
+  assert.deepEqual(
+    result.map(r => [r.action, r.reason]),
+    [['release', 'ownerless']]
+  );
+  assert.deepEqual(writes, ['comment', 'unlabel']);
 });

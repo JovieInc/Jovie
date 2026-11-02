@@ -139,7 +139,7 @@ export function releaseComment({ reason, owner, label = HOLD_LABEL }) {
   ].join('\n');
 }
 
-const QUERY = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){state headRefOid labels(first:100){nodes{name}} timelineItems(last:100,itemTypes:[LABELED_EVENT]){nodes{... on LabeledEvent{createdAt label{name}}}} comments(last:100){nodes{body createdAt}}}}}`;
+const QUERY = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){state headRefOid labels(first:100){nodes{name}} timelineItems(last:100,itemTypes:[LABELED_EVENT]){nodes{... on LabeledEvent{createdAt label{name}}}} comments(last:100){pageInfo{hasPreviousPage} nodes{body createdAt}}}}}`;
 
 function gh(args) {
   const readOnly =
@@ -196,12 +196,19 @@ export async function sweepHolds({ now, dryRun, io }) {
         .sort()
         .pop();
       if (!labeledAt) continue;
-      const verdict = evaluateHold({
-        labeledAt,
-        now,
-        headSha: pr.headRefOid,
-        comments: pr.comments?.nodes ?? [],
-      });
+      const comments = pr.comments?.nodes ?? [];
+      // A truncated window may hide a still-valid receipt or a persisted
+      // release comment. It is complete for this application only when the
+      // oldest returned comment reaches before the receipt skew window.
+      const oldestComment = Math.min(
+        ...comments.map(comment => Date.parse(comment.createdAt))
+      );
+      const completeWindow =
+        pr.comments?.pageInfo?.hasPreviousPage === false ||
+        oldestComment <= Date.parse(labeledAt) - RECEIPT_SKEW_MS;
+      const verdict = completeWindow
+        ? evaluateHold({ labeledAt, now, headSha: pr.headRefOid, comments })
+        : { action: 'keep', reason: 'incomplete-evidence' };
       results.push({ number, label, ...verdict });
       if (verdict.action !== 'release' || dryRun) continue;
       const body = releaseComment({ ...verdict, label });
