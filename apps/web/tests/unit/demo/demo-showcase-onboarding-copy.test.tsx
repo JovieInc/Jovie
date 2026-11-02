@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { DEMO_SHOWCASE_SURFACE_IDS } from '@/components/features/demo/showcase-surfaces';
 import { ONBOARDING_STEPS } from '@/features/dashboard/organisms/onboarding-v2/shared/types';
 
 vi.mock('next/navigation', () => ({
@@ -27,5 +28,20 @@ describe('DemoShowcaseSurface onboarding copy', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(step.prompt)).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(/\bfans?\b/i);
+  });
+});
+
+describe('DemoShowcaseSurface homepage moments', () => {
+  it('registers the homepage moment surfaces the product shots capture', () => {
+    expect(DEMO_SHOWCASE_SURFACE_IDS).toEqual(
+      expect.arrayContaining(['homepage-moment', 'homepage-email'])
+    );
+  });
+
+  it('leaves the server-only email moment to the showcase page', () => {
+    const { container } = render(
+      <DemoShowcaseSurface surface='homepage-email' />
+    );
+    expect(container).toBeEmptyDOMElement();
   });
 });

@@ -25,6 +25,7 @@ import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import type { InsightCategory } from '@/types/insights';
 import { DemoAuthShell } from './DemoAuthShell';
 import { DemoClientProviders } from './DemoClientProviders';
+import { DemoHomepageMomentSurface } from './DemoHomepageMomentSurface';
 import { DemoReleaseLandingSurface } from './DemoReleaseLandingSurface';
 import { DemoReleasePresaveSurface } from './DemoReleasePresaveSurface';
 import { DemoReleasesExperience } from './DemoReleasesExperience';
@@ -280,6 +281,11 @@ export function DemoShowcaseSurface({
       return <DemoReleaseTasksSurface />;
     case 'tim-white-profile':
       return <DemoTimWhiteProfileSurface />;
+    case 'homepage-moment':
+      return <DemoHomepageMomentSurface />;
+    case 'homepage-email':
+      // Server-rendered by the showcase page (server-only email template).
+      return null;
     case 'music-ai-command':
       return (
         <DemoDesignStudioShowcase

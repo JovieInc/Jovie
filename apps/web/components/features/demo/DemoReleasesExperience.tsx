@@ -13,6 +13,7 @@ import {
   FOUNDER_DEMO_PERSONA,
   INTERNAL_DJ_DEMO_PERSONA,
 } from '@/lib/demo-personas';
+import type { ReleaseType } from '@/lib/discography/types';
 import { DemoAuthShell } from './DemoAuthShell';
 import { createDemoReleaseExperienceAdapter } from './demo-release-experience-adapter';
 import { FOUNDER_DEMO_DASHBOARD_DATA } from './mock-dashboard-data';
@@ -36,8 +37,14 @@ export function DemoReleasesExperience({
   dashboardData,
   variant = 'internal-dj',
   capturePlayer,
+  excludeReleaseTypes,
 }: {
   readonly dashboardData?: DashboardData;
+  /**
+   * Release types to leave out of the list. The homepage catalog shot drops
+   * the video, whose cover shows a face (no face on `/`, Tim 2026-10-26).
+   */
+  readonly excludeReleaseTypes?: readonly ReleaseType[];
   readonly variant?: DemoReleasesExperienceVariant;
   /** Forces the capture-player demo state; production still opts in via the
    * capturePlayer=1 URL (stories cannot rely on search params in vitest). */
@@ -47,9 +54,14 @@ export function DemoReleasesExperience({
   const captureActive = capturePlayer ?? urlCapturePlayer;
   const useFounder = variant === 'founder' || captureActive;
   const persona = useFounder ? FOUNDER_DEMO_PERSONA : INTERNAL_DJ_DEMO_PERSONA;
-  const releases = useFounder
+  const allReleases = useFounder
     ? FOUNDER_DEMO_RELEASE_VIEW_MODELS
     : DEMO_RELEASE_VIEW_MODELS;
+  const releases = excludeReleaseTypes?.length
+    ? allReleases.filter(
+        release => !excludeReleaseTypes.includes(release.releaseType)
+      )
+    : allReleases;
   const sidebarDataByReleaseId = useFounder
     ? FOUNDER_DEMO_RELEASE_SIDEBAR_FIXTURES
     : DEMO_RELEASE_SIDEBAR_FIXTURES;

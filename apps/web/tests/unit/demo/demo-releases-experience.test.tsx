@@ -246,6 +246,32 @@ describe('DemoReleasesExperience', () => {
     expect(screen.queryByText("I'm Not Alone Remixes")).toBeNull();
   });
 
+  it(
+    'drops excluded release types from the founder catalog (homepage shot)',
+    async () => {
+      render(
+        <NuqsTestingAdapter>
+          <DemoReleasesExperience
+            variant='founder'
+            excludeReleaseTypes={['music_video']}
+          />
+        </NuqsTestingAdapter>
+      );
+      await waitFor(() =>
+        expect(
+          document.querySelectorAll('[data-shell-release-row]').length
+        ).toBeGreaterThan(0)
+      );
+      const rows = [
+        ...document.querySelectorAll('[data-shell-release-row]'),
+      ].map(row => row.textContent ?? '');
+      // The video's cover shows a face; the homepage never does.
+      expect(rows.some(text => text.includes('Never Say a Word'))).toBe(false);
+      expect(rows.some(text => text.includes('Take Me Over'))).toBe(true);
+    },
+    FULL_SHELL_TIMEOUT_MS
+  );
+
   it('uses the canonical founder catalog when the capturePlayer prop opts in', async () => {
     // The vitest storybook runner cannot carry per-story search params, so
     // DemoPlayerCapture.stories forces the prop instead of the URL opt-in.
