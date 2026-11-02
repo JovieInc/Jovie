@@ -20,7 +20,8 @@
  *   --list       print the derived plan and exit (no execution)
  *   --body-file  also lint the PR body with the Fleet Rules policy
  *   --hook       pre-push mode: honour JOVIE_PREFLIGHT=0 and skip when HEAD has
- *                no commits ahead of the base
+ *                no commits ahead of the base; retain every source check,
+ *                including commands excluded by standalone preflight
  *
  * The changelog guard needs a token: export GH_TOKEN (your gh login token) to
  * run it locally; without one that step is listed as skipped.
@@ -263,7 +264,9 @@ export function lineExclusion(line) {
 }
 
 /** Excluded lines of a statement, and the statement with them made no-ops. */
-export function applyExclusions(statement) {
+export function applyExclusions(statement, { qualification = false } = {}) {
+  // Qualification preserves every source check; standalone preflight stays light.
+  if (qualification) return { text: statement, excluded: [] };
   const excluded = [];
   const text = statement
     .split('\n')
@@ -323,12 +326,26 @@ const MARK = '@@PF';
 /** The bash program for one step; markers delimit each statement's output. */
 export function buildProgram(statements, envVars, opts = {}) {
   const lines = ['exec 2>&1', 'set -uo pipefail'];
+  if (opts.qualification) {
+    // Collect parent-shell failures, but stop a failed subshell so a later
+    // success cannot hide it from the workflow's background wait/status guard.
+    lines.push('set -E');
+    lines.push(
+      `trap '__pf_failure=$?; if (( BASH_SUBSHELL > 0 )); then exit "$__pf_failure"; fi' ERR`
+    );
+  }
   for (const [key, value] of Object.entries(envVars))
     lines.push(`export ${key}=${JSON.stringify(String(value))}`);
   statements.forEach((statement, index) => {
     lines.push(`printf '\\n${MARK}-BEGIN ${index}\\n'`);
-    lines.push(prepareStatement(applyExclusions(statement).text, opts));
-    lines.push(`__pf_rc=$?; printf '\\n${MARK}-END ${index} %s\\n' "$__pf_rc"`);
+    if (opts.qualification) lines.push('__pf_failure=0');
+    lines.push(prepareStatement(applyExclusions(statement, opts).text, opts));
+    lines.push('__pf_rc=$?');
+    if (opts.qualification)
+      lines.push(
+        'if [ "$__pf_failure" -ne 0 ]; then __pf_rc=$__pf_failure; fi'
+      );
+    lines.push(`printf '\\n${MARK}-END ${index} %s\\n' "$__pf_rc"`);
   });
   return lines.join('\n');
 }
@@ -632,7 +649,7 @@ export async function main({
         GITHUB_BASE_REF: args.base,
         GITHUB_EVENT_NAME: 'pull_request',
       },
-      { flockPath }
+      { flockPath, qualification: args.hook }
     );
     const seen = new Set();
     let mark = Date.now();
@@ -642,7 +659,9 @@ export async function main({
       const took = Date.now() - mark;
       mark = Date.now();
       const label = labelFor(statements[index]);
-      for (const item of applyExclusions(statements[index]).excluded)
+      for (const item of applyExclusions(statements[index], {
+        qualification: args.hook,
+      }).excluded)
         excluded.push({ step: step.name, ...item });
       timings.push({ step: step.name, label, ms: took });
       if (code !== 0) {

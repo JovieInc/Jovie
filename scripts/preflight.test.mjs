@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 import {
   applyExclusions,
   buildPreflightEnv,
+  buildProgram,
   chooseConcurrency,
   deriveSteps,
   exclusionReason,
@@ -116,6 +117,151 @@ test('hook qualifies a clean behind-base source without changing its head', asyn
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }
+});
+
+test('hook qualification executes and reports failures from every heavy command category', async () => {
+  const commands = [
+    'typecheck',
+    'biome:check',
+    'ci:control:test',
+    'test:coverage',
+    'run build',
+    'storybook',
+  ];
+  const f = hookGitFixture({
+    during: commands.map(command => `pnpm ${command}`).join('\n'),
+  });
+  try {
+    const bin = path.join(f.root, 'bin');
+    const executed = path.join(f.root, 'qualification-commands');
+    mkdirSync(bin);
+    writeFileSync(
+      path.join(bin, 'pnpm'),
+      '#!/bin/sh\nprintf \'%s\\n\' "$*" >> "$PREFLIGHT_QUALIFICATION_MARKER"\nexit 17\n',
+      { mode: 0o755 }
+    );
+    // Retain the real lock, but keep fixture locking out of a live host's lane.
+    const realFlock = spawnSync('which', ['flock'], {
+      env: f.env,
+      encoding: 'utf8',
+    });
+    if (realFlock.status === 0) {
+      f.env.PREFLIGHT_REAL_FLOCK = realFlock.stdout.trim();
+      f.env.PREFLIGHT_QUALIFICATION_LOCK = path.join(f.root, 'typecheck.lock');
+      writeFileSync(
+        path.join(bin, 'flock'),
+        '#!/bin/sh\nshift\nexec "$PREFLIGHT_REAL_FLOCK" "$PREFLIGHT_QUALIFICATION_LOCK" "$@"\n',
+        { mode: 0o755 }
+      );
+    }
+    f.env.PREFLIGHT_QUALIFICATION_MARKER = executed;
+    f.env.PATH = `${bin}${path.delimiter}${f.env.PATH}`;
+    const result = await f.run();
+    assert.equal(result.code, 1, result.output);
+    assert.deepEqual(
+      readFileSync(executed, 'utf8').trim().split('\n'),
+      commands
+    );
+    assert.equal(
+      (result.output.match(/FAIL \(17\)/g) ?? []).length,
+      commands.length
+    );
+    assert.doesNotMatch(result.output, /EXCLUDED:/);
+    assert.equal(f.gitAt(f.cwd, 'rev-parse', 'HEAD'), f.head);
+    assert.equal(f.gitAt(f.cwd, 'status', '--porcelain'), '');
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+// Execute the real workflow's background group and wait guard without running tsc.
+// This must keep the first failure even when the last command would succeed.
+for (const [testsStatus, storiesStatus] of [
+  [17, 0],
+  [0, 23],
+  [0, 0],
+]) {
+  test(`hook keeps background typecheck failures (${testsStatus}/${storiesStatus})`, () => {
+    const step = deriveSteps(
+      readFileSync(path.join(ROOT, WORKFLOW_PATH), 'utf8')
+    ).find(item => item.name === 'Run deterministic source contract');
+    assert.ok(step);
+    const start = step.run.indexOf('web_types_log=');
+    const end = step.run.indexOf('pnpm biome:check', start);
+    assert.ok(start >= 0 && end > start);
+    const group = step.run.slice(start, end);
+    assert.match(group, /typecheck:tests[\s\S]*typecheck:stories/);
+    assert.match(group, /wait "\$web_types_pid"/);
+    assert.match(group, /test "\$web_types_status" -eq 0 \|\| exit/);
+    const dir = mkdtempSync(path.join(tmpdir(), 'pf-background-'));
+    try {
+      const shell = `pnpm() {
+  printf '%s\\n' "$*" >> "$PREFLIGHT_TEST_COMMANDS"
+  case "$*" in
+    *typecheck:tests) return ${testsStatus} ;;
+    *typecheck:stories) return ${storiesStatus} ;;
+    *later-gate) return 29 ;;
+    *) return 0 ;;
+  esac
+}
+`;
+      const statements = splitStatements(
+        `${group}\npnpm later-gate\npnpm final-success\n`
+      );
+      const result = spawnSync(
+        'bash',
+        ['-c', shell + buildProgram(statements, {}, { qualification: true })],
+        {
+          env: {
+            ...buildPreflightEnv(),
+            TMPDIR: dir,
+            PREFLIGHT_TEST_COMMANDS: path.join(dir, 'commands'),
+          },
+          encoding: 'utf8',
+        }
+      );
+      assert.equal(result.status, 0, result.stderr);
+      const results = [...result.stdout.matchAll(/@@PF-END (\d+) (\d+)/g)].map(
+        match => Number(match[2])
+      );
+      const failure = testsStatus || storiesStatus;
+      assert.deepEqual(
+        results.filter(Boolean),
+        failure ? [failure, 29] : [29],
+        result.stdout
+      );
+      const commands = readFileSync(path.join(dir, 'commands'), 'utf8');
+      assert.match(commands, /typecheck:tests/);
+      if (!testsStatus) assert.match(commands, /typecheck:stories/);
+      assert.match(commands, /later-gate\nfinal-success/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
+
+test('hook aggregates compound failures without rejecting handled conditions', () => {
+  const statements = splitStatements(`
+{ false; true; }
+false || true
+if false; then false; fi
+(false; true)
+printf 'last gate ran\\n'
+`);
+  const result = spawnSync(
+    'bash',
+    ['-c', buildProgram(statements, {}, { qualification: true })],
+    { encoding: 'utf8' }
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(
+    [...result.stdout.matchAll(/@@PF-END (\d+) (\d+)/g)].map(match =>
+      Number(match[2])
+    ),
+    [1, 0, 0, 1, 0],
+    result.stdout
+  );
+  assert.match(result.stdout, /last gate ran/);
 });
 
 test('hook blocks real merge conflicts before executing source gates', async () => {
