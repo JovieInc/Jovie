@@ -62,7 +62,7 @@
     "test:performance": "node --test scripts/capture-production-baseline.test.mjs"
   },
   "dependencies": {
-    "electron-updater": "^6.8.9"
+    "electron-updater": "^6.8.11"
   },
   "devDependencies": {
     "@electron/fuses": "^2.1.3",
