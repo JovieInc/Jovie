@@ -2505,6 +2505,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/cron/track-daily-snapshots/route.ts",
+      "kind": "handler",
+      "route": "/api/cron/track-daily-snapshots",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/cron/voice-pipeline/route.ts",
       "kind": "handler",
       "route": "/api/cron/voice-pipeline",

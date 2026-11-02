@@ -1,7 +1,7 @@
 import 'server-only';
 import { and, sql as drizzleSql, eq, inArray, isNull } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { clickEvents } from '@/lib/db/schema/analytics';
+import { getReleaseClickCounts } from '@/lib/db/queries/analytics';
 import {
   discogReleases,
   discogTracks,
@@ -11,7 +11,6 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { trackDailySnapshots } from '@/lib/db/schema/track-daily-snapshots';
 import { parseYouTubeVideoId } from './contract';
 import type {
-  ReleaseClickCounts,
   SnapshotCatalog,
   SnapshotVideoRef,
   TrackSnapshotStore,
@@ -77,31 +76,7 @@ export const drizzleTrackSnapshotStore: TrackSnapshotStore = {
     return { creatorProfileId, releaseIds, tracks, videos };
   },
 
-  async releaseClicks(creatorProfileId, priorDay) {
-    const result = await db.execute<{
-      release_id: string;
-      total: string | number;
-      prior_day: string | number;
-    }>(drizzleSql`
-      select ${clickEvents.metadata} ->> 'contentId' as release_id,
-             count(*) as total,
-             count(*) filter (where ${clickEvents.createdAt}::date = ${priorDay}::date) as prior_day
-      from ${clickEvents}
-      where ${clickEvents.creatorProfileId} = ${creatorProfileId}
-        and ${clickEvents.isBot} = false
-        and ${clickEvents.metadata} ->> 'contentType' = 'release'
-        and ${clickEvents.metadata} ->> 'contentId' is not null
-      group by 1
-    `);
-    const map = new Map<string, ReleaseClickCounts>();
-    for (const row of result.rows ?? []) {
-      map.set(row.release_id, {
-        total: Number(row.total),
-        priorDay: Number(row.prior_day),
-      });
-    }
-    return map;
-  },
+  releaseClicks: getReleaseClickCounts,
 
   async insertMany(rows) {
     if (rows.length === 0) return 0;
