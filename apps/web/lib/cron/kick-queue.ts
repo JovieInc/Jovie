@@ -5,6 +5,8 @@ import { scheduleAfter } from '@/lib/next/schedule-after';
 import { getBaseUrl } from '@/lib/utils/platform-detection/environment';
 import type { QueueName } from './queue-tick';
 
+export const KICK_TIMEOUT_MS = 5000;
+
 /**
  * Event-driven trigger: run one queue now, right after a row was enqueued,
  * instead of waiting for the 5-minute fail-safe tick. Best effort and never
@@ -22,7 +24,9 @@ export function kickQueue(
       try {
         await fetchImpl(url, {
           headers: { authorization: `Bearer ${secret}` },
-          signal: AbortSignal.timeout(280_000),
+          // Short budget: the tick route keeps draining after we disconnect, and
+          // this callback must finish inside the calling route's 30s limit.
+          signal: AbortSignal.timeout(KICK_TIMEOUT_MS),
         });
       } catch {
         // The fail-safe tick will pick the work up.

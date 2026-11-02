@@ -474,7 +474,6 @@ export async function handleMerchCheckoutCompleted(
     .insert(merchFulfillmentJobs)
     .values({ merchOrderId: orderId, status: 'queued' })
     .onConflictDoNothing({ target: merchFulfillmentJobs.merchOrderId });
-  kickQueue('merch');
 
   const [ledgerEntry] = await db
     .insert(merchPayoutLedgerEntries)
@@ -528,6 +527,10 @@ export async function handleMerchCheckoutCompleted(
       updatedAt: paidAt,
     })
     .where(eq(merchOrders.id, orderId));
+
+  // Kick only once the order is `paid` with its shipping address, so the
+  // worker never sees a half-written order if an earlier step threw.
+  kickQueue('merch');
 
   await notifyFirstMerchSaleBestEffort({
     creatorProfileId: existing.order.creatorProfileId,
