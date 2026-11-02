@@ -2110,6 +2110,23 @@ class AccountAttributionTest(unittest.TestCase):
                          [4, 1, 1, 1, 1])
         self.assertNotIn("codex-all-banked", doctor.judge(obs(codex=self.report(**rows))))
 
+    def test_account_at_the_subsidy_floor_counts_as_banked_until_its_reset(self):
+        # codex_lane: at or below the 1% floor an account takes no new run, with no recorded hold.
+        floor = {"available": False, "leased": False, "freeSlots": 1, "exhaustedUntil": None, "lastKind": "ok",
+                 "atFloor": True, "floorUntil": doctor.epoch_iso(self.NOW + 3600)}
+        result = doctor.codex_attribution(self.report(a=floor), self.NOW)
+        self.assertEqual((result["state"], result["quotaBanked"], result["earliestCooldownS"]), ("quota-banked", 1, 3600))
+        stale = {**floor, "floorUntil": doctor.epoch_iso(self.NOW - 1)}
+        self.assertEqual(doctor.codex_attribution(self.report(a=stale), self.NOW)["state"], "unknown")
+
+    def test_status_feed_publishes_the_subsidy_ledger(self):
+        ledger = {"schema": "jovie.subsidy-ledger/v1", "allAtFloor": False, "burnOrder": ["lyb-pro"]}
+        report = {**self.report(a={"available": True, "leased": False}), "subsidyLedger": ledger}
+        observation = obs(codex=report, poolByProvider={"codex": 0}, capacityByProvider={"codex": {"running": 0, "slots": 1}})
+        lane = SimpleNamespace(HOST="test", provider_throughput=throughput_stub)
+        feed = doctor.status_feed(SimpleNamespace(), lane, observation, {}, {})
+        self.assertEqual(feed["subsidyLedger"], ledger)
+
     def test_incomplete_stale_or_malformed_account_status_is_unknown(self):
         valid = self.report(a={"available": True, "leased": True})
         cases = [{}, {**valid, "count": 2}, {**valid, "count": True}, {**valid, "error": "probe failed"},

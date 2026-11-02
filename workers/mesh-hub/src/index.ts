@@ -188,6 +188,7 @@ const BOARD_OPS = new Set([
   'done',
   'answer',
   'cancel',
+  'reassign',
 ]);
 
 async function boardRoute(

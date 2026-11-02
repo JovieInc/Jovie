@@ -165,7 +165,10 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_pytest_hook_names.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
-RELEASE_EXTRAS = ["scripts/shipping_origin.py", # Shared client layer (budgeted gh) used by the throughput sentinel.
+RELEASE_EXTRAS = ["scripts/shipping_origin.py",
+                  # Subsidy pool burn policy (floor, burn order) that codex_lane reads at runtime.
+                  "apps/web/lib/ai/routing.json",
+                  # Shared client layer (budgeted gh) used by the throughput sentinel.
                   "scripts/apiclient/__init__.py", "scripts/apiclient/__main__.py", "scripts/apiclient/cache.py", "scripts/apiclient/client.py", "scripts/apiclient/contract.py", "scripts/apiclient/credentials.py", "scripts/apiclient/fake.py", "scripts/apiclient/gh.py", "scripts/apiclient/github.py", "scripts/apiclient/headers.py", "scripts/apiclient/legacy.py", "scripts/apiclient/linear.py", "scripts/apiclient/policy.py", "scripts/apiclient/store.py",
                   "packages/api-client/providers.json",
                   "scripts/lib/github-rate-limit.mjs",

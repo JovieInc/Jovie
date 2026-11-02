@@ -94,6 +94,139 @@ export function workersAiUsdByDay(groups) {
   return out;
 }
 
+/** The executor that leases subscription aliases on the host (CODEX_LANE_SUBSCRIPTION_PROFILES). */
+export const CODEX_POOL_EXECUTOR = 'scripts/lanes/codex_lane.py';
+/** The only fields a host subscription profile may carry: no email, token or key. */
+const PROFILE_FIELDS = ['emailSha256', 'home', 'slots'];
+const FLOOR_PERCENT_MAX = 5;
+
+/**
+ * Subsidy pool ledger drift: the burn policy in routing.json must be the one Tim set
+ * (floor at or under 5% and 1% today, no auto-redeem, no paid fallback), pools must not
+ * carry identities, and when the host profiles are given (`profiles`: alias ->
+ * {home, slots, emailSha256}) every alias signed in on the host must be a ledgered pool
+ * and every ledgered codex pool must be signed in.
+ */
+export function evaluateSubsidyPools({ routing, profiles = null }) {
+  const findings = [];
+  const ledger = routing.subsidyPools;
+  const policy = ledger?.policy;
+  const invalid = (subject, message) =>
+    findings.push(finding('high', 'subsidy-policy-invalid', subject, message));
+  if (!ledger || !policy || !Array.isArray(ledger.pools)) {
+    invalid(
+      'subsidyPools',
+      'routing.json has no subsidyPools.policy and pools list; executors fall back to defaults nobody reviewed.'
+    );
+    return findings;
+  }
+  const floor = policy.floorPercent;
+  if (
+    typeof floor !== 'number' ||
+    !Number.isFinite(floor) ||
+    floor < 0 ||
+    floor > FLOOR_PERCENT_MAX
+  )
+    invalid(
+      'floorPercent',
+      `subsidyPools.policy.floorPercent is ${JSON.stringify(floor)}; it must be a number from 0 to ${FLOOR_PERCENT_MAX} (Tim: burn to 1% before asking for a reset).`
+    );
+  if (policy.autoRedeemResets !== false)
+    invalid(
+      'autoRedeemResets',
+      'subsidyPools.policy.autoRedeemResets must be false: a banked reset is proposed to Tim, never redeemed by an executor.'
+    );
+  if (policy.paidFallback !== 'never-without-tim')
+    invalid(
+      'paidFallback',
+      'subsidyPools.policy.paidFallback must be never-without-tim.'
+    );
+  if (policy.resetProposal !== 'only-when-every-pool-at-floor')
+    invalid(
+      'resetProposal',
+      'subsidyPools.policy.resetProposal must be only-when-every-pool-at-floor.'
+    );
+  const ids = new Set();
+  for (const pool of ledger.pools) {
+    if (!pool?.id || ids.has(pool.id))
+      invalid(
+        pool?.id ?? '(missing id)',
+        'Every subsidy pool needs a unique id.'
+      );
+    ids.add(pool?.id);
+    if (/@/u.test(JSON.stringify(pool ?? {})))
+      findings.push(
+        finding(
+          'critical',
+          'subsidy-pool-identity',
+          pool?.id ?? '(missing id)',
+          `Subsidy pool ${pool?.id} carries an email-like value; the ledger names pools by alias only.`
+        )
+      );
+  }
+  if (!profiles) return findings;
+  const ledgered = new Set(
+    ledger.pools
+      .filter(pool => pool?.executor === CODEX_POOL_EXECUTOR)
+      .map(pool => pool.alias)
+  );
+  for (const [alias, profile] of Object.entries(profiles)) {
+    const fields = Object.keys(profile ?? {}).sort();
+    if (fields.join(',') !== PROFILE_FIELDS.join(','))
+      findings.push(
+        finding(
+          'critical',
+          'subsidy-profile-fields',
+          alias,
+          `Host profile ${alias} has fields ${fields.join(', ')}; only ${PROFILE_FIELDS.join(', ')} are allowed (no credentials or emails).`
+        )
+      );
+    if (!ledgered.has(alias))
+      findings.push(
+        finding(
+          'high',
+          'subsidy-pool-unledgered',
+          alias,
+          `Subscription alias ${alias} is signed in on the host but routing.json subsidyPools does not list it, so its window is not measured or burned by policy.`
+        )
+      );
+  }
+  for (const alias of ledgered)
+    if (!(alias in profiles))
+      findings.push(
+        finding(
+          'high',
+          'subsidy-pool-not-signed-in',
+          alias,
+          `routing.json lists subscription pool ${alias} but the host profiles do not sign it in; the ledger overstates capacity.`
+        )
+      );
+  return findings;
+}
+
+/**
+ * CODEX_LANE_SUBSCRIPTION_PROFILES from systemd drop-in text (the last assignment wins,
+ * as in systemd). Returns null when no drop-in sets it.
+ */
+export function profilesFromDropIns(texts) {
+  let raw = null;
+  for (const text of texts)
+    for (const line of text.split('\n')) {
+      const match = /^\s*Environment=(?:"((?:[^"\\]|\\.)*)"|(\S+))\s*$/u.exec(
+        line
+      );
+      if (!match) continue;
+      const assignment =
+        match[1] !== undefined
+          ? match[1].replace(/\\(.)/gu, '$1')
+          : (match[2] ?? '');
+      const eq = assignment.indexOf('=');
+      if (assignment.slice(0, eq) === 'CODEX_LANE_SUBSCRIPTION_PROFILES')
+        raw = assignment.slice(eq + 1);
+    }
+  return raw === null ? null : JSON.parse(raw);
+}
+
 export function evaluateRouting({
   routing,
   keyRows = [],
@@ -103,8 +236,9 @@ export function evaluateRouting({
   health = {},
   envNames = null,
   workersAiByDay = null,
+  profiles = null,
 }) {
-  const findings = [];
+  const findings = evaluateSubsidyPools({ routing, profiles });
   const keyUsd = usdPerDayByKey(keyRows, days);
   const modelUsd = usdPerDayByModel(modelRows, days);
   const ceilings = declaredCeilings(routing);
