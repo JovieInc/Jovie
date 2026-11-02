@@ -53,8 +53,16 @@
       "exports": [
         "updateProfileById",
         "updateProfileByClerkId",
+        "holdLeadBuiltProfileInTx",
         "publishProfile"
       ],
+      "tables": ["creatorProfiles"]
+    },
+    {
+      "id": "profile.test-cleanup",
+      "entity": "profile",
+      "module": "apps/web/lib/services/profile/test-profile-unpublish.ts",
+      "exports": ["buildUnpublishTestProfilesQuery"],
       "tables": ["creatorProfiles"]
     },
     {
@@ -95,6 +103,13 @@
       "tables": ["waitlistEntries", "creatorProfiles"]
     },
     {
+      "id": "synthetic.admitted-canary",
+      "entity": "admitted production canary fixture",
+      "module": "apps/web/lib/synthetic/admitted-canary.server.ts",
+      "exports": ["reconcileAdmittedCanary", "verifyAdmittedCanaryOwnership"],
+      "tables": ["creatorProfiles", "userProfileClaims"]
+    },
+    {
       "id": "claim.finalize",
       "entity": "claim",
       "module": "apps/web/lib/claim/finalize.ts",
@@ -103,6 +118,13 @@
         "claimPrebuiltProfileForUser"
       ],
       "tables": ["creatorProfiles", "userProfileClaims"]
+    },
+    {
+      "id": "claim.legacy-verification",
+      "entity": "claim",
+      "module": "apps/web/lib/claim/legacy-verification.server.ts",
+      "exports": ["runLegacyClaimVerificationSweep"],
+      "tables": ["creatorProfiles"]
     },
     {
       "id": "billing.status",
@@ -159,6 +181,13 @@
       "module": "apps/web/lib/youtube-library/thumbnail-review.ts",
       "exports": ["registerThumbnailCandidateReview"],
       "tables": []
+    },
+    {
+      "id": "leads.lead-claim-token",
+      "entity": "lead claim token",
+      "module": "apps/web/lib/leads/lead-claim-token.ts",
+      "exports": ["persistLeadClaimToken"],
+      "tables": ["creatorProfiles"]
     }
   ],
   "agentTools": {

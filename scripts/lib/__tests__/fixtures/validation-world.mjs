@@ -137,6 +137,23 @@ export function createWorld(overrides = {}) {
       const path = href.slice('https://api.github.com/'.length);
       if (path === `repos/${REPO}/actions/workflows/production-controller.yml`)
         return ok({ id: 91 });
+      if (path.startsWith(`repos/${REPO}/pulls?state=closed`)) {
+        // The batched merged-PR lookup every full sweep reads. Rows carry
+        // the fields the binding check needs, so unmerged numbers are
+        // answered here instead of a per-pull read.
+        return ok(
+          Object.entries(world.pulls).map(([number, record]) => ({
+            number: Number(number),
+            html_url: `https://github.com/${REPO}/pull/${number}`,
+            merged_at: record.mergedAt || null,
+            merge_commit_sha: record.mergeSha || null,
+            base: { ref: record.base ?? 'main' },
+            title: record.title ?? 'feat(profile): editorial card',
+            body: record.body ?? '',
+            head: { ref: record.headRef ?? 'tim/jov-1-editorial-card' },
+          }))
+        );
+      }
       if (path.startsWith(`repos/${REPO}/pulls?state=open`))
         return ok(world.openPulls);
       let match = /^repos\/JovieInc\/Jovie\/pulls\/(\d+)\/files/.exec(path);

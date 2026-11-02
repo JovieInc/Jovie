@@ -33,7 +33,7 @@ export function ChatUsageAlert() {
     return (
       <InfoBox
         title="You're out of messages for this week"
-        variant='error'
+        variant='info'
         className='mb-2 rounded-2xl'
       >
         <div className='flex flex-wrap items-center justify-between gap-3'>

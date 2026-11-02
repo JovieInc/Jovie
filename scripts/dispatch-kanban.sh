@@ -277,8 +277,8 @@ QUALITY GATES — execute in order, do not skip:
 7. Run focused tests if applicable
 8. git add -A && git commit -m 'type(scope): description (${linear_id})'
 9. git push -u origin HEAD
-10. gh pr create --fill --body '<!-- customer-changelog/v1 {"releaseWorthy":false} -->'  # ready PR when green; draft OK while iterating.
-    # The marker is the internal default (docs/CHANGELOG_PUBLICATION.md); a customer-visible change replaces it with a customer outcome block.
+10. pnpm pr:open open  # drafts the body from the diff, runs the Fleet Rules / changelog / lane / coverage gates, refuses a failing PR; add --draft while iterating.
+    # Flags: --metric "name|unit|lower|before|source|query" (compounding/ci/perf), --failing-command/--failing-run (fix:), --customer-visible "availability". Never raw `gh pr create`.
 
 CRITICAL:
 - Do NOT modify drizzle/migrations that already exist on main

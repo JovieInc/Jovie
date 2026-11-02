@@ -294,9 +294,11 @@ export async function runFleetRules({ event, request, fromEvent = false }) {
   const current = fromEvent ? event.pull_request : await request(path);
   if (current.head?.sha !== event.pull_request.head?.sha)
     throw new Error('PR head changed; fresh event required');
+  // changed_files counts paths; the files list carries a removed and an added
+  // entry for one path whose type changed (symlink to file), so count paths.
   if (
-    files.length !== current.changed_files ||
-    files.some(file => typeof file.filename !== 'string')
+    files.some(file => typeof file.filename !== 'string') ||
+    new Set(files.map(file => file.filename)).size !== current.changed_files
   )
     throw new Error('incomplete PR file count');
   return evaluateFleetRules({ pr: current, files, repository });

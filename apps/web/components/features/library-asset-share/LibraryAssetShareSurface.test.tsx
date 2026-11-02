@@ -77,4 +77,12 @@ describe('web-194 private asset share source contract', () => {
     expect(story).not.toContain('accessToken');
     expect(story).not.toContain('token:');
   });
+
+  it('keeps the eyebrow Title Case, never uppercase-transformed', () => {
+    const source = readFileSync(
+      resolve(__dirname, './LibraryAssetShareSurface.tsx'),
+      'utf8'
+    );
+    expect(source).not.toMatch(/\buppercase\b/);
+  });
 });

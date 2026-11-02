@@ -213,14 +213,14 @@ test.describe('Pricing Page', () => {
           ).toContainText('$0');
           await expect(
             table
-              .getByRole('rowheader', { name: 'Fan email capture' })
+              .getByRole('rowheader', { name: 'Audience email capture' })
               .locator('..')
               .getByRole('cell')
           ).toHaveText('Unlimited');
           await expect(
             table
               .getByRole('rowheader', {
-                name: 'Release notifications (email to fans)',
+                name: 'Release notifications (email to your audience)',
               })
               .locator('..')
               .getByRole('cell')
@@ -235,14 +235,14 @@ test.describe('Pricing Page', () => {
           ).toContainText('$12/mo');
           await expect(
             table
-              .getByRole('rowheader', { name: 'Fan email capture' })
+              .getByRole('rowheader', { name: 'Audience email capture' })
               .locator('..')
               .getByRole('cell')
           ).toHaveText('Unlimited');
           await expect(
             table
               .getByRole('rowheader', {
-                name: 'Release notifications (email to fans)',
+                name: 'Release notifications (email to your audience)',
               })
               .locator('..')
               .getByRole('cell')
@@ -262,14 +262,14 @@ test.describe('Pricing Page', () => {
           ).toContainText('$0');
           await expect(
             table
-              .getByRole('rowheader', { name: 'Fan email capture' })
+              .getByRole('rowheader', { name: 'Audience email capture' })
               .locator('..')
               .getByRole('cell')
           ).toHaveText('Unlimited');
           await expect(
             table
               .getByRole('rowheader', {
-                name: 'Release notifications (email to fans)',
+                name: 'Release notifications (email to your audience)',
               })
               .locator('..')
               .getByRole('cell')
@@ -289,14 +289,14 @@ test.describe('Pricing Page', () => {
           ).toContainText('$12/mo');
           await expect(
             table
-              .getByRole('rowheader', { name: 'Fan email capture' })
+              .getByRole('rowheader', { name: 'Audience email capture' })
               .locator('..')
               .getByRole('cell')
           ).toHaveText('Unlimited');
           await expect(
             table
               .getByRole('rowheader', {
-                name: 'Release notifications (email to fans)',
+                name: 'Release notifications (email to your audience)',
               })
               .locator('..')
               .getByRole('cell')

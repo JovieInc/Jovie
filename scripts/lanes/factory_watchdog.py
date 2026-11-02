@@ -36,9 +36,14 @@ TICK_HARD_CAP_S = 3 * 3600
 ZERO_WORKER_S = 5 * 60
 ATTEMPT_COOLDOWN_S = 2 * 60
 MAX_RECOVERY_ATTEMPTS = 3
+# An exhausted incident re-opens as a new bounded generation (and a new alert) after this long.
+# Without it one exhausted incident wedged the dead-man for a week (2026-10-26 -> 11-02: incident
+# 109 on provider-idle:hyperagent; every pass exited 1 and the factory's later faults went unseen).
+EXHAUSTED_REOPEN_S = 6 * 3600
 VERIFY_TIMEOUT_S = 90
 VERIFY_POLL_S = 2
 ALERT_RETRY_S = 15 * 60
+ADMISSION_DENIED_TICKS = 3  # consecutive denied ticks (disk-critical backpressure) before Summer is alerted
 RECOVERABLE_CONDITIONS = frozenset({"spawn-exit", "tick-error"})
 CAPACITY_BLOCK = re.compile(r"banked|credit|quota|token|usage.limit", re.IGNORECASE)
 ACTIVE_STATUSES = frozenset({"observing", "recovering", "exhausted", "decision-required"})
@@ -138,6 +143,20 @@ def heartbeat_age(state: Path, now: float) -> int | None:
         return None
 
 
+def admission_streak(state: Path, tick: dict) -> int:
+    """Consecutive distinct ticks that ended admission-denied; persisted so each tick counts once."""
+    path = state / "admission-denied-streak.json"
+    row = read_json(path, {})
+    streak, last = int(row.get("streak") or 0), row.get("tickAt")
+    if tick.get("at") and tick.get("at") != last:
+        streak = streak + 1 if tick.get("admissionDenied") else 0
+        try:
+            atomic_write(path, {"tickAt": tick.get("at"), "streak": streak})
+        except OSError:
+            pass
+    return streak
+
+
 def snapshot(state: Path, now: float) -> dict:
     """Small local-only factory observation; no API call or credential read."""
     tick = read_json(state / "tick.json", {})
@@ -175,6 +194,7 @@ def snapshot(state: Path, now: float) -> dict:
         "heartbeatAgeSeconds": heartbeat_age(state, now),
         "tickError": tick.get("error"),
         "admissionDenied": tick.get("admissionDenied"),
+        "admissionDeniedStreak": admission_streak(state, tick),
         "enabledProviders": enabled,
         "spawnedProviders": spawned,
         "unhealthyProviders": unhealthy,
@@ -217,6 +237,10 @@ def assess(observation: dict) -> dict:
     if zero_capacity:
         reasons.append("zero-provider-capacity")
 
+    admission_blocked = not waiting and int(observation.get("admissionDeniedStreak") or 0) >= ADMISSION_DENIED_TICKS
+    if admission_blocked:
+        reasons.append("admission-denied")
+
     doctor_fresh = isinstance(doctor_age, (int, float)) and -30 <= doctor_age <= TICK_STALE_S
     if doctor_fresh and not waiting and not reasons[:1] == ["factory-down"]:
         conditions = observation.get("activeConditions") or []
@@ -224,14 +248,14 @@ def assess(observation: dict) -> dict:
                for key in conditions):
             reasons.append("stuck-retry")
         if observation.get("demandKnown") and observation.get("demand", 0) > 0 \
-                and observation.get("runningWorkers") == 0:
+                and observation.get("runningWorkers") == 0 and not observation.get("admissionDenied"):
             reasons.append("zero-worker")
 
     reasons = list(dict.fromkeys(reasons))
     return {
         "healthy": not reasons,
         "reasons": reasons,
-        "decisionRequired": "zero-provider-capacity" in reasons,
+        "decisionRequired": bool({"zero-provider-capacity", "admission-denied"} & set(reasons)),
         "waiting": waiting,
     }
 
@@ -291,6 +315,8 @@ def operator_alert(record: dict, issue_id: str | None = None, resolve: bool = Fa
         attempts = len(record.get("attempts") or [])
         text = (f"Factory stay-up recovery is {record.get('status')}: {reasons}; "
                 f"{attempts}/{MAX_RECOVERY_ATTEMPTS} bounded service attempts used. "
+                + ("Dispatch admission has been denied for 3+ consecutive ticks (disk-critical?); free disk, a restart will not help. "
+                   if "admission-denied" in (record.get("reasons") or []) else "") +
                 "Inspect factory-watchdog.json and its journal before any manual action.")
         return tracker.open("factory-stay-up", text)
     except Exception:
@@ -331,6 +357,12 @@ def run_once(state: Path, *, clock=time.time, monotonic=time.monotonic, sleep=ti
         if path.exists() and previous.get("schema") != SCHEMA:
             return {"schema": SCHEMA, "status": "state-unobservable"}
         now = clock()
+        if previous.get("status") == "exhausted":
+            epochs = [float(a.get("requestedEpoch") or 0) for a in previous.get("attempts") or []]
+            last = max(epochs or [float(previous.get("firstObservedEpoch") or 0)])
+            if now - last >= EXHAUSTED_REOPEN_S:
+                previous = {**previous, "status": "superseded", "supersededAt": epoch_iso(now)}
+                _persist(state, previous, "incident-superseded")
         before = observe(state, now)
         health = assess(before)
         if health["healthy"]:

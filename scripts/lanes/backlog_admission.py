@@ -1214,7 +1214,7 @@ def _native_runtime(reads, row, prs, binding, observed_at):
     work_allowed = work.get("allowed") is True and work.get("newImplementationAllowed") is True
     lease_allowed = (work.get("newIssueLeaseAllowed") is True and (work.get("productNewIssueLeaseAllowed") or {}).get("jovie") is True
                      and closure.get("newIssueIntakeAllowed") is True)
-    disk = lane.disk_guard.free_pct(state)
+    disk = lane.disk_guard.lanes_free_pct(state)
     worker = {"sourceFunctions": ["admission_rejection", "pool_rejections", "held_back_issues", "in_flight_issues"],
               "sourceHash": binding["sourceHash"], "provider": selected["provider"], "rejection": selected["rejection"],
               "poolRejection": lane.pool_rejections(pool, lane.hotspot_holds(prs), now=observed_at).get(issue.identifier),

@@ -51,7 +51,7 @@ export const JOB_ID = 'deterministic';
 export function buildPreflightEnv(source = process.env, cwd = ROOT) {
   const result = spawnSync('git', ['rev-parse', '--local-env-vars'], {
     cwd,
-    env: source,
+    env: { ...source },
     encoding: 'utf8',
   });
   const names = result.stdout?.trim().split('\n') ?? [];
@@ -169,6 +169,12 @@ export function prepareStatement(statement, { flockPath = '' } = {}) {
   let text = statement;
   // `set -e` would end the process at the first red statement.
   if (SET_E.test(text.trim())) return 'set -uo pipefail';
+  // CI starts shallow; a developer checkout may already have full history.
+  // Still fetch the same refs, and preserve failures in either form.
+  if (/^git fetch\b.*\s--unshallow(?:\s|$)/u.test(text)) {
+    const completeFetch = text.replace(/\s+--unshallow(?=\s|$)/u, '');
+    text = `if [ "$(git rev-parse --is-shallow-repository)" = false ]; then\n${completeFetch}\nelse\n${text}\nfi`;
+  }
   // `exit` would end the process; contain it in a subshell.
   if (/\bexit\b/.test(text)) text = `( ${text}\n)`;
   // Typechecks share gem's CPU: serialize them under the host lock.

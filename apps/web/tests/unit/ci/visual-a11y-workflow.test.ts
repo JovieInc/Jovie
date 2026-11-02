@@ -214,17 +214,17 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(buildLayout.if).not.toContain("github.event_name == 'pull_request'");
   });
 
-  it('runs the Storybook matrix on two workers of two hosted runners', () => {
+  it('runs the Storybook matrix on two workers of three hosted runners', () => {
     const storybook = job('ci-storybook-surfaces');
     expect(storybook['runs-on']).toMatch(/^ubuntu-(?:latest|24\.04)$/);
-    // Two disjoint Playwright shards cover the full spec list; one failing
+    // Three disjoint Playwright shards cover the full spec list; one failing
     // shard fails the job result the aggregates read.
     expect(storybook.strategy).toEqual({
       'fail-fast': true,
-      matrix: { shard: [1, 2] },
+      matrix: { shard: [1, 2, 3] },
     });
     const matrix = step(storybook, 'Run surface elevation matrix (Storybook)');
-    expect(matrix.step.env?.STORYBOOK_SHARD).toBe('${{ matrix.shard }}/2');
+    expect(matrix.step.env?.STORYBOOK_SHARD).toBe('${{ matrix.shard }}/3');
     const command = String(matrix.step.run).replace(/\s*\\\n\s*/g, ' ');
     expect(command).toMatch(
       /--config=playwright\.config\.storybook\.ts --project=chromium --reporter=line --workers=2 --shard="\$STORYBOOK_SHARD"/

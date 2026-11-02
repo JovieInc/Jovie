@@ -669,13 +669,12 @@ def test_staging_build_runs_in_job_and_materializes_trace_closure() -> None:
     assert "VERCEL_ENABLE_SOURCE_FALLBACK: 'false'" in deploy_step
 
 
-def test_staging_clerk_secrets_are_exposed_to_vercel_builds() -> None:
+def test_staging_build_env_is_doppler_scoped_and_clerk_free() -> None:
+    """Clerk is retired from the build env (2026-10-29, #23527): turbo hashes NEXT_PUBLIC_*
+    into the build task, so per-job Clerk values split the cache key, and nothing in the app
+    reads them any more (no-clerk-build-env guard). Staging build secrets resolve through the
+    staging-scoped Doppler config, never production, and the prebuilt deploy stays fail-closed."""
     workflow = PRODUCTION_RELEASE_WORKFLOW.read_text()
-    expected_publishable = (
-        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "
-        "${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}"
-    )
-    expected_secret = "CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}"
 
     staging = workflow[
         workflow.index("  deploy-staging:") : workflow.index(
@@ -684,13 +683,24 @@ def test_staging_clerk_secrets_are_exposed_to_vercel_builds() -> None:
     ]
     build_step = _staging_build_step(workflow)
 
-    # The in-job staging build must sign Clerk tokens with staging keys.
-    assert expected_publishable in build_step
-    assert expected_secret in build_step
-    # The prebuilt deploy step also receives them so CLI-side env resolution
-    # cannot fall back to production keys.
-    assert staging.count(expected_publishable) >= 2
-    assert staging.count(expected_secret) >= 2
+    # Clerk is retired: neither the in-job build nor prebuilt deployment
+    # should receive old credentials or aliases, including staging variants.
+    assert not re.search(
+        r"\b(?:NEXT_PUBLIC_CLERK_[A-Z_]+|CLERK_SECRET_KEY(?:_STAGING)?|"
+        r"CLERK_PUBLISHABLE_KEY(?:_STAGING)?)\b",
+        staging,
+    )
+    # The in-job staging build takes its secrets from the staging Doppler config
+    # with no fallback, so CLI-side env resolution cannot fall back to production.
+    assert "--project jovie-web --config stg" in build_step
+    assert "--no-fallback" in build_step
+
+    deploy_step = staging[
+        staging.index("- name: Deploy (staging preview, prebuilt)") :
+    ]
+    # Fail-closed: a source fallback would silently discard the in-job
+    # artifact and repeat the slow server build.
+    assert "VERCEL_ENABLE_SOURCE_FALLBACK: 'false'" in deploy_step
 
 
 def test_masked_deployment_url_is_encoded_across_job_boundary() -> None:

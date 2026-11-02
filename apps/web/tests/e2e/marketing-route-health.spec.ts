@@ -108,7 +108,8 @@ async function assertPageHealth(
       .replace(/\s+/g, ' ')
       .trim();
     expect(body, `${target.glob} did not render its not-found state`).toMatch(
-      /not found|could not be found/i
+      // Shared not-found copy: lib/routing/not-found-copy.ts.
+      /not found|could not be found|can['’]t find that page/i
     );
     return;
   }
