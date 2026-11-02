@@ -69,11 +69,33 @@ export {
 } from './scheduler';
 
 /**
+ * Job types whose processors own their own short transaction phases (via
+ * executeIngestionJob) and must NOT be wrapped in a spanning transaction by
+ * callers: their external HTTP must never run inside an open transaction
+ * (JOV-10139). All other job types (DSP enrichment, email) keep the caller's
+ * withSystemIngestionSession transaction.
+ */
+export const SELF_MANAGED_JOB_TYPES = new Set([
+  'import_beacons',
+  'import_laylo',
+  'import_tiktok',
+  'import_twitter',
+  'import_youtube',
+]);
+
+/**
  * Process a job based on its type.
  * Routes to the appropriate platform-specific processor.
+ *
+ * `conn` must be the pool-level handle (db), NOT a live transaction:
+ * processors await external HTTP (platform scrapes, MusicFetch, Resend), and
+ * holding BEGIN across those awaits leaves the Postgres session
+ * idle-in-transaction until Neon terminates it (JOV-10139). Social import
+ * processors manage their own short DB-only transaction phases; DSP/email
+ * processors keep the handle for their (individually committed) writes.
  */
 export async function processJob(
-  tx: DbOrTransaction,
+  conn: DbOrTransaction,
   job: typeof ingestionJobs.$inferSelect
 ) {
   switch (job.jobType) {
@@ -81,23 +103,23 @@ export async function processJob(
     case 'import_instagram':
       return disabledSocialHtmlDocument();
     case 'import_laylo':
-      return processLayloJob(tx, job.payload);
+      return processLayloJob(job.payload);
     case 'import_youtube':
-      return processYouTubeJob(tx, job.payload);
+      return processYouTubeJob(job.payload);
     case 'import_beacons':
-      return processBeaconsJob(tx, job.payload);
+      return processBeaconsJob(job.payload);
     case 'import_tiktok':
-      return processTikTokJob(tx, job.payload);
+      return processTikTokJob(job.payload);
     case 'import_twitter':
-      return processTwitterJob(tx, job.payload);
+      return processTwitterJob(job.payload);
     case 'send_claim_invite':
-      return processSendClaimInviteJob(tx, job.payload);
+      return processSendClaimInviteJob(conn, job.payload);
     case 'send_waitlist_email':
-      return processWaitlistEmailJob(tx, job.payload, { jobId: job.id });
+      return processWaitlistEmailJob(conn, job.payload, { jobId: job.id });
     case 'dsp_artist_discovery':
-      return processDspArtistDiscoveryJob(tx, job.payload);
+      return processDspArtistDiscoveryJob(conn, job.payload);
     case 'dsp_track_enrichment':
-      return processReleaseEnrichmentJob(tx, job.payload);
+      return processReleaseEnrichmentJob(conn, job.payload);
     case 'musicfetch_enrichment': {
       const parsed = musicFetchEnrichmentPayloadSchema.safeParse(job.payload);
       const recoveryProfileId =
@@ -105,15 +127,15 @@ export async function processJob(
           ? parsed.data.creatorProfileId
           : null;
       if (recoveryProfileId) {
-        await IngestionStatusManager.markProcessing(tx, recoveryProfileId);
+        await IngestionStatusManager.markProcessing(conn, recoveryProfileId);
       }
-      const result = await processMusicFetchEnrichmentJob(tx, job.payload);
+      const result = await processMusicFetchEnrichmentJob(conn, job.payload);
       if (recoveryProfileId) {
         if (result.status === 'complete') {
-          await IngestionStatusManager.markIdle(tx, recoveryProfileId);
+          await IngestionStatusManager.markIdle(conn, recoveryProfileId);
         } else {
           await IngestionStatusManager.markFailed(
-            tx,
+            conn,
             recoveryProfileId,
             result.errors.join('; ') || 'MusicFetch enrichment failed'
           );

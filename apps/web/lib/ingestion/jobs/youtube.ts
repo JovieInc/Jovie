@@ -1,4 +1,3 @@
-import type { DbOrTransaction } from '@/lib/db';
 import {
   extractYouTube,
   fetchYouTubeAboutDocument,
@@ -23,8 +22,7 @@ export const youtubeJobConfig: JobExecutorConfig<YouTubePayload> = {
  * Process a YouTube import job.
  */
 export async function processYouTubeJob(
-  tx: DbOrTransaction,
   jobPayload: unknown
 ): Promise<JobExecutionResult> {
-  return executeIngestionJob(tx, jobPayload, youtubeJobConfig);
+  return executeIngestionJob(jobPayload, youtubeJobConfig);
 }
