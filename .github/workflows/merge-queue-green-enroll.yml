@@ -294,7 +294,7 @@ jobs:
               ...holdLabels.machineBlockLabels,
             ]);
             const BREAKER_LABEL = 'queue-breaker';
-            const COMPOUNDING_LABEL = 'compounding', MAX_JUMPED = 2, JUMP_MAX_BUILD_S = 300, JUMP_BATCH_S = 1800;
+            const COMPOUNDING_LABEL = 'compounding', MARKETING_LABEL = 'priority:marketing', MAX_JUMPED = 2, JUMP_MAX_BUILD_S = 300, JUMP_BATCH_S = 1800;
             const COMPOUNDING_PATHS = [
               /^\.github\/(workflows|actions|ci-harness|scripts|runner-host|runner-image)\//,
               /^scripts\/(lanes|swarm|hermes)\//,
@@ -458,6 +458,8 @@ jobs:
                 }`, { owner, repo, number })).repository.pullRequest;
             if (sweep) {
               prs = prs.filter(ownCandidate).sort((a, b) =>
+                Number(!a.labels.some(l => l.name.toLowerCase() === MARKETING_LABEL)) -
+                Number(!b.labels.some(l => l.name.toLowerCase() === MARKETING_LABEL)) ||
                 String(a.updated_at ?? '').localeCompare(String(b.updated_at ?? '')) || a.number - b.number);
             }
             const prefetched = new Map();
@@ -492,19 +494,20 @@ jobs:
                   }
                 }
               }`;
-            const isCompoundingEntry = e => e.pullRequest.labels.nodes.some(l => l.name.toLowerCase() === COMPOUNDING_LABEL);
+            const isPriorityLabel = label => [COMPOUNDING_LABEL, MARKETING_LABEL].includes(label.name.toLowerCase());
+            const isPriorityEntry = e => e.pullRequest.labels.nodes.some(isPriorityLabel);
             // One reset-safe jump policy for a fresh enqueue and for a relabel re-route. A jump
             // invalidates every merge group already building and restarts its CI (10-20 min;
             // the 04:00Z jump of #23554 reset three groups and nothing merged for 90 min). So jump only
             // while no building group has had time to make progress: AWAITING_CHECKS entries enqueued
             // under JUMP_MAX_BUILD_S ago (enqueuedAt bounds the build start from above), at most one jump per
-            // JUMP_BATCH_S, and at most MAX_JUMPED compounding entries queued.
+            // JUMP_BATCH_S, and at most MAX_JUMPED priority entries queued (compounding and marketing share the cap).
             const jumpPolicy = entries => {
               const ageS = e => (Date.now() - Date.parse(e.enqueuedAt)) / 1000;
-              const jumped = entries.filter(isCompoundingEntry).length;
+              const jumped = entries.filter(isPriorityEntry).length;
               const building = entries.filter(e => e.state === 'AWAITING_CHECKS');
               const stale = building.filter(e => !(ageS(e) < JUMP_MAX_BUILD_S));
-              const recent = entries.filter(e => isCompoundingEntry(e) && ageS(e) < JUMP_BATCH_S);
+              const recent = entries.filter(e => isPriorityEntry(e) && ageS(e) < JUMP_BATCH_S);
               let deferred = null;
               if (jumped >= MAX_JUMPED) deferred = `cap ${jumped}/${MAX_JUMPED}`;
               else if (stale.length > 0) deferred = `building groups older than ${JUMP_MAX_BUILD_S}s: ${stale.map(e => '#' + e.pullRequest.number).join(',')}`;
@@ -607,7 +610,7 @@ jobs:
               if (pr && pr.state === 'OPEN' && pr.isInMergeQueue && !pr.isDraft && !pr.isCrossRepository &&
                   pr.baseRefName === 'main' && pr.headRefOid === candidate.head.sha &&
                   !pr.labels.pageInfo.hasNextPage &&
-                  pr.labels.nodes.some(l => l.name.toLowerCase() === COMPOUNDING_LABEL) &&
+                  pr.labels.nodes.some(isPriorityLabel) &&
                   !pr.labels.nodes.some(l => BLOCKING.has(l.name.toLowerCase()))) {
                 relabelJumpCandidates.push({ pr });
                 continue;
@@ -866,13 +869,14 @@ jobs:
                   if (!await breakerReleaseStillCurrent(false)) continue;
                 }
                 // Tim 2026-10-28: compounding work (infra that speeds up all other work) jumps
-                // the queue, at most MAX_JUMPED entries at once. A PR is compounding when it carries the
+                // the queue alongside explicitly labeled marketing work, sharing MAX_JUMPED and the reset budget.
+                // A PR is compounding when it carries the
                 // label or every touched file is lanes/swarm/CI/controller infrastructure. Every decision
                 // is logged as a receipt. Any failure here falls back to a plain enqueue.
                 let jump = false;
                 try {
-                  let compounding = pr.labels.nodes.some(l => l.name.toLowerCase() === COMPOUNDING_LABEL);
-                  let basis = 'label';
+                  let compounding = pr.labels.nodes.some(isPriorityLabel);
+                  let basis = pr.labels.nodes.some(l => l.name.toLowerCase() === MARKETING_LABEL) ? MARKETING_LABEL : 'label';
                   if (!compounding) {
                     const files = await github.paginate(github.rest.pulls.listFiles, {
                       owner, repo, pull_number: pr.number, per_page: 100,
@@ -964,7 +968,7 @@ jobs:
                 const self = all.find(e => e.pullRequest.number === pr.number);
                 if (!self) {
                   receipt(pr, 'skip', 'relabel-jump:entry-not-in-first-50');
-                } else if (all.filter(e => e.position < self.position).every(isCompoundingEntry)) {
+                } else if (all.filter(e => e.position < self.position).every(isPriorityEntry)) {
                   receipt(pr, 'skip', `relabel-jump:already-ahead position=${self.position}`);
                 } else {
                   const others = all.filter(e => e.pullRequest.number !== pr.number);
