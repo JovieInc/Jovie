@@ -869,9 +869,10 @@ def admission_order(issue: Issue, now: float) -> tuple:
     labels = {label.lower() for label in issue.labels}
     tier = (-1 if {SHARED_LABEL, "dispatch-next"} <= labels
             else 0 if effective_priority == 1 or workstreams.compounding(stream) else 1)
-    # Summer's signed portfolio rank is the first key, then explicit Urgent, tier, aged priority, age (JOV-7073).
+    # Summer's signed rank comes first, then Urgent, marketing, tier, aged priority, age (JOV-7073).
     return (*priority_admission.claim_key(issue.identifier, priority_admission.summer_ranks(now=now)),
-            0 if priority == 1 else 1, tier, effective_priority, workstreams.rank(stream),
+            0 if priority == 1 else 1, not priority_admission.marketing_priority(issue.labels),
+            tier, effective_priority, workstreams.rank(stream),
             created_at if created_at is not None else float("inf"))
 
 
