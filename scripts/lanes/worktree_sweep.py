@@ -76,7 +76,11 @@ def default_roots(home: Path, state: Path) -> list[Path]:
             home / "jovie-worktrees", home / "worktrees", home / "LogYourBody-wt",
             home / "jovie-wt-*", Path("/private/tmp/claude-501"), Path("/private/tmp/jovie-*"),
             home / "codex-worktrees", home / "grok-wt", home / "grok-ship-workspaces",
-            home / "codex-ship-workspaces", home / "wt-*", Path("/srv/worktrees/codex-worktrees")]
+            home / "codex-ship-workspaces", home / "wt-*", Path("/srv/worktrees/codex-worktrees"),
+            # ~/wt is where Gem agent sessions put worktrees (global charter: `git worktree add ... ~/wt/<name>`).
+            # It was out of scope: 75 checkouts at ~5.7 GiB each (pnpm copies, the store is on /srv/worktrees)
+            # and root at 89% on 2026-11-02 while the sweeper retired nothing there.
+            home / "wt"]
 
 
 def default_never(home: Path) -> list[Path]:
@@ -473,7 +477,7 @@ STATE_REF_MAX_BYTES = 8 * 1024 * 1024
 
 def standalone_globs(home: Path, state: Path) -> list[tuple[Path, str]]:
     return [(home, "grok-ship-workspaces/*/*"), (home, "codex-ship-workspaces/*/*"), (home, "grok-wt/*"),
-            (home, "codex-worktrees/*"), (home, "wt-*"), (Path("/srv/worktrees"), "codex-worktrees/*"), (state, "bindings/*/worktrees/*"),
+            (home, "codex-worktrees/*"), (home, "wt-*"), (home, "wt/*"), (Path("/srv/worktrees"), "codex-worktrees/*"), (state, "bindings/*/worktrees/*"),
             (state, "runs/owner-*/checkout")]
 
 
