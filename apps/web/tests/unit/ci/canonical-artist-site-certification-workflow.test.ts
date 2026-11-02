@@ -139,6 +139,10 @@ node -e 'process.stdout.write(process.env.URL_ENCRYPTION_KEY)'`,
       'repos/${{ github.repository }}/commits?sha=${{ github.sha }}&per_page=100&page=${page}'
     );
     expect(certify).toContain('for page in 1 2 3 4 5; do');
+    // Rate-limit guard: page only until the live build is found, never past a failure.
+    expect(certify).toContain('https://jov.ie/api/version');
+    expect(certify).toContain('grep -q "^$LIVE_BUILD" "$HISTORY"');
+    expect(certify).toContain('if [ "$failed" -ne 0 ]; then break; fi');
     expect(certify).toContain('>> "$HISTORY" || failed=1');
     expect(certify).toContain(': > "$HISTORY"');
     expect(certify).not.toContain('git fetch');

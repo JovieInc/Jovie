@@ -24,6 +24,42 @@ export interface CanonicalArtistSiteCliOptions {
   readonly outputPath: string;
   /** Newest-first SHAs from the certified revision. Empty means equality only. */
   readonly sourceHistory?: readonly string[];
+  /**
+   * Playwright JSON report of the golden-path run. When present, the revenue
+   * checks read the spec that proves them instead of the whole step outcome,
+   * so an unrelated spec (e.g. /start layout) cannot flip them.
+   */
+  readonly journeyReportPath?: string;
+}
+
+interface PlaywrightSpec {
+  readonly file?: string;
+  readonly ok?: boolean;
+}
+
+interface PlaywrightSuite {
+  readonly file?: string;
+  readonly specs?: readonly PlaywrightSpec[];
+  readonly suites?: readonly PlaywrightSuite[];
+}
+
+/** Per spec file: true when it ran at least one test and none failed. */
+export function summarizeJourneyReport(
+  report: unknown
+): ReadonlyMap<string, boolean> | null {
+  const root = report as { suites?: readonly PlaywrightSuite[] } | null;
+  if (!root || !Array.isArray(root.suites)) return null;
+  const byFile = new Map<string, boolean>();
+  const visit = (suite: PlaywrightSuite) => {
+    for (const spec of suite.specs ?? []) {
+      const file = (spec.file ?? suite.file ?? '').split('/').pop() ?? '';
+      if (!file) continue;
+      byFile.set(file, (byFile.get(file) ?? true) && spec.ok === true);
+    }
+    for (const child of suite.suites ?? []) visit(child);
+  };
+  for (const suite of root.suites) visit(suite);
+  return byFile.size > 0 ? byFile : null;
 }
 
 interface M2Receipt {
@@ -129,6 +165,7 @@ function parseOptions(argv: readonly string[]): CanonicalArtistSiteCliOptions {
     profileResultPath: required(argv, '--profile-result'),
     outputPath: required(argv, '--output'),
     sourceHistory: loadSourceHistory(optional(argv, '--source-history')),
+    journeyReportPath: optional(argv, '--journey-report'),
   };
 }
 
@@ -155,6 +192,19 @@ export function certifyCanonicalArtistSite(
     : null;
 
   const goldenPassed = options.goldenPathStatus === 'success';
+  const journeySpecs = options.journeyReportPath
+    ? summarizeJourneyReport(readJson(options.journeyReportPath))
+    : null;
+  // Without a usable report the revenue checks keep reading the step outcome.
+  const specOk = (file: string) => journeySpecs?.get(file) === true;
+  const billingJourneyOk = journeySpecs
+    ? specOk('golden-path.spec.ts')
+    : goldenPassed;
+  const freeStateOk = journeySpecs
+    ? specOk('claim-prebuilt.smoke.spec.ts') &&
+      specOk('golden-path-home-welcome.spec.ts') &&
+      specOk('golden-path.spec.ts')
+    : goldenPassed;
   const claimContractPassed = options.claimContractStatus === 'success';
   const deployedRevision = profileReport?.snapshot?.releaseSha ?? null;
   const profileHealthy =
@@ -331,8 +381,21 @@ export function certifyCanonicalArtistSite(
       [...claimAndJourney, ...navigationEvidence],
       'canonical-artist-site-refresh-back-retry'
     ),
-    ...(['free_state_value', 'payment_entitlement'] as const).map(checkId =>
-      row(checkId, goldenPassed, journeyDetail, goldenEvidence)
+    row(
+      'free_state_value',
+      freeStateOk,
+      freeStateOk
+        ? journeyDetail
+        : 'Free-state specs (claim-prebuilt, home-welcome, golden-path) did not all pass.',
+      goldenEvidence
+    ),
+    row(
+      'payment_entitlement',
+      billingJourneyOk && (journeySpecs ? proPassed && activationPassed : true),
+      billingJourneyOk && (journeySpecs ? proPassed && activationPassed : true)
+        ? journeyDetail
+        : 'Checkout, entitlement or activation proof failed (golden-path billing spec or revenue-path steps).',
+      [...goldenEvidence, ...m2Evidence]
     ),
     row(
       'pro_handoff_199',
@@ -345,12 +408,12 @@ export function certifyCanonicalArtistSite(
     ),
     row(
       'immediate_value',
-      goldenPassed && activationPassed,
-      goldenPassed && activationPassed
+      freeStateOk && activationPassed,
+      freeStateOk && activationPassed
         ? 'Claim first value and the live post-checkout activation state passed.'
         : 'Claim first value or the live post-checkout activation state failed.',
       [...goldenEvidence, ...m2Evidence],
-      goldenPassed ? 'JOV-6439' : 'JOV-7192'
+      freeStateOk ? 'JOV-6439' : 'JOV-7192'
     ),
   ];
 
