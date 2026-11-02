@@ -1081,6 +1081,19 @@ class SubscriptionPoolTest(Isolated):
         compute = patch.object(codex.os, "cpu_count", return_value=8)
         compute.start()
         self.addCleanup(compute.stop)
+        directory = str(ROOT / "scripts/lanes")
+        if directory not in sys.path:
+            sys.path.insert(0, directory)
+        import model_families
+        self.model_registry = Path(self.tmp.name) / "model-families.json"
+        self.model_registry.write_text(json.dumps({"modelFamilies": {
+            "schema": "jovie.model-families/v1", "families": {
+                "openai:astra": {"latest": "gpt-6-astra"},
+                "openai:sol": {"latest": "gpt-6.1-sol"},
+                "openai:luna": {"latest": "gpt-6-luna"}}}}))
+        registry = patch.object(model_families, "CAPACITY_PATH", self.model_registry)
+        registry.start()
+        self.addCleanup(registry.stop)
 
     def primary_slots(self, count):
         profiles = {name: dict(profile) for name, profile in self.profiles.items()}
@@ -1671,6 +1684,14 @@ class SubscriptionPoolTest(Isolated):
             codex.observe_headroom(state, "lyb-pro", {"usableCapacityRemaining": {"primary": malformed}}, self.NOW)
             self.assertEqual(state, {"lyb-pro": {"headroomAlarm": {"at": "preserved"}}})
         self.assertFalse((codex.STATE.parent / "capacity-events.jsonl").exists())
+
+    def test_fallback_aliases_follow_the_canonical_model_registry(self):
+        self.assertEqual(codex.model_fallbacks("openai:sol@latest"), ("gpt-6.1-sol", "gpt-6-luna"))
+        self.assertEqual(codex.model_fallbacks("custom-explicit-model"), ("custom-explicit-model",))
+        registry = json.loads(self.model_registry.read_text())
+        registry["modelFamilies"]["families"]["openai:sol"]["latest"] = "gpt-999-sol"
+        self.model_registry.write_text(json.dumps(registry))
+        self.assertEqual(codex.model_fallbacks("openai:sol@latest"), ("gpt-999-sol", "gpt-6-luna"))
 
     def test_model_capacity_uses_bounded_astra_sol_luna_chain(self):
         result, seen = self.run_failover_fixture([(1, "capacity", None), (1, "capacity", None), (0, "ok", None)])

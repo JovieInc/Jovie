@@ -51,7 +51,7 @@ SUBSCRIPTION_REFRESH_LEAD_S = 900
 SUBSCRIPTION_RETRY_S = 240
 EVIDENCE_MAX_AGE_S = 2 * 3600
 MODEL_CAPACITY = re.compile(r"(?:model|gpt-[\w.-]+).{0,60}(?:at capacity|temporarily unavailable|overloaded)|(?:at capacity|overloaded).{0,60}(?:model|gpt-[\w.-]+)", re.I)
-MODEL_FALLBACKS = ("gpt-6-astra", "gpt-6.1-sol", "gpt-6-luna")
+MODEL_FALLBACK_FAMILIES = ("openai:astra@latest", "openai:sol@latest", "openai:luna@latest")
 HEADROOM_ALARM_PERCENT = 20
 AUTH = re.compile(r"not logged in|login required|unauthori[sz]ed|invalid.*(token|credential)|\b401\b", re.I)
 # "Try again at 3:15 PM", "try again in 2 hours 5 minutes", "resets at 2026-09-27T01:00:00Z"
@@ -1198,6 +1198,22 @@ def pick(state: dict, now: float, names: list[str] | None = None, deltas: dict |
     return None, None
 
 
+def model_fallbacks(requested: str | None) -> tuple:
+    if not subscription_pool_mode():
+        return (requested,)
+    # Read the maintained registry; providers and installed releases share these aliases.
+    directory = str(Path(__file__).resolve().parent)
+    if directory not in sys.path:
+        sys.path.insert(0, directory)
+    import model_families
+    capacity = json.loads(model_families.CAPACITY_PATH.read_text())
+    chain = tuple(model_families.resolve(capacity, alias) for alias in MODEL_FALLBACK_FAMILIES)
+    first = requested or chain[0]
+    if first.startswith("openai:"):
+        first = model_families.resolve(capacity, first)
+    return chain[chain.index(first):] if first in chain else (first,)
+
+
 def run(args) -> int:
     """One lane run. When an account hits a limit or auth failure mid-run, bank it and rotate to
     the next available account on the same worktree, so the work finishes instead of stalling.
@@ -1220,9 +1236,7 @@ def run(args) -> int:
         base += ["--sandbox", "workspace-write", "-c", 'approval_policy="on-request"',
                  "-c", 'approvals_reviewer="auto_review"', "-c", 'model_provider="openai"',
                  "-c", 'forced_login_method="chatgpt"']
-    first_model = args.model or (MODEL_FALLBACKS[0] if subscription_pool_mode() else None)
-    models = (MODEL_FALLBACKS[MODEL_FALLBACKS.index(first_model):]
-              if subscription_pool_mode() and first_model in MODEL_FALLBACKS else (first_model,))
+    models = model_fallbacks(args.model)
     if args.reasoning_effort:
         base += ["-c", f'model_reasoning_effort="{args.reasoning_effort}"']
     if args.cwd:
