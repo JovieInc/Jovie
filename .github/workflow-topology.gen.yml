@@ -178,6 +178,7 @@ nodes:
       - Merge Queue Green Enroll
       - Mutation Diff
       - PR Conflict Handler
+      - Production Prebuild
       - Rolling CI Dispatch
       - Staging Controller
       - Test Flakiness Report
@@ -1129,6 +1130,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:recover-marker
     jobCount: 1
+  - name: Production Prebuild
+    path: .github/workflows/production-prebuild.yml
+    active: true
+    category: production-verification
+    authoritativeProducer: Production Controller
+    authoritativeFor: []
+    allowedConsumers:
+      - Production Release
+    triggeringStateTransition:
+      - workflow_run
+    terminalReceipt: job:prebuild
+    jobCount: 2
   - name: Production Release
     path: .github/workflows/production-release.yml
     active: true
@@ -1140,7 +1153,7 @@ nodes:
     triggeringStateTransition:
       - workflow_call
     terminalReceipt: job:release-result
-    jobCount: 16
+    jobCount: 17
   - name: Public Profile Benchmark
     path: .github/workflows/public-benchmark.yml
     active: true
@@ -1709,6 +1722,12 @@ edges:
     to: Production Controller
     type: workflow_run
   - from: Production Controller
+    to: Production Release
+    type: workflow_call
+  - from: CI
+    to: Production Prebuild
+    type: workflow_run
+  - from: Production Prebuild
     to: Production Release
     type: workflow_call
   - from: Production Release

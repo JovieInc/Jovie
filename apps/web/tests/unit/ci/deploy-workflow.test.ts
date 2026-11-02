@@ -68,6 +68,10 @@ const productionControllerRunLiveFixturePath = resolve(
   repoRoot,
   'apps/web/tests/unit/ci/fixtures/production-controller-run-live-shape.json'
 );
+const productionBuildAndDeployScriptPath = resolve(
+  repoRoot,
+  '.github/scripts/production-build-and-deploy.sh'
+);
 const productionReleaseWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/production-release.yml'
@@ -1520,10 +1524,12 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
   it('loads production runtime config from Doppler without yielding Vercel deployment identity', () => {
     const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const promoteJob = getJobBlock(workflow, 'promote-production');
-    const stageStep = getStepBlock(
+    // The build/deploy commands live in the shared script (prebuild overlap):
+    // assert on the step plus the script it sources, so both paths stay covered.
+    const stageStep = `${readFileSync(productionBuildAndDeployScriptPath, 'utf8')}\n${getStepBlock(
       promoteJob,
       'Build and stage production deployment'
-    );
+    )}`;
     const dopplerIndex = promoteJob.indexOf(
       '- uses: ./.github/actions/setup-doppler'
     );
@@ -1600,10 +1606,12 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       promoteJob,
       'Verify production domains are on canonical Vercel project'
     );
-    const stageStep = getStepBlock(
+    // The build/deploy commands live in the shared script (prebuild overlap):
+    // assert on the step plus the script it sources, so both paths stay covered.
+    const stageStep = `${readFileSync(productionBuildAndDeployScriptPath, 'utf8')}\n${getStepBlock(
       promoteJob,
       'Build and stage production deployment'
-    );
+    )}`;
     const promoteStep = getStepBlock(
       promoteJob,
       'Promote staged production deployment'
@@ -4171,10 +4179,12 @@ describe('production promotion exact-artifact contract', () => {
   it('builds and canaries a Production-target prebuilt before promotion', () => {
     const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const promoteJob = getJobBlock(workflow, 'promote-production');
-    const stageStep = getStepBlock(
+    // The build/deploy commands live in the shared script (prebuild overlap):
+    // assert on the step plus the script it sources, so both paths stay covered.
+    const stageStep = `${readFileSync(productionBuildAndDeployScriptPath, 'utf8')}\n${getStepBlock(
       promoteJob,
       'Build and stage production deployment'
-    );
+    )}`;
     const promoteStep = getStepBlock(
       promoteJob,
       'Promote staged production deployment'
@@ -4265,10 +4275,12 @@ describe('production promotion exact-artifact contract', () => {
     // bounded inside stage-production, mirroring the staging deploy loop.
     const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const promoteJob = getJobBlock(workflow, 'promote-production');
-    const stageStep = getStepBlock(
+    // The build/deploy commands live in the shared script (prebuild overlap):
+    // assert on the step plus the script it sources, so both paths stay covered.
+    const stageStep = `${readFileSync(productionBuildAndDeployScriptPath, 'utf8')}\n${getStepBlock(
       promoteJob,
       'Build and stage production deployment'
-    );
+    )}`;
 
     const loopIndex = stageStep.indexOf('for deploy_attempt in 1 2 3; do');
     const deployIndex = stageStep.indexOf(

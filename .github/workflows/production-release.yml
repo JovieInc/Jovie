@@ -17,7 +17,7 @@ on:
         required: true
         type: string
       release_mode:
-        description: Run exactly one mutation phase (staging or production).
+        description: Run exactly one phase (staging, production, or prebuild). prebuild only builds and stages the unpromoted production artifact.
         required: true
         type: string
       staging_verified:
@@ -111,6 +111,95 @@ jobs:
           # Authorized ancestor generations keep shipping as main advances.
           # Only a proven rewind or rewrite yields; unknown lineage fails.
           bash "$GITHUB_WORKSPACE/.github/scripts/recheck-main-lineage.sh" "before lease work began"
+
+  # Production build overlap (2026-10-29). Started by the Staging Controller as
+  # soon as main CI is green for this SHA (Production Prebuild workflow), in
+  # parallel with staging deploy and
+  # verification, so the ~7.5 min build no longer serializes behind them. It
+  # only builds and stages an unpromoted deployment (--prod --skip-domain): no
+  # domain, migration, or lease is touched. promote-production re-inspects it,
+  # re-binds its provenance receipts, runs the protected canary and every
+  # existing gate on the exact SHA, and rebuilds itself if this artifact is
+  # missing or fails any check. It runs from its own Production Prebuild
+  # workflow, so a failure here can never change a Staging Controller result.
+  prebuild-production:
+    name: Prebuild production artifact
+    needs: [release-head]
+    if: ${{ always() && inputs.release_mode == 'prebuild' && needs.release-head.result == 'success' && needs.release-head.outputs.is_current == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          package_cache: 'false'
+      - uses: ./.github/actions/setup-doppler
+      - name: Restore production Next build cache
+        id: production-next-cache-restore
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.next/cache
+          key: jovie-production-next-cache-v1-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js', 'apps/web/vercel.json') }}
+          restore-keys: |
+            jovie-production-next-cache-v1-${{ runner.os }}-
+      - name: Enforce Vercel on-demand spend cap
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        run: node .github/scripts/vercel-on-demand-ledger.mjs || echo "::warning::On-demand spend ledger failed; continuing on the normal build queue."
+      - name: Build and stage production deployment
+        id: prebuild
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          PRODUCTION_NEXT_CACHE_RESTORE_HIT: ${{ steps.production-next-cache-restore.outputs.cache-hit }}
+          PRODUCTION_NEXT_CACHE_SAVE_ENABLED: ${{ vars.JOVIE_PRODUCTION_NEXT_CACHE_SAVE || 'false' }}
+          PRODUCTION_NEXT_CACHE_MAX_ARCHIVE_BYTES: '536870912'
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: |
+          prebuild_stage() {
+            set -euo pipefail
+            fail_stage() {
+              echo "::error::$1"
+              echo "failure_subtype=$2" >> "$GITHUB_OUTPUT"
+              exit 1
+            }
+            # shellcheck source=.github/scripts/production-build-and-deploy.sh
+            source .github/scripts/production-build-and-deploy.sh
+            production_build_and_deploy
+            jq -n --arg sha "$EXPECTED_SHA" --arg id "$production_deploy_id" \
+              --arg url "$production_deploy_url" \
+              '{schema: "jovie-production-prebuild/v1", sha: $sha, deploymentId: $id, deploymentUrl: $url}' \
+              > "$provenance_dir/prebuild-receipt.json"
+          }
+          export -f prebuild_stage
+          doppler run --project jovie-web --config prd \
+            --only-secrets=BETTER_AUTH_URL,NEXT_PUBLIC_BETTER_AUTH_URL,NEXT_PUBLIC_GOOGLE_CLIENT_ID,BETTER_AUTH_SECRET,DATABASE_URL,SESSION_SECRET,AI_GATEWAY_API_KEY,NEXT_PUBLIC_TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY,AUTH_GOOGLE_CLIENT_ID,AUTH_GOOGLE_CLIENT_SECRET,AUTH_APPLE_CLIENT_ID,AUTH_APPLE_TEAM_ID,AUTH_APPLE_KEY_ID,AUTH_APPLE_PRIVATE_KEY,SENTRY_AUTH_TOKEN \
+            --no-fallback -- env -u DOPPLER_TOKEN bash -c prebuild_stage
+      - name: Preserve prebuilt production artifact receipt
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: production-prebuild-${{ inputs.expected_sha }}
+          overwrite: true
+          path: ${{ runner.temp }}/production-input-provenance/*.json
+          if-no-files-found: error
+          retention-days: 3
+      # Compiler cache only, never a deployment artifact. Writes stay opt-in
+      # (repo variable) and bounded by the measured archive size.
+      - name: Save bounded production Next build cache
+        if: ${{ steps.prebuild.outputs.next_cache_save_eligible == 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.next/cache
+          key: ${{ steps.production-next-cache-restore.outputs.cache-primary-key }}
 
   deploy-staging:
     needs: [release-head]
@@ -929,6 +1018,48 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
         run: node .github/scripts/vercel-on-demand-ledger.mjs
 
+      # github-token-budget: 2 calls/run - one artifact lookup and one download of the exact-SHA prebuild receipt
+      - name: Locate exact prebuilt production deployment
+        id: prebuilt
+        if: ${{ steps.mutation-head.outputs.is_current == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          locate_prebuilt() {
+            set -euo pipefail
+            name="production-prebuild-$EXPECTED_SHA"
+            run_id="$(node packages/api-client/cli.ts gh --priority deploy -- api "repos/$REPOSITORY/actions/artifacts?name=$name&per_page=100" \
+              --jq '[.artifacts[] | select(.expired == false)] | sort_by(.id) | last | .workflow_run.id // empty')"
+            if ! [[ "$run_id" =~ ^[1-9][0-9]*$ ]]; then
+              echo "::notice::No prebuilt production artifact for $EXPECTED_SHA; building in the promote job."
+              return 0
+            fi
+            dir="$RUNNER_TEMP/production-input-provenance"
+            mkdir "$dir"
+            node packages/api-client/cli.ts gh --priority deploy -- run download "$run_id" --repo "$REPOSITORY" --name "$name" --dir "$dir"
+            receipt="$dir/prebuild-receipt.json"
+            if [ ! -f "$receipt" ] || [ ! -f "$dir/artifact.json" ] || [ ! -f "$dir/inputs.json" ] || [ ! -f "$dir/sbom.cdx.json" ] ||
+              ! jq -e --arg sha "$EXPECTED_SHA" '.schema == "jovie-production-prebuild/v1" and .sha == $sha and (.deploymentId | test("^dpl_[A-Za-z0-9]+$")) and (.deploymentUrl | test("^https://[a-z0-9-]+\\.vercel\\.app$"))' "$receipt" >/dev/null; then
+              echo "::warning::Prebuilt production artifact failed validation; building in the promote job."
+              rm -rf "$dir"
+              return 0
+            fi
+            {
+              echo "deployment_id=$(jq -r .deploymentId "$receipt")"
+              echo "deployment_url=$(jq -r .deploymentUrl "$receipt")"
+              echo "provenance_dir=$dir"
+            } >> "$GITHUB_OUTPUT"
+            echo "::notice::Reusing prebuilt production deployment $(jq -r .deploymentId "$receipt")."
+          }
+          # Any miss or mismatch leaves the outputs empty and the stage step
+          # rebuilds, so reuse can only ever shorten a release, never alter it.
+          if ! (locate_prebuilt); then
+            echo "::warning::Prebuilt production lookup failed; building in the promote job."
+            rm -rf "$RUNNER_TEMP/production-input-provenance"
+          fi
+
       - name: Build and stage production deployment
         id: stage-production
         if: ${{ steps.mutation-head.outputs.is_current == 'true' }}
@@ -944,6 +1075,9 @@ jobs:
           PRODUCTION_NEXT_CACHE_SAVE_ENABLED: ${{ vars.JOVIE_PRODUCTION_NEXT_CACHE_SAVE || 'false' }}
           PRODUCTION_NEXT_CACHE_MAX_ARCHIVE_BYTES: '536870912'
           RUNNER_ENVIRONMENT: ${{ runner.environment }}
+          PREBUILT_DEPLOYMENT_ID: ${{ steps.prebuilt.outputs.deployment_id }}
+          PREBUILT_DEPLOYMENT_URL: ${{ steps.prebuilt.outputs.deployment_url }}
+          PREBUILT_PROVENANCE_DIR: ${{ steps.prebuilt.outputs.provenance_dir }}
         run: |
           production_stage() {
             set -euo pipefail
@@ -954,183 +1088,19 @@ jobs:
               exit 1
             }
 
-          missing=()
-          for key in EXPECTED_SHA VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
-            if [ -z "${!key:-}" ]; then
-              missing+=("$key")
-            fi
-          done
-          if [ "${#missing[@]}" -gt 0 ]; then
-            fail_stage "Missing production deployment inputs: ${missing[*]}" missing_creds
+          if [ -n "${PREBUILT_DEPLOYMENT_ID:-}" ]; then
+            # Exact prebuilt deployment from the Staging Controller. Everything
+            # below (inspect, provenance bind, protected canary) still runs on it.
+            scope_args=(--scope "$VERCEL_ORG_ID")
+            provenance_dir="$PREBUILT_PROVENANCE_DIR"
+            production_deploy_id="$PREBUILT_DEPLOYMENT_ID"
+            production_deploy_url="$PREBUILT_DEPLOYMENT_URL"
+            echo "Reusing prebuilt production deployment: ${production_deploy_id} (${production_deploy_url})"
+          else
+            # shellcheck source=.github/scripts/production-build-and-deploy.sh
+            source .github/scripts/production-build-and-deploy.sh
+            production_build_and_deploy
           fi
-
-          required_runtime_env=(
-            BETTER_AUTH_URL
-            NEXT_PUBLIC_BETTER_AUTH_URL
-            NEXT_PUBLIC_GOOGLE_CLIENT_ID
-            BETTER_AUTH_SECRET
-            DATABASE_URL
-            SESSION_SECRET
-            AI_GATEWAY_API_KEY
-            NEXT_PUBLIC_TURNSTILE_SITE_KEY
-            TURNSTILE_SECRET_KEY
-            AUTH_GOOGLE_CLIENT_ID
-            AUTH_GOOGLE_CLIENT_SECRET
-            AUTH_APPLE_CLIENT_ID
-            AUTH_APPLE_TEAM_ID
-            AUTH_APPLE_KEY_ID
-            AUTH_APPLE_PRIVATE_KEY
-          )
-          missing_runtime_env=()
-          runtime_env_args=()
-          for key in "${required_runtime_env[@]}"; do
-            if [ -z "${!key:-}" ]; then
-              missing_runtime_env+=("$key")
-            else
-              runtime_env_args+=(--env "$key")
-            fi
-          done
-          if [ "${#missing_runtime_env[@]}" -gt 0 ]; then
-            fail_stage "Missing production runtime env: ${missing_runtime_env[*]}" production_artifact_failed
-          fi
-
-          expected="${EXPECTED_SHA:0:7}"
-          scope_args=(--scope "$VERCEL_ORG_ID")
-          rm -rf .vercel/output .vercel/.env.preview.local .vercel/.env.production.local .vercel/.env.local
-
-          if ! ./node_modules/.bin/vercel pull --yes --environment=production \
-            "${scope_args[@]}"; then
-            fail_stage "Unable to pull the Production environment." production_artifact_failed
-          fi
-
-          for env_file in .vercel/.env.production.local .vercel/.env.local; do
-            if [ -f "$env_file" ]; then
-              grep -v '^TURBO_REMOTE_ONLY=' "$env_file" > "${env_file}.tmp" || true
-              mv "${env_file}.tmp" "$env_file"
-            fi
-          done
-
-          if ! pnpm --filter=@jovie/web exec tsx \
-            scripts/reconcile-vercel-build-env.ts \
-            --file=.vercel/.env.production.local; then
-            fail_stage "Unable to reconcile the canonical production build environment." production_artifact_failed
-          fi
-
-          if ! pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts \
-            --target=prd --source=vercel-file \
-            --file=.vercel/.env.production.local; then
-            fail_stage "Production signup configuration is incomplete." production_artifact_failed
-          fi
-
-          provenance_dir="$RUNNER_TEMP/production-input-provenance"
-          mkdir "$provenance_dir"
-          if ! node .github/scripts/production-input-provenance.mjs sbom \
-            "$provenance_dir/sbom.cdx.json"; then
-            fail_stage "Unable to generate the production SBOM from the installed dependency tree." production_artifact_failed
-          fi
-          node .github/scripts/production-input-provenance.mjs inputs \
-            "$provenance_dir/inputs.json" "$provenance_dir/sbom.cdx.json"
-
-          if ! env -u TURBO_REMOTE_ONLY \
-            VERCEL_GIT_COMMIT_SHA="$EXPECTED_SHA" \
-            NEXT_PUBLIC_BUILD_SHA="$expected" \
-            ./node_modules/.bin/vercel build --prod \
-              "${scope_args[@]}"; then
-            fail_stage "Production Vercel build failed." production_artifact_failed
-          fi
-          if [ ! -f .vercel/output/config.json ]; then
-            fail_stage "Production build did not create .vercel/output/config.json." production_artifact_failed
-          fi
-          if ! node .github/scripts/materialize-vercel-static.mjs; then
-            fail_stage "Production static asset materialization failed." production_artifact_failed
-          fi
-
-          # Measure the exact cache subtree before a separate save action can
-          # archive it. This must remain limited to apps/web/.next/cache: do
-          # not persist .vercel/output, server/static output, or node_modules.
-          next_cache_root='apps/web/.next/cache'
-          next_cache_bytes=0
-          next_cache_files=0
-          next_cache_archive_bytes=0
-          next_cache_save_eligible=false
-          if [ -e "$next_cache_root" ]; then
-            if [ -L "$next_cache_root" ] || [ ! -d "$next_cache_root" ]; then
-              fail_stage "Production Next cache root is unsafe or not a directory." production_artifact_failed
-            fi
-            next_cache_bytes="$(du -sb "$next_cache_root" | awk '{print $1}')"
-            next_cache_files="$(find "$next_cache_root" -type f -print | wc -l | tr -d ' ')"
-            next_cache_probe="$(mktemp "${RUNNER_TEMP:-/tmp}/jovie-production-next-cache.XXXXXX.tgz")"
-            tar -C apps/web/.next -czf "$next_cache_probe" cache
-            next_cache_archive_bytes="$(stat -c '%s' "$next_cache_probe")"
-            rm -f "$next_cache_probe"
-
-            if [ "${PRODUCTION_NEXT_CACHE_SAVE_ENABLED:-false}" = 'true' ] && \
-              [ "$next_cache_archive_bytes" -le "${PRODUCTION_NEXT_CACHE_MAX_ARCHIVE_BYTES}" ]; then
-              next_cache_save_eligible=true
-            fi
-          fi
-          {
-            echo "next_cache_bytes=$next_cache_bytes"
-            echo "next_cache_files=$next_cache_files"
-            echo "next_cache_archive_bytes=$next_cache_archive_bytes"
-            echo "next_cache_save_eligible=$next_cache_save_eligible"
-          } >> "$GITHUB_OUTPUT"
-          {
-            echo '### Production Next build cache'
-            echo "- restored: ${PRODUCTION_NEXT_CACHE_RESTORE_HIT:-false}"
-            echo "- cache files: $next_cache_files"
-            echo "- cache bytes: $next_cache_bytes"
-            echo "- measured gzip archive bytes: $next_cache_archive_bytes"
-            echo "- write enabled: ${PRODUCTION_NEXT_CACHE_SAVE_ENABLED:-false}"
-            echo "- save eligible (<= ${PRODUCTION_NEXT_CACHE_MAX_ARCHIVE_BYTES} bytes): $next_cache_save_eligible"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          provenance_digests="$(node .github/scripts/production-input-provenance.mjs artifact \
-            "$provenance_dir/artifact.json" "$provenance_dir/inputs.json" \
-            "$provenance_dir/sbom.cdx.json")"
-          read -r input_receipt_digest artifact_digest <<< "$provenance_digests"
-          [[ "$input_receipt_digest" =~ ^[0-9a-f]{64}$ && "$artifact_digest" =~ ^[0-9a-f]{64}$ ]] || \
-            fail_stage "Production input receipt digest is invalid." production_artifact_failed
-
-          deploy_json=""
-          export VERCEL_GIT_COMMIT_SHA="$EXPECTED_SHA"
-          export NEXT_PUBLIC_BUILD_SHA="$expected"
-          # Return after Vercel accepts the deployment; the exact-ID inspect
-          # below owns readiness, while this loop retries pre-acceptance errors.
-          for deploy_attempt in 1 2 3; do
-            if deploy_json="$(./node_modules/.bin/vercel deploy \
-              --prebuilt --archive=tgz --prod --skip-domain --no-wait --format=json \
-              --env VERCEL_GIT_COMMIT_SHA \
-              --env NEXT_PUBLIC_BUILD_SHA \
-              "${runtime_env_args[@]}" \
-              --meta "githubCommitSha=${EXPECTED_SHA}" \
-              --meta "jovieInputReceipt=${input_receipt_digest}" \
-              --meta "jovieArtifactDigest=${artifact_digest}" \
-              "${scope_args[@]}")"; then
-              break
-            fi
-            if [ "$deploy_attempt" -eq 3 ]; then
-              fail_stage "Production prebuilt deployment failed." production_artifact_failed
-            fi
-            echo "Production prebuilt deploy attempt ${deploy_attempt}/3 failed; retrying in 10s."
-            deploy_json=""
-            sleep 10
-          done
-          if ! jq -e 'type == "object"' >/dev/null 2>&1 <<<"$deploy_json"; then
-            fail_stage "Production deploy returned malformed JSON." production_artifact_failed
-          fi
-
-          production_deploy_id="$(jq -r '.id // .deployment.id // ""' <<<"$deploy_json")"
-          production_deploy_url="$(jq -r '.url // .deployment.url // ""' <<<"$deploy_json")"
-          if [[ "$production_deploy_url" != *://* && "$production_deploy_url" == *.vercel.app ]]; then
-            production_deploy_url="https://${production_deploy_url}"
-          fi
-          production_deploy_url="${production_deploy_url%/}"
-          if [[ "$production_deploy_id" != dpl_* ]] ||
-            [[ "$production_deploy_url" != https://*.vercel.app ]]; then
-            fail_stage "Production deploy returned an invalid deployment ID or URL." production_artifact_failed
-          fi
-          echo "Staged production deployment: ${production_deploy_id} (${production_deploy_url})"
 
           inspect_wait_status=0
           ./node_modules/.bin/vercel inspect "$production_deploy_id" \

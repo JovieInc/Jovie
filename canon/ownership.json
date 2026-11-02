@@ -121,6 +121,7 @@
     {"id": "workflow:source-admission-review-signal", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/source-admission-review-signal.yml"},
     {"id": "workflow:source-validation", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/source-validation.yml"},
     {"id": "workflow:staging-controller", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/staging-controller.yml"},
+    {"id": "workflow:production-prebuild", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/production-prebuild.yml"},
     {"id": "workflow:stale-branch-sweep", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/stale-branch-sweep.yml", "note": "Fired weekly by the lanes clock (repository_dispatch clock_stale_branch_sweep); registry entry github:jovie:stale-branch-sweep."},
     {"id": "workflow:ovie-summer-canary", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/ovie-summer-canary.yml", "note": "Fired hourly by the lanes clock (repository_dispatch clock_summer_canary); registry entry lanes-clock:summer-canary."},
     {"id": "workflow:summer-eve-pin", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/summer-eve-pin.yml"},
