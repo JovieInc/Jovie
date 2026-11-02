@@ -158,6 +158,7 @@ describe('ci-pr-ready source lane', () => {
 describe('ci-merge-group-ready combined head', () => {
   const laneGates: [string, string][] = [
     ['ci-unit-tests', 'run_web'],
+    ['ci-blocking-golden-path', 'run_web'],
     ['ci-build-layout', 'run_web'],
     ['ci-build-ovie', 'run_web'],
     ['ci-typecheck-ovie', 'run_web'],
