@@ -3211,6 +3211,8 @@ export async function POST(req: Request) {
     }
 
     return turn.streamResult.toUIMessageStreamResponse({
+      // Model reasoning restates prompt rules and is never rendered.
+      sendReasoning: false,
       headers: {
         ...corsHeaders,
         'x-request-id': requestId,

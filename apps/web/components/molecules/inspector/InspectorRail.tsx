@@ -128,7 +128,7 @@ export function InspectorShell<T extends string>({
         data-testid='inspector-tabbed-body'
         data-inspector-shell='true'
       >
-        <div className='shrink-0 border-b border-(--app-shell-frame-seam) px-3'>
+        <div className='shrink-0 px-3 pb-2'>
           <InspectorTabs
             value={activeTab}
             onValueChange={onTabChange}

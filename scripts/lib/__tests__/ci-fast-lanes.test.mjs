@@ -2205,6 +2205,7 @@ describe('source-read guard selection', () => {
       [
         'artist-launch-contract',
         'privacy-input-route-trackers',
+        'privacy-compliance',
         'merge-group-unit-guards',
         'node-environment-files',
       ],
@@ -2246,6 +2247,7 @@ describe('source-read guard selection', () => {
       [
         'artist-launch-contract',
         'privacy-input-route-trackers',
+        'privacy-compliance',
         'merge-group-unit-guards',
         'static-revalidate-policy',
         'art-direction',
@@ -2379,6 +2381,7 @@ describe('source-read guard selection', () => {
       'native-design-system',
       'artist-launch-contract',
       'privacy-input-route-trackers',
+      'privacy-compliance',
       'artist-profile-conformance',
       'ci-schedule-inventory',
       'automation-registry',
@@ -2399,6 +2402,7 @@ describe('source-read guard selection', () => {
       'native-design-system',
       'artist-launch-contract',
       'privacy-input-route-trackers',
+      'privacy-compliance',
       'artist-profile-conformance',
       'ci-schedule-inventory',
       'automation-registry',
@@ -2444,6 +2448,19 @@ describe('source-read guard selection', () => {
         expect(
           readFileSync(
             join(REPO_ROOT, 'scripts/compliance/input-page-trackers.test.mjs'),
+            'utf8'
+          )
+        ).toContain("from 'node:test'");
+        continue;
+      }
+      if (guard.id === 'privacy-compliance') {
+        expect(guard.prOnly).toBe(false);
+        expect(guard.command).toContain(
+          'scripts/compliance/privacy-rules.test.mjs'
+        );
+        expect(
+          readFileSync(
+            join(REPO_ROOT, 'scripts/compliance/privacy-rules.test.mjs'),
             'utf8'
           )
         ).toContain("from 'node:test'");

@@ -30,3 +30,16 @@ Use Clerk Playwright helpers and the local test-auth bypass. See `.claude/rules/
 2. Run the narrowest spec. Do not boot a gstack daemon.
 3. If a bug is real, fix the product code and keep the spec.
 4. Interactive dogfood uses the same Playwright runner, not `$B goto`.
+
+## Specs assert the outcome, not the render
+
+A visible element, a 200 or a non-empty reply is not a pass: the golden path
+once certified a chat reply that was a quota wall (JOV-9625). Every spec:
+
+- asserts the flow's expected content (this artist, a real release, the value
+  the step promised), not only that something rendered;
+- fails on error, quota, unavailable, empty or placeholder text, including a
+  200 error body: `assertOutcome(text, { label, expect })` from
+  `scripts/lib/outcome-verifier.mjs`;
+- is shown red first: run it against the broken state, or a known-bad sample
+  (`acceptedNegativeControls(check)` returns `[]`), before trusting its green.

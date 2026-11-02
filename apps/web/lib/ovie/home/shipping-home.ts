@@ -21,7 +21,6 @@ import {
   type HomeLoopTile,
   type HomeLoopTileMemory,
   type HomeLoopTone,
-  rememberTiles,
   withTileHistory,
 } from '@/lib/home-loop/contract';
 import { OVIE_CERTIFICATION_TIER_LABELS } from '@/lib/ovie/certifications/types';
@@ -38,8 +37,6 @@ import type {
   StageSummary,
 } from '@/lib/ovie/shipping-state/contract';
 import { fleetVerdict } from './fleet-verdict';
-
-export { summarizeSourceIssues } from './operator-copy';
 
 type OperationalTaskFeed = ShippingCockpitProjection['operationalTasks'];
 type OperationalTask = OperationalTaskFeed['tasks'][number];
@@ -71,35 +68,27 @@ export type OvieAsk = HomeLoopAsk;
 
 /** Priority order: the row shows as many as fit, left to right. */
 export type OviePulseKey =
+  | 'merges-day'
+  | 'ejections'
   | 'prod'
   | 'lyb-deploy'
-  | 'merges-hour'
-  | 'queue'
-  | 'red-prs'
   | 'lanes'
-  | 'eligible'
-  | 'held'
-  | 'ownerless'
-  | 'merges-today'
-  | 'merges-7d'
-  | 'gem-disk';
+  | 'ownerless';
 
 export type OviePulseTile = HomeLoopTile<OviePulseKey>;
 
-const PULSE_ORDER: readonly OviePulseKey[] = [
-  'prod',
-  'lyb-deploy',
-  'merges-hour',
-  'queue',
-  'red-prs',
-  'lanes',
-  'eligible',
-  'held',
-  'ownerless',
-  'merges-today',
-  'merges-7d',
-  'gem-disk',
-];
+/**
+ * Throughput targets. Values mirror `docs/metrics/shipping-slo-baseline.json`
+ * (the SLO ratchet owns them; `throughput-targets.test.ts` fails on drift).
+ * A tile without a target is a raw counter, and Home does not show those.
+ */
+export const OVIE_THROUGHPUT_TARGETS = {
+  mergesPerDay: 20,
+  queueEjectionRate: 0.1,
+  productionBehindMain: 0,
+  ownerless: 0,
+} as const;
+
 export type OviePulseMemory = HomeLoopTileMemory<OviePulseKey>;
 
 export interface OvieHomeShipping {
@@ -115,10 +104,6 @@ export interface OvieHomeShipping {
 
 function countValue(measurement: CountMeasurement): number | null {
   return measurement.state === 'not-measured' ? null : measurement.value;
-}
-
-function formatCount(value: number | null): string {
-  return value === null ? OVIE_NOT_MEASURED : String(value);
 }
 
 export function shortSha(sha: string | null): string | null {
@@ -250,17 +235,11 @@ export function buildDoneToday(
     }));
 }
 
-function sumValues(record: Readonly<Record<string, number>>): number {
-  return Object.values(record).reduce((total, value) => total + value, 0);
-}
-
 const LYB_REPO = 'JovieInc/LogYourBody';
 
 /**
- * LogYourBody production deploy health from the lanes feed's `deployHealth` block: "Failing, N behind" when its
- * deploys are red, otherwise how many commits production lags main. #23233 put this in HudShippingStrip, which no
- * page renders, so the Home vitals never showed it while LYB production sat 87 commits behind. Missing stays
- * missing, never healthy.
+ * LogYourBody production deploy health from the lanes feed's `deployHealth`
+ * block. Missing stays missing, never healthy.
  */
 function lybDeploy(health: DeliverySummary['lanes']['deployHealth']): {
   readonly value: string;
@@ -270,59 +249,108 @@ function lybDeploy(health: DeliverySummary['lanes']['deployHealth']): {
   const repo = health?.repos.find(row => row.repo === LYB_REPO);
   if (!repo || repo.status === 'unknown')
     return { value: OVIE_NOT_MEASURED, measured: false, tone: 'neutral' };
-  const behind = repo.behindMain === null ? null : formatCount(repo.behindMain);
   if (repo.status === 'failing')
     return {
-      value: behind === null ? 'Failing' : `Failing, ${behind} behind`,
+      value:
+        repo.behindMain === null
+          ? 'Failing'
+          : `Failing, ${repo.behindMain} behind`,
       measured: true,
       tone: 'bad',
     };
-  if (behind === null)
+  if (repo.behindMain === null)
     return { value: OVIE_NOT_MEASURED, measured: false, tone: 'neutral' };
   return {
-    value: repo.behindMain === 0 ? 'Current' : `${behind} behind`,
+    value: repo.behindMain === 0 ? 'Current' : `${repo.behindMain} behind`,
     measured: true,
     tone: repo.behindMain === 0 ? 'good' : 'warn',
   };
 }
 
+function behindLabel(behind: number): string {
+  return behind === 0 ? 'Current' : `${behind} behind`;
+}
+
+/** Inside `target` is good, up to `badAbove` is warn, past it is bad. */
+function toneAtMost(
+  value: number,
+  target: number,
+  badAbove: number
+): OvieHomeTone {
+  if (value <= target) return 'good';
+  return value > badAbove ? 'bad' : 'warn';
+}
+
+function toneAtLeast(value: number, target: number): OvieHomeTone {
+  if (value >= target) return 'good';
+  return value < target / 2 ? 'bad' : 'warn';
+}
+
+function perDay(measurement: CountMeasurement): number | null {
+  const week = countValue(measurement);
+  return week === null ? null : Math.round(week / 7);
+}
+
+const TARGETS = OVIE_THROUGHPUT_TARGETS;
+
 function rawPulse(
   delivery: DeliverySummary
 ): readonly Omit<OviePulseTile, 'was'>[] {
-  const { lanes, merges, production } = delivery;
+  const { lanes, production } = delivery;
+  const flow = lanes.flow ?? null;
+  const mergesPerDay = perDay(delivery.merges.last7Days);
+  const ejection = flow?.queueEjectionRate ?? null;
   const behind = countValue(production.behindMain);
-  const prodSha = shortSha(production.sha);
-  const today = countValue(merges.today);
-  const last7 = countValue(merges.last7Days);
-  const prior7 = countValue(merges.prior7Days);
   const running = countValue(lanes.running);
   const slots = countValue(lanes.slots);
-  const queue = countValue(delivery.mergeQueueDepth);
-  const held = lanes.publishedAt ? sumValues(lanes.heldByReason) : null;
-  const disk = lanes.diskFreePct;
-  const flow = lanes.flow ?? null;
-  const perHour = flow?.mergesPerHour ?? null;
-  const ejection = flow?.queueEjectionRate ?? null;
-  const red = flow?.redPrs ?? null;
-  const open = flow?.openPrs ?? null;
-  const eligible = flow?.eligiblePool ?? null;
-  const candidates = flow?.candidatePool ?? null;
   const ownerless = flow?.ownerless ?? null;
-
   const lyb = lybDeploy(lanes.deployHealth);
+  const shipping = APP_ROUTES.ADMIN_SHIPPING;
+  const fleet = APP_ROUTES.ADMIN_OPERATIONS;
 
-  const tiles: Omit<OviePulseTile, 'was'>[] = [
+  return [
+    {
+      key: 'merges-day',
+      label: 'Merges / day (7d)',
+      value: mergesPerDay === null ? OVIE_NOT_MEASURED : String(mergesPerDay),
+      measured: mergesPerDay !== null,
+      tone:
+        mergesPerDay === null
+          ? 'neutral'
+          : toneAtLeast(mergesPerDay, TARGETS.mergesPerDay),
+      target: `Target ≥ ${TARGETS.mergesPerDay}`,
+      href: shipping,
+    },
+    {
+      key: 'ejections',
+      label: 'Queue ejections',
+      value:
+        ejection === null
+          ? OVIE_NOT_MEASURED
+          : `${Math.round(ejection * 100)}%`,
+      measured: ejection !== null,
+      tone:
+        ejection === null
+          ? 'neutral'
+          : toneAtMost(
+              ejection,
+              TARGETS.queueEjectionRate,
+              TARGETS.queueEjectionRate * 2
+            ),
+      target: `Target ≤ ${Math.round(TARGETS.queueEjectionRate * 100)}%`,
+      href: shipping,
+    },
     {
       key: 'prod',
-      label: 'Prod',
-      value: prodSha ?? OVIE_NOT_MEASURED,
-      measured: prodSha !== null,
+      label: 'Jovie prod',
+      value: behind === null ? OVIE_NOT_MEASURED : behindLabel(behind),
+      measured: behind !== null,
       tone:
-        prodSha === null || behind === null
+        behind === null
           ? 'neutral'
-          : behind === 0
-            ? 'good'
-            : 'warn',
+          : toneAtMost(behind, TARGETS.productionBehindMain, 20),
+      target: 'Target current',
+      href: shipping,
     },
     {
       key: 'lyb-deploy',
@@ -330,138 +358,54 @@ function rawPulse(
       value: lyb.value,
       measured: lyb.measured,
       tone: lyb.tone,
-    },
-    {
-      key: 'merges-hour',
-      label: 'Merges / h',
-      value: perHour === null ? OVIE_NOT_MEASURED : String(perHour),
-      measured: perHour !== null,
-      tone: perHour === null ? 'neutral' : perHour >= 1 ? 'good' : 'warn',
-    },
-    {
-      key: 'queue',
-      label:
-        ejection === null
-          ? 'Queue'
-          : `Queue · ${Math.round(ejection * 100)}% ejected`,
-      value: formatCount(queue),
-      measured: queue !== null,
-      tone:
-        ejection === null
-          ? 'neutral'
-          : ejection > 0.3
-            ? 'bad'
-            : ejection > 0.1
-              ? 'warn'
-              : 'good',
-    },
-    {
-      key: 'red-prs',
-      label: 'Red PRs',
-      value:
-        red === null
-          ? OVIE_NOT_MEASURED
-          : open === null
-            ? String(red)
-            : `${red}/${open}`,
-      measured: red !== null,
-      tone: red === null ? 'neutral' : red === 0 ? 'good' : 'warn',
-    },
-    {
-      key: 'merges-today',
-      label: 'Merges today',
-      value: formatCount(today),
-      measured: today !== null,
-      tone: today === null ? 'neutral' : today > 0 ? 'good' : 'warn',
-    },
-    {
-      key: 'merges-7d',
-      label: 'Merges 7d',
-      value: formatCount(last7),
-      measured: last7 !== null,
-      tone:
-        last7 === null || prior7 === null
-          ? 'neutral'
-          : last7 >= prior7
-            ? 'good'
-            : 'warn',
+      target: 'Target current',
+      href: fleet,
     },
     {
       key: 'lanes',
-      label: 'Lanes',
+      label: 'Lanes busy',
       value:
         running === null || slots === null
           ? OVIE_NOT_MEASURED
-          : `${running}/${slots}`,
+          : `${running} of ${slots}`,
       measured: running !== null && slots !== null,
       tone:
         running === null || slots === null || lanes.stale
           ? 'neutral'
-          : running > 0
-            ? 'good'
-            : 'warn',
-    },
-    {
-      key: 'eligible',
-      label: 'Eligible',
-      value:
-        eligible === null
-          ? OVIE_NOT_MEASURED
-          : candidates === null
-            ? String(eligible)
-            : `${eligible}/${candidates}`,
-      measured: eligible !== null,
-      tone: eligible === null ? 'neutral' : eligible > 0 ? 'good' : 'warn',
-    },
-    {
-      key: 'held',
-      label: 'Held',
-      value: formatCount(held),
-      measured: held !== null,
-      tone: held === null ? 'neutral' : held === 0 ? 'good' : 'bad',
+          : toneAtLeast(running, slots),
+      target: slots === null ? null : `Target ${slots} of ${slots}`,
+      href: fleet,
     },
     {
       key: 'ownerless',
-      label: 'Ownerless',
-      value: formatCount(ownerless),
+      label: 'Ownerless PRs',
+      value: ownerless === null ? OVIE_NOT_MEASURED : String(ownerless),
       measured: ownerless !== null,
-      tone: ownerless === null ? 'neutral' : ownerless === 0 ? 'good' : 'bad',
-    },
-    {
-      key: 'gem-disk',
-      label: 'Gem disk free',
-      value: disk === null ? OVIE_NOT_MEASURED : `${Math.round(disk)}%`,
-      measured: disk !== null,
       tone:
-        disk === null
+        ownerless === null
           ? 'neutral'
-          : disk < 5
-            ? 'bad'
-            : disk < 15
-              ? 'warn'
-              : 'good',
+          : toneAtMost(ownerless, TARGETS.ownerless, 2),
+      target: `Target ${TARGETS.ownerless}`,
+      href: shipping,
     },
   ];
-  return [...tiles].sort(
-    (a, b) => PULSE_ORDER.indexOf(a.key) - PULSE_ORDER.indexOf(b.key)
-  );
 }
 
 function sourceWas(
   key: OviePulseKey,
   delivery: DeliverySummary
 ): string | null {
-  if (key === 'merges-7d') {
-    const prior = countValue(delivery.merges.prior7Days);
-    return prior === null ? null : String(prior);
+  if (key === 'merges-day') {
+    const prior = perDay(delivery.merges.prior7Days);
+    return prior === null ? null : `${prior} prior 7d`;
   }
   return null;
 }
 
 /**
- * Pulse tiles with a `was` value. A source-provided comparison wins (merges
- * 7d vs prior 7d); otherwise the last different observed value from
- * `memory`. Unmeasured values never become a `was`.
+ * Throughput tiles, each with a target and a state. `was` is the source's
+ * own comparison (merges vs the prior 7 days) or the value at Tim's last
+ * visit from `memory`. Unmeasured values never become a `was`.
  */
 export function buildPulse(
   delivery: DeliverySummary,
@@ -472,58 +416,113 @@ export function buildPulse(
   );
 }
 
-/** Advance pulse memory with the latest measured observation. */
-export function rememberPulse(
-  memory: OviePulseMemory,
-  pulse: readonly OviePulseTile[]
-): OviePulseMemory {
-  return rememberTiles(memory, pulse);
+/** Inputs the verdict needs before it may say shipping is on target. */
+const VERDICT_INPUTS: readonly OviePulseKey[] = [
+  'merges-day',
+  'ejections',
+  'prod',
+  'lanes',
+];
+
+const PULSE_NAMES: Record<OviePulseKey, string> = {
+  'merges-day': 'merges',
+  ejections: 'queue ejections',
+  prod: 'production',
+  'lyb-deploy': 'LYB production',
+  lanes: 'lanes',
+  ownerless: 'ownerless PRs',
+};
+
+function breachText(tile: OviePulseTile): string {
+  switch (tile.key) {
+    case 'merges-day':
+      return `${tile.value} merges/day (target ${TARGETS.mergesPerDay})`;
+    case 'ejections':
+      return `${tile.value} of queue entries ejected (target ${Math.round(TARGETS.queueEjectionRate * 100)}%)`;
+    case 'prod':
+      return `Jovie prod ${tile.value === 'Current' ? 'current' : `${tile.value} main`}`;
+    case 'lyb-deploy':
+      return `LYB prod ${tile.value.toLowerCase()}`;
+    case 'lanes':
+      return `${tile.value} lanes busy`;
+    case 'ownerless':
+      return `${tile.value} ownerless PRs`;
+  }
 }
 
 /**
- * The single highest-severity constraint, named in text. Order: lanes
- * alerts, blocked work, failing checks, production behind main, stale feed.
+ * The header verdict, computed from the same evidence as the tiles. It may
+ * only say shipping is on target when every required input is measured and
+ * inside its target; anything missing says so, and any breach is named
+ * worst first. It never falls back to "nothing is blocking".
  */
 export function buildConstraint(
   delivery: DeliverySummary,
   rows: readonly OvieShipRow[],
-  tasksSyncState: OperationalTaskFeed['syncState']
+  tasksSyncState: OperationalTaskFeed['syncState'],
+  pulse: readonly OviePulseTile[] = buildPulse(delivery)
 ): OvieConstraint | null {
-  // One verdict joins the doctor alerts and the lane ratio (see fleet-verdict.ts);
-  // the details link opens Fleet, which lists every reason.
+  const breaches: {
+    tone: 'bad' | 'warn';
+    text: string;
+    href?: string;
+  }[] = [];
+  // The fleet is one input among the rest, so a doctor alert can no longer
+  // hide a 58% queue ejection rate behind it.
   const fleet = fleetVerdict(delivery.lanes);
-  if (fleet.level === 'degraded' || fleet.level === 'down') {
-    const capacity = fleet.capacity ? ` · ${fleet.capacity}` : '';
-    return {
+  if (fleet.level === 'down')
+    breaches.push({
       tone: 'bad',
-      text: `${fleet.headline}${capacity}`,
-      detailsHref: APP_ROUTES.ADMIN_OPERATIONS,
+      text: 'fleet not reporting',
+      href: APP_ROUTES.ADMIN_OPERATIONS,
+    });
+  else if (fleet.level === 'degraded')
+    breaches.push({
+      tone: 'bad',
+      text: `fleet degraded (${fleet.reasons.length} ${fleet.reasons.length === 1 ? 'alert' : 'alerts'})`,
+      href: APP_ROUTES.ADMIN_OPERATIONS,
+    });
+  for (const tile of pulse) {
+    if (tile.tone === 'bad' || tile.tone === 'warn')
+      breaches.push({ tone: tile.tone, text: breachText(tile) });
+  }
+  const blocked = rows.filter(row => row.attention === 'blocked').length;
+  if (blocked > 0)
+    breaches.push({
+      tone: 'bad',
+      text: `${blocked} ${blocked === 1 ? 'item' : 'items'} blocked`,
+    });
+  const failing = rows.filter(row => row.attention === 'failing').length;
+  if (failing > 0)
+    breaches.push({
+      tone: 'warn',
+      text: `${failing} ${failing === 1 ? 'PR' : 'PRs'} failing checks`,
+    });
+
+  if (breaches.length > 0) {
+    const ordered = [
+      ...breaches.filter(b => b.tone === 'bad'),
+      ...breaches.filter(b => b.tone === 'warn'),
+    ];
+    const shown = ordered.slice(0, 2).map(b => b.text);
+    const more = ordered.length - shown.length;
+    return {
+      tone: ordered[0]?.tone ?? 'warn',
+      text: `Shipping off target: ${shown.join(' · ')}${more > 0 ? ` · +${more} more` : ''}`,
+      detailsHref: ordered[0]?.href ?? APP_ROUTES.ADMIN_SHIPPING,
     };
   }
 
-  const blocked = rows.filter(row => row.attention === 'blocked').length;
-  if (blocked > 0)
-    return {
-      tone: 'bad',
-      text: `${blocked} ${blocked === 1 ? 'item is' : 'items are'} blocked`,
-    };
-
-  const failing = rows.filter(row => row.attention === 'failing').length;
-  if (failing > 0)
+  const missing = VERDICT_INPUTS.filter(
+    key => !pulse.find(tile => tile.key === key)?.measured
+  ).map(key => PULSE_NAMES[key]);
+  if (tasksSyncState !== 'fresh') missing.push('work items');
+  if (missing.length > 0)
     return {
       tone: 'warn',
-      text: `${failing} ${failing === 1 ? 'PR has' : 'PRs have'} failing checks`,
+      text: `Shipping health unknown: ${missing.join(', ')} not measured`,
+      detailsHref: APP_ROUTES.ADMIN_SHIPPING,
     };
-
-  const behind = countValue(delivery.production.behindMain);
-  if (behind !== null && behind > 0)
-    return {
-      tone: 'warn',
-      text: `Production is ${behind} ${behind === 1 ? 'commit' : 'commits'} behind main`,
-    };
-
-  if (tasksSyncState === 'failed' || tasksSyncState === 'stale')
-    return { tone: 'warn', text: 'Work items are not current' };
   return null;
 }
 
@@ -558,10 +557,16 @@ export function buildOvieHomeShipping(input: {
   const { delivery, operationalTasks } = input;
   const since = delivery.merges.since;
   const rows = buildShipRows(operationalTasks);
+  const pulse = buildPulse(delivery, input.pulseMemory);
   return {
     stages: OVIE_SHIP_STAGES,
-    constraint: buildConstraint(delivery, rows, operationalTasks.syncState),
-    pulse: buildPulse(delivery, input.pulseMemory),
+    constraint: buildConstraint(
+      delivery,
+      rows,
+      operationalTasks.syncState,
+      pulse
+    ),
+    pulse,
     rows,
     done: mergeDoneWithRecent(
       buildDoneToday(operationalTasks, since),
