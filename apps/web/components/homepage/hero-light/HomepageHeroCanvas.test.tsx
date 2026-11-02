@@ -33,7 +33,7 @@ describe('HomepageHeroCanvas', () => {
         subhead={hero.subhead}
         claim={hero.claim}
         supportNote={hero.supportNote}
-        profile={hero.profile}
+        proofShot={hero.proofShot}
         sectionOwner='apps/web/components/homepage/HomepageArtistProfile.tsx'
       />
     );
@@ -44,20 +44,17 @@ describe('HomepageHeroCanvas', () => {
     const light = screen.getByTestId('homepage-hero-light');
     expect(light).toHaveAttribute('data-renderer', 'css');
     expect(light.querySelector('canvas')).toBeNull();
-    // The proof is the template profile capture in the canonical phone
-    // frame, beside the lead and never a person (no face on `/`).
+    // The proof is one registry product shot cropped to the link (handle
+    // down to the featured release), loaded eagerly as the hero image.
     const proof = screen.getByTestId('homepage-hero-proof');
     expect(
-      proof.querySelector(
-        '[data-testid="product-screenshot-frame-template-profile-live-mobile"]'
-      )
+      proof.querySelector(`[data-product-shot="${hero.proofShot}"]`)
     ).not.toBeNull();
-    expect(proof.querySelector('.mobile-web-screen')).not.toBeNull();
-    const shot = screen.getByRole('img', { name: hero.profile.alt });
-    expect(shot.getAttribute('src')).toMatch(
-      /^\/product-screenshots\/template-profile-live-phone\.png/
+    const shot = proof.querySelector('img');
+    expect(shot?.getAttribute('src')).toMatch(
+      new RegExp(`^/product-shots/${hero.proofShot}\\.webp`)
     );
-    expect(shot).toHaveAttribute('data-priority', 'true');
+    expect(shot).toHaveAttribute('loading', 'eager');
     expect(
       document
         .querySelector('.homepage-hero-canvas__copy')
@@ -73,7 +70,7 @@ describe('HomepageHeroCanvas', () => {
         subhead={hero.subhead}
         claim={hero.claim}
         supportNote={hero.supportNote}
-        profile={hero.profile}
+        proofShot={hero.proofShot}
         sectionOwner='apps/web/components/homepage/HomepageArtistProfile.tsx'
       />
     );
@@ -109,7 +106,7 @@ describe('HomepageHeroCanvas', () => {
         subhead={hero.subhead}
         claim={hero.claim}
         supportNote={hero.supportNote}
-        profile={hero.profile}
+        proofShot={hero.proofShot}
         sectionOwner='apps/web/components/homepage/HomepageArtistProfile.tsx'
       />
     );
@@ -131,7 +128,7 @@ describe('HomepageHeroCanvas', () => {
         subhead={hero.subhead}
         claim={hero.claim}
         supportNote={hero.supportNote}
-        profile={hero.profile}
+        proofShot={hero.proofShot}
         sectionOwner='apps/web/components/homepage/HomepageArtistProfile.tsx'
       />
     );
@@ -179,7 +176,7 @@ describe('HomepageHeroCanvas', () => {
         subhead={hero.subhead}
         claim={hero.claim}
         supportNote={hero.supportNote}
-        profile={hero.profile}
+        proofShot={hero.proofShot}
         sectionOwner='apps/web/app/(marketing)/product/ProductLanding.tsx'
         claimTestId='product-claim-card'
         claimInputId='product-handle-input'
@@ -202,7 +199,7 @@ describe('HomepageHeroCanvas', () => {
       '/start'
     );
     expect(screen.getByTestId('homepage-hero-proof')).toContainElement(
-      screen.getByRole('img', { name: hero.profile.alt })
+      screen.getByTestId(`product-shot-${hero.proofShot}`)
     );
     expect(screen.queryByTestId('homepage-primary-cta')).toBeNull();
   });

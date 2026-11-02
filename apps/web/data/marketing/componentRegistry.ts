@@ -378,6 +378,11 @@ const SECTION_RESOLUTIONS = {
     ),
     occurrenceProofs: [
       {
+        variantId: 'editorial',
+        componentPath: 'apps/web/components/homepage/HomepageArtistProfile.tsx',
+        rootBinding: "sectionVariant='editorial'",
+      },
+      {
         variantId: 'phone-right',
         componentPath:
           'apps/web/components/marketing/artist-profile/ArtistProfileOpinionatedSection.tsx',
@@ -415,6 +420,11 @@ const SECTION_RESOLUTIONS = {
     ),
     occurrenceProofs: [
       {
+        variantId: '3-step-media',
+        componentPath: 'apps/web/components/homepage/HomepageArtistProfile.tsx',
+        rootBinding: "sectionVariant='3-step-media'",
+      },
+      {
         variantId: '3-step-strip',
         componentPath:
           'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx',
@@ -451,6 +461,11 @@ const SECTION_RESOLUTIONS = {
       'data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.pricing}'
     ),
     occurrenceProofs: [
+      {
+        variantId: 'tier-cards-neutral',
+        componentPath: 'apps/web/components/homepage/HomepageArtistProfile.tsx',
+        rootBinding: "sectionVariant='tier-cards-neutral'",
+      },
       {
         variantId: 'tier-cards-neutral',
         componentPath: 'apps/web/components/organisms/PricingRecipeBody.tsx',
@@ -564,11 +579,6 @@ const SECTION_RESOLUTIONS = {
         variantId: 'profile-grid',
         componentPath:
           'apps/web/components/marketing/MarketingShippedSitesShowcase.tsx',
-        rootBinding: "sectionVariant='profile-grid'",
-      },
-      {
-        variantId: 'profile-grid',
-        componentPath: 'apps/web/components/homepage/HomepageArtistProfile.tsx',
         rootBinding: "sectionVariant='profile-grid'",
       },
       {
@@ -748,7 +758,7 @@ const RECIPE_RESOLUTIONS = {
         // The page renders the published marketing-page/home spec; the
         // spec renderer mounts each registered section once.
         source: 'apps/web/components/homepage/HomepageSpecSections.tsx',
-        binding: '<HomepageFanStates',
+        binding: '<HomepageLoop',
         occurrences: 1,
         kind: 'source',
       },

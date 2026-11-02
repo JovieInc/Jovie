@@ -70,8 +70,10 @@ describe('mounted homepage grid spine System B source contract', () => {
 
     for (const mount of [
       '<HomepageArtistHero',
-      '<HomepageFanStates',
-      '<HomepageOfferClose',
+      '<HomepageLoop',
+      '<HomepageOwnership',
+      '<HomepageOffer',
+      '<HomepageClose',
     ]) {
       expect(
         countOccurrences(rendererSource, mount),

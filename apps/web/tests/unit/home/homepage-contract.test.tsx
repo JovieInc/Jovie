@@ -71,19 +71,14 @@ async function renderHomePage() {
 }
 
 async function loadCopy() {
-  const [{ HOMEPAGE_COPY }, { HOMEPAGE_FAN_STATES_COPY }] = await Promise.all([
-    import('@/data/homepageCopy'),
-    import('@/data/homepageFanStatesCopy'),
-  ]);
-  return { HOMEPAGE_COPY, HOMEPAGE_FAN_STATES_COPY };
+  const { HOMEPAGE_COPY } = await import('@/data/homepageCopy');
+  return { HOMEPAGE_COPY };
 }
 
 const HOMEPAGE_SOURCES = [
   'data/homepageCopy.ts',
-  'data/homepageFanStatesCopy.ts',
   'components/homepage/HomepageArtistProfile.tsx',
   'components/marketing/MarketingOfferSummary.tsx',
-  'components/marketing/MarketingPhoneStateGallery.tsx',
 ] as const;
 
 const HOMEPAGE_STYLES = [
@@ -142,7 +137,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
   });
 
   it('renders one h1 from the copy module and no stray headings', async () => {
-    const { HOMEPAGE_COPY, HOMEPAGE_FAN_STATES_COPY } = await loadCopy();
+    const { HOMEPAGE_COPY } = await loadCopy();
     await renderHomePage();
 
     const h1s = screen.getAllByRole('heading', { level: 1 });
@@ -151,8 +146,10 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     expect(
       screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent)
     ).toEqual([
-      HOMEPAGE_FAN_STATES_COPY.headline,
+      HOMEPAGE_COPY.loop.headline,
+      HOMEPAGE_COPY.ownership.headline,
       HOMEPAGE_COPY.offer.headline,
+      HOMEPAGE_COPY.close.headline,
     ]);
   });
 
@@ -196,12 +193,20 @@ describe('homepage contract', { timeout: 60_000 }, () => {
   it('states prices only through offer truth', async () => {
     const { HOMEPAGE_COPY } = await loadCopy();
     await renderHomePage();
-    const summary = screen.getByTestId('homepage-offer-summary');
-    const claim = getPublicPriceClaim(HOMEPAGE_COPY.offer.plan);
-
-    expect(summary).toHaveAttribute('data-offer-plan', claim.plan);
-    expect(summary).toHaveTextContent(formatPublicPriceDisplay(claim));
-    expect(summary).toHaveTextContent(claim.badge);
+    for (const plan of [
+      HOMEPAGE_COPY.offer.plan,
+      HOMEPAGE_COPY.offer.paid.plan,
+    ]) {
+      const summary = screen.getByTestId(`homepage-offer-summary-${plan}`);
+      const claim = getPublicPriceClaim(plan);
+      expect(summary).toHaveAttribute('data-offer-plan', claim.plan);
+      expect(summary).toHaveTextContent(formatPublicPriceDisplay(claim));
+      expect(summary).toHaveTextContent(claim.badge);
+      // The plan name renders from offer truth too, never from copy.
+      expect(screen.getByRole('heading', { name: claim.displayName })).toBe(
+        summary.parentElement?.querySelector('h3')
+      );
+    }
     // No source file on the page may type a price, plan name, or trial.
     for (const path of HOMEPAGE_SOURCES) {
       expect(read(path), path).not.toMatch(
@@ -224,19 +229,28 @@ describe('homepage contract', { timeout: 60_000 }, () => {
       expect(feature, item.entitlement).toBeDefined();
       expect(feature?.free, item.entitlement).not.toBe(false);
     }
+    // Paid rows are paid on Artist Presence and not already free.
+    for (const item of HOMEPAGE_COPY.offer.paid.included) {
+      const feature = features.get(item.entitlement);
+      expect(feature, item.entitlement).toBeDefined();
+      expect(feature?.pro, item.entitlement).not.toBe(false);
+      expect(feature?.free, item.entitlement).toBe(false);
+    }
   });
 
   it('shows no person capture on the homepage (Tim, 2026-10-26)', async () => {
+    const { HOMEPAGE_COPY } = await loadCopy();
     const { container } = await renderHomePage();
     const images = [...container.querySelectorAll('main img, section img')];
     const sources = images.map(image => image.getAttribute('src') ?? '');
 
-    // One image on `/`: the hero's real product shot, the template profile
-    // capture (jov.ie/you, monogram avatar, abstract release art).
-    expect(sources).toHaveLength(1);
-    expect(sources[0]).toMatch(
-      /^\/product-screenshots\/template-profile-live-phone\.png(\?v=\w+)?$/
-    );
+    // Every image on `/` is a registry product shot, cropped to one moment.
+    // The hero crop starts at the handle, so no face is ever in frame.
+    expect(sources.length).toBeGreaterThan(1);
+    for (const source of sources) {
+      expect(source).toMatch(/^\/product-shots\/[a-z-]+\.webp\?v=\w+$/);
+    }
+    expect(sources[0]).toContain(`/${HOMEPAGE_COPY.hero.proofShot}.webp`);
     const hero = container.querySelector(
       '[data-testid="marketing-section-hero"]'
     );
@@ -250,8 +264,8 @@ describe('homepage contract', { timeout: 60_000 }, () => {
   });
 
   it('keeps copy in data and free of em dashes and stock promotion', async () => {
-    const { HOMEPAGE_COPY, HOMEPAGE_FAN_STATES_COPY } = await loadCopy();
-    const lines = JSON.stringify([HOMEPAGE_COPY, HOMEPAGE_FAN_STATES_COPY]);
+    const { HOMEPAGE_COPY } = await loadCopy();
+    const lines = JSON.stringify(HOMEPAGE_COPY);
     expect(lines).not.toContain('—');
     expect(lines).not.toMatch(
       /\b(seamless|unlock|elevate|world-class|all-in-one|supercharge)\b/i

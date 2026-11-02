@@ -24,7 +24,7 @@ const meta = {
     subhead: hero.subhead,
     claim: hero.claim,
     supportNote: hero.supportNote,
-    profile: hero.profile,
+    proofShot: hero.proofShot,
     sectionOwner: 'apps/web/components/homepage/HomepageArtistProfile.tsx',
   },
   decorators: [

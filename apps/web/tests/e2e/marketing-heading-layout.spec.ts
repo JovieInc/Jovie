@@ -23,7 +23,7 @@ for (const width of [320, 375, 390, 430, 720, 768, 1440]) {
       await page.evaluate(() => document.fonts.ready);
       const headings = page.locator(
         route === '/'
-          ? '#home-hero-heading, #homepage-fan-states-heading, #homepage-offer-heading'
+          ? '#home-hero-heading, #homepage-loop-heading, #homepage-ownership-heading, #homepage-offer-heading, #homepage-close-heading'
           : 'main h2.ap-shell-h2, main [data-testid="final-cta-headline"]'
       );
       expect(await headings.count()).toBeGreaterThan(0);

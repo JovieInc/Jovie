@@ -3,11 +3,23 @@
   "asOf": "2026-10-04T05:52:03.377Z",
   "funnelStepIds": {
     "homepage": [],
-    "claim": ["outreach", "claim-landing"],
-    "start": ["start", "qualify-chat"],
-    "preview": ["profile-reveal"],
-    "signup": ["claim-decision"],
-    "upgrade": ["upgrade"],
+    "claim": [
+      "outreach",
+      "claim-landing"
+    ],
+    "start": [
+      "start",
+      "qualify-chat"
+    ],
+    "preview": [
+      "profile-reveal"
+    ],
+    "signup": [
+      "claim-decision"
+    ],
+    "upgrade": [
+      "upgrade"
+    ],
     "pricing": []
   },
   "claims": [
@@ -27,44 +39,88 @@
       "step": "homepage",
       "route": "/",
       "source": "apps/web/data/homepageCopy.ts",
-      "copy": "A free profile for your music, bio, and links. Your latest release leads, with tour dates and updates one tap away.",
+      "copy": "Smart links that turn listeners into subscribers. Jovie builds them from your Spotify name and emails your list when the next song is out.",
       "nature": "capability",
       "evidenceClass": null,
       "status": "admissible",
-      "detail": "certified: artist-profiles, public-profile, artist-notifications"
+      "detail": "certified: smart-links, artist-notifications"
     },
     {
-      "id": "homepage.fan-states.headline",
+      "id": "homepage.loop.headline",
       "step": "homepage",
       "route": "/",
-      "source": "apps/web/data/homepageFanStatesCopy.ts",
-      "copy": "Your profile leads with one clear thing.",
+      "source": "apps/web/data/homepageCopy.ts",
+      "copy": "Every listen can turn into a subscriber.",
       "nature": "capability",
       "evidenceClass": null,
       "status": "admissible",
-      "detail": "certified: artist-profiles"
+      "detail": "certified: smart-links, artist-notifications"
+    },
+    {
+      "id": "homepage.loop.open",
+      "step": "homepage",
+      "route": "/",
+      "source": "apps/web/data/homepageCopy.ts",
+      "copy": "One tap to Spotify, Apple Music, or YouTube Music. No menu of links to scan.",
+      "nature": "capability",
+      "evidenceClass": null,
+      "status": "admissible",
+      "detail": "certified: smart-links"
+    },
+    {
+      "id": "homepage.loop.ask",
+      "step": "homepage",
+      "route": "/",
+      "source": "apps/web/data/homepageCopy.ts",
+      "copy": "Get Updates takes an email in one step, on every plan.",
+      "nature": "capability",
+      "evidenceClass": null,
+      "status": "admissible",
+      "detail": "certified: artist-notifications"
+    },
+    {
+      "id": "homepage.loop.send",
+      "step": "homepage",
+      "route": "/",
+      "source": "apps/web/data/homepageCopy.ts",
+      "copy": "When the next song is out, everyone who asked gets it in their inbox.",
+      "nature": "capability",
+      "evidenceClass": null,
+      "status": "admissible",
+      "detail": "certified: artist-notifications"
+    },
+    {
+      "id": "homepage.ownership.body",
+      "step": "homepage",
+      "route": "/",
+      "source": "apps/web/data/homepageCopy.ts",
+      "copy": "Every email lands on your own list in Jovie, not a platform you rent, ready for the next release.",
+      "nature": "capability",
+      "evidenceClass": null,
+      "status": "admissible",
+      "detail": "certified: artist-notifications"
     },
     {
       "id": "homepage.offer.headline",
       "step": "homepage",
       "route": "/",
       "source": "apps/web/data/homepageCopy.ts",
-      "copy": "Free to claim. Yours to share.",
+      "copy": "Collect for free. Send when you are ready.",
       "nature": "capability",
       "evidenceClass": null,
       "status": "admissible",
-      "detail": "certified: public-profile"
+      "detail": "certified: artist-notifications"
     },
     {
-      "id": "homepage.offer.smart-links",
+      "id": "homepage.close.subhead",
       "step": "homepage",
       "route": "/",
       "source": "apps/web/data/homepageCopy.ts",
-      "copy": "Unlimited smart links",
+      "copy": "Claim your name and search for yourself. Jovie imports your releases, old and new, and gives every one a smart link.",
       "nature": "capability",
       "evidenceClass": null,
       "status": "admissible",
-      "detail": "certified: smart-links"
+      "detail": "certified: public-profile, smart-links"
     },
     {
       "id": "claim.banner.ready",
@@ -195,7 +251,7 @@
     "none": 0
   },
   "statusCounts": {
-    "admissible": 16,
+    "admissible": 20,
     "proof-gap": 0,
     "uncertified-capability": 0,
     "invented-number": 0,
@@ -203,13 +259,17 @@
     "checkable-positioning": 0,
     "weak-proof-rendered": 0
   },
-  "prooflessPaywallSteps": ["pricing"],
+  "prooflessPaywallSteps": [
+    "pricing"
+  ],
   "proofRequests": [
     {
       "recordType": "proof-request",
       "kind": "metric",
       "claimId": "golden-path.pricing.paid-outcome",
-      "pagesBlocked": ["/pricing"],
+      "pagesBlocked": [
+        "/pricing"
+      ],
       "suggestedLane": "measurement",
       "generator": "dogfood"
     },
@@ -217,7 +277,10 @@
       "recordType": "proof-request",
       "kind": "metric",
       "claimId": "wanted.outcome.creator-before-after",
-      "pagesBlocked": ["/app/settings/billing", "/pricing"],
+      "pagesBlocked": [
+        "/app/settings/billing",
+        "/pricing"
+      ],
       "suggestedLane": "measurement",
       "generator": "pilot"
     },
@@ -225,7 +288,10 @@
       "recordType": "proof-request",
       "kind": "product-proof",
       "claimId": "wanted.billing.renewal-reminder-and-refund",
-      "pagesBlocked": ["/app/settings/billing", "/pricing"],
+      "pagesBlocked": [
+        "/app/settings/billing",
+        "/pricing"
+      ],
       "suggestedLane": "product-capture",
       "generator": "dogfood"
     },
@@ -233,7 +299,11 @@
       "recordType": "proof-request",
       "kind": "product-proof",
       "claimId": "wanted.ownership.page-and-export-survive-lapse",
-      "pagesBlocked": ["/app/settings/billing", "/pricing", "/signup"],
+      "pagesBlocked": [
+        "/app/settings/billing",
+        "/pricing",
+        "/signup"
+      ],
       "suggestedLane": "product-capture",
       "generator": "dogfood"
     },
@@ -241,7 +311,11 @@
       "recordType": "proof-request",
       "kind": "third-party",
       "claimId": "wanted.rights.no-training-on-creator-work",
-      "pagesBlocked": ["/app/settings/billing", "/pricing", "/signup"],
+      "pagesBlocked": [
+        "/app/settings/billing",
+        "/pricing",
+        "/signup"
+      ],
       "suggestedLane": "third-party-research",
       "generator": "research"
     },
@@ -249,7 +323,10 @@
       "recordType": "proof-request",
       "kind": "metric",
       "claimId": "wanted.dogfood.launch-loop",
-      "pagesBlocked": ["/", "/pricing"],
+      "pagesBlocked": [
+        "/",
+        "/pricing"
+      ],
       "suggestedLane": "measurement",
       "generator": "dogfood"
     },
@@ -257,7 +334,11 @@
       "recordType": "proof-request",
       "kind": "product-proof",
       "claimId": "wanted.dogfood.non-music-profile",
-      "pagesBlocked": ["/", "/[handle]?claim=1", "/pricing"],
+      "pagesBlocked": [
+        "/",
+        "/[handle]?claim=1",
+        "/pricing"
+      ],
       "suggestedLane": "product-capture",
       "generator": "dogfood"
     },
@@ -265,7 +346,10 @@
       "recordType": "proof-request",
       "kind": "product-proof",
       "claimId": "wanted.computed.link-drift-finding",
-      "pagesBlocked": ["/app/settings/billing", "/start (profile reveal)"],
+      "pagesBlocked": [
+        "/app/settings/billing",
+        "/start (profile reveal)"
+      ],
       "suggestedLane": "product-capture",
       "generator": "computed"
     }
@@ -275,7 +359,10 @@
       "id": "outcome.creator-before-after",
       "statement": "A before/after result on a creator’s own data: fans, streams or bookings.",
       "answers": "VOC: \"I made no sales\", \"no real results\" (ends subscriptions)",
-      "unlocks": ["upgrade", "pricing"],
+      "unlocks": [
+        "upgrade",
+        "pricing"
+      ],
       "kind": "metric",
       "generator": "pilot",
       "owner": "JOV-7793"
@@ -284,7 +371,10 @@
       "id": "billing.renewal-reminder-and-refund",
       "statement": "A renewal reminder at least 7 days before the charge, one-click cancel and a pro-rated refund.",
       "answers": "VOC: billing honesty",
-      "unlocks": ["upgrade", "pricing"],
+      "unlocks": [
+        "upgrade",
+        "pricing"
+      ],
       "kind": "product-proof",
       "generator": "dogfood",
       "owner": "JOV-7805"
@@ -293,7 +383,11 @@
       "id": "ownership.page-and-export-survive-lapse",
       "statement": "The public page stays live after a plan lapses, and the audience exports as CSV on any plan.",
       "answers": "VOC: ownership and lock-in",
-      "unlocks": ["signup", "upgrade", "pricing"],
+      "unlocks": [
+        "signup",
+        "upgrade",
+        "pricing"
+      ],
       "kind": "product-proof",
       "generator": "dogfood",
       "owner": "JOV-7806"
@@ -302,7 +396,11 @@
       "id": "rights.no-training-on-creator-work",
       "statement": "Jovie does not train on, or claim rights to, a creator’s work or likeness.",
       "answers": "VOC: creator rights",
-      "unlocks": ["signup", "upgrade", "pricing"],
+      "unlocks": [
+        "signup",
+        "upgrade",
+        "pricing"
+      ],
       "kind": "third-party",
       "generator": "research",
       "owner": "JOV-7807"
@@ -311,7 +409,10 @@
       "id": "dogfood.launch-loop",
       "statement": "Each Jovie launch grows the audience for the next one, measured send over send.",
       "answers": "Tim: each launch grows the audience for the next",
-      "unlocks": ["homepage", "pricing"],
+      "unlocks": [
+        "homepage",
+        "pricing"
+      ],
       "kind": "metric",
       "generator": "dogfood",
       "owner": "JOV-7834"
@@ -320,7 +421,11 @@
       "id": "dogfood.non-music-profile",
       "statement": "A real public Jovie profile for a non-music creator: a founder, podcaster or author.",
       "answers": "Studio 2026-10-04: non-music personas have no real page to judge; jov.ie/tim is an artist",
-      "unlocks": ["homepage", "claim", "pricing"],
+      "unlocks": [
+        "homepage",
+        "claim",
+        "pricing"
+      ],
       "kind": "product-proof",
       "generator": "dogfood",
       "owner": "JOV-7866"
@@ -329,7 +434,10 @@
       "id": "computed.link-drift-finding",
       "statement": "A drift finding about the visitor: a public link that points somewhere stale.",
       "answers": "Persona judge: most-quoted line in studio round 3 preview (value 6.9)",
-      "unlocks": ["preview", "upgrade"],
+      "unlocks": [
+        "preview",
+        "upgrade"
+      ],
       "kind": "product-proof",
       "generator": "computed",
       "owner": "JOV-7794"

@@ -16,7 +16,6 @@
  */
 
 import { HOMEPAGE_COPY } from '../homepageCopy';
-import { HOMEPAGE_FAN_STATES_COPY } from '../homepageFanStatesCopy';
 import type { MarketingAudience, MarketingSectionId } from './sections';
 
 export type RecipeId =
@@ -172,9 +171,10 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
     status: 'proven',
     referenceRoute: '/', // /new is a retired redirect, not a rendered reference
     audience: 'general',
-    // Claim + live profile, three real fan states, then the free offer with
-    // the same claim. Prices and plan terms come from offer truth only.
-    sectionOrder: ['hero', 'product-gallery', 'cta'],
+    // The link, the loop (open, subscribe, release email), the list you
+    // own, the offer, the close (Tim, 2026-11-01). Prices come from offer
+    // truth only; every visual is a registry product shot.
+    sectionOrder: ['hero', 'how-it-works', 'feature-split', 'pricing', 'cta'],
     arc: [
       {
         beat: 'promise',
@@ -183,20 +183,30 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
       },
       {
         beat: 'proof',
-        feeling: HOMEPAGE_FAN_STATES_COPY.headline,
-        section: 'product-gallery',
+        feeling: HOMEPAGE_COPY.loop.headline,
+        section: 'how-it-works',
+      },
+      {
+        beat: 'proof',
+        feeling: HOMEPAGE_COPY.ownership.headline,
+        section: 'feature-split',
       },
       {
         beat: 'action',
         feeling: HOMEPAGE_COPY.offer.headline,
+        section: 'pricing',
+      },
+      {
+        beat: 'action',
+        feeling: HOMEPAGE_COPY.close.headline,
         section: 'cta',
       },
     ],
     hierarchy: {
       oneBigIdea: HOMEPAGE_COPY.hero.subhead,
       seeFirst: 'hero',
-      second: 'product-gallery',
-      third: 'cta',
+      second: 'how-it-works',
+      third: 'pricing',
       emphasisBudget: {
         maxDisplayScaleMoments: 1,
         maxFullBleedBreaks: 1,

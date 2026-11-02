@@ -311,3 +311,22 @@
     opacity: 1;
   }
 }
+
+/* Registry product shot (ProductShot owns the frame and the explicit image
+   dimensions, so the box takes the shot's own aspect). The home crop is the
+   link from the handle to the featured release, about 0.87 wide to tall. */
+.homepage-hero-canvas__proof--shot {
+  aspect-ratio: auto;
+  width: min(88vw, 25rem);
+  max-width: 25rem;
+}
+
+@media (min-width: 64rem) {
+  .homepage-hero-canvas__copy[data-has-proof="true"]
+    .homepage-hero-canvas__proof--shot {
+    width: min(
+      25rem,
+      calc((100svh - var(--hero-canvas-bar) - var(--space-32, 8rem)) * 0.87)
+    );
+  }
+}

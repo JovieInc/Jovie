@@ -486,10 +486,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/homepage/HomepageElectricSeam.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/jovie/components/artist-provider.tsx",
       "linearIssue": "JOV-8847"
     },

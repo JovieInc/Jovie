@@ -72,7 +72,7 @@ describe('canonical web surface drift guard', () => {
     );
 
     expect(homepage).toContain('HomepageArtistHero');
-    expect(homepage).toContain('HomepageOfferClose');
+    expect(homepage).toContain('HomepageClose');
     expect(homepage).not.toContain('HomePageNarrative');
     expect(releases).toContain('LibraryLoadingState');
     expect(releases).toContain('PageErrorState');

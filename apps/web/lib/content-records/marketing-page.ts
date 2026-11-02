@@ -2,7 +2,6 @@ import { lintCopy } from '@jovie/copy';
 import { z } from 'zod';
 import surfaceCensus from '@/data/designSystem/surfaceCensus.json';
 import { HOMEPAGE_COPY } from '@/data/homepageCopy';
-import { HOMEPAGE_FAN_STATES_COPY } from '@/data/homepageFanStatesCopy';
 import { MARKETING_SECTIONS } from '@/data/marketing/sections';
 import icpLanguage from '../../../../scripts/invariants/icp-language/config.json';
 import { experimentSchema } from './experiment';
@@ -47,15 +46,27 @@ const HeroSection = z
   })
   .strict();
 
-const ProductGallerySection = z
+const HowItWorksSection = z
   .object({
-    section: z.literal('product-gallery'),
-    variant: z.literal('profile-grid'),
-    copy: z
-      .object({
-        headline: line(90),
-      })
-      .strict(),
+    section: z.literal('how-it-works'),
+    variant: z.literal('3-step-media'),
+    copy: z.object({ headline: line(90) }).strict(),
+  })
+  .strict();
+
+const FeatureSplitSection = z
+  .object({
+    section: z.literal('feature-split'),
+    variant: z.literal('editorial'),
+    copy: z.object({ headline: line(90), body: line(220) }).strict(),
+  })
+  .strict();
+
+const PricingSection = z
+  .object({
+    section: z.literal('pricing'),
+    variant: z.literal('tier-cards-neutral'),
+    copy: z.object({ headline: line(90), plansLinkLabel: line(32) }).strict(),
   })
   .strict();
 
@@ -63,13 +74,7 @@ const CtaSection = z
   .object({
     section: z.literal('cta'),
     variant: z.literal('final-single-claim'),
-    copy: z
-      .object({
-        headline: line(90),
-        subhead: line(220),
-        plansLinkLabel: line(32),
-      })
-      .strict(),
+    copy: z.object({ headline: line(90), subhead: line(220) }).strict(),
   })
   .strict();
 
@@ -112,9 +117,25 @@ export const SPEC_SECTION_REGISTRY: readonly SpecSectionRegistryEntry[] = [
     dsStatus: censusStatus('home'),
   },
   {
-    section: 'product-gallery',
-    variant: 'profile-grid',
-    component: 'HomepageFanStates',
+    section: 'how-it-works',
+    variant: '3-step-media',
+    component: 'HomepageLoop',
+    source: HOMEPAGE_SECTION_SOURCE,
+    censusGroup: 'home',
+    dsStatus: censusStatus('home'),
+  },
+  {
+    section: 'feature-split',
+    variant: 'editorial',
+    component: 'HomepageOwnership',
+    source: HOMEPAGE_SECTION_SOURCE,
+    censusGroup: 'home',
+    dsStatus: censusStatus('home'),
+  },
+  {
+    section: 'pricing',
+    variant: 'tier-cards-neutral',
+    component: 'HomepageOffer',
     source: HOMEPAGE_SECTION_SOURCE,
     censusGroup: 'home',
     dsStatus: censusStatus('home'),
@@ -122,7 +143,7 @@ export const SPEC_SECTION_REGISTRY: readonly SpecSectionRegistryEntry[] = [
   {
     section: 'cta',
     variant: 'final-single-claim',
-    component: 'HomepageOfferClose',
+    component: 'HomepageClose',
     source: HOMEPAGE_SECTION_SOURCE,
     censusGroup: 'home',
     dsStatus: censusStatus('home'),
@@ -131,7 +152,9 @@ export const SPEC_SECTION_REGISTRY: readonly SpecSectionRegistryEntry[] = [
 
 export const MarketingPageSectionSchema = z.discriminatedUnion('section', [
   HeroSection,
-  ProductGallerySection,
+  HowItWorksSection,
+  FeatureSplitSection,
+  PricingSection,
   CtaSection,
 ]);
 
@@ -152,7 +175,12 @@ export type MarketingPageSections = MarketingPageSpec['sections'];
 export const MARKETING_PAGE_KEYS = ['home'] as const;
 export type MarketingPageKey = (typeof MARKETING_PAGE_KEYS)[number];
 
-/** The code default: exactly what the homepage rendered before specs. */
+/**
+ * The code default: the five-beat homepage (Tim, 2026-11-01). A stored
+ * spec must place every one of these sections (see `HOME_REQUIRED_SECTIONS`),
+ * so an older published record falls back to this default instead of
+ * rendering half a page.
+ */
 export const DEFAULT_HOME_SPEC: MarketingPageSpec = {
   sections: [
     {
@@ -164,21 +192,40 @@ export const DEFAULT_HOME_SPEC: MarketingPageSpec = {
       },
     },
     {
-      section: 'product-gallery',
-      variant: 'profile-grid',
-      copy: { headline: HOMEPAGE_FAN_STATES_COPY.headline },
+      section: 'how-it-works',
+      variant: '3-step-media',
+      copy: { headline: HOMEPAGE_COPY.loop.headline },
+    },
+    {
+      section: 'feature-split',
+      variant: 'editorial',
+      copy: {
+        headline: HOMEPAGE_COPY.ownership.headline,
+        body: HOMEPAGE_COPY.ownership.body,
+      },
+    },
+    {
+      section: 'pricing',
+      variant: 'tier-cards-neutral',
+      copy: {
+        headline: HOMEPAGE_COPY.offer.headline,
+        plansLinkLabel: HOMEPAGE_COPY.offer.plansLink.label,
+      },
     },
     {
       section: 'cta',
       variant: 'final-single-claim',
       copy: {
-        headline: HOMEPAGE_COPY.offer.headline,
+        headline: HOMEPAGE_COPY.close.headline,
         subhead: HOMEPAGE_COPY.close.subhead,
-        plansLinkLabel: HOMEPAGE_COPY.offer.plansLink.label,
       },
     },
   ],
 };
+
+/** Every homepage spec places the whole argument, never a subset. */
+const HOME_REQUIRED_SECTIONS: readonly MarketingPageSection['section'][] =
+  DEFAULT_HOME_SPEC.sections.map(entry => entry.section);
 
 // Prices and plan terms come from offer truth only (same price everywhere).
 const PRICE_PATTERN =
@@ -253,6 +300,13 @@ function sectionsViolations(
       }
     }
   });
+  if (generalPage) {
+    for (const required of HOME_REQUIRED_SECTIONS) {
+      if (!sections.some(entry => entry.section === required)) {
+        errors.push(`${path}: the homepage must place "${required}"`);
+      }
+    }
+  }
   if (sections[0]?.section !== 'hero') {
     errors.push(`${path}[0]: the hero section must come first`);
   }

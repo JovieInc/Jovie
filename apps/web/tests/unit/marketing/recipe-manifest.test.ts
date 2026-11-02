@@ -1544,7 +1544,7 @@ describe('current acquisition source inventory (JOV-4065)', () => {
       binding => binding.kind === 'approved-section'
     );
     expect(entry.specVersion).toBe(MARKETING_SPEC_VERSION);
-    // EVENT 2026-10-20: the artist-profile homepage. The rendered contract
+    // Tim 2026-11-01: the five-beat homepage. The rendered contract
     // (order, owners, copy, prices, media) lives in homepage-contract.test.
     expect(bindings.map(binding => binding.sectionId)).toEqual(
       MARKETING_RECIPES.find(recipe => recipe.id === 'homepage')?.sectionOrder
@@ -1556,7 +1556,9 @@ describe('current acquisition source inventory (JOV-4065)', () => {
     expect(entry.bindingEvidence.status).toBe('verified');
     expect(bindings.map(binding => binding.variantId)).toEqual([
       'split-claim-card',
-      'profile-grid',
+      '3-step-media',
+      'editorial',
+      'tier-cards-neutral',
       'final-single-claim',
     ]);
   });

@@ -145,7 +145,7 @@ describe('artist profile landing family System B source contract', () => {
       ),
       'utf8'
     );
-    expect(hero).toContain('HomepagePosterHero');
+    expect(hero).toContain('MarketingPosterHero');
     expect(hero).toContain('trackedLinkComponent={HomepageTrackedLink}');
     expect(hero).toContain(
       "getMarketingExportImage('tim-white-profile-live-mobile')"
