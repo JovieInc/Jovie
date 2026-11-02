@@ -62,7 +62,9 @@ When enabled, these allow us to deliver relevant advertisements and measure camp
 | `jovie_lead_attribution` | Stores claim-invite attribution for signup and campaign conversion measurement | 30 days |
 | `_fbp` | Set by the Meta pixel to recognize a browser across visits for ad measurement and retargeting | 3 months |
 
-When you accept marketing cookies, we use server-side event forwarding to send anonymized profile visit data to advertising platforms including Meta, Google, and TikTok. This allows us to measure the effectiveness of retargeting campaigns. No third-party tracking scripts are loaded on your device.
+When marketing cookies are allowed, we also use server-side event forwarding to send profile visit data to advertising platforms including Meta, Google, and TikTok, to measure retargeting campaigns.
+
+On public artist profiles and some articles, we load the Meta pixel in your browser. It sets Meta's `_fbp` cookie and tells Meta which page you viewed, so artists and Jovie can show ads to past visitors. In the EU, the UK and other places where consent is required, it loads only after you accept marketing cookies. Elsewhere it loads by default, and you can turn it off with Reject or Manage in the cookie bar, or by sending a Global Privacy Control signal, which we honor automatically.
 
 ## Managing Your Preferences
 

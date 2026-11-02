@@ -3,8 +3,6 @@ import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { AlertGrowthLanding } from '@/components/features/alerts/AlertGrowthLanding';
 import { APP_NAME, BASE_URL } from '@/constants/app';
-import { MetaPixel } from '@/features/tracking/MetaPixel';
-import { env } from '@/lib/env-server';
 import { getPublicProfileRobots } from '@/lib/profile/public-profile-indexing-policy';
 import { convertCreatorProfileToArtist } from '@/types/db';
 import { getProfileAndLinks } from '../_lib/public-profile-loader';
@@ -67,11 +65,8 @@ export default async function AlertsPage({ params }: AlertsPageProps) {
   // independently of the page shell. The fallback can be null because the artist+page
   // shell renders synchronously above the form.
   return (
-    <>
-      {metaPixelIds.length > 0 ? <MetaPixel pixelIds={metaPixelIds} /> : null}
-      <Suspense fallback={null}>
-        <AlertGrowthLanding artist={artist} />
-      </Suspense>
-    </>
+    <Suspense fallback={null}>
+      <AlertGrowthLanding artist={artist} />
+    </Suspense>
   );
 }
