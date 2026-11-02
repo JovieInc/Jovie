@@ -241,7 +241,11 @@ def c_manual(spec: dict, now: float) -> dict | None:
     return {"value": spec["value"], "limit": spec["limit"], "observedAt": spec.get("observedAt")}
 
 
-COLLECTORS = {"disk": c_disk, "inodes": c_inodes, "gh-rate": c_gh_rate, "doppler": c_doppler,
+def c_liveness(spec: dict, now: float) -> dict | None:
+    return None  # filled in by `probe`; a host's own collect run is proof of life
+
+
+COLLECTORS = {"liveness": c_liveness, "disk": c_disk, "inodes": c_inodes, "gh-rate": c_gh_rate, "doppler": c_doppler,
               "spend": c_spend, "manual": c_manual, "neon": c_neon, "resend": c_resend}
 
 
@@ -381,9 +385,85 @@ def remote_samples(host: str) -> list[dict]:
     return rows
 
 
+def ssh_disk(target: str) -> dict | None:
+    """Agentless read of / over ssh: {"used", "total"} bytes, or None when the host is unreachable."""
+    raw = run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", target,
+               "df -Pk /System/Volumes/Data 2>/dev/null || df -Pk /"], 20)
+    try:
+        cols = (raw or "").strip().splitlines()[-1].split()
+        return {"total": int(cols[1]) * 1024, "used": int(cols[2]) * 1024}
+    except (IndexError, ValueError):
+        return None
+
+
+def probe(registry: dict, local: str, now: float, state: Path, limit_frac: float | None = None, probe_fn=ssh_disk) -> list[dict]:
+    """Liveness + disk for every fleet host except this one, with no collector needed on the target."""
+    by_id = {r["id"]: r for r in registry["resources"]}
+    rows, fresh = [], []
+    for m in registry["fleet"]:
+        if m["id"] == local or not m.get("ssh"):
+            continue
+        got = probe_fn(m["ssh"])
+        for rid, reading in ((f"{m['id']}-liveness", {"value": 0 if got else 1, "limit": 1}),
+                             (f"{m['id']}-disk", got and {"value": got["used"], "limit": got["total"] * (
+                                 limit_frac or by_id.get(f"{m['id']}-disk", {}).get("collector", {}).get("limitFrac", 0.9))})):
+            res = by_id.get(rid)
+            if not res:
+                continue
+            hist = sorted((r["t"], r["value"]) for r in load_samples(state / "samples.jsonl", now - WINDOW_S) if r.get("id") == rid)
+            if reading:
+                fresh.append({"t": now, "id": rid, "host": m["id"], **reading})
+            rows.append(evaluate(res, reading or None, hist, now))
+    with open(state / "samples.jsonl", "a") as f:
+        for s in fresh:
+            f.write(json.dumps(s) + "\n")
+    return rows
+
+
+def check_registry(registry: dict, tailscale: list[str] | None = None) -> list[str]:
+    """Completeness: every fleet machine has aliases, a disk resource, a liveness resource and an ssh target."""
+    errs, ids = [], {r["id"]: r for r in registry["resources"]}
+    fleet = registry.get("fleet") or []
+    if not fleet:
+        errs.append("registry has no fleet list")
+    for m in fleet:
+        h = m["id"]
+        if h not in registry["hostAliases"]:
+            errs.append(f"{h}: no hostAliases entry")
+        if m.get("required"):
+            if not m.get("ssh") and h != registry.get("cloudCollector"):
+                errs.append(f"{h}: required but no ssh target for the probe")
+            for rid in (f"{h}-disk", f"{h}-liveness"):
+                if rid not in ids:
+                    errs.append(f"{h}: missing resource {rid}")
+                elif ids[rid]["host"] != h:
+                    errs.append(f"{rid}: host mismatch")
+        elif not m.get("note"):
+            errs.append(f"{h}: optional machines need a note saying why")
+    for rid in registry.get("containers", {}).get("requiredResources", []):
+        if rid not in ids:
+            errs.append(f"container resource {rid} missing")
+    known = {a for m in fleet for a in registry["hostAliases"].get(m["id"], [])}
+    for peer in tailscale or []:
+        if peer.lower() not in known:
+            errs.append(f"tailscale peer {peer} is not in the fleet registry")
+    return errs
+
+
+def tailscale_peers() -> list[str]:
+    raw = run(["tailscale", "status", "--json"], 15)
+    try:
+        peers = json.loads(raw or "")["Peer"].values()
+    except (ValueError, KeyError):
+        return []
+    return [(p.get("DNSName") or p["HostName"]).split(".")[0] for p in peers]
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("cmd", choices=["collect", "report"])
+    ap.add_argument("cmd", choices=["collect", "report", "probe", "check-registry"])
+    ap.add_argument("--limit-frac", type=float, help="probe: override disk limitFrac (simulate a low threshold)")
+    ap.add_argument("--tailscale", action="store_true", help="check-registry: also require every tailnet peer be in the fleet")
     ap.add_argument("--host", default=os.environ.get("CAPACITY_HOST") or socket.gethostname().split(".")[0].lower())
     ap.add_argument("--remote", action="append", default=[], help="ssh alias whose samples to merge (report)")
     ap.add_argument("--remediate", action="store_true", help="run allowlisted auto actions for alarmed local resources")
@@ -394,6 +474,15 @@ def main(argv: list[str] | None = None) -> int:
     local = next((h for h, names in host_aliases.items() if args.host in names), args.host)
     now, state = time.time(), state_dir()
     state.mkdir(parents=True, exist_ok=True)
+    if args.cmd == "check-registry":
+        errs = check_registry(registry, tailscale_peers() if args.tailscale else None)
+        print("\n".join(errs) or "fleet registry complete")
+        return 1 if errs else 0
+    if args.cmd == "probe":
+        rows = probe(registry, local, now, state, args.limit_frac)
+        publish(rows, registry, now, state, alarm_feed())
+        print(json.dumps(rows, default=lambda x: None) if args.json else table(rows))
+        return 2 if any(r["status"] in ("ALARM", "AT-LIMIT") for r in rows) else 0
     samples_path = state / "samples.jsonl"
     merged = load_samples(samples_path, now - WINDOW_S)
     for remote in args.remote:
@@ -423,6 +512,8 @@ def main(argv: list[str] | None = None) -> int:
         with open(samples_path, "a") as f:
             for s in fresh:
                 f.write(json.dumps(s) + "\n")
+        if local == cloud_owner:
+            rows += probe(registry, local, now, state)
         publish(rows, registry, now, state, alarm_feed())
         if args.remediate:
             by_id = {r["id"]: r for r in registry["resources"]}
