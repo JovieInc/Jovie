@@ -542,7 +542,7 @@ export function OnboardingCheckoutClient({
         <div className='mb-4 space-y-2' data-testid='checkout-terms'>
           <p className='text-xs text-secondary-token'>{terms.timing}</p>
           <p className='text-xs text-secondary-token'>{terms.cancel}</p>
-          <label className='flex cursor-pointer items-start gap-2.5 text-app text-primary-token'>
+          <label className='flex cursor-pointer items-start gap-2 text-app text-primary-token'>
             <input
               type='checkbox'
               className='mt-0.5 h-4 w-4 shrink-0'
