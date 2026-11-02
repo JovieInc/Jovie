@@ -95,8 +95,11 @@ describe('WaitlistInviteMessage', () => {
       "import { WaitlistInviteMessage } from '@/components/features/waitlist/WaitlistInviteMessage';"
     );
     expect(routeSource).toContain('const { token } = await searchParams;');
-    expect(routeSource).toContain('await getCachedAuth()');
-    expect(routeSource).toContain('await getCachedCurrentUser()');
+    expect(routeSource).toContain("await getCachedAuth({ session: 'fresh' })");
+    expect(routeSource).toContain(
+      "await getCachedCurrentUser({ session: 'fresh' })"
+    );
+    expect(routeSource).toContain('currentUser?.emailVerified === true');
     expect(routeSource).toContain('await enforceOnboardingRateLimit({');
     expect(routeSource).toContain('await redeemWaitlistInviteToken({');
     expect(routeSource).toContain("result.outcome === 'approved'");
