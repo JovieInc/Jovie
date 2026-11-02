@@ -25,6 +25,30 @@ test('clean control snapshot passes every rule', () => {
   assert.deepEqual(fails, []);
 });
 
+test('a crawl with no successful page, or no analysable policy, fails instead of passing vacuously', () => {
+  const clean = cleanControlSnapshot();
+  const noPages = evaluate({ ...clean, pages: [] }, CONTROL_REGISTRY);
+  assert.ok(
+    noPages.some(r => r.rule === 'crawl' && r.status === 'fail'),
+    'an empty crawl must fail'
+  );
+  const allErrored = evaluate(
+    { ...clean, pages: clean.pages.map(p => ({ ...p, error: 'HTTP 503' })) },
+    CONTROL_REGISTRY
+  );
+  assert.ok(allErrored.some(r => r.rule === 'crawl' && r.status === 'fail'));
+  const noPolicy = evaluate(
+    {
+      ...clean,
+      policy_versions: { privacy: { url: 'x', error: 'fetch failed' } },
+    },
+    CONTROL_REGISTRY
+  );
+  assert.ok(
+    noPolicy.some(r => r.rule === 'claims-truthful' && r.status === 'fail')
+  );
+});
+
 test('every rule has a seeded violation that fails it and only it', () => {
   const outcomes = runControls();
   assert.equal(outcomes.length, Object.keys(RULES).length + 1);
