@@ -232,6 +232,7 @@ class CheckTest(unittest.TestCase):
         scratch = Path(self.cleanup.name)
         derived = guard.sweep_derived_data
         isolated = [
+            patch.object(Path, "home", return_value=scratch),
             patch.object(guard, "runner_roots", return_value=[]),
             patch.object(guard, "retired_workspace_roots", return_value=[]),
             patch.object(guard, "log_dirs", side_effect=lambda host: [host.state / "runs"]),
@@ -450,7 +451,21 @@ class CheckTest(unittest.TestCase):
             root = Path(tmp) / "symphony-elixir-workspaces"
             self.assertFalse(guard.reclaimable(None, roots=[root]))
             (root / "JOV-1").mkdir(parents=True)
-            self.assertTrue(guard.reclaimable(None, roots=[root]))
+            with patch.object(guard, "free_pct", return_value=guard.LOW_PCT), \
+                    patch.object(guard, "mount_points", return_value=set()):
+                self.assertTrue(guard.reclaimable(None, roots=[root]))
+            # 2026-10-25: a bind-mounted child (skipped whole by the sweep) or one on a roomy
+            # volume is not reclaimable; counting it held capacity at "disk-reclamation-pending".
+            with patch.object(guard, "free_pct", return_value=guard.LOW_PCT), \
+                    patch.object(guard, "mount_points", return_value={(root / "JOV-1").resolve()}):
+                self.assertFalse(guard.reclaimable(None, roots=[root]))
+            with patch.object(guard, "free_pct", return_value=guard.LOW_PCT + 20), \
+                    patch.object(guard, "mount_points", return_value=set()):
+                self.assertFalse(guard.reclaimable(None, roots=[root]))
+            # An unreadable mount table fails closed: this feeds a deletion decision.
+            with patch.object(guard, "free_pct", return_value=guard.LOW_PCT), \
+                    patch.object(guard, "mount_points", return_value=None):
+                self.assertFalse(guard.reclaimable(None, roots=[root]))
 
     def test_cleanup_lock_serializes_workers_and_recovers_after_release(self):
         with tempfile.TemporaryDirectory() as tmp, patch.object(guard, "free_pct", return_value=10.0), \
@@ -468,13 +483,111 @@ class CheckTest(unittest.TestCase):
 
     def test_cleanup_stops_if_disk_becomes_critical_between_steps(self):
         with tempfile.TemporaryDirectory() as tmp, \
-                patch.object(guard, "free_pct", side_effect=[10.0, 10.0, 4.0, 4.0]), \
+                patch.object(guard, "lanes_free", side_effect=[(10.0, []), (4.0, [])]), \
+                patch.object(guard, "lanes_free_pct", side_effect=[10.0, 4.0]), \
                 patch.object(guard, "sweep_derived_data") as first, \
                 patch.object(guard, "sweep_worktrees") as second:
             report = guard.check(self.host(tmp), sweep=True)
             first.assert_called_once()
             second.assert_not_called()
             self.assertFalse(report["admitted"])
+
+
+
+def probe_check_fixture():
+    """Audit only cleanup execution; import source before denying host access."""
+    import worktree_sweep  # noqa: F401 (load lazy dependencies before the audit)
+    case = CheckTest("test_healthy_disk_sweeps_nothing")
+    case.setUp()
+    root = Path(case.cleanup.name)
+    violations = []
+    active = True
+
+    def inside(path, dir_fd=None):
+        if isinstance(path, int) or path is None:
+            return
+        path = os.fsdecode(path)
+        if not os.path.isabs(path) and dir_fd is not None and dir_fd != -1:
+            path = os.path.join(os.readlink(f"/proc/self/fd/{dir_fd}"), path)
+        absolute = Path(os.path.realpath(path))
+        if not absolute.is_relative_to(root):
+            violations.append(f"outside fixture: {absolute}")
+            raise PermissionError(violations[-1])
+
+    def audit(event, args):
+        if not active:
+            return
+        if event.startswith(("subprocess.", "socket.")) or event in ("os.system", "os.posix_spawn", "os.exec"):
+            violations.append(f"forbidden launch/network: {event}")
+            raise PermissionError(violations[-1])
+        if event in ("open", "os.listdir", "os.scandir", "os.chdir", "os.remove",
+                     "os.rmdir", "os.mkdir", "shutil.rmtree", "pathlib.Path.glob", "pathlib.Path.rglob"):
+            dir_fd = args[1] if event in ("os.remove", "os.rmdir", "shutil.rmtree") else None
+            if event == "os.mkdir":
+                dir_fd = args[2]
+            inside(args[0], dir_fd)
+        if event in ("os.rename", "os.link", "os.symlink"):
+            inside(args[0])
+            inside(args[1])
+
+    # stat/lstat do not emit Python audit events. Observe those paths too.
+    stat, lstat = Path.stat, Path.lstat
+    def checked_stat(path, *args, **kwargs):
+        inside(path)
+        return stat(path, *args, **kwargs)
+    def checked_lstat(path, *args, **kwargs):
+        inside(path)
+        return lstat(path, *args, **kwargs)
+
+    commands = []
+    def run(args, **kwargs):
+        case.assertIsNotNone(kwargs.get("cwd"))
+        inside(kwargs["cwd"])
+        if args not in (["git", "worktree", "list", "--porcelain"],
+                        ["xcrun", "simctl", "delete", "unavailable"]):
+            violations.append(f"unexpected command: {args}")
+            raise PermissionError(violations[-1])
+        commands.append(args)
+        return ok(args)
+
+    sys.addaudithook(audit)
+    try:
+        with patch.object(Path, "stat", checked_stat), patch.object(Path, "lstat", checked_lstat), \
+                patch.object(guard, "free_pct", return_value=10.0):
+            derived = make_tree(root / "DerivedData/old", ["build.log"], age_s=6 * 3600)
+            logs = make_tree(root / "runs", ["old.log"], age_s=15 * 86400)
+            report = guard.check(case.host(root), run=run, now=NOW, sweep=True)
+            case.assertEqual(report["errors"], [])
+            case.assertFalse(derived.exists())
+            case.assertFalse((logs / "old.log").exists())
+            case.assertEqual(guard.runner_roots(), [])
+            case.assertEqual(guard.retired_workspace_roots(), [])
+            # Deliberate tool coverage still uses the fixture's own home.
+            with patch.object(guard.shutil, "which", return_value="/fixture/xcrun"):
+                guard.sweep_host_tools(run, report)
+            case.assertIn(["xcrun", "simctl", "delete", "unavailable"], commands)
+            case.assertEqual(violations, [], "caught sweep errors must also fail the probe")
+            # Prove launch/path refusal before any effect; these two are deliberate reds.
+            with case.assertRaises(PermissionError):
+                subprocess.run(["git", "push", "https://invalid.example/fixture"], cwd=root)
+            with case.assertRaises(PermissionError):
+                (root.parent / "outside-fixture").read_text()
+            case.assertEqual(len(violations), 2)
+    finally:
+        active = False
+        case.doCleanups()
+
+
+class FixtureIsolationTest(unittest.TestCase):
+    def test_check_fixture_paths_and_subprocesses_fail_closed(self):
+        # Audit hooks are irreversible: contain them in a fresh interpreter.
+        code = ("import importlib.util,sys; "
+                "s=importlib.util.spec_from_file_location('disk_fixture_probe', sys.argv[1]); "
+                "m=importlib.util.module_from_spec(s); s.loader.exec_module(m); "
+                "m.probe_check_fixture()")
+        result = subprocess.run([sys.executable, "-I", "-B", "-c", code, str(Path(__file__).resolve())],
+                                capture_output=True, text=True, timeout=60)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
 
@@ -616,7 +729,8 @@ class RetiredHostLoopTest(unittest.TestCase):
         backups = subprocess.run(["git", "for-each-ref", "--format=%(refname)", "refs/jovie-preserved/sweep/"],
                                  cwd=origin, env=self.env, capture_output=True, text=True).stdout.split()
         self.assertEqual(len(backups), 1, report)
-        self.assertTrue(backups[0].endswith("/JOV-2-" + guard.datetime.fromtimestamp(NOW, guard.timezone.utc).strftime("%Y%m%d")))
+        self.assertIn("/JOV-2-" + guard.datetime.fromtimestamp(NOW, guard.timezone.utc).strftime("%Y%m%d") + "-",
+                      backups[0])
         shown = subprocess.run(["git", "show", f"{backups[0]}:wip.txt"], cwd=origin, env=self.env,
                                capture_output=True, text=True).stdout
         self.assertEqual(shown, "unsaved")
@@ -790,6 +904,38 @@ class GitHousekeepingTest(unittest.TestCase):
             git_housekeeping.remove_tree(target)
         self.assertEqual(target.read_text(), "keep")
         git_housekeeping.remove_tree(root)
+
+
+class LanesMountsTest(unittest.TestCase):
+    """JOV-10233: the state root and the bind-mounted worktree disk are different filesystems."""
+
+    def test_lowest_mount_decides_admission_and_sweep(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            (state / "worktrees").mkdir()
+            readings = {str(state): 22.6, str(state / "worktrees"): 0.0}
+            with patch.object(guard, "lanes_mounts", return_value=[state, state / "worktrees"]), \
+                    patch.object(guard, "free_pct", side_effect=lambda path: readings[str(path)]):
+                pct, rows = guard.lanes_free(state)
+                report = guard.check(SimpleNamespace(state=state, repo=state), run=ok)
+        self.assertEqual(pct, 0.0)
+        self.assertEqual({row["path"] for row in rows}, {str(state), str(state / "worktrees")})
+        self.assertTrue(report["critical"])
+        self.assertFalse(report["admitted"])
+        self.assertEqual(len(report["mounts"]), 2)
+
+    def test_mounts_are_deduplicated_by_device(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            (state / "runs").mkdir()
+            (state / "bindings" / "LYB" / "worktrees").mkdir(parents=True)
+            self.assertEqual(guard.lanes_mounts(state), [state])  # one tmpfs/dev: one row
+
+    def test_unreadable_state_root_is_unknown_not_free(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            with patch.object(guard, "free_pct", return_value=None):
+                self.assertEqual(guard.lanes_free(state)[0], None)
 
 
 if __name__ == "__main__":

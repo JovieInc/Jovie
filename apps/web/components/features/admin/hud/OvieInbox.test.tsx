@@ -56,6 +56,40 @@ const response = (cases: readonly OvieInboxCase[]) =>
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Ovie Inbox', () => {
+  it('reserves decision content while loading without moving Refresh', async () => {
+    let resolveRead!: (response: Response) => void;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>(resolve => {
+            resolveRead = resolve;
+          })
+      )
+    );
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const { container } = render(
+      <QueryClientProvider client={client}>
+        <OvieInbox />
+      </QueryClientProvider>
+    );
+    expect(
+      screen.getByRole('status', { name: 'Loading Decisions…' })
+    ).toBeInTheDocument();
+    expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(
+      4
+    );
+    const refresh = screen.getByRole('button', { name: 'Refresh' });
+    resolveRead(Response.json({ cases: [], issues: [] }));
+    expect(
+      await screen.findByText('No pending founder decisions.')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBe(refresh);
+    expect(container.querySelector('[data-empty-state-card]')).toBeNull();
+  });
+
   it('shows one canonical certification card and submits its exact evidence digest', async () => {
     const cases = projectOvieInbox([], [], fixtureInventory()).cases;
     const fetcher = mount(response(cases), new Response('{}'), response([]));

@@ -62,6 +62,10 @@ async function verifiedDeploymentId(
 ): Promise<string> {
   const observed = response.headers.get('x-jovie-eve-deployment-id');
   if (observed === expected) return expected;
+  // A response with no deployment header at all (a 5xx or an edge error) says
+  // nothing about WHICH deployment answered. Do not call that a deployment
+  // mismatch: it hid a stuck-turn 503 as summer_deployment_unverified.
+  if (observed === null && !response.ok) throw new Error('summer_http_error');
   let live: string;
   try {
     live = await refresh();

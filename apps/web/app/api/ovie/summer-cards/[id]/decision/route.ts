@@ -7,7 +7,9 @@ import {
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { authorizeSummerControl } from '@/lib/ovie/control';
+import { extractBearer } from '@/lib/ovie/mcp/oauth';
 import { resolveOviePrincipal } from '@/lib/ovie/mcp/principal';
+import { requireOvieApiAccess } from '@/lib/ovie/privacy-lock/access';
 import {
   SUMMER_CARD_ID_PATTERN,
   summerCardDecisionSchema,
@@ -54,6 +56,10 @@ export async function POST(
       gate.status
     );
   }
+  // Recording a decision is a write. A read-scoped OAuth token never decides.
+  if (!principal.scopes.includes('ovie:write')) {
+    return json({ error: 'forbidden' }, 403);
+  }
 
   const { id } = await context.params;
   if (!SUMMER_CARD_ID_PATTERN.test(id)) {
@@ -78,6 +84,14 @@ export async function POST(
         ? profileIdFromClaimCardKey(existing.idempotencyKey)
         : null;
     if (claimProfileId) {
+      // Claim decisions link an artist identity or refund and cancel a
+      // subscription: same privileged gate (fresh passkey step-up) as
+      // /api/admin/claim-verifications. Write-scoped bearer tokens are
+      // already founder-issued machine credentials.
+      if (!extractBearer(request.headers.get('authorization'))) {
+        const denied = await requireOvieApiAccess({ privileged: true });
+        if (denied) return denied;
+      }
       const claim = await decideClaimVerification({
         profileId: claimProfileId,
         decision: parsed.data.decision,

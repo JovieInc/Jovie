@@ -31,8 +31,39 @@ fail() {
   exit 1
 }
 
-if [[ "$(uname -s)" != 'Linux' || "$(uname -m)" != 'x86_64' ]]; then
-  fail "pinned toolchain supports Linux x86_64 only (got $(uname -s) $(uname -m))"
+# Keep the CI Linux artifacts unchanged. Darwin pins come from the same
+# official releases; binary hashes are measured after verifying the archives.
+platform="$(uname -s) $(uname -m)"
+case "$platform" in
+  'Linux x86_64')
+    actionlint_platform='linux_amd64'
+    actionlint_sha256="$ACTIONLINT_SHA256"
+    shellcheck_platform='linux.x86_64'
+    shellcheck_tarball_sha256="$SHELLCHECK_TARBALL_SHA256"
+    shellcheck_binary_sha256="$SHELLCHECK_BINARY_SHA256"
+    ;;
+  'Darwin arm64')
+    actionlint_platform='darwin_arm64'
+    actionlint_sha256='aba9ced2dee8d27fecca3dc7feb1a7f9a52caefa1eb46f3271ea66b6e0e6953f'
+    shellcheck_platform='darwin.aarch64'
+    shellcheck_tarball_sha256='56affdd8de5527894dca6dc3d7e0a99a873b0f004d7aabc30ae407d3f48b0a79'
+    shellcheck_binary_sha256='61c17246d69f012cd458ae82f244c46023dac75d1b69733ca1cc7d28fb270fd7'
+    ;;
+  'Darwin x86_64')
+    actionlint_platform='darwin_amd64'
+    actionlint_sha256='5b44c3bc2255115c9b69e30efc0fecdf498fdb63c5d58e17084fd5f16324c644'
+    shellcheck_platform='darwin.x86_64'
+    shellcheck_tarball_sha256='3c89db4edcab7cf1c27bff178882e0f6f27f7afdf54e859fa041fca10febe4c6'
+    shellcheck_binary_sha256='2589be755bb115f4421b8271eb7c08df1e03729f00350c1e4cf53b4a0bf9c2df'
+    ;;
+  *) fail "unsupported platform: $platform" ;;
+esac
+
+# macOS ships shasum, so use it without requiring GNU coreutils. Minimal
+# Linux hosts may also use shasum; both verify the same SHA-256 manifest.
+if [[ "$platform" == Darwin* ]] || ! command -v sha256sum >/dev/null; then
+  command -v shasum >/dev/null || fail 'a SHA-256 verifier is required'
+  sha256sum() { shasum -a 256 "$@"; }
 fi
 
 tool_dir="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/actionlint-toolchain.XXXXXX")"
@@ -51,16 +82,16 @@ download() {
 }
 
 download \
-  "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" \
-  "$tool_dir/actionlint.tar.gz" "$ACTIONLINT_SHA256"
+  "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_${actionlint_platform}.tar.gz" \
+  "$tool_dir/actionlint.tar.gz" "$actionlint_sha256"
 tar -xzf "$tool_dir/actionlint.tar.gz" -C "$tool_dir" actionlint
 
 download \
-  "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
-  "$tool_dir/shellcheck.tar.xz" "$SHELLCHECK_TARBALL_SHA256"
+  "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.${shellcheck_platform}.tar.xz" \
+  "$tool_dir/shellcheck.tar.xz" "$shellcheck_tarball_sha256"
 tar -xJf "$tool_dir/shellcheck.tar.xz" -C "$tool_dir" --strip-components=1 \
   "shellcheck-v${SHELLCHECK_VERSION}/shellcheck"
-printf '%s  %s\n' "$SHELLCHECK_BINARY_SHA256" "$tool_dir/shellcheck" |
+printf '%s  %s\n' "$shellcheck_binary_sha256" "$tool_dir/shellcheck" |
   sha256sum --check --status || fail 'extracted shellcheck binary sha256 mismatch'
 
 download \

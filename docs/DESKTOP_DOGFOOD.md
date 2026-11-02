@@ -23,7 +23,7 @@ JOVIE_DESKTOP_DOGFOOD_FEATURE_FLAGS_JSON='[]' \
 pnpm desktop:dogfood
 ```
 
-The default target is `/Applications/Jovie Staging.app`. Override it with
+The default target is `/Applications/Jovie.app`. Override it with
 `JOVIE_DESKTOP_DOGFOOD_APP_PATH`; override the hosted origin with
 `JOVIE_DESKTOP_DOGFOOD_BASE_URL`. Use
 `JOVIE_DESKTOP_DOGFOOD_OUTPUT_DIR` when an existing GUI driver needs a stable

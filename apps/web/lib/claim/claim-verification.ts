@@ -47,6 +47,10 @@ export const CLAIM_VERIFICATION_STATUSES = [
   'pending_verification',
   'verified',
   'rejected',
+  /** A counter-claim with at least equal proof: page stays up, frozen. */
+  'disputed',
+  /** A human decided the page comes down. Never public, for every writer. */
+  'taken_down',
 ] as const;
 
 export type ClaimVerificationStatus =
@@ -73,6 +77,159 @@ export interface ClaimVerificationRecord {
   readonly decisionReason?: string | null;
   /** Stripe refund id for a rejected, refunded claim. */
   readonly refundId?: string | null;
+  /**
+   * Free admission: the page stays private until verified. Persisted on the
+   * profile so no mutable waitlist field can lose it; the database trigger
+   * `creator_profiles_proof_before_public` enforces it for every writer.
+   */
+  readonly proofOnly?: boolean;
+  /** Code the artist places on a page that belongs to their identity. */
+  readonly proofCode?: string;
+  /** Every automatic check, newest last, capped. Never stores page content. */
+  readonly proofAttempts?: readonly ProofAttempt[];
+  /** How ownership was proven. Absent on records written before 2026-11. */
+  readonly proofMethod?: ProofMethod;
+  /** `website_code` counts as strong only on a domain linked from Spotify. */
+  readonly proofDomainLinked?: boolean;
+  /** When proof verified the claim (ISO), for time-to-verify p50/p95. */
+  readonly verifiedAt?: string | null;
+  /** Open or decided counter-claim. */
+  readonly dispute?: ClaimDispute;
+  /** Grandfathered (`legacy`) claims: end of the 30-day verify window, ISO. */
+  readonly legacyNudgeDueAt?: string;
+  /** Grandfathered claims: when the nudge stage was recorded, ISO. */
+  readonly nudgeSentAt?: string | null;
+  /** When a 50k+ grandfathered claim was reopened for proof, ISO. */
+  readonly legacyProofRequiredAt?: string | null;
+  /** Rejections the artist answered with a new request. */
+  readonly reopenCount?: number;
+}
+
+export const PROOF_METHODS = [
+  'instagram_oauth',
+  'youtube_oauth',
+  'website_code',
+  'dns',
+  'domain_email',
+  'distributor',
+  'operator',
+  'legacy',
+] as const;
+
+export type ProofMethod = (typeof PROOF_METHODS)[number];
+
+export type ProofStrength = 'strong' | 'weak' | 'legacy';
+
+/**
+ * Base strength per method (spec 2026-11-01, section 3). `website_code` is
+ * weak here and strong only when the domain is linked from the artist's
+ * Spotify profile (see `proofStrength`). `legacy` is a grandfathered profile
+ * with no proof at all, so any real proof outranks it.
+ */
+export const PROOF_STRENGTH: Readonly<Record<ProofMethod, ProofStrength>> = {
+  instagram_oauth: 'strong',
+  youtube_oauth: 'strong',
+  dns: 'strong',
+  distributor: 'strong',
+  operator: 'strong',
+  website_code: 'weak',
+  domain_email: 'weak',
+  legacy: 'legacy',
+};
+
+const PROOF_STRENGTH_RANK: Readonly<Record<ProofStrength, number>> = {
+  legacy: 0,
+  weak: 1,
+  strong: 2,
+};
+
+export interface ProofEvidence {
+  readonly method: ProofMethod;
+  readonly domainLinked?: boolean;
+}
+
+export function proofStrength(evidence: ProofEvidence): ProofStrength {
+  if (evidence.method === 'website_code' && evidence.domainLinked === true) {
+    return 'strong';
+  }
+  return PROOF_STRENGTH[evidence.method];
+}
+
+/** Negative when `a` is weaker than `b`, zero when equal, positive when stronger. */
+export function compareProofStrength(
+  a: ProofEvidence,
+  b: ProofEvidence
+): number {
+  return (
+    PROOF_STRENGTH_RANK[proofStrength(a)] -
+    PROOF_STRENGTH_RANK[proofStrength(b)]
+  );
+}
+
+/**
+ * The proof behind a verified record. Records written before proof methods
+ * were stored have none: an operator decision (decidedAt set) counts as
+ * `operator`, anything else as `legacy`.
+ */
+export function currentProofEvidence(
+  record: ClaimVerificationRecord
+): ProofEvidence {
+  const method =
+    record.proofMethod ?? (record.decidedAt ? 'operator' : 'legacy');
+  return { method, domainLinked: record.proofDomainLinked };
+}
+
+export type DisputeOutcome = 'keep' | 'transfer' | 'take_down';
+
+export interface ClaimDispute {
+  readonly claimantProofMethod: ProofMethod;
+  readonly claimantDomainLinked?: boolean;
+  readonly openedAt: string;
+  readonly outcome?: DisputeOutcome;
+  readonly decidedAt?: string;
+  readonly decidedBy?: string | null;
+}
+
+export type ProofAttemptOutcome =
+  | 'matched'
+  | 'no_match'
+  | 'fetch_failed'
+  | 'no_candidate_page'
+  | 'blocked_host'
+  | 'rate_limited';
+
+export interface ProofAttempt {
+  readonly at: string;
+  readonly outcome: ProofAttemptOutcome;
+  /** Hostname only; never a URL, path or page content. */
+  readonly host: string | null;
+}
+
+export const PROOF_ATTEMPTS_PER_HOUR = 5;
+export const PROOF_ATTEMPTS_KEPT = 30;
+export const MAX_PROOF_REOPENS = 3;
+
+export function appendProofAttempt(
+  record: ClaimVerificationRecord,
+  attempt: ProofAttempt
+): ClaimVerificationRecord {
+  const attempts = [...(record.proofAttempts ?? []), attempt].slice(
+    -PROOF_ATTEMPTS_KEPT
+  );
+  return { ...record, proofAttempts: attempts };
+}
+
+/** Counted attempts in the trailing hour; rate-limited ones do not count. */
+export function proofAttemptsInLastHour(
+  record: ClaimVerificationRecord,
+  now: Date
+): number {
+  const since = now.getTime() - 3_600_000;
+  return (record.proofAttempts ?? []).filter(
+    attempt =>
+      attempt.outcome !== 'rate_limited' &&
+      new Date(attempt.at).getTime() >= since
+  ).length;
 }
 
 /** High-reach artists are never claimed self-serve. Unknown reach is not high. */
@@ -91,12 +248,22 @@ export function buildClaimVerificationRequest(input: {
   readonly artistName: string | null;
   readonly reach: number;
   readonly paid: boolean;
+  /**
+   * Free-first admission: the page stays private and the request is open for
+   * review immediately, with no payment involved (paidAt stays null).
+   */
+  readonly proofOnly?: boolean;
+  /** Generated by the caller (random), so this module stays pure. */
+  readonly proofCode?: string;
   readonly now: Date;
 }): ClaimVerificationRecord {
   const at = input.now.toISOString();
   return {
     schema: CLAIM_VERIFICATION_SCHEMA,
-    status: input.paid ? 'pending_verification' : 'awaiting_payment',
+    status:
+      input.paid || input.proofOnly
+        ? 'pending_verification'
+        : 'awaiting_payment',
     spotifyArtistId: input.spotifyArtistId,
     artistName: input.artistName?.trim() || null,
     reach: {
@@ -106,7 +273,98 @@ export function buildClaimVerificationRequest(input: {
     },
     requestedAt: at,
     paidAt: input.paid ? at : null,
+    ...(input.proofOnly
+      ? {
+          proofOnly: true,
+          ...(input.proofCode ? { proofCode: input.proofCode } : {}),
+        }
+      : {}),
   };
+}
+
+/**
+ * Self-serve claim proof (Tim, 2026-11-02): a non-admin claim that attaches a
+ * Spotify identity keeps the page private until ownership is proven. Returns
+ * the record to store, or null when the profile's current record already
+ * covers this identity (already private, or already verified for this artist).
+ *
+ * - An open request that is not proof-only keeps its status and payment and
+ *   becomes proof-only, so the page stays private (fail closed).
+ * - Proof for a different artist never publishes a new identity.
+ */
+export function buildSelfServeClaimProof(input: {
+  readonly settings: unknown;
+  readonly spotifyArtistId: string;
+  readonly artistName: string | null;
+  /** Spotify followers when known; unknown reach is stored as 0. */
+  readonly followers: number | null;
+  /** Generated by the caller (random), so this module stays pure. */
+  readonly proofCode: string;
+  readonly now: Date;
+}): ClaimVerificationRecord | null {
+  const existing = readClaimVerification(input.settings);
+  // A dispute or takedown is a human's open or final decision; a new claim
+  // never overwrites it.
+  if (existing?.status === 'disputed' || existing?.status === 'taken_down') {
+    return null;
+  }
+  if (existing?.proofOnly === true && existing.status !== 'verified') {
+    return null;
+  }
+  if (
+    existing?.spotifyArtistId === input.spotifyArtistId &&
+    existing.status === 'verified'
+  ) {
+    return null;
+  }
+  if (
+    existing &&
+    existing.proofOnly !== true &&
+    isClaimVerificationOpen(existing)
+  ) {
+    return {
+      ...existing,
+      proofOnly: true,
+      proofCode: existing.proofCode ?? input.proofCode,
+    };
+  }
+  return buildClaimVerificationRequest({
+    spotifyArtistId: input.spotifyArtistId,
+    artistName: input.artistName,
+    reach:
+      typeof input.followers === 'number' && Number.isFinite(input.followers)
+        ? input.followers
+        : 0,
+    paid: false,
+    proofOnly: true,
+    proofCode: input.proofCode,
+    now: input.now,
+  });
+}
+
+/**
+ * True while the page must not be public: a free-admission page waiting for
+ * (or failed) proof, or any taken-down page. A disputed page was verified and
+ * stays up, frozen (`isClaimFrozen`). Mirrors `enforce_proof_before_public()`.
+ */
+export function isRecordBlockingPublication(
+  record: ClaimVerificationRecord | null
+): boolean {
+  if (!record) return false;
+  if (record.status === 'taken_down') return true;
+  return (
+    record.proofOnly === true &&
+    record.status !== 'verified' &&
+    record.status !== 'disputed'
+  );
+}
+export function isProofBlockingPublication(settings: unknown): boolean {
+  return isRecordBlockingPublication(readClaimVerification(settings));
+}
+
+/** Disputed pages stay public but take no owner writes until a human decides. */
+export function isClaimFrozen(settings: unknown): boolean {
+  return readClaimVerification(settings)?.status === 'disputed';
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -183,6 +441,106 @@ export function decideClaimVerificationRecord(
     decidedBy: input.decidedBy,
     decisionReason: input.reason?.trim() || null,
     refundId: input.refundId ?? null,
+  };
+}
+
+/**
+ * Automatic proof transition. Only `pending_verification` can be verified,
+ * and only by strong proof: weak proof needs a second signal or a human, and
+ * `legacy` is not proof. Anything else returns null (idempotent retries).
+ */
+export function markVerifiedByProof(
+  record: ClaimVerificationRecord | null,
+  method: ProofMethod,
+  at: Date,
+  options: { readonly domainLinked?: boolean } = {}
+): ClaimVerificationRecord | null {
+  if (record?.status !== 'pending_verification') return null;
+  if (
+    proofStrength({ method, domainLinked: options.domainLinked }) !== 'strong'
+  ) {
+    return null;
+  }
+  return {
+    ...record,
+    status: 'verified',
+    proofMethod: method,
+    ...(options.domainLinked === undefined
+      ? {}
+      : { proofDomainLinked: options.domainLinked }),
+    verifiedAt: at.toISOString(),
+  };
+}
+
+/**
+ * Counter-claim. Only a verified page can be disputed, and only with proof at
+ * least as strong as the current owner's, so a bare claim cannot freeze a real
+ * artist. The page stays up, frozen. Returns null otherwise.
+ */
+export function openDispute(
+  record: ClaimVerificationRecord | null,
+  input: {
+    readonly claimantProofMethod: ProofMethod;
+    readonly claimantDomainLinked?: boolean;
+    readonly at: Date;
+  }
+): ClaimVerificationRecord | null {
+  if (record?.status !== 'verified') return null;
+  if (input.claimantProofMethod === 'legacy') return null;
+  const claimant: ProofEvidence = {
+    method: input.claimantProofMethod,
+    domainLinked: input.claimantDomainLinked,
+  };
+  if (compareProofStrength(claimant, currentProofEvidence(record)) < 0) {
+    return null;
+  }
+  return {
+    ...record,
+    status: 'disputed',
+    dispute: {
+      claimantProofMethod: input.claimantProofMethod,
+      ...(input.claimantDomainLinked === undefined
+        ? {}
+        : { claimantDomainLinked: input.claimantDomainLinked }),
+      openedAt: input.at.toISOString(),
+    },
+  };
+}
+
+/**
+ * Human decision on an open dispute. `keep` and `transfer` return the page to
+ * verified (a transfer carries the claimant's proof; moving ownership is the
+ * caller's job), `take_down` removes it. Returns null unless disputed.
+ */
+export function resolveDispute(
+  record: ClaimVerificationRecord | null,
+  input: {
+    readonly outcome: DisputeOutcome;
+    readonly decidedBy: string | null;
+    readonly at: Date;
+  }
+): ClaimVerificationRecord | null {
+  if (record?.status !== 'disputed' || !record.dispute) return null;
+  const decidedAt = input.at.toISOString();
+  const dispute: ClaimDispute = {
+    ...record.dispute,
+    outcome: input.outcome,
+    decidedAt,
+    decidedBy: input.decidedBy,
+  };
+  if (input.outcome === 'take_down') {
+    return { ...record, status: 'taken_down', dispute };
+  }
+  if (input.outcome === 'keep') {
+    return { ...record, status: 'verified', dispute };
+  }
+  return {
+    ...record,
+    status: 'verified',
+    proofMethod: record.dispute.claimantProofMethod,
+    proofDomainLinked: record.dispute.claimantDomainLinked === true,
+    verifiedAt: decidedAt,
+    dispute,
   };
 }
 

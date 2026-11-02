@@ -137,6 +137,16 @@ function allowedDependencyFile(path) {
     path === 'pnpm-lock.yaml' ||
     path === 'apps/eve-pilot/pnpm-lock.yaml' ||
     path === 'package.json' ||
+    // The Eve installation contract hardcodes the microsandbox/pnpm/eve pins
+    // in lockstep with apps/eve-pilot/package.json (its own documented rule).
+    // Every Dependabot bump of one of those packages requires the contract pin
+    // to move in the same PR; without this carve-out the pin-sync commit makes
+    // the PR ineligible here, deadlocking the lane: the writer cannot commit
+    // the regenerated lockfile while the stale pin fails the test job, and the
+    // test job cannot pass until the writer lands it (Safe PR Remediation runs
+    // 41426524239 / 41427756418, PR #24272). The writer still only ever writes
+    // the package/lockfile pair; the contract test gates the writer either way.
+    path === 'apps/eve-pilot/tests/eve-installation-contract.test.ts' ||
     /(^|\/)package\.json$/.test(path)
   );
 }

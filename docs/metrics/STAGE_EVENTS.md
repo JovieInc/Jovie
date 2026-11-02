@@ -13,7 +13,7 @@ One row per entity per stage. Stage dwell time is `exitedAt - enteredAt`.
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `schema` | `"jovie-stage-event/v1"` | Contract version. Breaking changes bump it. |
-| `entityType` | manifest key | `shipping`, `remediation`, `release`, `release-replay`, `ios-release`, `revenue-funnel`, `summer-turn`, `linear-intake`, `automation-run` |
+| `entityType` | manifest key | `shipping`, `remediation`, `release`, `release-replay`, `ios-release`, `revenue-funnel`, `summer-turn`, `linear-intake`, `detector-issue`, `automation-run`, `incident`, `board-task` |
 | `entityId` | string | Stable id; the format is declared per entity in the manifest. |
 | `stage` | manifest stage id | Must be registered for the entity type. Unregistered stages are rejected. |
 | `enteredAt` | ISO-8601 | When the entity entered the stage. |
@@ -60,6 +60,13 @@ terminal stage has no dwell, so it reports arrivals (`n`), `failed` and
 flagged only when both sides have enough samples (10 recent, 20 baseline), the
 ratio exceeds 1.25 and the absolute increase is at least 60s. Thresholds live
 in the manifest `regression` block.
+
+**Issue closure (`shipping:closed`).** `closed` is the terminal shipping stage: the
+Linear issue's first transition to a completed state (Done) at or after the PR's
+production verification. `verified` therefore carries the closure lag (verified to Done)
+as its dwell, and a verified PR whose issue is still open shows as an open `verified`
+stage. Done transitions before verification (manual closes, earlier PRs of a reworked
+issue) are ignored.
 
 ## Outputs
 
@@ -110,6 +117,21 @@ PATCH as `lanes-status.json`). Keep 28 days, drop older rows, cap at 8 MB.
 | `shipping:outcome-receipt` | `shipping` / `JOV-<n>` | lifecycle comment that owes `outcome` | outcome lane records the receipt (`advanced` pass, `failed` fail, `abandoned` no receipt) | `runs/ledger.jsonl` (`kind` outcome-verify) |
 | `remediation:repair-start` | `remediation` / `JovieInc/Jovie#<pr>@<first 12 chars of the red head sha>` | fix-red receipt `startedAt` | receipt `endedAt` | `runs/ledger.jsonl` (`kind` fix-red) |
 
+| `incident:undetected` | `incident` / `<host>:<condition key>#<generation>` | last proof of life: the probe's last pass (`probe-red:*`) or the receipt's mtime (`automation-silent:*`) | doctor raised the condition | `runs/incidents.jsonl` `detected` |
+| `incident:unfiled` | same | condition raised | Linear issue filed or reopened (first tick doctor.json `issues[key]` holds an open id) | `runs/incidents.jsonl` `filed` |
+| `incident:open` | same | issue filed (raise time when never filed) | doctor read the condition cleared (`null` while open) | `runs/incidents.jsonl` `cleared` |
+| `incident:cleared` | same | terminal, `completed` | | |
+| `board-task:posted` | `board-task` / hub task id | `postedEpoch` | `claimedEpoch` (claim latency) | `runs/board-intake.jsonl` `claimed` |
+| `board-task:running` | same | `claimedEpoch` | `closedEpoch`; `completed` for done, `failed` for failed | `runs/board-intake.jsonl` `done`/`failed` |
+| `board-task:closed` | same | terminal; `failRate` = 1 - success rate | | |
+
+Incidents: per doctor condition, time to detect (`undetected`), time to file
+(`unfiled`) and time to fix and verify (`open`). The same Linear issue's claim,
+PR and merge split is the `detector-issue` entity below; join on the issue the
+condition key names (`Symphony doctor: <key> (<host>)`). `actor` = `doctor` for
+incidents and `lanes:<kind>` for board tasks; `sourceReceipt` =
+`doctor:<host>:<key>:<generation>` or `board-intake:<task id>`.
+
 `actor` = provider (`codex`, `claude`, ...). `outcome`: `advanced` when the run
 produced a PR or a push, `failed` for `failed`/`provider-error`/`fix-no-change`
 verdicts. `sourceReceipt` = `lanes-ledger:<runId>`. Backfill: emit rows for
@@ -134,6 +156,27 @@ failed, pre-fix; fixed in summer-config #270).
 
 `entityId` = `<conversation>:<turn>`, both hashed by summer-config. `outcome` on the terminal row: `completed`,
 `failed` or `abandoned`. Backfill from the existing receipt blobs.
+
+### Detector issue loop (`detector-issue`, summer-config)
+
+Live emitter: summer-config `agent/lib/detector-loop.ts`. It writes one create-only
+marker per stage, `summer-company/stage-events/detector/<month>/<JOV-n>/c<cycle>/<stage>.<class>.<ms>.json`,
+and the same Summer stage feed turns those markers into rows. Detector issues are routed
+model-free from the Linear webhook, dispatched as leased mesh board tasks (or one
+founder card for reserved items), and close only on the detector's own `cleared`
+receipt.
+
+| Stage | Timestamp |
+| --- | --- |
+| `detector-issue:filed` | issue created by the doctor or capacity tracker (reopen: the reopen time) |
+| `detector-issue:owned` | first board claim, lane start (In Progress), or founder card for reserved items |
+| `detector-issue:pr` | first In Review or Merging |
+| `detector-issue:fixed` | merge (Merging, Validating or Done) or board task `done` for an ops fix |
+| `detector-issue:verified` | Done with the detector's `🤖 doctor: cleared` comment |
+
+`entityId` = `JOV-<n>#<cycle>`, `actor` = `detector:<class>`. Per-class p50/p95 and
+the counts that must stay at 0 (`unownedPastSla`, `agedPastFixSla`) are at
+`https://summer.jov.ie/runtime/v1/detector-loop.json`, refreshed every 10 minutes.
 
 ### Controller replay (`release-replay`)
 

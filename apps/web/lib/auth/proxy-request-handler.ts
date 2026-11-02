@@ -172,7 +172,9 @@ export async function handleProxyRequest(
           shouldAllowProductScreenshotCaptureRoutes(req),
       })
     ) {
-      return NextResponse.rewrite(new URL('/404', req.url));
+      // status 404: a bare rewrite serves the prerendered /404 body as HTTP 200
+      // (soft 404), which crawlers and uptime checks read as a live page.
+      return NextResponse.rewrite(new URL('/404', req.url), { status: 404 });
     }
 
     // Allow sidebar demo to bypass authentication

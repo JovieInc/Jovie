@@ -10,7 +10,6 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { setTestAuthBypassSession } from '../helpers/auth';
-import { installAppFlagOverrides } from './helpers/app-flag-overrides';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 test.skip(
@@ -18,12 +17,12 @@ test.skip(
   'Requires E2E_USE_TEST_AUTH_BYPASS=1'
 );
 
-// Identity stays off the rail while PROFILES_WORKSPACE defaults off. The
-// creator-ready persona does not receive the admin default-on exception.
-const CANONICAL_LABELS = ['Inbox', 'Work', 'Audience'] as const;
+// Canonical destinations are available to ordinary creators without rollout overrides.
+const CANONICAL_LABELS = ['Inbox', 'Identity', 'Work', 'Audience'] as const;
 
 const CANONICAL_HREFS = [
   APP_ROUTES.DASHBOARD,
+  APP_ROUTES.PRESENCE,
   APP_ROUTES.LIBRARY,
   APP_ROUTES.CONTACTS_AUDIENCE,
 ] as const;
@@ -75,11 +74,6 @@ test('mobile navigation and canonical sidebar are stable at 375, 768, and 1440',
 }, testInfo) => {
   test.setTimeout(180_000);
   await installStableShell(page);
-  // The contract below is the PROFILES_WORKSPACE-off rail. Shared dev/CI
-  // databases can carry a published environment enablement for the flag, so
-  // pin the documented precondition with a personal override (honored
-  // outside production) instead of inheriting environment state.
-  await installAppFlagOverrides(page, { PROFILES_WORKSPACE: false });
   await setTestAuthBypassSession(page, 'creator-ready');
   const chatWithProfileRail = `${APP_ROUTES.CHAT}?panel=profile`;
   await page.goto(
@@ -150,17 +144,17 @@ test('mobile navigation and canonical sidebar are stable at 375, 768, and 1440',
     const expandedLinks = expanded.getByRole('link');
     // Utility rows: Public Profile (any creator with a handle, since #16320)
     // then Settings.
-    await expect(expandedLinks).toHaveCount(5);
+    await expect(expandedLinks).toHaveCount(6);
     const expandedContract = await linkContract(expandedLinks);
-    expect(expandedContract.slice(0, 3)).toEqual(
+    expect(expandedContract.slice(0, 4)).toEqual(
       CANONICAL_LABELS.map((label, index) => ({
         label,
         href: CANONICAL_HREFS[index],
       }))
     );
-    expect(expandedContract[3]?.label).toBe('Public Profile');
-    expect(expandedContract[3]?.href).toMatch(/^\/[^/]+$/);
-    expect(expandedContract[4]).toEqual({
+    expect(expandedContract[4]?.label).toBe('Public Profile');
+    expect(expandedContract[4]?.href).toMatch(/^\/[^/]+$/);
+    expect(expandedContract[5]).toEqual({
       label: 'Settings',
       href: APP_ROUTES.SETTINGS,
     });
@@ -217,7 +211,22 @@ test('mobile navigation and canonical sidebar are stable at 375, 768, and 1440',
   process.stdout.write(
     `${JSON.stringify({ name: 'desktop-nav-box', before: navBeforeFilter, after: navAfterFilter })}\n`
   );
-  expect(navAfterFilter).toEqual(navBeforeFilter);
+  // Focus must not move the nav's box by a layout-relevant amount. Firefox
+  // reports the same box with device-pixel rounding deltas under half a CSS
+  // pixel (e.g. x 7.93 -> 8), so pin the intent — no visible shift — with a
+  // subpixel tolerance instead of exact deep equality.
+  expect(Math.abs(navAfterFilter.x - navBeforeFilter.x)).toBeLessThanOrEqual(
+    0.5
+  );
+  expect(Math.abs(navAfterFilter.y - navBeforeFilter.y)).toBeLessThanOrEqual(
+    0.5
+  );
+  expect(
+    Math.abs(navAfterFilter.width - navBeforeFilter.width)
+  ).toBeLessThanOrEqual(0.5);
+  expect(
+    Math.abs(navAfterFilter.height - navBeforeFilter.height)
+  ).toBeLessThanOrEqual(0.5);
   await expectNoHorizontalOverflow(page);
   await page.screenshot({
     path: testInfo.outputPath('canonical-customer-shell-1440x900.png'),

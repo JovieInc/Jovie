@@ -6,6 +6,7 @@
  * gate keep their `lintVoice` contract; do not add rules here.
  */
 import { lintCopy } from '@jovie/copy';
+import { repairCopyFloorText } from '@/lib/chat/copy-floor-repair';
 
 export interface VoiceLintViolation {
   readonly rule: string;
@@ -43,11 +44,13 @@ export interface GatedAssistantReply {
 }
 
 /**
- * Gate a completed assistant reply against the copy floor. Returns the
- * original text when clean; otherwise a safe fallback plus the violations so
- * the caller can log which rules fired.
+ * Gate a completed assistant reply against the copy floor. Mechanical
+ * violations (dashes) are rewritten first, as the floor requires; only a reply
+ * that still fails is replaced with the safe fallback. Returns the violations
+ * so the caller can log which rules fired.
  */
 export function gateAssistantReply(text: string): GatedAssistantReply {
-  const { ok, violations } = lintVoice(text);
-  return { text: ok ? text : ASSISTANT_REPLY_FALLBACK, violations };
+  const repaired = repairCopyFloorText(text);
+  const { ok, violations } = lintVoice(repaired);
+  return { text: ok ? repaired : ASSISTANT_REPLY_FALLBACK, violations };
 }

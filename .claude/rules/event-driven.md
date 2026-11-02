@@ -37,7 +37,7 @@ record is a defect, even when it exits 0.
 | Stage | Event | Backstop | SLO | Registry id |
 |---|---|---|---|---|
 | Linear Triage → classified (team, priority, labels, out of Triage, or Ovie card) | Linear `Issue` create / entered-triage webhook → Summer scoped triage turn | Summer hourly `triage-sweep` catch-up | 15 min | `summer:triage-dwell` |
-| Required-green ready PR → in merge queue | `workflow_run` of required checks, `pull_request_target` `ready_for_review`/`synchronize` → Merge Queue Green Enroll | push-to-main roster sweep | 10 min | `github:jovie:green-to-enqueue` |
+| Required-green ready PR → in merge queue | `workflow_run` of required checks, `pull_request_target` `ready_for_review` (no `synchronize`: a new head has no green verdict to act on) → Merge Queue Green Enroll | push-to-main roster sweep | 10 min | `github:jovie:green-to-enqueue` |
 | Green lane draft → ready | lane gate verdict on the exact head → lanes `publish_verified` (writer proof, JOV-INV-022) | lanes tick | measured in the `green-to-enqueue` reason (`draft-green`) | lanes-owned |
 
 ## When adding or changing automation

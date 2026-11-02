@@ -23,6 +23,27 @@ vi.mock('next/link', () => {
 });
 
 describe('EmptyState (canonical molecule API)', () => {
+  it('keeps a quiet link action accessible and disables it while unavailable', () => {
+    const action = { label: 'Refresh', href: '/app/admin' };
+    const { rerender } = render(
+      <EmptyState presentation='quiet' heading='No Data Yet' action={action} />
+    );
+    expect(screen.getByRole('status')).toHaveAccessibleName('No Data Yet');
+    expect(screen.getByRole('link', { name: 'Refresh' })).toHaveAttribute(
+      'href',
+      '/app/admin'
+    );
+    rerender(
+      <EmptyState
+        presentation='quiet'
+        heading='No Data Yet'
+        action={{ ...action, disabled: true }}
+      />
+    );
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeDisabled();
+  });
+
   it('renders heading, description, and greyscale icon without a nested panel', () => {
     render(
       <EmptyState

@@ -8,9 +8,19 @@ How agents claim, transition, and finish Linear-tracked work without colliding w
 
 ## Issue Gating
 
+<!-- EVENT 2026-10-29: agent-ready retired -->
+`agent-ready` is retired as an admission requirement, like `tim-hold` before it. Backlog admission
+computes readiness from what matters: a spec of at least 200 characters with acceptance criteria (or a
+Done section), no machine hold label or hold text, no open blocker, no red-line or sensitive text. A missing
+spec is drafted by Summer (Proposed spec section). Summer's rank, priority, the per-tick admission cap and
+WIP limits are unchanged. The label is still accepted and some intake still writes it; nothing may require
+it. Do not add it by hand to make an issue admissible, and do not write new code that reads it as a gate.
+
 <!-- JOV-INV-028 -->
-Legacy `human-review-required`, `needs-human`, and `no-auto` labels are invalid
-automation holds. Remove them when encountered and continue through the normal
+Legacy `human-review-required`, `needs-human`, `no-auto`, `tim-hold`, `tim:hold`,
+`hold:tim` and `do-not-merge` labels are invalid automation holds (EVENT
+2026-10-28: nothing waits on a human; reserved decisions are one non-blocking
+Ovie card with a default and a deadline). Remove them when encountered and continue through the normal
 machine gates. Product taste is steered before PR creation or certified after
 landing behind a feature flag. A physical or external action ships disabled and
 is tracked as a separate post-landing authority action; it never parks the code

@@ -89,9 +89,7 @@ describe('admin nav IA copy (JOV-2098)', () => {
     expect(source).toContain(
       'Certified, deployed, exposed, and observed customer reality'
     );
-    expect(source).toContain(
-      'Autonomous execution outcomes, exceptions, costs, and queues'
-    );
+    expect(source).toContain('Agents, lanes, health, exceptions, and queues');
     // Needs You folded into Home's asks (Tim 2026-10-21: one Home).
     expect(source).not.toContain(
       'Founder judgments that automation cannot safely make'

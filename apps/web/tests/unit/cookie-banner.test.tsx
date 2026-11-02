@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CookieActions } from '@/components/molecules/CookieActions';
 import { CookieBannerSection } from '@/components/organisms/CookieBannerSection';
@@ -164,6 +165,17 @@ describe('CookieBannerSection', () => {
     expect(
       screen.getByRole('button', { name: 'Customize' })
     ).toBeInTheDocument();
+  });
+
+  it('puts the card in the server HTML when the page resolves it visible (LCP)', () => {
+    // Painting the card only after hydration made it the LCP element on /claim
+    // (~4.5s on the throttled-mobile entry gate, budget 4000ms).
+    const html = renderToString(<CookieBannerSection initialVisible />);
+    expect(html).toContain('data-testid="cookie-banner"');
+    expect(html).toContain('Essential cookies keep Jovie working.');
+    expect(renderToString(<CookieBannerSection />)).not.toContain(
+      'data-testid="cookie-banner"'
+    );
   });
 
   it('hides the banner when jv_cc_required cookie is absent', () => {

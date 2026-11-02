@@ -88,7 +88,7 @@ describe('stage derivation from receipts', () => {
       prs: [pr(7, { mergedAt: ago(90) })],
       controllers,
       linearIssues: JSON.parse(
-        `{"JOV-7":{"createdAt":${q(ago(1000))},"startedAt":${q(ago(400))},"initialType":"backlog","history":[{"at":${q(ago(800))},"fromType":"backlog","toType":"unstarted"}]}}`
+        `{"JOV-7":{"createdAt":${q(ago(1000))},"startedAt":${q(ago(400))},"initialType":"backlog","history":[{"at":${q(ago(800))},"fromType":"backlog","toType":"unstarted"},{"at":${q(ago(100))},"fromType":"started","toType":"completed"},{"at":${q(ago(10))},"fromType":"started","toType":"completed"}]}}`
       ),
       feeds: {
         lanes: {
@@ -116,6 +116,8 @@ describe('stage derivation from receipts', () => {
       ['merged', ago(90)],
       ['deployed', ago(40)],
       ['verified', ago(30)],
+      // Done before verification (ago(100)) is ignored; closure is first Done after it.
+      ['closed', ago(10)],
     ]);
     expect(events[0].actor).toBe('codex');
     const release = deriveStageEvents(raw, MANIFEST).filter(
@@ -157,7 +159,7 @@ describe('stage derivation from receipts', () => {
       ).toMatchObject({ enteredAt: ago(40), exitedAt: ago(30) });
       expect(
         events.find(e => e.entityType === 'shipping' && e.stage === 'verified')
-      ).toMatchObject({ outcome: 'completed', exitedAt: ago(30) });
+      ).toMatchObject({ outcome: 'open', exitedAt: null });
       const timings = compactStageTimings(
         computeStageTimings(events, MANIFEST, { now: NOW })
       );
@@ -495,7 +497,7 @@ describe('committed stage-timings snapshot', () => {
       '28d': [1, 1200, 1200],
       regression: [false, null, 1200, null, 1, 0],
     });
-    expect(compact.entities.shipping.stages.verified).toMatchObject({
+    expect(compact.entities.shipping.stages.closed).toMatchObject({
       terminal: true,
       regression: null,
     });

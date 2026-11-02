@@ -38,8 +38,7 @@ fs.mkdirSync(screenshotsDir, { recursive: true });
 fs.mkdirSync(crashesDir, { recursive: true });
 
 const appPath = path.resolve(
-  process.env.JOVIE_DESKTOP_DOGFOOD_APP_PATH ??
-    '/Applications/Jovie Staging.app'
+  process.env.JOVIE_DESKTOP_DOGFOOD_APP_PATH ?? '/Applications/Jovie.app'
 );
 const processName = path.basename(appPath, '.app');
 const runnerId = process.env.JOVIE_DESKTOP_DOGFOOD_RUNNER_ID?.trim() || null;

@@ -7,6 +7,14 @@ import { FooterNavigation } from '@/components/molecules/FooterNavigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 
+/**
+ * Profile legal links keep 10px type but own a 44x44pt hit box. FooterLink's
+ * default negative x-margin is zeroed so neighbouring boxes tile, and the
+ * negative y-margin returns the extra height to layout.
+ */
+const PROFILE_LEGAL_LINK_CLASS =
+  'min-h-11 min-w-11 items-center justify-center -my-3 mx-0 text-3xs leading-4 opacity-60 hover:opacity-100';
+
 const FOOTER_COLUMNS = [
   {
     id: 'product',
@@ -101,7 +109,7 @@ export function Footer({
             ariaLabel='Legal'
             links={profileLegalLinks}
             className='gap-2 text-3xs leading-4'
-            linkClassName='text-3xs leading-4 opacity-60 hover:opacity-100'
+            linkClassName={PROFILE_LEGAL_LINK_CLASS}
           />
         </div>
 
@@ -111,7 +119,7 @@ export function Footer({
             ariaLabel='Legal'
             links={profileLegalLinks}
             className='gap-2 text-3xs leading-4'
-            linkClassName='text-3xs leading-4 opacity-60 hover:opacity-100'
+            linkClassName={PROFILE_LEGAL_LINK_CLASS}
           />
         </div>
       </footer>

@@ -29,9 +29,11 @@ describe('PayView', () => {
     expect(
       await screen.findByRole('button', { name: 'Continue with Venmo' })
     ).toBeInTheDocument();
+    // Plain, specific hint: the amount to send, not an instruction to retype.
+    expect(screen.getByText(/^Send \$\d+ in Venmo\.$/)).toBeInTheDocument();
     expect(
-      screen.getByText('Enter the amount in Venmo before sending.')
-    ).toBeInTheDocument();
+      screen.queryByText(/Enter the amount in Venmo/)
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole('group', { name: 'Choose a payment method' })
     ).toBeInTheDocument();
@@ -53,17 +55,17 @@ describe('PayView', () => {
     });
     globalThis.fetch = fetchMock;
     render(<PayView {...props} profileId={undefined} />);
-    await screen.findByRole('button', { name: 'Select Venmo' });
+    await screen.findByRole('option', { name: 'Venmo' });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/tips/create-checkout?handle=artist',
       expect.objectContaining({ cache: 'no-store' })
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Select Venmo' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Venmo' }));
     expect(fetchMock).toHaveBeenCalledTimes(1);
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Select Apple Pay / Card' })
+      await screen.findByRole('option', { name: 'Apple Pay / Card' })
     );
     fireEvent.click(
       await screen.findByRole('button', {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   activationSatisfied,
+  type CategorySpendEvidence,
   COMMITMENT_EXPERIMENTS,
   CONVERSATION_ENTRY_SURFACES,
   commitmentStrengthRank,
@@ -26,6 +27,17 @@ const FULL_ANSWERS = {
 } as const;
 
 describe('conversation loop (JOV-5947)', () => {
+  it('does not turn category spend into demonstrated willingness for a Jovie offer', () => {
+    const receipt = qualificationReceipt({
+      answers: { ...FULL_ANSWERS },
+      evidence: [],
+      hasCurrentSpend: true,
+      hasAuthority: true,
+      hasConcreteUrgency: true,
+    });
+    expect(receipt.willingnessToPay).toBe('unknown');
+    expect(receipt.recommendedNextAction).toBe('commitment_session');
+  });
   it('resolves and dedupes identity; public surfaces require confirmation', () => {
     const resolved = resolveConversationIdentity({
       surface: 'direct_imessage',
@@ -70,8 +82,9 @@ describe('conversation loop (JOV-5947)', () => {
       hasConcreteUrgency: true,
     });
     expect(receipt.missingDimensions).toEqual([]);
-    expect(receipt.willingnessToPay).toBe('demonstrated');
-    expect(receipt.recommendedNextAction).toBe('commitment_payment');
+    expect(receipt.willingnessToPay).toBe('unknown');
+    expect(receipt.categorySpend.status).toBe('unknown');
+    expect(receipt.recommendedNextAction).toBe('commitment_session');
     expect(receipt.confidence).toBeGreaterThan(0.5);
     expect(receipt.evidenceRefs).toHaveLength(2);
   });
@@ -125,7 +138,7 @@ describe('conversation loop (JOV-5947)', () => {
       hasAuthority: true,
       hasConcreteUrgency: true,
     });
-    expect(selectCommitmentExperiment(strong)).toBe('payment');
+    expect(selectCommitmentExperiment(strong)).toBe('scheduled_session');
 
     const weak = qualificationReceipt({
       answers: { ...FULL_ANSWERS },
@@ -135,11 +148,99 @@ describe('conversation loop (JOV-5947)', () => {
       hasConcreteUrgency: false,
     });
     const experiment = selectCommitmentExperiment(weak);
-    expect(experiment).toBe('setup_effort');
+    expect(experiment).toBe('scheduled_session');
     expect(commitmentStrengthRank(experiment as never)).toBeGreaterThan(
       commitmentStrengthRank('payment')
     );
     expect(COMMITMENT_EXPERIMENTS).toContain('scheduled_session');
+  });
+
+  it.each([
+    ['reported', { basis: 'reported', verificationRef: null }, 'reported'],
+    [
+      'verified',
+      { basis: 'verified', verificationRef: 'billing-receipt:1' },
+      'verified',
+    ],
+    [
+      'unverified claim',
+      { basis: 'verified', verificationRef: null },
+      'unknown',
+    ],
+    [
+      'free tool',
+      { basis: 'reported', verificationRef: null, amountMinor: 0 },
+      'unknown',
+    ],
+    [
+      'missing payer',
+      { basis: 'reported', verificationRef: null, payerId: '' },
+      'unknown',
+    ],
+    [
+      'unlinked turn',
+      { basis: 'reported', verificationRef: null, threadTurnId: 'missing' },
+      'unknown',
+    ],
+  ] satisfies [string, Partial<CategorySpendEvidence>, string][])(
+    'records %s category spend without asserting offer willingness',
+    (_name, patch, status) => {
+      const spend: CategorySpendEvidence = {
+        threadTurnId: 'spend-turn',
+        category: 'cover art',
+        payerId: 'business-1',
+        amountMinor: 15000,
+        currency: 'USD',
+        basis: 'reported',
+        verificationRef: null,
+      };
+      const receipt = qualificationReceipt({
+        answers: FULL_ANSWERS,
+        evidence: [{ threadTurnId: 'spend-turn', dimension: 'spend' }],
+        categorySpendEvidence: [
+          {
+            ...spend,
+            ...patch,
+          },
+        ],
+        hasCurrentSpend: true,
+        hasAuthority: true,
+        hasConcreteUrgency: true,
+      });
+      expect(receipt.categorySpend.status).toBe(status);
+      expect(receipt.willingnessToPay).toBe('unknown');
+      expect(receipt.recommendedNextAction).toBe('commitment_session');
+      expect(selectCommitmentExperiment(receipt)).toBe('scheduled_session');
+    }
+  );
+
+  it('does not let complete answer coverage become a payment probability', () => {
+    const receipt = qualificationReceipt({
+      answers: FULL_ANSWERS,
+      evidence: (
+        Object.keys(FULL_ANSWERS) as (keyof typeof FULL_ANSWERS)[]
+      ).map(dimension => ({ threadTurnId: dimension, dimension })),
+      hasCurrentSpend: true,
+      hasAuthority: true,
+      hasConcreteUrgency: true,
+    });
+    expect(receipt.confidence).toBe(1);
+    expect(receipt.willingnessToPay).toBe('unknown');
+    expect(receipt.recommendedNextAction).toBe('commitment_session');
+    expect(
+      selectCommitmentExperiment({
+        ...receipt,
+        recommendedNextAction: 'commitment_payment',
+        willingnessToPay: 'demonstrated',
+      })
+    ).toBeNull();
+    expect(
+      selectCommitmentExperiment({
+        ...receipt,
+        recommendedNextAction: 'commitment_deposit',
+        willingnessToPay: 'demonstrated',
+      })
+    ).toBeNull();
   });
 
   it('reconciles payment-link states and rejects impossible transitions', () => {

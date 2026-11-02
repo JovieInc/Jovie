@@ -14,6 +14,7 @@ import {
   expectedPublicProfileLayout,
   PROFILE_DESKTOP_SURFACE_SHIPPED,
 } from './utils/profile-desktop-surface';
+import { certifyProfileModeHistory } from './utils/profile-mode-history';
 import { auditPublicProfileLayout } from './utils/public-profile-layout-invariant';
 import {
   installPublicRouteMocks,
@@ -26,6 +27,18 @@ const PHONE_COLUMN_ONLY =
   'Exercises the default mobile-first desktop column; the build ships the desktop surface';
 
 const diagnostics = new WeakMap<object, () => Promise<void>>();
+
+for (const viewport of [
+  { width: 390, height: 844 },
+  { width: 1440, height: 900 },
+]) {
+  test(`profile mode history survives Home refresh at ${viewport.width}px`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize(viewport);
+    await certifyProfileModeHistory(page, testInfo, 'unfazed');
+  });
+}
 
 test.beforeEach(({ page }) => {
   diagnostics.set(page, observeProfileAdmissionFailure(page));
@@ -144,6 +157,56 @@ async function waitForSettledProfileLayout(
 }
 
 test.describe('public profile browser admission', () => {
+  test('keeps direct claim intent through hydration, Escape, and profile modes', async ({
+    page,
+  }, testInfo) => {
+    await installPublicRouteMocks(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const response = await page.goto(
+      '/renders/profile-admission?layout=public&state=unclaimed-direct&claim=1&source=qr',
+      { waitUntil: 'domcontentloaded' }
+    );
+    expect(response?.status()).toBe(200);
+    await waitForSettledProfileLayout(page, 'compact');
+
+    const assertClaimIntent = async (mode: string) => {
+      await expect(page.getByTestId('claim-banner')).toContainText(
+        'Your profile is ready. Claim it to turn on release emails.'
+      );
+      await expect(page.getByTestId('claim-banner-cta')).toHaveAttribute(
+        'href',
+        '/unfazed/claim?next=auth'
+      );
+      await expect(page).toHaveURL(
+        url =>
+          url.pathname === '/unfazed' &&
+          url.searchParams.get('claim') === '1' &&
+          url.searchParams.get('source') === 'qr' &&
+          url.searchParams.get('mode') === (mode === 'profile' ? null : mode)
+      );
+      await expect(page.getByTestId('profile-compact-surface')).toHaveAttribute(
+        'data-mode',
+        mode
+      );
+    };
+    await assertClaimIntent('profile');
+
+    const menu = page.getByRole('button', { name: 'Menu', exact: true });
+    await menu.click();
+    await expect(page.getByTestId('profile-menu-drawer')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('profile-menu-drawer')).toBeHidden();
+    await expect(menu).toBeFocused();
+    await assertClaimIntent('profile');
+
+    const nav = page.getByTestId('profile-bottom-nav');
+    await nav.getByRole('button', { name: 'Events', exact: true }).click();
+    await assertClaimIntent('tour');
+    await nav.getByRole('button', { name: 'Home', exact: true }).click();
+    await assertClaimIntent('profile');
+    await captureStill(page, testInfo, 'direct-claim-intent-preserved.png');
+  });
+
   for (const viewport of [1179, 1180].map(width => ({
     width,
     layout: expectedPublicProfileLayout(width),

@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import {
   createTestSelector,
+  HIGH_RISK_PREFIXES,
   readExecutedTests,
   readModuleSource,
   readReportMutants,
@@ -49,6 +50,7 @@ const { values } = parseArgs({
     'max-tests': { type: 'string', default: '15' },
     low: { type: 'string', default: '60' },
     summary: { type: 'string' },
+    scope: { type: 'string', default: 'high-risk' },
     'list-only': { type: 'boolean', default: false },
   },
 });
@@ -81,7 +83,13 @@ for (const [name, value] of caps) {
   }
 }
 const readModule = readModuleSource(webRoot);
-const sources = selectHighRiskSources(changedPaths(), readModule);
+if (!['high-risk', 'all'].includes(values.scope)) {
+  throw new Error('--scope must be high-risk or all');
+}
+// `all` is the rolling sweep: any apps/web source with a related test.
+const sources = selectHighRiskSources(changedPaths(), readModule, {
+  prefixes: values.scope === 'all' ? null : HIGH_RISK_PREFIXES,
+});
 const toRun = sources.slice(0, maxFiles);
 const skipped = sources.slice(maxFiles);
 const selectTests =

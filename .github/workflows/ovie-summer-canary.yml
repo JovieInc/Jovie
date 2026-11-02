@@ -1,0 +1,75 @@
+name: Ovie Summer Canary
+run-name: Ovie Summer Canary (${{ github.event_name }})
+# No cron here (JOV-INV-042 freezes GitHub crons): the Gem lanes clock fires
+# repository_dispatch clock_summer_canary hourly. Stateless probe of Summer's fast chat path from production. It writes
+# nothing to the founder's Summer history. Variable-gated: set the repo variable
+# E2E_PROD_SUMMER_CANARY=true once summer-config's fast chat endpoint is deployed.
+# clock-class: production-liveness
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: The probe route runs inside production with Gateway OIDC and the founder principal; the GitHub-hosted observer holds only the cron bearer secret and a Slack webhook.
+# removal-trigger: Remove when a first-party production monitor owns an equivalent Summer probe and has delivered alerts for 30 consecutive days.
+
+permissions:
+  contents: read
+
+on:
+  repository_dispatch:
+    types: [clock_summer_canary]
+  workflow_dispatch:
+
+concurrency:
+  group: ovie-summer-canary
+  cancel-in-progress: false
+
+jobs:
+  canary:
+    name: Summer fast chat canary
+    if: ${{ vars.E2E_PROD_SUMMER_CANARY == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Doppler CLI
+        uses: ./.github/actions/setup-doppler
+
+      - name: Resolve CRON_SECRET
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: node .github/scripts/resolve-synthetic-secrets.mjs --name CRON_SECRET
+
+      - name: Probe Summer through production
+        run: |
+          status=$(curl -sS -o "$RUNNER_TEMP/summer-canary.json" -w '%{http_code}' --max-time 90 \
+            -H "authorization: Bearer ${CRON_SECRET}" https://jov.ie/api/cron/summer-canary)
+          cat "$RUNNER_TEMP/summer-canary.json"; echo
+          test "$status" = "200"
+          # First-token targets (Tim): p50 < 1.5 s, p95 < 3 s. A miss is a warning, not an outage.
+          node -e '
+            const r = JSON.parse(require("fs").readFileSync(process.env.RUNNER_TEMP + "/summer-canary.json", "utf8"));
+            const bad = (r.ttftSummary || []).filter(s => s.withinTarget === false);
+            const line = "first token " + r.ttftMs + " ms (headers " + r.headersMs + " ms); server percentiles: " +
+              JSON.stringify(r.ttftSummary || []);
+            require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, line + "\n");
+            if (r.withinTarget && r.withinTarget.p50 === false || bad.length) console.log("::warning title=Summer first token over target::" + line);
+          '
+
+      - name: Send Slack Alert on Failure
+        if: ${{ failure() }}
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
+        with:
+          status: custom
+          channel: '#alerts-production'
+          author_name: 'Ovie Summer Canary'
+          custom_payload: |
+            {
+              "text": "Summer fast chat canary FAILED on production. Home chat may be down.",
+              "attachments": [{ "color": "danger", "fields": [{ "title": "Run", "value": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}", "short": false }] }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

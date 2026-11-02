@@ -55,7 +55,8 @@ export type AudienceMember = {
   jovieEmailSubscribed?: boolean;
   artistEmailOptedIn?: boolean;
   artistEmailPendingProvider?: boolean;
-  emailVisibleToArtist?: boolean;
+  /** Fail-closed share gate result; contact details may only leave the app when true. */
+  emailVisibleToArtist: boolean;
   spotifyConnected: boolean;
   purchaseCount: number;
   tipAmountTotalCents: number;

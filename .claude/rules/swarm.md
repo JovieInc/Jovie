@@ -201,7 +201,7 @@ pnpm --filter web exec vitest run <affected test file>   # if applicable
 git add <files>
 git commit -m "fix(design-system): <conventional commit message>"
 git push -u origin tim/<chunk-slug>
-gh pr create --draft --base main --title "fix(design-system): <title>" --body "<body>"
+pnpm pr:open open --draft --title "fix(design-system): <title>" --failing-command "<cmd>" --failing-run "<url>"
 
 # 6. QA (REQUIRED -- flag is mandatory)
 # Invoke /qa --exhaustive
@@ -236,3 +236,7 @@ The seed plan that established this pattern lives at:
 ```
 
 This file is gitignored (it is a session-specific plan artifact, not a committed doc). If you need to reconstruct a wave plan, use `/autoplan` and reference this rules file as the coordination contract.
+
+## Preflight
+
+Every chunk runs `pnpm preflight:changed` before its push (the pre-push gate that lanes and swarm workers use already does). It catches the repo rules CI would otherwise report one round at a time.

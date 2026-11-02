@@ -9,7 +9,7 @@ numbers — budgets live in the sources below and in the GBrain page, not here.
 
 | # | File | Owns | Enforcement today |
 |---|------|------|-------------------|
-| 1 | `apps/web/scripts/performance-route-manifest.ts` | Route budgets (FCP/LCP/CLS/TTFB, `interactive-shell-ready`, `warm-shell-response`, `skeleton-to-content`, `usable-alias-result`) and resource budgets in transferSize KB | `performance-budgets-guard.ts` in `production-release.yml`; staged-build alias budgets block; the production alias exception is bounded below |
+| 1 | `apps/web/scripts/performance-route-manifest.ts` | Route budgets (FCP/LCP/CLS/TTFB, `interactive-shell-ready`, `warm-shell-response`, `skeleton-to-content`, `usable-alias-result`) and resource budgets in transferSize KB | `performance-budgets-guard.ts` in `production-release.yml`; authenticated six-route and staged-build alias budgets block; the production alias exception is bounded below |
 | 2 | `apps/web/.lighthouserc.json` | Production Lighthouse for `/` and `/tim` | production-controller / postdeploy — perf assertions warn; only accessibility ≥ 0.9 errors |
 | 3 | `apps/web/.lighthouserc.{dashboard,onboarding,admin,chat,public-launch,pr}.json` | Per-surface Lighthouse thresholds (error level) | `ci.yml` `ci-lighthouse-*` jobs — `workflow_dispatch` only |
 | 4 | `apps/web/scripts/performance-interaction-manifest.ts` | Interaction latency / dropped frames (jank) classes | `perf:interactions` — manual |
@@ -43,6 +43,43 @@ compare-chunks:snapshot` after a clean build.
 | `/demo` | 815 | 831 | 800 |
 | `/` | 650 | 663 | 640 |
 
+## Authenticated six-route graduation
+
+**Ship now (JOV-8557):** fail the existing authenticated six-route guard closed.
+The independent [graduation receipt](./authenticated-performance-graduation.json),
+measured at 2026-10-23T14:40:00Z, records 14 consecutive complete native PASS
+results. Each execution measured three samples for each of `creator-inbox-nav`,
+`creator-chat-nav`, `creator-library`, `creator-contacts`, `creator-calendar` and
+`creator-tasks`; the guard's PASS covers all manifest timing/resource budgets,
+including its existing same-route confirmation policy. No budget is raised.
+
+The hashed JSONL inventory enumerates all 145 controllers in the fixed
+2026-10-22T14:00:00Z–2026-10-23T14:40:00Z window. The latest 14 completed,
+executed measurement steps are selected by job completion time, regardless of
+controller conclusion. Skipped steps never qualify; partial or missing native
+authenticated results consume a nonqualifying slot. Each measurement records
+controller/attempt/job/step identities, native log SHA-256, all 18 primary samples,
+the native result and the matching checkout SHA, expected SHA and immutable
+deployment ID/URL. `headSha` is the controller source; `testedSha` is its checkout.
+
+This is production-release evidence against the exact staged production build
+before promotion. It is independent of `staging.jov.ie` and both public-profile
+alias windows below; canonical post-promotion production measurements cannot
+graduate this gate. Missing Better Auth credentials remain explicit skipped
+evidence under JOV-4452, never a passing authenticated measurement.
+
+**Re-evaluate when:** the existing guard reports a regression, or when its
+manifest/probe contract changes. The receipt names 2026-10-28T14:40:00Z as the
+next measurement review; that date does not expire blocking enforcement.
+
+**Then:** repair the measured regression and retain fail-closed enforcement.
+Refresh this receipt independently with the existing shared GitHub API client:
+
+```sh
+node scripts/lib/authenticated-performance-graduation.mjs \
+  2026-10-22T14:00:00Z 2026-10-23T14:40:00Z 2026-10-28T14:40:00Z
+```
+
 ## Public-profile alias graduation
 
 Staging and production use separate evidence windows. Staging measures the exact immutable
@@ -53,22 +90,26 @@ other surface's streak.
 
 **Ship now:** production remains warning-only. The dated
 [`jovie-public-profile-alias-graduation/v2`](./public-profile-alias-graduation.json) receipt,
-measured at 2026-10-21T01:06:00Z, records 11 qualifying production runs in the latest
-14-run window and a current consecutive streak of 0/14. The three maxima over budget
-are 1626.2, 2083.1 and 2431.6 ms. Staging independently qualifies at 14/14, so its
-exact-build alias budget now fails closed when that measurement step runs. With five
-samples per route, nearest-rank p95 is the maximum sample; every selected route must
-be at or below 1500 ms for a run to qualify.
+measured at 2026-10-31T06:00:00Z, records 14 qualifying production runs in the latest
+14-run window and a current consecutive streak of 14/14 (worst run 1268.4 ms), so the
+production canonical-alias budget now fails closed. Staging independently qualifies at
+14/14 (worst run 1278.4 ms) and its exact-build alias budget keeps failing closed when
+that measurement step runs. The guard takes 20 samples per alias route
+(`ALIAS_TAIL_RUNS`, #22656), so a route's nearest-rank p95 is its 19th-ordered sample;
+every selected route must be at or below 1500 ms for a run to qualify. The collector
+reads the sample count from each log instead of assuming one: the 2026-10-21 collector
+assumed five samples and marked every later measurement invalid.
 
-**Re-evaluate when:** production reaches 14 consecutive eligible executions, and no later
-than 2026-10-28T01:06:00Z under JOV-8737. Staging's independent graduation is recorded
+**Re-evaluate when:** any selected execution misses, and no later than
+2026-11-07T06:00:00Z under JOV-8737. Staging's independent graduation is recorded
 under JOV-8338; production evidence never changes staging's decision.
 
 **Then:** make the qualifying surface's budget gate blocking. If a surface still does not
 qualify, refresh its dated measurement and set another bounded review date.
 
-The receipt references generated JSONL with all 472 controller jobsets in the fixed
-October 14–21 interval and 28 selected measurements (840 raw samples). Each measurement
+The receipt references generated JSONL with all 246 controller jobsets in the fixed
+2026-10-27T06:00Z to 2026-10-31T06:00Z interval and 28 selected measurements (3,360 raw
+samples). Each measurement
 records exact controller/attempt/job/step identities, native log SHA-256, samples and
 matching native maxima. `headSha` identifies the controller workflow source;
 `testedSha` identifies its actual checkout. Staging also records the immutable
@@ -80,7 +121,7 @@ Refresh manually with authenticated `gh`, explicit UTC boundaries, and the ownin
 
 ```sh
 node scripts/lib/public-profile-alias-graduation.mjs \
-  2026-10-14T00:00:00Z 2026-10-21T01:06:00Z 2026-10-28T01:06:00Z JOV-8737
+  2026-10-27T06:00:00Z 2026-10-31T06:00:00Z 2026-11-07T06:00:00Z JOV-8737
 ```
 
 This regenerates the receipt and its two evidence files; review the resulting
@@ -128,7 +169,9 @@ no numbers here and does not claim that async metadata changes crawler/bot wait.
 Canvas, WebGL, and video on marketing pages are not a second Lighthouse budget
 and do not add a row here. `scripts/invariants/art-direction/surface-media.mjs`
 allows them only inside a named scope that keeps a non-WebGL fallback and
-`prefers-reduced-motion`. The homepage hero
+`prefers-reduced-motion`. Scopes are registered in
+`docs/design-system/motion-effects.json` (ASR-039), which also carries each
+effect's gzip, frame-rate and offscreen-pause budget. The homepage hero
 (`apps/web/components/homepage/hero-light/`) is that approved scope and ships
 with no feature flag. The ambient field stays in scope because it already
 keeps a CSS poster and declines WebGL under reduced motion. Every other hit

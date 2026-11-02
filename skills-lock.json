@@ -7,6 +7,7 @@
     "gstack",
     "make-it-feel-better",
     "nightly-test-agent",
+    "throughput-diagnosis",
     "vercel-composition-patterns",
     "vercel-react-best-practices",
     "youtube-thumbnail-growth"
@@ -23,10 +24,10 @@
     "copywriting",
     "cso",
     "design-canonical",
-    "design-consultation",
     "design-html",
     "design-review",
     "design-shotgun",
+    "design-system",
     "document-release",
     "find-skills",
     "freeze",
@@ -54,6 +55,7 @@
     "setup-gbrain",
     "ship",
     "sync-gbrain",
+    "throughput-diagnosis",
     "tool-discovery",
     "unfreeze",
     "youtube-thumbnail-growth"

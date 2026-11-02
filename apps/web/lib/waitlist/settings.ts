@@ -357,6 +357,23 @@ export async function updateWaitlistSettings(input: {
   return updated;
 }
 
+/**
+ * Give back a slot reserved earlier in the same transaction when the approval
+ * it was reserved for did not happen. Never goes below zero.
+ */
+export async function releaseAutoAcceptSlot(
+  dbOrTx?: DbOrTransaction
+): Promise<void> {
+  const client = dbOrTx ?? db;
+  await client
+    .update(waitlistSettings)
+    .set({
+      autoAcceptedToday: drizzleSql`greatest(${waitlistSettings.autoAcceptedToday} - 1, 0)`,
+      updatedAt: new Date(),
+    })
+    .where(eq(waitlistSettings.id, SETTINGS_ROW_ID));
+}
+
 export async function tryReserveAutoAcceptSlot(
   dbOrTx?: DbOrTransaction
 ): Promise<{

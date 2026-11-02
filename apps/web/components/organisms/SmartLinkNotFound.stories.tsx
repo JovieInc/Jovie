@@ -12,7 +12,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'The exact shared missing-entity body inherited by public release, track, promo-download, and sound routes. These stories prove only the shipped missing state; successful server-backed states remain route-owned and require real data.',
+          'The exact shared missing-entity body inherited by public release, track, promo-download, and sound routes. These stories prove only the shipped missing state; successful server-backed states remain route-owned and require real data. The body is the page main landmark with a 44px Go Home target.',
       },
     },
   },

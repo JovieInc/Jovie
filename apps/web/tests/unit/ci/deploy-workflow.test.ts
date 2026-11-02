@@ -253,7 +253,7 @@ describe('source PR path-output reachability contract', () => {
     const buildLayout = getJobBlock(workflow, 'ci-build-layout');
 
     expect(provenanceHeader).not.toMatch(/^    if:/m);
-    expect(provenanceHeader).toContain('runs-on: ubuntu-latest');
+    expect(provenanceHeader).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(neutralProvenance).toContain(
       "github.event_name != 'push' || github.ref != 'refs/heads/main'"
     );
@@ -663,7 +663,7 @@ describe('deploy workflow Vercel env resolution', () => {
     const buildJob = getJobBlock(workflow, 'ci-build-layout');
 
     expect(buildJob).toContain("github.ref == 'refs/heads/main'");
-    expect(buildJob).toContain('runs-on: ubuntu-latest');
+    expect(buildJob).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(buildJob).toContain('Build exact combined head');
     expect(buildJob).toContain('Run deterministic layout behavior guard');
     expect(buildJob).not.toContain('actions/upload-artifact');
@@ -683,10 +683,12 @@ describe('deploy workflow Vercel env resolution', () => {
       'promote-production',
       'release-result',
     ]) {
-      expect(getJobBlock(workflow, job)).toContain('runs-on: ubuntu-latest');
+      expect(getJobBlock(workflow, job)).toMatch(
+        /runs-on: ubuntu-(?:latest|24\.04)/
+      );
     }
-    expect(readFileSync(canaryWorkflowPath, 'utf8')).toContain(
-      'runs-on: ubuntu-latest'
+    expect(readFileSync(canaryWorkflowPath, 'utf8')).toMatch(
+      /runs-on: ubuntu-(?:latest|24\.04)/
     );
   });
 
@@ -831,7 +833,7 @@ describe('deploy workflow Vercel env resolution', () => {
     }
   });
 
-  it('keeps exact-build performance proof deployable without optional auth credentials', () => {
+  it('enforces qualified exact-build budgets while allowing optional auth credentials to be unconfigured', () => {
     const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const promotionJob = getJobBlock(workflow, 'promote-production');
     const setupStep = getStepBlock(
@@ -879,12 +881,17 @@ describe('deploy workflow Vercel env resolution', () => {
     );
     expect(performanceStep).toContain('--auth-path "$auth_state"');
     expect(performanceStep).toContain('--runs 3');
-    expect(performanceStep).toContain(
+    expect(performanceStep).not.toContain(
       'echo "::warning::Canonical six-route browser budgets failed on the exact staged build."'
     );
-    expect(performanceStep).toContain('performance_status=warn');
     expect(performanceStep).not.toContain(
-      'fail_performance_gate "Canonical six-route browser budgets failed on the exact staged build."'
+      'authenticated_performance_status=warn'
+    );
+    expect(performanceStep).toContain(
+      'fail_performance_gate "Canonical six-route browser budgets failed on the exact staged build (JOV-8557)."'
+    );
+    expect(performanceStep).toContain(
+      'authenticated_performance_status=passed'
     );
     for (const routeId of [
       'creator-inbox-nav',
@@ -1649,6 +1656,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(stageStep).toContain('bootstrap-cookie-jar');
     expect(stageStep).toContain('EXPECTED_VERCEL_ENVIRONMENT=production');
     expect(stageStep).toContain('VERCEL_VERIFY_PUBLIC_SURFACES=true');
+    expect(stageStep).toContain('VERCEL_VERIFY_LINKED_RELEASES=tim');
     expect(stageStep).toContain('VERCEL_PROBE_TIMEOUT_MS=180000');
     expect(stageStep).not.toContain('fetch_staged');
     expect(stageStep).not.toContain('STAGED_RESPONSE');
@@ -1664,7 +1672,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(verifyStep).toContain('EXPECTED_PRODUCTION_DEPLOYMENT_ID');
   });
 
-  it('measures production public-profile alias budgets as warning-only', () => {
+  it('blocks production alias budgets on certified pages and warns elsewhere', () => {
     const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const aliasGate = getJobBlock(
       workflow,
@@ -1676,25 +1684,31 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(aliasGate).toContain('setup-playwright');
     expect(aliasGate).toContain('--base-url https://jov.ie');
     expect(aliasGate).toContain('--runs 5');
-    // Post-promote production alias budgets must not fail the job on miss.
+    // The 2026-10-31 receipt graduated production alias budgets (14/14,
+    // JOV-8737), but a miss blocks only on routes whose golden-path surface
+    // holds a current certification in the Ovie ledger; the rest warn.
     expect(aliasGate).toContain('id: alias-perf');
+    expect(aliasGate).toContain('scripts/performance-budgets-guard.ts');
     expect(aliasGate).toContain(
-      'if ! pnpm exec tsx scripts/performance-budgets-guard.ts'
+      'https://jov.ie/api/internal/ovie/golden-path-evidence'
+    );
+    expect(aliasGate).toContain('scripts/lib/alias-gate-certified-routes.mjs');
+    expect(aliasGate).toMatch(
+      /if ! guard \$blocking; then[\s\S]*?echo "performance_status=failed" >> "\$GITHUB_OUTPUT"\s+exit 1\s+fi/
+    );
+    expect(aliasGate).toMatch(
+      /if ! guard \$warning; then[\s\S]*?::warning::[\s\S]*?status=warn\s+fi/
     );
     expect(aliasGate).toContain(
-      'echo "performance_status=warn" >> "$GITHUB_OUTPUT"'
+      'echo "performance_status=${status}" >> "$GITHUB_OUTPUT"'
     );
-    expect(aliasGate).toContain(
-      'echo "performance_status=passed" >> "$GITHUB_OUTPUT"'
-    );
-    expect(aliasGate).toContain('::warning::');
+    expect(aliasGate).toContain('::error::');
     expect(aliasGate).toContain(
       'performance_status: ${{ steps.alias-perf.outputs.performance_status }}'
     );
-    expect(aliasGate).not.toContain('fail_performance_gate');
     expect(aliasGate).not.toContain('continue-on-error: true');
-    expect(aliasGate).not.toMatch(
-      /if ! pnpm exec tsx scripts\/performance-budgets-guard\.ts[\s\S]*?exit 1/
+    expect(releaseResult).toContain(
+      'production-public-profile-alias-gate:${{ needs.production-public-profile-alias-gate.result }}'
     );
     const promoteJob = getJobBlock(workflow, 'promote-production');
     const stagedPerformanceGate = getStepBlock(
@@ -1703,21 +1717,22 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     );
     expect(stagedPerformanceGate).toContain('--base-url "$deployment_url"');
     const stagedPublicProfileGate = stagedPerformanceGate.slice(
-      stagedPerformanceGate.lastIndexOf(
-        'if ! CI=true pnpm exec tsx scripts/performance-budgets-guard.ts'
-      )
+      stagedPerformanceGate.indexOf('public_profile_budget_lane() {'),
+      stagedPerformanceGate.indexOf('entry_route_lighthouse_lane() {')
     );
-    // JOV-8338 graduated the exact staged-build budget independently
-    // (2026-10-21 receipt: staging 14/14 qualifying), so it fails closed with
-    // the exact-build failure subtype. Production canonical-alias budgets
-    // above stay warning-only (11/14, streak 0/14) until their own receipt
-    // graduates.
+    // JOV-8338 graduated the exact staged-build budget (staging 14/14). Like
+    // the post-promotion gate (#24006, Tim 2026-10-31), it blocks only routes
+    // whose golden-path surface is certified in the Ovie ledger; uncertified
+    // routes warn and file one Linear perf ticket.
     expect(stagedPublicProfileGate).toContain(
-      'fail_performance_gate "Exact staged-build public-profile alias budgets failed."'
+      'scripts/lib/alias-gate-certified-routes.mjs'
     );
+    expect(stagedPublicProfileGate).toMatch(
+      /if ! staged_alias_guard \$blocking; then\s+fail_performance_gate "Exact staged-build public-profile alias budgets failed on certified pages/
+    );
+    expect(stagedPublicProfileGate).toContain('staged-alias-perf-intake.mjs');
+    expect(stagedPublicProfileGate).toContain('--base-url "$deployment_url"');
     expect(stagedPublicProfileGate).not.toContain('continue-on-error: true');
-    expect(stagedPublicProfileGate).not.toContain('performance_status=warn');
-    expect(stagedPublicProfileGate).not.toContain('::warning::');
     for (const routeId of [
       'public-profile-listen',
       'public-profile-music',
@@ -1726,8 +1741,11 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       'public-profile-tour',
       'public-profile-releases',
     ]) {
-      expect(aliasGate).toContain(`--route-id ${routeId}`);
+      // Routes are split into certified (blocking) and uncertified (warning)
+      // sets by scripts/lib/alias-gate-certified-routes.mjs before the guard.
+      expect(aliasGate).toMatch(new RegExp(`routes='[^']*\\b${routeId}\\b`));
     }
+    expect(aliasGate).toContain('args+=(--route-id "$route")');
     // Downstream still requires job successful completion (exit 0), not a perf pass.
     expect(releaseResult).toContain('production-public-profile-alias-gate,');
     expect(releaseResult).toContain(
@@ -1748,7 +1766,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       'lighthouse-ci',
     ]) {
       const block = getJobBlock(workflow, job);
-      expect(block).toContain('runs-on: ubuntu-latest');
+      expect(block).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
       expect(block).not.toContain('continue-on-error: true');
       expect(block).toContain(
         'needs.production-release.outputs.production_deployment_url_b64'
@@ -1813,6 +1831,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
 
     expect(publicSmoke).toContain('bootstrap-cookie-jar');
     expect(publicSmoke).toContain('VERCEL_VERIFY_PUBLIC_SURFACES=true');
+    expect(publicSmoke).toContain('VERCEL_VERIFY_LINKED_RELEASES=tim');
     expect(publicSmoke).toContain('EXPECTED_VERCEL_ENVIRONMENT=production');
     expect(publicSmoke).toContain('VERCEL_PROBE_TIMEOUT_MS=180000');
     expect(publicSmoke).not.toContain('x-vercel-protection-bypass');
@@ -2009,7 +2028,7 @@ describe('unit-test runner capacity', () => {
     const routeJob = getJobBlock(workflow, 'ci-unit-runner-route');
     const unitJob = getJobBlock(workflow, 'ci-unit-tests');
 
-    expect(routeJob).toContain('runs-on: ubuntu-latest');
+    expect(routeJob).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(routeJob).toContain('ref: main');
     expect(routeJob).toContain('continue-on-error: true');
     expect(routeJob).toContain("runner_class='hosted'");
@@ -2018,7 +2037,7 @@ describe('unit-test runner capacity', () => {
     expect(routeJob).toContain('fixed|hosted');
     expect(routeJob).not.toContain('runner: ${{ steps.route.outputs.runner }}');
     expect(routeJob).not.toContain('secrets.');
-    expect(unitJob).toContain('runs-on: ubuntu-latest');
+    expect(unitJob).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(unitJob).not.toContain('runs-on: jovie-runner');
     expect(unitJob).not.toContain('ci-unit-runner-route');
     expect(unitJob).not.toContain('vars.CI_UNIT_RUNNER');
@@ -2123,7 +2142,7 @@ describe('informational CI tail capacity', () => {
 
     expect(summaryJob).toContain('name: Manual Evidence Summary');
     expect(summaryJob).toContain("github.event_name == 'workflow_dispatch'");
-    expect(summaryJob).toContain('runs-on: ubuntu-latest');
+    expect(summaryJob).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(summaryJob).not.toContain('runs-on: ${{ vars.CI_FAST_RUNNER }}');
   });
 });
@@ -3371,7 +3390,10 @@ describe('CI E2E smoke workflow', () => {
       'Protected Golden Path fixture is already owned; refusing to detach'
     );
     expect(goldenPathSpec).toContain('user_profile_claims upc');
-    expect(goldenPathSpec).toContain('sync-spotify-empty-state');
+    // JOV-9758/JOV-9771: onboarding imports the catalog; the journey never
+    // clicks a manual sync and must see real releases before any pricing.
+    expect(goldenPathSpec).not.toContain('sync-spotify-empty-state');
+    expect(goldenPathSpec).toContain('data-catalog-releases');
     expect(goldenPathSpec).toContain('FROM discog_releases r');
     expect(goldenPathSpec).toContain(
       'INNER JOIN creator_profiles cp ON cp.id = r.creator_profile_id'
@@ -3432,8 +3454,6 @@ describe('CI E2E smoke workflow', () => {
     expect(builds).toHaveLength(1);
     expect(builds[0]?.env).toMatchObject({
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: '1x00000000000000000000AA',
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
-        '${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}',
       NEXT_PUBLIC_APP_URL: 'http://localhost:3250',
       NEXT_PUBLIC_BETTER_AUTH_URL: 'http://localhost:3250',
     });
@@ -4198,6 +4218,7 @@ describe('production promotion exact-artifact contract', () => {
       '[ "$production_deploy_target" != "production" ]'
     );
     expect(stageStep).toContain('VERCEL_VERIFY_PUBLIC_SURFACES=true');
+    expect(stageStep).toContain('VERCEL_VERIFY_LINKED_RELEASES=tim');
     expect(stageStep).not.toContain('fetch_staged');
     expect(stageStep).toContain('production_deployment_url_b64=');
     expect(stageStep).not.toContain(
@@ -4768,7 +4789,7 @@ describe('production promotion exact-artifact contract', () => {
     expect(sentryAction).toContain('echo "gate_status=error"');
     expect(sentryAction).toContain('refusing automatic rollback');
 
-    expect(sentryJob).toContain('runs-on: ubuntu-latest');
+    expect(sentryJob).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(sentryJob).toContain('name: Production – jovie');
     expect(sentryJob).toContain('ref: ${{ inputs.expected_sha }}');
     expect(sentryJob).toContain('uses: ./.github/actions/sentry-error-gate');

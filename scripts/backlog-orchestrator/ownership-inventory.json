@@ -135,13 +135,7 @@
       "current_repo": "JovieInc/Jovie",
       "verification_authority": "JovieInc/Jovie CI",
       "default_artifact": "docs/company/",
-      "current_artifacts": [
-        "canon/FLEET.md",
-        "docs/company/",
-        "STRATEGY.md",
-        "content/investors/",
-        "docs/fundraising/"
-      ],
+      "current_artifacts": ["canon/FLEET.md", "docs/company/"],
       "keywords": ["company canon", "fundraising operations", "JovieInc/Ops"],
       "jovie_admission": "allow-until-rehome",
       "later_slice": 3

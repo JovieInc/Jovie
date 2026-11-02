@@ -5,6 +5,60 @@ import Testing
 
 @MainActor
 struct ChatRepositoryTests {
+  #if DEBUG
+  @Test func nativeModelCompletionNeverCountsAsReplyPresentation() async throws {
+    let identity = try #require(ChatMeasurementIdentity(sourceSHA: String(repeating: "b", count: 40),
+      buildNumber: "42", maximumFramesPerSecond: 60))
+    let measurement = ChatPresentationMeasurement(identity: identity, now: { 1000 })
+    let client = ScriptedChatClient(sendTurnResult: .success([
+      .assistantCompleted(clientTurnId: "PLACEHOLDER", conversationId: "fixture", turnId: "fixture",
+        text: "Synthetic reply")
+    ]), listConversationsResult: .success([]),
+      fetchConversationResult: .failure(MobileChatClientError.requestFailed(statusCode: 404)))
+    let repository = ChatRepository(client: client,
+      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.measurement")!),
+      userID: "private-account-must-not-export", webBaseURL: URL(string: "https://preview.example")!)
+    repository.presentationMeasurement = measurement
+    _ = measurement.begin(runIndex: 0)
+    await repository.send(text: "private-message-must-not-export")
+    #expect(repository.timeline.last?.status == .completed)
+    measurement.cancel()
+    let sample = try #require(measurement.samples.first)
+    #expect(sample.dataReadyMs == 0)
+    #expect(sample.firstFeedbackMs == nil && sample.usableStateMs == nil)
+    #expect(sample.unavailableMetrics["usableStateMs"] == .noPresentation)
+    let json = String(decoding: try measurement.export(), as: UTF8.self)
+    #expect(!json.contains("private-account") && !json.contains("private-message"))
+    #expect(repository.measurementTurnID != nil)
+    repository.preparePresentationMeasurement()
+    #expect(repository.measurementTurnID == nil)
+    _ = measurement.begin(runIndex: 1)
+    await repository.send(text: "Another synthetic turn")
+    #expect(measurement.isActive)
+    // An unmeasured retry/tool submission must not reuse this attempt.
+    await repository.send(text: "Unmeasured tool submission")
+    #expect(!measurement.isActive)
+    #expect(measurement.samples.last?.outcome == .cancelled)
+  }
+
+  @Test func nativeClientCancellationEndsMeasurementWithoutWaitingForTimeout() async throws {
+    let identity = try #require(ChatMeasurementIdentity(sourceSHA: String(repeating: "c", count: 40),
+      buildNumber: "42", maximumFramesPerSecond: 60))
+    let measurement = ChatPresentationMeasurement(identity: identity, now: { 1000 })
+    let client = ScriptedChatClient(sendTurnResult: .failure(CancellationError()),
+      listConversationsResult: .success([]),
+      fetchConversationResult: .failure(MobileChatClientError.requestFailed(statusCode: 404)))
+    let repository = ChatRepository(client: client,
+      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.measurement-cancel")!),
+      userID: "fixture", webBaseURL: URL(string: "https://preview.example")!)
+    repository.presentationMeasurement = measurement
+    _ = measurement.begin(runIndex: 0)
+    await repository.send(text: "Synthetic cancelled turn")
+    #expect(!measurement.isActive)
+    #expect(measurement.samples.first?.outcome == .cancelled)
+  }
+  #endif
+
   @Test func openConversationDonatesSpotlightActivity() async {
     let donator = RecordingConversationActivityDonator()
     let repository = ChatRepository(

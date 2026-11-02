@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   DELIVERY_CONTROLLER_COVERAGE_ARGS,
+  SCRIPT_CONTRACT_VITEST_TESTS,
   STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
 } from './ci-fast-lanes.mjs';
 import {
@@ -47,6 +48,32 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
       'apps/web/tests/unit/marketing/MarketingTerminalCta.test.tsx',
     ],
   ],
+  // Homepage copy modules live under data/, outside the component/app import
+  // graph. Bind each one to the unit tests that import it.
+  [
+    'apps/web/data/homepageFrontDoorCta.ts',
+    [
+      'apps/web/components/features/waitlist/WaitlistPublicLanding.test.tsx',
+      'apps/web/data/canonicalPublicShellOptimization.test.ts',
+      'apps/web/tests/unit/app/auth-front-door-contract.test.ts',
+      'apps/web/tests/unit/marketing/marketing-cta-intents.test.ts',
+      'apps/web/tests/unit/marketing/marketing-header-cta-consistency.test.ts',
+    ],
+  ],
+  [
+    'apps/web/data/homepageV2Copy.ts',
+    ['apps/web/tests/unit/marketing/feature-tile-accent-uniqueness.test.ts'],
+  ],
+  [
+    'apps/web/data/marketingCtaIntents.ts',
+    [
+      'apps/web/app/(marketing)/product/ProductLanding.test.tsx',
+      'apps/web/tests/unit/app/auth-front-door-contract.test.ts',
+      'apps/web/tests/unit/marketing/marketing-bounded-revenue-path.test.ts',
+      'apps/web/tests/unit/marketing/marketing-cta-intents.test.ts',
+      'apps/web/tests/unit/marketing/marketing-header-cta-consistency.test.ts',
+    ],
+  ],
   [
     'apps/web/lib/leads/qualification-decision.ts',
     ['apps/web/tests/lib/leads/qualification-decision.test.ts'],
@@ -58,6 +85,31 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
   [
     'apps/web/lib/notifications/campaign-scheduling.ts',
     ['apps/web/lib/notifications/campaign-scheduling.test.ts'],
+  ],
+  [
+    'apps/web/components/features/onboarding/onboardingChatHelpers.ts',
+    [
+      'apps/web/tests/unit/onboarding/OnboardingChat.completed-steps.test.tsx',
+      'apps/web/tests/unit/onboarding/OnboardingChat.empty-intro.test.tsx',
+    ],
+  ],
+  [
+    'apps/web/tests/e2e/utils/start-entry-layout.ts',
+    [
+      'apps/web/tests/unit/e2e/start-entry-essentials.test.ts',
+      'apps/web/tests/unit/e2e/start-entry-layout.test.ts',
+    ],
+  ],
+  [
+    'apps/web/tests/e2e/helpers/golden-path-keyframes.ts',
+    [
+      'apps/web/tests/unit/e2e/golden-path-keyframes-errors.test.ts',
+      'apps/web/tests/unit/e2e/start-entry-essentials.test.ts',
+    ],
+  ],
+  [
+    'apps/web/tests/e2e/helpers/golden-path-tracking.ts',
+    ['apps/web/tests/unit/e2e/golden-path-tracking.test.ts'],
   ],
 ]);
 // Any web source that uses TanStack Virtual must stay out of React Compiler
@@ -1114,6 +1166,11 @@ export function classifyBlogContentForAffectedTests(base, head, options) {
 }
 
 const LANE_PYTHON_COVERAGE_INPUTS = new Set([
+  'scripts/hyperagent/hyperagent.py',
+  'scripts/hyperagent/install.py',
+  'scripts/hyperagent/models.json',
+  'scripts/lanes/reason.json',
+  'scripts/tests/test_hyperagent_cli.py',
   ...[
     'backlog_admission',
     'backlog_writer_guard',
@@ -1173,6 +1230,26 @@ const CODEX_CAPACITY_QUALIFICATION_MANIFEST = new Set([
   'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
+
+// The ejector driver has no product import edge. Qualify its complete repair
+// signature with its behavior suites and the CI plumbing/inventory contracts.
+// Partial signatures and unknown peers retain the existing full fallback.
+const MAIN_RED_EJECT_DRIVER = 'scripts/main-red-eject.mjs';
+// The quota regression arrives in the caller's PR. Discover that changed test,
+// then require its file and live CI registration before selecting it. Fixed
+// selector references continue to obey the existing-test inventory guard.
+const MAIN_RED_EJECT_QUOTA_TEST =
+  /^scripts\/lib\/__tests__\/main-red-eject-quota-failover\.test\.mjs$/;
+const MAIN_RED_EJECT_BEHAVIOR_TESTS = [
+  'scripts/lib/__tests__/main-red-eject.test.mjs',
+  'scripts/lib/__tests__/main-red-eject-failing-head.test.mjs',
+];
+const MAIN_RED_EJECT_PLUMBING_TESTS = [
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
+  ...AFFECTED_TEST_SELECTOR_TESTS,
+];
 
 export function buildAffectedTestPlan(changedFiles, options) {
   const files = unique(changedFiles.filter(Boolean));
@@ -1277,12 +1354,64 @@ function planAffectedTests(
     isFileAvailable = file => existsSync(resolve(REPO_ROOT, file)),
     readFile = readRepoFile,
     blogContentReceipt = undefined,
+    scriptContractVitestTests = SCRIPT_CONTRACT_VITEST_TESTS,
   } = {}
 ) {
   const files = unique(changedFiles.filter(Boolean)).sort();
   const globalTestInput = files.find(file => GLOBAL_TEST_INPUTS.has(file));
   if (globalTestInput) {
     return fullSuitePlan(`global test input changed: ${globalTestInput}`);
+  }
+  const ejectorQuotaTest = files.find(file =>
+    MAIN_RED_EJECT_QUOTA_TEST.test(file)
+  );
+  const ejectorInputs = [
+    MAIN_RED_EJECT_DRIVER,
+    CI_CANCELLATION_HEALER_COMPANION,
+    ejectorQuotaTest,
+  ];
+  const ejectorSelectorInputs = files.filter(file =>
+    AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
+  );
+  const isExactEjectorQualification =
+    Boolean(ejectorQuotaTest) &&
+    ejectorInputs.every(file => files.includes(file)) &&
+    files.length === ejectorInputs.length + ejectorSelectorInputs.length &&
+    (ejectorSelectorInputs.length === 0 ||
+      ejectorSelectorInputs.length === AFFECTED_TEST_SELECTOR_MANIFEST.size);
+  if (
+    (files.includes(MAIN_RED_EJECT_DRIVER) || ejectorQuotaTest) &&
+    !isExactEjectorQualification
+  ) {
+    return fullSuitePlan(
+      'main-red ejector change exceeds its complete qualification closure'
+    );
+  }
+  if (isExactEjectorQualification) {
+    const behaviorTests = [...MAIN_RED_EJECT_BEHAVIOR_TESTS, ejectorQuotaTest];
+    const qualificationTests = [
+      ...behaviorTests,
+      ...MAIN_RED_EJECT_PLUMBING_TESTS,
+    ];
+    if (
+      !qualificationTests.every(isFileAvailable) ||
+      !behaviorTests.every(test => scriptContractVitestTests.includes(test))
+    ) {
+      return fullSuitePlan(
+        'main-red ejector behavior or CI inventory proof is unavailable'
+      );
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      nodeTests: [],
+      scriptVitestTests: qualificationTests,
+    };
   }
   const sentryGateInputs = new Set([
     '.github/actions/sentry-error-gate/action.yml',
@@ -2063,6 +2192,8 @@ function planAffectedTests(
     files.some(
       file => file.startsWith('.github/') || file.startsWith('scripts/')
     ) && !isExactProductionReleaseContract;
+  const hasCompleteAffectedTestSelectorPair =
+    affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size;
   const hasManifestInputBeyondDirectTests = manifest =>
     files.some(
       file =>
@@ -2212,7 +2343,8 @@ function planAffectedTests(
     ...(isExactScannerLoadRepairPrimary || isExactScannerLoadRepairWithSelector
       ? SCANNER_LOAD_REPAIR_SCRIPT_TESTS
       : []),
-    ...(isExactAffectedTestSelector ||
+    ...(hasCompleteAffectedTestSelectorPair ||
+    isExactAffectedTestSelector ||
     (isBoundedAudienceReleaseDenial && affectedTestSelectorInputCount > 0) ||
     (isExactAuthenticatedA11yRepair && affectedTestSelectorInputCount > 0) ||
     isExactPrSizeGuardWithSelector ||
@@ -2479,6 +2611,32 @@ function planAffectedTests(
   const uncoveredSourceFiles = relatedFiles.filter(
     file => !isCoveredSource(file)
   );
+  // The complete selector pair may accompany an already-covered product
+  // change. It still fails closed for a partial pair, an exact control-lane
+  // member, or a manifest hit that is not one of the two selector files.
+  const selectorPairAccompaniesCoveredProduct =
+    hasCompleteAffectedTestSelectorPair &&
+    relatedFiles.length > 0 &&
+    uncoveredSourceFiles.length === 0 &&
+    !files.some(
+      file =>
+        !AFFECTED_TEST_SELECTOR_MANIFEST.has(file) &&
+        (SERVICE_CENSUS_QUALIFICATION_MANIFEST.has(file) ||
+          DEPENDENCY_GATE_QUALIFICATION_MANIFEST.has(file) ||
+          CODEX_CAPACITY_QUALIFICATION_MANIFEST.has(file))
+    );
+  const selectorPairIsTheOnlyManifestHit = manifest => {
+    if (!selectorPairAccompaniesCoveredProduct) return false;
+    const triggering = files.filter(
+      file =>
+        manifest.has(file) &&
+        (hasUnsupportedAutomationPeer || !directlyRunnableTestFiles.has(file))
+    );
+    return (
+      triggering.length > 0 &&
+      triggering.every(file => AFFECTED_TEST_SELECTOR_MANIFEST.has(file))
+    );
+  };
   const hasUncoveredSource =
     uncoveredSourceFiles.length > 0 ||
     (mergeQueueControllerInputCount > 0 &&
@@ -2494,15 +2652,28 @@ function planAffectedTests(
     hasStandalonePrerequisiteGlobal ||
     hasUnknownPrerequisiteTrainPeer ||
     hasIncompleteVercelCongestionControl ||
-    hasIncompleteAffectedTestSelector ||
-    hasIncompletePrSizeGuard ||
-    hasIncompletePerformanceProfilerRepair ||
-    hasIncompleteScannerLoadRepair ||
-    hasIncompleteMobileOverflowNavigationRace ||
-    hasIncompleteRunnerIoPressure ||
-    hasIncompleteRunnerPrerequisiteContract ||
-    hasIncompleteLayoutGuardContract ||
-    hasIncompleteNeonAttemptArtifactRepair;
+    (hasIncompleteAffectedTestSelector &&
+      !selectorPairIsTheOnlyManifestHit(AFFECTED_TEST_SELECTOR_MANIFEST)) ||
+    (hasIncompletePrSizeGuard &&
+      !selectorPairIsTheOnlyManifestHit(PR_SIZE_GUARD_MANIFEST)) ||
+    (hasIncompletePerformanceProfilerRepair &&
+      !selectorPairIsTheOnlyManifestHit(PERFORMANCE_PROFILER_REPAIR_ANCHORS)) ||
+    (hasIncompleteScannerLoadRepair &&
+      !selectorPairIsTheOnlyManifestHit(SCANNER_LOAD_REPAIR_MANIFEST)) ||
+    (hasIncompleteMobileOverflowNavigationRace &&
+      !selectorPairIsTheOnlyManifestHit(
+        MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST
+      )) ||
+    (hasIncompleteRunnerIoPressure &&
+      !selectorPairIsTheOnlyManifestHit(RUNNER_IO_PRESSURE_MANIFEST)) ||
+    (hasIncompleteRunnerPrerequisiteContract &&
+      !selectorPairIsTheOnlyManifestHit(
+        RUNNER_PREREQUISITE_CONTRACT_MANIFEST
+      )) ||
+    (hasIncompleteLayoutGuardContract &&
+      !selectorPairIsTheOnlyManifestHit(LAYOUT_GUARD_CONTRACT_MANIFEST)) ||
+    (hasIncompleteNeonAttemptArtifactRepair &&
+      !selectorPairIsTheOnlyManifestHit(NEON_ATTEMPT_ARTIFACT_MANIFEST));
   const hasSelectedTests =
     selectedTests.length > 0 ||
     rootVitestTests.length > 0 ||
@@ -3023,8 +3194,8 @@ export function buildSelectedTestCommands(
       [
         'NEXT_PUBLIC_APP_URL=http://localhost:3100',
         'NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3100',
-        'NEXT_PUBLIC_CLERK_MOCK=1',
-        'NEXT_PUBLIC_CLERK_PROXY_DISABLED=1',
+        'NEXT_PUBLIC_AUTH_MOCK=1',
+        'NEXT_PUBLIC_AUTH_PROXY_DISABLED=1',
         'NEXT_PUBLIC_E2E_MODE=1',
         'NEXT_IGNORE_ESLINT=1',
         'NEXT_IGNORE_TYPECHECK=1',

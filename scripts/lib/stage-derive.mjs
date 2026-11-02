@@ -110,6 +110,22 @@ export function deriveShippingEvents(
       stamps.push(stamp('verified', verified.verifiedAt, verified.runUrl));
     const linearId = linearIdFor(pr);
     const issue = linearId ? linearIssues[linearId] : null;
+    // closed: the Linear issue reached Done after production verification, so
+    // verified -> closed measures closure lag and a verified-but-open issue
+    // shows as an open verified stage.
+    if (issue && verified?.verifiedAt) {
+      const doneAt = earliest(
+        (issue.history ?? [])
+          .filter(
+            h => h.toType === 'completed' && ms(h.at) >= ms(verified.verifiedAt)
+          )
+          .map(h => h.at)
+      );
+      if (doneAt)
+        stamps.push(
+          stamp('closed', doneAt, `https://linear.app/jovie/issue/${linearId}`)
+        );
+    }
     if (issue?.createdAt) {
       const url = `https://linear.app/jovie/issue/${linearId}`;
       const toType = type =>
@@ -138,7 +154,7 @@ export function deriveShippingEvents(
     const kept = stamps.filter(
       s =>
         s.at &&
-        (['deployed', 'verified'].includes(s.stage) ||
+        (['deployed', 'verified', 'closed'].includes(s.stage) ||
           ms(s.at) <= ms(pr.mergedAt))
     );
     events.push(

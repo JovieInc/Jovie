@@ -250,7 +250,7 @@ function AudienceQualityFilterVisual() {
               <CheckCircle2 aria-hidden='true' className='h-3.5 w-3.5' />
             </span>
             <span className='text-xs font-semibold text-primary-token'>
-              Actual Fans
+              Actual listeners
             </span>
           </div>
           <div className='mt-4 space-y-2'>

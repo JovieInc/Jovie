@@ -4,7 +4,7 @@ import { Button } from '@jovie/ui';
 import { Copy, ExternalLink, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
 import { toast } from '@/components/feedback';
 import { buildReleaseTasksRoute } from '@/constants/routes';
@@ -135,6 +135,7 @@ export function WorkInspectorActions({
   disabled = false,
   onSharePrivately,
   onRetryLaunchKit,
+  preview = null,
 }: {
   readonly asset: LibraryReleaseAsset;
   /** Canonical launches for any work; only entries scoped to `asset.id` render. */
@@ -144,6 +145,8 @@ export function WorkInspectorActions({
   /** Opens private file sharing in place, on the link row it belongs to. */
   readonly onSharePrivately: () => void;
   readonly onRetryLaunchKit?: (launch: WorkLaunchSummary) => void;
+  /** Preview playback control; rendered in the same button style as the rest. */
+  readonly preview?: ReactNode;
 }) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
@@ -238,28 +241,32 @@ export function WorkInspectorActions({
 
         <div className='flex max-w-full shrink-0 flex-wrap items-center gap-1.5'>
           {action.kind === 'share_page' && pageUrl ? (
-            <a
-              href={pageUrl}
-              target='_blank'
-              rel='noopener noreferrer'
-              className={QUIET_LINK_CLASS}
+            <Button
+              asChild
+              variant='secondary'
+              size='sm'
               data-testid='work-action-preview-page'
             >
-              <ExternalLink className='h-3.5 w-3.5' strokeWidth={2.25} />
-              Preview page
-            </a>
+              <a href={pageUrl} target='_blank' rel='noopener noreferrer'>
+                <ExternalLink className='h-3.5 w-3.5' strokeWidth={2.25} />
+                Preview Page
+              </a>
+            </Button>
           ) : null}
 
-          <button
+          {preview}
+
+          <Button
             type='button'
+            variant='secondary'
+            size='sm'
             onClick={handleAskJovie}
-            className={QUIET_LINK_CLASS}
             disabled={disabled}
             data-testid='work-action-ask-jovie'
           >
             <Sparkles className='h-3.5 w-3.5' strokeWidth={2.25} />
             Ask Jovie
-          </button>
+          </Button>
         </div>
       </div>
 

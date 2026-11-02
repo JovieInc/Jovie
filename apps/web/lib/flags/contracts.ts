@@ -51,12 +51,7 @@ export const APP_FLAG_DEFAULTS = {
   BULK_PRESS_PHOTO_IMPORT: true,
   APPLE_WALLET_PROFILE_PASS: true,
   TELEPROMPTER_RECORDING: true,
-  /**
-   * Opportunity Inbox as named /app home (GH #13171 / JOV-3931).
-   * Default off in prod; enable via env override, admin dogfood, or FEATURE gate.
-   */
-  INBOX_HOME: false,
-  PROFILES_WORKSPACE: false,
+  /** Provider-runner stop control; health, scheduling and spend budgets also apply. */
   PROFILE_SEARCH_MONITORING: false,
   /**
    * Post-signup wow-moment: seed real presence-build tasks into workflow_runs
@@ -108,8 +103,6 @@ export const APP_FLAG_KEYS = {
   BULK_PRESS_PHOTO_IMPORT: LEGACY_STATSIG_GATE_KEYS.BULK_PRESS_PHOTO_IMPORT,
   APPLE_WALLET_PROFILE_PASS: LEGACY_STATSIG_GATE_KEYS.APPLE_WALLET_PROFILE_PASS,
   TELEPROMPTER_RECORDING: LEGACY_STATSIG_GATE_KEYS.TELEPROMPTER_RECORDING,
-  INBOX_HOME: 'inbox_home',
-  PROFILES_WORKSPACE: 'profiles_workspace',
   PROFILE_SEARCH_MONITORING: 'profile_search_monitoring',
   ONBOARDING_WOW_TASK_QUEUE: 'onboarding_wow_task_queue',
   PAID_WELCOME_EMAIL: 'paid_welcome_email',
@@ -136,8 +129,6 @@ export const APP_FLAG_OVERRIDE_KEYS = {
   BULK_PRESS_PHOTO_IMPORT: 'code:BULK_PRESS_PHOTO_IMPORT',
   APPLE_WALLET_PROFILE_PASS: 'code:APPLE_WALLET_PROFILE_PASS',
   TELEPROMPTER_RECORDING: 'code:TELEPROMPTER_RECORDING',
-  INBOX_HOME: 'code:INBOX_HOME',
-  PROFILES_WORKSPACE: 'code:PROFILES_WORKSPACE',
   PROFILE_SEARCH_MONITORING: 'code:PROFILE_SEARCH_MONITORING',
   ONBOARDING_WOW_TASK_QUEUE: 'code:ONBOARDING_WOW_TASK_QUEUE',
   PAID_WELCOME_EMAIL: 'code:PAID_WELCOME_EMAIL',
@@ -186,12 +177,8 @@ export const APP_FLAG_DESCRIPTIONS = {
     'First-party Apple Wallet profile pass for in-person sharing',
   TELEPROMPTER_RECORDING:
     'In-app teleprompter recording proposals and showcase interstitial',
-  INBOX_HOME:
-    'Opportunity Inbox as the named /app home surface (nav item + title agreement)',
-  PROFILES_WORKSPACE:
-    'Unified public Profiles and Connections workspace navigation',
   PROFILE_SEARCH_MONITORING:
-    'Google-first artist search-presence monitoring runner',
+    'Operational enable/stop control for Google search monitoring provider work',
   ONBOARDING_WOW_TASK_QUEUE:
     'Seed real onboarding presence-build tasks with live chat artifacts (JOV-3988)',
   PAID_WELCOME_EMAIL:
@@ -242,12 +229,8 @@ export const APP_FLAG_REMOVAL_CONDITIONS = {
     'Remove after Wallet passes are permanent or retired.',
   TELEPROMPTER_RECORDING:
     'Remove after recording is permanent and its experiment is concluded.',
-  INBOX_HOME:
-    'Remove when Inbox is either the canonical app home or no longer a candidate.',
-  PROFILES_WORKSPACE:
-    'Remove when Profiles is either the canonical workspace or retired.',
   PROFILE_SEARCH_MONITORING:
-    'Remove when monitoring is permanently available or retired.',
+    'Retain as the provider-work stop control alongside scheduler, health and spend budgets.',
   ONBOARDING_WOW_TASK_QUEUE:
     'Retain until task seeding has an independent queue incident stop control.',
   PAID_WELCOME_EMAIL:
@@ -318,8 +301,6 @@ export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
   'ALBUM_ART_GENERATION', // default-true feature; controlled by Statsig experiment separately in usage, not a gate
   'RELEASE_PLAN_DEMO', // mock EP planner; default off in production, on in dev/preview, no remote gate
   'RELEASE_TO_REVENUE_AUTOPILOT', // internal v1 default-on pilot surface; no remote gate
-  'INBOX_HOME', // rollout gate for Inbox-as-home IA; default off in prod (JOV-3931)
-  'PROFILES_WORKSPACE', // JOV-2659 Tim-first unified Profiles rollout
   'PROFILE_SEARCH_MONITORING', // JOV-2659 server runner remains separately health-gated
   'ONBOARDING_WOW_TASK_QUEUE', // JOV-3988 kill-switch; local default + env/admin override, no Statsig gate
   'PAID_WELCOME_EMAIL', // JOV-6445 external-recipient send; founder-gated default off, no Statsig gate

@@ -10,7 +10,7 @@
  * refactored to use it in a future PR.
  */
 
-import { and, eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, gt, lt } from 'drizzle-orm';
 import { createFingerprint } from '@/app/api/audience/lib/audience-utils';
 import { db } from '@/lib/db';
 import {
@@ -169,6 +169,78 @@ export async function requestEmailOtp(
   return { success: true, otpSent: true, otpCode, normalizedEmail };
 }
 
+// ─── OTP Attempts ─────────────────────────────────────────────────────
+
+/** Wrong guesses allowed per sent code (10^6 codes, 10 minute TTL). */
+export const EMAIL_OTP_MAX_ATTEMPTS = 5;
+
+interface CurrentEmailOtp {
+  /** Subscription row id. */
+  readonly id: string;
+  /** The code hash read with the row; ties every write to that exact code. */
+  readonly emailOtpHash: string;
+}
+
+// Transactional OTP writes, not analytics aggregates (metrics-layer guard).
+const otpColumns = notificationSubscriptions;
+
+function isCurrentCode(otp: CurrentEmailOtp) {
+  return and(
+    eq(otpColumns.id, otp.id),
+    eq(otpColumns.emailOtpHash, otp.emailOtpHash)
+  );
+}
+
+/**
+ * Spend one verification attempt atomically, before comparing the code.
+ * Returns false when the code is expired, replaced, or out of attempts.
+ *
+ * Never write back `attempts + 1` from a value read earlier: concurrent
+ * guesses all read the same count and the cap stops holding
+ * (tests/unit/security/credential-attempt-counters.test.ts).
+ */
+export async function spendEmailOtpAttempt(
+  otp: CurrentEmailOtp,
+  now: Date
+): Promise<boolean> {
+  const [spent] = await db
+    .update(otpColumns)
+    .set({
+      emailOtpAttempts: drizzleSql`${otpColumns.emailOtpAttempts} + 1`,
+    })
+    .where(
+      and(
+        isCurrentCode(otp),
+        gt(otpColumns.emailOtpExpiresAt, now),
+        lt(otpColumns.emailOtpAttempts, EMAIL_OTP_MAX_ATTEMPTS)
+      )
+    )
+    .returning({ id: otpColumns.id });
+  return Boolean(spent);
+}
+
+/**
+ * Confirm the subscription and consume exactly this code. Returns false when
+ * a concurrent request already consumed it or a new code replaced it.
+ */
+export async function consumeEmailOtp(
+  otp: CurrentEmailOtp,
+  now: Date
+): Promise<boolean> {
+  const [consumed] = await db
+    .update(otpColumns)
+    .set({
+      confirmedAt: now,
+      confirmationToken: null,
+      emailOtpHash: null,
+      emailOtpExpiresAt: null,
+      emailOtpAttempts: 0,
+    })
+    .where(isCurrentCode(otp))
+    .returning({ id: otpColumns.id });
+  return Boolean(consumed);
+}
+
 // ─── OTP Verify ──────────────────────────────────────────────────────
 
 /**
@@ -205,10 +277,9 @@ export async function verifyEmailOtp(
     return { success: false, error: 'Invalid verification code', status: 400 };
   }
 
-  // Already confirmed — idempotent success
-  if (subscription.confirmedAt) {
-    return { success: true, subscriptionId: subscription.id };
-  }
+  // A confirmed subscription still proves ownership with the current code:
+  // request-otp always issues one, and otherwise anyone who knows a confirmed
+  // fan's address could unlock downloads with any 6 digits.
 
   const now = new Date();
 
@@ -225,35 +296,28 @@ export async function verifyEmailOtp(
     };
   }
 
-  // Check attempt limit
-  if ((subscription.emailOtpAttempts ?? 0) >= 5) {
-    return {
-      success: false,
-      error: 'Too many attempts. Request a new code.',
-      status: 429,
-    };
+  const tooManyAttempts = {
+    success: false,
+    error: 'Too many attempts. Request a new code.',
+    status: 429,
+  } as const;
+  if ((subscription.emailOtpAttempts ?? 0) >= EMAIL_OTP_MAX_ATTEMPTS) {
+    return tooManyAttempts;
   }
 
-  // Verify hash
+  const currentOtp = {
+    id: subscription.id,
+    emailOtpHash: subscription.emailOtpHash,
+  };
+  if (!(await spendEmailOtpAttempt(currentOtp, now))) return tooManyAttempts;
+
   if (hashEmailOtp(params.code) !== subscription.emailOtpHash) {
-    await db
-      .update(notificationSubscriptions)
-      .set({ emailOtpAttempts: (subscription.emailOtpAttempts ?? 0) + 1 })
-      .where(eq(notificationSubscriptions.id, subscription.id));
     return { success: false, error: 'Invalid verification code', status: 400 };
   }
 
-  // Confirm subscription
-  await db
-    .update(notificationSubscriptions)
-    .set({
-      confirmedAt: now,
-      confirmationToken: null,
-      emailOtpHash: null,
-      emailOtpExpiresAt: null,
-      emailOtpAttempts: 0,
-    })
-    .where(eq(notificationSubscriptions.id, subscription.id));
+  if (!(await consumeEmailOtp(currentOtp, now))) {
+    return { success: false, error: 'Invalid verification code', status: 400 };
+  }
 
   return { success: true, subscriptionId: subscription.id };
 }
