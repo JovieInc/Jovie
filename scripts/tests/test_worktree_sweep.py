@@ -715,6 +715,50 @@ class StandaloneAndHeadroomTest(unittest.TestCase):
         self.assertFalse((path / "node_modules").exists())
         self.assertGreater(report["artifactsFreedKiB"], 0)
 
+    def test_kept_agent_wt_clone_loses_node_modules_but_keeps_work(self):
+        """JOV-10348: kept clones under the active agent-worktree roots prune their regenerable
+        build output exactly like retired roots; a checkout touched within ARTIFACT_IDLE_S is
+        treated as active and keeps everything."""
+        dirty = self.clone("wt/dirty")
+        (dirty / "b.txt").write_text("b\n")
+        git(dirty, "add", ".")
+        git(dirty, "commit", "-qm", "local only")
+        (dirty / "node_modules/x").mkdir(parents=True)
+        (dirty / "node_modules/x/big.bin").write_bytes(b"0" * 4096)
+        flat = self.clone("wt-flat")
+        (flat / "f.txt").write_text("f\n")  # untracked work: the clone is kept, not removed
+        (flat / "node_modules/y").mkdir(parents=True)
+        (flat / "node_modules/y/big.bin").write_bytes(b"0" * 4096)
+        fresh = self.clone("wt/fresh")
+        (fresh / "node_modules/z").mkdir(parents=True)
+        for rel in (".", ".git/HEAD", ".git/index", ".git/logs/HEAD", ".git/FETCH_HEAD"):
+            probe = fresh / rel
+            if probe.exists():
+                os.utime(probe, (self.now - 3600,) * 2)  # touched an hour ago: active
+        report = self.sweep()
+        self.assertEqual(report["kept"].get("dirty"), 1)
+        self.assertEqual(report["kept"].get("1-unpublished"), 1)
+        self.assertEqual(report["kept"].get("recent"), 1)
+        self.assertTrue((dirty / "b.txt").exists())
+        self.assertFalse((dirty / "node_modules").exists())
+        self.assertTrue((flat / "f.txt").exists())
+        self.assertFalse((flat / "node_modules").exists())
+        self.assertTrue((fresh / "node_modules").exists())
+        self.assertGreater(report["artifactsFreedKiB"], 0)
+
+    def test_agent_wt_artifact_prune_is_idempotent_and_never_errors(self):
+        path = self.clone("wt/idem")
+        (path / "n.txt").write_text("work\n")
+        (path / "node_modules/x").mkdir(parents=True)
+        (path / "node_modules/x/big.bin").write_bytes(b"0" * 4096)
+        first = self.sweep()
+        self.assertGreater(first["artifactsFreedKiB"], 0)
+        self.assertTrue((path / "n.txt").exists())
+        second = self.sweep()
+        self.assertEqual(second.get("artifactsFreedKiB", 0), 0)
+        self.assertEqual(second["errors"], [])
+        self.assertTrue((path / "n.txt").exists())
+
     def test_archive_branch_counts_as_published(self):
         path = self.clone("grok-wt/archived")
         (path / "c.txt").write_text("c\n")
