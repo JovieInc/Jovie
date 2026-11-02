@@ -1,6 +1,15 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, expect, test, vi } from 'vitest';
 import {
   lighthouseOnce,
@@ -51,22 +60,22 @@ function successRun() {
   });
 }
 test('does not treat HTTP error markup as a successful page observation', async () => {
-  const text = vi.fn().mockResolvedValue('<html>error</html>');
+  const response = new Response('<html>error</html>', { status: 503 });
+  const text = vi.spyOn(response, 'text');
   await expect(
-    pageFacts('https://example.com', async () => ({
-      ok: false,
-      status: 503,
-      text,
-    }))
+    pageFacts('https://example.com', async () => response)
   ).rejects.toThrow('HTTP 503');
   expect(text).not.toHaveBeenCalled();
 });
 test('parses successful markup and retains pinch-zoom behavior', async () => {
-  const request = vi.fn().mockResolvedValue({
-    ok: true,
-    text: async () =>
-      '<meta name="viewport" content="width=device-width, user-scalable=no">',
-  });
+  const request = vi
+    .fn()
+    .mockResolvedValue(
+      new Response(
+        '<meta name="viewport" content="width=device-width, user-scalable=no">',
+        { status: 200 }
+      )
+    );
   expect(await pageFacts('https://example.com', request)).toEqual({
     zoom: 0,
     music: 0,
@@ -96,6 +105,43 @@ test('keeps repeated Lighthouse failure red after a bounded retry', () => {
     lighthouseOnce('https://example.com', temp(), 'failed', run)
   ).toThrow('lighthouse failed');
   expect(run).toHaveBeenCalledTimes(2);
+});
+
+test('the actual CLI exits 2 and emits no claim receipt when measurement fails', () => {
+  const dir = temp();
+  const npm = join(dir, 'npm');
+  const cwdReceipt = join(dir, 'working-directory.txt');
+  const output = join(dir, 'receipt.json');
+  writeFileSync(npm, '#!/bin/sh\npwd > "$CLAIMS_BENCHMARK_CWD"\nexit 1\n');
+  chmodSync(npm, 0o755);
+  const result = spawnSync(
+    process.execPath,
+    [
+      fileURLToPath(
+        new URL('../../benchmarks/vs-linktree.mjs', import.meta.url)
+      ),
+      '--runs',
+      '1',
+      '--out',
+      output,
+    ],
+    {
+      encoding: 'utf8',
+      timeout: 10000,
+      env: {
+        ...process.env,
+        PATH: `${dir}:${process.env.PATH}`,
+        TMPDIR: dir,
+        CLAIMS_BENCHMARK_CWD: cwdReceipt,
+      },
+    }
+  );
+  expect(result.error).toBeUndefined();
+  expect(result.status).toBe(2);
+  expect(result.stderr).toContain('measurement-failed: lighthouse failed');
+  expect(result.stdout).not.toContain('CLAIM-FLAG');
+  expect(existsSync(output)).toBe(false);
+  expect(existsSync(readFileSync(cwdReceipt, 'utf8').trim())).toBe(false);
 });
 
 function liveSample(jovie) {

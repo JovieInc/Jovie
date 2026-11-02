@@ -35,6 +35,12 @@ function arg(name, fallback) {
   return index > 0 ? process.argv[index + 1] : fallback;
 }
 
+/**
+ * @param {string} url
+ * @param {string} dir
+ * @param {string} index
+ * @param {(command: string, args: string[], options: { encoding: 'utf8', timeout: number, cwd: string }) => { status: number | null, stderr?: string | null }} [run]
+ */
 export function lighthouseOnce(url, dir, index, run = spawnSync) {
   const out = join(dir, `lh-${index}.json`);
   const args = [
