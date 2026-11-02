@@ -6,7 +6,7 @@
  * that opens when every child is terminal. Every stage is timestamped per task and agent.
  * Pure store over the DO SqlStorage shape so node:sqlite tests cover it.
  */
-import { HubError, KIND, type Sql } from './core.ts';
+import { HubError, KIND, percentile, type Sql } from './core.ts';
 
 export const BOARD_KIND = 'board';
 export const BOARD = {
@@ -741,4 +741,136 @@ export class BoardStore {
         note: raw.note ?? null,
       }));
   }
+
+  /** p50/p95 per agent: post->claim (pickup), claim->done (work), post->done (total). */
+  metrics(windowMs: number, now: number) {
+    const rows = this.sql
+      .exec(
+        "SELECT * FROM tasks WHERE doneAt >= ? AND status IN ('done','failed') AND type != 'question'",
+        now - windowMs
+      )
+      .toArray()
+      .map(row)
+      // A fan-out parent closes with its merge result; counting it would double-count the merger.
+      .filter(task => task.merge === null);
+    const lease = this.sql
+      .exec(
+        "SELECT actor, COUNT(*) AS n FROM stages WHERE stage = 'lease_expired' AND at >= ? GROUP BY actor",
+        now - windowMs
+      )
+      .toArray();
+    const by: Record<
+      string,
+      {
+        pickup: number[];
+        work: number[];
+        total: number[];
+        done: number;
+        failed: number;
+      }
+    > = {};
+    for (const task of rows) {
+      const agent = task.claimant ?? 'unknown';
+      const entry = (by[agent] ??= {
+        pickup: [],
+        work: [],
+        total: [],
+        done: 0,
+        failed: 0,
+      });
+      entry[task.status === 'done' ? 'done' : 'failed']++;
+      if (task.firstClaimedAt !== null)
+        entry.pickup.push(task.firstClaimedAt - task.postedAt);
+      if (task.claimedAt !== null && task.doneAt !== null)
+        entry.work.push(task.doneAt - task.claimedAt);
+      if (task.doneAt !== null) entry.total.push(task.doneAt - task.postedAt);
+    }
+    const stat = (values: number[]) => ({
+      p50: percentile(values, 50),
+      p95: percentile(values, 95),
+    });
+    return {
+      windowHours: Math.round(windowMs / 3_600_000),
+      agents: Object.fromEntries(
+        Object.entries(by).map(([agent, entry]) => [
+          agent,
+          {
+            done: entry.done,
+            failed: entry.failed,
+            pickupMs: stat(entry.pickup),
+            workMs: stat(entry.work),
+            totalMs: stat(entry.total),
+          },
+        ])
+      ),
+      leaseExpired: Object.fromEntries(
+        lease.map(raw => [String(raw.actor), Number(raw.n)])
+      ),
+      open: Number(
+        this.sql
+          .exec("SELECT COUNT(*) AS n FROM tasks WHERE status = 'open'")
+          .toArray()[0]?.n ?? 0
+      ),
+      claimed: Number(
+        this.sql
+          .exec("SELECT COUNT(*) AS n FROM tasks WHERE status = 'claimed'")
+          .toArray()[0]?.n ?? 0
+      ),
+    };
+  }
+
+  /** One entry point for REST and `to: board` mesh sends. */
+  apply(
+    from: string,
+    op: string,
+    input: Record<string, unknown>,
+    active: readonly string[],
+    now: number
+  ) {
+    switch (op) {
+      case 'caps':
+        return this.setCaps(from, input.caps, now);
+      case 'post':
+        return this.post(from, input, active, now);
+      case 'claim':
+        return this.claim(from, input, now);
+      case 'update':
+        return this.update(from, input, now);
+      case 'done':
+        return this.done(from, input, active, now);
+      case 'answer':
+        return this.answer(from, input, now);
+      case 'cancel':
+        return this.cancel(from, input, now);
+      default:
+        throw new HubError(422, 'invalid_op');
+    }
+  }
+}
+
+/**
+ * A mesh send to `board`: a JSON body `{op, ...}`, or a plain-text reply whose inReplyTo is a
+ * board notice. A reply to a question notice is an answer; to a task notice it is `done`.
+ */
+export function parseBoardSend(
+  body: string,
+  inReplyTo: string | null,
+  lookup: (id: string) => Task | null
+): { op: string; input: Record<string, unknown> } {
+  const trimmed = body.trim();
+  if (trimmed.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+      if (typeof parsed.op === 'string')
+        return { op: parsed.op, input: parsed };
+    } catch {
+      // fall through to the reply form
+    }
+  }
+  const id = taskIdFromRef(inReplyTo);
+  const task = id ? lookup(id) : null;
+  if (!task) throw new HubError(422, 'board_needs_op_or_reply');
+  return task.type === 'question'
+    ? { op: 'answer', input: { id: task.id, answer: body } }
+    : { op: 'done', input: { id: task.id, result: body } };
 }
