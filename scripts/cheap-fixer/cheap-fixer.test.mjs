@@ -129,6 +129,41 @@ test('guards reject weakened tests, suppressions, denied and out-of-scope paths'
   );
 });
 
+test('every cheap class refuses assertion rewrites and arbitrary generated scope', () => {
+  for (const failureClass of ['lint', 'format', 'typecheck', 'generated']) {
+    for (const path of ['src/a.test.ts', 'src/assertions.ts']) {
+      const violations = guardPatch(
+        files(
+          path,
+          'expect(result).toBeTruthy();\n',
+          'expect(result).toBeFalsy();\n'
+        ),
+        { changedInPr: new Set([path]), failureClass }
+      );
+      assert.ok(
+        violations.some(v => v.startsWith('assertions-changed:')),
+        `${failureClass}:${path}`
+      );
+    }
+  }
+});
+
+test('generated failure class retains explicit PR path scope', () => {
+  assert.ok(
+    guardPatch(files('src/unrelated.ts', 'a\n', 'b\n'), {
+      changedInPr: new Set(['src/changed.ts']),
+      failureClass: 'generated',
+    }).some(v => v.startsWith('out-of-scope:'))
+  );
+  assert.deepEqual(
+    guardPatch(files('src/changed.ts', 'a\n', 'b\n'), {
+      changedInPr: new Set(['src/changed.ts']),
+      failureClass: 'generated',
+    }),
+    []
+  );
+});
+
 test('pathsInLog keeps only files the PR changed or snapshots', () => {
   const log =
     'error in apps/web/lib/a.ts:12:3 and apps/web/lib/other.ts:1 and __snapshots__/a.snap';

@@ -236,8 +236,7 @@ export function guardPatch(
     if (before === after) violations.push(`noop:${path}`);
     if (pathDenied(path)) violations.push(`denied-path:${path}`);
     const isSnapshot = /\.snap$|__snapshots__\//.test(path);
-    const isGeneratedClass = failureClass === 'generated';
-    if (!changedInPr.has(path) && !isSnapshot && !isGeneratedClass)
+    if (!changedInPr.has(path) && !isSnapshot)
       violations.push(`out-of-scope:${path}`);
     if (after.length > LIMITS.maxFileBytes * 2)
       violations.push(`file-too-large:${path}`);
@@ -248,14 +247,13 @@ export function guardPatch(
         violations.push(`weakening-added:${path}:${line.trim().slice(0, 60)}`);
       if (ASSERT_REMOVED.test(line)) addedAsserts++;
     }
-    for (const line of d.removed)
-      if (ASSERT_REMOVED.test(line)) removedAsserts++;
-    if (
-      TEST_FILE.test(path) &&
-      failureClass !== 'format' &&
-      failureClass !== 'lint' &&
-      failureClass !== 'typecheck'
-    ) {
+    for (const line of d.removed) {
+      if (ASSERT_REMOVED.test(line)) {
+        removedAsserts++;
+        if (!isSnapshot) violations.push(`assertions-changed:${path}`);
+      }
+    }
+    if (TEST_FILE.test(path)) {
       // A test edit may change an expectation only through snapshots/generated output; hand-edited
       // assertions are the classic way to turn red green without fixing anything.
       if (!isSnapshot) violations.push(`test-file-edit:${path}`);
