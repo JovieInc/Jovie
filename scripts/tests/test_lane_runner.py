@@ -12986,6 +12986,7 @@ with open(os.environ['INSTALL_COMMAND_LOG'], 'a') as log:
                     self.assertIn("factory_watchdog.py", watchdog_service)
                     self.assertNotIn("After=jovie-lanes.service", watchdog_service)
                     self.assertIn("OnUnitActiveSec=60s", watchdog_timer)
+                    self.assertIn("OnCalendar=minutely", watchdog_timer)
                 self.assertEqual(timer_path.split(":")[0], str(bin_dir))
                 if with_gbrain:
                     self.assertEqual(shutil.which("gbrain", path=timer_path), str(brain))
