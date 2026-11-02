@@ -6,10 +6,23 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { InvisibleTurnstileState } from '@/components/atoms/InvisibleTurnstile';
 import { WaitlistRoleForm } from './WaitlistRoleForm';
 
+const challenge = vi.hoisted(() => ({
+  onStateChange: undefined as
+    | ((state: InvisibleTurnstileState) => void)
+    | undefined,
+}));
 vi.mock('@/components/atoms/InvisibleTurnstile', () => ({
-  InvisibleTurnstile: () => null,
+  InvisibleTurnstile: ({
+    onStateChange,
+  }: {
+    onStateChange: (state: InvisibleTurnstileState) => void;
+  }) => {
+    challenge.onStateChange = onStateChange;
+    return <span hidden data-testid='turnstile-mock' />;
+  },
   isTurnstileClientBypassed: () => true,
   isTurnstileClientConfigured: () => false,
 }));
@@ -175,6 +188,30 @@ describe('WaitlistRoleForm', () => {
     expect(
       await screen.findByTestId('waitlist-role-form-joined')
     ).toHaveFocus();
+  });
+
+  it('keeps the focused confirmation after a queued challenge failure arrives', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ state: 'joined' }), { status: 201 })
+    );
+    render(<WaitlistRoleForm />);
+    const lateFailure = challenge.onStateChange;
+    expect(lateFailure).toBeTypeOf('function');
+    fireEvent.click(screen.getByRole('radio', { name: 'Artist' }));
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'person@example.com' },
+    });
+    fireEvent.submit(screen.getByTestId('waitlist-role-form'));
+    const confirmation = await screen.findByTestId('waitlist-role-form-joined');
+    await waitFor(() => expect(confirmation).toHaveFocus());
+    act(() =>
+      lateFailure?.({ status: 'expired', message: 'Challenge expired.' })
+    );
+    expect(confirmation).toBeInTheDocument();
+    expect(confirmation).toHaveFocus();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByTestId('turnstile-mock')).toBeNull();
+    expect(screen.getByTestId('waitlist-role-form')).toHaveAttribute('inert');
   });
 
   it('keeps the input and shows the server error on failure', async () => {

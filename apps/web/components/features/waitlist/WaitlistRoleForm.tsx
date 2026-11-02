@@ -51,6 +51,7 @@ export function WaitlistRoleForm({
   const roles = variant === 'general' ? GENERAL_WAITLIST_ROLES : WAITLIST_ROLES;
   const [name, setName] = useState('');
   const confirmationRef = useRef<HTMLDivElement>(null);
+  const joinedRef = useRef(false);
   const nameRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [role, setRole] = useState<WaitlistRole | ''>('');
@@ -71,6 +72,7 @@ export function WaitlistRoleForm({
 
   const handleTurnstileStateChange = useCallback(
     (state: InvisibleTurnstileState) => {
+      if (joinedRef.current) return;
       if (state.status === 'verified' || state.status === 'bypassed') {
         setTurnstileFailed(false);
         return;
@@ -136,6 +138,7 @@ export function WaitlistRoleForm({
         );
       }
       track('waitlist_role_form_joined', { role });
+      joinedRef.current = true;
       setStatus('joined');
     } catch (error) {
       setStatus('error');
@@ -257,11 +260,13 @@ export function WaitlistRoleForm({
           invalid={status === 'error' && !turnstileFailed}
           describedBy={`${formId}-error`}
         />
-        <InvisibleTurnstile
-          onToken={setTurnstileToken}
-          onStateChange={handleTurnstileStateChange}
-          resetSignal={turnstileResetSignal}
-        />
+        {status !== 'joined' ? (
+          <InvisibleTurnstile
+            onToken={setTurnstileToken}
+            onStateChange={handleTurnstileStateChange}
+            resetSignal={turnstileResetSignal}
+          />
+        ) : null}
         <p
           id={`${formId}-error`}
           className='min-h-5 text-sm text-accent-red'
