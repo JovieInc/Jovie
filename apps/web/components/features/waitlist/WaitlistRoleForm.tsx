@@ -1,8 +1,16 @@
 'use client';
 
 import { InlineSubscribe } from '@jovie/ui/atoms/inline-subscribe';
+import { Input } from '@jovie/ui/atoms/input';
 import { RadioGroup, RadioGroupItem } from '@jovie/ui/atoms/radio-group';
-import { type FormEvent, useCallback, useId, useRef, useState } from 'react';
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 import {
   InvisibleTurnstile,
   type InvisibleTurnstileState,
@@ -10,7 +18,11 @@ import {
   isTurnstileClientConfigured,
 } from '@/components/atoms/InvisibleTurnstile';
 import { track } from '@/lib/analytics';
-import { WAITLIST_ROLES, type WaitlistRole } from '@/lib/waitlist/roles';
+import {
+  GENERAL_WAITLIST_ROLES,
+  WAITLIST_ROLES,
+  type WaitlistRole,
+} from '@/lib/waitlist/roles';
 
 type Status = 'idle' | 'submitting' | 'joined' | 'error';
 
@@ -29,8 +41,18 @@ export const WAITLIST_ROLE_FORM_ENDPOINT = '/api/waitlist/join';
  * Turnstile-gated, no account. Uses the one email-capture control
  * (`InlineSubscribe`, built on `CompositeField`).
  */
-export function WaitlistRoleForm() {
+export function WaitlistRoleForm({
+  variant = 'artist',
+  headingLevel = 1,
+}: Readonly<{ variant?: 'artist' | 'general'; headingLevel?: 1 | 2 | 3 }>) {
   const formId = useId();
+  const Heading = headingLevel === 1 ? 'h1' : headingLevel === 2 ? 'h2' : 'h3';
+  const roles = variant === 'general' ? GENERAL_WAITLIST_ROLES : WAITLIST_ROLES;
+  const [name, setName] = useState('');
+  const formRef = useRef<HTMLFormElement>(null);
+  const confirmationRef = useRef<HTMLDivElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const [reservedHeight, setReservedHeight] = useState<number>();
   const inputRef = useRef<HTMLInputElement>(null);
   const [role, setRole] = useState<WaitlistRole | ''>('');
   const [email, setEmail] = useState('');
@@ -41,6 +63,12 @@ export function WaitlistRoleForm() {
   const [turnstileFailed, setTurnstileFailed] = useState(false);
   const turnstileRequired =
     isTurnstileClientConfigured() && !isTurnstileClientBypassed();
+
+  useEffect(() => {
+    if (status === 'joined') {
+      confirmationRef.current?.focus({ preventScroll: true });
+    }
+  }, [status]);
 
   const handleTurnstileStateChange = useCallback(
     (state: InvisibleTurnstileState) => {
@@ -63,6 +91,13 @@ export function WaitlistRoleForm() {
     event.preventDefault();
     if (status === 'submitting' || status === 'joined') return;
 
+    if (variant === 'general' && !name.trim()) {
+      nameRef.current?.focus({ preventScroll: true });
+      setStatus('error');
+      setErrorMessage('Enter your name.');
+      return;
+    }
+
     if (!role) {
       setStatus('error');
       setErrorMessage('Choose the role that fits you best.');
@@ -84,7 +119,12 @@ export function WaitlistRoleForm() {
       const response = await fetch(WAITLIST_ROLE_FORM_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), role, turnstileToken }),
+        body: JSON.stringify({
+          email: email.trim(),
+          role,
+          turnstileToken,
+          ...(variant === 'general' ? { name: name.trim() } : {}),
+        }),
       });
       const data = (await response.json().catch(() => ({}))) as {
         state?: string;
@@ -96,6 +136,7 @@ export function WaitlistRoleForm() {
         );
       }
       track('waitlist_role_form_joined', { role });
+      setReservedHeight(formRef.current?.getBoundingClientRect().height);
       setStatus('joined');
     } catch (error) {
       setStatus('error');
@@ -113,13 +154,16 @@ export function WaitlistRoleForm() {
   if (status === 'joined') {
     return (
       <div
+        ref={confirmationRef}
+        tabIndex={-1}
+        style={{ minHeight: reservedHeight }}
         data-testid='waitlist-role-form-joined'
         role='status'
         className='flex w-full flex-col items-center gap-2 text-center'
       >
-        <h1 className='text-balance text-xl font-medium tracking-tight text-primary-token'>
-          Request Received
-        </h1>
+        <Heading className='text-balance text-xl font-medium tracking-tight text-primary-token'>
+          Request received
+        </Heading>
         <p className='text-sm text-secondary-token'>
           We&apos;ll email you an invite when your spot opens.
         </p>
@@ -129,17 +173,42 @@ export function WaitlistRoleForm() {
 
   return (
     <form
+      ref={formRef}
       onSubmit={handleSubmit}
       data-testid='waitlist-role-form'
       aria-labelledby={`${formId}-heading`}
       className='flex w-full flex-col items-center gap-5'
     >
-      <h1
+      <Heading
         id={`${formId}-heading`}
         className='text-balance text-xl font-medium tracking-tight text-primary-token'
       >
-        Request Access
-      </h1>
+        Request access
+      </Heading>
+      {variant === 'general' ? (
+        <label
+          className='grid w-full gap-2 text-sm text-primary-token'
+          htmlFor={`${formId}-name`}
+        >
+          Your name
+          <Input
+            ref={nameRef}
+            id={`${formId}-name`}
+            name='name'
+            autoComplete='name'
+            required
+            maxLength={120}
+            value={name}
+            onChange={event => {
+              setName(event.target.value);
+              if (status === 'error' && !turnstileFailed) {
+                setStatus('idle');
+                setErrorMessage('');
+              }
+            }}
+          />
+        </label>
+      ) : null}
       <RadioGroup
         aria-label='Role'
         value={role}
@@ -151,7 +220,7 @@ export function WaitlistRoleForm() {
           }
         }}
       >
-        {WAITLIST_ROLES.map(option => (
+        {roles.map(option => (
           <label
             key={option.value}
             htmlFor={`${formId}-${option.value}`}

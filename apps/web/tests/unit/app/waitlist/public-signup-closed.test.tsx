@@ -89,12 +89,17 @@ describe('closed public signup (PUBLIC_SIGNUP_CLOSED)', () => {
     delete process.env.FEATURE_PUBLIC_SIGNUP_CLOSED;
   });
 
-  it('defaults off so signup stays open until the flag is flipped', async () => {
+  it('keeps public signup closed by default while preserving an explicit reopen switch', async () => {
     delete process.env.FEATURE_PUBLIC_SIGNUP_CLOSED;
     const { CODE_FLAGS } = await import('@/lib/flags/code-flags');
-    expect(CODE_FLAGS.PUBLIC_SIGNUP_CLOSED).toBe(false);
+    expect(CODE_FLAGS.PUBLIC_SIGNUP_CLOSED).toBe(true);
 
     const { default: SignUpPage } = await import('@/app/(auth)/signup/page');
+    await expect(
+      SignUpPage({ searchParams: Promise.resolve({}) })
+    ).rejects.toThrow('NEXT_REDIRECT:/waitlist');
+    mocks.redirect.mockClear();
+    process.env.FEATURE_PUBLIC_SIGNUP_CLOSED = 'false';
     await expect(
       SignUpPage({ searchParams: Promise.resolve({}) })
     ).resolves.toBeTruthy();

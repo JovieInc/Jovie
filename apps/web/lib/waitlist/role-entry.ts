@@ -31,12 +31,14 @@ export interface JoinWaitlistWithRoleResult {
 export async function joinWaitlistWithRole(input: {
   readonly email: string;
   readonly role: WaitlistRole;
+  readonly name?: string;
   readonly now?: Date;
 }): Promise<JoinWaitlistWithRoleResult> {
   const email = normalizeEmail(input.email);
   if (!email) throw new Error('A valid email is required to join the waitlist');
   const now = input.now ?? new Date();
   const capturedAt = now.toISOString();
+  const name = input.name?.trim() || null;
 
   const [row] = await db
     .insert(waitlistEntries)
@@ -49,7 +51,11 @@ export async function joinWaitlistWithRole(input: {
       status: 'waitlisted',
       statusReason: 'role_form_pending_review',
       waitlistedAt: now,
-      qualificationInputs: { role: input.role, roleCapturedAt: capturedAt },
+      qualificationInputs: {
+        role: input.role,
+        roleCapturedAt: capturedAt,
+        ...(name ? { name } : {}),
+      },
       createdAt: now,
       updatedAt: now,
     })
@@ -57,10 +63,10 @@ export async function joinWaitlistWithRole(input: {
       target: waitlistEntries.emailNormalized,
       targetWhere: drizzleSql`${waitlistEntries.canonical} = true`,
       set: {
-        qualificationInputs: drizzleSql`coalesce(${waitlistEntries.qualificationInputs}, '{}'::jsonb) || jsonb_build_object('role', ${input.role}::text, 'roleCapturedAt', ${capturedAt}::text)`,
+        qualificationInputs: drizzleSql`coalesce(${waitlistEntries.qualificationInputs}, '{}'::jsonb) || jsonb_build_object('role', coalesce(${waitlistEntries.qualificationInputs}->>'role', ${input.role}::text), 'roleCapturedAt', coalesce(${waitlistEntries.qualificationInputs}->>'roleCapturedAt', ${capturedAt}::text)) || case when ${waitlistEntries.qualificationInputs}->>'name' is null and ${name}::text is not null then jsonb_build_object('name', ${name}::text) else '{}'::jsonb end`,
         updatedAt: now,
       },
-      setWhere: drizzleSql`${waitlistEntries.qualificationInputs}->>'role' IS NULL`,
+      setWhere: drizzleSql`${waitlistEntries.qualificationInputs}->>'role' IS NULL or (${waitlistEntries.qualificationInputs}->>'name' IS NULL and ${name}::text IS NOT NULL)`,
     })
     .returning({
       created: drizzleSql<boolean>`(xmax = 0)`,

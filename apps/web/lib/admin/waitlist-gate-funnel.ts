@@ -2,7 +2,7 @@ import { sql as drizzleSql } from 'drizzle-orm';
 import { db, doesTableExist } from '@/lib/db';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { INVITE_FUNNEL_KEYS } from '@/lib/waitlist/invite-funnel';
-import { WAITLIST_ROLES, type WaitlistRole } from '@/lib/waitlist/roles';
+import { WAITLIST_ROLE_VALUES, type WaitlistRole } from '@/lib/waitlist/roles';
 import { organicWaitlistEntrySql } from './organic-waitlist';
 
 /**
@@ -29,7 +29,7 @@ export interface WaitlistGateFunnel {
 }
 
 const EMPTY_FUNNEL: WaitlistGateFunnel = {
-  byRole: WAITLIST_ROLES.map(({ value }) => ({ role: value, count: 0 })),
+  byRole: WAITLIST_ROLE_VALUES.map(value => ({ role: value, count: 0 })),
   invite: {
     sent: 0,
     opened: 0,
@@ -80,7 +80,7 @@ export async function getWaitlistGateFunnel(): Promise<WaitlistGateFunnel> {
   const p50 = funnel?.p50Hours;
 
   return {
-    byRole: WAITLIST_ROLES.map(({ value }) => ({
+    byRole: WAITLIST_ROLE_VALUES.map(value => ({
       role: value,
       count: counts.get(value) ?? 0,
     })),

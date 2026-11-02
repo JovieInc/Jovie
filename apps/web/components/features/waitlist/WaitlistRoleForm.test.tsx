@@ -34,6 +34,54 @@ describe('WaitlistRoleForm', () => {
     }
   });
 
+  it('captures a name and a general role on the company homepage without assuming an industry', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ state: 'joined' }), { status: 201 })
+    );
+    render(<WaitlistRoleForm variant='general' headingLevel={3} />);
+    expect(
+      screen.getByRole('heading', { level: 3, name: 'Request access' })
+    ).toBeVisible();
+    expect(screen.queryByRole('radio', { name: 'Artist' })).toBeNull();
+    fireEvent.change(screen.getByLabelText('Your name'), {
+      target: { value: ' Alex Example ' },
+    });
+    fireEvent.click(screen.getByRole('radio', { name: 'A team' }));
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'person@example.com' },
+    });
+    vi.spyOn(
+      screen.getByTestId('waitlist-role-form'),
+      'getBoundingClientRect'
+    ).mockReturnValue({ height: 420 } as DOMRect);
+    fireEvent.submit(screen.getByTestId('waitlist-role-form'));
+    const confirmation = await screen.findByTestId('waitlist-role-form-joined');
+    expect(confirmation).toHaveFocus();
+    expect(confirmation).toHaveStyle({ minHeight: '420px' });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      name: 'Alex Example',
+      role: 'team',
+      email: 'person@example.com',
+    });
+    expect(
+      screen.getByRole('heading', { level: 3, name: 'Request received' })
+    ).toBeVisible();
+  });
+
+  it('requires a useful name on the general form before sending a join', async () => {
+    render(<WaitlistRoleForm variant='general' />);
+    fireEvent.submit(screen.getByTestId('waitlist-role-form'));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Enter your name.'
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Your name')).toHaveFocus();
+    fireEvent.change(screen.getByLabelText('Your name'), {
+      target: { value: 'Alex' },
+    });
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it('asks for a role before submitting', async () => {
     render(<WaitlistRoleForm />);
     fireEvent.change(screen.getByLabelText('Email address'), {

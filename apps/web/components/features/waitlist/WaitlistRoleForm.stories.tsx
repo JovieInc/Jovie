@@ -13,3 +13,5 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const General: Story = { args: { variant: 'general', headingLevel: 3 } };

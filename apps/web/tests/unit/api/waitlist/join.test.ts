@@ -56,7 +56,7 @@ describe('POST /api/waitlist/join', () => {
   });
 
   it('is inert while public signup is open', async () => {
-    delete process.env.FEATURE_PUBLIC_SIGNUP_CLOSED;
+    process.env.FEATURE_PUBLIC_SIGNUP_CLOSED = 'false';
     const response = await POST(request(validBody));
     expect(response.status).toBe(404);
     expect(mocks.joinWaitlistWithRole).not.toHaveBeenCalled();
@@ -83,6 +83,26 @@ describe('POST /api/waitlist/join', () => {
     expect(response.status).toBe(201);
     await expect(response.json()).resolves.toEqual({ state: 'joined' });
   });
+
+  it('captures general homepage context without reclassifying it as a specialist role', async () => {
+    const response = await POST(
+      request({ ...validBody, name: ' Alex Example ', role: 'team' })
+    );
+    expect(response.status).toBe(201);
+    expect(mocks.joinWaitlistWithRole).toHaveBeenCalledWith({
+      email: 'person@example.com',
+      role: 'team',
+      name: 'Alex Example',
+    });
+  });
+
+  it.each(['', ' '.repeat(3), 'x'.repeat(121)])(
+    'rejects invalid supplied name before persistence',
+    async name => {
+      expect((await POST(request({ ...validBody, name }))).status).toBe(400);
+      expect(mocks.joinWaitlistWithRole).not.toHaveBeenCalled();
+    }
+  );
 
   it('rejects an unknown role or a bad email', async () => {
     expect((await POST(request({ ...validBody, role: 'fan' }))).status).toBe(

@@ -17,12 +17,20 @@ export const WAITLIST_ROLES = [
   { value: 'other', label: 'Other' },
 ] as const;
 
-export type WaitlistRole = (typeof WAITLIST_ROLES)[number]['value'];
+/** The company homepage asks for context without assuming a particular industry. */
+export const GENERAL_WAITLIST_ROLES = [
+  { value: 'individual', label: 'Myself' },
+  { value: 'team', label: 'A team' },
+  { value: 'organization', label: 'An organization' },
+  { value: 'other', label: 'Other' },
+] as const;
 
-export const WAITLIST_ROLE_VALUES = WAITLIST_ROLES.map(role => role.value) as [
-  WaitlistRole,
-  ...WaitlistRole[],
-];
+const ALL_WAITLIST_ROLES = [...WAITLIST_ROLES, ...GENERAL_WAITLIST_ROLES];
+export type WaitlistRole = (typeof ALL_WAITLIST_ROLES)[number]['value'];
+
+export const WAITLIST_ROLE_VALUES = [
+  ...new Set(ALL_WAITLIST_ROLES.map(role => role.value)),
+] as [WaitlistRole, ...WaitlistRole[]];
 
 export const waitlistRoleSchema = z.enum(WAITLIST_ROLE_VALUES);
 
@@ -31,5 +39,7 @@ export function isWaitlistRole(value: unknown): value is WaitlistRole {
 }
 
 export function getWaitlistRoleLabel(role: string): string {
-  return WAITLIST_ROLES.find(entry => entry.value === role)?.label ?? 'Unknown';
+  return (
+    ALL_WAITLIST_ROLES.find(entry => entry.value === role)?.label ?? 'Unknown'
+  );
 }

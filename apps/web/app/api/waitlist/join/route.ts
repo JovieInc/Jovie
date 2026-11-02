@@ -30,6 +30,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const joinSchema = z.object({
   email: z.string().trim().toLowerCase().email().max(254),
   role: waitlistRoleSchema,
+  name: z.string().trim().min(1).max(120).optional(),
   turnstileToken: z.string().max(4096).optional(),
 });
 
@@ -115,6 +116,7 @@ export async function POST(request: NextRequest) {
     await joinWaitlistWithRole({
       email: parsed.data.email,
       role: parsed.data.role,
+      ...(parsed.data.name ? { name: parsed.data.name } : {}),
     });
   } catch (error) {
     logger.error('[api/waitlist/join] join failed', error);
