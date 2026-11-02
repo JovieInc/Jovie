@@ -75,15 +75,13 @@ export async function measureInteractionLatency(
 
   try {
     await options.action();
-    const nextPaintMs = await waitForNextPaint(page, startTime);
-    await options.firstFeedback();
-    const firstFeedbackMs = await waitForNextPaint(page, startTime);
-
-    let usableStateMs: number | undefined;
-    if (options.usableState) {
-      await options.usableState();
-      usableStateMs = await waitForNextPaint(page, startTime);
-    }
+    // Each milestone shares the action's clock and can become visible on the
+    // same paint. Serial waits add artificial frames to feedback and usability.
+    const [nextPaintMs, firstFeedbackMs, usableStateMs] = await Promise.all([
+      waitForNextPaint(page, startTime),
+      options.firstFeedback().then(() => waitForNextPaint(page, startTime)),
+      options.usableState?.().then(() => waitForNextPaint(page, startTime)),
+    ]);
 
     return {
       firstFeedbackMs,

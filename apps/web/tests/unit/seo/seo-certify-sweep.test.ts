@@ -188,12 +188,12 @@ describe('per-record sweep (JOV-7283)', () => {
 describe('siblingPathMatcher', () => {
   it('matches exact published pages and one-segment wildcard children', () => {
     const matches = siblingPathMatcher([
-      entry('/card'),
+      entry('/pay'),
       entry('/compare/*', { recipeId: 'comparison' }),
       entry('/voice', { noindex: true }),
       entry('/new', { aliasOf: '/' }),
     ]);
-    expect(matches('/card')).toBe(true);
+    expect(matches('/pay')).toBe(true);
     expect(matches('/compare/linktree')).toBe(true);
     expect(matches('/compare/')).toBe(false);
     expect(matches('/compare/a/b')).toBe(false);

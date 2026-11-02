@@ -32,7 +32,8 @@ export async function expectDesktopSurfaceBuildMatches(page: Page) {
 
 /**
  * Geometry of the compact shell relative to the viewport, used to prove the
- * flag-off desktop presentation is a centered phone column.
+ * flag-off presentation is a centered column (phone column below 1024px, the
+ * two-column desktop composition at or above it).
  */
 export async function readCompactColumnGeometry(page: Page) {
   return page.evaluate(() => {
@@ -41,9 +42,15 @@ export async function readCompactColumnGeometry(page: Page) {
     );
     if (!shell) return null;
     const rect = shell.getBoundingClientRect();
+    // >= 1024px the flag-off profile is the two-column desktop composition
+    // (--profile-desktop-max-width); below it, the phone column.
+    const rootStyle = getComputedStyle(document.documentElement);
+    const desktopComposition = window.innerWidth >= 1024;
     const maxWidth = Number.parseFloat(
-      getComputedStyle(document.documentElement).getPropertyValue(
-        '--profile-shell-max-width'
+      rootStyle.getPropertyValue(
+        desktopComposition
+          ? '--profile-desktop-max-width'
+          : '--profile-shell-max-width'
       )
     );
     return {

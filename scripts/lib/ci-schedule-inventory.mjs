@@ -117,8 +117,6 @@ export const CRON_KEEP_REASONS = Object.freeze({
     'external: production event volume in Sentry can run away with no deploy or repository event',
   '.github/workflows/deepsec-native.yml':
     'AI credits: one subscription-bounded native security scan of main per day; per push would multiply native scanner spend',
-  '.github/workflows/desktop-release.yml':
-    'compute: one daily signed staging desktop reconciliation; unchanged desktop inputs skip the build',
   '.github/workflows/golden-path-nightly.yml':
     'external: real auth plus Stripe test mode drift without a repository event, and acquisition eligibility needs Golden Path proof under 48 h old',
   '.github/workflows/m2-revenue-path-canary.yml':
@@ -165,6 +163,8 @@ export const CRON_ALLOWLIST = Object.freeze(Object.keys(CRON_KEEP_REASONS));
 // the lanes stuck-PR ladder reports) and gem-producer-drift (its producer and
 // symphony-control's own drift check were removed in symphony-control#15).
 // 24: fleet-gate-refresh, whose receipt the Gem lanes emitter now keeps fresh.
+// 23 live after desktop-release lost its daily staging cron. Production
+// publish stays on workflow_run. The hand ceiling stays 24; base size is the cap.
 export const CRON_ALLOWLIST_CEILING = 24;
 
 /**

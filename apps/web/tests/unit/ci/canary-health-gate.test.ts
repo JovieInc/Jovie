@@ -187,6 +187,12 @@ describe('canary health gate (executed)', { timeout: 60_000 }, () => {
     }
   });
 
+  it('accepts an onboarding chat admitted on the unverified budget (JOV-10194)', () => {
+    const result = runCanary({ onboarding: { code: 200, body: '0:"hi"' } });
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(result.outputs.canary_status).toBeUndefined();
+  });
+
   it('decodes a masked base64 deployment URL handoff', () => {
     const result = runCanary(
       {},
@@ -249,8 +255,13 @@ describe('canary health gate (executed)', { timeout: 60_000 }, () => {
       'failed_onboarding_chat',
     ],
     [
-      'onboarding chat skipping the bot gate',
-      { onboarding: { code: 200, body: '{}' } },
+      'onboarding chat erroring past the bot gate',
+      { onboarding: { code: 500, body: '{"errorCode":"INTERNAL_ERROR"}' } },
+      'failed_onboarding_chat',
+    ],
+    [
+      'onboarding chat returning 200 with an error envelope',
+      { onboarding: { code: 200, body: '{"errorCode":"BOT_GATE_OFF"}' } },
       'failed_onboarding_chat',
     ],
     [

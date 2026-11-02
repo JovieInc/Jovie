@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import {
+  CONTRACT_LABELS,
   evaluateHold,
   HOLD_LABEL,
   MAX_HOLD_MS,
@@ -236,19 +237,78 @@ test('the enroll workflow runs the trusted hold contract with a Jovie Bot token'
   );
 });
 
-test('every stop label is held to the contract, each on its own labeled time', () => {
+function runHoldSweep(pr, now) {
+  const writes = [];
+  const log = console.log;
+  console.log = () => {};
+  try {
+    const results = sweepHolds({
+      now,
+      dryRun: false,
+      io: {
+        listHeld: () => [pr.number ?? 9],
+        read: () => pr,
+        comment: (...args) => writes.push(['comment', ...args]),
+        unlabel: (...args) => writes.push(['unlabel', ...args]),
+      },
+    });
+    return { results, writes };
+  } finally {
+    console.log = log;
+  }
+}
+
+// EVENT 2026-10-28: no stop label is human-owned. The retired labels are not in
+// the contract vocabulary, so the sweep neither honours nor touches them.
+for (const label of ['tim-hold', 'tim:hold', 'hold:tim', 'do-not-merge']) {
+  test(`${label} is retired: not a stop label and never preserved`, () => {
+    assert.ok(!CONTRACT_LABELS.includes(label));
+    const pr = {
+      state: 'OPEN',
+      headRefOid: HEAD,
+      labels: { nodes: [{ name: label }] },
+      timelineItems: {
+        nodes: [{ createdAt: LABELED, label: { name: label } }],
+      },
+      comments: { nodes: [] },
+    };
+    const { results, writes } = runHoldSweep(pr, T0 + MAX_HOLD_MS + HOUR);
+    assert.deepEqual(results, []);
+    assert.deepEqual(writes, []);
+  });
+}
+
+test('a machine hold alongside a retired human label still follows the contract', () => {
+  const pr = {
+    state: 'OPEN',
+    headRefOid: 'b'.repeat(40),
+    labels: { nodes: [{ name: 'hold' }, { name: 'tim-hold' }] },
+    timelineItems: { nodes: [{ createdAt: LABELED, label: { name: 'hold' } }] },
+    comments: { nodes: [comment({ owner: 'gem', head: HEAD })] },
+  };
+  const { results } = runHoldSweep(pr, T0 + MAX_HOLD_MS + HOUR);
+  assert.deepEqual(
+    results.map(row => [row.label, row.action]),
+    [['hold', 'release']]
+  );
+});
+
+test('machine stop labels follow their own labeled time', () => {
   // #21014 / #20953: `gated` applied 2026-10-08 with no owner or expiry sat
   // outside the contract and blocked admission indefinitely.
   const pr = {
     state: 'OPEN',
     headRefOid: HEAD,
     labels: {
-      nodes: [{ name: 'gated' }, { name: 'tim:hold' }, { name: 'ui' }],
+      nodes: [{ name: 'gated' }, { name: 'queue-deferred' }, { name: 'ui' }],
     },
     timelineItems: {
       nodes: [
         { createdAt: LABELED, label: { name: 'gated' } },
-        { createdAt: '2026-10-09T10:00:00Z', label: { name: 'tim:hold' } },
+        {
+          createdAt: '2026-10-09T10:00:00Z',
+          label: { name: 'queue-deferred' },
+        },
       ],
     },
     comments: { nodes: [] },
@@ -271,7 +331,7 @@ test('every stop label is held to the contract, each on its own labeled time', (
       results.map(r => [r.label, r.action, r.reason]),
       [
         ['gated', 'release', 'ownerless'],
-        ['tim:hold', 'keep', 'ownerless-grace'],
+        ['queue-deferred', 'keep', 'ownerless-grace'],
       ]
     );
   } finally {

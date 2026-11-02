@@ -98,7 +98,7 @@ describe('public root stylesheet isolation', () => {
   });
 });
 
-describe('electron compact-window desktop shell (JOV-8942)', () => {
+describe('electron compact desktop shell (JOV-8942)', () => {
   const source = readGlobals();
 
   it('hides the mobile bottom surface in the desktop runtime at every width', () => {

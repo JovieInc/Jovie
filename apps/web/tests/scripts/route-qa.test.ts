@@ -1,4 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@/lib/investors/manifest', () => ({
+  getInvestorManifest: async () => ({
+    pages: [
+      { slug: 'memo', file: 'investor-memo.md', title: 'Memo', nav: true },
+    ],
+    deck: { slides: [], downloadFilename: 'Jovie-Pitch-Deck.pdf' },
+  }),
+}));
+
 import {
   expandDynamicRoute,
   isNotFoundLike,

@@ -5,6 +5,18 @@
  * interaction latency on the real authenticated chat route. Network/provider
  * latency is covered separately by production telemetry.
  *
+ * Hosted smoke runners are multi-tenant: identical product code has passed
+ * and failed the unchanged budgets purely on runner allocation (JOV-5805;
+ * red run 39058466775 reported whole-instance ~2-2.5x inflated feedback and
+ * usable-state timings while the deterministic checks passed). Before the
+ * scored loop the runner's settled idle frame cadence is measured on the
+ * warmed document and the declared timing budgets are scaled by
+ * clamp(cadence / 16.7ms, 1, 2.5) via chat-performance-environment. A healthy
+ * runner derives exactly 1 and the manifest budgets are enforced unchanged;
+ * a degraded runner scores the same raw samples against proportionally
+ * scaled targets; dropped-frame and sample-count budgets never scale; the
+ * calibration is attached as evidence and recorded in every attempt receipt.
+ *
  * @smoke
  */
 
@@ -18,6 +30,13 @@ import {
 import { CHAT_TRANSCRIPT_WINDOW } from '@/lib/chat/transcript-window';
 import { UX_LATENCY_STORAGE_KEY } from '@/lib/monitoring/interaction-latency';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
+import {
+  CHAT_ENVIRONMENT_MAX_SCALE,
+  CHAT_ENVIRONMENT_REFERENCE_FRAME_MS,
+  calibrateChatScenario,
+  deriveChatEnvironmentScale,
+} from '@/scripts/chat-performance-environment';
+import { getInteractionHotPathById } from '@/scripts/performance-interaction-manifest';
 import {
   buildInteractionLatencyReport,
   type InteractionLatencySample,
@@ -350,18 +369,22 @@ function trackChatApiRequests(page: Page) {
  * before starting the clock. Give up after a few seconds so a wedged runner
  * still records the real interaction instead of hanging the lane.
  */
-async function waitForQuietFrames(page: Page): Promise<void> {
-  await page.evaluate(
+async function waitForQuietFrames(page: Page): Promise<readonly number[]> {
+  return page.evaluate(
     () =>
-      new Promise<void>(resolve => {
+      new Promise<number[]>(resolve => {
         let settled = false;
+        const gaps: number[] = [];
         const finish = () => {
           if (settled) return;
           settled = true;
-          resolve();
+          // The settled tail is the measured cadence: the last four gaps are
+          // the qualifying quiet window (or the most recent gaps on the
+          // timeout path), so the calibration below reads exactly what the
+          // runner delivered, never a stale settle burst.
+          resolve(gaps.slice(-4));
         };
         const started = performance.now();
-        const gaps: number[] = [];
         let previous: number | undefined;
         const step = (time: number) => {
           if (settled) return;
@@ -581,7 +604,8 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
       composer,
       sendButton,
       copy.userText,
-      copy.assistantText
+      copy.assistantText,
+      backend
     );
   }
 
@@ -591,6 +615,28 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
   await page.evaluate(storageKey => {
     localStorage.removeItem(storageKey);
   }, UX_LATENCY_STORAGE_KEY);
+
+  // JOV-5805: calibrate the smoke runner's frame cadence while the product is
+  // idle. The warmed document has no pending sends, so the settled gaps
+  // measured here are environment-only; scaling the declared timing budgets by
+  // them absorbs runner-side slowdown without absorbing product work. A
+  // healthy runner derives exactly 1 and the manifest budgets are enforced
+  // unchanged. Count budgets are never scaled, and the scale is capped at 2.5
+  // so a wedged runner still fails honestly.
+  const settledFrameGapsMs = await waitForQuietFrames(page);
+  const environmentScale = deriveChatEnvironmentScale(settledFrameGapsMs);
+  const chatScenario = getInteractionHotPathById('chat-message-round-trip');
+  if (!chatScenario) {
+    throw new Error('Missing chat-message-round-trip scenario');
+  }
+  const calibratedScenario = calibrateChatScenario(
+    chatScenario,
+    environmentScale
+  );
+  attemptData.calibration = {
+    settledFrameGapsMs: [...settledFrameGapsMs],
+    environmentScale,
+  };
 
   for (let runIndex = 0; runIndex < SAMPLE_COUNT; runIndex += 1) {
     await waitForChatSendPacer(page);
@@ -625,11 +671,31 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
     ...sample,
     droppedFrameCount,
   }));
-  const report = buildInteractionLatencyReport({ samples: completeSamples });
+  const report = buildInteractionLatencyReport({
+    samples: completeSamples,
+    // Focused, calibrated scope: the raw samples are unchanged; only the
+    // timing-budget application is calibrated to the measured runner.
+    scenarios: [calibratedScenario],
+  });
 
   attemptData.report = report;
   await testInfo.attach('chat-performance-report.json', {
     body: JSON.stringify(report, null, 2),
+    contentType: 'application/json',
+  });
+  await testInfo.attach('chat-environment-calibration.json', {
+    body: JSON.stringify(
+      {
+        schema: 'jovie-chat-environment-calibration/v1',
+        settledFrameGapsMs: [...settledFrameGapsMs],
+        environmentScale,
+        referenceFrameMs: CHAT_ENVIRONMENT_REFERENCE_FRAME_MS,
+        maxScale: CHAT_ENVIRONMENT_MAX_SCALE,
+        budget: calibratedScenario.budget,
+      },
+      null,
+      2
+    ),
     contentType: 'application/json',
   });
 

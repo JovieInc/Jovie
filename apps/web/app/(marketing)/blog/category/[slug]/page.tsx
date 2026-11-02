@@ -5,6 +5,10 @@ import { getCategoryBySlug } from '@/lib/blog/categories';
 import { getBlogPosts, slugifyCategory } from '@/lib/blog/getBlogPosts';
 import { resolveAuthor } from '@/lib/blog/resolveAuthor';
 import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
+import {
+  defaultOpenGraphImages,
+  defaultTwitterImages,
+} from '@/lib/seo/default-og-image';
 import type { ProfileData } from '@/lib/services/profile';
 import { getProfilesByUsernames } from '@/lib/services/profile';
 import { BlogCard } from '../../components/BlogCard';
@@ -51,6 +55,11 @@ export async function generateMetadata({ params }: CategoryPageProps) {
       title: `${category.name} | Jovie Blog`,
       description: category.description,
       url: `${BASE_URL}/blog/category/${slug}`,
+      images: defaultOpenGraphImages(`${category.name} on the Jovie blog`),
+    },
+    twitter: {
+      card: 'summary_large_image' as const,
+      images: defaultTwitterImages(),
     },
   };
 }

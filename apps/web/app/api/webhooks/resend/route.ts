@@ -102,6 +102,7 @@ interface ResendWebhookPayload {
  * @param payload - Raw request body
  * @param signature - svix-signature header value
  * @param timestamp - svix-timestamp header value
+ * @param messageId - svix-id header value
  * @param secret - Webhook signing secret
  * @returns true if signature is valid
  */
@@ -109,6 +110,7 @@ function verifySignature(
   payload: string,
   signature: string,
   timestamp: string,
+  messageId: string,
   secret: string
 ): boolean {
   try {
@@ -123,7 +125,7 @@ function verifySignature(
 
     // SVix signature format: v1,<base64-signature>
     const signatures = signature.split(' ');
-    const signedContent = `${timestamp}.${payload}`;
+    const signedContent = `${messageId}.${timestamp}.${payload}`;
 
     // Extract the actual secret (remove whsec_ prefix if present)
     const secretBytes = Buffer.from(
@@ -195,34 +197,71 @@ function getSuppressionReason(
   return null;
 }
 
+/** In-process attempts per recipient before the delivery is failed back to Svix. */
+const SUPPRESSION_ATTEMPTS = 3;
+const SUPPRESSION_RETRY_BASE_MS = 50;
+
 /**
- * Log suppression results for all emails
+ * A bounce or complaint that could not be made durable. The event must not be
+ * acknowledged: Svix retries non-2xx deliveries, and the stored webhook_events
+ * row keeps the failure (dead letter) for replay and audit.
  */
-function logSuppressionResults(
-  suppressionResults: Array<{
-    email: string;
-    result: { success: boolean; error?: string; alreadyExists?: boolean };
-  }>,
-  eventId: string,
-  reason: SuppressionReason
-): void {
-  for (const { email, result } of suppressionResults) {
-    const emailMasked = `${email.slice(0, 3)}***@***`;
-    if (!result.success) {
-      logger.error(`[Resend Webhook] Failed to add suppression`, {
-        error: result.error,
-        eventId,
-        reason,
-        emailMasked,
-      });
-    } else if (!result.alreadyExists) {
-      logger.info(`[Resend Webhook] Added suppression`, {
-        reason,
-        eventId,
-        emailMasked,
-      });
+class SuppressionPersistenceError extends Error {
+  constructor(
+    readonly failedSuppressions: number,
+    readonly failedEnrollmentStops: number
+  ) {
+    super(
+      `Resend suppression not persisted: ${failedSuppressions} suppression write(s), ${failedEnrollmentStops} enrollment stop(s) failed`
+    );
+    this.name = 'SuppressionPersistenceError';
+  }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** Add one suppression, retrying failed or thrown writes. True once durable. */
+async function addSuppressionWithRetry(
+  email: string,
+  reason: SuppressionReason,
+  options: Parameters<typeof addSuppression>[3],
+  eventId: string
+): Promise<boolean> {
+  const emailMasked = `${email.slice(0, 3)}***@***`;
+  for (let attempt = 1; attempt <= SUPPRESSION_ATTEMPTS; attempt++) {
+    let failure: string | undefined;
+    try {
+      const result = await addSuppression(email, reason, 'webhook', options);
+      if (result.success) {
+        if (!result.alreadyExists) {
+          logger.info('[Resend Webhook] Added suppression', {
+            reason,
+            eventId,
+            emailMasked,
+          });
+        }
+        return true;
+      }
+      failure = result.error;
+    } catch (error) {
+      failure = errorMessage(error);
+    }
+    logger.error('[Resend Webhook] Failed to add suppression', {
+      error: failure,
+      attempt,
+      eventId,
+      reason,
+      emailMasked,
+    });
+    if (attempt < SUPPRESSION_ATTEMPTS) {
+      await new Promise(resolve =>
+        setTimeout(resolve, SUPPRESSION_RETRY_BASE_MS * attempt)
+      );
     }
   }
+  return false;
 }
 
 /**
@@ -284,62 +323,55 @@ async function processBounceOrComplaint(
       ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
       : undefined;
 
-  // Look up which creator sent this email (for reputation tracking)
-  const creatorProfileId = await getCreatorByMessageId(data.email_id);
-
-  // Add all recipients to suppression list in parallel
-  // Use Promise.allSettled to prevent one failure from losing the entire batch
-  const suppressionSettled = await Promise.allSettled(
-    emails.map(email =>
-      addSuppression(email, reason, 'webhook', {
-        sourceEventId: eventId,
-        metadata: {
-          bounceCode: data.bounce?.diagnostic_code,
-          bounceMessage,
-          complaintType,
-        },
-        expiresAt,
-      }).then(result => ({ email, result }))
-    )
-  );
-
-  const suppressionResults = suppressionSettled
-    .filter(
-      (
-        r
-      ): r is PromiseFulfilledResult<{
-        email: string;
-        result: { success: boolean; error?: string; alreadyExists?: boolean };
-      }> => r.status === 'fulfilled'
-    )
-    .map(r => r.value);
-
-  // Log any rejected suppression attempts
-  for (const settled of suppressionSettled) {
-    if (settled.status === 'rejected') {
-      logger.error('[Resend Webhook] Suppression attempt threw unexpectedly', {
-        error:
-          settled.reason instanceof Error
-            ? settled.reason.message
-            : String(settled.reason),
-        eventId,
-        reason,
-      });
-    }
+  // Durable, idempotent effects first: suppression and enrollment stops. A
+  // failure here fails the delivery so Svix retries it; nothing below runs
+  // twice because reputation and delivery logs come after.
+  const suppressionOptions = {
+    sourceEventId: eventId,
+    metadata: {
+      bounceCode: data.bounce?.diagnostic_code,
+      bounceMessage,
+      complaintType,
+    },
+    expiresAt,
+  };
+  const enrollmentReason = type === 'email.bounced' ? 'bounced' : 'complained';
+  const [suppressed, enrollmentStops] = await Promise.all([
+    Promise.all(
+      emails.map(email =>
+        addSuppressionWithRetry(email, reason, suppressionOptions, eventId)
+      )
+    ),
+    Promise.allSettled(
+      emails.map(email =>
+        stopEnrollmentsForEmail(email, enrollmentReason, {
+          throwOnError: true,
+        })
+      )
+    ),
+  ]);
+  const failedSuppressions = suppressed.filter(ok => !ok).length;
+  const failedEnrollmentStops = enrollmentStops.filter(
+    settled => settled.status === 'rejected'
+  ).length;
+  if (failedSuppressions > 0 || failedEnrollmentStops > 0) {
+    throw new SuppressionPersistenceError(
+      failedSuppressions,
+      failedEnrollmentStops
+    );
   }
 
-  logSuppressionResults(suppressionResults, eventId, reason);
+  // Look up which creator sent this email (for reputation tracking)
+  const creatorProfileId = await getCreatorByMessageId(data.email_id);
 
   // Attribute bounce/complaint to the sending creator's reputation
   if (creatorProfileId) {
     await updateCreatorReputation(type, creatorProfileId, eventId);
   }
 
-  // Log all delivery outcomes and stop campaign enrollments in parallel
-  // Use Promise.allSettled so one failure doesn't prevent other operations
-  const secondaryResults = await Promise.allSettled([
-    // Log delivery outcomes
-    ...emails.map(email =>
+  // Delivery logs are best-effort audit records.
+  const deliveryLogs = await Promise.allSettled(
+    emails.map(email =>
       logDelivery({
         channel: 'email',
         recipientEmail: email,
@@ -353,24 +385,12 @@ async function processBounceOrComplaint(
           ...(creatorProfileId && { creatorProfileId }),
         },
       })
-    ),
-    // Stop campaign enrollments for bounced/complained emails
-    ...emails.map(email =>
-      stopEnrollmentsForEmail(
-        email,
-        type === 'email.bounced' ? 'bounced' : 'complained'
-      )
-    ),
-  ]);
-
-  // Log any failures from secondary operations
-  for (const settled of secondaryResults) {
+    )
+  );
+  for (const settled of deliveryLogs) {
     if (settled.status === 'rejected') {
       logger.error('[Resend Webhook] Secondary operation failed', {
-        error:
-          settled.reason instanceof Error
-            ? settled.reason.message
-            : String(settled.reason),
+        error: errorMessage(settled.reason),
         eventId,
       });
     }
@@ -456,6 +476,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  let eventId: string | null = null;
   try {
     const body = await request.text();
     const headersList = await headers();
@@ -478,7 +499,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify signature
-    if (!verifySignature(body, svixSignature, svixTimestamp, webhookSecret)) {
+    if (
+      !verifySignature(
+        body,
+        svixSignature,
+        svixTimestamp,
+        svixId,
+        webhookSecret
+      )
+    ) {
       await captureCriticalError(
         'Invalid Resend webhook signature',
         new Error('Signature verification failed'),
@@ -492,7 +521,7 @@ export async function POST(request: NextRequest) {
 
     // Parse the event
     const event = JSON.parse(body) as ResendWebhookPayload;
-    const eventId = svixId;
+    eventId = svixId;
 
     // Atomic insert with conflict handling (prevents TOCTOU race condition)
     await db
@@ -562,8 +591,21 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ received: true }, { headers: NO_STORE_HEADERS });
   } catch (error) {
+    if (eventId) {
+      // Dead letter: keep the stored event unprocessed with the failure, so
+      // replay and audit can find it after Svix gives up.
+      try {
+        await db
+          .update(webhookEvents)
+          .set({ error: errorMessage(error).slice(0, 1000) })
+          .where(eq(webhookEvents.eventId, eventId));
+      } catch {
+        // The critical capture below still fires.
+      }
+    }
     await captureCriticalError('Resend webhook processing failed', error, {
       route: '/api/webhooks/resend',
+      eventId,
     });
     return NextResponse.json(
       { error: 'Webhook processing failed' },

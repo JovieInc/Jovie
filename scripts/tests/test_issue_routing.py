@@ -20,6 +20,10 @@ SPEC.loader.exec_module(lane)
 remediation = lane.remediation
 
 PROVIDERS = json.loads((ROOT / "scripts/lanes/providers.json").read_text())
+# Quota numbers (softRuns, windowS) live in ops/registry/capacity.json, not providers.json.
+sys.path.insert(0, str(ROOT / "scripts/lanes"))
+import capacity_registry  # noqa: E402
+capacity_registry.apply_limits(PROVIDERS, capacity_registry.load(ROOT / "ops/registry/capacity.json"))
 POLICY = json.loads((ROOT / "scripts/lanes/routing.json").read_text())
 
 

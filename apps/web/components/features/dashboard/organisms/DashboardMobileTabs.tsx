@@ -7,7 +7,6 @@ import {
   artistNavigation,
   CUSTOMER_NAV_CAPACITY,
   isNavigationItemActive,
-  navigationVisibleForFlags,
   partitionCustomerNavigation,
   primaryNavigation,
   settingsNavItem,
@@ -17,7 +16,6 @@ import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useProfileData } from '@/hooks/useProfileData';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
-import { useAppFlag } from '@/lib/flags/client';
 import {
   type NavigationTelemetryContext,
   startNavigationTelemetry,
@@ -50,14 +48,7 @@ export function DashboardMobileTabs({
   const isMobile = useMediaQuery('(max-width: 1023px)');
   const isElectron = useIsElectronRuntime();
   const { profileHref } = useProfileData(true);
-  const profilesWorkspaceEnabled = useAppFlag('PROFILES_WORKSPACE');
-  const customerNavigation = useMemo(
-    () =>
-      navigationVisibleForFlags(primaryNavigation, {
-        PROFILES_WORKSPACE: profilesWorkspaceEnabled,
-      }),
-    [profilesWorkspaceEnabled]
-  );
+  const customerNavigation = primaryNavigation;
   const telemetryContext = useMemo<NavigationTelemetryContext>(
     () => ({
       isElectron,

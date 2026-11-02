@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 // Hold contract (jovie-hold/v1).
 //
-// A stop label (`hold`, `gated`, `incident`, `do-not-merge`, `queue-deferred`,
-// or a `tim-hold` variant; scripts/lib/admission-hold-labels.mjs) pauses admission. It may not
-// pause it forever on prose alone. Whoever applies one posts a receipt comment
-// on the PR:
+// Stop labels pause admission. None is human-owned: `tim-hold`, `tim:hold`,
+// `hold:tim` and `do-not-merge` are retired (EVENT 2026-10-28, Tim: nothing in
+// the shipping machinery waits on a human; taste ships behind a flag and Tim's
+// feedback arrives as an Ovie card). Every stop label
+// (scripts/lib/admission-hold-labels.mjs) uses a receipt
+// naming an owner and a machine-checkable release:
 //
 //   <!-- jovie-hold/v1 {"owner":"agent:<task>","until":"2026-10-12T18:00:00Z","reason":"..."} -->
 //   <!-- jovie-hold/v1 {"owner":"gem-lanes","head":"<40-hex sha>","reason":"waiting for a fix push"} -->
@@ -138,6 +140,7 @@ function gh(args) {
 }
 
 export function sweepHolds({ now, dryRun, io }) {
+  /** @type {Array<ReturnType<typeof evaluateHold> & { number: number, label: string }>} */
   const results = [];
   for (const number of io.listHeld()) {
     const pr = io.read(number);

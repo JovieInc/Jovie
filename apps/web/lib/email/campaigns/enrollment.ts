@@ -32,7 +32,15 @@ export type EnrollmentStopReason =
  */
 export async function stopEnrollmentsForEmail(
   email: string,
-  reason: EnrollmentStopReason
+  reason: EnrollmentStopReason,
+  options: {
+    /**
+     * Rethrow persistence failures instead of returning 0. Compliance callers
+     * (bounce/complaint webhooks) must not acknowledge a stop that never
+     * happened.
+     */
+    readonly throwOnError?: boolean;
+  } = {}
 ): Promise<number> {
   const recipientHash = hashEmail(email);
 
@@ -66,6 +74,7 @@ export async function stopEnrollmentsForEmail(
       error: error instanceof Error ? error.message : 'Unknown error',
       reason,
     });
+    if (options.throwOnError) throw error;
     return 0;
   }
 }

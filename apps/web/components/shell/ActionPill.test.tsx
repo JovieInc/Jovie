@@ -33,6 +33,10 @@ describe('ActionPill', () => {
   it('defaults type to button', () => {
     render(<ActionPill label='Go' />);
     expect(screen.getByRole('button')).toHaveAttribute('type', 'button');
+    expect(screen.getByRole('button')).toHaveAttribute(
+      'data-variant',
+      'primary'
+    );
   });
 
   it('accepts type=submit for use inside forms', () => {

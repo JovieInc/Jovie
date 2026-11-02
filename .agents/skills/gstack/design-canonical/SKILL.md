@@ -485,9 +485,9 @@ work even when they are internal or generated.
    density, accessibility constraints, and verification path.
 3. Use the official design system when one exists. In Jovie, `DESIGN.md`,
    `docs/design-system/*`, tokens, and existing components outrank generic advice.
-4. Anti-slop is mandatory. Reject generic SaaS card grids, centered everything,
-   decorative blobs, uniform oversized radii, purple-blue gradient defaults,
-   icon-in-circle feature grids, and copy that could describe any product.
+4. Anti-slop is mandatory. The canonical list is ASR-020 (plus ASR-021, ASR-023,
+   ASR-024, ASR-025, ASR-026) in `docs/design-system/anti-slop-rules.json`; cite
+   ids, do not copy the text. `node scripts/anti-slop/run.mjs list` prints them.
 5. Platform literacy matters. Web, iOS, macOS/Ovie, and ops tools share principles
    but not chrome, density, interaction conventions, or motion budgets.
 6. State coverage is design coverage. Include loading, empty, error, disabled,
@@ -504,6 +504,15 @@ work even when they are internal or generated.
    “Be found. Be understood.” MKT-D16 and
    `scripts/invariants/icp-language/check.mjs` enforce this. The baseline only
    shrinks.
+
+### Taste Rule: Quiet Surfaces, Hard Bans (founder, 2026-10-28)
+
+- **No bordered or filled containers around icons or emoji.** Show the bare icon at the right size and colour token, aligned to the text grid. `IconBadge`, `IconTile` and `IconGlyphFrame` are retired. `apps/web/scripts/lint-design-noise.mjs` (`icon-tile`) ratchets existing debt; new sites fail.
+- **Cards carry at most title + body + one optional bare visual.** Labels that restate structure ("Step 1", "Feature") are never visible text. Order comes from an `<ol>`; keep the count `sr-only`, or art-direct an oversized faded numeral.
+- **One email-capture control: `InlineSubscribe`** (`@jovie/ui/atoms/inline-subscribe`, built on `CompositeField`). One short title, one attached field and button, at most one microcopy line. No visible label (aria-label), no subtitle, no helper that restates the title or CTA.
+- **A primary button is never grey-disabled by field validity.** Validate on submit. Disable only for a genuinely unavailable service.
+- **Composite fields (prefix/suffix, search pill, composer) use `CompositeField`**, which owns the radius-following focus ring. Never a raw `outline`/`ring-0` on the inner input (`lint-composite-field.mjs`).
+- Rendered counterpart: `tests/e2e/marketing-noise-budget.spec.ts` (text-layer budget, icon tiles, "Step N") with deliberate-red cases for the vision critic.
 
 ### Taste Rule: Copy Is the Message, Never the Brief
 
@@ -556,8 +565,7 @@ Before declaring design work complete, report pass/fail for:
   without implementation or screenshot evidence.
 - Iconography: Lucide for UI icons where available; Jovie brand remains O-only;
   no invented brand marks.
-- Anti-slop: no generic gradients, nested cards, decorative blobs, repetitive
-  feature grids, or template copy.
+- Anti-slop: every ASR rule in scope passes (ASR-020 and the rules it links).
 - Evidence: screenshots, mockups, test output, or component/file evidence included
   in the PR or final handoff.
 - Forms, overflow, media, l10n, browser, and a11y gaps: load

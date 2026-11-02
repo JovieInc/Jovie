@@ -1,0 +1,35 @@
+{
+  "schema": "jovie-hyperagent-models/v1",
+  "models": {
+    "astra": {
+      "agent_id": "cmuc85zwf010j07adgiv0pvze",
+      "agent_name": "Astra Planner",
+      "role": "research"
+    },
+    "fable-5.1": {
+      "agent_id": "cmuk33ew70r2e06adfqx6gbpy",
+      "agent_name": "Fable 5.1 Research",
+      "role": "research"
+    },
+    "grok-4.7": {
+      "agent_id": "cmuc8gpim010407adjkkj85s5",
+      "agent_name": "Grok 4.7 Reviewer",
+      "role": "research"
+    },
+    "moonshotai/kimi-k3": {
+      "agent_id": "cmuk34vkb0rid06ad3rv8gvee",
+      "agent_name": "GLM 5.3 Developer (copy)",
+      "role": "coding"
+    },
+    "z-ai/glm-5.3": {
+      "agent_id": "cmtj3n2q901i407adklzzq01t",
+      "agent_name": "GLM 5.3 Developer",
+      "role": "coding"
+    },
+    "z-ai/glm-5.3-flash": {
+      "agent_id": "cmtkwfvld033b06adh0pqnx6a",
+      "agent_name": "GLM 5.3 Flash Developer",
+      "role": "coding"
+    }
+  }
+}

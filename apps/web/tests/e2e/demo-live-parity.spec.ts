@@ -25,7 +25,7 @@ function normalizeTexts(values: string[]) {
 }
 
 const AUDIENCE_COLUMN_HEADERS = [
-  'Fan',
+  'Member',
   'State',
   'Alerts',
   'Engagement',

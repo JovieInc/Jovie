@@ -83,12 +83,27 @@ if [ "$reset_status" -ne 0 ] || ! [[ "$reset" =~ ^[0-9]+$ ]]; then
   cat "$err" >&2
   exit "$status"
 fi
+# Which resource ran dry, from the failing response's own x-ratelimit-resource
+# header (core when the response carried none and rate_limit says core).
+bucket="$(printf '%s\n' "$message" | grep -ioE 'x-ratelimit-resource:[[:space:]]*[A-Za-z_]+' | head -n1 | sed -E 's/^[^:]*:[[:space:]]*//' || true)"
+bucket_src="x-ratelimit-resource"
+if [ -z "$bucket" ]; then
+  bucket="core"
+  bucket_src="rate_limit.resources.core"
+fi
+# Unit tests drive this script with a fake gh (GH_API_HOLD_BIN) and mocked
+# resets. Their lines carry [fixture] so nobody mistakes them for a live quota
+# refusal (2026-10-25: two workers chased a mocked "resets at 1792938043").
+tag=""
+if [ -n "${GH_API_HOLD_BIN:-}" ] || [ "${GH_API_HOLD_FIXTURE:-}" = 1 ]; then
+  tag="[fixture] "
+fi
 wait=$((reset - now + 1))
 if [ "$wait" -lt 0 ]; then
   wait=0
 fi
 if [ "$wait" -gt "$budget" ]; then
-  echo "::error::GitHub rate limit resets at ${reset}, outside the ${budget}s budget. Not passing." >&2
+  echo "::error::${tag}GitHub rate limit resets at ${reset} (resource=${bucket}), outside the ${budget}s budget. Not passing." >&2
   cat "$err" >&2
   exit "$status"
 fi
@@ -97,12 +112,6 @@ echo "::warning::Holding ${wait}s for the GitHub rate limit reset." >&2
 # stderr and re-print the ::notice line, so it is kept to sanitized metadata
 # (never tokens, headers or URLs). The summary is a plain file append.
 trigger_http="$(printf '%s\n' "$message" | grep -oE 'HTTP [0-9]{3}' | head -n1 | cut -d' ' -f2 || true)"
-bucket="$(printf '%s\n' "$message" | grep -ioE 'x-ratelimit-resource:[[:space:]]*[A-Za-z_]+' | head -n1 | sed -E 's/^[^:]*:[[:space:]]*//' || true)"
-bucket_src="x-ratelimit-resource"
-if [ -z "$bucket" ]; then
-  bucket="core"
-  bucket_src="rate_limit.resources.core"
-fi
 label="${GH_API_HOLD_LABEL:-gh ${1:-} ${2:-}}"
 label="${label%%\?*}"
 label="$(printf '%s' "$label" | tr -c 'A-Za-z0-9 ._/@-' '_' | cut -c1-120)"

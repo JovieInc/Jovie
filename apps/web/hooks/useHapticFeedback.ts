@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
+import { postNativeHaptic } from '@/lib/haptics/native-haptic-bridge';
 
 type HapticPattern =
   | 'light'
@@ -20,11 +21,14 @@ const HAPTIC_PATTERNS: Record<HapticPattern, number[]> = {
 };
 
 /**
- * Provides haptic feedback using the Vibration API.
- * Falls back gracefully on devices that don't support it.
+ * Provides haptic feedback. Inside the Jovie iOS app it routes to the native
+ * haptic engine (UIKit feedback generators) through the `jovieHaptics` script
+ * message bridge; elsewhere it uses the Vibration API (Android web) and falls
+ * back to a no-op on devices that support neither.
  */
 export function useHapticFeedback() {
   const trigger = useCallback((pattern: HapticPattern = 'light') => {
+    if (postNativeHaptic(pattern)) return;
     // Check for Vibration API support
     if (typeof navigator === 'undefined' || !navigator.vibrate) {
       return;

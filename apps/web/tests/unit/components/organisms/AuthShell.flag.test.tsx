@@ -29,14 +29,20 @@ vi.mock('@/components/organisms/AppShellFrame', () => ({
     main,
     mobileBottomNav,
     contentClassName,
+    chatAmbientGradient,
   }: {
     sidebar: ReactNode;
     header?: ReactNode;
     main: ReactNode;
     mobileBottomNav?: ReactNode;
     contentClassName?: string;
+    chatAmbientGradient?: boolean;
   }) => (
-    <div data-testid='app-shell-frame' data-content-class={contentClassName}>
+    <div
+      data-testid='app-shell-frame'
+      data-content-class={contentClassName}
+      data-chat-ambient-gradient={chatAmbientGradient}
+    >
       {sidebar}
       {header}
       {main}
@@ -60,8 +66,16 @@ vi.mock('@/components/organisms/sidebar', () => ({
 vi.mock(
   '@/components/molecules/sidebar-collapse-button/SidebarCollapseButton',
   () => ({
-    SidebarCollapseButton: () => (
-      <button type='button' data-testid='sidebar-rail-toggle'>
+    SidebarCollapseButton: ({
+      previewTrigger,
+    }: {
+      previewTrigger?: boolean;
+    }) => (
+      <button
+        type='button'
+        data-testid='sidebar-rail-toggle'
+        data-preview-trigger={String(previewTrigger)}
+      >
         Expand sidebar
       </button>
     ),
@@ -179,6 +193,22 @@ describe('AuthShell runtime update wiring', () => {
 });
 
 describe('AuthShell canonical wiring', () => {
+  it.each(['ov', 'dashboard'] as const)(
+    'keeps the Ovie canvas flat while preserving customer chat paint: %s',
+    section => {
+      render(
+        <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+          <AuthShell section={section} breadcrumbs={[]} isChatRoute>
+            <div>Chat</div>
+          </AuthShell>
+        </AppFlagProvider>
+      );
+      expect(screen.getByTestId('app-shell-frame')).toHaveAttribute(
+        'data-chat-ambient-gradient',
+        section === 'ov' ? 'false' : 'true'
+      );
+    }
+  );
   beforeEach(() => {
     sidebarMock.isMobile = false;
     sidebarMock.state = 'open';
@@ -190,6 +220,11 @@ describe('AuthShell canonical wiring', () => {
     renderAuthShell();
 
     expect(screen.getByTestId('sidebar-rail-toggle')).toBeInTheDocument();
+    // The in-content toggle must not trigger the flyout peek that covers it.
+    expect(screen.getByTestId('sidebar-rail-toggle')).toHaveAttribute(
+      'data-preview-trigger',
+      'false'
+    );
   });
 
   it('does not mount a second left-sidebar control in Electron (JOV-7207)', () => {

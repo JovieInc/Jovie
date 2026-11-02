@@ -35,6 +35,8 @@
   --app-shell-content-max-reading: 56rem;
   --app-shell-content-max-form: 50rem;
   --profile-shell-max-width: 430px;
+  --profile-desktop-max-width: 1280px;
+  --profile-desktop-min-height: 720px;
   --profile-shell-header-max-width: 38rem;
   --profile-shell-card-radius: 24px;
   --profile-card-radius: 22px;
@@ -262,6 +264,18 @@
   --ds-motion-subtle-easing: cubic-bezier(0.4, 0, 0.2, 1);
   --ds-motion-cinematic-duration: 420ms;
   --ds-motion-cinematic-easing: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Marketing motion language (guides/motion.md). Names only; the curves and
+     durations are the cinematic tokens above. presets.ts mirrors these and a
+     test pins the two together. */
+  --motion-scroll-hero-range: 100svh;
+  --motion-hero-zoom-from: 1.94;
+  --motion-parallax-tilt: 6deg;
+  --motion-parallax-pointer-max: 1.5deg;
+  --motion-takeover-lift: -32px;
+  --motion-takeover-settle: 24px;
+  --motion-field-fps: 30;
+  --motion-field-grain: 0.03;
 
   /* Core Theme Inputs */
   --theme-base-hue: 282;
@@ -870,13 +884,15 @@
 
 @media (min-width: 768px) and (max-width: 1179px) {
   /* At tablet and narrow-desktop widths, the centered profile still uses its
-     lower region for the PAC and dock. Keep consent above the card instead. */
+     lower region for the PAC and dock. The avatar sits at the card top, so
+     anchor consent directly above the dock (published by CookieBannerSection)
+     and never over the identity. */
   .cookie-banner-card--above-public-profile-dock {
-    top: var(--page-pad);
-    bottom: auto;
+    top: auto;
+    bottom: var(--cookie-banner-dock-clearance, var(--page-pad));
     left: 50%;
     right: auto !important;
-    width: 254px !important;
+    width: min(358px, calc(100vw - 32px)) !important;
     max-width: none;
     transform: translateX(-50%);
   }
@@ -1114,6 +1130,29 @@
     --cover-height: clamp(200px, 45%, 340px);
     height: min(740px, calc(100dvh - (var(--page-pad) * 2)));
   }
+
+  /* The shell height is floored/fixed at md+ (canvas min-height at 1024px+,
+     md card height below), so the compact surface must stretch to fill the
+     slot: bottom-anchored drawer sheets position against the surface root,
+     and a content-sized root stops 8px short of the shell bottom once the
+     floor exceeds the content height - failing the profile-drawers spec
+     'menu sheet spans the phone column' (2px tolerance, first red run
+     41005969193). Validated live: sheet/shell bottom delta 8px -> 0. */
+  .profile-viewport:not(.profile-viewport--embedded):not(
+    .profile-viewport--desktop-surface
+  ) .profile-compact-surface-slot {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .profile-compact-surface-slot
+    > div {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
 }
 
 @media (min-width: 1180px) {
@@ -1160,6 +1199,491 @@
   }
 }
 
+/* Desktop artist profile (Tim, 2026-10-25): at >= 1024px the page is the
+   canvas, not a phone card. No bordered container; tabs become a quiet text
+   row on top; Home is two top-aligned columns: identity (160px portrait,
+   display name) left, the one featured thing right as a 400px square cover
+   with title and action below it (never over the art). CSS only: the DOM is
+   identical to mobile, so < 1024px is pixel identical. Embedded previews and
+   the flagged wide surface are excluded. Everything sits on the 4/8 grid
+   (columns 320 / 400, gap 96, tab row 44). */
+@media (min-width: 1024px) {
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-layout-frame--compact {
+    max-width: none;
+    padding-inline: 0;
+  }
+  /* The canvas starts at the top of the stage. Once #23662 made the shell
+     height follow content, frame-level vertical centering re-centered the
+     canvas between profile modes (the tab row moved ~158px between Events
+     and Home — the JOV-6571/6572 mode-history contract) and re-centered it
+     again when fan-capture content mounted after assignment resolution
+     (public-profile CLS). Optical vertical centering stays owned by the
+     Home grid inside the shell. The 32px start padding keeps the canvas
+     inside the visual-audit shell bounds (y >= 24 at 1280x900). */
+  .profile-viewport:not(.profile-viewport--embedded):not(
+    .profile-viewport--desktop-surface
+  ) .public-profile-layout-frame--compact {
+    align-items: flex-start;
+    padding-block-start: 32px;
+  }
+
+  /* Drop the phone chrome: the page is the canvas. */
+  .profile-viewport:not(.profile-viewport--embedded):not(
+    .profile-viewport--desktop-surface
+  ) .public-profile-compact-shell {
+    max-width: min(100%, var(--profile-desktop-max-width));
+    /* Canvas height follows content with the designed minimum. Forcing
+       max(--profile-desktop-min-height, 100dvh) stretched the shell to
+       exactly viewport height (900px at 1280x900) and failed the
+       profile-visual-audit sizing gate ('desktop shell stays materially
+       below viewport height', < 780) on every scheduled run since
+       2026-10-26 (first red: run 40358085957). */
+    height: auto;
+    min-height: var(--profile-desktop-min-height);
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-compact-shell
+    [data-testid="profile-compact-surface"] {
+    background: transparent;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-compact-shell
+    [data-testid="profile-compact-surface"]
+    > .pointer-events-none.absolute.inset-0 {
+    display: none;
+  }
+
+  /* Unclaimed banner: a slim top line, not a boxed header. */
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-compact-shell
+    [data-testid="claim-banner"] {
+    border-bottom: 0;
+    background: transparent;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-compact-shell
+    [data-testid="claim-banner"]
+    > .bg-surface-1 {
+    display: none;
+  }
+
+  /* Tabs: minimal text row, top of the page. The labels are already in the
+     DOM (sr-only on the dock); show them and retire the glass dock. */
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-compact-shell
+    .profile-floating-tab-bar {
+    position: static;
+    order: -1;
+    margin-inline: auto;
+    padding-block: 24px 0;
+    width: auto;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-compact-shell
+    .profile-liquid-glass-nav {
+    height: auto;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-compact-shell
+    .profile-liquid-glass-nav::after,
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-compact-shell
+    .profile-liquid-glass-nav__lens,
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-compact-shell
+    .profile-liquid-glass-nav__glyph {
+    display: none;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-compact-shell
+    .profile-liquid-glass-nav__grid {
+    display: flex;
+    height: 44px;
+    margin-block: 0;
+    gap: 8px;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-compact-shell
+    .profile-liquid-glass-nav__item {
+    padding-inline: 16px;
+    border-radius: 8px;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-compact-shell
+    .profile-liquid-glass-nav__label {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    clip-path: none;
+    padding: 0;
+    white-space: nowrap;
+    font-size: 14px;
+    line-height: 20px;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-compact-shell
+    .profile-liquid-glass-nav__item[aria-current="page"]
+    .profile-liquid-glass-nav__label {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 8px;
+  }
+
+  /* Home: two top-aligned columns centered in the viewport (1fr / auto / 1fr
+     rows put the pair on the optical middle). */
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll {
+    display: grid;
+    grid-template-columns: 320px 400px;
+    grid-template-rows: 1fr auto 1fr;
+    column-gap: 96px;
+    justify-content: center;
+    align-items: start;
+    padding-inline: 48px;
+    overflow: visible;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    > [data-testid="profile-identity-header"] {
+    grid-column: 1;
+    grid-row: 2;
+    align-items: flex-start;
+    text-align: left;
+    padding: 0;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    [data-testid="profile-identity-portrait"] {
+    width: 160px !important;
+    height: 160px !important;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    [data-testid="profile-identity-portrait"]
+    > div:first-child {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    [data-testid="profile-header"] {
+    margin-top: 16px;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    [data-testid="profile-identity-link"] {
+    justify-content: flex-start;
+    font-size: 40px;
+    line-height: 48px;
+  }
+
+  /* The 320px identity column at 40px type cannot hold a full display name on
+     one line; wrap it instead of ellipsizing ("Browse Ready ..."). */
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    [data-testid="profile-identity-link"]
+    > span {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    [data-testid="profile-identity-handle"] {
+    font-size: 16px;
+    line-height: 24px;
+  }
+
+  /* Primary action is a full 44px control, not a stray chip; socials are a
+     quiet row beneath it. */
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    [data-testid="profile-identity-actions"] {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    [data-testid="profile-identity-actions"]
+    > a,
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    [data-testid="profile-identity-actions"]
+    > div:first-child:not([data-testid]) {
+    flex: none;
+    width: 100%;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    [data-testid="profile-identity-actions"]
+    .profile-glass-pill {
+    height: 44px;
+    font-size: 16px;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    [data-testid="profile-identity-social-row"] {
+    flex: none;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  /* Featured thing: the hero of the right column. */
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    > [data-testid="profile-home-rail"] {
+    grid-column: 2;
+    grid-row: 2;
+    flex: none;
+    width: 400px;
+    height: auto;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    [data-testid="profile-pac"] {
+    height: auto;
+    min-height: 0;
+    container-type: normal;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    [data-testid="profile-pac"]
+    .profile-mode-card {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    [data-testid="profile-pac"]
+    .profile-mode-card::before,
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    [data-testid="profile-pac"]
+    .profile-mode-card::after {
+    display: none;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    [data-testid="profile-pac"]
+    .profile-mode-card
+    > div:first-child {
+    display: none;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    [data-testid="profile-pac"]
+    .profile-mode-card
+    > div:nth-child(2) {
+    margin-top: 0;
+    justify-content: flex-start;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    [data-testid="profile-pac-featured-art"] {
+    width: 400px;
+    height: 400px;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    [data-testid="profile-pac"]
+    .profile-mode-card
+    > div:last-child {
+    padding-top: 24px;
+  }
+
+  /* One primary action: the featured card owns it as a full 44px control
+     (room below it stays free for the DSP carousel). The duplicate Listen
+     pill in the identity column is retired; tabs cover the modes. */
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    [data-testid="profile-identity-listen"] {
+    display: none;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    [data-testid="profile-pac"]
+    .profile-mode-card
+    a.group
+    > span {
+    height: 44px;
+  }
+
+  /* The Jovie mark stays (free-tier branding) but reads as a quiet footer. */
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    > [data-testid="profile-jovie-branding"] {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    align-self: end;
+    opacity: 0.4;
+  }
+
+  /* Non-Home tabs keep one readable column inside the wider page. */
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-compact-shell
+    [data-testid="profile-compact-surface"]:not([data-mode="profile"])
+    .profile-content-scroll-region
+    > * {
+    margin-inline: auto;
+    max-width: 560px;
+    width: 100%;
+  }
+}
+
 :root.dark {
   /* Dark mode only changes base lightness */
   /* Deep dark for dark mode */
@@ -1185,6 +1709,16 @@
   --noir-ion-card: #ffffff;
   --noir-ion-elevated: #ffffff;
   --noir-ion-floating: #ffffff;
+  /* Glass (2026-10-26): one semantic material for frosted panels. Shell
+     mixed 3% toward ion in OKLab (same recipe as JOV-8927 ds-glass), alpha per
+     theme so secondary text clears 4.5:1 over black, white and every accent
+     (light 0.88, dark 0.82). Edge = text-primary at 10% as a 1px top rim. */
+  --noir-ion-glass-surface: oklch(97.69% 0.0075 249 / 0.88);
+  --noir-ion-glass-edge: oklch(18.13% 0.0069 258.4 / 0.1);
+  --noir-ion-glass-blur: 8px;
+  --color-glass-surface: var(--noir-ion-glass-surface);
+  --color-glass-edge: var(--noir-ion-glass-edge);
+  --glass-blur: var(--noir-ion-glass-blur);
   --noir-ion-ion: #11afff;
   --noir-ion-ion-solid: #11afff;
   --noir-ion-ion-soft: rgba(17, 175, 255, 0.12);
@@ -1486,6 +2020,9 @@
 :root.dark {
   --noir-ion-canvas: #030406;
   --noir-ion-shell: #07080a;
+  --noir-ion-glass-surface: oklch(15.16% 0.0097 251.4 / 0.82);
+  --noir-ion-glass-edge: oklch(97.58% 0.0057 264.5 / 0.1);
+  --noir-ion-glass-blur: 8px;
   --noir-ion-card: #131417;
   --noir-ion-elevated: #1a1b1e;
   --noir-ion-floating: #232427;
@@ -2884,6 +3421,14 @@
   :root {
     --ds-motion-subtle-duration: 0ms;
     --ds-motion-cinematic-duration: 0ms;
+    /* Rest state: no zoom (from == rest frame scale 1248/1348), flat shell,
+       no pointer tilt, no takeover travel, no field frames. */
+    --motion-hero-zoom-from: 0.9258;
+    --motion-parallax-tilt: 0deg;
+    --motion-parallax-pointer-max: 0deg;
+    --motion-takeover-lift: 0px;
+    --motion-takeover-settle: 0px;
+    --motion-field-fps: 0;
     --duration-instant: 0ms;
     --duration-fast: 0ms;
     --duration-normal: 0ms;
@@ -3105,6 +3650,166 @@
   background-color: var(--color-bg-base);
   color: var(--color-text-primary-token);
   color-scheme: dark;
+}
+
+/* JOV-8780 — certified light mode for the marketing night stages.
+
+   home, pricing, launch, artist-profiles and artist-notifications are
+   art-directed night pages: they paint fixed cinematic-black surfaces
+   (.home-viewport, .system-b-pricing-page, .system-b-launch-page,
+   .frame-skin, bg-black stages) in BOTH themes. In the light theme their
+   text/badge/button tokens flipped to light-ink values over those dark
+   stages (axe color-contrast: 58 failing pairs across the 7 theme-route
+   surfaces). These scopes resolve the SAME Noir Ion token environment as
+   dark mode — every literal below is the verbatim :root.dark /
+   .system-b-marketing.dark value, so every text/background pair inside a
+   night page is the pair the dark WCAG scan already certifies. No new
+   colors.
+
+   Scoping note: custom-property aliases (--noir-ion-text-* and friends)
+   compute their var() references at :root, so this block must re-pin the
+   resolved tokens; re-aliasing them here would inherit the light
+   :root-computed values. The night-page match is done on the page-root
+   class hooks via :has() so other marketing pages (about, support, legal)
+   keep their light chrome. color-scheme: dark keeps native form controls
+   and scrollbars on the night surfaces; background-color is deliberately
+   NOT set so each stage keeps painting its own fixed background. */
+html:not(.dark) .home-viewport,
+html:not(.dark) .system-b-marketing:has(.system-b-pricing-page),
+html:not(.dark) .system-b-marketing:has(.system-b-launch-page),
+html:not(.dark) .system-b-marketing:has(.artist-profiles-home-system),
+html:not(.dark) .system-b-marketing:has(.artist-notifications-landing) {
+  color-scheme: dark;
+  --color-bg-base: #030406;
+  --color-bg-surface-0: #07080a;
+  --color-bg-surface-1: #131417;
+  --color-bg-surface-2: #1a1b1e;
+  --color-bg-surface-3: #232427;
+  --color-bg-page: #030406;
+  --color-bg-hover: rgba(168, 176, 195, 0.06);
+  --color-bg-elevated: #0a0d16;
+  --color-bg-input: #131417;
+  --color-bg-active: #1a1b1e;
+  --color-bg-primary: #131417;
+  --color-bg-secondary: #07080a;
+  --color-bg-button: #1a1b1e;
+  --color-bg-tooltip: #232427;
+  --color-base: var(--color-bg-base);
+  --color-surface-0: var(--color-bg-surface-0);
+  --color-surface-1: var(--color-bg-surface-1);
+  --color-surface-2: var(--color-bg-surface-2);
+  --color-surface-3: var(--color-bg-surface-3);
+  --color-surface-page: var(--color-bg-page);
+  --color-surface-hover: var(--color-bg-hover);
+  --color-surface-elevated: var(--color-bg-elevated);
+  --color-surface-input: var(--color-bg-input);
+  --color-surface-active: var(--color-bg-active);
+  --color-text-primary-token: #f5f7fb;
+  --color-text-secondary-token: #a0a5af;
+  --color-text-tertiary-token: #9da2ac;
+  --color-text-quaternary-token: #858b96;
+  --color-text-disabled-token: #77839d;
+  --color-text-tooltip: #ffffff;
+  --color-primary-token: var(--color-text-primary-token);
+  --color-secondary-token: var(--color-text-secondary-token);
+  --color-tertiary-token: var(--color-text-tertiary-token);
+  --color-quaternary-token: var(--color-text-quaternary-token);
+  --color-accent-gray: #8d8d93;
+  --color-accent-gray-subtle: rgb(127 127 133 / 0.18);
+  --color-accent-blue: #11afff;
+  --color-accent-blue-subtle: rgba(17, 175, 255, 0.12);
+  --color-accent-purple: #a982ff;
+  --color-accent-purple-subtle: rgba(169, 130, 255, 0.12);
+  --color-accent-pink: #ff48d2;
+  --color-accent-pink-subtle: rgba(255, 72, 210, 0.12);
+  --color-accent-red: #ff677d;
+  --color-accent-red-subtle: rgba(255, 103, 125, 0.12);
+  --color-accent-orange: #ffc857;
+  --color-accent-orange-subtle: rgba(255, 200, 87, 0.12);
+  --color-accent-green: #39e58c;
+  --color-accent-green-subtle: rgba(57, 229, 140, 0.12);
+  --color-accent-teal: #24f6d2;
+  --color-accent-teal-subtle: rgba(36, 246, 210, 0.1);
+  --color-accent: #11afff;
+  --color-accent-hover: #3bc0ff;
+  --color-accent-active: #0088ff;
+  --color-accent-subtle: rgba(17, 175, 255, 0.12);
+  --color-border-subtle: rgba(168, 176, 195, 0.1);
+  --color-border-default: rgba(168, 176, 195, 0.16);
+  --color-border-strong: rgba(199, 237, 255, 0.26);
+  --color-subtle: var(--color-border-subtle);
+  --color-default: var(--color-border-default);
+  --color-strong: var(--color-border-strong);
+  --color-btn-primary-bg: #e6e6e6;
+  --color-btn-primary-fg: #020307;
+  --color-btn-primary-hover: #f0f0f0;
+  --color-btn-secondary-bg: #1a1b1e;
+  --color-btn-secondary-fg: #f5f7fb;
+  --color-btn-secondary-hover: #232427;
+  --color-interactive-hover: rgba(168, 176, 195, 0.06);
+  --color-interactive-active: rgba(17, 175, 255, 0.1);
+  --color-badge-bg: rgba(168, 176, 195, 0.08);
+  --color-badge-border: rgba(168, 176, 195, 0.1);
+  --color-badge-text: #f5f7fb;
+  --color-cell-hover: #1a1b1e;
+  --color-logo-muted: rgba(245, 247, 251, 0.55);
+  --color-logo-muted-hover: rgba(245, 247, 251, 0.75);
+  --noir-ion-canvas: #030406;
+  --noir-ion-shell: #07080a;
+  --noir-ion-card: #131417;
+  --noir-ion-elevated: #1a1b1e;
+  --noir-ion-floating: #232427;
+  --noir-ion-text-strong: #ffffff;
+  --noir-ion-text-primary: #f5f7fb;
+  --noir-ion-text-secondary: #a0a5af;
+  --noir-ion-text-muted: #9da2ac;
+  --noir-ion-text-tertiary: #8c939e;
+  --noir-ion-text-disabled: #77839d;
+  --noir-ion-text-inverse: #020307;
+  --noir-ion-ion: #11afff;
+  --noir-ion-ion-solid: #11afff;
+  --noir-ion-ion-soft: rgba(17, 175, 255, 0.12);
+  --noir-ion-pulse: #f52bb5;
+  --noir-ion-pulse-solid: #f52bb5;
+  --noir-ion-pulse-soft: rgba(245, 43, 181, 0.12);
+  --noir-ion-ultra: #8e56f5;
+  --noir-ion-ultra-solid: #8e56f5;
+  --noir-ion-ultra-soft: rgba(142, 86, 245, 0.12);
+  --noir-ion-mint: #3ffa8b;
+  --noir-ion-mint-solid: #3ffa8b;
+  --noir-ion-mint-soft: rgba(63, 250, 139, 0.12);
+  --noir-ion-orange: #ff7800;
+  --noir-ion-gold: #ff7800;
+  --noir-ion-gold-solid: #ff7800;
+  --noir-ion-gold-soft: rgba(255, 120, 0, 0.12);
+  --noir-ion-red: #f72a36;
+  --noir-ion-flare: #f72a36;
+  --noir-ion-flare-solid: #f72a36;
+  --noir-ion-flare-soft: rgba(247, 42, 54, 0.12);
+  --noir-ion-aqua: #3ffa8b;
+  --noir-ion-aqua-solid: #3ffa8b;
+  --noir-ion-aqua-soft: rgba(63, 250, 139, 0.12);
+  --noir-ion-selected: rgba(17, 175, 255, 0.1);
+  --noir-ion-selected-strong: rgba(17, 175, 255, 0.16);
+  --noir-ion-border-subtle: rgba(168, 176, 195, 0.1);
+  --noir-ion-border-default: rgba(168, 176, 195, 0.16);
+  --noir-ion-border-strong: rgba(199, 237, 255, 0.26);
+  --noir-ion-border-interactive: rgba(17, 175, 255, 0.48);
+  --noir-ion-focus-ring: rgba(17, 175, 255, 0.72);
+  --system-b-text-primary: var(--color-text-primary-token);
+  --system-b-bg-page: var(--color-bg-base);
+  --system-b-bg-surface-0: var(--color-bg-surface-0);
+  --system-b-bg-surface-1: var(--color-bg-surface-1);
+  --system-b-bg-surface-2: var(--color-bg-surface-2);
+  --system-b-app-shell-border: var(--color-border-default);
+  --system-b-app-frame-seam: var(--color-border-subtle);
+  --system-b-app-content-surface: var(--color-bg-elevated);
+  --system-b-entity-chip-release-accent: var(--color-accent);
+  --system-b-entity-chip-artist-accent: var(--color-accent-purple);
+  --system-b-entity-chip-track-accent: var(--color-accent-blue);
+  --system-b-entity-chip-event-accent: var(--color-accent-orange);
+  --ds-marketing-eyebrow-color: #9da2ac;
+  --public-shell-text: #f5f7fb;
 }
 
 .system-b-marketing.dark :where(.bg-base),
@@ -3593,4 +4298,35 @@ html:not(.dark) .smart-link-powered-by {
 .public-container--bleed {
   width: 100%;
   max-width: none;
+}
+
+/* Floating profile sheet (ProfileDrawerShell floating): a short task sheet
+   opened on its own, such as Share, ends on its own rounded edge above the
+   bottom nav and safe area instead of running into the screen edge. */
+.profile-drawer-floating {
+  width: calc(100% - var(--space-4));
+  margin-inline: auto;
+  /* Clear the profile's floating bottom nav, which stays visible under
+     sheets, plus the same gap as the sides. */
+  margin-bottom: calc(var(--profile-bottom-nav-height, 0px) + var(--space-2));
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: var(--profile-drawer-radius-mobile);
+}
+
+/* The floating sheet sizes to its content (docked sheets keep one fixed
+   body height so view switches never jump); its edge already clears the
+   nav and safe area, so the body needs only the standard inset. */
+.profile-drawer-floating-body {
+  max-height: calc(
+    var(--profile-drawer-height-max) -
+    var(--profile-drawer-header)
+  );
+  /* Matches the inset above the first row (rows carry their own py-3). */
+  padding-bottom: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .profile-drawer-floating {
+    border-radius: var(--profile-drawer-radius-desktop);
+  }
 }

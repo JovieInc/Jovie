@@ -167,6 +167,70 @@ describe('design-system source identity ratchet (JOV-5301)', () => {
     }
   });
 
+  it('prunes removed identities without grandfathering allowlisted escapes', () => {
+    const { repoRoot, webRoot } = makeFixture();
+    try {
+      seedBaseline(repoRoot);
+      const escape = identityKey(
+        'apps/web/app/page.tsx',
+        'arbitrary-value',
+        'h-[42rem]'
+      );
+      writeJson(repoRoot, IDENTITY_ALLOWLIST_RELATIVE, {
+        identities: [escape],
+      });
+      writeFileSync(
+        join(webRoot, 'app/page.tsx'),
+        'export const classes = "w-[12px] h-[42rem]";\n'
+      );
+
+      writeIdentityBaseline({ repoRoot, prune: true });
+      const baseline = JSON.parse(
+        readFileSync(join(repoRoot, IDENTITY_BASELINE_RELATIVE), 'utf8')
+      );
+      expect(baseline.count).toBe(4);
+      expect(baseline.identities).not.toContain(escape);
+      expect(baseline.identities).not.toContain(
+        identityKey('apps/web/app/page.tsx', 'arbitrary-value', 'text-[#fff]')
+      );
+      expect(evaluateDesignSystemSourceRatchet({ repoRoot }).ok).toBe(true);
+      const once = readFileSync(
+        join(repoRoot, IDENTITY_BASELINE_RELATIVE),
+        'utf8'
+      );
+      writeIdentityBaseline({ repoRoot, prune: true });
+      expect(
+        readFileSync(join(repoRoot, IDENTITY_BASELINE_RELATIVE), 'utf8')
+      ).toBe(once);
+    } finally {
+      rmSync(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses to prune when a merge introduces new debt and preserves the baseline', () => {
+    const { repoRoot, webRoot } = makeFixture();
+    try {
+      seedBaseline(repoRoot);
+      const before = readFileSync(
+        join(repoRoot, IDENTITY_BASELINE_RELATIVE),
+        'utf8'
+      );
+      writeFileSync(
+        join(webRoot, 'app/page.tsx'),
+        'export const classes = "w-[99px]";\n'
+      );
+
+      expect(() => writeIdentityBaseline({ repoRoot, prune: true })).toThrow(
+        /new.*identit/i
+      );
+      expect(
+        readFileSync(join(repoRoot, IDENTITY_BASELINE_RELATIVE), 'utf8')
+      ).toBe(before);
+    } finally {
+      rmSync(repoRoot, { recursive: true, force: true });
+    }
+  });
+
   it('catches count-only escapes: arbitrary properties and styles/lib/ui roots', () => {
     const { repoRoot, webRoot } = makeFixture();
     try {

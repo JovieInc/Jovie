@@ -17,7 +17,7 @@ import {
 // These checks validate inventory parity, not authenticated runtime behavior.
 // State/action and exact-build certification remain JOV-7486 / JOV-7487.
 describe('admin surface inventory', () => {
-  it('covers the primary Home and Inbox workspaces', () => {
+  it('covers the five primary workspaces', () => {
     expect(ADMIN_PRIMARY_NAV_SURFACES.map(surface => surface.path)).toEqual(
       ADMIN_NAV_REGISTRY.filter(item => item.section === 'workspaces').map(
         item => item.href
@@ -26,10 +26,13 @@ describe('admin surface inventory', () => {
     expect(ADMIN_PRIMARY_NAV_SURFACES.map(surface => surface.id)).toEqual([
       'home',
       'inbox',
+      'shipping',
+      'operations',
+      'costs',
     ]);
     expect(
       ADMIN_RENDER_SURFACES.filter(surface => surface.primaryWorkspace)
-    ).toHaveLength(2);
+    ).toHaveLength(5);
   });
 
   it('includes each primary workspace in narrow-window snapshots', () => {

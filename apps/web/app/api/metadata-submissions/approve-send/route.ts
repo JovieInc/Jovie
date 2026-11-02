@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: `Metadata submission workflows require the ${getPlanDisplayName('pro')} plan. Upgrade to unlock this feature.`,
+          error: `Metadata submission workflows are not included in ${getPlanDisplayName('pro')} yet.`,
         },
         { status: 403 }
       );

@@ -1,10 +1,13 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import React from 'react';
+import { SHELL_RAIL_PREVIEW_INTENT_MS } from '@/components/shell/rail-motion';
 import {
   SidebarContext,
   type SidebarContextValue,
 } from '@/components/shell/SidebarContext';
+import { useRailPreview } from '@/components/shell/useRailPreview';
 import { useRailToggleFocusContinuity } from '@/components/shell/useRailToggleFocusContinuity';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { useSidebarCookieState } from '@/hooks/useSidebarCookieState';
@@ -41,6 +44,7 @@ export const SidebarProvider = React.forwardRef<
     },
     ref
   ) => {
+    const pathname = usePathname();
     const isNarrowViewport = useBreakpointDown('lg');
     const isElectron = useIsElectronRuntime();
     // JOV-8942: a desktop window never adopts the mobile shell. The Electron
@@ -52,6 +56,16 @@ export const SidebarProvider = React.forwardRef<
       defaultOpen,
       open: openProp,
       onOpenChange: setOpenProp,
+    });
+
+    // Transient peek: hover (after intent dwell) or focus on the collapsed
+    // rail floats the full menu over content. It never writes the pin bit.
+    const { isPreview, isFloating, dismissPreview } = useRailPreview({
+      side: 'left',
+      pinned: open,
+      enabled: !isMobile,
+      resetKey: pathname,
+      enterIntentMs: SHELL_RAIL_PREVIEW_INTENT_MS,
     });
 
     useRailToggleFocusContinuity('left', open);
@@ -97,28 +111,40 @@ export const SidebarProvider = React.forwardRef<
 
     // Helper to toggle the sidebar.
     const toggleSidebar = React.useCallback(() => {
+      dismissPreview();
       return isMobile ? setOpenMobile(open => !open) : setOpen(open => !open);
-    }, [isMobile, setOpen, setOpenMobile]);
+    }, [isMobile, setOpen, setOpenMobile, dismissPreview]);
 
     useSidebarKeyboardShortcut(toggleSidebar, SIDEBAR_KEYBOARD_SHORTCUT);
 
-    // Left navigation opens only on explicit activation. A hover preview
-    // changes the toggle's position before the pointer can click it.
-    const state = open ? 'open' : 'closed';
+    // Peek reads as open for layout and labels, but only the pin (setOpen)
+    // is persisted. The in-content toggle opts out of peek triggers so the
+    // pointer never lands on a control the flyout is about to cover.
+    const state = open || isPreview ? 'open' : 'closed';
 
     const contextValue = React.useMemo<SidebarContextValue>(
       () => ({
         state,
         open,
-        isPreview: false,
-        isFloating: false,
+        isPreview,
+        isFloating,
         setOpen,
         isMobile,
         openMobile,
         setOpenMobile,
         toggleSidebar,
       }),
-      [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+      [
+        state,
+        open,
+        isPreview,
+        isFloating,
+        setOpen,
+        isMobile,
+        openMobile,
+        setOpenMobile,
+        toggleSidebar,
+      ]
     );
 
     return (

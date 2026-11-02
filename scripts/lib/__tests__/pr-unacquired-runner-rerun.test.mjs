@@ -224,7 +224,11 @@ test('the relay skips the model-lane label only when a rerun was requested', () 
     relay.if,
     /^always\(\) && needs\.rerun-unacquired\.outputs\.requested != 'true' && \(/
   );
-  assert.match(relay.if, /"success"/);
+  // Green wakes are Source Validation's alone (the slowest required producer).
+  assert.match(
+    relay.if,
+    /conclusion == 'success' && github\.event\.workflow_run\.name == 'Source Validation'/
+  );
   assert.equal(relay.permissions.issues, 'write');
   assert.equal(relay.permissions['pull-requests'], 'write');
 });

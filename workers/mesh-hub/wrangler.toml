@@ -1,0 +1,53 @@
+name = "jovie-mesh-hub"
+main = "src/index.ts"
+compatibility_date = "2026-10-15"
+workers_dev = true
+preview_urls = false
+
+# Company agent mesh hub (gbrain projects/jovie/agent-mesh-hub-architecture-2026-10-31).
+# Runs on Cloudflare only: no Vercel, Gem or Mac in the delivery path.
+[[durable_objects.bindings]]
+name = "MAILBOX"
+class_name = "Mailbox"
+
+[[durable_objects.bindings]]
+name = "REGISTRY"
+class_name = "Registry"
+
+[[durable_objects.bindings]]
+name = "BOARD"
+class_name = "Board"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Mailbox", "Registry"]
+
+# Fleet task board (canon MESH-SWARM.md).
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Board"]
+
+# Hub model executor (failover for kinds with no live reader). Workers AI binding: no secret.
+[ai]
+binding = "AI"
+
+[observability]
+enabled = true
+
+# Secrets (wrangler secret put; values live in Doppler agent-mesh/prd, never here):
+#   HUB_ADMIN_TOKEN            registry writes only
+#   SUMMER_HUB_WEBHOOK_SECRET  HMAC for pushes to Summer (optional until Summer consumes the hub)
+
+[vars]
+# Kinds the hub answers (read-only, Workers AI) when no real reader handled their mail within the grace.
+# aeon, grokbot and stella are out: each has a real reader (canon MESH-SWARM.md); a stand-in would ack their mail first.
+EXECUTOR_KINDS = "codex,chloe,lola,muse,dots,instinct,devin"
+EXECUTOR_GRACE_MS = "20000"
+# Alarm once when peer mail sits unhandled this long (ms).
+MAIL_STALE_MS = "600000"
+# summer-config #387: Summer consumes hub pushes here (HMAC with SUMMER_HUB_WEBHOOK_SECRET).
+SUMMER_HUB_WEBHOOK_URL = "https://summer.jov.ie/summer/v1/mesh/hub"
+
+# Registry sweep (presence, silence, probes) every minute; also the dead-man for DO alarms.
+[triggers]
+crons = ["* * * * *"]

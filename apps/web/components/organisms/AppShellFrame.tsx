@@ -11,9 +11,11 @@ import {
   SHELL_RAIL_FRAME_GAP,
   SHELL_RAIL_MAIN_PLANE,
 } from '@/components/shell/rail-motion';
+import type { BrandVariant } from '@/lib/brand/tokens';
 import { cn } from '@/lib/utils';
 
 export interface AppShellFrameProps {
+  readonly brandVariant?: BrandVariant;
   readonly sidebar: ReactNode;
   readonly header?: ReactNode;
   readonly main: ReactNode;
@@ -61,6 +63,7 @@ export const CHAT_AMBIENT_GRADIENT_IMAGE =
  * unmounting the frame itself.
  */
 export const AppShellFrame = memo(function AppShellFrame({
+  brandVariant = 'jovie',
   sidebar,
   header,
   main,
@@ -77,10 +80,15 @@ export const AppShellFrame = memo(function AppShellFrame({
   return (
     <div
       data-app-shell-frame={placeholder ? undefined : 'true'}
+      data-app-shell-workspace={brandVariant === 'ov' ? 'ov' : undefined}
       data-app-shell-placeholder={placeholder ? 'true' : undefined}
       data-composer-focus={composerFocusActive ? 'true' : undefined}
       className={cn(
-        'relative flex h-full w-full flex-col overflow-hidden bg-(--linear-bg-page)',
+        // Clip without a scroll box: overflow:hidden stays programmatically
+        // scrollable, so a route journey's scrollIntoView can leave the whole
+        // frame shifted under the clip (JOV-7973: the /start preview badge
+        // measured a stable viewport ratio 0.8125 in CI from a 34.5px drift).
+        'relative flex h-full w-full flex-col overflow-clip bg-(--linear-bg-page)',
         /* PWA safe area: pad top for notch/Dynamic Island in standalone mode (mobile only) */
         'max-lg:pt-[env(safe-area-inset-top)]',
         containerClassName
@@ -96,7 +104,7 @@ export const AppShellFrame = memo(function AppShellFrame({
           // Allocation belongs to the shell, not individual routes. Keeping the
           // side slots and main plane on the same motion contract means a rail
           // can yield canvas without its content or adjacent route snapping.
-          'flex min-h-0 min-w-0 flex-1 overflow-hidden lg:gap-(--app-shell-gap) lg:p-(--app-shell-gap)',
+          'flex min-h-0 min-w-0 flex-1 overflow-clip lg:gap-(--app-shell-gap) lg:p-(--app-shell-gap)',
           SHELL_RAIL_FRAME_GAP
         )}
       >
@@ -143,7 +151,7 @@ export const AppShellFrame = memo(function AppShellFrame({
                   // frame, header, and content read as unrelated backgrounds.
                   // Founder lock 2026-09-25: one rounded, borderless, clipped
                   // panel — no border, soft elevation only.
-                  'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-(--app-shell-content-surface)',
+                  'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-clip bg-(--app-shell-content-surface)',
                   'lg:rounded-(--app-shell-radius) lg:bg-(--app-shell-content-surface) lg:shadow-(--app-shell-shadow)'
                 )}
               >
@@ -170,14 +178,14 @@ export const AppShellFrame = memo(function AppShellFrame({
                   // the top row and route read as one clipped plane (JOV-7207).
                   // The route inset lives on the scroll wrapper below.
                   className={cn(
-                    'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:shell-inspector-host',
+                    'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-clip lg:shell-inspector-host',
                     SHELL_RAIL_MAIN_PLANE
                   )}
                 >
                   <div
                     data-app-shell-content-inset='true'
                     className={cn(
-                      'flex min-h-0 min-w-0 flex-1 overflow-hidden',
+                      'flex min-h-0 min-w-0 flex-1 overflow-clip',
                       flushContent ? null : 'p-(--app-shell-content-inset)'
                     )}
                   >
