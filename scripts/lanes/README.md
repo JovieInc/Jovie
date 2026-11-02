@@ -53,7 +53,7 @@ The harness, not the model, owns:
 | Held and failed records carry `reason` + `next_action`; the status feed publishes `held_by_reason` | `pr_events.held_reason()`, `doctor.status_feed()` |
 | Garbage collection of crashed worktrees | `prune_worktrees()` |
 | Worktree retirement (JOV-7704): the tick spawns one sweep per hour (10 min under 15% free, and even when disk admission fails) over lanes, Codex, Conductor, Claude-scratch and `jovie-wt-*` checkouts. A checkout retires when its PR closed (1h grace) or after 12h idle; preserved repairs expire on PR close or after 3 days. Live-process paths are never touched; dirty or unpushed work is pushed to `refs/jovie-preserved/sweep/<host>/<name>-<date>-<snapshot>` first (a non-branch ref: no Actions or Vercel build); existing backup refs are immutable and push hooks run. A snapshot that is not proven secret-free is not published and the checkout stays untouched. A failed backup keeps the checkout and strips only build output. Primary clones, bare mirrors, `~/.cache` and the pnpm store are out of scope | `worktree_sweep.py`, `dispatch()` |
-| Disk admission on the tick and before installs: critical (at or below 5%) or unknown free space blocks work. Only a worker holding a slot may sweep under 15%, under one host-wide cleanup lock; cleanup preserves the shared pnpm store, unrelated checkouts and cancelled repair source. The same sweep also removes transient `_work` output of runners with no `Runner.Worker` running, retires idle Symphony workspaces on a low filesystem (never through a mount; dirty or unpushed work is pushed to a backup branch first, else only build output goes) and lane logs idle 14 days | `disk_guard.py`, `dispatch()`, `worker()` |
+| Disk admission on the tick and before installs: critical (at or below 5%) or unknown free space blocks work. A denied tick still drains the Linear outbox first — it is the doctor's own reporting channel, and the flush is bounded and touches only small state JSONs on the state root, never the full worktree volume (JOV-10355). Only a worker holding a slot may sweep under 15%, under one host-wide cleanup lock; cleanup preserves the shared pnpm store, unrelated checkouts and cancelled repair source. The same sweep also removes transient `_work` output of runners with no `Runner.Worker` running, retires idle Symphony workspaces on a low filesystem (never through a mount; dirty or unpushed work is pushed to a backup branch first, else only build output goes) and lane logs idle 14 days | `disk_guard.py`, `dispatch()`, `worker()` |
 | Adaptive slots (default on, every tick, measured limits only; kill switch `SYMPHONY_AUTOSCALE=0`) | `autoscale.decide()`, `dispatch()` |
 | Drain-safe self-update from `origin/main` after the release's own tests pass | `update()` |
 | Host upkeep on the same update event (no timers): fetch the bare object mirror the lanes clone borrows from (`objects/info/alternates`, under `<root>/locks/<name>-mirror.lock`) right before update's own fetch, and refresh the codex lanes' `autoreview`/`behavior-validator` skills from `~/agent-skills` only when its `main` moved. Both are bounded, non-fatal, and recorded in `update.json` | `update()` |
@@ -583,9 +583,11 @@ waiting, a worker is running or completed after the recovery request.
 Each incident gets at most three attempts, spaced by at least two minutes. The atomic latest
 receipt is `factory-watchdog.json`; every incident, action, and verified after-state is also
 fsynced to `runs/factory-watchdog.jsonl`. Exhaustion or a complete provider-capacity bank opens
-one deduped Linear doctor issue; alert delivery retries at most every 15 minutes until
-acknowledged. A later healthy observation closes that issue. Inspect the receipt before manual
-action; restarting workers outside the installed service path would bypass its ownership lock.
+one deduped Linear doctor issue; a re-raise within the doctor's cool-off re-opens the previous
+incident's issue with a "fired again" comment instead of filing a duplicate (JOV-10358 flap).
+Alert delivery retries at most every 15 minutes until acknowledged. A later healthy observation
+closes that issue. Inspect the receipt before manual action; restarting workers outside the
+installed service path would bypass its ownership lock.
 
 The extra timer is necessary because the normal event-driven worker re-exec and five-minute
 idle fallback cannot observe their own timer/process being dark. It performs only local file
