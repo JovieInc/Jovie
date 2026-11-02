@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, matchesGlob, resolve } from 'node:path';
 import { load as parseYaml } from 'js-yaml';
 import { afterEach, describe, expect, it } from 'vitest';
+import { runScreenCertification } from '../../../../../scripts/invariants/screen-certification.mjs';
 import * as realGhHarness from '../../../../../scripts/lib/real-gh-harness.mjs';
 
 // JOV-7707: Product Screenshots provenance is checked from parsed workflow
@@ -345,6 +346,89 @@ fi
       );
     }
   });
+
+  it('certifies from a full-history checkout that resolves the exact event diff base', () => {
+    // JOV-6494, run 35529716236 (head 56d68c5a4): the certify job checked out
+    // with the default fetch-depth 1, so github.event.before
+    // (eca1a3acdff53ff25d7f3f64870aa2ce6057272f, the previous main tip) was
+    // not an exact commit in the clone and screen certification failed closed
+    // with "screen certification diff base is not an exact commit". The
+    // certify checkout now fetches full history, so the event base resolves.
+    const checkout = certify.steps.find(entry =>
+      entry.uses?.startsWith('actions/checkout@')
+    );
+    expect(checkout?.with).toMatchObject({
+      'fetch-depth': 0,
+      'persist-credentials': false,
+    });
+
+    // Deliberate red/green at the git level the checkout depth controls: a
+    // depth-1 clone cannot resolve its own event base through the real
+    // certification resolution; a full fetch can.
+    const origin = tempRoot('jovie-diff-base-origin-');
+    const gitOrigin = (...args: string[]) =>
+      execFileSync('git', ['-C', origin, ...args], {
+        encoding: 'utf8',
+        env: fixtureEnv(),
+      });
+    gitOrigin('init', '-q', '--initial-branch=main');
+    gitOrigin('config', 'user.email', 'certify@example.test');
+    gitOrigin('config', 'user.name', 'certify');
+    writeFileSync(join(origin, 'page.txt'), 'base\n');
+    gitOrigin('add', '.');
+    gitOrigin('commit', '-qm', 'event base');
+    const eventBase = gitOrigin('rev-parse', 'HEAD').trim();
+    writeFileSync(join(origin, 'page.txt'), 'head\n');
+    gitOrigin('add', '.');
+    gitOrigin('commit', '-qm', 'pushed head');
+
+    // RED: the original depth-1 checkout cannot resolve github.event.before.
+    const shallow = tempRoot('jovie-diff-base-shallow-');
+    const clone = spawnSync(
+      'git',
+      ['clone', '-q', '--depth', '1', `file://${origin}`, shallow],
+      { encoding: 'utf8', env: fixtureEnv() }
+    );
+    expect(clone.status, clone.stderr).toBe(0);
+    expect(
+      spawnSync(
+        'git',
+        ['-C', shallow, 'rev-parse', '--verify', `${eventBase}^{commit}`],
+        { encoding: 'utf8', env: fixtureEnv() }
+      ).status
+    ).not.toBe(0);
+    expect(() =>
+      runScreenCertification({
+        repoRoot: shallow,
+        diffBase: eventBase,
+        registrationOnly: true,
+      })
+    ).toThrow('screen certification diff base is not an exact commit');
+
+    // GREEN: the repaired fetch-depth 0 checkout resolves the exact event
+    // base, so the same certification request stops failing on the base.
+    const unshallow = spawnSync(
+      'git',
+      ['-C', shallow, 'fetch', '--unshallow', 'origin'],
+      { encoding: 'utf8', env: fixtureEnv() }
+    );
+    expect(unshallow.status, unshallow.stderr).toBe(0);
+    expect(
+      spawnSync(
+        'git',
+        ['-C', shallow, 'rev-parse', '--verify', `${eventBase}^{commit}`],
+        { encoding: 'utf8', env: fixtureEnv() }
+      ).status
+    ).toBe(0);
+    const certified = runScreenCertification({
+      repoRoot: shallow,
+      diffBase: eventBase,
+      registrationOnly: true,
+    });
+    expect(certified.receipt.issues.join('\n')).not.toContain(
+      'diff base is not an exact commit'
+    );
+  }, 60_000);
 
   it('captures from a clean exact-head tree served by the production build', () => {
     const checkout = generate.steps.find(entry =>

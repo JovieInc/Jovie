@@ -2386,6 +2386,64 @@ ${fixtureCheckout}
     ).toEqual([]);
   }, 120_000);
 
+  it('admits the exact /changelog capture the pre-JOV-6494 400MB ceiling rejected as image-policy:1', () => {
+    // JOV-6494, run 35529716236 (head 56d68c5a4): every marketing route
+    // capture passed, then the safe upload rejected exactly one file
+    // (image-policy:1). The rejected artifact was the desktop /changelog
+    // full-page capture: 1440 CSS px at 2x device scale -> 2880 device px
+    // wide, RGBA, 58_814 device px tall, so strict decode measures
+    // (1 + 2880 * 4) * 58_814 = 677_596_094 bytes. The original commit shipped
+    // MAX_PLAYWRIGHT_PNG_PIXEL_BYTES = 400_000_000, so this exact geometry
+    // failed the pre-inflation decoded-buffer ceiling and the guard rejected
+    // it as image-policy even with allow-images (deliberate red: the same
+    // construction at 56d68c5a4 fails validPlaywrightPng and the guard
+    // CLI exits 1 with image-policy:1). The repaired 750MB ceiling admits
+    // the capture; level-1 deflate keeps the 677MB zero buffer affordable.
+    const originalJov6494PixelByteCeiling = 400_000_000;
+    const changelogDecodedBytes = (1 + 2880 * 4) * 58_814;
+    expect(changelogDecodedBytes).toBe(677_596_094);
+    expect(changelogDecodedBytes).toBeGreaterThan(
+      originalJov6494PixelByteCeiling
+    );
+    expect(changelogDecodedBytes).toBeLessThan(MAX_PLAYWRIGHT_PNG_PIXEL_BYTES);
+    const changelogCapture = png(
+      [],
+      deflateSync(Buffer.alloc(changelogDecodedBytes), { level: 1 }),
+      6,
+      2880,
+      58_814
+    );
+    expect(validPlaywrightPng(changelogCapture)).toBe(true);
+    const changelogWorkspace = fixture();
+    write(join(changelogWorkspace, 'marketing-route.png'), changelogCapture);
+    write(join(changelogWorkspace, 'receipt.json'), '{"ok":true}\n');
+    expect(
+      guardPlaywrightArtifacts(
+        ['marketing-route.png', 'receipt.json'],
+        {},
+        { workspace: changelogWorkspace, allowImages: true }
+      )
+    ).toEqual([]);
+    const changelogUpload = spawnSync(
+      process.execPath,
+      [guardScript, 'marketing-route.png', 'receipt.json'],
+      {
+        cwd: changelogWorkspace,
+        encoding: 'utf8',
+        env: baseEnv(changelogWorkspace, fixture(), {
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true',
+        }),
+      }
+    );
+    expect(
+      changelogUpload.status,
+      `${changelogUpload.stdout}\n${changelogUpload.stderr}`
+    ).toBe(0);
+    expect(`${changelogUpload.stdout}\n${changelogUpload.stderr}`).toContain(
+      'secret guard passed'
+    );
+  }, 240_000);
+
   it('retains filtered profile diagnostics and only explicitly public profile images', () => {
     const workflow = readFileSync(
       join(workflowsRoot, 'e2e-full-matrix.yml'),
