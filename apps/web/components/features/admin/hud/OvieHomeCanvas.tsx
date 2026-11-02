@@ -1,12 +1,13 @@
 'use client';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
 import { ChatOpsDataCard } from '@/components/jovie/components/ChatOpsDataCard';
 import type { HomeCanvasState } from '@/components/jovie/types';
 import {
   HomeLoopAnswerPanel,
+  HomeLoopCanvas,
   type HomeLoopCopy,
   type HomeLoopSectionStatus,
 } from '@/components/organisms/home-loop';
@@ -17,43 +18,112 @@ import {
   buildCanvasTurns,
   partitionCanvasCards,
 } from '@/lib/ovie/home/canvas-turns';
-import { buildCompanyTiles } from '@/lib/ovie/home/company-hud';
-import { fleetVerdict } from '@/lib/ovie/home/fleet-verdict';
+import {
+  buildCompanyTiles,
+  type OvieFunnelInput,
+  type OvieGoldenPathRow,
+} from '@/lib/ovie/home/company-tiles';
+import { summarizeSourceIssues } from '@/lib/ovie/home/operator-copy';
+import { reportOvieHomePanelError } from '@/lib/ovie/home/panel-alerts';
 import {
   buildOvieAsks,
   buildOvieHomeShipping,
+  OVIE_SHIP_STAGES,
+  type OviePulseMemory,
   ovieAskAction,
-  summarizeSourceIssues,
 } from '@/lib/ovie/home/shipping-home';
 import { inboxDecisionRequest, type OvieInbox } from '@/lib/ovie/inbox';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
-import { OvieCompanyHome } from './OvieCompanyHome';
-import { OvieFeedBanner } from './OvieFeedBanner';
-import { OvieFullscreenFrame } from './OvieFullscreenFrame';
-import { OvieFullscreenToggle } from './OvieFullscreenToggle';
+import type { HudMetrics } from '@/types/hud';
 import { useCanvasHistory } from './useCanvasHistory';
 import { useHudShippingStateQuery } from './useHudShippingStateQuery';
-import { useOvieCompanyQueries } from './useOvieCompanyQueries';
-import { useOvieFeedStatus } from './useOvieFeedStatus';
-import { useOvieFullscreen } from './useOvieFullscreen';
 import { useOvieHomeReadyTiming } from './useOvieHomeReadyTiming';
-import { useOvieLastLooked } from './useOvieLastLooked';
 
 const OVIE_HOME_COPY: HomeLoopCopy = {
-  constraintClear: 'Nothing is blocking shipping',
-  asksTitle: 'Blocked On You',
+  constraintClear: 'Shipping is on target',
+  asksTitle: 'Needs you',
   asksEmpty: 'Nothing needs your decision.',
   asksError: 'Decisions could not load.',
   inFlightTitle: 'In Flight',
   inFlightEmpty: 'No work in flight.',
   inFlightError: 'Shipping data could not load.',
-  doneTitle: 'Shipped Today',
+  doneTitle: 'Done Today',
   doneEmpty: 'Nothing has landed yet today.',
-  latencyTitle: 'Stage Time 7d (P50 / P95)',
-  latencyEmpty: 'Not measured',
 };
 
 const INBOX_QUERY_KEY = ['ovie', 'inbox'] as const;
+const LAST_VISIT_KEY = 'ovie.home.last-visit.v1';
+/** Home shows at most this many asks; the rest resolve by their defaults. */
+export const OVIE_HOME_MAX_ASKS = 3;
+
+interface OvieLastVisit {
+  readonly at: number | null;
+  readonly memory: OviePulseMemory;
+}
+
+/**
+ * Tile values as Tim last saw them, so each tile's "was" means "since your
+ * last visit" rather than "since the last 6s poll".
+ */
+function readLastVisit(): OvieLastVisit {
+  try {
+    const raw = globalThis.localStorage?.getItem(LAST_VISIT_KEY);
+    if (!raw) return { at: null, memory: {} };
+    const parsed = JSON.parse(raw) as {
+      at?: unknown;
+      values?: Record<string, unknown>;
+    };
+    const memory: Record<string, { value: string; was: null }> = {};
+    for (const [key, value] of Object.entries(parsed.values ?? {}))
+      if (typeof value === 'string') memory[key] = { value, was: null };
+    return {
+      at: typeof parsed.at === 'number' ? parsed.at : null,
+      memory: memory as OviePulseMemory,
+    };
+  } catch {
+    return { at: null, memory: {} };
+  }
+}
+
+function writeLastVisit(
+  pulse: readonly { key: string; value: string; measured: boolean }[]
+): void {
+  try {
+    const values = Object.fromEntries(
+      pulse.filter(tile => tile.measured).map(tile => [tile.key, tile.value])
+    );
+    globalThis.localStorage?.setItem(
+      LAST_VISIT_KEY,
+      JSON.stringify({ at: Date.now(), values })
+    );
+  } catch {
+    // A per-browser convenience; tiles render without it.
+  }
+}
+
+function sinceLabel(at: number | null, now: number): string {
+  if (at === null) return 'Shipping';
+  const minutes = Math.max(0, Math.round((now - at) / 60_000));
+  const ago =
+    minutes < 60
+      ? `${minutes}m`
+      : minutes < 48 * 60
+        ? `${Math.round(minutes / 60)}h`
+        : `${Math.round(minutes / 1440)}d`;
+  return `Shipping · compared with your visit ${ago} ago`;
+}
+
+async function fetchJson<T>(url: string, signal: AbortSignal): Promise<T> {
+  const response = await fetch(url, { signal, cache: 'no-store' });
+  if (!response.ok) throw new Error(`${url} ${response.status}`);
+  return (await response.json()) as T;
+}
+
+const COMPANY_PLACEHOLDER = buildCompanyTiles({
+  overview: null,
+  funnel: null,
+  goldenPath: null,
+});
 
 async function fetchInbox(signal: AbortSignal): Promise<OvieInbox> {
   const response = await fetch('/api/ovie/inbox', {
@@ -65,32 +135,61 @@ async function fetchInbox(signal: AbortSignal): Promise<OvieInbox> {
 }
 
 /**
- * Ovie Home: the company HUD (fleet/ovie-home.md). Tiles come from Stripe and
- * Mercury (HUD metrics), the founder funnel, `ovie.shipping-state.v1` and the
- * Ovie inbox. Each source keeps its own existing cadence; this component adds
- * no polling of its own beyond those queries.
+ * Ovie Home: the company loop rendered through the shared Home loop canvas.
+ * Shipping comes from `ovie.shipping-state.v1` and asks from the Ovie inbox;
+ * this component adds no polling of its own beyond those existing queries.
  */
 export interface OvieHomeCanvasProps {
   /** Shell chat state; absent when Home renders outside the composer slot. */
   readonly chat?: HomeCanvasState;
-  /** Office display: always Full Screen, no toggle. */
-  readonly display?: boolean;
 }
 
-export function OvieHomeCanvas({
-  chat,
-  display = false,
-}: Readonly<OvieHomeCanvasProps>) {
+export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
   const queryClient = useQueryClient();
-  const fullscreen = useOvieFullscreen({ force: display });
   const shipping = useHudShippingStateQuery(null);
-  const { metrics, funnel } = useOvieCompanyQueries();
   const inbox = useQuery<OvieInbox>({
     queryKey: INBOX_QUERY_KEY,
     queryFn: ({ signal }) => fetchInbox(signal),
     ...FREQUENT_CACHE,
     refetchOnWindowFocus: true,
     refetchInterval: 30_000,
+  });
+
+  const [lastVisit] = useState<OvieLastVisit>(readLastVisit);
+  const [mountedAt] = useState(() => Date.now());
+  const company = useQuery({
+    queryKey: ['ovie', 'home', 'company'],
+    queryFn: async ({ signal }) => {
+      const [metrics, funnel, certifications] = await Promise.allSettled([
+        fetchJson<HudMetrics>('/api/hud/metrics', signal),
+        fetchJson<OvieFunnelInput>(
+          '/api/admin/hud/founder-funnel?range=7d',
+          signal
+        ),
+        fetchJson<{ rows: readonly OvieGoldenPathRow[] }>(
+          '/api/ovie/certifications',
+          signal
+        ),
+      ]);
+      const failed = [metrics, funnel, certifications].filter(
+        result => result.status === 'rejected'
+      ).length;
+      if (failed > 0)
+        reportOvieHomePanelError('company', `${failed} of 3 sources failed`);
+      return buildCompanyTiles({
+        overview:
+          metrics.status === 'fulfilled' ? metrics.value.overview : null,
+        funnel: funnel.status === 'fulfilled' ? funnel.value : null,
+        goldenPath:
+          certifications.status === 'fulfilled'
+            ? certifications.value.rows
+            : null,
+      });
+    },
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    staleTime: 30_000,
+    retry: false,
   });
 
   const snapshot = shipping.isPending ? null : shipping;
@@ -100,15 +199,24 @@ export function OvieHomeCanvas({
         ? buildOvieHomeShipping({
             delivery: snapshot.view.delivery,
             operationalTasks: snapshot.operationalTasks,
+            pulseMemory: lastVisit.memory,
           })
         : null,
-    [snapshot]
+    [snapshot, lastVisit]
   );
 
-  const asks = useMemo(
+  useEffect(() => {
+    if (home) writeLastVisit(home.pulse);
+  }, [home]);
+
+  const allAsks = useMemo(
     () => (inbox.data ? buildOvieAsks(inbox.data) : []),
     [inbox.data]
   );
+  // Only the top few reach Home (Tim 2026-10-30); every other ask carries a
+  // declared default and resolves on its own unless he opens the inbox.
+  const asks = allAsks.slice(0, OVIE_HOME_MAX_ASKS);
+  const deferredAsks = allAsks.length - asks.length;
 
   const onCommitted = useCallback(
     (id: string) => {
@@ -164,6 +272,13 @@ export function OvieHomeCanvas({
     [answer, inbox.data]
   );
 
+  // Empty stage columns are dead space on a dense Home; the verdict already
+  // names a stalled queue. The full six-stage path lives on Shipping.
+  const activeStages = useMemo(() => {
+    const used = new Set(home?.rows.map(row => row.stage));
+    const active = OVIE_SHIP_STAGES.filter(stage => used.has(stage));
+    return active.length > 0 ? active : OVIE_SHIP_STAGES;
+  }, [home]);
   const connection = snapshot?.view.connection ?? null;
   // The task feed reports `syncing` with no observation until its first
   // reconciled read; that is loading, not an empty pipeline.
@@ -201,94 +316,52 @@ export function OvieHomeCanvas({
       : !snapshot || awaitingFirstTasks
         ? 'loading'
         : 'ready';
+  // A disconnected feed keeps the last values but must say so in text.
+  const constraint =
+    home?.constraint ??
+    (connection === 'disconnected'
+      ? { tone: 'warn' as const, text: 'Shipping data is disconnected' }
+      : null);
   const asksStatus: HomeLoopSectionStatus = inbox.data
     ? 'ready'
     : inbox.isError
       ? 'error'
       : 'loading';
+  // Every panel error state is an incident (panel-alerts.ts), not just copy.
+  const loopErrorReason =
+    loopStatus === 'error'
+      ? connection === 'unauthorized'
+        ? 'unauthorized'
+        : 'operational-tasks-unavailable'
+      : null;
+  useEffect(() => {
+    if (loopErrorReason)
+      reportOvieHomePanelError('shipping-loop', loopErrorReason);
+  }, [loopErrorReason]);
+  useEffect(() => {
+    if (asksStatus === 'error')
+      reportOvieHomePanelError('asks', 'inbox-unavailable');
+  }, [asksStatus]);
+  // Mirror the inbox: a successful read can still omit a source. Showing the
+  // loaded asks alone would claim the section is complete.
   // First meaningful paint: both sections past their skeletons.
   useOvieHomeReadyTiming(loopStatus !== 'loading' && asksStatus !== 'loading');
-  // Many issues collapse to a count; the inbox lists every one.
-  const asksNotice = inbox.data
-    ? summarizeSourceIssues(inbox.data.issues)
-    : null;
-
-  // Tiles render once every source has answered at least once; a source that
-  // failed reads "Not measured" instead of holding the whole HUD in skeleton.
-  const settled =
-    !metrics.isPending &&
-    !funnel.isPending &&
-    loopStatus !== 'loading' &&
-    asksStatus !== 'loading';
-  // Same rule as the asks section: answered asks leave the count unless the answer failed.
-  const openAsks = asks.filter(
-    ask => !answers[ask.id] || answers[ask.id]?.state === 'failed'
-  );
-  const nextDeadlineIso = useMemo(() => {
-    const deadlines = (inbox.data?.cases ?? [])
-      .map(item => item.decisionDefault?.deadline)
-      .filter((value): value is string => Boolean(value))
-      .sort();
-    return deadlines[0] ?? null;
-  }, [inbox.data]);
-  const fleet = snapshot ? fleetVerdict(snapshot.view.delivery.lanes) : null;
-  // `Date.now()` is read at render; tiles re-render on every poll anyway.
-  const tiles = useMemo(
-    () =>
-      settled
-        ? buildCompanyTiles({
-            overview: metrics.data?.overview ?? null,
-            reliability: metrics.data?.reliability ?? null,
-            funnel: funnel.data ?? null,
-            delivery: snapshot?.view.delivery ?? null,
-            verifiedToday: home
-              ? home.done.filter(item => item.verified).length
-              : null,
-            fleet,
-            openAsks: inbox.data ? openAsks.length : null,
-            nextDeadlineIso,
-            nowMs: Date.now(),
-          })
-        : null,
+  // The rest resolve by their declared defaults; a missing source is still
+  // named so a short list never reads as complete.
+  const sourceIssues = inbox.data?.issues.length ?? 0;
+  const asksNotice =
     [
-      settled,
-      metrics.data,
-      funnel.data,
-      snapshot,
-      home,
-      fleet,
-      inbox.data,
-      openAsks.length,
-      nextDeadlineIso,
-    ]
-  );
-  const lookedNow = useMemo(
-    () =>
-      settled
-        ? {
-            at: Date.now(),
-            mrrUsd: metrics.data?.overview?.mrrUsd ?? null,
-            subscribers: metrics.data?.overview?.activeSubscribers ?? null,
-            signups7d:
-              funnel.data?.stages.find(stage => stage.key === 'accounts')
-                ?.count ?? null,
-            merges7d: snapshot?.view.delivery.merges.last7Days.value ?? null,
-            fleet: fleet?.level ?? null,
-            askIds: inbox.data ? asks.map(ask => ask.id) : null,
-          }
+      deferredAsks > 0
+        ? `${deferredAsks} more resolve by their defaults`
         : null,
-    // Re-snapshot only when the underlying data changes, not on every render.
-    [
-      settled,
-      metrics.data,
-      funnel.data,
-      snapshot,
-      fleet?.level,
-      asks,
-      inbox.data,
+      inbox.data ? summarizeSourceIssues(inbox.data.issues) : null,
     ]
-  );
-  const since = useOvieLastLooked(lookedNow);
+      .filter(Boolean)
+      .join(' · ') || null;
+  useEffect(() => {
+    if (sourceIssues > 0)
+      reportOvieHomePanelError('asks', `${sourceIssues} inbox source issues`);
+  }, [sourceIssues]);
 
   const turns = useMemo(
     () => buildCanvasTurns(chat?.messages ?? [], chat?.isStreaming ?? false),
@@ -320,7 +393,7 @@ export function OvieHomeCanvas({
         : null}
     </HomeLoopAnswerPanel>
   ) : null;
-  const generatedInFlight = generated?.inFlight.length ? (
+  const inFlightOverride = generated?.inFlight.length ? (
     <div
       className='flex flex-col gap-2'
       data-testid='home-loop-in-flight-generated'
@@ -334,24 +407,16 @@ export function OvieHomeCanvas({
     </div>
   ) : undefined;
 
-  // Poll intervals match each query above; staleness is judged against them.
-  const { status: feedStatus, now } = useOvieFeedStatus([
-    { id: 'shipping', updatedAtMs: shipping.dataUpdatedAt, pollMs: 6_000 },
-    { id: 'decisions', updatedAtMs: inbox.dataUpdatedAt, pollMs: 30_000 },
-    { id: 'revenue', updatedAtMs: metrics.dataUpdatedAt, pollMs: 30_000 },
-    { id: 'funnel', updatedAtMs: funnel.dataUpdatedAt, pollMs: 60_000 },
-  ]);
-  const homeView = (
-    <OvieCompanyHome
-      tiles={tiles}
-      since={since}
+  return (
+    <HomeLoopCanvas
+      answer={answerPanel}
+      inFlightOverride={inFlightOverride}
       copy={OVIE_HOME_COPY}
+      stages={activeStages}
+      constraint={constraint}
+      pulse={home?.pulse ?? []}
       asks={asks}
-      asksStatus={asksStatus}
-      asksNotice={asksNotice}
-      asksNoticeHref={APP_ROUTES.ADMIN_INBOX}
-      asksMoreHref={APP_ROUTES.ADMIN_INBOX}
-      answers={answers}
+      rows={home?.rows ?? []}
       done={home?.done ?? []}
       doneSummary={
         home?.mergesToday != null
@@ -359,33 +424,20 @@ export function OvieHomeCanvas({
           : null
       }
       loopStatus={loopStatus}
-      answer={answerPanel}
-      generatedInFlight={generatedInFlight}
+      asksStatus={asksStatus}
+      asksNotice={asksNotice}
+      asksNoticeHref={APP_ROUTES.ADMIN_INBOX}
+      answers={answers}
       onApprove={(ask, option) => decide(ask, 'approve', option ?? '')}
       onReply={(ask, text) => decide(ask, 'reject', text)}
       onFeedback={sendFeedback}
-      onRetryAsks={() => void inbox.refetch()}
       onRetryLoop={() => void shipping.refetch()}
+      onRetryAsks={() => void inbox.refetch()}
+      asksMoreHref={APP_ROUTES.ADMIN_INBOX}
+      company={company.data ?? COMPANY_PLACEHOLDER}
+      companyLoading={company.isPending}
+      pulseCaption={sinceLabel(lastVisit.at, mountedAt)}
+      inFlightMoreHref={APP_ROUTES.ADMIN_SHIPPING}
     />
-  );
-  const content = (
-    <div className='relative flex w-full flex-col gap-2 lg:h-full lg:min-h-0'>
-      <OvieFeedBanner status={feedStatus} />
-      {fullscreen.on ? null : (
-        <div className='flex justify-end'>
-          <OvieFullscreenToggle
-            onToggle={fullscreen.toggle}
-            inDesktopApp={fullscreen.inDesktopApp}
-          />
-        </div>
-      )}
-      {homeView}
-    </div>
-  );
-  if (!fullscreen.on) return content;
-  return (
-    <OvieFullscreenFrame status={feedStatus} now={now}>
-      {content}
-    </OvieFullscreenFrame>
   );
 }

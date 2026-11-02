@@ -7,7 +7,7 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { captureError } from '@/lib/error-tracking';
+import { executePublicMusicRead } from '@/lib/music-resolver/public-execution';
 import {
   musicResolveOutputSchema,
   musicResolveSchema,
@@ -37,57 +37,16 @@ function toolResult(result: Record<string, unknown>): CallToolResult {
   };
 }
 
-// Below the route's 60-second platform budget, including provider retries.
-export const MUSIC_READ_TIMEOUT_MS = 45_000;
+export { MUSIC_READ_TIMEOUT_MS } from '@/lib/music-resolver/public-execution';
 
 async function readResult(
   operation: (signal: AbortSignal) => Promise<Record<string, unknown>>,
   requestSignal: AbortSignal | undefined,
   sdkSignal: AbortSignal
 ): Promise<CallToolResult> {
-  const deadline = new AbortController();
-  const timer = setTimeout(() => deadline.abort(), MUSIC_READ_TIMEOUT_MS);
-  const signal = AbortSignal.any([
-    deadline.signal,
-    sdkSignal,
-    ...(requestSignal ? [requestSignal] : []),
-  ]);
-  let onAbort: (() => void) | undefined;
-  try {
-    const stopped = new Promise<Record<string, unknown>>(resolve => {
-      onAbort = () =>
-        resolve({
-          error: {
-            code: deadline.signal.aborted ? 'UPSTREAM_TIMEOUT' : 'CANCELLED',
-            retryable: deadline.signal.aborted,
-          },
-        });
-      signal.addEventListener('abort', onAbort, { once: true });
-      if (signal.aborted) onAbort();
-    });
-    if (signal.aborted) return toolResult(await stopped);
-    const result = await Promise.race([operation(signal), stopped]);
-    // Provider cancellation may resolve its domain error before the race listener.
-    return toolResult(signal.aborted ? await stopped : result);
-  } catch {
-    if (signal.aborted) {
-      return toolResult({
-        error: {
-          code: deadline.signal.aborted ? 'UPSTREAM_TIMEOUT' : 'CANCELLED',
-          retryable: deadline.signal.aborted,
-        },
-      });
-    }
-    // Provider facts and caller arguments are untrusted data, never telemetry.
-    await captureError(
-      'Public music read failed',
-      new Error('Public music read failure')
-    );
-    return toolResult({ error: { code: 'UPSTREAM_FAILURE', retryable: true } });
-  } finally {
-    clearTimeout(timer);
-    if (onAbort) signal.removeEventListener('abort', onAbort);
-  }
+  return toolResult(
+    await executePublicMusicRead(operation, requestSignal, sdkSignal)
+  );
 }
 
 /** Transport adapter only. The existing resolver owns provider business logic. */

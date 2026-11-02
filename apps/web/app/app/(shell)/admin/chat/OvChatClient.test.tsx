@@ -39,6 +39,7 @@ vi.mock('@/components/jovie/JovieChat', () => ({
     chatMode,
     homeCanvas,
     homeCanvasMode,
+    ambientOwnedByShell,
   }: {
     readonly profileId?: string;
     readonly chatMode?: 'ov' | null;
@@ -50,12 +51,14 @@ vi.mock('@/components/jovie/JovieChat', () => ({
           onOpenTranscript: () => void;
         }) => ReactNode);
     readonly homeCanvasMode?: string;
+    readonly ambientOwnedByShell?: boolean;
   }) => (
     <div
       data-testid='shared-jovie-chat'
       data-profile-id={profileId}
       data-chat-mode={chatMode ?? undefined}
       data-home-canvas-mode={homeCanvasMode}
+      data-ambient-owned-by-shell={ambientOwnedByShell}
     >
       {typeof homeCanvas === 'function'
         ? homeCanvas({
@@ -71,6 +74,13 @@ vi.mock('@/components/jovie/JovieChat', () => ({
 import { OvChatClient } from './OvChatClient';
 
 describe('OvChatClient shared component ownership', () => {
+  it('uses the shell canvas without painting a second background wash', () => {
+    render(<OvChatClient />);
+    expect(screen.getByTestId('shared-jovie-chat')).toHaveAttribute(
+      'data-ambient-owned-by-shell',
+      'true'
+    );
+  });
   afterEach(() => {
     dashboard.selectedProfile = {
       id: 'profile_admin',

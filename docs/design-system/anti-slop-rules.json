@@ -1,0 +1,905 @@
+{
+  "schema": "jovie.anti-slop-rules/v1",
+  "note": "Canonical anti-slop rule registry. Skills and docs cite ids (ASR-nnn); they do not copy the statement. Run: node scripts/anti-slop/run.mjs validate",
+  "statusValues": ["enforced", "shadow", "in-review", "planned"],
+  "kindValues": ["static", "vision", "human", "static+vision", "human+vision"],
+  "scopeValues": [
+    "marketing",
+    "app",
+    "admin",
+    "artifact",
+    "pen",
+    "copy",
+    "native"
+  ],
+  "rules": [
+    {
+      "id": "ASR-001",
+      "title": "No serif fonts in product code",
+      "statement": "Product code must not introduce serif fonts.",
+      "rationale": "Deterministic subset of the frontend-skill taste contract (JOV-7759).",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-09-01",
+        "ref": "~/.codex/skills/frontend-skill, FS-001"
+      },
+      "scope": ["app", "marketing"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/design-frontend-skill-check.mjs#FS-001",
+        "evidence": ["scripts/design-frontend-skill-check.mjs"],
+        "wiredIn": [
+          {
+            "file": ".github/workflows/source-validation.yml",
+            "token": "design-frontend-skill-check.mjs"
+          }
+        ],
+        "coverageNote": "Diff mode only; apps/web/{app,components,styles} and packages/ui tsx/jsx/css. Not run on data/, content/, HTML artifacts or Pen."
+      }
+    },
+    {
+      "id": "ASR-002",
+      "title": "No emoji or Unicode checkmarks in UI",
+      "statement": "Use a text label or the canonical icon, never emoji or Unicode checkmarks.",
+      "rationale": "Deterministic subset of the frontend-skill taste contract (JOV-7759).",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-09-01",
+        "ref": "~/.codex/skills/frontend-skill, FS-002"
+      },
+      "scope": ["app", "marketing"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/design-frontend-skill-check.mjs#FS-002",
+        "evidence": ["scripts/design-frontend-skill-check.mjs"],
+        "wiredIn": [
+          {
+            "file": ".github/workflows/source-validation.yml",
+            "token": "design-frontend-skill-check.mjs"
+          }
+        ],
+        "coverageNote": "Diff mode only; apps/web/{app,components,styles} and packages/ui tsx/jsx/css. Not run on data/, content/, HTML artifacts or Pen."
+      }
+    },
+    {
+      "id": "ASR-003",
+      "title": "Hover changes paint only",
+      "statement": "Hover may change paint only: no translate, scale, offset, size, padding or border-width.",
+      "rationale": "Deterministic subset of the frontend-skill taste contract (JOV-7759).",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-09-01",
+        "ref": "~/.codex/skills/frontend-skill, FS-003"
+      },
+      "scope": ["app", "marketing"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/design-frontend-skill-check.mjs#FS-003",
+        "evidence": ["scripts/design-frontend-skill-check.mjs"],
+        "wiredIn": [
+          {
+            "file": ".github/workflows/source-validation.yml",
+            "token": "design-frontend-skill-check.mjs"
+          }
+        ],
+        "coverageNote": "Diff mode only; apps/web/{app,components,styles} and packages/ui tsx/jsx/css. Not run on data/, content/, HTML artifacts or Pen."
+      }
+    },
+    {
+      "id": "ASR-004",
+      "title": "Transition only what changes",
+      "statement": "No transition-all; transition only the properties that change.",
+      "rationale": "Deterministic subset of the frontend-skill taste contract (JOV-7759).",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-09-01",
+        "ref": "~/.codex/skills/frontend-skill, FS-004"
+      },
+      "scope": ["app", "marketing"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/design-frontend-skill-check.mjs#FS-004",
+        "evidence": ["scripts/design-frontend-skill-check.mjs"],
+        "wiredIn": [
+          {
+            "file": ".github/workflows/source-validation.yml",
+            "token": "design-frontend-skill-check.mjs"
+          }
+        ],
+        "coverageNote": "Diff mode only; apps/web/{app,components,styles} and packages/ui tsx/jsx/css. Not run on data/, content/, HTML artifacts or Pen."
+      }
+    },
+    {
+      "id": "ASR-005",
+      "title": "No text below 12px",
+      "statement": "Text below 12px is off the type scale.",
+      "rationale": "Deterministic subset of the frontend-skill taste contract (JOV-7759).",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-09-01",
+        "ref": "~/.codex/skills/frontend-skill, FS-005"
+      },
+      "scope": ["app", "marketing"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/design-frontend-skill-check.mjs#FS-005",
+        "evidence": ["scripts/design-frontend-skill-check.mjs"],
+        "wiredIn": [
+          {
+            "file": ".github/workflows/source-validation.yml",
+            "token": "design-frontend-skill-check.mjs"
+          }
+        ],
+        "coverageNote": "Diff mode only; apps/web/{app,components,styles} and packages/ui tsx/jsx/css. Not run on data/, content/, HTML artifacts or Pen."
+      }
+    },
+    {
+      "id": "ASR-006",
+      "title": "No hover-only affordance",
+      "statement": "A control revealed on hover must also reveal on focus.",
+      "rationale": "Deterministic subset of the frontend-skill taste contract (JOV-7759).",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-09-01",
+        "ref": "~/.codex/skills/frontend-skill, FS-006"
+      },
+      "scope": ["app", "marketing"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/design-frontend-skill-check.mjs#FS-006",
+        "evidence": ["scripts/design-frontend-skill-check.mjs"],
+        "wiredIn": [
+          {
+            "file": ".github/workflows/source-validation.yml",
+            "token": "design-frontend-skill-check.mjs"
+          }
+        ],
+        "coverageNote": "Diff mode only; apps/web/{app,components,styles} and packages/ui tsx/jsx/css. Not run on data/, content/, HTML artifacts or Pen."
+      }
+    },
+    {
+      "id": "ASR-007",
+      "title": "Semantic color tokens only",
+      "statement": "Never hardcode a color when a semantic token exists.",
+      "rationale": "Deterministic subset of the frontend-skill taste contract (JOV-7759).",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-09-01",
+        "ref": "~/.codex/skills/frontend-skill, FS-007"
+      },
+      "scope": ["app", "marketing"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/design-frontend-skill-check.mjs#FS-007",
+        "evidence": ["scripts/design-frontend-skill-check.mjs"],
+        "wiredIn": [
+          {
+            "file": ".github/workflows/source-validation.yml",
+            "token": "design-frontend-skill-check.mjs"
+          }
+        ],
+        "coverageNote": "Diff mode only; apps/web/{app,components,styles} and packages/ui tsx/jsx/css. Not run on data/, content/, HTML artifacts or Pen."
+      }
+    },
+    {
+      "id": "ASR-008",
+      "title": "No native select for certified design",
+      "statement": "Native <select> cannot certify a selection design; use the canonical select owner.",
+      "rationale": "Deterministic subset of the frontend-skill taste contract (JOV-7759).",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-09-01",
+        "ref": "~/.codex/skills/frontend-skill, FS-008"
+      },
+      "scope": ["app"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/design-frontend-skill-check.mjs#FS-008",
+        "evidence": ["scripts/design-frontend-skill-check.mjs"],
+        "wiredIn": [
+          {
+            "file": ".github/workflows/source-validation.yml",
+            "token": "design-frontend-skill-check.mjs"
+          }
+        ],
+        "coverageNote": "Diff mode only; apps/web/{app,components,styles} and packages/ui tsx/jsx/css. Not run on data/, content/, HTML artifacts or Pen."
+      }
+    },
+    {
+      "id": "ASR-009",
+      "title": "Marketing images and cards are rounded",
+      "statement": "Marketing images and cards use a radius token. Square corners and raw lengths fail. Full-bleed hero start, logos, icons and round avatars are exempt.",
+      "rationale": "Deterministic subset of the frontend-skill taste contract (JOV-7759).",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-20",
+        "ref": "MKT-D17"
+      },
+      "scope": ["marketing"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/design-frontend-skill-check.mjs#FS-009",
+        "evidence": ["scripts/design-frontend-skill-check.mjs"],
+        "wiredIn": [
+          {
+            "file": ".github/workflows/source-validation.yml",
+            "token": "design-frontend-skill-check.mjs"
+          }
+        ],
+        "coverageNote": "Diff mode only; apps/web/{app,components,styles} and packages/ui tsx/jsx/css. Not run on data/, content/, HTML artifacts or Pen."
+      }
+    },
+    {
+      "id": "ASR-010",
+      "title": "One accent per surface",
+      "statement": "Marketing surfaces use one accent role.",
+      "rationale": "Marketing art direction must read expensive and consistent.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-18",
+        "ref": "MKT-D (art direction)"
+      },
+      "scope": ["marketing"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/invariants/art-direction/accent.mjs",
+        "evidence": ["scripts/invariants/art-direction/accent.mjs"],
+        "wiredIn": [
+          {
+            "file": "scripts/ci-fast-lanes.mjs",
+            "token": "id: 'art-direction'",
+            "commandIncludes": "art-direction/run.mjs"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ASR-011",
+      "title": "One hue per plate; no orange wash",
+      "statement": "A plate has one dominant hue; a second non-adjacent hue or orange mass fails.",
+      "rationale": "Marketing art direction must read expensive and consistent.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-18",
+        "ref": "art-direction hue ratchet"
+      },
+      "scope": ["marketing"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/invariants/art-direction/hue.mjs",
+        "evidence": ["scripts/invariants/art-direction/hue.mjs"],
+        "wiredIn": [
+          {
+            "file": "scripts/ci-fast-lanes.mjs",
+            "token": "id: 'art-direction'",
+            "commandIncludes": "art-direction/run.mjs"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ASR-012",
+      "title": "Plates are smooth and declare an accent",
+      "statement": "Generated plates stay under the smoothness residual cap and declare accent ion|ultra|pulse in a sidecar.",
+      "rationale": "Marketing art direction must read expensive and consistent.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-19",
+        "ref": "MKT-D (plates)"
+      },
+      "scope": ["marketing"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/invariants/art-direction/images.mjs",
+        "evidence": ["scripts/invariants/art-direction/images.mjs"],
+        "wiredIn": [
+          {
+            "file": "scripts/ci-fast-lanes.mjs",
+            "token": "id: 'art-direction'",
+            "commandIncludes": "art-direction/run.mjs"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ASR-013",
+      "title": "No fake product UI in generated images",
+      "statement": "A generated image must never depict product UI. Sidecar kind generated-ui fails; undeclared fake UI is caught by the mockup-quality judge.",
+      "rationale": "Marketing art direction must read expensive and consistent.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-19",
+        "ref": "PR #22718 and Tim review 2026-10-25"
+      },
+      "scope": ["marketing", "artifact"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static+vision",
+        "status": "enforced",
+        "check": "images.mjs generated-ui + vision:mockup-quality",
+        "evidence": ["scripts/invariants/art-direction/images.mjs"],
+        "wiredIn": [
+          {
+            "file": "scripts/ci-fast-lanes.mjs",
+            "token": "id: 'art-direction'",
+            "commandIncludes": "art-direction/run.mjs"
+          }
+        ],
+        "coverageNote": "Static part only trusts the declared sidecar kind; vision part is shadow.",
+        "visionStatus": "shadow"
+      }
+    },
+    {
+      "id": "ASR-014",
+      "title": "Restrained hero with a scroll contract",
+      "statement": "Heroes follow the MKT-D03 scroll contract.",
+      "rationale": "Marketing art direction must read expensive and consistent.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-18",
+        "ref": "MKT-D03"
+      },
+      "scope": ["marketing"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/invariants/art-direction/hero-scroll.mjs",
+        "evidence": ["scripts/invariants/art-direction/hero-scroll.mjs"],
+        "wiredIn": [
+          {
+            "file": "scripts/ci-fast-lanes.mjs",
+            "token": "id: 'art-direction'",
+            "commandIncludes": "art-direction/run.mjs"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ASR-015",
+      "title": "One boxed width, one full-bleed override",
+      "statement": "Marketing uses one boxed container width plus a single full-bleed override.",
+      "rationale": "Marketing art direction must read expensive and consistent.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-22",
+        "ref": "MKT-D18"
+      },
+      "scope": ["marketing"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/invariants/art-direction/container-width.mjs",
+        "evidence": ["scripts/invariants/art-direction/container-width.mjs"],
+        "wiredIn": [
+          {
+            "file": "scripts/ci-fast-lanes.mjs",
+            "token": "id: 'marketing-container-width'",
+            "commandIncludes": "container-width.test.mjs"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ASR-016",
+      "title": "Canvas, WebGL and video are scoped on marketing",
+      "statement": "Canvas, WebGL and video appear only on declared surfaces.",
+      "rationale": "Marketing art direction must read expensive and consistent.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-19",
+        "ref": "PR #22720"
+      },
+      "scope": ["marketing"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/invariants/art-direction/surface-media.mjs",
+        "evidence": ["scripts/invariants/art-direction/surface-media.mjs"],
+        "wiredIn": [
+          {
+            "file": "scripts/ci-fast-lanes.mjs",
+            "token": "id: 'art-direction'",
+            "commandIncludes": "art-direction/run.mjs"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ASR-017",
+      "title": "Copy is the message, never the brief",
+      "statement": "Page copy must not leak briefs, prompts or internal planning language.",
+      "rationale": "Agent-written copy leaks its own instructions.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-21",
+        "ref": "copy-leak invariant"
+      },
+      "scope": ["marketing", "copy"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/invariants/copy-leak/check.mjs",
+        "evidence": ["scripts/invariants/copy-leak/check.mjs"],
+        "wiredIn": [
+          {
+            "file": "scripts/ci-fast-lanes.mjs",
+            "token": "id: 'copy-leak'",
+            "commandIncludes": "copy-leak/check.mjs"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ASR-018",
+      "title": "General pages stay generic",
+      "statement": "Homepage, pricing, about, brand and other general pages never name a customer segment. Audience routes are an explicit allowlist.",
+      "rationale": "Broad positioning; MKT-D16.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-22",
+        "ref": "MKT-D16"
+      },
+      "scope": ["marketing"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/invariants/icp-language/check.mjs",
+        "evidence": ["scripts/invariants/icp-language/check.mjs"],
+        "wiredIn": [
+          {
+            "file": "scripts/ci-fast-lanes.mjs",
+            "token": "id: 'icp-language'",
+            "commandIncludes": "icp-language/check.mjs"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ASR-019",
+      "title": "No AI-writing tells in copy",
+      "statement": "No em or en dashes, filler openers or other slop tells in user-facing copy; @jovie/copy is the only executable rule set.",
+      "rationale": "Slop copy reads as machine-written.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-09-25",
+        "ref": "canon/VOICE.md"
+      },
+      "scope": ["copy", "marketing", "app"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "packages/copy/rules.ts",
+        "evidence": ["packages/copy/rules.ts", "packages/copy/lint.test.ts"],
+        "wiredIn": [
+          {
+            "file": "package.json",
+            "token": "copy:check"
+          }
+        ],
+        "coverageNote": "Runs on registered writing surfaces only (scripts/invariants/writing-surfaces-registry.json); PR bodies and founder HTML are not covered."
+      }
+    },
+    {
+      "id": "ASR-020",
+      "title": "Generic SaaS composition is rejected",
+      "statement": "Reject generic card grids, centered-everything layouts, decorative blobs, purple-blue gradient defaults, icon-in-circle feature grids and copy that could describe any product.",
+      "rationale": "The canonical anti-slop list; every other copy of this sentence should cite this id.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-04-11",
+        "ref": "design-canonical principle 4, DETAILS.md"
+      },
+      "scope": ["marketing", "app", "artifact"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "vision",
+        "status": "shadow",
+        "check": "vision:polish",
+        "evidence": ["scripts/invariants/art-direction/vision.mjs"],
+        "wiredIn": [
+          {
+            "file": "scripts/ci-fast-lanes.mjs",
+            "token": "id: 'art-direction'",
+            "commandIncludes": "art-direction/run.mjs"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ASR-021",
+      "title": "No emoji or symbol on a colored square",
+      "statement": "Decorative icons stay unboxed; semantic color goes on the title text, not an icon tile.",
+      "rationale": "Reads as consumer-grade AI slop.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-04-11",
+        "ref": "DETAILS.md"
+      },
+      "scope": ["marketing", "app"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "human",
+        "status": "planned",
+        "check": "planned static: icon tile with bg color wrapper",
+        "evidence": []
+      }
+    },
+    {
+      "id": "ASR-022",
+      "title": "No all-caps eyebrow by default",
+      "statement": "Do not use all-caps labels, eyebrow text or section headers as a default styling move.",
+      "rationale": "Linear-level restraint.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-08-01",
+        "ref": ".claude/rules/ui.md"
+      },
+      "scope": ["app", "marketing"],
+      "severity": "warn",
+      "enforcement": {
+        "kind": "human",
+        "status": "planned",
+        "check": "planned static: uppercase + tracking-wide utility on non-canonical components",
+        "evidence": []
+      }
+    },
+    {
+      "id": "ASR-023",
+      "title": "No music-cliche imagery",
+      "statement": "No microphones, headphones, DJ decks, vinyl, guitars, stages or crowds with phones in imagery. The real product UI or abstract on-brand plates carry the page.",
+      "rationale": "Cheesy and cheap; must feel expensive.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-26",
+        "ref": "feedback_no_music_cliche_imagery"
+      },
+      "scope": ["marketing", "artifact", "pen"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static+vision",
+        "status": "planned",
+        "check": "banned imagery tags in asset sidecars (PR2) + vision:cliche",
+        "evidence": []
+      }
+    },
+    {
+      "id": "ASR-024",
+      "title": "Approved people only",
+      "statement": "No person imagery on any surface unless the person is in the approved-people registry with consent and provenance (today: Tim White only).",
+      "rationale": "Imagery of people implies real users or endorsement.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-26",
+        "ref": "feedback_approved_people_only; PR #23329"
+      },
+      "scope": ["marketing", "app", "artifact", "pen"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "in-review",
+        "check": "scripts/invariants/art-direction/people.mjs (PR #23329)",
+        "evidence": []
+      }
+    },
+    {
+      "id": "ASR-025",
+      "title": "Restrained marketing type scale",
+      "statement": "Marketing headings follow a Linear-precision scale: no billboard sizes. The single claim statement jov.ie/you is the only large exception.",
+      "rationale": "Consumer oversized type reads cheap to high-earning artists.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-26",
+        "ref": "feedback_linear_precision_luxury"
+      },
+      "scope": ["marketing", "artifact"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "planned",
+        "check": "type-scale cap (PR2)",
+        "evidence": []
+      }
+    },
+    {
+      "id": "ASR-026",
+      "title": "No text on text or busy art",
+      "statement": "UI text never overlays artwork that contains text or a busy region; text sits outside the image bounds unless the image is known text-free.",
+      "rationale": "Overlay on lettered cover art looked bad in the real render.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-25",
+        "ref": "feedback_no_text_on_text"
+      },
+      "scope": ["marketing", "app", "artifact"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static+vision",
+        "status": "planned",
+        "check": "vision:text_on_busy; static component contract planned",
+        "evidence": []
+      }
+    },
+    {
+      "id": "ASR-027",
+      "title": "Claims must be registered",
+      "statement": "Every factual, numeric or comparative claim on a public surface maps to a registered claim with evidence and a re-measure date.",
+      "rationale": "Unregistered claims are invented proof.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-26",
+        "ref": "frontend-skill truth rules; PRs #23136 #23144 #23316"
+      },
+      "scope": ["marketing", "copy", "artifact"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "planned",
+        "check": "claims-registry coverage (PR2); offer-claims guard in PR #23144",
+        "evidence": []
+      }
+    },
+    {
+      "id": "ASR-028",
+      "title": "No \"fan\" language",
+      "statement": "Jovie sends verified events only; use audience, not fan. The share-with-artist toggle unlocks export, ads and artist messaging.",
+      "rationale": "Audience permission model.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-25",
+        "ref": "project_audience_permission_model; PR #23317"
+      },
+      "scope": ["marketing", "app", "copy"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "in-review",
+        "check": "banned-terms guard (PR #23317)",
+        "evidence": []
+      }
+    },
+    {
+      "id": "ASR-029",
+      "title": "Optical and grid alignment",
+      "statement": "Spacing is token-only on a 4px beat; rendered bounding boxes align within 0.5px; nested radius equals outer minus padding.",
+      "rationale": "Misalignment is the most visible cheapness tell.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-25",
+        "ref": "feedback_optical_grid_alignment"
+      },
+      "scope": ["app", "marketing", "native"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/invariants/native-spacing-scale.mjs (native); rendered bbox check planned",
+        "evidence": ["scripts/invariants/native-spacing-scale.mjs"],
+        "wiredIn": [
+          {
+            "file": "scripts/ci-fast-lanes.mjs",
+            "token": "native-spacing-scale-ratchet.test.ts"
+          }
+        ],
+        "coverageNote": "Native spacing only; no rendered bounding-box check yet."
+      }
+    },
+    {
+      "id": "ASR-030",
+      "title": "Pen masters and code instances do not drift",
+      "statement": "Pen designs use instances of the canonical master; token values match code; stills match within threshold.",
+      "rationale": "Instance drift (#23326) breaks the Pen and code canonical program.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-25",
+        "ref": "project_pen_code_canonical_ds; #23326"
+      },
+      "scope": ["pen"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/invariants/pen-token-parity.mjs, pen-still-diff.mjs",
+        "evidence": [
+          "scripts/invariants/pen-token-parity.mjs",
+          "scripts/invariants/pen-still-diff.mjs"
+        ],
+        "wiredIn": [
+          {
+            "file": "scripts/ci-fast-lanes.mjs",
+            "token": "id: 'pen-token-parity'",
+            "commandIncludes": "pen-token-parity"
+          }
+        ],
+        "coverageNote": "Token parity and stills only; instance-override drift (#23326) not detected."
+      }
+    },
+    {
+      "id": "ASR-031",
+      "title": "Agent and realtime UI by default",
+      "statement": "A button that starts an agent conversation beats a multi-setting form. Deep settings stay reachable in one step.",
+      "rationale": "Forms push work onto the user; an agent does the work and explains it.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-26",
+        "ref": "feedback_agent_first_ui"
+      },
+      "scope": ["app", "admin"],
+      "severity": "warn",
+      "enforcement": {
+        "kind": "human+vision",
+        "status": "planned",
+        "check": "human review + vision:hierarchy; static flag planned: new route or component with more than N form fields and no agent-entry affordance",
+        "evidence": []
+      }
+    },
+    {
+      "id": "ASR-032",
+      "title": "Design-system tokens and dark-first in artifacts",
+      "statement": "HTML artifacts and founder-facing pages use semantic design-system tokens only (no raw colors) and are dark mode first.",
+      "rationale": "Interim artifacts are scaffolding for Ovie, not separate products.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-20",
+        "ref": "CLAUDE.md 2c, feedback_visual_output_ds_dark"
+      },
+      "scope": ["artifact"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "planned",
+        "check": "runner check --files on artifact HTML (PR2)",
+        "evidence": []
+      }
+    },
+    {
+      "id": "ASR-033",
+      "title": "No invented customers or proof",
+      "statement": "Never invent customers, avatars presented as customers, logos, metrics or testimonials.",
+      "rationale": "Fake proof is a trust failure.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-09-01",
+        "ref": "frontend-skill"
+      },
+      "scope": ["marketing", "artifact"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "human",
+        "status": "planned",
+        "check": "covered in part by ASR-024 and ASR-027",
+        "evidence": []
+      }
+    },
+    {
+      "id": "ASR-034",
+      "title": "Writing judged by calibrated readers",
+      "statement": "Customer-facing writing passes the Jev writing-quality evaluator before send.",
+      "rationale": "Machine review for prose (JOV-6476).",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-20",
+        "ref": "JOV-6476"
+      },
+      "scope": ["copy"],
+      "severity": "warn",
+      "enforcement": {
+        "kind": "vision",
+        "status": "shadow",
+        "check": "scripts/invariants/jev-writing-quality.mjs",
+        "evidence": ["scripts/invariants/jev-writing-quality.mjs"],
+        "wiredIn": [
+          {
+            "file": "package.json",
+            "token": "jev-writing-quality"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ASR-035",
+      "title": "No redundant chrome",
+      "statement": "Read the parent container before adding a title, header, card or label; do not duplicate chrome the container provides. Subtract before decorating.",
+      "rationale": "Linear-like density.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-08-01",
+        "ref": ".claude/rules/ui.md"
+      },
+      "scope": ["app", "marketing"],
+      "severity": "warn",
+      "enforcement": {
+        "kind": "human",
+        "status": "planned",
+        "check": "vision:hierarchy",
+        "evidence": []
+      }
+    },
+    {
+      "id": "ASR-039",
+      "title": "No motion effect ships without a reduced-motion rest state, a static fallback and a perf budget",
+      "statement": "Every canvas, WebGL or scroll-driven motion effect on marketing is registered in docs/design-system/motion-effects.json with a prefers-reduced-motion rest state, a static fallback and a gzip, frame-rate and offscreen-pause budget.",
+      "rationale": "Motion carries the story between scenes and must never cost the page: the rest state is the designed state, the budget keeps it cheap.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-26",
+        "ref": "Motion and shader language spec, docs/design-system/motion-effects.json"
+      },
+      "scope": ["marketing"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/invariants/art-direction/surface-media.mjs",
+        "evidence": [
+          "scripts/invariants/art-direction/surface-media.mjs",
+          "docs/design-system/motion-effects.json"
+        ],
+        "wiredIn": [
+          {
+            "file": "scripts/ci-fast-lanes.mjs",
+            "token": "id: 'art-direction'",
+            "commandIncludes": "art-direction/run.mjs"
+          }
+        ]
+      }
+    }
+  ],
+  "judges": [
+    {
+      "id": "polish",
+      "rule": "ASR-020"
+    },
+    {
+      "id": "hierarchy",
+      "rule": "ASR-035"
+    },
+    {
+      "id": "mockup-quality",
+      "rule": "ASR-013"
+    }
+  ],
+  "mirrors": [
+    {
+      "path": ".agents/skills/gstack/design-canonical/SKILL.md",
+      "ids": ["ASR-020"]
+    },
+    {
+      "path": ".claude/rules/ui.md",
+      "ids": ["ASR-022", "ASR-031", "ASR-035"]
+    },
+    {
+      "path": ".claude/skills/design-system/guides/art-direction.md",
+      "ids": ["ASR-017", "ASR-020"]
+    }
+  ]
+}

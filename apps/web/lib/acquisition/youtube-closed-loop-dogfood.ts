@@ -1,26 +1,13 @@
 /**
- * JOV-5883 — automated Tim-channel dogfood of the YouTube closed loop
- * (JOV-5881). Drives the golden path programmatically so the run is a
- * receipt, not a manual walk:
+ * JOV-5883 / JOV-9337 — Tim-channel preview and link inspection receipt.
  *
- *   paste channel → 3 free thumbs before/after → Connect apply →
- *   titles/descriptions + Jovie link insert → receipt
- *
- * Official YouTube Data API only. No spend beyond the free preview
- * allowance. `thumbnails.set` is never called — thumbnail apply stays
- * denied per the experiment guardrails; the only write is artist-owned
- * `videos.update` (snippet title/description) through the Connect token.
+ * Paste-channel preview may consume a free image-generation allowance. The
+ * Connect stage only reads live descriptions and proposes changes; this runner
+ * never approves or applies them. Exact proposals must be reviewed and applied
+ * through Jovie's existing approved link workflow.
  */
 
-import {
-  applyYouTubeLink,
-  approvalFromPlan,
-  createMemoryYouTubeLinkStore,
-  hashDescription,
-  sourceVersionFor,
-  type YouTubeLinkApplyStore,
-  type YouTubeSnippetWriter,
-} from '../youtube-library/link-apply';
+import type { YouTubeVideoSnippetRecord } from '../youtube-library/link-apply';
 import {
   inspectYouTubeLink,
   type YouTubeLinkPlan,
@@ -77,17 +64,19 @@ export type YoutubeDogfoodAuth =
   | { readonly state: 'ok'; readonly scopes: readonly string[] }
   | { readonly state: 'missing' | 'revoked' };
 
+export interface YoutubeDogfoodSnippetReader {
+  getVideo(videoId: string): Promise<YouTubeVideoSnippetRecord | null>;
+}
+
 export interface YoutubeClosedLoopDogfoodDeps {
   /** Golden-path entry point — paste a handle/link/id, get the preview payload. */
   readonly pasteChannelPreview: (
     channelInput: string
   ) => Promise<YoutubeDogfoodPastePreview>;
-  /** Connect-side writer used for the link apply stage. */
-  readonly writer?: YouTubeSnippetWriter;
-  /** Connect grant state; 'missing' blocks the apply stage honestly. */
+  /** Read-only Connect interface; possession of a grant never approves a write. */
+  readonly reader?: YoutubeDogfoodSnippetReader;
+  /** Connect grant state; missing/revoked access blocks inspection honestly. */
   readonly auth?: YoutubeDogfoodAuth;
-  /** Apply-operation store; defaults to an in-memory store for the run. */
-  readonly store?: YouTubeLinkApplyStore;
   readonly now?: Date;
 }
 
@@ -105,6 +94,8 @@ export interface YoutubeDogfoodLinkApplyResult {
   readonly applied: boolean;
   readonly verified: boolean;
   readonly error: string | null;
+  /** Exact read-only proposal; absent when the target could not be inspected. */
+  readonly plan?: YouTubeLinkPlan;
 }
 
 export interface YoutubeClosedLoopDogfoodReceipt {
@@ -159,27 +150,27 @@ interface DogfoodVideoTarget {
   readonly url: string;
 }
 
-async function runConnectApplyStage(input: {
+async function runConnectInspectionStage(input: {
   readonly videos: readonly DogfoodVideoTarget[];
+  readonly channelId: string;
   readonly expectedUrl: string;
   readonly deps: YoutubeClosedLoopDogfoodDeps;
-  readonly now: Date;
 }): Promise<{
   readonly stage: YoutubeDogfoodStageResult;
   readonly authState: 'ok' | 'missing' | 'revoked' | 'unattempted';
   readonly results: readonly YoutubeDogfoodLinkApplyResult[];
-  readonly videosUpdateCalls: number;
-  readonly linksInserted: number;
+  readonly videosUpdateCalls: 0;
+  readonly linksInserted: 0;
   readonly linksAlreadyVerified: number;
 }> {
   const { deps } = input;
   const auth = deps.auth ?? { state: 'missing' as const };
-  if (!deps.writer || auth.state !== 'ok') {
+  if (!deps.reader || auth.state !== 'ok') {
     return {
       stage: stage(
         'connect_apply',
         'blocked',
-        'Connect apply skipped: no authorized YouTube snippet writer (token missing or revoked).'
+        'Link inspection unavailable: Connect read access is missing or revoked. Live apply not attempted.'
       ),
       authState: auth.state,
       results: [],
@@ -189,32 +180,45 @@ async function runConnectApplyStage(input: {
     };
   }
 
-  const writer = deps.writer;
-  const store = deps.store ?? createMemoryYouTubeLinkStore();
-  let videosUpdateCalls = 0;
-  const countingWriter: YouTubeSnippetWriter = {
-    getVideo: videoId => writer.getVideo(videoId),
-    updateVideo: async update => {
-      videosUpdateCalls += 1;
-      return writer.updateVideo(update);
-    },
-  };
-
   const results: YoutubeDogfoodLinkApplyResult[] = [];
-  let linksInserted = 0;
   let linksAlreadyVerified = 0;
+  const blocked = (video: DogfoodVideoTarget, error: string) => {
+    results.push({
+      videoId: video.videoId,
+      title: video.title,
+      planStatus: 'unknown',
+      action: 'none',
+      applied: false,
+      verified: false,
+      error,
+    });
+  };
   for (const video of input.videos) {
-    const live = await writer.getVideo(video.videoId);
+    if (
+      typeof input.channelId !== 'string' ||
+      !input.channelId.trim() ||
+      typeof video.videoId !== 'string' ||
+      !/^[\w-]{1,128}$/.test(video.videoId)
+    ) {
+      blocked(video, 'invalid-target');
+      continue;
+    }
+    let live: YouTubeVideoSnippetRecord | null;
+    try {
+      live = await deps.reader.getVideo(video.videoId);
+    } catch {
+      blocked(video, 'provider-read-failed');
+      continue;
+    }
     if (!live) {
-      results.push({
-        videoId: video.videoId,
-        title: video.title,
-        planStatus: 'unknown',
-        action: 'none',
-        applied: false,
-        verified: false,
-        error: 'not-imported',
-      });
+      blocked(video, 'video-unavailable');
+      continue;
+    }
+    if (
+      live.id !== video.videoId ||
+      live.snippet.channelId !== input.channelId
+    ) {
+      blocked(video, 'identity-mismatch');
       continue;
     }
     const plan = inspectYouTubeLink({
@@ -222,89 +226,46 @@ async function runConnectApplyStage(input: {
       expectedUrl: input.expectedUrl,
       videoUrl: video.url,
     });
-    if (plan.action === 'none' || plan.blockedReason) {
-      if (plan.status === 'verified') linksAlreadyVerified += 1;
-      results.push({
-        videoId: video.videoId,
-        title: video.title,
-        planStatus: plan.status,
-        action: plan.action,
-        applied: false,
-        verified: plan.status === 'verified',
-        error: plan.blockedReason,
-      });
-      continue;
-    }
-    const approval = approvalFromPlan({
-      videoId: video.videoId,
-      plan,
-      sourceVersion: sourceVersionFor(live.snippet.description, live.etag),
-    });
-    if (
-      approval.proposedDescriptionSha256 !==
-      hashDescription(plan.proposedDescription)
-    ) {
-      results.push({
-        videoId: video.videoId,
-        title: video.title,
-        planStatus: plan.status,
-        action: plan.action,
-        applied: false,
-        verified: false,
-        error: 'invalid-approval',
-      });
-      continue;
-    }
-    const applied = await applyYouTubeLink({
-      videoId: video.videoId,
-      videoUrl: video.url,
-      expectedUrl: input.expectedUrl,
-      approval,
-      auth,
-      writer: countingWriter,
-      store,
-      now: input.now,
-    });
-    const ok = applied.ok && applied.status === 'verified';
-    // The returned plan is the post-write re-inspection (action 'none');
-    // count the insert by the pre-apply plan that drove the write.
-    if (ok && plan.action === 'insert') linksInserted += 1;
+    const verified = plan.status === 'verified';
+    if (verified) linksAlreadyVerified += 1;
     results.push({
       videoId: video.videoId,
       title: video.title,
-      planStatus: applied.plan?.status ?? plan.status,
-      action: applied.plan?.action ?? plan.action,
-      applied: true,
-      verified: ok,
-      error: applied.ok ? null : applied.error,
+      planStatus: plan.status,
+      action: plan.action,
+      applied: false,
+      verified,
+      error: verified
+        ? null
+        : (plan.blockedReason ??
+          (plan.status === 'unknown' ? 'inspection-unresolved' : null)),
+      plan,
     });
   }
 
-  const failed = results.filter(item => item.applied && !item.verified);
+  const unresolved = results.filter(result => result.error !== null).length;
   return {
     stage: stage(
       'connect_apply',
-      failed.length === 0 ? 'pass' : 'fail',
-      failed.length === 0
-        ? `Connect apply verified: ${linksInserted} link insert(s), ${linksAlreadyVerified} already correct.`
-        : `${failed.length} apply operation(s) failed verification.`
+      'blocked',
+      `Link inspection complete: ${results.length} target(s), ${linksAlreadyVerified} already correct, ${unresolved} unresolved. Live apply not attempted. Review each exact proposal and apply through Jovie's approved link workflow.`
     ),
     authState: 'ok',
     results,
-    videosUpdateCalls,
-    linksInserted,
+    videosUpdateCalls: 0,
+    linksInserted: 0,
     linksAlreadyVerified,
   };
 }
 
 /**
  * Run the Tim-channel dogfood. Pure orchestration — every external surface
- * (paste preview, Connect writer, auth) is injected, so the same loop runs
+ * (paste preview, Connect reader, auth) is injected, so the same loop runs
  * against production via the script or against fakes in tests.
  */
 export async function runYoutubeClosedLoopDogfood(input: {
   readonly channelInput: string;
-  /** Canonical Jovie smart link to insert, e.g. https://jov.ie/tim. */
+  /** Canonical Jovie smart link to inspect, e.g. https://jov.ie/tim. */
   readonly expectedUrl: string;
   readonly deps: YoutubeClosedLoopDogfoodDeps;
   readonly correlationId?: string;
@@ -414,17 +375,17 @@ export async function runYoutubeClosedLoopDogfood(input: {
     )
   );
 
-  // Stage 3 — Connect apply: titles/descriptions + Jovie link insert.
+  // Stage 3 — inspect links only; retain the blocked apply stage in v1 receipts.
   const targets: DogfoodVideoTarget[] = items.map(item => ({
     videoId: item.videoId,
     title: item.title,
     url: `https://www.youtube.com/watch?v=${encodeURIComponent(item.videoId)}`,
   }));
-  const applyStage = await runConnectApplyStage({
+  const applyStage = await runConnectInspectionStage({
     videos: targets,
+    channelId: preview.channel.id,
     expectedUrl: input.expectedUrl,
     deps: input.deps,
-    now,
   });
   stages.push(applyStage.stage);
 
@@ -449,16 +410,6 @@ export async function runYoutubeClosedLoopDogfood(input: {
     altersFaces: false,
   });
 
-  let outcome: YoutubeClosedLoopDogfoodReceipt['outcome'] = 'pass';
-  let blocker: string | null = null;
-  if (stages.some(item => item.status === 'fail')) {
-    outcome = 'fail';
-    blocker = stages.find(item => item.status === 'fail')?.stage ?? null;
-  } else if (!thumbnailsOk || applyStage.stage.status === 'blocked') {
-    outcome = 'blocked';
-    blocker = !thumbnailsOk ? 'free_thumbnails' : 'connect_apply';
-  }
-
   return finish(
     {
       channel: preview.channel,
@@ -471,7 +422,7 @@ export async function runYoutubeClosedLoopDogfood(input: {
       },
       apply: {
         authState: applyStage.authState,
-        videosEvaluated: targets.length,
+        videosEvaluated: applyStage.results.length,
         linksInserted: applyStage.linksInserted,
         linksAlreadyVerified: applyStage.linksAlreadyVerified,
         results: applyStage.results,
@@ -486,7 +437,7 @@ export async function runYoutubeClosedLoopDogfood(input: {
         sendRemainsHuman: true,
       },
     },
-    outcome,
-    blocker
+    'blocked',
+    !thumbnailsOk ? 'free_thumbnails' : 'connect_apply'
   );
 }

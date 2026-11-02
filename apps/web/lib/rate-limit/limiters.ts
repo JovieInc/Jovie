@@ -143,6 +143,24 @@ export const anonymousOnboardingChatFirstTouchLimiter = createRateLimiter(
   RATE_LIMITERS.anonymousOnboardingChatFirstTouch
 );
 
+/** Fail-open /start unverified budgets. Redis only: an outage denies. */
+export const anonymousOnboardingChatUnverifiedIpLimiter = createRateLimiter(
+  RATE_LIMITERS.anonymousOnboardingChatUnverifiedIp,
+  { requireRedis: true }
+);
+export const anonymousOnboardingChatUnverifiedGlobalLimiter = createRateLimiter(
+  RATE_LIMITERS.anonymousOnboardingChatUnverifiedGlobal,
+  {
+    requireRedis: true,
+  }
+);
+
+/** Canary passage tokens for the /start bot check (JOV-9625). Redis only. */
+export const syntheticPassageTokenLimiter = createRateLimiter(
+  RATE_LIMITERS.syntheticPassageToken,
+  { requireRedis: true }
+);
+
 export interface AnonymousChatLimitInput {
   readonly ip: string;
   readonly sessionId: string;
@@ -346,6 +364,17 @@ export const publicArtistApiLimiter = createRateLimiter(
  */
 export const agentProfileCreateLimiter = createRateLimiter(
   RATE_LIMITERS.agentProfileCreate,
+  {
+    requireRedis: true,
+  }
+);
+
+/**
+ * Global ceiling for agent draft writes across all callers (constant key).
+ * Limit: 600 requests per hour. Fails closed without Redis.
+ */
+export const agentWriteGlobalLimiter = createRateLimiter(
+  RATE_LIMITERS.agentWriteGlobal,
   {
     requireRedis: true,
   }
@@ -845,7 +874,8 @@ export async function checkAiChatRateLimit(
  */
 export async function checkAiChatRateLimitForPlan(
   userId: string,
-  plan: string | null
+  plan: string | null,
+  options: { readonly skipWeeklyQuota?: boolean } = {}
 ): Promise<RateLimitResult> {
   try {
     // 1. Check hourly burst limiter (applies to all plans)
@@ -862,6 +892,12 @@ export async function checkAiChatRateLimitForPlan(
     if (!burstAllowed.success) {
       return burstAllowed;
     }
+
+    // The dedicated production chat-health canary (see
+    // `isWeeklyQuotaExemptCanaryEmail`) skips only the weekly quota so deploy probes
+    // cannot exhaust any account's allowance; the hourly burst limiter above
+    // still caps its spend.
+    if (options.skipWeeklyQuota === true) return burstAllowed;
 
     // 2. Weekly plan quota is mandatory distributed coordination. A Redis
     // outage must not fail-open into unbounded model spend.
@@ -1317,6 +1353,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     publicProfile: publicProfileLimiter,
     publicArtistApi: publicArtistApiLimiter,
     agentProfileCreate: agentProfileCreateLimiter,
+    agentWriteGlobal: agentWriteGlobalLimiter,
     agentCreatorLookup: agentCreatorLookupLimiter,
     claimTokenAccess: claimTokenAccessLimiter,
     investorPortalToken: investorPortalTokenLimiter,

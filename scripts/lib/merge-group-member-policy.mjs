@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { isSizeExcluded } from './pr-size-exclusions.mjs';
 import { evaluatePrSizePolicy } from './pr-size-guard-policy.mjs';
 import {
   HYGIENE_LIMITS,
@@ -20,10 +21,6 @@ export const HOLD_LABELS = new Set([
   'hold',
   'gated',
   'incident',
-  'do-not-merge',
-  'tim-hold',
-  'tim:hold',
-  'hold:tim',
   'queue-deferred',
 ]);
 const COLLABORATOR_ASSOCIATIONS = new Set(['COLLABORATOR', 'MEMBER', 'OWNER']);
@@ -32,8 +29,6 @@ const OPINIONATED_REVIEW_STATES = new Set([
   'CHANGES_REQUESTED',
   'DISMISSED',
 ]);
-const SIZE_EXCLUSION_PATTERN =
-  /pnpm-lock\.yaml|package-lock\.json|yarn\.lock|\.lock$|\/generated\/|\.gen\.|__snapshots__\/|\.snap$|\.svg$|\.po$|\/dist\/|\/build\/|\.min\.|drizzle\/migrations\/meta\//;
 const REGULAR_FILE_MODES = new Set(['100644', '100755']);
 const MAX_API_RESPONSE_BYTES = 64 * 1024 * 1024;
 const MAX_API_REQUEST_MS = 10_000;
@@ -311,7 +306,7 @@ export function countSizeGuardFiles(files) {
     ) {
       fail('pull request file metadata is malformed');
     }
-    if (SIZE_EXCLUSION_PATTERN.test(file.filename)) continue;
+    if (isSizeExcluded(file.filename)) continue;
     lines += file.additions + file.deletions;
     count += 1;
   }

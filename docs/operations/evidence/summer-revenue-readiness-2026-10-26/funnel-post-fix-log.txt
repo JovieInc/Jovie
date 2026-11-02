@@ -1,0 +1,16 @@
+◇ injected env (0) from .env.test
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.fast.mts:16:41). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+Both esbuild and oxc options were set. oxc options will be used and esbuild options will be ignored. The following esbuild options were set: `{ target: 'esnext', format: 'esm' }`
+JSON report written to /tmp/jovie-readiness-evidence/funnel-final.json
+ % Coverage report from v8
+No files with missing coverage.
+1 file fully covered.
+
+=============================== Coverage summary ===============================
+Statements   : 100% ( 14/14 )
+Branches     : 100% ( 10/10 )
+Functions    : 100% ( 1/1 )
+Lines        : 100% ( 14/14 )
+================================================================================

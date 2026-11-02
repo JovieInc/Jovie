@@ -32,6 +32,7 @@ describe('public smart-link missing-state source contract', () => {
     render(<SmartLinkNotFound />);
 
     expect(screen.getByTestId('not-found')).toBeVisible();
+    expect(screen.getByRole('main')).toBe(screen.getByTestId('not-found'));
     expect(
       screen.getByRole('heading', { level: 1, name: 'Content Not Found' })
     ).toBeVisible();

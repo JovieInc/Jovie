@@ -39,7 +39,7 @@ export function maskAudiencePhone(phone: string): string {
 export function getAudienceVisibleEmail(
   member: Pick<AudienceMember, 'email' | 'emailVisibleToArtist'>
 ): string | null {
-  return member.emailVisibleToArtist === false ? null : member.email;
+  return member.emailVisibleToArtist === true ? member.email : null;
 }
 
 export function isAudienceMemberAnonymous(
@@ -73,10 +73,12 @@ export function getAudienceDisplayName(
     return name;
   }
 
-  return isAudienceMemberAnonymous(member) ? 'Anonymous Fan' : 'Fan';
+  return isAudienceMemberAnonymous(member)
+    ? 'Anonymous visitor'
+    : 'Audience member';
 }
 
-/** Whether the artist can message this fan through a known channel. */
+/** Whether the artist can message this audience member through a known channel. */
 export function canMessageAudienceMember(
   member: Pick<
     AudienceMember,
@@ -100,7 +102,7 @@ export function getAudienceIdentityChip(
   if (visibleEmail && visibleEmail !== displayName) {
     return visibleEmail;
   }
-  if (member.phone) {
+  if (member.phone && member.emailVisibleToArtist === true) {
     return maskAudiencePhone(member.phone);
   }
   return null;
@@ -109,7 +111,10 @@ export function getAudienceIdentityChip(
 export function isAudienceMemberReachable(
   member: Pick<AudienceMember, 'email' | 'emailVisibleToArtist' | 'phone'>
 ): boolean {
-  return Boolean(getAudienceVisibleEmail(member) || member.phone);
+  return Boolean(
+    getAudienceVisibleEmail(member) ||
+      (member.emailVisibleToArtist === true && member.phone)
+  );
 }
 
 export function getAudienceDisplayState({

@@ -214,6 +214,29 @@ describe('published track metadata and access', () => {
     });
   });
 
+  it.each(['release', 'track'])(
+    'noindexes a QA display name on the %s page',
+    async kind => {
+      hoisted.getCreatorByUsername.mockResolvedValue({
+        id: 'creator-1',
+        username: 'tmobr1gr5g156yo',
+        usernameNormalized: 'tmobr1gr5g156yo',
+        displayName: 'GP Example +clerk test',
+        settings: {},
+      });
+      const page =
+        kind === 'track' ? await import('./page') : await import('../page');
+      const metadata = await page.generateMetadata({
+        params: Promise.resolve({
+          username: 'tmobr1gr5g156yo',
+          slug: 'album',
+          trackSlug: 'song',
+        }),
+      });
+      expect(metadata.robots).toMatchObject({ index: false, follow: false });
+    }
+  );
+
   it('uses the nested canonical URL and measured track duration', async () => {
     const { generateMetadata } = await import('./page');
     const metadata = await generateMetadata({ params: params() });

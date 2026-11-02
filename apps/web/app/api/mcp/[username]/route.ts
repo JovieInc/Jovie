@@ -25,6 +25,13 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { BASE_URL } from '@/constants/app';
 import {
+  publicCreatorName,
+  publicMerch,
+  publicMerchUrl,
+  publicReleases,
+} from '@/lib/agent/public-catalog';
+import { publicWorkLinks } from '@/lib/agent/public-work-links';
+import {
   PUBLIC_ARTIST_API_RATE_LIMIT_POLICY,
   PUBLIC_ARTIST_API_RATE_LIMIT_POLICY_VALUE,
   PUBLIC_ARTIST_API_RATE_LIMIT_WINDOW_SECONDS,
@@ -34,6 +41,7 @@ import { proposeMerchAction } from '@/lib/chat/tools/merch-propose';
 import { db } from '@/lib/db';
 import { getAuthenticatedProfile } from '@/lib/db/queries/shared';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
+import { getMerchMvpEnabled } from '@/lib/flags/profile-variant';
 import { NO_STORE_HEADERS, RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import {
   artistMcpOwnerToolAuthMessage,
@@ -58,6 +66,7 @@ import {
   publicArtistApiLimiter,
 } from '@/lib/rate-limit';
 import { getProfileByUsername } from '@/lib/services/profile';
+import { getActiveLinksForProfile } from '@/lib/services/social-links/queries';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
 import {
   getVideoMetricsForProfile,
@@ -131,16 +140,19 @@ export async function GET(
   }
 
   // Return MCP server manifest on GET (discovery)
-  const profileUrl = `${BASE_URL}/${profile.username}`;
+  const handle = profile.usernameNormalized || profile.username.toLowerCase();
+  const profileUrl = `${BASE_URL}/${handle}`;
   return NextResponse.json({
     name: `jovie-artist-${profile.username}`,
     version: '1.0.0',
-    description: `MCP server for ${profile.displayName ?? profile.username} on Jovie`,
-    resources: buildResourceDescriptors(profile.username),
+    description: `MCP server for ${publicCreatorName(profile)} on Jovie`,
+    resources: buildResourceDescriptors(
+      profile.usernameNormalized || profile.username.toLowerCase()
+    ),
     tools: buildToolDescriptors(),
     _links: {
       profile: profileUrl,
-      api: `${BASE_URL}/api/v1/${profile.username}`,
+      api: `${BASE_URL}/api/v1/${handle}`,
     },
   });
 }
@@ -270,7 +282,11 @@ async function handleMcpRequest(
   // -------------------------------------------------------------------------
   if (msg.method === 'resources/list') {
     return mcpOk(
-      { resources: buildResourceDescriptors(profile.username) },
+      {
+        resources: buildResourceDescriptors(
+          profile.usernameNormalized || profile.username.toLowerCase()
+        ),
+      },
       requestId
     );
   }
@@ -568,14 +584,15 @@ function buildToolDescriptors() {
 type ProfileData = Awaited<ReturnType<typeof getProfileByUsername>>;
 
 async function readResource(uri: string, profile: NonNullable<ProfileData>) {
-  const username = profile.username;
+  const username = profile.usernameNormalized || profile.username.toLowerCase();
   const base = `artist://${username}`;
 
   if (uri === `${base}/bio`) {
+    const links = await getActiveLinksForProfile(profile.id);
     return {
       id: profile.id,
-      username: profile.username,
-      name: profile.displayName ?? profile.username,
+      username,
+      name: publicCreatorName(profile),
       bio: profile.bio ?? null,
       location: profile.location ?? null,
       genres: profile.genres ?? [],
@@ -583,18 +600,21 @@ async function readResource(uri: string, profile: NonNullable<ProfileData>) {
       spotifyUrl: profile.spotifyUrl ?? null,
       appleMusicUrl: profile.appleMusicUrl ?? null,
       youtubeUrl: profile.youtubeUrl ?? null,
+      profileUrl: `${BASE_URL}/${username}`,
+      creatorType: profile.creatorType,
+      links: publicWorkLinks(links).map(link => ({
+        platform: link.platform,
+        url: link.url,
+        displayText: link.displayText,
+      })),
+      isClaimed: profile.isClaimed === true,
+      isVerified: profile.isVerified === true,
     };
   }
 
   if (uri === `${base}/releases`) {
     const releases = await getReleasesForProfileLite(profile.id);
-    return releases.map(r => ({
-      id: r.id,
-      title: r.title,
-      type: r.releaseType,
-      releaseDate: r.releaseDate ?? null,
-      artworkUrl: r.artworkUrl ?? null,
-    }));
+    return publicReleases(username, releases);
   }
 
   if (uri === `${base}/events`) {
@@ -612,16 +632,10 @@ async function readResource(uri: string, profile: NonNullable<ProfileData>) {
   }
 
   if (uri === `${base}/merch`) {
-    const merch = await getLiveMerchCardsForProfile(profile.id);
-    return merch.map(m => ({
-      id: m.id,
-      title: m.title,
-      description: m.description,
-      productType: m.productType,
-      imageUrl: m.primaryImageUrl,
-      retailPriceCents: m.retailPriceCents,
-      available: true,
-    }));
+    const merch = (await getMerchMvpEnabled(null))
+      ? await getLiveMerchCardsForProfile(profile.id)
+      : [];
+    return publicMerch(username, merch);
   }
 
   if (uri === `${base}/videos`) {
@@ -636,7 +650,7 @@ async function callTool(
   args: Record<string, unknown>,
   profile: NonNullable<ProfileData>
 ): Promise<{ data?: unknown; error?: string }> {
-  const profileUrl = `${BASE_URL}/${profile.username}`;
+  const handle = profile.usernameNormalized || profile.username.toLowerCase();
 
   if (name === 'get_ticket_link') {
     const eventId = String(args.eventId ?? '');
@@ -654,7 +668,9 @@ async function callTool(
 
   if (name === 'check_merch_availability') {
     const itemId = String(args.itemId ?? '');
-    const merch = await getLiveMerchCardsForProfile(profile.id);
+    const merch = (await getMerchMvpEnabled(null))
+      ? await getLiveMerchCardsForProfile(profile.id)
+      : [];
     const item = merch.find(m => m.id === itemId);
     if (!item) return { error: `Merch item not found: ${itemId}` };
     return {
@@ -669,10 +685,14 @@ async function callTool(
 
   if (name === 'add_to_cart') {
     const itemId = String(args.itemId ?? '');
-    const merch = await getLiveMerchCardsForProfile(profile.id);
+    const merch = (await getMerchMvpEnabled(null))
+      ? await getLiveMerchCardsForProfile(profile.id)
+      : [];
     const item = merch.find(m => m.id === itemId);
     if (!item) return { error: `Merch item not found: ${itemId}` };
-    return { data: { itemId, checkoutUrl: `${profileUrl}/merch` } };
+    const checkoutUrl = publicMerchUrl(handle, item.id);
+    if (!checkoutUrl) return { error: `Merch item not found: ${itemId}` };
+    return { data: { itemId, checkoutUrl } };
   }
 
   if (

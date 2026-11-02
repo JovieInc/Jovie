@@ -10,6 +10,7 @@ Tim is never required.
 
 | Date | Incident | Failure classes | Status |
 | --- | --- | --- | --- |
+| 2026-10-31 | [A missed review deadline failed every merge group for about seven hours](2026-10-31-review-deadline-queue-stall.md) | `unowned-incident`, `evidence-forgery-or-staleness`, `non-convergent-control-loop` | draft |
 | 2026-10-21 | [Unreadable production ancestry became a successful supersession](2026-10-21-production-lineage-unknown-supersession.md) | `green-by-implication`, `pre-merge-parity-gap` | draft |
 | 2026-10-20 | [Screenshot accessibility failures blocked production freshness](2026-10-20-screenshot-accessible-name-freeze.md) | `pre-merge-parity-gap` | draft |
 | 2026-10-16 | [Desktop draft preparation failed on installation quota](2026-10-16-desktop-draft-quota.md) | `pre-merge-parity-gap`, `serial-layer-discovery` | draft |

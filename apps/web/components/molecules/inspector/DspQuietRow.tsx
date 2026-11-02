@@ -14,6 +14,17 @@ export interface DspQuietRowProps {
   readonly className?: string;
   readonly testId?: string;
   readonly closedTabIndex?: number;
+  /** Show the saved URL beside the name (link lists that review URLs). */
+  readonly showUrl?: boolean;
+}
+
+/** Saved DSP URL without protocol, `www.` or a trailing slash. */
+export function displayDspUrl(href: string): string {
+  return href
+    .trim()
+    .replace(/^https?:\/\//i, '')
+    .replace(/^www\./i, '')
+    .replace(/\/+$/, '');
 }
 
 const DSP_QUIET_ROW_CLASS =
@@ -29,6 +40,7 @@ export function DspQuietRow({
   className,
   testId,
   closedTabIndex,
+  showUrl = false,
 }: DspQuietRowProps) {
   const hasHref = Boolean(href?.trim());
 
@@ -46,11 +58,28 @@ export function DspQuietRow({
         <span className='flex h-4 w-4 shrink-0 items-center justify-center text-tertiary-token'>
           {icon}
         </span>
-        <span className='min-w-0 flex-1 truncate text-xs text-primary-token'>
+        <span
+          className={cn(
+            'min-w-0 truncate text-xs text-primary-token',
+            showUrl ? 'w-24 shrink-0' : 'flex-1'
+          )}
+        >
           {label}
         </span>
+        {showUrl ? (
+          <span
+            aria-hidden='true'
+            className='min-w-0 flex-1 truncate font-mono text-2xs text-tertiary-token'
+          >
+            {displayDspUrl(href)}
+          </span>
+        ) : null}
         <ExternalLink
-          className='h-3 w-3 shrink-0 text-tertiary-token opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
+          className={cn(
+            'h-3 w-3 shrink-0 text-tertiary-token',
+            !showUrl &&
+              'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
+          )}
           aria-hidden='true'
         />
       </a>
@@ -66,9 +95,15 @@ export function DspQuietRow({
       <span className='flex h-4 w-4 shrink-0 items-center justify-center text-tertiary-token'>
         {icon}
       </span>
-      <span className='min-w-0 flex-1 truncate text-xs text-secondary-token'>
+      <span
+        className={cn(
+          'min-w-0 truncate text-xs text-secondary-token',
+          showUrl ? 'w-24 shrink-0' : 'flex-1'
+        )}
+      >
         {label}
       </span>
+      {showUrl ? <span className='flex-1' /> : null}
       {onFind ? (
         <Button
           type='button'

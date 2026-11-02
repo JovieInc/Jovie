@@ -128,4 +128,49 @@ describe('controlled chat receipts', () => {
       chatAttemptReceipt({ ...input, diagnostics: [slow] }).measurementStatus
     ).toBe('incomplete');
   });
+
+  it('records the smoke environment calibration and rejects malformed calibration input', () => {
+    const calibrated = chatAttemptReceipt({
+      ...input,
+      calibration: {
+        settledFrameGapsMs: [40, 41, 39, 40],
+        environmentScale: 2.4,
+      },
+    });
+    expect(calibrated.environmentCalibration).toEqual({
+      settledFrameGapsMs: [40, 41, 39, 40],
+      environmentScale: 2.4,
+      referenceFrameMs: 1000 / 60,
+    });
+    expect(chatAttemptReceipt(input).environmentCalibration).toBeNull();
+    for (const environmentScale of [
+      0.9,
+      0,
+      2.51,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+    ]) {
+      expect(() =>
+        chatAttemptReceipt({
+          ...input,
+          calibration: { settledFrameGapsMs: [16.7], environmentScale },
+        })
+      ).toThrow('Invalid environment scale');
+    }
+    expect(() =>
+      chatAttemptReceipt({
+        ...input,
+        calibration: { settledFrameGapsMs: [0], environmentScale: 1 },
+      })
+    ).toThrow('Invalid frame gap');
+    expect(() =>
+      chatAttemptReceipt({
+        ...input,
+        calibration: {
+          settledFrameGapsMs: [16.7, Number.NaN],
+          environmentScale: 1,
+        },
+      })
+    ).toThrow('Invalid timing');
+  });
 });

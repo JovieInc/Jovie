@@ -7,11 +7,7 @@ import { chromium } from 'playwright';
 import {
   blockingCaptureRuntimeFailures,
   buildCaptureArtifactPaths,
-  CAPTURE_VIEWPORTS,
   CRITICAL_JOURNEY_CAPTURE_SCHEMA,
-  capturePersonaForRoute,
-  captureViewportNamesForRoute,
-  isOvieCaptureRoute,
   MAX_CAPTURE_WORKERS,
   resolveCaptureJourneyId,
   resolveCaptureWorkerCount,
@@ -19,7 +15,6 @@ import {
   sanitizeCaptureText,
   summarizeScriptedCaptures,
   validateCaptureManifest,
-  validateRoutesMatchChange,
 } from './pr-visual-review.mjs';
 
 const baseUrl = process.env.BASE_URL ?? 'http://127.0.0.1:3100';
@@ -45,7 +40,10 @@ const exactHead = (() => {
 
   return isExactSha(process.env.GITHUB_SHA) ? process.env.GITHUB_SHA : null;
 })();
-const viewports = CAPTURE_VIEWPORTS;
+const viewports = {
+  desktop: { width: 1440, height: 900 },
+  mobile: { width: 390, height: 844 },
+};
 const AUTHENTICATED_SHELL_WAIT_MS = 30_000;
 const NEW_CHAT_EMPTY_WAIT_MS = 15_000;
 const CAPTURE_TIMEOUT_MS = 45_000;
@@ -98,35 +96,6 @@ async function waitForAuthenticatedShell(page, route) {
     timeout: AUTHENTICATED_SHELL_WAIT_MS,
   });
 
-  if (isOvieCaptureRoute(route)) {
-    // Ovie Home proof: the company HUD itself, not just the shell around it.
-    await page
-      .getByTestId('ovie-company-home')
-      .waitFor({ state: 'visible', timeout: AUTHENTICATED_SHELL_WAIT_MS });
-    if (route.includes('fullscreen=1'))
-      await page
-        .getByTestId('ovie-fullscreen')
-        .waitFor({ state: 'visible', timeout: AUTHENTICATED_SHELL_WAIT_MS });
-    if (route.includes('fullscreen=1')) {
-      // Full Screen must cover the shell: no sidebar link may be the topmost
-      // element at its own position.
-      const covered = await page.evaluate(() => {
-        const link = [...document.querySelectorAll('a')].find(
-          el => el.textContent?.trim() === 'Inbox'
-        );
-        if (!link) return true;
-        const box = link.getBoundingClientRect();
-        const top = document.elementFromPoint(
-          box.x + box.width / 2,
-          box.y + box.height / 2
-        );
-        return Boolean(top?.closest('[data-testid="ovie-fullscreen"]'));
-      });
-      if (!covered)
-        throw new Error('Full Screen did not cover the app shell chrome');
-    }
-  }
-
   if (route === '/app/chat' || route.startsWith('/app/chat/')) {
     // JOV-7150: the loaded empty state is one greeting sentence rendered as
     // chat-empty-state-greeting-text. The loading still-frame only renders an
@@ -170,10 +139,10 @@ const workers = resolveCaptureWorkerCount(process.env.PR_VISUAL_WORKERS);
 const browser = await chromium.launch({ headless: true });
 const browserVersion = browser.version();
 const targets = routes.flatMap(route =>
-  captureViewportNamesForRoute(route).map(viewportName => ({
+  Object.entries(viewports).map(([viewportName, viewport]) => ({
     route,
     viewportName,
-    viewport: viewports[viewportName],
+    viewport,
   }))
 );
 let failureCount = 0;
@@ -260,9 +229,9 @@ try {
       });
       const url = new URL(route, baseUrl).toString();
       if (route.startsWith('/app/')) {
-        actions.push(`bootstrap-${capturePersonaForRoute(route)}-session`);
+        actions.push('bootstrap-creator-ready-session');
         const authEntryUrl = new URL(
-          `/api/dev/test-auth/enter?persona=${capturePersonaForRoute(route)}&redirect=${encodeURIComponent(route)}`,
+          `/api/dev/test-auth/enter?persona=creator-ready&redirect=${encodeURIComponent(route)}`,
           baseUrl
         );
         const authResponse = await context.request.get(
@@ -411,17 +380,9 @@ await writeFile(
 );
 const validation = validateCaptureManifest(evidenceManifest, {
   routes,
-  viewportNamesForRoute: captureViewportNamesForRoute,
+  viewportNames: Object.keys(viewports),
 });
-const validationFailures = [...validation.failures];
-try {
-  const routing = JSON.parse(
-    readFileSync(join(outDir, 'routing.json'), 'utf8')
-  );
-  validationFailures.push(...validateRoutesMatchChange(routing.files, routes));
-} catch {
-  // No routing receipt (local run): the route/file guard cannot run.
-}
+const validationFailures = validation.failures;
 if (validationFailures.length > 0) {
   await writeFile(
     join(outDir, 'capture-validation.json'),

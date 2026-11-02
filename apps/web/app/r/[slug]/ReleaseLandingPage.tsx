@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SmartLinkCreditGroup } from '@/app/[username]/[slug]/_lib/data';
 import { Icon } from '@/components/atoms/Icon';
+import { CreditList } from '@/components/molecules/CreditList';
 import { APP_ROUTES } from '@/constants/routes';
 import { ProfileDrawerShell } from '@/features/profile/ProfileDrawerShell';
 import {
@@ -28,10 +29,7 @@ import {
   SmartLinkShell,
 } from '@/features/release/SmartLinkShell';
 import { PublicShareActionList } from '@/features/share/PublicShareMenu';
-import {
-  formatReleaseArtistLine,
-  formatReleaseArtistLineParts,
-} from '@/lib/discography/formatting';
+import { formatReleaseArtistLine } from '@/lib/discography/formatting';
 import type { ProviderConfidence, ProviderKey } from '@/lib/discography/types';
 import { canonicalizeReleaseArtistHandle } from '@/lib/profile/opaque-internal-profile-handle';
 import { buildReleaseShareContext } from '@/lib/share/context';
@@ -244,6 +242,15 @@ function SmartLinkCreditName({
   return <span className='text-white/70'>{name}</span>;
 }
 
+function creditHandlesByName(artists: readonly FeaturedArtist[]) {
+  const handles = new Map<string, string | null>();
+  for (const artist of artists) {
+    const name = artist.name.trim();
+    if (name && !handles.has(name)) handles.set(name, artist.handle ?? null);
+  }
+  return handles;
+}
+
 function SmartLinkArtistLine({
   artist,
   primaryArtists,
@@ -254,71 +261,43 @@ function SmartLinkArtistLine({
   featuredArtists?: readonly FeaturedArtist[];
 }>) {
   const hasFeatured = featuredArtists && featuredArtists.length > 0;
-  const featuredArtistKeyCounts = new Map<string, number>();
-  const getFeaturedArtistKey = (name: string, handle: string | null) => {
-    const base = handle ?? name;
-    const count = featuredArtistKeyCounts.get(base) ?? 0;
-    featuredArtistKeyCounts.set(base, count + 1);
-    return count === 0 ? base : `${base}-${count + 1}`;
-  };
-
   const bylineArtists =
     primaryArtists && primaryArtists.length > 0 ? primaryArtists : [artist];
-  const artistByHandle = new Map(
-    bylineArtists.map(entry => [entry.name, entry])
-  );
-  const bylineParts = formatReleaseArtistLineParts(
-    bylineArtists.map(entry => entry.name)
-  );
-  const bylinePartKeys = new Map<string, number>();
-  const getBylinePartKey = (type: string, value: string) => {
-    const base = `${type}:${value}`;
-    const count = bylinePartKeys.get(base) ?? 0;
-    bylinePartKeys.set(base, count + 1);
-    return count === 0 ? base : `${base}-${count + 1}`;
-  };
+  const bylineHandleByName = creditHandlesByName(bylineArtists);
+  const featuredHandleByName = creditHandlesByName(featuredArtists ?? []);
 
   return (
     <p
       className='mt-1 text-sm font-book [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'
       data-testid='smart-link-artist-byline'
     >
-      {bylineParts.map(part =>
-        part.type === 'element' ? (
+      <CreditList
+        names={bylineArtists.map(entry => entry.name)}
+        renderName={name => (
           <SmartLinkCreditName
-            key={getBylinePartKey(part.type, part.value)}
-            name={part.value}
-            handle={artistByHandle.get(part.value)?.handle ?? null}
+            name={name}
+            handle={bylineHandleByName.get(name) ?? null}
             ownerHandle={artist.handle}
             ownerName={artist.name}
           />
-        ) : (
-          <span
-            key={getBylinePartKey(part.type, part.value)}
-            className='text-white/70'
-          >
-            {part.value}
-          </span>
-        )
-      )}
+        )}
+        literalClassName='text-white/70'
+      />
       {hasFeatured ? (
         <>
           <span className='text-white/40'> feat. </span>
-          {featuredArtists.map((fa, i) => (
-            <span key={getFeaturedArtistKey(fa.name, fa.handle)}>
-              {i > 0 && (
-                <span className='text-white/40'>
-                  {i === featuredArtists.length - 1 ? ' & ' : ', '}
-                </span>
-              )}
+          <CreditList
+            names={featuredArtists.map(entry => entry.name)}
+            renderName={name => (
               <SmartLinkCreditName
-                name={fa.name}
-                handle={fa.handle}
+                name={name}
+                handle={featuredHandleByName.get(name) ?? null}
                 ownerHandle={artist.handle}
                 ownerName={artist.name}
               />
-            </span>
-          ))}
+            )}
+            literalClassName='text-white/40'
+          />
         </>
       ) : null}
     </p>

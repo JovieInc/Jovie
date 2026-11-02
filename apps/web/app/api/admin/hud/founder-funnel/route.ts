@@ -1,4 +1,3 @@
-import { isDisplayReadRequest } from '@/lib/ovie/display/server';
 import 'server-only';
 
 import { NextResponse } from 'next/server';
@@ -8,6 +7,7 @@ import {
   getFounderFunnelData,
 } from '@/lib/admin/founder-funnel';
 import { captureError } from '@/lib/error-tracking';
+import { isDisplayReadRequest } from '@/lib/ovie/display/server';
 import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 export const runtime = 'nodejs';

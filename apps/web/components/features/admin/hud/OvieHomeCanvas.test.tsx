@@ -1,16 +1,10 @@
-import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HomeCanvasState } from '@/components/jovie/types';
+import { mockFitLayout } from '@/components/organisms/home-loop/fit-layout.test-utils';
 import { HOME_LOOP_UNDO_WINDOW_MS } from '@/components/organisms/home-loop/useUndoableAnswers';
+import { APP_ROUTES } from '@/constants/routes';
 import type { OvieInbox } from '@/lib/ovie/inbox';
 import { INTERACTION_CASE_CONTRACT } from '@/lib/ovie/interaction-case';
 import { SUMMER_OPS_CARD_SCHEMA } from '@/lib/ovie/ops-card';
@@ -31,58 +25,9 @@ vi.mock('./useOvieHomeReadyTiming', () => ({
   useOvieHomeReadyTiming: readyTiming,
 }));
 
-const company = vi.hoisted(() => ({
-  metrics: {
-    isPending: false,
-    data: {
-      overview: {
-        mrrUsd: 0,
-        activeSubscribers: 0,
-        balanceUsd: 22.96,
-        burnRateUsd: 110,
-        runwayMonths: 0.2,
-        defaultStatus: 'dead',
-        defaultStatusDetail: 'Revenue growth is not yet outpacing burn.',
-        financialDataAvailable: true,
-        weekAgo: { mrrUsd: 0, activeSubscribers: 0 },
-      },
-      reliability: { incidents24h: 0, unresolvedSentryIssues24h: 0 },
-    } as unknown,
-  },
-  funnel: {
-    isPending: false,
-    data: {
-      stages: [
-        {
-          key: 'chats',
-          label: 'Onboarding chats',
-          description: '',
-          count: 3,
-          conversionRate: null,
-          dropOff: null,
-          identifiable: false,
-          drillDownHref: null,
-        },
-        {
-          key: 'paid',
-          label: 'Paid',
-          description: '',
-          count: 0,
-          conversionRate: 0,
-          dropOff: 3,
-          identifiable: true,
-          drillDownHref: null,
-        },
-      ],
-      timeRange: '7d',
-      biggestDropOffKey: 'paid',
-      errors: [],
-      definitionVersion: 'founder-funnel.v2',
-    } as unknown,
-  },
-}));
-vi.mock('./useOvieCompanyQueries', () => ({
-  useOvieCompanyQueries: () => company,
+const panelAlert = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/ovie/home/panel-alerts', () => ({
+  reportOvieHomePanelError: panelAlert,
 }));
 
 const shipping = vi.hoisted(() => ({
@@ -172,14 +117,56 @@ function renderCanvas(chat?: HomeCanvasState) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return render(
+  const view = render(
     <QueryClientProvider client={client}>
-      <TooltipProvider>
-        <OvieHomeCanvas chat={chat} />
-      </TooltipProvider>
+      <OvieHomeCanvas chat={chat} />
     </QueryClientProvider>
   );
+  return {
+    ...view,
+    rerenderChat: (next: HomeCanvasState) =>
+      view.rerender(
+        <QueryClientProvider client={client}>
+          <OvieHomeCanvas chat={next} />
+        </QueryClientProvider>
+      ),
+  };
 }
+
+/** Home opens on the company loop; turns asked this session render in place. */
+function renderThenAsk(chat: HomeCanvasState) {
+  const view = renderCanvas({ ...chat, messages: [] });
+  view.rerenderChat(chat);
+  return view;
+}
+
+const COMPANY_RESPONSES: Record<string, unknown> = {
+  '/api/hud/metrics': {
+    overview: {
+      mrrUsd: 0,
+      activeSubscribers: 0,
+      balanceUsd: 22.96,
+      burnRateUsd: 110,
+      runwayMonths: 0.2,
+      defaultStatus: 'dead',
+      defaultStatusDetail: '',
+      financialDataAvailable: true,
+      weekAgo: { mrrUsd: 0, activeSubscribers: 0 },
+    },
+  },
+  '/api/admin/hud/founder-funnel?range=7d': {
+    stages: [{ key: 'accounts_created', count: 2, drillDownHref: null }],
+  },
+  '/api/ovie/certifications': {
+    rows: [
+      {
+        domain: 'flows',
+        state: 'working',
+        tiers: { runtime_dogfood: 'passed' },
+      },
+    ],
+  },
+};
 
 function opsCard(kind: 'shipping' | 'revenue', title: string) {
   return {
@@ -239,7 +226,7 @@ describe('OvieHomeCanvas', () => {
 
   beforeEach(() => {
     readyTiming.mockReset();
-    globalThis.localStorage.clear();
+    panelAlert.mockReset();
     shipping.data = snapshot();
     inbox = INBOX;
     toastMock.mockClear();
@@ -247,6 +234,10 @@ describe('OvieHomeCanvas', () => {
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
       if (url === '/api/ovie/inbox')
         return new Response(JSON.stringify(inbox), { status: 200 });
+      if (url in COMPANY_RESPONSES)
+        return new Response(JSON.stringify(COMPANY_RESPONSES[url]), {
+          status: 200,
+        });
       if (init?.method === 'POST')
         return new Response(JSON.stringify({ ok: true }), { status: 200 });
       return new Response('not found', { status: 404 });
@@ -258,42 +249,58 @@ describe('OvieHomeCanvas', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders the company tiles and the decisions that block the operator', async () => {
+  it('renders the company loop from shipping state and the inbox', async () => {
     renderCanvas();
     expect(
       await screen.findByText('Vercel on-demand concurrency')
     ).toBeVisible();
-    const tile = (id: string) => screen.getByTestId(`ovie-tile-${id}`);
-    expect(tile('alive')).toHaveTextContent('Dead');
-    expect(tile('alive')).toHaveTextContent('$22.96 cash');
-    expect(tile('revenue')).toHaveTextContent('$0.00');
-    expect(tile('funnel')).toHaveTextContent('3 → 0');
-    expect(tile('shipping')).toHaveTextContent('3');
-    expect(tile('blocked')).toHaveTextContent('1');
+    expect(screen.getByTestId('home-loop-constraint')).toHaveTextContent(
+      'Shipping off target: 1 item blocked'
+    );
+    const companyRow = await screen.findByTestId('home-loop-tile-runway');
+    expect(companyRow).toHaveTextContent('6 days');
+    expect(companyRow).toHaveTextContent('Default dead');
+    expect(screen.getByTestId('home-loop-tile-golden-path')).toHaveTextContent(
+      '1 of 1 pass in prod'
+    );
     expect(screen.getByTestId('home-loop-done')).toHaveTextContent('3 merges');
+    // Stage time lives on Shipping; Home shows only metrics with a target.
+    expect(screen.queryByTestId('home-loop-stage-strip')).toBeNull();
+    expect(screen.getByTestId('home-loop-kanban-card')).toHaveAttribute(
+      'data-attention',
+      'blocked'
+    );
   });
 
-  it('cuts the ledger from Home: no stage strip, no in-flight board, no pulse counters', async () => {
-    renderCanvas();
-    await screen.findByText('Vercel on-demand concurrency');
-    for (const gone of [
-      'home-loop-stage-strip',
-      'home-loop-kanban-card',
-      'home-loop-pulse',
-      'home-loop-constraint',
-      'home-loop-in-flight-section',
-    ]) {
-      expect(screen.queryByTestId(gone)).toBeNull();
+  it('links overflowing in-flight tasks to the shipping surface', () => {
+    const base = snapshot();
+    shipping.data = {
+      ...base,
+      operationalTasks: {
+        ...base.operationalTasks,
+        tasks: Array.from({ length: 4 }, (_, index) => ({
+          ...base.operationalTasks.tasks[0],
+          id: `linear:JOV-${index + 1}`,
+          linearIdentifier: `JOV-${index + 1}`,
+        })),
+      },
+    };
+    const restore = mockFitLayout('home-loop-kanban-cards', 150);
+    try {
+      renderCanvas();
+      const more = screen.getByRole('link', { name: '+3 more' });
+      expect(more).toHaveAttribute('href', APP_ROUTES.ADMIN_SHIPPING);
+    } finally {
+      restore();
     }
   });
 
-  it('keeps the tile frame while any source has not answered', () => {
+  it('shows loading while shipping state has not arrived', () => {
     shipping.data = undefined;
     renderCanvas();
-    expect(screen.getAllByTestId('ovie-tile-loading')).toHaveLength(6);
-    expect(screen.getByTestId('ovie-company-hud')).toHaveAttribute(
-      'aria-busy',
-      'true'
+    expect(screen.getByTestId('home-loop-in-flight-section')).toHaveAttribute(
+      'data-state',
+      'loading'
     );
   });
 
@@ -309,7 +316,7 @@ describe('OvieHomeCanvas', () => {
       },
     };
     renderCanvas();
-    expect(screen.getByTestId('home-loop-done-section')).toHaveAttribute(
+    expect(screen.getByTestId('home-loop-in-flight-section')).toHaveAttribute(
       'data-state',
       'loading'
     );
@@ -330,32 +337,46 @@ describe('OvieHomeCanvas', () => {
         },
       };
       renderCanvas();
-      expect(screen.getByTestId('home-loop-done-section')).toHaveAttribute(
+      expect(screen.getByTestId('home-loop-in-flight-section')).toHaveAttribute(
         'data-state',
         'error'
       );
       expect(
-        within(screen.getByTestId('home-loop-done-section')).getByText(
+        within(screen.getByTestId('home-loop-in-flight-section')).getByText(
           'Shipping data could not load.'
         )
       ).toBeVisible();
       await screen.findByTestId('home-loop-ask-approve');
       expect(readyTiming).toHaveBeenLastCalledWith(true);
+      expect(panelAlert).toHaveBeenCalledWith(
+        'shipping-loop',
+        connection === 'unauthorized'
+          ? 'unauthorized'
+          : 'operational-tasks-unavailable'
+      );
     }
   );
 
-  it('says Not measured for a failed company source instead of holding the HUD in skeleton', async () => {
-    company.metrics = { isPending: false, data: undefined };
+  it('raises no panel alert when every section is ready', async () => {
+    shipping.data = snapshot();
     renderCanvas();
-    await screen.findByText('Vercel on-demand concurrency');
-    expect(screen.getByTestId('ovie-tile-alive')).toHaveTextContent(
-      'Not measured'
+    await screen.findByTestId('home-loop-ask-approve');
+    expect(panelAlert).not.toHaveBeenCalled();
+  });
+
+  it('keeps reconciled tasks visible when a later shipping read fails', () => {
+    const base = snapshot();
+    shipping.data = {
+      ...base,
+      view: { ...base.view, connection: 'disconnected' },
+      operationalRequestState: 'error',
+    };
+    renderCanvas();
+    expect(screen.getByTestId('home-loop-in-flight-section')).toHaveAttribute(
+      'data-state',
+      'populated'
     );
-    expect(screen.getByTestId('ovie-tile-alive')).toHaveAttribute(
-      'data-measured',
-      'false'
-    );
-    expect(screen.getByTestId('ovie-tile-funnel')).toHaveTextContent('3 → 0');
+    expect(screen.getByText('Blocked task')).toBeVisible();
   });
 
   it('records an approval only after the undo window closes', async () => {
@@ -605,9 +626,36 @@ describe('OvieHomeCanvas', () => {
     ).toHaveAttribute('href', '/app/ov/inbox');
   });
 
+  it('shows at most three asks; the rest resolve by their defaults', async () => {
+    const base = INBOX.cases[0];
+    if (!base) throw new Error('fixture');
+    inbox = {
+      issues: [],
+      cases: Array.from({ length: 5 }, (_, index) => ({
+        ...base,
+        id: `summer:card-${index}`,
+        title: `Ask ${index}`,
+        decisionTarget: { kind: 'summer' as const, id: `card-${index}` },
+      })),
+    };
+    renderCanvas();
+    await screen.findByText('Ask 0');
+    expect(screen.queryByText('Ask 3')).toBeNull();
+    expect(
+      screen.getByTestId('home-loop-asks-section-notice')
+    ).toHaveTextContent('2 more resolve by their defaults');
+  });
+
+  it('opens on the company loop, not an earlier conversation', async () => {
+    renderCanvas(chatState());
+    await screen.findByText('Vercel on-demand concurrency');
+    expect(screen.queryByTestId('home-loop-answer')).toBeNull();
+    expect(screen.getByTestId('home-loop-kanban-card')).toBeVisible();
+  });
+
   it('renders the latest turn in place and restores earlier canvas states', async () => {
     const chat = chatState();
-    renderCanvas(chat);
+    renderThenAsk(chat);
     await screen.findByText('Vercel on-demand concurrency');
 
     const answer = screen.getByTestId('home-loop-answer');
@@ -617,7 +665,7 @@ describe('OvieHomeCanvas', () => {
     expect(
       screen.getByTestId('home-loop-in-flight-generated')
     ).toHaveTextContent('Shipping Now');
-    expect(screen.queryByTestId('home-loop-done')).toBeNull();
+    expect(screen.queryByTestId('home-loop-kanban-card')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Previous Answer' }));
     expect(screen.getByTestId('home-loop-answer')).toHaveTextContent(
@@ -626,8 +674,7 @@ describe('OvieHomeCanvas', () => {
     expect(screen.getByTestId('home-loop-answer')).toHaveTextContent(
       'Monthly Revenue'
     );
-    expect(screen.queryByTestId('home-loop-in-flight-generated')).toBeNull();
-    expect(screen.getByTestId('home-loop-done')).toHaveTextContent('3 merges');
+    expect(screen.getByTestId('home-loop-kanban-card')).toBeVisible();
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Conversation' }));
     expect(chat.onOpenTranscript).toHaveBeenCalledOnce();
@@ -637,7 +684,7 @@ describe('OvieHomeCanvas', () => {
   });
 
   it('reserves the answer slot while a reply streams', async () => {
-    renderCanvas(
+    renderThenAsk(
       chatState({
         isStreaming: true,
         messages: [
@@ -655,20 +702,5 @@ describe('OvieHomeCanvas', () => {
       'pending'
     );
     expect(screen.getByTestId('home-loop-answer-pending')).toBeVisible();
-  });
-});
-
-describe('Home full screen', () => {
-  it('has a labelled toggle that covers the shell with the same Home, and Esc leaves', async () => {
-    renderCanvas();
-    const { findByTestId, queryByTestId } = screen;
-    const toggle = await findByTestId('ovie-fullscreen-toggle');
-    expect(toggle).toHaveAccessibleName(/Full Screen/);
-    fireEvent.click(toggle);
-    expect(await findByTestId('ovie-fullscreen')).toBeInTheDocument();
-    expect(await findByTestId('ovie-company-home')).toBeInTheDocument();
-    fireEvent.keyDown(globalThis, { key: 'Escape' });
-    await waitFor(() => expect(queryByTestId('ovie-fullscreen')).toBeNull());
-    expect(localStorage.getItem('ovie-home-fullscreen')).toBe('0');
   });
 });

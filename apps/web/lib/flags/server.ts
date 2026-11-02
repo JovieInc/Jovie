@@ -33,10 +33,6 @@ const ADMIN_DEFAULT_TRUE_FLAGS = new Set<AppFlagName>(
     flagName =>
       flagName !== 'RELEASE_PLAN_DEMO' &&
       flagName !== 'RELEASE_TO_REVENUE_AUTOPILOT' &&
-      // The inbox flag changes canonical customer navigation. Keep its
-      // rollout role-invariant so entering customer mode never gives admins
-      // a different sidebar from creators.
-      flagName !== 'INBOX_HOME' &&
       // Unapproved workspace doors remain off for admins and customers.
       flagName !== 'YOUTUBE_WORKSPACE_NAV' &&
       flagName !== 'JOVIE_WORK_NAV' &&

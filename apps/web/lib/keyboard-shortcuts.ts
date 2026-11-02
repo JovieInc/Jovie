@@ -12,7 +12,6 @@ import {
   Link2,
   Lock,
   LogOut,
-  Maximize2,
   MessageCircle,
   Mic2,
   PanelLeft,
@@ -124,21 +123,6 @@ export const FOUNDER_DOOR_SHORTCUT: KeyboardShortcut = {
   decision: { status: 'required', binding: 'useGlobalShortcutActions' },
 };
 
-/**
- * Admin-only Full screen binding for Ovie Home (also Ctrl+Cmd+F in the Mac
- * app; handled in useOvieFullscreen). Stays out of the public catalog.
- */
-export const OVIE_FULLSCREEN_SHORTCUT: KeyboardShortcut = {
-  id: 'ovie-fullscreen',
-  label: 'Full Screen',
-  keys: `${GLYPH_CMD} ${GLYPH_SHIFT} F`,
-  description: 'Fill the display with Home; Esc leaves',
-  category: 'actions',
-  icon: Maximize2,
-  shortcutKey: 'Meta+Shift+f',
-  decision: { status: 'required', binding: 'useOvieFullscreen' },
-};
-
 /** Project existing navigation actions; routes, names, and hints have one owner. */
 function commandShortcut(
   commandId: string,
@@ -185,7 +169,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     shortcutKey: '/',
     decision: {
       status: 'required',
-      binding: 'HeaderActionsProvider, HeaderSearchSurface',
+      binding: 'HeaderActionsProvider, CommandPalette',
     },
   },
   {
@@ -394,11 +378,7 @@ export function shortcutsForHelpSheet(options: {
   readonly canUseFounderDoor: boolean;
 }): readonly KeyboardShortcut[] {
   if (!options.canUseFounderDoor) return KEYBOARD_SHORTCUTS;
-  return [
-    ...KEYBOARD_SHORTCUTS,
-    FOUNDER_DOOR_SHORTCUT,
-    OVIE_FULLSCREEN_SHORTCUT,
-  ];
+  return [...KEYBOARD_SHORTCUTS, FOUNDER_DOOR_SHORTCUT];
 }
 
 /**

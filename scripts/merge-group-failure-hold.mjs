@@ -3,9 +3,11 @@
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { runGh } from '../packages/api-client/gh.ts';
 import { isTransientAdmissionFailureMessage } from './lib/merge-group-admission.mjs';
 import {
   attributeAgainstAheadRun,
+  attributeAgainstPeerRuns,
   CI_FAST_REMAINING_JOB,
 } from './lib/merge-group-ahead-attribution.mjs';
 import {
@@ -82,6 +84,27 @@ const ADMISSION_FAILURE_SUMMARIES = new Set([
 ]);
 const RETRY_DESCRIPTION =
   /^(spent|released):run=([1-9][0-9]*);try=([1-9][0-9]*)$/;
+// The base-branch fetch await step (ci.yml `&base-fetch-await`) emits exactly
+// this annotation when the detached background fetch never reports an exit
+// status. Only that timeout is infrastructure; any other fetch failure says
+// something we cannot attribute and stays unclassified.
+export const FETCH_STEP = 'Fetch base-branch history';
+export const FETCH_TIMEOUT_TITLE = 'Base-branch fetch';
+export const FETCH_TIMEOUT_MESSAGE =
+  'background fetch did not finish within 540s';
+// Aggregate steps that only report a lane job's failure, never originate one.
+const FETCH_TIMEOUT_CASCADE_STEPS = new Set([
+  'Require every ci-fast lane group to pass',
+  'Join exact lane results',
+  'Evaluate combined-head checks',
+]);
+const LANE_AGGREGATE_STEP = 'Require every ci-fast lane group to pass';
+const LANE_AGGREGATE_TITLE = 'ci-fast failed closed';
+// "ci-fast (structural web)" reports itself as `structural-web`.
+const laneOfJob = name =>
+  String(name ?? '')
+    .replace(/^ci-fast \((.*)\)$/, '$1')
+    .replace(/ /g, '-');
 const INFRASTRUCTURE_STEP =
   /^(?:Set up job|Initialize containers|Prepare all required actions|Complete job|Post |Checkout|Set up |Restore |Upload |Download )/i;
 
@@ -211,13 +234,111 @@ function instructionErrorsFromLog(log) {
   return errors.includes(RUNNER_EXIT_FAILURE) ? errors : null;
 }
 
-/** @param {{ conclusion?: string, failedSteps?: string[], annotationText?: string, changedFiles?: string[], admissionText?: string }} [input] */
+function hasOnlyFetchTimeoutErrors(text) {
+  const errors = String(text ?? '')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean);
+  let timeoutFound = false;
+  for (const error of errors) {
+    if (error === RUNNER_EXIT_FAILURE) continue;
+    if (error !== FETCH_TIMEOUT_MESSAGE) return false;
+    timeoutFound = true;
+  }
+  return timeoutFound;
+}
+
+/**
+ * Failure annotations of every failed fetch-step job, only when each job
+ * belongs to this exact run and attempt and carries nothing but the fetch
+ * timeout. Anything else (other run/attempt, other message, unreadable
+ * annotations) returns '' and leaves the failure unclassified.
+ * @param {{ id?: number, run_attempt?: number }} run
+ * @param {object[]} jobs
+ * @param {(job: object) => object[]} readAnnotations
+ */
+export function fetchTimeoutEvidence(run, jobs, readAnnotations) {
+  const failedJobs = (Array.isArray(jobs) ? jobs : []).filter(
+    job =>
+      Array.isArray(job?.steps) &&
+      job.steps.some(
+        step => step?.name === FETCH_STEP && step?.conclusion === 'failure'
+      )
+  );
+  if (failedJobs.length === 0) return '';
+  const messages = [];
+  for (const job of failedJobs) {
+    if (job.run_id !== run?.id || job.run_attempt !== run?.run_attempt)
+      return '';
+    let notes;
+    try {
+      notes = readAnnotations(job);
+    } catch {
+      return '';
+    }
+    if (!Array.isArray(notes)) return '';
+    const failures = notes.filter(note => note?.annotation_level === 'failure');
+    if (
+      failures.some(
+        note =>
+          typeof note.message !== 'string' ||
+          (note.message !== RUNNER_EXIT_FAILURE &&
+            (note.message !== FETCH_TIMEOUT_MESSAGE ||
+              note.title !== FETCH_TIMEOUT_TITLE))
+      ) ||
+      !failures.some(note => note.message === FETCH_TIMEOUT_MESSAGE)
+    )
+      return '';
+    messages.push(...failures.map(note => note.message));
+  }
+  // The aggregate job names every failed lane. A failed lane other than the
+  // one whose job hit the fetch timeout is not proven infrastructure.
+  const fetchLanes = new Set(failedJobs.map(job => laneOfJob(job.name)));
+  const aggregateJobs = jobs.filter(
+    job =>
+      Array.isArray(job?.steps) &&
+      job.steps.some(
+        step =>
+          step?.name === LANE_AGGREGATE_STEP && step?.conclusion === 'failure'
+      )
+  );
+  for (const job of aggregateJobs) {
+    if (job.run_id !== run?.id || job.run_attempt !== run?.run_attempt)
+      return '';
+    let notes;
+    try {
+      notes = readAnnotations(job);
+    } catch {
+      return '';
+    }
+    if (!Array.isArray(notes)) return '';
+    const closed = notes.filter(
+      note =>
+        note?.annotation_level === 'failure' &&
+        note.title === LANE_AGGREGATE_TITLE
+    );
+    if (closed.length !== 1) return '';
+    const lanes = String(closed[0].message ?? '').split(' ');
+    const failedLanes = [];
+    for (const lane of lanes) {
+      const match = /^([a-z][a-z-]*)=([a-z_]+)$/.exec(lane);
+      if (!match) return '';
+      if (match[2] !== 'success') failedLanes.push(match[1]);
+    }
+    if (failedLanes.length === 0 || !failedLanes.every(l => fetchLanes.has(l)))
+      return '';
+  }
+  return messages.join('\n');
+}
+
+/** @param {{ conclusion?: string, failedSteps?: string[], annotationText?: string, changedFiles?: string[], admissionText?: string, fetchTimeoutText?: string }} [input] */
 export function classifyMergeGroupFailure({
   conclusion,
   failedSteps = [],
   annotationText = '',
   changedFiles,
   admissionText = '',
+  fetchTimeoutText = '',
 } = {}) {
   if (!MERGE_GROUP_FAILURE_CONCLUSIONS.has(conclusion)) {
     fail(`unsupported terminal conclusion ${JSON.stringify(conclusion)}`);
@@ -260,6 +381,20 @@ export function classifyMergeGroupFailure({
       return changedFiles.some(file => AGENT_CONTEXT_BUDGET_FILES.has(file))
         ? 'deterministic-source'
         : 'base-branch';
+    }
+    // Reached only after every deterministic and product step above declined,
+    // so any stronger failure in the same run has already won.
+    if (
+      steps.includes(FETCH_STEP) &&
+      steps.every(
+        step =>
+          step === FETCH_STEP ||
+          FETCH_TIMEOUT_CASCADE_STEPS.has(step) ||
+          INFRASTRUCTURE_STEP.test(step)
+      ) &&
+      hasOnlyFetchTimeoutErrors(fetchTimeoutText)
+    ) {
+      return 'transient-infrastructure';
     }
     if (
       steps.length > 0 &&
@@ -855,6 +990,29 @@ export function supersededByLiveEntry(pr, sourceHeadSha, groupHeadSha) {
   );
 }
 
+// HEADGREEN grouping (live ruleset 10512119, 2026-10-29): only the group head's
+// build gates the merge, so a failed build of an entry that still has entries
+// queued behind it, on the same live synthetic commit, did not eject it and a
+// later head can still land it. Holding it (durable failure status, dequeue,
+// auto-merge off) would turn a one-off intermediate flake into the ejection
+// HEADGREEN exists to avoid. The last queued entry has nothing behind it, so
+// its failure still holds, and so does a deterministic-source failure (a PR
+// that is itself broken must not wait to eject everyone behind it). Missing
+// queue data fails closed to the old behavior.
+export function coveredByLaterEntry(pr, sourceHeadSha, groupHeadSha) {
+  const entry = pr?.mergeQueueEntry;
+  const total = entry?.mergeQueue?.entries?.totalCount;
+  return (
+    pr?.state === 'OPEN' &&
+    String(pr?.headRefOid ?? '').toLowerCase() === sourceHeadSha &&
+    pr.isInMergeQueue === true &&
+    Number.isInteger(entry?.position) &&
+    Number.isInteger(total) &&
+    entry.position < total &&
+    liveEntryHeadSha(pr) === groupHeadSha
+  );
+}
+
 // A group's base is main or, behind other entries, the head of the group ahead
 // of it. Until that group's CI passes, a failure here can be the ahead entry's:
 // on 2026-10-12 #21393 was held as deterministic-source for a DESIGN.md check
@@ -884,8 +1042,8 @@ export function aheadEntryUnproven({
 // Dequeue denial is non-fatal: this token cannot call dequeuePullRequest, and
 // GitHub already removes the PR when the merge_group run fails.
 /**
- * @param {{ repository: string, run: object, timeline: object[], failedSteps?: string[], statuses?: object[], annotationText?: string, changedFiles?: string[], mainSha?: string, admissionText?: string, aheadGroup?: AheadGroup }} input
- * @param {{ writeStatus: Function, readPullRequest: Function, dequeuePullRequest: Function, disableAutoMerge: Function }} io
+ * @param {{ repository: string, run: object, timeline: object[], failedSteps?: string[], statuses?: object[], annotationText?: string, changedFiles?: string[], mainSha?: string, admissionText?: string, fetchTimeoutText?: string, aheadGroup?: AheadGroup }} input
+ * @param {{ writeStatus: Function, readPullRequest: Function, dequeuePullRequest: Function, disableAutoMerge: Function, recordDequeue?: Function }} io
  */
 export async function applyMergeGroupFailure(
   {
@@ -898,9 +1056,16 @@ export async function applyMergeGroupFailure(
     changedFiles,
     mainSha,
     admissionText = '',
+    fetchTimeoutText = '',
     aheadGroup,
   },
-  { writeStatus, readPullRequest, dequeuePullRequest, disableAutoMerge }
+  {
+    writeStatus,
+    readPullRequest,
+    dequeuePullRequest,
+    disableAutoMerge,
+    recordDequeue,
+  }
 ) {
   const front = validateRun(run, repository);
   const sourceHeadSha = sourceHeadForRun(timeline, run.created_at);
@@ -910,6 +1075,7 @@ export async function applyMergeGroupFailure(
     annotationText,
     changedFiles,
     admissionText,
+    fetchTimeoutText,
   });
   const groupHeadSha = String(run.head_sha).toLowerCase();
   // Quota or gateway trouble spends no source-failure retry and removes no merge
@@ -991,6 +1157,28 @@ export async function applyMergeGroupFailure(
   }
   if (
     !failedSteps?.includes?.(WORKFLOW_LOAD_STEP) &&
+    classification !== 'deterministic-source' &&
+    coveredByLaterEntry(current, sourceHeadSha, groupHeadSha)
+  ) {
+    return {
+      schema: FAILURE_HOLD_SCHEMA,
+      repository,
+      prNumber: front.prNumber,
+      sourceHeadSha,
+      mergeGroupHeadSha: groupHeadSha,
+      workflowRunId: run.id,
+      workflowRunAttempt: run.run_attempt,
+      classification,
+      skipped: true,
+      coveredByLaterEntry: true,
+      statusWritten: false,
+      dequeued: false,
+      dequeueOutcome: 'not-attempted',
+      autoMergeDisabled: false,
+    };
+  }
+  if (
+    !failedSteps?.includes?.(WORKFLOW_LOAD_STEP) &&
     aheadEntryUnproven(aheadGroup)
   ) {
     return {
@@ -1061,9 +1249,31 @@ export async function applyMergeGroupFailure(
     current = await readPullRequest(front.prNumber);
     if (currentMatches() && current.isInMergeQueue && current.mergeQueueEntry) {
       try {
-        await dequeuePullRequest(current.id);
-        dequeued = true;
-        dequeueOutcome = 'dequeued';
+        // The durable exact-head failure status above is authoritative even if
+        // this advisory comment fails. Record intent before the removal so a
+        // crash cannot turn a completed action into an unrecorded one.
+        try {
+          await recordDequeue?.({
+            number: front.prNumber,
+            head: sourceHeadSha,
+            code: 'poison',
+            reason: `merge-group failure hold: run ${run.id} failed for head ${sourceHeadSha.slice(0, 12)}`,
+          });
+        } catch (error) {
+          console.error(
+            `::warning::merge-group-failure-hold could not record the dequeue reason: ${errorText(error).slice(0, 200)}`
+          );
+        }
+        current = await readPullRequest(front.prNumber);
+        if (
+          currentMatches() &&
+          current.isInMergeQueue &&
+          current.mergeQueueEntry
+        ) {
+          await dequeuePullRequest(current.id);
+          dequeued = true;
+          dequeueOutcome = 'dequeued';
+        }
       } catch (error) {
         const denial = classifyDequeueDenial(error);
         if (!denial) throw error;
@@ -1148,6 +1358,35 @@ function gh(args) {
   });
 }
 
+export async function recordDequeueReason(
+  { repository, number, code, reason, head },
+  { run = runGh, now = () => new Date().toISOString() } = {}
+) {
+  const record = {
+    code,
+    reason,
+    actor: 'merge-group-failure-hold',
+    at: now(),
+    head,
+    outcome: 'requested',
+  };
+  const result = await run(
+    [
+      'api',
+      '-X',
+      'POST',
+      `repos/${repository}/issues/${number}/comments`,
+      '-f',
+      `body=Dequeue requested (${code}): ${reason}\n<!-- queue-dequeue ${JSON.stringify(record)} -->`,
+    ],
+    { priority: 'repair' }
+  );
+  if (result.code !== 0)
+    throw new Error(
+      result.stderr || `reason recording failed (${result.code})`
+    );
+}
+
 function ghJson(args) {
   return JSON.parse(gh(args));
 }
@@ -1181,7 +1420,7 @@ function graphql(query, variables) {
 }
 
 const TIMELINE_QUERY = `query($owner:String!,$name:String!,$number:Int!,$cursor:String){repository(owner:$owner,name:$name){pullRequest(number:$number){timelineItems(first:100,after:$cursor,itemTypes:[ADDED_TO_MERGE_QUEUE_EVENT,REMOVED_FROM_MERGE_QUEUE_EVENT,PULL_REQUEST_COMMIT,HEAD_REF_FORCE_PUSHED_EVENT]){nodes{__typename ... on AddedToMergeQueueEvent{createdAt} ... on RemovedFromMergeQueueEvent{createdAt reason beforeCommit{oid}} ... on PullRequestCommit{commit{oid}} ... on HeadRefForcePushedEvent{createdAt afterCommit{oid}}} pageInfo{hasNextPage endCursor}}}}}`;
-const PR_QUERY = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id state headRefOid isInMergeQueue mergeQueueEntry{id headCommit{oid}} autoMergeRequest{enabledAt}}}}`;
+const PR_QUERY = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id state headRefOid isInMergeQueue mergeQueueEntry{id position headCommit{oid} mergeQueue{entries{totalCount}}} autoMergeRequest{enabledAt}}}}`;
 
 function readTimeline(repository, prNumber) {
   const [owner, name] = repository.split('/');
@@ -1340,6 +1579,90 @@ function ciFastRemainingLog(
   return gh(['api', `repos/${repository}/actions/jobs/${job.id}/logs`]);
 }
 
+// Shadow only (canon/MERGE_QUEUE_STEWARD.md invariant 4): did this group's
+// failing signal also fail in a recent group that does not contain the PR?
+// The verdict is logged, never applied: holds and enrollment are unchanged
+// until the shadow record qualifies a non-attributable class. Membership is
+// every queue entry ahead of main in the peer group (its base chain included),
+// so a PR riding in a peer's base counts as contained. Bounded to 5 peers and
+// never throws.
+export const PEER_RECURRENCE_WINDOW_MS = 6 * 60 * 60 * 1000;
+export const PEER_RECURRENCE_MAX_PEERS = 5;
+
+export function peerContainsPr(compareCommits, peerPrNumber, prNumber) {
+  if (peerPrNumber === prNumber) return true;
+  if (!Array.isArray(compareCommits)) return null;
+  const suffix = new RegExp(`\\(#${prNumber}\\)$`);
+  return compareCommits.some(commit =>
+    suffix.test(
+      String(commit?.commit?.message ?? '')
+        .split('\n')[0]
+        .trim()
+    )
+  );
+}
+
+export function readPeerRecurrence(repository, prNumber, run, jobs) {
+  try {
+    const currentCiFastLog = ciFastRemainingLog(repository, jobs);
+    const eligibility = attributeAgainstPeerRuns({
+      currentJobs: jobs,
+      currentCiFastLog,
+      peers: [],
+    });
+    if (!eligibility.reason.startsWith('signal-not-seen-without-pr:'))
+      return eligibility;
+    const end = Date.parse(run.updated_at ?? run.created_at);
+    const mainSha = ghJson(['api', `repos/${repository}/commits/main`]).sha;
+    const listed = ghJson([
+      'api',
+      `repos/${repository}/actions/workflows/${CI_WORKFLOW_ID}/runs?event=merge_group&status=failure&per_page=30`,
+    ]).workflow_runs;
+    const candidates = (Array.isArray(listed) ? listed : [])
+      .filter(peer => peer?.id !== run.id && peer?.conclusion === 'failure')
+      .filter(peer => {
+        const at = Date.parse(peer.created_at);
+        return at <= end && end - at <= PEER_RECURRENCE_WINDOW_MS;
+      })
+      .slice(0, PEER_RECURRENCE_MAX_PEERS);
+    const peers = candidates.map(peer => {
+      const peerJobs = restPages(
+        `repos/${repository}/actions/runs/${peer.id}/jobs?filter=latest`
+      );
+      const compare = ghJson([
+        'api',
+        `repos/${repository}/compare/${mainSha}...${peer.head_sha}`,
+      ]);
+      return {
+        runId: peer.id,
+        conclusion: peer.conclusion,
+        containsPr: peerContainsPr(
+          compare?.commits,
+          parseMergeQueueBranch(peer.head_branch)?.prNumber,
+          prNumber
+        ),
+        ciFastLog: ciFastRemainingLog(repository, peerJobs),
+      };
+    });
+    return {
+      ...attributeAgainstPeerRuns({
+        currentJobs: jobs,
+        currentCiFastLog,
+        peers,
+      }),
+      peersExamined: peers.map(({ runId, containsPr }) => ({
+        runId,
+        containsPr,
+      })),
+    };
+  } catch (error) {
+    return {
+      recurring: false,
+      reason: `evidence-read-failed:${error instanceof Error ? error.message.slice(0, 120) : 'unknown'}`,
+    };
+  }
+}
+
 // Only a completed, failed ahead run can prove this group's own failure; any
 // read error keeps today's wait (no attribution).
 /** @returns {AheadGroup} */
@@ -1461,12 +1784,24 @@ async function main(argv) {
   const admissionText = failedSteps.includes(ADMISSION_STEP)
     ? admissionEvidence(repository, jobs)
     : '';
+  const fetchTimeoutText = failedSteps.includes(FETCH_STEP)
+    ? fetchTimeoutEvidence(run, jobs, job => {
+        const checkRunId = String(job.check_run_url ?? '').match(
+          /\/check-runs\/([1-9][0-9]*)$/
+        )?.[1];
+        if (!checkRunId) throw new Error('check-run identity unavailable');
+        return restPages(
+          `repos/${repository}/check-runs/${checkRunId}/annotations`
+        );
+      })
+    : '';
   const preview = classifyMergeGroupFailure({
     conclusion: run.conclusion,
     failedSteps,
     annotationText: evidence.annotationText,
     changedFiles: evidence.changedFiles,
     admissionText,
+    fetchTimeoutText,
   });
   const mainSha =
     preview === 'base-branch'
@@ -1489,6 +1824,7 @@ async function main(argv) {
       changedFiles: evidence.changedFiles,
       mainSha,
       admissionText,
+      fetchTimeoutText,
       aheadGroup: withAheadAttribution(
         repository,
         jobs,
@@ -1520,6 +1856,7 @@ async function main(argv) {
           'mutation($id:ID!){disablePullRequestAutoMerge(input:{pullRequestId:$id}){clientMutationId}}',
           { id }
         ),
+      recordDequeue: data => recordDequeueReason({ repository, ...data }),
     }
   );
   const serialized = JSON.stringify(result);
@@ -1537,6 +1874,26 @@ async function main(argv) {
     );
   }
   process.stdout.write(`${serialized}\n`);
+  if (preview === 'deterministic-source' && !result.skipped) {
+    const peerRecurrence = {
+      schema: 'jovie-merge-group-peer-recurrence/v1',
+      mode: 'shadow',
+      prNumber: front.prNumber,
+      workflowRunId: run.id,
+      ...readPeerRecurrence(repository, front.prNumber, run, jobs),
+    };
+    const line = JSON.stringify(peerRecurrence);
+    // Not a job output: failure_receipt stays the only trusted hold output.
+    if (process.env.GITHUB_STEP_SUMMARY)
+      appendFileSync(
+        process.env.GITHUB_STEP_SUMMARY,
+        `\n### Peer recurrence (shadow)\n\n\`${peerRecurrence.reason}\`\n\n\`\`\`json\n${line}\n\`\`\`\n`
+      );
+    if (peerRecurrence.recurring)
+      process.stdout.write(
+        `::notice title=peer recurrence (shadow)::#${front.prNumber} failing signals also failed without it in run(s) ${peerRecurrence.peerRunIds.join(', ')}\n`
+      );
+  }
 }
 
 if (

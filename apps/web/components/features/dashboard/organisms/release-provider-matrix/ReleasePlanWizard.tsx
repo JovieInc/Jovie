@@ -3,7 +3,6 @@
 // @coverage-via apps/web/tests/unit/release-tasks/release-plan-wizard.test.tsx
 
 import { Button } from '@jovie/ui';
-import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Dialog,
@@ -12,7 +11,6 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/organisms/Dialog';
-import { APP_ROUTES } from '@/constants/routes';
 import { PRO_PLAN_DISPLAY_NAME } from '@/lib/config/plan-prices';
 import type {
   DistributionModel,
@@ -161,7 +159,6 @@ export function ReleasePlanWizard({
   onClose,
   onSubmit,
 }: ReleasePlanWizardProps) {
-  const router = useRouter();
   const [stepIndex, setStepIndex] = useState(0);
   const [answers, setAnswers] = useState<WizardAnswers>(INITIAL);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -197,11 +194,6 @@ export function ReleasePlanWizard({
     if (!canAdvance) return;
     setStepIndex(idx => Math.min(STEPS.length - 1, idx + 1));
   }, [canAdvance]);
-
-  const handleUpgrade = useCallback(() => {
-    handleClose();
-    router.push(APP_ROUTES.BILLING);
-  }, [handleClose, router]);
 
   const handleSubmit = useCallback(async () => {
     if (submitInFlightRef.current) return;
@@ -272,24 +264,19 @@ export function ReleasePlanWizard({
   }
 
   if (!canGenerateReleasePlans) {
+    // No self-serve plan grants release plans (canGenerateReleasePlans is
+    // Max-only and Max is not sold), so there is no upgrade to offer here.
     return (
       <Dialog open={open} onClose={handleClose} size='md'>
         <DialogTitle>Release Plan</DialogTitle>
         <DialogDescription>
-          {`Release plans are an ${PRO_PLAN_DISPLAY_NAME} feature. Upgrade to generate a tailored task list for `}
-          <span className='font-medium'>{releaseTitle ?? 'this release'}</span>.
+          {`Generated release plans for `}
+          <span className='font-medium'>{releaseTitle ?? 'this release'}</span>
+          {` aren't included in ${PRO_PLAN_DISPLAY_NAME} yet.`}
         </DialogDescription>
         <DialogActions>
-          <Button
-            type='button'
-            size='sm'
-            variant='secondary'
-            onClick={handleClose}
-          >
-            Maybe Later
-          </Button>
-          <Button type='button' size='sm' onClick={handleUpgrade}>
-            Upgrade
+          <Button type='button' size='sm' onClick={handleClose}>
+            Got It
           </Button>
         </DialogActions>
       </Dialog>

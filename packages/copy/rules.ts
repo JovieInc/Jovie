@@ -432,6 +432,18 @@ export const COPY_RULES: readonly CopyRule[] = [
     message: 'Filler. Cut the word and reread.',
   },
 
+  {
+    id: 'pipeline-jargon',
+    category: 'clarity',
+    severity: 'block',
+    registers: ['jovie-persona', 'jovie-marketing'],
+    // 2026-10-31 golden-path walk: "97 Spotify followers (source: enrichment)"
+    // shipped in the claim chat. Artists never see our pipeline's names.
+    pattern: /\benrichment\b|\(source:\s*[a-z_-]+\)/i,
+    message:
+      'Internal pipeline word. Name the real source ("on Spotify") or cut it.',
+  },
+
   // ── Product truth (registered overclaims) ──────────────────────────────
   {
     id: 'premature-ownership',
@@ -465,3 +477,52 @@ export const COPY_BUDGETS: Readonly<
   'founder-tim': { maxSentenceWords: 32, maxExclamations: 1 },
   'customer-voice': { maxSentenceWords: 40, maxExclamations: 3 },
 };
+
+/**
+ * JOV-INV-046 dead-end copy. Rendered text must never tell a user a feature
+ * cannot work here, defer it, or send them elsewhere: capability-gate the
+ * control instead of explaining its absence. Scanned over UI string sources
+ * by dead-ends.ts (not part of COPY_RULES: it is a UI-source ratchet, not a
+ * generation-time rule).
+ */
+export interface DeadEndRule {
+  readonly id: string;
+  readonly pattern: RegExp;
+  readonly message: string;
+}
+
+export const DEAD_END_RULES: readonly DeadEndRule[] = [
+  {
+    id: 'dead-end-not-available',
+    pattern:
+      /\b(?:isn'?t|is not|aren'?t|are not|not|currently|temporarily)\s+(?:currently\s+|yet\s+)?(?:available|supported|enabled)\b|\bunavailable\b|\bnot supported\b/i,
+    message:
+      'Copy says a feature is not available or supported. Hide the control (capability-gate it) or wire it to a working path.',
+  },
+  {
+    id: 'dead-end-coming-soon',
+    pattern:
+      /\bcoming soon\b|\bstay tuned\b|\bcheck back (?:soon|later)\b|\bwill be (?:available|supported|added)\b|\bnot yet (?:live|launched)\b/i,
+    message: 'Copy defers a feature. Do not render controls that cannot work.',
+  },
+  {
+    id: 'dead-end-use-instead',
+    pattern:
+      /\buse (?:\w+ ){0,3}instead\b|\b(?:use|try) (?:macOS|the (?:web|desktop|mobile) app|your browser|another browser|a different browser|the web version)\b/i,
+    message:
+      'Copy sends the user elsewhere. Make the action work in this runtime or do not offer it.',
+  },
+  {
+    id: 'dead-end-only-on-platform',
+    pattern: /\bonly (?:available|works|supported) (?:on|in|with)\b/i,
+    message:
+      'Copy limits a control to another runtime. Render it only where it works.',
+  },
+];
+
+/**
+ * A string that offers a retry or reports a transient failure is an allowed
+ * error-with-retry state, not a dead end.
+ */
+export const DEAD_END_TRANSIENT =
+  /\b(?:try again|retry|refresh|reload|temporarily|in a moment|moment ago)\b/i;

@@ -7,10 +7,13 @@ vi.mock('@jovie/ui', async importOriginal => ({
     children,
 }));
 
+const sidebar = vi.hoisted(() => ({ isPreview: false }));
 vi.mock('@/components/shell/SidebarContext', () => ({
   useSidebar: () => ({
     toggleSidebar: vi.fn(),
     state: 'open' as const,
+    isPreview: sidebar.isPreview,
+    open: !sidebar.isPreview,
   }),
 }));
 
@@ -36,5 +39,14 @@ describe('SidebarCollapseButton', () => {
     expect(button.className).not.toMatch(/\bborder-(?:default|subtle|\[)/);
     expect(button.className).not.toContain('rounded-md');
     expect(button.className).not.toContain('hover:border-default');
+  });
+
+  it('offers Pin sidebar during a flyout peek and can opt out of peek triggers', () => {
+    sidebar.isPreview = true;
+    render(<SidebarCollapseButton previewTrigger={false} />);
+    const button = screen.getByRole('button', { name: 'Pin sidebar' });
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+    expect(button).toHaveAttribute('data-rail-preview-trigger', 'false');
+    sidebar.isPreview = false;
   });
 });

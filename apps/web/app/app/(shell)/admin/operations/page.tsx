@@ -17,6 +17,7 @@ export default async function OperationsPage() {
 
   return (
     <AdminPage
+      views='operations'
       title='Fleet'
       description='Agents, lanes, health and exceptions. Active remediation stays attached to the work.'
       testId='founder-operations-page'

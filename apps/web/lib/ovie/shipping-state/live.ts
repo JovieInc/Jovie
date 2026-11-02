@@ -6,6 +6,9 @@ import {
   type DeliveryLanes,
   type DeliveryMergedPullRequest,
   type DeliveryMergeRepo,
+  type DeployHealth,
+  type DeployHealthRepo,
+  type DeployLag,
   isExactSha,
   LANE_BRANCH_PREFIXES,
   LANE_BRANCH_RE,
@@ -951,6 +954,54 @@ export function parseLaneFlow(
   };
 }
 
+/** The lanes feed's `jovie-deploy-health/v1` block; anything malformed is treated as not published. */
+export function parseDeployHealth(value: unknown): DeployHealth | null {
+  if (!isRecord(value) || value.schema !== 'jovie-deploy-health/v1')
+    return null;
+  if (typeof value.healthy !== 'boolean' || !isRecord(value.repos)) return null;
+  const nullableInt = (raw: unknown) =>
+    Number.isSafeInteger(raw) && Number(raw) >= 0 ? Number(raw) : null;
+  const repos: DeployHealthRepo[] = [];
+  for (const [name, row] of Object.entries(value.repos).slice(0, 8)) {
+    const repo = /^[\w.-]{1,48}\/[\w.-]{1,48}$/.test(name) ? name : null;
+    if (!repo || !isRecord(row)) return null;
+    repos.push({
+      repo,
+      status:
+        row.status === 'ok' || row.status === 'failing'
+          ? row.status
+          : 'unknown',
+      failedStreak: nullableInt(row.failedStreak) ?? 0,
+      behindMain: nullableInt(row.behindMain),
+      oldestUnshippedAgeSeconds: nullableInt(row.oldestUnshippedAge),
+      lastSuccessAt: parseTimestamp(row.lastSuccessAt),
+    });
+  }
+  const lag: DeployLag[] = [];
+  if (isRecord(value.lag)) {
+    const minutes = (raw: unknown) =>
+      typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? raw : null;
+    for (const [name, row] of Object.entries(value.lag).slice(0, 8)) {
+      if (!/^[\w.-]{1,48}\/[\w.-]{1,48}$/.test(name) || !isRecord(row))
+        continue;
+      lag.push({
+        repo: name,
+        p50Min: minutes(row.p50Min),
+        p95Min: minutes(row.p95Min),
+        samples: nullableInt(row.n) ?? 0,
+        targetP50Min: minutes(row.targetP50Min),
+        targetP95Min: minutes(row.targetP95Min),
+      });
+    }
+  }
+  return {
+    observedAt: parseTimestamp(value.observedAt),
+    healthy: value.healthy,
+    repos,
+    lag,
+  };
+}
+
 /** Validate a `symphony-lanes-status/v1` document into the lanes block. */
 export function parseLanesStatus(
   payload: Record<string, unknown>
@@ -1003,6 +1054,7 @@ export function parseLanesStatus(
     heldByReason: countRecord(payload.held_by_reason),
     failedByReason: countRecord(payload.failed_by_reason),
     capacity: parseCapacityHorizon(payload.capacity),
+    deployHealth: parseDeployHealth(payload.deployHealth),
     stageSummary: isRecord(payload.slo)
       ? parseStageSummary(payload.slo.stages)
       : null,

@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { leads } from '@/lib/db/schema/leads';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { recordLeadFunnelEvent } from '@/lib/leads/funnel-events';
+import { resolveLeadClaimToken } from '@/lib/leads/lead-claim-token';
 import { evaluateOutboundHistoryRecord } from '@/lib/outbound/approval';
 import {
   outboundTargetFromLead,
@@ -48,7 +49,8 @@ export async function PATCH(
         contactEmail: leads.contactEmail,
         instagramHandle: leads.instagramHandle,
         creatorProfileId: leads.creatorProfileId,
-        claimToken: leads.claimToken,
+        claimTokenHash: leads.claimTokenHash,
+        claimTokenExpiresAt: leads.claimTokenExpiresAt,
       })
       .from(leads)
       .where(eq(leads.id, id))
@@ -65,7 +67,14 @@ export async function PATCH(
     // Preserve the existing exact-copy review requirement for this local action.
     const ledger = await readOutboundLedger([existingLead.id]);
     const permission = evaluateOutboundHistoryRecord({
-      target: outboundTargetFromLead(existingLead),
+      target: outboundTargetFromLead({
+        ...existingLead,
+        claimToken: await resolveLeadClaimToken({
+          id: existingLead.id,
+          claimTokenHash: existingLead.claimTokenHash,
+          claimTokenExpiresAt: existingLead.claimTokenExpiresAt,
+        }),
+      }),
       channel: 'dm',
       rows: ledger.get(existingLead.id) ?? [],
     });

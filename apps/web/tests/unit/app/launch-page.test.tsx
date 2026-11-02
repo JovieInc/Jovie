@@ -13,7 +13,7 @@ describe('LaunchPage audience surface', () => {
 
     expect(heading).toHaveClass('system-b-launch-hero-title', 'text-balance');
     expect(heading).toHaveClass('marketing-h1-max-two-lines');
-    expect(screen.getByText('7M')).toHaveClass('tabular-nums');
+    expect(screen.queryByText('7M')).not.toBeInTheDocument();
   });
 
   it('exposes the audience table overflow region to keyboard scrolling', () => {

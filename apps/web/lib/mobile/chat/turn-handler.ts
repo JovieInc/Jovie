@@ -391,7 +391,7 @@ export async function handleMobileChatTurn(
       await persistTerminalAssistantMessage({
         conversationId: reservation.conversationId,
         turnId: reservation.turn.id,
-        status: 'failed_model_error',
+        status: failure.terminalStatus,
         content: failure.userMessage,
         errorCode: failure.errorCode,
         errorMessage: failure.errorMessage,

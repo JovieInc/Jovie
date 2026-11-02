@@ -314,6 +314,20 @@ If removing an element makes the screen clearer and does not reduce comprehensio
 
 ---
 
+## No dead ends
+
+JOV-INV-046. Every rendered control works in the current runtime. A control that cannot work here is not rendered.
+
+- Decide with a capability check: desktop or web or iOS, browser support, entitlement. Render nothing when the check fails.
+- Do not explain the absence. Banned copy: "not available", "unavailable", "not supported", "coming soon", "check back", "use X instead", "only available on Y".
+- Do not ship a disabled control with no actionable reason (`title`, `disabledReason`, or `aria-describedby`), an empty or no-op handler, `href="#"`, or a link to a route that does not exist.
+- Allowed: a permission or entitlement prompt that leads to a working path, and a transient error that offers retry. Mark a deliberate exception with a `dead-end-ok: <reason>` comment on the same or previous line.
+- `pnpm design:no-dead-ends:check` fails new violations. Grandfathered findings live in `packages/copy/dead-ends.baseline.json` and only shrink (`pnpm design:no-dead-ends:update`). If a dead end can still reach a user, call `trackDeadEndShown(surface, reason)`.
+
+The agent checklist is `.claude/rules/ui.md`. The canon statement is JOV-INV-046 and `canon/PRODUCT.md`.
+
+---
+
 ## Color System
 
 > **Canonical source:** Pen node **ZiaWI** (`ziawi-color-sot-v1` in

@@ -6,6 +6,24 @@ import { BREAKPOINTS } from '@/hooks/useBreakpoint';
 const webRoot = path.resolve(__dirname, '../../..');
 
 describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
+  it('keeps the left flyout peek wired with hover intent and an uncoverable in-content toggle', () => {
+    // #22207 removed the left hover peek because the pointer landed on a
+    // control the flyout then covered. The flyout returns only with both
+    // guards: a hover-intent dwell, and the in-content toggle opting out of
+    // peek triggers. Dropping either reintroduces the bug.
+    const read = (file: string) =>
+      readFileSync(path.join(webRoot, file), 'utf8');
+    const provider = read('components/organisms/sidebar/context.tsx');
+    expect(provider).toMatch(/useRailPreview\(\{[\s\S]*?side: 'left'/);
+    expect(provider).toContain('enterIntentMs: SHELL_RAIL_PREVIEW_INTENT_MS');
+    expect(read('components/organisms/AuthShell.tsx')).toContain(
+      '<SidebarCollapseButton previewTrigger={false} />'
+    );
+    expect(read('components/organisms/sidebar/sidebar.tsx')).toContain(
+      'shadow-(--app-shell-drawer-shadow)'
+    );
+  });
+
   it('anchors sidebar footer on a full-height flex chain (JOV-3960)', () => {
     const sidebar = readFileSync(
       path.join(webRoot, 'components/organisms/sidebar/sidebar.tsx'),

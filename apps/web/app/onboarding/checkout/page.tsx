@@ -18,6 +18,7 @@ import {
 } from '@/lib/auth/plan-intent';
 import { isSelfServiceOffer } from '@/lib/billing/offer-truth';
 import { PRICING } from '@/lib/config/pricing';
+import { fetchOnboardingCatalogPreview } from '@/lib/onboarding/catalog-preview.server';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import {
   hasOnboardingUpgradeOfferState,
@@ -25,6 +26,7 @@ import {
 } from '@/lib/onboarding/upgrade-offer';
 import { loadClaimTimeProof } from '@/lib/proof/claim-time-proof.server';
 import { isRenderFixtureEnabled } from '@/lib/render-fixture-policy';
+import { hasProofPendingProfile } from '@/lib/waitlist/golden-path-admission.server';
 import { OnboardingCheckoutClient } from './OnboardingCheckoutClient';
 
 /**
@@ -139,12 +141,14 @@ export default async function OnboardingCheckoutPage({
     username: string;
     avatarUrl: string | null;
     spotifyFollowers: number | null;
+    spotifyId: string | null;
   } = {
     id: null,
     displayName: '',
     username: '',
     avatarUrl: null,
     spotifyFollowers: null,
+    spotifyId: null,
   };
 
   // JOV-8068: a truthful "your profile is live" upsell requires a claimed,
@@ -164,6 +168,7 @@ export default async function OnboardingCheckoutPage({
           ((profile as Record<string, unknown>).spotifyFollowers as
             | number
             | null) ?? null,
+        spotifyId: profile.spotifyId ?? null,
       };
       profileLive = Boolean(
         profile.isPublic && profile.isClaimed && profile.onboardingCompletedAt
@@ -172,6 +177,12 @@ export default async function OnboardingCheckoutPage({
   } catch {
     // Profile load failed — proceed with empty data
   }
+
+  // Paying never publishes a page; proof does. A free-admission page that is
+  // waiting for proof may still check out, and says so plainly.
+  const proofPending = Boolean(
+    authResult.dbUserId && (await hasProofPendingProfile(authResult.dbUserId))
+  );
 
   // Smart plan recommendation only for organic users with no expressed paid intent.
   // If the user has a paid-intent cookie (e.g., founding), preserve it — don't override
@@ -197,7 +208,7 @@ export default async function OnboardingCheckoutPage({
   // already active — never a premature offer over an empty preview.
   // Explicit paid intent (source=intent) is unaffected — it is
   // artist-initiated checkout, not an offer impression.
-  if (isDefaultUpsell && !profileLive) {
+  if (isDefaultUpsell && !profileLive && !proofPending) {
     redirect(getRedirectForState(authResult.state) ?? APP_ROUTES.START);
   }
 
@@ -232,9 +243,13 @@ export default async function OnboardingCheckoutPage({
   }
 
   // JOV-7794: the paywall carries the visitor's own computed proof.
-  const proofFindings = profileData.id
-    ? await loadClaimTimeProof(profileData.id)
-    : [];
+  // JOV-9758: and their real catalog, above the price.
+  const [proofFindings, catalog] = await Promise.all([
+    profileData.id ? loadClaimTimeProof(profileData.id) : Promise.resolve([]),
+    profileData.spotifyId
+      ? fetchOnboardingCatalogPreview(profileData.spotifyId)
+      : Promise.resolve(null),
+  ]);
 
   return (
     <OnboardingCheckoutClient
@@ -250,6 +265,8 @@ export default async function OnboardingCheckoutPage({
       spotifyFollowers={profileData.spotifyFollowers}
       isDefaultUpsell={isDefaultUpsell}
       proofFindings={proofFindings}
+      proofPending={proofPending}
+      catalog={catalog}
     />
   );
 }

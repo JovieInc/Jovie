@@ -2,13 +2,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 
 const {
-  getAppFlagValueMock,
   loadAppShellRouteContextMock,
   loadProfilesWorkspaceDataMock,
   redirectMock,
   requireAppShellDashboardUserIdMock,
 } = vi.hoisted(() => ({
-  getAppFlagValueMock: vi.fn(),
   loadAppShellRouteContextMock: vi.fn(),
   loadProfilesWorkspaceDataMock: vi.fn(),
   redirectMock: vi.fn(),
@@ -17,10 +15,6 @@ const {
 
 vi.mock('next/navigation', () => ({
   redirect: redirectMock,
-}));
-
-vi.mock('@/lib/flags/server', () => ({
-  getAppFlagValue: getAppFlagValueMock,
 }));
 
 vi.mock('@/app/app/(shell)/app-shell-route-context', () => ({
@@ -74,46 +68,23 @@ describe('Presence route separation', () => {
     expect(result.props.data.profileId).toBe('identity-1');
   });
 
-  it('redirects the legacy profiles route to Presence', async () => {
-    getAppFlagValueMock.mockResolvedValue(true);
+  it('redirects the legacy profiles route to Presence without a rollout provider', async () => {
     const { default: ProfilesPage } = await import(
       '../../../app/app/(shell)/profiles/page'
     );
 
     await ProfilesPage();
 
-    expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.PRESENCE);
+    expect(redirectMock).toHaveBeenCalledExactlyOnceWith(APP_ROUTES.PRESENCE);
   });
 
-  it('redirects the legacy dashboard presence route to Presence', async () => {
-    getAppFlagValueMock.mockResolvedValue(true);
+  it('redirects the legacy dashboard presence route to Presence without a rollout provider', async () => {
     const { default: LegacyPresencePage } = await import(
       '../../../app/app/(shell)/dashboard/presence/page'
     );
 
     await LegacyPresencePage();
 
-    expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.PRESENCE);
-  });
-
-  it('keeps both compatibility routes on the ungated settings fallback', async () => {
-    getAppFlagValueMock.mockResolvedValue(false);
-    const [{ default: ProfilesPage }, { default: LegacyPresencePage }] =
-      await Promise.all([
-        import('../../../app/app/(shell)/profiles/page'),
-        import('../../../app/app/(shell)/dashboard/presence/page'),
-      ]);
-
-    await ProfilesPage();
-    await LegacyPresencePage();
-
-    expect(redirectMock).toHaveBeenNthCalledWith(
-      1,
-      `${APP_ROUTES.SETTINGS_PROFILE}?tab=music`
-    );
-    expect(redirectMock).toHaveBeenNthCalledWith(
-      2,
-      `${APP_ROUTES.SETTINGS_PROFILE}?tab=music`
-    );
+    expect(redirectMock).toHaveBeenCalledExactlyOnceWith(APP_ROUTES.PRESENCE);
   });
 });

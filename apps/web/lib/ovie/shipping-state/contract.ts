@@ -33,6 +33,12 @@ export const LANE_BRANCH_PREFIXES = [
   'sonnet',
   'fable',
 ] as const;
+/** The agent lane a PR belongs to; one value per {@link LANE_BRANCH_PREFIXES}. */
+export type LaneAgent = (typeof LANE_BRANCH_PREFIXES)[number];
+const LANE_AGENTS: ReadonlySet<string> = new Set(LANE_BRANCH_PREFIXES);
+export function isLaneAgent(value: unknown): value is LaneAgent {
+  return typeof value === 'string' && LANE_AGENTS.has(value);
+}
 const LANE_PREFIX_ALTERNATION = LANE_BRANCH_PREFIXES.join('|');
 export const LANE_BRANCH_RE = new RegExp(`^(?:${LANE_PREFIX_ALTERNATION})/`);
 export const LANE_AGENT_RE = new RegExp(`^(${LANE_PREFIX_ALTERNATION})/`, 'i');
@@ -165,7 +171,7 @@ export type OperationalTaskPullRequest = {
   readonly url: string | null;
   readonly branch: string | null;
   /** Owning agent lane derived from the branch prefix. */
-  readonly agent: 'devin' | 'codex' | null;
+  readonly agent: LaneAgent | null;
   readonly isDraft: boolean;
   readonly checks: OperationalTaskChecks;
   readonly queuePosition: number | null;
@@ -427,6 +433,33 @@ export type DeliveryMergedPullRequest = {
   readonly mergedAt: string;
 };
 
+/** One repo's production deploy health from the lanes feed's `deployHealth` block (scripts/lanes/deploy_health.py). */
+export type DeployHealthRepo = {
+  readonly repo: string;
+  readonly status: 'ok' | 'failing' | 'unknown';
+  readonly failedStreak: number;
+  readonly behindMain: number | null;
+  readonly oldestUnshippedAgeSeconds: number | null;
+  readonly lastSuccessAt: string | null;
+};
+
+/** Merge-to-production lag over the trailing 7 days with its target (the tracked metric CI and quota work should reduce). */
+export type DeployLag = {
+  readonly repo: string;
+  readonly p50Min: number | null;
+  readonly p95Min: number | null;
+  readonly samples: number;
+  readonly targetP50Min: number | null;
+  readonly targetP95Min: number | null;
+};
+
+export type DeployHealth = {
+  readonly observedAt: string | null;
+  readonly healthy: boolean;
+  readonly repos: readonly DeployHealthRepo[];
+  readonly lag?: readonly DeployLag[];
+};
+
 export type DeliveryLanes = {
   readonly running: CountMeasurement;
   readonly slots: CountMeasurement;
@@ -446,6 +479,8 @@ export type DeliveryLanes = {
    */
   readonly stageSummary?: StageSummary | null;
   readonly flow?: DeliveryFlow | null;
+  /** Production deploy failure and lag per repo (Jovie, LogYourBody). Null when the feed does not publish it. */
+  readonly deployHealth?: DeployHealth | null;
   readonly publishedAt: string | null;
   /** The feed's own `at` is older than the lanes semantic window. */
   readonly stale: boolean;
@@ -614,6 +649,7 @@ export function emptyDeliverySummary(): DeliverySummary {
       failedByReason: {},
       capacity: null,
       stageSummary: null,
+      deployHealth: null,
       publishedAt: null,
       stale: false,
     },

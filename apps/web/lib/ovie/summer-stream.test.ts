@@ -1,5 +1,9 @@
 import { readUIMessageStream, type UIMessage, type UIMessageChunk } from 'ai';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const captureErrorMock = vi.hoisted(() => vi.fn(async () => undefined));
+vi.mock('@/lib/error-tracking', () => ({ captureError: captureErrorMock }));
+
 import { encodeToolEvents } from '@/lib/chat/tool-events';
 import { MemoryOperatingStore } from './mcp/store';
 import { summerFailureText } from './summer-failure';
@@ -51,6 +55,24 @@ async function readTurn(
 }
 
 describe('Summer UI message stream', () => {
+  beforeEach(() => captureErrorMock.mockClear());
+
+  it('reports a failed founder turn to error tracking with its hop (no silent P0)', async () => {
+    await readTurn([
+      { type: 'state', state: 'unknown', hop: 'summer_deployment_unverified' },
+    ]);
+    expect(captureErrorMock).toHaveBeenCalledWith(
+      'Summer founder turn failed',
+      expect.objectContaining({
+        message: 'summer_turn_failed:summer_deployment_unverified',
+      }),
+      expect.objectContaining({
+        feature: 'ovie-summer',
+        hop: 'summer_deployment_unverified',
+      })
+    );
+  });
+
   it.each(['unknown', 'unavailable', 'failure'] as const)(
     'makes a textless Summer %s outcome visible without changing persistence',
     async state => {
@@ -337,5 +359,49 @@ describe('Summer UI message stream', () => {
       expect.objectContaining({ text: 'Summer response.' }),
     ]);
     expect(encodeToolEvents(message.parts)).toHaveLength(1);
+  });
+});
+
+describe('Summer fast-path progress and acknowledgement mapping', () => {
+  async function raw(events: SummerTurnEvent[]) {
+    const response = await createSummerAssistantStreamResponse({
+      events: (async function* () {
+        yield* events;
+      })(),
+      requestId: 'progress-stream',
+      corsHeaders: {},
+    });
+    return response.text();
+  }
+  const ack = {
+    requestId: 'chat_1',
+    route: 'chat',
+    model: 'zai/glm-5.3-flash',
+    ttftMs: 700,
+    totalMs: 900,
+  };
+
+  it('sends progress as transient data parts and the ack as message metadata', async () => {
+    const text = await raw([
+      {
+        type: 'progress',
+        progress: { kind: 'tool', name: 'spend', phase: 'start', ms: null },
+      },
+      { type: 'text-delta', text: 'Fine.' },
+      { type: 'ack', ack },
+      { type: 'state', state: 'completed' },
+    ]);
+    expect(text).toContain('"type":"data-summer-progress"');
+    expect(text).toContain('"transient":true');
+    expect(text).toContain('"summerAck"');
+  });
+
+  it('never shows an ack or progress that the speaker did not send', async () => {
+    const text = await raw([
+      { type: 'text-delta', text: 'Fine.' },
+      { type: 'state', state: 'completed' },
+    ]);
+    expect(text).not.toContain('data-summer-progress');
+    expect(text).not.toContain('summerAck');
   });
 });

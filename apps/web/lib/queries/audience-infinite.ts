@@ -33,6 +33,42 @@ interface UseAudienceInfiniteQueryParams {
   initialData?: { rows: AudienceMember[]; total: number | null };
 }
 
+/**
+ * The exact query string the Audience client sends to
+ * GET /api/dashboard/audience/members. profileId is REQUIRED by the route
+ * (membersQuerySchema); keep this the single builder so the contract test in
+ * tests/unit/api/audience/members-request-contract.test.ts covers real requests.
+ */
+export function buildAudienceMembersParams({
+  profileId,
+  view,
+  sort,
+  direction,
+  pageSize,
+  cursor,
+  segments,
+}: {
+  profileId: string;
+  view: AudienceView;
+  sort: string;
+  direction: 'asc' | 'desc';
+  pageSize: number;
+  cursor?: string;
+  segments: readonly string[];
+}): URLSearchParams {
+  const params = new URLSearchParams({
+    pageSize: String(pageSize),
+    sort,
+    direction,
+    profileId,
+  });
+  // Cursor-based pagination for members (JOV-1263).
+  if (cursor) params.set('cursor', cursor);
+  params.set('view', view);
+  for (const segment of segments) params.append('segments', segment);
+  return params;
+}
+
 export function useAudienceInfiniteQuery({
   profileId,
   view,
@@ -59,23 +95,15 @@ export function useAudienceInfiniteQuery({
       ...queryKeys.audience.members(profileId, { ...filterParams, view }),
     ] as unknown[],
     queryFn: async ({ pageParam, signal }) => {
-      const params = new URLSearchParams({
-        pageSize: String(pageSize),
+      const params = buildAudienceMembersParams({
+        profileId,
+        view,
         sort,
         direction,
-        profileId,
+        pageSize,
+        cursor: pageParam === 'first' ? undefined : pageParam,
+        segments: filters.segments,
       });
-
-      // Cursor-based pagination for members (JOV-1263).
-      if (pageParam !== 'first') {
-        params.set('cursor', pageParam);
-      }
-
-      params.set('view', view);
-
-      for (const segment of filters.segments) {
-        params.append('segments', segment);
-      }
 
       const res = await fetch(
         `/api/dashboard/audience/members?${params.toString()}`,
