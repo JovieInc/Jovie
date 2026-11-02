@@ -16,6 +16,7 @@ import {
   downgradeHostRed,
   GENERATORS,
   HEAVY_GUARDS,
+  hostSlotted,
   invariantTestFiles,
   NARROWED,
   parseArgs,
@@ -298,4 +299,17 @@ test('a scripts/ .mjs-only change still runs the checkJs scripts typecheck', () 
     ['scripts']
   );
   assert.deepEqual(typecheckTargets([file('docs/a.mjs')], process.cwd()), []);
+});
+
+test('heavy checks run through the host typecheck slot and keep their quoting', () => {
+  const cmd =
+    "cd apps/web && NODE_OPTIONS=--max-old-space-size=8192 pnpm exec tsc --noEmit -p 'tsconfig x.json'";
+  const wrapped = hostSlotted(cmd);
+  assert.match(wrapped, /^node scripts\/typecheck-slot\.mjs -- bash -c '/);
+  const r = spawnSync(
+    'bash',
+    ['-c', `printf '%s' ${wrapped.slice(wrapped.indexOf("'"))}`],
+    { encoding: 'utf8' }
+  );
+  assert.equal(r.stdout, cmd);
 });
