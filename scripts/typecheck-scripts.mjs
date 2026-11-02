@@ -131,6 +131,22 @@ export function unknownJsonPropertyRepair(diagnosticLines) {
   return null;
 }
 
+/** @param {readonly string[]} diagnosticLines */
+function tupleInferenceRepair(diagnosticLines) {
+  const { counts } = parseTscOutput(diagnosticLines.join('\n'));
+  for (const byCode of counts.values()) {
+    if (byCode.has('TS2769') && byCode.has('TS2698')) {
+      return (
+        'TS2769 and TS2698 in the same file: inspect heterogeneous table rows. ' +
+        'Array inference can mix object and number columns when destructuring. ' +
+        'Declare a JSDoc tuple on the table (for example Array<[typeof event, number]>) ' +
+        'or use named object rows. Do not grow scripts/typecheck-baseline.json to absorb these.'
+      );
+    }
+  }
+  return null;
+}
+
 /**
  * Compare current error counts against a baseline.
  * @param {ErrorCounts} current
@@ -409,8 +425,10 @@ export function evaluateTypecheckBaseline({
     for (const { file, code } of newErrors) {
       diagnosticLines.push(...(lines.get(`${file}::${code}`) ?? []));
     }
-    const repair = unknownJsonPropertyRepair(diagnosticLines);
-    if (repair) console.error(repair);
+    for (const diagnose of [unknownJsonPropertyRepair, tupleInferenceRepair]) {
+      const repair = diagnose(diagnosticLines);
+      if (repair) console.error(repair);
+    }
   }
   exit(1);
 }

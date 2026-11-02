@@ -191,6 +191,13 @@ When evidence is incomplete, keep remediation running until the relevant machine
    A PR the queue ejected for failed checks must not be re-enqueued at the same
    head: push a repair first. Re-enqueuing a rejected head poisons and rebuilds
    every merge group behind it (JOV-6620).
+   Never pass `jump: true` to `enqueuePullRequest`, and never dequeue and
+   re-enqueue to change a PR's position. A jump restarts every merge group
+   already building, so its CI starts over. On 2026-10-31, agents jumped 8
+   `compounding` PRs in 24 minutes and no group finished in that window. Only
+   `merge-queue-green-enroll.yml` jumps, under its `MAX_JUMPED` and
+   `JUMP_BATCH_S` limits. If a fix has to land first, ask the queue owner;
+   do not jump it yourself.
    Do not wait for the retired Auto-Enroll controller. GitHub owns required
    checks, native queue groups, and final merge; do not bypass them.
    Do not add, read, or retain the retired `merge-queue` label; authoritative

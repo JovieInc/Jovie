@@ -126,7 +126,10 @@ async function readSendPath() {
       .select({ total: count() })
       .from(leads)
       .where(
-        and(eq(leads.outreachStatus, 'pending'), isNotNull(leads.claimToken))
+        and(
+          eq(leads.outreachStatus, 'pending'),
+          isNotNull(leads.claimTokenHash)
+        )
       ),
   ]);
   return {

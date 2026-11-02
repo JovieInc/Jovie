@@ -65,6 +65,74 @@
   padding-bottom: var(--space-5);
 }
 
+/* Draft profile panel header (Pen R6As7U · SDt0M). */
+:where(.system-b-onboarding-draft-header) {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-4);
+}
+
+:where(.system-b-onboarding-draft-eyebrow) {
+  color: var(--color-text-secondary-token);
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+:where(.system-b-onboarding-draft-title) {
+  color: var(--color-text-primary-token);
+  font-size: var(--text-3xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.016em;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+
+:where(.system-b-onboarding-draft-lead) {
+  color: var(--color-text-secondary-token);
+  font-size: var(--text-app);
+  line-height: 1.4;
+}
+
+/*
+ * /start claim chat transcript (Pen R6As7U · T68xUV). The onboarding thread
+ * reads at 16px body with dark surface-2 user bubbles; the app chat keeps its
+ * own ladder. Tokens are re-pointed here so ChatMessage stays one component.
+ */
+:where(.system-b-onboarding-chat) {
+  --system-b-chat-body-size: var(--text-base);
+  --system-b-chat-body-line-height: 1.5;
+  --system-b-chat-message-max-width: 75%;
+  --system-b-chat-user-bubble-bg: var(--color-bg-surface-2);
+  --system-b-chat-user-bubble-text: var(--color-text-primary-token);
+  --system-b-chat-user-bubble-border: transparent;
+  --system-b-chat-user-bubble-shadow: none;
+}
+
+/* Specificity (not :where) so this beats the shared pill/rectangle shapes. */
+.system-b-onboarding-chat .system-b-chat-user-bubble {
+  border-radius: calc(var(--radius-xl) + var(--space-0-5));
+  padding: var(--space-4) var(--space-5);
+}
+
+.system-b-onboarding-chat .system-b-chat-user-text {
+  line-height: 1.45;
+}
+
+:where(.system-b-onboarding-speaker-row) {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  color: var(--color-text-primary-token);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.4;
+}
+
 :where(.system-b-onboarding-empty-state) {
   border-bottom: 1px solid
     color-mix(in oklab, var(--system-b-app-frame-seam) 58%, transparent);
@@ -1924,6 +1992,14 @@
   font-size: var(--text-3xs);
 }
 
+/* Shell search trigger shortcut hint: the glyph renders as generated content
+   so axe's visible-text pass (label-content-name-mismatch, WCAG 2.5.3) only
+   measures the control label. aria-hidden does not remove a text node from
+   that pass; CSS content is not a DOM text node, so the hint is excluded. */
+:where(.system-b-shell-search-trigger-kbd)::before {
+  content: attr(data-shortcut-glyph);
+}
+
 :where(.system-b-pill-search-chip) {
   height: calc(var(--space-5) + var(--space-0-5));
   max-width: 13.75rem;
@@ -3237,6 +3313,33 @@
   background: var(--system-b-app-content-surface);
   color: var(--color-text-primary-token);
   box-shadow: none;
+}
+
+:where(.system-b-chat-composer-input-grid) {
+  /* Match the textarea's measured height/min-h-6 plus field pt-0.5 before
+     either child streams. Auto still admits chips and multiline drafts. */
+  --system-b-chat-composer-textarea-min-height: calc(var(--spacing) * 6);
+  grid-template-rows:
+    minmax(
+      calc(
+        max(
+          var(--system-b-chat-composer-measured-input-height),
+          var(--system-b-chat-composer-textarea-min-height)
+        ) +
+        var(--spacing) *
+        0.5
+      ),
+      auto
+    )
+    minmax(calc(var(--spacing) * 9), auto);
+}
+
+:where(
+  .system-b-chat-composer-surface[data-hero="true"]
+    .system-b-chat-composer-input-grid
+) {
+  /* Filled hero fields use min-h-7; the empty hero pill is a separate flex row. */
+  --system-b-chat-composer-textarea-min-height: calc(var(--spacing) * 7);
 }
 
 .system-b-chat-composer-input {

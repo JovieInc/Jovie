@@ -414,6 +414,24 @@ describe('shared linear cooldown', () => {
     }
   });
 
+  it('LINEAR_COOLDOWN_FALLBACK_DIR overrides the fallback location', () => {
+    const override = join(root, 'fallback-override');
+    const previousFallback = process.env.LINEAR_COOLDOWN_FALLBACK_DIR;
+    process.env.LINEAR_COOLDOWN_FALLBACK_DIR = override;
+    try {
+      assert.equal(fallbackCooldownRoot(), override);
+    } finally {
+      if (previousFallback === undefined)
+        delete process.env.LINEAR_COOLDOWN_FALLBACK_DIR;
+      else process.env.LINEAR_COOLDOWN_FALLBACK_DIR = previousFallback;
+    }
+    const uid = process.getuid ? process.getuid() : 'shared';
+    assert.equal(
+      fallbackCooldownRoot(),
+      join(tmpdir(), `jovie-linear-cooldown-${uid}`)
+    );
+  });
+
   it('an unwritable state dir still backs siblings off and reports (JOV-7577)', async () => {
     const key = 'fallback-secret';
     const blocker = join(root, 'unwritable');

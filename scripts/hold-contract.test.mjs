@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import {
+  chmodSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { test } from 'node:test';
 import {
   CONTRACT_LABELS,
@@ -22,6 +31,151 @@ const receipt = fields =>
 const comment = (fields, createdAt = '2026-10-08T05:48:00Z') => ({
   body: typeof fields === 'string' ? fields : receipt(fields),
   createdAt,
+});
+
+// Execute the actual CLI and retry adapter across the gh process boundary.
+// The fixture answers every request locally, including the reset-budget read.
+function runCli(scenario, { dryRun = false } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'hold-contract-cli-'));
+  const callsPath = join(dir, 'calls.jsonl');
+  const executable = join(dir, 'gh');
+  writeFileSync(
+    executable,
+    `#!${process.execPath}
+import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
+const args = process.argv.slice(2);
+appendFileSync(process.env.HOLD_TEST_CALLS, JSON.stringify(args) + '\\n');
+const stage = args[0] === 'pr' ? 'list'
+  : args[1] === 'rate_limit' ? 'reset'
+  : args[1] === 'graphql' ? 'read'
+  : args.includes('DELETE') ? 'unlabel' : 'comment';
+const scenario = process.env.HOLD_TEST_SCENARIO;
+if (stage === 'reset') { console.log('0 9999999999'); process.exit(0); }
+if (scenario === stage + '-quota') {
+  console.error('GraphQL: API rate limit already exceeded for installation ID 112037986.');
+  process.exit(1);
+}
+if (scenario === stage + '-transient' && !existsSync(process.env.HOLD_TEST_CALLS + '.transient')) {
+  writeFileSync(process.env.HOLD_TEST_CALLS + '.transient', 'response lost');
+  console.error('HTTP 503: response lost after the write may have completed');
+  process.exit(1);
+}
+if (scenario === stage + '-forbidden') {
+  console.error('HTTP 403: Resource not accessible by integration');
+  process.exit(1);
+}
+if (stage === 'list') {
+  console.log(JSON.stringify(scenario === 'empty' ? [] : [
+    { number: 1, labels: [{ name: 'hold' }] },
+    { number: 2, labels: [{ name: 'unrelated' }] }
+  ]));
+} else if (stage === 'read') {
+  console.log(JSON.stringify({ data: { repository: { pullRequest: {
+    state: scenario === 'closed' ? 'CLOSED' : 'OPEN',
+    headRefOid: 'a'.repeat(40), labels: { nodes: [{ name: 'hold' }] },
+    timelineItems: { nodes: [{ createdAt: '2026-10-08T05:47:46Z', label: { name: 'hold' } }] },
+    comments: { nodes: [] }
+  } } } }));
+} else { console.log('{}'); }
+`
+  );
+  chmodSync(executable, 0o755);
+  try {
+    const result = spawnSync(
+      process.execPath,
+      [resolve('scripts/hold-contract.mjs')],
+      {
+        encoding: 'utf8',
+        timeout: 5000,
+        env: {
+          ...process.env,
+          PATH: `${dir}:${process.env.PATH}`,
+          GITHUB_REPOSITORY: 'JovieInc/Jovie',
+          DRY_RUN: String(dryRun),
+          HOLD_TEST_SCENARIO: scenario,
+          HOLD_TEST_CALLS: callsPath,
+        },
+      }
+    );
+    assert.equal(result.error, undefined);
+    const calls = readFileSync(callsPath, 'utf8')
+      .trim()
+      .split('\n')
+      .map(JSON.parse);
+    return {
+      status: result.status,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      calls,
+    };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+const mutations = calls =>
+  calls.filter(
+    args =>
+      args[0] === 'api' && args[1] !== 'graphql' && args[1] !== 'rate_limit'
+  );
+
+test('CLI defers a quota-exhausted list without judging or releasing holds', () => {
+  const result = runCli('list-quota');
+  assert.equal(result.status, 75);
+  assert.match(result.stderr, /github-quota-deferred/);
+  assert.match(result.stderr, /Hold contract sweep deferred/);
+  assert.deepEqual(mutations(result.calls), []);
+  assert.equal(result.calls.filter(args => args[0] === 'pr').length, 1);
+  assert.equal(result.calls.filter(args => args[1] === 'rate_limit').length, 1);
+});
+
+test('CLI defers unreadable PR evidence without posting a release comment', () => {
+  const result = runCli('read-quota');
+  assert.equal(result.status, 75);
+  assert.match(result.stderr, /github-quota-deferred/);
+  assert.deepEqual(mutations(result.calls), []);
+});
+
+test('CLI preserves authorization failures as real failures without retrying', () => {
+  const result = runCli('list-forbidden');
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Resource not accessible/);
+  assert.doesNotMatch(result.stderr, /github-quota-deferred/);
+  assert.equal(result.calls.length, 1);
+});
+
+test('CLI awaits the release comment before removing the held label', () => {
+  const result = runCli('success');
+  assert.equal(result.status, 0);
+  const writes = mutations(result.calls);
+  assert.equal(writes.length, 2);
+  assert.match(writes[0][1], /issues\/1\/comments$/);
+  assert.ok(writes[1].includes('DELETE'));
+  assert.ok(writes[1].includes('repos/JovieInc/Jovie/issues/1/labels/hold'));
+});
+
+test('CLI never unlabels when the release comment is quota-deferred', () => {
+  const result = runCli('comment-quota');
+  assert.equal(result.status, 75);
+  const writes = mutations(result.calls);
+  assert.equal(writes.length, 1);
+  assert.match(writes[0][1], /comments$/);
+  assert.ok(!result.calls.some(args => args.includes('DELETE')));
+});
+
+test('CLI reports an incomplete label release as deferred after the comment', () => {
+  const result = runCli('unlabel-quota');
+  assert.equal(result.status, 75);
+  assert.equal(mutations(result.calls).length, 2);
+  assert.match(result.stderr, /github-quota-deferred/);
+});
+
+test('CLI dry runs read evidence but never write, and empty or closed sets succeed', () => {
+  const dry = runCli('success', { dryRun: true });
+  assert.equal(dry.status, 0);
+  assert.deepEqual(mutations(dry.calls), []);
+  assert.equal(runCli('empty').status, 0);
+  assert.equal(runCli('closed').status, 0);
 });
 
 test('parses only receipts that name an owner and a machine-checkable release', () => {
@@ -338,7 +492,7 @@ test('machine stop labels follow their own labeled time', async () => {
     console.log = log;
   }
   assert.deepEqual(writes[1], ['unlabel', 9, 'gated']);
-  assert.match(writes[0][2], /removed `gated`/);
+  assert.match(writes[0][2], /releasing `gated`/);
   assert.equal(writes.length, 2);
 });
 
@@ -376,4 +530,104 @@ test('an exact-head queue-deferral receipt keeps queue-deferred until the head m
     'head-changed'
   );
   assert.equal(parseHoldReceipt(body.replace('"pr":7', '"pr":0')), null);
+});
+
+test('CLI never replays an ambiguous comment or delete response', () => {
+  for (const stage of ['comment', 'unlabel']) {
+    const result = runCli(`${stage}-transient`);
+    assert.equal(result.status, 75);
+    assert.match(result.stderr, /github-quota-deferred/);
+    const writes = mutations(result.calls);
+    assert.equal(writes.length, stage === 'comment' ? 1 : 2);
+    assert.ok(!result.calls.some(args => args[1] === 'rate_limit'));
+  }
+});
+
+for (const failure of ['comment-response-lost', 'unlabel-quota']) {
+  test(`the next sweep reconciles a persisted comment after ${failure}`, async () => {
+    const pr = {
+      state: 'OPEN',
+      headRefOid: HEAD,
+      labels: { nodes: [{ name: 'hold' }] },
+      timelineItems: {
+        nodes: [{ createdAt: LABELED, label: { name: 'hold' } }],
+      },
+      comments: { nodes: [] },
+    };
+    let comments = 0;
+    let deletes = 0;
+    let first = true;
+    const io = {
+      listHeld: async () => [1],
+      read: async () => pr,
+      comment: async (_number, body) => {
+        comments += 1;
+        pr.comments.nodes.push({
+          body,
+          createdAt: new Date(T0 + 30 * HOUR).toISOString(),
+        });
+        if (first && failure === 'comment-response-lost')
+          throw new Error('response lost');
+      },
+      unlabel: async () => {
+        deletes += 1;
+        if (first)
+          throw Object.assign(new Error('quota deferred'), { deferred: true });
+      },
+    };
+    await assert.rejects(
+      sweepHolds({ now: T0 + 30 * HOUR, dryRun: false, io })
+    );
+    first = false;
+    const log = console.log;
+    console.log = () => {};
+    try {
+      await sweepHolds({ now: T0 + 31 * HOUR, dryRun: false, io });
+    } finally {
+      console.log = log;
+    }
+    assert.equal(comments, 1);
+    assert.equal(deletes, failure === 'comment-response-lost' ? 1 : 2);
+  });
+}
+
+test('a release comment from an earlier application does not dedupe a new hold', async () => {
+  const body = releaseComment({ reason: 'ownerless', label: 'hold' });
+  const pr = {
+    state: 'OPEN',
+    headRefOid: HEAD,
+    labels: { nodes: [{ name: 'hold' }] },
+    timelineItems: {
+      nodes: [
+        {
+          createdAt: new Date(T0 + 31 * HOUR).toISOString(),
+          label: { name: 'hold' },
+        },
+      ],
+    },
+    comments: {
+      nodes: [{ body, createdAt: new Date(T0 + 30 * HOUR).toISOString() }],
+    },
+  };
+  const writes = [];
+  const log = console.log;
+  console.log = () => {};
+  try {
+    await sweepHolds({
+      now: T0 + 60 * HOUR,
+      dryRun: false,
+      io: {
+        listHeld: () => [1],
+        read: () => pr,
+        comment: (_number, text) => writes.push(['comment', text]),
+        unlabel: () => writes.push(['unlabel']),
+      },
+    });
+  } finally {
+    console.log = log;
+  }
+  assert.deepEqual(
+    writes.map(row => row[0]),
+    ['comment', 'unlabel']
+  );
 });

@@ -38,16 +38,29 @@
  * styles unchanged focus-to-blur and red the exact marketing-routes
  * screenshot check on home/pay/product — the frame ring is real but
  * invisible to a check that samples the focused control itself, so the
- * input-owned ring is the canonical form.
+ * input-owned ring is the canonical form for standalone claim fields.
+ *
+ * Composite-field resolution (founder-directed 2026-10-28, #23562): claim
+ * fields rebuilt on CompositeField (e.g. /product) paint no input ring by
+ * design — the pill frame owns a radius-following ring via
+ * `:has(:focus-visible)`. This check mirrors the production
+ * route-quality.ts contract exactly: a visible focus change on the control
+ * itself OR on its closest [data-component="composite-field"] ancestor
+ * passes; a change on neither fails.
  */
 
 import type { ElementHandle, Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
-import { hasVisibleFocusStyleChange } from '../visual-qa/route-quality';
+import {
+  hasVisibleCompositeFocusChange,
+  hasVisibleFocusStyleChange,
+} from '../visual-qa/route-quality';
 
 async function captureFocusStyle(handle: ElementHandle) {
   return handle.evaluate(element => {
     const style = getComputedStyle(element);
+    const container = element.closest('[data-component="composite-field"]');
+    const compositeStyle = container ? getComputedStyle(container) : null;
     return {
       backgroundColor: style.backgroundColor,
       borderColor: style.borderColor,
@@ -55,6 +68,16 @@ async function captureFocusStyle(handle: ElementHandle) {
       outlineColor: style.outlineColor,
       outlineStyle: style.outlineStyle,
       outlineWidth: style.outlineWidth,
+      composite: compositeStyle
+        ? {
+            backgroundColor: compositeStyle.backgroundColor,
+            borderColor: compositeStyle.borderColor,
+            boxShadow: compositeStyle.boxShadow,
+            outlineColor: compositeStyle.outlineColor,
+            outlineStyle: compositeStyle.outlineStyle,
+            outlineWidth: compositeStyle.outlineWidth,
+          }
+        : null,
     };
   });
 }
@@ -95,7 +118,8 @@ for (const route of ROUTES) {
     const blurred = await captureFocusStyle(input);
 
     expect(
-      hasVisibleFocusStyleChange(focused, blurred),
+      hasVisibleFocusStyleChange(focused, blurred) ||
+        hasVisibleCompositeFocusChange(focused, blurred),
       `${route} claim-handle field focus indicator ${JSON.stringify({ focused, blurred })}`
     ).toBe(true);
   });
