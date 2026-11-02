@@ -393,11 +393,12 @@ describe('new-account admission through Better Auth', () => {
       'ALTER TABLE waitlist_entries RENAME TO unavailable_waitlist_entries'
     );
     try {
-      const response = await fixture.auth.api.signInEmailOTP({
-        body: { email: 'invited@example.com', otp },
-        asResponse: true,
-      });
-      expect(response.ok).toBe(false);
+      await expect(
+        fixture.auth.api.signInEmailOTP({
+          body: { email: 'invited@example.com', otp },
+          asResponse: true,
+        })
+      ).rejects.toThrow();
       expect(await counts()).toEqual({ users: 0, sessions: 0, accounts: 0 });
     } finally {
       await client.exec(
