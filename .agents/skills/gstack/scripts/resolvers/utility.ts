@@ -405,7 +405,7 @@ A check is green only when it proves the RIGHT thing happened. None of these is 
 1. **Oracle first.** Name the expected outcome before checking, then assert it: this artist's name and real releases on the profile, the word the probe asked for, the deployed SHA in build-info.
 2. **Failure surfaces fail.** Error copy, quota or limit walls, "temporarily unavailable" or paused, empty states, stuck spinners, placeholder or template text, and a 200 whose body is an error. Jovie catalog: \\\`scripts/lib/outcome-verifier.mjs\\\` (\\\`assertOutcome\\\`, \\\`detectFailureSurface\\\`).
 3. **Red before green.** Before trusting a new or changed check, show it fails on known-bad input (\\\`acceptedNegativeControls(check)\\\` returns \\\`[]\\\`, or a seeded-bug run goes red).
-4. **Strict fold.** Pass needs at least one check and every check passed. Skipped, blocked, unknown or nothing-ran is BLOCKED, never green. Never mark something healthy without a passing re-run.
+4. **Strict fold.** Pass needs at least one check and every check passed. Skipped, blocked, unknown or nothing-ran is BLOCKED, never green. After a failure or a remediation, never mark something healthy without a passing re-run; a clean first pass that met its oracle needs none.
 
 Report expected vs observed and the negative control you ran.`;
 }
