@@ -20,7 +20,7 @@ import {
 
 const repoRoot = path.resolve(__dirname, '../../../../..');
 
-const INBOX_SOURCE = 'apps/web/app/app/(shell)/page.tsx';
+const INBOX_SOURCE = 'apps/web/app/app/(shell)/inbox/page.tsx';
 const CALENDAR_SOURCE = 'apps/web/app/app/(shell)/calendar/page.tsx';
 
 function readProductionTypeScriptFiles(directory: string): CanvasSourceInput[] {
@@ -167,7 +167,7 @@ describe('app screen canvas-ownership manifest', () => {
           nestedSurfaceRoles: [],
           nestedCanvasAllowances: [
             {
-              source: 'apps/web/app/app/(shell)/page.tsx',
+              source: 'apps/web/app/app/(shell)/inbox/page.tsx',
               component: 'PageShell',
               enclosingFunction: 'InboxPage',
             },

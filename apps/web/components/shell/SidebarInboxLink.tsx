@@ -26,7 +26,7 @@ export function SidebarInboxLink({
   return (
     <Tooltip label={accessibleLabel} side='bottom'>
       <Link
-        href={APP_ROUTES.DASHBOARD}
+        href={APP_ROUTES.INBOX}
         prefetch={false}
         aria-label={accessibleLabel}
         data-inbox-attention={

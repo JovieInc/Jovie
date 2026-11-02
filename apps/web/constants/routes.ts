@@ -58,6 +58,8 @@ export const APP_ROUTES = {
   LEGACY_TRACKS: '/app/tracks',
   TASKS: '/app/tasks',
   CHAT: '/app/chat',
+  /** Opportunity inbox (Needs you / Done for you). Home (`/app`) is the chat composer. */
+  INBOX: '/app/inbox',
   CHAT_PROFILE_PANEL: '/app/chat?panel=profile',
   INSIGHTS: '/app/insights',
   /** YouTube packaging optimizer — revival queue + experiment dashboard (GH-10921) */

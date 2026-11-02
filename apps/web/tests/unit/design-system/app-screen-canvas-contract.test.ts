@@ -10,7 +10,7 @@ import {
   validateAppScreenSystem,
 } from '@/data/appScreens';
 
-const INBOX_SOURCE = 'apps/web/app/app/(shell)/page.tsx';
+const INBOX_SOURCE = 'apps/web/app/app/(shell)/inbox/page.tsx';
 
 describe('app screen canvas contract', () => {
   it('pins one shell-owned default and the closed nested-role vocabulary', () => {

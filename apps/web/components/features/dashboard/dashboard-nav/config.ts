@@ -36,7 +36,7 @@ import type { NavItem } from './types';
 /** Named Inbox home. `/app` renders the opportunity card stack. */
 export const inboxNavItem: NavItem = {
   name: 'Inbox',
-  href: APP_ROUTES.DASHBOARD,
+  href: APP_ROUTES.INBOX,
   id: 'inbox',
   icon: Inbox,
   iconName: 'Inbox',

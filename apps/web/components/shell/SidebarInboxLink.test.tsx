@@ -36,7 +36,7 @@ describe('central Inbox bell', () => {
       'size-(--app-shell-sidebar-icon-size)'
     );
     expect(link).toHaveClass('size-7', 'items-center', 'justify-center');
-    expect(link).toHaveAttribute('href', '/app');
+    expect(link).toHaveAttribute('href', '/app/inbox');
     expect(link).toHaveAttribute('data-prefetch', 'false');
     expect(link.querySelector('span')).toHaveClass(
       'absolute',
@@ -99,7 +99,7 @@ describe('central Inbox bell', () => {
   ])('keeps the destination available for %s', (availability, name) => {
     render(<SidebarInboxLink availability={availability} />);
     const link = screen.getByRole('link', { name });
-    expect(link).toHaveAttribute('href', '/app');
+    expect(link).toHaveAttribute('href', '/app/inbox');
     expect(link.querySelector('span')).toBeNull();
   });
 });

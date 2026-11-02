@@ -147,13 +147,13 @@ describe('dashboard metadata generation', () => {
     expect(dataSource).toContain('chatConversations');
   });
 
-  it('home page renders the opportunity inbox route (JOV-3386)', async () => {
+  it('inbox page renders the opportunity inbox route (JOV-3386); home does not', async () => {
     const { OpportunityInboxRoute } = await import(
       '@/app/app/(shell)/OpportunityInboxRoute'
     );
-    const homePage = await import('@/app/app/(shell)/page');
+    const inboxPage = await import('@/app/app/(shell)/inbox/page');
 
-    const result = await homePage.default();
+    const result = await inboxPage.default();
     const children = Children.toArray(result.props.children);
 
     expect(children.some(child => child.type === OpportunityInboxRoute)).toBe(
