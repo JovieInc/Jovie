@@ -36,6 +36,10 @@ TICK_HARD_CAP_S = 3 * 3600
 ZERO_WORKER_S = 5 * 60
 ATTEMPT_COOLDOWN_S = 2 * 60
 MAX_RECOVERY_ATTEMPTS = 3
+# An exhausted incident re-opens as a new bounded generation (and a new alert) after this long.
+# Without it one exhausted incident wedged the dead-man for a week (2026-10-26 -> 11-02: incident
+# 109 on provider-idle:hyperagent; every pass exited 1 and the factory's later faults went unseen).
+EXHAUSTED_REOPEN_S = 6 * 3600
 VERIFY_TIMEOUT_S = 90
 VERIFY_POLL_S = 2
 ALERT_RETRY_S = 15 * 60
@@ -353,6 +357,12 @@ def run_once(state: Path, *, clock=time.time, monotonic=time.monotonic, sleep=ti
         if path.exists() and previous.get("schema") != SCHEMA:
             return {"schema": SCHEMA, "status": "state-unobservable"}
         now = clock()
+        if previous.get("status") == "exhausted":
+            epochs = [float(a.get("requestedEpoch") or 0) for a in previous.get("attempts") or []]
+            last = max(epochs or [float(previous.get("firstObservedEpoch") or 0)])
+            if now - last >= EXHAUSTED_REOPEN_S:
+                previous = {**previous, "status": "superseded", "supersededAt": epoch_iso(now)}
+                _persist(state, previous, "incident-superseded")
         before = observe(state, now)
         health = assess(before)
         if health["healthy"]:

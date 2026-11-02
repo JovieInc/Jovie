@@ -13,4 +13,10 @@ export type Env = {
   ALERT_WEBHOOK_URL?: string;
   /** Comma-separated kinds that also receive alarm events (default "claude,codex"). */
   ALERT_KINDS?: string;
+  /** Cloudflare Workers AI binding (no secret): the hub model executor. */
+  AI?: Ai;
+  /** Kinds the hub executes for when no live reader handles their mail. */
+  EXECUTOR_KINDS?: string;
+  /** How long a real reader gets before the executor takes a message (ms). */
+  EXECUTOR_GRACE_MS?: string;
 };
