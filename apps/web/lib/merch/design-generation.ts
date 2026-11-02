@@ -428,6 +428,24 @@ function toContentReviewReceipt(
   };
 }
 
+/**
+ * Tells the model the truth about the batch. A zero-design batch used to say
+ * "Pick one", so Jovie asked the artist to choose from designs that never
+ * rendered (chat-merch-never-lands 2026-10-29).
+ */
+export const MERCH_NO_DESIGNS_NEXT_STEP =
+  'No designs rendered. Tell the artist plainly that generation did not produce usable designs and offer to try again. Do not say designs are queued, loading or coming, and do not ask them to pick one.';
+
+export function resolveGenerationNextStep(
+  readyCount: number,
+  contentReviews: readonly { readonly verdict: string }[]
+): string {
+  if (readyCount > 0) return 'Pick one and I’ll put it on products.';
+  return contentReviews.some(review => review.verdict === 'reject')
+    ? MERCH_PERSON_CONTENT_PUBLISH_BLOCKER
+    : MERCH_NO_DESIGNS_NEXT_STEP;
+}
+
 function logMerchGenerationReceipt(receipt: MerchGenerationReceipt): void {
   logger.info('[merch-generation] production receipt', { ...receipt });
 }
@@ -900,11 +918,7 @@ export async function generateMerchDesigns(params: {
       confidence: review.confidence,
       reviewed_at: review.reviewedAt,
     })),
-    nextStep:
-      ready.length === 0 &&
-      contentReviews.some(review => review.verdict === 'reject')
-        ? MERCH_PERSON_CONTENT_PUBLISH_BLOCKER
-        : 'Pick one and I’ll put it on products.',
+    nextStep: resolveGenerationNextStep(ready.length, contentReviews),
     designs: ready,
   };
 }

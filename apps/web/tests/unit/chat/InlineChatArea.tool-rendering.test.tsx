@@ -605,3 +605,12 @@ it('passes live execution through ChatMessage and resolves only after the saved 
   );
   expect(container.querySelectorAll('[data-fill="check"]')).toHaveLength(1);
 });
+
+it('shows one feedback row: message-level control yields to finished tool events', () => {
+  const source = readFileSync(
+    resolve(appRoot, 'components/jovie/components/ChatMessage.tsx'),
+    'utf8'
+  );
+  expect(source).toContain('hasToolFeedback');
+  expect(source).toContain('enableFeedback && !hasToolFeedback');
+});
