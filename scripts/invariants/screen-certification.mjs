@@ -297,6 +297,7 @@ web.instant-merch|web|marketing-instant-merch|apps/web/app/(marketing)/instant-m
 web.youtube-thumbnails|web|marketing-youtube-thumbnails|apps/web/app/(marketing)/youtube-thumbnails/|desktop,mobile
 web.demo-video|web|marketing-demo-video|apps/web/app/(marketing)/demo/video/page.tsx|desktop,mobile
 web.demovideo|web|marketing-demovideo|apps/web/app/(marketing)/demovideo/page.tsx|desktop,mobile
+web.demo-showcase|web|marketing-product|apps/web/app/demo/showcase/[surface]/page.tsx|desktop,mobile
 web.waitlist-invite|web|marketing-waitlist-invite|apps/web/app/waitlist/invite/page.tsx|desktop,mobile
 web.legal-shell|web|legal-shell|apps/web/app/(dynamic)/legal/layout.tsx|desktop,mobile
 web.legal-privacy|web|legal-privacy|apps/web/app/(dynamic)/legal/privacy/|desktop,mobile

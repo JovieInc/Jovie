@@ -46,7 +46,7 @@ const STATIC_ACTIONS: AudienceActionAdapter = {};
 function SmartLinkMoment() {
   return (
     <div
-      className='mx-auto w-full max-w-[26rem]'
+      className='mx-auto w-full max-w-104'
       data-testid='homepage-moment-smart-link'
     >
       <ReleaseLandingPage
@@ -70,10 +70,7 @@ function SmartLinkMoment() {
 function CaptureMoment() {
   return (
     <div className='flex min-h-screen items-center justify-center bg-base px-6'>
-      <div
-        className='w-full max-w-[22rem]'
-        data-testid='homepage-moment-capture'
-      >
+      <div className='w-full max-w-88' data-testid='homepage-moment-capture'>
         <ReleaseNotificationsProvider artist={HOMEPAGE_PROFILE_PREVIEW_ARTIST}>
           <ArtistNotificationsCTA
             artist={HOMEPAGE_PROFILE_PREVIEW_ARTIST}
@@ -95,7 +92,7 @@ function ListMoment() {
         {/* A fixed column so the crop reads at marketing scale, not 1440 wide. */}
         <div
           data-testid='homepage-moment-list'
-          className='h-[30rem] w-[46rem] max-w-full'
+          className='h-120 w-184 max-w-full'
         >
           <DashboardAudienceWorkspace
             mode='subscribers'

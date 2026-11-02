@@ -230,6 +230,7 @@ export const PRODUCT_SHOTS = [
       `${DEMO}/homepage-moment-fixtures.ts`,
       'apps/web/app/r/[slug]/ReleaseLandingPage.tsx',
       'apps/web/components/features/release/MusicServiceDial.tsx',
+      'apps/web/lib/discography/config.ts',
     ],
     placements: ['/'],
   },

@@ -1,4 +1,5 @@
 import { HOMEPAGE_PROFILE_PREVIEW_CATALOG } from '@/features/home/tim-white-catalog';
+import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import type { AudienceMember } from '@/types/audience';
 
@@ -48,19 +49,19 @@ export const HOMEPAGE_MOMENT_PROVIDERS = [
   {
     key: 'spotify',
     label: 'Spotify',
-    accent: '#1DB954',
+    accent: PROVIDER_CONFIG.spotify.accent,
     url: TIM_WHITE_PROFILE.spotifyUrl,
   },
   {
     key: 'apple_music',
     label: 'Apple Music',
-    accent: '#FA243C',
+    accent: PROVIDER_CONFIG.apple_music.accent,
     url: 'https://music.apple.com/us/search?term=Tim%20White%20Take%20Me%20Over',
   },
   {
     key: 'youtube_music',
     label: 'YouTube Music',
-    accent: '#FF0000',
+    accent: PROVIDER_CONFIG.youtube_music.accent,
     url: 'https://music.youtube.com/search?q=Tim%20White%20Take%20Me%20Over',
   },
 ] as const;

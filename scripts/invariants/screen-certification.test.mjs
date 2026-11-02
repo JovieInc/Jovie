@@ -328,6 +328,22 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       assert.deepEqual(classified.entry?.viewports, ['desktop', 'mobile']);
     }
   });
+  it('registers the product-shot showcase without claiming browser certification', () => {
+    const source = 'apps/web/app/demo/showcase/[surface]/page.tsx';
+    const classified = classifyScreenPath(source);
+    assert.equal(classified.kind, 'registered');
+    assert.equal(classified.entry?.id, 'web.demo-showcase');
+    assert.deepEqual(classified.entry?.viewports, ['desktop', 'mobile']);
+    const registration = runScreenCertification({
+      headSha: HEAD,
+      changedFiles: [source],
+      registrationOnly: true,
+    });
+    assert.equal(registration.ok, true);
+    assert.equal(registration.receipt.certified, false);
+    assert.equal(registration.receipt.status, 'source-registered');
+  });
+
   it('registers the money route and layout for both viewports', () => {
     for (const path of [
       'apps/web/app/app/money/page.tsx',

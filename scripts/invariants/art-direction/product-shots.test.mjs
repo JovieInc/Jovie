@@ -100,7 +100,7 @@ describe('raw product imagery in marketing source', () => {
 });
 
 describe('CI wiring', () => {
-  it('selects shot checks for both onboarding generations without widening to unrelated dashboard work', () => {
+  it('selects capture dependencies without widening to unrelated source work', () => {
     const selected = source =>
       selectSourceGuards('pull_request', [source]).some(
         guard => guard.id === 'art-direction'
@@ -108,6 +108,7 @@ describe('CI wiring', () => {
     for (const source of [
       'apps/web/components/features/dashboard/organisms/onboarding/Step.tsx',
       'apps/web/components/features/dashboard/organisms/onboarding-v2/shared/types.ts',
+      'apps/web/lib/discography/config.ts',
     ]) {
       assert.equal(selected(source), true, source);
     }
@@ -116,6 +117,7 @@ describe('CI wiring', () => {
       'apps/web/components/features/dashboard/organisms/onboarding-v20/Step.tsx',
       'apps/web/components/features/release/UnrelatedReleasePanel.tsx',
       'apps/web/lib/email/templates/welcome.ts',
+      'apps/web/lib/discography/unrelated.ts',
       'apps/web/components/features/dashboard/organisms/dashboard-audience-table/UnrelatedCell.tsx',
     ]) {
       assert.equal(selected(source), false, source);

@@ -4,9 +4,9 @@
     "home-capture": {
       "width": 720,
       "height": 689,
-      "sourceHash": "fc899529805cc08474dda1b72d243c65bf503ebe484aa308c97a40225d6ca69e",
+      "sourceHash": "2a81776ea1b3a660c8f3558e05f5a3ca9d11f71281a59c500c6335d0e57670ef",
       "specHash": "4d08f253dee4416a4af036fb29a971db2669ce5b50084fd2944bb11305ccb3ee",
-      "renderedAt": "2026-11-02T02:30:38.764Z",
+      "renderedAt": "2026-11-02T13:40:45.527Z",
       "sources": [
         "apps/web/components/features/demo/DemoHomepageMomentSurface.tsx",
         "apps/web/components/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA.tsx",
@@ -14,40 +14,40 @@
         "apps/web/components/features/release/ReleaseNotificationsProvider.tsx"
       ],
       "bytes": {
-        "avif": 17141,
-        "webp": 19944
+        "avif": 12598,
+        "webp": 16586
       }
     },
     "home-catalog": {
       "width": 1440,
       "height": 176,
-      "sourceHash": "1bd6c662d13025b0c3840a593970043234e7d9a022d98b6df85d3dfb94859f1d",
+      "sourceHash": "ab7f4fdaa212d4e7de3bb7810b99889644dfe3902a7b4aedc0e0c491a5fe9b1f",
       "specHash": "6c1dede715f31e830771b61e9d49797696b118c35dd2310f0401f4666cb0c89f",
-      "renderedAt": "2026-11-02T02:30:58.606Z",
+      "renderedAt": "2026-11-02T13:40:58.297Z",
       "sources": [
         "apps/web/components/features/demo/DemoHomepageMomentSurface.tsx",
         "apps/web/components/features/demo/DemoReleasesExperience.tsx",
         "apps/web/components/features/demo/mock-release-data.ts"
       ],
       "bytes": {
-        "avif": 9436,
-        "webp": 9842
+        "avif": 7472,
+        "webp": 8394
       }
     },
     "home-catalog-phone": {
       "width": 410,
       "height": 178,
-      "sourceHash": "1bd6c662d13025b0c3840a593970043234e7d9a022d98b6df85d3dfb94859f1d",
+      "sourceHash": "ab7f4fdaa212d4e7de3bb7810b99889644dfe3902a7b4aedc0e0c491a5fe9b1f",
       "specHash": "bd8968ce34c9b2f1abf307fdd506e3e733d32858e0ceb6a4bea2030560861b4f",
-      "renderedAt": "2026-11-02T02:32:10.776Z",
+      "renderedAt": "2026-11-02T13:41:03.834Z",
       "sources": [
         "apps/web/components/features/demo/DemoHomepageMomentSurface.tsx",
         "apps/web/components/features/demo/DemoReleasesExperience.tsx",
         "apps/web/components/features/demo/mock-release-data.ts"
       ],
       "bytes": {
-        "avif": 5603,
-        "webp": 5744
+        "avif": 3695,
+        "webp": 4746
       }
     },
     "home-profile-release": {
@@ -70,9 +70,9 @@
     "home-release-email": {
       "width": 800,
       "height": 998,
-      "sourceHash": "073522bcfba762e5d846ee1c769ccaf7d3dcde1f638b06d585c2042bb7f35680",
+      "sourceHash": "b83da0dce3c46cd81396ba32b40b236fcc58de1a8a3802bf5f604d6a954e8840",
       "specHash": "7b3c1a86d884e8992aadd04be6ae4a85d9fd88ff4fdb385af53f3fa4a46db3cb",
-      "renderedAt": "2026-11-02T02:30:46.598Z",
+      "renderedAt": "2026-11-02T13:40:49.966Z",
       "sources": [
         "apps/web/components/features/demo/DemoHomepageEmailMoment.tsx",
         "apps/web/components/features/demo/homepage-moment-email.ts",
@@ -80,21 +80,22 @@
         "apps/web/lib/email/templates/release-day-notification.ts"
       ],
       "bytes": {
-        "avif": 20521,
-        "webp": 29326
+        "avif": 18356,
+        "webp": 27656
       }
     },
     "home-smart-link": {
       "width": 720,
       "height": 333,
-      "sourceHash": "9630d576e3345808c8ceb5e4f4844530818c8f47cd3ec01f66913ba6062243ad",
+      "sourceHash": "4aa81218dae3dcdc6ebc79b49649b1e3bda8beb470592c8d658fcf42b997c75f",
       "specHash": "d2707228bbe39575b544a0f871d35272f98e3cba9ea59b1c68bf32304485181d",
-      "renderedAt": "2026-11-02T12:44:24.004Z",
+      "renderedAt": "2026-11-02T13:40:42.088Z",
       "sources": [
         "apps/web/components/features/demo/DemoHomepageMomentSurface.tsx",
         "apps/web/components/features/demo/homepage-moment-fixtures.ts",
         "apps/web/app/r/[slug]/ReleaseLandingPage.tsx",
-        "apps/web/components/features/release/MusicServiceDial.tsx"
+        "apps/web/components/features/release/MusicServiceDial.tsx",
+        "apps/web/lib/discography/config.ts"
       ],
       "bytes": {
         "avif": 4597,
@@ -104,33 +105,33 @@
     "home-subscriber-list": {
       "width": 1440,
       "height": 376,
-      "sourceHash": "d0aff9df1d7fd4e8233d9a9ca5acef731c73a67ba07d792f004eba87cdd56f04",
+      "sourceHash": "97d4cad5c063a4164c8f5f12d061a5ec1a71276f7e45f9a1de7c7e461753fde0",
       "specHash": "db3f85858a688f822fe79770a4409ce91a93890653b22134f331d014cc3cf536",
-      "renderedAt": "2026-11-02T02:30:54.417Z",
+      "renderedAt": "2026-11-02T13:40:54.125Z",
       "sources": [
         "apps/web/components/features/demo/DemoHomepageMomentSurface.tsx",
         "apps/web/components/features/demo/homepage-moment-fixtures.ts",
         "apps/web/components/features/dashboard/organisms/dashboard-audience-table/DashboardAudienceTableUnified.tsx"
       ],
       "bytes": {
-        "avif": 19569,
-        "webp": 25374
+        "avif": 16375,
+        "webp": 22536
       }
     },
     "home-subscriber-list-phone": {
       "width": 716,
       "height": 280,
-      "sourceHash": "d0aff9df1d7fd4e8233d9a9ca5acef731c73a67ba07d792f004eba87cdd56f04",
+      "sourceHash": "97d4cad5c063a4164c8f5f12d061a5ec1a71276f7e45f9a1de7c7e461753fde0",
       "specHash": "23ea68e40017acdb03f81c19387a5da331d0e913b2d23375d7764284dfe269fd",
-      "renderedAt": "2026-11-02T02:31:02.652Z",
+      "renderedAt": "2026-11-02T13:41:01.425Z",
       "sources": [
         "apps/web/components/features/demo/DemoHomepageMomentSurface.tsx",
         "apps/web/components/features/demo/homepage-moment-fixtures.ts",
         "apps/web/components/features/dashboard/organisms/dashboard-audience-table/DashboardAudienceTableUnified.tsx"
       ],
       "bytes": {
-        "avif": 10505,
-        "webp": 13694
+        "avif": 9060,
+        "webp": 12582
       }
     },
     "profile-hero-desktop": {
