@@ -1275,10 +1275,55 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       totalReceivedCents: 250,
       monthReceivedCents: 125,
     });
+    expect(result.legacyNudge).toBeNull();
     expect(result.dashboardLoadError).toBeUndefined();
     expect(captureExceptionMock).not.toHaveBeenCalled();
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
   });
+  it('exposes the grandfathered-claim nudge for a legacy-verified profile', async () => {
+    outcomes.push(
+      ok([userRow]),
+      ok([
+        {
+          ...dashboardProfile,
+          settings: {
+            claimVerification: {
+              schema: 'jovie-claim-verification/v1',
+              status: 'verified',
+              proofMethod: 'legacy',
+              spotifyArtistId: 'sp-1',
+              artistName: 'Artist',
+              reach: {
+                signal: 'spotify_followers',
+                value: 1_200,
+                threshold: 50_000,
+              },
+              requestedAt: '2026-11-02T00:00:00.000Z',
+              paidAt: null,
+              decidedBy: 'grandfather-2026-11',
+              legacyNudgeDueAt: '2999-01-01T00:00:00.000Z',
+            },
+          },
+        },
+      ]),
+      ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]),
+      ok([{ count: 0 }]),
+      ok([{ hasLinks: true, hasMusicLinks: true }]),
+      ok([{ width: 256, height: 256 }]),
+      ok([{ totalReceived: 0, monthReceived: 0, tipsSubmitted: 0 }]),
+      ok([{ total: 0, qr: 0, link: 0 }])
+    );
+
+    const result = await getDashboardData();
+
+    expect(result.legacyNudge).toEqual({
+      state: 'nudge',
+      dueAt: '2999-01-01T00:00:00.000Z',
+      nudgeSentAt: null,
+    });
+  });
+
   it('JOV-8580-recovery: recovers avatar metadata on a fresh transaction after idle setup cleanup', async () => {
     const idle = new Error('Failed query: SELECT set_config', {
       cause: Object.assign(
