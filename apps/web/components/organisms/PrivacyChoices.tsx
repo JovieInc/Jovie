@@ -15,20 +15,42 @@ import {
   PRIVACY_CHOICES_LABEL,
 } from '@/lib/cookies/consent-state';
 import {
+  isAnalyticsAllowed,
+  isDNTEnabled,
   isGPCEnabled,
   isMarketingAllowed,
   setConsentState,
 } from '@/lib/tracking/consent';
 
+/** Keep the visitor's existing analytics choice when only advertising changes. */
+function currentAnalyticsChoice(): boolean {
+  try {
+    const raw = localStorage.getItem('jv_cc');
+    if (raw) {
+      const stored = JSON.parse(raw) as { analytics?: unknown };
+      if (typeof stored?.analytics === 'boolean') return stored.analytics;
+    }
+  } catch {
+    // Fall through to the consent helper, which handles unreadable storage.
+  }
+  return isAnalyticsAllowed();
+}
+
 export function PrivacyChoices({ onClose }: Readonly<{ onClose: () => void }>) {
   const gpc = isGPCEnabled();
+  const dnt = !gpc && isDNTEnabled();
+  const signalLocked = gpc || dnt;
   const [optedOut, setOptedOut] = useState(() => !isMarketingAllowed());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
 
   const change = async (checked: boolean) => {
-    if (gpc) return;
-    const consent = { essential: true, analytics: false, marketing: !checked };
+    if (signalLocked) return;
+    const consent = {
+      essential: true,
+      analytics: currentAnalyticsChoice(),
+      marketing: !checked,
+    };
     // Apply withdrawal before the network request. A failed server save must
     // never re-enable advertising; the first-party cookie also covers blocked storage.
     setConsentState(checked ? 'rejected' : 'accepted');
@@ -67,14 +89,16 @@ export function PrivacyChoices({ onClose }: Readonly<{ onClose: () => void }>) {
           <Switch
             aria-labelledby='privacy-opt-out-label'
             checked={optedOut}
-            disabled={gpc || saving}
+            disabled={signalLocked || saving}
             onCheckedChange={checked => void change(checked)}
           />
         </div>
         <p className='mt-2 text-xs text-secondary-token'>
           {gpc
             ? GPC_CONFIRMATION
-            : 'Global Privacy Control is not detected in this browser.'}
+            : dnt
+              ? 'Do Not Track is enabled in this browser, so advertising stays off.'
+              : 'Global Privacy Control is not detected in this browser.'}
         </p>
         <div
           className='mt-2 min-h-12 text-xs text-secondary-token'

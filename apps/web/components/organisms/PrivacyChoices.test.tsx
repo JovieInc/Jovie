@@ -18,6 +18,12 @@ vi.mock('@/hooks/useClerkSafe', () => ({
 }));
 vi.mock('@/hooks/useBreakpoint', () => ({ useBreakpoint: () => false }));
 
+const pathname = vi.hoisted(() => ({ value: '/' }));
+vi.mock('next/navigation', async importOriginal => ({
+  ...(await importOriginal<typeof import('next/navigation')>()),
+  usePathname: () => pathname.value,
+}));
+
 const saveConsent = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock('@/lib/cookies/consent', () => ({ saveConsent }));
 vi.mock('@/lib/env-client', () => ({ env: { IS_TEST: false, IS_E2E: false } }));
@@ -56,6 +62,7 @@ beforeEach(() => {
     _fbq: undefined,
     __jovieMetaPixelInited: undefined,
   });
+  pathname.value = '/';
   saveConsent.mockReset().mockResolvedValue(undefined);
 });
 afterEach(() => {
@@ -117,7 +124,7 @@ describe('Your Privacy Choices', () => {
     await waitFor(() =>
       expect(saveConsent).toHaveBeenCalledWith({
         essential: true,
-        analytics: false,
+        analytics: true,
         marketing: false,
       })
     );
@@ -129,6 +136,51 @@ describe('Your Privacy Choices', () => {
     surface();
     expect(screen.queryByTestId('ad-pixel')).toBeNull();
     expect((window as Window & { fbq?: unknown }).fbq).toBeUndefined();
+  });
+
+  it('keeps an existing analytics choice when only advertising changes', async () => {
+    localStorage.setItem(
+      'jv_cc',
+      JSON.stringify({ essential: true, analytics: false, marketing: true })
+    );
+    surface();
+    fireEvent.click(screen.getByRole('link', { name: 'Your Privacy Choices' }));
+    fireEvent.click(await screen.findByRole('switch', {}, { timeout: 5000 }));
+    await waitFor(() =>
+      expect(saveConsent).toHaveBeenCalledWith({
+        essential: true,
+        analytics: false,
+        marketing: false,
+      })
+    );
+  });
+
+  it('shows Do Not Track as a locked, honored signal instead of an enabled toggle', async () => {
+    Object.defineProperty(navigator, 'doNotTrack', {
+      configurable: true,
+      value: '1',
+    });
+    surface();
+    fireEvent.click(screen.getByRole('link', { name: 'Your Privacy Choices' }));
+    const toggle = await screen.findByRole('switch', {}, { timeout: 5000 });
+    expect(toggle).toBeChecked();
+    expect(toggle).toBeDisabled();
+    expect(screen.getByText(/Do Not Track is enabled/)).toBeVisible();
+    expect(saveConsent).not.toHaveBeenCalled();
+  });
+
+  it('does not show the privacy-signal card on routes where banner chrome is suppressed', async () => {
+    Object.defineProperty(navigator, 'globalPrivacyControl', {
+      configurable: true,
+      value: true,
+    });
+    pathname.value = '/app';
+    surface();
+    await waitFor(() =>
+      expect(
+        screen.queryByText("Your browser's privacy signal is honored")
+      ).toBeNull()
+    );
   });
 
   it('keeps the local opt-out when the server save fails', async () => {
