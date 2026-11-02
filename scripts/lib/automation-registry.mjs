@@ -230,6 +230,28 @@ export function parseLanesClocks(source = '') {
   }));
 }
 
+/** Cron expressions from a wrangler.toml `crons = [...]` array. */
+export function parseWranglerCrons(source = '') {
+  const match = String(source).match(/^\s*crons\s*=\s*\[([^\]]*)\]/m);
+  if (!match) return [];
+  return [...match[1].matchAll(/"([^"]+)"|'([^']+)'/g)].map(m => m[1] ?? m[2]);
+}
+
+const SKIP_DIRS = new Set(['node_modules', '.git', '.next', 'dist']);
+
+function findFiles(repoRoot, dir, depth, test, out = []) {
+  if (depth < 0 || !existsSync(join(repoRoot, dir))) return out;
+  for (const entry of readdirSync(join(repoRoot, dir), {
+    withFileTypes: true,
+  })) {
+    if (SKIP_DIRS.has(entry.name)) continue;
+    const rel = dir ? `${dir}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) findFiles(repoRoot, rel, depth - 1, test, out);
+    else if (test(entry.name)) out.push(rel);
+  }
+  return out;
+}
+
 /** Cron paths from a vercel.json document. */
 export function parseVercelCrons(source = '') {
   let doc;
@@ -269,6 +291,8 @@ function findVercelFiles(repoRoot) {
  * - github-cron:.github/workflows/<file>
  * - vercel-cron:<cron path>
  * - lanes-clock:<clock name>
+ * - cloudflare-cron:<wrangler file> (any workers/** wrangler.* with crons)
+ * - systemd-timer:<unit file> (any committed *.timer)
  */
 export function discoverScheduledAutomations(repoRoot) {
   const found = new Map();
@@ -294,6 +318,20 @@ export function discoverScheduledAutomations(repoRoot) {
       });
     }
   }
+  for (const file of findFiles(repoRoot, 'workers', 3, name =>
+    /^wrangler\..*\.(toml|jsonc?)$|^wrangler\.(toml|jsonc?)$/.test(name)
+  )) {
+    const crons = parseWranglerCrons(
+      readFileSync(join(repoRoot, file), 'utf8')
+    );
+    if (crons.length) found.set(`cloudflare-cron:${file}`, { file, crons });
+  }
+  for (const file of [
+    ...findFiles(repoRoot, '.github', 3, name => name.endsWith('.timer')),
+    ...findFiles(repoRoot, 'scripts', 3, name => name.endsWith('.timer')),
+  ]) {
+    found.set(`systemd-timer:${file}`, { file });
+  }
   const clockFile = join(repoRoot, 'scripts/lanes/continuity_clock.py');
   if (existsSync(clockFile)) {
     for (const clock of parseLanesClocks(readFileSync(clockFile, 'utf8'))) {
@@ -312,6 +350,16 @@ export function coverageKey(entry) {
     return `vercel-cron:${trigger.path}`;
   if (trigger.kind === 'lanes-clock' && trigger.clock)
     return `lanes-clock:${trigger.clock}`;
+  if (
+    trigger.kind === 'cloudflare-cron' &&
+    /^workers\/.*wrangler/.test(trigger.source ?? '')
+  )
+    return `cloudflare-cron:${trigger.source}`;
+  if (
+    trigger.kind === 'systemd-timer' &&
+    /^[\w./-]+\.timer$/.test(trigger.source ?? '')
+  )
+    return `systemd-timer:${trigger.source}`;
   return null;
 }
 
@@ -592,4 +640,161 @@ export function parseRegistry(text = '') {
 
 export function loadRegistry(repoRoot) {
   return parseRegistry(readFileSync(join(repoRoot, REGISTRY_PATH), 'utf8'));
+}
+
+// --- Shared scheduling (compounding: one scheduler per platform) ---------------
+//
+// Tim's rule (memory feedback_event_driven): N jobs polling on the same
+// schedule become one job running N tasks, and every check is event-driven
+// unless no event exists, in which case it is a slow fail-safe. So a live
+// timer-driven entry must (1) name the shared scheduler it registers into
+// (canon/schedulers.json, one per platform) and (2) say why an event cannot do
+// the job. Entries that predate this rule are grandfathered by id; that list
+// only shrinks.
+
+export const SCHEDULERS_PATH = 'canon/schedulers.json';
+export const SCHEDULERS_SCHEMA = 'jovie-shared-schedulers/v1';
+export const TIMER_KINDS = Object.freeze([
+  'github-cron',
+  'vercel-cron',
+  'lanes-clock',
+  'systemd-timer',
+  'launchd',
+  'crontab',
+  'codex-heartbeat',
+  'openclaw-cron',
+  'hermes-cron',
+  'eve-schedule',
+  'cloudflare-cron',
+  'claude-routine',
+]);
+export const WHY_NOT_EVENT_MIN = 30;
+
+export function loadSchedulers(repoRoot) {
+  return JSON.parse(readFileSync(join(repoRoot, SCHEDULERS_PATH), 'utf8'));
+}
+
+function clockProblems(entry, schedulerIds) {
+  const clock = entry.clock ?? {};
+  const problems = [];
+  if (!schedulerIds.has(clock.scheduler))
+    problems.push(
+      `clock.scheduler must be one of ${[...schedulerIds].join('|')} (register into the platform's shared scheduler instead of owning a timer)`
+    );
+  if (
+    !nonEmpty(clock.whyNotEvent) ||
+    clock.whyNotEvent.trim().length < WHY_NOT_EVENT_MIN
+  )
+    problems.push(
+      `clock.whyNotEvent must say why no event (webhook, queue insert, deploy hook, relay connect/disconnect) can do this job (>= ${WHY_NOT_EVENT_MIN} chars)`
+    );
+  return problems;
+}
+
+/** Errors for timer-driven entries that skip the shared scheduler or the event question. */
+export function validateScheduling(registry, schedulers) {
+  const errors = [];
+  if (schedulers?.schema !== SCHEDULERS_SCHEMA)
+    errors.push(`${SCHEDULERS_PATH}: schema must be ${SCHEDULERS_SCHEMA}`);
+  const schedulerIds = new Set(
+    Object.values(schedulers?.platforms ?? {}).map(platform => platform.id)
+  );
+  const grandfathered = new Set(schedulers?.grandfathered ?? []);
+  const live = new Map(
+    (registry?.entries ?? [])
+      .filter(entry => entry?.status === 'live')
+      .map(entry => [entry.id, entry])
+  );
+  for (const entry of live.values()) {
+    if (!TIMER_KINDS.includes(entry.trigger?.kind)) continue;
+    const problems = clockProblems(entry, schedulerIds);
+    if (grandfathered.has(entry.id)) {
+      if (!problems.length)
+        errors.push(
+          `${entry.id}: complies now; remove it from grandfathered in ${SCHEDULERS_PATH} (the list only shrinks)`
+        );
+      continue;
+    }
+    for (const problem of problems) errors.push(`${entry.id}: ${problem}`);
+  }
+  for (const id of grandfathered) {
+    const entry = live.get(id);
+    if (!entry || !TIMER_KINDS.includes(entry.trigger?.kind))
+      errors.push(
+        `${id}: grandfathered but not a live timer entry; remove it from ${SCHEDULERS_PATH}`
+      );
+  }
+  return errors;
+}
+
+function expandField(field, min, max) {
+  const values = new Set();
+  for (const part of field.split(',')) {
+    const [range, step] = part.split('/');
+    let lo = min;
+    let hi = max;
+    if (range !== '*' && range !== '?') {
+      const [a, b] = range.split('-');
+      lo = Number(a);
+      hi = b === undefined ? (step ? max : lo) : Number(b);
+    }
+    const stride = step ? Number(step) : 1;
+    if (![lo, hi, stride].every(Number.isFinite) || stride < 1) return null;
+    for (let value = lo; value <= hi; value += stride) values.add(value);
+  }
+  return values;
+}
+
+const CRON_EXPR_RE =
+  /(?<![\w*/-])([\d*/,?-]+)\s+([\d*/,?-]+)\s+([\d*?]+)\s+([\d*]+)\s+([\d*/,?-]+)(?![\w*/-])/;
+
+/** Runs per day for one schedule phrase; null when it cannot be derived. */
+export function runsPerDay(schedule = '') {
+  const text = String(schedule);
+  let total = 0;
+  let parsed = false;
+  const freq = text.match(/FREQ=(MINUTELY|HOURLY|DAILY)(?:;INTERVAL=(\d+))?/);
+  if (freq) {
+    const every = Number(freq[2] ?? 1);
+    const perDay = { MINUTELY: 1440, HOURLY: 24, DAILY: 1 }[freq[1]];
+    return perDay / every;
+  }
+  for (const segment of text.split(/;|\+|\band\b/)) {
+    const cron = segment.match(CRON_EXPR_RE);
+    if (cron) {
+      const minutes = expandField(cron[1], 0, 59);
+      const hours = expandField(cron[2], 0, 23);
+      const days = expandField(cron[5], 0, 7);
+      if (!minutes || !hours || !days) continue;
+      const weekly = cron[5] === '*' || cron[5] === '?' ? 1 : days.size / 7;
+      total += minutes.size * hours.size * weekly;
+      parsed = true;
+      continue;
+    }
+    const calendar = segment.match(/OnCalendar\s+\*:\d+\/(\d+)/);
+    const every = segment.match(
+      /every\s+(?:(\d+)\s*)?(minute|min|m|hours?|h|days?|d)\b/i
+    );
+    if (calendar) {
+      total += 1440 / Number(calendar[1]);
+      parsed = true;
+    } else if (every) {
+      const n = Number(every[1] ?? 1);
+      const unit = every[2].toLowerCase();
+      const perDay = unit.startsWith('m')
+        ? 1440
+        : unit.startsWith('h')
+          ? 24
+          : 1;
+      total += perDay / n;
+      parsed = true;
+    } else if (/\bhourly\b/i.test(segment)) {
+      total += 24;
+      parsed = true;
+    } else if (/\bdaily\b/i.test(segment)) {
+      total += 1;
+      parsed = true;
+    }
+  }
+  return parsed ? Math.round(total * 100) / 100 : null;
 }
