@@ -286,6 +286,38 @@ test('transient evidence failures retry inside the budget before succeeding', ()
   assert.deepEqual(sleeps, [2000, 4000]);
 });
 
+test('all evidence reads and retries share one deadline and preserve the relay signal', () => {
+  let clock = 0;
+  const timeouts = [];
+  const outcomes = [
+    { jobs: [unacquiredJob(111940110687)] },
+    null,
+    [{ message: UNACQUIRED }],
+  ];
+  const api = makeResilientApi({
+    now: () => clock,
+    sleep: ms => {
+      clock += ms;
+    },
+    log: () => {},
+    capture: (_args, timeout) => {
+      timeouts.push(timeout);
+      clock += timeout;
+      const response = outcomes.shift();
+      return response
+        ? { ok: true, stdout: JSON.stringify(response), text: '' }
+        : { ok: false, stdout: '', text: 'gh: HTTP 502: Bad Gateway' };
+    },
+  });
+  const result = runMainOverrides(run(), { api });
+  assert.deepEqual(timeouts, [20_000, 20_000, 18_000]);
+  assert.equal(clock, 60_000);
+  assert.equal(result.plan.rerun, false);
+  assert.equal(result.output, 'requested=false\n');
+  assert.match(result.warnings[0], /evidence read budget exhausted/);
+  assert.doesNotMatch(result.warnings[0], /github-quota-deferred|quota resets/);
+});
+
 test('quota exhaustion defers immediately without sleeping off the reset', () => {
   const sleeps = [];
   const logs = [];
@@ -429,18 +461,18 @@ test('the relay skips the model-lane label only when a rerun was requested', () 
   assert.match(rerunJob.if, /workflow_run\.conclusion == 'failure'/);
   const step = rerunJob.steps.find(s => s.id === 'rerun');
   assert.equal(step.run, 'node scripts/pr-unacquired-runner-rerun.mjs');
-  // The rerun policy only OPTIONALLY imports the shared-bucket failure
-  // classifier: the trusted sparse checkout does not carry
-  // scripts/lib/github-rate-limit.mjs yet (the App token that lands script
-  // PRs cannot write workflow files), so the script degrades safely without
-  // it. When the checkout line lands, retries and the full doctrine kinds
-  // activate without any script change.
+  // Current trusted checkouts carry the full classifier; the script keeps
+  // its conservative fallback for older sparse trees.
   const checkout = rerunJob.steps.find(
     s => s.name === 'Checkout trusted rerun policy'
   );
   assert.match(
     checkout.with['sparse-checkout'],
     /^\s*scripts\/pr-unacquired-runner-rerun\.mjs\s*$/m
+  );
+  assert.match(
+    checkout.with['sparse-checkout'],
+    /^\s*scripts\/lib\/github-rate-limit\.mjs\s*$/m
   );
   assert.match(String(workflow.concurrency.group), /workflow_run\.head_sha/);
   assert.match(

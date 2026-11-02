@@ -27,13 +27,8 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 
-// The shared-bucket failure classifier is preferred but optional: the rerun
-// job's trusted sparse checkout in .github/workflows/lane-fix-relay.yml does
-// not carry scripts/lib/github-rate-limit.mjs yet (the App token that lands
-// script PRs cannot write workflow files), so until that one-line checkout
-// change lands the fallback below classifies without it. Both paths downgrade
-// an API failure to a warning; only the retry timing and the marker wording
-// differ.
+// Prefer the shared-bucket classifier. Trusted workflow checkouts include it;
+// the conservative fallback preserves compatibility with older sparse trees.
 const sharedClassifier = await import('./lib/github-rate-limit.mjs').then(
   mod => ({
     classify: mod.classifyGitHubFailure,
@@ -210,12 +205,19 @@ export function makeResilientApi({
   log = message => process.stderr.write(`${message}\n`),
   classifier = sharedClassifier,
 } = {}) {
+  let deadlineMs;
   return function ghApi(path) {
-    const deadlineMs = now() + maxWaitMs;
+    deadlineMs ??= now() + maxWaitMs;
     for (let attempt = 1; ; attempt += 1) {
+      const remainingMs = deadlineMs - now();
+      if (remainingMs <= 0)
+        throw new GitHubApiError(
+          'GitHub evidence read budget exhausted',
+          'transient-server'
+        );
       const outcome = capture(
         ['api', '-H', 'Cache-Control: no-cache', path],
-        timeoutMs
+        Math.min(timeoutMs, remainingMs)
       );
       if (outcome.ok) return JSON.parse(outcome.stdout);
       const classification = classifier
@@ -311,7 +313,11 @@ export function main(
           })?.kind ??
           classifyFallbackFailure(String(error?.message ?? error)).kind);
     plan = { rerun: false, reason: `evidence unavailable: GitHub ${kind}` };
-    if (kind === 'none' || kind === 'unclassified')
+    if (
+      !['primary-rate-limit', 'secondary-rate-limit', 'rate-limit'].includes(
+        kind
+      )
+    )
       warn(
         `rerun evidence for run ${runId} is unavailable: ${firstLine(error?.message ?? error)}`
       );
