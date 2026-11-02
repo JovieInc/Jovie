@@ -127,3 +127,21 @@ test('brand findings outrank everything else as the next fix', () => {
     'artist-dignity'
   );
 });
+
+test('settled product decisions reach every judge prompt; none means no line', async () => {
+  const { personaPrompt } = await import('./judges.mjs');
+  const brief = {
+    surface: 'S5',
+    mission: 'm',
+    audience: 'a',
+    decisions: ['Invites are sent by the artist from their own Gmail.'],
+  };
+  assert.match(
+    personaPrompt('premium-critic', brief, '- x'),
+    /Settled product decisions.*own Gmail/
+  );
+  assert.doesNotMatch(
+    personaPrompt('premium-critic', { surface: 'S5', mission: 'm' }, '- x'),
+    /Settled product decisions/
+  );
+});

@@ -18,6 +18,11 @@
         "premium-critic",
         "buyer",
         "heritage-manager"
+      ],
+      "decisions": [
+        "Invites are drafted by Jovie but opened and sent by the artist from their own Gmail, one at a time; Jovie never sends, nudges or follows up.",
+        "The empty state is intentional: it shows how to start an import, not missing data.",
+        "Credits shown to a recipient are only those Jovie is at least 90% sure of."
       ]
     },
     {
@@ -26,7 +31,10 @@
       "audience": "an artist who just claimed their profile and is waiting for it to be built",
       "mission": "show honest progress so the artist trusts the wait and knows what they will get, without fake precision",
       "buyer": "You are deciding in your first minutes whether Jovie is worth paying for.",
-      "personas": ["intended-user", "premium-critic", "buyer"]
+      "personas": ["intended-user", "premium-critic", "buyer"],
+      "decisions": [
+        "Progress shows exact counts (for example 2 of 14 releases) because the import is real and the artist can keep chatting while it runs."
+      ]
     },
     {
       "match": "Claim verification|Verify|Verification|Dispute",
@@ -39,6 +47,9 @@
         "premium-critic",
         "buyer",
         "heritage-manager"
+      ],
+      "decisions": [
+        "Verification starts with one-tap OAuth (Instagram, YouTube); the page stays private until verified, and a dispute freezes edits without taking the page offline."
       ]
     },
     {
@@ -47,7 +58,12 @@
       "audience": "an independent artist (or a fan, on the opt-in and email screens) using Jovie fan stories",
       "mission": "set the rails once, then trust Jovie to write to opted-in fans one story at a time, with one-tap pause and nothing that feels like spam",
       "buyer": "You would pay because fans hear from you every week without you running campaigns.",
-      "personas": ["intended-user", "premium-critic", "buyer"]
+      "personas": ["intended-user", "premium-critic", "buyer"],
+      "decisions": [
+        "The artist sets rails once and never approves individual emails; the feed is for watching, with one-tap pause.",
+        "Fans are shown by pseudonym and coarse context only.",
+        "The artist and catalog on these frames are fictional by design."
+      ]
     }
   ]
 }
