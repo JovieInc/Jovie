@@ -52,6 +52,30 @@ describe('public homepage discovery boundary', () => {
     expect(mocks.candidates).toHaveBeenCalledWith(30);
   });
 
+  it('reads each search independently and prevents response reuse between queries', async () => {
+    mocks.candidates
+      .mockResolvedValueOnce([publicProfile])
+      .mockResolvedValueOnce([
+        {
+          ...publicProfile,
+          username: 'jamie-example',
+          displayName: 'Jamie Example',
+        },
+      ]);
+    const first = await GET(request('Alex'));
+    const second = await GET(request('Jamie'));
+    expect(await first.json()).toEqual({
+      profiles: [{ username: 'alex-example', name: 'Alex Example' }],
+    });
+    expect(await second.json()).toEqual({
+      profiles: [{ username: 'jamie-example', name: 'Jamie Example' }],
+    });
+    expect(first.headers.get('Cache-Control')).toBe('no-store');
+    expect(second.headers.get('Cache-Control')).toBe('no-store');
+    expect(mocks.limit).toHaveBeenCalledTimes(2);
+    expect(mocks.candidates).toHaveBeenCalledTimes(2);
+  });
+
   it('continues beyond excluded candidates so an eligible 31st match is not hidden', async () => {
     mocks.candidates
       .mockResolvedValueOnce(
