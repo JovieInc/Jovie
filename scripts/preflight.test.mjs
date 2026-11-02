@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   copyFileSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -28,6 +29,219 @@ import {
 } from './preflight.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+function hookGitFixture({ behind = true, conflict = false, during = '' } = {}) {
+  const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'pf-hook-base-')));
+  const cwd = path.join(root, 'source');
+  const origin = path.join(root, 'origin.git');
+  const baseWriter = path.join(root, 'base');
+  const marker = path.join(root, 'gate-ran');
+  const env = {
+    ...buildPreflightEnv(),
+    JOVIE_PREFLIGHT_LEDGER: 'off',
+    PREFLIGHT_FIXTURE_MARKER: marker,
+    PREFLIGHT_FIXTURE_BASE: baseWriter,
+  };
+  const gitAt = (dir, ...args) => {
+    const r = spawnSync('git', args, { cwd: dir, env, encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    return r.stdout.trim();
+  };
+  const configure = dir => {
+    gitAt(dir, 'config', 'user.name', 'Preflight fixture');
+    gitAt(dir, 'config', 'user.email', 'fixture@example.com');
+    gitAt(dir, 'config', 'commit.gpgsign', 'false');
+  };
+  mkdirSync(cwd);
+  gitAt(root, 'init', '-q', '--bare', origin);
+  gitAt(cwd, 'init', '-q', '-b', 'main');
+  configure(cwd);
+  writeFileSync(path.join(cwd, 'shared.txt'), 'base\n');
+  writeFileSync(
+    path.join(cwd, 'fixture.yml'),
+    `jobs:\n  ${JOB_ID}:\n    steps:\n      - name: Exact source gate\n        run: |\n          node -e 'require("node:fs").writeFileSync(process.env.PREFLIGHT_FIXTURE_MARKER, "ran")'\n${
+      during
+        ? during
+            .split('\n')
+            .map(line => `          ${line}`)
+            .join('\n')
+        : ''
+    }\n`
+  );
+  gitAt(cwd, 'add', '.');
+  gitAt(cwd, 'commit', '-qm', 'base');
+  gitAt(cwd, 'remote', 'add', 'origin', origin);
+  gitAt(cwd, 'push', '-q', 'origin', 'main');
+  gitAt(root, 'clone', '-q', '--branch', 'main', origin, baseWriter);
+  configure(baseWriter);
+  gitAt(cwd, 'checkout', '-qb', 'feature');
+  writeFileSync(path.join(cwd, 'shared.txt'), 'source\n');
+  gitAt(cwd, 'add', '.');
+  gitAt(cwd, 'commit', '-qm', 'source');
+  const head = gitAt(cwd, 'rev-parse', 'HEAD');
+  if (behind) {
+    writeFileSync(
+      path.join(baseWriter, conflict ? 'shared.txt' : 'base-only.txt'),
+      'upstream\n'
+    );
+    gitAt(baseWriter, 'add', '.');
+    gitAt(baseWriter, 'commit', '-qm', 'upstream');
+    gitAt(baseWriter, 'push', '-q', 'origin', 'main');
+  }
+  const run = async () => {
+    const lines = [];
+    const code = await main({
+      argv: ['--hook', '--workflow', 'fixture.yml'],
+      cwd,
+      env,
+      log: line => lines.push(line),
+    });
+    return { code, output: lines.join('\n') };
+  };
+  return { root, cwd, origin, marker, env, head, gitAt, run };
+}
+
+test('hook qualifies a clean behind-base source without changing its head', async () => {
+  const f = hookGitFixture();
+  try {
+    const result = await f.run();
+    assert.equal(result.code, 0, result.output);
+    assert.equal(readFileSync(f.marker, 'utf8'), 'ran');
+    assert.equal(f.gitAt(f.cwd, 'rev-parse', 'HEAD'), f.head);
+    assert.equal(f.gitAt(f.cwd, 'status', '--porcelain'), '');
+    assert.match(result.output, /mergeable.*base=/);
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('hook blocks real merge conflicts before executing source gates', async () => {
+  const f = hookGitFixture({ conflict: true });
+  try {
+    const result = await f.run();
+    assert.equal(result.code, 1);
+    assert.equal(existsSync(f.marker), false);
+    assert.equal(f.gitAt(f.cwd, 'rev-parse', 'HEAD'), f.head);
+    assert.equal(f.gitAt(f.cwd, 'status', '--porcelain'), '');
+    assert.match(result.output, /merge conflict/);
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('a clean behind-base hook still fails a real source check', async () => {
+  const f = hookGitFixture({ during: "node -e 'process.exit(17)'" });
+  try {
+    const result = await f.run();
+    assert.equal(result.code, 1, result.output);
+    assert.equal(readFileSync(f.marker, 'utf8'), 'ran');
+    assert.match(result.output, /FAIL \(17\)/);
+    assert.equal(f.gitAt(f.cwd, 'rev-parse', 'HEAD'), f.head);
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('hook rejects failed refresh instead of accepting a cached base', async () => {
+  const f = hookGitFixture({ behind: false });
+  try {
+    f.gitAt(
+      f.cwd,
+      'remote',
+      'set-url',
+      'origin',
+      path.join(f.root, 'missing.git')
+    );
+    const result = await f.run();
+    assert.equal(result.code, 1);
+    assert.equal(existsSync(f.marker), false);
+    assert.match(result.output, /cannot fetch/);
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+for (const [command, response] of [
+  ['merge-tree', 'exit 2'],
+  ['merge-tree', 'printf "not-a-tree\\n"; exit 0'],
+  ['cat-file', 'printf "tree\\n"; exit 2'],
+]) {
+  test(`hook fails closed on an unknown merge proof (${command}: ${response})`, async () => {
+    const f = hookGitFixture();
+    try {
+      const bin = path.join(f.root, 'bin');
+      mkdirSync(bin);
+      writeFileSync(
+        path.join(bin, 'git'),
+        `#!/bin/sh\nif [ "$1" = ${command} ]; then ${response}; fi\nexec /usr/bin/git "$@"\n`,
+        { mode: 0o755 }
+      );
+      f.env.PATH = `${bin}:${f.env.PATH}`;
+      const result = await f.run();
+      assert.equal(result.code, 1);
+      assert.equal(existsSync(f.marker), false);
+      assert.match(result.output, /cannot prove mergeability/);
+      assert.doesNotMatch(result.output, /merge conflict/);
+    } finally {
+      rmSync(f.root, { recursive: true, force: true });
+    }
+  });
+}
+
+test('hook rejects a base ref changed while proving mergeability', async () => {
+  const f = hookGitFixture();
+  try {
+    const bin = path.join(f.root, 'bin');
+    mkdirSync(bin);
+    writeFileSync(
+      path.join(bin, 'git'),
+      '#!/bin/sh\nif [ "$1" = merge-tree ]; then\n  /usr/bin/git "$@" || exit $?\n  /usr/bin/git update-ref refs/remotes/origin/main HEAD\n  exit $?\nfi\nexec /usr/bin/git "$@"\n',
+      { mode: 0o755 }
+    );
+    f.env.PATH = `${bin}:${f.env.PATH}`;
+    const result = await f.run();
+    assert.equal(result.code, 1, result.output);
+    assert.equal(existsSync(f.marker), false);
+    assert.match(result.output, /base moved during mergeability proof/);
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+for (const conflict of [false, true]) {
+  test(`hook rechecks a base moved during source gates (${conflict ? 'conflict' : 'clean'})`, async () => {
+    const file = conflict ? 'shared.txt' : 'base-only.txt';
+    const f = hookGitFixture({
+      behind: false,
+      during: `printf 'new base\\n' > "$PREFLIGHT_FIXTURE_BASE/${file}"\ngit -C "$PREFLIGHT_FIXTURE_BASE" add .\ngit -C "$PREFLIGHT_FIXTURE_BASE" commit -qm moved\ngit -C "$PREFLIGHT_FIXTURE_BASE" push -q origin main`,
+    });
+    try {
+      const result = await f.run();
+      assert.equal(result.code, conflict ? 1 : 0, result.output);
+      assert.equal(readFileSync(f.marker, 'utf8'), 'ran');
+      assert.equal(f.gitAt(f.cwd, 'rev-parse', 'HEAD'), f.head);
+      assert.match(result.output, conflict ? /merge conflict/ : /base moved/);
+    } finally {
+      rmSync(f.root, { recursive: true, force: true });
+    }
+  });
+}
+
+test('hook rejects a source head changed during its gates', async () => {
+  const f = hookGitFixture({
+    behind: false,
+    during:
+      'git -c commit.gpgsign=false commit --allow-empty -qm unexpected-source-change',
+  });
+  try {
+    const result = await f.run();
+    assert.equal(result.code, 1, result.output);
+    assert.equal(readFileSync(f.marker, 'utf8'), 'ran');
+    assert.match(result.output, /source head changed/);
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
 
 async function lintRepairDiff(
   before,
@@ -331,6 +545,10 @@ jobs:
     );
     git(parent, 'add', '.');
     git(parent, '-c', 'commit.gpgsign=false', 'commit', '-qm', 'initial');
+    const origin = path.join(root, 'origin.git');
+    git(root, 'init', '-q', '--bare', origin);
+    git(parent, 'remote', 'add', 'origin', origin);
+    git(parent, 'push', '-q', 'origin', 'main');
     git(parent, 'worktree', 'add', '-q', '-b', 'hook-worktree', linked);
     symlinkSync(
       path.join(ROOT, 'node_modules'),

@@ -47,6 +47,72 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const WORKFLOW_PATH = '.github/workflows/source-validation.yml';
 export const JOB_ID = 'deterministic';
 
+/** Read-only integration proof; source checks and the native queue stay required. */
+export async function hookBaseProof({ base, cwd, env, expectedHead = '' }) {
+  const deadline = Date.now() + 60_000;
+  const run = args => {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new Error('mergeability proof deadline exceeded');
+    return spawnSync('git', args, {
+      cwd,
+      env: { ...env, GIT_TERMINAL_PROMPT: '0' },
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: remaining,
+      maxBuffer: 16 * 1024 * 1024,
+    });
+  };
+  const ref = `refs/remotes/origin/${base}`;
+  if (run(['check-ref-format', `refs/heads/${base}`]).status !== 0)
+    throw new Error('invalid base branch');
+  if (
+    run([
+      'fetch',
+      '--no-tags',
+      '--no-write-fetch-head',
+      '--no-recurse-submodules',
+      '-q',
+      'origin',
+      `refs/heads/${base}:${ref}`,
+    ]).status !== 0
+  )
+    throw new Error(`cannot fetch origin/${base}; mergeability is unknown`);
+  const commit = name => {
+    const r = run(['rev-parse', '--verify', '-q', `${name}^{commit}`]);
+    const oid = r.stdout?.trim();
+    if (r.status !== 0 || !/^[0-9a-f]{40,64}$/.test(oid ?? ''))
+      throw new Error(`cannot resolve ${name}; mergeability is unknown`);
+    return oid;
+  };
+  const baseSha = commit(ref);
+  const headSha = commit('HEAD');
+  if (expectedHead && headSha !== expectedHead)
+    throw new Error(
+      'source head changed during its checks; rerun qualification'
+    );
+  const merged = run(['merge-tree', '--write-tree', baseSha, headSha]);
+  const treeSha = merged.stdout?.split('\n')[0]?.trim();
+  if (merged.status === 1 && /^[0-9a-f]{40,64}$/.test(treeSha ?? '')) {
+    const { parseMergeConflicts } = await import('./lib/preflight-changed.mjs');
+    const paths = parseMergeConflicts(merged.stdout);
+    throw new Error(
+      `merge conflict with origin/${base}${paths.length ? `: ${paths.join(', ')}` : ''}; resolve before pushing`
+    );
+  }
+  if (merged.status !== 0 || !/^[0-9a-f]{40,64}$/.test(treeSha ?? ''))
+    throw new Error(`cannot prove mergeability with origin/${base}`);
+  const tree = run(['cat-file', '-t', treeSha]);
+  if (tree.status !== 0 || tree.stdout?.trim() !== 'tree')
+    throw new Error(`cannot prove mergeability with origin/${base}`);
+  if (commit('HEAD') !== headSha)
+    throw new Error('source head changed during mergeability proof');
+  if (commit(ref) !== baseSha)
+    throw new Error(
+      'base moved during mergeability proof; rerun qualification'
+    );
+  return { headSha, baseSha, treeSha };
+}
+
 /** Keep hook-local Git routing out of gates that create fixture repositories. */
 export function buildPreflightEnv(source = process.env, cwd = ROOT) {
   const result = spawnSync('git', ['rev-parse', '--local-env-vars'], {
@@ -369,9 +435,19 @@ export async function main({
   }
   const childEnv = buildPreflightEnv(env, cwd);
   const workflowFile = path.resolve(cwd, args.workflow ?? WORKFLOW_PATH);
-  // A branch behind base fails CI on files it never saw (#23313: a missing
-  // scripts/anti-slop/run.mjs). Bring base in first; the hook only reports.
-  if (!args.list) {
+  let hookProof = null;
+  if (args.hook && !args.list) {
+    try {
+      hookProof = await hookBaseProof({ base: args.base, cwd, env: childEnv });
+      log(
+        `[preflight] mergeable head=${hookProof.headSha} base=${hookProof.baseSha} tree=${hookProof.treeSha}`
+      );
+    } catch (error) {
+      log(`[preflight] ${error.message}`);
+      return 1;
+    }
+    // Interactive preflight retains its existing ordinary forward merge.
+  } else if (!args.list) {
     spawnSync('git', ['fetch', '--no-tags', '-q', 'origin', args.base], {
       cwd,
       env: childEnv,
@@ -388,12 +464,6 @@ export async function main({
         ['merge-base', '--is-ancestor', `origin/${args.base}`, 'HEAD'],
         { cwd, env: childEnv }
       ).status !== 0;
-    if (behind && args.hook) {
-      log(
-        `[preflight] branch is behind origin/${args.base}; merge it, then push.`
-      );
-      return 1;
-    }
     if (behind) {
       log(`[preflight] merging origin/${args.base} into the branch first`);
       const merged = spawnSync(
@@ -546,6 +616,29 @@ export async function main({
     }
   }
 
+  if (hookProof && failures.length === 0) {
+    try {
+      const refreshed = await hookBaseProof({
+        base: args.base,
+        cwd,
+        env: childEnv,
+        expectedHead: hookProof.headSha,
+      });
+      if (refreshed.baseSha !== hookProof.baseSha)
+        log(
+          `[preflight] base moved; mergeable head=${refreshed.headSha} base=${refreshed.baseSha} tree=${refreshed.treeSha}`
+        );
+      hookProof = refreshed;
+    } catch (error) {
+      failures.push({
+        step: 'Mergeability',
+        label: error.message,
+        code: 1,
+        output: [],
+      });
+    }
+  }
+
   log('\n== preflight summary');
   for (const item of skipped) log(`  skipped  ${item.name}  [${item.reason}]`);
   if (failures.length === 0) log(`  all clear (${passed} statements passed)`);
@@ -566,6 +659,7 @@ export async function main({
     {
       at: new Date().toISOString(),
       head: headSha,
+      ...(hookProof ? { mergeability: hookProof } : {}),
       durationMs: Date.now() - started,
       red: failures.map(f => `${f.step}: ${f.label}`),
       timings: timings.filter(t => t.ms >= 1000),
