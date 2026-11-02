@@ -4,6 +4,7 @@ import { and, desc, eq, inArray } from 'drizzle-orm';
 import { readCachedAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
 import {
   isProofBlockingPublication,
+  isRecordBlockingPublication,
   readClaimVerification,
 } from '@/lib/claim/claim-verification';
 import { db } from '@/lib/db';
@@ -138,7 +139,7 @@ export async function requiresProofBeforePublic(
     .map(profile => readClaimVerification(profile.settings))
     .filter(record => record?.proofOnly === true);
   if (records.length > 0) {
-    return records.some(record => record?.status !== 'verified');
+    return records.some(record => isRecordBlockingPublication(record));
   }
 
   const [adminApproval] = await db

@@ -3,13 +3,23 @@ import {
   buildClaimVerificationRequest,
   CLAIM_VERIFICATION_REACH_THRESHOLD,
   CLAIM_VERIFICATION_SETTINGS_KEY,
+  type ClaimVerificationRecord,
   claimVerificationPendingMessage,
+  compareProofStrength,
+  currentProofEvidence,
   decideClaimVerificationRecord,
+  isClaimFrozen,
   isClaimVerificationOpen,
   isProofBlockingPublication,
   markClaimVerificationPaid,
+  markVerifiedByProof,
+  openDispute,
+  PROOF_METHODS,
+  PROOF_STRENGTH,
+  proofStrength,
   readClaimVerification,
   requiresClaimVerification,
+  resolveDispute,
   withClaimVerification,
 } from './claim-verification';
 
@@ -223,5 +233,310 @@ describe('isProofBlockingPublication', () => {
 
   it('records proofOnly on the request so it survives any waitlist write', () => {
     expect(proof('pending_verification').proofOnly).toBe(true);
+  });
+});
+
+describe('proof strength', () => {
+  it('ranks every method: OAuth, DNS, distributor and operator are strong', () => {
+    expect(Object.keys(PROOF_STRENGTH).sort()).toEqual(
+      [...PROOF_METHODS].sort()
+    );
+    for (const method of [
+      'instagram_oauth',
+      'youtube_oauth',
+      'dns',
+      'distributor',
+      'operator',
+    ] as const) {
+      expect(proofStrength({ method })).toBe('strong');
+    }
+    expect(proofStrength({ method: 'domain_email' })).toBe('weak');
+    expect(proofStrength({ method: 'legacy' })).toBe('legacy');
+  });
+
+  it('counts a website code as strong only on a Spotify-linked domain', () => {
+    expect(proofStrength({ method: 'website_code' })).toBe('weak');
+    expect(proofStrength({ method: 'website_code', domainLinked: false })).toBe(
+      'weak'
+    );
+    expect(proofStrength({ method: 'website_code', domainLinked: true })).toBe(
+      'strong'
+    );
+  });
+
+  it('compares strong > weak > legacy', () => {
+    expect(
+      compareProofStrength({ method: 'dns' }, { method: 'domain_email' })
+    ).toBeGreaterThan(0);
+    expect(
+      compareProofStrength({ method: 'domain_email' }, { method: 'legacy' })
+    ).toBeGreaterThan(0);
+    expect(
+      compareProofStrength({ method: 'legacy' }, { method: 'operator' })
+    ).toBeLessThan(0);
+    expect(
+      compareProofStrength(
+        { method: 'instagram_oauth' },
+        { method: 'website_code', domainLinked: true }
+      )
+    ).toBe(0);
+  });
+});
+
+const pendingProof = () =>
+  buildClaimVerificationRequest({
+    spotifyArtistId: '06HL4z0CvFAxyc27GXpf02',
+    artistName: 'Indie Artist',
+    reach: 1_200,
+    paid: false,
+    proofOnly: true,
+    proofCode: 'jovie-verify-abc',
+    now,
+  });
+const verifiedAt = new Date('2026-11-01T09:00:00.000Z');
+const disputedAt = new Date('2026-11-02T09:00:00.000Z');
+const resolvedAt = new Date('2026-11-03T09:00:00.000Z');
+const settingsOf = (record: ClaimVerificationRecord | null) =>
+  withClaimVerification({}, record as ClaimVerificationRecord);
+
+describe('markVerifiedByProof', () => {
+  it('verifies a pending claim by strong proof with an ISO timestamp', () => {
+    const verified = markVerifiedByProof(
+      pendingProof(),
+      'instagram_oauth',
+      verifiedAt
+    );
+    expect(verified).toMatchObject({
+      status: 'verified',
+      proofMethod: 'instagram_oauth',
+      verifiedAt: '2026-11-01T09:00:00.000Z',
+      requestedAt: now.toISOString(),
+    });
+    expect(isProofBlockingPublication(settingsOf(verified))).toBe(false);
+  });
+
+  it('records whether a website code was on a linked domain', () => {
+    expect(
+      markVerifiedByProof(pendingProof(), 'website_code', verifiedAt, {
+        domainLinked: true,
+      })
+    ).toMatchObject({ proofMethod: 'website_code', proofDomainLinked: true });
+  });
+
+  it('never verifies on weak or legacy proof alone', () => {
+    expect(
+      markVerifiedByProof(pendingProof(), 'domain_email', verifiedAt)
+    ).toBeNull();
+    expect(
+      markVerifiedByProof(pendingProof(), 'website_code', verifiedAt)
+    ).toBeNull();
+    expect(
+      markVerifiedByProof(pendingProof(), 'legacy', verifiedAt)
+    ).toBeNull();
+  });
+
+  it('only moves pending_verification, so retries are no-ops', () => {
+    const verified = markVerifiedByProof(pendingProof(), 'dns', verifiedAt);
+    expect(markVerifiedByProof(verified, 'dns', verifiedAt)).toBeNull();
+    expect(markVerifiedByProof(request(false), 'dns', verifiedAt)).toBeNull();
+    expect(markVerifiedByProof(null, 'dns', verifiedAt)).toBeNull();
+  });
+});
+
+describe('disputes', () => {
+  const verifiedBy = (
+    method: Parameters<typeof markVerifiedByProof>[1],
+    domainLinked?: boolean
+  ) =>
+    markVerifiedByProof(pendingProof(), method, verifiedAt, { domainLinked });
+
+  it('opens on a verified page with at least equal proof; the page stays up, frozen', () => {
+    const disputed = openDispute(verifiedBy('instagram_oauth'), {
+      claimantProofMethod: 'youtube_oauth',
+      at: disputedAt,
+    });
+    expect(disputed).toMatchObject({
+      status: 'disputed',
+      proofMethod: 'instagram_oauth',
+      dispute: {
+        claimantProofMethod: 'youtube_oauth',
+        openedAt: '2026-11-02T09:00:00.000Z',
+      },
+    });
+    expect(isProofBlockingPublication(settingsOf(disputed))).toBe(false);
+    expect(isClaimFrozen(settingsOf(disputed))).toBe(true);
+  });
+
+  it('refuses weaker proof, so a bare claim cannot freeze a real artist', () => {
+    expect(
+      openDispute(verifiedBy('dns'), {
+        claimantProofMethod: 'domain_email',
+        at: disputedAt,
+      })
+    ).toBeNull();
+    expect(
+      openDispute(verifiedBy('dns'), {
+        claimantProofMethod: 'website_code',
+        claimantDomainLinked: false,
+        at: disputedAt,
+      })
+    ).toBeNull();
+    expect(
+      openDispute(verifiedBy('dns'), {
+        claimantProofMethod: 'website_code',
+        claimantDomainLinked: true,
+        at: disputedAt,
+      })
+    ).not.toBeNull();
+  });
+
+  it('lets any real proof dispute a grandfathered legacy page, never legacy itself', () => {
+    const legacy: ClaimVerificationRecord = {
+      ...request(false),
+      status: 'verified',
+      proofMethod: 'legacy',
+    };
+    expect(
+      openDispute(legacy, {
+        claimantProofMethod: 'domain_email',
+        at: disputedAt,
+      })
+    ).toMatchObject({ status: 'disputed' });
+    expect(
+      openDispute(legacy, { claimantProofMethod: 'legacy', at: disputedAt })
+    ).toBeNull();
+  });
+
+  it('reads pre-2026-11 verified records: operator-decided is strong, else legacy', () => {
+    const operatorDecided = decideClaimVerificationRecord(
+      markClaimVerificationPaid(request(false), paidAt),
+      { decision: 'approve', decidedAt: verifiedAt, decidedBy: 'admin_1' }
+    ) as ClaimVerificationRecord;
+    expect(operatorDecided.proofMethod).toBeUndefined();
+    expect(currentProofEvidence(operatorDecided).method).toBe('operator');
+    expect(
+      openDispute(operatorDecided, {
+        claimantProofMethod: 'domain_email',
+        at: disputedAt,
+      })
+    ).toBeNull();
+    expect(
+      currentProofEvidence({ ...request(false), status: 'verified' }).method
+    ).toBe('legacy');
+  });
+
+  it('only opens from verified', () => {
+    for (const record of [pendingProof(), request(false), null]) {
+      expect(
+        openDispute(record, { claimantProofMethod: 'dns', at: disputedAt })
+      ).toBeNull();
+    }
+    const disputed = openDispute(verifiedBy('dns'), {
+      claimantProofMethod: 'dns',
+      at: disputedAt,
+    });
+    expect(
+      openDispute(disputed, { claimantProofMethod: 'dns', at: disputedAt })
+    ).toBeNull();
+  });
+
+  describe('resolveDispute', () => {
+    const disputed = () =>
+      openDispute(verifiedBy('dns'), {
+        claimantProofMethod: 'website_code',
+        claimantDomainLinked: true,
+        at: disputedAt,
+      });
+
+    it('keep returns the page to verified with the original proof', () => {
+      const kept = resolveDispute(disputed(), {
+        outcome: 'keep',
+        decidedBy: 'admin_1',
+        at: resolvedAt,
+      });
+      expect(kept).toMatchObject({
+        status: 'verified',
+        proofMethod: 'dns',
+        verifiedAt: verifiedAt.toISOString(),
+        dispute: {
+          outcome: 'keep',
+          decidedBy: 'admin_1',
+          openedAt: disputedAt.toISOString(),
+          decidedAt: resolvedAt.toISOString(),
+        },
+      });
+      expect(isClaimFrozen(settingsOf(kept))).toBe(false);
+    });
+
+    it("transfer verifies on the claimant's proof", () => {
+      expect(
+        resolveDispute(disputed(), {
+          outcome: 'transfer',
+          decidedBy: 'admin_1',
+          at: resolvedAt,
+        })
+      ).toMatchObject({
+        status: 'verified',
+        proofMethod: 'website_code',
+        proofDomainLinked: true,
+        verifiedAt: resolvedAt.toISOString(),
+        dispute: { outcome: 'transfer' },
+      });
+    });
+
+    it('take_down blocks publication, proof-only or not', () => {
+      const down = resolveDispute(disputed(), {
+        outcome: 'take_down',
+        decidedBy: 'admin_1',
+        at: resolvedAt,
+      });
+      expect(down?.status).toBe('taken_down');
+      expect(isProofBlockingPublication(settingsOf(down))).toBe(true);
+      const { proofOnly: _p, ...notProofOnly } =
+        down as ClaimVerificationRecord;
+      expect(
+        isProofBlockingPublication(
+          settingsOf(notProofOnly as ClaimVerificationRecord)
+        )
+      ).toBe(true);
+      expect(isClaimFrozen(settingsOf(down))).toBe(false);
+    });
+
+    it('only resolves an open dispute, so repeated decisions are no-ops', () => {
+      const kept = resolveDispute(disputed(), {
+        outcome: 'keep',
+        decidedBy: 'admin_1',
+        at: resolvedAt,
+      });
+      expect(
+        resolveDispute(kept, {
+          outcome: 'take_down',
+          decidedBy: 'admin_1',
+          at: resolvedAt,
+        })
+      ).toBeNull();
+      expect(
+        resolveDispute(
+          { ...(disputed() as ClaimVerificationRecord), dispute: undefined },
+          { outcome: 'keep', decidedBy: null, at: resolvedAt }
+        )
+      ).toBeNull();
+    });
+  });
+
+  it('reads the new statuses under the v1 schema', () => {
+    const disputed = openDispute(verifiedBy('operator'), {
+      claimantProofMethod: 'distributor',
+      at: disputedAt,
+    });
+    const down = resolveDispute(disputed, {
+      outcome: 'take_down',
+      decidedBy: null,
+      at: resolvedAt,
+    });
+    expect(readClaimVerification(settingsOf(disputed))?.status).toBe(
+      'disputed'
+    );
+    expect(readClaimVerification(settingsOf(down))?.status).toBe('taken_down');
   });
 });

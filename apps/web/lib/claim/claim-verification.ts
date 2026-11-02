@@ -47,6 +47,10 @@ export const CLAIM_VERIFICATION_STATUSES = [
   'pending_verification',
   'verified',
   'rejected',
+  /** A counter-claim with at least equal proof: page stays up, frozen. */
+  'disputed',
+  /** A human decided the page comes down. Never public, for every writer. */
+  'taken_down',
 ] as const;
 
 export type ClaimVerificationStatus =
@@ -83,10 +87,101 @@ export interface ClaimVerificationRecord {
   readonly proofCode?: string;
   /** Every automatic check, newest last, capped. Never stores page content. */
   readonly proofAttempts?: readonly ProofAttempt[];
-  /** How the request was decided: `website_code` (automatic) or an operator. */
-  readonly proofMethod?: 'website_code' | 'operator';
+  /** How ownership was proven. Absent on records written before 2026-11. */
+  readonly proofMethod?: ProofMethod;
+  /** `website_code` counts as strong only on a domain linked from Spotify. */
+  readonly proofDomainLinked?: boolean;
+  /** When proof verified the claim (ISO), for time-to-verify p50/p95. */
+  readonly verifiedAt?: string | null;
+  /** Open or decided counter-claim. */
+  readonly dispute?: ClaimDispute;
   /** Rejections the artist answered with a new request. */
   readonly reopenCount?: number;
+}
+
+export const PROOF_METHODS = [
+  'instagram_oauth',
+  'youtube_oauth',
+  'website_code',
+  'dns',
+  'domain_email',
+  'distributor',
+  'operator',
+  'legacy',
+] as const;
+
+export type ProofMethod = (typeof PROOF_METHODS)[number];
+
+export type ProofStrength = 'strong' | 'weak' | 'legacy';
+
+/**
+ * Base strength per method (spec 2026-11-01, section 3). `website_code` is
+ * weak here and strong only when the domain is linked from the artist's
+ * Spotify profile (see `proofStrength`). `legacy` is a grandfathered profile
+ * with no proof at all, so any real proof outranks it.
+ */
+export const PROOF_STRENGTH: Readonly<Record<ProofMethod, ProofStrength>> = {
+  instagram_oauth: 'strong',
+  youtube_oauth: 'strong',
+  dns: 'strong',
+  distributor: 'strong',
+  operator: 'strong',
+  website_code: 'weak',
+  domain_email: 'weak',
+  legacy: 'legacy',
+};
+
+const PROOF_STRENGTH_RANK: Readonly<Record<ProofStrength, number>> = {
+  legacy: 0,
+  weak: 1,
+  strong: 2,
+};
+
+export interface ProofEvidence {
+  readonly method: ProofMethod;
+  readonly domainLinked?: boolean;
+}
+
+export function proofStrength(evidence: ProofEvidence): ProofStrength {
+  if (evidence.method === 'website_code' && evidence.domainLinked === true) {
+    return 'strong';
+  }
+  return PROOF_STRENGTH[evidence.method];
+}
+
+/** Negative when `a` is weaker than `b`, zero when equal, positive when stronger. */
+export function compareProofStrength(
+  a: ProofEvidence,
+  b: ProofEvidence
+): number {
+  return (
+    PROOF_STRENGTH_RANK[proofStrength(a)] -
+    PROOF_STRENGTH_RANK[proofStrength(b)]
+  );
+}
+
+/**
+ * The proof behind a verified record. Records written before proof methods
+ * were stored have none: an operator decision (decidedAt set) counts as
+ * `operator`, anything else as `legacy`.
+ */
+export function currentProofEvidence(
+  record: ClaimVerificationRecord
+): ProofEvidence {
+  const method =
+    record.proofMethod ?? (record.decidedAt ? 'operator' : 'legacy');
+  return { method, domainLinked: record.proofDomainLinked };
+}
+
+export type DisputeOutcome = 'keep' | 'transfer' | 'take_down';
+
+export interface ClaimDispute {
+  readonly claimantProofMethod: ProofMethod;
+  readonly claimantDomainLinked?: boolean;
+  readonly openedAt: string;
+  readonly outcome?: DisputeOutcome;
+  readonly decidedAt?: string;
+  readonly decidedBy?: string | null;
 }
 
 export type ProofAttemptOutcome =
@@ -181,10 +276,30 @@ export function buildClaimVerificationRequest(input: {
   };
 }
 
-/** True while a free-admission page is waiting for (or failed) proof. */
+/**
+ * True while the page must not be public: a free-admission page waiting for
+ * (or failed) proof, or any taken-down page. A disputed page was verified and
+ * stays up, frozen (`isClaimFrozen`). Mirrors `enforce_proof_before_public()`.
+ */
+export function isRecordBlockingPublication(
+  record: ClaimVerificationRecord | null
+): boolean {
+  if (!record) return false;
+  if (record.status === 'taken_down') return true;
+  return (
+    record.proofOnly === true &&
+    record.status !== 'verified' &&
+    record.status !== 'disputed'
+  );
+}
+
 export function isProofBlockingPublication(settings: unknown): boolean {
-  const record = readClaimVerification(settings);
-  return record?.proofOnly === true && record.status !== 'verified';
+  return isRecordBlockingPublication(readClaimVerification(settings));
+}
+
+/** Disputed pages stay public but take no owner writes until a human decides. */
+export function isClaimFrozen(settings: unknown): boolean {
+  return readClaimVerification(settings)?.status === 'disputed';
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -261,6 +376,106 @@ export function decideClaimVerificationRecord(
     decidedBy: input.decidedBy,
     decisionReason: input.reason?.trim() || null,
     refundId: input.refundId ?? null,
+  };
+}
+
+/**
+ * Automatic proof transition. Only `pending_verification` can be verified,
+ * and only by strong proof: weak proof needs a second signal or a human, and
+ * `legacy` is not proof. Anything else returns null (idempotent retries).
+ */
+export function markVerifiedByProof(
+  record: ClaimVerificationRecord | null,
+  method: ProofMethod,
+  at: Date,
+  options: { readonly domainLinked?: boolean } = {}
+): ClaimVerificationRecord | null {
+  if (record?.status !== 'pending_verification') return null;
+  if (
+    proofStrength({ method, domainLinked: options.domainLinked }) !== 'strong'
+  ) {
+    return null;
+  }
+  return {
+    ...record,
+    status: 'verified',
+    proofMethod: method,
+    ...(options.domainLinked === undefined
+      ? {}
+      : { proofDomainLinked: options.domainLinked }),
+    verifiedAt: at.toISOString(),
+  };
+}
+
+/**
+ * Counter-claim. Only a verified page can be disputed, and only with proof at
+ * least as strong as the current owner's, so a bare claim cannot freeze a real
+ * artist. The page stays up, frozen. Returns null otherwise.
+ */
+export function openDispute(
+  record: ClaimVerificationRecord | null,
+  input: {
+    readonly claimantProofMethod: ProofMethod;
+    readonly claimantDomainLinked?: boolean;
+    readonly at: Date;
+  }
+): ClaimVerificationRecord | null {
+  if (record?.status !== 'verified') return null;
+  if (input.claimantProofMethod === 'legacy') return null;
+  const claimant: ProofEvidence = {
+    method: input.claimantProofMethod,
+    domainLinked: input.claimantDomainLinked,
+  };
+  if (compareProofStrength(claimant, currentProofEvidence(record)) < 0) {
+    return null;
+  }
+  return {
+    ...record,
+    status: 'disputed',
+    dispute: {
+      claimantProofMethod: input.claimantProofMethod,
+      ...(input.claimantDomainLinked === undefined
+        ? {}
+        : { claimantDomainLinked: input.claimantDomainLinked }),
+      openedAt: input.at.toISOString(),
+    },
+  };
+}
+
+/**
+ * Human decision on an open dispute. `keep` and `transfer` return the page to
+ * verified (a transfer carries the claimant's proof; moving ownership is the
+ * caller's job), `take_down` removes it. Returns null unless disputed.
+ */
+export function resolveDispute(
+  record: ClaimVerificationRecord | null,
+  input: {
+    readonly outcome: DisputeOutcome;
+    readonly decidedBy: string | null;
+    readonly at: Date;
+  }
+): ClaimVerificationRecord | null {
+  if (record?.status !== 'disputed' || !record.dispute) return null;
+  const decidedAt = input.at.toISOString();
+  const dispute: ClaimDispute = {
+    ...record.dispute,
+    outcome: input.outcome,
+    decidedAt,
+    decidedBy: input.decidedBy,
+  };
+  if (input.outcome === 'take_down') {
+    return { ...record, status: 'taken_down', dispute };
+  }
+  if (input.outcome === 'keep') {
+    return { ...record, status: 'verified', dispute };
+  }
+  return {
+    ...record,
+    status: 'verified',
+    proofMethod: record.dispute.claimantProofMethod,
+    proofDomainLinked: record.dispute.claimantDomainLinked === true,
+    verifiedAt: decidedAt,
+    dispute,
   };
 }
 
