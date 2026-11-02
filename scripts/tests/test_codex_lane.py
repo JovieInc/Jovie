@@ -1412,6 +1412,33 @@ class SubscriptionPoolTest(Isolated):
         self.assertTrue(codex.available("current-login",codex.read_state(),self.NOW))
         self.assertFalse(codex.available("lyb-pro",codex.read_state(),self.NOW))
 
+    def test_verified_headroom_releases_a_quota_hold_left_by_an_outside_reset(self):
+        self.reconcile()
+        codex.update_state(lambda st: st["current-login"].update(exhaustedUntil=self.NOW + 86400, lastKind="limit"))
+        self.assertFalse(codex.available("current-login", codex.read_state(), self.NOW))
+        self.reconcile()
+        state = codex.read_state()
+        self.assertNotIn("exhaustedUntil", state["current-login"])
+        self.assertEqual(state["current-login"]["staleHoldWas"], self.NOW + 86400)
+        self.assertTrue(codex.available("current-login", state, self.NOW))
+
+    def test_depleted_window_auth_bank_or_pending_reset_keeps_the_hold(self):
+        cases = (("depleted", {"lastKind": "limit"}, 100), ("auth", {"lastKind": "auth"}, 1),
+                 ("pending", {"lastKind": "limit", "pendingReset": {"before": {}}}, 1))
+        for label, extra, used in cases:
+            with self.subTest(label=label):
+                self.reconcile()
+                codex.update_state(lambda st: st["current-login"].update(exhaustedUntil=self.NOW + 86400, **extra))
+
+                def fetch(name, used=used):
+                    value = self.snapshot(name)
+                    value["rateLimits"]["rateLimits"]["primary"]["usedPercent"] = used
+                    return value
+                codex.reconcile(self.NOW, if_due=0, fetch=fetch)
+                self.assertEqual(codex.read_state()["current-login"]["exhaustedUntil"], self.NOW + 86400)
+                codex.update_state(lambda st: [st["current-login"].pop(k, None)
+                                               for k in ("exhaustedUntil", "pendingReset", "lastKind")])
+
     def test_failed_observation_keeps_its_own_cadence_without_suppressing_other_profile(self):
         seen = []
         def fetch(name):

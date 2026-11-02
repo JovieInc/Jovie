@@ -797,6 +797,20 @@ def reconcile_current_subscription(now, if_due, fetch, name=CURRENT_LOGIN) -> di
                     entry.update(subscriptionBinding=binding, subscriptionIdentityVerifiedAt=now)
                 previous = entry.get("capacityLease") or {}
                 entry["capacityLease"] = value
+                # A quota hold outlives the window it was recorded in when the reset is
+                # redeemed outside the lane (2026-11-02: Tim redeemed a banked reset, readback
+                # showed 99%, and the stale hold kept codex at 0 seats). A verified observation
+                # with headroom in every window releases a quota hold only; auth banks and
+                # pending lane redemptions stay with their own owners.
+                remaining = list((value.get("usableCapacityRemaining") or {}).values())
+                held = entry.get("exhaustedUntil")
+                if (type(held) in (int, float) and held > now and entry.get("lastKind") == "limit"
+                        and not entry.get("pendingReset") and remaining
+                        and all(type(row.get("remainingPercent")) in (int, float) and row["remainingPercent"] > 0
+                                for row in remaining)):
+                    entry.pop("exhaustedUntil", None)
+                    entry["staleHoldReleasedAt"] = now
+                    entry["staleHoldWas"] = held
                 if _lease_digest(previous) != _lease_digest(value):
                     path = STATE.parent / "capacity-events.jsonl"
                     with path.open("a") as stream:
