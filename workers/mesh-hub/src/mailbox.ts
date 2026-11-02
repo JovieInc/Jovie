@@ -15,6 +15,8 @@ const SWEEP_MS = 5 * 60_000;
 /** Only statuses that mean "this message is bad", never "the route is not ready". */
 const WEBHOOK_TERMINAL = new Set([400, 409, 413, 422]);
 /** Webhook retry ladder for pushes to Summer (serverless, cannot hold a socket). */
+/** Delay before a task that threw is tried again. */
+const ALARM_RETRY_MS = 5_000;
 const WEBHOOK_BACKOFF_MS = [5_000, 15_000, 60_000, 300_000, 900_000] as const;
 
 export type MailboxConfig = {
@@ -167,9 +169,16 @@ export class Mailbox extends DurableObject<Env> {
     return messages.map(project);
   }
 
-  async history(since: number, limit: number) {
+  /** Pages by seq: pass `nextAfter` back as `afterSeq` until it is null. */
+  async history(since: number, limit: number, afterSeq = 0) {
     this.touch();
-    return this.store.history(since, limit).map(project);
+    const rows = this.store.history(since, limit, afterSeq);
+    const full =
+      rows.length > 0 && rows.length >= Math.min(limit, LIMITS.pageSize);
+    return {
+      messages: rows.map(project),
+      nextAfter: full ? (rows[rows.length - 1] as Delivered).seq : null,
+    };
   }
 
   async ack(ids: string[]) {
@@ -256,9 +265,12 @@ export class Mailbox extends DurableObject<Env> {
           .filter((id): id is string => typeof id === 'string')
           .slice(0, 500)
       : [];
-    if (frame.type === 'receipt') this.store.receipt(ids, Date.now());
-    else if (frame.type === 'ack') this.store.ack(ids, Date.now());
-    else if (frame.type === 'sync')
+    if (frame.type === 'receipt' || frame.type === 'ack') {
+      if (frame.type === 'receipt') this.store.receipt(ids, Date.now());
+      else this.store.ack(ids, Date.now());
+      // A page is capped; drain the rest of the backlog as the client catches up.
+      if (ids.length) this.sendBatch(ws, this.store.unreceived(Date.now()));
+    } else if (frame.type === 'sync')
       this.sendBatch(ws, this.store.unreceived(Date.now()));
   }
 
@@ -283,11 +295,26 @@ export class Mailbox extends DurableObject<Env> {
     const now = Date.now();
     const due = this.outbox.dueTasks(now);
     try {
+      // A task is cleared before it runs (it may reschedule itself) and put
+      // back if it throws, so a failure never drops it or the tasks after it.
       for (const task of due) this.outbox.schedule(task, null);
+      const run = async (task: string, fn: () => Promise<void>) => {
+        try {
+          await fn();
+        } catch (error) {
+          console.error(
+            JSON.stringify({ channel: 'mesh-hub', task, error: String(error) })
+          );
+          this.outbox.schedule(task, Date.now() + ALARM_RETRY_MS);
+        }
+      };
       if (due.includes('fanout'))
-        for (const intent of this.outbox.open()) await this.fanOut(intent.id);
-      if (due.includes('sweep')) await this.sweep(now);
-      if (due.includes('webhook')) await this.pushWebhook(now);
+        await run('fanout', async () => {
+          for (const intent of this.outbox.open()) await this.fanOut(intent.id);
+        });
+      if (due.includes('sweep')) await run('sweep', () => this.sweep(now));
+      if (due.includes('webhook'))
+        await run('webhook', () => this.pushWebhook(now));
     } finally {
       // Re-arm before returning so a failing task can never stop the timers.
       await this.arm();
@@ -298,8 +325,22 @@ export class Mailbox extends DurableObject<Env> {
     const config = this.config();
     this.store.purge(now);
     if (config) {
-      for (const dead of this.store.sweepDead(now, config.deadAfterMs))
-        await this.notifyDead(config, dead);
+      for (const dead of this.store.sweepDead(now, config.deadAfterMs)) {
+        try {
+          await this.notifyDead(config, dead);
+        } catch (error) {
+          // Un-flag so the next sweep retries instead of losing the DLQ wrapper.
+          this.store.clearDead(dead.seq);
+          console.error(
+            JSON.stringify({
+              channel: 'mesh-hub',
+              task: 'notifyDead',
+              id: dead.id,
+              error: String(error),
+            })
+          );
+        }
+      }
     }
     if (this.store.unackedCount() > 0 || this.outbox.open(1).length)
       this.outbox.schedule('sweep', now + SWEEP_MS);
@@ -343,7 +384,9 @@ export class Mailbox extends DurableObject<Env> {
     });
     if (fallback) {
       const stub = this.env.MAILBOX.get(this.env.MAILBOX.idFromName(fallback));
-      await stub.enqueue(wrapper);
+      const result = await stub.enqueue(wrapper);
+      if (!result.ok)
+        throw new Error(`dead-letter enqueue failed: ${result.code}`);
     }
   }
 
@@ -390,13 +433,17 @@ export class Mailbox extends DurableObject<Env> {
         // block the queue, and alarm. 401/404/408/429/5xx are config or deploy
         // lag and keep retrying; never strand a message on a missing route.
         this.store.receipt([message.id], Date.now());
-        const registry = this.env.REGISTRY.get(
-          this.env.REGISTRY.idFromName('registry')
-        );
-        await registry.recordEvent('webhook.rejected', 'summer', {
-          id: message.id,
-          status,
-        });
+        // An event rejected by the webhook must not raise another event into
+        // the same mailbox: that would loop for as long as Summer rejects it.
+        if (message.kind !== 'event') {
+          const registry = this.env.REGISTRY.get(
+            this.env.REGISTRY.idFromName('registry')
+          );
+          await registry.recordEvent('webhook.rejected', 'summer', {
+            id: message.id,
+            status,
+          });
+        }
       } else {
         failures++;
         break;
