@@ -111,7 +111,21 @@ def events(row: dict) -> list[dict]:
             return []
         return gate_events(row, started, ended)
     found = event(row)
-    return [found] if found else []
+    result = [found] if found else []
+    learning = row.get("repairLearning")
+    if found and row.get("kind") == "fix-red" and isinstance(learning, dict):
+        retrieval = learning.get("retrieval")
+        retrieval = retrieval if isinstance(retrieval, dict) else {}
+        for name, span, advanced in (
+                ("learning-retrieval", retrieval, retrieval.get("gbrain") == "retrieved"),
+                ("learning-record", learning, learning.get("status") == "source-and-brain-bound-ci-pending")):
+            if not isinstance(span, dict):
+                continue
+            entered, exited = _epoch(span.get("enteredAt")), _epoch(span.get("exitedAt"))
+            if entered is not None and exited is not None and exited >= entered:
+                result.append({**found, "stage": name, "enteredAt": _iso(entered), "exitedAt": _iso(exited),
+                               "outcome": "advanced" if advanced else "failed"})
+    return result
 
 
 def event(row: dict) -> dict | None:
