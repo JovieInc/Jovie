@@ -312,9 +312,28 @@ export function renameFrame(id, name, opts) {
 /** Save-guard signature per top-level node: cheap, changes on any edit. */
 export const SIGNATURE_SNIPPET = `Get((n,c)=>{if(c.depth>0){c.skipChildren();return}let k=0,h=0;Get(n.id,m=>{k++;const s=JSON.stringify([m.id,m.name,m.x,m.y,m.width,m.height,m.content,m.fill,m.enabled,m.ref]);for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0});Print("SIG"+JSON.stringify([n.id,k+":"+h]))})`;
 
-export function signatures(opts) {
-  const [res] = runPen([SIGNATURE_SNIPPET], opts);
-  return Object.fromEntries(tagged(res.lines, 'SIG'));
+/** Signature of the given top-level ids only (one execute per chunk). */
+export const signatureSnippet = ids =>
+  `for(const T of ${JSON.stringify(ids)}){let k=0,h=0;try{Get(T,m=>{k++;const s=JSON.stringify([m.id,m.name,m.x,m.y,m.width,m.height,m.content,m.fill,m.enabled,m.ref]);for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0})}catch(e){k=-1}Print("SIG"+JSON.stringify([T,k+":"+h]))}`;
+
+/**
+ * Per-top-level content signatures. The whole-document pass ran past the
+ * ~55 s execute budget on the 200-frame canonical file (2026-11-02), so the
+ * work is split into chunks of top-level frames, one execute each.
+ */
+export function signatures(opts, { chunk = 8 } = {}) {
+  const [list] = runPen(
+    [
+      `const t=[];Get((n,c)=>{if(c.depth>0){c.skipChildren();return}t.push(n.id)});Print("TOPS"+JSON.stringify(t))`,
+    ],
+    opts
+  );
+  const tops = tagged(list.lines, 'TOPS')[0] ?? [];
+  const snippets = [];
+  for (let i = 0; i < tops.length; i += chunk)
+    snippets.push(signatureSnippet(tops.slice(i, i + chunk)));
+  const res = runPen(snippets, { timeoutMs: 600_000, ...opts });
+  return Object.fromEntries(res.flatMap(r => tagged(r.lines, 'SIG')));
 }
 
 /** save() on the attached live canvas; returns the persist evidence. */

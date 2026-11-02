@@ -107,6 +107,8 @@ their flex translation stretches some vertical stacks.
    one writer. Headless prints raw result text, not JSON, and each `execute`
    has about a 55 s budget: split graft and export into separate calls.
 7. Before each batch, `get_app_state()` to confirm the active document.
+8. Size properties (`width`, `height`) do not bind variables: `Update(id,{width:"$logo-size-default"})` is silently ignored. Set the number (logo marks 28, never above 32) and let the `logo-size` check enforce it. Colour, type size, radius, gap and padding do bind `$tokens`.
+9. A headless render shows the saved file plus the grafted frame. After editing a master or a variable, run the guarded save before rendering, or the render shows the old master.
 
 ## Cold readback
 

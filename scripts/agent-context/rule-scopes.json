@@ -129,7 +129,7 @@
   {
     "file": ".claude/rules/pen.md",
     "paths": ["**/*.pen", "scripts/agent/pen*", "docs/design-system/**"],
-    "bodySha256": "2a6eaf72640c30ef1cf2b53f95bdb6d41e244ba58156264b8a02ab7ca8339761"
+    "bodySha256": "f78c32aedb9ba92a9e2f7a939ddad27d7947fa1abeea4c528d1374dfa9148ec6"
   },
   {
     "file": ".claude/rules/pr-stacking.md",

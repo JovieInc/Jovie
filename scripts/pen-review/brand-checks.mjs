@@ -190,6 +190,66 @@ export function dsFindings(facts) {
   return out;
 }
 
+// ── Sidebar header (Tim, 2026-11-02: "resolve this garbage") ─────────────
+
+const SATURATED =
+  /^\$(ion|ultra|pulse|mint|orange|red|atom-accent-(focus|info|pulse|warning|success|danger))$/;
+const isPill = n =>
+  n.r?.cornerRadius === '$radius-pill' ||
+  (typeof n.cr === 'number' && n.cr >= Math.min(n.w, n.h) / 2);
+
+/** Saturated count badges and detached circular buttons inside a sidebar. */
+export function sidebarFindings(facts) {
+  const out = [];
+  const byId = new Map(facts.nodes.map(n => [n.id, n]));
+  const inSidebar = n => {
+    for (let p = byId.get(n.p); p; p = byId.get(p.p))
+      if (/sidebar/i.test(p.nm ?? '')) return true;
+    return false;
+  };
+  const kids = id => facts.nodes.filter(k => k.p === id);
+  for (const n of facts.nodes) {
+    if (n.d === 0 || n.t !== 'frame' || !inSidebar(n)) continue;
+    const fill = typeof n.r?.fill === 'string' ? n.r.fill : null;
+    const text = kids(n.id).find(k => k.t === 'text');
+    if (
+      fill &&
+      SATURATED.test(fill) &&
+      n.h <= 24 &&
+      n.w <= 48 &&
+      isPill(n) &&
+      text &&
+      /^\d+\+?$/.test(String(text.tx ?? '').trim())
+    )
+      out.push({
+        check: 'sidebar-badge',
+        severity: 'block',
+        node: n.id,
+        name: n.nm,
+        message: `count badge uses saturated ${fill}; use a muted numeral or a neutral $atom-surface-elevated badge`,
+      });
+    const detached =
+      fill &&
+      fill !== '$atom-transparent' &&
+      Math.abs(n.w - n.h) < 1 &&
+      n.w <= 44 &&
+      isPill(n) &&
+      kids(n.id).some(
+        k => k.t === 'icon_font' || k.t === 'icon' || k.t === 'path'
+      );
+    if (detached)
+      out.push({
+        check: 'sidebar-detached-button',
+        severity: 'block',
+        node: n.id,
+        name: n.nm,
+        message:
+          'filled circular button floating in the sidebar; use a quiet 28px icon button in the header row or a full-width row',
+      });
+  }
+  return out;
+}
+
 /** All brand checks over one frame's facts (see pen-bridge factsSnippet). */
 export function brandChecks(facts) {
   const nodes = facts.nodes.filter(n => n.d > 0);
@@ -199,5 +259,6 @@ export function brandChecks(facts) {
     ...logoFindings(nodes),
     ...ratingFindings(facts.name, texts),
     ...dsFindings(facts),
+    ...sidebarFindings(facts),
   ];
 }

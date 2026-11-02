@@ -294,3 +294,88 @@ test('DS rules: elevation inversion, accent misuse, raw radius and spacing', asy
     ['ds-radius', 'ds-spacing']
   );
 });
+
+test('sidebar header: saturated count badge and detached circle fail; muted count passes', async () => {
+  const { sidebarFindings } = await import('./brand-checks.mjs');
+  const base = [
+    { id: 'F', t: 'frame', d: 0, w: 1348, h: 900 },
+    {
+      id: 'S',
+      t: 'frame',
+      nm: 'Sidebar / Contacts',
+      p: 'F',
+      d: 1,
+      w: 244,
+      h: 884,
+      r: {},
+    },
+  ];
+  const run = nodes =>
+    sidebarFindings({ name: 'P', nodes: [...base, ...nodes] }).map(
+      f => f.check
+    );
+  assert.deepEqual(
+    run([
+      {
+        id: 'b',
+        t: 'frame',
+        nm: 'Unread Count',
+        p: 'S',
+        d: 2,
+        w: 24,
+        h: 20,
+        r: { fill: '$ion', cornerRadius: '$radius-pill' },
+      },
+      { id: 'bt', t: 'text', p: 'b', d: 3, tx: '3' },
+    ]),
+    ['sidebar-badge']
+  );
+  assert.deepEqual(
+    run([
+      {
+        id: 'b',
+        t: 'frame',
+        nm: 'Count / neutral',
+        p: 'S',
+        d: 2,
+        w: 20,
+        h: 18,
+        r: { fill: '$atom-surface-elevated', cornerRadius: '$radius-pill' },
+      },
+      { id: 'bt', t: 'text', p: 'b', d: 3, tx: '3' },
+    ]),
+    []
+  );
+  assert.deepEqual(
+    run([
+      {
+        id: 'n',
+        t: 'frame',
+        nm: 'New chat',
+        p: 'S',
+        d: 2,
+        w: 32,
+        h: 32,
+        r: { fill: '$atom-surface-elevated', cornerRadius: '$radius-pill' },
+      },
+      { id: 'ni', t: 'icon', p: 'n', d: 3 },
+    ]),
+    ['sidebar-detached-button']
+  );
+  assert.deepEqual(
+    run([
+      {
+        id: 'n',
+        t: 'frame',
+        nm: 'Icon button / New chat',
+        p: 'S',
+        d: 2,
+        w: 28,
+        h: 28,
+        r: { fill: '$atom-transparent', cornerRadius: '$radius-xs' },
+      },
+      { id: 'ni', t: 'icon', p: 'n', d: 3 },
+    ]),
+    []
+  );
+});

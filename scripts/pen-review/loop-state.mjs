@@ -33,6 +33,8 @@ const CHECK_RANK = [
   'private-ratings',
   'layout',
   'logo-size',
+  'sidebar-badge',
+  'sidebar-detached-button',
   'elevation',
   'accent',
   'contrast',
