@@ -27,7 +27,12 @@ const hoisted = vi.hoisted(() => ({
   getVideoMetricsForProfile: vi.fn(),
   registerThumbnailCandidateReview: vi.fn(),
   getAuthenticatedProfile: vi.fn(),
+  loadArtistMemory: vi.fn(),
   rateLimit: vi.fn(),
+}));
+
+vi.mock('@/lib/artist-memory/queries.server', () => ({
+  loadArtistMemory: hoisted.loadArtistMemory,
 }));
 
 vi.mock('server-only', () => ({}));
@@ -673,6 +678,45 @@ describe('POST /api/mcp/[username] — JSON-RPC id echo', () => {
       contentType: 'music_video',
       limit: 10,
     });
+  });
+
+  it('get_artist_memory gives anonymous agents the public projection only', async () => {
+    hoisted.loadArtistMemory.mockResolvedValue([]);
+    const { POST } = await import('./route');
+    const res = await POST(
+      makeRequest({
+        jsonrpc: '2.0',
+        id: 40,
+        method: 'tools/call',
+        params: { name: 'get_artist_memory', arguments: {} },
+      }),
+      { params: Promise.resolve({ username: 'artist1' }) }
+    );
+    expect(res.status).toBe(200);
+    expect(hoisted.getAuthenticatedProfile).not.toHaveBeenCalled();
+    expect(hoisted.loadArtistMemory).toHaveBeenCalledWith('p1', 'public');
+  });
+
+  it('get_artist_memory gives the owner the full view and non-owners the public one', async () => {
+    hoisted.loadArtistMemory.mockResolvedValue([]);
+    hoisted.getCachedAuth.mockResolvedValue({ userId: 'owner-1' });
+    hoisted.getAuthenticatedProfile.mockResolvedValueOnce({ id: 'p1' });
+    const { POST } = await import('./route');
+    const call = () =>
+      POST(
+        makeRequest({
+          jsonrpc: '2.0',
+          id: 41,
+          method: 'tools/call',
+          params: { name: 'get_artist_memory', arguments: {} },
+        }),
+        { params: Promise.resolve({ username: 'artist1' }) }
+      );
+    await call();
+    expect(hoisted.loadArtistMemory).toHaveBeenLastCalledWith('p1', 'owner');
+    hoisted.getAuthenticatedProfile.mockResolvedValueOnce(null);
+    await call();
+    expect(hoisted.loadArtistMemory).toHaveBeenLastCalledWith('p1', 'public');
   });
 
   it('list_videos rejects a limit above 100', async () => {

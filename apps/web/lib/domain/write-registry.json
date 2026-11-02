@@ -327,6 +327,9 @@
       "kind": "domain",
       "domain": "merch.cards"
     },
+    "mcp:artist:get_artist_memory": {
+      "kind": "read"
+    },
     "mcp:artist:list_videos": {
       "kind": "read"
     },

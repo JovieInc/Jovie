@@ -1817,6 +1817,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/artist-memory/route.ts",
+      "kind": "handler",
+      "route": "/api/artist-memory",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/artist-rules/route.ts",
       "kind": "handler",
       "route": "/api/artist-rules",
