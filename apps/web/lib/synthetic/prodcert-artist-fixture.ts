@@ -82,8 +82,6 @@ export const SHARED_E2E_ARTIST_POOL: readonly ProdcertArtistFixture[] = [
     url: 'https://open.spotify.com/artist/1ZlSI1juLMMN1HU8X7RViN',
   },
   {
-  },
-  {
     spotifyId: '6TWG4bY1qzp0lJuxxFtl6F',
     name: 'Unmarked Cars',
     url: 'https://open.spotify.com/artist/6TWG4bY1qzp0lJuxxFtl6F',
