@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
+import { stripVTControlCharacters } from 'node:util';
 import { BRAND_NAME_COVERAGE_COMMAND } from '../ci-fast-lanes.mjs';
 import {
   checkDrift,
@@ -159,6 +160,7 @@ test('brand spelling assertions pass with per-file V8 coverage floors', () => {
     cwd: REPO_ROOT,
     shell: true,
     encoding: 'utf8',
+    env: { ...process.env, FORCE_COLOR: '1' },
     timeout: 120_000,
     maxBuffer: 8 * 1024 * 1024,
   });
@@ -170,6 +172,7 @@ test('brand spelling assertions pass with per-file V8 coverage floors', () => {
     0,
     'real brand spelling tests and V8 floors must pass'
   );
-  assert.match(result.stdout, /Tests\s+\d+ passed/u);
-  assert.match(result.stdout, /Coverage report from v8/u);
+  const stdout = stripVTControlCharacters(result.stdout);
+  assert.match(stdout, /Tests\s+\d+ passed/u);
+  assert.match(stdout, /Coverage report from v8/u);
 });
