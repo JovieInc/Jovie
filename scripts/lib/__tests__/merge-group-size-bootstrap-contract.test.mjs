@@ -102,6 +102,7 @@ describe('merge-group size trusted bootstrap contract', () => {
   });
 
   it.each([
+    ['export GIT_CONFIG_COUNT=2', 'GIT_CONFIG_COUNT=2'],
     ['node scripts/lib/merge-group-local-evidence.mjs || true', ''],
     [
       '--filter=blob:none --no-tags --depth=2',

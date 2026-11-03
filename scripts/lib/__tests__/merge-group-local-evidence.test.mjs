@@ -417,7 +417,11 @@ const { spawnSync } = require('node:child_process');
 let args = process.argv.slice(2);
 let first = false;
 if (args[0] === 'fetch') {
-  fs.appendFileSync(process.env.FETCH_TRACE, JSON.stringify(args) + String.fromCharCode(10));
+  const authenticated = process.env.GIT_CONFIG_COUNT === '2' &&
+    process.env.GIT_CONFIG_KEY_0 === 'http.https://github.com/.extraheader' &&
+    process.env.GIT_CONFIG_VALUE_0 === 'AUTHORIZATION: basic ' + Buffer.from('x-access-token:' + process.env.GH_TOKEN).toString('base64');
+  fs.appendFileSync(process.env.FETCH_TRACE, JSON.stringify({ args, authenticated }) + String.fromCharCode(10));
+  if (!authenticated) process.exit(77);
   first = !fs.existsSync(process.env.INITIAL_FETCH);
   if (first) {
     fs.writeFileSync(process.env.INITIAL_FETCH, 'started');
@@ -475,10 +479,12 @@ process.exit(first ? 124 : (result.status ?? 1));
         expect(readFileSync(policyCalled, 'utf8')).toBe(
           '--policy=size --also=fork'
         );
-        const fetches = readFileSync(trace, 'utf8')
+        const requests = readFileSync(trace, 'utf8')
           .trim()
           .split(String.fromCharCode(10))
           .map(line => JSON.parse(line));
+        expect(requests.every(request => request.authenticated)).toBe(true);
+        const fetches = requests.map(request => request.args);
         expect(fetches[0]).toContain('--filter=blob:none');
         expect(
           fetches.filter(args => args.includes('--filter=blob:limit=1g'))
