@@ -36,20 +36,13 @@ const VITEST_TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
 const KNOWN_VITEST_FIXTURE_TESTS = new Map([
   [
     'apps/web/data/designSystem/surfaceCensus.json',
-    ['scripts/lib/__tests__/design-surface-census.test.mjs'],
-  ],
-  [
-    'apps/web/lib/brand/tokens.ts',
     [
-      'apps/web/tests/unit/lib/brand/brand-mark-size-guard.test.ts',
-      'apps/web/tests/unit/lib/brand/primitives.test.tsx',
-      'apps/web/tests/unit/atoms/BrandLogo.test.tsx',
-      'apps/web/components/atoms/BrandLogo.test.tsx',
-      'apps/web/components/atoms/Logo.test.tsx',
-      'apps/web/components/atoms/LogoLink.test.tsx',
-      'apps/web/tests/unit/components/site/MarketingHeader.test.tsx',
+      'scripts/lib/__tests__/design-surface-census.test.mjs',
+      'apps/web/lib/content-records/marketing-page.test.ts',
     ],
   ],
+  // Shared brand tokens have broad runtime and test consumers. Keep the
+  // full-suite fallback until selection can prove their complete coverage.
   [
     'apps/web/tests/unit/design-system/arbitrary-values.baseline.json',
     ['apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'],
@@ -1316,6 +1309,19 @@ export function buildAffectedTestPlan(changedFiles, options) {
     nodeTestArgs: [],
     retouchPromptCoverage: false,
     ...plan,
+    censusValidation: files.includes(
+      'apps/web/data/designSystem/surfaceCensus.json'
+    ),
+    ...(files.includes('apps/web/data/designSystem/surfaceCensus.json') &&
+    plan.mode === 'full' &&
+    isFileAvailable('scripts/lib/__tests__/design-surface-census.test.mjs')
+      ? {
+          scriptVitestTests: unique([
+            ...(plan.scriptVitestTests ?? []),
+            'scripts/lib/__tests__/design-surface-census.test.mjs',
+          ]),
+        }
+      : {}),
     ...(lanePythonCoverage
       ? {
           lanePythonCoverage: true,
@@ -3069,6 +3075,7 @@ export function buildSelectedTestCommands(
 ) {
   const commands = [];
   if (
+    plan.censusValidation ||
     plan.scriptVitestTests.includes(
       'scripts/lib/__tests__/design-surface-census.test.mjs'
     )

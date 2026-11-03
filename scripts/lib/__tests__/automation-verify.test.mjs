@@ -3741,16 +3741,20 @@ describe('automation-verify affected scope', () => {
     const censusProducer =
       'scripts/lib/__tests__/design-surface-census.test.mjs';
     const tokens = 'apps/web/lib/brand/tokens.ts';
-    const brandProducers = [
-      'apps/web/tests/unit/lib/brand/brand-mark-size-guard.test.ts',
-      'apps/web/tests/unit/lib/brand/primitives.test.tsx',
-      'apps/web/tests/unit/atoms/BrandLogo.test.tsx',
-      'apps/web/components/atoms/BrandLogo.test.tsx',
-      'apps/web/components/atoms/Logo.test.tsx',
-      'apps/web/components/atoms/LogoLink.test.tsx',
-      'apps/web/tests/unit/components/site/MarketingHeader.test.tsx',
-    ];
-
+    it('retains full fallback for shared tokens with unregistered real consumers', () => {
+      const repo = resolve(import.meta.dirname, '../../..');
+      for (const test of [
+        'apps/web/tests/unit/og/marketing-og-cards.test.ts',
+        'apps/web/components/atoms/JovieMarkElectric.test.tsx',
+      ]) {
+        expect(readFileSync(resolve(repo, test), 'utf8')).toContain(
+          "from '@/lib/brand/tokens'"
+        );
+      }
+      const plan = buildAffectedTestPlan([tokens]);
+      expect(plan.mode).toBe('full');
+      expect(plan.fallbackReason).toContain(tokens);
+    });
     it('runs the real census validator with the scripts Vitest runner', () => {
       const plan = buildAffectedTestPlan([census]);
       expect(plan.mode).toBe('selected');
@@ -3779,22 +3783,23 @@ describe('automation-verify affected scope', () => {
       ]);
     });
 
-    it('runs the existing brand geometry and rendered header behavior producers', () => {
-      const plan = buildAffectedTestPlan([tokens]);
-      expect(plan.mode).toBe('selected');
-      expect(plan.selectedTests).toEqual(
-        expect.arrayContaining(brandProducers)
+    it('runs the runtime census consumer and falls back when its test is absent', () => {
+      const repo = resolve(import.meta.dirname, '../../..');
+      const consumer = 'apps/web/lib/content-records/marketing-page.ts';
+      const producer = 'apps/web/lib/content-records/marketing-page.test.ts';
+      expect(readFileSync(resolve(repo, consumer), 'utf8')).toContain(
+        "import surfaceCensus from '@/data/designSystem/surfaceCensus.json'"
       );
-      const commands = buildSelectedTestCommands(plan, '2');
-      expect(commands.some(([command]) => command === 'node')).toBe(false);
+      expect(readFileSync(resolve(repo, producer), 'utf8')).toContain(
+        'e.dsStatus'
+      );
+      const plan = buildAffectedTestPlan([census]);
+      expect(plan.selectedTests).toContain(producer);
       expect(
-        commands.some(
-          ([command, args]) =>
-            command === 'pnpm' &&
-            args.includes('@jovie/web') &&
-            args.includes('tests/unit/components/site/MarketingHeader.test.tsx')
-        )
-      ).toBe(true);
+        buildAffectedTestPlan([census], {
+          isFileAvailable: file => file !== producer,
+        }).mode
+      ).toBe('full');
     });
 
     it('validates current census transitions against the caller-provided base', () => {
@@ -3804,19 +3809,22 @@ describe('automation-verify affected scope', () => {
         'node',
         ['scripts/design-surface-census.mjs', base],
       ]);
+      expect(
+        buildSelectedTestCommands(
+          { ...plan, censusValidation: false },
+          '2',
+          base
+        )
+      ).toContainEqual(['node', ['scripts/design-surface-census.mjs', base]]);
     });
 
-    it.each([censusProducer, ...brandProducers])(
-      'retains full fallback when required producer %s is missing',
-      producer => {
-        const source = producer === censusProducer ? census : tokens;
-        const plan = buildAffectedTestPlan([source], {
-          isFileAvailable: file => file !== producer,
-        });
-        expect(plan.mode).toBe('full');
-        expect(plan.fallbackReason).toContain(source);
-      }
-    );
+    it('retains full fallback when the census producer is missing', () => {
+      const plan = buildAffectedTestPlan([census], {
+        isFileAvailable: file => file !== censusProducer,
+      });
+      expect(plan.mode).toBe('full');
+      expect(plan.fallbackReason).toContain(census);
+    });
 
     it.each([
       'apps/web/lib/brand/unregistered.ts',
@@ -3831,14 +3839,26 @@ describe('automation-verify affected scope', () => {
       }
     );
 
-    it('retains both real runners when the two registered sources change together', () => {
-      const plan = buildAffectedTestPlan([census, tokens]);
-      expect(plan.mode).toBe('selected');
-      expect(plan.scriptVitestTests).toContain(censusProducer);
-      expect(plan.selectedTests).toEqual(
-        expect.arrayContaining(brandProducers)
-      );
-    });
+    it.each([tokens, 'package.json'])(
+      'retains census validation when %s requires full fallback',
+      other => {
+        const plan = buildAffectedTestPlan([census, other]);
+        expect(plan.mode).toBe('full');
+        expect(plan.scriptVitestTests).toContain(censusProducer);
+        const commands = buildSelectedTestCommands(plan, '2', 'origin/main');
+        expect(commands).toContainEqual([
+          'node',
+          ['scripts/design-surface-census.mjs', 'origin/main'],
+        ]);
+        expect(
+          commands.some(
+            ([command, args]) =>
+              command === 'pnpm' &&
+              args.includes('lib/__tests__/design-surface-census.test.mjs')
+          )
+        ).toBe(true);
+      }
+    );
   });
 
   describe('audience release denial lane', () => {
