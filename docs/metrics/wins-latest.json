@@ -1,14 +1,14 @@
 {
   "schema": "jovie.wins-metrics/v1",
-  "at": "2026-11-03T08:51:58.188Z",
-  "winsTotal": 29,
+  "at": "2026-11-03T09:20:06.466Z",
+  "winsTotal": 30,
   "winsVerified": 1,
   "winsClaimed": 14,
   "winsUnverified": 3,
   "winsNotReproduced": 1,
   "winsPendingMerge": 4,
-  "winsPendingMeasure": 6,
-  "winsLast7d": 29,
+  "winsPendingMeasure": 7,
+  "winsLast7d": 30,
   "clusters": [
     {
       "theme": "release-reliability",
@@ -60,6 +60,12 @@
     },
     {
       "theme": "golden-path",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "hydration-correctness",
       "total": 1,
       "verified": 0,
       "ready": false
@@ -182,6 +188,10 @@
     },
     {
       "id": "win-2026-10-31-typed-handles-are-honored-and-freed",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-31-removes-the-client-side-hydration-re",
       "status": "pending-measure"
     },
     {
