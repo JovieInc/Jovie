@@ -36,6 +36,15 @@ describe('tracking consent', () => {
     });
   });
 
+  it('never forwards advertising events when only analytics is accepted', () => {
+    setConsentState('accepted');
+    localStorage.setItem(
+      'jv_cc',
+      JSON.stringify({ essential: true, analytics: true, marketing: false })
+    );
+    expect(isTrackingAllowed()).toBe(false);
+  });
+
   describe('isGPCEnabled', () => {
     it('returns false when navigator.globalPrivacyControl is undefined', () => {
       expect(isGPCEnabled()).toBe(false);

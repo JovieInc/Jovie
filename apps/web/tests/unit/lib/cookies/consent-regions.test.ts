@@ -34,12 +34,12 @@ describe('consent-regions', () => {
   });
 
   describe('US state-level detection', () => {
-    it('requires the banner for regulated US states', () => {
-      expect(isCookieBannerRequired('US', 'CA')).toBe(true);
-      expect(isCookieBannerRequired('US', 'CO')).toBe(true);
-      expect(isCookieBannerRequired('US', 'VA')).toBe(true);
-      expect(isCookieBannerRequired('US', 'CT')).toBe(true);
-      expect(isCookieBannerRequired('US', 'UT')).toBe(true);
+    it('uses opt-out choices for all US states', () => {
+      expect(isCookieBannerRequired('US', 'CA')).toBe(false);
+      expect(isCookieBannerRequired('US', 'CO')).toBe(false);
+      expect(isCookieBannerRequired('US', 'VA')).toBe(false);
+      expect(isCookieBannerRequired('US', 'CT')).toBe(false);
+      expect(isCookieBannerRequired('US', 'UT')).toBe(false);
     });
 
     it('does not require the banner for non-regulated US states', () => {
@@ -48,14 +48,14 @@ describe('consent-regions', () => {
       expect(isCookieBannerRequired('US', 'FL')).toBe(false);
     });
 
-    it('shows the banner when US region is unknown (safe fallback)', () => {
-      expect(isCookieBannerRequired('US', null)).toBe(true);
-      expect(isCookieBannerRequired('US', undefined)).toBe(true);
+    it('uses opt-out choices when the US region is unknown', () => {
+      expect(isCookieBannerRequired('US', null)).toBe(false);
+      expect(isCookieBannerRequired('US', undefined)).toBe(false);
     });
 
     it('handles case-insensitive US region codes', () => {
-      expect(isCookieBannerRequired('US', 'ca')).toBe(true);
-      expect(isCookieBannerRequired('us', 'CA')).toBe(true);
+      expect(isCookieBannerRequired('US', 'ca')).toBe(false);
+      expect(isCookieBannerRequired('us', 'CA')).toBe(false);
     });
   });
 
@@ -112,7 +112,7 @@ describe('consent-regions', () => {
           countryCode: 'US',
           regionCode: 'CA',
         })
-      ).toBe(true);
+      ).toBe(false);
     });
 
     it('passes region through to detection', () => {

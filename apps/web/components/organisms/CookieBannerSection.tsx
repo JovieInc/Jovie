@@ -13,7 +13,7 @@ import {
 import { saveConsent } from '@/lib/cookies/consent';
 import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
 import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
-import { setConsentState } from '@/lib/tracking/consent';
+import { isGPCEnabled, setConsentState } from '@/lib/tracking/consent';
 
 const CONSENT_SAVE_ERROR =
   'We could not save preferences. Check your connection and try again.';
@@ -64,7 +64,7 @@ export function CookieBannerSection({
   const [saveError, setSaveError] = useState<string | null>(null);
 
   useLayoutEffect(() => {
-    if (isSuppressedPath) {
+    if (isSuppressedPath || isGPCEnabled()) {
       setVisible(false);
       return;
     }
