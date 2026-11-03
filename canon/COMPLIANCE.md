@@ -2,7 +2,7 @@
 
 Status: Canon
 Inherits: [`OPERATING_SYSTEM.md`](./OPERATING_SYSTEM.md), [`FLEET.md`](./FLEET.md)
-Last updated: 2026-10-28
+Last updated: 2026-10-31
 Owner: summer (keeps it current). Human owner of last resort: Tim White.
 Source: Tim White, 2026-10-28 ("I'm one person with limited cash; I can't afford a lawsuit")
 
@@ -33,7 +33,21 @@ Columns: requirement, current state with evidence, gap, fix, owner. Status: `ok`
 | PRIV-1 | Privacy policy present and accurate to what we collect | `/legal/privacy` live, 235 lines, covers account, Google/Spotify data, AI providers, retention, deletion, children under 13, Google/Spotify API disclosures. This change removes stale Clerk references (auth is Better Auth) and bumps the date. | Policy does not describe audience data: fan/subscriber emails and phone numbers captured on artist profiles, visitor analytics and the `jv_aid` / `jv_identified` cookies, SMS opt-ins, outreach to unclaimed artists. No GDPR or CCPA/CPRA sections (legal bases, rights, transfers, categories, no-sale/no-share statement, authorized agents). Sub-processor list unverified (Resend, Statsig, Sentry, Neon, Vercel, Stripe, Anthropic, Google AI) | Rewrite with the three gaps above; keep sub-processor list generated from `ops/registry/third-party-grants.jsonl`. **COUNSEL** for final text. | summer | partial |
 | PRIV-2 | Terms of service present, enforceable form | `/legal/terms` live (Oct 2026); includes DMCA, AUP, JAMS arbitration with class waiver and 30-day opt-out. | Arbitration/class-waiver enforceability, governing law and consumer carve-outs not reviewed | **COUNSEL** review once, at the same time as PRIV-1 | summer | unverified |
 | PRIV-3 | Terms and Privacy linked where users sign up | `AuthShell` links both. `/identity` page showed plain text with no links. | Fixed in this change (links added) | PR | summer | ok after PR |
-| COOK-1 | Cookie and analytics consent where required (EEA/UK, some US states) | `/legal/cookies` live; `ConsentBanner`, `ga-consent-init.js`, and consent-gated GoogleAnalytics component exist. | Not verified that non-essential tracking (Statsig, GA, audience cookies) is blocked before consent for EEA/UK visitors, nor that the banner is shown by region | Playwright check with EU geo header; record result here | summer | unverified |
+| COOK-1 | Cookie and analytics consent where required (EEA/UK, some US states); see TRK-5 | `/legal/cookies` live; `ConsentBanner`, `ga-consent-init.js`, and consent-gated GoogleAnalytics component exist. | Not verified that non-essential tracking (Statsig, GA, audience cookies) is blocked before consent for EEA/UK visitors, nor that the banner is shown by region | Playwright check with EU geo header; record result here | summer | unverified |
+
+### Tracking, pixels and the compliance loop
+
+Canon: gbrain `decisions/company/privacy-tracking-compliance-guidelines-2026-10-31`. Loop: `canon/privacy/tracker-registry.json` (approved vendors and crawled surfaces) → `scripts/compliance/privacy-inventory.mjs` (headless crawl, four visitor scenarios) → `scripts/compliance/privacy-rules.mjs` (rules, each with a seeded-violation negative control) → `scripts/compliance/privacy-check.mjs` (evidence record, published to gbrain `compliance/privacy-evidence/<run>`). Change gate: `JovieInc/ci` `guards/plugins/tracker-registry.mjs` plus the `privacy-compliance` source guard here.
+
+| ID | Requirement | Current state (evidence) | Gap | Fix | Owner | Status |
+|---|---|---|---|---|---|---|
+| TRK-1 | Every third party a page loads is registered with a rationale | Crawl 2026-10-31: 15 surfaces x 4 scenarios, 0 unregistered hosts after registering goQR (`api.qrserver.com`, profile QR images) | goQR receives visitor IP and referrer | Registry added (PR). ISSUE: first-party QR images | summer | ok |
+| TRK-2 | No third-party pixel or replay on pages where people type | Crawl 2026-10-31: Meta pixel fired on `/tim/alerts` (phone signup) for default US visitors and after Accept in the EU | Fixed: pixel removed from the alerts route; static guard blocks tracker mounts on input routes. Profiles open the fan-subscribe form in a drawer on the same page as the pixel | PR #23971. **COUNSEL** on the profile drawer (brief Q3) | summer | partial |
+| TRK-3 | "Do Not Sell or Share" link wherever pixels run (US opt-out model) | No such link on any Jovie surface; Meta pixel loads by default for US visitors outside the five banner states | Missing link and opt-out page | ISSUE: footer and profile-menu link to a privacy-choices control | summer | gap |
+| TRK-4 | GPC honored with a visible confirmation | Crawl: with GPC, no pixel fires (honored in `isMarketingAllowed`) | No visible confirmation; consent bar still asks | ISSUE (with TRK-3): show "Global Privacy Control honored" and skip the bar | summer | partial |
+| TRK-5 | EU/UK: equal Accept/Reject, nothing pre-checked, nothing fires before Accept | Crawl (consent-required scenario): bar shown with one Accept and one Reject; no pixel before Accept; pixel fires after Accept (positive control); no pre-checked boxes | Geo detection itself is unit-tested, not crawled | none | summer | ok |
+| TRK-6 | Minors: pixels off on young-audience profiles and for visitors who signal under 16 | No young-audience flag exists; pixels run on every profile | Flag, artist toggle and crawl fixture missing | ISSUE: `young_audience` profile flag that suppresses pixels, plus crawl fixture | summer | gap |
+| TRK-7 | Policy claims literally true; every pixel vendor named | Live 2026-10-31: privacy policy said "never selling it" and omitted Meta; cookie policy said "No third-party tracking scripts are loaded on your device" | Fixed in copy (PR #23971), pending counsel wording | PR #23971. **COUNSEL** for final text | summer | partial |
 
 ### Data rights, retention and breach
 
@@ -98,4 +112,5 @@ Prices are rough planning ranges; Summer confirms current quotes before recommen
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-10-31 | Added tracking rows TRK-1..7 and the compliance loop (registry, crawl, rules with negative controls, evidence log); the Meta pixel removal from release-alert signup pages and the privacy and cookie policy corrections ship separately in PR #23971. | Tim White |
 | 2026-10-28 | Created the register; Clerk references removed from the privacy and cookie policies; postal-address email footer and `/identity` legal links added. | Tim White |

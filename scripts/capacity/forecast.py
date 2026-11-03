@@ -424,6 +424,12 @@ def main(argv: list[str] | None = None) -> int:
             for s in fresh:
                 f.write(json.dumps(s) + "\n")
         publish(rows, registry, now, state, alarm_feed())
+        if local == cloud_owner and os.environ.get("WASTE_LOOP") != "off":
+            try:  # unit-metric waste detectors ride the same pass (ops/registry/waste.json)
+                import waste
+                waste.run_pass()
+            except Exception as error:  # a waste-loop fault never blocks capacity alarms
+                print(f"waste-loop: {type(error).__name__}: {error}", file=sys.stderr)
         if args.remediate:
             by_id = {r["id"]: r for r in registry["resources"]}
             for row in rows:

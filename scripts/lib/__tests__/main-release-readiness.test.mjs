@@ -722,7 +722,17 @@ esac
         writeFileSync(calls, '0');
         const slept = join(root, 'slept');
         writeFileSync(slept, '');
-        const reset = Math.floor(Date.now() / 1000) + resetOffset;
+        // Both the fixture reset and the child shell must use one clock. Real
+        // elapsed seconds otherwise shorten the asserted one-hour hold.
+        const now = 1_700_000_000;
+        const reset = now + resetOffset;
+        writeFileSync(
+          join(root, 'date'),
+          `#!/bin/sh
+if [ "$*" = '+%s' ]; then printf '%s\\n' '${now}'; else exec /bin/date "$@"; fi
+`
+        );
+        chmodSync(join(root, 'date'), 0o755);
         writeFileSync(
           join(root, 'sleep'),
           `#!/bin/sh

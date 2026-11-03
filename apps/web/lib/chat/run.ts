@@ -88,6 +88,9 @@ import { OvieProgramError } from '@/lib/ovie/program';
 
 type EntitlementsForPlan = ReturnType<typeof GetEntitlements>;
 
+/** Reasoning effort for the user-facing chat stream (latency sensitive). */
+export const CHAT_REASONING_EFFORT = 'low' as const;
+
 /**
  * Regex patterns for messages that can be handled by the lightweight model.
  * These are simple, tool-invocation-oriented requests that don't need
@@ -648,6 +651,10 @@ export async function executeChatTurn(
             return {};
           },
     abortSignal: signal,
+    // First text, not hidden thinking, is what an artist waits on. The
+    // provider default on glm-5.3 spent ~45s reasoning before any visible
+    // word (prod walk 2026-11-02, 1,561 reasoning deltas).
+    reasoning: CHAT_REASONING_EFFORT,
     providerOptions: {
       gateway: {
         ...(writingPilot ? { models: [] } : {}),
