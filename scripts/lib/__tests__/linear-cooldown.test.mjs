@@ -383,6 +383,12 @@ describe('shared linear cooldown', () => {
             mode: variant === 'nonprivate' ? 0o644 : 0o600,
           }
         );
+      if (variant === 'nonprivate') {
+        // Creation modes are filtered by umask; exercise the unsafe mode even
+        // when the runner creates private files by default.
+        fs.chmodSync(pending, 0o644);
+        assert.equal(fs.statSync(pending).mode & 0o777, 0o644);
+      }
       const waits = t.mock.method(globalThis, 'setTimeout', () => {
         throw new Error('unsafe staging must fail immediately');
       });

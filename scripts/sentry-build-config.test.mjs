@@ -8,8 +8,14 @@ const configPath = new URL('../apps/web/next.config.js', import.meta.url);
 const source = readFileSync(configPath, 'utf8');
 const realRequire = createRequire(configPath);
 function load(env) {
-  let sentryOptions;
-  let base;
+  /** @type {{
+   * config?: { productionBrowserSourceMaps: boolean },
+   * sentryOptions?: {
+   *   sourcemaps: { deleteSourcemapsAfterUpload: boolean },
+   *   widenClientFileUpload: boolean
+   * }
+   * }} */
+  const captured = {};
   const context = {
     process: { env },
     __dirname: new URL('../apps/web', import.meta.url).pathname,
@@ -19,7 +25,7 @@ function load(env) {
       if (name === 'workflow/next')
         return {
           withWorkflow(config) {
-            base = config;
+            captured.config = config;
             return config;
           },
         };
@@ -28,7 +34,7 @@ function load(env) {
       if (name === '@sentry/nextjs/config')
         return {
           withSentryConfig(config, options) {
-            sentryOptions = options;
+            captured.sentryOptions = options;
             return config;
           },
         };
@@ -36,7 +42,11 @@ function load(env) {
     },
   };
   vm.runInNewContext(source, context, { filename: configPath.pathname });
-  return { config: base, sentryOptions };
+  assert.ok(
+    captured.config,
+    'workflow plugin receives the base Next configuration'
+  );
+  return { config: captured.config, sentryOptions: captured.sentryOptions };
 }
 for (const token of [undefined, '', '[SENSITIVE]', '   ', ' [SENSITIVE]\n']) {
   test(`does not emit browser maps or enable uploads with unusable token ${String(token)}`, () => {
@@ -57,6 +67,7 @@ for (const env of [
       ...env,
       SENTRY_AUTH_TOKEN: 'test-fixture-token',
     });
+    assert.ok(sentryOptions, 'upload-enabled builds configure Sentry');
     assert.equal(config.productionBrowserSourceMaps, true);
     assert.equal(sentryOptions.sourcemaps.deleteSourcemapsAfterUpload, true);
     assert.equal(sentryOptions.widenClientFileUpload, true);
