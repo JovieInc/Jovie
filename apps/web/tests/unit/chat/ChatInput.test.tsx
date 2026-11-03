@@ -11,6 +11,7 @@ import {
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ComponentProps, type ReactNode, useState } from 'react';
+import { renderToString } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const desktopAuth = vi.hoisted(() => ({ isLoaded: true, isSignedIn: false }));
@@ -193,6 +194,27 @@ describe('ChatInput', () => {
     isLoading: false,
     isSubmitting: false,
   };
+
+  it.each(['', 'I want to claim jov.ie/sam.'])(
+    'includes the draft and send action in server HTML before hydration (%s)',
+    value => {
+      const serverDocument = document.createElement('div');
+      serverDocument.innerHTML = renderToString(
+        withProviders(
+          <ChatInput {...baseProps} value={value} dictationEnabled={false} />
+        )
+      );
+      const server = within(serverDocument);
+      expect(
+        server.getByRole('textbox', { name: /chat message input/i })
+      ).toHaveValue(value);
+      const send = server.getByRole('button', {
+        name: 'Send message',
+      });
+      if (value) expect(send).toBeEnabled();
+      else expect(send).toBeDisabled();
+    }
+  );
 
   it('certifies only the opted-in loaded authenticated composer and observes focus passively', async () => {
     const frames = new Map<number, FrameRequestCallback>();

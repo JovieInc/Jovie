@@ -1,6 +1,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
   cpSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -85,7 +86,16 @@ describe('lanes release self-test env at PR time', () => {
     );
   });
 
-  function run(testBody, { listed = true } = {}) {
+  it('runs UpdateTest whenever a release test changed, so bundle-only fixture gaps fail on the PR', () => {
+    expect(LANES_SELFTEST_CHANGED_TESTS_SCRIPT).toContain(
+      'if [ -n "${tests// /}" ]; then case " $tests $extra " in'
+    );
+    expect(LANES_SELFTEST_CHANGED_TESTS_SCRIPT).toMatch(
+      /extra="\$extra scripts\.tests\.test_lane_runner\.UpdateTest"/
+    );
+  });
+
+  function run(testBody, { listed = true, scenario = 'ancestor' } = {}) {
     const dir = mkdtempSync(join(tmpdir(), 'lanes-selftest-guard-'));
     try {
       const origin = join(dir, 'origin.git');
@@ -98,10 +108,15 @@ describe('lanes release self-test env at PR time', () => {
       writeFileSync(
         join(work, 'scripts/lanes/lane_runner.py'),
         listed
-          ? 'RELEASE_EXTRAS = []\nLANE_TESTS = ["scripts/tests/test_probe.py"]\n'
+          ? 'RELEASE_EXTRAS = []\nLANE_TESTS = ["scripts/tests/test_probe.py", "scripts/tests/test_main_only.py"]\n'
           : 'RELEASE_EXTRAS = []\nLANE_TESTS = []\n'
       );
       writeFileSync(join(work, 'README.md'), 'base\n');
+      // The staged-bundle proof (UpdateTest) runs whenever a release test changed; stub it green here.
+      writeFileSync(
+        join(work, 'scripts/tests/test_lane_runner.py'),
+        'import unittest\n\n\nclass UpdateTest(unittest.TestCase):\n    def test_stub(self):\n        pass\n'
+      );
       git(work, 'add', '-A');
       git(work, 'commit', '-q', '-m', 'base');
       git(work, 'push', '-q', 'origin', 'HEAD:main');
@@ -109,18 +124,73 @@ describe('lanes release self-test env at PR time', () => {
       writeFileSync(join(work, 'scripts/tests/test_probe.py'), testBody);
       git(work, 'add', '-A');
       git(work, 'commit', '-q', '-m', 'pr');
+      const head = git(work, 'rev-parse', 'HEAD').trim();
+      const proof = join(dir, 'native-proof.json');
+      const hookProof = join(dir, 'commit-msg-invoked');
+      if (scenario !== 'ancestor') {
+        git(work, 'checkout', '-q', 'main');
+        writeFileSync(join(work, 'README.md'), 'advanced main\n');
+        // A HEAD-vs-base diff wrongly selects this main-only failing test.
+        writeFileSync(
+          join(work, 'scripts/tests/test_main_only.py'),
+          probe('self.fail("main-only test must not be selected")')
+        );
+        if (scenario === 'conflict') {
+          writeFileSync(
+            join(work, 'scripts/tests/test_probe.py'),
+            '# main conflict\n'
+          );
+        }
+        git(work, 'add', '-A');
+        git(work, 'commit', '-q', '-m', 'advance main');
+        git(work, 'push', '-q', 'origin', 'HEAD:main');
+        git(work, 'checkout', '-q', 'pr');
+      }
+      // Install only after fixture commits. A validation merge needs no commit.
+      const hooks = join(dir, 'hooks');
+      mkdirSync(hooks);
+      writeFileSync(
+        join(hooks, 'commit-msg'),
+        '#!/bin/sh\nprintf invoked > "$HOOK_PROOF"\necho "deliberate commit-msg failure" >&2\nexit 1\n',
+        { mode: 0o755 }
+      );
+      git(work, 'config', 'core.hooksPath', hooks);
+      if (scenario === 'fetch-failure') {
+        git(
+          work,
+          'remote',
+          'set-url',
+          'origin',
+          join(dir, 'missing-origin.git')
+        );
+      } else if (scenario === 'merge-prerequisite') {
+        // The detached worktree shares this config; Git rejects an invalid strategy.
+        git(work, 'config', 'pull.twohead', 'nonexistent-selftest-strategy');
+      }
       const result = spawnSync(
         'bash',
         ['-c', LANES_SELFTEST_CHANGED_TESTS_SCRIPT],
         {
           cwd: work,
           encoding: 'utf8',
-          env: { ...process.env, GITHUB_BASE_REF: 'main' },
+          env: {
+            ...process.env,
+            GITHUB_BASE_REF: 'main',
+            EXPECTED_HEAD: head,
+            NATIVE_PROOF: proof,
+            HOOK_PROOF: hookProof,
+          },
         }
       );
       return {
         status: result.status,
         output: `${result.stdout}${result.stderr}`,
+        head,
+        headAfter: git(work, 'rev-parse', 'HEAD').trim(),
+        nativeProof: existsSync(proof)
+          ? JSON.parse(readFileSync(proof, 'utf8'))
+          : null,
+        hookInvoked: existsSync(hookProof),
       };
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -136,6 +206,84 @@ class Probe(unittest.TestCase):
         ${assertion}
 `;
 
+  const mergedProbe = `import json, os, subprocess, unittest
+from pathlib import Path
+
+class Probe(unittest.TestCase):
+    def test_merged_source(self):
+        head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+        self.assertEqual(head, os.environ['EXPECTED_HEAD'])
+        self.assertEqual(os.environ['LANES_SELFTEST'], '1')
+        self.assertTrue(Path(os.environ['HOME']).is_relative_to(Path(os.environ['LANES_STATE'])))
+        main_data = Path('README.md').read_text()
+        self.assertEqual(main_data, 'advanced main\\n')
+        pr_data = Path(__file__).read_text()
+        self.assertIn('test_merged_source', pr_data)
+        Path(os.environ['NATIVE_PROOF']).write_text(json.dumps(dict(head=head, main=main_data, pr=True)))
+`;
+
+  it('runs selected native tests on disjoint advanced main without committing or invoking commit-msg', () => {
+    const result = run(mergedProbe, { scenario: 'advanced' });
+    expect(result.status, result.output).toBe(0);
+    expect(result.nativeProof).toEqual({
+      head: result.head,
+      main: 'advanced main\n',
+      pr: true,
+    });
+    expect(result.headAfter).toBe(result.head);
+    expect(result.hookInvoked).toBe(false);
+    expect(result.output).toContain('scripts/tests/test_probe.py');
+    expect(result.output).not.toContain('main-only test must not be selected');
+    expect(result.output).not.toContain('scripts/tests/test_main_only.py');
+  });
+
+  it('runs selected native tests when base is already an ancestor without invoking commit-msg', () => {
+    const result = run(
+      probe(
+        `__import__('pathlib').Path(os.environ['NATIVE_PROOF']).write_text('{"ran":true}')`
+      )
+    );
+    expect(result.status, result.output).toBe(0);
+    expect(result.nativeProof).toEqual({ ran: true });
+    expect(result.headAfter).toBe(result.head);
+    expect(result.hookInvoked).toBe(false);
+  });
+
+  it('fails genuine merge conflicts without claiming native proof', () => {
+    const result = run(mergedProbe, { scenario: 'conflict' });
+    expect(result.status).not.toBe(0);
+    expect(result.output).toContain('merge with base conflicts');
+    expect(result.output).toContain('scripts/tests/test_probe.py');
+    expect(result.output).not.toContain('skipped');
+    expect(result.output).not.toContain('release self-test env');
+    expect(result.nativeProof).toBeNull();
+    expect(result.hookInvoked).toBe(false);
+    expect(result.headAfter).toBe(result.head);
+  });
+
+  it('fails fetching the base even when a stale origin/main exists', () => {
+    const result = run(mergedProbe, { scenario: 'fetch-failure' });
+    expect(result.status).not.toBe(0);
+    expect(result.output).toContain('missing-origin.git');
+    expect(result.output).not.toContain('release self-test env');
+    expect(result.nativeProof).toBeNull();
+    expect(result.hookInvoked).toBe(false);
+    expect(result.headAfter).toBe(result.head);
+  });
+
+  it('fails non-conflict merge prerequisites with the actual Git diagnostic', () => {
+    const result = run(mergedProbe, { scenario: 'merge-prerequisite' });
+    expect(result.status).not.toBe(0);
+    expect(result.output).toContain('nonexistent-selftest-strategy');
+    expect(result.output).toContain('merge with base failed');
+    expect(result.output).not.toContain('merge with base conflicts');
+    expect(result.output).not.toContain('skipped');
+    expect(result.output).not.toContain('release self-test env');
+    expect(result.nativeProof).toBeNull();
+    expect(result.hookInvoked).toBe(false);
+    expect(result.headAfter).toBe(result.head);
+  });
+
   it('fails a test that breaks under LANES_SELFTEST=1 (deliberate red)', () => {
     const { status, output } = run(
       probe('self.assertNotEqual(os.environ.get("LANES_SELFTEST"), "1")')
@@ -149,6 +297,7 @@ class Probe(unittest.TestCase):
       probe('self.assertEqual(os.environ.get("LANES_SELFTEST"), "1")')
     );
     expect(output).toContain('release self-test env');
+    expect(output).toContain('scripts.tests.test_lane_runner.UpdateTest');
     expect(status).toBe(0);
   });
 

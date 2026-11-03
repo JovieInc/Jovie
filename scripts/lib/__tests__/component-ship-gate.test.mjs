@@ -1,5 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +16,7 @@ import {
   checkStoryBaseline,
   hasRealLegacyTestEvidence,
   isStoryRequirementExempt,
+  linkCoverageViaReceipts,
   resolveRenderedEvaluationSection,
   runComponentShipGate,
   runRenderedEvaluation,
@@ -1340,6 +1347,102 @@ describe('coverage-via executable evidence', () => {
     expect(audit.invalid).toEqual([]);
     expect(audit.ok).toBe(true);
   }, 15_000);
+});
+
+describe('coverage-via repair', () => {
+  const sourceRel = 'apps/web/components/atoms/RepairPanel.tsx';
+  const testRel = 'apps/web/tests/unit/RepairPanel.test.tsx';
+  const source = 'export function RepairPanel() { return <div />; }';
+  const test = [
+    "import { render } from '@testing-library/react';",
+    "import { RepairPanel } from '@/components/atoms/RepairPanel';",
+    "it('renders', () => render(<RepairPanel />));",
+  ].join('\n');
+
+  it('links one verified changed test, preserves source, and is idempotent', () => {
+    const repoRoot = fixtureRepo({ [sourceRel]: source, [testRel]: test });
+    const changed = [sourceRel, testRel];
+    expect(checkChangedComponents(changed, { repoRoot }).issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ rule: 'missing-test' }),
+      ])
+    );
+    expect(linkCoverageViaReceipts(changed, { repoRoot })).toEqual([sourceRel]);
+    expect(readFileSync(join(repoRoot, sourceRel), 'utf8')).toBe(
+      `// @coverage-via ${testRel}\n${source}`
+    );
+    const result = checkChangedComponents(changed, { repoRoot });
+    expect(result.issues.map(issue => issue.rule)).toEqual(['missing-story']);
+    expect(linkCoverageViaReceipts(changed, { repoRoot })).toEqual([]);
+  });
+
+  it.each([
+    ['an untouched test', test, false],
+    [
+      'an inert import',
+      "import { RepairPanel } from '@/components/atoms/RepairPanel';",
+      true,
+    ],
+    [
+      'a different module',
+      test.replace(
+        '@/components/atoms/RepairPanel',
+        '@/components/atoms/OtherPanel'
+      ),
+      true,
+    ],
+    [
+      'an uncalled render helper',
+      test.replace(
+        "it('renders', () => render(<RepairPanel />));",
+        'function unused() { render(<RepairPanel />); }'
+      ),
+      true,
+    ],
+  ])('leaves %s unresolved', (_label, testSource, includeTest) => {
+    const repoRoot = fixtureRepo({
+      [sourceRel]: source,
+      [testRel]: testSource,
+    });
+    expect(
+      linkCoverageViaReceipts(
+        includeTest ? [sourceRel, testRel] : [sourceRel],
+        { repoRoot }
+      )
+    ).toEqual([]);
+    expect(readFileSync(join(repoRoot, sourceRel), 'utf8')).toBe(source);
+  });
+
+  it('does not guess between tests or replace an explicit receipt or colocated test', () => {
+    const secondTest = 'apps/web/tests/unit/second.test.tsx';
+    const repoRoot = fixtureRepo({
+      [sourceRel]: source,
+      [testRel]: test,
+      [secondTest]: test,
+    });
+    expect(
+      linkCoverageViaReceipts([sourceRel, testRel, secondTest], { repoRoot })
+    ).toEqual([]);
+    writeFileSync(
+      join(repoRoot, sourceRel),
+      `// @coverage-via missing.test.tsx\n${source}`
+    );
+    expect(linkCoverageViaReceipts([sourceRel, testRel], { repoRoot })).toEqual(
+      []
+    );
+    expect(readFileSync(join(repoRoot, sourceRel), 'utf8')).toContain(
+      '@coverage-via missing.test.tsx'
+    );
+    writeFileSync(join(repoRoot, sourceRel), source);
+    writeFileSync(
+      join(repoRoot, 'apps/web/components/atoms/RepairPanel.test.tsx'),
+      test
+    );
+    expect(linkCoverageViaReceipts([sourceRel, testRel], { repoRoot })).toEqual(
+      []
+    );
+    expect(readFileSync(join(repoRoot, sourceRel), 'utf8')).toBe(source);
+  });
 });
 
 describe('multi-root ratchet', () => {

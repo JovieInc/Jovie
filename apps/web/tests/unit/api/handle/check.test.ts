@@ -198,21 +198,63 @@ describe('GET /api/handle/check', () => {
     expect(data.suggestedAlternatives).toEqual(['admin1', 'admin2', 'admin3']);
   });
 
-  it('uses cached availability when present and still surfaces alternatives when taken', async () => {
-    mockGetCachedHandleAvailability.mockResolvedValue(false);
+  it('trusts a cached available answer without hitting the database', async () => {
+    mockGetCachedHandleAvailability.mockResolvedValue(true);
 
     const { GET } = await import('@/app/api/handle/check/route');
-    const request = new Request(
-      'http://localhost/api/handle/check?handle=cachedhandle'
+    const response = await GET(
+      new Request('http://localhost/api/handle/check?handle=cachedhandle')
     );
+    const data = await response.json();
 
-    const response = await GET(request);
+    expect(data.available).toBe(true);
+    expect(mockCheckOnboardingHandleAvailability).not.toHaveBeenCalled();
+  });
+
+  it('re-verifies a cached taken handle and heals the cache when the DB says available', async () => {
+    mockGetCachedHandleAvailability.mockResolvedValue(false);
+    mockCheckOnboardingHandleAvailability.mockResolvedValue({
+      handle: 'unmarkedpavement',
+      available: true,
+      reason: 'available',
+    });
+
+    const { GET } = await import('@/app/api/handle/check/route');
+    const response = await GET(
+      new Request('http://localhost/api/handle/check?handle=unmarkedpavement')
+    );
     const data = await response.json();
 
     expect(response.status).toBe(200);
+    expect(data.available).toBe(true);
+    expect(mockCheckOnboardingHandleAvailability).toHaveBeenCalledTimes(1);
+    expect(mockCacheHandleAvailability).toHaveBeenCalledWith(
+      'unmarkedpavement',
+      true
+    );
+  });
+
+  it('keeps a cached taken handle taken when the DB confirms it', async () => {
+    mockGetCachedHandleAvailability.mockResolvedValue(false);
+    mockCheckOnboardingHandleAvailability.mockResolvedValue({
+      handle: 'cachedhandle',
+      available: false,
+      reason: 'taken',
+      suggestedAlternatives: ['cachedhandle1'],
+    });
+
+    const { GET } = await import('@/app/api/handle/check/route');
+    const response = await GET(
+      new Request('http://localhost/api/handle/check?handle=cachedhandle')
+    );
+    const data = await response.json();
+
     expect(data.available).toBe(false);
-    expect(data.suggestedAlternatives?.[0]).toMatch(/^cachedhandle\d+$/);
-    expect(mockCheckOnboardingHandleAvailability).not.toHaveBeenCalled();
+    expect(data.suggestedAlternatives).toEqual(['cachedhandle1']);
+    expect(mockCacheHandleAvailability).toHaveBeenCalledWith(
+      'cachedhandle',
+      false
+    );
   });
 
   it('returns available true when handle is not taken', async () => {

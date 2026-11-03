@@ -11,6 +11,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { runGh } from '../packages/api-client/gh.ts';
+import { formatBiomeJson } from './lib/format-biome-json.mjs';
 import {
   clusters,
   dueMeasurements,
@@ -25,6 +26,7 @@ import {
   winFromPr,
   winStatus,
 } from './lib/wins-ledger.mjs';
+import { putWinToStore } from './lib/wins-store.mjs';
 
 const HEADER = readFileSync(WINS_PATH, 'utf8').split('\n')[0];
 const arg = (argv, k) => {
@@ -61,7 +63,11 @@ export async function main(argv, io = console) {
     if (argv.includes('--write'))
       writeFileSync(
         'docs/metrics/wins-latest.json',
-        `${JSON.stringify({ schema: 'jovie.wins-metrics/v1', at: new Date().toISOString(), ...out }, null, 2)}\n`
+        formatBiomeJson({
+          schema: 'jovie.wins-metrics/v1',
+          at: new Date().toISOString(),
+          ...out,
+        })
       );
     io.log(JSON.stringify(out, null, argv.includes('--json') ? 0 : 2));
     return 0;
@@ -81,6 +87,12 @@ export async function main(argv, io = console) {
     }
     const problems = validateWin(win);
     if (problems.length) throw new Error(problems.join('; '));
+    if (argv.includes('--store')) {
+      // Data is not shipped as PRs: write the record to the runtime store.
+      const r = await putWinToStore(win);
+      io.log(`${win.id}: ${r}`);
+      return 0;
+    }
     if (wins.some(w => w.prs.some(p => p.number === number && p.repo === repo)))
       return io.log(`#${number}: already in the ledger`), 0;
     save([...wins, win]);
@@ -137,10 +149,7 @@ export async function main(argv, io = console) {
       note: 'Engineering metrics only. Dollar figures belong in the private ops store and are never written here.',
     };
     if (argv.includes('--write'))
-      writeFileSync(
-        'docs/metrics/wins-weekly.json',
-        `${JSON.stringify(out, null, 2)}\n`
-      );
+      writeFileSync('docs/metrics/wins-weekly.json', formatBiomeJson(out));
     io.log(JSON.stringify(out, null, 2));
     return 0;
   }
