@@ -3738,6 +3738,131 @@ describe('automation-verify affected scope', () => {
     );
   });
 
+  describe('marketing certification evidence producers', () => {
+    const census = 'apps/web/data/designSystem/surfaceCensus.json';
+    const censusProducer =
+      'scripts/lib/__tests__/design-surface-census.test.mjs';
+    const tokens = 'apps/web/lib/brand/tokens.ts';
+    it('retains full fallback for shared tokens with unregistered real consumers', () => {
+      const repo = resolve(import.meta.dirname, '../../..');
+      for (const test of [
+        'apps/web/tests/unit/og/marketing-og-cards.test.ts',
+        'apps/web/components/atoms/JovieMarkElectric.test.tsx',
+      ]) {
+        expect(readFileSync(resolve(repo, test), 'utf8')).toContain(
+          "from '@/lib/brand/tokens'"
+        );
+      }
+      const plan = buildAffectedTestPlan([tokens]);
+      expect(plan.mode).toBe('full');
+      expect(plan.fallbackReason).toContain(tokens);
+    });
+    it('runs the real census validator with the scripts Vitest runner', () => {
+      const plan = buildAffectedTestPlan([census]);
+      expect(plan.mode).toBe('selected');
+      expect(plan.scriptVitestTests).toContain(censusProducer);
+      expect(plan.selectedTests).not.toContain(censusProducer);
+      expect(plan.nodeTests).not.toContain(censusProducer);
+      const commands = buildSelectedTestCommands(plan, '2');
+      expect(commands).toContainEqual([
+        'node',
+        ['scripts/design-surface-census.mjs', 'origin/main'],
+      ]);
+      expect(commands).toContainEqual([
+        'pnpm',
+        [
+          'exec',
+          'vitest',
+          '--root',
+          'scripts',
+          '--config',
+          'vitest.config.mts',
+          'run',
+          'lib/__tests__/design-surface-census.test.mjs',
+          '--maxWorkers',
+          '2',
+        ],
+      ]);
+    });
+
+    it('runs the runtime census consumer and falls back when its test is absent', () => {
+      const repo = resolve(import.meta.dirname, '../../..');
+      const consumer = 'apps/web/lib/content-records/marketing-page.ts';
+      const producer = 'apps/web/lib/content-records/marketing-page.test.ts';
+      expect(readFileSync(resolve(repo, consumer), 'utf8')).toContain(
+        "import surfaceCensus from '@/data/designSystem/surfaceCensus.json'"
+      );
+      expect(readFileSync(resolve(repo, producer), 'utf8')).toContain(
+        'e.dsStatus'
+      );
+      const plan = buildAffectedTestPlan([census]);
+      expect(plan.selectedTests).toContain(producer);
+      expect(
+        buildAffectedTestPlan([census], {
+          isFileAvailable: file => file !== producer,
+        }).mode
+      ).toBe('full');
+    });
+
+    it('validates current census transitions against the caller-provided base', () => {
+      const plan = buildAffectedTestPlan([census]);
+      const base = '0123456789abcdef0123456789abcdef01234567';
+      expect(buildSelectedTestCommands(plan, '2', base)).toContainEqual([
+        'node',
+        ['scripts/design-surface-census.mjs', base],
+      ]);
+      expect(
+        buildSelectedTestCommands(
+          { ...plan, censusValidation: false },
+          '2',
+          base
+        )
+      ).toContainEqual(['node', ['scripts/design-surface-census.mjs', base]]);
+    });
+
+    it('retains full fallback when the census producer is missing', () => {
+      const plan = buildAffectedTestPlan([census], {
+        isFileAvailable: file => file !== censusProducer,
+      });
+      expect(plan.mode).toBe('full');
+      expect(plan.fallbackReason).toContain(census);
+    });
+
+    it.each([
+      'apps/web/lib/brand/unregistered.ts',
+      'apps/web/data/designSystem/unregistered.json',
+    ])(
+      'retains full fallback for unknown neighbor %s, alone or mixed',
+      neighbor => {
+        expect(buildAffectedTestPlan([neighbor]).mode).toBe('full');
+        expect(buildAffectedTestPlan([census, tokens, neighbor]).mode).toBe(
+          'full'
+        );
+      }
+    );
+
+    it.each([tokens, 'package.json'])(
+      'retains census validation when %s requires full fallback',
+      other => {
+        const plan = buildAffectedTestPlan([census, other]);
+        expect(plan.mode).toBe('full');
+        expect(plan.scriptVitestTests).toContain(censusProducer);
+        const commands = buildSelectedTestCommands(plan, '2', 'origin/main');
+        expect(commands).toContainEqual([
+          'node',
+          ['scripts/design-surface-census.mjs', 'origin/main'],
+        ]);
+        expect(
+          commands.some(
+            ([command, args]) =>
+              command === 'pnpm' &&
+              args.includes('lib/__tests__/design-surface-census.test.mjs')
+          )
+        ).toBe(true);
+      }
+    );
+  });
+
   describe('audience release denial lane', () => {
     const productFiles = [
       'apps/web/app/api/cron/schedule-release-notifications/route.ts',

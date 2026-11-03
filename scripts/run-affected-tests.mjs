@@ -37,6 +37,15 @@ const TESTABLE_FILE = /\.(?:[cm]?[jt]sx?|json)$/;
 const VITEST_TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
 const KNOWN_VITEST_FIXTURE_TESTS = new Map([
   [
+    'apps/web/data/designSystem/surfaceCensus.json',
+    [
+      'scripts/lib/__tests__/design-surface-census.test.mjs',
+      'apps/web/lib/content-records/marketing-page.test.ts',
+    ],
+  ],
+  // Shared brand tokens have broad runtime and test consumers. Keep the
+  // full-suite fallback until selection can prove their complete coverage.
+  [
     'apps/web/tests/unit/design-system/arbitrary-values.baseline.json',
     ['apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'],
   ],
@@ -1302,6 +1311,19 @@ export function buildAffectedTestPlan(changedFiles, options) {
     nodeTestArgs: [],
     retouchPromptCoverage: false,
     ...plan,
+    censusValidation: files.includes(
+      'apps/web/data/designSystem/surfaceCensus.json'
+    ),
+    ...(files.includes('apps/web/data/designSystem/surfaceCensus.json') &&
+    plan.mode === 'full' &&
+    isFileAvailable('scripts/lib/__tests__/design-surface-census.test.mjs')
+      ? {
+          scriptVitestTests: unique([
+            ...(plan.scriptVitestTests ?? []),
+            'scripts/lib/__tests__/design-surface-census.test.mjs',
+          ]),
+        }
+      : {}),
     ...(lanePythonCoverage
       ? {
           lanePythonCoverage: true,
@@ -2237,9 +2259,12 @@ function planAffectedTests(
       'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'
     );
   }
-  for (const file of files) {
-    mandatoryTests.push(...(KNOWN_VITEST_FIXTURE_TESTS.get(file) ?? []));
-  }
+  const fixtureProducers = files.flatMap(
+    file => KNOWN_VITEST_FIXTURE_TESTS.get(file) ?? []
+  );
+  mandatoryTests.push(
+    ...fixtureProducers.filter(test => !test.startsWith('scripts/'))
+  );
   const hasHomepageSystemBGuardInput = files.some(isHomepageSystemBGuardInput);
   if (hasHomepageSystemBGuardInput) {
     mandatoryTests.push(...HOMEPAGE_SYSTEM_B_STYLE_GUARD_TESTS);
@@ -2333,6 +2358,7 @@ function planAffectedTests(
   ]);
   const pythonUnittestTests = unique([]);
   const scriptVitestTests = unique([
+    ...fixtureProducers.filter(test => test.startsWith('scripts/')),
     ...(isExactPerformanceProfilerRepairPrimary ||
     isExactPerformanceProfilerRepairWithSelectorLegacy
       ? PERFORMANCE_PROFILER_REPAIR_SCRIPT_TESTS
@@ -3051,6 +3077,14 @@ export function buildSelectedTestCommands(
   head
 ) {
   const commands = [];
+  if (
+    plan.censusValidation ||
+    plan.scriptVitestTests.includes(
+      'scripts/lib/__tests__/design-surface-census.test.mjs'
+    )
+  ) {
+    commands.push(['node', ['scripts/design-surface-census.mjs', base]]);
+  }
   if (plan.lanePythonCoverage) {
     // Qualification must fail when the CI-pinned Python dependencies are absent,
     // even on a local host; the structural wrapper's local skip is not proof.
