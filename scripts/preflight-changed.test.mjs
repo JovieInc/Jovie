@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -24,6 +31,7 @@ import {
   NARROWED,
   parseArgs,
   resolveBaseRef,
+  sh,
   typecheckTargets,
 } from './preflight-changed.mjs';
 
@@ -501,6 +509,322 @@ test('preflight exits clean on a valid clean branch but fails an invalid base re
     assert.ok(!lines.some(l => /no changes/.test(l)), lines.join('\n'));
   } finally {
     rmSync(bad, { recursive: true, force: true });
+  }
+});
+
+test('timeout terminates descendants that retain preflight output pipes', {
+  skip: process.platform === 'win32',
+}, async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'preflight-timeout-'));
+  const pidFile = path.join(directory, 'child.pid');
+  let childPid;
+  let stopped = false;
+  let watchdog;
+  try {
+    const started = Date.now();
+    const result = await Promise.race([
+      sh(`sleep 30 & echo $! > "${pidFile}"; echo started; exit 0`, {
+        cwd: directory,
+        env: process.env,
+        timeoutMs: 200,
+      }),
+      new Promise(
+        (_, reject) =>
+          (watchdog = setTimeout(
+            () =>
+              reject(new Error('preflight timeout left its output pipe open')),
+            2000
+          ))
+      ),
+    ]);
+    childPid = Number(readFileSync(pidFile, 'utf8'));
+    assert.notEqual(
+      result.code,
+      0,
+      'timed-out work must fail even if its shell exited zero'
+    );
+    assert.ok(Date.now() - started < 2000, 'timeout must settle promptly');
+    assert.match(result.out, /started/);
+    const deadline = Date.now() + 1000;
+    while (!stopped && Date.now() < deadline) {
+      try {
+        process.kill(childPid, 0);
+        // Linux can briefly retain an already-killed orphan as a zombie.
+        if (process.platform === 'linux') {
+          stopped =
+            readFileSync(`/proc/${childPid}/stat`, 'utf8').split(' ')[2] ===
+            'Z';
+        }
+      } catch (error) {
+        if (error.code !== 'ESRCH' && error.code !== 'ENOENT') throw error;
+        stopped = true;
+      }
+      if (!stopped) await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    assert.equal(stopped, true, 'descendant must stop after the group signal');
+  } finally {
+    clearTimeout(watchdog);
+    if (!childPid && existsSync(pidFile))
+      childPid = Number(readFileSync(pidFile, 'utf8'));
+    if (childPid && !stopped) {
+      try {
+        process.kill(childPid, 'SIGKILL');
+      } catch {}
+    }
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('preflight command keeps ordinary exit codes and output', async () => {
+  const success = await sh('printf ok', {
+    cwd: process.cwd(),
+    env: process.env,
+    timeoutMs: 2000,
+  });
+  assert.equal(success.code, 0);
+  assert.equal(success.out, 'ok');
+  const failure = await sh('exit 7', {
+    cwd: process.cwd(),
+    env: process.env,
+    timeoutMs: 2000,
+  });
+  assert.equal(failure.code, 7);
+});
+
+test('preflight timeout stops a real host-slot child process group', {
+  skip: process.platform === 'win32',
+}, async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'preflight-slot-timeout-'));
+  const pidFile = path.join(directory, 'slot-child.pid');
+  const slotScript = path.resolve('scripts/typecheck-slot.mjs');
+  let pid;
+  let stopped = false;
+  try {
+    const result = await sh(
+      `node '${slotScript}' -- bash -c 'echo $$ > "$1"; exec sleep 30' _ '${pidFile}'`,
+      {
+        cwd: process.cwd(),
+        env: {
+          ...process.env,
+          GEM_TYPECHECK_SLOTS: '1',
+          GEM_TYPECHECK_SLOT_HELD: '0',
+          GEM_TYPECHECK_LOCK_DIR: directory,
+        },
+        timeoutMs: 500,
+      }
+    );
+    assert.notEqual(result.code, 0);
+    pid = Number(readFileSync(pidFile, 'utf8'));
+    const deadline = Date.now() + 1000;
+    while (!stopped && Date.now() < deadline) {
+      try {
+        process.kill(pid, 0);
+        if (process.platform === 'linux') {
+          stopped =
+            readFileSync(`/proc/${pid}/stat`, 'utf8').split(' ')[2] === 'Z';
+        }
+      } catch (error) {
+        if (error.code !== 'ESRCH' && error.code !== 'ENOENT') throw error;
+        stopped = true;
+      }
+      if (!stopped) await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    assert.equal(
+      stopped,
+      true,
+      'slot descendant must stop after preflight timeout'
+    );
+  } finally {
+    if (!pid && existsSync(pidFile))
+      pid = Number(readFileSync(pidFile, 'utf8'));
+    if (pid && !stopped) {
+      try {
+        process.kill(pid, 'SIGKILL');
+      } catch {}
+    }
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('preflight-managed host slots still serialize concurrent commands', {
+  skip: process.platform === 'win32',
+}, async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'preflight-slot-lock-'));
+  const events = path.join(directory, 'events');
+  const slotScript = path.resolve('scripts/typecheck-slot.mjs');
+  const env = {
+    ...process.env,
+    GEM_TYPECHECK_SLOTS: '1',
+    GEM_TYPECHECK_SLOT_HELD: '0',
+    GEM_TYPECHECK_LOCK_DIR: directory,
+    GEM_TYPECHECK_POLL_MS: '20',
+  };
+  const command = label =>
+    `node '${slotScript}' -- bash -c 'echo ${label}-start >> "$1"; sleep 0.2; echo ${label}-end >> "$1"' _ '${events}'`;
+  try {
+    const results = await Promise.all(
+      ['a', 'b'].map(label =>
+        sh(command(label), { cwd: process.cwd(), env, timeoutMs: 5000 })
+      )
+    );
+    assert.deepEqual(
+      results.map(result => result.code),
+      [0, 0]
+    );
+    const rows = readFileSync(events, 'utf8').trim().split('\n');
+    assert.ok(
+      rows.join(',') === 'a-start,a-end,b-start,b-end' ||
+        rows.join(',') === 'b-start,b-end,a-start,a-end',
+      `slot commands overlapped: ${rows.join(',')}`
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+for (const mode of ['SIGTERM', 'SIGINT', 'exit']) {
+  test(`outer ${mode} cleans a detached preflight host-slot child`, {
+    skip: process.platform === 'win32',
+  }, async () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'preflight-cancel-'));
+    const pidFile = path.join(directory, 'child.pid');
+    const moduleUrl = new URL('./preflight-changed.mjs', import.meta.url).href;
+    const command = `node scripts/typecheck-slot.mjs -- bash -c 'echo $$ > "$GEM_TEST_PID_FILE"; exec sleep 30'`;
+    const source = `import { sh } from ${JSON.stringify(moduleUrl)}; ${mode === 'exit' ? 'setTimeout(() => process.exit(0), 500);' : ''} await sh(${JSON.stringify(command)}, { cwd: process.cwd(), env: process.env, timeoutMs: 30000 });`;
+    const outer = spawn(
+      process.execPath,
+      ['--input-type=module', '-e', source],
+      {
+        cwd: process.cwd(),
+        detached: true,
+        stdio: 'ignore',
+        env: {
+          ...process.env,
+          GEM_TEST_PID_FILE: pidFile,
+          GEM_TYPECHECK_SLOTS: '1',
+          GEM_TYPECHECK_SLOT_HELD: '0',
+          GEM_TYPECHECK_LOCK_DIR: directory,
+        },
+      }
+    );
+    let childPid;
+    let stopped = false;
+    try {
+      const startedDeadline = Date.now() + 4000;
+      while (!existsSync(pidFile) && Date.now() < startedDeadline)
+        await new Promise(resolve => setTimeout(resolve, 20));
+      assert.ok(existsSync(pidFile), 'host-slot child must start');
+      childPid = Number(readFileSync(pidFile, 'utf8'));
+      const closed = new Promise((resolve, reject) => {
+        const watchdog = setTimeout(
+          () => reject(new Error('outer process did not terminate')),
+          4000
+        );
+        outer.once('close', (code, signal) => {
+          clearTimeout(watchdog);
+          resolve({ code, signal });
+        });
+      });
+      if (mode !== 'exit') process.kill(-outer.pid, mode);
+      const result = await closed;
+      if (mode !== 'exit') assert.equal(result.signal, mode);
+      else assert.equal(result.code, 0);
+      const deadline = Date.now() + 1000;
+      while (!stopped && Date.now() < deadline) {
+        try {
+          process.kill(childPid, 0);
+          if (process.platform === 'linux')
+            stopped =
+              readFileSync(`/proc/${childPid}/stat`, 'utf8').split(' ')[2] ===
+              'Z';
+        } catch (error) {
+          if (error.code !== 'ESRCH' && error.code !== 'ENOENT') throw error;
+          stopped = true;
+        }
+        if (!stopped) await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      assert.equal(stopped, true, 'owned host-slot descendant must stop');
+    } finally {
+      if (outer.exitCode === null && outer.signalCode === null) {
+        try {
+          process.kill(-outer.pid, 'SIGKILL');
+        } catch {}
+      }
+      if (!childPid && existsSync(pidFile))
+        childPid = Number(readFileSync(pidFile, 'utf8'));
+      if (childPid && !stopped) {
+        try {
+          process.kill(childPid, 'SIGKILL');
+        } catch {}
+      }
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+}
+
+test('outer cancellation stops all concurrent preflight command groups', {
+  skip: process.platform !== 'linux',
+}, async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'preflight-cancel-many-'));
+  const files = ['a', 'b'].map(name => path.join(directory, `${name}.pid`));
+  const moduleUrl = new URL('./preflight-changed.mjs', import.meta.url).href;
+  const source = `import { sh } from ${JSON.stringify(moduleUrl)}; const run = name => sh('echo $$ > "$GEM_TEST_DIR/' + name + '.pid"; exec sleep 30', { cwd: process.cwd(), env: process.env, timeoutMs: 30000 }); await Promise.all([run('a'), run('b')]);`;
+  const outer = spawn(process.execPath, ['--input-type=module', '-e', source], {
+    cwd: process.cwd(),
+    detached: true,
+    stdio: 'ignore',
+    env: { ...process.env, GEM_TEST_DIR: directory },
+  });
+  let pids = [];
+  let stopped = false;
+  try {
+    const deadline = Date.now() + 4000;
+    while (!files.every(existsSync) && Date.now() < deadline)
+      await new Promise(resolve => setTimeout(resolve, 20));
+    assert.ok(files.every(existsSync), 'both commands must start');
+    pids = files.map(file => Number(readFileSync(file, 'utf8')));
+    const closed = new Promise((resolve, reject) => {
+      const watchdog = setTimeout(
+        () => reject(new Error('outer cancellation hung')),
+        4000
+      );
+      outer.once('close', (_code, signal) => {
+        clearTimeout(watchdog);
+        resolve(signal);
+      });
+    });
+    process.kill(-outer.pid, 'SIGTERM');
+    assert.equal(await closed, 'SIGTERM');
+    const stopDeadline = Date.now() + 1000;
+    while (!stopped && Date.now() < stopDeadline) {
+      stopped = pids.every(pid => {
+        try {
+          return (
+            readFileSync(`/proc/${pid}/stat`, 'utf8').split(' ')[2] === 'Z'
+          );
+        } catch (error) {
+          if (error.code !== 'ENOENT') throw error;
+          return true;
+        }
+      });
+      if (!stopped) await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    assert.equal(stopped, true, 'all owned command groups must stop');
+  } finally {
+    if (outer.exitCode === null && outer.signalCode === null) {
+      try {
+        process.kill(-outer.pid, 'SIGKILL');
+      } catch {}
+    }
+    if (!stopped) {
+      for (const file of files) {
+        if (!existsSync(file)) continue;
+        try {
+          process.kill(Number(readFileSync(file, 'utf8')), 'SIGKILL');
+        } catch {}
+      }
+    }
+    rmSync(directory, { recursive: true, force: true });
   }
 });
 
