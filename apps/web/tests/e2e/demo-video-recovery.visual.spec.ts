@@ -14,7 +14,18 @@ for (const route of ['/demo/video', '/demovideo']) {
       expect(FEATURE_FLAGS.SHOW_PRODUCT_DEMO_VIDEO).toBe(false);
       await page.setViewportSize({ width, height: 900 });
       const response = await page.goto(route, { waitUntil: 'networkidle' });
-      expect(response?.ok()).toBe(true);
+      expect(response?.status()).toBe(200);
+      const aliasRequest = response?.request().redirectedFrom();
+      expect(aliasRequest?.redirectedFrom()).toBeNull();
+      const aliasResponse = await aliasRequest?.response();
+      expect(aliasResponse?.status()).toBe(307);
+      expect(aliasRequest?.url()).toBe(new URL(route, page.url()).href);
+      expect(
+        new URL(aliasResponse?.headers().location ?? '', aliasRequest?.url())
+      ).toEqual(new URL('/product', page.url()));
+      expect(response?.url()).toBe(
+        new URL('/product', aliasRequest?.url()).href
+      );
       await expect(page).toHaveURL(/\/product$/);
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
       await expect(page.getByRole('main')).not.toBeEmpty();

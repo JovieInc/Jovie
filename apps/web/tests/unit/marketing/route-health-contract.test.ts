@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   getMarketingRouteHealthTarget,
   getRouteManifestEntry,
@@ -172,6 +172,46 @@ describe('marketing route health contract', () => {
     expect(getRouteRecipeParity(pricing).matches).toBe(false);
   });
 
+  it.each([false, true])(
+    'keeps demo route disposition aligned with video availability %s',
+    async enabled => {
+      vi.resetModules();
+      vi.doMock('@/lib/flags/marketing-static', async importOriginal => {
+        const original =
+          await importOriginal<typeof import('@/lib/flags/marketing-static')>();
+        return {
+          ...original,
+          FEATURE_FLAGS: {
+            ...original.FEATURE_FLAGS,
+            SHOW_PRODUCT_DEMO_VIDEO: enabled,
+          },
+        };
+      });
+      try {
+        const manifest = await import('@/data/marketing/routeManifest');
+        const { sweepTargets } = await import('@/lib/seo/seo-certify-sweep');
+        const swept = sweepTargets(manifest.MARKETING_ROUTE_MANIFEST).map(
+          target => target.pathname
+        );
+        expect(swept).toContain('/product');
+        for (const path of ['/demo/video', '/demovideo']) {
+          const entry = manifest.MARKETING_ROUTE_MANIFEST.find(
+            entry => entry.url === path
+          )!;
+          expect(swept.includes(path)).toBe(enabled);
+          expect(manifest.getMarketingRouteHealthTarget(entry)).toMatchObject({
+            path,
+            expected: enabled ? 'page' : 'redirect',
+            allowedFinalPaths: enabled ? [] : ['/product'],
+          });
+        }
+      } finally {
+        vi.doUnmock('@/lib/flags/marketing-static');
+        vi.resetModules();
+      }
+    }
+  );
+
   it('tracks intentional redirects and keeps public pages renderable', () => {
     const redirects = MARKETING_ROUTE_HEALTH_TARGETS.filter(
       target => target.expected === 'redirect'
@@ -193,6 +233,14 @@ describe('marketing route health contract', () => {
         allowsAuthShell: false,
         requiresSharedChrome: false,
       },
+      ...['/demo/video', '/demovideo'].map(path => ({
+        glob: `(marketing)${path}/page.tsx`,
+        path,
+        expected: 'redirect',
+        allowedFinalPaths: ['/product'],
+        allowsAuthShell: false,
+        requiresSharedChrome: false,
+      })),
     ]);
 
     expect(
@@ -291,6 +339,19 @@ describe('marketing route health contract', () => {
     for (const entry of MARKETING_ROUTE_MANIFEST) {
       const target = getMarketingRouteHealthTarget(entry);
       const productionBlocked = isProductionBlockedDebugPath(target.path);
+      if (entry.status === 'active' && target.expected === 'redirect') {
+        expect(target.allowedFinalPaths.length).toBeGreaterThan(0);
+        for (const path of target.allowedFinalPaths) {
+          const destination = MARKETING_ROUTE_MANIFEST.find(
+            entry => entry.url === path
+          );
+          expect(destination?.status).toBe('active');
+          expect(getMarketingRouteHealthTarget(destination!).expected).toBe(
+            'page'
+          );
+        }
+        continue;
+      }
       if (entry.status === 'active' && !entry.url.includes('*')) {
         expect(
           target.expected,

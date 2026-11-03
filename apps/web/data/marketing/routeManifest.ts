@@ -20,6 +20,7 @@ import {
   type ProductCapabilityId,
   ROUTE_CAPABILITY_BINDINGS,
 } from '@/data/product-truth/registry';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { isRenderFixturePathname } from '@/lib/render-fixture-policy';
 import type { ProposedSectionId } from './designGaps';
 import type { RecipeId } from './recipes';
@@ -1894,6 +1895,15 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     specVersion: '1.0.0',
     url: '/demo/video',
     noindex: true,
+    ...(!FEATURE_FLAGS.SHOW_PRODUCT_DEMO_VIDEO
+      ? {
+          healthCheck: {
+            path: '/demo/video',
+            expected: 'redirect' as const,
+            allowedFinalPaths: ['/product'],
+          },
+        }
+      : {}),
   },
   {
     glob: '(marketing)/demovideo/page.tsx',
@@ -1912,6 +1922,15 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     specVersion: '1.0.0',
     url: '/demovideo',
     noindex: true,
+    ...(!FEATURE_FLAGS.SHOW_PRODUCT_DEMO_VIDEO
+      ? {
+          healthCheck: {
+            path: '/demovideo',
+            expected: 'redirect' as const,
+            allowedFinalPaths: ['/product'],
+          },
+        }
+      : {}),
   },
   {
     glob: '(marketing)/renders/page.tsx',

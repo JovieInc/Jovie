@@ -7,7 +7,12 @@ import {
   type PageRecordPageContract,
 } from '@/data/marketing/factory/pageRecordContract';
 import { validateStageReceipt } from '@/data/marketing/factory/spine';
-import type { RouteManifestEntry } from '@/data/marketing/routeManifest';
+import {
+  getMarketingRouteHealthTarget,
+  MARKETING_ROUTE_MANIFEST,
+  type RouteManifestEntry,
+} from '@/data/marketing/routeManifest';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import {
   certifySweep,
   compareToBaseline,
@@ -84,7 +89,53 @@ function sweep(pages: SeoSweepPage[], llmsTxt: string | null = null) {
   });
 }
 
+function assertBaselineRouteCoverage(
+  paths: readonly string[],
+  manifest: readonly RouteManifestEntry[] = MARKETING_ROUTE_MANIFEST,
+  videoEnabled = FEATURE_FLAGS.SHOW_PRODUCT_DEMO_VIDEO
+) {
+  const swept = new Set(sweepTargets(manifest).map(target => target.pathname));
+  for (const path of paths) {
+    if (!videoEnabled && ['/demo/video', '/demovideo'].includes(path)) {
+      const alias = manifest.find(entry => entry.url === path);
+      expect(alias?.status, path).toBe('active');
+      expect(alias?.healthCheck, path).toMatchObject({
+        path,
+        expected: 'redirect',
+        allowedFinalPaths: ['/product'],
+      });
+      expect(alias?.healthCheck?.allowedFinalPaths, path).toEqual(['/product']);
+      const product = manifest.find(entry => entry.url === '/product');
+      expect(product?.status).toBe('active');
+      expect(getMarketingRouteHealthTarget(product!).expected).toBe('page');
+      expect(swept.has('/product')).toBe(true);
+    } else {
+      expect(swept.has(path), path).toBe(true);
+    }
+  }
+}
+
 describe('sweepTargets', () => {
+  it('certifies product instead of disabled demo redirect documents, and rejects a broken target', () => {
+    const paths = sweepTargets().map(target => target.pathname);
+    expect(paths).not.toContain('/demo/video');
+    expect(paths).not.toContain('/demovideo');
+    expect(paths).toContain('/product');
+    for (const status of [307, 404, 500]) {
+      const result = sweep([
+        {
+          target: target('/product'),
+          status,
+          html: html('/product', GOOD_BODY, PRODUCT_LD),
+          source: 'test',
+        },
+      ]);
+      expect(result[0]?.certification.checks).toContainEqual(
+        expect.objectContaining({ id: 'http-status', status: 'failed' })
+      );
+    }
+  });
+
   it('certifies the live homepage while the retired /new alias stays a redirect', () => {
     const paths = sweepTargets().map(target => target.pathname);
     expect(paths).toContain('/');
@@ -453,15 +504,73 @@ describe('shrink-only baseline', () => {
     });
   });
 
-  it('checked-in baseline only names swept routes and known dimensions', () => {
+  it('checked-in baseline names swept pages or declared redirects to swept pages', () => {
     const checkedIn = loadSeoCertifyBaseline();
-    const swept = new Set(sweepTargets().map(t => t.pathname));
-    for (const [path, keys] of Object.entries(checkedIn.failures)) {
-      expect(swept.has(path), path).toBe(true);
+    assertBaselineRouteCoverage(Object.keys(checkedIn.failures));
+    for (const keys of Object.values(checkedIn.failures)) {
       for (const key of keys) {
         expect(key).toMatch(/^(technical|agentic|copy|geo):[\w-]+$/);
       }
     }
+  });
+
+  it('rejects missing, disabled or non-page product and wrong alias destinations', () => {
+    const paths = ['/demo/video', '/demovideo'];
+    for (const change of [
+      'missing',
+      'disabled',
+      'redirect',
+      'wrong-destination',
+      'extra-destination',
+    ] as const) {
+      const manifest = MARKETING_ROUTE_MANIFEST.flatMap(entry => {
+        if (entry.url === '/product') {
+          if (change === 'missing') return [];
+          if (change === 'disabled')
+            return [{ ...entry, status: 'removed' as const }];
+          if (change === 'redirect')
+            return [
+              {
+                ...entry,
+                healthCheck: {
+                  path: '/product',
+                  expected: 'redirect' as const,
+                  allowedFinalPaths: ['/pricing'],
+                },
+              },
+            ];
+        }
+        if (
+          paths.includes(entry.url) &&
+          (change === 'wrong-destination' || change === 'extra-destination')
+        ) {
+          return [
+            {
+              ...entry,
+              healthCheck: {
+                path: entry.url,
+                expected: 'redirect' as const,
+                allowedFinalPaths:
+                  change === 'wrong-destination'
+                    ? ['/pricing']
+                    : ['/product', '/pricing'],
+              },
+            },
+          ];
+        }
+        return [entry];
+      });
+      expect(
+        () => assertBaselineRouteCoverage(paths, manifest, false),
+        change
+      ).toThrow();
+    }
+    expect(() =>
+      assertBaselineRouteCoverage(['/missing-baseline-page'])
+    ).toThrow();
+    expect(() =>
+      assertBaselineRouteCoverage(paths, MARKETING_ROUTE_MANIFEST, true)
+    ).toThrow();
   });
 
   it('rejects a baseline with the wrong schema', () => {
