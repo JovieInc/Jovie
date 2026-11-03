@@ -234,6 +234,11 @@ export const SERVER_ANALYTICS_EVENTS = {
     properties: ['profileId', 'source'],
     source: { property: 'profileId', type: 'creator_profile' },
   },
+  claim_private_created: {
+    category: 'funnel',
+    properties: ['profileId', 'source', 'requestedAtMs'],
+    source: { property: 'profileId', type: 'creator_profile' },
+  },
   signup_completed: {
     category: 'funnel',
     properties: ['profileId', 'source'],
@@ -274,6 +279,11 @@ export const SERVER_ANALYTICS_EVENTS = {
       'step_ms',
       'entry_ms',
     ],
+  },
+  // One row per fresh /start chat: how its bot check resolved, by client.
+  onboarding_bot_check: {
+    category: 'funnel',
+    properties: ['result', 'reason', 'client_status', 'ua_class'],
   },
   // JOV-9627: one row per onboarding chat reply. `session_id` is the signed
   // onboarding session, which chat_conversations carries and claim attaches to
@@ -401,6 +411,11 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
     events: ['claim_completed', 'signup_completed', 'activation_achieved'],
   },
   {
+    path: 'lib/claim/self-serve-claim-proof.server.ts',
+    invocations: 0,
+    events: ['claim_private_created'],
+  },
+  {
     path: 'lib/onboarding/catalog-import.server.ts',
     invocations: 1,
     events: ['releases_synced'],
@@ -467,6 +482,11 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
     events: ['funnel_step'],
   },
   {
+    path: 'lib/turnstile/onboarding-bot-check.server.ts',
+    invocations: 1,
+    events: ['onboarding_bot_check'],
+  },
+  {
     path: 'lib/chat/onboarding-script/telemetry.server.ts',
     invocations: 1,
     events: ['onboarding_reply'],
@@ -499,6 +519,7 @@ const SAFE_TOKEN_PROPERTY_NAMES = new Set([
   'billingReason',
   'campaign_id',
   'classifier',
+  'client_status',
   'decision_kind',
   'engine',
   'fallback',
@@ -519,6 +540,7 @@ const SAFE_TOKEN_PROPERTY_NAMES = new Set([
   'source',
   'stripeEventId',
   'toolName',
+  'ua_class',
   'variant_id',
 ]);
 const ENUM_PROPERTY_VALUES: Readonly<Record<string, ReadonlySet<string>>> = {
@@ -855,13 +877,6 @@ export async function trackServerEvent(
 }
 
 /**
- * Emit a server analytics event inside an existing transaction so the
- * business state write and its measurement commit atomically. Use this for
- * revenue-critical transitions (claim/signup/activation) where a post-commit
- * emission could permanently lose the event. A duplicate `eventIdentity`
- * deduplicates instead of throwing.
- */
-/**
  * Best-effort transaction-scoped statement_timeout guard (JOV-8761).
  *
  * Returns the caller's previous timeout when the guard was applied, or null
@@ -928,6 +943,10 @@ async function restoreServerAnalyticsTimeout(
   }
 }
 
+/**
+ * Emit inside an existing transaction so a revenue-critical business write and
+ * its measurement commit atomically. A duplicate `eventIdentity` deduplicates.
+ */
 export async function trackServerEventTx(
   tx: DbOrTransaction,
   event: string,

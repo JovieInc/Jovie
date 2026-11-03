@@ -20,12 +20,13 @@ describe('synthetic principal roster', () => {
     for (const id of ids) expect(id).toMatch(/^[a-z0-9]+$/);
   });
 
-  it('names Grokbot, Muse, Instinct and the production canary', () => {
+  it('names Grokbot, Muse, Instinct, the production canary and release', () => {
     expect(SYNTHETIC_PRINCIPALS.map(p => p.actorId)).toEqual([
       'grokbot',
       'muse',
       'instinct',
       'canary',
+      'release',
     ]);
   });
 });

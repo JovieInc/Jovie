@@ -6,7 +6,7 @@ This policy applies to {{LEGAL_ENTITY_NAME}} ("Jovie", "we", "us").
 
 ## Our Commitment to Privacy
 
-Jovie exists so you can share your story with confidence. That means keeping your information safe, using it transparently, and never selling it. We aim for clarity, control, and fast responses whenever you need help.
+Jovie exists so you can share your story with confidence. That means keeping your information safe, using it transparently, and keeping it away from data brokers. We aim for clarity, control, and fast responses whenever you need help.
 
 ## Information We Collect
 
@@ -98,6 +98,7 @@ Our stack uses a small set of trusted partners:
 - **Vercel** for hosting, edge functions, file storage, web analytics, and AI Gateway routing
 - **Sentry** for error tracking and performance monitoring
 - **Resend** for transactional email delivery
+- **Meta** for the Meta pixel on public artist profiles and some articles, which lets artists and Jovie show ads to people who visited. See "Your Privacy Choices" below to opt out.
 
 We never introduce other analytics platforms or tracking cookies without explicit notice.
 
@@ -162,11 +163,12 @@ You can choose not to use AI features. The AI chat assistant is optional and doe
 
 ## Data Sharing
 
-We do not sell data to anyone. We may share data with:
+We do not sell data to data brokers. We may share data with:
 
 - Service providers who assist in operating Jovie (Neon, Stripe, Statsig, Anthropic, Google AI, Vercel, Sentry, Resend)
 - Legal authorities when required by law or to protect against fraud
 - Partners only when you explicitly connect a service (e.g., Spotify)
+- Meta, through the Meta pixel on public artist profiles and some articles. Meta receives the page you viewed and identifiers from your browser so ads can reach past visitors. California law may treat this as "sharing" for cross-context behavioral advertising. You can opt out at any time (see "Your Privacy Choices").
 
 ### Google and Spotify Data Sharing
 
@@ -243,6 +245,16 @@ We build in control throughout the experience:
 - **Deletion:** Close your account and your profile data is removed on request
 - **Exports:** Download your data for a standalone backup
 - **Analytics opt-out:** Contact privacy@jov.ie to opt out of non-essential analytics (we rely on Statsig for core product signals)
+
+## Your Privacy Choices
+
+You can opt out of the Meta pixel and any other sale or sharing of your personal information for advertising:
+
+- **Cookie bar:** choose Reject, or Manage and turn Marketing off.
+- **Global Privacy Control:** if your browser sends a Global Privacy Control signal, we treat it as an opt-out and the Meta pixel does not load.
+- **Email:** write to privacy@jov.ie with "Do Not Sell or Share" in the subject.
+
+In the EU, the UK and other places where the law requires consent, the Meta pixel loads only after you accept marketing cookies.
 
 ## Google API Services Disclosure
 
