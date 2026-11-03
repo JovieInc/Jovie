@@ -61,6 +61,7 @@ import execution_attempt  # noqa: E402
 import file_overlap  # noqa: E402
 import claude_lane  # noqa: E402  (subscription quota bank read by the router)
 import hyperagent_lane  # noqa: E402
+import hyperagent_repair  # noqa: E402
 import migration_renumber  # noqa: E402  (no-model fix for migration number collisions)
 import fix_red_classes  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
 from gh_budget import gh_call  # noqa: E402  (budgeted gh for new lane code)
@@ -69,6 +70,7 @@ import slot_yield  # noqa: E402  (slot ceilings from measured merged-per-dollar)
 import update_drain  # noqa: E402  (drain gate admission while an update waits)
 import linear_app_token  # noqa: E402  (Jovie Lanes OAuth app quota, separate from Tim's user)
 import linear_sync  # noqa: E402  (local issue mirror, claim ledger, write outbox)
+import board_intake  # noqa: E402  (mesh board work for codex, closed on verified outcomes)
 import ownership  # noqa: E402  (started-state live-owner invariant)
 import fleet_ledger  # noqa: E402  (external agent claims, stranded-claim view)
 import pr_events  # noqa: E402
@@ -141,7 +143,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_migration_renumber.py",
+LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_migration_renumber.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -157,12 +159,15 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_capacity_limit.py", "scripts/tests/test_capacity_registry.py", "scripts/tests/test_fleet_gate_emitter.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
               "scripts/tests/test_epics.py",
-              "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py", "scripts/tests/test_priority_admission.py", "scripts/tests/test_macos_pool.py",
+              "scripts/tests/test_board_intake.py", "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py", "scripts/tests/test_priority_admission.py", "scripts/tests/test_macos_pool.py",
               "scripts/tests/test_backlog_rank.py", "scripts/tests/test_decompose_pass.py",
               "scripts/tests/test_pytest_hook_names.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
-RELEASE_EXTRAS = ["scripts/shipping_origin.py", # Shared client layer (budgeted gh) used by the throughput sentinel.
+RELEASE_EXTRAS = ["scripts/shipping_origin.py",
+                  # Subsidy pool burn policy (floor, burn order) that codex_lane reads at runtime.
+                  "apps/web/lib/ai/routing.json",
+                  # Shared client layer (budgeted gh) used by the throughput sentinel.
                   "scripts/apiclient/__init__.py", "scripts/apiclient/__main__.py", "scripts/apiclient/cache.py", "scripts/apiclient/client.py", "scripts/apiclient/contract.py", "scripts/apiclient/credentials.py", "scripts/apiclient/fake.py", "scripts/apiclient/gh.py", "scripts/apiclient/github.py", "scripts/apiclient/headers.py", "scripts/apiclient/legacy.py", "scripts/apiclient/linear.py", "scripts/apiclient/policy.py", "scripts/apiclient/store.py",
                   "packages/api-client/providers.json",
                   "scripts/lib/github-rate-limit.mjs",
@@ -864,9 +869,10 @@ def admission_order(issue: Issue, now: float) -> tuple:
     labels = {label.lower() for label in issue.labels}
     tier = (-1 if {SHARED_LABEL, "dispatch-next"} <= labels
             else 0 if effective_priority == 1 or workstreams.compounding(stream) else 1)
-    # Summer's signed portfolio rank is the first key, then explicit Urgent, tier, aged priority, age (JOV-7073).
+    # Summer's signed rank comes first, then Urgent, marketing, tier, aged priority, age (JOV-7073).
     return (*priority_admission.claim_key(issue.identifier, priority_admission.summer_ranks(now=now)),
-            0 if priority == 1 else 1, tier, effective_priority, workstreams.rank(stream),
+            0 if priority == 1 else 1, not priority_admission.marketing_priority(issue.labels),
+            tier, effective_priority, workstreams.rank(stream),
             created_at if created_at is not None else float("inf"))
 
 
@@ -3170,8 +3176,16 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
                               f"{type(failure).__name__}: {failure}\n")
                 except (AttributeError, OSError):
                     pass
+        stop_failure = None
+        if _lifecycle_helper:
+            _HELD_CLEANUP[:] = [owned, proc]
         try:
             owned.stop(proc)
+        except RuntimeError as failure:
+            # A failed tracked-descendant stop must not skip the process-group sweep below
+            # or replace the stop cause with a permanent cleanup hold (Gem, 2026-10-29: a
+            # `--timeout 600` trufflehog gate lived 2d17h). Re-verify drainage afterwards.
+            stop_failure = failure
         finally:
             for sig, grace in ((signal.SIGTERM, 15), (signal.SIGKILL, 5)):
                 # A reaped leader's PID/PGID may now belong to an unrelated job.
@@ -3195,6 +3209,8 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
                 else:
                     continue
                 break
+        if stop_failure is not None and not _cleanup_drained(owned, proc):
+            raise stop_failure
         raise
     finally:
         for signo, previous in restored.items():
@@ -3202,6 +3218,36 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
                 signal.signal(signo, previous)
             except (ValueError, OSError):
                 pass
+
+
+_HELD_CLEANUP: list = []  # [AgentProcesses, Popen] of the helper's last stopped run
+
+
+def _cleanup_drained(owned, proc) -> bool:
+    """True only when no owned descendant and no process-group member remains."""
+    try:
+        proc.poll()
+        return not owned.observe() and not process_group_alive(proc.pid)
+    except Exception:
+        return False  # unreadable membership cannot prove drainage
+
+
+def retry_held_cleanup() -> bool:
+    """One more TERM/KILL sweep over the helper's owned tree and its process group."""
+    import signal
+    if len(_HELD_CLEANUP) != 2:
+        return False
+    owned, proc = _HELD_CLEANUP
+    try:
+        owned.stop(proc)
+    except Exception:
+        pass
+    if proc.returncode is None:  # unreaped leader: its PID/PGID cannot belong to anyone else
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except OSError:
+            pass
+    return _cleanup_drained(owned, proc)
 
 
 PROVIDER_HANDOFFS = 2
@@ -4795,8 +4841,12 @@ def escalate_exhausted(host: Host, prs: list[dict], linear, *, model_only=False,
     data = load_escalation(host)
     now = time.time()
 
-    def healthy(_name, spec):
-        return provider_healthy(spec)
+    health_seen = {}  # one probe per provider per pass: a per-PR probe cost ~460 `grok models` calls (~400s) per tick
+
+    def healthy(name, spec):
+        if name not in health_seen:
+            health_seen[name] = provider_healthy(spec)
+        return health_seen[name]
 
     def plan_next(classified, record, now, head):
         if routing_context is REPAIR_ROUTING_UNSET:
@@ -5052,6 +5102,14 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
         if last.get("main") == main or publication_revocation(host, pr.get("headRefName")) \
                 or claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
             continue
+        # Comment transport is not a verified Dependabot source generation.
+        # Keep a same-head request pending across main changes, including legacy
+        # receipts that mistook successful comment posting for recreation.
+        if dependabot and last.get("head") == pr["headRefOid"] \
+                and last.get("action") == "dependabot-recreate" \
+                and (last.get("requested") or last.get("ok")):
+            continue
+        requested = False
         # A held PR (preservation hold, live repair) is not a revisit: it took one of the few
         # per-pass slots and was ledgered as revisit-failed without any GitHub call (~334/day).
         if not dependabot and pr.get("mergeStateStatus") != "DIRTY" and pr_events.maintenance_hold(
@@ -5061,7 +5119,9 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
             action = "dependabot-recreate"
             result = sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG,
                          "--body", "@dependabot recreate"])
-            ok = result.returncode == 0
+            requested = result.returncode == 0
+            # Only observed new source can release terminal-generation fences.
+            ok = False
         elif pr.get("mergeStateStatus") == "DIRTY":
             action = "partial-main-sync"
             ok = partial_main_sync(host, pr) is not None
@@ -5074,6 +5134,8 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
                 if label in present:
                     sh(["gh", "api", "-X", "DELETE", f"repos/{REPO_SLUG}/issues/{pr['number']}/labels/{label}"])
         visit = {"at": now, "head": pr["headRefOid"], "main": main, "action": action, "ok": ok}
+        if dependabot:
+            visit["requested"] = requested
         update_json(path, lambda rows, key=str(pr["number"]), visit=visit: rows.update({key: visit}))
         pr_events.ledger(host, {"schema": "jovie-lane-run/v1", "kind": "terminal-revisit", "origin": AUTONOMOUS_ORIGIN,
                                 "attribution": {"category": "finalizer-only", "provider": "lane-event"},
@@ -5628,8 +5690,12 @@ def claim_remediation_events(host: Host, linear) -> dict:
     providers = load_providers()
     cooled = {name for name in providers if cooling(host, name)}
 
-    def healthy(_name, spec):
-        return provider_healthy(spec)
+    health_seen = {}  # one probe per provider per pass: a per-PR probe cost ~460 `grok models` calls (~400s) per tick
+
+    def healthy(name, spec):
+        if name not in health_seen:
+            health_seen[name] = provider_healthy(spec)
+        return health_seen[name]
 
     delivery_lock = Locked(host.state / "event-delivery.lock", blocking=False)
     if not delivery_lock.held:
@@ -9181,7 +9247,7 @@ def reserved_binding_pass(host: Host, name: str, spec: dict) -> int:
     guaranteed seat, so a full or throttled Jovie pool cannot stall another repository. Disk-critical
     hosts admit nothing: a binding run needs a local checkout like any other."""
     try:
-        pct = disk_guard.free_pct(host.state)  # observation only: cleanup stays with slot holders
+        pct = disk_guard.lanes_free_pct(host.state)  # observation only: cleanup stays with slot holders
         if pct is None or pct <= disk_guard.CRITICAL_PCT:
             return 0
         bound = bindings.reserve(THIS, host, name, spec)
@@ -9524,6 +9590,21 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     if bound is not None:
         slot.release()
         return 1 if bound == "disk-held" else reexec(host, name)
+    if name == "hyperagent":
+        # Remote repair of existing PRs comes before new issues, and the shared 24/day thread
+        # cap (bridge + issues + repairs) gates both: a spent cap ends the turn here.
+        try:
+            turn, _receipt = hyperagent_repair.lane_turn(host.state, spec)
+        except Exception as error:
+            turn = "idle"
+            print(f"hyperagent repair pass failed: {type(error).__name__}: {error}"[:300], file=sys.stderr)
+        if turn == "capped":
+            record_idle_exit(host, name, "hyperagent-daily-cap")
+            slot.release()
+            return 0
+        if turn == "ran":
+            slot.release()
+            return reexec(host, name)
     linear = None
     # Publication can await canonical policy and native queue reads. Keep those
     # outside the global claim lock, then refresh inventory for ordinary admission.
@@ -10045,6 +10126,20 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
         except Exception as error:  # the sweep never takes dispatch down
             tick["worktreeSweep"] = f"{type(error).__name__}: {error}"[:200]
         if not tick["disk"].get("admitted"):
+            if not os.environ.get("LANES_SELFTEST"):
+                try:
+                    # Drain the Linear outbox even on a denied tick (JOV-10355, four recurrences):
+                    # the outbox is the doctor's own reporting channel — the writes that raise
+                    # and clear the disk condition travel through it — and starving it during a
+                    # disk emergency blinds the board exactly then. The flush is bounded
+                    # (FLUSH_LIMIT/FLUSH_BUDGET_S) and writes only small state JSONs on the
+                    # state root, never the worktree volume that is full; `admit` here is the
+                    # Linear client's rate budget, not disk admission.
+                    client = Linear(host.linear_env)
+                    tick["linearSync"] = {"outbox": linear_sync.flush(host.state, client, client.admit,
+                                                                     (LinearRateLimited,))}
+                except (Exception, SystemExit) as error:
+                    tick["linearSyncError"] = f"{type(error).__name__}: {error}"[:200]
             raise DiskAdmissionError(tick["disk"].get("reason", "disk-unobservable"))
         ensure_full_history(host)
         if not os.environ.get("LANES_SELFTEST"):
@@ -10074,6 +10169,13 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                 tick["linearSync"] = linear_sync.tick(host.state, client, client.admit, (LinearRateLimited,), teams)
             except (Exception, SystemExit) as error:  # dispatch reads the mirror at any age
                 tick["linearSyncError"] = f"{type(error).__name__}: {error}"[:200]
+        if not os.environ.get("LANES_SELFTEST") and os.environ.get("LANES_BOARD_INTAKE", "1") != "0":
+            try:
+                # Typed failures Summer posts to the mesh board (doctor issues, stuck PRs, red main)
+                # become lanes work here and close only on a verified outcome (board_intake.py).
+                tick["boardIntake"] = board_intake.tick(host.state, Linear(host.linear_env))
+            except (Exception, SystemExit) as error:  # the board never takes dispatch down
+                tick["boardIntakeError"] = f"{type(error).__name__}: {error}"[:200]
             try:  # measure the shared hosted-macOS pool (throttled); the LYB refill below reads it
                 tick["macosPool"] = macos_pool.sample(host.state)
             except (Exception, SystemExit) as error:  # a sampling fault never blocks dispatch
@@ -11549,8 +11651,12 @@ def guarded_main(argv: list[str] | None = None) -> int:
                       file=sys.stderr, flush=True)
             except OSError:
                 pass
-            while True:
-                time.sleep(60)
+            # Keep the locks only while descendants are provably alive: retry the sweep and
+            # release the moment the tree drains, instead of holding them until an operator.
+            while not retry_held_cleanup():
+                time.sleep(float(os.environ.get("LANES_GATE_CLEANUP_RETRY_S", 10)))
+            report_outcome({"returncode": None, "timeout": True})
+            return 124
     if args.command == "context-manifest":
         path = HERE / "context-manifest.json"
         generated = context_manifest_json()

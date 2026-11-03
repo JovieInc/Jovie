@@ -13,6 +13,7 @@ import {
 } from 'react';
 import { useRailPreview } from '@/components/shell/useRailPreview';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
+import { recordRuntimeTrace } from '@/lib/testing/runtime-trace';
 
 export interface PreviewPanelLink {
   id: string;
@@ -111,13 +112,20 @@ export function PreviewPanelProvider({
   // (server would render panel open, client would compute closed).
   const [isLargeScreen, setIsLargeScreen] = useState(false);
 
+  // Keep mount diagnostics tied to the initial render, independent of prop changes.
+  const mountInputsRef = useRef({ scope, defaultOpen, enabled });
+
   // After mount, read the actual screen size and listen for changes.
   // This ensures SSR and client initial render match (both start with isOpen=false),
   // then the effect opens the panel on large screens if defaultOpen is true.
   useEffect(() => {
     if (globalThis.window?.matchMedia === undefined) return;
 
+    recordRuntimeTrace('shell-rail', 'provider-mount', mountInputsRef.current);
     const mediaQuery = globalThis.window.matchMedia('(min-width: 1024px)');
+    recordRuntimeTrace('shell-rail', 'large-screen-resolved', {
+      isLargeScreen: mediaQuery.matches,
+    });
     setIsLargeScreen(mediaQuery.matches);
 
     const handleChange = (e: MediaQueryListEvent) => {
@@ -155,6 +163,12 @@ export function PreviewPanelProvider({
   const previousScopeRef = useRef(scope);
   useEffect(() => {
     if (previousScopeRef.current === scope) return;
+    recordRuntimeTrace('shell-rail', 'scope-change', {
+      from: previousScopeRef.current,
+      to: scope,
+      defaultOpen,
+      isLargeScreen,
+    });
     previousScopeRef.current = scope;
     const panel = new URLSearchParams(globalThis.location.search).get('panel');
     if (scope === 'chat' && panel === 'profile') {
@@ -175,6 +189,7 @@ export function PreviewPanelProvider({
     // empty-panel dependency never transitions when the hydration and this
     // wipe land in one flush — a wipe here would leave the reopened rail
     // stuck on its empty skeleton (Account → Back round trip).
+    recordRuntimeTrace('shell-rail', 'scope-reset-close', { scope });
     setPreviewData(null);
     setIsOpen(false);
   }, [defaultOpen, isLargeScreen, scope]);
@@ -186,8 +201,10 @@ export function PreviewPanelProvider({
   useEffect(() => {
     if (defaultOpen && isLargeScreen) {
       openedByUserRef.current = false;
+      recordRuntimeTrace('shell-rail', 'default-open-apply', { scope });
       setIsOpen(true);
     } else if (!isLargeScreen && isOpen && !openedByUserRef.current) {
+      recordRuntimeTrace('shell-rail', 'small-screen-close', { scope });
       setIsOpen(false);
     }
     // Intentionally omit isOpen to avoid re-triggering when user manually closes.

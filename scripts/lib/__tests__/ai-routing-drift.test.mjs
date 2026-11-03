@@ -4,7 +4,9 @@ import {
   declaredCeilings,
   declaredGatewayModels,
   evaluateRouting,
+  evaluateSubsidyPools,
   OIDC_KEY,
+  profilesFromDropIns,
   workersAiUsdByDay,
 } from '../ai-routing-drift.mjs';
 
@@ -120,5 +122,101 @@ describe('evaluateRouting', () => {
     expect(
       evaluateRouting({ ...calm, credits: { balanceUsd: 20 } }).findings
     ).toEqual([]);
+  });
+});
+
+describe('subsidy pool ledger', () => {
+  const sha = c => c.repeat(64);
+  const hostProfiles = {
+    'current-login': { home: '/h/.codex', slots: 5, emailSha256: sha('a') },
+    'lyb-pro': { home: '/h/lyb', slots: 1, emailSha256: sha('b') },
+    'jovie-pro': { home: '/h/jovie', slots: 2, emailSha256: sha('c') },
+  };
+  const clone = value => JSON.parse(JSON.stringify(value));
+
+  it("carries Tim's burn policy: 1% floor, proposals only at the floor, no auto-redeem, no paid fallback", () => {
+    expect(routing.subsidyPools.policy).toMatchObject({
+      floorPercent: 1,
+      floorScope: 'new-dispatch',
+      burnOrder: 'use-it-or-lose-it',
+      resetProposal: 'only-when-every-pool-at-floor',
+      autoRedeemResets: false,
+      paidFallback: 'never-without-tim',
+      newAccounts: 'never',
+      apiKeysInWorkers: 'never',
+      targets: { windowUsedBeforeResetPercent: 90 },
+    });
+    expect(evaluateSubsidyPools({ routing })).toEqual([]);
+  });
+
+  it('matches the aliases signed in on the host, with no drift either way', () => {
+    expect(evaluateSubsidyPools({ routing, profiles: hostProfiles })).toEqual(
+      []
+    );
+    const extra = {
+      ...hostProfiles,
+      'new-pro': { home: '/h/new', slots: 1, emailSha256: sha('d') },
+    };
+    const missing = clone(hostProfiles);
+    delete missing['lyb-pro'];
+    expect(
+      evaluateSubsidyPools({ routing, profiles: extra }).map(f => [
+        f.type,
+        f.subject,
+        f.severity,
+      ])
+    ).toEqual([['subsidy-pool-unledgered', 'new-pro', 'high']]);
+    expect(
+      evaluateSubsidyPools({ routing, profiles: missing }).map(f => [
+        f.type,
+        f.subject,
+      ])
+    ).toEqual([['subsidy-pool-not-signed-in', 'lyb-pro']]);
+  });
+
+  it('fails a policy that pauses early, auto-redeems or pays, and any identity in the ledger', () => {
+    const bad = clone(routing);
+    bad.subsidyPools.policy.floorPercent = 15;
+    bad.subsidyPools.policy.autoRedeemResets = true;
+    bad.subsidyPools.policy.paidFallback = 'gateway';
+    bad.subsidyPools.pools[0].note = 'someone@example.com';
+    const findings = evaluateSubsidyPools({ routing: bad });
+    expect(findings.map(f => [f.type, f.subject])).toEqual([
+      ['subsidy-policy-invalid', 'floorPercent'],
+      ['subsidy-policy-invalid', 'autoRedeemResets'],
+      ['subsidy-policy-invalid', 'paidFallback'],
+      ['subsidy-pool-identity', 'codex:current-login'],
+    ]);
+    const withSecret = clone(hostProfiles);
+    withSecret['lyb-pro'].apiKey = 'x';
+    expect(evaluateSubsidyPools({ routing, profiles: withSecret })).toEqual([
+      expect.objectContaining({
+        type: 'subsidy-profile-fields',
+        severity: 'critical',
+      }),
+    ]);
+    const none = clone(routing);
+    delete none.subsidyPools;
+    expect(evaluateSubsidyPools({ routing: none })[0]).toMatchObject({
+      type: 'subsidy-policy-invalid',
+      severity: 'high',
+    });
+  });
+
+  it('pages through evaluateRouting so the cost gate fails on ledger drift', () => {
+    const { findings } = evaluateRouting({
+      routing,
+      profiles: { ...hostProfiles, stray: hostProfiles['lyb-pro'] },
+    });
+    expect(findings.map(f => f.type)).toEqual(['subsidy-pool-unledgered']);
+  });
+
+  it('reads the profiles from systemd drop-ins, last assignment wins', () => {
+    const quoted = JSON.stringify(hostProfiles).replaceAll('"', '\\"');
+    const older =
+      '[Service]\nEnvironment="CODEX_LANE_SUBSCRIPTION_PROFILES={}"\n';
+    const live = `[Service]\nEnvironment=CODEX_LANE_AUTH_MODE=subscription-pool\nEnvironment="CODEX_LANE_SUBSCRIPTION_PROFILES=${quoted}"\n`;
+    expect(profilesFromDropIns([older, live])).toEqual(hostProfiles);
+    expect(profilesFromDropIns(['[Service]\nEnvironment=A=1\n'])).toBeNull();
   });
 });

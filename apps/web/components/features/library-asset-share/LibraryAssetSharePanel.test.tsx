@@ -51,13 +51,15 @@ describe('LibraryAssetSharePanel', () => {
       />
     );
 
-    expect(screen.getByLabelText('URL To Copy')).toHaveValue(
-      'jov.ie/p/token-1'
-    );
     expect(
-      screen.getByRole('button', { name: 'Copy to clipboard' })
-    ).toBeVisible();
+      screen.getByTestId('library-asset-share-url-release-1')
+    ).toHaveTextContent('jov.ie/p/token-1');
+    expect(screen.getByRole('button', { name: 'Copy link' })).toBeVisible();
     expect(screen.queryByText('Public Link')).not.toBeInTheDocument();
+    // Canonical copyable-link row: proportional type, not a monospace field.
+    expect(screen.getByText('jov.ie/p/token-1').className).not.toContain(
+      'font-mono'
+    );
     expect(
       screen.queryByRole('button', { name: 'Revoke private link' })
     ).not.toBeInTheDocument();
@@ -130,9 +132,9 @@ describe('LibraryAssetSharePanel', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByLabelText('URL To Copy')).toHaveValue(
-        'jov.ie/p/token-1'
-      );
+      expect(
+        screen.getByTestId('library-asset-share-url-release-1')
+      ).toHaveTextContent('jov.ie/p/token-1');
     });
     expect(onShareChange).toHaveBeenCalledWith(asset.id, privateShare);
     expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
@@ -195,9 +197,9 @@ describe('LibraryAssetSharePanel', () => {
       await user.click(await screen.findByRole('menuitem', { name: action }));
 
       await waitFor(() => {
-        expect(screen.getByLabelText('URL To Copy')).toHaveValue(
-          nextShare.shareUrl.replace('https://', '')
-        );
+        expect(
+          screen.getByTestId('library-asset-share-url-release-1')
+        ).toHaveTextContent(nextShare.shareUrl.replace('https://', ''));
       });
       expect(onShareChange).toHaveBeenCalledExactlyOnceWith(
         asset.id,
@@ -248,9 +250,9 @@ describe('LibraryAssetSharePanel', () => {
         'Unable to change share visibility right now'
       );
     });
-    expect(screen.getByLabelText('URL To Copy')).toHaveValue(
-      'jov.ie/p/token-1'
-    );
+    expect(
+      screen.getByTestId('library-asset-share-url-release-1')
+    ).toHaveTextContent('jov.ie/p/token-1');
     expect(onShareChange).not.toHaveBeenCalled();
   });
 });
