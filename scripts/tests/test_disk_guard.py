@@ -701,7 +701,7 @@ class RetiredHostLoopTest(unittest.TestCase):
             return SimpleNamespace(returncode=0, stdout="", stderr="")
         return subprocess.run(args, env=kwargs.pop("env", None) or self.env, **kwargs)
 
-    def test_retired_workspaces_back_up_work_then_go_never_through_mounts(self):
+    def test_retired_workspaces_hold_unsaved_work_without_private_archive_never_through_mounts(self):
         origin = self.root / "origin.git"
         self.git("init", "-q", "--bare", str(origin), cwd=self.root)
         root = self.root / "symphony-workspaces"; root.mkdir()
@@ -718,24 +718,22 @@ class RetiredHostLoopTest(unittest.TestCase):
         self.age(clean, dirty, orphan, plain, mounted)
         os.utime(fresh / "a.txt", (NOW, NOW))
         report = self.report()
-        with patch.dict(os.environ, self.env, clear=True), patch.object(guard, "free_pct", return_value=10.0), \
+        with patch.dict(os.environ, {**self.env, "LANES_SWEEP_ARCHIVE_GH": ""}, clear=True), \
+                patch.object(guard, "free_pct", return_value=10.0), \
                 patch.object(guard, "mount_points", return_value={mounted}):
             guard.sweep_retired_workspaces(SimpleNamespace(state=self.root), self.run_cmd, NOW, report, roots=[root])
         self.assertFalse(clean.exists())
-        self.assertFalse(dirty.exists())
+        self.assertTrue(dirty.exists())
+        self.assertEqual((dirty / "wip.txt").read_text(), "unsaved")
+        self.assertIn(f"kept workspace {dirty}: snapshot held (archive-credentials-unconfigured)", report["actions"])
         branches = subprocess.run(["git", "for-each-ref", "--format=%(refname)", "refs/heads/backup"],
                                   cwd=origin, env=self.env, capture_output=True, text=True).stdout.split()
         self.assertEqual(branches, [], "a retired-workspace snapshot is never a branch")
         backups = subprocess.run(["git", "for-each-ref", "--format=%(refname)", "refs/jovie-preserved/sweep/"],
                                  cwd=origin, env=self.env, capture_output=True, text=True).stdout.split()
-        self.assertEqual(len(backups), 1, report)
-        self.assertIn("/JOV-2-" + guard.datetime.fromtimestamp(NOW, guard.timezone.utc).strftime("%Y%m%d") + "-",
-                      backups[0])
-        shown = subprocess.run(["git", "show", f"{backups[0]}:wip.txt"], cwd=origin, env=self.env,
-                               capture_output=True, text=True).stdout
-        self.assertEqual(shown, "unsaved")
+        self.assertEqual(backups, [], "unverified work never falls back to source origin")
         self.assertTrue((orphan / "wip.txt").exists(), "unsaved work without a backup stays")
-        self.assertFalse((orphan / "node_modules").exists())
+        self.assertTrue((orphan / "node_modules").exists())
         self.assertTrue((plain / "notes.md").exists(), "a non-git dir cannot prove it holds no work")
         self.assertFalse((plain / "node_modules").exists())
         self.assertTrue((mounted / "a.txt").exists())
@@ -914,7 +912,11 @@ class LanesMountsTest(unittest.TestCase):
             state = Path(tmp)
             (state / "worktrees").mkdir()
             readings = {str(state): 22.6, str(state / "worktrees"): 0.0}
-            with patch.object(guard, "lanes_mounts", return_value=[state, state / "worktrees"]), \
+            # This fixture owns only its two mounts. The host may still contain
+            # retired Symphony checkouts; do not enumerate those while checking
+            # admission for a synthetic disk reading.
+            with patch.object(guard, "retired_workspace_roots", return_value=[state / "retired"]), \
+                    patch.object(guard, "lanes_mounts", return_value=[state, state / "worktrees"]), \
                     patch.object(guard, "free_pct", side_effect=lambda path: readings[str(path)]):
                 pct, rows = guard.lanes_free(state)
                 report = guard.check(SimpleNamespace(state=state, repo=state), run=ok)
