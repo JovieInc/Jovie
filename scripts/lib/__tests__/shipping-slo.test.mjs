@@ -891,6 +891,13 @@ describe('production verification sources (JOV-8082)', () => {
       deployments: [],
     };
     const mergeQueueSpeed = {
+      schema: 'jovie-merge-queue-speed/v1',
+      collection: {
+        status: 'collected',
+        collectionId: process.env.GITHUB_RUN_ID
+          ? `${process.env.GITHUB_RUN_ID}/${process.env.GITHUB_RUN_ATTEMPT || '1'}`
+          : null,
+      },
       generatedAt: ago(0),
       mergesPerHour: 4.08,
       groupSuccessRate: 0.409,

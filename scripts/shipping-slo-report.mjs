@@ -587,7 +587,12 @@ export function buildReport(
   if (ciCapacity) gistSlo.ciCapacity = ciCapacity;
   // Merge-queue speed (scripts/merge-queue-speed.mjs): merges/h, group
   // success and merge-group p50 for Summer's digest.
-  const mqDigest = digestBlock(mergeQueueSpeed);
+  const mqDigest = digestBlock(mergeQueueSpeed, {
+    now: nowMs,
+    collectionId: process.env.GITHUB_RUN_ID
+      ? `${process.env.GITHUB_RUN_ID}/${process.env.GITHUB_RUN_ATTEMPT || '1'}`
+      : null,
+  });
   if (mqDigest) gistSlo.mergeQueueSpeed = mqDigest;
 
   return {

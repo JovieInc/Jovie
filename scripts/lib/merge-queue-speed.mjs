@@ -27,7 +27,7 @@ export function stat(values) {
   };
 }
 
-/** Wall seconds of a completed workflow run (start of first attempt to end). */
+/** Wall seconds of a completed workflow run (latest attempt start to workflow update; not total retry/rework time). */
 export function runWallSeconds(run) {
   if (run.status !== 'completed') return null;
   const start = run.run_started_at ?? run.created_at;
@@ -122,7 +122,10 @@ export function successByWindow(runs, nowMs, hoursList = [2, 6, 24]) {
   for (const h of hoursList) {
     const since = nowMs - h * 3_600_000;
     const c = outcomeCounts(
-      runs.filter(r => Date.parse(r.created_at) >= since)
+      runs.filter(
+        r =>
+          Date.parse(r.created_at) >= since && Date.parse(r.created_at) <= nowMs
+      )
     );
     const decided = c.success + c.failure;
     out[`${h}h`] = {
@@ -144,6 +147,7 @@ export function summarize({
   mergedPrs = [],
   now = Date.now(),
   windowHours = 24,
+  collection = null,
 }) {
   const nowMs = typeof now === 'number' ? now : Date.parse(now);
   const okWall = runs =>
@@ -153,35 +157,78 @@ export function summarize({
         .map(runWallSeconds)
         .filter(v => v !== null)
     );
-  const windows = successByWindow(groupRuns, nowMs);
-  const merges = mergedPrs.filter(
-    p => p.mergedAt && Date.parse(p.mergedAt) >= nowMs - windowHours * 3.6e6
-  ).length;
-  const completedGroups = groupRuns.filter(r => r.status === 'completed');
+  if (!Number.isFinite(windowHours) || windowHours <= 0 || windowHours > 24)
+    throw new Error('invalid windowHours');
+  const inWindow = t =>
+    Date.parse(t) >= nowMs - windowHours * 3.6e6 && Date.parse(t) <= nowMs;
+  const windows = successByWindow(groupRuns, nowMs, [
+    ...new Set([2, 6, 24, windowHours]),
+  ]);
+  if (collection?.groupRunsComplete === false) {
+    for (const w of Object.values(windows)) {
+      w.successRate = null;
+      w.successRateInclCancelled = null;
+    }
+  }
+  const windowGroups = groupRuns.filter(r => inWindow(r.created_at));
+  const windowPrs = prRuns.filter(r => inWindow(r.created_at));
+  const windowMerged = mergedPrs.filter(p => inWindow(p.mergedAt));
+  const merges = windowMerged.length;
+  const completedGroups = windowGroups.filter(r => r.status === 'completed');
   const sampledCompleted = sampledGroupJobs.filter(
-    s => s.run.status === 'completed'
+    s => s.run.status === 'completed' && inWindow(s.run.created_at)
   );
-  const sampleRatio = completedGroups.length
-    ? sampledCompleted.length / completedGroups.length
-    : 0;
-  const groupMinutes = sampleRatio
-    ? runnerMinutes(sampledCompleted) / sampleRatio
-    : null;
+  // A deterministic bounded job sample cannot establish total spend.
+  const groupMinutes =
+    sampledCompleted.length === completedGroups.length
+      ? runnerMinutes(sampledCompleted)
+      : null;
   const success2h = windows['2h'].successRate;
   return {
     schema: SCHEMA,
     generatedAt: new Date(nowMs).toISOString(),
     windowHours,
-    prCiSeconds: okWall(prRuns),
-    mergeGroupCiSeconds: okWall(groupRuns),
+    collection,
+    criticalPathBasis: 'bounded deterministic sample of latest-attempt jobs',
+    timingBasis: 'latest-attempt-start-to-workflow-update',
+    runnerMinutesBasis:
+      'latest-attempt-jobs; null unless all completed runs and job pages covered',
+    prCiSeconds:
+      collection?.prRunsComplete === false
+        ? { n: windowPrs.length, p50: null, p95: null }
+        : okWall(windowPrs),
+    mergeGroupCiSeconds:
+      collection?.groupRunsComplete === false
+        ? { n: windowGroups.length, p50: null, p95: null }
+        : okWall(windowGroups),
     groupOutcomes: windows,
     groupSuccessRate: windows[`${windowHours}h`]?.successRate ?? null,
-    mergesPerHour: round(merges / windowHours, 2),
+    mergesPerHour:
+      collection?.mergedPrsComplete === false
+        ? null
+        : round(merges / windowHours, 2),
     merges,
-    queueWaitSeconds: stat(queueWaits(mergedPrs)),
-    criticalPath: criticalPath(sampledGroupJobs),
+    queueWaitSeconds:
+      collection?.mergedPrsComplete === false ||
+      collection?.queueEventsComplete === false
+        ? { n: queueWaits(windowMerged).length, p50: null, p95: null }
+        : stat(queueWaits(windowMerged)),
+    criticalPath:
+      collection?.jobsComplete === false ||
+      collection?.groupRunsComplete === false
+        ? []
+        : criticalPath(
+            sampledGroupJobs.filter(s => inWindow(s.run.created_at))
+          ),
     mergeGroupRunnerMinutesPerMerge:
-      groupMinutes !== null && merges ? round(groupMinutes / merges) : null,
+      collection?.groupRunsComplete !== false &&
+      collection?.mergedPrsComplete !== false &&
+      collection?.jobsComplete !== false &&
+      sampledCompleted.length === completedGroups.length &&
+      groupMinutes !== null &&
+      merges
+        ? round(groupMinutes / merges)
+        : null,
     sampled: {
       prRuns: prRuns.length,
       groupRuns: groupRuns.length,
@@ -197,8 +244,20 @@ export function summarize({
 }
 
 /** Digest line for Summer (lanes status gist embeds the slo block). */
-export function digestBlock(summary) {
-  if (!summary) return null;
+export function digestBlock(
+  summary,
+  { now = Date.now(), collectionId = null } = {}
+) {
+  const age = now - Date.parse(summary?.generatedAt);
+  if (
+    summary?.schema !== SCHEMA ||
+    summary?.collection?.status !== 'collected' ||
+    !Number.isFinite(age) ||
+    age < 0 ||
+    age > 26 * 3_600_000 ||
+    (collectionId && summary.collection.collectionId !== collectionId)
+  )
+    return null;
   return {
     mergesPerHour: summary.mergesPerHour,
     groupSuccessRate: summary.groupSuccessRate,

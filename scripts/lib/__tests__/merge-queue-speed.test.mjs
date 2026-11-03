@@ -1,8 +1,14 @@
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { collect } from '../../merge-queue-speed.mjs';
 import {
   criticalPath,
   digestBlock,
   queueWaits,
+  runWallSeconds,
   successByWindow,
   summarize,
 } from '../merge-queue-speed.mjs';
@@ -109,6 +115,7 @@ describe('merge-queue speed', () => {
         { mergedAt: at(2000), enqueuedAt: [at(2010)] },
       ],
       now: NOW,
+      collection: { status: 'collected', collectionId: 'run-1' },
     });
     expect(summary).toMatchObject({
       merges: 1,
@@ -116,11 +123,11 @@ describe('merge-queue speed', () => {
       groupSuccessRate: 0.667,
       mergeGroupCiSeconds: { n: 2, p50: 720 },
       prCiSeconds: { n: 1, p50: 360 },
-      queueWaitSeconds: { n: 2, p50: 1800 },
+      queueWaitSeconds: { n: 1, p50: 1800 },
       mergeGroupRunnerMinutesPerMerge: 30,
       batchSizeGate: { success2h: 1, eligible: true },
     });
-    expect(digestBlock(summary)).toEqual({
+    expect(digestBlock(summary, { now: NOW })).toEqual({
       mergesPerHour: 0.04,
       groupSuccessRate: 0.667,
       groupSuccessRate2h: 1,
@@ -137,4 +144,248 @@ describe('merge-queue speed', () => {
     expect(summary.mergeGroupRunnerMinutesPerMerge).toBeNull();
     expect(summary.batchSizeGate.eligible).toBe(false);
   });
+});
+
+describe('bounded collection correctness', () => {
+  it('computes arbitrary windows and excludes old and future samples', () => {
+    const s = summarize({
+      now: NOW,
+      windowHours: 3,
+      groupRuns: [
+        run(1, 'success', 30),
+        run(2, 'failure', 200),
+        run(3, 'success', -10),
+      ],
+      mergedPrs: [
+        { mergedAt: at(10), enqueuedAt: [at(20)] },
+        { mergedAt: at(300), enqueuedAt: [at(320)] },
+        { mergedAt: at(-5), enqueuedAt: [at(20)] },
+      ],
+    });
+    expect(s.groupSuccessRate).toBe(1);
+    expect(s.mergeGroupCiSeconds.n).toBe(1);
+    expect(s.queueWaitSeconds.n).toBe(1);
+    expect(s.merges).toBe(1);
+  });
+  it('does not extrapolate runner spend from a biased job sample', () => {
+    const a = run(1, 'success', 30),
+      b = run(2, 'failure', 40);
+    const s = summarize({
+      now: NOW,
+      groupRuns: [a, b],
+      sampledGroupJobs: [{ run: a, jobs: [job('a', 30, 20)] }],
+      mergedPrs: [{ mergedAt: at(1) }],
+    });
+    expect(s.mergeGroupRunnerMinutesPerMerge).toBeNull();
+  });
+  it('names latest-attempt timing without claiming first-attempt duration', () => {
+    const r = run(1, 'success', 60, 10, {
+      run_attempt: 2,
+      run_started_at: at(20),
+      updated_at: at(10),
+    });
+    expect(runWallSeconds(r)).toBe(600);
+    expect(summarize({ now: NOW }).timingBasis).toBe(
+      'latest-attempt-start-to-workflow-update'
+    );
+  });
+  it('rejects stale, future, failed and different-run digest receipts', () => {
+    const s = summarize({
+      now: NOW,
+      collection: { status: 'collected', collectionId: 'current' },
+    });
+    expect(
+      digestBlock(s, { now: NOW, collectionId: 'current' })
+    ).not.toBeNull();
+    for (const options of [
+      { now: NOW + 27 * 3600000 },
+      { now: NOW - 1 },
+      { now: NOW, collectionId: 'next' },
+    ])
+      expect(digestBlock(s, options)).toBeNull();
+    expect(digestBlock({ ...s, collection: null }, { now: NOW })).toBeNull();
+  });
+  it('marks capped lists and job pages partial without increasing API bounds', () => {
+    let calls = 0;
+    const gh = args => {
+      calls++;
+      if (args[0] === 'graphql')
+        return {
+          data: {
+            search: {
+              nodes: Array.from({ length: 100 }, (_, i) => ({
+                number: i,
+                mergedAt: at(10),
+                timelineItems: { nodes: [] },
+              })),
+              pageInfo: { hasNextPage: true, endCursor: 'next' },
+            },
+          },
+        };
+      if (args[0].includes('/jobs?'))
+        return { jobs: [job('a', 20, 10)], total_count: 101 };
+      return {
+        workflow_runs: Array.from({ length: 100 }, (_, i) =>
+          run(i, 'success', 30)
+        ),
+        total_count: 2000,
+      };
+    };
+    const s = collect({
+      gh,
+      repo: 'JovieInc/Jovie',
+      now: NOW,
+      maxJobs: 2,
+      hours: 3,
+    });
+    expect(calls).toBe(27); // 20 list pages + 2 job reads + 5 search pages
+    expect(s.collection).toMatchObject({
+      prRunsComplete: false,
+      groupRunsComplete: false,
+      mergedPrsComplete: false,
+      jobsComplete: false,
+    });
+    expect(s.groupSuccessRate).toBeNull();
+    expect(s.mergesPerHour).toBeNull();
+    expect(s.batchSizeGate.eligible).toBe(false);
+    expect(s.criticalPath).toEqual([]);
+  });
+  it('rejects invalid arguments before requesting data', () => {
+    const gh = () => {
+      throw new Error('unexpected API call');
+    };
+    for (const hours of [0, -1, NaN, Infinity, 25])
+      expect(() => collect({ gh, repo: 'x/y', hours })).toThrow('--hours');
+    for (const maxJobs of [0, -1, 1.5, 201, NaN])
+      expect(() => collect({ gh, repo: 'x/y', maxJobs })).toThrow('--max-jobs');
+  });
+});
+
+it('withholds queue wait percentiles when bounded enqueue history is incomplete', () => {
+  const s = summarize({
+    now: NOW,
+    mergedPrs: [{ mergedAt: at(1), enqueuedAt: [at(10)] }],
+    collection: { queueEventsComplete: false },
+  });
+  expect(s.queueWaitSeconds).toEqual({ n: 1, p50: null, p95: null });
+});
+
+it('publishes complete bounded collections and forwards pagination and the 24h coverage window', () => {
+  const calls = [];
+  let searchPage = 0;
+  const gh = args => {
+    calls.push(args);
+    if (args[0] === 'graphql') {
+      searchPage++;
+      return {
+        data: {
+          search: {
+            nodes:
+              searchPage === 1
+                ? [
+                    {
+                      number: 1,
+                      mergedAt: at(10),
+                      timelineItems: {
+                        totalCount: 1,
+                        nodes: [{ createdAt: at(40) }],
+                      },
+                    },
+                  ]
+                : [],
+            pageInfo: { hasNextPage: searchPage === 1, endCursor: 'cursor-1' },
+          },
+        },
+      };
+    }
+    if (args[0].includes('/jobs?'))
+      return { jobs: [job('build', 30, 20)], total_count: 1 };
+    return { workflow_runs: [run(1, 'success', 30)] };
+  };
+  const s = collect({
+    gh,
+    repo: 'JovieInc/Jovie',
+    now: NOW,
+    hours: 3,
+    collectionId: 'current/2',
+  });
+  expect(calls).toHaveLength(5);
+  expect(
+    calls
+      .filter(args => args[0].includes('/runs?'))
+      .every(args =>
+        args[0].includes(new Date(NOW - 24 * 3600000).toISOString())
+      )
+  ).toBe(true);
+  expect(calls.at(-1)).toContain('after=cursor-1');
+  expect(s.collection).toEqual({
+    status: 'collected',
+    collectionId: 'current/2',
+    prRunsComplete: true,
+    groupRunsComplete: true,
+    mergedPrsComplete: true,
+    jobsComplete: true,
+    queueEventsComplete: true,
+  });
+  expect(s.groupSuccessRate).toBe(1);
+  expect(s.mergesPerHour).toBe(0.33);
+  expect(s.mergeGroupRunnerMinutesPerMerge).toBe(10);
+  expect(s.queueWaitSeconds.p50).toBe(1800);
+  expect(
+    digestBlock(s, { now: NOW, collectionId: 'current/2' })
+  ).not.toBeNull();
+});
+
+it('the real CLI writes a fresh receipt bound to its workflow run and attempt', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'queue-speed-cli-'));
+  try {
+    const preload = join(dir, 'api-fixture.mjs');
+    writeFileSync(
+      preload,
+      `import cp from 'node:child_process';
+import {syncBuiltinESMExports} from 'node:module';
+cp.execFileSync = (command,args) => {
+ if (!args[0].endsWith('/packages/api-client/cli.ts') || !args.includes('--priority') || !args.includes('report')) throw new Error('unexpected command');
+ return args.includes('graphql') ? JSON.stringify({data:{search:{nodes:[],pageInfo:{hasNextPage:false}}}}) : JSON.stringify({workflow_runs:[]});
+};
+syncBuiltinESMExports();`
+    );
+    const out = join(dir, 'snapshot.json');
+    const output = execFileSync(
+      process.execPath,
+      [
+        '--import',
+        preload,
+        resolve(import.meta.dirname, '../../merge-queue-speed.mjs'),
+        '--out',
+        out,
+        '--hours',
+        '3',
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GITHUB_RUN_ID: 'fixture-run',
+          GITHUB_RUN_ATTEMPT: '2',
+        },
+      }
+    );
+    const summary = JSON.parse(readFileSync(out, 'utf8'));
+    expect(summary.collection).toMatchObject({
+      status: 'collected',
+      collectionId: 'fixture-run/2',
+      mergedPrsComplete: true,
+      groupRunsComplete: true,
+    });
+    expect(output).toContain('Merge-queue speed (3h)');
+    expect(
+      digestBlock(summary, { now: Date.now(), collectionId: 'fixture-run/2' })
+    ).not.toBeNull();
+    expect(
+      digestBlock(summary, { now: Date.now(), collectionId: 'fixture-run/3' })
+    ).toBeNull();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
