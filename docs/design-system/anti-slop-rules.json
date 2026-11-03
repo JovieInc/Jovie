@@ -872,6 +872,158 @@
           }
         ]
       }
+    },
+    {
+      "id": "ASR-040",
+      "title": "No icon tiles or bordered wrapper cards",
+      "statement": "Icons and emoji sit bare, never inside a bordered or filled tile. Do not wrap a single message, form or receipt in a bordered card floating in an empty page.",
+      "rationale": "Bordered tiles and lone cards read as template UI; Tim: icons in tiles are \"ugly af\".",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-29",
+        "ref": "feedback_matte_subtle_color; waitlist walkthrough 2026-10-29"
+      },
+      "scope": ["app", "marketing", "admin"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "vision",
+        "status": "shadow",
+        "check": "scripts/dogfood-judge (Tim-taste rubric)",
+        "evidence": []
+      }
+    },
+    {
+      "id": "ASR-041",
+      "title": "Sentence case, restrained controls",
+      "statement": "Labels and buttons use sentence case. No Title Case labels, no oversized text tabs, no default-disabled grey primary buttons, and at most one line of microcopy per field.",
+      "rationale": "Noisy controls make a premium product look consumer and cheap.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-29",
+        "ref": "feedback_matte_subtle_color (noisy UI bans)"
+      },
+      "scope": ["app", "marketing", "admin", "copy"],
+      "severity": "warn",
+      "enforcement": {
+        "kind": "vision",
+        "status": "shadow",
+        "check": "scripts/dogfood-judge (Tim-taste rubric)",
+        "evidence": []
+      }
+    },
+    {
+      "id": "ASR-042",
+      "title": "No internal or test data on user surfaces",
+      "statement": "A user never sees pipeline vocabulary (enrichment, source, payload, token), route paths, ids, synthetic or test identities, or raw URLs used as content.",
+      "rationale": "Leaked internals break trust and show the product was never looked at.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-29",
+        "ref": "waitlist walkthrough: '(source: enrichment)', synthetic-prodcert email on the waitlist receipt"
+      },
+      "scope": ["app", "marketing", "copy"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "vision",
+        "status": "shadow",
+        "check": "scripts/dogfood-judge (Tim-taste rubric)",
+        "evidence": []
+      }
+    },
+    {
+      "id": "ASR-043",
+      "title": "No dead ends",
+      "statement": "Every state offers a working next step. Do not render a control or message that cannot help (unavailable, coming soon, use something else), and do not ignore what the user typed.",
+      "rationale": "Dead ends waste attention and erode trust.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-28",
+        "ref": "feedback_no_dead_ends"
+      },
+      "scope": ["app", "marketing", "admin", "native"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "vision",
+        "status": "shadow",
+        "check": "scripts/dogfood-judge (Tim-taste rubric)",
+        "evidence": []
+      }
+    },
+    {
+      "id": "ASR-044",
+      "title": "Value before price",
+      "statement": "No price, plan or upgrade CTA appears before the person has seen value built from their own data, and never on a waitlist or reservation receipt.",
+      "rationale": "Asking for money before showing value converts badly and reads as a cash grab.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-29",
+        "ref": "waitlist walkthrough: 'Start Pro ($12)' on the waitlist receipt"
+      },
+      "scope": ["app", "marketing", "copy"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "vision",
+        "status": "shadow",
+        "check": "scripts/dogfood-judge (Tim-taste rubric)",
+        "evidence": []
+      }
+    },
+    {
+      "id": "ASR-045",
+      "title": "One right thing per screen",
+      "statement": "Each screen has one focal point and one primary action, chosen for this person. No catalog rows, competing CTAs or dead space around a small focal element.",
+      "rationale": "Jovie's core principle: one signal-picked thing per person.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-25",
+        "ref": "project_one_right_thing; feedback_matte_subtle_color (/smart-links: no single focal point)"
+      },
+      "scope": ["app", "marketing"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "vision",
+        "status": "shadow",
+        "check": "scripts/dogfood-judge (Tim-taste rubric)",
+        "evidence": []
+      }
+    },
+    {
+      "id": "ASR-046",
+      "title": "Living canvas for setup",
+      "statement": "Setup and onboarding are a conversation with the agent, with the person's real result taking shape live beside it. The agent infers what it can and asks only for the rest; the full settings stay one step away.",
+      "rationale": "An agent doing the work beats six settings fields.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-26",
+        "ref": "feedback_agent_first_ui; Pen R6As7U /waitlist chat and live profile"
+      },
+      "scope": ["app", "admin"],
+      "severity": "warn",
+      "enforcement": {
+        "kind": "vision",
+        "status": "shadow",
+        "check": "scripts/dogfood-judge (Tim-taste rubric)",
+        "evidence": []
+      }
+    },
+    {
+      "id": "ASR-047",
+      "title": "No placeholder or stale data",
+      "statement": "No placeholder values (your-handle, lorem, sample), empty media, broken images or contradicting states (available, then taken) on a surface a person sees.",
+      "rationale": "Placeholders tell the person the product is not ready for them.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-29",
+        "ref": "waitlist walkthrough: jov.ie/your-handle, handle available then not available"
+      },
+      "scope": ["app", "marketing", "copy"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "vision",
+        "status": "shadow",
+        "check": "scripts/dogfood-judge (Tim-taste rubric)",
+        "evidence": []
+      }
     }
   ],
   "judges": [

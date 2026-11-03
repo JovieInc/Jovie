@@ -78,7 +78,7 @@ function runClaude(args, cwd, timeoutMs) {
   });
 }
 
-async function runJudge(args, cwd, timeoutMs) {
+export async function runJudge(args, cwd, timeoutMs) {
   const envelope = JSON.parse(await runClaude(args, cwd, timeoutMs));
   if (envelope.is_error)
     throw new Error(`judge error: ${envelope.result ?? 'unknown'}`);
