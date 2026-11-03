@@ -572,14 +572,37 @@ jobs:
       - *quota-prime
       - *quota-runtime
       - *proof-reuse
-      # TruffleHog reads the object store directly and cannot use a partial
-      # clone (#13994), so this job keeps the full-blob history fetch.
+      # TruffleHog reads the object store directly: retain complete unfiltered
+      # head/base ancestry, without downloading every unrelated branch and tag.
       - if: steps.reuse.outputs.reuse != 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
+      - name: Fetch full-blob source ancestry
+        if: steps.reuse.outputs.reuse != 'true'
+        env:
+          SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          TARGET_BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          git check-ref-format "refs/heads/$TARGET_BASE_REF"
+          [[ "$(git rev-parse HEAD)" == "$SOURCE_HEAD_SHA" ]]
+          [[ -z "$(git config --get extensions.partialClone || true)" ]]
+          [[ "$(git config --bool --get remote.origin.promisor || true)" != true ]]
+          history_args=()
+          if [[ "$(git rev-parse --is-shallow-repository)" == true ]]; then
+            history_args+=(--unshallow)
+          fi
+          git fetch --no-tags "${history_args[@]}" origin \
+            "+$SOURCE_HEAD_SHA:refs/remotes/origin/security-evidence-head" \
+            "+refs/heads/$TARGET_BASE_REF:refs/remotes/origin/$TARGET_BASE_REF"
+          [[ "$(git rev-parse HEAD)" == "$SOURCE_HEAD_SHA" ]]
+          [[ "$(git rev-parse --is-shallow-repository)" == false ]]
+          git rev-list --objects --missing=error \
+            "$SOURCE_HEAD_SHA" "refs/remotes/origin/$TARGET_BASE_REF" >/dev/null
       - &reused-setup
         if: steps.reuse.outputs.reuse != 'true'
         uses: ./.github/actions/setup-node-pnpm
