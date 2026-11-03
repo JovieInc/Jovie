@@ -22,6 +22,7 @@ import {
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import {
   type AppShellRouteContext,
+  type AppShellRouteContextResult,
   loadAppShellRouteContext,
   requireAppShellDashboardUserId,
 } from '../app-shell-route-context';
