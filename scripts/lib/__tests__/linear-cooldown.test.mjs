@@ -383,8 +383,11 @@ describe('shared linear cooldown', () => {
             mode: variant === 'nonprivate' ? 0o644 : 0o600,
           }
         );
-      // A restrictive worker umask must not turn this unsafe fixture private.
-      if (variant === 'nonprivate') fs.chmodSync(pending, 0o644);
+      if (variant === 'nonprivate') {
+        // Creation modes are masked by the host umask; make this unsafe fixture explicit.
+        fs.chmodSync(pending, 0o644);
+        assert.equal(fs.statSync(pending).mode & 0o777, 0o644);
+      }
       const waits = t.mock.method(globalThis, 'setTimeout', () => {
         throw new Error('unsafe staging must fail immediately');
       });
