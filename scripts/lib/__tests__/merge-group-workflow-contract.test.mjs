@@ -3330,7 +3330,25 @@ ${selectedGateScript}`,
       'ref: ${{ github.event.pull_request.head.sha }}'
     );
     expect(sourceSizeGuard).toContain('persist-credentials: false');
-    expect(sourceSizeGuard).toContain('fetch-depth: 0');
+    // Depth-one checkout is followed by one targeted unshallow fetch: a
+    // merely available shallow merge base is not proof of complete ancestry.
+    expect(sourceSizeGuard).toContain('fetch-depth: 1');
+    expect(sourceSizeGuard).toContain(
+      'name: Fetch exact PR and current base ancestry'
+    );
+    expect(sourceSizeGuard).toContain(
+      'git fetch --filter=blob:none --no-tags --unshallow origin "$PR_HEAD_SHA"'
+    );
+    expect(sourceSizeGuard).toContain(
+      '+refs/heads/$PR_BASE_REF:refs/remotes/origin/$PR_BASE_REF'
+    );
+    expect(sourceSizeGuard).toContain(
+      '[[ "$(git rev-parse HEAD)" == "$PR_HEAD_SHA" ]]'
+    );
+    expect(sourceSizeGuard).toContain(
+      '[[ "$(git rev-parse --is-shallow-repository)" == false ]]'
+    );
+    expect(sourceSizeGuard).toContain('git archive "$PR_BASE_SHA" scripts/lib');
     expect(sourceSizeGuard).toContain('id: pr-merge-base');
     // The event base SHA goes stale on long-lived PRs; judge the PR against
     // the fetched base branch tip instead (#18131 failed on a 3-day-old base).
