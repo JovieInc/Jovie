@@ -21,8 +21,6 @@ interface WaitlistSuccessViewProps {
   readonly email?: string | null;
   /** jov.ie handle held by the reservation profile, when one exists. */
   readonly reservedHandle?: string | null;
-  /** Self-serve Pro price; enables "Start Pro" on waiting receipts. */
-  readonly proCheckoutPriceId?: string | null;
 }
 
 export function WaitlistSuccessView({
@@ -30,7 +28,6 @@ export function WaitlistSuccessView({
   onRetry,
   email,
   reservedHandle,
-  proCheckoutPriceId,
 }: Readonly<WaitlistSuccessViewProps>) {
   useEffect(() => {
     if (
@@ -73,7 +70,6 @@ export function WaitlistSuccessView({
         onRetry={onRetry}
         email={email}
         reservedHandle={reservedHandle}
-        proCheckoutPriceId={proCheckoutPriceId}
       />
     </AuthLayout>
   );

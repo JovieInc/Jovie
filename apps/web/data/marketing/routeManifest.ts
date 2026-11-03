@@ -1290,11 +1290,6 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       ),
       approvedVariantBinding(
         'apps/web/app/(marketing)/launch/page.tsx',
-        'stats',
-        '3-stat-band'
-      ),
-      approvedVariantBinding(
-        'apps/web/app/(marketing)/launch/page.tsx',
         'comparison',
         'feature-matrix'
       ),
@@ -1308,7 +1303,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     bindingEvidence: {
       status: 'verified',
       source:
-        'mounted stamps 2026-10-15: profile-stage hero, platform strip, pillar grid, editorial splits, deeplink grid, three-stat band, dual-path close',
+        'mounted stamps 2026-10-15: profile-stage hero, platform strip, pillar grid, editorial splits, deeplink grid, dual-path close',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -1430,6 +1425,30 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     url: '/developers/agents',
     healthCheck: {
       path: '/developers/agents',
+      expected: 'page',
+    },
+  },
+  {
+    glob: '(marketing)/proof/methodology/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'proof-stat registry methodology',
+      notes:
+        'Methodology page is generated from apps/web/data/proof-stats/registry.json; prose-led reference, not recipe-composable.',
+    },
+    exempt: {
+      reason:
+        'public proof methodology — generated from the stat registry; not recipe-composable',
+      linearId: 'JOV-9911',
+      approvedBy: 'autonomous-shipping-policy (agent)',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/23666',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/proof/methodology',
+    healthCheck: {
+      path: '/proof/methodology',
       expected: 'page',
     },
   },

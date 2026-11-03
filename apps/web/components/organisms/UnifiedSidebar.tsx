@@ -463,6 +463,7 @@ export function UnifiedSidebar({
     isAdmin: canSwitchWorkspaces,
     user,
     profileCompletion,
+    selectedProfile: dockProfile,
   } = useDashboardData();
   const sidebarOverride = useShellSidebarOverride();
   const { state: sidebarState } = useSidebar();
@@ -556,6 +557,7 @@ export function UnifiedSidebar({
       <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 pt-(--space-2-5) pb-(--space-3-5) [&_[data-slot=common-dropdown-trigger]]:min-h-8'>
         <SidebarDockBridge
           userId={user?.id ?? ''}
+          userState={{ hasClaimedHandle: Boolean(dockProfile?.username) }}
           collapsed={isSidebarCollapsed}
         >
           {dockStatus => (
