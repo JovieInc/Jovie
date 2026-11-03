@@ -131,6 +131,8 @@ function shallowFixture() {
   git(source, ['config', 'user.email', 'ci@example.com']);
   git(source, ['config', 'user.name', 'ci']);
   execFileSync('git', ['init', '-q', '--bare', remote]);
+  git(remote, ['config', 'uploadpack.allowFilter', 'true']);
+  git(remote, ['config', 'uploadpack.allowAnySHA1InWant', 'true']);
   git(source, ['remote', 'add', 'origin', `file://${remote}`]);
   const fixtureLib = join(source, 'scripts/lib');
   mkdirSync(fixtureLib, { recursive: true });
@@ -165,7 +167,15 @@ function shallowFixture() {
   ]);
   execFileSync('git', ['init', '-q', clone]);
   git(clone, ['remote', 'add', 'origin', `file://${remote}`]);
-  git(clone, ['fetch', '-q', '--no-tags', '--depth=1', 'origin', head]);
+  git(clone, [
+    'fetch',
+    '-q',
+    '--filter=blob:none',
+    '--no-tags',
+    '--depth=1',
+    'origin',
+    head,
+  ]);
   git(clone, ['checkout', '-q', '--detach', head]);
   return { root, source, clone, rootSha, head, base, unrelated };
 }
@@ -177,8 +187,12 @@ describe('targeted complete ancestry for PR Size Guard', () => {
     expect(checkout).toContain('persist-credentials: false');
     const script = stepRunScript('Fetch exact PR and current base ancestry');
     expect(script.match(/\bgit fetch\b/g)).toHaveLength(1);
-    expect(script).toContain('--no-tags --unshallow');
-    expect(script).not.toMatch(/--filter|--depth|refs\/heads\/\*/);
+    expect(script).toContain('--filter=blob:none --no-tags --unshallow');
+    expect(script).not.toMatch(/--depth|refs\/heads\/\*/);
+    expect(checkout).toContain('filter: blob:none');
+    expect(
+      stepRunScript('Hydrate and verify policy snapshot objects')
+    ).toContain('git fetch --refetch --no-tags --no-filter');
     expect(stepRunScript('Resolve exact PR merge base')).toContain(
       '--is-shallow-repository'
     );
@@ -227,7 +241,10 @@ describe('targeted complete ancestry for PR Size Guard', () => {
     expect(git(f.clone, ['rev-parse', 'HEAD'])).toBe(f.head);
     expect(git(f.clone, ['show-ref'])).not.toContain('unrelated');
     expect(
-      spawnSync('git', ['cat-file', '-e', f.unrelated], { cwd: f.clone }).status
+      spawnSync('git', ['cat-file', '-e', f.unrelated], {
+        cwd: f.clone,
+        env: { ...process.env, GIT_NO_LAZY_FETCH: '1' },
+      }).status
     ).not.toBe(0);
     const output = join(f.root, 'output');
     writeFileSync(output, '');
@@ -243,7 +260,23 @@ describe('targeted complete ancestry for PR Size Guard', () => {
     expect(git(f.clone, ['diff', '--numstat', f.rootSha, f.head])).toBe(
       git(f.source, ['diff', '--numstat', f.rootSha, f.head])
     );
+    const envFile = join(f.root, 'github-env');
+    writeFileSync(envFile, '');
+    const hydrated = workflowStep(
+      'Hydrate and verify policy snapshot objects',
+      f.clone,
+      {
+        PR_BASE_SHA: f.base,
+        PR_HEAD_SHA: f.head,
+        PR_MERGE_BASE: f.rootSha,
+        GITHUB_ENV: envFile,
+      }
+    );
+    expect(hydrated.status, hydrated.stderr).toBe(0);
+    expect(readFileSync(envFile, 'utf8')).toBe('GIT_NO_LAZY_FETCH=1\n');
+    expect(git(f.clone, ['config', '--local', '--list'])).toBe(before);
     const policyEnv = {
+      GIT_NO_LAZY_FETCH: '1',
       RUNNER_TEMP: f.root,
       PR_BASE_SHA: f.base,
       PR_HEAD_SHA: f.head,
@@ -262,6 +295,47 @@ describe('targeted complete ancestry for PR Size Guard', () => {
     expect(fullPolicy.status, fullPolicy.stderr).toBe(0);
     expect(targetedPolicy.status, targetedPolicy.stderr).toBe(0);
     expect(targetedPolicy.stdout).toBe(fullPolicy.stdout);
+  });
+
+  it('rejects failed hydration and a successful fetch that omits snapshot blobs', () => {
+    for (const mode of ['fetch-fails', 'missing-blob']) {
+      const f = shallowFixture();
+      const fetched = workflowStep(
+        'Fetch exact PR and current base ancestry',
+        f.clone,
+        {
+          PR_BASE_REF: 'main',
+          PR_HEAD_SHA: f.head,
+        }
+      );
+      expect(fetched.status, fetched.stderr).toBe(0);
+      const bin = join(f.root, 'fake-git');
+      mkdirSync(bin);
+      const realGit = execFileSync('which', ['git'], {
+        encoding: 'utf8',
+      }).trim();
+      const code = mode === 'fetch-fails' ? 1 : 0;
+      writeFileSync(
+        join(bin, 'git'),
+        `#!/bin/sh\nif [ "$1" = fetch ]; then exit ${code}; fi\nexec "${realGit}" "$@"\n`,
+        { mode: 0o755 }
+      );
+      const envFile = join(f.root, 'env-negative');
+      writeFileSync(envFile, '');
+      const result = workflowStep(
+        'Hydrate and verify policy snapshot objects',
+        f.clone,
+        {
+          PR_BASE_SHA: f.base,
+          PR_HEAD_SHA: f.head,
+          PR_MERGE_BASE: f.rootSha,
+          GITHUB_ENV: envFile,
+          PATH: `${bin}:${process.env.PATH}`,
+        }
+      );
+      expect(result.status, mode).not.toBe(0);
+      expect(readFileSync(envFile, 'utf8')).toBe('');
+    }
   });
 
   it('fails closed on wrong head, invalid or missing base, and missing token', () => {
@@ -354,6 +428,39 @@ it('actual fetch preserves all criss-cross merge bases and sorted selection', ()
   expect(readFileSync(output, 'utf8')).toBe(
     `base_tip=${base}\nsha=${expected[0]}\n`
   );
+  const envFile = join(f.root, 'cross-env');
+  writeFileSync(envFile, '');
+  const hydrated = workflowStep(
+    'Hydrate and verify policy snapshot objects',
+    clone,
+    {
+      PR_BASE_SHA: base,
+      PR_HEAD_SHA: head,
+      PR_MERGE_BASE: expected[0],
+      GITHUB_ENV: envFile,
+    }
+  );
+  expect(hydrated.status, hydrated.stderr).toBe(0);
+  const policyEnv = {
+    RUNNER_TEMP: f.root,
+    PR_BASE_SHA: base,
+    PR_HEAD_SHA: head,
+    PR_MERGE_BASE: expected[0],
+    GIT_NO_LAZY_FETCH: '1',
+  };
+  const fullPolicy = workflowStep(
+    'Enforce projected combined-tree byte budget',
+    f.source,
+    policyEnv
+  );
+  const partialPolicy = workflowStep(
+    'Enforce projected combined-tree byte budget',
+    clone,
+    policyEnv
+  );
+  expect(fullPolicy.status, fullPolicy.stderr).toBe(0);
+  expect(partialPolicy.status, partialPolicy.stderr).toBe(0);
+  expect(partialPolicy.stdout).toBe(fullPolicy.stdout);
 });
 
 it('a successful shallow merge base cannot bypass the full-ancestry invariant', () => {

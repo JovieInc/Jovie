@@ -3337,7 +3337,7 @@ ${selectedGateScript}`,
       'name: Fetch exact PR and current base ancestry'
     );
     expect(sourceSizeGuard).toContain(
-      'git fetch --no-tags --unshallow origin "$PR_HEAD_SHA"'
+      'git fetch --filter=blob:none --no-tags --unshallow origin "$PR_HEAD_SHA"'
     );
     expect(sourceSizeGuard).toContain(
       '+refs/heads/$PR_BASE_REF:refs/remotes/origin/$PR_BASE_REF'
