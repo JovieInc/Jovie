@@ -446,7 +446,7 @@ process.exit(first ? 124 : (result.status ?? 1));
         const step = job.steps.find(
           s => s.name === 'Enforce combined-tree payload and member size policy'
         );
-        expect(job['timeout-minutes']).toBe(3);
+        expect(job['timeout-minutes']).toBe(5);
         expect(step).toBeTruthy();
         let status;
         try {

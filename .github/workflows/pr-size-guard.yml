@@ -67,9 +67,10 @@ jobs:
     # at runner assignment, before image provisioning: a 1-minute budget let a
     # 69s provisioning stall mark a fully passing run CANCELLED, which
     # admission treats as a terminal failure (PR #18454, run 36271793816).
-    # 100s of in-script hold plus that stall still finishes inside 3 minutes.
+    # The separate 70s fetch and checkout also consume the outer job budget;
+    # runs 41705044176 and 41703581589 timed out at 3 minutes after policy passed.
     # A cancelled required check ejects the group the same way a red one does.
-    timeout-minutes: 3
+    timeout-minutes: 5
     permissions:
       actions: write
       contents: read
