@@ -1180,6 +1180,13 @@ def test_product_screenshot_budget_covers_capture_and_publication() -> None:
     assert "Create or update screenshot PR" not in producer_job
     assert "Upload generated screenshot catalog" in producer_job
     assert "Download generated screenshot catalog" in publisher_job
+    # Retired Clerk credentials/aliases must not return to the producer.
+    # E2E_CLERK_USER_ID remains the active bypass identity and is stripped below.
+    assert not re.search(
+        r"\b(?:NEXT_PUBLIC_CLERK_[A-Z_]+|CLERK_SECRET_KEY(?:_STAGING)?|"
+        r"CLERK_PUBLISHABLE_KEY(?:_STAGING)?)\b",
+        producer_job,
+    )
     for capture_only_variable in (
         "DATABASE_URL",
         "NEXT_DISABLE_TOOLBAR",

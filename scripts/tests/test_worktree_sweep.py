@@ -44,9 +44,18 @@ def git(cwd, *args):
 
 
 def no_processes(args, **kw):
-    """Real git; an empty, readable process inventory."""
+    """Real local git; synthetic metadata and a separately fenced archive transport."""
     if args[0] in ("ps", "lsof"):
         return SimpleNamespace(returncode=0, stdout="", stderr="")
+    if args[0] == sys.executable:
+        return SimpleNamespace(returncode=0, stdout=json.dumps({
+            "id": 1, "full_name": sweeper.ARCHIVE_REPO, "private": True,
+            "visibility": "private", "archived": False, "disabled": False,
+            "permissions": {"push": True}}), stderr="")
+    if sweeper.ARCHIVE_URL in args:
+        archive = Path(os.environ["SWEEP_TEST_ARCHIVE"])
+        assert archive.is_relative_to(Path(tempfile.gettempdir()).resolve())
+        args = [str(archive) if arg == sweeper.ARCHIVE_URL else arg for arg in args]
     return subprocess.run(args, **{**kw, "env": {**os.environ, **GIT_ENV, **(kw.get("env") or {})}})
 
 
@@ -63,6 +72,13 @@ class SweepTest(unittest.TestCase):
         git(self.repo, "add", ".")
         git(self.repo, "commit", "-qm", "init")
         git(self.repo, "push", "-q", "origin", "HEAD:main")
+        self.origin = self.remote
+        self.remote = self.base / "archive.git"
+        git(self.base, "init", "-q", "--bare", "-b", "main", str(self.remote))
+        context = patch.dict(os.environ, {"LANES_SWEEP_ARCHIVE_GH": sys.executable,
+                                          "SWEEP_TEST_ARCHIVE": str(self.remote)})
+        context.start()
+        self.addCleanup(context.stop)
         self.roots = [self.base / "wts"]
         self.now = time.time() + 2 * DAY  # every reflog entry reads two days idle
         # Hermetic: the real scanners are exercised by SnapshotScanTest; here every snapshot is clean.
@@ -83,6 +99,8 @@ class SweepTest(unittest.TestCase):
     def remote_snapshots(self):
         """Sweep snapshots on the remote; a sweep never creates a branch (refs/heads/*), since
         branch pushes started Actions and Vercel builds (77 queued on 2026-10-20)."""
+        self.assertEqual(git(self.origin, "for-each-ref", "--format=%(refname)", "refs/jovie-preserved/"), "",
+                         "public source origin never receives recovery refs")
         heads = git(self.remote, "for-each-ref", "--format=%(refname)", "refs/heads/").split()
         self.assertEqual([ref for ref in heads if ref != "refs/heads/main"], [], "sweep created a branch")
         return git(self.remote, "for-each-ref", "--format=%(refname)", "refs/jovie-preserved/").split()
@@ -150,12 +168,311 @@ class SweepTest(unittest.TestCase):
         self.assertTrue(first.exists())
         self.assertEqual(report["removed"], [])
 
+    def test_spent_budget_ends_the_phase_without_marking_a_drain(self):
+        # 2026-11-01: one unbounded phase starved the standalone reclaim, headroom alarm and report.
+        first = self.worktree("first")
+        state = self.base / "state"
+        state.mkdir()
+        clock = iter([0.0, 10_000.0, 10_001.0, 10_002.0, 10_003.0])
+        report = self.sweep(state=state, run=no_processes, budget_s=60, clock=lambda: next(clock))
+        self.assertTrue(report["budgetSpent"])
+        self.assertNotIn("drained", report)
+        self.assertTrue(first.exists())
+
+    def test_a_spent_budget_resumes_at_the_least_recently_visited_checkout(self):
+        # 2026-11-02: every interval restarted at the first repository and spent its budget there,
+        # so ~/Jovie's worktrees (~/wt, 334 GiB on root) were never reached.
+        first, second = self.worktree("first"), self.worktree("second")
+        state = self.base / "state"
+        state.mkdir()
+        visited = []
+
+        def one_unit_budget():
+            ticks = iter([0.0, 0.0, 0.0, 10_000.0, 10_000.0, 10_000.0, 10_000.0])
+            return lambda: next(ticks, 10_000.0)
+        with patch.object(sweeper, "retire", side_effect=lambda repo, path, *a, **k: visited.append(path.name)):
+            self.sweep(state=state, run=no_processes, budget_s=60, clock=one_unit_budget())
+            self.sweep(state=state, run=no_processes, budget_s=60, clock=one_unit_budget(), now=self.now + 60)
+        self.assertEqual(len(visited), 2)
+        self.assertEqual(set(visited), {"first", "second"})
+        self.assertTrue((state / sweeper.VISITS_FILE).exists())
+
     def test_clean_pushed_idle_worktree_is_removed_without_backup(self):
         path = self.worktree("clean")
         report = self.sweep()
         self.assertFalse(path.exists())
         self.assertEqual(report["removed"], [{"path": str(path), "reason": "idle"}])
         self.assertEqual(self.remote_snapshots(), [])
+
+    def test_public_archive_rejected_even_with_clean_scanners(self):
+        path = self.worktree("private-provenance")
+        note = path / ".symphony/package-cache/network-trace"
+        note.parent.mkdir(parents=True)
+        note.write_text("synthetic operational provenance without credential patterns\n")
+        (path / "node_modules").mkdir()
+        calls = []
+
+        def run(args, **kw):
+            calls.append(args)
+            if args[0] == sys.executable:
+                return SimpleNamespace(returncode=0, stdout=json.dumps({
+                    "id": 1, "full_name": "JovieInc/Ops", "private": False,
+                    "visibility": "public", "archived": False, "disabled": False,
+                    "permissions": {"push": True}}), stderr="")
+            return no_processes(args, **kw)
+
+        with patch.dict(os.environ, {"LANES_SWEEP_ARCHIVE_GH": sys.executable}):
+            report = self.sweep(run=run)
+        self.assertEqual(self.remote_snapshots(), [], "operational snapshots never go to public origin")
+        self.assertTrue(note.exists() and (path / "node_modules").exists())
+        self.assertFalse(any("push" in args for args in calls), "reject privacy before any push")
+        self.assertEqual(report["removed"], [])
+
+    def test_invalid_archive_metadata_and_credentials_hold_without_push(self):
+        path = self.worktree("held-metadata")
+        (path / "a.txt").write_text("unsaved\n")
+        (path / "node_modules").mkdir()
+        good = json.loads(no_processes([sys.executable]).stdout)
+        bad = [None, [], {}, {**good, "full_name": "example/wrong"},
+               {**good, "visibility": "public"}, {**good, "private": "true"},
+               {**good, "archived": True}, {**good, "disabled": True},
+               {**good, "permissions": {}}, {**good, "permissions": {"push": False}},
+               {**good, "id": True}]
+        calls = []
+
+        def run(args, **kw):
+            calls.append(args)
+            if args[0] == sys.executable:
+                return SimpleNamespace(returncode=0, stdout=payload, stderr="")
+            return no_processes(args, **kw)
+
+        for payload in [*(json.dumps(item) for item in bad), "invalid json"]:
+            with self.subTest(metadata=payload):
+                self.assertEqual(self.sweep(run=run)["removed"], [])
+        for executable in ("", "gh", str(self.base / "missing-gh"), str(self.base)):
+            with self.subTest(executable=executable), patch.dict(os.environ, {"LANES_SWEEP_ARCHIVE_GH": executable}):
+                self.assertEqual(self.sweep(run=run)["removed"], [])
+        for failure in (SimpleNamespace(returncode=1, stdout="", stderr="denied"), OSError("unavailable"),
+                        subprocess.TimeoutExpired("metadata", 30)):
+            with self.subTest(failure=type(failure).__name__):
+                def unavailable(args, **kw):
+                    calls.append(args)
+                    if args[0] == sys.executable:
+                        if isinstance(failure, Exception):
+                            raise failure
+                        return failure
+                    return no_processes(args, **kw)
+                self.assertEqual(self.sweep(run=unavailable)["removed"], [])
+        self.assertFalse(any("push" in args for args in calls))
+        self.assertTrue((path / "node_modules").exists())
+        self.assertEqual((path / "a.txt").read_text(), "unsaved\n")
+        self.assertEqual(self.remote_snapshots(), [])
+
+    def test_private_archive_preserves_exact_snapshot_and_unpublished_ancestry(self):
+        path = self.worktree("unpublished-history")
+        (path / "parent-only.txt").write_text("synthetic private parent content\n")
+        git(path, "add", ".")
+        git(path, "commit", "-qm", "unpublished parent")
+        parent = git(path, "rev-parse", "HEAD")
+        (path / "parent-only.txt").unlink()
+        git(path, "commit", "-qam", "remove parent content from latest tree")
+        head = git(path, "rev-parse", "HEAD")
+        (path / "a.txt").write_text("staged version\n")
+        (path / "staged-only.txt").write_text("staged content\n")
+        git(path, "add", ".")
+        (path / "a.txt").write_text("unstaged version\n")
+        (path / "untracked.txt").write_text("untracked content\n")
+        report = self.sweep()
+        self.assertFalse(path.exists())
+        ref = self.backup_ref("unpublished-history")
+        self.assertEqual(report["backups"], [ref])
+        self.assertEqual(git(self.remote, "ls-tree", "-r", "--name-only", ref).split(),
+                         ["a.txt", "staged-only.txt", "untracked.txt"])
+        self.assertEqual(git(self.remote, "show", f"{ref}:a.txt"), "unstaged version")
+        self.assertEqual(git(self.remote, "show", f"{ref}:staged-only.txt"), "staged content")
+        self.assertEqual(git(self.remote, "show", f"{ref}:untracked.txt"), "untracked content")
+        self.assertEqual(git(self.remote, "rev-parse", f"{ref}^"), head)
+        self.assertEqual(git(self.remote, "show", f"{parent}:parent-only.txt"), "synthetic private parent content")
+        git(self.remote, "merge-base", "--is-ancestor", parent, ref)
+        git(self.remote, "fsck", "--full", "--no-reflogs")
+        self.assertEqual(git(self.origin, "rev-list", "--all", "--count"), "1")
+
+    def test_archive_readback_and_postwrite_metadata_failures_retain_original(self):
+        for failure in ("missing", "wrong-sha", "offline", "timeout", "public", "identity", "permission"):
+            with self.subTest(failure=failure):
+                path = self.worktree("readback-" + failure)
+                (path / "a.txt").write_text("staged\n")
+                git(path, "add", ".")
+                (path / "a.txt").write_text("unstaged\n")
+                (path / "new.txt").write_text("untracked\n")
+                (path / "node_modules").mkdir()
+                index = Path(git(path, "rev-parse", "--path-format=absolute", "--git-path", "index"))
+                before = index.read_bytes()
+                pushed = False
+
+                def run(args, **kw):
+                    nonlocal pushed
+                    if "push" in args:
+                        pushed = True
+                    if pushed and "ls-remote" in args:
+                        if failure == "timeout":
+                            raise subprocess.TimeoutExpired(args, 1)
+                        if failure in {"missing", "offline", "wrong-sha"}:
+                            return SimpleNamespace(returncode=1 if failure == "offline" else 0,
+                                                   stdout=("0" * 40 + "\t" + args[-1] + "\n")
+                                                   if failure == "wrong-sha" else "", stderr="")
+                    if pushed and args[0] == sys.executable:
+                        data = json.loads(no_processes(args).stdout)
+                        if failure == "public":
+                            data.update(private=False, visibility="public")
+                        if failure == "identity":
+                            data["id"] += 1
+                        if failure == "permission":
+                            data["permissions"]["push"] = False
+                        return SimpleNamespace(returncode=0, stdout=json.dumps(data), stderr="")
+                    return no_processes(args, **kw)
+
+                report = self.sweep(run=run)
+                self.assertTrue(pushed)
+                self.assertEqual(report["removed"], [])
+                self.assertEqual(report["stripped"], [])
+                self.assertEqual(index.read_bytes(), before)
+                self.assertEqual((path / "a.txt").read_text(), "unstaged\n")
+                self.assertTrue((path / "new.txt").exists() and (path / "node_modules").exists())
+                # Keep earlier subcases outside subsequent sweeps.
+                (path / ".sweep-keep").write_text("")
+
+    def test_explicit_saved_credentials_are_used_for_metadata_and_archive_transport(self):
+        path = self.worktree("credential-context")
+        (path / "a.txt").write_text("unsaved\n")
+        calls = []
+
+        def run(args, **kw):
+            if args[0] == sys.executable or sweeper.ARCHIVE_URL in args:
+                env = kw["env"]
+                self.assertFalse({"GH_TOKEN", "GITHUB_TOKEN", "GH_CONFIG_DIR"} & env.keys())
+                self.assertEqual(env["GH_HOST"], "github.com")
+                self.assertEqual(env["GIT_TERMINAL_PROMPT"], "0")
+                if args[0] == "git":
+                    self.assertIn(f"credential.{sweeper.ARCHIVE_URL}.helper=", args)
+                    self.assertIn(f"credential.{sweeper.ARCHIVE_URL}.helper=!{sys.executable} auth git-credential", args)
+                    calls.append(args)
+            return no_processes(args, **kw)
+
+        with patch.dict(os.environ, {"GH_TOKEN": "synthetic-app", "GITHUB_TOKEN": "synthetic-app",
+                                     "GH_CONFIG_DIR": str(self.base / "app-config")}):
+            report = self.sweep(run=run)
+        self.assertFalse(path.exists())
+        self.assertEqual(len(report["backups"]), 1)
+        self.assertEqual(["ls-remote" in args for args in calls], [True, False, True])
+
+    def test_shallow_missing_objects_and_url_rewrites_fail_closed(self):
+        path = self.worktree("incomplete-archive")
+        (path / "a.txt").write_text("unsaved\n")
+        for flag in ("--is-shallow-repository", "--missing=print", "--get-regexp"):
+            calls = []
+
+            def run(args, **kw):
+                calls.append(args)
+                if flag in args:
+                    output = {"--is-shallow-repository": "true\n", "--missing=print": "?" + "a" * 40 + "\n",
+                              "--get-regexp": "url.https://example.invalid.insteadof https://github.com/\n"}[flag]
+                    return SimpleNamespace(returncode=0, stdout=output, stderr="")
+                return no_processes(args, **kw)
+
+            with self.subTest(flag=flag):
+                self.assertEqual(self.sweep(run=run)["removed"], [])
+                self.assertFalse(any("push" in args for args in calls))
+                self.assertTrue(path.exists())
+
+    def test_unreadable_source_and_failed_snapshot_never_authorize_removal(self):
+        path = self.worktree("failed-snapshot")
+        (path / "a.txt").write_text("unsaved\n")
+        for command in ("add", "write-tree", "commit-tree", "rev-list", "replace"):
+            calls = []
+
+            def run(args, **kw):
+                calls.append(args)
+                if command in args and (command != "rev-list" or "--objects" in args):
+                    return SimpleNamespace(returncode=1, stdout="", stderr="synthetic failure")
+                return no_processes(args, **kw)
+
+            with self.subTest(command=command):
+                self.assertEqual(self.sweep(run=run)["removed"], [])
+                self.assertFalse(any("push" in args for args in calls))
+                self.assertEqual((path / "a.txt").read_text(), "unsaved\n")
+                self.assertFalse((path.parent / f".{path.name}.sweep-index").exists())
+        git(path, "remote", "remove", "origin")
+        self.assertEqual(self.sweep()["removed"], [])
+
+    def test_private_identity_is_rechecked_immediately_before_push(self):
+        path = self.worktree("identity-race")
+        (path / "a.txt").write_text("unsaved\n")
+        metadata_calls = 0
+        calls = []
+
+        def run(args, **kw):
+            nonlocal metadata_calls
+            calls.append(args)
+            result = no_processes(args, **kw)
+            if args[0] == sys.executable:
+                metadata_calls += 1
+                data = json.loads(result.stdout)
+                if metadata_calls > 1:
+                    data["id"] += 1
+                result.stdout = json.dumps(data)
+            return result
+
+        self.assertEqual(self.sweep(run=run)["removed"], [])
+        self.assertFalse(any("push" in args for args in calls))
+        self.assertTrue(path.exists())
+
+    def test_snapshot_index_fallback_must_seed_successfully(self):
+        path = self.worktree("index-fallback")
+        (path / "a.txt").write_text("unsaved\n")
+        calls = []
+
+        def failed_seed(args, **kw):
+            calls.append(args)
+            if "read-tree" in args:
+                return SimpleNamespace(returncode=1, stdout="", stderr="unreadable tree")
+            return no_processes(args, **kw)
+
+        with patch.object(sweeper.shutil, "copyfile", side_effect=OSError("index unreadable")):
+            self.assertEqual(self.sweep(run=failed_seed)["removed"], [])
+            self.assertFalse(any("push" in args for args in calls))
+            self.assertEqual(len(self.sweep()["removed"]), 1)
+        ref = self.backup_ref("index-fallback")
+        self.assertEqual(git(self.remote, "show", f"{ref}:a.txt"), "unsaved")
+
+    def test_archive_git_uses_selected_helper_without_ambient_credential_fallback(self):
+        path = self.worktree("selected-helper")
+        (path / "a.txt").write_text("unsaved\n")
+        selected, ambient = self.base / "selected-gh", self.base / "ambient-helper"
+        # Neither helper supplies credentials. Mark invocation and fail closed.
+        for executable, marker in ((selected, "selected-called"), (ambient, "ambient-called")):
+            executable.write_text(f'#!/bin/sh\ntouch "{self.base / marker}"\nexit 1\n')
+            executable.chmod(0o700)
+        git(path, "config", "credential.https://github.com.helper", f"!{ambient}")
+        calls = []
+
+        def run(args, **kw):
+            if args[0] == str(selected):
+                return no_processes([sys.executable])
+            if "ls-remote" in args:
+                calls.append((args[3:args.index("ls-remote")], kw["env"]))
+            return no_processes(args, **kw)
+
+        with patch.dict(os.environ, {"LANES_SWEEP_ARCHIVE_GH": str(selected)}):
+            self.sweep(run=run)
+        options, env = calls[0]
+        result = subprocess.run(["git", "-C", str(self.repo), *options, "credential", "fill"],
+                                input="protocol=https\nhost=github.com\npath=JovieInc/Ops.git\n\n",
+                                capture_output=True, text=True, env=env, timeout=10)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "", "missing selected credentials never fall back")
+        self.assertTrue((self.base / "selected-called").exists())
+        self.assertFalse((self.base / "ambient-called").exists())
 
     def test_dirty_and_unpushed_work_is_backed_up_before_removal(self):
         path = self.worktree("dirty")
@@ -204,12 +521,13 @@ class SweepTest(unittest.TestCase):
         git(path, "commit", "-qam", "local only")
         head = git(path, "rev-parse", "HEAD")
         branch = f"refs/jovie-preserved/sweep/mac/occupied-ref-20261003-{head}"
+        git(self.remote, "fetch", "-q", str(self.repo), initial)
         git(self.remote, "update-ref", branch, initial)
         report = self.sweep()
         self.assertTrue(path.exists(), "a conflicting immutable ref leaves the checkout in place")
         self.assertEqual(git(self.remote, "rev-parse", branch), initial)
         self.assertEqual(report["backups"], [])
-        self.assertEqual(report["stripped"], [str(path)])
+        self.assertEqual(report["stripped"], [])
 
     def test_long_checkout_name_still_gets_a_recoverable_backup(self):
         path = self.worktree("long-" + "x" * 210)
@@ -245,9 +563,9 @@ class SweepTest(unittest.TestCase):
         self.assertTrue(path.exists(), "a rejected backup never authorizes deletion")
         self.assertEqual((path / "a.txt").read_text(), "must survive rejected backup\n")
         self.assertEqual(self.remote_snapshots(), [])
-        self.assertEqual(report["stripped"], [str(path)])
+        self.assertEqual(report["stripped"], [])
 
-    def test_failed_backup_keeps_checkout_and_strips_build_output(self):
+    def test_failed_archive_keeps_checkout_including_build_output(self):
         path = self.worktree("unsaved")
         (path / "a.txt").write_text("edited\n")
         (path / ".next").mkdir()
@@ -262,15 +580,15 @@ class SweepTest(unittest.TestCase):
         source = path / "src/pnpm-store/keep.txt"
         source.parent.mkdir(parents=True)
         source.write_text("unrelated source\n")
-        git(self.repo, "remote", "set-url", "origin", str(self.base / "missing.git"))
-        report = self.sweep()
+        with patch.dict(os.environ, {"SWEEP_TEST_ARCHIVE": str(self.base / "missing.git")}):
+            report = self.sweep()
         self.assertTrue((path / "a.txt").exists())
-        self.assertFalse((path / ".next").exists())
-        self.assertFalse(private.parent.exists())
+        self.assertTrue((path / ".next").exists())
+        self.assertTrue(private.parent.exists())
         self.assertEqual(provenance.read_text(), "retain provenance\n")
         self.assertEqual(shared.read_text(), "shared store\n")
         self.assertEqual(source.read_text(), "unrelated source\n")
-        self.assertEqual(report["stripped"], [str(path)])
+        self.assertEqual(report["stripped"], [])
 
     def test_live_process_recent_activity_and_scope_protect_checkouts(self):
         live = self.worktree("live")
@@ -390,7 +708,7 @@ class SweepTest(unittest.TestCase):
         self.assertEqual(self.remote_snapshots(), [], "a clean checkout needs no backup branch")
 
 class SnapshotScanTest(unittest.TestCase):
-    """refs/jovie-preserved/* is public: a snapshot pushes only when both scanners prove it clean."""
+    """Secret scanning is an additional gate, separate from private archive validation."""
 
     def fake_run(self, *, truffle=0, leaks=0, base="b" * 40, raise_on=None):
         calls = []
@@ -612,6 +930,20 @@ class StandaloneAndHeadroomTest(unittest.TestCase):
         self.state = self.base / "state"
         self.home.mkdir()
         self.state.mkdir()
+        # Fail before enumeration if a future test forgets its explicit fixture roots.
+        candidates = sweeper.standalone_candidates
+
+        def fixture_candidates(home, state, repos, **kw):
+            roots = [home, state, *kw.get("mounted_roots", sweeper.DEFAULT_MOUNTED_ROOTS)]
+            for root in roots:
+                resolved = root.resolve()
+                self.assertTrue(resolved == self.base or self.base in resolved.parents,
+                                f"cleanup fixture reached host root: {root}")
+            return candidates(home, state, repos, **kw)
+
+        candidate_guard = patch.object(sweeper, "standalone_candidates", fixture_candidates)
+        candidate_guard.start()
+        self.addCleanup(candidate_guard.stop)
         self.remote = self.base / "remote.git"
         git(self.base, "init", "-q", "--bare", "-b", "main", str(self.remote))
         seed = self.base / "seed"
@@ -630,7 +962,51 @@ class StandaloneAndHeadroomTest(unittest.TestCase):
 
     def sweep(self, **kw):
         return sweeper.sweep_standalone(self.home, self.state, [], [self.base / "never"], run=no_processes,
-                                        now=self.now, **kw)
+                                        now=self.now, mounted_roots=(), **kw)
+
+    def test_fixture_sweep_cannot_enumerate_or_remove_host_clones(self):
+        """A future fixture clock and fake ps must never escape the fixture root."""
+        path = self.clone("codex-worktrees/owned")
+        foreign = self.base / "mounted/codex-worktrees/foreign"
+        foreign.mkdir(parents=True)
+        (foreign / "sentinel").write_text("owner work\n")
+        real_glob = Path.glob
+        removed = []
+
+        def fixture_glob(base, pattern):
+            self.assertTrue(base == self.base or self.base in base.parents,
+                            f"cleanup fixture reached host root: {base}")
+            return real_glob(base, pattern)
+
+        def fixture_remove(target):
+            self.assertTrue(self.base in target.parents, target)
+            removed.append(target)
+            sweeper.shutil.rmtree(target)
+
+        with patch.object(Path, "glob", fixture_glob):
+            report = self.sweep(remove=fixture_remove)
+        self.assertEqual(report["removed"], [str(path)])
+        self.assertEqual(removed, [path])
+        self.assertEqual((foreign / "sentinel").read_text(), "owner work\n")
+
+    def test_explicit_mounted_roots_and_production_default(self):
+        default_globs = sweeper.standalone_globs(self.home, self.state)
+        self.assertIn((Path("/srv/worktrees"), "codex-worktrees/*"), default_globs)
+        local_globs = sweeper.standalone_globs(self.home, self.state, mounted_roots=())
+        self.assertNotIn((Path("/srv/worktrees"), "codex-worktrees/*"), local_globs)
+        mounted = self.base / "mounted"
+        path = mounted / "codex-worktrees/published"
+        git(self.base, "clone", "-q", str(self.remote), str(path))
+        self.assertEqual(sweeper.standalone_candidates(
+            self.home, self.state, [], mounted_roots=(mounted,)), [path])
+        self.assertEqual(sweeper.standalone_candidates(
+            self.home, self.state, [], mounted_roots=()), [])
+        self.assertEqual(sweeper.standalone_candidates(
+            self.home, self.state, [path], mounted_roots=(mounted,)), [])
+        report = sweeper.sweep_standalone(self.home, self.state, [], [], now=self.now,
+                                         run=no_processes, mounted_roots=(mounted,))
+        self.assertEqual(report["removed"], [str(path)])
+        self.assertFalse(path.exists())
 
     def test_clean_published_idle_clone_is_removed_and_logged_first(self):
         path = self.clone("grok-ship-workspaces/JOV/JOV-1")
@@ -664,7 +1040,7 @@ class StandaloneAndHeadroomTest(unittest.TestCase):
         (self.state / "bindings.json").write_text('{"wt": "ref-me"}')
         busy = self.clone("grok-wt/busy")
         report = sweeper.sweep_standalone(
-            self.home, self.state, [], [], now=self.now,
+            self.home, self.state, [], [], now=self.now, mounted_roots=(),
             run=lambda args, **kw: SimpleNamespace(returncode=0, stdout=f"{busy}\n", stderr="")
             if args[0] == "ps" else no_processes(args, **kw))
         for path in (dirty, unpushed, stash, linked, kept, referenced, busy):
@@ -673,10 +1049,75 @@ class StandaloneAndHeadroomTest(unittest.TestCase):
         self.assertEqual(set(report["kept"]), {"dirty", "1-unpublished", "stash", "linked-worktrees",
                                               "keep-marker", "state-referenced", "busy"})
 
+    def test_unpublished_retired_clone_loses_build_output_but_keeps_work(self):
+        path = self.clone("grok-ship-workspaces/JOV/JOV-9")
+        (path / "b.txt").write_text("b\n")
+        git(path, "add", ".")
+        git(path, "commit", "-qm", "local only")
+        (path / "node_modules/x").mkdir(parents=True)
+        (path / "node_modules/x/big.bin").write_bytes(b"0" * 4096)
+        report = sweeper.sweep_standalone(self.home, self.state, [], [], now=self.now, run=no_processes, mounted_roots=())
+        self.assertTrue(path.exists())
+        self.assertTrue((path / "b.txt").exists())
+        self.assertFalse((path / "node_modules").exists())
+        self.assertGreater(report["artifactsFreedKiB"], 0)
+
+    def test_kept_agent_wt_clone_loses_node_modules_but_keeps_work(self):
+        """JOV-10348: kept clones under the active agent-worktree roots prune their regenerable
+        build output exactly like retired roots; a checkout touched within ARTIFACT_IDLE_S is
+        treated as active and keeps everything."""
+        dirty = self.clone("wt/dirty")
+        (dirty / "b.txt").write_text("b\n")
+        git(dirty, "add", ".")
+        git(dirty, "commit", "-qm", "local only")
+        (dirty / "node_modules/x").mkdir(parents=True)
+        (dirty / "node_modules/x/big.bin").write_bytes(b"0" * 4096)
+        flat = self.clone("wt-flat")
+        (flat / "f.txt").write_text("f\n")  # untracked work: the clone is kept, not removed
+        (flat / "node_modules/y").mkdir(parents=True)
+        (flat / "node_modules/y/big.bin").write_bytes(b"0" * 4096)
+        fresh = self.clone("wt/fresh")
+        (fresh / "node_modules/z").mkdir(parents=True)
+        for rel in (".", ".git/HEAD", ".git/index", ".git/logs/HEAD", ".git/FETCH_HEAD"):
+            probe = fresh / rel
+            if probe.exists():
+                os.utime(probe, (self.now - 3600,) * 2)  # touched an hour ago: active
+        report = self.sweep()
+        self.assertEqual(report["kept"].get("dirty"), 1)
+        self.assertEqual(report["kept"].get("1-unpublished"), 1)
+        self.assertEqual(report["kept"].get("recent"), 1)
+        self.assertTrue((dirty / "b.txt").exists())
+        self.assertFalse((dirty / "node_modules").exists())
+        self.assertTrue((flat / "f.txt").exists())
+        self.assertFalse((flat / "node_modules").exists())
+        self.assertTrue((fresh / "node_modules").exists())
+        self.assertGreater(report["artifactsFreedKiB"], 0)
+
+    def test_agent_wt_artifact_prune_is_idempotent_and_never_errors(self):
+        path = self.clone("wt/idem")
+        (path / "n.txt").write_text("work\n")
+        (path / "node_modules/x").mkdir(parents=True)
+        (path / "node_modules/x/big.bin").write_bytes(b"0" * 4096)
+        first = self.sweep()
+        self.assertGreater(first["artifactsFreedKiB"], 0)
+        self.assertTrue((path / "n.txt").exists())
+        second = self.sweep()
+        self.assertEqual(second.get("artifactsFreedKiB", 0), 0)
+        self.assertEqual(second["errors"], [])
+        self.assertTrue((path / "n.txt").exists())
+
+    def test_archive_branch_counts_as_published(self):
+        path = self.clone("grok-wt/archived")
+        (path / "c.txt").write_text("c\n")
+        git(path, "add", ".")
+        git(path, "commit", "-qm", "work")
+        git(path, "push", "-q", "origin", "HEAD:refs/heads/archive/grok-ship/archived")
+        self.assertEqual(self.sweep()["removed"], [str(path)])
+
     def test_recent_clone_and_unreadable_process_inventory_keep_everything(self):
         path = self.clone("wt-fresh")
         self.assertEqual(self.sweep(idle_s=30 * DAY)["kept"], {"recent": 1})
-        broken = sweeper.sweep_standalone(self.home, self.state, [], [], now=self.now, run=lambda *a, **k: (_ for _ in ()).throw(OSError("no ps")))
+        broken = sweeper.sweep_standalone(self.home, self.state, [], [], now=self.now, mounted_roots=(), run=lambda *a, **k: (_ for _ in ()).throw(OSError("no ps")))
         self.assertEqual(broken["errors"], ["process-state-unavailable"])
         self.assertTrue(path.exists())
 
@@ -734,13 +1175,20 @@ class StandaloneAndHeadroomTest(unittest.TestCase):
     def test_candidates_skip_linked_worktrees_and_known_repos(self):
         repo = self.clone("codex-worktrees/primary")
         git(repo, "worktree", "add", "-q", "-b", "wt", str(self.home / "codex-worktrees/linked"), "origin/main")
-        names = [p.name for p in sweeper.standalone_candidates(self.home, self.state, [repo])]
+        names = [p.name for p in sweeper.standalone_candidates(self.home, self.state, [repo], mounted_roots=())]
         self.assertEqual(names, [])
 
     def test_default_roots_cover_the_ship_and_fleet_roots(self):
         roots = {str(r) for r in sweeper.default_roots(self.home, self.state)}
-        for rel in ("codex-worktrees", "grok-wt", "grok-ship-workspaces", "codex-ship-workspaces", "wt-*"):
+        for rel in ("codex-worktrees", "grok-wt", "grok-ship-workspaces", "codex-ship-workspaces", "wt-*", "wt"):
             self.assertIn(str(self.home / rel), roots)
+
+    def test_agent_worktrees_under_home_wt_are_in_scope_and_the_primary_clone_is_not(self):
+        roots = sweeper.default_roots(self.home, self.state)
+        never = sweeper.default_never(self.home)
+        self.assertTrue(sweeper.in_scope(self.home / "wt" / "fix-thing", roots, never))
+        self.assertFalse(sweeper.in_scope(self.home / "Jovie", roots, never))
+        self.assertIn((self.home, "wt/*"), sweeper.standalone_globs(self.home, self.state, mounted_roots=()))
 
     def test_headroom_levels_and_alarm_events_on_change(self):
         usage = {Path("/a"): (100, 0, 20), Path("/b"): (100, 0, 25), Path("/c"): (100, 0, 10), Path("/d"): (100, 0, 60)}

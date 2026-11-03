@@ -12,6 +12,7 @@ import {
 import {
   releaseGoldenPathTestBindings,
   selectGoldenPathArtist,
+  unpublishGoldenPathTestProfiles,
 } from './helpers/claim-dogfood-fixtures';
 import { completeGoldenPathBillingJourney } from './helpers/golden-path-billing';
 import { openHomeWelcome } from './helpers/golden-path-home-welcome';
@@ -22,7 +23,6 @@ import {
   watchKeyframeErrors,
 } from './helpers/golden-path-keyframes';
 import { interceptGoldenPathTrackingCalls } from './helpers/golden-path-tracking';
-import { ratchetGeometry } from './utils/ratchet-geometry';
 import {
   installRuntimeAutomationBypass,
   resetAuthStatePreservingOnboardingSession,
@@ -180,18 +180,15 @@ async function verifyHomeWelcome(page: Page) {
           `[data-testid="chat-composer-surface"] button[aria-label=${JSON.stringify(name)}]`
         );
     }
-    // ratchet: JOV-9612
-    await ratchetGeometry('home composer essentials', async () => {
-      expect(
-        await inspectEssentialViewport(page, [
-          ...selectors,
-          '[data-testid="chat-empty-state-greeting-text"]',
-          '[data-testid="chat-empty-state-next-step"]',
-          '[data-testid="chat-composer-surface"]',
-          '[aria-label="Chat message input" i]',
-        ])
-      ).toEqual({ supported: true, findings: [] });
-    });
+    expect(
+      await inspectEssentialViewport(page, [
+        ...selectors,
+        '[data-testid="chat-empty-state-greeting-text"]',
+        '[data-testid="chat-empty-state-next-step"]',
+        '[data-testid="chat-composer-surface"]',
+        '[aria-label="Chat message input" i]',
+      ])
+    ).toEqual({ supported: true, findings: [] });
     const centering = await measureCenter();
     expect(centering).not.toBeNull();
     if (centering)
@@ -230,10 +227,7 @@ async function verifyHomeWelcome(page: Page) {
       expect(before).not.toBeNull();
       expect(after).not.toBeNull();
       if (before && after) {
-        // ratchet: JOV-9612
-        await ratchetGeometry('home composer y shift', () => {
-          expect(Math.abs(before.y - after.y)).toBeLessThanOrEqual(1);
-        });
+        expect(Math.abs(before.y - after.y)).toBeLessThanOrEqual(1);
       }
       await assertGeometry();
       if (viewport.width === 1440) {
@@ -348,7 +342,7 @@ async function ensureDbUser(betterAuthUserId: string) {
       async () => {
         const [user] = await sql`
           UPDATE users
-          SET user_status = 'waitlist_approved', updated_at = NOW()
+          SET user_status = 'waitlist_approved', name = COALESCE(NULLIF(BTRIM(name), ''), 'Golden Path Artist'), updated_at = NOW()
           WHERE better_auth_user_id = ${betterAuthUserId}
           RETURNING id
         `;
@@ -642,6 +636,8 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
   expect(handleResponse.headers()['x-onboarding-fallback']).toMatch(/^handle:/);
   const handleCard = page.getByTestId('onboarding-handle-check');
   await expect(handleCard).toBeVisible({ timeout: 60_000 });
+  // Pen R6As7U: the field sits behind an explicit Change Handle action.
+  await handleCard.getByTestId('onboarding-edit-handle').click();
   await handleCard.getByLabel('Edit Proposed Handle').fill(handle);
   await expect(handleCard.getByText('is available')).toBeVisible({
     timeout: 30_000,
@@ -850,7 +846,9 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
   // (or the prod-cert pool) starts from an unclaimed artist.
   test.afterAll(async () => {
     if (!process.env.DATABASE_URL) return;
-    await releaseGoldenPathTestBindings(neon(process.env.DATABASE_URL));
+    const teardownSql = neon(process.env.DATABASE_URL);
+    await releaseGoldenPathTestBindings(teardownSql);
+    await unpublishGoldenPathTestProfiles(teardownSql);
   });
 
   test.beforeEach(() => {
@@ -917,6 +915,31 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
       page,
       uniqueHandle
     );
+    // The real /start rail must expose its full preview at the hosted desktop
+    // viewport, regardless of the selected artist's optional enrichment copy.
+    const profilePreview = page.getByTestId('onboarding-profile-rail');
+    await expect(profilePreview).toBeInViewport({ ratio: 1 });
+    await profilePreview.focus();
+    await expect(profilePreview).toBeFocused();
+    await page.keyboard.press('End');
+    await expect
+      .poll(
+        () =>
+          profilePreview.evaluate(element =>
+            Math.abs(
+              element.scrollHeight - element.clientHeight - element.scrollTop
+            )
+          ),
+        { message: 'Preview bottom remains unreachable after pressing End' }
+      )
+      .toBeLessThanOrEqual(1);
+    await page.keyboard.press('Home');
+    await expect(
+      profilePreview.getByTestId('onboarding-profile-preview-badge')
+    ).toBeInViewport({ ratio: 1 });
+    await profilePreview.evaluate(element => {
+      if (element instanceof HTMLElement) element.blur();
+    });
     await captureKeyframe(page, 'anonymous-chat');
 
     // ──────────────────────────────────────────────────────────────────
@@ -1226,6 +1249,14 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
     // with their music imported. Render it as an anonymous fan would —
     // fresh browser context, no auth — the way a real fan clicking a link
     // in bio would land here.
+    // Test-account profiles 404 publicly by policy (lib/profile/test-profile-policy).
+    // This run must render its own profile as a fan, so mark just this profile
+    // directly-viewable; afterAll teardown unpublishes it.
+    await sql`
+      UPDATE creator_profiles
+      SET settings = coalesce(settings, '{}'::jsonb) || '{"testProfileDirectUrlExempt": true}'::jsonb
+      WHERE username_normalized = ${uniqueHandle.toLowerCase()}
+    `;
     const fanContext = await browser.newContext({
       storageState: { cookies: [], origins: [] },
     });

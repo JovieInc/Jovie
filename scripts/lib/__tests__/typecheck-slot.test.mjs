@@ -70,3 +70,23 @@ test('exit codes pass through and an unset env does not throttle', async () => {
   await Promise.all([1, 2, 3].map(() => runSlot(env, job(log))));
   assert.equal(replay(log).peak, 3);
 });
+
+test('a nested caller inside a held slot runs at once instead of waiting on itself', {
+  skip: process.platform !== 'linux',
+}, async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'slots-'));
+  const log = join(dir, 'log');
+  const env = {
+    GEM_TYPECHECK_SLOTS: '1',
+    GEM_TYPECHECK_LOCK_DIR: dir,
+    GEM_TYPECHECK_POLL_MS: '50',
+  };
+  // The only slot is held by the outer call; the inner call must not queue behind it.
+  const nested = ['node', SLOT, '--', ...job(log)];
+  const code = await Promise.race([
+    runSlot(env, nested),
+    new Promise(resolve => setTimeout(() => resolve('deadlock'), 5000)),
+  ]);
+  assert.equal(code, 0);
+  assert.deepEqual(replay(log), { peak: 1, starts: 1 });
+});

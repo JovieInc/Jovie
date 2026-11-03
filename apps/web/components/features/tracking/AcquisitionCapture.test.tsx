@@ -127,3 +127,19 @@ describe('AcquisitionCapture', () => {
     expect(consent.clearAcquisitionId).toHaveBeenCalledOnce();
   });
 });
+
+describe('prerendered homepage pathname', () => {
+  it('AcquisitionCapture.tsx reads "/index" as "/" via usePublicPathname', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/tracking/AcquisitionCapture.tsx'
+      ),
+      'utf8'
+    );
+    expect(source).toContain('usePublicPathname');
+    expect(source).not.toMatch(/\busePathname\b/);
+  });
+});

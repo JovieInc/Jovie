@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
+import { OvieShippingStateCard } from '@/components/features/admin/hud/OvieShippingStateCard';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
-import { OperatorRouteTabs } from '@/components/features/admin/layout/OperatorRouteTabs';
-import { ADMIN_WORKSPACE_TABS } from '@/constants/admin-navigation';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import { ShippingMatrix } from './ShippingMatrix';
@@ -17,14 +16,12 @@ export default async function ShippingPage() {
   await requireCurrentAdminPageAccess();
   return (
     <AdminPage
+      views='shipping'
       title='Shipping'
       description='Live PR and merge-queue status matrix.'
       testId='ovie-shipping-page'
     >
-      <OperatorRouteTabs
-        tabs={ADMIN_WORKSPACE_TABS.shipping}
-        label='Shipping Views'
-      />
+      <OvieShippingStateCard />
       <ShippingMatrix />
       <ShippingStatistics />
     </AdminPage>

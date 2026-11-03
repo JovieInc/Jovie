@@ -17,9 +17,12 @@
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { ADMISSION_BLOCKING_LABELS } from './lib/admission-hold-labels.mjs';
+import { AGGREGATE_JOBS } from './lib/merge-group-ahead-attribution.mjs';
 
 export const REARM_CONTEXT = 'jovie-queue-victim-rearm/v1';
 export const REARM_CAP = 2;
+// The CI workflow whose merge_group and push runs gate the queue.
+export const CI_WORKFLOW_ID = 178737329;
 const SHA = /^[0-9a-f]{40}$/;
 const REARM_DESCRIPTION =
   /^n=([1-9][0-9]*);sha=([0-9a-f]{40});run=([1-9][0-9]*)(?:;why=[a-z-]+)?$/;
@@ -91,6 +94,33 @@ export function trustedRearmRecords(statuses) {
   return records;
 }
 
+/**
+ * True only when every failing non-aggregate job of this group completed
+ * `success` in the CI run of the group's base (the group ahead, or main).
+ * Then the base without the front entry passed the very jobs the front entry
+ * failed, so "base-branch" by elimination is wrong for the front entry: the
+ * failure is its own. On 2026-10-31 #24072's group (run 41247973238) failed
+ * Visual Snapshot Compare, which had passed on its base's run (41247971178,
+ * still finishing an unrelated lanes flake). The failure hold deferred on the
+ * unfinished ahead run, so no receipt named #24072, and this script re-armed
+ * the culprit as base-branch. Missing or unfinished jobs prove nothing.
+ * @param {{ currentJobs?: Array<{ name?: string, conclusion?: string | null }>, baseJobs?: Array<{ name?: string, status?: string, conclusion?: string | null }> }} input
+ */
+export function frontFailurePassedOnBase({ currentJobs, baseJobs } = {}) {
+  if (!Array.isArray(currentJobs) || !Array.isArray(baseJobs)) return false;
+  const failed = currentJobs.filter(
+    job =>
+      ['failure', 'timed_out'].includes(job?.conclusion) &&
+      !AGGREGATE_JOBS.has(job.name)
+  );
+  if (failed.length === 0) return false;
+  const base = new Map(baseJobs.map(job => [job?.name, job]));
+  return failed.every(job => {
+    const match = base.get(job.name);
+    return match?.status === 'completed' && match.conclusion === 'success';
+  });
+}
+
 function classify(candidate, candidates, paths, now) {
   if (paths.length === 0) {
     // Flake or unattributable: only a fresh GitHub-made dequeue is positive
@@ -130,6 +160,8 @@ export function planVictimRearms({
   candidates,
   cap = REARM_CAP,
   heldRevision = null,
+  frontPr = null,
+  frontFailureOwn = false,
   now = Date.now(),
 }) {
   if (!Number.isSafeInteger(runId) || runId < 1) fail('run id is missing');
@@ -174,6 +206,13 @@ export function planVictimRearms({
     if (!verdict.classification) return skip(verdict.reason);
     if (failureOwner && verdict.classification !== 'another-pr') {
       return skip('failure-owner');
+    }
+    if (
+      frontFailureOwn === true &&
+      candidate.prNumber === frontPr &&
+      verdict.classification === 'base-branch'
+    ) {
+      return skip('front-failure-passed-on-base');
     }
     const records = trustedRearmRecords(candidate.statuses).filter(
       record => record.sha === candidate.headSha
@@ -546,6 +585,35 @@ function loadAnnotations(repository, runId) {
   return implicatedPathsFromAnnotations(annotations);
 }
 
+// Any read error keeps the pre-existing decision (false).
+function readFrontFailureOwn(repository, runId, baseSha) {
+  try {
+    const listed = ghJson([
+      'api',
+      `repos/${repository}/actions/workflows/${CI_WORKFLOW_ID}/runs?head_sha=${baseSha}&per_page=10`,
+    ]).workflow_runs;
+    const baseRun = (Array.isArray(listed) ? listed : [])
+      .filter(item => item?.head_sha === baseSha)
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
+    if (!baseRun) return false;
+    const jobs = id =>
+      restPages(
+        `repos/${repository}/actions/runs/${id}/jobs?filter=latest`,
+        5,
+        'jobs'
+      );
+    const current = jobs(runId);
+    const base = jobs(baseRun.id);
+    if (current.truncated || base.truncated) return false;
+    return frontFailurePassedOnBase({
+      currentJobs: current.rows,
+      baseJobs: base.rows,
+    });
+  } catch {
+    return false;
+  }
+}
+
 function readArmState(repository, prNumber) {
   const [owner, name] = repository.split('/');
   const data = ghJson([
@@ -602,6 +670,8 @@ function main() {
     runId: run.id,
     implicatedPaths,
     candidates,
+    frontPr: Number(front[1]),
+    frontFailureOwn: readFrontFailureOwn(repository, run.id, front[2]),
     heldRevision: heldRevisionFromReceipt(
       process.env.FAILURE_HOLD_RECEIPT,
       repository

@@ -157,3 +157,21 @@ describe('passing controls: concrete language survives', () => {
     expect(blocks(text)).toEqual([]);
   });
 });
+
+describe('pipeline-jargon', () => {
+  it('blocks pipeline words in Jovie persona copy', () => {
+    const { blocking } = lintCopy(
+      'Pulled up this artist. 97 Spotify followers (source: enrichment).',
+      { register: 'jovie-persona' }
+    );
+    expect(blocking.map(f => f.rule)).toContain('pipeline-jargon');
+  });
+
+  it('allows the plain source name', () => {
+    const { blocking } = lintCopy(
+      'Found Unmarked Pavement on Spotify: 97 followers.',
+      { register: 'jovie-persona' }
+    );
+    expect(blocking.map(f => f.rule)).not.toContain('pipeline-jargon');
+  });
+});

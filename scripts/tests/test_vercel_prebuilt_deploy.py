@@ -683,14 +683,13 @@ def test_staging_build_env_is_doppler_scoped_and_clerk_free() -> None:
     ]
     build_step = _staging_build_step(workflow)
 
-    # No job of the staging deploy may set a retired Clerk key again.
-    for retired in (
-        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
-        "CLERK_SECRET_KEY",
-        "CLERK_PUBLISHABLE_KEY_STAGING",
-        "CLERK_SECRET_KEY_STAGING",
-    ):
-        assert retired not in staging
+    # Clerk is retired: neither the in-job build nor prebuilt deployment
+    # should receive old credentials or aliases, including staging variants.
+    assert not re.search(
+        r"\b(?:NEXT_PUBLIC_CLERK_[A-Z_]+|CLERK_SECRET_KEY(?:_STAGING)?|"
+        r"CLERK_PUBLISHABLE_KEY(?:_STAGING)?)\b",
+        staging,
+    )
     # The in-job staging build takes its secrets from the staging Doppler config
     # with no fallback, so CLI-side env resolution cannot fall back to production.
     assert "--project jovie-web --config stg" in build_step
