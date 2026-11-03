@@ -2098,6 +2098,11 @@ jobs:
       # idles awaiting the base-branch fetch instead of serially before the
       # structural lane (10s of merge-group run 36270458408's critical path).
       # Unconditional: a strict superset of the former structural-only gate.
+      - name: Set up Go for source-pinned actionlint
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.10'
+          cache: false
       - name: Run actionlint
         run: bash .github/scripts/run-actionlint.sh
       - name: Fetch base-branch history
@@ -3593,11 +3598,14 @@ jobs:
     # The 162 Storybook specs took 4.0m of a 6.6m job on two workers and set
     # the merge-group wall (end p50 7.3m over 18 web merge groups on
     # 2026-10-12). Playwright --shard splits the same fullyParallel spec list
-    # across two runners; the aggregates read the matrix result.
+    # across runners; the aggregates read the matrix result. Three shards since
+    # 2026-11-01: on two, the matrix step was 276s p50 and the shards ended
+    # at 12.2 of 14.4 min, the next tail once ci-fast (remaining) stopped
+    # waiting on the lanes pytest.
     strategy:
       fail-fast: true
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3]
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -3632,7 +3640,7 @@ jobs:
       # Web-independent checks ride here, off the Build + Layout tail.
       - name: Check extension and observability ingest
         if: matrix.shard == 1
-        run: pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test && pnpm --filter @jovie/canary-otp typecheck && pnpm --filter @jovie/canary-otp test
+        run: pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test && pnpm --filter @jovie/canary-otp typecheck && pnpm --filter @jovie/canary-otp test && pnpm --filter @jovie/mesh-hub typecheck && pnpm --filter @jovie/mesh-hub test
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
       # Surface-elevation matrix (JOV-2156): screenshot every allowed/banned
@@ -3689,7 +3697,7 @@ jobs:
           exit 1
         env:
           STORYBOOK_BASE_URL: http://localhost:6006
-          STORYBOOK_SHARD: ${{ matrix.shard }}/2
+          STORYBOOK_SHARD: ${{ matrix.shard }}/3
           MERGE_GROUP_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}
           CI: true
           JOVIE_STORYBOOK_MANUAL_AXE: '1'
@@ -5592,8 +5600,22 @@ jobs:
             pnpm turbo test:fast --filter=@jovie/web -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
           elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
             echo "🔍 Merge group: Running affected test suite"
-            # Run affected tests against the merge-group base SHA.
-            pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
+            # run_web includes Ovie/CLI and inputs outside Turbo's graph.
+            # Keep affected tasks; explicitly run web if it was not selected.
+            pnpm turbo test:fast --affected --dry=json > "$RUNNER_TEMP/unit-selection-$SHARD_SLUG.json"
+            UNIT_SELECTION_MODE="$(node scripts/ci-unit-selection.mjs < "$RUNNER_TEMP/unit-selection-$SHARD_SLUG.json")"
+            # Preserve sibling packages' existing empty-shard policy.
+            pnpm turbo test:fast --affected --filter='!@jovie/web' -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
+            WEB_CACHE_FLAG=""
+            if [[ "$UNIT_SELECTION_MODE" == "affected-and-web" ]]; then
+              echo "Affected graph omitted web; running the selected web lane explicitly"
+              pnpm turbo test:fast --filter=@jovie/web --dry=json > "$RUNNER_TEMP/unit-selection-$SHARD_SLUG.json"
+              node scripts/ci-unit-selection.mjs --require-web < "$RUNNER_TEMP/unit-selection-$SHARD_SLUG.json"
+              # Unknown dependency edges are also absent from cache inputs.
+              WEB_CACHE_FLAG="--force"
+            fi
+            # Override the wrapper's empty-suite success only for web shards.
+            pnpm turbo test:fast --filter=@jovie/web $WEB_CACHE_FLAG -- $VITEST_CI_FLAGS $RETRY_FLAG --passWithNoTests=false --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
           else
             echo "🔍 Manual dispatch: Running critical + interaction tests (no base_ref available)"
             # Non-main manual dispatches have no base_ref. Run the critical and
@@ -6733,6 +6755,8 @@ jobs:
           JOURNEY_EVIDENCE_REPORT: ${{ runner.temp }}/journey-evidence/playwright-report.json
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           GOLDEN_PATH_REVIEW_GATEWAY_KEY: ${{ secrets.GOLDEN_PATH_REVIEW_GATEWAY_KEY }}
+          # Workers AI (Cloudflare credits) is tried first by the reviewer; unset = Gateway only.
+          GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN: ${{ secrets.GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN }}
           VISUAL_REVIEW_BASE_URL: ${{ vars.VISUAL_REVIEW_BASE_URL }}
           # The runner also needs the database and deterministic E2E OTP flag.
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -6767,6 +6791,7 @@ jobs:
           # journey keyframes are declared public (failure captures never are).
           review() {
             AI_GATEWAY_API_KEY="$GOLDEN_PATH_REVIEW_GATEWAY_KEY" \
+              WORKERS_AI_TOKEN="$GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN" \
               PLAYWRIGHT_ARTIFACT_PATHS=apps/web/test-results/golden-path-keyframes \
               PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES=true \
               node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
@@ -6782,6 +6807,8 @@ jobs:
           fi
         env:
           GOLDEN_PATH_REVIEW_GATEWAY_KEY: ${{ secrets.GOLDEN_PATH_REVIEW_GATEWAY_KEY }}
+          # Workers AI (Cloudflare credits) is tried first by the reviewer; unset = Gateway only.
+          GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN: ${{ secrets.GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN }}
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           VISUAL_REVIEW_BASE_URL: ${{ vars.VISUAL_REVIEW_BASE_URL }}
 

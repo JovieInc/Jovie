@@ -85,6 +85,15 @@ describe('lanes release self-test env at PR time', () => {
     );
   });
 
+  it('runs UpdateTest whenever a release test changed, so bundle-only fixture gaps fail on the PR', () => {
+    expect(LANES_SELFTEST_CHANGED_TESTS_SCRIPT).toContain(
+      'if [ -n "${tests// /}" ]; then case " $tests $extra " in'
+    );
+    expect(LANES_SELFTEST_CHANGED_TESTS_SCRIPT).toMatch(
+      /extra="\$extra scripts\.tests\.test_lane_runner\.UpdateTest"/
+    );
+  });
+
   function run(testBody, { listed = true } = {}) {
     const dir = mkdtempSync(join(tmpdir(), 'lanes-selftest-guard-'));
     try {
@@ -102,6 +111,11 @@ describe('lanes release self-test env at PR time', () => {
           : 'RELEASE_EXTRAS = []\nLANE_TESTS = []\n'
       );
       writeFileSync(join(work, 'README.md'), 'base\n');
+      // The staged-bundle proof (UpdateTest) runs whenever a release test changed; stub it green here.
+      writeFileSync(
+        join(work, 'scripts/tests/test_lane_runner.py'),
+        'import unittest\n\n\nclass UpdateTest(unittest.TestCase):\n    def test_stub(self):\n        pass\n'
+      );
       git(work, 'add', '-A');
       git(work, 'commit', '-q', '-m', 'base');
       git(work, 'push', '-q', 'origin', 'HEAD:main');
@@ -149,6 +163,7 @@ class Probe(unittest.TestCase):
       probe('self.assertEqual(os.environ.get("LANES_SELFTEST"), "1")')
     );
     expect(output).toContain('release self-test env');
+    expect(output).toContain('scripts.tests.test_lane_runner.UpdateTest');
     expect(status).toBe(0);
   });
 

@@ -1259,3 +1259,9 @@ for the canonical CSS + Tailwind references.
 | `apps/web/app/(home)/layout.tsx` | Homepage shell — `PublicPageShell` |
 
 ---
+## No text on text (founder-locked 2026-10-25)
+
+Our text never overlays artwork that carries text. Release heroes show clean
+square art and render title and artist below it in normal flow, aligned to the
+art edges; the h1 stays in the DOM. Guard:
+`apps/web/components/features/release/SmartLinkShell.test.tsx` ("no text on text").

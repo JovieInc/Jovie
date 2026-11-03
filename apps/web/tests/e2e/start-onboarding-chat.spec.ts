@@ -530,7 +530,7 @@ test.describe('canonical /start onboarding chat', () => {
     await sendComposerMessage(page, 'I am Test Artist');
 
     await expect(page.getByTestId('onboarding-artist-picker')).toBeVisible();
-    await page.getByTestId('onboarding-artist-picker').getByText('Use').click();
+    await page.getByTestId('onboarding-artist-confirm').click();
 
     await expect(page.getByTestId('onboarding-profile-rail')).toBeHidden();
     const inlineRail = page.getByTestId('onboarding-profile-rail-inline');
@@ -576,7 +576,7 @@ test.describe('canonical /start onboarding chat', () => {
 
     await sendComposerMessage(page, 'I am Test Artist');
     await expect(page.getByTestId('onboarding-artist-picker')).toBeVisible();
-    await page.getByTestId('onboarding-artist-picker').getByText('Use').click();
+    await page.getByTestId('onboarding-artist-confirm').click();
 
     const sideRail = page.getByTestId('onboarding-profile-rail');
     await expect(sideRail).toBeVisible();
@@ -684,7 +684,7 @@ test.describe('canonical /start onboarding chat', () => {
       width: 440,
     });
 
-    await page.getByTestId('onboarding-artist-picker').getByText('Use').click();
+    await page.getByTestId('onboarding-artist-confirm').click();
 
     await expect(page.getByTestId('onboarding-artist-confirmed')).toHaveCount(
       0
@@ -755,6 +755,8 @@ test.describe('canonical /start onboarding chat', () => {
     );
     await expect(laterMessage).toBeVisible();
 
+    // Pen R6As7U: search sits behind Not Me on the proposed match.
+    await picker.getByTestId('onboarding-artist-not-me').click();
     await picker
       .getByRole('textbox', { name: 'Search Spotify artists' })
       .fill('muse');

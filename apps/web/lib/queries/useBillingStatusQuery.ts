@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { getEffectivePlan } from '@/lib/entitlements/registry';
 import { FREQUENT_BACKGROUND_CACHE } from './cache-strategies';
 import { createQueryFn } from './fetch';
 import { queryKeys } from './keys';
@@ -43,9 +44,11 @@ async function fetchBillingStatus({
 }): Promise<BillingStatusData> {
   const payload = await fetchBillingStatusRaw({ signal });
 
+  const isPro = Boolean(payload?.isPro);
   return {
-    isPro: Boolean(payload?.isPro),
-    plan: payload?.plan ?? null,
+    isPro,
+    // Effective plan: also corrects stale cached payloads that carry a raw plan.
+    plan: payload?.plan ? getEffectivePlan(payload.plan, isPro) : null,
     hasStripeCustomer: Boolean(payload?.stripeCustomerId),
     stripeSubscriptionId: payload?.stripeSubscriptionId ?? null,
     stale: Boolean(payload?._stale),

@@ -672,7 +672,7 @@ class NativeJoinTest(unittest.TestCase):
                 quota_pressure=lambda *args: {"ok": True}, new_issue_budget=native.new_issue_budget,
                 hotspot_holds=native.hotspot_holds, pool_rejections=native.pool_rejections,
                 file_overlap=SimpleNamespace(_state_path=native.file_overlap._state_path, local_tasks=lambda *args: [], admission_policy=native.file_overlap.admission_policy),
-                workstreams=native.workstreams, disk_guard=SimpleNamespace(free_pct=lambda path: 30, CRITICAL_PCT=5, PRESERVED_REPAIR=native.disk_guard.PRESERVED_REPAIR))
+                workstreams=native.workstreams, disk_guard=SimpleNamespace(free_pct=lambda path: 30, lanes_free_pct=lambda path: 30, CRITICAL_PCT=5, PRESERVED_REPAIR=native.disk_guard.PRESERVED_REPAIR))
             host = SimpleNamespace(state=state, slots=lambda *args: 6, intake_slots=lambda *args: 6)
             reads = SimpleNamespace(lane=lane, host=host, state=state, fleet_max_age=lambda: 600, linear=None,
                                     fleet_observation=lambda: admission._json_file(gate / "latest.json"))
