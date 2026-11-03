@@ -123,6 +123,7 @@ REVIEWED_FIXTURE_SHA256 = (
     "294f539ccbde6e19e1a22e94f18a03378cf1f19006dc39170dd8912cdb0da652",  # #23282 (reclaimable fails closed on an unreadable mount table)
     "59392e121dbbf64b42cfe9eca426c0edb3c22ae511cc95440bf4303d6469f81e",  # JOV-10233 (guard reads every lanes mount)
     "ed65e255b5c3ec2683c505cd85e0227c075725bcb9d01eb14fa2a68fca9b4194",  # #24298 (synthetic mount fixture owns retired roots)
+    "8ff13a123ff5add243bac3f0cb5f0f73e978b2aad953a64fccbf9ff11b3eb48f",  # #24298 (unconfigured private archive holds unsaved work)
 )
 DEFAULT_POLICY = SafetyPolicy(
     "5db1a60487c0a29dda45315d9aa5da14493d9409",
