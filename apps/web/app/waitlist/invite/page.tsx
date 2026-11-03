@@ -28,7 +28,7 @@ export default async function WaitlistInvitePage({
     );
   }
 
-  const { userId } = await getCachedAuth();
+  const { userId } = await getCachedAuth({ session: 'fresh' });
   if (!userId) {
     const redirectUrl = `${APP_ROUTES.WAITLIST_INVITE}?token=${encodeURIComponent(token)}`;
     redirect(
@@ -36,11 +36,13 @@ export default async function WaitlistInvitePage({
     );
   }
 
-  const currentUser = await getCachedCurrentUser();
+  const currentUser = await getCachedCurrentUser({ session: 'fresh' });
   const verifiedEmails =
-    currentUser?.emailAddresses
-      ?.map(e => e.emailAddress)
-      .filter(email => email.trim().length > 0) ?? [];
+    currentUser?.emailVerified === true
+      ? currentUser.emailAddresses
+          .map(e => e.emailAddress)
+          .filter(email => email.trim().length > 0)
+      : [];
 
   if (verifiedEmails.length === 0) {
     return (

@@ -40,7 +40,11 @@ function tile(
 }
 
 export const HOME_LOOP_FIXTURE_PULSE: readonly HomeLoopTile[] = [
-  tile('prod', 'Prod', 'c9b767a', '060037d', 'good'),
+  {
+    ...tile('prod', 'Prod', 'c9b767a', '060037d', 'good'),
+    target: 'Target current',
+    href: '/app/ov/shipping',
+  },
   tile('merges-today', 'Merges Today', '12', '7', 'good'),
   tile('merges-7d', 'Merges 7 Days', '84', '61', 'good'),
   tile('lanes', 'Lanes', '3/3', '0/1', 'good'),

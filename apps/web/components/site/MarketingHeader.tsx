@@ -1,7 +1,6 @@
 // @coverage-via apps/web/tests/unit/marketing/support-route-header-contract.test.ts
 'use client';
 
-import { usePathname } from 'next/navigation';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { LogoVariant } from '@/components/atoms/Logo';
 import {
@@ -9,6 +8,7 @@ import {
   HeaderNav,
   type HeaderNavCta,
 } from '@/components/organisms/HeaderNav';
+import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
 import './MarketingHeader.css';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -181,7 +181,7 @@ export function MarketingHeader({
   showHomepageCenterNav = true,
   variant = 'landing',
 }: MarketingHeaderProps) {
-  const pathname = usePathname();
+  const pathname = usePublicPathname();
   useEffect(() => {
     track(
       CANONICAL_PUBLIC_SHELL_EVENTS.EXPOSURE,

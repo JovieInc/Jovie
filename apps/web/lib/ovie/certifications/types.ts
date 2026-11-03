@@ -154,6 +154,15 @@ export interface OvieCertificationRow {
   readonly payScore?: number | null;
   readonly fitScore?: number | null;
   readonly heldFor?: readonly string[];
+  /**
+   * Golden-path runtime evidence (JOV-9625 outcome rework): the row's
+   * per-surface browser counts, JPEG frame and lifecycle state, preserved
+   * from the production receipt. Absent on every other domain's rows.
+   */
+  readonly goldenPathState?: 'certified' | 'expired' | 'missing';
+  readonly consoleErrorCount?: number | null;
+  readonly networkErrorCount?: number | null;
+  readonly screenshot?: string | null;
   readonly source: {
     readonly repository: string;
     readonly sha: string;
