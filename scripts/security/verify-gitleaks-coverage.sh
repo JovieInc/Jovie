@@ -104,4 +104,6 @@ run_default_fixture_scan() {
 
 run_default_fixture_scan
 
+GITLEAKS_BIN="$GITLEAKS_BIN" bash scripts/security/staged-public-digests.test.sh
+
 echo "PASS: gitleaks coverage verification complete"
