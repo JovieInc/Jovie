@@ -1,6 +1,6 @@
 {
   "schema": "jovie.wins-weekly/v1",
-  "at": "2026-11-03T14:54:41.217Z",
+  "at": "2026-11-03T15:32:35.568Z",
   "weeks": [
     {
       "week": "2026-09-07",
@@ -81,7 +81,7 @@
     },
     {
       "week": "2026-10-26",
-      "wins": 28,
+      "wins": 29,
       "verified": 1,
       "claimed": 15,
       "mergedPrs": 641,
