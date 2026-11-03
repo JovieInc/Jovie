@@ -298,7 +298,13 @@ export function prepareStatement(statement, { flockPath = '' } = {}) {
   // `exit` would end the process; contain it in a subshell.
   if (/\bexit\b/.test(text)) text = `( ${text}\n)`;
   // Typechecks share gem's CPU: serialize them under the host lock.
-  if (flockPath) text = text.replace(TYPECHECK, `$1flock ${flockPath} $2`);
+  if (flockPath) {
+    const quotedLock = `'${flockPath.replace(/'/g, `'\\''`)}'`;
+    text = text.replace(
+      TYPECHECK,
+      (_match, indent, command) => `${indent}flock ${quotedLock} ${command}`
+    );
+  }
   return text;
 }
 
@@ -596,7 +602,11 @@ export async function main({
       spawnSync('which', ['flock'], { cwd, env: childEnv }).status !== 0
     )
       return '';
-    return path.join(homedir(), '.cache', 'gem-typecheck.lock');
+    const cacheRoot =
+      procEnv.XDG_CACHE_HOME && path.isAbsolute(procEnv.XDG_CACHE_HOME)
+        ? procEnv.XDG_CACHE_HOME
+        : path.join(homedir(), '.cache');
+    return path.join(cacheRoot, 'gem-typecheck.lock');
   })();
   if (flockPath) mkdirSync(path.dirname(flockPath), { recursive: true });
 
