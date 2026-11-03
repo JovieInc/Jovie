@@ -461,7 +461,7 @@ describe('merge_group workflow contract', () => {
     expect(admission).toContain(
       'runs-on: ${{ vars.MERGE_GATE_POOL == \'fixed\' && fromJSON(\'["self-hosted","Linux","X64","jovie-fixed"]\') || \'ubuntu-latest\' }}'
     );
-    expect(admission).toContain('timeout-minutes: 75');
+    expect(admission).toContain('timeout-minutes: 78');
     expect(admission).not.toContain('sleep "$wait_s"');
     expect(admission).toContain('actions: read');
     expect(admission).toContain(
@@ -541,6 +541,19 @@ describe('merge_group workflow contract', () => {
         MERGE_GROUP_ADMISSION_WAIT_MS / 2
       );
     }
+    // Fork PR Gate starts after Size Guard; both full job budgets must fit
+    // within the admission polling window even if each consumes its limit.
+    const sizeMinutes = Number(
+      sizeGuard.match(/timeout-minutes:\s*(\d+)/)?.[1]
+    );
+    const forkMinutes = Number(
+      getJobBlock(SIZE_GUARD_WORKFLOW, 'merge-group-fork').match(
+        /timeout-minutes:\s*(\d+)/
+      )?.[1]
+    );
+    expect((sizeMinutes + forkMinutes) * 60_000).toBeLessThan(
+      MERGE_GROUP_ADMISSION_WAIT_MS
+    );
     expect(sizeGuard).toContain('GH_TOKEN: ${{ github.token }}');
     expect(sizeGuard).toContain('--policy=size');
     expect(sizeGuard).toContain('--policy=size --also=fork');
@@ -3277,6 +3290,20 @@ ${selectedGateScript}`,
       /merge_group:\n\s+types: \[checks_requested\]/
     );
     const sizeGuard = getJobBlock(SIZE_GUARD_WORKFLOW, 'merge-group-size');
+    const timeoutMinutes = Number(
+      sizeGuard.match(/timeout-minutes: (\d+)/)?.[1]
+    );
+    const fetchSeconds = Number(
+      sizeGuard.match(
+        /timeout --kill-after=5s (\d+)s\s+\\\s*git fetch --refetch/
+      )?.[1]
+    );
+    // Run 41705044176 spent 43s in checkout; allow another minute for setup
+    // and cleanup beyond the independently bounded fetch and policy budgets.
+    expect(fetchSeconds).toBe(70);
+    expect(timeoutMinutes * 60).toBeGreaterThanOrEqual(
+      fetchSeconds + MERGE_GROUP_JOB_BUDGET_MS / 1000 + 43 + 60
+    );
     expect(sizeGuard).toContain(
       "github.event_name == 'merge_group' && 'PR Size Guard'"
     );
