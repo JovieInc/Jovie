@@ -7,7 +7,19 @@ gate read the same recording.
 ```sh
 CRON_SECRET=… DATABASE_URL=… node scripts/golden-path-walk/walk.mjs OUT=… # new visitor: homepage claim -> chat -> sign-up -> waitlist
 FLOW=./flow-returning.mjs EMAIL=browse-ready+clerk_test@jov.ie node scripts/golden-path-walk/walk.mjs # sign-in -> app -> profile -> chat -> billing -> pricing
+FLOW=./flow-latency.mjs EMAIL=browse-ready+clerk_test@jov.ie node scripts/golden-path-walk/walk.mjs # 6 chat turns: ms to first visible answer -> latency.json
+node scripts/golden-path-walk/latency-gate.mjs <OUT>/latency.json ~/.local/state/jovie-golden-path-cert/chat-latency-history.jsonl # p95 <= 2s; report-only until 3 passes
 node scripts/dogfood-judge/cli.mjs judge --surface waitlist-signup-to-waitlisted --run <OUT>
 ```
 
 Canary identities only; the teardown frees shared-pool artists the canary claimed.
+
+## Agents through the /start bot check
+
+Every production agent (cert, demo, QA, walks) uses
+`scripts/synthetic-passage-mint.mjs`: `installPassageRoute(page, …)` for
+Playwright, or the CLI under `doppler run --project jovie-web --config prd`
+for a single token. Never rely on the fail-open path: `/start` admits a
+failed Turnstile check on an unverified budget (4 fresh chats per IP per
+hour, 120 globally) that exists for real people whose browsers cannot run
+the widget.

@@ -28,6 +28,7 @@ import {
   formatStructuralTimings,
   LANE_COMMANDS,
   LANE_GROUPS,
+  LANES_COVERAGE_COMMAND,
   laneFailureExcerpt,
   MARKETING_CERTIFICATION_COMMAND,
   runCommandPool,
@@ -170,6 +171,10 @@ describe('Shared fenced-attempt coverage contract', () => {
     expect(command).toContain('scripts/tests/test_execution_attempt.py');
     expect(command).toContain('scripts/tests/test_backlog_admission.py');
     expect(command).toContain('scripts/tests/test_backlog_writer_guard.py');
+    expect(command).toContain('scripts/tests/test_board_intake.py');
+    expect(command).toContain(
+      '*/scripts/lanes/board_intake.py" --fail-under=85'
+    );
     expect(command).toContain(
       '*/scripts/lanes/backlog_writer_guard.py" --fail-under=90'
     );
@@ -1357,6 +1362,7 @@ describe('structural command pool', () => {
     vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
     vi.stubEnv('CI_FAST_STRUCTURAL_PYTEST', 'skip');
     vi.stubEnv('CI_FAST_STRUCTURAL_WEB', 'skip');
+    vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'skip');
     const started = [];
     await runStructural({
       concurrency: 3,
@@ -1365,11 +1371,63 @@ describe('structural command pool', () => {
         return { code: 0, output: '' };
       },
     });
-    // Merge group 38247843089: the 174.5s lanes pytest started last and set
-    // the 260s remaining wall; it must hold a slot from the start.
-    const head = started.slice(0, 2).join('\n');
-    expect(head).toContain('scripts/tests/test_lane_runner.py');
-    expect(head).toContain('lib/__tests__/merge-group-failure-hold.test.mjs');
+    // The lanes pytest left for ci-fast (structural lanes); the next pole
+    // (merge-group-failure-hold, 249s in 41250311104) holds a slot first.
+    expect(started.join('\n')).not.toContain(
+      'scripts/tests/test_lane_runner.py'
+    );
+    expect(started).not.toContain(LANES_COVERAGE_COMMAND);
+    expect(started.slice(0, 2).join('\n')).toContain(
+      'lib/__tests__/merge-group-failure-hold.test.mjs'
+    );
+  });
+
+  it('runs only the lanes coverage pytest in ci-fast (structural lanes)', async () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'operations');
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    vi.stubEnv('CI_FAST_STRUCTURAL_PYTEST', '');
+    vi.stubEnv('CI_FAST_STRUCTURAL_WEB', '');
+    vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'only');
+    const started = [];
+    await runStructural({
+      concurrency: 3,
+      execute: command => {
+        started.push(command);
+        return { code: 0, output: '' };
+      },
+    });
+    expect(started).toEqual([LANES_COVERAGE_COMMAND]);
+    // Every per-module coverage floor still runs, after the shards combine.
+    expect(LANES_COVERAGE_COMMAND).toContain('coverage combine');
+    expect(LANES_COVERAGE_COMMAND.match(/--fail-under=/g)?.length).toBe(22);
+    expect(LANES_COVERAGE_COMMAND).toContain(
+      'priority_admission.py" --fail-under=80'
+    );
+    expect(LANES_COVERAGE_COMMAND).toContain(
+      'board_intake.py" --fail-under=85'
+    );
+    expect(STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0]).toBe(
+      LANES_COVERAGE_COMMAND
+    );
+  });
+
+  it('does not also run lanes coverage in the structural python job', async () => {
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'operations');
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    vi.stubEnv('CI_FAST_STRUCTURAL_PYTEST', 'only');
+    vi.stubEnv('CI_FAST_STRUCTURAL_WEB', '');
+    vi.stubEnv('CI_FAST_STRUCTURAL_LANES', '');
+    const started = [];
+    await runStructural({
+      execute: command => {
+        started.push(command);
+        return { code: 0, output: '' };
+      },
+    });
+    expect(started.length).toBeGreaterThan(0);
+    expect(started).not.toContain(LANES_COVERAGE_COMMAND);
   });
 
   it('starts the slowest web commands first', async () => {
@@ -2205,6 +2263,7 @@ describe('source-read guard selection', () => {
       [
         'artist-launch-contract',
         'privacy-input-route-trackers',
+        'privacy-compliance',
         'merge-group-unit-guards',
         'node-environment-files',
       ],
@@ -2246,6 +2305,7 @@ describe('source-read guard selection', () => {
       [
         'artist-launch-contract',
         'privacy-input-route-trackers',
+        'privacy-compliance',
         'merge-group-unit-guards',
         'static-revalidate-policy',
         'art-direction',
@@ -2379,6 +2439,7 @@ describe('source-read guard selection', () => {
       'native-design-system',
       'artist-launch-contract',
       'privacy-input-route-trackers',
+      'privacy-compliance',
       'artist-profile-conformance',
       'ci-schedule-inventory',
       'automation-registry',
@@ -2399,6 +2460,7 @@ describe('source-read guard selection', () => {
       'native-design-system',
       'artist-launch-contract',
       'privacy-input-route-trackers',
+      'privacy-compliance',
       'artist-profile-conformance',
       'ci-schedule-inventory',
       'automation-registry',
@@ -2444,6 +2506,19 @@ describe('source-read guard selection', () => {
         expect(
           readFileSync(
             join(REPO_ROOT, 'scripts/compliance/input-page-trackers.test.mjs'),
+            'utf8'
+          )
+        ).toContain("from 'node:test'");
+        continue;
+      }
+      if (guard.id === 'privacy-compliance') {
+        expect(guard.prOnly).toBe(false);
+        expect(guard.command).toContain(
+          'scripts/compliance/privacy-rules.test.mjs'
+        );
+        expect(
+          readFileSync(
+            join(REPO_ROOT, 'scripts/compliance/privacy-rules.test.mjs'),
             'utf8'
           )
         ).toContain("from 'node:test'");
