@@ -932,6 +932,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/runner-pool-routing.test.mjs',
   'scripts/sentry-build-config.test.mjs',
+  'scripts/next-telemetry.test.mjs',
   'scripts/lib/__tests__/spend-guard.test.mjs',
   'scripts/lib/__tests__/wins-ledger.test.mjs',
   'scripts/lib/__tests__/wins-store.test.mjs',

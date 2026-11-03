@@ -1,6 +1,8 @@
+diff --git a/dist/build/templates/app-page-runtime.js b/dist/build/templates/app-page-runtime.js
+index fc5eef172bc3e2567ab414416590f85fb49e4ef1..92355b885193c71635c552d98a8afe664cc8fb4d 100644
 --- a/dist/build/templates/app-page-runtime.js
 +++ b/dist/build/templates/app-page-runtime.js
-@@ -1366,6 +1366,14 @@
+@@ -1366,6 +1366,14 @@ function createAppPageEntrypoint({ tree, page, pathname, require: __next_app_req
                      }
                      for (let [key, value] of Object.entries(headers)){
                          if (typeof value === 'undefined') continue;
@@ -15,9 +17,11 @@
                          if (Array.isArray(value)) {
                              for (const v of value){
                                  res.appendHeader(key, v);
+diff --git a/dist/esm/build/templates/app-page-runtime.js b/dist/esm/build/templates/app-page-runtime.js
+index 96beb1b9bd89e6eb55e9d0cfbed49fa3aa9c42ea..bf330b04afa19dc92bd3abe8141e635724bb9b3a 100644
 --- a/dist/esm/build/templates/app-page-runtime.js
 +++ b/dist/esm/build/templates/app-page-runtime.js
-@@ -1385,6 +1385,14 @@
+@@ -1385,6 +1385,14 @@ export function createAppPageEntrypoint({ tree, page, pathname, require: __next_
                      }
                      for (let [key, value] of Object.entries(headers)){
                          if (typeof value === 'undefined') continue;
@@ -32,63 +36,11 @@
                          if (Array.isArray(value)) {
                              for (const v of value){
                                  res.appendHeader(key, v);
---- a/dist/server/lib/router-utils/resolve-routes.js
-+++ b/dist/server/lib/router-utils/resolve-routes.js
-@@ -37,6 +37,42 @@
-         default: obj
-     };
- }
-+const PROFILE_ALIAS_REDIRECT_MODES = new Set([
-+    'listen',
-+    'pay',
-+    'releases',
-+    'subscribe',
-+    'tour',
-+    'contact'
-+]);
-+// Next merges redirect queries as { ...requestQuery, ...destinationQuery }.
-+// Request keys stay in front, so /dualipa/listen?source=qr becomes
-+// ?source=qr&mode=listen even when the destination is written
-+// ?mode=listen&source=:profileSource. Canonical profile hrefs, alias cache
-+// keys, and the public redirect contract are mode then source.
-+function canonicalizeProfileAliasRedirectQuery(pathname, query) {
-+    if (!query || typeof pathname !== 'string' || !/^\/[^/]+$/.test(pathname)) {
-+        return query;
-+    }
-+    const mode = query.mode;
-+    const source = query.source;
-+    if (typeof mode !== 'string' || typeof source !== 'string') return query;
-+    if ((source !== 'link' && source !== 'qr') || !PROFILE_ALIAS_REDIRECT_MODES.has(mode)) {
-+        return query;
-+    }
-+    const keys = Object.keys(query);
-+    if (keys[0] === 'mode' && keys[1] === 'source') return query;
-+    const rest = {};
-+    for (const key of keys){
-+        if (key === 'mode' || key === 'source') continue;
-+        rest[key] = query[key];
-+    }
-+    return {
-+        mode,
-+        source,
-+        ...rest
-+    };
-+}
- const debug = (0, _debug.default)('next:router-server:resolve-routes');
- function getResolveRoutes(fsChecker, config, getAssetPrefix, opts, renderServer, renderServerOpts, ensureMiddleware) {
-     let clientHashes = undefined;
-@@ -533,7 +569,7 @@
-                     });
-                     const { query } = parsedDestination;
-                     delete parsedDestination.query;
--                    parsedDestination.search = (0, _serverrouteutils.stringifyQuery)(req, query);
-+                    parsedDestination.search = (0, _serverrouteutils.stringifyQuery)(req, canonicalizeProfileAliasRedirectQuery(parsedDestination.pathname, query));
-                     parsedDestination.pathname = (0, _utils2.normalizeRepeatedSlashes)(parsedDestination.pathname);
-                     return {
-                         finished: true,
+diff --git a/dist/esm/server/lib/router-utils/resolve-routes.js b/dist/esm/server/lib/router-utils/resolve-routes.js
+index dd35af4e070b3795f18fb14cf50bbf5b7e80c097..bed8da0f1c3c593d93759d151b6c3c8e88982df2 100644
 --- a/dist/esm/server/lib/router-utils/resolve-routes.js
 +++ b/dist/esm/server/lib/router-utils/resolve-routes.js
-@@ -22,6 +22,42 @@
+@@ -22,6 +22,42 @@ import { addRequestMeta } from '../../request-meta';
  import { isRSCRequestHeader } from '../is-rsc-request';
  import { compileNonPath, matchHas, prepareDestination } from '../../../shared/lib/router/utils/prepare-destination';
  import { NEXT_REWRITTEN_PATH_HEADER, NEXT_REWRITTEN_QUERY_HEADER, RSC_HEADER } from '../../../client/components/app-router-headers';
@@ -131,7 +83,7 @@
  const debug = setupDebug('next:router-server:resolve-routes');
  export function getResolveRoutes(fsChecker, config, getAssetPrefix, opts, renderServer, renderServerOpts, ensureMiddleware) {
      let clientHashes = undefined;
-@@ -518,7 +554,7 @@
+@@ -518,7 +554,7 @@ export function getResolveRoutes(fsChecker, config, getAssetPrefix, opts, render
                      });
                      const { query } = parsedDestination;
                      delete parsedDestination.query;
@@ -140,3 +92,71 @@
                      parsedDestination.pathname = normalizeRepeatedSlashes(parsedDestination.pathname);
                      return {
                          finished: true,
+diff --git a/dist/server/lib/router-utils/resolve-routes.js b/dist/server/lib/router-utils/resolve-routes.js
+index bfd79032122f9c193c2352744d58e7999eb62730..9b1d6290b5ac59c38d2a72dc37e9f64976759133 100644
+--- a/dist/server/lib/router-utils/resolve-routes.js
++++ b/dist/server/lib/router-utils/resolve-routes.js
+@@ -37,6 +37,42 @@ function _interop_require_default(obj) {
+         default: obj
+     };
+ }
++const PROFILE_ALIAS_REDIRECT_MODES = new Set([
++    'listen',
++    'pay',
++    'releases',
++    'subscribe',
++    'tour',
++    'contact'
++]);
++// Next merges redirect queries as { ...requestQuery, ...destinationQuery }.
++// Request keys stay in front, so /dualipa/listen?source=qr becomes
++// ?source=qr&mode=listen even when the destination is written
++// ?mode=listen&source=:profileSource. Canonical profile hrefs, alias cache
++// keys, and the public redirect contract are mode then source.
++function canonicalizeProfileAliasRedirectQuery(pathname, query) {
++    if (!query || typeof pathname !== 'string' || !/^\/[^/]+$/.test(pathname)) {
++        return query;
++    }
++    const mode = query.mode;
++    const source = query.source;
++    if (typeof mode !== 'string' || typeof source !== 'string') return query;
++    if ((source !== 'link' && source !== 'qr') || !PROFILE_ALIAS_REDIRECT_MODES.has(mode)) {
++        return query;
++    }
++    const keys = Object.keys(query);
++    if (keys[0] === 'mode' && keys[1] === 'source') return query;
++    const rest = {};
++    for (const key of keys){
++        if (key === 'mode' || key === 'source') continue;
++        rest[key] = query[key];
++    }
++    return {
++        mode,
++        source,
++        ...rest
++    };
++}
+ const debug = (0, _debug.default)('next:router-server:resolve-routes');
+ function getResolveRoutes(fsChecker, config, getAssetPrefix, opts, renderServer, renderServerOpts, ensureMiddleware) {
+     let clientHashes = undefined;
+@@ -533,7 +569,7 @@ function getResolveRoutes(fsChecker, config, getAssetPrefix, opts, renderServer,
+                     });
+                     const { query } = parsedDestination;
+                     delete parsedDestination.query;
+-                    parsedDestination.search = (0, _serverrouteutils.stringifyQuery)(req, query);
++                    parsedDestination.search = (0, _serverrouteutils.stringifyQuery)(req, canonicalizeProfileAliasRedirectQuery(parsedDestination.pathname, query));
+                     parsedDestination.pathname = (0, _utils2.normalizeRepeatedSlashes)(parsedDestination.pathname);
+                     return {
+                         finished: true,
+diff --git a/dist/telemetry/storage.js b/dist/telemetry/storage.js
+index ba404888c825ff94c670869a87a830a19c3fea86..f90db8f9169c703a82399519d99ae0927fba0939 100644
+--- a/dist/telemetry/storage.js
++++ b/dist/telemetry/storage.js
+@@ -158,6 +158,7 @@ class Telemetry {
+         // detached process to submit the records without blocking
+         // the main process from exiting
+         this.flushDetached = ({ mode, dir, distDir, events })=>{
++            if (this.isDisabled) return;
+             // Nudges detach only their own events; shutdown flushes the full queue.
+             const allEvents = events ?? [];
+             if (events === null) {
