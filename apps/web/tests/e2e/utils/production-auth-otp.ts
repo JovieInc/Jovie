@@ -1,5 +1,8 @@
 import { neon } from '@neondatabase/serverless';
-import { PRODUCTION_AUTH_SMOKE_EMAIL } from './production-auth-credentials';
+import {
+  isProdcertCanaryEmail,
+  newProdcertUserEmail,
+} from '@/lib/synthetic/prodcert-identities';
 
 const OTP_PATTERN = /^\d{6}$/;
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -27,32 +30,13 @@ function buildSignInVerificationIdentifier(email: string): string {
 }
 
 /**
- * Synthetic new-user canary addresses (JOV-9625): exactly
- * browse-ready+synthetic-prodcert-<run>@jov.ie on our own domain. The
- * `+synthetic-` tag already quarantines the account from customer metrics
- * (isInternalOrTestAccountEmail). Nothing else is readable.
+ * Production canary addresses (JOV-9625) come from one lib module so the OTP
+ * reader and the /start passage token accept exactly the same identities.
  */
-const PRODCERT_NEW_USER_EMAIL =
-  /^browse-ready\+synthetic-prodcert-[a-z0-9]{6,24}@jov\.ie$/u;
+export { newProdcertUserEmail };
 
 export function isProductionCanaryOtpEmail(email: string): boolean {
-  const normalized = email.trim().toLowerCase();
-  return (
-    normalized === PRODUCTION_AUTH_SMOKE_EMAIL ||
-    PRODCERT_NEW_USER_EMAIL.test(normalized)
-  );
-}
-
-export function newProdcertUserEmail(runId: string): string {
-  const slug = runId
-    .toLowerCase()
-    .replace(/[^a-z0-9]/gu, '')
-    .slice(0, 24);
-  const email = `browse-ready+synthetic-prodcert-${slug}@jov.ie`;
-  if (!isProductionCanaryOtpEmail(email)) {
-    throw new Error('Run id cannot form a valid prodcert canary address.');
-  }
-  return email;
+  return isProdcertCanaryEmail(email);
 }
 
 export function extractProductionAuthOtp(

@@ -89,11 +89,14 @@ describe('CLI landing page', () => {
     }
   });
 
-  it('docks the hero over its own abstract photo', () => {
+  it('docks the hero on the matte page background with no photo', () => {
     const { container } = render(<CliLandingPage />);
-    const photo = container.querySelector('.marketing-hero-photo img');
-    expect(photo?.getAttribute('src')).toContain('marketing-hero%2Fcli.webp');
-    expect(photo).toHaveAttribute('alt', '');
+    const hero = container.querySelector(
+      '[data-testid="marketing-section-hero"]'
+    );
+    expect(hero).not.toBeNull();
+    expect(hero?.querySelector('[class*="hero-photo"]')).toBeNull();
+    expect(container.innerHTML).not.toContain('marketing-hero%2F');
   });
 
   it('composes shared hero, prose, FAQ, and footer CTA primitives', () => {

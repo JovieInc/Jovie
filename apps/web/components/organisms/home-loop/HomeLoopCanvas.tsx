@@ -53,6 +53,11 @@ export interface HomeLoopCanvasProps {
   /** Stage timing (7d p50 / p95) and flow p95s under the pulse. */
   readonly strip?: readonly HomeLoopStripItem[];
   readonly stripCoverage?: string | null;
+  /** "Are we winning" tiles above the shipping verdict (Ovie: runway, MRR, users, golden path). */
+  readonly company?: readonly HomeLoopTile[];
+  readonly companyLoading?: boolean;
+  /** Caption over the pulse row, e.g. what its comparison is against. */
+  readonly pulseCaption?: string | null;
   /** Generated answer for the current canvas state, under the pulse. */
   readonly answer?: ReactNode;
   /** Generated UI that updates the in-flight section in place. */
@@ -93,6 +98,9 @@ export function HomeLoopCanvas({
   stripCoverage,
   answer,
   inFlightOverride,
+  company,
+  companyLoading = false,
+  pulseCaption,
 }: HomeLoopCanvasProps) {
   const openAsks = asks.filter(
     ask => !answers[ask.id] || answers[ask.id]?.state === 'failed'
@@ -102,11 +110,32 @@ export function HomeLoopCanvas({
       className='@container flex w-full flex-col gap-3 lg:h-full lg:min-h-0'
       data-testid='home-loop-canvas'
     >
+      {company ? (
+        <section aria-label='Company' className='flex flex-col gap-1.5'>
+          <h2 className='text-2xs font-medium text-balance text-tertiary-token'>
+            Company
+          </h2>
+          <HomeLoopPulse
+            tiles={company}
+            loading={companyLoading}
+            placeholderCount={4}
+            testId='home-loop-company'
+          />
+        </section>
+      ) : null}
       <HomeLoopConstraintBanner
         constraint={loopStatus === 'ready' ? constraint : null}
         emptyLabel={copy.constraintClear}
         loading={loopStatus === 'loading'}
       />
+      {pulseCaption ? (
+        <h2
+          className='-mb-1.5 text-2xs font-medium text-balance text-tertiary-token'
+          data-testid='home-loop-pulse-caption'
+        >
+          {pulseCaption}
+        </h2>
+      ) : null}
       <HomeLoopPulse tiles={pulse} loading={loopStatus === 'loading'} />
       {strip ? (
         <HomeLoopStageStrip

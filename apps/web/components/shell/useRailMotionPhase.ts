@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
+import { recordRuntimeTrace } from '@/lib/testing/runtime-trace';
 import { type RailMotionPhase, SHELL_RAIL_MOTION_MS } from './rail-motion';
 
 /**
@@ -27,6 +28,13 @@ export function useRailMotionPhase(open: boolean): RailMotionPhase {
   if (open !== prevOpen) {
     setPrevOpen(open);
     setTransitioning(true);
+    // Test-readable receipt (JOV-8786 rail lifecycle): names the input flip
+    // behind a stuck data-rail-phase after browser back/forward.
+    recordRuntimeTrace('shell-rail', 'input-flip', {
+      from: prevOpen ? 'open' : 'closed',
+      to: open ? 'open' : 'closed',
+      reducedMotion: prefersReducedMotion,
+    });
   }
 
   useEffect(() => {
@@ -35,10 +43,12 @@ export function useRailMotionPhase(open: boolean): RailMotionPhase {
       setTransitioning(false);
       return;
     }
-    const timeout = globalThis.window.setTimeout(
-      () => setTransitioning(false),
-      SHELL_RAIL_MOTION_MS
-    );
+    const timeout = globalThis.window.setTimeout(() => {
+      recordRuntimeTrace('shell-rail', 'settle', {
+        to: open ? 'open' : 'closed',
+      });
+      setTransitioning(false);
+    }, SHELL_RAIL_MOTION_MS);
     return () => globalThis.window.clearTimeout(timeout);
   }, [transitioning, open, prefersReducedMotion]);
 

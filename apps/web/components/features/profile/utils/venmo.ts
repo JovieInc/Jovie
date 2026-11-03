@@ -47,7 +47,11 @@ export function buildVenmoPaymentUrl(
   amount: number
 ): string | null {
   if (!venmoLink || !isAllowedVenmoUrl(venmoLink)) return null;
-  const sep = venmoLink.includes('?') ? '&' : '?';
-  const username = extractVenmoUsername(venmoLink) ?? '';
-  return `${venmoLink}${sep}utm_amount=${amount}&utm_username=${encodeURIComponent(username)}`;
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  // Venmo reads `txn` and `amount` from the profile URL, so the chosen amount
+  // arrives pre-filled and the payer never retypes it.
+  const url = new URL(venmoLink);
+  url.searchParams.set('txn', 'pay');
+  url.searchParams.set('amount', String(Number(amount.toFixed(2))));
+  return url.toString();
 }

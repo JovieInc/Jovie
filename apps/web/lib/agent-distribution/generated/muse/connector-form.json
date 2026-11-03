@@ -1,8 +1,8 @@
 {
   "_generated": {
-    "version": "95c2f8460164",
-    "toolsListHash": "5d4c361dd8af47313af5a5f273b1bdea84b68e21e5099741df8d0f5cd90d5f94",
-    "listingHash": "7883dee8a0ce9226462c05def64fcd2cae40c2fce1eab660e996c1b12b7363b6",
+    "version": "83f329c3072b",
+    "toolsListHash": "87e4a522b0ed1415e0ca53e123958ef35b15b35f4eeff2fe72cc35d3cafe32f6",
+    "listingHash": "a7665b2f5a09882b4a03e68179c82c6e3651a971c63ad7dfb88cc10b9d213c6f",
     "regenerate": "pnpm --filter @jovie/web agent-distribution:generate"
   },
   "overview": {
@@ -17,8 +17,13 @@
       "Resume the Jovie draft I started earlier for this artist.",
       "What is still missing before this release draft is ready to review?"
     ],
-    "icon512": "apps/web/public/brand/app-icons/jovie-app-icon-512.png",
-    "icon1024": "apps/web/public/brand/app-icons/jovie-app-icon-1024.png",
+    "icon512": ".agent-distribution-out/icons/icon-512.png",
+    "icons": {
+      "48": ".agent-distribution-out/icons/icon-48.png",
+      "64": ".agent-distribution-out/icons/icon-64.png",
+      "512": ".agent-distribution-out/icons/icon-512.png",
+      "1024": ".agent-distribution-out/icons/icon-1024.png"
+    },
     "acceptsPayments": false,
     "contact": "support@jov.ie",
     "supportUrl": "https://jov.ie/support",
@@ -28,7 +33,7 @@
   "technical": {
     "connectionType": "Existing MCP",
     "url": "https://jov.ie/api/mcp",
-    "docsUrl": "https://jov.ie/support",
+    "docsUrl": "https://jov.ie/developers/agents",
     "accessRequirements": "None. No account or API key is needed to connect.",
     "authentication": "none"
   },
@@ -47,7 +52,7 @@
     {
       "name": "workspace.create_draft",
       "title": "Create artist draft",
-      "description": "Create or resume an unpublished visibility draft using the exact artist_id and draft_token from artist.search_or_import. Retrying the same token resumes the same draft; a token for another artist is rejected. Never claims ownership, publishes or purchases.",
+      "description": "Create or resume an unpublished visibility draft using the exact artist_id and draft_token from artist.search_or_import. Retrying the same token resumes the same draft; a token for another artist is rejected. Returns claim_url: show it to the user so they can sign in on Jovie and claim the draft; the artist is matched to its Spotify identity and stays private until the user publishes. Never share draft_token. Never claims ownership, publishes or purchases.",
       "annotations": {
         "title": "Create artist draft",
         "readOnlyHint": false,
@@ -59,7 +64,7 @@
     {
       "name": "release.prepare_launch",
       "title": "Prepare release launch",
-      "description": "Resolve public release facts and create or resume an unpublished artist, release-page, and smart-link draft. Requires the draft capability. Returns only unresolved questions and never claims, publishes, or purchases.",
+      "description": "Resolve public release facts and create or resume an unpublished artist, release-page, and smart-link draft. Requires the draft capability. Returns only unresolved questions plus claim_url; when next_action is send_user_claim_url, show claim_url to the user so they can claim it on Jovie, where it stays private until they publish. Never claims, publishes, or purchases.",
       "annotations": {
         "title": "Prepare release launch",
         "readOnlyHint": false,

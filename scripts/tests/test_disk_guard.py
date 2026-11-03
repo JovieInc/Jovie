@@ -483,7 +483,8 @@ class CheckTest(unittest.TestCase):
 
     def test_cleanup_stops_if_disk_becomes_critical_between_steps(self):
         with tempfile.TemporaryDirectory() as tmp, \
-                patch.object(guard, "free_pct", side_effect=[10.0, 10.0, 4.0, 4.0]), \
+                patch.object(guard, "lanes_free", side_effect=[(10.0, []), (4.0, [])]), \
+                patch.object(guard, "lanes_free_pct", side_effect=[10.0, 4.0]), \
                 patch.object(guard, "sweep_derived_data") as first, \
                 patch.object(guard, "sweep_worktrees") as second:
             report = guard.check(self.host(tmp), sweep=True)
@@ -708,7 +709,7 @@ class RetiredHostLoopTest(unittest.TestCase):
         blob.write_text("retired private cache")
         return blob
 
-    def test_retired_workspaces_back_up_work_then_go_never_through_mounts(self):
+    def test_retired_workspaces_hold_unsaved_work_without_private_archive_never_through_mounts(self):
         origin = self.root / "origin.git"
         self.git("init", "-q", "--bare", str(origin), cwd=self.root)
         root = self.root / "symphony-workspaces"; root.mkdir()
@@ -741,24 +742,22 @@ class RetiredHostLoopTest(unittest.TestCase):
             return self.run_cmd(args, **kwargs)
 
         report = self.report()
-        with patch.dict(os.environ, self.env, clear=True), patch.object(guard, "free_pct", return_value=10.0), \
+        with patch.dict(os.environ, {**self.env, "LANES_SWEEP_ARCHIVE_GH": ""}, clear=True), \
+                patch.object(guard, "free_pct", return_value=10.0), \
                 patch.object(guard, "mount_points", return_value={mounted}):
             guard.sweep_retired_workspaces(SimpleNamespace(state=self.root), run, NOW, report, roots=[root])
         self.assertFalse(clean.exists())
-        self.assertFalse(dirty.exists())
+        self.assertTrue(dirty.exists())
+        self.assertEqual((dirty / "wip.txt").read_text(), "unsaved")
+        self.assertIn(f"kept workspace {dirty}: snapshot held (archive-credentials-unconfigured)", report["actions"])
         branches = subprocess.run(["git", "for-each-ref", "--format=%(refname)", "refs/heads/backup"],
                                   cwd=origin, env=self.env, capture_output=True, text=True).stdout.split()
         self.assertEqual(branches, [], "a retired-workspace snapshot is never a branch")
         backups = subprocess.run(["git", "for-each-ref", "--format=%(refname)", "refs/jovie-preserved/sweep/"],
                                  cwd=origin, env=self.env, capture_output=True, text=True).stdout.split()
-        self.assertEqual(len(backups), 1, report)
-        self.assertIn("/JOV-2-" + guard.datetime.fromtimestamp(NOW, guard.timezone.utc).strftime("%Y%m%d") + "-",
-                      backups[0])
-        shown = subprocess.run(["git", "show", f"{backups[0]}:wip.txt"], cwd=origin, env=self.env,
-                               capture_output=True, text=True).stdout
-        self.assertEqual(shown, "unsaved")
+        self.assertEqual(backups, [], "unverified work never falls back to source origin")
         self.assertTrue((orphan / "wip.txt").exists(), "unsaved work without a backup stays")
-        self.assertFalse((orphan / "node_modules").exists())
+        self.assertTrue((orphan / "node_modules").exists())
         self.assertTrue((plain / "notes.md").exists(), "a non-git dir cannot prove it holds no work")
         self.assertFalse((plain / "node_modules").exists())
         self.assertTrue((mounted / "a.txt").exists())
@@ -768,15 +767,13 @@ class RetiredHostLoopTest(unittest.TestCase):
                         "a live process keeps its whole workspace")
         # JOV-8270 acceptance: reclamation clears only inactive generated private
         # stores; live, mounted, protected and shared roots survive with their bytes.
-        files = subprocess.run(["git", "ls-tree", "-r", "--name-only", backups[0]],
-                              cwd=origin, env=self.env, capture_output=True, text=True).stdout.split()
-        self.assertIn("wip.txt", files)
-        self.assertIn(".symphony/package-cache/network-trace", files)
-        self.assertFalse([name for name in files if "pnpm-store" in name],
-                         "private cache bytes never reach a reclamation backup")
-        for workspace in (orphan, plain):
-            self.assertFalse((workspace / ".symphony/package-cache/pnpm-store").exists(),
-                             "a kept inactive workspace loses only regenerable bytes")
+        self.assertEqual((dirty / ".symphony/package-cache/network-trace").read_text(),
+                         "retain provenance", "held work retains its provenance in place")
+        for workspace in (dirty, orphan):
+            self.assertEqual((workspace / ".symphony/package-cache/pnpm-store/v10/blob").read_text(),
+                             "retired private cache", "an archive hold preserves the whole workspace")
+        self.assertFalse((plain / ".symphony/package-cache/pnpm-store").exists(),
+                         "an unverifiable inactive workspace loses only regenerable bytes")
         self.assertTrue((mounted / ".symphony/package-cache/pnpm-store/v10/blob").exists(),
                         "a mounted workspace survives whole, private store included")
         self.assertTrue((busy / ".symphony/package-cache/pnpm-store/v10/blob").exists(),
@@ -945,6 +942,42 @@ class GitHousekeepingTest(unittest.TestCase):
             git_housekeeping.remove_tree(target)
         self.assertEqual(target.read_text(), "keep")
         git_housekeeping.remove_tree(root)
+
+
+class LanesMountsTest(unittest.TestCase):
+    """JOV-10233: the state root and the bind-mounted worktree disk are different filesystems."""
+
+    def test_lowest_mount_decides_admission_and_sweep(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            (state / "worktrees").mkdir()
+            readings = {str(state): 22.6, str(state / "worktrees"): 0.0}
+            # This fixture owns only its two mounts. The host may still contain
+            # retired Symphony checkouts; do not enumerate those while checking
+            # admission for a synthetic disk reading.
+            with patch.object(guard, "retired_workspace_roots", return_value=[state / "retired"]), \
+                    patch.object(guard, "lanes_mounts", return_value=[state, state / "worktrees"]), \
+                    patch.object(guard, "free_pct", side_effect=lambda path: readings[str(path)]):
+                pct, rows = guard.lanes_free(state)
+                report = guard.check(SimpleNamespace(state=state, repo=state), run=ok)
+        self.assertEqual(pct, 0.0)
+        self.assertEqual({row["path"] for row in rows}, {str(state), str(state / "worktrees")})
+        self.assertTrue(report["critical"])
+        self.assertFalse(report["admitted"])
+        self.assertEqual(len(report["mounts"]), 2)
+
+    def test_mounts_are_deduplicated_by_device(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            (state / "runs").mkdir()
+            (state / "bindings" / "LYB" / "worktrees").mkdir(parents=True)
+            self.assertEqual(guard.lanes_mounts(state), [state])  # one tmpfs/dev: one row
+
+    def test_unreadable_state_root_is_unknown_not_free(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            with patch.object(guard, "free_pct", return_value=None):
+                self.assertEqual(guard.lanes_free(state)[0], None)
 
 
 if __name__ == "__main__":

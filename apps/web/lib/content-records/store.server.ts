@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, desc, eq, max } from 'drizzle-orm';
+import { and, desc, eq, gte, max } from 'drizzle-orm';
 import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
 import { db, doesTableExist } from '@/lib/db';
 import { runAtomicDbOperation } from '@/lib/db/legacy-transaction';
@@ -12,6 +12,7 @@ import { captureWarning } from '@/lib/error-tracking';
 import {
   type ContentKindDefinition,
   contentRecordCacheTag,
+  gateContentRecord,
   validateContentRecord,
 } from './kind';
 
@@ -200,7 +201,7 @@ export async function createContentVersion<T>(
     readonly note?: string | null;
   }
 ): Promise<ContentVersion> {
-  const validated = validateContentRecord(definition, input.key, input.data);
+  const validated = gateContentRecord(definition, input.key, input.data);
   if (!validated.ok) throw new ContentValidationError(validated.errors);
 
   const row = await runAtomicDbOperation(
@@ -463,4 +464,23 @@ export async function getContentHistory(
       createdAt: row.createdAt.toISOString(),
     })),
   };
+}
+
+/** Versions and pointer moves since `since`, for the stage feed. */
+export async function getContentStageRows(since: Date) {
+  const [versions, events] = await Promise.all([
+    db
+      .select()
+      .from(contentRecordVersions)
+      .where(gte(contentRecordVersions.createdAt, since))
+      .orderBy(desc(contentRecordVersions.createdAt))
+      .limit(2000),
+    db
+      .select()
+      .from(contentRecordEvents)
+      .where(gte(contentRecordEvents.createdAt, since))
+      .orderBy(desc(contentRecordEvents.createdAt))
+      .limit(2000),
+  ]);
+  return { versions, events };
 }

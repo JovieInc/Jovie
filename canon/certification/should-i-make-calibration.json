@@ -1,0 +1,13 @@
+{
+  "schema": "company.buyer-calibration/v1",
+  "note": "Known-bad walks must come out no_pay (at least 3) and the off-ICP control must be no_pay. A positive canary (known-good walk that should pay) is required before the buyer gate can open. Walk directories live in the private state dir; this file holds ids, labels and expected objection categories only.",
+  "holdouts": [
+    {
+      "id": "TODO-known-bad-1",
+      "expect": "no_pay",
+      "why": "TODO",
+      "walk": "TODO: run id"
+    }
+  ],
+  "positiveCanaries": []
+}

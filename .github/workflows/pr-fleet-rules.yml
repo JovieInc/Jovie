@@ -14,10 +14,22 @@ concurrency:
 jobs:
   fleet:
     name: PR Fleet Rules
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event_name == 'merge_group' && vars.MERGE_GATE_POOL == 'fixed' && fromJSON('["self-hosted","Linux","X64","jovie-fixed"]') || 'ubuntu-latest' }}
     # 3 min of work plus bounded quota holds (FLEET_RULES_QUOTA_HOLD_SECONDS, 120s).
     timeout-minutes: 6
     steps:
+      - name: Reset workspace git state (self-hosted)
+        if: runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          # Fixed runners reuse one workspace; a sparse checkout left by an earlier job hides files
+          # (.nvmrc, .github/scripts) from this full checkout (PR Fleet Rules merge_group 40908938908).
+          if [[ -d .git ]]; then
+            git sparse-checkout disable 2>/dev/null || true
+            git config --local --unset-all core.sparseCheckout 2>/dev/null || true
+            git config --local --unset-all core.sparseCheckoutCone 2>/dev/null || true
+            rm -f .git/info/sparse-checkout
+          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false

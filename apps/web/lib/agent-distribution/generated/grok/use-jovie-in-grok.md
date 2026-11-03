@@ -1,4 +1,4 @@
-<!-- generated: version 67ebd6d4eb40, tools/list 5d4c361dd8af47313af5a5f273b1bdea84b68e21e5099741df8d0f5cd90d5f94 -->
+<!-- generated: version f762d704e4a8, tools/list 87e4a522b0ed1415e0ca53e123958ef35b15b35f4eeff2fe72cc35d3cafe32f6 -->
 
 # Jovie in Grok
 
@@ -24,8 +24,8 @@ Server URL: `https://jov.ie/api/mcp`
 ## Tools
 
 - `artist.search_or_import`: Resolve a public Spotify/Apple artist identity or return ranked name candidates. Select an exact ID before drafting. Returns a private, seven-day draft_token; retain it for workspace.create_draft. Creates no account and does not publish.
-- `workspace.create_draft`: Create or resume an unpublished visibility draft using the exact artist_id and draft_token from artist.search_or_import. Retrying the same token resumes the same draft; a token for another artist is rejected. Never claims ownership, publishes or purchases.
-- `release.prepare_launch`: Resolve public release facts and create or resume an unpublished artist, release-page, and smart-link draft. Requires the draft capability. Returns only unresolved questions and never claims, publishes, or purchases.
+- `workspace.create_draft`: Create or resume an unpublished visibility draft using the exact artist_id and draft_token from artist.search_or_import. Retrying the same token resumes the same draft; a token for another artist is rejected. Returns claim_url: show it to the user so they can sign in on Jovie and claim the draft; the artist is matched to its Spotify identity and stays private until the user publishes. Never share draft_token. Never claims ownership, publishes or purchases.
+- `release.prepare_launch`: Resolve public release facts and create or resume an unpublished artist, release-page, and smart-link draft. Requires the draft capability. Returns only unresolved questions plus claim_url; when next_action is send_user_claim_url, show claim_url to the user so they can claim it on Jovie, where it stays private until they publish. Never claims, publishes, or purchases.
 
 ## Jovie in the xAI API
 

@@ -1,7 +1,7 @@
 import { Button } from '@jovie/ui';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { MarketingContainer, MarketingHeroPhoto } from '@/components/marketing';
+import { MarketingContainer } from '@/components/marketing';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_ROUTES } from '@/constants/routes';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
@@ -23,18 +23,10 @@ export const metadata: Metadata = {
 
 const AI_HERO_INNER_CLASS = 'relative z-3 py-16 sm:py-20 lg:py-24';
 
-const AI_HERO_PHOTO = {
-  src: '/images/marketing-hero/ai.webp',
-  width: 1600,
-  height: 1067,
-  opacity: 0.2,
-} as const;
-
 export default function AiPage() {
   return (
     <main className='marketing-hero-dock marketing-hero-dock--inset relative overflow-x-clip bg-base text-primary-token'>
       <section className='relative overflow-hidden'>
-        <MarketingHeroPhoto {...AI_HERO_PHOTO} />
         <div
           aria-hidden='true'
           className='hero-glow pointer-events-none absolute inset-0'
@@ -72,7 +64,7 @@ export default function AiPage() {
         <section className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
           <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
             {/* ui-casing-allow: marketing display headline */}
-            <h2 className='text-lg font-semibold line-clamp-2'>1. Identify</h2>
+            <h2 className='text-lg font-semibold line-clamp-2'>Identify</h2>
             <p className='mt-3 text-sm leading-7 text-secondary-token'>
               Recognize known visitors, captured contacts, and anonymous
               browsers with enough signal to personalize the page in real time.
@@ -80,7 +72,7 @@ export default function AiPage() {
           </article>
           <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
             {/* ui-casing-allow: marketing display headline */}
-            <h2 className='text-lg font-semibold line-clamp-2'>2. Decide</h2>
+            <h2 className='text-lg font-semibold line-clamp-2'>Decide</h2>
             <p className='mt-3 text-sm leading-7 text-secondary-token'>
               Route each visit toward the highest-value next action, whether
               that is listening, subscribing, tipping, merch, or tickets.
@@ -88,7 +80,7 @@ export default function AiPage() {
           </article>
           <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
             {/* ui-casing-allow: marketing display headline */}
-            <h2 className='text-lg font-semibold line-clamp-2'>3. Measure</h2>
+            <h2 className='text-lg font-semibold line-clamp-2'>Measure</h2>
             <p className='mt-3 text-sm leading-7 text-secondary-token'>
               Capture impressions, clicks, and downstream value events so
               creators can see what turns traffic into real relationships.
@@ -96,7 +88,7 @@ export default function AiPage() {
           </article>
           <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
             {/* ui-casing-allow: marketing display headline */}
-            <h2 className='text-lg font-semibold line-clamp-2'>4. Learn</h2>
+            <h2 className='text-lg font-semibold line-clamp-2'>Learn</h2>
             <p className='mt-3 text-sm leading-7 text-secondary-token'>
               Use those outcomes to improve routing, segmentation, and follow-up
               automation across future visits.
