@@ -828,6 +828,60 @@ test('outer cancellation stops all concurrent preflight command groups', {
   }
 });
 
+test('actual preflight CLI exports logical GitHub base and qualified CI base to downstream guards', () => {
+  const repo = baseFixtureRepo('consumer-env');
+  try {
+    mkdirSync(path.join(repo, 'scripts/lib'), { recursive: true });
+    writeFileSync(path.join(repo, '.gitignore'), 'scripts/\nnode_modules/\n');
+    gitIn(repo, ['add', '.gitignore']);
+    gitIn(repo, ['commit', '-m', 'ignore fixture consumers']);
+    gitIn(repo, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    commitOnFeature(repo, 'changed.txt');
+    writeFileSync(
+      path.join(repo, 'scripts/ci-fast-lanes.mjs'),
+      `
+export const selectSourceGuards = () => [{
+  id: 'base-env-probe',
+  command: 'git rev-parse --verify "origin/$GITHUB_BASE_REF" && test "$GITHUB_BASE_REF" = main && test "$CI_BASE_REF" = "$EXPECTED_CI_BASE"'
+}];
+`
+    );
+    writeFileSync(
+      path.join(repo, 'scripts/lib/source-validation-manifest.mjs'),
+      "export const selectManifestGuards = (paths, base) => [{ id: 'manifest-base-probe', name: 'manifest base branch', command: 'test ' + base + ' = main && git rev-parse --verify origin/' + base }];\n"
+    );
+    /** @type {NodeJS.ProcessEnv} */
+    const env = { ...process.env, JOVIE_PREFLIGHT_LEDGER: 'off' };
+    delete env.NODE_TEST_CONTEXT;
+    delete env.JOVIE_PR_BODY_FILE;
+    for (const base of ['main', 'origin/main', 'refs/remotes/origin/main']) {
+      const result = spawnSync(
+        process.execPath,
+        [
+          path.join(import.meta.dirname, 'preflight-changed.mjs'),
+          '--repo',
+          repo,
+          '--base',
+          base,
+        ],
+        {
+          cwd: repo,
+          encoding: 'utf8',
+          env: {
+            ...env,
+            EXPECTED_CI_BASE: base === 'main' ? 'origin/main' : base,
+          },
+        }
+      );
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      assert.match(result.stdout, /ok +source guard base-env-probe/);
+      assert.match(result.stdout, /ok +manifest base branch/);
+    }
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
 test('private data guard uses an absolute XDG cache when home is unavailable', async () => {
   const root = mkdtempSync(path.join(tmpdir(), 'preflight-xdg-'));
   try {
