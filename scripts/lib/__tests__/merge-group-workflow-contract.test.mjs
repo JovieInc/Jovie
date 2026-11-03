@@ -3343,7 +3343,15 @@ ${selectedGateScript}`,
       'node scripts/lib/merge-group-member-policy.mjs --policy=size'
     );
     expect(sizeGuard).toContain('--filter=blob:limit=1g');
-    expect(sizeGuard).not.toContain('--filter=blob:none');
+    expect(sizeGuard).toContain(
+      'git fetch --refetch --filter=blob:none --no-tags --depth=2 origin "$GROUP_HEAD"'
+    );
+    expect(sizeGuard).not.toContain(
+      'git fetch --refetch --filter=blob:limit=1g --no-tags --depth=2'
+    );
+    expect(sizeGuard).toContain(
+      'node scripts/lib/merge-group-local-evidence.mjs || true'
+    );
     expect(MEMBER_POLICY).toContain('await enforceCombinedTreePayload({');
     expect(MEMBER_POLICY).toContain('/git/trees/${treeSha}?recursive=1');
     expect(MEMBER_POLICY).not.toContain("from 'node:child_process'");
@@ -3559,7 +3567,7 @@ ${selectedGateScript}`,
     expect(Object.keys(privateGuard.jobs)).toEqual(['guard']);
     expect(privateGuard.jobs.guard.permissions).toEqual({ contents: 'read' });
     expect(privateGuard.jobs.guard.uses).toBe(
-      'JovieInc/ci/.github/workflows/private-data-guard.yml@315c327e822e328e01c0e8f50d4e6b14db86af2c'
+      'JovieInc/ci/.github/workflows/private-data-guard.yml@a26a5e2b62ec427b4d1bf465662adac0627b5102'
     );
     expect(privateGuardSource).not.toMatch(
       /secrets\.[A-Z0-9_]+|secrets:\s*inherit/
