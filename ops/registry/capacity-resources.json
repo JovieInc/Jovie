@@ -559,32 +559,6 @@
       }
     },
     {
-      "id": "neon-storage-connections",
-      "group": "database",
-      "host": "cloud",
-      "label": "Neon storage and connections",
-      "unit": "count",
-      "collector": {
-        "type": "none",
-        "note": "Neon MCP needs auth (mcp__Neon__authenticate); use API key from Doppler in collector"
-      },
-      "hardLimit": "plan-dependent: verify",
-      "atLimit": {
-        "effect": "crash",
-        "note": "writes fail at storage cap; connection errors at the pool cap"
-      },
-      "leadTimeHours": 72,
-      "mode": "trend",
-      "fix": {
-        "auto": [],
-        "escalate": {
-          "options": [],
-          "default": "wire collector, then forecast",
-          "deadlineHours": 72
-        }
-      }
-    },
-    {
       "id": "supabase-storage-connections",
       "group": "database",
       "host": "cloud",
@@ -814,6 +788,180 @@
         "escalate": {
           "options": [],
           "default": "wire collector, then forecast",
+          "deadlineHours": 72
+        }
+      }
+    },
+    {
+      "id": "neon-compute-hours",
+      "group": "database",
+      "host": "cloud",
+      "label": "Neon compute CU-hours this month (Launch includes 300)",
+      "unit": "cu-hours",
+      "collector": {
+        "type": "neon",
+        "orgId": "org-soft-darkness-40519110",
+        "metric": "compute-hours",
+        "limit": 300
+      },
+      "atLimit": {
+        "effect": "crash",
+        "note": "overage billed per CU-hour; the org spend alert fires"
+      },
+      "leadTimeHours": 24,
+      "mode": "level",
+      "warnFrac": 0.7,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "find the top consumer and cut it; plan upgrade is spend, Tim decides",
+          "deadlineHours": 24
+        }
+      }
+    },
+    {
+      "id": "neon-egress-gb",
+      "group": "database",
+      "host": "cloud",
+      "label": "Neon public egress GB this month (Launch includes 100)",
+      "unit": "GB",
+      "collector": {
+        "type": "neon",
+        "orgId": "org-soft-darkness-40519110",
+        "metric": "egress-gb",
+        "limit": 100
+      },
+      "atLimit": {
+        "effect": "crash",
+        "note": "overage billed per GB"
+      },
+      "leadTimeHours": 24,
+      "mode": "level",
+      "warnFrac": 0.7,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "find the top consumer and cut it; plan upgrade is spend, Tim decides",
+          "deadlineHours": 24
+        }
+      }
+    },
+    {
+      "id": "neon-branches",
+      "group": "database",
+      "host": "cloud",
+      "label": "Neon branches in Jovie-Primary (Launch includes 10)",
+      "unit": "count",
+      "collector": {
+        "type": "neon",
+        "orgId": "org-soft-darkness-40519110",
+        "metric": "branches",
+        "projectId": "curly-dew-35158967",
+        "limit": 10
+      },
+      "atLimit": {
+        "effect": "crash",
+        "note": "extra branches billed hourly; CI branch leak signal"
+      },
+      "leadTimeHours": 2,
+      "mode": "level",
+      "warnFrac": 0.7,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "run the Neon branch reaper; CI branches must set suspend timeout and expire",
+          "deadlineHours": 2
+        }
+      }
+    },
+    {
+      "id": "neon-spend",
+      "group": "database",
+      "host": "cloud",
+      "label": "Neon est. month-to-date overage USD vs the $70 spend notification",
+      "unit": "usd",
+      "collector": {
+        "type": "neon",
+        "orgId": "org-soft-darkness-40519110",
+        "metric": "spend-usd",
+        "limit": 70,
+        "rates": {
+          "includedCuHours": 300,
+          "includedEgressGb": 100,
+          "cuHourUsd": 0.106,
+          "egressGbUsd": 0.1,
+          "extraBranchHourUsd": 0.002
+        }
+      },
+      "atLimit": {
+        "effect": "bill",
+        "note": "Neon emails at 100% and keeps billing"
+      },
+      "leadTimeHours": 72,
+      "mode": "level",
+      "warnFrac": 0.5,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "find the top consumer and cut it; plan upgrade is spend, Tim decides",
+          "deadlineHours": 72
+        }
+      }
+    },
+    {
+      "id": "resend-daily",
+      "group": "email",
+      "host": "cloud",
+      "label": "Resend emails today (free plan 100/day)",
+      "unit": "count",
+      "collector": {
+        "type": "resend",
+        "window": "day",
+        "limit": 100
+      },
+      "atLimit": {
+        "effect": "deny",
+        "note": "sends are rejected until midnight UTC: sign-in codes and receipts stop"
+      },
+      "leadTimeHours": 1,
+      "mode": "level",
+      "warnFrac": 0.5,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "find the sender by from/subject/tag; synthetic and operational mail must not use the transactional stream",
+          "deadlineHours": 1
+        }
+      }
+    },
+    {
+      "id": "resend-monthly",
+      "group": "email",
+      "host": "cloud",
+      "label": "Resend emails this month (free plan 3000/month)",
+      "unit": "count",
+      "collector": {
+        "type": "resend",
+        "window": "month",
+        "limit": 3000
+      },
+      "atLimit": {
+        "effect": "deny",
+        "note": "sends are rejected until the month rolls"
+      },
+      "leadTimeHours": 72,
+      "mode": "level",
+      "warnFrac": 0.7,
+      "fix": {
+        "auto": [],
+        "escalate": {
+          "options": [],
+          "default": "find the top consumer and cut it; plan upgrade is spend, Tim decides",
           "deadlineHours": 72
         }
       }

@@ -36,6 +36,9 @@ name: Auto-Ready Agent Drafts
 on:
   workflow_run:
     workflows: ['Source Validation']
+    # Same-repo PR heads only (the job requires event pull_request/pull_request_target):
+    # main pushes and merge-group refs only produced skipped runs.
+    branches-ignore: [main, 'gh-readonly-queue/**']
     types: [completed]
   workflow_dispatch:
     inputs:
