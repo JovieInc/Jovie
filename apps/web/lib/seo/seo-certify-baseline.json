@@ -32,14 +32,6 @@
     "/cli": ["copy:copy-lint", "geo:geo-sibling-links"],
     "/compare": ["copy:copy-lint"],
     "/compare/linktree": ["geo:geo-last-updated", "geo:geo-sibling-links"],
-    "/demo/video": [
-      "agentic:server-rendered-content",
-      "agentic:structured-data"
-    ],
-    "/demovideo": [
-      "agentic:server-rendered-content",
-      "agentic:structured-data"
-    ],
     "/developers": ["geo:geo-jsonld-type"],
     "/download": ["geo:geo-jsonld-type", "geo:geo-sibling-links"],
     "/engineering": [

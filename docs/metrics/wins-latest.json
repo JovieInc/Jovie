@@ -1,14 +1,14 @@
 {
   "schema": "jovie.wins-metrics/v1",
-  "at": "2026-11-03T09:20:06.466Z",
-  "winsTotal": 30,
+  "at": "2026-11-03T15:32:35.314Z",
+  "winsTotal": 33,
   "winsVerified": 1,
-  "winsClaimed": 14,
+  "winsClaimed": 15,
   "winsUnverified": 3,
   "winsNotReproduced": 1,
   "winsPendingMerge": 4,
-  "winsPendingMeasure": 7,
-  "winsLast7d": 30,
+  "winsPendingMeasure": 9,
+  "winsLast7d": 33,
   "clusters": [
     {
       "theme": "release-reliability",
@@ -60,7 +60,7 @@
     },
     {
       "theme": "golden-path",
-      "total": 1,
+      "total": 2,
       "verified": 0,
       "ready": false
     },
@@ -72,6 +72,18 @@
     },
     {
       "theme": "neon-egress",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "false-green",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "ovie-home",
       "total": 1,
       "verified": 0,
       "ready": false
@@ -196,6 +208,18 @@
     },
     {
       "id": "win-2026-10-31-certification-ingest-reads-the-6-5",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-31-the-shared-outcome-verifier-rejects-all",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-31-sign-up-in-the-claim-chat",
+      "status": "pending-measure"
+    },
+    {
+      "id": "win-2026-10-31-ovie-home-in-flight-done-today",
       "status": "pending-measure"
     }
   ]
