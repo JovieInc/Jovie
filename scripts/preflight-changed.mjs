@@ -72,6 +72,12 @@ export const NARROWED = {
 /** Generators whose output must be committed. `write` rewrites, `check` verifies. */
 export const GENERATORS = [
   {
+    id: 'artist-launch-inventory',
+    when: /^apps\/web\/app\/|^scripts\/artist-launch-|^docs\/product\/generated\/artist-launch-inventory\.json$/,
+    write: 'node scripts/artist-launch-contract.mjs --write',
+    check: 'node scripts/artist-launch-contract.mjs --check',
+  },
+  {
     id: 'workflow-topology',
     when: /^\.github\/workflows\/[^/]+\.ya?ml$|^scripts\/ci-workflow-topology\.mjs$/,
     write: 'node scripts/ci-workflow-topology.mjs --write',
@@ -198,11 +204,36 @@ const git = (cwd, args) => {
   return r.status === 0 ? r.stdout.trim() : '';
 };
 
-/** Changed files vs the merge-base, including uncommitted and untracked. */
+/**
+ * Ref names to try for a diff base (JOV-10351). A bare branch name resolves
+ * to its remote-tracking ref first, then the local branch; a name that is
+ * already qualified (origin/main, refs/...) is never prefixed again.
+ * @returns {string[]}
+ */
+export function baseRefCandidates(base) {
+  const b = base.trim();
+  if (/^(?:origin\/|refs\/)/.test(b)) return [b];
+  return [`origin/${b}`, b];
+}
+
+/**
+ * The first candidate that names a commit, or null when none does. Callers
+ * must fail on null instead of treating it as 'no changes' (JOV-10351).
+ * @returns {string|null}
+ */
+export function resolveBaseRef(cwd, base) {
+  for (const candidate of baseRefCandidates(base))
+    if (git(cwd, ['rev-parse', '--verify', '--quiet', `${candidate}^{commit}`]))
+      return candidate;
+  return null;
+}
+
+/** Changed files vs the merge-base, including uncommitted and untracked.
+ *  `base` must be a ref that resolves to a commit (see resolveBaseRef). */
 export function changedFiles(cwd, base) {
   const mb =
-    git(cwd, ['merge-base', `origin/${base}`, 'HEAD']) ||
-    git(cwd, ['rev-parse', `origin/${base}`]);
+    git(cwd, ['merge-base', base, 'HEAD']) || git(cwd, ['rev-parse', base]);
+  if (!mb) return { mergeBase: '', files: [] };
   /** @type {{filename:string, previous_filename:string|undefined, status:string, patch:string}[]} */
   const rows = git(cwd, ['diff', '--name-status', '-M', mb])
     .split('\n')
@@ -379,8 +410,10 @@ export function typecheckTargets(files, cwd) {
     if (web) {
       out.add(isTest ? 'web-tests' : 'web');
       if (!isTest) {
-        // Source changes also affect test consumers and Ovie's TS graph.
+        // App, test and story projects have separate includes. Prop changes
+        // can break stories even when both the app and test projects compile.
         out.add('web-tests');
+        out.add('web-stories');
         out.add('pkg:@jovie/ovie');
       }
     } else if (/^scripts\//.test(f.filename)) out.add('scripts');
@@ -417,6 +450,8 @@ function typecheckCommand(target, cwd) {
     return `cd apps/web && ${cap} pnpm exec node ../../scripts/typecheck-singleflight.mjs -- tsc -p tsconfig.typecheck.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo`;
   if (target === 'web-tests')
     return `cd apps/web && ${cap} node ../../scripts/typecheck-singleflight.mjs -- node ../../scripts/typecheck-web-tests.mjs`;
+  if (target === 'web-stories')
+    return `cd apps/web && ${cap} node ../../scripts/typecheck-singleflight.mjs -- node ../../scripts/typecheck-web-stories.mjs`;
   if (target === 'scripts') return `${cap} pnpm typecheck:scripts`;
   return `${cap} pnpm --filter ${target.slice(4)} run typecheck`;
 }
@@ -452,21 +487,40 @@ export async function main({
   });
   if (pinned.status === 0 && pinned.stdout.trim())
     childEnv.PATH = `${pinned.stdout.trim()}:${childEnv.PATH}`;
+  // Fetch the remote branch under its unqualified name; a base that arrives
+  // already remote-qualified (origin/main) maps back to 'main' (JOV-10351).
+  spawnSync(
+    'git',
+    ['fetch', '--no-tags', '-q', 'origin', args.base.replace(/^origin\//, '')],
+    { cwd }
+  );
+  const baseRef = resolveBaseRef(cwd, args.base);
+  if (!baseRef) {
+    log(
+      `[preflight:changed] base ref '${args.base}' does not resolve to a commit (tried ${baseRefCandidates(args.base).join(', ')}); run 'git fetch origin' or pass an existing branch as --base`
+    );
+    return 1;
+  }
   Object.assign(childEnv, {
     NODE_OPTIONS: `--max-old-space-size=${HEAP_MB}`,
     GITHUB_BASE_REF: args.base,
     GITHUB_EVENT_NAME: 'pull_request',
-    CI_BASE_REF: `origin/${args.base}`,
+    CI_BASE_REF: baseRef,
     // Copied guards compare their module URL to argv[1]; macOS /var -> /private/var
     // aliases turn their real checks into silent no-ops or false reds.
     TMPDIR: realpathSync(env.TMPDIR || tmpdir()),
   });
-  spawnSync('git', ['fetch', '--no-tags', '-q', 'origin', args.base], { cwd });
-  const { mergeBase, files } = changedFiles(cwd, args.base);
+  const { mergeBase, files } = changedFiles(cwd, baseRef);
+  if (!mergeBase) {
+    log(
+      `[preflight:changed] git could not compute a diff base against ${baseRef}; failing instead of reporting 'no changes'`
+    );
+    return 1;
+  }
   childEnv.SHADCN_LINT_DIFF_BASE = mergeBase;
   const paths = files.map(f => f.filename);
   if (!paths.length) {
-    log('[preflight:changed] no changes vs origin/' + args.base);
+    log(`[preflight:changed] no changes vs ${baseRef}`);
     return 0;
   }
   const readFile = p => {
@@ -550,9 +604,9 @@ export async function main({
     );
 
   // Merge-with-base: Source Validation judges the merged tree. Warn-only.
-  add('merge-base', 'merges cleanly with origin/' + args.base, async () => {
+  add('merge-base', 'merges cleanly with ' + baseRef, async () => {
     const r = await sh(
-      `git merge-tree --write-tree --name-only origin/${args.base} HEAD`,
+      `git merge-tree --write-tree --name-only ${baseRef} HEAD`,
       { cwd, env: childEnv, timeoutMs: 60_000 }
     );
     if (r.code === 0) return r;
@@ -560,7 +614,7 @@ export async function main({
     return {
       ...r,
       code: 0,
-      warn: `does not merge cleanly with origin/${args.base}; resolve before pushing${conflicts.length ? `: ${conflicts.join(', ')}` : ''}`,
+      warn: `does not merge cleanly with ${baseRef}; resolve before pushing${conflicts.length ? `: ${conflicts.join(', ')}` : ''}`,
     };
   });
 
@@ -587,7 +641,7 @@ export async function main({
     cmd(
       'migration',
       'Migration Guard',
-      `cd apps/web && ./scripts/check-migrations.sh origin/${args.base} && ./scripts/validate-migrations.sh && pnpm exec tsx scripts/online-index-migrate.ts --validate-only`
+      `cd apps/web && ./scripts/check-migrations.sh ${baseRef} && ./scripts/validate-migrations.sh && pnpm exec tsx scripts/online-index-migrate.ts --validate-only`
     );
     add('migration-lint', 'migration SQL lint (squawk)', async () => {
       const r = await sh(

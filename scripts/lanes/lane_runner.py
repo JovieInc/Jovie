@@ -869,9 +869,10 @@ def admission_order(issue: Issue, now: float) -> tuple:
     labels = {label.lower() for label in issue.labels}
     tier = (-1 if {SHARED_LABEL, "dispatch-next"} <= labels
             else 0 if effective_priority == 1 or workstreams.compounding(stream) else 1)
-    # Summer's signed portfolio rank is the first key, then explicit Urgent, tier, aged priority, age (JOV-7073).
+    # Summer's signed rank comes first, then Urgent, marketing, tier, aged priority, age (JOV-7073).
     return (*priority_admission.claim_key(issue.identifier, priority_admission.summer_ranks(now=now)),
-            0 if priority == 1 else 1, tier, effective_priority, workstreams.rank(stream),
+            0 if priority == 1 else 1, not priority_admission.marketing_priority(issue.labels),
+            tier, effective_priority, workstreams.rank(stream),
             created_at if created_at is not None else float("inf"))
 
 
@@ -5101,6 +5102,14 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
         if last.get("main") == main or publication_revocation(host, pr.get("headRefName")) \
                 or claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
             continue
+        # Comment transport is not a verified Dependabot source generation.
+        # Keep a same-head request pending across main changes, including legacy
+        # receipts that mistook successful comment posting for recreation.
+        if dependabot and last.get("head") == pr["headRefOid"] \
+                and last.get("action") == "dependabot-recreate" \
+                and (last.get("requested") or last.get("ok")):
+            continue
+        requested = False
         # A held PR (preservation hold, live repair) is not a revisit: it took one of the few
         # per-pass slots and was ledgered as revisit-failed without any GitHub call (~334/day).
         if not dependabot and pr.get("mergeStateStatus") != "DIRTY" and pr_events.maintenance_hold(
@@ -5110,7 +5119,9 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
             action = "dependabot-recreate"
             result = sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG,
                          "--body", "@dependabot recreate"])
-            ok = result.returncode == 0
+            requested = result.returncode == 0
+            # Only observed new source can release terminal-generation fences.
+            ok = False
         elif pr.get("mergeStateStatus") == "DIRTY":
             action = "partial-main-sync"
             ok = partial_main_sync(host, pr) is not None
@@ -5123,6 +5134,8 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
                 if label in present:
                     sh(["gh", "api", "-X", "DELETE", f"repos/{REPO_SLUG}/issues/{pr['number']}/labels/{label}"])
         visit = {"at": now, "head": pr["headRefOid"], "main": main, "action": action, "ok": ok}
+        if dependabot:
+            visit["requested"] = requested
         update_json(path, lambda rows, key=str(pr["number"]), visit=visit: rows.update({key: visit}))
         pr_events.ledger(host, {"schema": "jovie-lane-run/v1", "kind": "terminal-revisit", "origin": AUTONOMOUS_ORIGIN,
                                 "attribution": {"category": "finalizer-only", "provider": "lane-event"},
@@ -10113,6 +10126,20 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
         except Exception as error:  # the sweep never takes dispatch down
             tick["worktreeSweep"] = f"{type(error).__name__}: {error}"[:200]
         if not tick["disk"].get("admitted"):
+            if not os.environ.get("LANES_SELFTEST"):
+                try:
+                    # Drain the Linear outbox even on a denied tick (JOV-10355, four recurrences):
+                    # the outbox is the doctor's own reporting channel — the writes that raise
+                    # and clear the disk condition travel through it — and starving it during a
+                    # disk emergency blinds the board exactly then. The flush is bounded
+                    # (FLUSH_LIMIT/FLUSH_BUDGET_S) and writes only small state JSONs on the
+                    # state root, never the worktree volume that is full; `admit` here is the
+                    # Linear client's rate budget, not disk admission.
+                    client = Linear(host.linear_env)
+                    tick["linearSync"] = {"outbox": linear_sync.flush(host.state, client, client.admit,
+                                                                     (LinearRateLimited,))}
+                except (Exception, SystemExit) as error:
+                    tick["linearSyncError"] = f"{type(error).__name__}: {error}"[:200]
             raise DiskAdmissionError(tick["disk"].get("reason", "disk-unobservable"))
         ensure_full_history(host)
         if not os.environ.get("LANES_SELFTEST"):

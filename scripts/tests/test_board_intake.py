@@ -1,10 +1,12 @@
 """Board intake: the lanes claim codex board work, hand it to lanes intake, close on verified outcomes."""
 import json
+import multiprocessing
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
 import board_intake as bi  # noqa: E402
@@ -144,6 +146,78 @@ class TickTest(unittest.TestCase):
         rows = [json.loads(l) for l in (self.state / "runs/board-intake.jsonl").read_text().splitlines()]
         self.assertTrue(all(r["claimedEpoch"] - r["postedEpoch"] == 600 for r in rows))
 
+    def test_repair_backlog_does_not_consume_new_work_claim_budget(self):
+        repairs = [task(f"stall-jovie-{n}-aaaaaaa-a1") for n in range(1, 21)]
+        goals = [task(f"goal-{n}") for n in range(7)]
+        hub = FakeHub([*goals, *repairs])
+        linear = FakeLinear()
+        with patch.object(bi, "MAX_CLAIMS_PER_TICK", 5):
+            receipt = self.run_tick(hub, linear)
+        self.assertEqual(len(receipt["claimed"]), 25)
+        self.assertTrue(all(t["id"] in receipt["claimed"] for t in repairs))
+        self.assertEqual(len(linear.created), 5)
+        self.assertEqual(receipt["repairClaimed"], 20)
+        self.assertEqual(receipt["newWorkClaimed"], 5)
+
+    def test_repair_claims_continue_when_new_work_budget_is_zero(self):
+        hub = FakeHub([task("goal-x"), task("stall-jovie-1-aaaaaaa-a1")])
+        with patch.object(bi, "MAX_CLAIMS_PER_TICK", 0):
+            receipt = self.run_tick(hub, FakeLinear())
+        self.assertEqual(receipt["claimed"], ["stall-jovie-1-aaaaaaa-a1"])
+
+    def test_one_claim_per_repo_pr_across_repeated_fingerprints(self):
+        hub = FakeHub([task("stall-jovie-1-aaaaaaa-a1"), task("stall-jovie-1-bbbbbbb-a2"),
+                       task("stall-logyourbody-1-ccccccc-a1")])
+        receipt = self.run_tick(hub, FakeLinear())
+        self.assertEqual(receipt["claimed"], ["stall-jovie-1-aaaaaaa-a1", "stall-logyourbody-1-ccccccc-a1"])
+        self.assertEqual([t["id"] for t in hub.ops("claim")], receipt["claimed"])
+        rows = [json.loads(line) for line in (self.state / "runs/board-intake.jsonl").read_text().splitlines()]
+        self.assertEqual({(r["repo"], r["number"]) for r in rows},
+                         {("JovieInc/Jovie", 1), ("JovieInc/LogYourBody", 1)})
+
+    def test_existing_pr_claim_fences_new_repair_task_until_verified_outcome(self):
+        hub = FakeHub([task("stall-jovie-1-aaaaaaa-a1")])
+        self.run_tick(hub, FakeLinear())
+        hub.tasks["stall-jovie-1-bbbbbbb-a2"] = task("stall-jovie-1-bbbbbbb-a2")
+        receipt = self.run_tick(hub, FakeLinear(), gh=gh_with({1: "OPEN"}), now=NOW + 60)
+        self.assertEqual(receipt["claimed"], [])
+        self.assertEqual(len(hub.ops("claim")), 1)
+
+    def test_overlapping_process_yields_before_reading_or_claiming_board_tasks(self):
+        ctx = multiprocessing.get_context("fork")
+        entered, release = ctx.Event(), ctx.Event()
+        receiver, sender = ctx.Pipe(duplex=False)
+        tasks = [task("stall-jovie-1-aaaaaaa-a1"), task("stall-jovie-1-bbbbbbb-a2")]
+
+        def first_tick():
+            hub = FakeHub(tasks)
+
+            def paused(method, path, body=None):
+                if path.startswith("/v1/board?"):
+                    entered.set()
+                    if not release.wait(10):
+                        raise RuntimeError("test release missing")
+                return hub(method, path, body)
+            sender.send(bi.tick(self.state, FakeLinear(), now=NOW, call=paused, gh=gh_with({})))
+
+        first = ctx.Process(target=first_tick)
+        first.start()
+        try:
+            self.assertTrue(entered.wait(10))
+            hub = FakeHub(tasks)
+            second = self.run_tick(hub, FakeLinear())
+            self.assertEqual(second["deferred"], "active-intake")
+            self.assertEqual(second["claimed"], [])
+            self.assertEqual(hub.calls, [])
+        finally:
+            release.set()
+            first.join(10)
+        self.assertEqual(first.exitcode, 0)
+        self.assertTrue(receiver.poll(1))
+        self.assertEqual(receiver.recv()["claimed"], ["stall-jovie-1-aaaaaaa-a1"])
+        held = json.loads((self.state / "board-intake.json").read_text())["tasks"]
+        self.assertEqual(list(held), ["stall-jovie-1-aaaaaaa-a1"])
+
     def test_hourly_reposts_of_one_goal_share_one_issue(self):
         hub = FakeHub([task("goal-mq-merge-rate-2026110201"), task("goal-mq-merge-rate-2026110202")])
         linear = FakeLinear()
@@ -184,7 +258,8 @@ class TickTest(unittest.TestCase):
                       + [task("stall-jovie-9-aaaaaaa-a1"), task("stall-jovie-8-bbbbbbb-a2")])
         receipt = self.run_tick(hub, FakeLinear())
         self.assertEqual(receipt["claimed"][:2], ["stall-jovie-9-aaaaaaa-a1", "stall-jovie-8-bbbbbbb-a2"])
-        self.assertEqual(len(receipt["claimed"]), bi.MAX_CLAIMS_PER_TICK)
+        self.assertEqual(len(receipt["claimed"]), bi.MAX_CLAIMS_PER_TICK + 2)
+        self.assertEqual(receipt["newWorkClaimed"], bi.MAX_CLAIMS_PER_TICK)
         self.assertNotIn("goal-y", receipt["claimed"])
 
     def test_a_held_stuck_pr_gets_its_lanes_repair_label_once(self):
