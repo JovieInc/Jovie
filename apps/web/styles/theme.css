@@ -45,17 +45,29 @@
   font-display: swap;
 }
 
-/* Provider-owned colors, proportions and artwork are branded exceptions. */
+/* Provider-owned colors and artwork are branded exceptions; geometry and type
+   are shared so stacked provider buttons always match. Apple HIG allows a
+   custom white button with the Apple logo and "Continue with Apple" wording. */
 .auth-provider-button {
   display: flex;
   position: relative;
   align-items: center;
-  min-height: max(44px, 3.1429em);
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 1px solid var(--auth-provider-outline);
+  border-radius: var(--radius-md);
   --auth-provider-paper: #fff;
-  --auth-provider-ink: #000;
+  --auth-provider-ink: #1f1f1f;
+  --auth-provider-outline: #747775;
   background: var(--auth-provider-paper);
   color: var(--auth-provider-ink);
+  overflow: hidden;
   overflow-wrap: anywhere;
+  font:
+    500 0.875rem / 1.4286 "Auth Google Sans",
+    system-ui,
+    sans-serif;
 }
 
 /* Hydration disables the control so a click cannot no-op. That wait is not
@@ -65,40 +77,16 @@
   opacity: 1;
 }
 
-.auth-provider-button[data-auth-provider-slot="apple"] {
-  /* round() keeps the em-scaled height on integer CSS px: at 19px text the
-     raw 2.32em is 44.078125px, whose sub-pixel flow residue clips controls
-     past the viewport edge at 200% zoom (toBeInViewport ratio: 1). */
-  min-height: max(44px, round(2.32em, 1px));
-  border-radius: 6px;
-  overflow: hidden;
-  padding-right: 12px;
-  font:
-    400 1.1875rem / 1.15 system-ui,
-    sans-serif;
-}
-
-.auth-provider-button[data-auth-provider-slot="apple"] img {
-  width: auto;
-  height: round(2.32em, 1px);
-  flex-shrink: 0;
-}
-
-.auth-provider-button[data-auth-provider-slot="google"] {
-  gap: 10px;
-  padding: 6px 12px;
-  border: 1px solid #747775;
-  border-radius: 4px;
-  --auth-provider-ink: #1f1f1f;
-  font:
-    500 0.875rem / 1.4286 "Auth Google Sans",
-    sans-serif;
-}
-
-.auth-provider-button[data-auth-provider-slot="google"] img {
+.auth-provider-button img {
   width: 20px;
   height: 20px;
   flex-shrink: 0;
+}
+
+/* The Apple artwork is a 24x44 padded glyph; crop it to the shared 20px icon box. */
+.auth-provider-button[data-auth-provider-slot="apple"] img {
+  object-fit: none;
+  object-position: center;
 }
 
 .auth-form-stack-offset {

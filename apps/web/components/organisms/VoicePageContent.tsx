@@ -6,22 +6,18 @@ import { APP_ROUTES } from '@/constants/routes';
 
 export const VOICE_PAGE_STEPS = [
   {
-    n: '01',
     title: 'Link your clip',
     desc: 'Paste any public YouTube URL or upload a 60–90s voice sample. We extract clean audio.',
   },
   {
-    n: '02',
     title: 'Consent & start train',
     desc: 'Review the ElevenLabs consent flow. One click starts the async job. Webhook notifies when ready.',
   },
   {
-    n: '03',
     title: 'Review your model',
     desc: 'Listen to test generations. Approve or re-train with better source. You own the model.',
   },
   {
-    n: '04',
     title: 'Use it everywhere',
     desc: 'Generate voice replies, radio drops, and promo audio directly from your Jovie dashboard or API.',
   },
@@ -78,8 +74,7 @@ export function VoicePageContent() {
       >
         <MarketingContainer width='page'>
           <div className='mx-auto max-w-3xl text-center'>
-            <p className='homepage-section-eyebrow'>Four steps</p>
-            <h2 className='mt-3 text-2xl font-semibold tracking-tight text-primary-token'>
+            <h2 className='text-balance text-2xl font-semibold tracking-tight text-primary-token'>
               Your Voice. Trained. Ready.
             </h2>
             <p className='mt-3 text-mid leading-7 text-secondary-token'>
@@ -91,13 +86,10 @@ export function VoicePageContent() {
           <div className='mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
             {VOICE_PAGE_STEPS.map(step => (
               <article
-                key={step.n}
+                key={step.title}
                 className='rounded-3xl border border-subtle bg-base p-6'
               >
-                <div className='text-xs font-mono tracking-widest text-tertiary-token'>
-                  {step.n}
-                </div>
-                <h3 className='mt-3 text-lg font-semibold text-primary-token'>
+                <h3 className='text-balance text-lg font-semibold text-primary-token'>
                   {step.title}
                 </h3>
                 <p className='mt-2 text-sm leading-6 text-secondary-token'>

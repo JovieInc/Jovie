@@ -1,16 +1,21 @@
 import type { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { verifyCronRequest } from '@/lib/cron/auth';
 import {
   handleCronEvidencePost,
   jsonResponse,
 } from '@/lib/cron/evidence-route';
 import {
+  certifiedProdGoldenPathSurfaces,
+  PROD_GOLDEN_PATH_CERTIFICATION_MAX_AGE_MS,
   PROD_GOLDEN_PATH_RECEIPT_SCHEMA,
   PROD_GOLDEN_PATH_STATUSES,
   PROD_GOLDEN_PATH_SURFACE_IDS,
   ProdGoldenPathPersistenceError,
   type ProdGoldenPathReceipt,
+  readProdGoldenPathLedger,
   recordProdGoldenPathRun,
+  recordQualityContractObservations,
 } from '@/lib/ovie/certifications/prod-golden-path-ledger';
 import { postgresRecordBackend } from '@/lib/ovie/mcp/postgres-backend';
 import { logger } from '@/lib/utils/logger';
@@ -84,6 +89,16 @@ const receiptSchema = z
       })
       .strict()
       .nullish(),
+    // One admin certifications-inventory readback per run, carried on the
+    // landing receipt. Evidence only: a not-viable admin fixture records
+    // 'blocked' with the exact reason and never turns a surface red.
+    adminInventoryReadback: z
+      .object({
+        status: z.enum(['passed', 'blocked', 'failed']),
+        detail: z.string().max(2_000),
+      })
+      .strict()
+      .nullish(),
   })
   .strict();
 
@@ -103,6 +118,13 @@ export async function POST(request: Request): Promise<NextResponse> {
           backend: postgresRecordBackend(),
           receipts: data.receipts as unknown as ProdGoldenPathReceipt[],
         });
+        // JOV-9625 outcome rework: fold the run's quality-contract
+        // observations into the observations ledger so the six contracts'
+        // observed values are populated from evidence.
+        await recordQualityContractObservations({
+          backend: postgresRecordBackend(),
+          receipts: data.receipts as unknown as ProdGoldenPathReceipt[],
+        });
         return jsonResponse({ ok: true, ...result }, 200);
       } catch (error) {
         if (error instanceof ProdGoldenPathPersistenceError) {
@@ -118,4 +140,35 @@ export async function POST(request: Request): Promise<NextResponse> {
       }
     },
   });
+}
+
+export const PROD_GOLDEN_PATH_CERTIFIED_SCHEMA =
+  'jovie.prod-golden-path-certified/v1' as const;
+
+/**
+ * Which golden-path surfaces hold a current production certification. Read by
+ * the production alias perf gate (production-release.yml) so it blocks only
+ * on certified pages. Cron-secret authenticated, like the write path.
+ */
+export async function GET(request: Request): Promise<NextResponse> {
+  const authError = verifyCronRequest(request, { route: ROUTE });
+  if (authError) return authError;
+  try {
+    const ledger = await readProdGoldenPathLedger(postgresRecordBackend());
+    return jsonResponse(
+      {
+        schema: PROD_GOLDEN_PATH_CERTIFIED_SCHEMA,
+        ledger: ledger ? 'present' : 'missing',
+        maxAgeMs: PROD_GOLDEN_PATH_CERTIFICATION_MAX_AGE_MS,
+        certifiedSurfaces: certifiedProdGoldenPathSurfaces(ledger),
+        generatedAt: new Date().toISOString(),
+      },
+      200
+    );
+  } catch (error) {
+    logger.error('[golden-path-evidence] certified read failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return jsonResponse({ error: 'read_failed' }, 503);
+  }
 }
