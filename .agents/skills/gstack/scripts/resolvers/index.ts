@@ -12,7 +12,7 @@ import { generateCommandReference, generateSnapshotFlags, generateBrowseSetup } 
 import { generateDesignMethodology, generateDesignHardRules, generateDesignOutsideVoices, generateDesignReviewLite, generateDesignSketch, generateDesignSetup, generateDesignMockup, generateDesignShotgunLoop } from './design';
 import { generateTestBootstrap, generateTestCoverageAuditPlan, generateTestCoverageAuditShip, generateTestCoverageAuditReview } from './testing';
 import { generateReviewDashboard, generatePlanFileReviewReport, generateSpecReviewLoop, generateBenefitsFrom, generateCodexSecondOpinion, generateAdversarialStep, generateCodexPlanReview, generatePlanCompletionAuditShip, generatePlanCompletionAuditReview, generatePlanVerificationExec, generateScopeDrift } from './review';
-import { generateSlugEval, generateSlugSetup, generateBaseBranchDetect, generateDeployBootstrap, generateQAMethodology, generateCoAuthorTrailer, generateChangelogWorkflow } from './utility';
+import { generateSlugEval, generateSlugSetup, generateBaseBranchDetect, generateDeployBootstrap, generateQAMethodology, generateCoAuthorTrailer, generateChangelogWorkflow, generateVerifyOutcome } from './utility';
 import { generateLearningsSearch, generateLearningsLog } from './learnings';
 import { generateConfidenceCalibration } from './confidence';
 import { generateInvokeSkill } from './composition';
@@ -56,6 +56,7 @@ export const RESOLVERS: Record<string, ResolverFn> = {
   LEARNINGS_SEARCH: generateLearningsSearch,
   LEARNINGS_LOG: generateLearningsLog,
   CONFIDENCE_CALIBRATION: generateConfidenceCalibration,
+  VERIFY_OUTCOME: generateVerifyOutcome,
   INVOKE_SKILL: generateInvokeSkill,
   CHANGELOG_WORKFLOW: generateChangelogWorkflow,
   REVIEW_ARMY: generateReviewArmy,

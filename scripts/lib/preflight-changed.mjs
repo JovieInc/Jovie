@@ -4,6 +4,7 @@
  * checklist for new workflows, scripts, migrations and registries. No
  * filesystem or git access here; the CLI passes in file lists and a reader.
  */
+import { createHash } from 'node:crypto';
 import { evaluateCustomerNoteContract } from './daily-changelog-publication.mjs';
 
 const CUSTOMER_MARKER =
@@ -112,6 +113,20 @@ export function companionChecklist(files, read) {
   const items = [];
   const push = (trigger, item, done, hint) =>
     items.push({ trigger, item, done: Boolean(done), hint });
+
+  const fixture = 'scripts/tests/test_disk_guard.py';
+  if (has(fixture)) {
+    const policy = 'scripts/lanes/qualification_guard.py';
+    const digest = createHash('sha256').update(read(fixture)).digest('hex');
+    // Structural companion diagnostic only; the qualification guard still owns
+    // runtime admission and independently checks committed/index/worktree bytes.
+    push(
+      fixture,
+      'qualification fixture version registered',
+      read(policy).includes(`"${digest}"`),
+      `review fixture isolation, then register SHA-256 ${digest} in REVIEWED_FIXTURE_SHA256 in ${policy}; run \`PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.tests.test_qualification_guard.GuardContractTest.test_the_repo_fixture_is_a_reviewed_version -v\``
+    );
+  }
 
   for (const wf of added(files, /^\.github\/workflows\/[^/]+\.ya?ml$/)) {
     const base = wf.filename.split('/').pop();

@@ -30,6 +30,16 @@ describe('HomeLoopKanban', () => {
     expect(screen.queryByTestId('home-loop-kanban-more')).toBeNull();
   });
 
+  it('gives only the stages it is passed, as equal lanes', () => {
+    const stages = HOME_LOOP_FIXTURE_STAGES.slice(0, 3);
+    render(<HomeLoopKanban stages={stages} rows={HOME_LOOP_FIXTURE_ROWS} />);
+    expect(screen.getAllByTestId('home-loop-kanban-lane')).toHaveLength(3);
+    expect(screen.getByTestId('home-loop-kanban')).toHaveClass(
+      '@4xl:auto-cols-fr',
+      '@4xl:grid-flow-col'
+    );
+  });
+
   it('collapses what does not fit a lane into +N more', () => {
     const restore = mockFitLayout('home-loop-kanban-cards', 250);
     try {

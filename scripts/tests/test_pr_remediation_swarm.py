@@ -1,4 +1,5 @@
 import json
+import re
 import sys
 import tempfile
 import unittest
@@ -227,19 +228,64 @@ class SwarmPolicyTest(unittest.TestCase):
         finally:
             swarm.gh_json, swarm.fetch_job_log, swarm.gh_version = saved
 
+    def test_smoke_reaches_a_readable_log_past_a_starved_recent_window(self):
+        # 2026-10-29 run 40936622218: at this repo's run rate the 20 newest completed runs can all be
+        # skipped/cancelled event handlers, so the old 20-run window gave up while a readable log was
+        # one run deeper. The scan must reach it without weakening the loud failure.
+        import contextlib, io
+        saved = (swarm.gh_json, swarm.fetch_job_log, swarm.gh_version)
+        swarm.gh_version = lambda: "2.103.2"
+        skipped = [{"id": i, "conclusion": "skipped"} for i in range(40, 20, -1)]  # 20 newest, all skipped
+        def jsons(args, **kw):
+            if "/runs?" in args[1]:
+                n = int(re.search(r"per_page=(\d+)", args[1]).group(1))  # the API slices, so must the fake
+                rows = skipped + [{"id": 7, "conclusion": "success"}]
+                status = args[1].split("status=")[1].split("&")[0]
+                return {"workflow_runs": [r for r in rows if status == "completed" or r["conclusion"] == status][:n]}
+            return {"jobs": [{"id": 5, "name": "x", "conclusion": "success", "started_at": "t"}]}
+        swarm.gh_json = jsons
+        try:
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                swarm.fetch_job_log = lambda j: swarm._Result({"code": 0, "stdout": "log", "stderr": ""})
+                self.assertEqual(swarm.cmd_smoke(None), 0)
+            self.assertIn("smoke job 5", buf.getvalue())
+        finally:
+            swarm.gh_json, swarm.fetch_job_log, swarm.gh_version = saved
+
+    def test_smoke_starved_scan_still_fails_loudly_with_diagnostics(self):
+        import contextlib, io
+        saved = (swarm.gh_json, swarm.fetch_job_log, swarm.gh_version)
+        swarm.gh_version = lambda: "2.103.2"
+        def jsons(args, **kw):
+            rows = [{"id": 1, "conclusion": "skipped"}, {"id": 2, "conclusion": "cancelled"},
+                    {"id": 3, "conclusion": "success"}, {"id": 4, "conclusion": "success"}]
+            if "/runs?" in args[1]:
+                status = args[1].split("status=")[1].split("&")[0]
+                return {"workflow_runs": [r for r in rows if status == "completed" or r["conclusion"] == status]}
+            return {"jobs": []}
+        swarm.gh_json = jsons
+        try:
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                self.assertEqual(swarm.cmd_smoke(None), 1)
+            out = buf.getvalue()
+            self.assertIn("no readable completed job log to smoke-test the log fetch", out)
+            self.assertIn("eligible_jobs=0", out)   # the scan, not the fetch, found nothing
+            self.assertIn('"success": 2', out)      # conclusions breakdown for the next reader
+        finally:
+            swarm.gh_json, swarm.fetch_job_log, swarm.gh_version = saved
+
     def test_smoke_survives_a_starved_completed_window_via_conclusion_filtered_runs(self):
-        # JOV-10201 / runs 40936622218 + 41254795498: at this repo's run rate (dozens per minute,
-        # overwhelmingly skipped/cancelled event handlers) the 20 newest completed runs are routinely
-        # ALL non-smokable, which starved the old completed-only window and failed select with "no
-        # readable completed job log". This is the reconstructed 2026-11-01T00:15:25Z snapshot. The
-        # canary must pull candidates from conclusion-filtered run lists instead, so a readable
-        # failure-run log is still reached, and must never consult the raw firehose again.
+        # Controlled crowdout fixture for the CURRENT 50-run main selector:
+        # 33 skipped + 16 cancelled + one success with only skipped jobs. The
+        # readable failure exists outside that firehose, inside a filtered list.
         import contextlib, io
         saved = (swarm.gh_json, swarm.fetch_job_log, swarm.gh_version)
         swarm.gh_version = lambda: "2.93.0"
-        starved = ([{"id": 100 - i, "conclusion": "skipped"} for i in range(13)]
-                   + [{"id": 80 - i, "conclusion": "cancelled"} for i in range(6)]
-                   + [{"id": 87, "conclusion": "success"}])  # lone success run: all its jobs skipped
+        starved = ([{"id": 100 - i, "conclusion": "skipped"} for i in range(33)]
+                   + [{"id": 80 - i, "conclusion": "cancelled"} for i in range(16)]
+                   + [{"id": 987, "conclusion": "success"}])  # lone success run: all its jobs skipped
         seen = []
 
         def jsons(args, **kw):
@@ -251,7 +297,7 @@ class SwarmPolicyTest(unittest.TestCase):
                 status = url.split("status=")[1].split("&")[0]
                 self.assertIn(status, ("failure", "success"), url)
                 return {"workflow_runs": [{"id": 7, "conclusion": "failure"}]}
-            if "/runs/87/" in url:
+            if "/runs/987/" in url:
                 return {"jobs": [{"id": 870, "name": "gate", "conclusion": "skipped"}]}
             return {"jobs": [{"id": 5, "name": "CI", "conclusion": "failure", "started_at": "t"}]}
 
@@ -349,10 +395,8 @@ class SwarmPolicyTest(unittest.TestCase):
         finally:
             swarm.gh_json, swarm.fetch_job_log, swarm.gh_version = saved
 
-    def test_smoke_reports_unverified_and_passes_when_nothing_is_smokable(self):
-        # A repo with zero completed failure/success runs has no subject for the canary: the path is
-        # unverified, not broken. The old code failed select here — the same false-negative class as
-        # the starved window — so this must pass with an explicit notice instead.
+    def test_smoke_reports_unverified_and_fails_when_nothing_is_smokable(self):
+        # An absent subject never proves the log path; retain main fail-closed behavior.
         import contextlib, io
         saved = (swarm.gh_json, swarm.fetch_job_log, swarm.gh_version)
         swarm.gh_version = lambda: "2.93.0"
@@ -360,9 +404,73 @@ class SwarmPolicyTest(unittest.TestCase):
         try:
             buf = io.StringIO()
             with contextlib.redirect_stdout(buf):
-                self.assertEqual(swarm.cmd_smoke(None), 0)
+                self.assertEqual(swarm.cmd_smoke(None), 1)
             self.assertIn("log path unverified", buf.getvalue())
-            self.assertIn("::notice", buf.getvalue())
+            self.assertIn("::error", buf.getvalue())
+        finally:
+            swarm.gh_json, swarm.fetch_job_log, swarm.gh_version = saved
+
+    def test_smoke_caps_two_lists_and_forty_job_reads_without_evidence(self):
+        import contextlib, io
+        saved = (swarm.gh_json, swarm.fetch_job_log, swarm.gh_version)
+        seen = []
+        swarm.gh_version = lambda: "2.103.3"
+        def jsons(args, **kw):
+            url = args[1]
+            seen.append(url)
+            if "/runs?" in url:
+                status = url.split("status=")[1].split("&")[0]
+                offset = 0 if status == "failure" else 100
+                return {"workflow_runs": [{"id": offset + i, "conclusion": status} for i in range(25)]}
+            return {"jobs": [{"id": 1, "conclusion": "skipped"}]}
+        swarm.gh_json = jsons
+        swarm.fetch_job_log = lambda j: self.fail("no eligible log may be fetched")
+        try:
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                self.assertEqual(swarm.cmd_smoke(None), 1)
+            self.assertEqual(sum("/runs?" in url for url in seen), 2)
+            self.assertEqual(sum("/jobs?" in url for url in seen), 40)
+            self.assertIn("scanned 40 runs", output.getvalue())
+            self.assertIn("eligible_jobs=0", output.getvalue())
+        finally:
+            swarm.gh_json, swarm.fetch_job_log, swarm.gh_version = saved
+
+    def test_smoke_deduplicates_a_run_that_moves_between_conclusion_lists(self):
+        import contextlib, io
+        saved = (swarm.gh_json, swarm.fetch_job_log, swarm.gh_version)
+        jobs = []
+        swarm.gh_version = lambda: "2.103.3"
+        def jsons(args, **kw):
+            url = args[1]
+            if "/runs?" in url:
+                rows = [{"id": 7, "conclusion": "failure"}]
+                if "status=success" in url:
+                    rows = [{"id": 7, "conclusion": "success"}, {"id": 8, "conclusion": "success"}]
+                return {"workflow_runs": rows}
+            jobs.append(url)
+            return {"jobs": [] if "/runs/7/" in url else [{"id": 8, "name": "proof", "conclusion": "success", "started_at": "t"}]}
+        swarm.gh_json = jsons
+        swarm.fetch_job_log = lambda j: swarm._Result({"code": 0, "stdout": "real log bytes", "stderr": ""})
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(swarm.cmd_smoke(None), 0)
+            self.assertEqual(len(jobs), 2)
+        finally:
+            swarm.gh_json, swarm.fetch_job_log, swarm.gh_version = saved
+
+    def test_smoke_rejects_ineligible_runs_even_if_the_filtered_api_returns_them(self):
+        import contextlib, io
+        saved = (swarm.gh_json, swarm.fetch_job_log, swarm.gh_version)
+        swarm.gh_version = lambda: "2.103.3"
+        def jsons(args, **kw):
+            self.assertIn("/runs?", args[1], "ineligible run must not trigger a job read")
+            return {"workflow_runs": [{"id": 7, "conclusion": "cancelled"}]}
+        swarm.gh_json = jsons
+        swarm.fetch_job_log = lambda j: self.fail("ineligible run must not fetch a log")
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(swarm.cmd_smoke(None), 1)
         finally:
             swarm.gh_json, swarm.fetch_job_log, swarm.gh_version = saved
 

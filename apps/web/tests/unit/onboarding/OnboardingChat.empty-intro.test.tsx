@@ -59,6 +59,7 @@ vi.mock('@/components/jovie/hooks', () => ({
     isStuckToBottom: true,
     onScroll: vi.fn(),
     scrollContainerRef: { current: null },
+    setStuckToBottom: vi.fn(),
     totalSizeRef: { current: null },
   }),
 }));
@@ -148,7 +149,7 @@ vi.mock('@/components/features/onboarding/ChatProposeNextStepCard', () => ({
 }));
 
 describe('OnboardingChat empty intro', () => {
-  it('gives the sign-up card the handle locked in chat, not the homepage one (JOV-10127)', () => {
+  it('gives the sign-up card the handle locked in chat, not the homepage one (JOV-10127)', async () => {
     const initialMessages: UIMessage[] = [
       {
         id: 'u1',
@@ -195,7 +196,8 @@ describe('OnboardingChat empty intro', () => {
         turnstileStatus='verified'
       />
     );
-    expect(screen.getByTestId('next-step-card')).toHaveAttribute(
+    // The proposal card is code-split out of the /start entry bundle.
+    expect(await screen.findByTestId('next-step-card')).toHaveAttribute(
       'data-claim-handle',
       'unmarkedpave'
     );

@@ -12,7 +12,7 @@ export function LegalSupportBlock({
   email,
 }: LegalSupportBlockProps) {
   return (
-    <div className='public-doc-support-block mt-8 pt-6'>
+    <div className='public-doc-support-block mt-8 px-3 pt-6'>
       <p className='public-doc-label mb-2'>{title}</p>
       <p className='text-sm text-neutral-600 dark:text-neutral-400'>
         {description}
