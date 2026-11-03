@@ -147,7 +147,7 @@ describe('ci-fast bounded parallel workflow', () => {
       .find(
         line =>
           line.includes('pnpm turbo test:fast --affected --') &&
-          /--passWithNoTests(?:\s|$)/u.test(line)
+          line.includes('--passWithNoTests')
       );
     const selectors = command?.match(
       /unit_excludes \}\}\s+(.+?)\s+\$OUTPUT_FLAG$/u

@@ -6,7 +6,6 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
-  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -1794,11 +1793,7 @@ describe('merge_group workflow contract', () => {
   });
 
   it('materializes a release-consumable intake receipt for equal-tree no-op groups', () => {
-    // Node resolves module URLs through macOS's /var symlink. Match that
-    // canonical path so the copied classifiers recognize their CLI entrypoint.
-    const root = realpathSync(
-      mkdtempSync(join(tmpdir(), 'noop-intake-receipt-'))
-    );
+    const root = mkdtempSync(join(tmpdir(), 'noop-intake-receipt-'));
     const laneDir = join(root, 'product-lane-classification');
     mkdirSync(laneDir);
     writeFileSync(join(laneDir, 'changed-paths.txt'), '');
