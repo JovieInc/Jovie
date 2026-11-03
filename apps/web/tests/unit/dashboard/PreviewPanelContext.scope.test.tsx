@@ -20,7 +20,12 @@ import { RailToggleButton } from '@/components/atoms/RailToggleButton';
 import { RightDrawer } from '@/components/molecules/drawer/RightDrawer';
 import { TableMetaProvider } from '@/contexts/TableMetaContext';
 import { RightRailKeyboardHandler } from '@/hooks/RightRailKeyboardHandler';
+import { recordRuntimeTrace } from '@/lib/testing/runtime-trace';
 import { detectReversibleControl } from '@/tests/utils/reversible-control-detector';
+
+vi.mock('@/lib/testing/runtime-trace', () => ({
+  recordRuntimeTrace: vi.fn(),
+}));
 
 /**
  * JOV-7150 regression fixture: the profile rail must never carry open into
@@ -79,6 +84,36 @@ function ReversibleRightRailProbe() {
 describe('PreviewPanelProvider scope reset (JOV-7150)', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('records initial mount inputs once across surface changes', () => {
+    vi.mocked(recordRuntimeTrace).mockClear();
+    const { rerender } = render(
+      <PreviewPanelProvider scope='app-shell' defaultOpen enabled>
+        <RailProbe />
+      </PreviewPanelProvider>
+    );
+
+    rerender(
+      <PreviewPanelProvider scope='chat' defaultOpen={false} enabled={false}>
+        <RailProbe />
+      </PreviewPanelProvider>
+    );
+
+    const mounts = vi
+      .mocked(recordRuntimeTrace)
+      .mock.calls.filter(([, event]) => event === 'provider-mount');
+    expect(mounts).toEqual([
+      [
+        'shell-rail',
+        'provider-mount',
+        {
+          scope: 'app-shell',
+          defaultOpen: true,
+          enabled: true,
+        },
+      ],
+    ]);
   });
 
   it('starts closed', () => {

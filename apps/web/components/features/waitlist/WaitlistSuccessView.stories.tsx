@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect, fn, userEvent, within } from 'storybook/test';
 import { WaitlistSuccessView } from './WaitlistSuccessView';
 
 const meta = {
@@ -33,4 +34,38 @@ type Story = StoryObj<typeof meta>;
 export const Web214AuthenticatedPending: Story = {
   name: 'web-214 /waitlist — authenticated pending',
   render: () => <WaitlistSuccessView />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole('heading', { name: "You're on the list" })
+    ).toBeVisible();
+    await expect(
+      canvas.queryByTestId('waitlist-start-pro-checkout')
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByText(/skip the waitlist/i)
+    ).not.toBeInTheDocument();
+    const resume = canvas.getByRole('link', { name: 'Resume At Start' });
+    await expect(resume).toHaveAttribute('href', '/start');
+    resume.focus();
+    await expect(resume).toHaveFocus();
+    const activated = fn();
+    resume.addEventListener(
+      'click',
+      event => {
+        // Verify keyboard activation without leaving the isolated receipt.
+        event.preventDefault();
+        activated();
+      },
+      { once: true }
+    );
+    await userEvent.keyboard('{Enter}');
+    await expect(activated).toHaveBeenCalledOnce();
+  },
+};
+
+export const MobilePending: Story = {
+  ...Web214AuthenticatedPending,
+  name: 'Pending receipt / mobile',
+  parameters: { viewport: { defaultViewport: 'mobile1' } },
 };

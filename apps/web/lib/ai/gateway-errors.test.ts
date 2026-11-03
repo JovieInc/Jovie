@@ -86,6 +86,7 @@ describe('classifyChatStreamFailure', () => {
       errorCode: GATEWAY_BUDGET_EXCEEDED_ERROR_CODE,
       userMessage: GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE,
       errorMessage: GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE,
+      terminalStatus: 'failed_model_error',
     });
     expect(resolveChatStreamErrorMessage(gatewayBudgetError())).toBe(
       GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE
@@ -220,6 +221,7 @@ const unavailableFailure = {
   errorCode: 'AI_UNAVAILABLE',
   userMessage: 'Jovie AI is currently unavailable. Please try again later.',
   errorMessage: 'Jovie AI is currently unavailable. Please try again later.',
+  terminalStatus: 'failed_model_error',
 };
 
 describe('Gateway insufficient funds', () => {

@@ -1308,20 +1308,18 @@ ${fixtureCheckout}
     expect(violations).toEqual([]);
     const reportJob = policyWorkflow('nightly-testing-agent.yml').jobs?.report;
     expect(reportJob?.permissions).toEqual({ contents: 'read' });
-    const reportToken = reportJob?.steps?.find(
-      step => step.id === 'report-token'
-    );
-    expect(reportToken?.with).toMatchObject({
-      'permission-contents': 'write',
-      'permission-pull-requests': 'write',
-    });
-    const commitReport = reportJob?.steps?.find(
-      step => step.name === 'Open nightly evidence PR'
-    );
-    expect(commitReport?.env?.GH_TOKEN).toBe(
-      '${{ steps.report-token.outputs.token }}'
-    );
-    expect(String(commitReport?.run)).not.toMatch(/\bgit\s+(?:pull|push)\b/);
+    // Evidence is data: the nightly report ships as a run artifact, never as
+    // a PR (#23906). The report job must not mint a publication token at all,
+    // so no bot credentials can reach it in any order.
+    expect(
+      reportJob?.steps?.some(step =>
+        /create-github-app-token@/.test(step.uses ?? '')
+      )
+    ).toBe(false);
+    expect(
+      reportJob?.steps?.some(step => step.name === 'Open nightly evidence PR')
+    ).toBe(false);
+    expect(JSON.stringify(reportJob)).not.toContain('JOVIE_BOT_PRIVATE_KEY');
     expect(reportJob?.env?.GH_TOKEN).toBeUndefined();
     for (const [file, jobId, stepName] of [
       ['screenshots.yml', 'publish', 'Create or update screenshot PR'],
