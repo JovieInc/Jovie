@@ -73,7 +73,9 @@ for (const scenario of cases) {
     await send.click();
     await expect(page.getByTestId('submitted-turn-count')).toHaveText('2');
     // Pen R6As7U: the handle field sits behind an explicit Change Handle.
-    await page.getByTestId('onboarding-edit-handle').click();
+    const handleCards = page.getByTestId('onboarding-edit-handle');
+    await expect(handleCards).toHaveCount(2);
+    await handleCards.last().click();
     await expect(
       page.getByRole('textbox', { name: 'Proposed handle' })
     ).toBeVisible();
