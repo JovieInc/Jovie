@@ -2,6 +2,7 @@
 // One policy for PR feedback, native admission, and durable delivery receipts.
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { requiredWinErrors, winSectionErrors } from './lib/wins-ledger.mjs';
 
 const RUN_URL =
   /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/actions\/runs\/([1-9]\d*)(?:\/attempts\/[1-9]\d*)?$/;
@@ -236,6 +237,8 @@ export function evaluateFleetRules({
     errors.push(
       'assertions: red-to-green diff only weakens existing tests; restore assertions and prove the repair.'
     );
+  for (const message of winSectionErrors(body)) errors.push(`win: ${message}`);
+  errors.push(...requiredWinErrors({ title: pr.title, labels, body }));
   const blast = section(body, 'Blast radius');
   if (!text(field(blast, 'What could break')) || !text(field(blast, 'Proof')))
     warnings.push(
@@ -291,9 +294,11 @@ export async function runFleetRules({ event, request, fromEvent = false }) {
   const current = fromEvent ? event.pull_request : await request(path);
   if (current.head?.sha !== event.pull_request.head?.sha)
     throw new Error('PR head changed; fresh event required');
+  // changed_files counts paths; the files list carries a removed and an added
+  // entry for one path whose type changed (symlink to file), so count paths.
   if (
-    files.length !== current.changed_files ||
-    files.some(file => typeof file.filename !== 'string')
+    files.some(file => typeof file.filename !== 'string') ||
+    new Set(files.map(file => file.filename)).size !== current.changed_files
   )
     throw new Error('incomplete PR file count');
   return evaluateFleetRules({ pr: current, files, repository });

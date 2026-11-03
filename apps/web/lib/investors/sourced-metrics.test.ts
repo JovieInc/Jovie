@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -79,7 +79,12 @@ describe('selectInvestorFacingStats', () => {
 
 describe('investor markdown', () => {
   it('does not carry hand-typed raise, stream, or market counts', () => {
-    const roots = [join(process.cwd(), 'content/investors')];
+    // Investor markdown is private (JovieInc/Ops jovie-private/); check it
+    // when a checkout is available.
+    const privateDir = process.env.JOVIE_PRIVATE_DIR;
+    const roots = privateDir
+      ? [join(privateDir, 'apps/web/content/investors')].filter(existsSync)
+      : [];
 
     const offenders = roots.flatMap(root =>
       markdownFiles(root)

@@ -53,6 +53,7 @@ function commitFile(cwd, file, content, message) {
 function fixture({
   childConflicts = false,
   parentMerged = true,
+  parentBase = 'main',
   activeClaim = '',
   policyCheckout = false,
   commentOverride = false,
@@ -170,6 +171,7 @@ function fixture({
           {
             number: 10,
             merged_at: '2026-10-01T00:00:00Z',
+            base: { ref: parentBase },
             head: { sha: parentTip },
           },
         ],
@@ -303,6 +305,17 @@ describe('unstack-merged-parent.sh', () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('has no merged parent PR');
     expect(git(fx.remote, 'rev-parse', 'child')).toBe(fx.childSha);
+  });
+
+  it('preserves children when the parent merged into a feature branch', () => {
+    const fx = fixture({ parentBase: 'feature' });
+    const result = run(fx);
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(git(fx.remote, 'rev-parse', 'child')).toBe(fx.childSha);
+    expect(git(fx.remote, 'rev-parse', 'grandchild')).toBe(fx.grandSha);
+    expect(readFileSync(join(fx.dir, 'calls.log'), 'utf8')).not.toContain(
+      'pr edit'
+    );
   });
 
   it('aborts on conflict without rewriting the branch', () => {
@@ -471,14 +484,35 @@ describe('unstack-merged-parent.sh', () => {
     expect(git(fx.remote, 'rev-parse', 'grandchild')).toBe(fx.grandSha);
   });
 
-  it('wakes only on a retarget to main or a manual dispatch, on trusted main code', () => {
-    expect(workflow).toContain('pull_request_target:\n    types: [edited]');
+  it('wakes on a merged parent or a retarget to main, on trusted main code', () => {
+    expect(workflow).toContain('types: [edited, closed]');
     expect(workflow).toContain("github.event.changes.base.ref.from != ''");
     expect(workflow).toContain("github.event.pull_request.base.ref == 'main'");
+    expect(workflow).toContain('github.event.pull_request.merged == true');
+    expect(workflow).toContain(
+      'github.event.pull_request.head.repo.full_name == github.repository'
+    );
+    expect(workflow).toContain('-f base="$MERGED_HEAD_REF"');
+    expect(workflow).toContain(
+      'group: unstack-merged-parent-${{ matrix.child }}'
+    );
     expect(workflow).toContain('ref: main');
     expect(workflow).toContain(
       '# controller-hop-exception: jovie-controller-hop/v1'
     );
+    // Admission goes through green enroll's per-PR dispatch and is frozen with the queue.
+    expect(workflow).toContain("vars.QUEUE_FREEZE != '1'");
     expect(workflow).not.toContain('--auto');
+  });
+
+  it('hands the unstacked child to green enroll and never writes the queue itself', () => {
+    const fx = fixture();
+    const result = run(fx, { DRY_RUN: '1', ADMIT_AFTER_UNSTACK: '1' });
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(result.stdout).toContain('would dispatch green enroll for #11');
+    const source = readFileSync(script, 'utf8');
+    expect(source).not.toMatch(/enqueuePullRequest|enablePullRequestAutoMerge/);
+    expect(source).not.toMatch(/pr merge[^\n]*--auto/);
+    expect(git(fx.remote, 'rev-parse', 'child')).toBe(fx.childSha);
   });
 });

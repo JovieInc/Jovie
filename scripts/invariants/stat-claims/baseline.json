@@ -1,0 +1,8 @@
+{
+  "apps/web/app/(marketing)/launch/page.tsx": {
+    "count_claim": 1
+  },
+  "apps/web/data/product-truth/proof.ts": {
+    "count_claim": 1
+  }
+}

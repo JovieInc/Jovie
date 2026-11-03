@@ -105,32 +105,36 @@ export function OnboardingHandleStep({
               hasError && 'border-destructive/60'
             )}
           >
-            <span className='pl-3 text-mid font-semibold whitespace-nowrap text-secondary-token'>
-              jov.ie/
-            </span>
-            <input
-              id='handle-input'
-              ref={inputRef}
-              name='username'
-              aria-label='Claim Your Handle'
-              type='text'
-              value={handleInput}
-              onChange={e =>
-                onHandleChange(
-                  e.target.value
-                    .toLowerCase()
-                    .replaceAll(/\s+/g, '')
-                    .replace(/^@+/, '')
-                )
-              }
-              placeholder='yourname' // ui-casing-allow: literal example placeholder
-              autoComplete='username'
-              autoCapitalize='none'
-              autoCorrect='off'
-              spellCheck={false}
-              aria-invalid={hasError ? 'true' : undefined}
-              className='min-w-0 flex-1 bg-transparent text-mid font-semibold tracking-tighter text-primary-token placeholder:text-tertiary-token placeholder:opacity-60 focus-ring-themed'
-            />
+            {/* Prefix and handle share one group with no gap so the URL
+                reads as one string (jov.ie/tim, not "jov.ie/ tim"). */}
+            <div className='flex min-w-0 flex-1 items-center'>
+              <span className='pl-3 text-mid font-semibold whitespace-nowrap text-secondary-token'>
+                jov.ie/
+              </span>
+              <input
+                id='handle-input'
+                ref={inputRef}
+                name='username'
+                aria-label='Claim Your Handle'
+                type='text'
+                value={handleInput}
+                onChange={e =>
+                  onHandleChange(
+                    e.target.value
+                      .toLowerCase()
+                      .replaceAll(/\s+/g, '')
+                      .replace(/^@+/, '')
+                  )
+                }
+                placeholder='yourname' // ui-casing-allow: literal example placeholder
+                autoComplete='username'
+                autoCapitalize='none'
+                autoCorrect='off'
+                spellCheck={false}
+                aria-invalid={hasError ? 'true' : undefined}
+                className='min-w-0 flex-1 bg-transparent text-mid font-semibold tracking-tighter text-primary-token placeholder:text-tertiary-token placeholder:opacity-60 focus-ring-themed'
+              />
+            </div>
             <button
               data-testid='onboarding-handle-submit'
               type='submit'
