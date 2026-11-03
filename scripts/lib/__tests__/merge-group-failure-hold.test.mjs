@@ -41,6 +41,7 @@ import {
   ownerHoldReleaseIntent,
   PR_SIZE_GUARD_WORKFLOW_ID,
   parseMergeQueueBranch,
+  peerContainsPr,
   REVISION_FAILED_AT_HEAD,
   recordDequeueReason,
   reenrollmentDisposition,
@@ -3000,5 +3001,37 @@ describe('base-branch fetch timeout (merge-group infrastructure)', () => {
       );
       expect(replay(annotations(), other)).toBe('unclassified');
     });
+  });
+});
+
+describe('peerContainsPr (shadow peer recurrence membership)', () => {
+  // 2026-10-31: #24072 rode in the base chain of #24075's groups, so the
+  // queue entries ahead of main, not only base...head, decide membership.
+  const subject = message => ({ commit: { message } });
+  it('counts the peer head PR and every queue entry ahead of main', () => {
+    expect(peerContainsPr([], 24072, 24072)).toBe(true);
+    expect(
+      peerContainsPr(
+        [
+          subject('fix(changelog): newest-first archive (#24072)\n\nbody'),
+          subject('docs: x (#24075)'),
+        ],
+        24075,
+        24072
+      )
+    ).toBe(true);
+  });
+  it('excludes groups without the PR and stays unknown without evidence', () => {
+    expect(peerContainsPr([subject('docs: x (#24075)')], 24075, 24072)).toBe(
+      false
+    );
+    expect(
+      peerContainsPr(
+        [subject('mentions (#24072) mid-title only (#24075)')],
+        24075,
+        24072
+      )
+    ).toBe(false);
+    expect(peerContainsPr(undefined, 24075, 24072)).toBeNull();
   });
 });

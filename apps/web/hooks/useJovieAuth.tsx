@@ -224,8 +224,7 @@ export function JovieAuthValuesProvider({
 
 /**
  * Safe-defaults provider for mock/DB-less mode: build-time rendering, tests,
- * and bypassed-auth origins (keyed off NEXT_PUBLIC_AUTH_MOCK, with a
- * one-release NEXT_PUBLIC_CLERK_MOCK fallback). Everything renders
+ * and bypassed-auth origins (keyed off NEXT_PUBLIC_AUTH_MOCK). Everything renders
  * signed-out and auth UI stays hidden.
  */
 export function JovieAuthDefaultsProvider({

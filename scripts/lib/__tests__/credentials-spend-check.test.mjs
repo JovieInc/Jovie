@@ -1,4 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
@@ -16,6 +18,7 @@ import {
   summarizeProviderTrialLedger,
 } from '../credentials-live-reads.mjs';
 import {
+  closeSpendFunding,
   DAY_MS,
   evaluateRegistry,
   validateCredentialsRegistry,
@@ -312,11 +315,65 @@ describe('committed registry', () => {
     expect(counts.unclaimedSecretNames).toBe(0);
   });
 
-  it('loads no grants when the private grants file is absent', () => {
-    const { thirdPartyGrants } = loadRegistry({
+  it('reports a specific private-data issue when the grants file is absent', () => {
+    const { thirdPartyGrants, privateDataIssues } = loadRegistry({
       grantsPath: '/nonexistent/third-party-grants.jsonl',
     });
     expect(thirdPartyGrants).toEqual([]);
+    expect(privateDataIssues).toEqual([
+      {
+        subject: 'third-party-grants',
+        path: '/nonexistent/third-party-grants.jsonl',
+        reason: 'read failed: ENOENT',
+      },
+    ]);
+  });
+
+  it('fails loudly and alerts instead of passing with zero grants', async () => {
+    const registry = loadRegistry({
+      grantsPath: '/nonexistent/third-party-grants.jsonl',
+    });
+    const report = await runCheck({ registry });
+    const stage = report.run.stages.find(
+      item => item.name === 'read-private-third-party-grants'
+    );
+    expect(stage).toMatchObject({ ok: false });
+    expect(stage.reason).toContain('ENOENT');
+    expect(stage.reason).toContain('/nonexistent/third-party-grants.jsonl');
+    expect(report.run.reads.privateGrants).toContain('unavailable');
+    const alert = report.findings.find(
+      item => item.fingerprint === 'private-data:third-party-grants-unavailable'
+    );
+    expect(alert).toMatchObject({ severity: 'high' });
+    expect(alert.message).toContain('JOVIE_PRIVATE_DIR');
+    expect(
+      report.plans.some(
+        plan =>
+          plan.fingerprint === 'private-data:third-party-grants-unavailable'
+      )
+    ).toBe(true);
+  });
+
+  it('treats an empty grants file as unavailable too', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'grants-'));
+    const path = join(dir, 'third-party-grants.jsonl');
+    writeFileSync(path, '\n');
+    const { privateDataIssues } = loadRegistry({ grantsPath: path });
+    expect(privateDataIssues).toMatchObject([{ reason: 'file is empty' }]);
+  });
+
+  it('raises no private-data finding when grants are present', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'grants-'));
+    const path = join(dir, 'third-party-grants.jsonl');
+    writeFileSync(
+      path,
+      `${JSON.stringify({ platform: 'google', grantee: 'x', purpose: 'p' })}\n`
+    );
+    const { thirdPartyGrants, privateDataIssues } = loadRegistry({
+      grantsPath: path,
+    });
+    expect(thirdPartyGrants).toHaveLength(1);
+    expect(privateDataIssues).toEqual([]);
   });
 
   // The grants file is private (JovieInc/Ops jovie-private/); validate it when a checkout is available.
@@ -380,7 +437,7 @@ describe('Summer provider-trial ledger', () => {
   const FIXTURE = fileURLToPath(
     new URL('./fixtures/provider-trial-ledger.json', import.meta.url)
   );
-  const trialSpend = () =>
+  const spendProviders = () =>
     JSON.parse(
       readFileSync(
         fileURLToPath(
@@ -388,7 +445,33 @@ describe('Summer provider-trial ledger', () => {
         ),
         'utf8'
       )
-    ).providers.filter(entry => entry.id.startsWith('summer-trial-'));
+    ).providers;
+  const trialSpend = () => {
+    const providers = spendProviders();
+    return closeSpendFunding(
+      providers,
+      providers.filter(entry => entry.id.startsWith('summer-trial-'))
+    );
+  };
+
+  it('keeps the credit pools a summer-trial slice draws from', () => {
+    const providers = spendProviders();
+    const sliced = providers.filter(entry =>
+      entry.id.startsWith('summer-trial-')
+    );
+    expect(validateSpendLedger(spend(sliced))).toEqual([
+      'summer-trial-workers-ai: funding.creditPoolId cloudflare-credits is not a spend entry',
+      'summer-trial-anthropic-api: funding.creditPoolId anthropic-api-credit is not a spend entry',
+    ]);
+    const closed = closeSpendFunding(providers, sliced);
+    expect(validateSpendLedger(spend(closed))).toEqual([]);
+    expect(closed.map(entry => entry.id)).toEqual([
+      'cloudflare-credits',
+      'anthropic-api-credit',
+      'summer-trial-workers-ai',
+      'summer-trial-anthropic-api',
+    ]);
+  });
 
   it('books the current UTC month per channel, $0 for an empty channel', () => {
     const ledger = JSON.parse(readFileSync(FIXTURE, 'utf8'));

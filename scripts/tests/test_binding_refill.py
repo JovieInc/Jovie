@@ -42,8 +42,8 @@ class SelectTests(unittest.TestCase):
                 row(8, description=BODY + "\n**Sequencing:** after LYB-138.\n"), row(9)]
         rows.append(row(138, state="In Progress"))
         picked, skipped = br.select(rows, 10, excluded=("hold",))
-        self.assertEqual([r["identifier"] for r in picked], ["LYB-9"])
-        self.assertEqual(skipped["LYB-1"], "not-agent-ready")
+        self.assertEqual([r["identifier"] for r in picked], ["LYB-1", "LYB-9"])  # agent-ready is retired as a requirement
+        self.assertNotIn("LYB-1", skipped)
         self.assertEqual(skipped["LYB-2"], "thin-description")
         self.assertEqual(skipped["LYB-3"], "label:type:epic")
         self.assertEqual(skipped["LYB-4"], "label:needs-tim")
@@ -146,11 +146,11 @@ class RefillTests(unittest.TestCase):
         self.assertFalse((self.state / "linear" / "outbox.json").exists())
 
     def test_nothing_ready_reports_why(self):
-        self.mirror([row(1, labels=()), row(2, description="short")])
+        self.mirror([row(1, labels=("hold",)), row(2, description="short")])
         receipt = br.refill(self.lane, self.host, self.binding, FakeClient(), now=1010.0)
         self.assertEqual(receipt["promoted"], [])
         self.assertEqual(receipt["short"], 4)
-        self.assertEqual(receipt["skipped"], {"LYB-1": "not-agent-ready", "LYB-2": "thin-description"})
+        self.assertEqual(receipt["skipped"], {"LYB-1": "label:hold", "LYB-2": "thin-description"})
 
 
 if __name__ == "__main__":

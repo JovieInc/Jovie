@@ -320,4 +320,24 @@ describe('MarketingFooter', () => {
 
     expect(screen.queryByTestId('marketing-footer-controls')).toBeNull();
   });
+
+  it('keeps the legal entity line in code, with the current year', () => {
+    render(<MarketingFooter variant='minimal' />);
+    expect(document.querySelector('.mf-copyright')?.textContent).toContain(
+      `© ${new Date().getFullYear()} Jovie Technology Inc.`
+    );
+  });
+});
+
+describe('prerendered homepage pathname', () => {
+  it('MarketingFooter.tsx reads "/index" as "/" via usePublicPathname', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(
+      resolve(process.cwd(), 'components/site/MarketingFooter.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('usePublicPathname');
+    expect(source).not.toMatch(/\busePathname\b/);
+  });
 });

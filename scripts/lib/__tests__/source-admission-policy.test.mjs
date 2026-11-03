@@ -1351,9 +1351,10 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
   assert.equal(runtime.if, reuseStep.if);
   assert.equal(reuseStep.id, 'reuse');
   // Base retargets change the compared tree, so they never reuse a proof.
+  // Label changes leave the tree untouched, so they reuse it too (#23748).
   assert.equal(
     reuseStep.if,
-    "${{ github.event.action == 'edited' && !github.event.changes.base }}"
+    "${{ (github.event.action == 'edited' && !github.event.changes.base) || github.event.action == 'labeled' || github.event.action == 'unlabeled' }}"
   );
   for (const job of ['security', 'migration', 'coverage', 'unit']) {
     const [jobClient, jobPrime, jobRuntime, first, ...rest] =

@@ -102,7 +102,11 @@ describe('product typecheck memory', () => {
               TYPECHECK_SINGLEFLIGHT_DIR: directory,
             },
             encoding: 'utf8',
-            timeout: 10000,
+            // Harness slack only: on loaded merge-queue runners the launcher chain
+            // (pnpm/turbo boot) can exceed 10s before the heap probe runs, killing the
+            // spawn (status null) and failing this test nondeterministically. The
+            // assertions on the propagated heap bound are unchanged.
+            timeout: 60000,
           }
         );
         expect(result.status, result.stderr).toBe(0);
