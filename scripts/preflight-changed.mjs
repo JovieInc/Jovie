@@ -172,26 +172,45 @@ export function parseArgs(argv) {
   return a;
 }
 
-function sh(cmd, { cwd, env, timeoutMs = 600_000 }) {
+export function sh(cmd, { cwd, env, timeoutMs = 600_000 }) {
   return new Promise(resolve => {
     const t0 = Date.now();
     const child = spawn('bash', ['-c', cmd], {
       cwd,
-      env,
+      env: {
+        ...(env ?? process.env),
+        ...(process.platform === 'win32'
+          ? {}
+          : { JOVIE_PREFLIGHT_MANAGED_GROUP: '1' }),
+      },
       stdio: ['ignore', 'pipe', 'pipe'],
+      detached: process.platform !== 'win32',
     });
     let out = '';
+    let timedOut = false;
     const take = d => {
       out += d.toString();
       if (out.length > 400_000) out = out.slice(-200_000);
     };
     child.stdout.on('data', take);
     child.stderr.on('data', take);
-    const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
+    const timer = setTimeout(() => {
+      timedOut = true;
+      // A shell can exit before its descendants close inherited output pipes.
+      // Kill its whole POSIX group, then close our pipe ends so timeout settles.
+      try {
+        if (process.platform === 'win32' || !child.pid) child.kill('SIGKILL');
+        else process.kill(-child.pid, 'SIGKILL');
+      } catch (error) {
+        if (error.code !== 'ESRCH') child.kill('SIGKILL');
+      }
+      child.stdout.destroy();
+      child.stderr.destroy();
+    }, timeoutMs);
     child.on('close', (code, signal) => {
       clearTimeout(timer);
       resolve({
-        code: code ?? (signal ? 137 : 1),
+        code: timedOut ? 124 : (code ?? (signal ? 137 : 1)),
         out,
         ms: Date.now() - t0,
       });

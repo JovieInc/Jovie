@@ -29,16 +29,20 @@ const HELD = 'GEM_TYPECHECK_SLOT_HELD';
 
 function run(argv, env = process.env) {
   return new Promise(resolve => {
-    // detached: own process group, so a signal to this wrapper reaches flock and the typecheck.
+    // Preflight already owns a process group and must be able to terminate it
+    // on timeout. Other callers retain the slot wrapper's own process group.
+    const managedGroup =
+      process.platform !== 'win32' && env.JOVIE_PREFLIGHT_MANAGED_GROUP === '1';
     const child = spawn(argv[0], argv.slice(1), {
       stdio: 'inherit',
-      detached: true,
+      detached: !managedGroup,
       env,
     });
     for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
       process.on(signal, () => {
         try {
-          process.kill(-child.pid, signal);
+          if (managedGroup) child.kill(signal);
+          else process.kill(-child.pid, signal);
         } catch {
           // already gone
         }

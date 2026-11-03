@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -24,6 +31,7 @@ import {
   NARROWED,
   parseArgs,
   resolveBaseRef,
+  sh,
   typecheckTargets,
 } from './preflight-changed.mjs';
 
@@ -471,5 +479,175 @@ test('preflight exits clean on a valid clean branch but fails an invalid base re
     assert.ok(!lines.some(l => /no changes/.test(l)), lines.join('\n'));
   } finally {
     rmSync(bad, { recursive: true, force: true });
+  }
+});
+
+test('timeout terminates descendants that retain preflight output pipes', {
+  skip: process.platform === 'win32',
+}, async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'preflight-timeout-'));
+  const pidFile = path.join(directory, 'child.pid');
+  let childPid;
+  let stopped = false;
+  let watchdog;
+  try {
+    const started = Date.now();
+    const result = await Promise.race([
+      sh(`sleep 30 & echo $! > "${pidFile}"; echo started; exit 0`, {
+        cwd: directory,
+        env: process.env,
+        timeoutMs: 200,
+      }),
+      new Promise(
+        (_, reject) =>
+          (watchdog = setTimeout(
+            () =>
+              reject(new Error('preflight timeout left its output pipe open')),
+            2000
+          ))
+      ),
+    ]);
+    childPid = Number(readFileSync(pidFile, 'utf8'));
+    assert.notEqual(
+      result.code,
+      0,
+      'timed-out work must fail even if its shell exited zero'
+    );
+    assert.ok(Date.now() - started < 2000, 'timeout must settle promptly');
+    assert.match(result.out, /started/);
+    const deadline = Date.now() + 1000;
+    while (!stopped && Date.now() < deadline) {
+      try {
+        process.kill(childPid, 0);
+        // Linux can briefly retain an already-killed orphan as a zombie.
+        if (process.platform === 'linux') {
+          stopped =
+            readFileSync(`/proc/${childPid}/stat`, 'utf8').split(' ')[2] ===
+            'Z';
+        }
+      } catch (error) {
+        if (error.code !== 'ESRCH' && error.code !== 'ENOENT') throw error;
+        stopped = true;
+      }
+      if (!stopped) await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    assert.equal(stopped, true, 'descendant must stop after the group signal');
+  } finally {
+    clearTimeout(watchdog);
+    if (!childPid && existsSync(pidFile))
+      childPid = Number(readFileSync(pidFile, 'utf8'));
+    if (childPid && !stopped) {
+      try {
+        process.kill(childPid, 'SIGKILL');
+      } catch {}
+    }
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('preflight command keeps ordinary exit codes and output', async () => {
+  const success = await sh('printf ok', {
+    cwd: process.cwd(),
+    env: process.env,
+    timeoutMs: 2000,
+  });
+  assert.equal(success.code, 0);
+  assert.equal(success.out, 'ok');
+  const failure = await sh('exit 7', {
+    cwd: process.cwd(),
+    env: process.env,
+    timeoutMs: 2000,
+  });
+  assert.equal(failure.code, 7);
+});
+
+test('preflight timeout stops a real host-slot child process group', {
+  skip: process.platform === 'win32',
+}, async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'preflight-slot-timeout-'));
+  const pidFile = path.join(directory, 'slot-child.pid');
+  const slotScript = path.resolve('scripts/typecheck-slot.mjs');
+  let pid;
+  let stopped = false;
+  try {
+    const result = await sh(
+      `node '${slotScript}' -- bash -c 'echo $$ > "$1"; exec sleep 30' _ '${pidFile}'`,
+      {
+        cwd: process.cwd(),
+        env: {
+          ...process.env,
+          GEM_TYPECHECK_SLOTS: '1',
+          GEM_TYPECHECK_SLOT_HELD: '0',
+          GEM_TYPECHECK_LOCK_DIR: directory,
+        },
+        timeoutMs: 500,
+      }
+    );
+    assert.notEqual(result.code, 0);
+    pid = Number(readFileSync(pidFile, 'utf8'));
+    const deadline = Date.now() + 1000;
+    while (!stopped && Date.now() < deadline) {
+      try {
+        process.kill(pid, 0);
+        if (process.platform === 'linux') {
+          stopped =
+            readFileSync(`/proc/${pid}/stat`, 'utf8').split(' ')[2] === 'Z';
+        }
+      } catch (error) {
+        if (error.code !== 'ESRCH' && error.code !== 'ENOENT') throw error;
+        stopped = true;
+      }
+      if (!stopped) await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    assert.equal(
+      stopped,
+      true,
+      'slot descendant must stop after preflight timeout'
+    );
+  } finally {
+    if (!pid && existsSync(pidFile))
+      pid = Number(readFileSync(pidFile, 'utf8'));
+    if (pid && !stopped) {
+      try {
+        process.kill(pid, 'SIGKILL');
+      } catch {}
+    }
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('preflight-managed host slots still serialize concurrent commands', {
+  skip: process.platform === 'win32',
+}, async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'preflight-slot-lock-'));
+  const events = path.join(directory, 'events');
+  const slotScript = path.resolve('scripts/typecheck-slot.mjs');
+  const env = {
+    ...process.env,
+    GEM_TYPECHECK_SLOTS: '1',
+    GEM_TYPECHECK_SLOT_HELD: '0',
+    GEM_TYPECHECK_LOCK_DIR: directory,
+    GEM_TYPECHECK_POLL_MS: '20',
+  };
+  const command = label =>
+    `node '${slotScript}' -- bash -c 'echo ${label}-start >> "$1"; sleep 0.2; echo ${label}-end >> "$1"' _ '${events}'`;
+  try {
+    const results = await Promise.all(
+      ['a', 'b'].map(label =>
+        sh(command(label), { cwd: process.cwd(), env, timeoutMs: 5000 })
+      )
+    );
+    assert.deepEqual(
+      results.map(result => result.code),
+      [0, 0]
+    );
+    const rows = readFileSync(events, 'utf8').trim().split('\n');
+    assert.ok(
+      rows.join(',') === 'a-start,a-end,b-start,b-end' ||
+        rows.join(',') === 'b-start,b-end,a-start,a-end',
+      `slot commands overlapped: ${rows.join(',')}`
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
   }
 });
