@@ -5005,16 +5005,24 @@ class RunAgentTest(unittest.TestCase):
             self.assertFalse(lane.retry_held_cleanup())
 
     def test_gate_command_timeout_kills_a_term_ignoring_descendant(self):
-        marker = Path(tempfile.mkdtemp()) / "pids"
-        script = f"trap '' TERM; sleep 300 & echo $! > {marker}; wait"
-        started = time.monotonic()
-        result = subprocess.run([sys.executable, str(Path(lane.__file__).resolve()), "gate-command",
-                                 "--timeout", "1", "--", "sh", "-c", script], timeout=60,
-                                capture_output=True, text=True)
-        self.assertEqual(result.returncode, 124)
-        self.assertLess(time.monotonic() - started, 45)
-        with self.assertRaises(ProcessLookupError):
-            os.kill(int(marker.read_text()), 0)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            home = root / "home"
+            home.mkdir()
+            # The CLI acquires lifecycle ownership before running the command;
+            # its state must be independent of a drained host running pytest.
+            env = {**os.environ, "HOME": str(home), "LANES_STATE": str(root / "state"),
+                   "LANES_SELFTEST": "1", "LANES_EXECUTION_BACKEND": "local-test"}
+            marker = root / "pids"
+            script = f"trap '' TERM; sleep 300 & echo $! > {marker}; wait"
+            started = time.monotonic()
+            result = subprocess.run([sys.executable, str(Path(lane.__file__).resolve()), "gate-command",
+                                     "--timeout", "1", "--", "sh", "-c", script], timeout=60,
+                                    capture_output=True, text=True, cwd=root, env=env)
+            self.assertEqual(result.returncode, 124, f"stdout: {result.stdout}\nstderr: {result.stderr}")
+            self.assertLess(time.monotonic() - started, 45)
+            with self.assertRaises(ProcessLookupError):
+                os.kill(int(marker.read_text()), 0)
 
     def test_cancellation_does_not_signal_a_reused_root_process_group(self):
         original = {10: (1, 10, "S", "original")}
@@ -6312,6 +6320,89 @@ class TerminalRevisitTest(unittest.TestCase):
         self.assertEqual(comments[0][-1], "@dependabot recreate")
         self.assertEqual(self.updates(), [], "never merge main into a Dependabot branch")
 
+
+    def dependabot_terminal(self):
+        spent = {"sha": "h9", "count": lane.MAX_FIX_ATTEMPTS, "escalated": True}
+        self.write("fix-attempts.json", {"9": spent})
+        return self.pr(9, headRefName="dependabot/npm_and_yarn/runtime-non-major",
+                       mergeStateStatus="DIRTY",
+                       labels=[{"name": "queue-poison"}, {"name": "lane-fix-exhausted"}])
+
+    def terminal_label_deletes(self):
+        return [args for args in self.calls if args[:4] == ["gh", "api", "-X", "DELETE"]]
+
+    def test_dependabot_request_acknowledgment_is_not_a_source_generation(self):
+        bump = self.dependabot_terminal()
+        attempts = (self.host.state / "fix-attempts.json").read_bytes()
+        self.assertEqual(lane.revisit_terminal_prs(self.host, [bump], now=TERMINAL_NOW), [9])
+        self.assertEqual(self.terminal_label_deletes(), [],
+                         "comment delivery cannot remove poison or exhausted fences")
+        visit = lane.read_json(self.host.state / "terminal-revisits.json")["9"]
+        self.assertFalse(visit["ok"])
+        self.assertTrue(visit["requested"])
+        self.assertEqual((self.host.state / "fix-attempts.json").read_bytes(), attempts)
+        ledger = [json.loads(row) for row in (self.host.state / "runs/ledger.jsonl").read_text().splitlines()]
+        self.assertEqual(ledger[-1]["verdict"], "revisit-failed",
+                         "canonical progress cannot report recreation from a comment acknowledgment")
+
+    def test_dependabot_pending_request_is_not_reissued_for_another_main(self):
+        bump = self.dependabot_terminal()
+        attempts = (self.host.state / "fix-attempts.json").read_bytes()
+        lane.revisit_terminal_prs(self.host, [bump], now=TERMINAL_NOW)
+        self.calls.clear()
+        self.main = "m2"
+        self.assertEqual(lane.revisit_terminal_prs(self.host, [bump], now=TERMINAL_NOW + 60), [])
+        self.assertFalse([args for args in self.calls if args[:3] == ["gh", "pr", "comment"]])
+        self.assertEqual(self.terminal_label_deletes(), [])
+        self.assertEqual((self.host.state / "fix-attempts.json").read_bytes(), attempts)
+
+    def test_dependabot_legacy_false_success_does_not_authorize_another_request(self):
+        bump = self.dependabot_terminal()
+        self.write("terminal-revisits.json", {"9": {
+            "head": "h9", "main": "older-main", "at": TERMINAL_NOW - 60,
+            "action": "dependabot-recreate", "ok": True}})
+        self.assertEqual(lane.revisit_terminal_prs(self.host, [bump], now=TERMINAL_NOW), [])
+        self.assertFalse([args for args in self.calls if args[:3] == ["gh", "pr", "comment"]])
+        self.assertEqual(self.terminal_label_deletes(), [])
+
+    def test_dependabot_real_new_head_can_request_without_releasing_new_fences(self):
+        bump = self.dependabot_terminal()
+        self.write("terminal-revisits.json", {"9": {
+            "head": "previous-source", "main": "older-main", "at": TERMINAL_NOW - 60,
+            "action": "dependabot-recreate", "requested": True, "ok": False}})
+        self.assertEqual(lane.revisit_terminal_prs(self.host, [bump], now=TERMINAL_NOW), [9])
+        comments = [args for args in self.calls if args[:3] == ["gh", "pr", "comment"]]
+        self.assertEqual(len(comments), 1)
+        self.assertEqual(comments[0][-1], "@dependabot recreate")
+        self.assertEqual(self.terminal_label_deletes(), [])
+        visit = lane.read_json(self.host.state / "terminal-revisits.json")["9"]
+        self.assertEqual(visit["head"], "h9")
+        self.assertTrue(visit["requested"])
+        self.assertFalse(visit["ok"])
+
+    def test_dependabot_comment_failure_preserves_attempts_and_fences(self):
+        bump = self.dependabot_terminal()
+        attempts = (self.host.state / "fix-attempts.json").read_bytes()
+        ordinary_shell = lane.sh.side_effect
+        def refuse_comment(args, **kwargs):
+            if args[:3] == ["gh", "pr", "comment"]:
+                self.calls.append(args)
+                return SimpleNamespace(returncode=1, stdout="", stderr="delivery failed")
+            return ordinary_shell(args, **kwargs)
+        with patch.object(lane, "sh", side_effect=refuse_comment):
+            self.assertEqual(lane.revisit_terminal_prs(self.host, [bump], now=TERMINAL_NOW), [9])
+        self.assertEqual(self.terminal_label_deletes(), [])
+        visit = lane.read_json(self.host.state / "terminal-revisits.json")["9"]
+        self.assertFalse(visit["ok"])
+        self.assertFalse(visit.get("requested"))
+        self.assertEqual((self.host.state / "fix-attempts.json").read_bytes(), attempts)
+
+    def test_dependabot_other_writer_lease_prevents_requests_and_fence_changes(self):
+        bump = self.dependabot_terminal()
+        with patch.object(lane, "claimed_elsewhere", return_value=True):
+            self.assertEqual(lane.revisit_terminal_prs(self.host, [bump], now=TERMINAL_NOW), [])
+        self.assertFalse([args for args in self.calls if args[:3] == ["gh", "pr", "comment"]])
+        self.assertEqual(self.terminal_label_deletes(), [])
     def test_unreadable_main_or_revoked_branch_does_nothing(self):
         self.write("fix-attempts.json", {"1": {"sha": "h1", "count": lane.MAX_FIX_ATTEMPTS, "escalated": True}})
         self.main = ""
@@ -12947,7 +13038,7 @@ class TimerInstallerNodePathTests(unittest.TestCase):
         source = (Path(__file__).resolve().parents[1] / "lanes/install.sh").read_text()
         for platform, with_gbrain, temp_case in ((p, g, t) for p in ("Linux", "Darwin")
                                                 for g in (False, True)
-                                                for t in (("unset", "private", "insecure", "relative", "specifier", "symlink")
+                                                for t in (("unset", "private", "insecure", "relative", "specifier", "symlink", "shared-policy", "unsafe-policy", "collision-policy", "specifier-policy", "escaped-policy", "unicode-policy", "octal-policy")
                                                           if p == "Linux" else ("unset",))):
             with self.subTest(platform=platform, with_gbrain=with_gbrain, temp_case=temp_case), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
@@ -12958,11 +13049,35 @@ class TimerInstallerNodePathTests(unittest.TestCase):
                     target = root / "real-temp"
                     target.mkdir(mode=0o700)
                     temp_dir.symlink_to(target, target_is_directory=True)
-                configured_temp = {"unset": "", "relative": "relative-temp", "specifier": str(root / "bad%h")}.get(temp_case, str(temp_dir))
+                configured_temp = {"unset": "", "shared-policy": "", "unsafe-policy": "", "collision-policy": "", "specifier-policy": "", "escaped-policy": "", "unicode-policy": "", "octal-policy": "", "relative": "relative-temp", "specifier": str(root / "bad%h")}.get(temp_case, str(temp_dir))
                 bin_dir = root / "selected-node-bin"
                 bin_dir.mkdir()
                 units = root / "units"
                 units.mkdir()
+                main_policy = units / "jovie-lanes.service.d"
+                if temp_case.endswith("policy"):
+                    main_policy.mkdir()
+                    (main_policy / "20-current-login.conf").write_text("[Service]\nEnvironment=CODEX_LANE_AUTH_MODE=current-login\n")
+                    (main_policy / "40-subscription-pool.conf").write_text('[Service]\nEnvironment=CODEX_LANE_AUTH_MODE=subscription-pool\nEnvironment="CODEX_LANE_SUBSCRIPTION_PROFILES={\\"fixture\\":{\\"home\\":\\"/private/fixture\\",\\"slots\\":2}}"\n')
+                    (main_policy / "50-environment-file.conf").write_text("[Service]\nEnvironmentFile=-/private/fixture/existing.env\nUnsetEnvironment=FIXTURE_UNUSED\n")
+                    (main_policy / "claude-slots.conf").write_text("[Service]\nEnvironment=LANES_SLOTS_CLAUDE=0\n")
+                    resource_policy = "[Service]\nSlice=agent-lanes.slice\nCPUWeight=20\nNice=10\n"
+                    if temp_case == "shared-policy":
+                        resource_policy += "CPUQuota=50%\nMemoryHigh=60%\nMemoryMax=75%\n"
+                        escaped_literal = chr(92) * 2 + "x25n"
+                        (main_policy / "55-literal-escape.conf").write_text(f'[Service]\nEnvironment="FIXTURE_LITERAL={escaped_literal}"\n')
+                    (main_policy / "cpu-weight.conf").write_text(resource_policy)
+                    if temp_case == "unsafe-policy":
+                        (main_policy / "70-command.conf").write_text("[Service]\nExecStart=/bin/false\n")
+                    if temp_case == "specifier-policy":
+                        (main_policy / "70-unit-identity.conf").write_text("[Service]\nEnvironment=FIXTURE_SENDER=%n\n")
+                    if temp_case in ("escaped-policy", "unicode-policy", "octal-policy"):
+                        escape = {"escaped-policy": r"\x25n", "unicode-policy": r"\u0025n", "octal-policy": r"\045n"}[temp_case]
+                        (main_policy / "70-escaped-identity.conf").write_text(f'[Service]\nEnvironment="FIXTURE_SENDER={escape}"\n')
+                    if temp_case == "collision-policy":
+                        protected = units / "jovie-lanes-wake.service.d/50-main-40-subscription-pool.conf"
+                        protected.parent.mkdir()
+                        protected.write_text("operator-owned\n")
                 plist = root / "lanes.plist"
                 watchdog_plist = root / "lanes-watchdog.plist"
                 # Redirect only service output destinations; keep HOME and the
@@ -13016,11 +13131,13 @@ with open(os.environ['INSTALL_COMMAND_LOG'], 'a') as log:
                          "LANES_STATE": str(root / "state"), "LANES_REPO": str(root / "repo"),
                          "LANES_TMPDIR": configured_temp, "LANES_HUD": "0", "INSTALL_COMMAND_LOG": str(commands)},
                 )
-                if temp_case in ("insecure", "relative", "specifier", "symlink"):
+                if temp_case in ("insecure", "relative", "specifier", "symlink", "unsafe-policy", "collision-policy", "specifier-policy", "escaped-policy", "unicode-policy", "octal-policy"):
                     self.assertNotEqual(result.returncode, 0, "Unsafe temporary placement was accepted")
                     self.assertNotIn("--user enable", commands.read_text())
                     if temp_case == "insecure":
                         self.assertEqual(temp_dir.stat().st_mode & 0o777, 0o755)
+                    if temp_case == "collision-policy":
+                        self.assertEqual(protected.read_text(), "operator-owned\n")
                     continue
                 self.assertEqual(result.returncode, 0, result.stderr)
                 if platform == "Darwin":
@@ -13044,6 +13161,26 @@ with open(os.environ['INSTALL_COMMAND_LOG'], 'a') as log:
                     self.assertNotIn("After=jovie-lanes.service", watchdog_service)
                     self.assertIn("OnUnitActiveSec=60s", watchdog_timer)
                     self.assertIn("OnCalendar=minutely", watchdog_timer)
+                    if temp_case == "shared-policy":
+                        wake_policy = units / "jovie-lanes-wake.service.d"
+                        expected = sorted(main_policy.glob("*.conf"))
+                        self.assertEqual([p.name for p in sorted(wake_policy.glob("50-main-*.conf"))],
+                                         ["50-main-" + p.name for p in expected])
+                        for policy in expected:
+                            shared = wake_policy / ("50-main-" + policy.name)
+                            self.assertTrue(shared.is_symlink())
+                            self.assertEqual(shared.resolve(), policy.resolve())
+                            self.assertEqual(shared.read_text(), policy.read_text())
+                        (main_policy / "20-current-login.conf").unlink()
+                        pool = main_policy / "40-subscription-pool.conf"
+                        pool.write_text(pool.read_text() + "Environment=CODEX_LANE_LOGIN_SLOTS=2\n")
+                        repeated = subprocess.run(["/bin/bash", str(installer)], capture_output=True, text=True,
+                                                  env={**os.environ, "PATH": f"{bin_dir}:{brain_bin}:/usr/bin:/bin",
+                                                       "LANES_STATE": str(root / "state"), "LANES_REPO": str(root / "repo"),
+                                                       "LANES_TMPDIR": "", "LANES_HUD": "0", "INSTALL_COMMAND_LOG": str(commands)})
+                        self.assertEqual(repeated.returncode, 0, repeated.stderr)
+                        self.assertFalse((wake_policy / "50-main-20-current-login.conf").is_symlink())
+                        self.assertIn("CODEX_LANE_LOGIN_SLOTS=2", (wake_policy / "50-main-40-subscription-pool.conf").read_text())
                     for name in ("jovie-lanes", "jovie-lanes-watchdog", "jovie-lanes-wake"):
                         placement = units / f"{name}.service.d/65-temp-placement.conf"
                         if temp_case == "private":

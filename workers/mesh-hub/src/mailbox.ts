@@ -12,10 +12,10 @@ import type { Env } from './env.ts';
 import {
   allowedUrls,
   buildPrompt,
-  executorKinds,
   fetchEvidence,
   isExecutable,
   runModel,
+  runtimeStatus,
   validateReply,
 } from './executor.ts';
 import { backoffFor, isOpen, Outbox, type RecipientStatus } from './outbox.ts';
@@ -301,8 +301,7 @@ export class Mailbox extends DurableObject<Env> {
     const kind = this.config()?.kind;
     return Boolean(
       kind &&
-        this.env.AI &&
-        executorKinds(this.env.EXECUTOR_KINDS).has(kind) &&
+        runtimeStatus(kind, this.env).executorAvailable &&
         isExecutable({ ...envelope, to: kind })
     );
   }
@@ -314,7 +313,13 @@ export class Mailbox extends DurableObject<Env> {
    */
   private async runExecutor(now: number) {
     const config = this.config();
-    if (!config || !this.env.AI) return;
+    // Old exec alarms survive configuration changes. Recheck before claiming mail.
+    if (
+      !config ||
+      !this.env.AI ||
+      !runtimeStatus(config.kind, this.env).executorAvailable
+    )
+      return;
     const batch = this.store.claimForExecutor(now, this.graceMs(), 120_000, 3);
     const registry = this.env.REGISTRY.get(
       this.env.REGISTRY.idFromName('registry')
@@ -351,11 +356,13 @@ export class Mailbox extends DurableObject<Env> {
       }
       const body =
         `[hub-executor:workers-ai for ${config.kind}] ${reply}`.slice(0, 3_900);
-      const correlationId =
-        `reply-${config.kind}-${message.correlationId}`.slice(0, 120);
+      // The shared hub sender needs a collision-free namespace across target kinds.
+      const correlationId = `reply-exec-${await sha256Hex(
+        JSON.stringify([config.kind, message.id])
+      )}`;
       const envelope: Envelope = {
-        id: `${config.kind}:${correlationId}`,
-        from: config.kind,
+        id: `mesh-hub:${correlationId}`,
+        from: 'mesh-hub',
         to: message.from,
         correlationId,
         sha256: await sha256Hex(body),

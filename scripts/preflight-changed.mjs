@@ -72,6 +72,12 @@ export const NARROWED = {
 /** Generators whose output must be committed. `write` rewrites, `check` verifies. */
 export const GENERATORS = [
   {
+    id: 'artist-launch-inventory',
+    when: /^apps\/web\/app\/|^scripts\/artist-launch-|^docs\/product\/generated\/artist-launch-inventory\.json$/,
+    write: 'node scripts/artist-launch-contract.mjs --write',
+    check: 'node scripts/artist-launch-contract.mjs --check',
+  },
+  {
     id: 'workflow-topology',
     when: /^\.github\/workflows\/[^/]+\.ya?ml$|^scripts\/ci-workflow-topology\.mjs$/,
     write: 'node scripts/ci-workflow-topology.mjs --write',
@@ -404,8 +410,10 @@ export function typecheckTargets(files, cwd) {
     if (web) {
       out.add(isTest ? 'web-tests' : 'web');
       if (!isTest) {
-        // Source changes also affect test consumers and Ovie's TS graph.
+        // App, test and story projects have separate includes. Prop changes
+        // can break stories even when both the app and test projects compile.
         out.add('web-tests');
+        out.add('web-stories');
         out.add('pkg:@jovie/ovie');
       }
     } else if (/^scripts\//.test(f.filename)) out.add('scripts');
@@ -442,6 +450,8 @@ function typecheckCommand(target, cwd) {
     return `cd apps/web && ${cap} pnpm exec node ../../scripts/typecheck-singleflight.mjs -- tsc -p tsconfig.typecheck.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo`;
   if (target === 'web-tests')
     return `cd apps/web && ${cap} node ../../scripts/typecheck-singleflight.mjs -- node ../../scripts/typecheck-web-tests.mjs`;
+  if (target === 'web-stories')
+    return `cd apps/web && ${cap} node ../../scripts/typecheck-singleflight.mjs -- node ../../scripts/typecheck-web-stories.mjs`;
   if (target === 'scripts') return `${cap} pnpm typecheck:scripts`;
   return `${cap} pnpm --filter ${target.slice(4)} run typecheck`;
 }

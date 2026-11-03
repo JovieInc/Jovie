@@ -188,6 +188,7 @@ test('typecheck targets are the affected packages only', () => {
     'pkg:@jovie/ovie',
     'scripts',
     'web',
+    'web-stories',
     'web-tests',
   ]);
 });
@@ -214,7 +215,7 @@ test('web source changes typecheck test consumers without a changed test file', 
       [file('apps/web/lib/leads/route-lead.ts')],
       process.cwd()
     ).sort(),
-    ['pkg:@jovie/ovie', 'web', 'web-tests']
+    ['pkg:@jovie/ovie', 'web', 'web-stories', 'web-tests']
   );
   assert.deepEqual(
     typecheckTargets(
@@ -232,11 +233,40 @@ test('web source changes typecheck test consumers without a changed test file', 
   );
 });
 
+test('story changes select the story compiler omitted by the app and test projects', () => {
+  const story =
+    'apps/web/components/features/opportunity-inbox/OpportunityInboxEmptyState.stories.tsx';
+  assert.ok(
+    typecheckTargets([file(story)], process.cwd()).includes('web-stories')
+  );
+  assert.deepEqual(
+    typecheckTargets([file(story, 'removed')], process.cwd()),
+    []
+  );
+  assert.deepEqual(
+    typecheckTargets([file('apps/web/tests/unit/a.test.ts')], process.cwd()),
+    ['web-tests']
+  );
+});
+
 test('arguments parse and unknown flags fail', () => {
   assert.equal(parseArgs(['--no-coverage', '--base', 'dev']).coverage, false);
   assert.throws(() => parseArgs(['--nope']));
   assert.ok(HEAVY_GUARDS.has('merged-with-base-invariants'));
   assert.ok(GENERATORS.some(g => g.id === 'workflow-topology'));
+});
+
+test('route and policy changes select launch inventory regeneration before guards', () => {
+  const generator = GENERATORS.find(g => g.id === 'artist-launch-inventory');
+  assert.ok(generator);
+  for (const source of [
+    'apps/web/app/api/admin/reference-review/route.ts',
+    'scripts/artist-launch-policy.mjs',
+    'scripts/artist-launch-contract.mjs',
+    'docs/product/generated/artist-launch-inventory.json',
+  ])
+    assert.ok(generator.when.test(source), source);
+  assert.equal(generator.when.test('apps/web/lib/unrelated.ts'), false);
 });
 
 test('host-only reds are downgraded on macOS but real reds are not', () => {
