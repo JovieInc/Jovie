@@ -151,6 +151,13 @@ function shallowFixture() {
   git(source, ['checkout', '-q', '-b', 'feature']);
   const head = commit(source, 'feature');
   git(source, ['checkout', '-q', 'main']);
+  const historicCommit = commit(source, 'historical-only');
+  const historicBlob = git(source, [
+    'rev-parse',
+    `${historicCommit}:historical-only.txt`,
+  ]);
+  git(source, ['rm', '-q', 'historical-only.txt']);
+  git(source, ['commit', '-q', '-m', 'remove historical file']);
   for (let i = 0; i < 80; i++) commit(source, `main-${i}`);
   const base = git(source, ['rev-parse', 'HEAD']);
   git(source, ['checkout', '-q', '--orphan', 'unrelated']);
@@ -177,7 +184,7 @@ function shallowFixture() {
     head,
   ]);
   git(clone, ['checkout', '-q', '--detach', head]);
-  return { root, source, clone, rootSha, head, base, unrelated };
+  return { root, source, clone, rootSha, head, base, unrelated, historicBlob };
 }
 
 describe('targeted complete ancestry for PR Size Guard', () => {
@@ -257,9 +264,6 @@ describe('targeted complete ancestry for PR Size Guard', () => {
     expect(readFileSync(output, 'utf8')).toBe(
       `base_tip=${f.base}\nsha=${f.rootSha}\n`
     );
-    expect(git(f.clone, ['diff', '--numstat', f.rootSha, f.head])).toBe(
-      git(f.source, ['diff', '--numstat', f.rootSha, f.head])
-    );
     const envFile = join(f.root, 'github-env');
     writeFileSync(envFile, '');
     const hydrated = workflowStep(
@@ -274,6 +278,14 @@ describe('targeted complete ancestry for PR Size Guard', () => {
     );
     expect(hydrated.status, hydrated.stderr).toBe(0);
     expect(readFileSync(envFile, 'utf8')).toBe('GIT_NO_LAZY_FETCH=1\n');
+    expect(
+      git(f.clone, ['--no-lazy-fetch', 'diff', '--numstat', f.rootSha, f.head])
+    ).toBe(git(f.source, ['diff', '--numstat', f.rootSha, f.head]));
+    expect(
+      spawnSync('git', ['--no-lazy-fetch', 'cat-file', '-e', f.historicBlob], {
+        cwd: f.clone,
+      }).status
+    ).not.toBe(0);
     expect(git(f.clone, ['config', '--local', '--list'])).toBe(before);
     const policyEnv = {
       GIT_NO_LAZY_FETCH: '1',
