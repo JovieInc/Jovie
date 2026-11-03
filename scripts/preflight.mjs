@@ -43,6 +43,7 @@ import { cpus, freemem, homedir, loadavg, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load as yamlLoad } from 'js-yaml';
+import { cacheHome } from './lib/cache-home.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const WORKFLOW_PATH = '.github/workflows/source-validation.yml';
@@ -298,7 +299,13 @@ export function prepareStatement(statement, { flockPath = '' } = {}) {
   // `exit` would end the process; contain it in a subshell.
   if (/\bexit\b/.test(text)) text = `( ${text}\n)`;
   // Typechecks share gem's CPU: serialize them under the host lock.
-  if (flockPath) text = text.replace(TYPECHECK, `$1flock ${flockPath} $2`);
+  if (flockPath) {
+    const quotedLock = `'${flockPath.replaceAll("'", "'\"'\"'")}'`;
+    text = text.replace(
+      TYPECHECK,
+      (_, prefix, command) => `${prefix}flock ${quotedLock} ${command}`
+    );
+  }
   return text;
 }
 
@@ -596,7 +603,7 @@ export async function main({
       spawnSync('which', ['flock'], { cwd, env: childEnv }).status !== 0
     )
       return '';
-    return path.join(homedir(), '.cache', 'gem-typecheck.lock');
+    return path.join(cacheHome(childEnv), 'gem-typecheck.lock');
   })();
   if (flockPath) mkdirSync(path.dirname(flockPath), { recursive: true });
 

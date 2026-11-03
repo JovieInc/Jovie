@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -23,6 +30,7 @@ import {
   main,
   NARROWED,
   parseArgs,
+  privateDataCheck,
   resolveBaseRef,
   typecheckTargets,
 } from './preflight-changed.mjs';
@@ -31,6 +39,59 @@ const file = (filename, status = 'modified') => ({
   filename,
   status,
   patch: '',
+});
+
+test('Private Data Guard uses the XDG cache for cold and warm pinned runs and keeps failures blocking', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'pdg-xdg-'));
+  const pin = 'a'.repeat(40);
+  const cache = path.join(dir, "cache ' $(touch injected) $&");
+  const cachedGuard = path.join(
+    cache,
+    'jovie-preflight',
+    `private-data-${pin}.py`
+  );
+  const guard = [
+    'import os, sys',
+    'assert os.environ["EVENT_NAME"] == "pull_request"',
+    'assert os.environ["PR_BASE_SHA"] == "fixture-base"',
+    'assert os.environ["FULL_TREE"] == "false"',
+    'assert os.environ["FAIL_ON_FINDINGS"] == "true"',
+    'assert os.environ["EXTRA_PATHS"] == "fixture-path"',
+    'assert os.environ["EXTRA_CONTENT"] == "fixture-content"',
+    'print("pinned guard executed")',
+    'sys.exit(17)',
+  ].join('\n');
+  const pinnedWorkflow = `run: |\n  python3 - <<'PY'\n${guard
+    .split('\n')
+    .map(line => `  ${line}`)
+    .join('\n')}\n  PY\n`;
+  try {
+    mkdirSync(path.join(dir, '.github/workflows'), { recursive: true });
+    mkdirSync(path.join(dir, 'packages/api-client'), { recursive: true });
+    writeFileSync(
+      path.join(dir, '.github/workflows/private-data-guard.yml'),
+      `jobs:\n  guard:\n    uses: JovieInc/ci/.github/workflows/private-data-guard.yml@${pin}\n    with:\n      extra-path-patterns: fixture-path\n      extra-content-patterns: fixture-content\n`
+    );
+    writeFileSync(
+      path.join(dir, 'packages/api-client/cli.ts'),
+      `import assert from 'node:assert/strict';\nassert.deepEqual(process.argv.slice(2), ${JSON.stringify(['gh', '--priority', 'default', '--', 'api', `repos/JovieInc/ci/contents/.github/workflows/private-data-guard.yml?ref=${pin}`, '--jq', '.content'])});\nconsole.log(${JSON.stringify(Buffer.from(pinnedWorkflow).toString('base64'))});\n`
+    );
+    const env = { ...process.env, XDG_CACHE_HOME: cache };
+    const cold = await privateDataCheck(dir, env, 'fixture-base');
+    assert.ok('code' in cold, JSON.stringify(cold));
+    assert.equal(cold.code, 17, JSON.stringify(cold));
+    assert.match(cold.out, /pinned guard executed/);
+    assert.equal(readFileSync(cachedGuard, 'utf8'), guard);
+    // A cached pin must not need the fetch client again.
+    rmSync(path.join(dir, 'packages'), { recursive: true });
+    const warm = await privateDataCheck(dir, env, 'fixture-base');
+    assert.ok('code' in warm, JSON.stringify(warm));
+    assert.equal(warm.code, 17, JSON.stringify(warm));
+    assert.match(warm.out, /pinned guard executed/);
+    assert.equal(existsSync(path.join(dir, 'injected')), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('changed invariant modules select their contract tests before push', () => {

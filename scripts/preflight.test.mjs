@@ -12,10 +12,11 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { cacheHome } from './lib/cache-home.mjs';
 import {
   applyExclusions,
   buildPreflightEnv,
@@ -33,6 +34,93 @@ import {
 } from './preflight.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const hasFlock = spawnSync('which', ['flock']).status === 0;
+
+test('XDG cache accepts absolute paths and falls back for unset, empty and relative values', () => {
+  for (const configured of [
+    undefined,
+    '',
+    'cache',
+    './cache',
+    '../cache',
+    '~/cache',
+  ]) {
+    const env = configured === undefined ? {} : { XDG_CACHE_HOME: configured };
+    assert.equal(cacheHome(env), path.join(homedir(), '.cache'));
+  }
+  for (const configured of ['/', '/tmp/cache with spaces', '/tmp/ cache ']) {
+    assert.equal(cacheHome({ XDG_CACHE_HOME: configured }), configured);
+  }
+});
+
+test('preflight creates its XDG lock directory only on hosts with flock', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'pf-xdg-'));
+  const cache = path.join(dir, 'cache with spaces');
+  try {
+    writeFileSync(
+      path.join(dir, 'fixture.yml'),
+      `jobs:\n  ${JOB_ID}:\n    steps:\n      - name: Gate\n        run: echo ok\n`
+    );
+    const code = await main({
+      argv: ['--list', '--workflow', 'fixture.yml'],
+      cwd: dir,
+      env: { ...process.env, XDG_CACHE_HOME: cache },
+      log: () => {},
+    });
+    assert.equal(code, 0);
+    assert.equal(existsSync(cache), hasFlock);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test(
+  hasFlock
+    ? 'XDG lock paths stay literal and the real flock preserves exclusion and command failure'
+    : 'typechecks remain unwrapped on hosts without flock',
+  () => {
+    if (!hasFlock) {
+      assert.equal(prepareStatement('pnpm typecheck'), 'pnpm typecheck');
+      return;
+    }
+    const dir = mkdtempSync(path.join(tmpdir(), 'pf-xdg-lock-'));
+    const flockPath = path.join(
+      dir,
+      "cache ' $(touch injected) $&",
+      'gem-typecheck.lock'
+    );
+    try {
+      mkdirSync(path.dirname(flockPath));
+      writeFileSync(
+        path.join(dir, 'pnpm'),
+        '#!/bin/sh\nif flock -n "$EXPECTED_LOCK" true; then exit 99; fi\nprintf "locked:%s\\n" "$*"\nexit 23\n',
+        { mode: 0o700 }
+      );
+      const result = spawnSync(
+        'bash',
+        [
+          '-c',
+          prepareStatement('pnpm typecheck --pretty false', { flockPath }),
+        ],
+        {
+          cwd: dir,
+          env: {
+            ...process.env,
+            PATH: `${dir}:${process.env.PATH}`,
+            EXPECTED_LOCK: flockPath,
+          },
+          encoding: 'utf8',
+        }
+      );
+      assert.equal(result.status, 23, result.stdout + result.stderr);
+      assert.equal(result.stdout.trim(), 'locked:typecheck --pretty false');
+      assert.equal(existsSync(flockPath), true);
+      assert.equal(existsSync(path.join(dir, 'injected')), false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+);
 
 function hookGitFixture({ behind = true, conflict = false, during = '' } = {}) {
   const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'pf-hook-base-')));
@@ -503,6 +591,7 @@ async function runPlan(text, extraEnv = {}) {
     argv: ['--workflow', path.join(dir, WORKFLOW_PATH)],
     env: {
       JOVIE_PREFLIGHT_LEDGER: 'off',
+      XDG_CACHE_HOME: path.join(dir, 'cache'),
       PATH: process.env.PATH,
       ...extraEnv,
     },
@@ -737,6 +826,11 @@ test('pre-push Git environment cannot redirect fixture writes into its linked wo
       path.join(ROOT, 'scripts/preflight.mjs'),
       path.join(parent, 'scripts/preflight.mjs')
     );
+    mkdirSync(path.join(parent, 'scripts/lib'));
+    copyFileSync(
+      path.join(ROOT, 'scripts/lib/cache-home.mjs'),
+      path.join(parent, 'scripts/lib/cache-home.mjs')
+    );
     writeFileSync(path.join(parent, 'tracked.txt'), 'parent content\n');
     writeFileSync(
       path.join(parent, WORKFLOW_PATH),
@@ -809,6 +903,7 @@ jobs:
           GIT_TRACE: '0',
           PREFLIGHT_KEEP: 'retained',
           PREFLIGHT_FIXTURES: fixtures,
+          XDG_CACHE_HOME: path.join(root, 'cache'),
           JOVIE_PREFLIGHT_LEDGER: 'off',
           JOVIE_PREFLIGHT: '1',
         },
@@ -881,6 +976,11 @@ function copiedCliFixture() {
   copyFileSync(
     path.join(ROOT, 'scripts/preflight.mjs'),
     path.join(real, 'scripts/preflight.mjs')
+  );
+  mkdirSync(path.join(real, 'scripts/lib'));
+  copyFileSync(
+    path.join(ROOT, 'scripts/lib/cache-home.mjs'),
+    path.join(real, 'scripts/lib/cache-home.mjs')
   );
   symlinkSync(
     path.join(ROOT, 'node_modules'),

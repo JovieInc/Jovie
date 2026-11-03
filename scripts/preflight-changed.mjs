@@ -38,6 +38,7 @@ import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { load as yamlLoad } from 'js-yaml';
+import { cacheHome } from './lib/cache-home.mjs';
 import {
   companionChecklist,
   explainShipGate,
@@ -333,14 +334,14 @@ function loadBody(args, cwd) {
 }
 
 /** Run the shared Private Data Guard from the pinned JovieInc/ci workflow. */
-async function privateDataCheck(cwd, env, mergeBase) {
+export async function privateDataCheck(cwd, env, mergeBase) {
   const wfPath = path.join(cwd, '.github/workflows/private-data-guard.yml');
   if (!existsSync(wfPath)) return { skip: 'no private-data-guard workflow' };
   const wf = /** @type {any} */ (yamlLoad(readFileSync(wfPath, 'utf8')));
   const job = Object.values(wf.jobs ?? {})[0] ?? {};
   const m = String(job.uses ?? '').match(/^JovieInc\/ci\/(.+)@([0-9a-f]{40})$/);
   if (!m) return { skip: 'guard is not a pinned JovieInc/ci workflow' };
-  const cache = path.join(homedir(), '.cache', 'jovie-preflight');
+  const cache = path.join(cacheHome(env), 'jovie-preflight');
   mkdirSync(cache, { recursive: true });
   const file = path.join(cache, `private-data-${m[2]}.py`);
   if (!existsSync(file)) {
@@ -365,7 +366,8 @@ async function privateDataCheck(cwd, env, mergeBase) {
   const tmp = path.join(tmpdir(), `pdg-${process.pid}`);
   // Include uncommitted work: scan base..working tree via a temp commit-free diff
   // is not possible for the guard, so it scans committed history; commit first.
-  const run = await sh(`python3 ${JSON.stringify(file)}`, {
+  const quotedFile = `'${file.replaceAll("'", "'\"'\"'")}'`;
+  const run = await sh(`python3 ${quotedFile}`, {
     cwd,
     env: {
       ...env,
