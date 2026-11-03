@@ -5,10 +5,12 @@ import { runInNewContext } from 'node:vm';
 import { load } from 'js-yaml';
 
 const workflow = name =>
-  load(
-    readFileSync(
-      new URL(`../.github/workflows/${name}.yml`, import.meta.url),
-      'utf8'
+  /** @type {{ jobs: Record<string, { 'runs-on': string }> }} */ (
+    load(
+      readFileSync(
+        new URL(`../.github/workflows/${name}.yml`, import.meta.url),
+        'utf8'
+      )
     )
   );
 const pool = ['self-hosted', 'Linux', 'X64', 'jovie-fixed'];
@@ -106,3 +108,30 @@ test('Fleet Rules never executes fork checkout code on the persistent pool', () 
     'ubuntu-latest'
   );
 });
+
+for (const file of [
+  'auto-ready-agent-drafts',
+  'lane-fix-relay',
+  'merge-queue-green-enroll',
+]) {
+  const jobs = Object.values(workflow(file).jobs).filter(job =>
+    job['runs-on']?.includes('RUNNER_CONTROL_PLANE')
+  );
+  test(`${file}: control-plane jobs accept string and label-array pools with hosted defaults`, () => {
+    assert.ok(jobs.length > 0);
+    for (const job of jobs) {
+      assert.equal(select(job['runs-on']), 'ubuntu-latest');
+      assert.deepEqual(
+        select(job['runs-on'], { RUNNER_CONTROL_PLANE: JSON.stringify(pool) }),
+        pool
+      );
+      assert.equal(
+        select(job['runs-on'], { RUNNER_CONTROL_PLANE: '"ubuntu-24.04"' }),
+        'ubuntu-24.04'
+      );
+      assert.throws(() =>
+        select(job['runs-on'], { RUNNER_CONTROL_PLANE: 'invalid-json' })
+      );
+    }
+  });
+}
