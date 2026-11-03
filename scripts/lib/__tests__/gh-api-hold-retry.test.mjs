@@ -107,18 +107,22 @@ exit 0
 
 describe('gh-api-hold.sh transient retry', () => {
   it('recovers a transient failure with the TestFlight authorize step retry budget', () => {
-    const workflow = load(
-      readFileSync(
-        new URL(
-          '../../../.github/workflows/ios-testflight.yml',
-          import.meta.url
-        ),
-        'utf8'
-      )
-    );
+    const workflow =
+      /** @type {{ jobs: Record<string, { steps: Array<{ id?: string, env?: Record<string, string> }> }> }} */ (
+        load(
+          readFileSync(
+            new URL(
+              '../../../.github/workflows/ios-testflight.yml',
+              import.meta.url
+            ),
+            'utf8'
+          )
+        )
+      );
     const authorize = workflow.jobs['authorize-release'].steps.find(
       step => step.id === 'authorize'
     );
+    if (!authorize?.env) throw new Error('TestFlight authorize env is missing');
     expect(authorize.env.GH_API_RETRY_ATTEMPTS).toBe('3');
     expect(authorize.env.GH_API_RETRY_SECONDS).toBe('2');
     const result = runHold({
