@@ -47,7 +47,8 @@ RANK_TTL_S = 24 * 3600
 MAX_RANKED = 50
 CEILING_FLOOR = 30          # Todo above max(this, 4 x target) is over WIP
 DEMOTE_PRIORITIES = (3, 4)  # P3/P4 only; unset priority is unknown, not unimportant
-PROTECT_LABELS = frozenset({"dispatch-next", "plan-approved", "tim-approved", "incident", "factory"})
+MARKETING_LABEL = "priority:marketing"
+PROTECT_LABELS = frozenset({MARKETING_LABEL, "dispatch-next", "plan-approved", "tim-approved", "incident", "factory"})
 MIRROR_MAX_AGE_S = 6 * 3600  # candidates are re-read live, so a lagging mirror only needs to be recent enough to nominate
 PUBKEY_ENV = "LANES_SUMMER_PORTFOLIO_PUBKEY"
 DEFAULT_PUBKEY = Path.home() / ".config" / "symphony" / "summer-portfolio-pubkey.pem"
@@ -192,6 +193,11 @@ def claim_key(identifier: str, ranks: dict[str, int]) -> tuple[int, int]:
 
 # ------------------------------------------------------------------ selection (pure)
 
+def marketing_priority(labels) -> bool:
+    """Explicit, reversible routing label; never a readiness or hold exemption."""
+    return MARKETING_LABEL in {str(label).strip().lower() for label in labels or ()}
+
+
 def protected(row: dict, ranks: dict[str, int]) -> bool:
     labels = {str(label).lower() for label in row.get("labels") or ()}
     return row.get("priority") == 1 or row.get("identifier") in ranks or bool(labels & PROTECT_LABELS)
@@ -200,7 +206,7 @@ def protected(row: dict, ranks: dict[str, int]) -> bool:
 def admit_candidates(rows: list[dict], ranks: dict[str, int], excluded=(), red_line=lambda row: False,
                      now: float | None = None, pending: dict | None = None) -> tuple[list[dict], dict]:
     """Backlog rows that qualify for priority admission, best first: Summer rank order, then
-    Urgent by backlog score. Readiness gates are the refill's own (`skip_reason`)."""
+    Urgent, marketing, then backlog score. Readiness gates are the refill's own (`skip_reason`)."""
     now = time.time() if now is None else now
     pending = pending or {}
     excluded = frozenset(label.lower() for label in excluded)
@@ -209,7 +215,7 @@ def admit_candidates(rows: list[dict], ranks: dict[str, int], excluded=(), red_l
     for row in rows:
         if row.get("state") != "Backlog" or pending.get(row["id"]) == "Todo":
             continue
-        if row.get("priority") != 1 and row["identifier"] not in ranks:
+        if row.get("priority") != 1 and row["identifier"] not in ranks and not marketing_priority(row.get("labels")):
             continue
         reason = binding_refill.skip_reason(row, open_ids, excluded, red_line)
         if reason:
@@ -217,6 +223,7 @@ def admit_candidates(rows: list[dict], ranks: dict[str, int], excluded=(), red_l
         else:
             found.append(row)
     found.sort(key=lambda row: (*claim_key(row["identifier"], ranks), row.get("priority") != 1,
+                                not marketing_priority(row.get("labels")),
                                 -backlog_rank.score(row, now), row.get("createdAt") or ""))
     return found, skipped
 
@@ -280,7 +287,8 @@ def measure(state, now: float | None = None) -> dict:
         latency = round(claim["claimedAt"] - row["admittedAt"], 1)
         _log(state, "priority-latency.jsonl", {"id": row["id"], "admittedAt": row["admittedAt"],
                                                "claimedAt": claim["claimedAt"], "latencyS": latency,
-                                               "urgent": row.get("urgent"), "ranked": row.get("ranked")})
+                                               "urgent": row.get("urgent"), "ranked": row.get("ranked"),
+                                               "marketing": row.get("marketing", False)})
     try:
         lat = [json.loads(line) for line in (state / "priority-latency.jsonl").read_text().splitlines() if line][-200:]
     except (OSError, ValueError):
@@ -339,7 +347,7 @@ def run(lane, host, team: str, client, now: float | None = None, floor: int = 0,
             receipt["skipped"][row["identifier"]] = "live-state-changed"
     victims = displacement_order(live_todo, ranks, now)
     for row in admitted:
-        why = "Summer portfolio rank %s" % ranks[row["identifier"]] if row["identifier"] in ranks else "Urgent (P1)"
+        why = "Summer portfolio rank %s" % ranks[row["identifier"]] if row["identifier"] in ranks else ("Urgent (P1)" if row.get("priority") == 1 else MARKETING_LABEL)
         displaced = None
         if len(live_todo) >= goal and len(receipt["displaced"]) < MAX_DISPLACE_PER_TICK and victims:
             displaced = victims.pop(0)
@@ -361,13 +369,14 @@ def run(lane, host, team: str, client, now: float | None = None, floor: int = 0,
         # "Label at admission" is read by Summer's quality check (labelled vs unlabelled revert/fail rate).
         outbox.comment(row["id"], f"Priority admission: promoted to Todo regardless of target ({why}; Todo was {len(todo)} of {goal}"
                                   + (f"; displaced {displaced['identifier']}" if displaced else "")
-                                  + f"). Claim order: Summer rank, then priority, then age. Label at admission: {'present' if labelled else 'none'}.")
+                                  + f"). Claim order: Summer rank, Urgent, marketing, then priority and age. Label at admission: {'present' if labelled else 'none'}.")
         live_todo.append(row)
         receipt["admitted"].append(row["identifier"])
         if not labelled:  # measured: admission no longer needs the retired agent-ready label
             receipt["admittedUnlabelled"].append(row["identifier"])
         _log(state, "priority-admissions.jsonl", {"id": row["identifier"], "issueId": row["id"], "admittedAt": now,
                                                   "urgent": row.get("priority") == 1, "ranked": row["identifier"] in ranks, "labelled": labelled,
+                                                  "marketing": marketing_priority(row.get("labels")),
                                                   "backlogAgeS": round(now - (_epoch(row.get("createdAt")) or now)),
                                                   "displaced": displaced["identifier"] if displaced else None})
     excess = len(live_todo) - ceiling(goal)

@@ -34,6 +34,12 @@ export interface ContentKindDefinition<T> {
   readonly smoke?: (data: T, key: string) => readonly string[];
   /** Paths to revalidate after the live pointer moves for `key`. */
   readonly livePaths: (key: string) => readonly string[];
+  /**
+   * false: drafts and publishes come only from the kind's own producer (a
+   * measured value must not be typed in through the API). History and
+   * rollback stay available. Default true.
+   */
+  readonly apiWritable?: boolean;
 }
 
 export type AnyContentKind = ContentKindDefinition<unknown>;

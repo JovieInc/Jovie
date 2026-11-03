@@ -2,7 +2,7 @@
 
 // @coverage-via apps/web/tests/unit/onboarding/OnboardingShell.sign-in-placement.test.tsx
 
-import { Button, Link as JovieLink, Skeleton } from '@jovie/ui';
+import { Button, Link as JovieLink } from '@jovie/ui';
 import type { UIMessage } from 'ai';
 import NextLink from 'next/link';
 import {
@@ -38,7 +38,9 @@ import {
   OnboardingTurnstile,
   type OnboardingTurnstileState,
 } from './OnboardingTurnstile';
+import { endsInTerminalNextStep } from './onboardingChatHelpers';
 import { useOnboardingClaim } from './useOnboardingClaim';
+import { useOnboardingTurnstileFailOpen } from './useOnboardingTurnstileFailOpen';
 
 const SIGN_IN_LABEL = 'Sign in';
 
@@ -78,6 +80,14 @@ export interface OnboardingShellProps {
 export function buildEntryProfileBuilderState(
   entryProfile: StartEntryProfile | null | undefined
 ): OnboardingProfileBuilderState {
+  // An open name still seeds the draft panel (Pen R6As7U): the visitor sees
+  // jov.ie/<handle> taking shape before the first message.
+  if (entryProfile?.status === 'available') {
+    return {
+      ...EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
+      handle: entryProfile.handle,
+    };
+  }
   if (entryProfile?.status !== 'claimable') {
     return EMPTY_ONBOARDING_PROFILE_BUILDER_STATE;
   }
@@ -204,15 +214,12 @@ export function OnboardingShell({
     turnstileSiteKey
   );
 
-  const isTurnstileUnavailable =
-    turnstileState.status === 'error' ||
-    turnstileState.status === 'timeout' ||
-    turnstileState.status === 'unsupported' ||
-    turnstileState.status === 'unconfigured';
-  const turnstileFailureMessage = isTurnstileUnavailable
-    ? (turnstileState.message ??
-      "We couldn't start your chat. Refresh the page to try again.")
-    : null;
+  // No dead end: a failed check sends anyway on the unverified budget.
+  const failOpen = useOnboardingTurnstileFailOpen({
+    state: turnstileState,
+    token: turnstileToken,
+    instruction: turnstileInstruction,
+  });
 
   const handleTurnstileRequired = useCallback(
     (message?: string) => {
@@ -221,17 +228,30 @@ export function OnboardingShell({
     [requestTurnstileVerification]
   );
 
+  const { onServerRejected } = failOpen;
   const handleTurnstileRejected = useCallback(() => {
+    onServerRejected();
     resetTurnstileVerification('One quick check before we send');
-  }, [resetTurnstileVerification]);
+  }, [onServerRejected, resetTurnstileVerification]);
 
   // Auto-claim any anonymous transcript once Better Auth reports the user is
   // authenticated, then retry after completed chat turns. Durable waitlist
   // receipts route to /waitlist; admitted users go to checkout; missing
   // artist identity stays in this chat.
+  //
+  // A restored owned transcript normally waits for a genuine turn, except
+  // when it already ends in a terminal next-step decision: then a claim was
+  // committed whose response never arrived (the email-code form hard-navigates
+  // to /start while the pre-navigation claim is in flight), and only this
+  // claim's idempotent alreadyClaimed recovery can deliver the receipt
+  // (golden-path cert 2026-10-31 pm, mobile walks m1-m3).
+  const awaitingClaimHandoff = useMemo(
+    () => resumeOwnedConversation && endsInTerminalNextStep(initialMessages),
+    [resumeOwnedConversation, initialMessages]
+  );
   const claimStatus = useOnboardingClaim(
     claimTrigger,
-    !resumeOwnedConversation || claimTrigger > 0
+    !resumeOwnedConversation || awaitingClaimHandoff || claimTrigger > 0
   );
   const isLinking =
     claimStatus === 'pending' || claimStatus === 'retry-after-webhook';
@@ -316,8 +336,8 @@ export function OnboardingShell({
                 onProfileBuilderChange={setProfileBuilderState}
                 starterHandoff={starterHandoff}
                 entryProfile={entryProfile}
-                turnstileToken={turnstileToken}
-                turnstileStatus={turnstileState.status}
+                turnstileToken={failOpen.token}
+                turnstileStatus={failOpen.status}
                 turnstilePanel={turnstilePanel}
                 turnstilePanelVisible={turnstilePanelVisible}
                 turnstileHasSiteKey={Boolean(turnstileSiteKey)}
@@ -332,13 +352,8 @@ export function OnboardingShell({
               />
 
               <OnboardingShellStatus
-                kind='error'
-                message={turnstileFailureMessage}
-                visible={Boolean(turnstileFailureMessage)}
-              />
-              <OnboardingShellStatus
                 kind='status'
-                message='Linking your conversation...'
+                message='Saving this conversation to your account…'
                 visible={isLinking}
               />
               <OnboardingShellStatus
@@ -434,7 +449,7 @@ export function OnboardingIdentityConflict({
   );
 }
 
-function OnboardingShellStatus({
+export function OnboardingShellStatus({
   kind,
   message,
   visible,
@@ -452,12 +467,13 @@ function OnboardingShellStatus({
         role='status'
         aria-live='polite'
         aria-busy='true'
-        data-testid='onboarding-linking-skeleton'
+        data-testid='onboarding-linking-status'
       >
-        <div className='flex h-3.5 w-44'>
-          <Skeleton className='flex-1' rounded='md' />
-        </div>
-        <span className='sr-only'>{message}</span>
+        {/* Words, not a bare skeleton bar: a wordless placeholder after sign-up
+            read as a stuck load (2026-10-31 golden-path walk). */}
+        <span className='text-xs leading-5 text-secondary-token'>
+          {message}
+        </span>
       </div>
     );
   }

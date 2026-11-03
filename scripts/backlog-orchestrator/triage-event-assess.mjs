@@ -668,6 +668,35 @@ export async function assessTriageSweep(
   };
 }
 
+/** Convert a failed catch-up sweep into its receipt: an active shared-credential
+ * cooldown defers exactly like the remediator path (status deferred, reason
+ * RATE_LIMITED, retryAt) instead of failing the whole Fleet Gate Refresh job;
+ * every other error — auth, schema, non-rate-limit transport — rethrows and
+ * keeps failing the sweep. No budget, threshold, or cooldown is touched. */
+export function triageSweepReceiptForError(error) {
+  const cooldown = linear.activeLinearCooldown(error);
+  if (!cooldown) throw error;
+  return {
+    schema: 'linear-triage-catch-up/v1',
+    observedAt: new Date().toISOString(),
+    triageSweep: {
+      status: 'deferred',
+      reason: 'RATE_LIMITED',
+      resetAt: cooldown.resetAt,
+      retryAt: cooldown.retryAt,
+      inventoryObserved: false,
+    },
+    issueCount: 0,
+    assessed: 0,
+    deferred: 0,
+    failed: 0,
+    blocked: 0,
+    providerBlocked: 0,
+    wakeSymphony: false,
+    results: [],
+  };
+}
+
 export function parseTriageEvent(event) {
   const payload = event?.client_payload;
   if (
@@ -889,16 +918,24 @@ export async function runCli() {
           wakeSymphony: false,
           results: [],
         }
-      : await assessTriageSweep()
+      : await assessTriageSweep().catch(error =>
+          // An active shared-credential cooldown defers the catch-up sweep
+          // exactly like the remediator path; every other error rethrows.
+          triageSweepReceiptForError(error)
+        )
     : await assessTriageEvent(JSON.parse(readFileSync(eventPath, 'utf8')));
   // Backlog outcomes must neither renew a skipped Triage window nor erase a
   // successful Triage assessment and repeat its paid work on the next event.
+  // A deferred sweep is not a successful one either: it must not renew the
+  // throttle floor or spend the paid Backlog sweep on a cooling credential.
+  const triageDeferred = isSweep && receipt.triageSweep?.status === 'deferred';
   const triageSucceeded =
     isSweep &&
     !throttle?.skip &&
+    !triageDeferred &&
     'failed' in receipt &&
     Number(receipt.failed ?? 0) === 0;
-  if (isSweep) {
+  if (isSweep && !triageDeferred) {
     const backlog = await assessBacklogSweep(linear, requestSummerAssessment, {
       cacheFile: sweepCacheFile,
     });
@@ -914,6 +951,10 @@ export async function runCli() {
     };
   }
   process.stdout.write(`${JSON.stringify(receipt)}\n`);
+  if (triageDeferred)
+    console.error(
+      `::warning title=Triage catch-up deferred::Linear credential cooldown is active; the next fleet-gate-refresh tick retries at or after ${receipt.triageSweep?.retryAt}.`
+    );
   if (triageSucceeded && sweepCacheFile) {
     const cache = readSweepCache(sweepCacheFile);
     cache[SWEEP_THROTTLE_KEY] = new Date().toISOString();
