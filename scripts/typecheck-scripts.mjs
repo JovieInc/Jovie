@@ -133,6 +133,19 @@ export function unknownJsonPropertyRepair(diagnosticLines) {
 
 /** @param {readonly string[]} diagnosticLines */
 function tupleInferenceRepair(diagnosticLines) {
+  if (
+    diagnosticLines.some(line =>
+      /error TS2339: Property 'test' does not exist on type '(?:string \| RegExp|RegExp \| string)'/.test(
+        line
+      )
+    )
+  ) {
+    return (
+      'TS2339 on string | RegExp: inspect pattern/reason table rows. ' +
+      'Declare a JSDoc tuple on the table (ReadonlyArray<readonly [RegExp, string]>) ' +
+      'so destructuring preserves each column type. Do not grow scripts/typecheck-baseline.json to absorb these.'
+    );
+  }
   const { counts } = parseTscOutput(diagnosticLines.join('\n'));
   for (const byCode of counts.values()) {
     if (byCode.has('TS2769') && byCode.has('TS2698')) {
