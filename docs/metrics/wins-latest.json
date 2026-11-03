@@ -1,14 +1,14 @@
 {
   "schema": "jovie.wins-metrics/v1",
-  "at": "2026-11-03T14:14:57.814Z",
-  "winsTotal": 31,
+  "at": "2026-11-03T14:54:41.132Z",
+  "winsTotal": 32,
   "winsVerified": 1,
   "winsClaimed": 15,
   "winsUnverified": 3,
   "winsNotReproduced": 1,
   "winsPendingMerge": 4,
-  "winsPendingMeasure": 7,
-  "winsLast7d": 31,
+  "winsPendingMeasure": 8,
+  "winsLast7d": 32,
   "clusters": [
     {
       "theme": "release-reliability",
@@ -60,7 +60,7 @@
     },
     {
       "theme": "golden-path",
-      "total": 1,
+      "total": 2,
       "verified": 0,
       "ready": false
     },
@@ -207,6 +207,10 @@
     {
       "id": "win-2026-10-31-the-shared-outcome-verifier-rejects-all",
       "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-31-sign-up-in-the-claim-chat",
+      "status": "pending-measure"
     }
   ]
 }
