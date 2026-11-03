@@ -6,6 +6,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -211,12 +212,12 @@ function parseExactCiFastFailureOperands(script) {
     .map(
       clause =>
         clause.match(
-          /^"\$(TYPECHECK_RESULT|REMAINING_RESULT|PROFILE_BROWSER_RESULT|STRUCTURAL_PYTHON_RESULT|STRUCTURAL_WEB_RESULT)"\s+!=\s+"success"$/
+          /^"\$(TYPECHECK_RESULT|REMAINING_RESULT|PROFILE_BROWSER_RESULT|STRUCTURAL_PYTHON_RESULT|STRUCTURAL_WEB_RESULT|STRUCTURAL_LANES_RESULT)"\s+!=\s+"success"$/
         )?.[1]
     );
   if (
     operands.sort().join() !==
-    'PROFILE_BROWSER_RESULT,REMAINING_RESULT,STRUCTURAL_PYTHON_RESULT,STRUCTURAL_WEB_RESULT,TYPECHECK_RESULT'
+    'PROFILE_BROWSER_RESULT,REMAINING_RESULT,STRUCTURAL_LANES_RESULT,STRUCTURAL_PYTHON_RESULT,STRUCTURAL_WEB_RESULT,TYPECHECK_RESULT'
   )
     throw new Error('Invalid ci-fast fail-closed result set');
   return operands;
@@ -279,9 +280,9 @@ describe('merge_group workflow contract', () => {
   it('accepts reordered exact ci-fast failure operands', () => {
     expect(
       parseExactCiFastFailureOperands(
-        'if [[ "$PROFILE_BROWSER_RESULT" != "success" || "$STRUCTURAL_WEB_RESULT" != "success" || "$STRUCTURAL_PYTHON_RESULT" != "success" || "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then'
+        'if [[ "$PROFILE_BROWSER_RESULT" != "success" || "$STRUCTURAL_LANES_RESULT" != "success" || "$STRUCTURAL_WEB_RESULT" != "success" || "$STRUCTURAL_PYTHON_RESULT" != "success" || "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then'
       )
-    ).toHaveLength(5);
+    ).toHaveLength(6);
   });
 
   it('rejects a ci-fast failure condition missing a required operand', () => {
@@ -310,7 +311,7 @@ describe('merge_group workflow contract', () => {
     );
 
     const consumers =
-      'ci-fast-typecheck ci-fast-remaining ci-profile-admission-browser ci-fast-structural-python ci-fast-structural-web ci-promptfoo-evals ci-golden-eval-set ci-build-layout ci-build-ovie ci-typecheck-ovie ci-storybook-surfaces ci-cross-product-integration ci-unit-tests ci-exact-head-coverage-shard ci-golden-path-lock ci-visual-snapshot-compare drizzle-migration-guard';
+      'ci-fast-typecheck ci-fast-remaining ci-profile-admission-browser ci-fast-structural-python ci-fast-structural-web ci-fast-structural-lanes ci-promptfoo-evals ci-golden-eval-set ci-build-layout ci-build-ovie ci-typecheck-ovie ci-storybook-surfaces ci-cross-product-integration ci-unit-tests ci-exact-head-coverage-shard ci-golden-path-lock ci-visual-snapshot-compare drizzle-migration-guard';
     for (const jobId of consumers.split(' ')) {
       const job = getJobBlock(CI_WORKFLOW, jobId);
       expect(job, jobId).toContain('ci-merge-group-workspace');
@@ -638,7 +639,7 @@ describe('merge_group workflow contract', () => {
     expect(ciFast).toContain('TYPECHECK_RESULT');
     expect(ciFast).toContain('REMAINING_RESULT');
     expect(ciFast).toContain('PROFILE_BROWSER_RESULT');
-    expect(parseExactCiFastFailureOperands(ciFast)).toHaveLength(5);
+    expect(parseExactCiFastFailureOperands(ciFast)).toHaveLength(6);
     expect(ciFast).toContain('exit 1');
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     expect(units).not.toContain('ci-unit-runner-route');
@@ -1793,7 +1794,11 @@ describe('merge_group workflow contract', () => {
   });
 
   it('materializes a release-consumable intake receipt for equal-tree no-op groups', () => {
-    const root = mkdtempSync(join(tmpdir(), 'noop-intake-receipt-'));
+    // Node resolves module URLs through macOS's /var symlink. Match that
+    // canonical path so the copied classifiers recognize their CLI entrypoint.
+    const root = realpathSync(
+      mkdtempSync(join(tmpdir(), 'noop-intake-receipt-'))
+    );
     const laneDir = join(root, 'product-lane-classification');
     mkdirSync(laneDir);
     writeFileSync(join(laneDir, 'changed-paths.txt'), '');
@@ -3311,7 +3316,15 @@ ${selectedGateScript}`,
       'node scripts/lib/merge-group-member-policy.mjs --policy=size'
     );
     expect(sizeGuard).toContain('--filter=blob:limit=1g');
-    expect(sizeGuard).not.toContain('--filter=blob:none');
+    expect(sizeGuard).toContain(
+      'git fetch --refetch --filter=blob:none --no-tags --depth=2 origin "$GROUP_HEAD"'
+    );
+    expect(sizeGuard).not.toContain(
+      'git fetch --refetch --filter=blob:limit=1g --no-tags --depth=2'
+    );
+    expect(sizeGuard).toContain(
+      'node scripts/lib/merge-group-local-evidence.mjs || true'
+    );
     expect(MEMBER_POLICY).toContain('await enforceCombinedTreePayload({');
     expect(MEMBER_POLICY).toContain('/git/trees/${treeSha}?recursive=1');
     expect(MEMBER_POLICY).not.toContain("from 'node:child_process'");
@@ -3325,7 +3338,25 @@ ${selectedGateScript}`,
       'ref: ${{ github.event.pull_request.head.sha }}'
     );
     expect(sourceSizeGuard).toContain('persist-credentials: false');
-    expect(sourceSizeGuard).toContain('fetch-depth: 0');
+    // Depth-one checkout is followed by one targeted unshallow fetch: a
+    // merely available shallow merge base is not proof of complete ancestry.
+    expect(sourceSizeGuard).toContain('fetch-depth: 1');
+    expect(sourceSizeGuard).toContain(
+      'name: Fetch exact PR and current base ancestry'
+    );
+    expect(sourceSizeGuard).toContain(
+      'git fetch --filter=blob:none --no-tags --unshallow origin "$PR_HEAD_SHA"'
+    );
+    expect(sourceSizeGuard).toContain(
+      '+refs/heads/$PR_BASE_REF:refs/remotes/origin/$PR_BASE_REF'
+    );
+    expect(sourceSizeGuard).toContain(
+      '[[ "$(git rev-parse HEAD)" == "$PR_HEAD_SHA" ]]'
+    );
+    expect(sourceSizeGuard).toContain(
+      '[[ "$(git rev-parse --is-shallow-repository)" == false ]]'
+    );
+    expect(sourceSizeGuard).toContain('git archive "$PR_BASE_SHA" scripts/lib');
     expect(sourceSizeGuard).toContain('id: pr-merge-base');
     // The event base SHA goes stale on long-lived PRs; judge the PR against
     // the fetched base branch tip instead (#18131 failed on a 3-day-old base).
@@ -3509,7 +3540,7 @@ ${selectedGateScript}`,
     expect(Object.keys(privateGuard.jobs)).toEqual(['guard']);
     expect(privateGuard.jobs.guard.permissions).toEqual({ contents: 'read' });
     expect(privateGuard.jobs.guard.uses).toBe(
-      'JovieInc/ci/.github/workflows/private-data-guard.yml@315c327e822e328e01c0e8f50d4e6b14db86af2c'
+      'JovieInc/ci/.github/workflows/private-data-guard.yml@a26a5e2b62ec427b4d1bf465662adac0627b5102'
     );
     expect(privateGuardSource).not.toMatch(
       /secrets\.[A-Z0-9_]+|secrets:\s*inherit/
@@ -4844,6 +4875,14 @@ describe('merge-queue green enroll scan window and failure hold', () => {
     // revision failure hold, may re-enroll an unchanged removed head.
     expect(ENROLL).toContain("removalReason === 'manual'");
     expect(ENROLL).toContain("failure.action === 'allow' &&");
+    // 2026-10-29 ejection re-enroll: a non-human removal with no revision
+    // failure hold is re-admitted (bounded); a failure hold still blocks first
+    // and admission never runs from a cron (JOV-INV-042).
+    expect(ENROLL).toContain("failureBeforeReenroll === 'allow'");
+    expect(ENROLL).toContain("reason: 'ejection-reenroll'");
+    expect(ENROLL).toContain('removalsOnHead < REENROLL_MAX_REMOVALS');
+    expect(ENROLL).toContain('!humanDequeued');
+    expect(ENROLL).not.toMatch(/^\s{2}schedule:/m);
     for (const runtimePath of [
       'scripts/merge-group-failure-hold.mjs',
       'scripts/lib/merge-queue-guard.mjs',

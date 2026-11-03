@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   DELIVERY_CONTROLLER_COVERAGE_ARGS,
+  SCRIPT_CONTRACT_VITEST_TESTS,
   STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
 } from './ci-fast-lanes.mjs';
 import {
@@ -13,6 +14,8 @@ import {
   classifyBlogContentDiff,
   isBlogContentCandidatePath,
 } from './lib/blog-content-ci.mjs';
+
+import { baseRefCandidates, resolveBaseRef } from './lib/git-base-ref.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Full-suite shards are deliberately independent so one Vitest process cannot
@@ -34,6 +37,15 @@ const TESTABLE_FILE = /\.(?:[cm]?[jt]sx?|json)$/;
 const VITEST_TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
 const KNOWN_VITEST_FIXTURE_TESTS = new Map([
   [
+    'apps/web/data/designSystem/surfaceCensus.json',
+    [
+      'scripts/lib/__tests__/design-surface-census.test.mjs',
+      'apps/web/lib/content-records/marketing-page.test.ts',
+    ],
+  ],
+  // Shared brand tokens have broad runtime and test consumers. Keep the
+  // full-suite fallback until selection can prove their complete coverage.
+  [
     'apps/web/tests/unit/design-system/arbitrary-values.baseline.json',
     ['apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'],
   ],
@@ -49,6 +61,10 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
   ],
   // Homepage copy modules live under data/, outside the component/app import
   // graph. Bind each one to the unit tests that import it.
+  [
+    'apps/web/data/homepageSearchCopy.ts',
+    ['apps/web/components/homepage/HomepageNameSearch.test.tsx'],
+  ],
   [
     'apps/web/data/homepageFrontDoorCta.ts',
     [
@@ -621,15 +637,6 @@ const CI_CONTROL_NODE_COVERAGE_TESTS = [
       '--test-coverage-lines=100',
       '--test-coverage-branches=100',
       '--test-coverage-functions=100',
-    ],
-  ],
-  [
-    '.github/scripts/internal-pr-review.test.mjs',
-    '.github/scripts/internal-pr-review.mjs',
-    [
-      '--test-coverage-lines=85',
-      '--test-coverage-branches=80',
-      '--test-coverage-functions=85',
     ],
   ],
   [
@@ -1230,6 +1237,26 @@ const CODEX_CAPACITY_QUALIFICATION_MANIFEST = new Set([
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
 
+// The ejector driver has no product import edge. Qualify its complete repair
+// signature with its behavior suites and the CI plumbing/inventory contracts.
+// Partial signatures and unknown peers retain the existing full fallback.
+const MAIN_RED_EJECT_DRIVER = 'scripts/main-red-eject.mjs';
+// The quota regression arrives in the caller's PR. Discover that changed test,
+// then require its file and live CI registration before selecting it. Fixed
+// selector references continue to obey the existing-test inventory guard.
+const MAIN_RED_EJECT_QUOTA_TEST =
+  /^scripts\/lib\/__tests__\/main-red-eject-quota-failover\.test\.mjs$/;
+const MAIN_RED_EJECT_BEHAVIOR_TESTS = [
+  'scripts/lib/__tests__/main-red-eject.test.mjs',
+  'scripts/lib/__tests__/main-red-eject-failing-head.test.mjs',
+];
+const MAIN_RED_EJECT_PLUMBING_TESTS = [
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
+  ...AFFECTED_TEST_SELECTOR_TESTS,
+];
+
 export function buildAffectedTestPlan(changedFiles, options) {
   const files = unique(changedFiles.filter(Boolean));
   const plan = planAffectedTests(files, options);
@@ -1284,6 +1311,19 @@ export function buildAffectedTestPlan(changedFiles, options) {
     nodeTestArgs: [],
     retouchPromptCoverage: false,
     ...plan,
+    censusValidation: files.includes(
+      'apps/web/data/designSystem/surfaceCensus.json'
+    ),
+    ...(files.includes('apps/web/data/designSystem/surfaceCensus.json') &&
+    plan.mode === 'full' &&
+    isFileAvailable('scripts/lib/__tests__/design-surface-census.test.mjs')
+      ? {
+          scriptVitestTests: unique([
+            ...(plan.scriptVitestTests ?? []),
+            'scripts/lib/__tests__/design-surface-census.test.mjs',
+          ]),
+        }
+      : {}),
     ...(lanePythonCoverage
       ? {
           lanePythonCoverage: true,
@@ -1333,12 +1373,64 @@ function planAffectedTests(
     isFileAvailable = file => existsSync(resolve(REPO_ROOT, file)),
     readFile = readRepoFile,
     blogContentReceipt = undefined,
+    scriptContractVitestTests = SCRIPT_CONTRACT_VITEST_TESTS,
   } = {}
 ) {
   const files = unique(changedFiles.filter(Boolean)).sort();
   const globalTestInput = files.find(file => GLOBAL_TEST_INPUTS.has(file));
   if (globalTestInput) {
     return fullSuitePlan(`global test input changed: ${globalTestInput}`);
+  }
+  const ejectorQuotaTest = files.find(file =>
+    MAIN_RED_EJECT_QUOTA_TEST.test(file)
+  );
+  const ejectorInputs = [
+    MAIN_RED_EJECT_DRIVER,
+    CI_CANCELLATION_HEALER_COMPANION,
+    ejectorQuotaTest,
+  ];
+  const ejectorSelectorInputs = files.filter(file =>
+    AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
+  );
+  const isExactEjectorQualification =
+    Boolean(ejectorQuotaTest) &&
+    ejectorInputs.every(file => files.includes(file)) &&
+    files.length === ejectorInputs.length + ejectorSelectorInputs.length &&
+    (ejectorSelectorInputs.length === 0 ||
+      ejectorSelectorInputs.length === AFFECTED_TEST_SELECTOR_MANIFEST.size);
+  if (
+    (files.includes(MAIN_RED_EJECT_DRIVER) || ejectorQuotaTest) &&
+    !isExactEjectorQualification
+  ) {
+    return fullSuitePlan(
+      'main-red ejector change exceeds its complete qualification closure'
+    );
+  }
+  if (isExactEjectorQualification) {
+    const behaviorTests = [...MAIN_RED_EJECT_BEHAVIOR_TESTS, ejectorQuotaTest];
+    const qualificationTests = [
+      ...behaviorTests,
+      ...MAIN_RED_EJECT_PLUMBING_TESTS,
+    ];
+    if (
+      !qualificationTests.every(isFileAvailable) ||
+      !behaviorTests.every(test => scriptContractVitestTests.includes(test))
+    ) {
+      return fullSuitePlan(
+        'main-red ejector behavior or CI inventory proof is unavailable'
+      );
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      nodeTests: [],
+      scriptVitestTests: qualificationTests,
+    };
   }
   const sentryGateInputs = new Set([
     '.github/actions/sentry-error-gate/action.yml',
@@ -2167,9 +2259,12 @@ function planAffectedTests(
       'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'
     );
   }
-  for (const file of files) {
-    mandatoryTests.push(...(KNOWN_VITEST_FIXTURE_TESTS.get(file) ?? []));
-  }
+  const fixtureProducers = files.flatMap(
+    file => KNOWN_VITEST_FIXTURE_TESTS.get(file) ?? []
+  );
+  mandatoryTests.push(
+    ...fixtureProducers.filter(test => !test.startsWith('scripts/'))
+  );
   const hasHomepageSystemBGuardInput = files.some(isHomepageSystemBGuardInput);
   if (hasHomepageSystemBGuardInput) {
     mandatoryTests.push(...HOMEPAGE_SYSTEM_B_STYLE_GUARD_TESTS);
@@ -2263,6 +2358,7 @@ function planAffectedTests(
   ]);
   const pythonUnittestTests = unique([]);
   const scriptVitestTests = unique([
+    ...fixtureProducers.filter(test => test.startsWith('scripts/')),
     ...(isExactPerformanceProfilerRepairPrimary ||
     isExactPerformanceProfilerRepairWithSelectorLegacy
       ? PERFORMANCE_PROFILER_REPAIR_SCRIPT_TESTS
@@ -2914,6 +3010,7 @@ export function buildControlCoverageCommands() {
     '--coverage.include=lib/native-queue-eval.mjs',
     '--coverage.include=native-queue-eval.mjs',
     '--coverage.include=run-affected-tests.mjs',
+    '--coverage.include=lib/git-base-ref.mjs',
     '--coverage.include=lib/github-open-prs-rest.mjs',
     '--coverage.include=lib/pr-conflict-event.mjs',
     '--coverage.include=lib/pr-conflict-handler.mjs',
@@ -2980,6 +3077,14 @@ export function buildSelectedTestCommands(
   head
 ) {
   const commands = [];
+  if (
+    plan.censusValidation ||
+    plan.scriptVitestTests.includes(
+      'scripts/lib/__tests__/design-surface-census.test.mjs'
+    )
+  ) {
+    commands.push(['node', ['scripts/design-surface-census.mjs', base]]);
+  }
   if (plan.lanePythonCoverage) {
     // Qualification must fail when the CI-pinned Python dependencies are absent,
     // even on a local host; the structural wrapper's local skip is not proof.
@@ -3275,7 +3380,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (args.includes('--control')) {
     process.exit(await runControlTestCommands());
   }
-  const base = argValue(args, '--base', 'origin/main');
+  let base = argValue(args, '--base', 'origin/main');
   const maxWorkers = argValue(args, '--max-workers', '2');
   const shardConcurrency = argValue(args, '--shard-concurrency', '2');
   const shardTimeoutMs = positiveDurationMs(
@@ -3296,6 +3401,24 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     DEFAULT_PROGRESS_INTERVAL_MS
   );
   const explicitFiles = argValue(args, '--changed-files-json', '');
+  if (!explicitFiles) {
+    const resolved = resolveBaseRef(REPO_ROOT, base);
+    if (!resolved) {
+      console.error(
+        `[affected-tests] base ref '${base}' does not resolve to a commit (tried ${baseRefCandidates(base).join(', ')})`
+      );
+      process.exit(1);
+    }
+    // Use one snapshot for selection, blog classification and coverage.
+    base = execFileSync(
+      'git',
+      ['rev-parse', '--verify', `${resolved}^{commit}`],
+      {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+      }
+    ).trim();
+  }
   const files = explicitFiles ? JSON.parse(explicitFiles) : changedFiles(base);
   const prerequisitesAvailable = BLOG_CERTIFICATION_PROOFS.every(file =>
     existsSync(resolve(REPO_ROOT, file))
