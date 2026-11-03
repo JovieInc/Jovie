@@ -35,7 +35,7 @@ const traceExcludes = [
 // Sentry build plugin gate. `vercel pull` writes the literal "[SENSITIVE]" for
 // sensitive-typed env vars, which is not a usable token and must not enable
 // source map emission or upload.
-const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
+const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN?.trim();
 const hasSentryAuthToken = Boolean(
   sentryAuthToken && sentryAuthToken !== '[SENSITIVE]'
 );
