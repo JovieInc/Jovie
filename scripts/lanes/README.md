@@ -1011,3 +1011,28 @@ own gate fails before CI does.
 CI (`.github/workflows/design-gate.yml`) warns when a PR touches the same
 paths with no completed brief; it enforces only when `DESIGN_GATE_ENFORCE`
 is truthy, and unreadable briefs stay warnings even then.
+
+## Linux worker resource scopes
+
+Dispatch and red-wake workers run through `worker_resources.py`, composing the
+user systemd manager's transient scope support. Each scope has a CPU quota of
+200%, `MemoryHigh=12 GiB`, `MemoryMax=20 GiB`, `MemorySwapMax=0`, and
+`TasksMax=512`. The memory ceiling accommodates the existing two-worker web
+test command's 8-GiB V8 heaps and coordinator; host admission, gate seats and
+the host's aggregate memory limits still control total concurrency. These are
+ceilings, not memory reservations.
+
+The child reads its actual cgroup files before sending a startup receipt.
+Dispatch records that receipt in `workerResources`; red-wake receipts include
+`resources`. A receipt proves placement and enforced limits, not a claimed task
+or a successful check. Scope startup or verification failures never fall back
+to an unbounded Linux worker. A failed red wake remains retryable. Failed
+cleanup is reported as `cleanup=unproven` rather than claimed as drained.
+
+The scope preserves the inherited lifecycle lock descriptors and CLI
+authentication environment. Worker PATH is resolved from the checkout's
+`.nvmrc` using the existing `worktree_pool.node_env` helper. The existing
+`local-test` backend stays hermetic; non-Linux dispatch retains its platform
+behavior. Finite positive per-worker overrides are
+`LANES_WORKER_MEMORY_HIGH_BYTES`, `LANES_WORKER_MEMORY_MAX_BYTES`,
+`LANES_WORKER_TASKS_MAX`, and `LANES_WORKER_CPU_PERCENT`.
