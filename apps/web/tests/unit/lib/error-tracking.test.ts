@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   captureException: vi.fn(),
@@ -24,6 +24,11 @@ const { captureWarning } = await import('@/lib/error-tracking');
 describe('error-tracking capture suppression', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('does not file Sentry for the expected owner verified-merge guard receipt (JOV-10124 / Sentry 7822218012)', async () => {
@@ -39,6 +44,11 @@ describe('error-tracking capture suppression', () => {
     );
 
     expect(hoisted.captureException).not.toHaveBeenCalled();
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining(
+        '[WARNING] Owner identity requires an explicit verified profile merge'
+      )
+    );
     // The receipt is still observable through the always-on console warning
     // and the analytics event — only the Sentry filing is suppressed.
     expect(hoisted.trackEvent).toHaveBeenCalledWith(
