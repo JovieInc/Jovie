@@ -503,3 +503,61 @@ test('preflight exits clean on a valid clean branch but fails an invalid base re
     rmSync(bad, { recursive: true, force: true });
   }
 });
+
+test('private data guard uses an absolute XDG cache when home is unavailable', async () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'preflight-xdg-'));
+  try {
+    const repo = path.join(root, 'repo');
+    const cache = path.join(root, 'cache');
+    const home = path.join(root, 'unavailable-home');
+    const sha = 'a'.repeat(40);
+    mkdirSync(path.join(repo, '.github/workflows'), { recursive: true });
+    mkdirSync(path.join(cache, 'jovie-preflight'), { recursive: true });
+    writeFileSync(home, 'not a directory');
+    writeFileSync(
+      path.join(repo, '.github/workflows/private-data-guard.yml'),
+      `jobs:\n  guard:\n    uses: JovieInc/ci/.github/workflows/guard.yml@${sha}\n`
+    );
+    writeFileSync(
+      path.join(cache, 'jovie-preflight', `private-data-${sha}.py`),
+      'import os, sys\nprint(os.environ["FAIL_ON_FINDINGS"])\nsys.exit(7)\n'
+    );
+    const runner = `import { privateDataCheck } from ${JSON.stringify(new URL('./preflight-changed.mjs', import.meta.url).href)};
+const r = await privateDataCheck(${JSON.stringify(repo)}, process.env, 'base');
+console.log(JSON.stringify(r));`;
+    const result = spawnSync(
+      process.execPath,
+      ['--input-type=module', '-e', runner],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, HOME: home, XDG_CACHE_HOME: cache },
+      }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    const output = JSON.parse(result.stdout.trim());
+    assert.equal(output.code, 7);
+    assert.match(output.out, /true/);
+
+    const fallbackHome = path.join(root, 'fallback-home');
+    const fallbackCache = path.join(fallbackHome, '.cache/jovie-preflight');
+    mkdirSync(fallbackCache, { recursive: true });
+    writeFileSync(
+      path.join(fallbackCache, `private-data-${sha}.py`),
+      'import sys\nsys.exit(8)\n'
+    );
+    for (const invalid of ['', 'relative-cache']) {
+      const fallback = spawnSync(
+        process.execPath,
+        ['--input-type=module', '-e', runner],
+        {
+          encoding: 'utf8',
+          env: { ...process.env, HOME: fallbackHome, XDG_CACHE_HOME: invalid },
+        }
+      );
+      assert.equal(fallback.status, 0, fallback.stderr);
+      assert.equal(JSON.parse(fallback.stdout.trim()).code, 8, invalid);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
