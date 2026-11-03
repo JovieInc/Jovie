@@ -7,6 +7,7 @@ import {
   buildEntitySameAs,
   type EntityIdentityLink,
 } from '@/lib/entity/sameAs';
+import { buildProfileDescription } from '@/lib/profile/metadata';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { CreatorProfile, LegacySocialLink } from '@/types/db';
 import { profileEntityAnchor, resolveArtistEntityType } from './artist-entity';
@@ -118,10 +119,22 @@ function buildDspListenActions(
 
 function profileEntityDescription(
   profile: CreatorProfile,
-  profileName: string
+  profileName: string,
+  genres: string[] | null
 ): string {
   if (profile.bio) return profile.bio;
-  if (profile.creator_type === 'artist') return `Music by ${profileName}`;
+  if (profile.creator_type === 'artist') {
+    // Match the page meta description whenever it has real facts to state.
+    if (profile.location || (genres && genres.length > 0)) {
+      return buildProfileDescription(
+        profileName,
+        null,
+        profile.location,
+        genres
+      );
+    }
+    return `Music by ${profileName}`;
+  }
   return profileName;
 }
 
@@ -148,7 +161,7 @@ function buildArtistEntitySchema(
     '@type': resolveArtistEntityType(profile.creator_type),
     '@id': `${profileUrl}#${profileEntityAnchor(profile.creator_type)}`,
     name: artistName,
-    description: profileEntityDescription(profile, artistName),
+    description: profileEntityDescription(profile, artistName, genres),
     url: profileUrl,
     ...(uniqueSocialUrls.length > 0 && { sameAs: uniqueSocialUrls }),
     ...(entityMentions.length > 0 && {

@@ -94,9 +94,13 @@ vi.mock('@/components/organisms/user-button', () => ({
 vi.mock('@/components/organisms/SidebarDockBridge', () => ({
   SidebarDockBridge: (props: {
     readonly collapsed: boolean;
+    readonly userState?: { readonly hasClaimedHandle: boolean };
     readonly children: (status: undefined) => React.ReactNode;
   }) => {
-    nowPlayingBridgePropsMock({ collapsed: props.collapsed });
+    nowPlayingBridgePropsMock({
+      collapsed: props.collapsed,
+      userState: props.userState,
+    });
     return (
       <>
         <div data-sidebar-dock='true' className='shrink-0'>
@@ -320,9 +324,9 @@ describe('UnifiedSidebar library route', () => {
     expect(dock).toContainElement(
       screen.getByTestId('sidebar-now-playing-bridge')
     );
-    expect(nowPlayingBridgePropsMock).toHaveBeenCalledWith({
-      collapsed: false,
-    });
+    expect(nowPlayingBridgePropsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ collapsed: false })
+    );
     const row = screen
       .getByRole('link', { name: /Inbox —/ })
       .closest('[data-sidebar-brand-row]');
@@ -388,6 +392,16 @@ describe('UnifiedSidebar library route', () => {
     );
     expect(whatsNew.compareDocumentPosition(nowPlaying)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
+    );
+  });
+
+  it('tells the dock whether the viewer already claimed a handle', () => {
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.DASHBOARD,
+      section: 'dashboard',
+    });
+    expect(nowPlayingBridgePropsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ userState: { hasClaimedHandle: true } })
     );
   });
 
@@ -696,7 +710,7 @@ describe('UnifiedSidebar library route', () => {
         href: link.getAttribute('href'),
       }))
     ).toEqual(
-      // Business is collapsed here; Tools is open because Ops is active.
+      // Company is collapsed here; Tools is open because Ops is active.
       ADMIN_NAV_REGISTRY.filter(item => item.section !== 'business').map(
         item => ({
           label: item.label,
@@ -794,7 +808,7 @@ describe('UnifiedSidebar library route', () => {
       within(operatorNavigation).getByRole('link', { name: 'Presence' })
     ).toBeVisible();
     const business = within(operatorNavigation).getByRole('button', {
-      name: 'Business',
+      name: 'Company',
     });
     expect(business).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(business);
@@ -855,5 +869,54 @@ describe('UnifiedSidebar library route', () => {
 
     renderUnifiedSidebar({ pathname: APP_ROUTES.CHAT, section: 'dashboard' });
     expect(screen.getAllByTestId('operator-lists-nav')).toHaveLength(1);
+  });
+});
+
+// JOV-8137: the completion widget persists in the sidebar on every page
+// until the profile hits 100%.
+describe('UnifiedSidebar profile completion widget (JOV-8137)', () => {
+  const incompleteCompletion = {
+    percentage: 50,
+    completedCount: 2,
+    totalCount: 4,
+    steps: [
+      {
+        id: 'avatar' as const,
+        label: 'Add A Profile Photo',
+        description: 'A recognizable photo makes your page feel personal.',
+        href: APP_ROUTES.SETTINGS_PROFILE,
+      },
+    ],
+    profileIsLive: false,
+  };
+
+  it('renders the completion widget while the profile is incomplete', () => {
+    renderUnifiedSidebar({
+      section: 'dashboard',
+      data: { profileCompletion: incompleteCompletion },
+    });
+
+    expect(
+      document.querySelector('[data-testid="sidebar-profile-completion"]')
+    ).not.toBeNull();
+  });
+
+  it('renders no completion widget once the profile is complete', () => {
+    renderUnifiedSidebar({
+      section: 'dashboard',
+      data: {
+        profileCompletion: {
+          ...incompleteCompletion,
+          percentage: 100,
+          completedCount: 4,
+          steps: [],
+          profileIsLive: true,
+        },
+      },
+    });
+
+    expect(
+      document.querySelector('[data-testid="sidebar-profile-completion"]')
+    ).toBeNull();
   });
 });

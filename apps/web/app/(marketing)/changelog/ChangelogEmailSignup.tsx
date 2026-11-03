@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui/atoms/button';
-import { Input } from '@jovie/ui/atoms/input';
+import { InlineSubscribe } from '@jovie/ui/atoms/inline-subscribe';
 import {
   type FormEvent,
   useCallback,
@@ -22,7 +22,6 @@ type ResendState = 'idle' | 'sending' | 'sent' | 'error';
 
 export interface ChangelogEmailSignupCopy {
   readonly idleHeading: string;
-  readonly idleDescription: string;
   readonly buttonLabel: string;
   readonly consent: string;
   readonly successHeading: string;
@@ -32,10 +31,9 @@ export interface ChangelogEmailSignupCopy {
 }
 
 const DEFAULT_COPY: ChangelogEmailSignupCopy = {
-  idleHeading: 'Get product updates',
-  idleDescription: 'New features and improvements from Jovie.',
+  idleHeading: 'Get updates',
   buttonLabel: 'Subscribe',
-  consent: 'Subscribe to Jovie changelog emails. Unsubscribe anytime.',
+  consent: 'Unsubscribe anytime.',
   successHeading: 'Check your email',
   successDescription:
     'Confirm your subscription to receive Jovie changelog emails.',
@@ -107,7 +105,7 @@ export function ChangelogEmailSignup({
     ? status === 'subscribed'
       ? copy.subscribedDescription
       : copy.successDescription
-    : copy.idleDescription;
+    : '';
   const successMessage = `${heading}. ${description}`;
 
   useEffect(() => {
@@ -345,21 +343,18 @@ export function ChangelogEmailSignup({
       aria-labelledby={`${formId}-heading`}
       data-pen-source='qKrDn'
       data-visual-state={status}
-      className='rounded-2xl bg-surface-1 p-6'
+      className='mx-auto flex w-full max-w-md flex-col items-center gap-3 text-center'
     >
       <h2
         id={`${formId}-heading`}
-        className='line-clamp-2 text-2xl font-semibold tracking-tight text-primary-token'
+        className='line-clamp-2 text-lg font-medium tracking-tight text-primary-token'
       >
         {heading}
       </h2>
-      <p className='mt-4 grid text-base text-secondary-token'>
-        <span className='invisible col-start-1 row-start-1' aria-hidden='true'>
-          {copy.successDescription}
-        </span>
-        <span className='col-start-1 row-start-1'>{description}</span>
-      </p>
-      <div className='mt-4 grid'>
+      {settled ? (
+        <p className='text-sm text-secondary-token'>{description}</p>
+      ) : null}
+      <div className='grid w-full'>
         <form
           onSubmit={handleSubmit}
           onFocusCapture={() => setSecurityCheckArmed(true)}
@@ -367,59 +362,28 @@ export function ChangelogEmailSignup({
           data-testid='changelog-subscribe-form'
           aria-hidden={settled || undefined}
           inert={settled}
-          className={`col-start-1 row-start-1 grid gap-4 ${settled ? 'invisible pointer-events-none' : ''}`}
+          className={`col-start-1 row-start-1 grid ${settled ? 'invisible pointer-events-none' : ''}`}
         >
-          <label
-            htmlFor={`${formId}-email`}
-            className='text-sm text-primary-token'
-          >
-            Email Address
-          </label>
-          <Input
-            ref={inputRef}
-            id={`${formId}-email`}
-            name='email'
-            type='email'
-            autoComplete='email'
-            maxLength={254}
-            inputSize='lg'
-            // eslint-disable-next-line @jovie/canonical-ui-label-casing -- email placeholder literal
-            placeholder='you@email.com'
+          <InlineSubscribe
+            inputId={`${formId}-email`}
+            inputRef={inputRef}
+            ariaLabel='Email address'
+            buttonLabel={copy.buttonLabel}
             value={email}
-            onChange={e => {
+            onValueChange={value => {
               emailEditedRef.current = true;
-              setEmail(e.target.value);
+              setEmail(value);
               if (status === 'error' && !turnstileFailed) {
                 setStatus('idle');
                 setErrorMessage('');
               }
             }}
-            required
-            className='h-11 min-w-0 rounded-lg'
-            disabled={status === 'submitting'}
-            aria-invalid={
-              status === 'error' && !turnstileFailed ? 'true' : undefined
-            }
-            aria-describedby={`${formId}-consent${status === 'error' ? ` ${formId}-error` : ''}`}
+            loading={status === 'submitting'}
+            pending={status === 'submitting'}
+            unavailable={turnstileFailed}
+            invalid={status === 'error' && !turnstileFailed}
+            describedBy={`${formId}-consent${status === 'error' ? ` ${formId}-error` : ''}`}
           />
-          <div className='flex min-h-11 items-center'>
-            <Button
-              type='submit'
-              size='marketing'
-              className='w-full'
-              loading={status === 'submitting'}
-              disabled={
-                status === 'submitting' ||
-                turnstileFailed ||
-                (turnstileRequired && !turnstileToken)
-              }
-              aria-describedby={
-                status === 'error' ? `${formId}-error` : undefined
-              }
-            >
-              {copy.buttonLabel}
-            </Button>
-          </div>
           {status === 'subscribed' || !securityCheckArmed ? null : (
             <InvisibleTurnstile
               onToken={setTurnstileToken}
@@ -490,17 +454,19 @@ export function ChangelogEmailSignup({
               : ''}
         </div>
       </div>
-      <p id={`${formId}-consent`} className='mt-4 text-xs text-tertiary-token'>
-        {copy.consent}
-      </p>
+      {settled ? null : (
+        <p id={`${formId}-consent`} className='text-xs text-tertiary-token'>
+          {copy.consent}
+        </p>
+      )}
       <p
         id={`${formId}-error`}
-        className='mt-3 min-h-10 text-sm text-accent-red'
+        className='min-h-5 text-sm text-accent-red'
         role={status === 'error' ? 'alert' : undefined}
       >
         {status === 'error' ? errorMessage : ''}
       </p>
-      <div className='min-h-8'>
+      <div className='min-h-6'>
         {turnstileFailed && turnstileRetryable ? (
           <Button
             type='button'

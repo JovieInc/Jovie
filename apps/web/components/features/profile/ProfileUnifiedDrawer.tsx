@@ -5,7 +5,7 @@
 import { Switch } from '@jovie/ui';
 import { BellOff } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChannelIcon } from '@/features/profile/artist-contacts-button/ContactIcons';
 import { formatPublicContactChannelAriaLabel } from '@/features/profile/artist-contacts-button/contact-channel-label';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
@@ -338,15 +338,37 @@ export function ProfileUnifiedDrawer({
   const venmoUsername = extractVenmoUsername(venmoLink);
 
   const isSubView = renderedView !== 'menu';
+  // The view the drawer opened on. Share opened directly (from the profile's
+  // share action, not from the menu) has nowhere to go back to: it gets the
+  // direct header (title + close) and floats above the safe area.
+  // Stored-from-previous-render pattern: updates only when `open` flips, so
+  // it cannot loop, and needs no effect (no flash of the wrong header).
+  const [entry, setEntry] = useState<{
+    readonly open: boolean;
+    readonly view: DrawerView | null;
+  }>(() => ({ open, view: open ? view : null }));
+  if (entry.open !== open) {
+    setEntry({ open, view: open ? view : null });
+  }
+  const entryView = entry.open === open ? entry.view : open ? view : null;
+  const isDirectShare = renderedView === 'share' && entryView === 'share';
+  const navigationLevel = isDirectShare
+    ? 'direct'
+    : isSubView
+      ? 'secondary'
+      : 'root';
 
   return (
     <ProfileDrawerShell
       open={open}
       onOpenChange={handleOpenChange}
-      title={meta.title}
+      title={renderedView === 'pay' ? `Pay ${artist.name}` : meta.title}
       subtitle={'subtitle' in meta ? meta.subtitle : undefined}
-      onBack={isSubView ? () => navigateTo('menu') : undefined}
-      navigationLevel={isSubView ? 'secondary' : 'root'}
+      onBack={
+        navigationLevel === 'secondary' ? () => navigateTo('menu') : undefined
+      }
+      navigationLevel={navigationLevel}
+      floating={isDirectShare}
       dataTestId='profile-menu-drawer'
       presentation={presentation}
       centerTitle={renderedView === 'pay'}
@@ -380,6 +402,7 @@ export function ProfileUnifiedDrawer({
           {renderedView === 'share' && (
             <PublicShareActionList
               context={shareContext}
+              drawerHeader={isDirectShare ? 'direct' : 'secondary'}
               onActionComplete={() => handleOpenChange(false)}
             />
           )}
@@ -498,17 +521,6 @@ export function ProfileUnifiedDrawer({
             <div data-testid='profile-mode-drawer-pay'>
               {hasValidVenmoLink ? (
                 <>
-                  <div
-                    className='mb-4 text-center'
-                    data-testid='profile-pay-recipient'
-                  >
-                    <p className='text-sm font-semibold text-primary-token'>
-                      Pay {artist.name}
-                    </p>
-                    <p className='mt-1 text-xs text-tertiary-token'>
-                      @{artist.handle}
-                    </p>
-                  </div>
                   <PayView
                     profileId={artist.id}
                     artistHandle={artist.handle}

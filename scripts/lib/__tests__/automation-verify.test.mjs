@@ -45,6 +45,133 @@ const SERVICE_CENSUS_SELECTOR_TESTS = [
   'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
 ];
 
+describe('main-red ejector qualification closure', () => {
+  const inputs = [
+    'scripts/ci-fast-lanes.mjs',
+    'scripts/lib/__tests__/main-red-eject-quota-failover.test.mjs',
+    'scripts/main-red-eject.mjs',
+  ];
+  const behavior = [
+    'scripts/lib/__tests__/main-red-eject.test.mjs',
+    'scripts/lib/__tests__/main-red-eject-failing-head.test.mjs',
+    'scripts/lib/__tests__/main-red-eject-quota-failover.test.mjs',
+  ];
+  const proofs = [
+    ...behavior,
+    'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+    'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+    'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
+    'scripts/lib/__tests__/automation-verify.test.mjs',
+  ];
+  const options = {
+    isFileAvailable: () => true,
+    scriptContractVitestTests: behavior,
+  };
+  it('selects the complete behavior and CI inventory closure for the exact repair signature', () => {
+    for (const files of [
+      inputs,
+      [
+        ...inputs,
+        'scripts/run-affected-tests.mjs',
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+      ],
+    ]) {
+      const plan = buildAffectedTestPlan(files, options);
+      expect(plan.mode).toBe('selected');
+      expect(plan.scriptVitestTests).toEqual(proofs);
+      expect(plan.selectedTests).toEqual([]);
+      const commands = buildSelectedTestCommands(plan, '1');
+      expect(commands).toHaveLength(1);
+      expect(commands[0][1]).toEqual(
+        expect.arrayContaining(
+          proofs.map(file => file.replace(/^scripts\//, ''))
+        )
+      );
+    }
+  });
+  it.each(proofs)(
+    'retains full fallback when required proof %s is missing',
+    missing => {
+      const plan = buildAffectedTestPlan(inputs, {
+        ...options,
+        isFileAvailable: file => file !== missing,
+      });
+      expect(plan.mode).toBe('full');
+      expect(plan.fallbackReason).toBe(
+        'main-red ejector behavior or CI inventory proof is unavailable'
+      );
+    }
+  );
+  it.each(behavior)(
+    'requires actual CI inventory registration of %s',
+    missing => {
+      expect(
+        buildAffectedTestPlan(inputs, {
+          ...options,
+          scriptContractVitestTests: behavior.filter(test => test !== missing),
+        }).mode
+      ).toBe('full');
+    }
+  );
+  it.each([
+    'scripts/unknown-control.mjs',
+    'scripts/lib/__tests__/unknown.test.mjs',
+    'apps/web/lib/product.ts',
+    'package.json',
+    'scripts/run-affected-tests.mjs',
+  ])('preserves full fallback for an unknown/mixed/partial peer %s', peer => {
+    expect(buildAffectedTestPlan([...inputs, peer], options).mode).toBe('full');
+  });
+  it.each(inputs)(
+    'does not accept the incomplete signature without %s',
+    missing => {
+      expect(
+        buildAffectedTestPlan(
+          inputs.filter(file => file !== missing),
+          options
+        ).mode
+      ).toBe('full');
+    }
+  );
+  it('executes a selected failing behavior test and propagates its real nonzero status', async () => {
+    const dir = mkdtempSync(resolve(tmpdir(), 'ejector-selected-failure-'));
+    const marker = resolve(dir, 'selected-args');
+    const fixture = resolve(dir, 'behavior.test.mjs');
+    try {
+      writeFileSync(
+        fixture,
+        "import { test } from 'node:test'; import assert from 'node:assert/strict'; test('behavior regression', () => assert.equal(1, 2));\n"
+      );
+      writeFileSync(
+        resolve(dir, 'pnpm'),
+        '#!/bin/sh\nprintf "%s\\n" "$@" > "$EJECTOR_SELECTED_MARKER"\ncase "$*" in *lib/__tests__/main-red-eject-quota-failover.test.mjs*) exec "$EJECTOR_REAL_NODE" --test "$EJECTOR_FAILURE_FIXTURE";; *) exit 0;; esac\n',
+        { mode: 0o755 }
+      );
+      const plan = buildAffectedTestPlan(inputs, options);
+      expect(plan.mode).toBe('selected');
+      const [[command, args]] = buildSelectedTestCommands(plan, '1');
+      const status = await runCommandStatus(
+        'env',
+        [
+          `PATH=${dir}:${process.env.PATH}`,
+          `EJECTOR_SELECTED_MARKER=${marker}`,
+          `EJECTOR_REAL_NODE=${process.execPath}`,
+          `EJECTOR_FAILURE_FIXTURE=${fixture}`,
+          command,
+          ...args,
+        ],
+        { bufferOutput: true }
+      );
+      expect(status).toBe(1);
+      expect(readFileSync(marker, 'utf8')).toContain(
+        'lib/__tests__/main-red-eject-quota-failover.test.mjs'
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('Sentry deployment contract selection', () => {
   const inputs = [
     '.github/actions/sentry-error-gate/action.yml',
@@ -890,7 +1017,7 @@ describe('structural control stage execution', () => {
 
   it('starts registry, project, control coverage, Dependabot coverage, CLI coverage, web, continuity, and FX stages in order', async () => {
     const stages = buildControlTestCommands();
-    expect(stages).toHaveLength(24);
+    expect(stages).toHaveLength(23);
     expect(stages[0]).toEqual(buildCompanyRegistryTestCommand());
     expect(stages[1]).toEqual(buildProjectCreationTestCommand());
     expect(stages[2][1]).toContain('lib/__tests__/pr-conflict-event.test.mjs');
@@ -1052,18 +1179,6 @@ describe('structural control stage execution', () => {
       [
         '--test',
         '--experimental-test-coverage',
-        '--test-coverage-include=.github/scripts/internal-pr-review.mjs',
-        '--test-coverage-lines=85',
-        '--test-coverage-branches=80',
-        '--test-coverage-functions=85',
-        '.github/scripts/internal-pr-review.test.mjs',
-      ],
-    ]);
-    expect(stages[22]).toEqual([
-      'node',
-      [
-        '--test',
-        '--experimental-test-coverage',
         '--test-coverage-include=scripts/lib/source-admission-policy.mjs',
         '--test-coverage-lines=95',
         '--test-coverage-branches=90',
@@ -1071,7 +1186,7 @@ describe('structural control stage execution', () => {
         'scripts/lib/__tests__/source-admission-policy.test.mjs',
       ],
     ]);
-    expect(stages[23]).toEqual([
+    expect(stages[22]).toEqual([
       'pnpm',
       ['run', 'test:rolling-ci-fx:coverage'],
     ]);
@@ -2139,17 +2254,12 @@ describe('automation-verify affected scope', () => {
   describe('scripts typecheck selection', () => {
     // The affected bundle runs the scripts/ ratchet only when scripts/ changed
     // since the merge-base; execute that exact block against a temp repo.
-    const selection = script
-      .slice(
-        script.indexOf('if ! SCRIPTS_DIFF_BASE='),
-        script.indexOf('node scripts/turbo-local.mjs lint --affected')
-      )
-      .replace(
-        'node scripts/typecheck-scripts.mjs',
-        'echo RAN_SCRIPTS_TYPECHECK'
-      );
+    const selection = script.slice(
+      script.indexOf('if ! SCRIPTS_DIFF_BASE='),
+      script.indexOf('node scripts/turbo-local.mjs lint --affected')
+    );
 
-    function runSelection(changedPath) {
+    function runSelection(changedPath, state = 'committed', status = 0) {
       const repo = mkdtempSync(resolve(tmpdir(), 'scripts-typecheck-select-'));
       const git = args => {
         const result = spawnSync('git', args, {
@@ -2168,13 +2278,19 @@ describe('automation-verify affected scope', () => {
         git(['config', 'user.email', 'test@example.com']);
         git(['config', 'user.name', 'test']);
         writeFileSync(resolve(repo, 'README.md'), 'base\n');
+        mkdirSync(resolve(repo, 'scripts/lib'), { recursive: true });
+        writeFileSync(resolve(repo, 'scripts/lib/example.mjs'), 'base\n');
+        writeFileSync(
+          resolve(repo, 'scripts/typecheck-scripts.mjs'),
+          `console.log('RAN_SCRIPTS_TYPECHECK'); process.exit(${status});\n`
+        );
         git(['add', '.']);
         git(['commit', '-q', '-m', 'base']);
         git(['switch', '-q', '-c', 'feature']);
         mkdirSync(dirname(resolve(repo, changedPath)), { recursive: true });
         writeFileSync(resolve(repo, changedPath), 'change\n');
-        git(['add', '.']);
-        git(['commit', '-q', '-m', 'change']);
+        if (state === 'committed' || state === 'staged') git(['add', '.']);
+        if (state === 'committed') git(['commit', '-q', '-m', 'change']);
         return spawnSync(
           'bash',
           ['-c', `set -euo pipefail\nBASE_REF=main\n${selection}`],
@@ -2188,6 +2304,22 @@ describe('automation-verify affected scope', () => {
     it('runs the ratchet when scripts/ changed', () => {
       const result = runSelection('scripts/lib/example.mjs');
       expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain('RAN_SCRIPTS_TYPECHECK');
+    });
+
+    it.each([
+      ['staged', 'scripts/lib/example.mjs'],
+      ['unstaged', 'scripts/lib/example.mjs'],
+      ['untracked', 'scripts/lib/new.mjs'],
+    ])('runs the ratchet for %s scripts before commit', (state, path) => {
+      const result = runSelection(path, state);
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain('RAN_SCRIPTS_TYPECHECK');
+    });
+
+    it('propagates a failing compiler status', () => {
+      const result = runSelection('scripts/lib/example.mjs', 'committed', 73);
+      expect(result.status, result.stderr).toBe(73);
       expect(result.stdout).toContain('RAN_SCRIPTS_TYPECHECK');
     });
 
@@ -3900,6 +4032,33 @@ describe('automation-verify affected scope', () => {
           'scripts/run-affected-tests.mjs',
           'scripts/lib/__tests__/automation-verify.test.mjs',
           '.github/workflows/ci.yml',
+        ]).mode
+      ).toBe('full');
+    });
+  });
+
+  describe('homepage discovery copy binding', () => {
+    const source = 'apps/web/data/homepageSearchCopy.ts';
+    const producer = 'apps/web/components/homepage/HomepageNameSearch.test.tsx';
+
+    it('executes the real component behavior producer for discovery copy', () => {
+      const plan = buildAffectedTestPlan([source]);
+      expect(plan.mode).toBe('selected');
+      expect(plan.mandatoryTests).toEqual([producer]);
+      expect(plan.selectedTests).toEqual([producer]);
+      expect(plan.fallbackReason).toBeUndefined();
+    });
+
+    it('fails closed when the behavior producer is unavailable or another unknown data file changes', () => {
+      expect(
+        buildAffectedTestPlan([source], {
+          isFileAvailable: file => file !== producer,
+        }).mode
+      ).toBe('full');
+      expect(
+        buildAffectedTestPlan([
+          source,
+          'apps/web/data/homepageSearchCopy-neighbor.ts',
         ]).mode
       ).toBe('full');
     });

@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { LyricsViewTrack } from './LyricsView.types';
@@ -36,13 +37,15 @@ export function LyricsHeader({
       )}
     >
       {onArtistClick ? (
-        <button
+        <Button
+          variant='link'
+          size='sm'
           type='button'
           onClick={onArtistClick}
-          className='inline-flex items-center no-underline hover:underline focus-visible:underline underline-offset-2 decoration-dotted text-tertiary-token hover:text-primary-token transition-colors duration-subtle ease-subtle truncate'
+          className='min-w-0 [&>span]:min-w-0 [&>span]:max-w-full'
         >
-          {track.artist || 'Unknown artist'}
-        </button>
+          <span className='truncate'>{track.artist || 'Unknown artist'}</span>
+        </Button>
       ) : (
         <span className='text-tertiary-token truncate'>{track.artist}</span>
       )}

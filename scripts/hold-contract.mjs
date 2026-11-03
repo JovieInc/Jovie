@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // Hold contract (jovie-hold/v1).
 //
-// Stop labels pause admission. The human-owned `tim-hold` variants and
-// `do-not-merge` require an authorized disposition; age, machine receipts,
-// and head changes never release them or their coexisting stops here.
-// Other stop labels (scripts/lib/admission-hold-labels.mjs) use a receipt
+// Stop labels pause admission. None is human-owned: `tim-hold`, `tim:hold`,
+// `hold:tim` and `do-not-merge` are retired (EVENT 2026-10-28, Tim: nothing in
+// the shipping machinery waits on a human; taste ships behind a flag and Tim's
+// feedback arrives as an Ovie card). Every stop label
+// (scripts/lib/admission-hold-labels.mjs) uses a receipt
 // naming an owner and a machine-checkable release:
 //
 //   <!-- jovie-hold/v1 {"owner":"agent:<task>","until":"2026-10-12T18:00:00Z","reason":"..."} -->
@@ -17,21 +18,12 @@
 // OWNERLESS_GRACE_MS. Release removes the label and leaves one comment; the
 // Jovie Bot unlabel event wakes Merge Queue Green Enroll, whose required
 // checks remain the only merge gate.
-import { execFileSync } from 'node:child_process';
 import { STOP_HOLD_LABELS } from './lib/admission-hold-labels.mjs';
+import { EX_TEMPFAIL, runWithGitHubRetry } from './lib/github-rate-limit.mjs';
 import { extractReceiptFromComment } from './lib/queue-deferral-receipt.mjs';
 
 export const HOLD_LABEL = 'hold';
 export const CONTRACT_LABELS = STOP_HOLD_LABELS;
-// Same dedicated human family as scripts/lanes/pr_events.py. Machine false
-// holds have a separate proof-bound reconciliation path; this expiry sweep
-// cannot establish permission to release a human-owned hold.
-const HUMAN_HOLD_LABELS = new Set([
-  'tim-hold',
-  'tim:hold',
-  'hold:tim',
-  'do-not-merge',
-]);
 export const HOLD_RECEIPT_SCHEMA = 'jovie-hold/v1';
 export const OWNERLESS_GRACE_MS = 24 * 3600 * 1000;
 export const MAX_HOLD_MS = 7 * 24 * 3600 * 1000;
@@ -40,6 +32,16 @@ export const RECEIPT_SKEW_MS = 3600 * 1000;
 
 const SHA = /^[0-9a-f]{40}$/;
 const RECEIPT = /<!--\s*jovie-hold\/v1\s+(\{[\s\S]*?\})\s*-->/g;
+
+// The sweep draws on the shared Jovie Bot installation GraphQL/REST budget
+// every workflow uses. 2026-10-29 12:52-12:58 PT (runs 40944019979,
+// 40944172375, 40944333276, 40944845412): the open-PR list died with
+// 'GraphQL: API rate limit already exceeded for installation ID 112037986'
+// and exited 1. Reads retry quota/transient failures within this budget;
+// writes run once because a lost response may follow a successful mutation.
+// Quota exhaustion defers (exit 75, `github-quota-deferred`); unfinished
+// releases stay pending for the next enroll wake. Real errors still exit 1.
+const HOLD_SWEEP_MAX_WAIT_MS = 90_000;
 
 /** @returns {{ owner: string, until: number | null, head: string | null, reason: string } | null} */
 export function parseHoldReceipt(body) {
@@ -130,55 +132,95 @@ export function releaseComment({ reason, owner, label = HOLD_LABEL }) {
     'head-changed': `its \`${HOLD_RECEIPT_SCHEMA}\` receipt (owner \`${owner}\`) released on a head change, and the head has moved`,
   }[reason];
   return [
-    `Hold contract: removed \`${label}\` because ${why}.`,
+    `Hold contract: releasing \`${label}\` because ${why}.`,
     'Required checks still gate the merge queue. To hold again, re-apply the label and post a receipt:',
     `\`<!-- ${HOLD_RECEIPT_SCHEMA} {"owner":"<who>","until":"<ISO time>","reason":"<why>"} -->\``,
     `(or \`"head":"<sha>"\` to release when the head moves; no receipt lasts past ${MAX_HOLD_MS / 86400000} days).`,
   ].join('\n');
 }
 
-const QUERY = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){state headRefOid labels(first:100){nodes{name}} timelineItems(last:100,itemTypes:[LABELED_EVENT]){nodes{... on LabeledEvent{createdAt label{name}}}} comments(last:100){nodes{body createdAt}}}}}`;
+const QUERY = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){state headRefOid labels(first:100){nodes{name}} timelineItems(last:100,itemTypes:[LABELED_EVENT]){nodes{... on LabeledEvent{createdAt label{name}}}} comments(last:100){pageInfo{hasPreviousPage} nodes{body createdAt}}}}}`;
 
 function gh(args) {
-  return execFileSync('gh', args, {
-    encoding: 'utf8',
-    maxBuffer: 32 * 1024 * 1024,
-    stdio: ['ignore', 'pipe', 'pipe'],
+  const readOnly =
+    (args[0] === 'pr' && args[1] === 'list') ||
+    (args[0] === 'api' &&
+      args[1] === 'graphql' &&
+      args.includes(`query=${QUERY}`));
+  // A lost write response may follow a successful mutation. Do not replay it;
+  // the next sweep reads current labels and reconciles the release comment.
+  return runWithGitHubRetry(['gh', ...args], {
+    attempts: readOnly ? 4 : 1,
+    maxWaitMs: readOnly ? HOLD_SWEEP_MAX_WAIT_MS : 0,
+    readReset: readOnly ? undefined : () => null,
   });
 }
 
-export function sweepHolds({ now, dryRun, io }) {
+/**
+ * Throw the outcome as an error carrying a deferred marker, so the sweep can
+ * report an infrastructure deferral (exit 75) without turning it into a
+ * verdict on any hold.
+ */
+function ghError(outcome) {
+  const message = `${outcome.stderr}\n${outcome.stdout}`.trim();
+  /** @type {Error & { deferred?: boolean, exitCode?: number }} */
+  const error = new Error(
+    outcome.deferred
+      ? `GitHub quota deferral: ${message || 'hold sweep deferred'}`
+      : message || `gh exited ${outcome.code}`
+  );
+  error.deferred = Boolean(outcome.deferred);
+  error.exitCode = error.deferred ? EX_TEMPFAIL : outcome.code || 1;
+  return error;
+}
+
+async function ghOrThrow(args) {
+  const outcome = await gh(args);
+  if (outcome.deferred || outcome.code !== 0) throw ghError(outcome);
+  return outcome.stdout;
+}
+
+export async function sweepHolds({ now, dryRun, io }) {
   /** @type {Array<ReturnType<typeof evaluateHold> & { number: number, label: string }>} */
   const results = [];
-  for (const number of io.listHeld()) {
-    const pr = io.read(number);
+  for (const number of await io.listHeld()) {
+    const pr = await io.read(number);
     if (pr?.state !== 'OPEN') continue;
     const present = new Set((pr.labels?.nodes ?? []).map(l => l?.name));
-    const humanHeld = [...present].some(label => HUMAN_HOLD_LABELS.has(label));
     // Each stop label is its own hold with its own labeled time; one receipt
     // on the PR covers every label applied within its window.
     for (const label of CONTRACT_LABELS) {
       if (!present.has(label)) continue;
-      if (humanHeld) {
-        results.push({ number, label, action: 'keep', reason: 'human-hold' });
-        continue;
-      }
       const labeledAt = (pr.timelineItems?.nodes ?? [])
         .filter(event => event?.label?.name === label)
         .map(event => event.createdAt)
         .sort()
         .pop();
       if (!labeledAt) continue;
-      const verdict = evaluateHold({
-        labeledAt,
-        now,
-        headSha: pr.headRefOid,
-        comments: pr.comments?.nodes ?? [],
-      });
+      const comments = pr.comments?.nodes ?? [];
+      // A truncated window may hide a still-valid receipt or a persisted
+      // release comment. It is complete for this application only when the
+      // oldest returned comment reaches before the receipt skew window.
+      const oldestComment = Math.min(
+        ...comments.map(comment => Date.parse(comment.createdAt))
+      );
+      const completeWindow =
+        pr.comments?.pageInfo?.hasPreviousPage === false ||
+        oldestComment <= Date.parse(labeledAt) - RECEIPT_SKEW_MS;
+      /** @type {ReturnType<typeof evaluateHold>} */
+      const verdict = completeWindow
+        ? evaluateHold({ labeledAt, now, headSha: pr.headRefOid, comments })
+        : { action: 'keep', reason: 'incomplete-evidence' };
       results.push({ number, label, ...verdict });
       if (verdict.action !== 'release' || dryRun) continue;
-      io.comment(number, releaseComment({ ...verdict, label }));
-      io.unlabel(number, label);
+      const body = releaseComment({ ...verdict, label });
+      const alreadyNoted = (pr.comments?.nodes ?? []).some(
+        comment =>
+          comment?.body === body &&
+          Date.parse(comment.createdAt) >= Date.parse(labeledAt)
+      );
+      if (!alreadyNoted) await io.comment(number, body);
+      await io.unlabel(number, label);
     }
   }
   for (const result of results) {
@@ -189,65 +231,76 @@ export function sweepHolds({ now, dryRun, io }) {
   return results;
 }
 
-function main() {
+async function main() {
   const repository = process.env.GITHUB_REPOSITORY;
   if (!repository) throw new Error('GITHUB_REPOSITORY is required');
   const [owner, name] = repository.split('/');
-  sweepHolds({
-    now: Date.now(),
-    dryRun: process.env.DRY_RUN === 'true',
-    io: {
-      // One open-PR read; `gh pr list --label` ANDs repeated labels.
-      listHeld: () =>
-        JSON.parse(
-          gh([
-            'pr',
-            'list',
-            '--repo',
-            repository,
-            '--state',
-            'open',
-            '--limit',
-            '1000',
-            '--json',
-            'number,labels',
-          ])
-        )
-          .filter(pr =>
-            (pr.labels ?? []).some(l => CONTRACT_LABELS.includes(l?.name))
+  try {
+    await sweepHolds({
+      now: Date.now(),
+      dryRun: process.env.DRY_RUN === 'true',
+      io: {
+        // One open-PR read; a pr list with repeated --label flags ANDs them.
+        listHeld: async () =>
+          JSON.parse(
+            await ghOrThrow([
+              'pr',
+              'list',
+              '--repo',
+              repository,
+              '--state',
+              'open',
+              '--limit',
+              '1000',
+              '--json',
+              'number,labels',
+            ])
           )
-          .map(pr => pr.number),
-      read: number =>
-        JSON.parse(
-          gh([
+            .filter(pr =>
+              (pr.labels ?? []).some(l => CONTRACT_LABELS.includes(l?.name))
+            )
+            .map(pr => pr.number),
+        read: async number =>
+          JSON.parse(
+            await ghOrThrow([
+              'api',
+              'graphql',
+              '-f',
+              `query=${QUERY}`,
+              '-F',
+              `owner=${owner}`,
+              '-F',
+              `name=${name}`,
+              '-F',
+              `number=${number}`,
+            ])
+          ).data.repository.pullRequest,
+        comment: async (number, body) =>
+          ghOrThrow([
             'api',
-            'graphql',
+            `repos/${repository}/issues/${number}/comments`,
             '-f',
-            `query=${QUERY}`,
-            '-F',
-            `owner=${owner}`,
-            '-F',
-            `name=${name}`,
-            '-F',
-            `number=${number}`,
-          ])
-        ).data.repository.pullRequest,
-      comment: (number, body) =>
-        gh([
-          'api',
-          `repos/${repository}/issues/${number}/comments`,
-          '-f',
-          `body=${body}`,
-        ]),
-      unlabel: (number, label) =>
-        gh([
-          'api',
-          '--method',
-          'DELETE',
-          `repos/${repository}/issues/${number}/labels/${encodeURIComponent(label)}`,
-        ]),
-    },
-  });
+            `body=${body}`,
+          ]),
+        unlabel: async (number, label) =>
+          ghOrThrow([
+            'api',
+            '--method',
+            'DELETE',
+            `repos/${repository}/issues/${number}/labels/${encodeURIComponent(label)}`,
+          ]),
+      },
+    });
+  } catch (error) {
+    if (error?.deferred) {
+      console.warn(
+        `Hold contract sweep deferred (${error.message}); unfinished hold releases remain pending. It re-runs on the next enroll wake.`
+      );
+      process.exitCode = error.exitCode ?? EX_TEMPFAIL;
+      return;
+    }
+    throw error;
+  }
 }
 
-if (process.argv[1]?.endsWith('hold-contract.mjs')) main();
+if (process.argv[1]?.endsWith('hold-contract.mjs')) await main();

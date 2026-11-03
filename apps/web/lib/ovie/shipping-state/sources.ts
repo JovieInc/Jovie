@@ -5,6 +5,10 @@ import {
   emptyCounts,
   emptyDurations,
   isExactSha,
+  isLaneAgent,
+  LANE_AGENT_RE,
+  LANE_ISSUE_RE,
+  type LaneAgent,
   measuredCount,
   measuredDuration,
   NOT_MEASURED_COUNT,
@@ -240,8 +244,6 @@ function interpretDurations(
   };
 }
 
-const LANE_ISSUE_RE = /^(?:devin|codex)\/(jov-\d+)(?:-|$)/i;
-
 /** Linear issue a lane branch (`devin/jov-123-<stamp>`) is working. */
 export function laneIssueIdentifier(headRefName: unknown): string | null {
   if (typeof headRefName !== 'string') return null;
@@ -294,7 +296,6 @@ function safeDisplayText(value: unknown): string | null {
   return normalized.length > 0 ? normalized : null;
 }
 
-const LANE_AGENT_RE = /^(devin|codex)\//i;
 const CHECK_ROLLUPS = new Set(['success', 'failure', 'pending', 'unknown']);
 const MAX_FAILING_CHECKS = 20;
 
@@ -321,6 +322,11 @@ function lanePrChecks(
   return { rollup, failing };
 }
 
+function laneAgentOf(prefix: string | undefined): LaneAgent | null {
+  const agent = prefix?.toLowerCase();
+  return isLaneAgent(agent) ? agent : null;
+}
+
 function lanePrDetail(
   pr: Readonly<Record<string, unknown>>,
   prNumber: number
@@ -332,9 +338,7 @@ function lanePrDetail(
     number: prNumber,
     url: safeHttpsUrl(pr.url),
     branch: safeDisplayText(pr.headRefName),
-    agent: agentMatch
-      ? (agentMatch[1]?.toLowerCase() as 'devin' | 'codex')
-      : null,
+    agent: laneAgentOf(agentMatch?.[1]),
     isDraft: pr.isDraft === true,
     checks: lanePrChecks(pr),
     queuePosition: Number.isSafeInteger(pr.mergeQueuePosition)

@@ -1,0 +1,110 @@
+{
+  "_generated": {
+    "version": "d58fc3f8ec3b",
+    "toolsListHash": "87e4a522b0ed1415e0ca53e123958ef35b15b35f4eeff2fe72cc35d3cafe32f6",
+    "listingHash": "a7665b2f5a09882b4a03e68179c82c6e3651a971c63ad7dfb88cc10b9d213c6f",
+    "regenerate": "pnpm --filter @jovie/web agent-distribution:generate"
+  },
+  "name": "Jovie",
+  "oneLiner": "Find an artist and draft their Jovie page and release smart link. Nothing is published.",
+  "description": "Jovie lets an assistant set up an unpublished draft for a musician. Give it an artist name or a Spotify or Apple Music artist link. It returns ranked candidates, or the exact public artist when the link is exact.\n\nFrom there it can create a private workspace draft for that artist and prepare a release launch draft: a release page and a smart link built from public release facts. It returns only the questions that are still open.\n\nThe draft is private to the person who holds the draft token and expires after seven days. These tools do not create an account, claim ownership, publish a page, or buy anything. Publishing and ownership go through a separate sign-in step on jov.ie.\n\nThe tools read public music catalog data and write only the draft. No sign-in is needed to connect.",
+  "categories": [
+    "Entertainment",
+    "Productivity",
+    "Marketing"
+  ],
+  "documentationUrl": "https://jov.ie/developers/agents",
+  "privacyPolicyUrl": "https://jov.ie/legal/privacy",
+  "supportUrl": "https://jov.ie/support",
+  "serverUrl": "https://jov.ie/api/mcp",
+  "useCases": [
+    "Find an artist on Spotify or Apple Music and start an unpublished Jovie draft.",
+    "Prepare a release page and smart link from a public release link.",
+    "Resume an earlier draft and see which questions are still open."
+  ],
+  "authentication": "none",
+  "dataHandling": "Reads public Spotify and Apple Music artist and release data. Stores only the unpublished draft and the acquisition fields the caller sends. The draft token is private, scoped to one artist, and expires after seven days. No account, payment or contact details are collected by these tools.",
+  "reviewerInstructions": "No sign-in or API key is needed. Connect to the URL and call tools/list.\nSuggested walkthrough: artist.search_or_import with \"Radiohead\", then again with an exact Spotify artist link, then workspace.create_draft with the returned artist_id and draft_token, then release.prepare_launch with a public Spotify track link.\nNo tool publishes, claims, or purchases. Writes are limited to the private draft.\nTest traffic should send acquisition.agent_source set to a marketplace-review value so it can be filtered.",
+  "exampleTests": {
+    "positive": [
+      {
+        "description": "Search by artist name returns ranked candidates.",
+        "prompt": "Find the artist Radiohead and show me who matches.",
+        "tools_triggered": [
+          "artist.search_or_import"
+        ],
+        "expected_behavior": "Calls artist.search_or_import with the name and returns ranked candidates. Does not guess one when the match is ambiguous."
+      },
+      {
+        "description": "An exact Spotify artist link resolves to one artist.",
+        "prompt": "Use this Spotify artist link to start a Jovie draft: https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb",
+        "tools_triggered": [
+          "artist.search_or_import"
+        ],
+        "expected_behavior": "Calls artist.search_or_import with the exact link and returns the artist, a draft id, and a private draft token."
+      },
+      {
+        "description": "Create a draft after an exact artist is chosen.",
+        "prompt": "Create the unpublished Jovie draft for that artist.",
+        "tools_triggered": [
+          "artist.search_or_import",
+          "workspace.create_draft"
+        ],
+        "expected_behavior": "Calls workspace.create_draft with the artist id and draft token from the search result. Reports that the draft is unpublished."
+      },
+      {
+        "description": "Retrying the same draft resumes it.",
+        "prompt": "Try creating that same draft again.",
+        "tools_triggered": [
+          "workspace.create_draft"
+        ],
+        "expected_behavior": "Calls workspace.create_draft with the same token and gets the same draft back instead of a second one."
+      },
+      {
+        "description": "Prepare a release launch draft from a public release link.",
+        "prompt": "Prepare a release page and smart link from https://open.spotify.com/track/25dMCbj0duxuvx5T8ClCp3",
+        "tools_triggered": [
+          "release.prepare_launch"
+        ],
+        "expected_behavior": "Calls release.prepare_launch with the draft id, token and release link. Returns the draft status and only the questions still open. Nothing is published."
+      }
+    ]
+  },
+  "tools": [
+    {
+      "name": "artist.search_or_import",
+      "title": "Find artist",
+      "description": "Resolve a public Spotify/Apple artist identity or return ranked name candidates. Select an exact ID before drafting. Returns a private, seven-day draft_token; retain it for workspace.create_draft. Creates no account and does not publish.",
+      "annotations": {
+        "title": "Find artist",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "workspace.create_draft",
+      "title": "Create artist draft",
+      "description": "Create or resume an unpublished visibility draft using the exact artist_id and draft_token from artist.search_or_import. Retrying the same token resumes the same draft; a token for another artist is rejected. Returns claim_url: show it to the user so they can sign in on Jovie and claim the draft; the artist is matched to its Spotify identity and stays private until the user publishes. Never share draft_token. Never claims ownership, publishes or purchases.",
+      "annotations": {
+        "title": "Create artist draft",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "release.prepare_launch",
+      "title": "Prepare release launch",
+      "description": "Resolve public release facts and create or resume an unpublished artist, release-page, and smart-link draft. Requires the draft capability. Returns only unresolved questions plus claim_url; when next_action is send_user_claim_url, show claim_url to the user so they can claim it on Jovie, where it stays private until they publish. Never claims, publishes, or purchases.",
+      "annotations": {
+        "title": "Prepare release launch",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    }
+  ]
+}

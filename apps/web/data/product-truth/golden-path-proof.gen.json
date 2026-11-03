@@ -155,22 +155,22 @@
       "detail": "computed slot assembled-profile: Jovie built a profile from the visitor’s own data."
     },
     {
-      "id": "upgrade.checkout.payments",
+      "id": "upgrade.checkout.release-emails",
       "step": "upgrade",
       "route": "/onboarding/checkout",
       "source": "apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx",
-      "copy": "Take tips and payments on your profile",
+      "copy": "Email your verified subscribers when new music drops",
       "nature": "capability",
       "evidenceClass": null,
       "status": "admissible",
-      "detail": "certified: pay"
+      "detail": "certified: artist-notifications"
     },
     {
       "id": "pricing.pro.note",
       "step": "pricing",
       "route": "/pricing",
       "source": "apps/web/lib/billing/offer-truth.ts",
-      "copy": "Self-serve. Cancel anytime.",
+      "copy": "Self-serve.",
       "nature": "offer",
       "evidenceClass": null,
       "status": "admissible",

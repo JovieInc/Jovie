@@ -11,8 +11,8 @@ What's here:
 ## Plan tiers (canonical: `lib/entitlements/registry.ts`)
 
 - **Free** — limited analytics window, capped contacts, capped weekly AI messages
-- **Pro** (Artist Presence) — $12/mo self-serve via `/claim` (EVENT: Tim, 2026-10-20; canonical: `lib/config/plan-prices.ts`). Retired $39 and $199 prices stay mapped as legacy. Verification is never granted by payment.
-- **Max** — $149/mo or $1430/yr — Pro plus team management, webhooks, email campaigns
+- **Pro** (Artist Presence) — monthly self-serve (price: `ARTIST_VISIBILITY_OFFER.pro.monthlyUsd`) via `/claim` (EVENT: Tim, 2026-10-20; canonical: `lib/config/plan-prices.ts`). Retired prices stay mapped as legacy for existing subscribers (see `lib/stripe/legacy-prices.ts`). Verification is never granted by payment.
+- **Max** — contact sales, no public price; legacy subscribers only — Pro plus team management, webhooks, email campaigns
 - **Trial** — 14-day reverse trial granting Pro-tier features (with a tighter notification cap, see `feedback_pricing_strategy` in memory)
 
 ## Trial-aware upgrade nudges (commit 8a27e3fec, Phase 1)
