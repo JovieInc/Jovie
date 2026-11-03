@@ -4100,6 +4100,9 @@ class WorkerTest(unittest.TestCase):
 
     def test_large_valid_inventory_cache_does_not_hold_the_worker(self):
         rows = [{**repair_inventory_pr(), 'body': 'x' * (2 * 1024 * 1024)}]
+        cache = patch.object(lane, "SHARED_CACHE_DIR", self.host.state / "cache")
+        cache.start()
+        self.addCleanup(cache.stop)
         (lane.SHARED_CACHE_DIR).mkdir(parents=True, exist_ok=True)
         (lane.SHARED_CACHE_DIR/'open-prs-labels-v2.json').write_text(json.dumps({'at': time.time(), 'value': rows}))
         lane._SUMMARY.update(at=0.0, prs=[], readable=False)
