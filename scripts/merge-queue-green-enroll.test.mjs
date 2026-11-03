@@ -32,10 +32,12 @@ const run = new AsyncFunction(
 async function recordTimers(fn) {
   const realSetTimeout = globalThis.setTimeout;
   const delays = [];
-  globalThis.setTimeout = (callback, ms, ...args) => {
-    delays.push(Number(ms) || 0);
-    return realSetTimeout(callback, ms, ...args);
-  };
+  globalThis.setTimeout = new Proxy(realSetTimeout, {
+    apply(target, thisArg, args) {
+      delays.push(Number(args[1]) || 0);
+      return Reflect.apply(target, thisArg, args);
+    },
+  });
   try {
     return { value: await fn(), delays };
   } finally {
