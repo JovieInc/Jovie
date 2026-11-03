@@ -157,7 +157,14 @@ describe('canonical contacts page', () => {
     const tree = await ContactsPage({
       searchParams: Promise.resolve({ tab: 'audience' }),
     });
-    const contentRegion = (tree as ReactElement).props.children;
+    type ChildElement<Child> = ReactElement<{ children: Child }>;
+    type ServerElement = ReactElement<
+      unknown,
+      (props: unknown) => Promise<ReactElement>
+    >;
+    const contentRegion = (
+      tree as ChildElement<ChildElement<ChildElement<ServerElement>>>
+    ).props.children;
     const suspense = contentRegion.props.children;
     const inner = suspense.props.children;
     return inner.type(inner.props) as Promise<ReactElement>;
