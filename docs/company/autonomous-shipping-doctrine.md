@@ -88,7 +88,6 @@ separate post-landing authority action for external side effects.
 ## References
 
 - `~/.claude/CLAUDE.md` §2 Shipping Philosophy
-- `~/.hermes/scripts/lib/pr_gates.py`
-- `~/.hermes/scripts/pr-merge-queue.py`
+- `Jovie/scripts/lanes/` (Gem lanes, the current ship loop; the Hermes scripts were retired 2026-10-31)
 - `Jovie/scripts/drain-pr-queue.sh`
 - `Jovie/.github/MERGE_QUEUE.md`
