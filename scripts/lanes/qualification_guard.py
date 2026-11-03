@@ -113,6 +113,7 @@ HERE = Path(__file__).resolve().parent
 # silently deferred every lane draft's gate after #22301 changed the fixture (2026-10-20
 # 17:26Z to 2026-10-21): 45 jovie-bot drafts were never qualified or promoted.
 REVIEWED_FIXTURE_SHA256 = (
+    "7371802bd9234c367bc60ff2be0c1edb517f74a0b0dd62183ae7421a92629939",  # #23119 (JOV-8270 retired private-store reclamation proof)
     "53d4b1b3b46143fec03da0f02788a8409778d06ff59aadec14e8002c70d77304",  # JOV-8517 (owned home and fail-closed probe)
     "aa24ace3f9cf6fc485806d2c8395c9344e7680cc4e8b7fd5c126d777515e4f0c",  # 0fa7c7a (#22301)
     "be680e72198db2174f6c0ac5fe05157a4a03f7bd791941c9254f13b21d0686fb",  # 5db1a60 (#22010)
@@ -122,7 +123,8 @@ REVIEWED_FIXTURE_SHA256 = (
     "a31068082dbfe838369e1cab46edfd331afc6991cefeb725a6c05f5456364fb9",  # #23280 (reclaimable ignores mounts and roomy volumes)
     "294f539ccbde6e19e1a22e94f18a03378cf1f19006dc39170dd8912cdb0da652",  # #23282 (reclaimable fails closed on an unreadable mount table)
     "59392e121dbbf64b42cfe9eca426c0edb3c22ae511cc95440bf4303d6469f81e",  # JOV-10233 (guard reads every lanes mount)
-    "8ff13a123ff5add243bac3f0cb5f0f73e978b2aad953a64fccbf9ff11b3eb48f",  # Private archive fail-closed and fixture-owned retired roots
+    "ed65e255b5c3ec2683c505cd85e0227c075725bcb9d01eb14fa2a68fca9b4194",  # #24298 (synthetic mount fixture owns retired roots)
+    "8ff13a123ff5add243bac3f0cb5f0f73e978b2aad953a64fccbf9ff11b3eb48f",  # #24298 (unconfigured private archive holds unsaved work)
 )
 DEFAULT_POLICY = SafetyPolicy(
     "5db1a60487c0a29dda45315d9aa5da14493d9409",

@@ -38,6 +38,7 @@ import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { load as yamlLoad } from 'js-yaml';
+import { baseRefCandidates, resolveBaseRef } from './lib/git-base-ref.mjs';
 import {
   companionChecklist,
   explainShipGate,
@@ -45,6 +46,9 @@ import {
   PR_BODY_SKELETON,
   parseMergeConflicts,
 } from './lib/preflight-changed.mjs';
+
+export { baseRefCandidates, resolveBaseRef };
+
 import { checkInstallMatchesLockfile } from './lib/preflight-install.mjs';
 import { remoteHint } from './lib/remote-hint.mjs';
 
@@ -204,30 +208,6 @@ const git = (cwd, args) => {
   return r.status === 0 ? r.stdout.trim() : '';
 };
 
-/**
- * Ref names to try for a diff base (JOV-10351). A bare branch name resolves
- * to its remote-tracking ref first, then the local branch; a name that is
- * already qualified (origin/main, refs/...) is never prefixed again.
- * @returns {string[]}
- */
-export function baseRefCandidates(base) {
-  const b = base.trim();
-  if (/^(?:origin\/|refs\/)/.test(b)) return [b];
-  return [`origin/${b}`, b];
-}
-
-/**
- * The first candidate that names a commit, or null when none does. Callers
- * must fail on null instead of treating it as 'no changes' (JOV-10351).
- * @returns {string|null}
- */
-export function resolveBaseRef(cwd, base) {
-  for (const candidate of baseRefCandidates(base))
-    if (git(cwd, ['rev-parse', '--verify', '--quiet', `${candidate}^{commit}`]))
-      return candidate;
-  return null;
-}
-
 /** Changed files vs the merge-base, including uncommitted and untracked.
  *  `base` must be a ref that resolves to a commit (see resolveBaseRef). */
 export function changedFiles(cwd, base) {
@@ -333,14 +313,18 @@ function loadBody(args, cwd) {
 }
 
 /** Run the shared Private Data Guard from the pinned JovieInc/ci workflow. */
-async function privateDataCheck(cwd, env, mergeBase) {
+export async function privateDataCheck(cwd, env, mergeBase) {
   const wfPath = path.join(cwd, '.github/workflows/private-data-guard.yml');
   if (!existsSync(wfPath)) return { skip: 'no private-data-guard workflow' };
   const wf = /** @type {any} */ (yamlLoad(readFileSync(wfPath, 'utf8')));
   const job = Object.values(wf.jobs ?? {})[0] ?? {};
   const m = String(job.uses ?? '').match(/^JovieInc\/ci\/(.+)@([0-9a-f]{40})$/);
   if (!m) return { skip: 'guard is not a pinned JovieInc/ci workflow' };
-  const cache = path.join(homedir(), '.cache', 'jovie-preflight');
+  const cacheRoot =
+    env.XDG_CACHE_HOME && path.isAbsolute(env.XDG_CACHE_HOME)
+      ? env.XDG_CACHE_HOME
+      : path.join(homedir(), '.cache');
+  const cache = path.join(cacheRoot, 'jovie-preflight');
   mkdirSync(cache, { recursive: true });
   const file = path.join(cache, `private-data-${m[2]}.py`);
   if (!existsSync(file)) {
@@ -487,13 +471,14 @@ export async function main({
   });
   if (pinned.status === 0 && pinned.stdout.trim())
     childEnv.PATH = `${pinned.stdout.trim()}:${childEnv.PATH}`;
-  // Fetch the remote branch under its unqualified name; a base that arrives
-  // already remote-qualified (origin/main) maps back to 'main' (JOV-10351).
-  spawnSync(
-    'git',
-    ['fetch', '--no-tags', '-q', 'origin', args.base.replace(/^origin\//, '')],
-    { cwd }
+  // GitHub's environment contract is a logical branch name. Source guards
+  // prepend origin/ themselves; keep qualified refs only in CI_BASE_REF.
+  const branchBase = args.base.replace(
+    /^(?:refs\/remotes\/origin\/|refs\/heads\/|origin\/)/,
+    ''
   );
+  // Fetch the remote branch under its unqualified name (JOV-10351).
+  spawnSync('git', ['fetch', '--no-tags', '-q', 'origin', branchBase], { cwd });
   const baseRef = resolveBaseRef(cwd, args.base);
   if (!baseRef) {
     log(
@@ -503,7 +488,7 @@ export async function main({
   }
   Object.assign(childEnv, {
     NODE_OPTIONS: `--max-old-space-size=${HEAP_MB}`,
-    GITHUB_BASE_REF: args.base,
+    GITHUB_BASE_REF: branchBase,
     GITHUB_EVENT_NAME: 'pull_request',
     CI_BASE_REF: baseRef,
     // Copied guards compare their module URL to argv[1]; macOS /var -> /private/var
@@ -587,7 +572,7 @@ export async function main({
     pathToFileURL(path.join(cwd, 'scripts/lib/source-validation-manifest.mjs'))
       .href
   );
-  for (const g of manifest.selectManifestGuards(paths, args.base)) {
+  for (const g of manifest.selectManifestGuards(paths, branchBase)) {
     if (g.heavy && !args.thorough) {
       deferred.push(g.id);
       continue;
