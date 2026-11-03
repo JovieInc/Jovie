@@ -3316,7 +3316,15 @@ ${selectedGateScript}`,
       'node scripts/lib/merge-group-member-policy.mjs --policy=size'
     );
     expect(sizeGuard).toContain('--filter=blob:limit=1g');
-    expect(sizeGuard).not.toContain('--filter=blob:none');
+    expect(sizeGuard).toContain(
+      'git fetch --refetch --filter=blob:none --no-tags --depth=2 origin "$GROUP_HEAD"'
+    );
+    expect(sizeGuard).not.toContain(
+      'git fetch --refetch --filter=blob:limit=1g --no-tags --depth=2'
+    );
+    expect(sizeGuard).toContain(
+      'node scripts/lib/merge-group-local-evidence.mjs || true'
+    );
     expect(MEMBER_POLICY).toContain('await enforceCombinedTreePayload({');
     expect(MEMBER_POLICY).toContain('/git/trees/${treeSha}?recursive=1');
     expect(MEMBER_POLICY).not.toContain("from 'node:child_process'");
@@ -3330,7 +3338,25 @@ ${selectedGateScript}`,
       'ref: ${{ github.event.pull_request.head.sha }}'
     );
     expect(sourceSizeGuard).toContain('persist-credentials: false');
-    expect(sourceSizeGuard).toContain('fetch-depth: 0');
+    // Depth-one checkout is followed by one targeted unshallow fetch: a
+    // merely available shallow merge base is not proof of complete ancestry.
+    expect(sourceSizeGuard).toContain('fetch-depth: 1');
+    expect(sourceSizeGuard).toContain(
+      'name: Fetch exact PR and current base ancestry'
+    );
+    expect(sourceSizeGuard).toContain(
+      'git fetch --filter=blob:none --no-tags --unshallow origin "$PR_HEAD_SHA"'
+    );
+    expect(sourceSizeGuard).toContain(
+      '+refs/heads/$PR_BASE_REF:refs/remotes/origin/$PR_BASE_REF'
+    );
+    expect(sourceSizeGuard).toContain(
+      '[[ "$(git rev-parse HEAD)" == "$PR_HEAD_SHA" ]]'
+    );
+    expect(sourceSizeGuard).toContain(
+      '[[ "$(git rev-parse --is-shallow-repository)" == false ]]'
+    );
+    expect(sourceSizeGuard).toContain('git archive "$PR_BASE_SHA" scripts/lib');
     expect(sourceSizeGuard).toContain('id: pr-merge-base');
     // The event base SHA goes stale on long-lived PRs; judge the PR against
     // the fetched base branch tip instead (#18131 failed on a 3-day-old base).

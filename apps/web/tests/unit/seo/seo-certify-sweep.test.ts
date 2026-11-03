@@ -85,6 +85,26 @@ function sweep(pages: SeoSweepPage[], llmsTxt: string | null = null) {
 }
 
 describe('sweepTargets', () => {
+  it('certifies product instead of disabled demo redirect documents, and rejects a broken target', () => {
+    const paths = sweepTargets().map(target => target.pathname);
+    expect(paths).not.toContain('/demo/video');
+    expect(paths).not.toContain('/demovideo');
+    expect(paths).toContain('/product');
+    for (const status of [307, 404, 500]) {
+      const result = sweep([
+        {
+          target: target('/product'),
+          status,
+          html: html('/product', GOOD_BODY, PRODUCT_LD),
+          source: 'test',
+        },
+      ]);
+      expect(result[0]?.certification.checks).toContainEqual(
+        expect.objectContaining({ id: 'http-status', status: 'failed' })
+      );
+    }
+  });
+
   it('certifies the live homepage while the retired /new alias stays a redirect', () => {
     const paths = sweepTargets().map(target => target.pathname);
     expect(paths).toContain('/');
