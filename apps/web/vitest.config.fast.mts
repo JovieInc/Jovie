@@ -8,7 +8,6 @@ import {
   type TestProjectInlineConfiguration,
 } from 'vitest/config';
 import DurationShardSequencer from './scripts/vitest-duration-sequencer.mjs';
-import { localMaxWorkers } from './scripts/vitest-local-workers.mjs';
 
 // Resolve the real filesystem path (handles Windows short-name paths like TIMWHI~1)
 // so that Vite's @fs handler can locate files when the path contains spaces.
@@ -231,7 +230,7 @@ export default defineConfig({
         : undefined
       : isCI
         ? 2
-        : localMaxWorkers(),
+        : undefined,
     minWorkers: 1,
     fileParallelism: isExactHeadCoverageRun ? true : !isCI,
     maxConcurrency: isExactHeadCoverageRun
