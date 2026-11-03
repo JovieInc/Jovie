@@ -3540,7 +3540,7 @@ ${selectedGateScript}`,
     expect(Object.keys(privateGuard.jobs)).toEqual(['guard']);
     expect(privateGuard.jobs.guard.permissions).toEqual({ contents: 'read' });
     expect(privateGuard.jobs.guard.uses).toBe(
-      'JovieInc/ci/.github/workflows/private-data-guard.yml@315c327e822e328e01c0e8f50d4e6b14db86af2c'
+      'JovieInc/ci/.github/workflows/private-data-guard.yml@a26a5e2b62ec427b4d1bf465662adac0627b5102'
     );
     expect(privateGuardSource).not.toMatch(
       /secrets\.[A-Z0-9_]+|secrets:\s*inherit/
