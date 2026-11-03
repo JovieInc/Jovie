@@ -33,6 +33,8 @@ const mocks = vi.hoisted(() => ({
     state: 'active',
     version: 1,
   } as LinkState | null,
+  usernameNormalized: 'artist' as string | null,
+  commitTransaction: vi.fn().mockResolvedValue(undefined),
   concurrentCreateWins: false,
   transactionTail: Promise.resolve(),
   deleteUpdateReached: Promise.resolve(),
@@ -73,6 +75,7 @@ const mockDb = vi.hoisted(() => ({
             {
               id: PROFILE_ID,
               internalUserId: 'internal-user-1',
+              usernameNormalized: mocks.usernameNormalized,
             },
           ];
         }
@@ -188,7 +191,9 @@ vi.mock('@/lib/auth/session', () => ({
       },
     };
     try {
-      return await callback(tx, 'clerk-user-1');
+      const result = await callback(tx, 'clerk-user-1');
+      await mocks.commitTransaction();
+      return result;
     } finally {
       release?.();
     }
@@ -246,9 +251,62 @@ describe('social link compare-and-swap routes', () => {
     mocks.getCachedAuth.mockResolvedValue({ userId: 'internal-user-1' });
     mocks.selections = [];
     mocks.confirmationReceipts = [];
+    mocks.usernameNormalized = 'artist';
+    mocks.commitTransaction.mockResolvedValue(undefined);
     mocks.concurrentCreateWins = false;
     mocks.transactionTail = Promise.resolve();
     resetBarriers();
+  });
+
+  it.each(['artist', null])(
+    'invalidates the profile cache after commit with username %s',
+    async username => {
+      mocks.usernameNormalized = username;
+      const { POST } = await import('@/app/api/chat/confirm-link/route');
+      const response = await POST(
+        new Request('http://localhost/api/chat/confirm-link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            profileId: PROFILE_ID,
+            platform: 'instagram',
+            url: 'https://instagram.com/newer',
+            normalizedUrl: 'https://instagram.com/newer',
+            expectedVersion: 1,
+          }),
+        })
+      );
+      expect(response.status).toBe(200);
+      expect(mocks.invalidateSocialLinksCache).toHaveBeenCalledExactlyOnceWith(
+        PROFILE_ID,
+        username
+      );
+      expect(mocks.commitTransaction.mock.invocationCallOrder[0]).toBeLessThan(
+        mocks.invalidateSocialLinksCache.mock.invocationCallOrder[0]
+      );
+    }
+  );
+
+  it('does not invalidate the cache when committing a link write fails', async () => {
+    mocks.commitTransaction.mockRejectedValueOnce(new Error('commit failed'));
+    const { POST } = await import('@/app/api/chat/confirm-link/route');
+    const response = await POST(
+      new Request('http://localhost/api/chat/confirm-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profileId: PROFILE_ID,
+          platform: 'instagram',
+          url: 'https://instagram.com/newer',
+          normalizedUrl: 'https://instagram.com/newer',
+          expectedVersion: 1,
+        }),
+      })
+    );
+    expect(response.status).toBe(500);
+    expect(mocks.syncPrimaryMusicUrls).toHaveBeenCalledOnce();
+    expect(mocks.commitTransaction).toHaveBeenCalledOnce();
+    expect(mocks.invalidateSocialLinksCache).not.toHaveBeenCalled();
   });
 
   it('replays a lost acknowledgement without a second write, sync or audit', async () => {

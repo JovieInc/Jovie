@@ -127,9 +127,7 @@ export async function POST(req: Request) {
 
   // Set once the link write commits; the public-profile cache is invalidated
   // after the transaction, as the dashboard route does.
-  const committed: { usernameNormalized: string | null } | { none: true } = {
-    none: true,
-  };
+  const committed: { usernameNormalized?: string | null } = {};
 
   try {
     const response = await withDbSessionTx(
@@ -313,9 +311,7 @@ export async function POST(req: Request) {
         }
 
         await syncPrimaryMusicUrlsFromSocialLinks(tx, profileId);
-        Object.assign(committed, {
-          usernameNormalized: profile.usernameNormalized,
-        });
+        committed.usernameNormalized = profile.usernameNormalized;
 
         const result = {
           success: true as const,
