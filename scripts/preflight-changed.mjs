@@ -47,6 +47,7 @@ import {
   parseMergeConflicts,
 } from './lib/preflight-changed.mjs';
 import { checkInstallMatchesLockfile } from './lib/preflight-install.mjs';
+import { cachePinnedGuard } from './lib/private-data-guard-cache.mjs';
 import { remoteHint } from './lib/remote-hint.mjs';
 
 const SELF = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -173,14 +174,27 @@ export function parseArgs(argv) {
   return a;
 }
 
-function sh(cmd, { cwd, env, timeoutMs = 600_000 }) {
+/** @param {string} cmd
+ * @param {{cwd: string, env: NodeJS.ProcessEnv, timeoutMs?: number, input?: string}} options
+ */
+function sh(cmd, { cwd, env, timeoutMs = 600_000, input = undefined }) {
   return new Promise(resolve => {
     const t0 = Date.now();
     const child = spawn('bash', ['-c', cmd], {
       cwd,
       env,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
     });
+    /** @type {Error | undefined} */
+    let inputError;
+    if (input !== undefined) {
+      // A child that exits early (including a missing Python) still reports its
+      // own nonzero status; EPIPE must not crash the parent before that receipt.
+      child.stdin?.on('error', error => {
+        inputError = error;
+      });
+      child.stdin?.end(input);
+    }
     let out = '';
     const take = d => {
       out += d.toString();
@@ -192,8 +206,10 @@ function sh(cmd, { cwd, env, timeoutMs = 600_000 }) {
     child.on('close', (code, signal) => {
       clearTimeout(timer);
       resolve({
-        code: code ?? (signal ? 137 : 1),
-        out,
+        code: inputError && code === 0 ? 1 : (code ?? (signal ? 137 : 1)),
+        out: inputError
+          ? `${out}\nstdin delivery failed: ${inputError.message}`
+          : out,
         ms: Date.now() - t0,
       });
     });
@@ -342,32 +358,47 @@ export async function privateDataCheck(cwd, env, mergeBase) {
   const m = String(job.uses ?? '').match(/^JovieInc\/ci\/(.+)@([0-9a-f]{40})$/);
   if (!m) return { skip: 'guard is not a pinned JovieInc/ci workflow' };
   const cache = path.join(cacheHome(env), 'jovie-preflight');
-  mkdirSync(cache, { recursive: true });
-  const file = path.join(cache, `private-data-${m[2]}.py`);
-  if (!existsSync(file)) {
-    const r = ghClient(cwd, [
-      'api',
-      `repos/JovieInc/ci/contents/${m[1]}?ref=${m[2]}`,
-      '--jq',
-      '.content',
-    ]);
-    if (r.status !== 0)
-      return { skip: 'could not fetch the pinned guard (gh)' };
-    const yaml = Buffer.from(r.stdout.trim(), 'base64').toString('utf8');
-    const py = yaml.match(/python3 - <<'PY'\n([\s\S]*?)\n\s*PY\n/);
-    if (!py) return { skip: 'guard script not found in pinned workflow' };
-    const lines = py[1].split('\n');
-    const indent = lines[0].match(/^\s*/)[0].length;
-    const { writeFileSync } = await import('node:fs');
-    writeFileSync(file, lines.map(l => l.slice(indent)).join('\n'));
+  const failed = message => ({ code: 1, out: message, ms: 0 });
+  // A writable receipt cannot authenticate itself. Re-read the immutable pin
+  // through the budgeted client even on warm runs; verification never skips.
+  const r = ghClient(cwd, [
+    'api',
+    `repos/JovieInc/ci/contents/${m[1]}?ref=${m[2]}`,
+    '--jq',
+    '.content',
+  ]);
+  if (r.status === 75)
+    return {
+      code: 75,
+      infrastructure: 'github-quota-deferred',
+      out: 'github-quota-deferred: could not fetch the pinned guard (gh)',
+      ms: 0,
+    };
+  if (r.status !== 0) return failed('could not fetch the pinned guard (gh)');
+  const yaml = Buffer.from(r.stdout.trim(), 'base64').toString('utf8');
+  const py = yaml.match(/python3 - <<'PY'\n([\s\S]*?)\n\s*PY\n/);
+  if (!py) return failed('guard script not found in pinned workflow');
+  const lines = py[1].split('\n');
+  const indent = lines[0].match(/^\s*/)[0].length;
+  let script;
+  try {
+    ({ script } = cachePinnedGuard({
+      cacheDir: cache,
+      commit: m[2],
+      workflowPath: m[1],
+      script: lines.map(l => l.slice(indent)).join('\n'),
+    }));
+  } catch (error) {
+    return failed(`pinned guard cache verification failed: ${error.message}`);
   }
   const w = job.with ?? {};
   const head = git(cwd, ['rev-parse', 'HEAD']);
   const tmp = path.join(tmpdir(), `pdg-${process.pid}`);
   // Include uncommitted work: scan base..working tree via a temp commit-free diff
   // is not possible for the guard, so it scans committed history; commit first.
-  const quotedFile = `'${file.replaceAll("'", "'\"'\"'")}'`;
-  const run = await sh(`python3 ${quotedFile}`, {
+  // Match the upstream stdin invocation. Do not reopen a mutable cache pathname
+  // after verification: another process may replace it before Python launches.
+  const run = await sh('python3 -', {
     cwd,
     env: {
       ...env,
@@ -380,6 +411,7 @@ export async function privateDataCheck(cwd, env, mergeBase) {
       EXTRA_CONTENT: w['extra-content-patterns'] ?? '',
     },
     timeoutMs: 60_000,
+    input: script,
   });
   void tmp;
   return run;
@@ -753,9 +785,13 @@ export async function main({
           ? 'skip'
           : r.warn
             ? 'warn'
-            : r.code === 0
-              ? 'ok'
-              : 'FAIL';
+            : c.id === 'private-data' &&
+                r.code === 75 &&
+                r.infrastructure === 'github-quota-deferred'
+              ? 'quota'
+              : r.code === 0
+                ? 'ok'
+                : 'FAIL';
         log(
           `  ${status.padEnd(4)}  ${c.name} (${((r.ms ?? 0) / 1000).toFixed(1)}s)${r.skip ? `  [${r.skip}]` : ''}`
         );
@@ -806,6 +842,8 @@ export async function main({
 
   log('\n== preflight:changed summary');
   const red = results.filter(r => r.status === 'FAIL');
+  const infrastructure = results.filter(r => r.status === 'quota');
+  for (const r of infrastructure) log(`\n[~] ${r.name}: ${r.out}`);
   for (const w of results.filter(r => r.warn)) log(`\n[~] ${w.warn}`);
   for (const r of red) {
     log(`\n[ ] ${r.name}`);
@@ -825,7 +863,13 @@ export async function main({
     log(`  deferred  guard:${d} (heavy; rerun with --thorough)`);
 
   const total = red.length + body.errors.length + companion.length;
-  log(total ? `\n${total} item(s) to fix before pushing.` : '\nall clear.');
+  log(
+    total
+      ? `\n${total} item(s) to fix before pushing.`
+      : infrastructure.length
+        ? '\nqualification incomplete: GitHub quota deferred.'
+        : '\nall clear.'
+  );
 
   if (env.JOVIE_PREFLIGHT_LEDGER !== 'off') {
     try {
@@ -840,6 +884,7 @@ export async function main({
           head: git(cwd, ['rev-parse', 'HEAD']),
           durationMs: Date.now() - started,
           checks: results.length,
+          infrastructure: infrastructure.map(r => r.id),
           red: [
             ...red.map(r => r.id),
             ...body.errors.map(e => `body:${e.id}`),
@@ -853,9 +898,14 @@ export async function main({
   }
   if (args.json)
     log(
-      JSON.stringify({ red: red.map(r => r.id), body: body.errors, companion })
+      JSON.stringify({
+        red: red.map(r => r.id),
+        infrastructure: infrastructure.map(r => r.id),
+        body: body.errors,
+        companion,
+      })
     );
-  return total ? 1 : 0;
+  return total ? 1 : infrastructure.length ? 75 : 0;
 }
 
 if (
