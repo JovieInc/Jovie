@@ -26,6 +26,7 @@ import {
   winFromPr,
   winStatus,
 } from './lib/wins-ledger.mjs';
+import { putWinToStore } from './lib/wins-store.mjs';
 
 const HEADER = readFileSync(WINS_PATH, 'utf8').split('\n')[0];
 const arg = (argv, k) => {
@@ -86,6 +87,12 @@ export async function main(argv, io = console) {
     }
     const problems = validateWin(win);
     if (problems.length) throw new Error(problems.join('; '));
+    if (argv.includes('--store')) {
+      // Data is not shipped as PRs: write the record to the runtime store.
+      const r = await putWinToStore(win);
+      io.log(`${win.id}: ${r}`);
+      return 0;
+    }
     if (wins.some(w => w.prs.some(p => p.number === number && p.repo === repo)))
       return io.log(`#${number}: already in the ledger`), 0;
     save([...wins, win]);

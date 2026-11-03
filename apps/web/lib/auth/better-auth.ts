@@ -53,6 +53,7 @@ import {
   isDeterministicTestOtpEmail,
 } from './rate-limit-rules';
 import { authRateLimitStorage } from './rate-limit-storage';
+import { assertNewAccountAdmission } from './signup-admission';
 
 export {
   AUTH_RATE_LIMIT_RULES,
@@ -408,6 +409,7 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
+        before: assertNewAccountAdmission,
         after: async user => {
           try {
             await provisionAppUser({

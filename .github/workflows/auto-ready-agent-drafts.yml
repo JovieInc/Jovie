@@ -36,6 +36,9 @@ name: Auto-Ready Agent Drafts
 on:
   workflow_run:
     workflows: ['Source Validation']
+    # Same-repo PR heads only (the job requires event pull_request/pull_request_target):
+    # main pushes and merge-group refs only produced skipped runs.
+    branches-ignore: [main, 'gh-readonly-queue/**']
     types: [completed]
   workflow_dispatch:
     inputs:
@@ -64,8 +67,8 @@ jobs:
     concurrency:
       group: auto-ready-agent-drafts
       cancel-in-progress: false
-    # Fleet controller: use the hosted image contract so `gh` is always
-    # available. Some self-hosted fast runners intentionally lack it.
+    # Any configured control-plane pool must provide the hosted image tools,
+    # including `gh`; unset retains the hosted image.
     runs-on: ${{ fromJSON(vars.RUNNER_CONTROL_PLANE || '"ubuntu-latest"') }}
     permissions:
       actions: read

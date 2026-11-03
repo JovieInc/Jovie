@@ -43,6 +43,29 @@ export const ARTIST_VISIBILITY_ACTIVATION_COPY = {
   next: 'Included with your plan.',
 } as const;
 
+/**
+ * The one thing only the paid plan unlocks that works the moment checkout
+ * lands: contact export (`canExportContacts` is false on Free, true on the
+ * paid plan; POST /api/dashboard/audience/subscribers returns 403 without
+ * it). The CSV columns match SUBSCRIBER_EXPORT_COLUMNS in the audience
+ * toolbar: name, email, country, consent date.
+ */
+export const ARTIST_VISIBILITY_FAN_LIST_UNLOCK = {
+  header: `You're on ${PRO_PLAN_DISPLAY_NAME}: unlocked`,
+  title: 'Your fan list: export',
+  description:
+    'Fans who subscribe on your page are yours to export anytime with name, email, country and consent date.',
+  cta: 'Open your fan list',
+  href: APP_ROUTES.CONTACTS_AUDIENCE,
+} as const;
+
+/** Day one the fan list is empty, so the first action is filling it. */
+export const ARTIST_VISIBILITY_SHARE_PROMPT = {
+  title: 'Share your page to collect your first fans',
+  shareLabel: 'Share',
+  shareText: 'Subscribe to hear when I release new music.',
+} as const;
+
 export const ARTIST_VISIBILITY_ACTIVATION_STEPS = [
   {
     key: 'notify',
