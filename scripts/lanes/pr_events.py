@@ -33,6 +33,7 @@ import lifecycle  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+from atomic_state import append_json_object
 import remediation  # noqa: E402  (classifier + non-PR intake; no lane_runner import)
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 PREFIX = "lane-fix-"
@@ -2220,8 +2221,7 @@ def sync_failure_reason(result) -> str:
 
 def ledger(host, receipt: dict) -> None:
     (host.state / "runs").mkdir(parents=True, exist_ok=True)
-    with open(host.state / "runs" / "ledger.jsonl", "a") as handle:
-        handle.write(json.dumps(receipt) + "\n")
+    append_json_object(host.state / "runs" / "ledger.jsonl", receipt)
 
 
 OPEN_PRS_QUERY = """query($owner:String!,$name:String!,$cursor:String){repository(owner:$owner,name:$name){nameWithOwner

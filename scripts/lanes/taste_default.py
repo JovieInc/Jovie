@@ -41,7 +41,7 @@ import lifecycle  # noqa: E402
 import outcome_lane  # noqa: E402
 import pathlib as _pl, sys as _sys  # noqa: E402
 _sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
-from atomic_state import atomic_write_text  # noqa: E402
+from atomic_state import append_json_object, atomic_write_text  # noqa: E402
 
 esc = outcome_lane.esc
 POLICY_PATH = Path(os.environ.get("LANES_TASTE_POLICY", HERE / "taste-policy.json"))
@@ -236,8 +236,7 @@ def ledger_row(state: Path, issue: str, proposal: dict, verdict: str, ended: flo
            "waitHours": proposal.get("waitHours")}
     try:
         (state / "runs").mkdir(parents=True, exist_ok=True)
-        with open(state / "runs" / "ledger.jsonl", "a") as out:
-            out.write(json.dumps(row) + "\n")
+        append_json_object(state / "runs" / "ledger.jsonl", row)
     except OSError:
         pass
 
