@@ -48,6 +48,32 @@ import {
   webCiContractTestsCommand,
 } from '../../ci-fast-lanes.mjs';
 
+it('selects capacity behavior and coverage on collector, fixture and registry changes', () => {
+  for (const file of [
+    'scripts/capacity/forecast.py',
+    'scripts/tests/test_capacity_forecast.py',
+    'scripts/tests/test_neon_collector.py',
+    'ops/registry/capacity-resources.json',
+  ]) {
+    const guards = selectSourceGuards('pull_request', [file]);
+    const guard = guards.find(item => item.id === 'capacity-forecast');
+    expect(guard, file).toBeDefined();
+    expect(guard.command).toContain('coverage run --branch -m unittest');
+    expect(guard.command).toContain('scripts.tests.test_capacity_forecast');
+    expect(guard.command).toContain('scripts.tests.test_neon_collector');
+    expect(guard.command).toContain('--fail-under=60');
+    expect(guard.command).toContain('python3 -m venv');
+    expect(guard.command).toContain(
+      '--require-hashes -r .github/requirements/pytest.txt'
+    );
+  }
+  expect(
+    selectSourceGuards('pull_request', ['docs/unrelated.md']).some(
+      item => item.id === 'capacity-forecast'
+    )
+  ).toBe(false);
+});
+
 it('selects writing readiness regressions and the evaluator coverage command', async () => {
   const names = [
     'CI_PRODUCT_LANES',
@@ -2436,6 +2462,7 @@ describe('source-read guard selection', () => {
     const all = SOURCE_GUARDS.map(guard => guard.id);
     // Manual dispatch runs web Unit Tests and structural, which carry the rest.
     expect(selected('workflow_dispatch', ['README.md'])).toEqual([
+      'capacity-forecast',
       'native-design-system',
       'artist-launch-contract',
       'privacy-input-route-trackers',
@@ -2457,6 +2484,7 @@ describe('source-read guard selection', () => {
     expect(selected('pull_request', null)).toEqual(all);
     expect(selected('pull_request', [])).toEqual(all);
     expect(selected('merge_group', null)).toEqual([
+      'capacity-forecast',
       'native-design-system',
       'artist-launch-contract',
       'privacy-input-route-trackers',
@@ -2478,6 +2506,25 @@ describe('source-read guard selection', () => {
 
   it('points every guard at a test file that exists', () => {
     for (const guard of SOURCE_GUARDS) {
+      if (guard.id === 'capacity-forecast') {
+        const modules = [
+          ...guard.command.matchAll(/scripts\.tests\.test_[a-z_]+/gu),
+        ].map(match => match[0]);
+        expect(modules).toEqual([
+          'scripts.tests.test_capacity_forecast',
+          'scripts.tests.test_neon_collector',
+        ]);
+        for (const module of modules) {
+          expect(
+            readFileSync(
+              join(REPO_ROOT, `${module.replaceAll('.', '/')}.py`),
+              'utf8'
+            ),
+            module
+          ).toContain('unittest.TestCase');
+        }
+        continue;
+      }
       if (guard.id === 'native-design-system') {
         expect(guard.command).toContain('native-design-system.mjs');
         expect(guard.command).toContain('native-spacing-scale.mjs');
