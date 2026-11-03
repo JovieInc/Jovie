@@ -419,3 +419,39 @@ person or agent arming auto-merge by hand). When a parent merges,
 the parent's squash-merged commits, then dispatches green enroll's per-PR path
 for it, so admission (green head, holds, draft) stays in the single queue
 writer. `QUEUE_FREEZE=1` stops that dispatch; the retarget and rebase still run.
+
+## Runner pool variables
+
+Control-plane and the cheap required `PR Ready` job read their pool from repo
+variables so a saturated hosted pool can be relieved without a PR. Unset means
+`ubuntu-latest`. Values are JSON:
+
+- `RUNNER_CONTROL_PLANE`: Green Enroll, Lane Fix Relay, PR Fleet Rules (fork PRs stay hosted) and PR targets main (non-merge-group events). Gem: `["self-hosted","Linux","X64","jovie-fixed"]`.
+- `RUNNER_READY`: the `PR Ready` job in Source Validation.
+
+- `RUNNER_SOURCE_VALIDATION`: the six Source Validation jobs except `PR Ready`. Fork PRs always stay on their hosted label. Gem has 5 slots (one job each) against Source Validation's ~26 average concurrent hosted jobs, so only flip this for a measured subset; compare per-job time before and after.
+
+Auto-Ready Drafts fleet controllers stay hosted to preserve their verified `gh` CLI contract.
+
+Fork PR Gate stays hosted: it handles untrusted fork events and must not run on persistent runners.
+Flip: `gh variable set RUNNER_CONTROL_PLANE --body '["self-hosted","Linux","X64","jovie-fixed"]'`; revert: `gh variable delete RUNNER_CONTROL_PLANE`.
+
+### Marketing priority
+
+Apply `priority:marketing` to a marketing-page PR and its ready Linear issue.
+Green Enroll considers labeled PRs first in reconciliation and uses the existing
+bounded jump and relabel-jump path. Marketing and `compounding` entries share
+`MAX_JUMPED`, `JUMP_MAX_BUILD_S` and `JUMP_BATCH_S`; an active build or cap can
+defer a jump. The label never clears a hold or substitutes for current-head checks.
+
+Symphony admits ready labeled Backlog issues through the existing bounded
+priority replacement and protects them from low-priority displacement. Signed
+Summer portfolio ranks and explicit Linear Urgent remain ahead; marketing
+precedes other eligible work. Removing the label restores ordinary ordering.
+The mesh board still orders stuck-PR repairs before detector issues and goals;
+it does not interpret arbitrary task text as a priority grant. Existing admission
+timestamps and Green Enroll decision receipts measure the effect.
+
+Ship now: reuse the existing priority paths. Re-evaluate when marketing is
+cleared or jump-reset receipts show lost throughput. Then remove the label or
+adjust the existing bounded policy with measured evidence, retaining every gate.

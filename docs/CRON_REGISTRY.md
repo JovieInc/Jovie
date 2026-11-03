@@ -161,6 +161,7 @@ Source: `apps/web/app/api/cron/frequent/route.ts`
 | 9 | aiCrawlerAnalytics | Every day | Syncs Cloudflare zone AI-crawl analytics into `ai_crawler_analytics_snapshots` per artist profile when configured |
 | 10 | releaseOutcomeReconciliation | Every day | Reconciles bounded release-workflow outcome snapshots and fails visibly on partial errors |
 | 11 | founderReviewUploadLeases | Every day | Deletes expired private founder-review uploads that never bound to a receipt; quarantines and reports cleanup failures |
+| 11c | legacyClaimSweep | Every day, only with `FEATURE_CLAIM_LEGACY_PROOF_SWEEP=true` | Grandfathered (legacy) claims: stamps the 30-day nudge stage once, then reopens 50k+ claims past the window as proof-only requests (page private) with a review card. Bounded to 200 rows per run; idempotent |
 | 12 | dataRetention | **Sundays only** | Heavy: purges old analytics, click events, audience members, pixel events, webhook events, audit logs, chat messages, ingestion jobs per retention policy |
 
 > **Note:** `scheduleNotifications` was previously listed here but has been called directly from `/api/cron/frequent` for sub-hourly scheduling. It is NOT a daily-maintenance sub-job. See AUTOMATION_AUDIT.md for rationale.

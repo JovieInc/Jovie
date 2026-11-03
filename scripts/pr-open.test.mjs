@@ -252,7 +252,7 @@ test('Vitest logs become literal FAIL evidence accepted by Fleet Rules', () => {
   assert.throws(() => redOutput('All 3 tests passed'), /no failure evidence/);
 });
 
-test('refresh forces two edits and confirms new runs, never stale reruns', async () => {
+test('refresh edits once when the body changed and never requests stale reruns', async () => {
   const pr = targetPr(42);
   const edits = [],
     output = [];
@@ -278,8 +278,9 @@ test('refresh forces two edits and confirms new runs, never stale reruns', async
     pause: async () => {},
     log: x => output.push(x),
   });
-  assert.match(edits[0], /pr-open-refresh/);
-  assert.equal(edits[1], 'final body');
+  // The body changed, so a single PATCH carries the exact final body and
+  // fires exactly one edited event (JOV-10354: one flight per update).
+  assert.deepEqual(edits, ['final body']);
   assert.equal(output.length, 2);
   assert.match(output[0], /runs\/3/);
   await assert.rejects(
@@ -292,6 +293,33 @@ test('refresh forces two edits and confirms new runs, never stale reruns', async
     }),
     /not confirmed/
   );
+});
+
+test('a byte-identical update still forces a fresh event with the marker round-trip', async () => {
+  const pr = targetPr(42);
+  const edits = [];
+  let reads = 0;
+  const github = (_cwd, args) => {
+    if (!args.includes('PATCH'))
+      return ok({
+        workflow_runs: reads++ < 2 ? freshRuns(pr, 1) : freshRuns(pr, 3),
+      });
+    edits.push(
+      JSON.parse(readFileSync(args[args.indexOf('--input') + 1], 'utf8')).body
+    );
+    return okText('');
+  };
+  await refreshBodyChecks('.', pr, pr.body, pr.title, {
+    github,
+    pause: async () => {},
+    log: () => {},
+  });
+  // GitHub emits no edited event for an identical body: the marker mutation
+  // is the only way to request fresh checks, and the second edit restores
+  // the exact final body.
+  assert.equal(edits.length, 2);
+  assert.match(edits[0], /pr-open-refresh/);
+  assert.equal(edits[1], pr.body);
 });
 
 test('update N always drafts from PR N diff and title, even in another checkout', async () => {
@@ -323,10 +351,12 @@ test('update N always drafts from PR N diff and title, even in another checkout'
     pause: async () => {},
   });
   assert.equal(code, 0, out.join('\n'));
-  assert.equal(edits.length, 2);
-  assert.match(edits[1], /Changes: apps\/web\/lib\/target/);
-  assert.match(edits[1], /pr-open-target: JovieInc\/Jovie#42/);
-  assert.doesNotMatch(edits[1], /unrelated checkout|pull\/99/);
+  // The drafted body differs from the live one, so the update emits exactly
+  // one PATCH (one edited event, one Source Validation flight; JOV-10354).
+  assert.equal(edits.length, 1);
+  assert.match(edits[0], /Changes: apps\/web\/lib\/target/);
+  assert.match(edits[0], /pr-open-target: JovieInc\/Jovie#42/);
+  assert.doesNotMatch(edits[0], /unrelated checkout|pull\/99/);
 });
 
 test('update rejects swapped bodies and missing identity before any edit', async () => {
@@ -467,6 +497,53 @@ function localRepo() {
     cleanup: () => rmSync(repo, { recursive: true, force: true }),
   };
 }
+
+test('new PR checks use remote main when local main is stale', async () => {
+  const { repo, cleanup } = localRepo();
+  const bodyDir = mkdtempSync(path.join(tmpdir(), 'pr-open-remote-base-'));
+  const bodyFile = path.join(bodyDir, 'body.md');
+  const git = args =>
+    execFileSync('git', args, { cwd: repo, encoding: 'utf8' });
+  try {
+    git(['checkout', '-b', 'feature']);
+    git(['branch', '-f', 'main', 'origin/main']);
+    writeFileSync(path.join(repo, 'unrelated-baseline.json'), '{}\n');
+    git(['add', '.']);
+    git(['commit', '-m', 'chore: upstream baseline']);
+    git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    writeFileSync(path.join(repo, 'new.txt'), 'feature\n');
+    git(['add', '.']);
+    git(['commit', '-m', 'chore: feature']);
+    writeFileSync(
+      bodyFile,
+      draftBody({
+        title: 'chore(ci): feature',
+        files: [file('new.txt')],
+        summary: 'Checks the feature against current remote main.',
+      })
+    );
+    const output = [];
+    const code = await main(
+      ['check', '--repo', repo, '--body-file', bodyFile],
+      line => output.push(line),
+      {
+        execute: (command, args) =>
+          command === 'git' && args[0] !== 'show'
+            ? okText(git(args))
+            : fakeDiffRunner(command, args),
+      }
+    );
+    assert.equal(code, 0, output.join('\n'));
+    assert.doesNotMatch(output.join('\n'), /locked-areas/);
+    assert.notEqual(
+      git(['rev-parse', 'main']),
+      git(['rev-parse', 'origin/main'])
+    );
+  } finally {
+    cleanup();
+    rmSync(bodyDir, { recursive: true, force: true });
+  }
+});
 
 test('check reports lane-map waiting as pending without a failure', async () => {
   const pr = targetPr(42);

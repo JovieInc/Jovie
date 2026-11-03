@@ -35,7 +35,7 @@ function RecoveryFixture() {
           type: 'text-delta',
           id,
           delta: first
-            ? 'UNMARKED is confirmed. Choose your profile handle.'
+            ? 'Found UNMARKED on Spotify: 100 followers. Confirm the handle for this page below.'
             : 'Checking your profile handle.',
         },
         { type: 'text-end', id },
@@ -64,6 +64,30 @@ function RecoveryFixture() {
                 summary: 'Checking @unmarked.',
               },
         },
+        // JOV-10168: the confirm-artist turn ships the checkHandle card in
+        // the same turn as the confirm output (the route's
+        // turnFromArtistConfirmation event order), so the preview artist has
+        // a real handle and the rail renders — never the fabricated
+        // jov.ie/your-handle placeholder (JOV-10169).
+        ...(first
+          ? [
+              {
+                type: 'tool-input-available',
+                toolCallId: `${id}-handle`,
+                toolName: 'checkHandle',
+                input: { handle: 'unmarked' },
+              },
+              {
+                type: 'tool-output-available',
+                toolCallId: `${id}-handle`,
+                output: {
+                  action: 'check_handle',
+                  handle: 'unmarked',
+                  summary: 'Checking @unmarked.',
+                },
+              },
+            ]
+          : []),
         { type: 'finish-step' },
         { type: 'finish', finishReason: 'stop' },
       ];

@@ -27,6 +27,7 @@
  *   CI_FAST_ONLY_STRUCTURAL — "true" to run only the structural lane
  *   CI_FAST_FAIL_FAST — "false" to run every selected lane even after a failure
  *   CI_FAST_STRUCTURAL_CONCURRENCY — structural commands run at once (default 3)
+ *   CI_FAST_STRUCTURAL_LANES — only|skip the lanes coverage pytest (its own job)
  *   CI_FAST_STRUCTURAL_ABORT_STATUS_FILE — background cheap-lane exit status;
  *     non-zero stops starting structural commands (fail-fast)
  */
@@ -159,9 +160,11 @@ export const LANES_SELFTEST_CHANGED_TESTS_SCRIPT = [
   'git worktree add -q --detach "$t/wt" HEAD',
   'trap \'git worktree remove --force "$t/wt" >/dev/null 2>&1 || true; rm -rf "$t"\' EXIT',
   'cd "$t/wt"',
-  'git fetch -q --no-tags origin "$B" || true',
-  'git -c user.name=ci -c user.email=ci@invalid merge -q --no-edit "origin/$B" >/dev/null 2>&1 || { echo "merge with base conflicts; skipped"; exit 0; }',
-  'files="$(git diff --name-only "origin/$B" HEAD)"',
+  'git fetch -q --no-tags origin "$B"',
+  'base="$(git rev-parse --verify "FETCH_HEAD^{commit}")"',
+  // Inspect the merged tree without creating a commit or requiring dependency-backed commit hooks.
+  'git -c user.name=ci -c user.email=ci@invalid merge --no-commit --no-ff --quiet "$base" || { merge_status=$?; conflicts="$(git diff --name-only --diff-filter=U)"; if [ -n "$conflicts" ]; then echo "merge with base conflicts: $conflicts" >&2; else echo "merge with base failed (status $merge_status)" >&2; fi; exit "$merge_status"; }',
+  'files="$(git diff --name-only "$base" --)"',
   'cand=""',
   // The qualification guard pins the sha256 of scripts/tests/test_disk_guard.py; editing that fixture without
   // adding its hash ejected seven merge groups and six bystanders (#23280, 2026-10-25), so run its pinning test.
@@ -201,6 +204,17 @@ export const LANES_SELFTEST_CHANGED_TESTS_SCRIPT = [
 ].join('; ');
 
 export const SOURCE_GUARDS = Object.freeze([
+  Object.freeze({
+    id: 'capacity-forecast',
+    command: [
+      'capacity_python=python3',
+      'if ! python3 -c "import coverage" 2>/dev/null; then capacity_env="$(mktemp -d "${RUNNER_TEMP:-/tmp}/jovie-capacity-python.XXXXXX")" && python3 -m venv "$capacity_env" && "$capacity_env/bin/python" -m pip install --quiet --require-hashes -r .github/requirements/pytest.txt || exit 1; capacity_python="$capacity_env/bin/python"; fi',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-capacity-forecast.coverage" "$capacity_python" -m coverage run --branch -m unittest scripts.tests.test_capacity_forecast scripts.tests.test_neon_collector && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-capacity-forecast.coverage" "$capacity_python" -m coverage report --include="*/scripts/capacity/forecast.py" --show-missing --fail-under=60',
+    ].join('; '),
+    inputs:
+      /^(?:scripts\/capacity\/forecast\.py|scripts\/tests\/test_(?:capacity_forecast|neon_collector)\.py|ops\/registry\/capacity-resources\.json|scripts\/ci-fast-lanes\.mjs)$/u,
+    prOnly: false,
+  }),
   Object.freeze({
     id: 'native-design-system',
     command:
@@ -373,7 +387,7 @@ export const SOURCE_GUARDS = Object.freeze([
     command:
       'node scripts/anti-slop/run.mjs validate && node --test --test-isolation=none scripts/anti-slop/anti-slop.test.mjs',
     inputs:
-      /^(?:docs\/|scripts\/(?:anti-slop\/|invariants\/|design-frontend-skill-check|ci-fast-lanes\.mjs$)|packages\/copy\/|\.github\/workflows\/source-validation\.yml$|\.claude\/(?:skills|rules)\/|\.agents\/skills\/|canon\/[^/]*\.md$|package\.json$|CLAUDE\.md$|AGENTS\.md$)/u,
+      /^(?:apps\/web\/(?:components\/shell\/|app\/.*\/settings\/)|docs\/|scripts\/(?:anti-slop\/|invariants\/|design-frontend-skill-check|ci-fast-lanes\.mjs$)|packages\/copy\/|\.github\/workflows\/source-validation\.yml$|\.claude\/(?:skills|rules)\/|\.agents\/skills\/|canon\/[^/]*\.md$|package\.json$|CLAUDE\.md$|AGENTS\.md$)/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -511,7 +525,7 @@ export const SOURCE_GUARDS = Object.freeze([
     command: `bash -c ${shellQuote(LANES_SELFTEST_CHANGED_TESTS_SCRIPT)}`,
     // Candidate roots only; the command intersects changed paths with RELEASE_EXTRAS.
     inputs:
-      /^(?:scripts\/|packages\/|ops\/registry\/|\.nvmrc$|pnpm-lock\.yaml$)/u,
+      /^(?:scripts\/|packages\/|ops\/registry\/|\.nvmrc$|pnpm-lock\.yaml$|apps\/web\/lib\/ai\/routing\.json$)/u,
     prOnly: true,
   }),
   Object.freeze({
@@ -727,6 +741,7 @@ export const STRUCTURAL_PYTEST_FILES = Object.freeze([
   'scripts/tests/test_runner_routing.py',
   'scripts/tests/test_signal_watch.py',
   'scripts/tests/test_x_grok.py',
+  'scripts/tests/test_pr_remediation_swarm.py',
 ]);
 
 /**
@@ -779,7 +794,7 @@ export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
 
 /** Files of the lanes coverage suite (one coverage map, sharded below). */
 export const LANES_PYTEST_FILES = Object.freeze(
-  'scripts/tests/test_factory_signals.py scripts/tests/test_factory_intake.py scripts/tests/test_backlog_admission.py scripts/tests/test_backlog_writer_guard.py scripts/tests/test_capacity_limit.py scripts/tests/test_claude_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_conftest_host_isolation.py scripts/tests/test_continuity_clock.py scripts/tests/test_design_gate.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_doctor.py scripts/tests/test_epics.py scripts/tests/test_execution_attempt.py scripts/tests/test_gh_app_token.py scripts/tests/test_hud.py scripts/tests/test_hyperagent_cli.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_lane_runner.py scripts/tests/test_model_families.py scripts/tests/test_model_radar.py scripts/tests/test_pr_events.py scripts/tests/test_qualification_guard.py scripts/tests/test_reason_lane.py scripts/tests/test_remediation.py scripts/tests/test_service_census.py scripts/tests/test_shipping_attribution.py scripts/tests/test_shipping_origin.py scripts/tests/test_telegram_archive.py scripts/tests/test_worktree_pool.py scripts/tests/test_worktree_sweep.py'.split(
+  'scripts/tests/test_factory_signals.py scripts/tests/test_factory_intake.py scripts/tests/test_backlog_admission.py scripts/tests/test_backlog_writer_guard.py scripts/tests/test_board_intake.py scripts/tests/test_capacity_limit.py scripts/tests/test_claude_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_conftest_host_isolation.py scripts/tests/test_continuity_clock.py scripts/tests/test_design_gate.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_doctor.py scripts/tests/test_epics.py scripts/tests/test_execution_attempt.py scripts/tests/test_gh_app_token.py scripts/tests/test_hud.py scripts/tests/test_hyperagent_cli.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_lane_runner.py scripts/tests/test_model_families.py scripts/tests/test_model_radar.py scripts/tests/test_pr_events.py scripts/tests/test_priority_admission.py scripts/tests/test_qualification_guard.py scripts/tests/test_reason_lane.py scripts/tests/test_remediation.py scripts/tests/test_service_census.py scripts/tests/test_shipping_attribution.py scripts/tests/test_shipping_origin.py scripts/tests/test_telegram_archive.py scripts/tests/test_worktree_pool.py scripts/tests/test_worktree_sweep.py'.split(
     ' '
   )
 );
@@ -879,37 +894,44 @@ export const API_CLIENT_PY_COMMAND = structuralPythonRegression(
   'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-apiclient.coverage" python3 -m coverage run --branch --include="*/scripts/apiclient/*" -m pytest scripts/tests/test_apiclient.py scripts/tests/test_apiclient_adapters.py scripts/tests/test_apiclient_conformance.py scripts/tests/test_apiclient_pricing.py -q -p no:cacheprovider --basetemp="${RUNNER_TEMP:-/tmp}/jovie-apiclient-pytest" && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-apiclient.coverage" python3 -m coverage report --fail-under=85'
 );
 
-export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
-  structuralPythonRegression(
-    [
-      LANES_COVERAGE_RUN,
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/backlog_admission.py" --fail-under=90',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/backlog_writer_guard.py" --fail-under=90',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/hud.py" --fail-under=80',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/capacity_limit.py" --fail-under=90',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/qualification_guard.py" --fail-under=85',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/gbrain_catalog.py,*/scripts/lanes/design_gate.py,*/scripts/lanes/doctor.py,*/scripts/lanes/disk_guard.py,*/scripts/lanes/continuity_clock.py" --fail-under=85',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/hyperagent/*.py" --fail-under=90',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/hyperagent_lane.py" --fail-under=95',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/devin_free_policy.py" --fail-under=85',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/claude_lane.py" --fail-under=95',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/codex_lane.py" --fail-under=85',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/worktree_sweep.py" --fail-under=85',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/service_census.py" --fail-under=85',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/epics.py" --fail-under=90',
+// Run the CPU-heavy coverage shards alone; keep every main-branch floor.
+export const LANES_COVERAGE_COMMAND = structuralPythonRegression(
+  [
+    LANES_COVERAGE_RUN,
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/backlog_admission.py" --fail-under=90',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/priority_admission.py" --fail-under=80',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/backlog_writer_guard.py" --fail-under=90',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/board_intake.py" --fail-under=85',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/hud.py" --fail-under=80',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/capacity_limit.py" --fail-under=90',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/qualification_guard.py" --fail-under=85',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/gbrain_catalog.py,*/scripts/lanes/design_gate.py,*/scripts/lanes/doctor.py,*/scripts/lanes/disk_guard.py,*/scripts/lanes/continuity_clock.py" --fail-under=85',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/hyperagent/*.py" --fail-under=90',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/hyperagent_lane.py" --fail-under=95',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/devin_free_policy.py" --fail-under=85',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/claude_lane.py" --fail-under=95',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/codex_lane.py" --fail-under=85',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/worktree_sweep.py" --fail-under=85',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/service_census.py" --fail-under=85',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/epics.py" --fail-under=90',
 
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/execution_attempt.py" --fail-under=85',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/merge_evidence.py" --fail-under=85',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/worktree_pool.py" --fail-under=85',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/dependency_diff.py" --fail-under=95',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/remediation.py" --fail-under=85',
-      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/model_radar.py" --fail-under=90',
-    ].join(' && ')
-  ),
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/execution_attempt.py" --fail-under=85',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/merge_evidence.py" --fail-under=85',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/worktree_pool.py" --fail-under=85',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/dependency_diff.py" --fail-under=95',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/remediation.py" --fail-under=85',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/model_radar.py" --fail-under=90',
+  ].join(' && ')
+);
+
+export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
+  LANES_COVERAGE_COMMAND,
   ...STRUCTURAL_PYTEST_PARTS,
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/runner-pool-routing.test.mjs',
+  'scripts/sentry-build-config.test.mjs',
   'scripts/lib/__tests__/spend-guard.test.mjs',
   'scripts/lib/__tests__/wins-ledger.test.mjs',
   'scripts/lib/__tests__/wins-store.test.mjs',
@@ -976,6 +998,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/evals/summer-ops-card-copy.test.mjs',
   'scripts/buyer-eval/buyer-eval.test.mjs',
   'scripts/buyer-eval/gate.test.mjs',
+  'scripts/golden-path-walk/latency-gate.test.mjs',
   'scripts/positioning/positioning.test.mjs',
   'scripts/funnel-judge/preview-gate.test.mjs',
   'scripts/funnel-judge/proof-gate.test.mjs',
@@ -1087,6 +1110,7 @@ export const SCRIPT_CONTRACT_NODE_COMMAND = `${PR_OPEN_COVERAGE_COMMAND} && ${DE
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
+  'scripts/lib/__tests__/gh-api-hold-retry.test.mjs',
   'scripts/lib/__tests__/prod-cert.test.mjs',
   'scripts/lib/__tests__/self-hosted-workspace-reset-contract.test.mjs',
   'scripts/lib/__tests__/ci-timing-collector.test.mjs',
@@ -1149,6 +1173,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/flaky-test-filing.test.mjs',
   'scripts/lib/__tests__/gbrain-pool-env.test.mjs',
   'scripts/lib/__tests__/github-installation-quota.test.mjs',
+  'scripts/lib/__tests__/main-red-eject-quota-failover.test.mjs',
   'scripts/lib/__tests__/github-rate-limit.test.mjs',
   'scripts/lib/__tests__/help-center-recertification-workflow.test.mjs',
   'scripts/lib/__tests__/isolated-ui-docs-policy.test.mjs',
@@ -1168,11 +1193,6 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/postdeploy-probes-workflow.test.mjs',
   'scripts/lib/__tests__/pr-preparation-safety.test.mjs',
   'scripts/lib/__tests__/production-environment-secrets.test.mjs',
-  'scripts/lib/__tests__/pr-review-workflow.test.mjs',
-  'scripts/lib/__tests__/pr-review-contracts.test.mjs',
-  'scripts/lib/__tests__/pr-review-kernel.test.mjs',
-  'scripts/lib/__tests__/pr-review-learn.test.mjs',
-  'scripts/lib/__tests__/pr-review-rank.test.mjs',
   'scripts/lib/__tests__/pr-size-guard-base-tip.test.mjs',
   'scripts/lib/__tests__/pr-size-guard-label-override.test.mjs',
   'scripts/lib/__tests__/pr-size-exclusions.test.mjs',
@@ -1235,6 +1255,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/visual-snapshot-compare.test.mjs',
   'scripts/lib/__tests__/web-test-selectors.test.mjs',
   'scripts/lib/__tests__/web-vitest-fast-runner.test.mjs',
+  'scripts/lib/__tests__/ci-unit-selection.test.mjs',
   'scripts/lib/__tests__/merge-group-fail-fast.test.mjs',
   'scripts/lib/__tests__/merge-group-local-evidence.test.mjs',
   'scripts/lib/__tests__/merge-group-token-budget.test.mjs',
@@ -1254,6 +1275,8 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/verify-patched-dependencies.test.mjs',
   'scripts/lib/__tests__/incident-dedupe.test.mjs',
   'scripts/lib/__tests__/ci-capacity.test.mjs',
+  'scripts/lib/__tests__/merge-queue-speed.test.mjs',
+  'scripts/lib/__tests__/source-qualification-receipt.test.mjs',
 ]);
 export const MESH_HOST_ACK_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-host-ack.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-host-ack.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-host-ack-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=99 --coverage.thresholds.statements=99 --coverage.thresholds.branches=90 --coverage.thresholds.functions=100';
@@ -3147,6 +3170,8 @@ export async function runStructural(opts = {}) {
   delete process.env.CI_FAST_STRUCTURAL_PYTEST;
   const webMode = process.env.CI_FAST_STRUCTURAL_WEB;
   delete process.env.CI_FAST_STRUCTURAL_WEB;
+  const lanesMode = process.env.CI_FAST_STRUCTURAL_LANES;
+  delete process.env.CI_FAST_STRUCTURAL_LANES;
   // Same for the fail-fast status file: the runner's own contract suite runs
   // runStructural and must not abort on this job's cheap-lane status.
   const abortStatusFile = process.env.CI_FAST_STRUCTURAL_ABORT_STATUS_FILE;
@@ -3160,7 +3185,8 @@ export async function runStructural(opts = {}) {
   const parts = allParts.filter(
     part =>
       mode !== (STRUCTURAL_PYTHON_JOB_PARTS.has(part) ? 'skip' : 'only') &&
-      webMode !== (webJobParts.has(part) ? 'skip' : 'only')
+      webMode !== (webJobParts.has(part) ? 'skip' : 'only') &&
+      lanesMode !== (part === LANES_COVERAGE_COMMAND ? 'skip' : 'only')
   );
   if (parts.length === 0) {
     return {
