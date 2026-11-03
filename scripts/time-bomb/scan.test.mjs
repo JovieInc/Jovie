@@ -174,12 +174,18 @@ test('parses run and file commands', () => {
 
 test('research is a named suite in the CLI and scheduled discovery matrix', () => {
   assert.equal(parseArgs(['run', '--suite', 'research']).suite, 'research');
-  const workflow = load(
-    readFileSync(
-      new URL('../../.github/workflows/remediation-sweep.yml', import.meta.url),
-      'utf8'
-    )
-  );
+  const workflow =
+    /** @type {{ jobs: { 'time-bombs': { strategy: { matrix: { include: Array<{ suite: string, shard: string }> } }, steps: Array<{ name?: string, run?: string }> } } }} */ (
+      load(
+        readFileSync(
+          new URL(
+            '../../.github/workflows/remediation-sweep.yml',
+            import.meta.url
+          ),
+          'utf8'
+        )
+      )
+    );
   const job = workflow.jobs['time-bombs'];
   assert.deepEqual(
     job.strategy.matrix.include.filter(row => row.suite === 'research'),
