@@ -5,19 +5,11 @@ import { ExternalLink, PanelRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { ArtistRulesSheet } from '@/app/app/(shell)/library/ArtistRulesSheet';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { ArtistProfileRailToggle } from '@/components/shell/ArtistProfileRailToggle';
-import { SettingsPaySection } from '@/features/dashboard/organisms/SettingsPaySection';
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
 import { SettingsProfileSection } from '@/features/dashboard/organisms/settings-profile-section';
-import {
-  ShopifyStoreCard,
-  ShopifyStoreCardSkeleton,
-} from '@/features/dashboard/organisms/shopify/ShopifyStoreCard';
 import { useSettingsContext } from '@/features/dashboard/organisms/useSettingsContext';
-import type { ArtistRuleView } from '@/lib/artist-rules/types';
-import { SettingsRiderSection } from './SettingsRiderSection';
 
 function MobileProfilePanelTrigger() {
   const { isOpen, open } = usePreviewPanelState();
@@ -70,15 +62,7 @@ function CompanionRailReservation() {
   );
 }
 
-export function ArtistProfileContent({
-  creatorProfileId = 'unavailable',
-  initialArtistRules = [],
-  defaultRulesOpen = false,
-}: {
-  readonly creatorProfileId?: string;
-  readonly initialArtistRules?: readonly ArtistRuleView[];
-  readonly defaultRulesOpen?: boolean;
-} = {}) {
+export function ArtistProfileContent() {
   const router = useRouter();
   const { artist, setArtist, avatarQuality } = useSettingsContext();
 
@@ -106,17 +90,6 @@ export function ArtistProfileContent({
                 <Skeleton key={index} className='h-10 w-full' rounded='lg' />
               ))}
             </SettingsPanel>
-            <SettingsPanel
-              title='Payments'
-              description='Let fans support you directly from your profile.'
-              bodyClassName='space-y-3 px-4 py-4 sm:px-5'
-            >
-              <Skeleton className='h-6 w-28' rounded='full' />
-              <Skeleton className='h-4 w-full' rounded='md' />
-              <Skeleton className='h-4 w-3/4' rounded='md' />
-              <Skeleton className='h-8 w-60' rounded='lg' />
-            </SettingsPanel>
-            <ShopifyStoreCardSkeleton />
           </div>
         </SettingsSection>
         <Skeleton
@@ -162,25 +135,6 @@ export function ArtistProfileContent({
             onArtistUpdate={setArtist}
             onRefresh={() => router.refresh()}
           />
-          <SettingsPaySection />
-          <ShopifyStoreCard />
-          <SettingsRiderSection
-            profileId={artist.id}
-            username={artist.handle}
-          />
-          <SettingsPanel
-            title='Artist Rules'
-            description='Confirmed rules guide every draft. Memory can suggest a rule, but it cannot activate one.'
-            bodyClassName='px-4 py-4 sm:px-5'
-          >
-            <div id='artist-rules'>
-              <ArtistRulesSheet
-                creatorProfileId={creatorProfileId}
-                initialRules={initialArtistRules}
-                defaultOpen={defaultRulesOpen}
-              />
-            </div>
-          </SettingsPanel>
         </div>
       </SettingsSection>
       <MobileProfilePanelTrigger />

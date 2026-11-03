@@ -35,7 +35,6 @@ import { PageShell } from '@/components/organisms/PageShell';
 import { BASE_URL } from '@/constants/domains';
 import { CopyToClipboardButton } from '@/features/dashboard/molecules/CopyToClipboardButton';
 import { EarningsTab } from '@/features/dashboard/organisms/EarningsTab';
-import { ShopifyStoreCard } from '@/features/dashboard/organisms/shopify/ShopifyStoreCard';
 import { useDashboardPay } from './useDashboardPay';
 import { formatCount } from './utils';
 
@@ -467,8 +466,6 @@ export function DashboardPay() {
               <EarningsTab />
             </>
           )}
-
-          <ShopifyStoreCard />
         </div>
       </PageShell>
 

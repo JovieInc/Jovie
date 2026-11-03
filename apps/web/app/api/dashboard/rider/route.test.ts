@@ -19,6 +19,11 @@ vi.mock('@/lib/db', () => ({
 }));
 
 vi.mock('@/lib/auth/cached', () => ({ getCachedAuth: hoisted.getCachedAuth }));
+// Exercise retained route behavior after launch promotion. The real deferred
+// boundary is covered in tests/unit/launch/launch-enforcement.test.ts.
+vi.mock('@/lib/launch/launch-enforcement', () => ({
+  deferredLaunchRefusal: () => null,
+}));
 vi.mock('@/lib/auth/profile-access', () => ({
   getExactProfileAccess: hoisted.getExactProfileAccess,
   isCanonicalUuid: (v: unknown) =>

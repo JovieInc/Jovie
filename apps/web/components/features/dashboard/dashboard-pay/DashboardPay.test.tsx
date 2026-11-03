@@ -34,12 +34,6 @@ vi.mock('@/features/dashboard/organisms/EarningsTab', () => ({
   EarningsTab: () => <div data-testid='earnings-tab'>Earnings tab content</div>,
 }));
 
-vi.mock('@/features/dashboard/organisms/shopify/ShopifyStoreCard', () => ({
-  ShopifyStoreCard: () => (
-    <div data-testid='shopify-store-card'>Shopify store card</div>
-  ),
-}));
-
 vi.mock('./useDashboardPay', () => ({
   useDashboardPay: () => mockUseDashboardPay(),
 }));
@@ -89,7 +83,8 @@ describe('DashboardPay', () => {
       screen.getByRole('button', { name: 'Connect Venmo' })
     ).toBeInTheDocument();
     expect(screen.queryByTestId('earnings-tab')).not.toBeInTheDocument();
-    expect(screen.getByTestId('shopify-store-card')).toBeInTheDocument();
+    // Deferred (C) launch controls stay off the pay surface (JOV-8505).
+    expect(screen.queryByTestId('shopify-store-card')).not.toBeInTheDocument();
   });
 
   it('renders bounded earnings metrics and pay link when Venmo is connected', () => {
