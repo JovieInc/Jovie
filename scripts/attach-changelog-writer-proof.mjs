@@ -150,7 +150,13 @@ function gh(args) {
   return result.stdout;
 }
 
-function main(argv) {
+export function main(
+  argv,
+  {
+    github = gh,
+    repository = process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie',
+  } = {}
+) {
   const flags = {};
   for (let index = 2; index < argv.length; index += 1) {
     if (!argv[index].startsWith('--')) continue;
@@ -161,9 +167,17 @@ function main(argv) {
   }
   const prNumber = Number.parseInt(String(flags.pr ?? ''), 10);
   const headSha = String(flags.head ?? '').toLowerCase();
-  const repository = process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
-
-  const pr = JSON.parse(gh(['api', `repos/${repository}/pulls/${prNumber}`]));
+  const pr = JSON.parse(
+    github(['api', `repos/${repository}/pulls/${prNumber}`])
+  );
+  // Never attest the supplied commit if the release branch advanced. Check
+  // before even accepting an existing receipt for that earlier commit.
+  if (String(pr.head?.sha ?? '').toLowerCase() !== headSha) {
+    console.error(
+      `Refusing to attach a changelog writer proof to #${prNumber}: head-mismatch`
+    );
+    return 1;
+  }
   const authorLogin = pr.user?.login ?? '';
   const body = pr.body ?? '';
   const branch = pr.head?.ref ?? '';
@@ -219,7 +233,7 @@ function main(argv) {
     );
     return 0;
   }
-  gh([
+  github([
     'api',
     '-X',
     'PATCH',

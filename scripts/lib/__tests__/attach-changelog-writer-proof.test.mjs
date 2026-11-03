@@ -1,9 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { load } from 'js-yaml';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   attachReceiptToReleaseBody,
   buildChangelogWriterProofReceipt,
   CHANGELOG_PR_BODY_MARKER,
+  main,
   RELEASE_PR_WRITER_EVIDENCE,
   releasePrEligibleForWriterProof,
 } from '../../attach-changelog-writer-proof.mjs';
@@ -185,4 +189,129 @@ describe('changelog release PR writer proof (JOV-10216)', () => {
       releasePrEligibleForWriterProof({ ...base, prNumber: 0 })
     ).toMatchObject({ eligible: false, reason: 'pr-unavailable' });
   });
+});
+
+describe('publisher writer-proof execution', () => {
+  const argv = [
+    'node',
+    'attach-proof',
+    '--pr',
+    String(PR_NUMBER),
+    '--head',
+    HEAD,
+  ];
+  const pullRequest = (headSha = HEAD, body = PUBLISHER_BODY) => ({
+    user: { login: WRITER },
+    head: { ref: 'release/daily-changelog-2026-11-01-run-1', sha: headSha },
+    body,
+  });
+
+  it('attaches a receipt for the live release PR head', () => {
+    const github = vi.fn(args =>
+      args.includes('PATCH') ? '{}' : JSON.stringify(pullRequest())
+    );
+    expect(main(argv, { github, repository: 'JovieInc/Jovie' })).toBe(0);
+    expect(github).toHaveBeenCalledTimes(2);
+    const patch = github.mock.calls[1][0];
+    expect(patch.slice(0, 4)).toEqual([
+      'api',
+      '-X',
+      'PATCH',
+      `repos/JovieInc/Jovie/pulls/${PR_NUMBER}`,
+    ]);
+    const body = patch[5].slice('body='.length);
+    expect(classifyAutoReadyPromotion(greenSourceInput(body))).toMatchObject({
+      eligible: true,
+      reason: 'writer-proof-complete',
+    });
+  });
+
+  it.each(['missing', 'stale', 'stale-with-receipt'])(
+    'refuses a %s live head without writing a receipt',
+    state => {
+      const body =
+        state === 'stale-with-receipt'
+          ? attachReceiptToReleaseBody({
+              body: PUBLISHER_BODY,
+              prNumber: PR_NUMBER,
+              headSha: HEAD,
+              writerLogin: WRITER,
+            }).body
+          : PUBLISHER_BODY;
+      const pr = pullRequest(OTHER_HEAD, body);
+      if (state === 'missing') delete pr.head.sha;
+      const github = vi.fn(() => JSON.stringify(pr));
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        expect(main(argv, { github, repository: 'JovieInc/Jovie' })).toBe(1);
+        expect(github).toHaveBeenCalledTimes(1);
+        expect(error).toHaveBeenCalledWith(
+          expect.stringContaining('head-mismatch')
+        );
+      } finally {
+        error.mockRestore();
+      }
+    }
+  );
+
+  it('does not rewrite an existing receipt at the live head', () => {
+    const { body } = attachReceiptToReleaseBody({
+      body: PUBLISHER_BODY,
+      prNumber: PR_NUMBER,
+      headSha: HEAD,
+      writerLogin: WRITER,
+    });
+    const github = vi.fn(() => JSON.stringify(pullRequest(HEAD, body)));
+    expect(main(argv, { github, repository: 'JovieInc/Jovie' })).toBe(0);
+    expect(github).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([0, 1])(
+    'the publisher passes its exact PR and commit and preserves helper exit %s',
+    helperExit => {
+      const workflow = load(
+        readFileSync(
+          new URL(
+            '../../../.github/workflows/production-controller.yml',
+            import.meta.url
+          ),
+          'utf8'
+        )
+      );
+      const publish = workflow.jobs['publish-customer-changelog'].steps.find(
+        step => step.run?.includes('gh pr create --draft')
+      ).run;
+      const start = publish.indexOf('gh pr create --draft');
+      const end = publish.indexOf('python3 scripts/shipping_origin.py', start);
+      const script = publish.slice(start, end);
+      const result = spawnSync(
+        'bash',
+        [
+          '-euc',
+          `
+      branch=release/daily-changelog-test
+      RUNNER_TEMP=/tmp
+      gh() {
+        if [ "$1 $2" = 'pr create' ]; then echo created-draft >&2;
+        elif [ "$1 $2" = 'pr view' ]; then echo ${PR_NUMBER};
+        else return 1; fi
+      }
+      git() { [ "$1 $2" = 'rev-parse HEAD' ] && echo ${HEAD}; }
+      node() { printf '%s\\n' "$@"; return ${helperExit}; }
+      ${script}
+    `,
+        ],
+        { encoding: 'utf8' }
+      );
+      expect(result.status, result.stderr).toBe(helperExit);
+      expect(result.stderr).toContain('created-draft');
+      expect(result.stdout.trim().split('\n')).toEqual([
+        'scripts/attach-changelog-writer-proof.mjs',
+        '--pr',
+        String(PR_NUMBER),
+        '--head',
+        HEAD,
+      ]);
+    }
+  );
 });
